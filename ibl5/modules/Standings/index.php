@@ -12,7 +12,8 @@ declare(strict_types=1);
  * @see \Standings\StandingsView For HTML rendering
  */
 
-if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (preg_match('/modules\.php/i', is_string($phpSelfGuard) ? $phpSelfGuard : '') !== 1) {
     die("You can't access this file directly...");
 }
 
@@ -29,7 +30,7 @@ if (!isset($mysqli_db)) {
 
 // Create repository and view instances
 $repository = new Standings\StandingsRepository($mysqli_db, $leagueContext);
-$season = new \Season\Season($mysqli_db, $leagueContext);
+$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
 
 if ($leagueContext !== null && $leagueContext->isOlympics()) {
     $realTeamIds = \League\OlympicsTeamFilter::getRealTeamIds($mysqli_db);

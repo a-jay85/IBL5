@@ -26,6 +26,21 @@ class ModuleRedirectTest extends TestCase
         $this->assertNull(ModuleRedirect::targetFor('votingresults'));
     }
 
+    public function testEveryTargetIsAnAppRelativeModulesUrl(): void
+    {
+        foreach (ModuleRedirect::TARGETS as $module => $target) {
+            $this->assertStringStartsWith('modules.php?name=', $target);
+            $this->assertStringNotContainsString('://', $target);
+            $this->assertStringStartsNotWith('//', $target);
+            $this->assertSame($target, ModuleRedirect::targetFor($module));
+        }
+    }
+
+    public function testUnknownModuleHasNoTarget(): void
+    {
+        $this->assertNull(ModuleRedirect::targetFor('NoSuchModule'));
+    }
+
     public function testPassthroughUrlIncludesWhitelistedParam(): void
     {
         $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => '5']);

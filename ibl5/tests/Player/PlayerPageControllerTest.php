@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Player;
 
 use Http\HttpRequest;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Player\Contracts\PlayerRepositoryInterface;
 use Player\PlayerPageController;
 use Player\PlayerPageService;
@@ -138,31 +139,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         ];
     }
 
-    public function testRenderPageReturnsHtmlForActivePlayer(): void
-    {
-        $html = $this->controller->renderPage(1, null, 'testuser');
-
-        $this->assertStringContainsString('Test Player', $html);
-        $this->assertStringContainsString('card-flip-container', $html);
-    }
-
-    public function testRenderPageFreeAgentUsesTeamZeroColorsOnEveryCard(): void
-    {
-        $this->seedInvariantQueries(0);
-        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
-        $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
-        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => '888888', 'color2' => 'cccccc']);
-
-        $html = $this->buildController()->renderPage(1, null, 'nobody');
-
-        // The trading card uses the same team-0 row (gray) as the menu and stats cards.
-        $this->assertStringContainsStringIgnoringCase('888888', $html);
-        $card = substr($html, (int) strpos($html, 'card-flip-container'), 600);
-        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#cccccc', $card);
-        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
-    }
-
-    public function testRenderPageOverviewForRetiredPlayer(): void
+    private function seedRetiredPlayer(): void
     {
         $retiredRow = array_merge($this->playerStatsRow(), ['retired' => 1]);
         $playerWithRetired = [
@@ -222,6 +199,35 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
         $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => 'D4AF37', 'color2' => '1e3a5f']);
+    }
+
+    public function testRenderPageReturnsHtmlForActivePlayer(): void
+    {
+        $html = $this->controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringContainsString('Test Player', $html);
+        $this->assertStringContainsString('card-flip-container', $html);
+    }
+
+    public function testRenderPageFreeAgentUsesTeamZeroColorsOnEveryCard(): void
+    {
+        $this->seedInvariantQueries(0);
+        $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $this->stubRepo->method('getTeamColorRow')->willReturn(['color1' => '888888', 'color2' => 'cccccc']);
+
+        $html = $this->buildController()->renderPage(1, null, 'nobody');
+
+        // The trading card uses the same team-0 row (gray) as the menu and stats cards.
+        $this->assertStringContainsStringIgnoringCase('888888', $html);
+        $card = substr($html, (int) strpos($html, 'card-flip-container'), 600);
+        $this->assertStringContainsStringIgnoringCase('--card-grad-start:#cccccc', $card);
+        $this->assertStringNotContainsStringIgnoringCase('--card-grad-start:#1e3a5f', $card);
+    }
+
+    public function testRenderPageOverviewForRetiredPlayer(): void
+    {
+        $this->seedRetiredPlayer();
 
         $controller = $this->buildController();
         $html = $controller->renderPage(1, null, 'nobody');
@@ -402,62 +408,8 @@ class PlayerPageControllerTest extends WideUnitTestCase
         // Mirror the retired-player mock setup from testRenderPageOverviewForRetiredPlayer
         // (line 137), then pass pageView=999 to reach the default-fallback block
         // at PlayerPageController.php line 265–273 (retired branch → Regular Season view).
-        $retiredRow = array_merge($this->playerStatsRow(), ['retired' => 1]);
-        $playerWithRetired = [
-            'pid' => 1, 'ordinal' => 1, 'name' => 'Retired Player', 'nickname' => null,
-            'age' => 40, 'teamid' => 0, 'pos' => 'SG',
-            'r_fga' => 70, 'r_fgp' => 50, 'r_fta' => 60, 'r_ftp' => 80,
-            'r_3ga' => 40, 'r_3gp' => 35, 'r_orb' => 30, 'r_drb' => 50,
-            'r_ast' => 60, 'r_stl' => 50, 'r_tvr' => 40, 'r_blk' => 30,
-            'r_foul' => 40, 'oo' => 70, 'od' => 60, 'r_drive_off' => 65,
-            'dd' => 55, 'po' => 50, 'pd' => 45, 'r_trans_off' => 70,
-            'td' => 60, 'clutch' => 75, 'consistency' => 80,
-            'talent' => 85, 'skill' => 80, 'intangibles' => 70,
-            'loyalty' => 50, 'playing_time' => 60, 'winner' => 40,
-            'tradition' => 30, 'security' => 55,
-            'exp' => 15, 'bird' => 0, 'cy' => 0, 'cyt' => 0,
-            'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0,
-            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
-            'draftyear' => 2010, 'draftround' => 1, 'draftpickno' => 3,
-            'draftedby' => 'Heat', 'draftedbycurrentname' => 'Heat',
-            'college' => 'U of Test',
-            'htft' => 6, 'htin' => 5, 'wt' => 210,
-            'injured' => 0, 'retired' => 1, 'droptime' => 0,
-            'teamname' => 'Free Agents', 'color1' => 'D4AF37', 'color2' => '1e3a5f',
-            'rookie_option_used' => 0, 'uuid' => 'retired-uuid',
-            'gm_username' => '',
-        ];
-
-        $this->mockDb = new \Tests\WideUnit\Mocks\MockDatabase();
-        $this->injectGlobalMockDb();
-        $this->mockDb->onQuery('team_name AS teamname', [$playerWithRetired]);
-        $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 0, 'threePoint' => 0, 'dunkContest' => 0, 'rookieSoph' => 0]]);
-        $this->mockDb->onQuery('ibl_awards.*WHERE name', []);
-        $this->mockDb->onQuery('ibl_standings', [[
-            'teamid' => 0, 'team_city' => '', 'team_name' => 'Free Agents',
-            'color1' => 'D4AF37', 'color2' => '1e3a5f',
-            'arena' => '', 'capacity' => 0,
-            'owner_name' => '', 'owner_email' => '',
-            'discord_id' => null, 'used_extension_this_chunk' => 0,
-            'used_extension_this_season' => 0, 'has_mle' => 0, 'has_lle' => 0,
-            'league_record' => '0-0', 'uuid' => 'fa-uuid',
-            'gm_username' => '',
-        ]]);
-        $this->mockDb->onQuery('ibl_hist', [[
-            'pid' => 1, 'year' => 2020, 'teamid' => 5, 'team' => 'Heat',
-            'games' => 55, 'minutes' => 1500,
-            'fgm' => 400, 'fga' => 800, 'ftm' => 200, 'fta' => 250,
-            'tgm' => 100, 'tga' => 280,
-            'orb' => 50, 'reb' => 200, 'ast' => 300, 'stl' => 80,
-            'tvr' => 120, 'blk' => 40, 'pf' => 130, 'pts' => 1100,
-            'salary' => 1000,
-        ]]);
-        $this->mockDb->setMockData([$retiredRow]);
-
-        $stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
-        $stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
-        $stubRepo->method('getTeamColorRow')->willReturn(['color1' => 'D4AF37', 'color2' => '1e3a5f']);
-        $controller = new PlayerPageController($this->mockDb, $stubRepo, new PlayerPageService($this->mockDb, $stubRepo), new HttpRequest());
+        $this->seedRetiredPlayer();
+        $controller = $this->buildController();
 
         $html = $controller->renderPage(1, 999, 'nobody');
 
@@ -468,6 +420,51 @@ class PlayerPageControllerTest extends WideUnitTestCase
     }
 
     private const SAMPLE_UUID = '123e4567-e89b-42d3-a456-426614174000';
+
+    // ── Golden output per page type (characterization for renderContentView) ──
+    //
+    // Fixtures were captured once from the pre-refactor controller. They are
+    // never regenerated by the test. A mismatch is a regression to investigate.
+
+    /**
+     * @return array<string, array{string, ?int, bool}>
+     */
+    public static function goldenCaseProvider(): array
+    {
+        return [
+            'overview null active' => ['overview-null-active', PlayerPageType::OVERVIEW, false],
+            'overview null retired' => ['overview-null-retired', PlayerPageType::OVERVIEW, true],
+            'invalid 99 active' => ['invalid-99-active', 99, false],
+            'invalid 99 retired' => ['invalid-99-retired', 99, true],
+            'awards and news' => ['awards-and-news', PlayerPageType::AWARDS_AND_NEWS, false],
+            'one on one' => ['one-on-one', PlayerPageType::ONE_ON_ONE, false],
+            'regular season totals' => ['regular-season-totals', PlayerPageType::REGULAR_SEASON_TOTALS, false],
+            'regular season averages' => ['regular-season-averages', PlayerPageType::REGULAR_SEASON_AVERAGES, false],
+            'playoff totals' => ['playoff-totals', PlayerPageType::PLAYOFF_TOTALS, false],
+            'playoff averages' => ['playoff-averages', PlayerPageType::PLAYOFF_AVERAGES, false],
+            'heat totals' => ['heat-totals', PlayerPageType::HEAT_TOTALS, false],
+            'heat averages' => ['heat-averages', PlayerPageType::HEAT_AVERAGES, false],
+            'ratings and salary' => ['ratings-and-salary', PlayerPageType::RATINGS_AND_SALARY, false],
+            'sim stats' => ['sim-stats', PlayerPageType::SIM_STATS, false],
+            'olympic totals' => ['olympic-totals', PlayerPageType::OLYMPIC_TOTALS, false],
+            'olympic averages' => ['olympic-averages', PlayerPageType::OLYMPIC_AVERAGES, false],
+        ];
+    }
+
+    #[DataProvider('goldenCaseProvider')]
+    public function testRenderPageMatchesGoldenFixture(string $fixture, ?int $pageView, bool $retired): void
+    {
+        if ($retired) {
+            $this->seedRetiredPlayer();
+            $html = $this->buildController()->renderPage(1, $pageView, 'nobody');
+        } else {
+            $html = $this->controller->renderPage(1, $pageView, 'testuser');
+        }
+
+        $path = __DIR__ . '/fixtures/PlayerPageController/' . $fixture . '.html';
+        self::assertFileExists($path);
+        self::assertSame((string) file_get_contents($path), $html);
+    }
 
     public function testShowPageResolvesUuidViaRepository(): void
     {

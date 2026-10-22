@@ -17,8 +17,9 @@ class _Stop(BaseException):
 
 def _capture_live_git(captured: dict):
     class _FakeLiveGit:
-        def __init__(self, worktree, push_remote=None, llm=None):
-            captured.update(worktree=worktree, push_remote=push_remote, llm=llm)
+        def __init__(self, worktree, push_remote=None, llm=None, state_dir=None):
+            captured.update(worktree=worktree, push_remote=push_remote, llm=llm,
+                            state_dir=state_dir)
             raise _Stop()
     return _FakeLiveGit
 

@@ -222,7 +222,7 @@ def test_runner_logs_one_audit_line_per_accepted_adaptation(tmp_path, monkeypatc
     monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda git, *a, **k: git.head())
     monkeypatch.setattr(runner, "run_meta_checks_local", stop)
     with pytest.raises(_Stop):
-        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: ({}, False))
+        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: {})
 
     lines = (tmp_path / "out" / "audit.log").read_text().splitlines()
     proved = [l for l in lines if "TREE-EQUIVALENT proved; manifest=/tmp/m notes=/tmp/n" in l]
@@ -285,7 +285,7 @@ def test_runner_logs_one_audit_line_per_accepted_adaptation_on_plain_merge(
     monkeypatch.setattr(runner, "_commit_with_gate_fix", lambda git, *a, **k: git.head())
     monkeypatch.setattr(runner, "run_meta_checks_local", stop)
     with pytest.raises(_Stop):
-        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: ({}, False))
+        _run_live(tmp_path, wt, monkeypatch, lambda *a, **k: {})
 
     lines = (tmp_path / "out" / "audit.log").read_text().splitlines()
     adapted = [l for l in lines if "phase2: adapted line accepted:" in l]

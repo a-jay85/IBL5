@@ -7,7 +7,8 @@ declare(strict_types=1);
 /* 3/22/2005                                                            */
 /************************************************************************/
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -20,7 +21,7 @@ $httpRequest = \Http\HttpRequest::fromGlobals();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $validator = new \Draft\DraftValidator();
 $repository = new \Draft\DraftRepository($mysqli_db, $commonRepository);
 $processor = new \Draft\DraftProcessor();
@@ -33,9 +34,14 @@ $controller = new \Draft\DraftController(
     null, null, $nukeCompat
 );
 
+$postData = [];
+foreach ($_POST as $key => $value) {
+    $postData[(string) $key] = $value;
+}
+
 switch ($op) {
     case 'select':
-        echo $controller->submitSelection($_POST, $user);
+        echo $controller->submitSelection($postData, $user);
         break;
     default:
         $controller->main($user);

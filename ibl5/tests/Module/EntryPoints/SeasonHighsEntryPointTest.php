@@ -96,4 +96,12 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
         );
         $this->assertSame('modules.php?name=Records&tab=thisseason&seasonPhase=Regular%20Season', $url);
     }
+
+    public function testZeroStringPhaseFallsBackToCurrent(): void
+    {
+        $output = $this->runModule('SeasonHighs', ['seasonPhase' => '0']);
+
+        $this->assertNotSame('', $output);
+        $this->assertStringContainsString('Regular Season', $output);
+    }
 }

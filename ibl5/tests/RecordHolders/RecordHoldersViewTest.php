@@ -39,6 +39,18 @@ final class RecordHoldersViewTest extends TestCase
         $this->assertStringContainsString('Team Records', $html);
     }
 
+    public function testRecordTablesCarryBorderlessModifier(): void
+    {
+        $records = $this->createMinimalRecords();
+
+        $html = $this->view->render($records);
+
+        $this->assertSame(0, substr_count($html, 'class="ibl-data-table record-table'));
+        $borderless = substr_count($html, 'ibl-data-table ibl-data-table--borderless record-table');
+        $this->assertGreaterThan(0, $borderless);
+        $this->assertSame(substr_count($html, 'record-table ibl-table-subheading'), $borderless);
+    }
+
     public function testRenderPlayerRecordIncludesPlayerLink(): void
     {
         $records = $this->createMinimalRecords();

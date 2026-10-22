@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from typing import Optional
 
 from . import manual_rows
 from .classify import BACKLOG_REPO
@@ -48,18 +49,27 @@ _LEGAL_STOP_CONDITIONS = ("tests-green", "evidence-present")
 _EVIDENCE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
-def frontmatter_auto_merge_false(content: str) -> bool:
-    """Line-1 YAML frontmatter only (a body documenting the syntax can't self-select)."""
+def frontmatter_auto_merge_value(content: str) -> Optional[str]:
+    """Raw `auto_merge:` value from the line-1 YAML frontmatter; None when the
+    file has no frontmatter or the key is absent. Line-1 frontmatter only (a body
+    documenting the syntax can't self-select). Whitespace-stripped, never lowercased:
+    `False` is an unknown value and condition (7) holds on it.
+    """
     lines = content.splitlines()
     if not lines or not re.match(r"^---\s*$", lines[0]):
-        return False
+        return None
     for line in lines[1:]:
         if re.match(r"^---\s*$", line):
-            return False
+            return None
         m = re.match(r"^auto_merge:\s*(.+?)\s*$", line)
         if m:
-            return m.group(1).strip() == "false"
-    return False
+            return m.group(1).strip()
+    return None
+
+
+def frontmatter_auto_merge_false(content: str) -> bool:
+    """Kept for existing callers and tests: True only for the exact value `false`."""
+    return frontmatter_auto_merge_value(content) == "false"
 
 
 def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
@@ -175,26 +185,63 @@ def _has_planning_type_cell(cells: list[str]) -> bool:
     return any(_TEST_TYPE_LABEL.match(_norm_cell(c)) for c in cells)
 
 
+_TRULY_MANUAL_CELL = re.compile(r"truly.?manual", re.IGNORECASE)
+# Header cells that open a table whose rows may declare a Test type. "what to
+# verify" is the house matrix (bin/check-plan's GATEP_MATRIX); "test type" keeps
+# the legacy `| Behavior | Test type | Test |` matrices the harness still reads.
+_MANUAL_TABLE_HEADERS = frozenset({"what to verify", "test type"})
+
+# A backticked token that names a test file or test method. Matched per CELL, so
+# a description cell's bare method name (`testFoo`) or command never hides the
+# location cell's path.
+_TEST_TOKEN_RE = re.compile(r"`([^`]*(?:test|spec|Test)[^`]*)`")
+
+
+def _first_test_path(cell: str) -> str | None:
+    """The first backticked test-ish token in `cell` that passes `_is_test_path`.
+
+    Every token in the cell is tried, so `testFoo` followed by
+    `tests/Foo/BarTest.php` in one cell yields the path.
+    """
+    for m in _TEST_TOKEN_RE.finditer(cell):
+        if _is_test_path(m.group(1)):
+            return m.group(1)
+    return None
+
+
+def _has_truly_manual_cell(cells: list[str]) -> bool:
+    """True when some WHOLE cell is a Truly-manual label (bin/check-plan gate [Q]'s
+    MC_TYPE rule). A cell that merely mentions the words never counts."""
+    return any(_TRULY_MANUAL_CELL.fullmatch(_norm_cell(c)) for c in cells)
+
+
 def _planned_token(cells: list[str]) -> str | None:
     """The row's planned test token, or None when the row plans nothing.
 
-    Single source of truth for "this matrix row plans a test": parse_matrix and
-    parse_no_change_test_paths must agree on it, or a token could be exempted by
-    one parser and planned by the other.
+    Single source of truth for "this matrix row plans a test": parse_matrix,
+    parse_no_change_test_paths and parse_run_only_test_paths must agree on it, or
+    a token could be exempted by one parser and planned by another.
 
     The Test type is read from a WHOLE cell (`_has_planning_type_cell`), never
     from the joined row. The old whole-row `\\bE2E\\b` search planned
     `/tmp/bug-pipeline-test-env.sh` from a CLI-executable row whose command ended
     in `bin/test-bug-pipeline-e2e` (bug-pipeline-e2e-guard-tests row 10), and the
-    phantom path blocked arming via Phase 5.0 condition (3). The path itself is
-    still the first backticked `test|spec` token in the joined row.
+    phantom path blocked arming via Phase 5.0 condition (3).
+
+    The path is read cell by cell, rightmost first, so the location cell wins
+    over a description cell. In each cell every backticked test-ish token is
+    tried. The row plans a test when ANY cell holds a token passing
+    `_is_test_path`. Gating on the joined row's FIRST token planned nothing for
+    a row whose description cited `testFoo` (no `/`) or a command ahead of the
+    location cell's `tests/Foo/BarTest.php`, so a test the diff never wrote
+    raised no MISSING (backlog#1501).
     """
     if not _has_planning_type_cell(cells):
         return None
-    row = " | ".join(cells)
-    m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
-    if m and _is_test_path(m.group(1)):
-        return m.group(1)
+    for cell in reversed(cells):
+        tok = _first_test_path(cell)
+        if tok is not None:
+            return tok
     return None
 
 
@@ -269,8 +316,13 @@ def parse_run_only_test_paths(content: str) -> list[str]:
     return [p for p in marked if p not in unmarked]
 
 
-def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
-    """Returns (planned_test_paths, truly_manual_rows) from the Verification Matrix.
+def parse_matrix(
+    content: str,
+) -> tuple[list[str], list[manual_rows.ManualRow], list[manual_rows.ManualRow]]:
+    """Returns (planned_test_paths, truly_manual_rows, post_merge_rows) from the matrix.
+
+    A Truly-manual row whose cells carry `post-merge: <reason>` goes to
+    post_merge_rows instead of truly_manual_rows (bin/check-plan gate [PM]).
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
@@ -297,20 +349,35 @@ def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     and it already shipped. Making the harness report unbalanced-fence as
     INDETERMINATE rather than empty changes a Phase 5.0 contract, so it is filed as
     backlog, not fixed here.
+
+    A manual row needs a WHOLE Truly-manual cell inside a typed table (a
+    What-to-verify or `Test type` header), backlog#1490. The old whole-row
+    search read 28 of 128 corpus rows as manual: 17 sat in prose tables and
+    11 were CLI-executable matrix rows that only mentioned the words.
     """
     planned: list[str] = []
     manual: list[manual_rows.ManualRow] = []
+    post_merge: list[manual_rows.ManualRow] = []
+    in_matrix = False  # inside a `What to verify` table, as bin/check-plan's GATEP_MATRIX
+    in_typed_table = False  # What-to-verify OR a whole `Test type` header cell
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
+            in_matrix = False
+            in_typed_table = False
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        row = " | ".join(cells)
-        if re.search(r"truly.?manual", row, re.I):
-            manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
+        if any(_norm_cell(c).lower() == "what to verify" for c in cells):
+            in_matrix = True
+        if any(_norm_cell(c).lower() in _MANUAL_TABLE_HEADERS for c in cells):
+            in_typed_table = True
+        if in_typed_table and _has_truly_manual_cell(cells):
+            mrow = manual_rows.row_from_cells(
+                cells, len(manual) + len(post_merge) + 1, in_matrix=in_matrix)
+            (post_merge if mrow.post_merge_reason else manual).append(mrow)
         p = _planned_token(cells)
         if p is not None and p not in planned:
             planned.append(p)
-    return planned, manual
+    return planned, manual, post_merge
 
 
 _EXECUTABLE_TYPE = re.compile(
@@ -900,12 +967,15 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
             content = fh.read()
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
+    info.auto_merge_value = frontmatter_auto_merge_value(content)
     info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())
     info.has_reuse = bool(_REUSE.search(content))
     if info.has_matrix:
-        info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
+        (
+            info.planned_test_paths, info.truly_manual_rows, info.post_merge_rows,
+        ) = parse_matrix(content)
         info.executable_row_count = count_executable_matrix_rows(content)
         info.no_change_test_paths = parse_no_change_test_paths(content)
         info.run_only_test_paths = parse_run_only_test_paths(content)

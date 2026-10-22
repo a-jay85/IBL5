@@ -149,37 +149,4 @@ class DatabaseCache extends \Database\BaseMysqliRepository implements DatabaseCa
             $this->channelLogger->error('cache_delete_failed', ['cache_key' => $key, 'error' => $e->getMessage()]);
         }
     }
-
-    /**
-     * @see DatabaseCacheInterface::acquireLock()
-     */
-    public function acquireLock(string $key, int $timeoutSeconds): bool
-    {
-        try {
-            $row = $this->fetchOne("SELECT GET_LOCK(?, ?) AS got", 'si', $key, $timeoutSeconds);
-        } catch (\RuntimeException $e) {
-            $this->channelLogger->error('cache_lock_acquire_failed', ['lock_key' => $key, 'error' => $e->getMessage()]);
-            return false;
-        }
-
-        if ($row === null) {
-            return false; // GET_LOCK returned NULL (error/killed) — do not rebuild
-        }
-
-        /** @var array{got: int|string|null} $row */
-        return (int) ($row['got'] ?? 0) === 1;
-    }
-
-    /**
-     * @see DatabaseCacheInterface::releaseLock()
-     */
-    public function releaseLock(string $key): void
-    {
-        try {
-            // DO (not SELECT) avoids leaving an unconsumed result set → "commands out of sync".
-            $this->execute("DO RELEASE_LOCK(?)", 's', $key);
-        } catch (\RuntimeException $e) {
-            $this->channelLogger->error('cache_lock_release_failed', ['lock_key' => $key, 'error' => $e->getMessage()]);
-        }
-    }
 }

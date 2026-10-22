@@ -38,4 +38,30 @@ class TableStylesTest extends TestCase
         $vars = TableStyles::inlineTeamVars('red; evil', "'/**/");
         self::assertSame('--team-color-primary: #000000; --team-color-secondary: #000000;', $vars);
     }
+
+    public function testInlineTeamVarsDefaultOmitsOnPrimaryVar(): void
+    {
+        $vars = TableStyles::inlineTeamVars('003DA5','FF5733');
+        self::assertSame('--team-color-primary: #003DA5; --team-color-secondary: #FF5733;', $vars);
+    }
+
+    public function testInlineTeamVarsOnPrimaryFallsBackForCiSeedPair(): void
+    {
+        $vars = TableStyles::inlineTeamVars('003DA5', 'FF5733', true);
+        self::assertStringEndsWith(' --team-color-on-primary: #ffffff;', $vars);
+    }
+
+    public function testInlineTeamVarsOnPrimaryKeepsPassingSecondary(): void
+    {
+        $vars = TableStyles::inlineTeamVars('003DA5', 'FFFFFF', true);
+        self::assertStringEndsWith(' --team-color-on-primary: #FFFFFF;', $vars);
+    }
+
+    public function testInlineTeamVarsOnPrimarySanitizesInjectedColor(): void
+    {
+        $vars = TableStyles::inlineTeamVars('003DA5', 'red;}body{x', true);
+        self::assertStringNotContainsString(';}', $vars);
+        self::assertStringNotContainsString('body', $vars);
+        self::assertStringEndsWith(' --team-color-on-primary: #ffffff;', $vars);
+    }
 }

@@ -45,7 +45,8 @@ if ($op === 'save_order') {
         return;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawBody = file_get_contents('php://input');
+    $input = is_string($rawBody) ? json_decode($rawBody, true) : null;
     if (!is_array($input) || !isset($input['order']) || !is_array($input['order'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid request body']);
@@ -86,7 +87,7 @@ if ($op === 'save_order') {
     }
 
     try {
-        $season = new \Season\Season($mysqli_db);
+        $season = \Season\SharedSeason::get($mysqli_db);
         $repository = new ProjectedDraftOrderRepository($mysqli_db);
         $service = new ProjectedDraftOrderService($repository);
         $service->saveLotteryOrder($season->endingYear, $intOrder);
@@ -100,7 +101,7 @@ if ($op === 'save_order') {
     return;
 }
 
-$season = new \Season\Season($mysqli_db);
+$season = \Season\SharedSeason::get($mysqli_db);
 $repository = new ProjectedDraftOrderRepository($mysqli_db);
 $service = new ProjectedDraftOrderService($repository);
 $view = new ProjectedDraftOrderView();

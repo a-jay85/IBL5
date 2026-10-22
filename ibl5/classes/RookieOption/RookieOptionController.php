@@ -37,7 +37,7 @@ class RookieOptionController implements RookieOptionControllerInterface
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
     private \Psr\Log\LoggerInterface $auditLogger;
     /**
-     * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
+     * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
 
@@ -117,7 +117,7 @@ class RookieOptionController implements RookieOptionControllerInterface
             return ['success' => false, 'type' => 'validation_error', 'message' => self::MISSING_PARAMS_MESSAGE, 'playerID' => $playerID];
         }
 
-        $season = $this->season ?? new Season($this->db);
+        $season = $this->season ?? \Season\SharedSeason::get($this->db);
         $player = Player::withPlayerID($this->db, $playerID);
 
         // Validate player eligibility

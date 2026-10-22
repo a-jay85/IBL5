@@ -38,7 +38,7 @@
 
 /* Input sizes */
 .ibl-input--sm {
-    font-size: 1rem;
+    font-size: var(--text-base);
     padding: var(--space-1) var(--space-2);
 }
 
@@ -49,7 +49,7 @@
 .ibl-label {
     display: block;
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-700);
     text-transform: uppercase;
@@ -168,7 +168,7 @@
 
 /* Button sizes */
 .ibl-btn--sm {
-    font-size: 1rem;
+    font-size: var(--text-base);
     padding: var(--space-1) var(--space-3);
 }
 
@@ -200,13 +200,13 @@
 }
 
 .ibl-form-help {
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--gray-500);
     margin-top: var(--space-1);
 }
 
 .ibl-form-error {
-    font-size: 1rem;
+    font-size: var(--text-base);
     color: var(--error-600);
     margin-top: var(--space-1);
 }
@@ -254,7 +254,7 @@
     border: none;
     border-radius: var(--radius-full);
     padding: var(--space-1) var(--space-3);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background var(--transition-fast);
@@ -295,7 +295,7 @@
 
 .ibl-filter-form__label {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     color: var(--gray-600);
     text-transform: uppercase;
@@ -328,7 +328,7 @@
 
 .ibl-filter-form__submit {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);

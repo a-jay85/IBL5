@@ -13,7 +13,7 @@ from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GateChange, Verdict, com
                                    render_gate_backtest)
 from harness.state import TerminalState, UsageLedger
 
-from tests.test_body_check import CANNED, _actions, _fixture
+from tests.test_body_pass import CANNED, _actions, _fixture
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 

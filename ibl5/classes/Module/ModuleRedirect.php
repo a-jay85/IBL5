@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Module;
 
-use Utilities\HtmxHelper;
-
 /**
  * Constant 302 targets for modules whose content moved into a host page.
  *
  * send() targets never derive from the request, so an old URL's query string is
- * dropped. passthroughUrl()/sendWithPassthrough() reflect only whitelisted,
+ * dropped. passthroughUrl() reflects only whitelisted,
  * non-empty string params that pass their validator, RFC 3986-encoded.
  */
 final class ModuleRedirect
@@ -34,7 +32,7 @@ final class ModuleRedirect
             return;
         }
 
-        header('Location: ' . $target, true, 302);
+        (new \Api\Response\RedirectResponder())->redirect($target);
     }
 
     /**
@@ -72,33 +70,5 @@ final class ModuleRedirect
         }
 
         return $target . '&' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-    }
-
-    /**
-     * Redirects to passthroughUrl() built from the supplied $request array.
-     * Pass `$_GET + $_POST` (GET wins on a key collision) at the call site so
-     * this method stays free of direct superglobal access.
-     * HTMX requests get HX-Redirect; others get a Location header with $status.
-     * Caller must `return` immediately after.
-     *
-     * @param array<int, string> $whitelist
-     * @param array<array-key, mixed> $request merged request params (e.g. $_GET + $_POST)
-     * @param array<string, callable(string): bool>|null $validators
-     */
-    public static function sendWithPassthrough(
-        string $target,
-        array $whitelist,
-        array $request,
-        ?array $validators = null,
-        int $status = 302
-    ): void {
-        $url = self::passthroughUrl($target, $whitelist, $request, $validators);
-
-        if (HtmxHelper::isHtmxRequest()) {
-            header('HX-Redirect: ' . $url);
-            return;
-        }
-
-        header('Location: ' . $url, true, $status);
     }
 }

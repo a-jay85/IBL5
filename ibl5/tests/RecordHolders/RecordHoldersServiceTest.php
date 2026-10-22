@@ -566,6 +566,29 @@ final class RecordHoldersServiceTest extends TestCase
         }
     }
 
+    public function testTeamRegistryEachAbbrHasLogoPng(): void
+    {
+        $reflection = new \ReflectionClass(RecordFormatter::class);
+        /** @var array<int, array{abbr: string, name: string}> $registry */
+        $registry = $reflection->getConstant('TEAM_REGISTRY');
+        $this->assertIsArray($registry);
+        $this->assertNotSame([], $registry);
+
+        $topicsDir = dirname(__DIR__, 2) . '/images/topics';
+        $missing = [];
+        foreach ($registry as $id => $info) {
+            if (!is_file("{$topicsDir}/{$info['abbr']}.png")) {
+                $missing[$id] = "images/topics/{$info['abbr']}.png";
+            }
+        }
+
+        $this->assertSame(
+            [],
+            $missing,
+            'TEAM_REGISTRY abbr has no logo png (team id => missing path)',
+        );
+    }
+
     public function testUnknownTeamIdReturnsEmptyAbbreviation(): void
     {
         $record = $this->createPlayerRecord(1, 'Unknown', 50, 999);

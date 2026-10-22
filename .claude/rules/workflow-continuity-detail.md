@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-14
+last_verified: 2026-10-19
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -51,7 +51,8 @@ branch; it survives you closing Claude Code. Engine selection:
   call. Rung 2 retries the resolver once on Opus with the exact LOST lines. Rung 3 runs one
   headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness re-runs the
   unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
-  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
+  Rung 4 runs one headless Sonnet 5.5 session capped at $5, 25 minutes and 100 turns on the same merge commit (`tools/postplan-harness/harness/conflict_fix.py`). It may edit the conflicted files, the branch's own files, and test files master added under `ibl5/tests/`, `bin/test-*` or `tools/postplan-harness/tests/`. The harness amends the merge commit and re-runs the proof. It runs at most once per branch head and master tip. The marker is a `<key>.sonnet-fix.json` file in the harness state dir, `tools/postplan-harness/out/state/`. The session cannot push, commit, fetch, run gh, or move any ref, and a moved ref or HEAD fails the rung. When it ran and the proof still failed, `blocked-ship.txt` adds a `Headless Sonnet fix:` line and the session's summary labelled as untrusted text.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, merges `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, commits the merge locally, and prints the `bin/post-plan-now` paste line. It never pushes. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
   `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
   worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
   one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
@@ -115,7 +116,7 @@ arms. A failed proof stops before the push. When the patch-id is unchanged, the 
 the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
 record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
 back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
-without charging an attempt.
+without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove.
 
 ## What `--auto` adds
 
@@ -127,6 +128,7 @@ It does **not** hold post-plan for a "risky" plan. Post-plan **always** runs and
 the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which
 honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open
 for a human to merge.
+A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead; Phase 6.5 arms it only when the realized PR is a docs-only refresh with a two-way merge-danger line and a READY verdict, and holds it otherwise with the failed clause named.
 
 ## Ad-hoc branches
 

@@ -1,4 +1,4 @@
-import { test as publicTest } from '../fixtures/public';
+import { test as publicTest, expect } from '../fixtures/public';
 import { test as authTest } from '../fixtures/auth';
 import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibility';
 import { gotoWithRetry } from '../helpers/navigation';
@@ -24,10 +24,8 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'franchise history',
     'franchise record book',
     'injuries',
-    'one on one game',
     'player movement',
     'projected draft order',
-    'record holders',
     // Search page with a transactions preset (modules.php?name=Search plus a preset).
     // Verified 2026-09-23: every failing node is pre-existing results markup
     // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
@@ -36,8 +34,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'season archive',
     'season highs',
     'team off/def stats',
-    'team schedule',
-    'topics',
     // Pages with team-color contrast failures (ibl-team-cell--colored uses DB-configured team colors)
     // 2026-10-07 (IBL5-backlog#1270): 'free agency preview' and 'schedule' passed 10/10 and were removed (DELTA-OK).
     // Re-checked 2026-10-07 (IBL5-backlog#1270): kept, together with 'season leaderboards' below.
@@ -73,14 +69,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // Heading-level skip (h4 after h2, no h3). See a-jay85/IBL5-backlog (label: a11y).
   // Burn-down: a11y-2-heading-one-single-title (record holders view, same render pass).
   'heading-order': new Set([
-    // Pre-existing SearchView::renderResults() markup: the page emits <h1 class="ibl-title">
-    // then <h3 class="search-results__heading">, skipping h2. Identical on the plain
-    // modules.php?name=Search&query=waive results page on master — this is simply the first
-    // search-RESULTS page brought under axe (the 'search' row renders the bare
-    // form, which has no results heading). Loosens enforcement on no previously-checked page.
-    // Follow-up: promote .search-results__heading to <h2> and refresh the SearchView golden
-    // masters, then delete this entry.
-    'search transactions preset',
   ]),
 
   // Links with no discernible text. Remaining entry is the homepage last-sim-recap
@@ -180,6 +168,10 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'team schedule', url: 'modules.php?name=Schedule&teamid=1' },
   // Seed rows for this game: ibl5/tests/e2e/fixtures/ci-seed.sql:124 and :814-823. An unknown pair 404s.
   { name: 'game boxscore', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1' },
+  // Anonymous sign-in form. Gated modules (Voting, Trading, FreeAgency, ...) JS-redirect here via loginbox().
+  // Deliberately absent from KNOWN_FAILING['color-contrast'] (the .auth-links colors are fixed in auth.css)
+  // and from MOBILE_KNOWN_FAILING['target-size'] (the 375px loop passes without an allowlist entry).
+  { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 
 publicTest.describe('Public page accessibility', () => {
@@ -193,6 +185,74 @@ publicTest.describe('Public page accessibility', () => {
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
   }
+});
+
+// --- Sign-in divider contrast ---
+// axe skips punctuation-only text, so the "|" in <span class="auth-links__divider">
+// (LoginView) is never contrast-checked by the 'sign in' row above. Compute the WCAG
+// ratio directly. The divider is display:none at narrow widths, so pin a desktop viewport.
+
+type Rgb = [number, number, number];
+
+function parseCssRgb(value: string): { rgb: Rgb; alpha: number } {
+  const match = value.match(/^rgba?\(\s*(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)[,\s]+(\d+(?:\.\d+)?)(?:[,\s/]+(\d+(?:\.\d+)?%?))?\s*\)$/);
+  if (!match) {
+    throw new Error(`Unparseable CSS color: ${value}`);
+  }
+  const alphaRaw = match[4];
+  const alpha =
+    alphaRaw === undefined
+      ? 1
+      : alphaRaw.endsWith('%')
+        ? parseFloat(alphaRaw) / 100
+        : parseFloat(alphaRaw);
+  return { rgb: [Number(match[1]), Number(match[2]), Number(match[3])], alpha };
+}
+
+function relativeLuminance([r, g, b]: Rgb): number {
+  const [lr, lg, lb] = [r, g, b].map((channel) => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * lr! + 0.7152 * lg! + 0.0722 * lb!;
+}
+
+function contrastRatio(foreground: Rgb, background: Rgb): number {
+  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort(
+    (a, b) => b - a,
+  );
+  return (lighter! + 0.05) / (darker! + 0.05);
+}
+
+publicTest.describe('Sign-in divider contrast (WCAG 1.4.3)', () => {
+  publicTest.use({ viewport: { width: 1280, height: 720 } });
+
+  publicTest('.auth-links__divider meets 4.5:1 against its effective background', async ({
+    page,
+  }) => {
+    await gotoWithRetry(page, 'modules.php?name=YourAccount');
+
+    const divider = page.locator('.auth-links__divider').first();
+    await expect(divider).toBeVisible();
+
+    const { color, backgrounds } = await divider.evaluate((el) => {
+      const chain: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        chain.push(getComputedStyle(node).backgroundColor);
+      }
+      return { color: getComputedStyle(el).color, backgrounds: chain };
+    });
+
+    // Effective background: first ancestor with a non-transparent fill; white if none.
+    const solid = backgrounds.map(parseCssRgb).find(({ alpha }) => alpha > 0);
+    const background: Rgb = solid?.rgb ?? [255, 255, 255];
+
+    const ratio = contrastRatio(parseCssRgb(color).rgb, background);
+    expect(
+      ratio,
+      `divider color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 // --- Authenticated pages ---

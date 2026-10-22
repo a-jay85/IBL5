@@ -16,7 +16,8 @@ declare(strict_types=1);
  * @see Voting\VotingSubmissionView For submission result rendering
  */
 
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+$phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
+if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -54,7 +55,7 @@ $teamIdentityRepo  = new \Repositories\TeamIdentityRepository($mysqli_db);
 $resultsController = new VotingResultsController(
     new VotingResultsService($repository),
     new VotingResultsView(),
-    new \Season\Season($mysqli_db)
+    \Season\SharedSeason::get($mysqli_db)
 );
 $controller        = new \Voting\VotingController(
     $mysqli_db, $ballotService, $ballotView,

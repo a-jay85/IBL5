@@ -309,6 +309,40 @@ want "conflicts-resolved verdict" "$LAST5" "RUN-REVIEW conflicts-resolved"
 [ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 5: prior-verdict file not cleared by step-0"
 end_case tree-equal-with-conflicts
 
+# --- pr3267 dual-layout: skip-pr3267-v1 / skip-pr3267-v2 ---------------------------------
+# The old (v1) and new (v2) post-plan sticky layouts must give the same verdict token. Both
+# fixtures end in a suffixed `READY (re-review)` form, so the audit-trail anchor rejects
+# them before any tree compare. HEAD^{tree} is stubbed to 40 d's through a git shim that
+# forwards every other call to the real git.
+PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
+PR3267_REAL_GIT="$(command -v git)"
+PR3267_SHIM="$SCRATCH/pr3267-shim"
+mkdir -p "$PR3267_SHIM"
+cat > "$PR3267_SHIM/git" << SHIM_EOF
+#!/usr/bin/env bash
+if [ "\${1:-}" = "rev-parse" ] && [ "\${2:-}" = 'HEAD^{tree}' ]; then
+    printf '%s\n' "dddddddddddddddddddddddddddddddddddddddd"
+    exit 0
+fi
+exec "$PR3267_REAL_GIT" "\$@"
+SHIM_EOF
+chmod +x "$PR3267_SHIM/git"
+PR3267_WANT_TOKEN="RUN-REVIEW verdict-not-ready"
+
+for _v in v1 v2; do
+    begin_case
+    _fx="$SCRATCH/pr3267-$_v.json"
+    jq '{comments: [.comments[-1]], headRefName: "pr-branch"}' \
+        "$PR3267_DIR/post-plan-sticky-pr3267-$_v.json" > "$_fx"
+    PATH="$PR3267_SHIM:$PATH" _run_skip "$_fx"
+    [ "$RS_STATUS" -eq 0 ] || fail "skip-pr3267-$_v: exit status was $RS_STATUS, want 0"
+    [ "$(printf '%s\n' "$RS_OUT" | head -1)" = "CURRENT-TREE: dddddddddddddddddddddddddddddddddddddddd" ] \
+        || fail "skip-pr3267-$_v: HEAD^{tree} stub not applied: $RS_OUT"
+    [ "$RS_LAST" = "$PR3267_WANT_TOKEN" ] \
+        || fail "skip-pr3267-$_v: want '$PR3267_WANT_TOKEN', got '$RS_LAST'"
+    end_case "skip-pr3267-$_v"
+done
+
 # --- case 6: multiple-sticky-comments ----------------------------------------------------
 begin_case
 fixture6="$SCRATCH/fix6.json"

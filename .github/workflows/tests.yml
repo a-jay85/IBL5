@@ -559,9 +559,13 @@ jobs:
           #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci:20,
           #            CI-only script, suggestion uses bash 4 mapfile)
           # Bash portability checks (SC3xxx) remain fully enforced.
-          shellcheck --severity=warning --shell=bash \
-            --exclude=SC2034,SC1090,SC2207 \
-            "${scripts[@]}"
+          # No -x, so each file is analyzed on its own: batches of 30 across all
+          # cores report the same findings as one serial run. GNU xargs exits 123
+          # when any batch fails, and as the last command of the pipeline that
+          # exit status fails the step.
+          printf '%s\0' "${scripts[@]}" \
+            | xargs -0 -P "$(nproc)" -n 30 shellcheck --severity=warning --shell=bash \
+                --exclude=SC2034,SC1090,SC2207
 
   pinact-check:
     name: Action SHA-pin drift guard
@@ -918,7 +922,8 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       # Parallel run: each script logs to its own ::group:: and the step fails if any fails.
       # Add a new harness as one line in this list (slowest first packs best). A harness
-      # that cannot share the runner (fixed ports, global state) gets its own step instead.
+      # that cannot share the runner (fixed ports, global state) gets a step in
+      # harness-tests-isolated instead.
       - name: Shell harnesses (parallel)
         run: |
           bin/run-shell-harnesses \
@@ -950,6 +955,7 @@ jobs:
             bin/test-pr-cycle \
             bin/test-pr-cycle-tick \
             bin/test-digest-dm-build \
+            bin/test-after-merge-checklist \
             bin/test-pr-review-now \
             bin/test-launchd-job \
             bin/test-launchd-sched \
@@ -1019,6 +1025,8 @@ jobs:
             bin/test-bug-pipeline-ci-autofix \
             bin/test-sim-recap-tick \
             bin/test-events-review \
+            bin/test-code-slice-review \
+            bin/test-finding-class-scan \
             bin/test-sim-recap-ssh-gate \
             bin/test-discord-dm \
             bin/test-post-plan-fail-dm \
@@ -1043,6 +1051,21 @@ jobs:
             bin/test-db-backups-pull \
             bin/test-wt-compose \
             bin/test-predeploy-db-snapshot
+
+  harness-tests-isolated:
+    name: Shell harness tests (isolated)
+    needs: [ci-memo-check, mirror-ready]
+    if: needs.ci-memo-check.outputs.hit != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Harnesses that cannot share a runner with bin/run-shell-harnesses: one
+    # exercises a real lsof port guard and four need an env -i scrubbed shell.
+    # Split out of harness-tests so they run beside its parallel batch.
+    # None of the seven reads IBL5_TEST_MARIADB_IMAGE, GHCR, or Bun, so the
+    # only setup is the checkout.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Exercises a real lsof port guard, so it cannot share the runner.
       - name: bin/test-bug-pipeline-e2e
         run: bin/test-bug-pipeline-e2e
@@ -1070,7 +1093,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint, mirror-ready]
+    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, pinact-check, actionlint, mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The memo is written only here: after a clean aggregate, on a run that was a miss.

@@ -1,4 +1,5 @@
 """Tests for _call_agent retry behavior on llm-invalid-output (review.py Phase 1)."""
+import json
 import os
 import sys
 
@@ -8,6 +9,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.review import ReviewPhase
 from harness.state import Classification, HarnessError, PlanInfo
+
+
+def _all_real(count): return json.dumps([{"n": i, "verdict": "real", "reason": "verified"} for i in range(1, count + 1)])
 
 
 class _CountingLlm:
@@ -32,6 +36,17 @@ class _CountingLlm:
         validate(resp)
         return resp
 
+    def call_tooled(self, purpose, model, prompt, *, cwd, allowed_tools=(), **kw):
+        idx = self._calls.get(purpose, 0)
+        self._calls[purpose] = idx + 1
+        responses = self._resp.get(purpose, [])
+        if idx >= len(responses):
+            raise HarnessError("llm-fixture-missing", purpose)
+        resp = responses[idx]
+        if isinstance(resp, Exception):
+            raise resp
+        return resp
+
 
 class _NullGh:
     def __init__(self):
@@ -49,14 +64,16 @@ def _code_only_cls():
     return Classification()  # defaults: non_code_only=False, engine_only=False, has_php=False
 
 
-def test_first_invalid_output_retries_once():
+def test_first_invalid_output_retries_once(tmp_path):
     valid = [{"path": "f.py", "line": 1, "body": "x"}]
     llm = _CountingLlm({
         "review-agent-a": [HarnessError("llm-invalid-output", "bad parse"), valid],
-        "score-findings": [[{"n": 1, "score": 90}]],
+        "verify-findings-1": [_all_real(1)],
+        "verify-findings-2": [_all_real(1)],
+        "verify-findings-3": [_all_real(1)],
     })
     gh = _NullGh()
-    surviving, _, _, degraded = ReviewPhase(llm, gh).run(
+    surviving, _, _, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
         {"number": 1, "headRefOid": "abc"}, _code_only_cls(), PlanInfo()
     )
     assert len(surviving) == 1
@@ -64,7 +81,7 @@ def test_first_invalid_output_retries_once():
     assert llm._calls["review-agent-a"] == 2
 
 
-def test_second_invalid_output_degrades_to_unavailable():
+def test_second_invalid_output_degrades_to_unavailable(tmp_path):
     llm = _CountingLlm({
         "review-agent-a": [
             HarnessError("llm-invalid-output", "fail 1"),
@@ -72,7 +89,7 @@ def test_second_invalid_output_degrades_to_unavailable():
         ],
     })
     gh = _NullGh()
-    surviving, _, _, degraded = ReviewPhase(llm, gh).run(
+    surviving, _, _, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
         {"number": 1, "headRefOid": "abc"}, _code_only_cls(), PlanInfo()
     )
     assert surviving == []
@@ -82,13 +99,13 @@ def test_second_invalid_output_degrades_to_unavailable():
     assert not any("No issues found" in body for _, body in gh.summary_calls)
 
 
-def test_non_parse_error_raises_immediately():
+def test_non_parse_error_raises_immediately(tmp_path):
     llm = _CountingLlm({
         "review-agent-a": [HarnessError("llm-fixture-missing", "missing")],
     })
     gh = _NullGh()
     with pytest.raises(HarnessError) as exc_info:
-        ReviewPhase(llm, gh).run(
+        ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
             {"number": 1, "headRefOid": "abc"}, _code_only_cls(), PlanInfo()
         )
     assert exc_info.value.kind == "llm-fixture-missing"

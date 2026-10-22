@@ -145,7 +145,7 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             GO_BASE_IMAGE=ghcr.io/a-jay85/mirror/golang:1.27
-            PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5-apache
+            PHP_BASE_IMAGE=ghcr.io/a-jay85/mirror/php:8.5.12-apache
 
       # --- Summary ---
       - name: Cache summary

@@ -94,6 +94,34 @@ class PlayerImageHelperTest extends TestCase
         $this->assertFalse(PlayerImageHelper::isPlaceholderUrl(PlayerImageHelper::getImageUrl(123)));
     }
 
+    public function testPngOnlyPhotoGetsPngUrl(): void
+    {
+        $dir = $this->makePhotoDir();
+        touch($dir . '6900.png');
+        PlayerImageHelper::usePhotoDirectory($dir);
+
+        $this->assertSame('./images/player/6900.png', PlayerImageHelper::getImageUrl(6900));
+    }
+
+    public function testJpgWinsWhenBothPhotoFilesExist(): void
+    {
+        $dir = $this->makePhotoDir(614);
+        touch($dir . '614.png');
+        PlayerImageHelper::usePhotoDirectory($dir);
+
+        $this->assertSame('./images/player/614.jpg', PlayerImageHelper::getImageUrl(614));
+    }
+
+    public function testMissingPhotoIsCachedAsPlaceholder(): void
+    {
+        $dir = $this->makePhotoDir();
+        PlayerImageHelper::usePhotoDirectory($dir);
+        PlayerImageHelper::getImageUrl(6900);
+        touch($dir . '6900.png');
+
+        $this->assertTrue(PlayerImageHelper::isPlaceholderUrl(PlayerImageHelper::getImageUrl(6900)));
+    }
+
     /**
      * Test that empty string playerID returns placeholder data URI
      */

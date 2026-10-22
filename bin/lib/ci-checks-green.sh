@@ -47,3 +47,17 @@ ccg_skip_json() { printf '%s\n' "$1" | jq -R 'split(",") | map(sub("^ +";"") | s
 ccg_drop_pending() { jq --argjson ignore "$1" '
   [ .check_runs[] | select(((.name | IN($ignore[])) and (.status != "completed")) | not) ]
   | { total_count: length, check_runs: . }'; }
+
+# ccg_drop_failed <ignore-json-array> — drop every run whose name is an EXACT
+#   match in $1, whose .status == "completed", AND whose conclusion is outside
+#   the ccg_failed pass set {success, skipped, neutral}. A null conclusion
+#   counts as non-passing, as in ccg_failed. A pending or passing run of a
+#   listed name is kept, so a still-running helper still reports as running.
+#   Callers apply it AFTER ccg_dedupe so only the newest run per name is
+#   judged: a newer pending re-run hides an older red run, which is today's
+#   behavior. Input/output: {check_runs:[...]} (total_count recomputed). An
+#   empty list is a no-op apart from total_count being recomputed.
+ccg_drop_failed() { jq --argjson ignore "$1" '
+  [ .check_runs[] | select(((.name | IN($ignore[])) and (.status == "completed")
+      and ((.conclusion // "unknown") | IN("success","skipped","neutral") | not)) | not) ]
+  | { total_count: length, check_runs: . }'; }

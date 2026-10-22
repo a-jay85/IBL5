@@ -9,6 +9,8 @@
 # L1-L9  source the lib and call its functions directly.
 # P1-P24 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
+# S1-S10 run bin/settle-pr-status against a `gh` shim that dispatches on the API path
+#        and records the commit-status POST body in $PFIX/posted.json.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
@@ -605,5 +607,147 @@ run_poll --ignore-workflows 'All checks green'
 if [ "$RC" -eq 2 ] && grep -qF 'unknown flag' "$ERR"; then
     ok "P24 space-form --ignore-workflows is rejected"
 else fail "P24 space-form --ignore-workflows is rejected (rc=$RC err=$(head -1 "$ERR"))"; fi
+
+# --- S1-S10: bin/settle-pr-status against a URL-dispatch gh shim ---------------
+SETTLE="$SCRIPT_DIR/settle-pr-status"
+S_SHA2="fedcba9876543210fedcba9876543210fedcba98"
+
+# The shim dispatches on the API path. Fixtures live in $PFIX: assoc.json (commits/S/pulls),
+# pull.json (pulls/N), cr.json (check-runs, slurped), wr.json (actions/runs, slurped).
+# A -X POST to statuses copies stdin to $PFIX/posted.json. $PFIX/cr-fail makes check-runs exit 1.
+SSHIM_DIR="$TMP/sshim"
+mkdir -p "$SSHIM_DIR"
+cat > "$SSHIM_DIR/gh" <<'SHIM'
+#!/bin/bash
+case "$*" in
+    *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
+    *commits/*/pulls*)    cat "$PFIX/assoc.json" ;;
+    */pulls/[0-9]*)       cat "$PFIX/pull.json" ;;
+    *check-runs*)         [ -f "$PFIX/cr-fail" ] && exit 1; cat "$PFIX/cr.json" ;;
+    *actions/runs*)       cat "$PFIX/wr.json" ;;
+    *)                    echo "sshim: unexpected: $*" >&2; exit 1 ;;
+esac
+SHIM
+chmod +x "$SSHIM_DIR/gh"
+
+# s_case <name> [base-ref] [pull-head-sha] — fresh fixtures: one open PR #7 with an all-green
+# check-run set for the anchors A,B.
+s_case() {
+    new_case "s-$1"
+    local base="${2:-master}" head="${3:-$P_SHA}"
+    printf '[{"number":7,"state":"open","base":{"ref":"%s","repo":{"full_name":"a-jay85/IBL5"}}}]' \
+        "$base" > "$PFIX/assoc.json"
+    printf '{"number":7,"state":"open","head":{"sha":"%s"},"base":{"ref":"%s"}}' \
+        "$head" "$base" > "$PFIX/pull.json"
+    cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"
+    cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+    wr 1 "$RUNS_DONE"
+    cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+}
+
+# run_settle <args...> — sets OUT, ERR, RC; always passes --repo and the anchors A,B.
+run_settle() {
+    OUT="$TMP/s-out"; ERR="$TMP/s-err"
+    GITHUB_WORKFLOW="" GH_API_CMD="$SSHIM_DIR/gh api" \
+        "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B "$@" >"$OUT" 2>"$ERR"
+    RC=$?
+}
+
+s_state() { jq -r .state "$PFIX/posted.json" 2>/dev/null; }
+s_desc()  { jq -r .description "$PFIX/posted.json" 2>/dev/null; }
+
+# S1: all green -> success posted.
+s_case s1
+run_settle --head-sha="$P_SHA" --target-url=https://example.test/run/1
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] \
+        && [ "$(jq -r .context "$PFIX/posted.json")" = "All checks settled" ] \
+        && [ "$(jq -r .target_url "$PFIX/posted.json")" = "https://example.test/run/1" ] \
+        && [[ "$(s_desc)" == PASS:* ]]; then
+    ok "S1 all green posts success"
+else fail "S1 all green posts success (rc=$RC state=$(s_state) desc=$(s_desc) err=$(cat "$ERR"))"; fi
+
+# S2: a failed check -> failure naming it.
+s_case s2
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},{\"name\":\"Lint broke\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"Lint broke"* ]]; then
+    ok "S2 failed check posts failure naming it"
+else fail "S2 failed check posts failure naming it (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S3: a missing anchor -> pending.
+s_case s3
+cr 1 "[{\"name\":\"A\",$G}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] && [[ "$(s_desc)" == *"anchors not reported"* ]]; then
+    ok "S3 missing anchor posts pending"
+else fail "S3 missing anchor posts pending (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S4: the PR head moved past the event head -> nothing posted.
+s_case s4 master "$S_SHA2"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'STALE:' "$OUT"; then
+    ok "S4 stale event head posts nothing"
+else fail "S4 stale event head posts nothing (rc=$RC posted=$([ -f "$PFIX/posted.json" ] && echo yes || echo no) out=$(cat "$OUT"))"; fi
+
+# S5: no open PR owns the head -> nothing posted.
+s_case s5
+printf '[]' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'NOTHING:' "$OUT"; then
+    ok "S5 no open PR posts nothing"
+else fail "S5 no open PR posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S6: a stacked base -> failure with the retarget message, resolved from the API.
+s_case s6 feature
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"stacked on feature"* ]]; then
+    ok "S6 stacked base posts failure with retarget message"
+else fail "S6 stacked base posts failure with retarget message (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S7: a bad --pr and both selectors are usage errors.
+s_case s7
+s7_ok=1
+for bad in "--pr=abc" "--pr=1 --head-sha=$P_SHA" "--pr=12345678" ""; do
+    # shellcheck disable=SC2086
+    run_settle $bad
+    if [ "$RC" -ne 2 ] || ! grep -qiE 'unknown|usage|invalid' "$ERR" || [ -f "$PFIX/posted.json" ]; then
+        s7_ok=0; echo "  S7 '$bad' -> rc=$RC: $(head -1 "$ERR")" >&2
+    fi
+done
+if [ "$s7_ok" -eq 1 ]; then ok "S7 bad --pr and both-selectors are usage errors"
+else fail "S7 bad --pr and both-selectors are usage errors"; fi
+
+# S8: --dry-run prints the payload and posts nothing (also covers the --pr path).
+s_case s8
+run_settle --pr=7 --dry-run
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] \
+        && grep -qF 'would POST repos/a-jay85/IBL5/statuses/' "$OUT" \
+        && grep -qF '"state": "success"' "$OUT"; then
+    ok "S8 dry-run prints payload and posts nothing"
+else fail "S8 dry-run prints payload and posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S9: a check-runs API error -> nothing posted, exit 2.
+s_case s9
+: > "$PFIX/cr-fail"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ]; then
+    ok "S9 check-runs API error posts nothing and exits 2"
+else fail "S9 check-runs API error posts nothing and exits 2 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# S10: the description is capped at 140 bytes (the statuses API rejects longer).
+s_case s10
+long_runs=""
+for i in $(seq 1 30); do
+    long_runs="${long_runs}{\"name\":\"long-running-check-number-$i\",\"status\":\"in_progress\",\"conclusion\":null},"
+done
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},${long_runs%,}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] \
+        && [ "$(jq -r .description "$PFIX/posted.json" | wc -c)" -le 141 ]; then
+    ok "S10 description is capped at 140 bytes"
+else fail "S10 description is capped at 140 bytes (rc=$RC state=$(s_state) len=$(jq -r .description "$PFIX/posted.json" | wc -c))"; fi
 
 h_done

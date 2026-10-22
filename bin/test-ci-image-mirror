@@ -136,6 +136,43 @@ expect_exit "check with dry-run" 2 "$RC"
 run --check=yes --manifest="$REAL_MANIFEST"
 expect_exit "check=yes form" 2 "$RC"
 
+# 10. mirror-ci-images.yml probe wiring: the probe runs only for only-missing
+# callers, ahead of Buildx, and Buildx plus the copy skip when every ref is present.
+# CI_MIRROR_WF lets the mutation checks point this case at a modified copy.
+MIRROR_WF="${CI_MIRROR_WF:-$SCRIPT_DIR/../.github/workflows/mirror-ci-images.yml}"
+# step_block <step-name>: prints that step's lines, up to the next step or EOF.
+step_block() {
+    awk -v name="      - name: $1" '
+        $0 == name { b = 1; print; next }
+        b && /^      - / { exit }
+        b { print }
+    ' "$MIRROR_WF"
+}
+# step_line <step-name>: line number of the step's "- name:" line, 0 if absent.
+step_line() {
+    awk -v name="      - name: $1" '$0 == name { print NR; f = 1 } END { if (!f) print 0 }' "$MIRROR_WF"
+}
+PROBE_BLOCK=$(step_block "Probe mirror refs")
+BUILDX_BLOCK=$(step_block "Set up Docker Buildx")
+MIRROR_BLOCK=$(step_block "Mirror images")
+# shellcheck disable=SC2016  # the workflow expression is literal text, not a shell expansion
+PROBE_IF='        if: ${{ inputs.only-missing }}'
+SKIP_IF="        if: steps.probe.outputs.all-present != 'true'"
+PROBE_LN=$(step_line "Probe mirror refs")
+BUILDX_LN=$(step_line "Set up Docker Buildx")
+expect_eq "probe step has id: probe" 1 \
+    "$(printf '%s\n' "$PROBE_BLOCK" | grep -cxF '        id: probe' || true)"
+expect_eq "probe step is gated on inputs.only-missing" 1 \
+    "$(printf '%s\n' "$PROBE_BLOCK" | grep -cxF "$PROBE_IF" || true)"
+expect_eq "probe step precedes Buildx" yes \
+    "$([ "$PROBE_LN" -gt 0 ] && [ "$BUILDX_LN" -gt "$PROBE_LN" ] && echo yes || echo no)"
+expect_eq "Buildx step carries the all-present skip" 1 \
+    "$(printf '%s\n' "$BUILDX_BLOCK" | grep -cxF "$SKIP_IF" || true)"
+expect_eq "Mirror images step carries the all-present skip" 1 \
+    "$(printf '%s\n' "$MIRROR_BLOCK" | grep -cxF "$SKIP_IF" || true)"
+expect_eq "probe step runs bin/ci-image-mirror --check" 1 \
+    "$(printf '%s\n' "$PROBE_BLOCK" | grep -cF 'bin/ci-image-mirror --check' || true)"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "test-ci-image-mirror: FAILED"
     exit 1

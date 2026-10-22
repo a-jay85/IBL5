@@ -16,6 +16,10 @@ Usage: bin/settle-pr-status --repo=<owner/repo> (--head-sha=<40-hex> | --pr=<n>)
   --context=<name>          Status context (default: All checks settled)
   --target-url=<url>        Status link (the aggregator run)
   --self=<csv> --ignore=<csv> --anchor=<csv> --ignore-workflows=<csv>   passed through verbatim
+  --sweep-stale-minutes=<M> Sweep mode (no --head-sha/--pr): for every open PR whose <context>
+                            status is pending and last updated more than M minutes ago, POST a
+                            workflow_dispatch of all-checks-settled.yml (ref master, pr_number=N).
+                            With --dry-run prints each payload instead. Exit 2 if any dispatch fails.
   --dry-run                 Print the payload and `would POST ...`; never call the statuses API
 Exit: 0 = posted, or nothing to settle (stale event, no open PR, closed PR), or dry-run printed
       2 = usage error, API read error, POST failure (the job turns red; no status is written)
@@ -26,6 +30,7 @@ Every SHA and base ref comes from the API, never from a flag or event field.
 Environment:
   GH_API_CMD       Override the API command (default "gh api"). Tests point it at a shim.
   IBL5_GH_RETRY_DELAYS  Sleeps between retries of an API read (default "2 5": 3 attempts). Unset and empty both select the default.
+  CCG_NOW_EPOCH    Test seam: epoch seconds used as "now" for the staleness age (unset or empty = wall clock).
 EOF_USAGE
 }
 
@@ -41,6 +46,10 @@ IGNORE=""
 ANCHOR=""
 IGNORE_WF=""
 DRY_RUN=0
+SWEEP_MIN=""
+SWEEP_SET=0
+# Dispatched from master only: the workflow header says so, and the dispatch ref is pinned below.
+SWEEP_WORKFLOW="all-checks-settled.yml"
 
 for arg in "$@"; do
     case "$arg" in
@@ -54,6 +63,7 @@ for arg in "$@"; do
         --ignore=*)           IGNORE="${arg#--ignore=}" ;;
         --anchor=*)           ANCHOR="${arg#--anchor=}" ;;
         --ignore-workflows=*) IGNORE_WF="${arg#--ignore-workflows=}" ;;
+        --sweep-stale-minutes=*) SWEEP_MIN="${arg#--sweep-stale-minutes=}"; SWEEP_SET=1 ;;
         --dry-run)            DRY_RUN=1 ;;
         --*)
             echo "unknown flag: $arg" >&2
@@ -73,14 +83,18 @@ if ! [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || [[ "$REPO" == *..* ]]
     usage >&2
     exit 2
 fi
-if [ "$HEAD_SHA_SET" -eq 1 ] && [ "$PR_SET" -eq 1 ]; then
-    echo "usage error: give exactly one of --head-sha or --pr, not both" >&2
+if [ "$((HEAD_SHA_SET + PR_SET + SWEEP_SET))" -ne 1 ]; then
+    echo "usage error: give exactly one of --head-sha, --pr or --sweep-stale-minutes" >&2
     usage >&2
     exit 2
 fi
-if [ "$HEAD_SHA_SET" -eq 0 ] && [ "$PR_SET" -eq 0 ]; then
-    echo "usage error: one of --head-sha or --pr is required" >&2
+if [ "$SWEEP_SET" -eq 1 ] && ! [[ "$SWEEP_MIN" =~ ^[1-9][0-9]{0,4}$ ]]; then
+    echo "invalid --sweep-stale-minutes: '$SWEEP_MIN' (want 1-99999)" >&2
     usage >&2
+    exit 2
+fi
+if [ -n "${CCG_NOW_EPOCH:-}" ] && ! [[ "$CCG_NOW_EPOCH" =~ ^[0-9]+$ ]]; then
+    echo "invalid CCG_NOW_EPOCH: '$CCG_NOW_EPOCH' (want epoch seconds, or unset)" >&2
     exit 2
 fi
 if [ "$HEAD_SHA_SET" -eq 1 ] && ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
@@ -122,6 +136,69 @@ api_get() {
     rm -f "$errfile"
     printf '%s' "$out"
 }
+
+# api_get_paged <path> — like api_get, but --paginate --slurp: prints the slurped page array.
+api_get_paged() {
+    local out err errfile
+    errfile="$(mktemp)"
+    if ! out="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"$1\"" 2>"$errfile")"; then
+        err="$(tail -n 1 "$errfile")"
+        rm -f "$errfile"
+        echo "API read error: $1: ${err:-${out%%$'\n'*}}" >&2
+        exit 2
+    fi
+    cat "$errfile" >&2
+    rm -f "$errfile"
+    printf '%s' "$out"
+}
+
+if [ "$SWEEP_SET" -eq 1 ]; then
+    # Stateless re-settle for a status left pending with no further workflow_run event
+    # (ADR-0149 addendum 2026-10-22: the ghost run). Every open PR is read; only a pending
+    # status older than the window is dispatched. Dispatching an honestly-running PR is
+    # harmless: the aggregator re-posts pending in seconds.
+    now="${CCG_NOW_EPOCH:-$(date +%s)}"
+    window=$((SWEEP_MIN * 60))
+    pulls="$(api_get_paged "repos/$REPO/pulls?state=open&per_page=100")"
+    if ! prs="$(jq -ec '[.[][] | {number, sha: .head.sha}]' <<< "$pulls" 2>/dev/null)"; then
+        echo "API read error: repos/$REPO/pulls: unparseable page list" >&2; exit 2
+    fi
+    open=0; stale=0; dispatched=0; failed=0
+    while IFS=$'\t' read -r n sha; do
+        [ -n "$n" ] || continue
+        open=$((open + 1))
+        if ! [[ "$n" =~ ^[0-9]{1,7}$ ]] || ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "SWEEP: PR ${n:-?}: skip: head.sha or number malformed"; continue
+        fi
+        combined="$(api_get "repos/$REPO/commits/$sha/status")"
+        verdict="$(jq -r --arg ctx "$CONTEXT" --argjson now "$now" --argjson w "$window" '
+            ([.statuses[]? | select(.context == $ctx)] | first) as $s
+            | if $s == null then "skip: no \($ctx) status"
+              elif $s.state != "pending" then "skip: state \($s.state)"
+              else (($s.updated_at | if type == "string" then (try fromdateiso8601 catch null) else null end) as $u
+                | if $u == null then "skip: pending with unparseable updated_at"
+                  elif ($now - $u) <= $w then "skip: pending for \($now - $u)s (<= \($w)s)"
+                  else "stale: pending since \($s.updated_at) (\($now - $u)s > \($w)s)" end) end' <<< "$combined")"
+        case "$verdict" in
+            stale:*)
+                stale=$((stale + 1))
+                echo "SWEEP: PR $n head $sha $CONTEXT ${verdict#stale: }: dispatching"
+                payload="$(jq -n --arg n "$n" '{ref: "master", inputs: {pr_number: $n}}')"
+                if [ "$DRY_RUN" -eq 1 ]; then
+                    printf '%s\n' "$payload"
+                    echo "would POST repos/$REPO/actions/workflows/$SWEEP_WORKFLOW/dispatches"
+                elif printf '%s' "$payload" | bash -c "$GH_API_CMD -X POST \"repos/$REPO/actions/workflows/$SWEEP_WORKFLOW/dispatches\" --input -" >/dev/null; then
+                    dispatched=$((dispatched + 1))
+                else
+                    failed=$((failed + 1)); echo "SWEEP: dispatch failed for PR $n" >&2
+                fi ;;
+            *) echo "SWEEP: PR $n head $sha: $verdict" ;;
+        esac
+    done < <(jq -r '.[] | [.number, .sha] | @tsv' <<< "$prs")
+    echo "SWEEP: $open open PR(s), $stale stale pending (> $SWEEP_MIN min), $dispatched dispatched, $failed failed"
+    [ "$failed" -eq 0 ] || exit 2
+    exit 0
+fi
 
 if [ "$HEAD_SHA_SET" -eq 1 ]; then
     SHA="$HEAD_SHA"
@@ -188,7 +265,16 @@ case "$RC" in
         ;;
 esac
 
-line="${OUT%%$'\n'*}"
+# The V4 ghost check logs one GHOST: or ghost-check: line per active run before the
+# verdict line. Those lines go to this job's log; the first other line is the verdict
+# and becomes the description.
+line=""
+while IFS= read -r l; do
+    case "$l" in
+        "GHOST: "*|"ghost-check: "*) printf '%s\n' "$l" >&2 ;;
+        *) [ -n "$line" ] || line="$l" ;;
+    esac
+done <<< "$OUT"
 DESC="${line:0:140}"
 
 PAYLOAD="$(jq -n --arg state "$STATE" --arg context "$CONTEXT" --arg description "$DESC" \

@@ -215,6 +215,9 @@ expect_added_bad shape3-one-stage "$SH3"
 expect_added_bad shape3-tr-newline "echo \"\$x\" $PIPE tr ' ' '\\n' $PIPE $GQ -qx y"
 expect_added_bad shape3-two-stages "echo \"\$x\" $PIPE tr A-Z a-z $PIPE sed s/a/b/ $PIPE $GQ -q y"
 expect_added_bad shape3-printf-producer "printf '%s\\n' \"\$x\" $PIPE tr a b $PIPE $GQ -q y"
+# Decision: a redirect stage (2>&1, &>/dev/null) is matched like any other stage. The
+# &>/dev/null line writes nothing into grep and cannot exit 141, but the gate stays
+# conservative and flags it, as with the wc -l stage below.
 expect_added_bad shape3-stderr-redirect-stage "echo \"\$x\" $PIPE tr a b 2>&1 $PIPE $GQ -q y"
 expect_added_bad shape3-amp-redirect-stage "echo \"\$x\" $PIPE tr a b &>/dev/null $PIPE $GQ -q y"
 

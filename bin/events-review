@@ -18,6 +18,13 @@ set -euo pipefail
 #                           stdout. Spawns no claude, sends no DM.
 #   --from-tsv=<path>       Skip SSH and SQL; feed this 4-column TSV to the
 #                           digest builder (CI and worktree exercise path).
+#   --at-reset              Launchd mode: run when the UTC hour is 16 (Sunday
+#                           16:03 UTC, the weekly usage reset). Any other hour
+#                           logs one line and exits 0, unless no review went out
+#                           in the last 6 days (a late launchd fire after sleep)
+#                           and it is not a pre-reset Sunday hour. The plist fires
+#                           at 08:03 and 09:03 local so one fire hits 16:xx UTC
+#                           in both PDT and PST.
 #   --print-schedule        Print the launchd plist and exit (no side effect).
 #   --install-schedule      Write the plist and bootstrap it (main checkout only).
 #   --uninstall-schedule    Boot the job out and remove the plist (idempotent).
@@ -33,8 +40,13 @@ set -euo pipefail
 #   EVENTS_REVIEW_DB_HOST=127.0.0.1  EVENTS_REVIEW_DB_PORT=13306
 #   EVENTS_REVIEW_MODEL=claude-sonnet-5-5  EVENTS_REVIEW_MIN_ROWS=20
 #   EVENTS_REVIEW_CLAUDE_TIMEOUT=600
+#   EVENTS_REVIEW_WEBHOOK_FILE=~/.iblbot-reviews-webhook-url  (the #reviews
+#   webhook the review and the skip line post to; failure notices stay on the
+#   default #dev webhook)
 # Test seams: EVENTS_REVIEW_SSH_BIN, EVENTS_REVIEW_MYSQL_BIN,
-#   EVENTS_REVIEW_CLAUDE_BIN, EVENTS_REVIEW_DM_BIN, EVENTS_REVIEW_LAUNCHCTL_BIN.
+#   EVENTS_REVIEW_CLAUDE_BIN, EVENTS_REVIEW_DM_BIN, EVENTS_REVIEW_LAUNCHCTL_BIN,
+#   EVENTS_REVIEW_UTC_HOUR, EVENTS_REVIEW_UTC_DOW, EVENTS_REVIEW_NOW_EPOCH,
+#   EVENTS_REVIEW_STATE_FILE (default ~/Library/Logs/ibl5/events-review.last-sent).
 #
 # Exit codes: 0 success (including an empty week), 1 run failure, 2 usage/env.
 
@@ -50,6 +62,7 @@ DAYS=7
 DRY_RUN=0
 FROM_TSV=""
 MODE="run"
+AT_RESET=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -63,6 +76,7 @@ while [ $# -gt 0 ]; do
             DAYS="$((10#$v))"
             shift ;;
         --dry-run)            DRY_RUN=1; shift ;;
+        --at-reset)           AT_RESET=1; shift ;;
         --from-tsv=*)
             FROM_TSV="${1#--from-tsv=}"
             if [ -z "$FROM_TSV" ] || [ ! -f "$FROM_TSV" ] || [ ! -r "$FROM_TSV" ]; then
@@ -100,6 +114,8 @@ EVENTS_REVIEW_MYSQL_BIN="${EVENTS_REVIEW_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/
 EVENTS_REVIEW_CLAUDE_BIN="${EVENTS_REVIEW_CLAUDE_BIN:-claude}"
 EVENTS_REVIEW_DM_BIN="${EVENTS_REVIEW_DM_BIN:-$REPO_ROOT/bin/discord-dm}"
 EVENTS_REVIEW_LAUNCHCTL_BIN="${EVENTS_REVIEW_LAUNCHCTL_BIN:-launchctl}"
+# The review and the skip line post to #reviews; failure notices keep the default webhook.
+EVENTS_REVIEW_WEBHOOK_FILE="${EVENTS_REVIEW_WEBHOOK_FILE:-${HOME:+$HOME/.iblbot-reviews-webhook-url}}"
 
 for _v in EVENTS_REVIEW_MIN_ROWS EVENTS_REVIEW_CLAUDE_TIMEOUT EVENTS_REVIEW_DB_PORT; do
     if ! [[ "${!_v}" =~ ^[0-9]+$ ]]; then
@@ -175,18 +191,29 @@ build_plist() {
 		<string>-s</string>
 		<string>/bin/bash</string>
 		<string>${MAIN_WT}/bin/events-review</string>
+		<string>--at-reset</string>
 	</array>
 	<key>WorkingDirectory</key>
 	<string>${MAIN_WT}</string>
 	<key>StartCalendarInterval</key>
-	<dict>
-		<key>Weekday</key>
-		<integer>1</integer>
-		<key>Hour</key>
-		<integer>9</integer>
-		<key>Minute</key>
-		<integer>17</integer>
-	</dict>
+	<array>
+		<dict>
+			<key>Weekday</key>
+			<integer>0</integer>
+			<key>Hour</key>
+			<integer>8</integer>
+			<key>Minute</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>Weekday</key>
+			<integer>0</integer>
+			<key>Hour</key>
+			<integer>9</integer>
+			<key>Minute</key>
+			<integer>3</integer>
+		</dict>
+	</array>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
@@ -233,7 +260,7 @@ schedule_main() {
             build_plist "$home" > "$plist_path"
             "$EVENTS_REVIEW_LAUNCHCTL_BIN" bootout "gui/$uid/$PLIST_LABEL" 2>/dev/null || true
             "$EVENTS_REVIEW_LAUNCHCTL_BIN" bootstrap "gui/$uid" "$plist_path"
-            echo "Installed $PLIST_LABEL (Mondays 09:17). Program: $MAIN_WT/bin/events-review"
+            echo "Installed $PLIST_LABEL (Sundays 08:03 and 09:03 local; --at-reset passes the one at 16:03 UTC). Program: $MAIN_WT/bin/events-review"
             ;;
         uninstall)
             uid="$(id -u)"
@@ -247,6 +274,46 @@ schedule_main() {
 case "$MODE" in
     print|install|uninstall) schedule_main; exit 0 ;;
 esac
+
+# launchd fires twice on Sunday (08:03 and 09:03 local); the 16:xx UTC fire runs.
+# A fire launchd ran late (Mac asleep at both times) lands at an arbitrary hour,
+# so any other hour is a catch-up when no review went out in the last 6 days,
+# except the pre-reset Sunday hours, which wait for the 16:xx fire.
+STATE_FILE="${EVENTS_REVIEW_STATE_FILE:-${HOME:+$HOME/Library/Logs/ibl5/events-review.last-sent}}"
+if [ "$AT_RESET" = 1 ]; then
+    _utc_hour="${EVENTS_REVIEW_UTC_HOUR:-$(date -u +%H)}"
+    _utc_dow="${EVENTS_REVIEW_UTC_DOW:-$(date -u +%w)}"
+    _last=""
+    [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ] && IFS= read -r _last < "$STATE_FILE" || true
+    case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+    _now="${EVENTS_REVIEW_NOW_EPOCH:-$(date -u +%s)}"
+    if [ "$_utc_hour" != "16" ]; then
+        if [ "$_utc_dow" = "0" ] && [ "$((10#$_utc_hour))" -lt 16 ]; then
+            log "--at-reset: UTC hour is ${_utc_hour}, not 16; skipping this fire"
+            exit 0
+        fi
+        if [ $((_now - _last)) -le 518400 ]; then
+            log "--at-reset: UTC hour is ${_utc_hour}, not 16, and a review already went out; skipping this fire"
+            exit 0
+        fi
+        log "--at-reset: UTC hour is ${_utc_hour}; no review in the last 6 days, running as catch-up"
+    elif [ "$_utc_dow" != "0" ] && [ $((_now - _last)) -le 518400 ]; then
+        # A late fire (Mac asleep Sunday) can land on 16:xx UTC on a later day.
+        log "--at-reset: UTC hour is 16 on a non-Sunday and a review already went out; skipping this fire"
+        exit 0
+    fi
+fi
+
+# Records a delivered review (or skip line) so a late launchd fire is not re-run.
+mark_sent() {
+    [ "$AT_RESET" = 1 ] && [ "$DRY_RUN" != 1 ] || return 0
+    if [ -z "$STATE_FILE" ]; then
+        log "HOME is unset and EVENTS_REVIEW_STATE_FILE is not set; not recording the send"
+        return 0
+    fi
+    mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
+    date -u +%s > "$STATE_FILE" 2>/dev/null || log "could not write $STATE_FILE"
+}
 
 if [ -z "$FROM_TSV" ]; then
     require_vars
@@ -609,15 +676,21 @@ sanitize_dm() {
     printf '%s' "$body"
 }
 
-# send_dm <body> [header]. Every DM, fixed one-liners included, passes
-# sanitize_dm. The header is built from script literals and shape-checked dates.
+# send_dm <body> [header] [webhook-file]. Every DM, fixed one-liners included,
+# passes sanitize_dm. The header is built from script literals and shape-checked
+# dates. A webhook-file argument routes the send to that channel's webhook; none
+# keeps the default (#dev), which is where failure notices go.
 send_dm() {
-    local body="$1" header="${2:-}" text rc=0
+    local body="$1" header="${2:-}" webhook_file="${3:-}" text rc=0
     text="$(printf '%s' "$body" | sanitize_dm)"
     if [ -n "$header" ]; then
         text="$(printf '%s' "$header" | sanitize_dm)"$'\n'"$text"
     fi
-    printf '%s' "$text" | "$EVENTS_REVIEW_DM_BIN" - >/dev/null || rc=$?
+    if [ -n "$webhook_file" ]; then
+        printf '%s' "$text" | DISCORD_DM_WEBHOOK_FILE="$webhook_file" "$EVENTS_REVIEW_DM_BIN" - >/dev/null || rc=$?
+    else
+        printf '%s' "$text" | "$EVENTS_REVIEW_DM_BIN" - >/dev/null || rc=$?
+    fi
     case "$rc" in
         0) return 0 ;;
         1) log "ERROR: discord-dm undeliverable (spooled)" ;;
@@ -656,7 +729,8 @@ if [ "$HUMAN" -lt "$EVENTS_REVIEW_MIN_ROWS" ]; then
         printf '%s\n[dry-run] would skip claude\n' "$SKIP_LINE"
         exit 0
     fi
-    send_dm "$SKIP_LINE"
+    send_dm "$SKIP_LINE" "" "$EVENTS_REVIEW_WEBHOOK_FILE"
+    mark_sent
     exit 0
 fi
 
@@ -695,4 +769,5 @@ if [ "$CLAUDE_RC" -ne 0 ] || [ -z "${REVIEW//[[:space:]]/}" ]; then
     exit 1
 fi
 
-send_dm "$REVIEW" "IBL5 analytics review ${WSTART}..${WEND}"
+send_dm "$REVIEW" "IBL5 analytics review ${WSTART}..${WEND}" "$EVENTS_REVIEW_WEBHOOK_FILE"
+mark_sent

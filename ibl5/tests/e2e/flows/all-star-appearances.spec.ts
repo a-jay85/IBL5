@@ -4,7 +4,7 @@ import { publicStorageState } from '../helpers/public-storage-state';
 import { assertSortableTablePage } from '../helpers/sortable-table-page';
 
 // All-Star Appearances is a standalone module at name=AllStarAppearances.
-// RecordHolders&op=allstar redirects here via ModuleRedirect::sendWithPassthrough().
+// RecordHolders&op=allstar redirects here via RecordsController::legacyRedirectUrl().
 test.use({ storageState: publicStorageState() });
 
 const SUB_VIEW_URL = 'modules.php?name=AllStarAppearances';

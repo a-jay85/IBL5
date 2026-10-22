@@ -1517,6 +1517,8 @@ srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
     "context_empty_games_parks_transport — parks transport"
 srt_file_absent "$STUB/claude.sentinel" \
     "context empty games — claude never spawned"
+srt_log_lacks "$STUB" curl.log "/post-to-thread" \
+    "context_empty_games_parks_transport — no ops alert for a timing state"
 
 # ── context_null_ordinal_parks_transport ─────────────────────────────────────
 # A game whose team box row is not imported yet has a null game_of_that_day;
@@ -1531,6 +1533,8 @@ srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
     "context_null_ordinal_parks_transport — parks transport"
 srt_file_absent "$STUB/claude.sentinel" \
     "context null ordinal — claude never spawned"
+srt_log_lacks "$STUB" curl.log "/post-to-thread" \
+    "context_null_ordinal_parks_transport — no ops alert for a timing state"
 
 # ── onset_alert_full_wording ─────────────────────────────────────────────────
 srt_reset

@@ -522,15 +522,21 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json + roste
     # both read it, so a sim without it parks (transport) before any agent spend.
     local ctx ctx_rc
     ctx="$(qctx "$sim")"; ctx_rc=$?
-    if [ "$ctx_rc" -ne 0 ] || ! jq_ok "$ctx" '(.sim != null)
-            and (.games | type == "array") and (.games | length > 0)
-            and all(.games[]; (.game_of_that_day | type == "number") and .game_of_that_day >= 1)'; then
-        log "sim $sim: fact-sheet context unavailable, empty, or missing a game_of_that_day (rc=$ctx_rc) — parking"
+    if [ "$ctx_rc" -ne 0 ] || ! jq_ok "$ctx" '(.sim != null) and (.games | type == "array")'; then
+        log "sim $sim: fact-sheet context unavailable or malformed (rc=$ctx_rc) — parking"
         roster_health_transition "$sim" degraded
         return 1
     fi
-    printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
+    # The endpoint answered, so ops health is fine. No games yet, or a game
+    # whose box row is not imported (null game_of_that_day), is a timing state:
+    # park without alerting so real outages are not buried in harmless delays.
     roster_health_transition "$sim" ok
+    if ! jq_ok "$ctx" '(.games | length > 0)
+            and all(.games[]; (.game_of_that_day | type == "number") and .game_of_that_day >= 1)'; then
+        log "sim $sim: fact-sheet context has no games or a game missing its game_of_that_day — parking until ready"
+        return 1
+    fi
+    printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
     return 0
 }
 

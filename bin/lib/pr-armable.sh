@@ -42,9 +42,10 @@ GH_CMD="${GH_CMD:-gh}"
 REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
 
 # The aggregator context name. bin/check-composite-contracts A2 pins this literal to
-# the job name in .github/workflows/all-checks-green.yml and to
-# tools/postplan-harness/harness/armable.py, so the three cannot drift apart.
-PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'
+# the --context= of .github/workflows/all-checks-settled.yml and to armable.py.
+# It is a commit status on the PR head, so condition (15) still reads protection
+# contexts, never check-runs.
+PR_ARMABLE_AGGREGATOR_CONTEXT='All checks settled'
 
 # pr_manual_testing_clearance <body>
 #   The fail-closed positive-clearance axis (Phase 6.5 condition (1), mechanized).

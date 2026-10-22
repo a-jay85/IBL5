@@ -733,6 +733,7 @@ notify_scan() { # <wf-dir> <mode>
                 if (mode == "lines") printf "%s#%d\t%s\n", file, ord, line
                 if (line == "webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = "dev"
                 if (line == "webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}") wh = "merged"
+                if (line == "webhook-url: ${{ secrets.DISCORD_REVIEWS_WEBHOOK_URL }}") wh = "reviews"
                 if (line ~ /^ping: /) ping = substr(line, 7)
             }
             END { emit() }' "$f"
@@ -748,8 +749,8 @@ db-backup.yml#4 webhook=dev ping='true'
 docfix-health.yml#1 webhook=dev ping=-
 docfix-health.yml#2 webhook=dev ping=-
 docs-refreshed-notify.yml#1 webhook=dev ping=-
-flake-report.yml#1 webhook=dev ping=-
-log-review.yml#1 webhook=dev ping=-
+flake-report.yml#1 webhook=reviews ping=-
+log-review.yml#1 webhook=reviews ping=-
 main.yml#1 webhook=dev ping=-
 merge-digest-notify.yml#1 webhook=merged ping='false'   # #merged posts never @mention the owner
 merge-digest-notify.yml#2 webhook=merged ping='false'   # #merged posts never @mention the owner
@@ -779,7 +780,7 @@ G2_GOT=$(notify_sites "$TMP/wf")
 [ "$G2_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G2: an injected ping line changes the scan" \
     || fail "G2: an injected ping line went unnoticed"
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=dev ping='true'"
+    want "G2: the injected ping is what differs" "$G2_GOT" "flake-report.yml#1 webhook=reviews ping='true'"
 fi
 
 # G3: a deleted webhook-url line must show up in the scan.

@@ -288,7 +288,7 @@ per_game AS (
     FROM `ibl_box_scores` bs
     JOIN pair_games g ON g.game_date = bs.game_date AND g.visitor_teamid = bs.visitor_teamid
         AND g.home_teamid = bs.home_teamid AND g.game_of_that_day = bs.game_of_that_day
-    WHERE bs.pid > 0 AND bs.teamid IN (g.visitor_teamid, g.home_teamid)
+    WHERE bs.pid > 0 AND bs.game_min > 0 AND bs.teamid IN (g.visitor_teamid, g.home_teamid)
     GROUP BY bs.pid, bs.teamid, bs.game_date, bs.game_of_that_day, side
 )';
 

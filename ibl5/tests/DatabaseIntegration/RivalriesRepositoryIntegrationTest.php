@@ -121,6 +121,9 @@ final class RivalriesRepositoryIntegrationTest extends DatabaseTestCase
         $this->insertScoredTeamBoxscoreRow('2001-11-20', 1, 13, 11, 90, 80);
         $this->insertPlayerBoxscoreRow('2001-11-05', $pid, 'Alias A', 'G', 11, 13, 11, 30, 20);
         $this->insertPlayerBoxscoreRow('2001-11-20', $pid, 'Alias B', 'G', 13, 11, 11, 30, 20);
+        // A 0-minute DNP row in a third pair game must not count as a game played.
+        $this->insertScoredTeamBoxscoreRow('2001-12-05', 1, 11, 13, 90, 80);
+        $this->insertPlayerBoxscoreRow('2001-12-05', $pid, 'Alias C', 'G', 11, 13, 11, 0, 0);
 
         $performers = $this->repo->getFranchiseTopPerformers(11, 13);
         $rows = array_values(array_filter(

@@ -15,6 +15,7 @@ use JsbParser\PlayerIdResolver;
 use LeagueConfig\LeagueConfigService;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserServiceInterface;
+use PlrParser\PlrOrdinalMap;
 use PlrParser\PlrParseResult;
 
 /**
@@ -391,6 +392,104 @@ class BulkImportRunnerTest extends TestCase
         );
     }
 
+    /**
+     * One .plr row in the fixed-width layout PlrOrdinalMap::fromPlrFile() parses.
+     *
+     * Format: ordinal(4) | name(32) | age(2) | pid(6) + padding
+     */
+    private function plrLine(int $ordinal, string $name, int $pid): string
+    {
+        $line = str_pad((string) $ordinal, 4, ' ', STR_PAD_LEFT);
+        $line .= str_pad($name, 32);
+        $line .= str_pad('25', 2); // age placeholder
+        $line .= str_pad((string) $pid, 6, ' ', STR_PAD_LEFT);
+        return str_pad($line, 100);
+    }
+
+    /** Three valid rows: ordinals 1, 2, 1440 map to pids 101, 202, 303. */
+    private function validPlrBytes(): string
+    {
+        return $this->plrLine(1, 'Alpha', 101) . "\n"
+            . $this->plrLine(2, 'Bravo', 202) . "\n"
+            . $this->plrLine(1440, 'Charlie', 303) . "\n";
+    }
+
+    /** One season dir ('06-07' -> 2007) with a single Regular Season .plb archive and a HEAT-end archive. */
+    private function seedHeatSeason(): void
+    {
+        mkdir($this->backupsDir . '/06-07', 0700, true);
+        $this->stubExtractor->method('seasonLabelToEndingYear')->willReturn(2007);
+        $this->stubExtractor->method('findAllArchives')->willReturn([
+            ['path' => '/fake/06-07/0607-sim01.zip', 'season' => '06-07', 'seq' => 1, 'phase' => 'Regular Season', 'ending_year' => 2007],
+        ]);
+        $this->stubExtractor->method('findHeatEndArchive')->willReturn('/fake/06-07/0607-heat.zip');
+    }
+
+    /**
+     * Configures jsbFilename, extractSingleFile and cleanupTemp ONCE for the whole test.
+     *
+     * @param \Closure(string): (string|false) $plrResult receives the real tmp $targetDir
+     *        production created (ibl5_plb_<hex>) and returns the .plr path, or false
+     * @param list<string> $plrTargetDirs filled with each $targetDir the IBL5.plr call received
+     * @param list<string> $cleaned filled with each path passed to cleanupTemp
+     */
+    private function stubHeatArchiveExtraction(\Closure $plrResult, array &$plrTargetDirs, array &$cleaned): void
+    {
+        $this->stubExtractor->method('jsbFilename')
+            ->willReturnCallback(static fn (string $ext): string => 'IBL5.' . $ext);
+        $this->stubExtractor->method('extractSingleFile')->willReturnCallback(
+            static function (string $archive, string $filename, string $targetDir) use ($plrResult, &$plrTargetDirs): string|false {
+                if ($filename === 'IBL5.plr') {
+                    $plrTargetDirs[] = $targetDir;
+                    return $plrResult($targetDir);
+                }
+                $path = $targetDir . '/' . $filename; // IBL5.plb main extraction, same as recordExtraction()
+                file_put_contents($path, 'x');
+                return $path;
+            },
+        );
+        $this->stubExtractor->method('cleanupTemp')->willReturnCallback(
+            static function (string $path) use (&$cleaned): void {
+                $cleaned[] = $path;
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            },
+        );
+    }
+
+    /** @param list<array{0: PlrOrdinalMap, 1: int, 2: int}> $plbCalls filled with [map, seasonYear, simNumber] */
+    private function capturePlbCalls(array &$plbCalls): void
+    {
+        $this->stubJsb->method('processPlbFile')->willReturnCallback(
+            static function (string $filePath, PlrOrdinalMap $map, int $seasonYear, int $simNumber, string $sourceArchive) use (&$plbCalls): JsbImportResult {
+                $plbCalls[] = [$map, $seasonYear, $simNumber];
+                return new JsbImportResult();
+            },
+        );
+    }
+
+    /** @return list<string> sorted ibl5_plb_* and ibl5_import_* dirs currently under the system temp dir */
+    private function tempDirSnapshot(): array
+    {
+        $dirs = array_merge(
+            glob(sys_get_temp_dir() . '/ibl5_plb_*') ?: [],
+            glob(sys_get_temp_dir() . '/ibl5_import_*') ?: [],
+        );
+        sort($dirs);
+        return $dirs;
+    }
+
+    /** @param list<string> $before result of tempDirSnapshot() taken before run() */
+    private function assertNoLeakedTempDirs(array $before): void
+    {
+        $leaked = array_values(array_diff($this->tempDirSnapshot(), $before));
+        foreach ($leaked as $dir) {
+            $this->removeDir($dir); // keep a failing run from polluting later runs
+        }
+        self::assertSame([], $leaked);
+    }
+
     public function testSnapshotPlrEmitsOneEntryPerArchiveWithPhaseYearAndSourceLabel(): void
     {
         mkdir($this->backupsDir . '/06-07', 0700, true);
@@ -560,6 +659,151 @@ class BulkImportRunnerTest extends TestCase
         self::assertStringContainsString('  [3/3] 0708-sim01.zip', $output);
         self::assertStringContainsString('No HEAT archive found', $output);
         self::assertSame(3, $summary->filesProcessed);
+    }
+
+    public function testPlbOrdinalMapBuiltFromHeatPlrReachesProcessPlbFileAndIsReported(): void
+    {
+        $before = $this->tempDirSnapshot();
+        $this->seedHeatSeason();
+
+        $plrPath = null;
+        $plrTargetDirs = [];
+        $cleaned = [];
+        $this->stubHeatArchiveExtraction(
+            function (string $targetDir) use (&$plrPath): string {
+                $plrPath = $targetDir . '/IBL5.plr';
+                file_put_contents($plrPath, $this->validPlrBytes());
+                return $plrPath;
+            },
+            $plrTargetDirs,
+            $cleaned,
+        );
+        $plbCalls = [];
+        $this->capturePlbCalls($plbCalls);
+
+        ob_start();
+        $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
+        $output = ob_get_clean();
+
+        self::assertIsString($output);
+        self::assertCount(1, $plbCalls);
+        self::assertSame(2007, $plbCalls[0][1]);
+        $map = $plbCalls[0][0];
+        self::assertSame(3, $map->count());
+        self::assertSame(['pid' => 101, 'name' => 'Alpha'], $map->getSlotPlayer(1, 0));
+        self::assertSame(['pid' => 202, 'name' => 'Bravo'], $map->getSlotPlayer(1, 1));
+        self::assertSame(['pid' => 303, 'name' => 'Charlie'], $map->getSlotPlayer(48, 29));
+        self::assertStringContainsString('PLR ordinal map: 3 players from 0607-heat.zip', $output);
+        self::assertCount(1, $plrTargetDirs);
+        self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
+        self::assertContains($plrPath, $cleaned);
+        $this->assertNoLeakedTempDirs($before);
+    }
+
+    public function testPlbOrdinalMapWithNoUsableRowsIsReportedAsZeroPlayersNotAsFailure(): void
+    {
+        $before = $this->tempDirSnapshot();
+        $this->seedHeatSeason();
+
+        $plrTargetDirs = [];
+        $cleaned = [];
+        $this->stubHeatArchiveExtraction(
+            function (string $targetDir): string {
+                $plrPath = $targetDir . '/IBL5.plr';
+                file_put_contents(
+                    $plrPath,
+                    $this->plrLine(5, 'Zero', 0) . "\n"
+                    . $this->plrLine(1441, 'Over', 909) . "\n"
+                    . "short\n",
+                );
+                return $plrPath;
+            },
+            $plrTargetDirs,
+            $cleaned,
+        );
+        $plbCalls = [];
+        $this->capturePlbCalls($plbCalls);
+
+        ob_start();
+        $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
+        $output = ob_get_clean();
+
+        self::assertIsString($output);
+        self::assertCount(1, $plbCalls);
+        self::assertSame(0, $plbCalls[0][0]->count());
+        self::assertStringContainsString('PLR ordinal map: 0 players from 0607-heat.zip', $output);
+        self::assertStringNotContainsString('WARNING', $output);
+        $this->assertNoLeakedTempDirs($before);
+    }
+
+    public function testPlbOrdinalMapFallsBackToEmptyMapWhenHeatArchiveHasNoPlr(): void
+    {
+        $before = $this->tempDirSnapshot();
+        $this->seedHeatSeason();
+
+        $plrTargetDirs = [];
+        $cleaned = [];
+        $this->stubHeatArchiveExtraction(
+            static fn (string $targetDir): false => false,
+            $plrTargetDirs,
+            $cleaned,
+        );
+        $plbCalls = [];
+        $this->capturePlbCalls($plbCalls);
+
+        ob_start();
+        $summary = $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
+        $output = ob_get_clean();
+
+        self::assertIsString($output);
+        self::assertStringContainsString('WARNING: IBL5.plr not found in HEAT archive', $output);
+        self::assertStringNotContainsString('PLR ordinal map:', $output);
+        self::assertCount(1, $plbCalls);
+        self::assertSame(0, $plbCalls[0][0]->count());
+        self::assertSame(1, $summary->filesProcessed);
+        self::assertCount(1, $plrTargetDirs);
+        self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
+        foreach ($cleaned as $path) {
+            self::assertStringEndsNotWith('IBL5.plr', $path);
+        }
+        $this->assertNoLeakedTempDirs($before);
+    }
+
+    public function testPlbOrdinalMapParseFailureWarnsAndStillCleansUpTmpDir(): void
+    {
+        $before = $this->tempDirSnapshot();
+        $this->seedHeatSeason();
+
+        $plrPath = null;
+        $plrTargetDirs = [];
+        $cleaned = [];
+        // Returned but never written, so PlrOrdinalMap::fromPlrFile() throws "PLR file not found".
+        $this->stubHeatArchiveExtraction(
+            static function (string $targetDir) use (&$plrPath): string {
+                $plrPath = $targetDir . '/IBL5.plr';
+                return $plrPath;
+            },
+            $plrTargetDirs,
+            $cleaned,
+        );
+        $plbCalls = [];
+        $this->capturePlbCalls($plbCalls);
+
+        ob_start();
+        $summary = $this->runnerWith()->run($this->backupsDir, [JsbFileType::Plb], false, false, null);
+        $output = ob_get_clean();
+
+        self::assertIsString($output);
+        self::assertIsString($plrPath);
+        self::assertStringContainsString('WARNING: PLR parse failed: PLR file not found: ' . $plrPath, $output);
+        self::assertStringNotContainsString('PLR ordinal map:', $output);
+        self::assertCount(1, $plbCalls);
+        self::assertSame(0, $plbCalls[0][0]->count());
+        self::assertSame(0, $summary->totalErrors);
+        self::assertContains($plrPath, $cleaned);
+        self::assertCount(1, $plrTargetDirs);
+        self::assertDirectoryDoesNotExist($plrTargetDirs[0]);
+        $this->assertNoLeakedTempDirs($before);
     }
 
     public function testCumulativeSkipsNullArchiveAndWarnsOnUnparseableLabel(): void

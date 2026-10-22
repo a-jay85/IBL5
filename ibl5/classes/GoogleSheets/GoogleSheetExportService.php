@@ -97,6 +97,7 @@ class GoogleSheetExportService
         }
         $this->refreshConnection($row);
 
+        // The caller reads status and last_refresh_status from this row to report a failed first write.
         return $this->connections->findByUserId($userId) ?? $row;
     }
 
@@ -122,9 +123,10 @@ class GoogleSheetExportService
      * Write the current export to one GM's sheet. Never throws.
      *
      * @param ConnectionRow $row
+     * @param list<list<string>>|null $rows Pre-built export rows, so a batch builds them once
      * @return string One of RESULT_OK, RESULT_ERROR, RESULT_BROKEN
      */
-    public function refreshConnection(array $row): string
+    public function refreshConnection(array $row, ?array $rows = null): string
     {
         $userId = $row['user_id'];
         $started = hrtime(true);
@@ -146,7 +148,7 @@ class GoogleSheetExportService
                 $this->connections->updateRefreshToken($userId, $this->box->encrypt($refreshToken));
             }
 
-            $rows = $this->buildRows();
+            $rows ??= $this->buildRows();
             try {
                 $this->sheets->ensureTab(
                     $accessToken,

@@ -124,7 +124,7 @@ class GoogleSheetExportServiceTest extends TestCase
         self::assertSame(0, $row['refresh_pending']);
         self::assertSame('active', $row['status']);
         self::assertCount(4, $this->http->requests);
-        $write = json_decode((string) $this->http->requests[3]['body'], true);
+        $write = json_decode((string) $this->http->requests[2]['body'], true);
         self::assertIsArray($write);
         self::assertSame([['PID', 'Name'], ['1', 'Player 1'], ['2', 'Player 2']], $write['data'][0]['values']);
     }

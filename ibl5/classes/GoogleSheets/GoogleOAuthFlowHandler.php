@@ -17,6 +17,8 @@ class GoogleOAuthFlowHandler
 {
     public const TEXT_CANCELLED = 'Google sign-in was cancelled.';
     public const TEXT_BAD_STATE = 'Sign-in link expired or invalid. Please try again.';
+    public const TEXT_FIRST_WRITE_BROKEN = 'Google Sheet created, but the first write was rejected. Use Reconnect Google below.';
+    public const TEXT_FIRST_WRITE_FAILED = 'Google Sheet created, but the first refresh failed. Use Refresh now to retry.';
     public const TEXT_SUCCESS = 'Google Sheet created. Your player export will refresh after every sim.';
 
     public function __construct(
@@ -48,13 +50,20 @@ class GoogleOAuthFlowHandler
         }
 
         try {
-            $this->export->connect($userId, $code);
+            $connection = $this->export->connect($userId, $code);
         } catch (GoogleApiException $e) {
             return ['type' => 'error', 'text' => self::connectError($e->reason)];
         } catch (GoogleHttpException) {
             return ['type' => 'error', 'text' => self::connectError('network')];
         } catch (SecretBoxKeyUnavailableException) {
             return ['type' => 'error', 'text' => self::connectError('server key unavailable')];
+        }
+
+        if ($connection['status'] === 'broken') {
+            return ['type' => 'error', 'text' => self::TEXT_FIRST_WRITE_BROKEN];
+        }
+        if ($connection['last_refresh_status'] !== GoogleSheetExportService::RESULT_OK) {
+            return ['type' => 'error', 'text' => self::TEXT_FIRST_WRITE_FAILED];
         }
 
         return ['type' => 'success', 'text' => self::TEXT_SUCCESS];

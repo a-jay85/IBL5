@@ -59,12 +59,14 @@ class GoogleSheetRefreshWorker
         $start = $this->clock->now();
         $processed = 0;
         $failures = 0;
+        $exportRows = null;
         foreach ($rows as $row) {
             if ($this->clock->now() - $start >= $budgetSeconds) {
                 break;
             }
 
-            $status = $this->export->refreshConnection($row);
+            $exportRows ??= $this->export->buildRows();
+            $status = $this->export->refreshConnection($row, $exportRows);
             $out('user_id=' . $row['user_id'] . ' status=' . $status);
             $processed++;
             if ($status !== GoogleSheetExportService::RESULT_OK) {

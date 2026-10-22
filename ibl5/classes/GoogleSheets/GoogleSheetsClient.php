@@ -121,7 +121,7 @@ class GoogleSheetsClient
     }
 
     /**
-     * Clear $tab, then write $rows starting at A1 as RAW values, in chunks.
+     * Write $rows starting at A1 as RAW values, in chunks, then clear the rows below them.
      *
      * @param list<list<mixed>> $rows Header row first
      * @throws GoogleSheetMissingException When the spreadsheet is gone
@@ -131,7 +131,11 @@ class GoogleSheetsClient
         $base = self::BASE_URL . '/' . rawurlencode($spreadsheetId);
         $range = "'" . str_replace("'", "''", $tab) . "'";
 
-        $this->send($accessToken, 'POST', $base . '/values/' . rawurlencode($range) . ':clear', (object) [], true);
+        if ($rows === []) {
+            $this->clearRange($accessToken, $base, $range);
+
+            return;
+        }
 
         $data = [];
         foreach (array_chunk($rows, self::WRITE_CHUNK_ROWS) as $index => $chunk) {
@@ -141,14 +145,19 @@ class GoogleSheetsClient
                 'values' => $chunk,
             ];
         }
-        if ($data === []) {
-            return;
-        }
 
+        // Write first, then clear only the rows below the new data: a failed write
+        // leaves the previous export intact instead of an empty tab.
         $this->send($accessToken, 'POST', $base . '/values:batchUpdate', [
             'valueInputOption' => 'RAW',
             'data' => $data,
         ], true);
+        $this->clearRange($accessToken, $base, $range . '!A' . (count($rows) + 1) . ':ZZZ');
+    }
+
+    private function clearRange(#[\SensitiveParameter] string $accessToken, string $base, string $range): void
+    {
+        $this->send($accessToken, 'POST', $base . '/values/' . rawurlencode($range) . ':clear', (object) [], true);
     }
 
     /**
@@ -166,7 +175,7 @@ class GoogleSheetsClient
         $status = $response['status'];
         if ($status < 200 || $status >= 300) {
             $e = GoogleApiException::fromResponse($status, $response['body']);
-            if ($notFoundMeansMissing && $status === 404) {
+            if ($notFoundMeansMissing && ($status === 404 || ($status === 403 && $e->reason === 'PERMISSION_DENIED'))) {
                 throw new GoogleSheetMissingException($e->getMessage(), $e->status, $e->reason);
             }
             throw $e;

@@ -88,7 +88,7 @@ class GoogleSheetsClientTest extends TestCase
         }
     }
 
-    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    public function testOverwriteTabBatchWritesThenClearsTailHeaderAndRowsRaw(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);
@@ -97,10 +97,10 @@ class GoogleSheetsClientTest extends TestCase
         $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
 
         self::assertCount(2, $this->http->requests);
-        self::assertStringEndsWith('/values/' . rawurlencode("'Players'") . ':clear', $this->http->requests[0]['url']);
-        self::assertSame('{}', $this->http->requests[0]['body']);
-        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[1]['url']);
-        $body = $this->body(1);
+        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
+        self::assertStringEndsWith('/values/' . rawurlencode("'Players'!A4:ZZZ") . ':clear', $this->http->requests[1]['url']);
+        self::assertSame('{}', $this->http->requests[1]['body']);
+        $body = $this->body(0);
         self::assertSame('RAW', $body['valueInputOption']);
         self::assertCount(1, $body['data']);
         self::assertSame("'Players'!A1", $body['data'][0]['range']);
@@ -118,7 +118,7 @@ class GoogleSheetsClientTest extends TestCase
         }
         $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
 
-        $data = $this->body(1)['data'];
+        $data = $this->body(0)['data'];
         self::assertCount(2, $data);
         self::assertSame("'Players'!A1", $data[0]['range']);
         self::assertCount(GoogleSheetsClient::WRITE_CHUNK_ROWS, $data[0]['values']);

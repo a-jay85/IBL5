@@ -32,6 +32,20 @@ test.describe('Voting Results expander — admin', () => {
     await expect(results).toBeHidden();
   });
 
+  test('results header toggles with Enter and Space from the keyboard', async ({ page }) => {
+    const toggle = page.locator('[aria-controls="Results"]');
+    const results = page.locator('#Results');
+
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(results).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await page.keyboard.press('Space');
+    await expect(results).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Voting ballot with admin results expander');
   });
@@ -55,6 +69,7 @@ nonAdminTest.describe('Voting Results expander — regular GM', () => {
     // The gate lives in VotingController::showBallot(). Dropping it fails here.
     await expect(page.locator('text=Voting Results')).toHaveCount(0);
     expect(await page.content()).not.toContain('ShowAndHideResults');
+    expect(await page.content()).not.toContain('aria-controls="Results"');
   });
 });
 
@@ -68,6 +83,7 @@ anonTest.describe('Voting Results — anonymous user', () => {
     // Admin expander must never reach an unauthenticated request.
     await expect(page.locator('text=Voting Results')).toHaveCount(0);
     expect(await page.content()).not.toContain('ShowAndHideResults');
+    expect(await page.content()).not.toContain('aria-controls="Results"');
   });
 });
 

@@ -1,13 +1,13 @@
 name: 'Notify Discord via channel webhook'
 description: >-
-  POST a pre-built message file to a Discord channel webhook (#dev or #merged).
+  POST a pre-built message file to a Discord channel webhook (#dev, #merged or #reviews).
 inputs:
   message-file:
     description: 'Path to a file holding the already-built message body.'
     required: false
     default: '/tmp/discord-msg.txt'
   webhook-url:
-    description: 'The channel webhook URL. Pass secrets.DISCORD_DEV_WEBHOOK_URL (#dev) or secrets.DISCORD_MERGED_WEBHOOK_URL (#merged, merge notices only).'
+    description: 'The channel webhook URL. Pass secrets.DISCORD_DEV_WEBHOOK_URL (#dev), secrets.DISCORD_MERGED_WEBHOOK_URL (#merged, merge notices only) or secrets.DISCORD_REVIEWS_WEBHOOK_URL (#reviews, weekly review reports only).'
     required: true
   ping:
     description: '"true" @mentions the owner on this message. Failure notices only.'

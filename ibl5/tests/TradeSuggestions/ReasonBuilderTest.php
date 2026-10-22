@@ -80,7 +80,7 @@ class ReasonBuilderTest extends TestCase
 
         $options = $this->options(TeamMode::Rebuild, new TeamAssets(1, $in, []), $in, $out);
 
-        self::assertContains('Frees $3,200K of salary owed after this season.', $options);
+        self::assertContains('Frees $3,200K of salary owed in later contract years.', $options);
     }
 
     public function testNoSalaryLineWhenSalaryGrows(): void

@@ -170,6 +170,7 @@ final class PlrBulkScriptsTest extends TestCase
         string $tag,
         string $previewNeedle,
     ): void {
+        // phpunit-hygiene-allow: the guarded property is the file's shape, a first-statement CLI guard
         $source = file_get_contents(dirname(__DIR__, 2) . '/scripts/' . $scriptName . '.php');
         self::assertIsString($source);
 

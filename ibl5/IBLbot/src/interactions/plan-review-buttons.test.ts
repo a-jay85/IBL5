@@ -34,17 +34,22 @@ import { appendDecision } from '../server/decision-store.js';
 type FakeInteraction = {
     customId: string;
     user: { id: string };
-    message?: { id: string; channelId: string };
+    message?: { id: string; channelId: string; components?: unknown };
     reply: ReturnType<typeof vi.fn>;
     deferUpdate: ReturnType<typeof vi.fn>;
     editReply: ReturnType<typeof vi.fn>;
 };
 
-function makeInteraction(customId: string, userId = 'OWNER_SNOWFLAKE', includeMessage = true): FakeInteraction {
+function makeInteraction(
+    customId: string,
+    userId = 'OWNER_SNOWFLAKE',
+    includeMessage = true,
+    messageComponents?: unknown,
+): FakeInteraction {
     return {
         customId,
         user: { id: userId },
-        ...(includeMessage ? { message: { id: 'MSG_ID', channelId: 'CHAN_ID' } } : {}),
+        ...(includeMessage ? { message: { id: 'MSG_ID', channelId: 'CHAN_ID', components: messageComponents } } : {}),
         reply: vi.fn(async () => undefined),
         deferUpdate: vi.fn(async () => undefined),
         editReply: vi.fn(async () => undefined),
@@ -252,5 +257,41 @@ describe('handlePlanReviewButton', () => {
         for (const btn of buttons) {
             expect(btn.data.disabled).not.toBe(true);
         }
+    });
+
+    it('8. Discard press on a discard-only DM keeps one disabled Discard button', async () => {
+        const interaction = makeInteraction('plan_discard_solo-plan', 'OWNER_SNOWFLAKE', true, [
+            { components: [{ customId: 'plan_discard_solo-plan' }] },
+        ]);
+        await handlePlanReviewButton(interaction as never, tmp);
+
+        expect(interaction.editReply).toHaveBeenCalledTimes(1);
+        const payload = interaction.editReply.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row).toHaveLength(1);
+        expect(row[0]!.data.custom_id).toBe('plan_discard_solo-plan');
+        expect(row[0]!.data.disabled).toBe(true);
+    });
+
+    it('9. Store write failure on a discard-only DM keeps one enabled Discard button', async () => {
+        vi.mocked(appendDecision).mockImplementationOnce(() => {
+            throw new Error('disk full');
+        });
+
+        const interaction = makeInteraction('plan_discard_solo-plan', 'OWNER_SNOWFLAKE', true, [
+            { components: [{ customId: 'plan_discard_solo-plan' }] },
+        ]);
+        await handlePlanReviewButton(interaction as never, tmp);
+
+        expect(interaction.editReply).toHaveBeenCalledTimes(1);
+        const payload = interaction.editReply.mock.calls[0]![0] as {
+            components: { components: { data: { custom_id?: string; disabled?: boolean } }[] }[];
+        };
+        const row = payload.components[0]!.components;
+        expect(row).toHaveLength(1);
+        expect(row[0]!.data.custom_id).toBe('plan_discard_solo-plan');
+        expect(row[0]!.data.disabled).toBeFalsy();
     });
 });

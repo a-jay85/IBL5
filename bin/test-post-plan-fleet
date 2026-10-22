@@ -1469,7 +1469,7 @@ _dm_result_case 511 'RESULT: terminal=shipped-armed' <<'RJSON'
   "terminal": "shipped-armed",
   "arm": {"armed": true, "conditions": [
     {"number": 15, "name": "red-ci-check", "blocked": false, "reason": "",
-     "warning": "red CI check(s): pytest (stdlib harness) — arming anyway; the required 'All checks green' context keeps the merge blocked until green"}
+     "warning": "red CI check(s): pytest (stdlib harness) — arming anyway; the required 'All checks settled' context keeps the merge blocked until green"}
   ]},
   "fidelity": {"verdict_1": "READY", "verdict_2": null, "rounds": [],
     "reviewed_tree_2": null, "error_kind": null, "remediation_sha": null}

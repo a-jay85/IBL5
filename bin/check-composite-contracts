@@ -600,8 +600,9 @@ else
   }
 
   # A1: only workflow_run (completed) and workflow_dispatch(pr_number) start it.
-  # A pull_request trigger would run PR-branch code with statuses: write; a
-  # head-branch filter would drop a fork PR whose branch is named master.
+  # A pull_request trigger would run PR-branch code with statuses: write. A
+  # branches: [master] filter on workflow_run matches the head branch, so it
+  # would drop every PR whose head branch is not master.
   _a1_bad=""
   if grep -qE '^[[:space:]]*(-[[:space:]]*)?pull_request(_target)?([[:space:]]*:|[[:space:]]*$|[],[:space:]])' <<< "$agg_on" \
      || grep -qE '^on:.*pull_request' <<< "$agg_on"; then
@@ -770,7 +771,7 @@ else
       !nm && /^name:/ { v=$0; sub(/^name:[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); nm=v }
       /^on:/ { inon=1; if ($0 ~ /pull_request/) pr=1; next }
       inon && /^[A-Za-z]/ { inon=0 }
-      inon && /^[[:space:]]*(-[[:space:]]*)?pull_request(_target)?[[:space:]]*:?[[:space:]]*$/ { pr=1 }
+      inon && /^[[:space:]]*(-[[:space:]]*)?pull_request(_target)?[[:space:]]*:?[[:space:]]*([#{[].*)?$/ { pr=1 }
       END { if (pr && nm != "") print nm }
     ' "$_wf"
   done | LC_ALL=C sort)"

@@ -1,6 +1,6 @@
 ---
-description: A required aggregator check, All checks green, blocks auto-merge on any red check on the PR head; condition (15) demotes to a warning only while protection lists it.
-last_verified: 2026-10-21
+description: A required aggregator blocks auto-merge on any red check on the PR head; the 2026-10-21 addendum replaces the polling All checks green job with the All checks settled commit status. Condition (15) demotes to a warning only while protection lists the aggregator.
+last_verified: 2026-10-22
 owner: ajaynicolas
 ---
 
@@ -201,9 +201,14 @@ satisfied by a status, so the two aggregators coexist until the runbook below co
 6. Open the retirement PR (delete `all-checks-green.yml`, drop its three remaining
    tokens; see the plan's Out of Scope). It merges under the new gate.
 
-**Escape hatch.** If `All checks settled` stops settling repo-wide, step 5 in reverse
-re-adds `All checks green` as an any-source entry, which the legacy check-run satisfies,
-and the DELETE from step 5 removes the new entry. Both are single API calls.
+**Escape hatch.** If `All checks settled` stops settling repo-wide, undo steps 5 and 4.
+A POST re-adds `All checks green` as an any-source entry, which the legacy check-run
+satisfies. A DELETE then removes `All checks settled`. Both are single API calls.
+
+**Interim window.** Condition (15) reads `All checks settled` from live protection. From
+this merge until runbook step 4 adds that entry, condition (15) blocks arming on any red
+check, as it did before ADR-0149. That is the safe direction. The legacy waiter still
+gates merge in that window.
 
 **Contract renumbering.** `bin/check-composite-contracts` A1-A6 now pin
 `all-checks-settled.yml`: the triggers, the context literal shared with `bin/lib/pr-armable.sh`

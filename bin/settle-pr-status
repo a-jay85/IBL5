@@ -98,12 +98,17 @@ export GH_API_CMD
 
 # api_get <path> — GET through the GH_API_CMD seam; read errors exit 2 (no status written).
 # Every interpolated value is regex-validated above or is a number read back from the API.
+# stdout only: a warning on stderr must never land inside the JSON being parsed.
 api_get() {
-    local out
-    if ! out="$(bash -c "$GH_API_CMD \"$1\"" 2>&1)"; then
-        echo "API read error: $1: $(printf '%s' "$out" | head -n 1)" >&2
+    local out err errfile
+    errfile="$(mktemp)"
+    if ! out="$(bash -c "$GH_API_CMD \"$1\"" 2>"$errfile")"; then
+        err="$(sed -n '1p' "$errfile")"
+        rm -f "$errfile"
+        echo "API read error: $1: ${err:-${out%%$'\n'*}}" >&2
         exit 2
     fi
+    rm -f "$errfile"
     printf '%s' "$out"
 }
 

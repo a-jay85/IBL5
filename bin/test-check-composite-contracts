@@ -663,6 +663,14 @@ printf 'name: Unlisted PR Gate\non:\n  pull_request:\njobs:\n  gate:\n    runs-o
 run_agg_mut "A6 rejects an unlisted PR workflow" "(A6)" "$d_wf"
 
 d_wf="$(agg_copy)"
+printf 'name: Commented PR Gate\non:\n  pull_request: # every PR\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/commented-pr-gate.yml"
+run_agg_mut "A6 rejects an unlisted PR workflow whose trigger carries a comment" "(A6)" "$d_wf"
+
+d_wf="$(agg_copy)"
+printf 'name: Flow PR Gate\non:\n  pull_request: {types: [opened]}\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/flow-pr-gate.yml"
+run_agg_mut "A6 rejects an unlisted PR workflow with a flow-map trigger" "(A6)" "$d_wf"
+
+d_wf="$(agg_copy)"
 agg_edit "$d_wf/all-checks-settled.yml" 's/^      - VR Refresh$/      - VR Refresh\n      - Phantom Workflow/m'
 run_agg_mut "A6 rejects a listed name without a PR trigger" "(A6)" "$d_wf"
 

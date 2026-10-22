@@ -995,7 +995,7 @@ span.nav-dropdown-item a:hover {
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--color-gray-400);
+    color: var(--gray-400);
 }
 
 .nav-login-input {

@@ -24,7 +24,10 @@ export async function expandVotingCategory(page: Page, cat: string): Promise<voi
     hasText: new RegExp(pattern, 'i'),
   });
   await expect(header.first(), 'voting category header must render').toBeVisible();
-  const isExpanded = await header.first().getAttribute('aria-expanded');
+  const isExpanded = await header
+    .first()
+    .locator('.voting-category-toggle')
+    .getAttribute('aria-expanded');
   // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
   if (isExpanded !== 'true') {
     await header.first().click();

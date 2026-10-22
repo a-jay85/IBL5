@@ -205,6 +205,19 @@ jobs:
           bin/test-check-engine-freeze
           bin/check-engine-freeze --since="$BASE_SHA"
 
+      # --- Pipefail grep -q guard: no ADDED bin/ line in a pipefail shell file
+      # may pipe echo/printf into grep -q (SIGPIPE false-red, see
+      # .claude/rules/shell-pipefail-grep.md). Diff-only, so existing sites
+      # never block. The harness runs first so a broken pattern fails loudly.
+      # Hard gate. ---
+      - name: Run bin/check-pipefail-grep-q (harness + PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bin/test-check-pipefail-grep-q
+          bin/check-pipefail-grep-q --since="$BASE_SHA"
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

@@ -364,6 +364,8 @@ if [ "$STAGE" = "pre-push" ]; then
     run_step "test-check-model-pins"         hard "$BIN/test-check-model-pins"
     run_step "test-check-engine-freeze"      hard "$BIN/test-check-engine-freeze"
     run_step "check-engine-freeze"           hard "$BIN/check-engine-freeze" "--since=$BASE"
+    run_step "test-check-pipefail-grep-q"    hard "$BIN/test-check-pipefail-grep-q"
+    run_step "check-pipefail-grep-q"         hard "$BIN/check-pipefail-grep-q" "--since=$BASE"
     run_step "test-check-reviewer-eval"      hard "$BIN/test-check-reviewer-eval"
     run_step "reviewer-eval-validate"        hard "$BIN/reviewer-eval" validate
 

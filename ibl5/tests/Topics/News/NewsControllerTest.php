@@ -169,6 +169,36 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->assertLessThan($ideasPos, $recapPos);
     }
 
+    public function testTradeSuggestionsFailureStillRendersTheRecap(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $recapService = self::createStub(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
+        $recapService->method('buildSlateForTeam')->willReturn(
+            new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),
+        );
+        $recapView = self::createStub(\LastSimRecap\Contracts\LastSimRecapViewInterface::class);
+        $recapView->method('render')->willReturn('<section data-test="recap-card"></section>');
+
+        $suggestions = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $suggestions->method('buildForTeam')->willThrowException(new \RuntimeException('db down'));
+
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            recapService: $recapService,
+            recapView: $recapView,
+            suggestions: $suggestions,
+            suggestionsView: self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class),
+        );
+
+        $html = $this->runMain($controller);
+
+        $this->assertStringContainsString('<section data-test="recap-card"></section>', $html);
+    }
+
     public function testSkipsTradeSuggestionsForAnonymousAndFreeAgents(): void
     {
         $suggestionsView = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);

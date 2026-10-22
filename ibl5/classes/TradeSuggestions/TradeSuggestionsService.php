@@ -192,7 +192,7 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
             return count($players);
         }
 
-        return count(array_filter($players, static fn (SuggestionPlayer $p): bool => $p->yearsRemaining > 0));
+        return count(array_filter($players, static fn (SuggestionPlayer $p): bool => $p->countsOnRoster));
     }
 
     /**

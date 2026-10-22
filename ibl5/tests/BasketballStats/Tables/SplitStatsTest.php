@@ -181,4 +181,109 @@ final class SplitStatsTest extends TestCase
         $this->assertStringNotContainsString('table-empty-message', $html);
         $this->assertStringNotContainsString('onerror', $html);
     }
+
+    public function testSplitStatsExposesOnlyRenderAsPublicMethod(): void
+    {
+        $class = new \ReflectionClass(SplitStats::class);
+
+        $publicNames = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            $class->getMethods(\ReflectionMethod::IS_PUBLIC)
+        );
+        $this->assertSame(['render'], $publicNames);
+        $this->assertSame([], $class->getProperties());
+        $this->assertNull($class->getConstructor());
+
+        $render = $class->getMethod('render');
+        $this->assertTrue($render->isStatic());
+        $params = $render->getParameters();
+        $this->assertSame(
+            ['rows', 'team', 'splitLabel', 'starterPids'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $params)
+        );
+        $teamType = $params[1]->getType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $teamType);
+        $this->assertSame('Team\Team', $teamType->getName());
+        $this->assertTrue($params[3]->isOptional());
+        $returnType = $render->getReturnType();
+        $this->assertInstanceOf(\ReflectionNamedType::class, $returnType);
+        $this->assertSame('string', $returnType->getName());
+    }
+
+    public function testRenderHelpersArePrivateStaticAndTakeNoDatabaseOrActorValue(): void
+    {
+        $class = new \ReflectionClass(SplitStats::class);
+        $helpers = array_values(array_filter(
+            $class->getMethods(),
+            static fn (\ReflectionMethod $m): bool => !$m->isPublic()
+        ));
+
+        $this->assertSame(
+            ['mapRows', 'renderHeader', 'renderPlayerRow'],
+            array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $helpers)
+        );
+
+        $expectedReturnTypes = ['mapRows' => 'array', 'renderHeader' => 'string', 'renderPlayerRow' => 'string'];
+        foreach ($helpers as $helper) {
+            $this->assertTrue($helper->isPrivate(), $helper->getName());
+            $this->assertTrue($helper->isStatic(), $helper->getName());
+            $returnType = $helper->getReturnType();
+            $this->assertInstanceOf(\ReflectionNamedType::class, $returnType, $helper->getName());
+            $this->assertSame($expectedReturnTypes[$helper->getName()], $returnType->getName(), $helper->getName());
+        }
+
+        $this->assertSame([], self::helperParameterViolations($class));
+    }
+
+    /**
+     * @param \ReflectionClass<object> $class
+     * @return list<string> one entry per non-public method parameter typed outside the allowlist
+     */
+    private static function helperParameterViolations(\ReflectionClass $class): array
+    {
+        $violations = [];
+        foreach ($class->getMethods() as $method) {
+            if ($method->isPublic()) {
+                continue;
+            }
+            foreach ($method->getParameters() as $param) {
+                $type = $param->getType();
+                $name = $type instanceof \ReflectionNamedType ? $type->getName() : 'untyped';
+                if (!in_array($name, ['array'], true)) {
+                    $violations[] = $method->getName() . ' $' . $param->getName() . ': ' . $name;
+                }
+            }
+        }
+
+        return $violations;
+    }
+
+    public function testDischargeCheckFlagsDatabaseHandleAndIdentityParameters(): void
+    {
+        $mutant = new class {
+            private static ?\mysqli $db = null;
+
+            public function connect(\mysqli $db): void
+            {
+                self::$db = $db;
+            }
+
+            public function touch(\Team\Team $team): string
+            {
+                return self::$db === null ? '' : self::renderPlayerRow(self::$db, 0, $team);
+            }
+
+            private static function renderPlayerRow(\mysqli $db, int $loggedInTeamID, \Team\Team $team): string
+            {
+                return $db->host_info . $loggedInTeamID . $team->name;
+            }
+        };
+        $class = new \ReflectionClass($mutant);
+
+        $this->assertSame(
+            ['renderPlayerRow $db: mysqli', 'renderPlayerRow $loggedInTeamID: int', 'renderPlayerRow $team: Team\Team'],
+            self::helperParameterViolations($class)
+        );
+        $this->assertCount(1, $class->getProperties());
+    }
 }

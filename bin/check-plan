@@ -1686,11 +1686,13 @@ while IFS= read -r row; do
         [ "$_bx_tok" != "bin/" ] || continue
         [ -e "$REPO_ROOT/$_bx_tok" ] && continue
         [ -e "$REPO_ROOT/ibl5/$_bx_tok" ] && continue
-        # Whole-token match: a listed bin/foo-bar must not excuse a missing bin/foo.
+        # Whole-token match: a listed script whose name merely starts with the
+        # missing script's name must not excuse it.
         # Not preceded by a path char; followed by end/non-path char, or a `.` that
-        # itself ends the token (sentence period), so "`bin/foo` (new)" still counts.
-        # Any path prefix ending in `/` is allowed, so `ibl5/bin/foo`, `./bin/foo`, and
-        # an absolute worktree path all excuse `bin/foo`.
+        # itself ends the token (sentence period), so a backticked name followed by
+        # "(new)" still counts.
+        # Any path prefix ending in `/` is allowed, so an ibl5/ prefix, a `./` prefix,
+        # and an absolute worktree path all excuse the token.
         _bx_esc="${_bx_tok//./\\.}"
         _bx_left='(^|[^A-Za-z0-9_.-])([^[:space:]`]*/)?'
         grep -qE -- "${_bx_left}${_bx_esc}(\\.?\$|\\.?[^A-Za-z0-9_./-])" <<< "$CF_SECTION" && continue

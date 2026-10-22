@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions;
 
+use League\League;
+use Negotiation\Contracts\NegotiationRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use Settings\Contracts\SettingsServiceInterface;
@@ -12,7 +14,9 @@ use Trading\Contracts\TradeValidatorInterface;
 use TradeSuggestions\CandidateGenerator;
 use TradeSuggestions\Contracts\SuggestionAssetRepositoryInterface;
 use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
+use TradeSuggestions\ModeInputs;
 use TradeSuggestions\PickValuer;
+use TradeSuggestions\RejectReason;
 use TradeSuggestions\ResolvedTeamMode;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\SuggestionRanker;
@@ -22,6 +26,8 @@ use TradeSuggestions\TeamModeService;
 use TradeSuggestions\TeamModeSetting;
 use TradeSuggestions\TradeImpactEvaluator;
 use TradeSuggestions\TradeSuggestionsService;
+use Validation\ValidationResult;
+use Validation\ValidationResultWithContext;
 
 /**
  * PickValuer, CandidateGenerator, TradeImpactEvaluator, and SuggestionRanker are
@@ -44,22 +50,24 @@ class TradeSuggestionsServiceTest extends TestCase
         self::assertNull($service->buildForTeam(self::USER_TID));
     }
 
-    public function testExcludesOwnTeamFromPartners(): void
+    /**
+     * The GM's own mode and the mode partners see for that team come from one
+     * call path, so the panel header and the deals never disagree.
+     */
+    public function testEveryTeamIncludingTheUserResolvesThroughTheSameInputs(): void
     {
-        // Three real franchises including the GM's own; only the two others are partners.
+        $resolvedFor = [];
         $teamModeService = self::createMock(TeamModeService::class);
-        $teamModeService->method('resolve')->willReturn(new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false));
-        $partnerTids = [];
-        $teamModeService->expects($this->exactly(2))->method('resolveFromInputs')->willReturnCallback(
-            static function (TeamModeSetting $s, int $wins, int $losses, float $avgAge) use (&$partnerTids): ResolvedTeamMode {
-                $partnerTids[] = $wins;
+        $teamModeService->expects($this->exactly(3))->method('resolveFromInputs')->willReturnCallback(
+            static function (TeamModeSetting $s, ModeInputs $inputs) use (&$resolvedFor): ResolvedTeamMode {
+                // wins encode the tid (see the draft order below).
+                $resolvedFor[] = $inputs->wins;
 
                 return new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::Rebuild, false);
             },
         );
 
         $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
-        // wins encode the tid so the callback can tell which team it was asked about.
         $draftOrder->method('calculateDraftOrder')->willReturn([
             'round1' => [$this->slot(1, 1, 1), $this->slot(2, 2, 2), $this->slot(3, 3, 3)],
             'round2' => [],
@@ -74,30 +82,11 @@ class TradeSuggestionsServiceTest extends TestCase
         $result = $service->buildForTeam(self::USER_TID);
 
         self::assertNotNull($result);
-        sort($partnerTids);
-        self::assertSame([2, 3], $partnerTids);
+        sort($resolvedFor);
+        self::assertSame([1, 2, 3], $resolvedFor);
         foreach ($result->items as $item) {
             self::assertNotSame('Lakers', $item->partnerTeamName);
         }
-    }
-
-    public function testReturnsEmptyItemsWhenNothingPasses(): void
-    {
-        $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('canPlayerBeTraded')->willReturn(false);
-
-        $rosters = [
-            1 => [$this->player(101, 'User Guard', 'PG', 30), $this->player(102, 'User Wing', 'SF', 22)],
-            2 => [$this->player(201, 'Partner Big', 'C', 31), $this->player(202, 'Partner Guard', 'SG', 21)],
-        ];
-
-        $service = $this->buildService(teams: [1 => 'Lakers', 2 => 'Heat'], rosters: $rosters, validator: $validator);
-
-        $result = $service->buildForTeam(self::USER_TID);
-
-        self::assertNotNull($result);
-        self::assertSame([], $result->items);
-        self::assertSame(TeamMode::WinNow, $result->mode->mode);
     }
 
     public function testPartnerModeUsesStoredOverride(): void
@@ -105,32 +94,72 @@ class TradeSuggestionsServiceTest extends TestCase
         $teamModeRepo = self::createStub(TeamModeRepositoryInterface::class);
         $teamModeRepo->method('getAllStoredSettings')->willReturn([2 => TeamModeSetting::Rebuild]);
 
-        // Partner 2 is 50-6 (would guess WinNow); its stored override must reach the resolver.
-        $teamModeService = self::createMock(TeamModeService::class);
-        $teamModeService->method('resolve')->willReturn(new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false));
-        $teamModeService->expects($this->once())->method('resolveFromInputs')
-            ->with(TeamModeSetting::Rebuild, 50, 6, 30.0)
-            ->willReturn(new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::WinNow, true));
+        $settings = [];
+        $teamModeService = self::createStub(TeamModeService::class);
+        $teamModeService->method('resolveFromInputs')->willReturnCallback(
+            static function (TeamModeSetting $s, ModeInputs $inputs) use (&$settings): ResolvedTeamMode {
+                $settings[$inputs->wins] = $s;
+
+                return new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false);
+            },
+        );
 
         $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
         $draftOrder->method('calculateDraftOrder')->willReturn([
-            'round1' => [$this->slot(1, 20, 36), $this->slot(2, 50, 6)],
+            'round1' => [$this->slot(1, 1, 40), $this->slot(2, 2, 6)],
             'round2' => [],
         ]);
 
-        $rosters = [
-            2 => [$this->player(201, 'Vet', 'C', 32), $this->player(202, 'Kid', 'PG', 28), $this->player(203, 'Unknown', 'SF', 0)],
-        ];
-
         $service = $this->buildService(
             teams: [1 => 'Lakers', 2 => 'Heat'],
-            rosters: $rosters,
             teamModeService: $teamModeService,
             teamModeRepo: $teamModeRepo,
             draftOrder: $draftOrder,
         );
 
         self::assertNotNull($service->buildForTeam(self::USER_TID));
+        self::assertSame([1 => TeamModeSetting::Auto, 2 => TeamModeSetting::Rebuild], $settings);
+    }
+
+    /**
+     * Every generated deal lands in exactly one bucket, so an empty panel can
+     * say which filter emptied it.
+     */
+    public function testDiagnosticsAccountForEveryCandidate(): void
+    {
+        $result = $this->buildService(rosters: self::rosters())->buildForTeam(self::USER_TID);
+
+        self::assertNotNull($result);
+        $d = $result->diagnostics;
+        self::assertNotNull($d);
+        self::assertGreaterThan(0, $d->generated);
+        self::assertSame($d->generated, array_sum($d->rejections) + $d->scored);
+        self::assertSame(count($result->items) + array_sum($d->validatorRejections), $d->validated);
+    }
+
+    public function testTeamAtTheHardCapGetsOnlySalaryNeutralOrShedding(): void
+    {
+        $result = $this->buildService(rosters: self::rosters(), capTotal: League::HARD_CAP_MAX)->buildForTeam(self::USER_TID);
+
+        self::assertNotNull($result);
+        $d = $result->diagnostics;
+        self::assertNotNull($d);
+        self::assertGreaterThan(0, $d->rejections[RejectReason::OverHardCap->value]);
+        self::assertSame([], $d->validatorRejections);
+    }
+
+    public function testReturnsEmptyItemsWhenNothingPasses(): void
+    {
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('canPlayerBeTraded')->willReturn(false);
+
+        $service = $this->buildService(rosters: self::rosters(), validator: $validator);
+
+        $result = $service->buildForTeam(self::USER_TID);
+
+        self::assertNotNull($result);
+        self::assertSame([], $result->items);
+        self::assertSame(TeamMode::Rebuild, $result->mode->mode);
     }
 
     /**
@@ -147,13 +176,13 @@ class TradeSuggestionsServiceTest extends TestCase
         ?ProjectedDraftOrderServiceInterface $draftOrder = null,
         ?TradeFormRepositoryInterface $formRepo = null,
         ?TradeValidatorInterface $validator = null,
+        int $capTotal = 5000,
     ): TradeSuggestionsService {
         $settings = self::createStub(SettingsServiceInterface::class);
         $settings->method('isTradesAllowed')->willReturn($tradesAllowed);
 
         if ($teamModeService === null) {
             $teamModeService = self::createStub(TeamModeService::class);
-            $teamModeService->method('resolve')->willReturn(new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false));
             $teamModeService->method('resolveFromInputs')->willReturn(new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::Rebuild, false));
         }
 
@@ -184,11 +213,22 @@ class TradeSuggestionsServiceTest extends TestCase
             $formRepo->method('getTeamDraftPicksForTrading')->willReturn([]);
         }
 
-        $validator ??= self::createStub(TradeValidatorInterface::class);
+        if ($validator === null) {
+            $validator = self::createStub(TradeValidatorInterface::class);
+            $validator->method('validateSalaryCaps')->willReturn(ValidationResultWithContext::success(['userPostTradeCapTotal' => 0, 'partnerPostTradeCapTotal' => 0]));
+            $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
+            $validator->method('canPlayerBeTraded')->willReturn(true);
+        }
         $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
         $season->endingYear = 2027;
 
         $capCalculator = self::createStub(\Trading\TradeCapCalculator::class);
+        $capCalculator->method('calculateSalaryCapData')->willReturn([
+            'userCurrentSeasonCapTotal' => $capTotal,
+            'partnerCurrentSeasonCapTotal' => $capTotal,
+            'userCapSentToPartner' => 0,
+            'partnerCapSentToUser' => 0,
+        ]);
 
         return new TradeSuggestionsService(
             $teamModeService,
@@ -203,6 +243,7 @@ class TradeSuggestionsServiceTest extends TestCase
             new TradeImpactEvaluator(),
             new SuggestionValidationFilter($validator, $capCalculator, $formRepo, $season),
             new SuggestionRanker(),
+            self::createStub(NegotiationRepositoryInterface::class),
         );
     }
 
@@ -218,8 +259,23 @@ class TradeSuggestionsServiceTest extends TestCase
         ];
     }
 
-    private function player(int $pid, string $name, string $pos, int $age): SuggestionPlayer
+    /**
+     * Two nine-man rosters with a spread of ovr, ages, and salaries.
+     *
+     * @return array<int, list<SuggestionPlayer>>
+     */
+    private static function rosters(): array
     {
-        return new SuggestionPlayer($pid, $name, $pos, $age, 15, false, 1000, 2, 1000);
+        $positions = ['PG', 'SG', 'SF', 'GF', 'PF', 'C', 'G', 'F', 'C'];
+        $rosters = [];
+        foreach ([1, 2] as $tid) {
+            foreach ($positions as $i => $pos) {
+                $pid = $tid * 100 + $i;
+                $ovr = 72 - 2 * $i - $tid;
+                $rosters[$tid][] = new SuggestionPlayer($pid, 'Player ' . $pid, $pos, 22 + $i + $tid, $ovr, false, 400 + 100 * $i, 1 + $i % 4, 500 * ($i % 4));
+            }
+        }
+
+        return $rosters;
     }
 }

@@ -5,23 +5,22 @@ declare(strict_types=1);
 namespace TradeSuggestions;
 
 /**
- * Pure scorer: turns a team's assets into now / short / long horizon scores.
+ * Scores a whole roster for one team in its mode. Pure.
  *
- * - now: rotation quality minus a penalty per missing player in each position group.
- * - short: rotation quality discounted for expiring and aging players.
- * - long: young-player quality + pick value + future cap room.
+ * Players are sorted by their value to the team; the best five count in full,
+ * the next three at 60%, then less down the bench, so a new player helps only
+ * as much as the slot he would take. Picks add their value. Each missing player
+ * below MIN_PER_GROUP in a position group of the top eight costs a penalty,
+ * larger for win-now teams.
  */
 final class TeamNeedsScorer
 {
-    public const int ROTATION_SIZE = 8;
+    /** @var list<float> */
+    public const array SLOT_WEIGHTS = [1.0, 1.0, 1.0, 1.0, 1.0, 0.6, 0.6, 0.6, 0.25, 0.25];
+    public const float DEEP_BENCH_WEIGHT = 0.1;
     public const int MIN_PER_GROUP = 2;
-    public const int POSITION_HOLE_PENALTY = 6;
-    public const float EXPIRING_FACTOR = 0.5;
-    public const float AGING_FACTOR = 0.6;
-    public const int AGING_AFTER = 30;
-    public const int YOUNG_AGE = 24;
-    public const int FUTURE_CAP_REFERENCE = 20000;
-    public const int CAP_ROOM_DIVISOR = 1000;
+    public const float WIN_NOW_HOLE_PENALTY = 8.0;
+    public const float REBUILD_HOLE_PENALTY = 3.0;
 
     public const string GROUP_GUARD = 'guard';
     public const string GROUP_WING = 'wing';
@@ -30,49 +29,42 @@ final class TeamNeedsScorer
     /** @var list<string> */
     public const array GROUPS = [self::GROUP_GUARD, self::GROUP_WING, self::GROUP_BIG];
 
-    public function score(TeamAssets $assets): HorizonScores
+    public function __construct(private readonly AssetValuer $valuer = new AssetValuer())
     {
-        $rotation = self::rotation($assets->players);
+    }
+
+    public function score(TeamAssets $assets, TeamMode $mode): TeamScore
+    {
+        $values = array_map(fn (SuggestionPlayer $p): float => $this->valuer->playerValue($p, $mode), $assets->players);
+        rsort($values);
+
+        $total = 0.0;
+        foreach ($values as $slot => $value) {
+            $total += $value * (self::SLOT_WEIGHTS[$slot] ?? self::DEEP_BENCH_WEIGHT);
+        }
+        foreach ($assets->picks as $pick) {
+            $total += $this->valuer->pickValue($pick, $mode);
+        }
 
         $groupCounts = [self::GROUP_GUARD => 0, self::GROUP_WING => 0, self::GROUP_BIG => 0];
-        $now = 0.0;
-        $short = 0.0;
-        foreach ($rotation as $player) {
-            $now += $player->quality;
-
+        foreach (TeamModeGuesser::rotation($assets->players) as $player) {
             $group = self::positionGroup($player->pos);
             if ($group !== null) {
                 $groupCounts[$group]++;
             }
-
-            $contractFactor = $player->yearsRemaining >= 2 ? 1.0 : self::EXPIRING_FACTOR;
-            $ageFactor = $player->age <= self::AGING_AFTER ? 1.0 : self::AGING_FACTOR;
-            $short += $player->quality * $contractFactor * $ageFactor;
         }
 
+        $penalty = $mode === TeamMode::WinNow ? self::WIN_NOW_HOLE_PENALTY : self::REBUILD_HOLE_PENALTY;
         $positionHoles = [];
         foreach ($groupCounts as $group => $count) {
             $shortfall = self::MIN_PER_GROUP - $count;
             if ($shortfall > 0) {
                 $positionHoles[$group] = $shortfall;
-                $now -= self::POSITION_HOLE_PENALTY * $shortfall;
+                $total -= $penalty * $shortfall;
             }
         }
 
-        $long = 0.0;
-        $futureSalary = 0;
-        foreach ($assets->players as $player) {
-            if ($player->age <= self::YOUNG_AGE) {
-                $long += $player->quality;
-            }
-            $futureSalary += $player->futureSalary;
-        }
-        foreach ($assets->picks as $pick) {
-            $long += $pick->value;
-        }
-        $long += max(0, self::FUTURE_CAP_REFERENCE - $futureSalary) / self::CAP_ROOM_DIVISOR;
-
-        return new HorizonScores($now, $short, $long, $positionHoles);
+        return new TeamScore($total, $groupCounts, $positionHoles);
     }
 
     /**
@@ -86,22 +78,5 @@ final class TeamNeedsScorer
             'PF', 'C' => self::GROUP_BIG,
             default => null,
         };
-    }
-
-    /**
-     * Top ROTATION_SIZE healthy players by quality, ties broken by lower pid.
-     *
-     * @param list<SuggestionPlayer> $players
-     * @return list<SuggestionPlayer>
-     */
-    private static function rotation(array $players): array
-    {
-        $healthy = array_values(array_filter(
-            $players,
-            static fn (SuggestionPlayer $p): bool => !$p->injured
-        ));
-        usort($healthy, static fn (SuggestionPlayer $a, SuggestionPlayer $b): int => [$b->quality, $a->pid] <=> [$a->quality, $b->pid]);
-
-        return array_slice($healthy, 0, self::ROTATION_SIZE);
     }
 }

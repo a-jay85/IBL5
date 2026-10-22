@@ -71,38 +71,4 @@ class TeamModeRepository extends \Database\BaseMysqliRepository implements TeamM
             $tid
         );
     }
-
-    /**
-     * @see TeamModeRepositoryInterface::getModeInputs()
-     *
-     * @return array{wins: int, losses: int, avgAge: float}
-     */
-    public function getModeInputs(int $tid): array
-    {
-        $record = $this->fetchOne(
-            "SELECT wins, losses FROM `ibl_standings` WHERE teamid = ?",
-            "i",
-            $tid
-        );
-
-        $wins = 0;
-        $losses = 0;
-        if ($record !== null) {
-            $winsRaw = $record['wins'] ?? null;
-            $lossesRaw = $record['losses'] ?? null;
-            $wins = is_numeric($winsRaw) ? (int) $winsRaw : 0;
-            $losses = is_numeric($lossesRaw) ? (int) $lossesRaw : 0;
-        }
-
-        $ageRow = $this->fetchOne(
-            "SELECT AVG(age) AS avg_age FROM `ibl_plr` WHERE teamid = ? AND retired = 0 AND ordinal <= 800 AND age IS NOT NULL",
-            "i",
-            $tid
-        );
-
-        $avgAgeRaw = $ageRow['avg_age'] ?? null;
-        $avgAge = is_numeric($avgAgeRaw) ? (float) $avgAgeRaw : 0.0;
-
-        return ['wins' => $wins, 'losses' => $losses, 'avgAge' => $avgAge];
-    }
 }

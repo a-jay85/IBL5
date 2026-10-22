@@ -21,6 +21,8 @@
 # Comment-only lines are skipped, so this header may describe the pattern. Fixtures in
 # the harness are built by concatenation, so no line there holds the literal shape.
 #
+# gate-backtest-argv: --since={base}
+#
 # Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
 #
 # Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.

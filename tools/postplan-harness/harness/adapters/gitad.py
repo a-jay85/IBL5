@@ -653,7 +653,8 @@ class LiveGit:
         caller then runs exactly today's path. Never runs the generator; see
         _regen_generated."""
         from .. import conflict_ladder
-        targets = conflict_ladder.pre_resolve_targets(inventory.files, worktree=self.worktree)
+        targets = conflict_ladder.pre_resolve_targets(
+            inventory.files, worktree=self.worktree, stage_sets=inventory.stage_sets)
         if not targets:
             return inventory, ()
         skip = {t.path for t in targets}
@@ -916,7 +917,12 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}")
 
-                text_reason = assert_text_only(self.worktree, inventory.files)
+                # A copy-only target was taken from master byte-for-byte, never
+                # three-way merged, so the text guard does not apply to it. Every
+                # LLM-resolved and generator-regenerated path is still checked.
+                binary_exempt = {t.path for t in regen_targets if t.command is None}
+                text_reason = assert_text_only(
+                    self.worktree, [p for p in inventory.files if p not in binary_exempt])
                 if text_reason:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,

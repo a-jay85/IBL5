@@ -31,11 +31,9 @@ global $mysqli_db, $leagueContext;
 
 // IBL serves Season Highs from the Records page; Olympics keeps this standalone page.
 if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlympics())) {
-    \Module\ModuleRedirect::sendWithPassthrough(
-        'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_THISSEASON,
-        ['seasonPhase'],
-        $_GET + $_POST
-    );
+    $target = \Records\RecordsController::legacyRedirectUrl('SeasonHighs', $_GET + $_POST)
+        ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_THISSEASON;
+    (new \Api\Response\RedirectResponder())->redirect($target);
     return;
 }
 

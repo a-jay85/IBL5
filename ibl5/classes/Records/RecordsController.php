@@ -80,4 +80,45 @@ final class RecordsController
             . $this->pageTabs->wrapPanel(($this->tabRenderers[$tab])($query), $tab)
             . '</div>';
     }
+
+    /**
+     * Map a retired module plus its query to the Records-hub URL, or null when the
+     * module has nothing to redirect (unknown module, or the HTMX `op=api` fast path).
+     *
+     * @param array<array-key, mixed> $query
+     */
+    public static function legacyRedirectUrl(string $legacyModule, array $query): ?string
+    {
+        $records = 'modules.php?name=Records&tab=';
+
+        switch ($legacyModule) {
+            case 'RecordHolders':
+                if (($query['op'] ?? null) === 'allstar') {
+                    return 'modules.php?name=AllStarAppearances';
+                }
+                return $records . self::TAB_ALLTIME;
+
+            case 'FranchiseRecordBook':
+                if (($query['op'] ?? null) === 'api') {
+                    return null;
+                }
+                $teamId = $query['teamid'] ?? null;
+                if (is_string($teamId) && ctype_digit($teamId)) {
+                    return $records . self::TAB_BYFRANCHISE
+                        . '&' . http_build_query(['teamid' => (int) $teamId], '', '&', PHP_QUERY_RFC3986);
+                }
+                return $records . self::TAB_BYFRANCHISE;
+
+            case 'SeasonHighs':
+                $phase = $query['seasonPhase'] ?? null;
+                if (is_string($phase) && $phase !== '') {
+                    return $records . self::TAB_THISSEASON
+                        . '&' . http_build_query(['seasonPhase' => $phase], '', '&', PHP_QUERY_RFC3986);
+                }
+                return $records . self::TAB_THISSEASON;
+
+            default:
+                return null;
+        }
+    }
 }

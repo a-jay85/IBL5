@@ -167,4 +167,71 @@ final class RecordsControllerTest extends TestCase
         self::assertSame('- Records: This Season', RecordsController::pageTitle('thisseason'));
         self::assertSame('- Records: All-Time', RecordsController::pageTitle('bogus'));
     }
+
+    public function testLegacyRedirectUrlMapsEachLegacyModule(): void
+    {
+        self::assertSame(
+            'modules.php?name=Records&tab=alltime',
+            RecordsController::legacyRedirectUrl('RecordHolders', [])
+        );
+        self::assertSame(
+            'modules.php?name=Records&tab=alltime',
+            RecordsController::legacyRedirectUrl('RecordHolders', ['op' => 'bogus'])
+        );
+        self::assertSame(
+            'modules.php?name=AllStarAppearances',
+            RecordsController::legacyRedirectUrl('RecordHolders', ['op' => 'allstar'])
+        );
+        self::assertSame(
+            'modules.php?name=Records&tab=byfranchise',
+            RecordsController::legacyRedirectUrl('FranchiseRecordBook', [])
+        );
+        self::assertSame(
+            'modules.php?name=Records&tab=byfranchise&teamid=5',
+            RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['teamid' => '5'])
+        );
+        self::assertSame(
+            'modules.php?name=Records&tab=thisseason',
+            RecordsController::legacyRedirectUrl('SeasonHighs', [])
+        );
+        self::assertSame(
+            'modules.php?name=Records&tab=thisseason&seasonPhase=Playoffs',
+            RecordsController::legacyRedirectUrl('SeasonHighs', ['seasonPhase' => 'Playoffs'])
+        );
+    }
+
+    public function testLegacyRedirectUrlReturnsNullForFranchiseApiOp(): void
+    {
+        self::assertNull(RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['op' => 'api']));
+        self::assertNull(RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['op' => 'api', 'teamid' => '5']));
+    }
+
+    public function testLegacyRedirectUrlReturnsNullForUnknownModule(): void
+    {
+        self::assertNull(RecordsController::legacyRedirectUrl('Standings', []));
+        self::assertNull(RecordsController::legacyRedirectUrl('recordholders', []));
+        self::assertNull(RecordsController::legacyRedirectUrl('', []));
+    }
+
+    public function testLegacyRedirectUrlDropsNonNumericTeamId(): void
+    {
+        $base = 'modules.php?name=Records&tab=byfranchise';
+
+        self::assertSame($base, RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['teamid' => '5abc']));
+        self::assertSame($base, RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['teamid' => '']));
+        self::assertSame($base, RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['teamid' => ['5']]));
+        self::assertSame($base, RecordsController::legacyRedirectUrl('FranchiseRecordBook', ['teamid' => 5]));
+    }
+
+    public function testLegacyRedirectUrlEncodesSeasonPhase(): void
+    {
+        $url = RecordsController::legacyRedirectUrl('SeasonHighs', ['seasonPhase' => "Reg\r\nSet-Cookie: x=1&tab=evil"]);
+
+        self::assertSame(
+            'modules.php?name=Records&tab=thisseason&seasonPhase=Reg%0D%0ASet-Cookie%3A%20x%3D1%26tab%3Devil',
+            $url
+        );
+        self::assertStringNotContainsString("\r", (string) $url);
+        self::assertStringNotContainsString("\n", (string) $url);
+    }
 }

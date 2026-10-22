@@ -26,10 +26,7 @@ if ($op === 'api') {
     return;
 }
 
-\Module\ModuleRedirect::sendWithPassthrough(
-    'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_BYFRANCHISE,
-    ['teamid'],
-    $_GET + $_POST,
-    ['teamid' => 'ctype_digit']
-);
+$target = \Records\RecordsController::legacyRedirectUrl('FranchiseRecordBook', $_GET + $_POST)
+    ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_BYFRANCHISE;
+(new \Api\Response\RedirectResponder())->redirect($target);
 return;

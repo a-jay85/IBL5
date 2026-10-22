@@ -72,6 +72,7 @@ final class ModuleRegistryTest extends TestCase
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';
+        self::assertDirectoryExists($modulesDir . '/Records', 'modules/Records/ must exist so this disk-vs-registry check covers it');
         $entries = scandir($modulesDir);
         $dirs = array_filter(
             $entries ? $entries : [],

@@ -980,11 +980,11 @@ finish_case
 fx E4-launchd-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 printf '123\t0\tcom.ibl5.postplan-now-e-old-1-2\n' > "$CD/labels1"
-printf -- '-\t0\tcom.ibl5.plan-now-1-2\n' > "$CD/labels2"
+printf -- '-\t0\tcom.ibl5.pr-cycle-1-2\n' > "$CD/labels2"
 rt "${E_ON[@]}" STUB_LAUNCHCTL_LIST="$CD/labels1" -- --force
 log_has 'live-work e-old: launchd label' || note_err "slug label not seen"
 rt "${E_ON[@]}" STUB_LAUNCHCTL_LIST="$CD/labels2" -- --force
-log_has 'unattributable live job com.ibl5.plan-now-1-2' || note_err "slug-less label not deferring"
+log_has 'unattributable live job com.ibl5.pr-cycle-1-2' || note_err "slug-less label not deferring"
 [ -d "$(wt_dir e-old)" ] || note_err "removed"
 finish_case
 

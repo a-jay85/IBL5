@@ -164,6 +164,7 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
         $currentSalary = 0;
         $yearsRemaining = 0;
         $futureSalary = 0;
+        $laterSalaries = [];
         if ($cy !== 0) {
             $currentSalary = self::salaryForYear($row, $year);
             if ($currentSalary > 0) {
@@ -171,6 +172,7 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
             }
             for ($later = $year + 1; $later <= $cyt; $later++) {
                 $futureSalary += self::salaryForYear($row, $later);
+                $laterSalaries[] = self::salaryForYear($row, $later);
             }
         }
 
@@ -201,6 +203,7 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
             currentSalary: $currentSalary,
             yearsRemaining: $yearsRemaining,
             futureSalary: $futureSalary,
+            laterSalaries: $laterSalaries,
             // Mirrors TradeValidator::canPlayerBeTraded(); the validator still decides.
             tradeable: $cy !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL && $yearsRemaining > 0,
             // Mirrors TradeFormRepository::getTeamPlayerCount(): in the offseason a

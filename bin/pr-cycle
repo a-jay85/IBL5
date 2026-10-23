@@ -265,16 +265,6 @@ if [ "$GO" = "1" ] && [ "$STOP" = "1" ]; then usage >&2; exit 2; fi
 # Refused rather than merged: `--only 101 --skip 101` has no honest reading, and the
 # --go/--stop line above is this file's existing precedent for refusing over picking.
 if [ -n "$ONLY" ] && [ -n "$SKIP" ]; then usage >&2; exit 2; fi
-for _uv in PR_CYCLE_UNKNOWN_POLLS PR_CYCLE_UNKNOWN_SLEEP; do
-    case "${!_uv}" in
-        *[!0-9]*|0[0-9]*) echo "pr-cycle: $_uv must be a non-negative integer, got '${!_uv}'" >&2; exit 2 ;;
-    esac
-done
-if [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] \
-    && [ $(( (PR_CYCLE_UNKNOWN_POLLS - 1) * PR_CYCLE_UNKNOWN_SLEEP )) -gt 120 ]; then
-    echo "pr-cycle: UNKNOWN warm-up would wait over 120s (PR_CYCLE_UNKNOWN_POLLS x PR_CYCLE_UNKNOWN_SLEEP)" >&2
-    exit 2
-fi
 
 # --- --stop ------------------------------------------------------------------------------
 # Handled before every other guard so it works from any cwd, including a worktree.
@@ -286,6 +276,18 @@ if [ "$STOP" = "1" ]; then
     echo "pr-cycle: stop file created: $PR_CYCLE_STOP_FILE"
     "$PR_CYCLE_READY_CMD" --stop-all
     exit $?
+fi
+
+# Warm-up env validation sits after --stop so a stray bad value cannot block a stop.
+for _uv in PR_CYCLE_UNKNOWN_POLLS PR_CYCLE_UNKNOWN_SLEEP; do
+    case "${!_uv}" in
+        *[!0-9]*|0[0-9]*) echo "pr-cycle: $_uv must be a non-negative integer, got '${!_uv}'" >&2; exit 2 ;;
+    esac
+done
+if [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] \
+    && [ $(( (PR_CYCLE_UNKNOWN_POLLS - 1) * PR_CYCLE_UNKNOWN_SLEEP )) -gt 120 ]; then
+    echo "pr-cycle: UNKNOWN warm-up would wait over 120s (PR_CYCLE_UNKNOWN_POLLS x PR_CYCLE_UNKNOWN_SLEEP)" >&2
+    exit 2
 fi
 
 # --- refusal guards ----------------------------------------------------------------------

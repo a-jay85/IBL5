@@ -16,8 +16,14 @@ from tests.test_armable import inputs
 
 
 class _Gh:
-    def __init__(self, body, apply_edits=True, raise_on_edit=None):
+    """`body` is the stale snapshot the caller read before editing; pr_body() keeps returning
+    it. `remote` is what GitHub holds now (our edit applied, plus any `concurrent_tail`
+    another writer appended); only pr_body_fresh() sees it. The two diverge after an edit, so
+    a retry that re-reads through pr_body() instead of pr_body_fresh() is caught."""
+
+    def __init__(self, body, apply_edits=True, raise_on_edit=None, concurrent_tail=""):
         self.body, self.apply_edits, self.raise_on_edit = body, apply_edits, raise_on_edit
+        self.remote, self.concurrent_tail = body, concurrent_tail
         self.edits = []
 
     def pr_edit_body(self, pr, body):
@@ -25,13 +31,13 @@ class _Gh:
             raise self.raise_on_edit
         self.edits.append(body)
         if self.apply_edits:
-            self.body = body
+            self.remote = body + self.concurrent_tail
 
     def pr_body(self):
         return self.body
 
     def pr_body_fresh(self):
-        return self.body
+        return self.remote
 
 
 BODY_NO_LINE = "## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed.\n"
@@ -54,6 +60,15 @@ def test_missing_after_phase2_wrote_refills_once(tmp_path):
     assert merge_danger.classify_body(out) == "TWO-WAY"
     assert len(gh.edits) == 1
     assert res.retries == {"merge-danger": 1}
+
+
+def test_refill_returns_the_fresh_read_not_the_stale_snapshot(tmp_path):
+    tail = "\n<!-- concurrent writer -->\n"
+    gh = _Gh(BODY_NO_LINE, concurrent_tail=tail)
+    out, _ = _retry(gh, _phase2_md(tmp_path), tmp_path)
+    assert out == gh.remote
+    assert out.endswith(tail)
+    assert out != gh.pr_body()
 
 
 def test_second_miss_holds_after_one_retry(tmp_path):

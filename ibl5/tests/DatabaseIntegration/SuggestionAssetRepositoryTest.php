@@ -143,6 +143,57 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
     }
 
     /**
+     * In season the load reads `salary_yr{cy}`. Two 3500 deals sum to exactly
+     * the 7000 hard cap, so the effective-year payroll is not over.
+     */
+    public function testCurrentSalaryUsesCurrentContractYearInSeason(): void
+    {
+        $players = $this->effectiveYearPair(false);
+
+        self::assertSame(3500, $players[200000051]->currentSalary);
+        self::assertSame(3500, $players[200000052]->currentSalary);
+        self::assertSame(7000, self::payrollOf($players));
+        self::assertLessThanOrEqual(\League\League::HARD_CAP_MAX, self::payrollOf($players));
+    }
+
+    /**
+     * In the offseason the load reads `salary_yr{cy+1}`. The same two deals
+     * rise to 3600 each, so the effective-year payroll goes over the cap.
+     */
+    public function testCurrentSalaryUsesNextContractYearInOffseason(): void
+    {
+        $players = $this->effectiveYearPair(true);
+
+        self::assertSame(3600, $players[200000051]->currentSalary);
+        self::assertSame(3600, $players[200000052]->currentSalary);
+        self::assertSame(7200, self::payrollOf($players));
+        self::assertGreaterThan(\League\League::HARD_CAP_MAX, self::payrollOf($players));
+    }
+
+    /**
+     * @return array<int, SuggestionPlayer>
+     */
+    private function effectiveYearPair(bool $advancesContractYears): array
+    {
+        foreach ([200000051, 200000052] as $pid) {
+            $this->insertTestPlayer($pid, 'Suggest Cap ' . $pid, [
+                'teamid' => 1, 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 3500, 'salary_yr2' => 3600, 'salary_yr3' => 3700,
+            ]);
+        }
+        $all = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), $advancesContractYears, self::LAST_SEASON)[1] ?? []);
+
+        return [200000051 => $all[200000051], 200000052 => $all[200000052]];
+    }
+
+    /**
+     * @param array<int, SuggestionPlayer> $players
+     */
+    private static function payrollOf(array $players): int
+    {
+        return array_sum(array_map(static fn (SuggestionPlayer $p): int => $p->currentSalary, $players));
+    }
+
+    /**
      * The roster count must match TradeFormRepository::getTeamPlayerCount(),
      * which in the offseason counts anyone with a salary next contract year,
      * including a cy=0 player with salary_yr1 set.

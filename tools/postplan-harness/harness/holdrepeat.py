@@ -43,6 +43,7 @@ FIX_ELIGIBLE_EXIT = 10
 FIX_GIVEUP_EXIT = 11
 FIX_ATTEMPTS_PER_PR = 2   # hard ceiling across ALL fingerprints for one branch
 FIX_SCHEMA_VERSION = 1
+FIX_RECHECK_FAIL_EXIT = 12
 
 _RUN_DIR = re.compile(r"live-\S*?-\d{8}-\d{6}-\d+")
 _WT_PATH = re.compile(r"/(?:[^\s/]+/)*IBL5-worktrees/[^\s/]+/")
@@ -624,6 +625,24 @@ def mark_fix_giveup_dm(state_dir, slug, fp: str) -> bool:
     return True
 
 
+def _recheck_items(slug, worktree, plan_path) -> list[str]:
+    """Current MISSING / MISSING-FILE items, derived the way the runner derives them."""
+    from harness import conformance
+    from harness.adapters.gitad import LiveGit
+    from harness.planfile import locate_plan
+    plan = locate_plan(slug, explicit_path=plan_path or None)
+    conf_files = LiveGit(worktree).conformance_files()
+    return conformance.early_missing_items(plan, conf_files)
+
+
+def fix_recheck(state_dir, slug, worktree, plan_path) -> list[str]:
+    """Recorded MISSING parts that still survive in the worktree, sorted."""
+    reason = _condition3_reason(load_record(state_dir, slug))
+    recorded = missing_parts(reason)
+    current = missing_parts("; ".join(_recheck_items(slug, worktree, plan_path)))
+    return sorted(recorded & current)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="harness.holdrepeat")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -648,6 +667,12 @@ def _build_parser() -> argparse.ArgumentParser:
     fr.add_argument("--fingerprint", required=True)
     fr.add_argument("--pr", default="")
     fr.add_argument("--outcome", required=True)
+    rc = sub.add_parser("fix-recheck",
+                        help="exit 12 when a recorded MISSING part survives in the worktree")
+    rc.add_argument("--state-dir", required=True)
+    rc.add_argument("--slug", required=True)
+    rc.add_argument("--worktree", required=True)
+    rc.add_argument("--plan", default="")
     return ap
 
 
@@ -673,6 +698,16 @@ def main(argv=None) -> int:
         except Exception as e:  # noqa: BLE001 - every error path ends as "no session"
             print(f"holdrepeat: FIX ineligible reason=error ({e})")
             return 0
+    if args.cmd == "fix-recheck":
+        # Fails CLOSED, the opposite of `check`: an unreadable recheck must stop a push.
+        try:
+            left = fix_recheck(args.state_dir, args.slug, args.worktree, args.plan)
+        except Exception as e:  # noqa: BLE001
+            print(f"holdrepeat: fix-recheck error ({e})")
+            return 1
+        for p in left:
+            print(f"part: {p}")
+        return FIX_RECHECK_FAIL_EXIT if left else 0
     if args.cmd == "fix-record":
         if args.outcome == "started":
             from datetime import datetime, timezone

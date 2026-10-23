@@ -173,3 +173,37 @@ def test_fix_ledger_survives_cleared_hold(tmp_path, capsys):
     _fix_record(tmp_path, _fp_of(out), "started")
     hr.clear_record(str(tmp_path), SLUG)
     assert os.path.exists(hr.fix_attempts_path(str(tmp_path), SLUG))
+
+
+def test_fix_recheck_reports_remaining_missing(tmp_path, capsys, monkeypatch):
+    _seed(tmp_path, {3: f"{MISSING_A}; {MISSING_B}"})
+    monkeypatch.setattr(hr, "_recheck_items",
+                        lambda slug, wt, plan: [MISSING_B, "MISSING: unrelated"])
+    rc = hr.main(["fix-recheck", "--state-dir", str(tmp_path), "--slug", SLUG,
+                  "--worktree", str(tmp_path), "--plan", ""])
+    out = capsys.readouterr().out
+    assert rc == hr.FIX_RECHECK_FAIL_EXIT
+    assert f"part: {MISSING_B}" in out
+    assert MISSING_A not in out and "unrelated" not in out
+
+
+def test_fix_recheck_clean_when_recorded_parts_gone(tmp_path, capsys, monkeypatch):
+    _seed(tmp_path, {3: MISSING_A})
+    monkeypatch.setattr(hr, "_recheck_items", lambda slug, wt, plan: ["MISSING: unrelated"])
+    rc = hr.main(["fix-recheck", "--state-dir", str(tmp_path), "--slug", SLUG,
+                  "--worktree", str(tmp_path)])
+    assert rc == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_fix_recheck_error_fails_closed(tmp_path, capsys, monkeypatch):
+    _seed(tmp_path, {3: MISSING_A})
+
+    def boom(slug, wt, plan):
+        raise RuntimeError("git exploded")
+
+    monkeypatch.setattr(hr, "_recheck_items", boom)
+    rc = hr.main(["fix-recheck", "--state-dir", str(tmp_path), "--slug", SLUG,
+                  "--worktree", str(tmp_path)])
+    assert rc == 1
+    assert "fix-recheck error (git exploded)" in capsys.readouterr().out

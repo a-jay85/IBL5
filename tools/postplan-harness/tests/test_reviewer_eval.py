@@ -305,6 +305,28 @@ def test_real_corpus_trade_line_63_misses_expected_only():
     assert not re_.case_hit([_f(TRADE_PATH, 46)], expected)
 
 
+def test_real_corpus_trade_line_63_hits_via_also_accept():
+    ranges = re_.accepted_ranges(_real_case(TRADE_CASE))
+    assert re_.case_hit([_f(TRADE_PATH, 63)], ranges)
+    for line in (58, 68):
+        assert re_.case_hit([_f(TRADE_PATH, line)], ranges), line
+    for line in (57, 69):
+        assert not re_.case_hit([_f(TRADE_PATH, line)], ranges), line
+    other = "ibl5/classes/Trading/TradeRosterPreviewView.php"
+    assert not re_.case_hit([_f(other, 63)], ranges)
+
+
+def test_real_corpus_only_trade_case_has_also_accept():
+    cases = _real_corpus()["cases"]
+    assert [c["id"] for c in cases if "also_accept" in c] == [TRADE_CASE]
+    trade = _real_case(TRADE_CASE)
+    assert [(e["path"], e["start"], e["end"]) for e in trade["also_accept"]] == [(TRADE_PATH, 63, 63)]
+
+
+def test_real_corpus_schema_valid():
+    assert re_.validate_schema(_real_corpus()) == []
+
+
 # ---------------------------------------------------------------------------
 # Phase 3: corpus validate
 # ---------------------------------------------------------------------------

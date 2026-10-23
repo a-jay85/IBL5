@@ -51,6 +51,7 @@ dsn_setup() {
     cat > "$STUB/db-sync-prod" <<'SH'
 #!/bin/bash
 { printf 'called'; printf ' %s' "$@"; printf '\n'; } >> "$STUB/calls"
+printf '%s\n' "$PWD" > "$STUB/prod-cwd"
 if [ "${1:-}" = "--snapshot" ] && [ -f "${2:-}" ]; then
     echo "snapshot-file-exists $2" >> "$STUB/snapshot-files"
 fi
@@ -391,6 +392,7 @@ dsn_expect_eq "FB-7: one snapshot call with the artifact path" "1" \
 dsn_count 1 "$STUB/calls"
 dsn_count 0 "$STUB/import-calls"
 dsn_count 1 "$STUB/snapshot-files"
+dsn_expect_eq "FB-7: db-sync-prod runs from / (container resolves to ibl5-mariadb)" "/" "$(cat "$STUB/prod-cwd" 2>/dev/null)"
 dsn_expect_eq "FB-7: marker OK" "OK" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
 dsn_log_has "FB-7: restore complete logged" "restore complete"
 

@@ -2282,6 +2282,7 @@ while true; do
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
@@ -2313,6 +2314,7 @@ while true; do
         echo "Plan $PLAN_NAME declares an unusable impl_model — $BASE_MODEL — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"

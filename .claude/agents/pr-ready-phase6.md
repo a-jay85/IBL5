@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-10-07
+last_verified: 2026-10-22
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -39,8 +39,8 @@ and return that same line. Never improvise the six checks from memory.
 Your prompt carries all five 6b inputs. Three you gather yourself (plan file, post-rebase
 diff, PR body); **two are handed to you as literals because they exist nowhere on disk** —
 the conflict-resolved path list (a `/pr-ready` Phase 3 run note held in orchestrator
-context) and the Phase 4B probe evidence (`scripts/4b-probe.sh` prints to stdout, not to a
-file). If either literal is absent from your prompt, say so in the verdict under the 6d
+context) and the Phase 4B probe evidence (`.claude/review-shared/scripts/4b-probe.sh` prints to stdout and never
+lands in a file). If either literal is absent from your prompt, say so in the verdict under the 6d
 check it starves and mark that check `UNVERIFIED` — never silently skip it.
 
 ### Gathering the plan file: index first, then read by range

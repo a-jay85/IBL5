@@ -1,6 +1,6 @@
 ---
 description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, the engine lint-pin rule, and required-status claims enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 paths: "**/*.md"
 ---
 
@@ -37,6 +37,8 @@ When editing any in-scope `.md` file, verify its content still matches reality, 
 Enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that changes an in-scope `.md` body without bumping `last_verified`. The comparison is base-vs-head, never date-equality-to-today.
 
 Never set a future date. The local `date +%F` (never `date -u`) is always the right value, even when master already carries it. A strictly-newer value is rejected as `` `last_verified` in the future ``. Run `bin/check-docs --since=master --no-staleness` on the dirty tree before shipping. `--since` sees uncommitted edits (base...HEAD, unstaged, and staged); untracked files are excluded. Detail: `doc-freshness-detail.md` § On-touch gate mechanics.
+
+**Date-only merge conflicts.** Two branches that each bump `last_verified` on one doc conflict on that line. `.gitattributes` routes these docs through `bin/lib/merge-last-verified`, which keeps the newer date when that line is the only conflict and leaves standard markers for anything else. `bin/install-git-hooks` and `bin/wt-new` register it in the common `.git/config`. A clone without the registration gets git's plain conflict. Decision: `ibl5/docs/decisions/0203-last-verified-merge-driver.md`.
 
 ## Dead-Reference Rule
 

@@ -366,7 +366,7 @@ if [ ! -e "/tmp/post-plan-exec-mutations-done-$PPID" ]; then
 elif [ -s "$XMF" ]; then
   echo "BLOCKED: exec-mutations: $(head -c 300 "$XMF" | tr '\n' ';')"
 fi
-if bin/lib/plan-exec-mutations pending --root "$(git rev-parse --show-toplevel)" >/dev/null 2>&1; then
+if "$(git rev-parse --show-toplevel)/bin/lib/plan-exec-mutations" pending --root "$(git rev-parse --show-toplevel)" >/dev/null 2>&1; then
   echo "BLOCKED: exec-mutations: journal pending, the tree may still carry a mutation"
 fi
 if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then

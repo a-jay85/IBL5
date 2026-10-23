@@ -77,7 +77,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
         $html .= $this->renderGamesByMonth($gamesByMonth, $teamId, $team->name, $isPlayoffPhase, $playoffMonthKey);
         $html .= '</div>';
-        $html .= $this->renderScrollScripts($firstUpcomingId);
+        $html .= $this->renderScrollScript();
 
         return $html;
     }
@@ -102,7 +102,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= '<div class="schedule-header__center">';
 
         if ($firstUpcomingId !== null && $firstUpcomingId !== '') {
-            $html .= '<a href="#' . $firstUpcomingId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
+            $safeNextId = HtmlSanitizer::e($firstUpcomingId);
+            $html .= '<a href="#' . $safeNextId . '" class="schedule-jump-btn" data-scroll-target="' . $safeNextId . '" data-scroll-next>';
             $html .= '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
             $html .= 'Next Games';
             $html .= '</a>';
@@ -151,7 +152,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $abbrev = (is_int($monthTimestamp) && $monthTimestamp !== 0) ? date('M', $monthTimestamp) : '';
             $safeLabel = HtmlSanitizer::safeHtmlOutput($monthLabel);
             $safeAbbrev = HtmlSanitizer::safeHtmlOutput($abbrev);
-            $html .= '<a href="#team-month-' . $monthKey . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
+            $safeMonthId = HtmlSanitizer::e('team-month-' . $monthKey);
+            $html .= '<a href="#' . $safeMonthId . '" class="ibl-jump-menu__link schedule-months__link" data-scroll-target="' . $safeMonthId . '">';
             $html .= '<span class="schedule-months__full">' . $safeLabel . '</span>';
             $html .= '<span class="schedule-months__abbr">' . $safeAbbrev . '</span>';
             $html .= '</a>';
@@ -427,34 +429,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Render JavaScript for smooth scrolling
+     * Load the shared smooth-scroll script; the anchors carry data-scroll-* attributes
      */
-    private function renderScrollScripts(?string $firstUpcomingId): string
+    private function renderScrollScript(): string
     {
-        return '<script>
-var headerOffset = 70;
-
-function scrollToMonth(e, monthKey) {
-    e.preventDefault();
-    var el = document.getElementById("team-month-" + monthKey);
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - headerOffset;
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-
-function scrollToNextGames(e) {
-    e.preventDefault();
-    var el = document.getElementById("' . ($firstUpcomingId ?? '') . '");
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-</script>';
+        return '<script src="jslib/schedule-scroll.js" defer></script>';
     }
 }

@@ -113,6 +113,28 @@ test.describe('League Schedule — scroll behavior', () => {
     const after = await readTargetPosition(page, targetId);
     expect(Math.abs(after.top - 70)).toBeGreaterThan(20);
   });
+
+  test('script re-injection keeps exactly one scroll handler', async ({ page }) => {
+    const monthLink = page.locator('.schedule-months__link').last();
+    expect(await monthLink.getAttribute('href')).toMatch(/^#month-\d{4}-\d{2}$/);
+
+    await page.evaluate(() => {
+      const spyWindow = window as Window & { __scrollToCalls?: number };
+      spyWindow.__scrollToCalls = 0;
+      window.scrollTo = (() => {
+        spyWindow.__scrollToCalls = (spyWindow.__scrollToCalls ?? 0) + 1;
+      }) as typeof window.scrollTo;
+    });
+    // hx-boost swaps re-run the page's <script src>; simulate two more executions.
+    await page.addScriptTag({ url: 'jslib/schedule-scroll.js' });
+    await page.addScriptTag({ url: 'jslib/schedule-scroll.js' });
+
+    await monthLink.click();
+    const calls = await page.evaluate(
+      () => (window as Window & { __scrollToCalls?: number }).__scrollToCalls,
+    );
+    expect(calls).toBe(1);
+  });
 });
 
 // ============================================================

@@ -178,6 +178,69 @@ class SeasonHighsViewTest extends TestCase
         $this->assertStringContainsString('RCB Player: 50', $html);
     }
 
+    private function assertGolden(string $path, string $html): void
+    {
+        if (getenv('IBL_GOLDEN_CAPTURE') === '1') {
+            file_put_contents($path, $html);
+        }
+        $this->assertStringEqualsFile($path, $html);
+    }
+
+    /**
+     * Whole-page pin captured before renderStatTable was split. Reaches every
+     * row shape and every date-link arm; see the plan's branch map.
+     *
+     * Mutations verified to turn this red: renaming `rank-cell` to `rank-celx`
+     * in renderPlayerStatRow, `value-cell` to `value-celx` in renderTeamStatRow,
+     * and `<a href=` to `<a hreg=` in linkDate.
+     */
+    public function testRenderGoldenMixedRowShapes(): void
+    {
+        $data = [
+            'playerHighs' => [
+                'FG & FT' => [
+                    ['name' => "Shaq O'Neal", 'date' => '2024-12-15', 'value' => 41, 'pid' => 7, 'teamid' => 3, 'teamname' => 'Hawks', 'color1' => 'FF0000', 'color2' => '000000', 'gameOfThatDay' => 2, 'boxId' => 0],
+                    ['name' => 'Unsigned Guy', 'date' => '2024-12-16', 'value' => 39, 'pid' => 8, 'teamid' => 0, 'teamname' => '', 'boxId' => 100],
+                    ['name' => 'Legacy & Co', 'date' => '2024-12-17', 'value' => 35, 'boxId' => 0],
+                ],
+            ],
+            'teamHighs' => [
+                'TEAM POINTS' => [
+                    ['name' => 'Hawks', 'date' => '2024-12-18', 'value' => 150, 'teamid' => 3, 'color1' => 'FF0000', 'color2' => '000000', 'boxId' => 101],
+                    ['name' => 'Bulls', 'date' => '2024-12-19', 'value' => 148, 'teamid' => 4, 'color1' => 'CC0000', 'color2' => 'FFFFFF', 'boxId' => 0],
+                    ['name' => 'Stray Player', 'date' => '2024-12-20', 'value' => 60, 'pid' => 9, 'teamid' => 4, 'boxId' => 0],
+                ],
+            ],
+        ];
+
+        $html = $this->view->render('Regular Season', $data);
+
+        $this->assertGolden(__DIR__ . '/fixtures/season-highs-mixed.golden.html', $html);
+    }
+
+    /**
+     * A name with no pid and no teamid is printed as safeHtmlOutput($row['name']);
+     * the unlinked date is printed as safeHtmlOutput($row['date']). Both must
+     * come out escaped. Removing either safeHtmlOutput call fails this test.
+     */
+    public function testRenderEscapesScriptInFallbackNameAndDate(): void
+    {
+        $data = [
+            'playerHighs' => [
+                'POINTS' => [
+                    ['name' => '<script>alert(1)</script>', 'date' => '<script>d</script>', 'value' => 10, 'boxId' => 0],
+                ],
+            ],
+            'teamHighs' => [],
+        ];
+
+        $html = $this->view->render('Regular Season', $data);
+
+        $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
+        $this->assertStringContainsString('&lt;script&gt;d&lt;/script&gt;', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+    }
+
     /**
      * @return array{playerHighs: array<string, list<mixed>>, teamHighs: array<string, list<mixed>>}
      */

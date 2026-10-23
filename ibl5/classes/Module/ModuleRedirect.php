@@ -17,9 +17,10 @@ final class ModuleRedirect
     public const TARGETS = [
         'PlayerExportGuide'    => 'modules.php?name=ApiKeys',
         'VotingResults'        => 'modules.php?name=Voting',
-        'AllStarAppearances'   => 'modules.php?name=RecordHolders&op=allstar',
         'SeasonLeaderboards'   => 'modules.php?name=Leaderboards&tab=season',
         'CareerLeaderboards'   => 'modules.php?name=Leaderboards&tab=career',
+        'CapSpace'           => 'modules.php?name=Contracts&tab=teams',
+        'ContractList'       => 'modules.php?name=Contracts&tab=players',
     ];
 
     public static function targetFor(string $moduleName): ?string

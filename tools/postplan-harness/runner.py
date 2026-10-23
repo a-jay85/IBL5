@@ -1005,7 +1005,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
-                                           outcome, out_dir)
+                                           outcome, out_dir,
+                                           run_started=run_started)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -1168,6 +1169,11 @@ def _round_model(round_num: int) -> str:
     return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
 _DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
+# Expected length of one BEHIND re-rebase pass (rebase, push, full CI watch).
+# Observed CI runs 57-61 min; 3720s adds margin. This is a CI-length figure and
+# is NOT derived from MAX_PP_SECS. The budget it is compared against is
+# _CI_FIX_WALL_BUDGET_SECS (defined below; resolved at call time).
+_BEHIND_CI_EXPECTED_SECS = 3720
 
 
 def _retry_key(branch: str, attempt: int) -> str:
@@ -1533,13 +1539,18 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
     return sha, bg_ci
 
 
-def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
+def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
+                    *, run_started=None):
     """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
     and the branch is still BEHIND, auto-merge stays armed and the PR is handed
     to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
     set here. Divergence inside the loop still disarms (see the disarm=True
-    call sites below)."""
+    call sites below). When run_started is given, a pass is skipped once the
+    remaining _CI_FIX_WALL_BUDGET_SECS budget is below
+    max(_BEHIND_CI_EXPECTED_SECS, the longest pass measured so far); auto-merge
+    stays armed and the same update-behind-prs.yml hand-off applies."""
     strict = gh.branch_protection_strict()
+    longest_pass = 0.0
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
         if mss != "BEHIND":
@@ -1548,6 +1559,17 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
             log("phase7: BEHIND but required checks are not strict — "
                 "leaving auto-merge armed")
             return sha, outcome
+        if run_started is not None:
+            remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            need = max(_BEHIND_CI_EXPECTED_SECS, longest_pass)
+            if remaining < need:
+                log(f"phase7: BEHIND re-rebase {attempt}/{_MAX_BEHIND_RETRIES} "
+                    f"skipped: wall budget {int(remaining)}s left < {int(need)}s "
+                    "expected CI pass; leaving auto-merge armed; "
+                    ".github/workflows/update-behind-prs.yml (ADR-0081) "
+                    "carries the PR to merge")
+                return sha, outcome
+        pass_started = time.time()
         log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
         if worktree and os.path.isdir(worktree):
             r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
@@ -1570,6 +1592,7 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.head_sha:
             sha = outcome.head_sha
         ciwatch.reap_background_watch(bg)
+        longest_pass = max(longest_pass, time.time() - pass_started)
         log(f"phase7 ci(re-rebase {attempt}): exit={outcome.exit_code} "
             f"failed={outcome.failed}")
         if outcome.exit_code != 0:

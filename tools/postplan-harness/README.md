@@ -52,6 +52,7 @@ harness/
   scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
+  reviewer_eval.py        reviewer eval: corpus validate, run, score line, surface hash, mine, compare, check-claim
   ciwatch.py              Phase 7 outcome interpretation
   llm_calls.py            prompt builders for the non-review retained calls
   schemas.py              typed validation for every LLM output
@@ -63,6 +64,7 @@ harness/
     verify.py             LiveVerify (phpunit/phpstan/go) / ReplayVerify (recorded outputs)
 tests/                    27 tests (pure logic + live-git tempdir + full replay runs)
 fixtures/scenarios/<slug>/fixture.json   point-in-time inputs from 8 historical runs
+fixtures/reviewer-eval/corpus.json       confirmed bug cases + clean cases scored by bin/reviewer-eval
 bench/benchmark.py        Method-A replay benchmark + parity gates
 report/report.html        self-contained benchmark report
 out/                      per-run result.json, audit.log, actions.jsonl
@@ -187,6 +189,16 @@ the same kind and detail as before. `Could not read from remote repository` and
 the first error is raised and every wrapped call in the same process makes a
 single attempt for the next 300 seconds. Each retry logs one warning on the
 `harness.netretry` logger.
+
+`gh pr create` also gets one retry after a GitHub API rate-limit error
+(`API rate limit exceeded` or `API rate limit already exceeded`). The harness
+reads the GraphQL reset time with `gh api rate_limit`, waits until two seconds
+after it, then lists open PRs for the head branch. A PR it finds is returned
+without a second create. Otherwise the create runs once more. A reset more than
+15 minutes away, an unreadable reset, a failed listing, or a second rate-limit
+error fails the run with the original `gh` error plus a note that names the rate
+limit and the reset time. The wait never reads or trips the 300-second outage
+latch. Other gh calls fail on a rate limit as before.
 
 The wrapped calls are `LiveGit.fetch_base`, the lease `ls-remote`, `push` and
 `push_ff` in `harness/adapters/gitad.py`, the fetch and `ls-remote` helpers in

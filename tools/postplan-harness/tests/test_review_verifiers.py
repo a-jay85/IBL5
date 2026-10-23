@@ -165,7 +165,7 @@ def test_scored_rows_keep_legacy_key_set(tmp_path):
     (findings, _gates, scored, _degraded), _llm, _gh = _run(tmp_path)
     assert scored, "expected at least one scored row"
     for row in scored:
-        assert set(row) == {"source", "agent", "path", "line", "score", "body_head"}
+        assert set(row) == {"source", "agent", "path", "line", "score", "label", "body_head"}
     assert len(scored) == len(findings)
 
 
@@ -492,7 +492,8 @@ def test_votes_file_written_with_one_record_per_finding(tmp_path):
     assert len(doc["records"]) == 2
     for rec in doc["records"]:
         assert set(rec) == {"n", "source", "agent", "path", "line", "body_head", "votes",
-                            "valid_real", "valid_not_real", "abstain", "kept", "score", "fallback"}
+                            "valid_real", "valid_not_real", "abstain", "kept", "score", "fallback",
+                            "preexisting"}
         assert len(rec["votes"]) == 3
     assert [r["n"] for r in doc["records"]] == [1, 2]
 
@@ -513,7 +514,7 @@ def test_scored_rows_unchanged_by_vote_record(tmp_path):
     (_findings, _gates, scored, _degraded), _llm, _gh = _run(tmp_path, out_dir=str(tmp_path / "out"))
     assert scored
     for row in scored:
-        assert set(row) == {"source", "agent", "path", "line", "score", "body_head"}
+        assert set(row) == {"source", "agent", "path", "line", "score", "label", "body_head"}
     assert "votes" not in json.dumps(scored, sort_keys=True)
 
 

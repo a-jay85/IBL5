@@ -30,13 +30,34 @@ PRF_FOOTER='Generated with [Claude Code](https://claude.ai/code)
 
 <sub>If this was useful, react with thumbs-up. Otherwise, react with thumbs-down.</sub>'
 
+# Severity labels on posted findings. Unknown or missing => important (fail-closed:
+# only nit and pre-existing are the non-holding labels condition (11) skips).
+PRF_NIT_CAP="${PRF_NIT_CAP:-5}"
+# jq helpers shared by the inline and fallback renderers.
+# shellcheck disable=SC2016  # jq program, not shell expansion
+PRF_JQ_LABEL='def prf_label: (.label // "important") as $l | if ($l == "nit" or $l == "pre-existing") then $l else "important" end;
+def prf_word: {"important":"Important","nit":"Nit","pre-existing":"Pre-existing"}[prf_label];
+def prf_rank: {"important":0,"nit":1,"pre-existing":2}[prf_label];
+def prf_score: (.score | if type == "number" then . else 0 end);
+def prf_bc: (.bug_class | if type == "string" then . else "" end);
+def prf_oi: (.other_instances | if type == "array" then map(select(type == "string")) else [] end);
+def prf_header: "<!-- label: " + prf_label + " -->\n<!-- score: " + (prf_score|tostring) + " -->\n**" + prf_word + "**"
+  + (if (prf_bc | length) > 0 then " · bug class: `" + prf_bc + "`" else "" end)
+  + (if (prf_oi | length) > 0 then " · other instances: " + (prf_oi | map("`" + . + "`") | join(", ")) else "" end)
+  + "\n\n";'
+
 # prf_diff_right_lines PR_NUMBER
 #   Emits "path<TAB>line" for every right-side (context or added) line in the
 #   PR diff.  Deleted lines (-) are skipped and do not advance the counter.
 #   Handles both "@@ -a,b +c,d @@" and "@@ -a +c @@" (single-line) hunk forms.
+#   With a second arg of "added", emits only the added (+) lines.
 prf_diff_right_lines() {
-    local pr="$1"
-    "$GH_CMD" pr diff "$pr" | awk '
+    local pr="$1" mode="${2:-}" diff_file="${3:-}"
+    if [ -n "$diff_file" ]; then
+        cat "$diff_file"
+    else
+        "$GH_CMD" pr diff "$pr"
+    fi | awk -v mode="$mode" '
         /^diff --git / { cur_file = "" }
         /^\+\+\+ b\// {
             sub(/^\+\+\+ b\//, "")
@@ -54,7 +75,7 @@ prf_diff_right_lines() {
             next
         }
         cur_file != "" && /^ / {
-            print cur_file "\t" rline
+            if (mode != "added") print cur_file "\t" rline
             rline++
             next
         }
@@ -91,9 +112,51 @@ post_review_findings() {
     count=$(jq 'length' "$findings_file")
     [ "$count" -eq 0 ] && return 0
 
+    # Normalize labels, sort Important > Nit > Pre-existing (score desc within a
+    # label), and cap nits. Every later count is post-cap by construction.
+    # A `pre-existing` label is only honored on a context line.  A finding the
+    # caller tagged pre-existing that sits on an added (+) line was introduced by
+    # this PR, so it is forced back to important before anything else reads it.
+    # The diff is fetched once and fails closed: an empty added set from a failed
+    # fetch would skip every demotion and post a self-introduced bug as trusted
+    # pre-existing.  Both line sets below are built from this one file.
+    local diff_file="$tmp/pr.diff"
+    if ! "$GH_CMD" pr diff "$pr" > "$diff_file" || [ ! -s "$diff_file" ]; then
+        printf 'ERROR: could not fetch diff for PR %s; not posting findings.\n' "$pr" >&2
+        return 1
+    fi
+    local added_file="$tmp/added.json" demoted_file="$tmp/demoted.json"
+    prf_diff_right_lines "$pr" added "$diff_file" \
+        | jq -R 'split("\t") | .[0]+":"+.[1]' \
+        | jq -s '.' > "$added_file"
+    # A file this PR adds has no pre-existing content, so any pre-existing label
+    # on it is demoted, including a whole-file (line 0 / missing line) finding
+    # that never matches an added path:line.
+    local newfiles_file="$tmp/newfiles.json"
+    awk '
+        /^diff --git / { is_new = 0 }
+        /^--- \/dev\/null/ { is_new = 1 }
+        is_new && /^\+\+\+ b\// { sub(/^\+\+\+ b\//, ""); print }
+    ' "$diff_file" | jq -R '.' | jq -s '.' > "$newfiles_file"
+    jq --slurpfile added "$added_file" --slurpfile newfiles "$newfiles_file" '
+        map(if .label == "pre-existing"
+               and ((((.path // "") + ":" + (.line | tostring)) as $k | $added[0] | index($k) != null)
+                    or ((.path // "") as $p | $newfiles[0] | index($p) != null))
+            then .label = "important" else . end)' "$findings_file" > "$demoted_file"
+    findings_file="$demoted_file"
+
+    local norm_file="$tmp/normalized.json"
+    jq --argjson cap "$PRF_NIT_CAP" "$PRF_JQ_LABEL"'
+        [ to_entries[] | .value + {_i: .key, _label: (.value|prf_label)} ]
+        | sort_by([ (.|prf_rank), -(.|prf_score), ._i ])
+        | ( [ .[] | select(._label != "nit") ] + ([ .[] | select(._label == "nit") ] | .[:$cap]) )
+        | sort_by([ (.|prf_rank), -(.|prf_score), ._i ])
+        | map(del(._i, ._label))' "$findings_file" > "$norm_file"
+    findings_file="$norm_file"
+
     # Build path:line set from the diff
     local lines_file="$tmp/lines.json"
-    prf_diff_right_lines "$pr" \
+    prf_diff_right_lines "$pr" "" "$diff_file" \
         | jq -R 'split("\t") | .[0]+":"+.[1]' \
         | jq -s '.' > "$lines_file"
 
@@ -128,7 +191,7 @@ ${PRF_FOOTER}"
         local payload_file="$tmp/payload.json"
         # The agent marker is written only for an allowlisted id, so a hostile
         # value cannot inject an HTML-comment terminator into the body.
-        local comments_prog='[.[] | {path, line, side:"RIGHT", body: (.body + "\n\n<!-- score: " + (.score|tostring) + " -->" + ((.agent // "") | tostring | if test("^[A-Za-z0-9_-]{1,32}$") then "\n<!-- agent: " + . + " -->" else "" end))}]'
+        local comments_prog="$PRF_JQ_LABEL"'[.[] | {path, line, side:"RIGHT", body: (prf_header + .body + ((.agent // "") | tostring | if test("^[A-Za-z0-9_-]{1,32}$") then "\n<!-- agent: " + . + " -->" else "" end))}]'
         jq -n \
             --arg sha "$head_sha" \
             --arg ev "COMMENT" \
@@ -151,12 +214,12 @@ ${PRF_FOOTER}"
             printf 'Found %d issue(s) that could not be anchored to a diff line:\n\n' "$fallback_count"
             if [ "$file_count" -gt 0 ]; then
                 printf '**Whole-file findings**\n\n'
-                jq -r 'to_entries[] | "\(.key + 1). `\(.value.path)` — \(.value.body)\n\n<!-- score: \(.value.score) -->"' "$file_file"
+                jq -r "$PRF_JQ_LABEL"'to_entries[] | "\(.key + 1). `\(.value.path)` — " + (.value|prf_header) + .value.body + "\n"' "$file_file"
                 printf '\n'
             fi
             if [ "$off_count" -gt 0 ]; then
                 printf '**Findings on lines not present in the diff**\n\n'
-                jq -r 'to_entries[] | "\(.key + 1). `\(.value.path):\(.value.line // "?")` — \(.value.body)\n\n<!-- score: \(.value.score) -->"' "$off_file"
+                jq -r "$PRF_JQ_LABEL"'to_entries[] | "\(.key + 1). `\(.value.path):\(.value.line // "?")` — " + (.value|prf_header) + .value.body + "\n"' "$off_file"
                 printf '\n'
             fi
             printf '%s\n' "$PRF_FOOTER"

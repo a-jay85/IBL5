@@ -16,6 +16,7 @@ import os
 from .fidelity import REMEDIATION_ALLOWED_TOOLS, REMEDIATION_DENIED_TOOLS, denied_gate_edits
 from .adapters.llm import extract_json
 from . import outcome_log
+from .labels import NON_HOLDING_LABELS, parse_label
 from .state import HarnessError
 
 TRUSTED_LOGIN = "a-jay85"
@@ -53,6 +54,9 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
         if t.get("isResolved") or t.get("isOutdated"):
             continue
         if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
+            continue
+        # Nit / Pre-existing threads never hold condition (11); leave them open.
+        if parse_label(t.get("body") or "") in NON_HOLDING_LABELS:
             continue
         if keep is not None and not keep(t):
             continue

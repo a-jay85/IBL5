@@ -573,6 +573,210 @@ GH_CMD="$SAVED_GH_CMD"
     && ok "case24: clear path returns 0 under strict mode" \
     || fail "case24: clear path returned non-zero — pr-triage would abort"
 
+# ── cases 25-32: label exception — trusted nit / pre-existing threads never hold ─
+# Helper: one-thread fixture with a given first-comment body and author JSON.
+c11_fixture() { # <file> <body-json-string> <author-json>
+    jq -n --argjson b "$2" --argjson a "$3" \
+        '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+          {"isResolved":false,"comments":{"nodes":[{"databaseId":901,"body":$b,"author":$a}]}}
+        ]}}}}}' > "$1"
+}
+BOT_AUTHOR='{"login":"claude[bot]","__typename":"Bot"}'
+OWNER_AUTHOR='{"login":"a-jay85","__typename":"User"}'
+HUMAN_AUTHOR='{"login":"someone","__typename":"User"}'
+
+# case 25: nit marker, trusted bot author → no stdout, rc 0, stderr note
+fix25="$BASE_TMP/threads25.json"; out25="$BASE_TMP/case25.txt"; err25="$BASE_TMP/case25.err"
+c11_fixture "$fix25" '"<!-- label: nit -->\n<!-- score: 70 -->\n**Nit** rename x"' "$BOT_AUTHOR"
+GH_THREADS_FIXTURE="$fix25"
+rc25=0; pr_unresolved_findings_hold 42 > "$out25" 2> "$err25" || rc25=$?
+if [ ! -s "$out25" ] && [ "$rc25" -eq 0 ]; then
+    ok "case25: trusted nit-labeled thread does not hold (stdout empty, rc 0)"
+else
+    fail "case25: expected empty stdout rc 0, got rc=$rc25: $(tr '\n' ' ' < "$out25")"
+fi
+assert_contains "case25: skipped thread logged on stderr" "$err25" "non-holding thread 901 (nit)"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 26: pre-existing marker, trusted a-jay85 author, score 85 → empty
+fix26="$BASE_TMP/threads26.json"; out26="$BASE_TMP/case26.txt"
+c11_fixture "$fix26" '"<!-- label: pre-existing -->\n<!-- score: 85 -->\n**Pre-existing** old bug"' "$OWNER_AUTHOR"
+GH_THREADS_FIXTURE="$fix26"
+pr_unresolved_findings_hold 42 > "$out26" 2>/dev/null
+if [ ! -s "$out26" ]; then
+    ok "case26: trusted pre-existing-labeled thread does not hold"
+else
+    fail "case26: expected empty, got: $(tr '\n' ' ' < "$out26")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 27: spoof — same marker from an untrusted human author → holds
+fix27="$BASE_TMP/threads27.json"; out27="$BASE_TMP/case27.txt"
+c11_fixture "$fix27" '"<!-- label: pre-existing -->\n<!-- score: 85 -->\n**Pre-existing** old bug"' "$HUMAN_AUTHOR"
+GH_THREADS_FIXTURE="$fix27"
+pr_unresolved_findings_hold 42 > "$out27" 2>/dev/null
+if [ "$(cat "$out27")" = "unresolved-finding:85" ]; then
+    ok "case27: untrusted author with a label marker still holds"
+else
+    fail "case27: expected 'unresolved-finding:85', got: $(tr '\n' ' ' < "$out27")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 28: marker on line 2 → holds
+fix28="$BASE_TMP/threads28.json"; out28="$BASE_TMP/case28.txt"
+c11_fixture "$fix28" '"text\n<!-- label: nit -->"' "$BOT_AUTHOR"
+GH_THREADS_FIXTURE="$fix28"
+pr_unresolved_findings_hold 42 > "$out28" 2>/dev/null
+if [ "$(cat "$out28")" = "unresolved-finding:-" ]; then
+    ok "case28: marker not on line 1 still holds"
+else
+    fail "case28: expected 'unresolved-finding:-', got: $(tr '\n' ' ' < "$out28")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 29: unknown label word → holds
+fix29="$BASE_TMP/threads29.json"; out29="$BASE_TMP/case29.txt"
+c11_fixture "$fix29" '"<!-- label: trivial -->\nsomething"' "$BOT_AUTHOR"
+GH_THREADS_FIXTURE="$fix29"
+pr_unresolved_findings_hold 42 > "$out29" 2>/dev/null
+if [ "$(cat "$out29")" = "unresolved-finding:-" ]; then
+    ok "case29: unknown label word still holds"
+else
+    fail "case29: expected 'unresolved-finding:-', got: $(tr '\n' ' ' < "$out29")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 30: important marker, trusted, score 90 → holds exactly as today
+fix30="$BASE_TMP/threads30.json"; out30="$BASE_TMP/case30.txt"
+c11_fixture "$fix30" '"<!-- label: important -->\n<!-- score: 90 -->\n**Important** bug"' "$BOT_AUTHOR"
+GH_THREADS_FIXTURE="$fix30"
+pr_unresolved_findings_hold 42 > "$out30" 2>/dev/null
+if [ "$(cat "$out30")" = "unresolved-finding:90" ]; then
+    ok "case30: important-labeled thread holds as today"
+else
+    fail "case30: expected 'unresolved-finding:90', got: $(tr '\n' ' ' < "$out30")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 31: null author with a nit marker → holds
+fix31="$BASE_TMP/threads31.json"; out31="$BASE_TMP/case31.txt"
+c11_fixture "$fix31" '"<!-- label: nit -->\nrename"' 'null'
+GH_THREADS_FIXTURE="$fix31"
+pr_unresolved_findings_hold 42 > "$out31" 2>/dev/null
+if [ "$(cat "$out31")" = "unresolved-finding:-" ]; then
+    ok "case31: deleted (null) author with a nit marker still holds"
+else
+    fail "case31: expected 'unresolved-finding:-', got: $(tr '\n' ' ' < "$out31")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# case 32: mixed — one trusted nit thread plus one scored-85 human thread → one line
+fix32="$BASE_TMP/threads32.json"; out32="$BASE_TMP/case32.txt"
+cat > "$fix32" <<'THREADS32'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":911,"body":"<!-- label: nit -->\n<!-- score: 65 -->\n**Nit** x","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
+  {"isResolved":false,"comments":{"nodes":[{"databaseId":912,"body":"Bug <!-- score: 85 -->","author":{"login":"someone","__typename":"User"}}]}}
+]}}}}}
+THREADS32
+GH_THREADS_FIXTURE="$fix32"
+pr_unresolved_findings_hold 42 > "$out32" 2>/dev/null
+if [ "$(cat "$out32")" = "unresolved-finding:85" ]; then
+    ok "case32: mixed threads → only the holding thread emits"
+else
+    fail "case32: expected exactly 'unresolved-finding:85', got: $(tr '\n' ' ' < "$out32")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── cases 33-39b: severity label rendering, sort, nit cap ─────────────────────
+# case 33: inline nit renders the label marker on line 1, score on line 2
+reset_outputs
+f33="$BASE_TMP/f33.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Nit Z","score":70,"label":"nit","bug_class":"magic-number","other_instances":["classes/Foo.php:40"]}]' > "$f33"
+post_review_findings 42 deadbeefcafe "Code review" "$f33"
+assert_jq "case33: marker line 1, score line 2, bold Nit" \
+    '.comments[0].body | startswith("<!-- label: nit -->\n<!-- score: 70 -->\n**Nit**")' "$REVIEW_OUT"
+# shellcheck disable=SC2016  # backticks are literal markdown in the jq string
+assert_jq "case33: bug class rendered" '.comments[0].body | contains("bug class: `magic-number`")' "$REVIEW_OUT"
+# shellcheck disable=SC2016
+assert_jq "case33: other instances rendered" '.comments[0].body | contains("`classes/Foo.php:40`")' "$REVIEW_OUT"
+
+# case 34: missing label defaults to important
+reset_outputs
+f34="$BASE_TMP/f34.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug M","score":85}]' > "$f34"
+post_review_findings 42 deadbeefcafe "Code review" "$f34"
+assert_jq "case34: missing label renders important" \
+    '.comments[0].body | startswith("<!-- label: important -->\n<!-- score: 85 -->\n**Important**")' "$REVIEW_OUT"
+
+# case 35: unknown label word defaults to important
+reset_outputs
+f35="$BASE_TMP/f35.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug U","score":85,"label":"blocker"}]' > "$f35"
+post_review_findings 42 deadbeefcafe "Code review" "$f35"
+assert_jq "case35: unknown label renders important" \
+    '.comments[0].body | startswith("<!-- label: important -->")' "$REVIEW_OUT"
+
+# case 36: sorted important, nit, pre-existing with a score tiebreak
+reset_outputs
+f36="$BASE_TMP/f36.json"
+printf '%s' '[{"path":"classes/Foo.php","line":12,"body":"n","score":70,"label":"nit"},
+ {"path":"classes/Foo.php","line":10,"body":"p","score":85,"label":"pre-existing"},
+ {"path":"classes/Foo.php","line":12,"body":"i82","score":82,"label":"important"},
+ {"path":"classes/Foo.php","line":12,"body":"i90","score":90,"label":"important"}]' > "$f36"
+post_review_findings 42 deadbeefcafe "Code review" "$f36"
+assert_jq "case36: order important(90,82), nit, pre-existing" \
+    '.comments | map(.body | capture("<!-- score: (?<s>[0-9]+)") | .s) == ["90","82","70","85"]' "$REVIEW_OUT"
+
+# case 36b: pre-existing on an added (+) line is forced back to important;
+# pre-existing on a context line keeps its label
+reset_outputs
+f36b="$BASE_TMP/f36b.json"
+printf '%s' '[{"path":"classes/Foo.php","line":12,"body":"added","score":90,"label":"pre-existing"},
+ {"path":"classes/Foo.php","line":10,"body":"ctx","score":85,"label":"pre-existing"}]' > "$f36b"
+post_review_findings 42 deadbeefcafe "Code review" "$f36b"
+assert_jq "case36b: added-line pre-existing becomes important" \
+    '.comments[0].body | startswith("<!-- label: important -->")' "$REVIEW_OUT"
+assert_jq "case36b: context-line pre-existing keeps label" \
+    '.comments[1].body | startswith("<!-- label: pre-existing -->")' "$REVIEW_OUT"
+
+# case 37: nit cap keeps the five highest-scored nits, never an important
+reset_outputs
+f37="$BASE_TMP/f37.json"
+jq -n '[range(61;68) | {path:"classes/Foo.php",line:12,body:("nit " + tostring),score:.,label:"nit"}]
+       + [{path:"classes/Foo.php",line:12,body:"imp",score:90,label:"important"}]' > "$f37"
+post_review_findings 42 deadbeefcafe "Code review" "$f37"
+assert_jq "case37: 5 nits + 1 important posted" '.comments | length == 6' "$REVIEW_OUT"
+assert_not_contains "case37: lowest nit 61 dropped" "$REVIEW_OUT" "<!-- score: 61 -->"
+assert_not_contains "case37: nit 62 dropped" "$REVIEW_OUT" "<!-- score: 62 -->"
+assert_jq "case37: envelope counts post-cap" '.body | contains("Found 6 issue(s)")' "$REVIEW_OUT"
+
+# case 38: off-diff pre-existing goes to the fallback comment with its label
+reset_outputs
+f38="$BASE_TMP/f38.json"
+printf '[{"path":"classes/Foo.php","line":999,"body":"Old bug","score":85,"label":"pre-existing"}]' > "$f38"
+post_review_findings 42 deadbeefcafe "Code review" "$f38"
+assert_contains "case38: bold Pre-existing label" "$COMMENT_OUT" "**Pre-existing**"
+assert_contains "case38: label marker" "$COMMENT_OUT" "<!-- label: pre-existing -->"
+assert_contains "case38: path:line anchor kept" "$COMMENT_OUT" "classes/Foo.php:999"
+assert_absent   "case38: no review POST" "$REVIEW_OUT"
+
+# case 39: an important inline thread survives alongside an off-diff pre-existing
+reset_outputs
+f39="$BASE_TMP/f39.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Imp","score":90,"label":"important"},{"path":"classes/Foo.php","line":999,"body":"Old","score":85,"label":"pre-existing"}]' > "$f39"
+post_review_findings 42 deadbeefcafe "Code review" "$f39"
+assert_jq "case39: important stays inline" '.comments | length == 1' "$REVIEW_OUT"
+assert_contains "case39: pre-existing in fallback" "$COMMENT_OUT" "Found 1 issue(s) that could not be anchored"
+
+# case 39b: PRF_NIT_CAP env seam
+reset_outputs
+f39b="$BASE_TMP/f39b.json"
+jq -n '[range(70;73) | {path:"classes/Foo.php",line:12,body:"n",score:.,label:"nit"}]' > "$f39b"
+SAVED_NIT_CAP="$PRF_NIT_CAP"; PRF_NIT_CAP=2
+post_review_findings 42 deadbeefcafe "Code review" "$f39b"
+PRF_NIT_CAP="$SAVED_NIT_CAP"
+assert_jq "case39b: PRF_NIT_CAP=2 keeps two nits" '.comments | length == 2' "$REVIEW_OUT"
+
 # ── structural: condition (11) block exists and is self-contained ─────────────
 COND11_FILE="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 if grep -q '# condition (11)' "$COND11_FILE" \
@@ -965,8 +1169,8 @@ reset_outputs
 fa="$BASE_TMP/f-agent.json"
 printf '[{"path":"classes/Foo.php","line":12,"body":"Bug A","score":85,"agent":"B"}]' > "$fa"
 post_review_findings 42 deadbeefcafe "Code review" "$fa"
-assert_jq "agent: marker follows the score marker" \
-    '.comments[0].body | endswith("<!-- score: 85 -->\n<!-- agent: B -->")' "$REVIEW_OUT"
+assert_jq "agent: marker closes the body; score marker sits on line 2" \
+    '.comments[0].body | endswith("\n<!-- agent: B -->") and (split("\n")[1] == "<!-- score: 85 -->")' "$REVIEW_OUT"
 
 reset_outputs
 fh="$BASE_TMP/f-agent-hostile.json"

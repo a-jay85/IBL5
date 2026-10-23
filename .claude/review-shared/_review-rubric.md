@@ -20,7 +20,7 @@ When the parent command passes issues to the Haiku scoring agent, pass **this se
 
 Score each finding 0-100 using the rubric below:
 
-- **0**: False positive that doesn't survive light scrutiny, or a pre-existing issue, or caught by the **Automatic Zero** list below.
+- **0**: False positive that doesn't survive light scrutiny, or caught by the **Automatic Zero** list below. A pre-existing defect is scored on its merit as a defect; its age is reported only through the `preexisting` flag.
 - **25**: Suspicious but likely mitigated. Variable constrained elsewhere; pattern present but unexploitable in context.
 - **50**: Moderately confident. Pattern present but exploitation requires specific conditions that may not apply. Stylistic issue not explicitly called out in a project rule (`.claude/rules/*.md`).
 - **75**: Highly confident. Double-checked and verified as a real issue that will happen in practice. Directly stated in a project rule (`.claude/rules/*.md`) or clearly present with no visible mitigation.
@@ -28,7 +28,21 @@ Score each finding 0-100 using the rubric below:
 
 For rule-cited issues: **verify the rule is actually stated in the cited `.claude/rules/*.md` file**. Do not invent rules.
 
-Return ONLY valid JSON: `[{"n": 1, "score": 75}, {"n": 2, "score": 0}, ...]`
+Return ONLY valid JSON: `[{"n": 1, "score": 75, "preexisting": false}, {"n": 2, "score": 0, "preexisting": false}, ...]`
+
+## Pre-existing defects and labels
+
+The scorer returns `[{"n": 1, "score": 75, "preexisting": false}, ...]`. `preexisting` is `true` only when the defect clearly existed before the PR (unchanged line, bug not introduced by the diff). A missing or non-boolean value reads as `false`.
+
+Every finding that survives gets exactly one label; the label can never lower a finding that cleared the threshold:
+
+| Label | Rule | Holds auto-merge |
+|---|---|---|
+| `Important` | score at or above the threshold, unless all three pre-existing conditions hold | yes, as before |
+| `Pre-existing` | score at or above the threshold AND reviewer said `pre-existing: yes` AND scorer said `"preexisting": true` AND the anchor line is a context line (not a `+` line) of the PR diff | no |
+| `Nit` | code review only; reviewer said `severity: nit` AND 60 <= score < 80 | no |
+
+Any disagreement among the three pre-existing conditions falls back to `Important`. Security findings are never `Nit`. Below 60, or below threshold without a `nit` hint, a finding is dropped as before. At most 5 nits post per PR (highest score first), and posted findings sort `Important`, `Nit`, `Pre-existing`. The posting helper writes `<!-- label: <label> -->` as the first line of every comment; Phase 6.5 conditions (2) and (11) skip `nit` and `pre-existing`.
 
 **Post-plan 4D votes instead of scoring.** `/post-plan` Phase 4D and the harness (`tools/postplan-harness/harness/review.py`) no longer request this JSON. Three code-reading verifiers vote `real` or `not-real` per finding, using the Automatic Zero and IBL5-specific false-positive sections below as rejection rules, and the posted score is derived from the tally (see `.claude/skills/post-plan/_phase-4-review-audit.md` § 4D). `/pr-review` and `/security-audit` keep using the scale above.
 
@@ -84,7 +98,6 @@ Apply after the Automatic Zero list.
 - `$db->sql_query()` with fully hardcoded strings (no variables)
 - API handlers already using `ApiKeyAuthenticator` — CSRF exempt
 - GET-only read handlers — CSRF exempt
-- Pre-existing issues on lines the PR did not modify
 - Changes in functionality that are likely intentional or directly related to the broader change
 - Issues called out in a project rule but silenced by explicit opt-out comments (e.g. `// phpcs:ignore`, `@phpstan-ignore-next-line`)
 - `tests/e2e/smoke/**/*.ts` flagged for Section 2 generic-visibility assertions — smoke tests legitimately assert "page loads" via generic selectors; Agent D should already exempt these, but if one slips through it scores 0
@@ -92,4 +105,3 @@ Apply after the Automatic Zero list.
 - Helpers returning null/empty arrays as legitimate sentinels (`getOptional…`, `findIf…`) flagged for "missing assertion" — sentinel returns are by design
 - Section 3 findings when `ibl5/tests/e2e/vr-manifest.ts` does not exist in the repo (Layer 3b not landed)
 - Section 1 findings when `submitFormAndAssertEffect` helper does not exist AND the test uses cross-page navigation + destination assertion (Layer 3a not landed, underlying pattern present)
-- Pre-existing assertion patterns on lines the PR did not modify (restated from above for E2E clarity)

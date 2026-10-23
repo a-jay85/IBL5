@@ -292,7 +292,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(1, "manual-testing-clearance", cond1_held,
                               f"state={clearance}" if cond1_held else ""))
 
-    high = [f for f in inp.findings if (f.score or 0) >= 80]
+    # Only nit and pre-existing (set by labels.classify) are non-holding. A missing,
+    # empty or unknown label such as "blocker" resolves to Important and holds (fail-closed).
+    high = [f for f in inp.findings
+            if (f.score or 0) >= 80
+            and (getattr(f, "label", None) or "important") not in ("nit", "pre-existing")]
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 
@@ -379,6 +383,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # holds; the split below is for the reason text only. Trust and authorship are
     # never consulted here: thread_ingestion.py decides what a run may ACT on,
     # this decides whether the PR may merge. None / api-error / cap stay fail-closed.
+    # Threads whose first comment carries a trusted <!-- label: nit --> or
+    # <!-- label: pre-existing --> marker are dropped by pr_unresolved_findings_hold
+    # before this list is built; this grader never parses labels and still holds on
+    # any non-empty list.
     uf = inp.unresolved_findings
     if uf is None:
         r = "unresolved review-thread state not consulted — fail-closed"

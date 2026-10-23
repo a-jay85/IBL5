@@ -18,7 +18,7 @@ import os
 import re
 
 from .state import Classification, Finding, HarnessError, PlanInfo
-from . import schemas
+from . import labels, schemas
 from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
@@ -44,8 +44,9 @@ VERIFIER_TERMINAL_KINDS = frozenset({"llm-fixture-missing", "llm-model-not-allow
 VERIFIER_FALSE_POSITIVES = (
     "Reject (not-real) when the finding is one of the IBL5 false positives: BaseMysqliRepository "
     "variables (already parameterized); test files; echo in CLI scripts; hardcoded sql_query "
-    "strings; ApiKeyAuthenticator handlers (CSRF-exempt); GET-only readers; pre-existing issues "
-    "on lines the PR did not modify; intentional changes that are the PR's stated purpose."
+    "strings; ApiKeyAuthenticator handlers (CSRF-exempt); GET-only readers; intentional "
+    "changes that are the PR's stated purpose. A real defect on a line the PR did not modify "
+    "is still real (it posts as a non-holding Pre-existing note); do not reject it for being old."
 )
 
 AUTOMATIC_ZERO_NOTE = (
@@ -54,21 +55,34 @@ AUTOMATIC_ZERO_NOTE = (
     "require_once in classes/, meaningless assertions, number_format outside "
     "StatsFormatter, direct nuke globals, begin_transaction in repositories, cookie-"
     "before-header). Any finding those rules would catch is OUT OF SCOPE — a merged "
-    "PR cannot violate them. Do not report pre-existing issues on lines the PR did "
-    "not modify."
+    "PR cannot violate them. A real defect on a line the PR did not modify IS "
+    "reportable: set \"preexisting\": true on it so it posts as a non-holding "
+    "Pre-existing note instead of being dropped."
 )
 
 OUTPUT_CONTRACT_EXAMPLE = (
     '[{"path": "ibl5/classes/TeamRepository.php", "line": 88, '
     '"body": "fetchAll() on ibl_box_scores is unbounded and this table grows every sim; '
-    'add a LIMIT or filter by season."}]'
+    'add a LIMIT or filter by season.", "severity": "important", "preexisting": false, '
+    '"bug_class": "unbounded-fetch", '
+    '"other_instances": ["ibl5/classes/PlayerRepository.php:142"]}]'
 )
 
 _CONTRACT_BODY = (
     "Return ONLY a JSON array of findings: "
     '[{"path": "repo/relative/file.php", "line": 123, "body": "what and why"}]. '
-    "Every finding carries exactly these three lowercase keys. Do NOT emit any other "
-    'key: no "category", no "severity", no "symbol", no "file", no "detail". '
+    'Every finding carries the three required lowercase keys "path", "line", "body", '
+    "plus four OPTIONAL lowercase keys and nothing else: "
+    '"severity" ("important" or "nit"; a nit is a real but low-impact issue), '
+    '"preexisting" (JSON true only when the defect existed before this PR and the '
+    'anchor line is unchanged context), '
+    '"bug_class" (a short kebab-case name for the defect class, e.g. unbounded-fetch, '
+    'missing-null-guard), and '
+    '"other_instances" (a JSON array of "path:line" strings naming EVERY other place '
+    "in the diff with the same bug class, and any you can see cheaply in the diff's "
+    "context windows of the touched files; [] when none). "
+    'Do NOT emit any other key: no "category", no "symbol", no "file", no "detail". '
+    "Give bug_class and other_instances for every finding so one round fixes all copies. "
     "Do NOT wrap the array in an object and do NOT group findings under per-topic keys; "
     "one flat array covers the whole review. "
     "line is a single anchor line on the new-file side of the diff; use 0 when the "
@@ -208,8 +222,10 @@ def security_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
 
 _VERDICT_CONTRACT = (
     'Return ONLY a JSON array with one entry per finding number you were given: '
-    '[{"n": 1, "verdict": "real", "reason": "one sentence citing what you read"}]. '
-    '"verdict" is exactly "real" or "not-real". Do NOT add entries for issues you noticed '
+    '[{"n": 1, "verdict": "real", "preexisting": false, "reason": "one sentence citing what you read"}]. '
+    '"verdict" is exactly "real" or "not-real". "preexisting" is JSON true only when the defect '
+    "clearly existed before this PR (unchanged line, bug not introduced by the diff); otherwise false. "
+    "Do NOT add entries for issues you noticed "
     "yourself; you are verifying, not reviewing. No prose outside the JSON."
 )
 
@@ -250,7 +266,7 @@ def verifier_prompt(chunk: list[Finding], hunks: dict[str, str]) -> str:
         "line in the working tree (your cwd is the PR checkout), read enough surrounding code "
         "to judge the claim, compare with the diff hunk, and vote.\n"
         "Vote not-real ONLY when you verified in the code that the claim is wrong, already "
-        "mitigated, out of the PR's changed lines, or matches a rejection rule below. "
+        "mitigated, or matches a rejection rule below. "
         "When you cannot open the file, cannot find the line, or cannot decide, vote real: "
         "the pipeline keeps a finding unless every verifier rejects it.\n\n"
         "REJECTION RULES:\n" + AUTOMATIC_ZERO_NOTE + "\n" + VERIFIER_FALSE_POSITIVES + "\n\n"
@@ -286,17 +302,19 @@ def aggregate_votes(findings: list[Finding], seat_votes: list[dict]) -> list[dic
     base + round((100 - base) * valid_real / VERIFIER_COUNT), base = the source's threshold."""
     records = []
     for idx, f in enumerate(findings):
-        votes, real, not_real = [], 0, 0
+        votes, real, not_real, pre_real = [], 0, 0, 0
         for seat, sv in enumerate(seat_votes, start=1):
             v = (sv.get("votes") or {}).get(idx)
             if v is None:
                 votes.append({"seat": seat, "verdict": "abstain", "reason": "",
                               "error": (sv.get("errors") or {}).get(idx, "missing-vote")})
                 continue
-            verdict, reason = v
+            verdict, reason = v[0], v[1]
             votes.append({"seat": seat, "verdict": verdict, "reason": reason})
             if verdict == "real":
                 real += 1
+                if len(v) > 2 and v[2] is True:
+                    pre_real += 1
             else:
                 not_real += 1
         kept = not_real < VERIFIER_COUNT
@@ -306,7 +324,8 @@ def aggregate_votes(findings: list[Finding], seat_votes: list[dict]) -> list[dic
                         "line": f.line, "body_head": (f.body or "")[:160], "votes": votes,
                         "valid_real": real, "valid_not_real": not_real,
                         "abstain": VERIFIER_COUNT - real - not_real, "kept": kept,
-                        "score": score, "fallback": kept and real == 0})
+                        "score": score, "fallback": kept and real == 0,
+                        "preexisting": real > 0 and pre_real == real})
     return records
 
 
@@ -379,7 +398,8 @@ class ReviewPhase:
             for v in data:
                 n = v["n"]
                 if 1 <= n <= len(idxs) and idxs[n - 1] not in votes:   # first vote per n wins
-                    votes[idxs[n - 1]] = (v["verdict"], v.get("reason", ""))
+                    votes[idxs[n - 1]] = (v["verdict"], v.get("reason", ""),
+                                                v.get("preexisting", False) is True)
             return seat, idxs, votes, None
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(jobs)) as ex:
@@ -469,25 +489,32 @@ class ReviewPhase:
             else:
                 for f in data:
                     findings.append(Finding(source=source, agent=agent, path=f["path"],
-                                            line=f["line"], body=f["body"]))
+                                            line=f["line"], body=f["body"],
+                                            severity_hint=f.get("severity", "important"),
+                                            preexisting_hint=bool(f.get("preexisting", False)),
+                                            bug_class=f.get("bug_class", ""),
+                                            other_instances=list(f.get("other_instances", []))))
 
+        changed = labels.changed_right_lines(cls.filtered_diff)
         self.last_votes = self.verify_findings(findings, cls.filtered_diff)
         for f, rec in zip(findings, self.last_votes):
             f.score = rec["score"]
+            f.scorer_preexisting = bool(rec.get("preexisting"))
         self._audit_votes(self.last_votes)
 
-        surviving = [f for f in findings
-                     if (f.score or 0) >= (SEC_THRESHOLD if f.source == "security-audit"
-                                           else CODE_THRESHOLD)]
+        for f in findings:
+            f.label = labels.classify(
+                f, SEC_THRESHOLD if f.source == "security-audit" else CODE_THRESHOLD, changed)
+        surviving = labels.apply_nit_cap([f for f in findings if f.label is not None])
         scored = [{"source": f.source, "agent": f.agent, "path": f.path,
-                   "line": f.line, "score": f.score,
+                   "line": f.line, "score": f.score, "label": f.label,
                    "body_head": (f.body or "")[:160]}
                   for f in findings]
 
         pr = meta.get("number") or 0
         sha = meta.get("headRefOid") or meta.get("sha") or ""
-        code = [f for f in surviving if f.source == "code-review"]
-        sec = [f for f in surviving if f.source == "security-audit"]
+        code = labels.sort_by_severity([f for f in surviving if f.source == "code-review"])
+        sec = labels.sort_by_severity([f for f in surviving if f.source == "security-audit"])
         code_degraded = [p for p in degraded_agents if p.startswith("review-agent-")]
         # Interdiff mode: findings on unchanged files were posted by the run that produced
         # them; they are never re-posted, and their presence rules out "No issues found.".

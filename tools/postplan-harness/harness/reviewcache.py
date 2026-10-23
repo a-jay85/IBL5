@@ -17,7 +17,7 @@ import sys
 
 from harness.statefile import safe_slug
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 # Prompt-defining sources, relative to the harness root (tools/postplan-harness).
 # runner.py is deliberately absent: it changes on every harness PR and would void
 # the cache for edits that never touch a prompt.
@@ -26,6 +26,7 @@ PROMPT_SOURCE_FILES = (
     "harness/llm_calls.py",
     "harness/fidelity.py",
     "harness/schemas.py",
+    "harness/labels.py",
     "harness/reviewcache.py",
 )
 # Literal pins the hash also covers. test_model_pins_match_source greps review.py
@@ -195,6 +196,8 @@ def restore_review(arm, gates):
                 or isinstance(d.get("score"), bool):
             return None
         try:
+            if not isinstance(d, dict) or "label" not in d:
+                raise TypeError("pre-label finding record")
             findings.append(Finding(**d))
         except TypeError:
             return None

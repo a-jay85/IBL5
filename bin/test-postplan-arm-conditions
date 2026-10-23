@@ -591,6 +591,23 @@ if grep -qF 'BLOCKED: unresolved review thread(s) [$UNRESOLVED_HOLD]' "$SKILL" \
 else
     echo "FAIL: c11_block_message_widened — condition (11) block still reports the >= 80 floor"; FAILED=1
 fi
+if grep -qF 'label: pre-existing' "$SKILL" \
+   && grep -qF 'label: nit' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md"; then
+    echo "ok: c11_doc_label_exception"
+else
+    echo "FAIL: c11_doc_label_exception — condition (11) prose lacks the nit/pre-existing label exception"; FAILED=1
+fi
+if grep -qE '^2\. No `Important` review/audit finding' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
+   && ! grep -qF '11. Unresolved scored finding' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md"; then
+    echo "ok: c2_doc_important_only"
+else
+    echo "FAIL: c2_doc_important_only — SKILL.md conditions (2)/(11) prose is stale"; FAILED=1
+fi
+if grep -qF 'Exception (2026-10)' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+    echo "ok: c11_lib_header_exception"
+else
+    echo "FAIL: c11_lib_header_exception — pr-armable.sh header lacks the label exception note"; FAILED=1
+fi
 if grep -qE '^#   thread holds auto-merge: scored' "$REPO_ROOT/bin/lib/pr-armable.sh" \
    && ! grep -qF 'Human (unscored) threads, scores < 80, and resolved threads NEVER block' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
     echo "ok: c11_lib_header_widened"

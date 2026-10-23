@@ -12,6 +12,7 @@ from harness import reviewcache, same_run_threads
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
+from harness.labels import render_body
 from harness.same_run_threads import (
     MAX_SAME_RUN_ROUNDS,
     candidate_ids,
@@ -31,6 +32,9 @@ DECLINE = ('{"verdict":"DECLINE","reason":"guard already present",'
 
 
 def _thread(cid, *, path=PATH, body=BODY, login="a-jay85", typ="User"):
+    # GitHub shows the body the recorder rendered: label and score markers included.
+    body = render_body(Finding(source="code-review", agent="A", path=path, line=41, body=body,
+                               score=85), 1000)
     return {
         "id": f"PRRT_{cid}", "commentId": cid, "isResolved": False, "isOutdated": False,
         "path": path, "line": 41, "score": 85, "body": body, "agent": "A",

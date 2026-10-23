@@ -56,6 +56,7 @@ on:
 permissions:
   contents: write        # update-branch writes a merge commit onto the PR head branch
   pull-requests: write   # enumerate PRs and invoke the update-branch endpoint
+  actions: read          # list this SHA's master runs before updating the head
 
 concurrency:
   # A dry-run dispatch gets its own group so it never cancels a live push pass in flight.
@@ -69,7 +70,7 @@ jobs:
   update-behind:
     name: Keep the merge-line head current
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # coalesce wait + mergeability retries only; no CI wait remains
+    timeout-minutes: 60   # coalesce wait + bot-commit wait (capped at 45 min) + mergeability retries
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,6 +82,20 @@ jobs:
       - name: Coalesce a burst of master merges
         if: github.event_name == 'push'
         run: sleep 300
+
+      # Updating the head before master's bot commits land wastes its whole CI run: the bot
+      # commit makes it BEHIND again, and the baseline push is in paths-ignore above, so no
+      # pass even re-updates it. The helper's header says which workflows push them and why
+      # the check covers every master SHA. Past its 45-min cap the pass goes ahead as before.
+      - name: Wait for master CI that can push a bot commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          source bin/lib/master-bot-wait.sh
+          master_bot_wait "$REPO"
 
       - name: Select the head of the merge line
         id: select

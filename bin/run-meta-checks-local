@@ -366,6 +366,8 @@ if [ "$STAGE" = "pre-push" ]; then
     run_step "check-engine-freeze"           hard "$BIN/check-engine-freeze" "--since=$BASE"
     run_step "test-check-pipefail-grep-q"    hard "$BIN/test-check-pipefail-grep-q"
     run_step "check-pipefail-grep-q"         hard "$BIN/check-pipefail-grep-q" "--since=$BASE"
+    run_step "test-check-reviewer-eval"      hard "$BIN/test-check-reviewer-eval"
+    run_step "reviewer-eval-validate"        hard "$BIN/reviewer-eval" validate
 
     # Row 7: pre-push form of manual-testing check
     if [ -n "$BODY_FILE" ]; then
@@ -380,6 +382,14 @@ if [ "$STAGE" = "pre-push" ]; then
         run_step "check-post-merge-recipe" hard "$BIN/check-post-merge-recipe" --body-file "$BODY_FILE"
     else
         printf 'SKIP  check-post-merge-recipe (no --body-file)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+
+    # Row 7c: pre-push form of the reviewer-eval before/after claim check
+    if [ -n "$BODY_FILE" ]; then
+        run_step "check-reviewer-eval" hard "$BIN/check-reviewer-eval" --body-file "$BODY_FILE" --base "$BASE"
+    else
+        printf 'SKIP  check-reviewer-eval (no --body-file)\n'
         SKIP_COUNT=$((SKIP_COUNT + 1))
     fi
 
@@ -405,6 +415,9 @@ if [ "$STAGE" = "post-pr" ]; then
 
     # Row 16b: live PR body post-merge recipe check (hard)
     run_step "check-post-merge-recipe" hard "$BIN/check-post-merge-recipe" --pr "$PR"
+
+    # Row 16c: live PR body reviewer-eval claim check (hard)
+    run_step "check-reviewer-eval" hard "$BIN/check-reviewer-eval" --pr "$PR" --base "$BASE"
 
     # Row 17: advisory collision check
     run_filtered_step "check-pr-collisions" advisory "prcollisions" "$BIN/check-pr-collisions" --pr "$PR"

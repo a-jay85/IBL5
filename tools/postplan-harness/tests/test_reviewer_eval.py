@@ -350,6 +350,24 @@ def test_validate_schema_rejects_bad_fields(tmp_path):
     assert len(errs) == 1 and "duplicate" in errs[0]
 
 
+FOO_PATH = "ibl5/classes/Foo.php"
+
+
+def test_validate_schema_also_accept(tmp_path):
+    r = {"intro": "a" * 40, "fix": "b" * 40}
+    good = [{"path": "x.php", "start": 3, "end": 4}]
+    assert re_.validate_schema(_vcorpus([_bug(r, also_accept=good)])) == []
+    cases = [
+        (_bug(r, also_accept=[]), "also_accept must be a non-empty list"),
+        (_bug(r, also_accept=[{"path": "x.php", "start": 5, "end": 4}]), "also_accept[0]"),
+        (_bug(r, also_accept=[{"path": "x.php", "start": 5}]), "missing=['end']"),
+        (_bug(r, also_accept=good, extra="x"), "unknown=['extra']"),
+    ]
+    for case, needle in cases:
+        errs = re_.validate_schema(_vcorpus([case]))
+        assert len(errs) == 1 and needle in errs[0], (needle, errs)
+
+
 def test_validate_git_confirmed_case_passes(tmp_path):
     r = _mk_repo(tmp_path)
     assert _vg(r, _vcorpus([_bug(r)])) == []
@@ -360,6 +378,29 @@ def test_validate_range_outside_added_lines(tmp_path):
     c = _bug(r, expected=[{"path": "ibl5/classes/Foo.php", "start": 20, "end": 22}])
     errs = _vg(r, _vcorpus([c]))
     assert any("b1" in e and "outside the lines added" in e for e in errs), errs
+
+
+def test_validate_also_accept_outside_added_lines(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, also_accept=[{"path": FOO_PATH, "start": 20, "end": 22}])
+    errs = _vg(r, _vcorpus([c]))
+    assert len(errs) == 1, errs
+    assert "also_accept range" in errs[0] and "outside the lines added" in errs[0]
+
+
+def test_validate_also_accept_needs_no_blame(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, expected=[{"path": FOO_PATH, "start": 12, "end": 12}],
+             also_accept=[{"path": FOO_PATH, "start": 14, "end": 14}])
+    assert _vg(r, _vcorpus([c])) == []
+
+
+def test_validate_blame_ignores_also_accept(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, expected=[{"path": FOO_PATH, "start": 14, "end": 14}],
+             also_accept=[{"path": FOO_PATH, "start": 12, "end": 12}])
+    errs = _vg(r, _vcorpus([c]))
+    assert len(errs) == 1 and "does not corroborate" in errs[0], errs
 
 
 def test_validate_fix_not_touching_range(tmp_path):

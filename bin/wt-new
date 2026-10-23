@@ -118,17 +118,20 @@ if [ -d "$WT_ROOT" ]; then
     exit 1
 fi
 
-# Abort cleanup. The guard above proved WT_ROOT did not exist, so any WT_ROOT
-# present at a non-zero exit was made by this run (cold add, --existing add, or
-# pool claim). bin/wt-remove --if-empty re-checks emptiness at removal time and
-# keeps anything with work. --pool-refill already exited above (`pool_refill;
-# exit $?`) and never reaches this trap, so _pool-* slots are never handed to it.
-# The wt-remove beside this wt-new is used (SCRIPT_ROOT), so the flag is guaranteed.
+# Abort cleanup. WT_OWNED is set only after this run's own worktree add or pool
+# claim succeeds, so a concurrent `wt-new <same name>` that lost the add race never
+# removes the winner's directory. bin/wt-remove --if-empty re-checks emptiness at
+# removal time and keeps anything with work. The absolute WT_ROOT is passed because
+# a bare name resolves by branch first and could hit a different worktree.
+# --pool-refill already exited above (`pool_refill; exit $?`) and never reaches this
+# trap, so _pool-* slots are never handed to it. The wt-remove beside this wt-new is
+# used (SCRIPT_ROOT), so the flag is guaranteed.
+WT_OWNED=0
 wt_new_abort_cleanup() {
     local rc=$?
-    if [ "$rc" != 0 ] && [ -d "$WT_ROOT" ]; then
+    if [ "$rc" != 0 ] && [ "$WT_OWNED" = 1 ] && [ -d "$WT_ROOT" ]; then
         cd "$REPO_ROOT" 2>/dev/null || cd /
-        "$SCRIPT_ROOT/bin/wt-remove" "$NAME" --if-empty || true
+        "$SCRIPT_ROOT/bin/wt-remove" "$WT_ROOT" --if-empty || true
     fi
     exit "$rc"
 }
@@ -186,6 +189,7 @@ if [ -n "$EXISTING_BRANCH" ]; then
         git -C "$REPO_ROOT" worktree add --track -b "$EXISTING_BRANCH" \
             "$WT_ROOT" "origin/$EXISTING_BRANCH"
     fi
+    WT_OWNED=1
 else
     BRANCH_NAME="$NAME"
     # Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
@@ -201,6 +205,7 @@ else
         echo "Creating worktree '$NAME' from $BASE_BRANCH..."
         git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
     fi
+    WT_OWNED=1
 
     # Record which Claude session created this branch (see wt_write_session).
     # Skipped for --existing, whose branch can carry earlier work.

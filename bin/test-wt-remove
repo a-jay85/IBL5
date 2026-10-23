@@ -231,13 +231,31 @@ R15="$(awk '
             if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"/) {
                 n++; hit = 0
                 for (j = i + 1; j <= i + 15 && j <= NR; j++)
-                    if (index(line[j], "reap_empty_worktree ")) hit = 1
+                    if (index(line[j], "reap_empty_worktree ") || index(line[j], "reap-exempt:")) hit = 1
                 if (!hit) { miss++; printf "MISS line %d\n", i }
             }
         }
         printf "sites=%d missing=%d\n", n, miss
     }' "$SCRIPT_DIR/automouse/run")"
 h_contains "case 15: 5 sites, 0 missing" "$R15" "sites=5 missing=0"
+h_eq "case 15: only the pre-attempt impl_model skip is reap-exempt" 1 "$(grep -c 'reap-exempt:' "$SCRIPT_DIR/automouse/run")"
+
+echo "== case 15b: the impl-agent-moved-it-to-skipped branch reaps"
+R15B="$(awk '
+    { line[NR] = $0 }
+    END {
+        res = "no-site"
+        for (i = 1; i <= NR; i++) {
+            if (index(line[i], "[ -e \"$NIGHTLY_DIR/skipped/$PLAN_NAME\" ]; then")) {
+                res = "misses"
+                for (j = i + 1; j <= i + 3 && j <= NR; j++)
+                    if (index(line[j], "reap_empty_worktree ")) res = "reaps"
+                break
+            }
+        }
+        print res
+    }' "$SCRIPT_DIR/automouse/run")"
+h_eq "case 15b: reap_empty_worktree within 3 lines of the skipped/ check" "reaps" "$R15B"
 
 echo "== case 16: burndown's failed-item block names the reap"
 BD="$REAL_ROOT/.claude/skills/burndown/SKILL.md"
@@ -252,6 +270,25 @@ h_eq "case 17: reap command present once" 1 \
     "$(grep -cF 'bin/wt-remove <slug> --if-empty' "$FP")"
 h_contains "case 17: same line as the /plan hand-off" \
     "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
+
+echo "== case 18: an absolute path resolves by directory, not by branch name"
+mkwt swap-a swap-b
+mkwt swap-b swap-a
+run_rm "$WTS/swap-a" --if-empty
+h_eq "case 18: rc 0" 0 "$RC"
+h_absent "case 18: named directory gone" "$WTS/swap-a"
+h_exists "case 18: same-named branch's directory kept" "$WTS/swap-b"
+run_rm /tmp --if-empty
+h_eq "case 18: path outside the parent rc 1" 1 "$RC"
+h_contains "case 18: path outside the parent message" "$OUT" "is outside"
+
+echo "== case 19: bin/wt-new removes only a worktree it created"
+WN="$SCRIPT_DIR/wt-new"
+h_eq "case 19: WT_OWNED=1 set at two sites" 2 "$(grep -cF 'WT_OWNED=1' "$WN")"
+h_contains "case 19: trap gates on ownership" \
+    "$(grep -F '"$WT_OWNED" = 1' "$WN")" '"$WT_OWNED" = 1'
+h_contains "case 19: trap calls wt-remove --if-empty" \
+    "$(grep -F 'bin/wt-remove' "$WN")" '"$WT_ROOT" --if-empty'
 
 # backup-name helper (bin/lib/git-helpers.sh wt_backup_branch_name)
 # shellcheck disable=SC1091  # the fixture copy of the real lib

@@ -1,7 +1,7 @@
 ---
 name: reset-ready
-description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs and stale docs, open PRs, prod logs, slow queries, Lighthouse a11y scores and code health (PHPStan baseline, mutation, orphan CSS) in parallel, prefer chore, fix, refactor, test and docs picks over feat, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
-last_verified: 2026-10-15
+description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs and stale docs, open PRs, prod logs, slow queries, Lighthouse a11y scores, code health (PHPStan baseline, mutation, orphan CSS), unshipped plans and branches, GM bug reports and #dev alerts on Discord, master CI failures, deferred PR follow-ups, dangling doc pointers and session tool errors in parallel, prefer chore, fix, refactor, test and docs picks over feat, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
+last_verified: 2026-10-22
 ---
 
 # /reset-ready
@@ -94,6 +94,12 @@ fix, a size (S, M or L), its honest PR title type (`feat`, `fix`, `refactor`, `t
 | `perf` | The "Slow Queries" section (grouped by repository) of `bin/log-fetch-prod --days 7`. Rank repositories by hit count, then by max ms, and trace each to its query method and the page that calls it. Cite the query text and table for every fix. Cap: 2 picks. Dedupe: by repository or class name against `context.md` Recent plans, the open PR branch names, and local branches from `git branch --list`. Branch `franchise-five-season-window-slow` already covers the FranchiseHistoryRepository slow queries. |
 | `a11y` | The newest weekly Lighthouse issue: `gh issue list -R a-jay85/IBL5 --label lighthouse-audit --state all --limit 1 --json number,title`, then `gh issue view <number> -R a-jay85/IBL5`. Take the three lowest Accessibility scores under 1.00 and any Performance score under 0.80. Map each URL to its module with `bin/lighthouse-audit-urls --json`. Fixes stay on existing markup per the pick rules. Do not run Lighthouse locally. Cap: 2 picks. Dedupe: by module against `context.md` and by URL against the earlier reset-ready reports. |
 | `codehealth` | `ibl5/phpstan-baseline.neon` hotspots by path from `awk '/count:/{c=$2} /path:/{s[$2]+=c} END{for(p in s) print s[p], p}' ibl5/phpstan-baseline.neon`, skipping every path backlog#1463 already lists. Per-module test ratio, long methods with or without characterization tests, duplicate helpers, TODO and FIXME. Mutation: the newest scheduled run from `gh run list -R a-jay85/IBL5 --workflow mutation.yml --event schedule --limit 1 --json databaseId`, then `gh run download <id> -R a-jay85/IBL5 -n mutation-reports -D /tmp/reset-ready/mutation` and its `infection-summary.log`. Report it only when the Escaped, Timed Out or Not Covered count is above zero. Orphan CSS: `bin/check-orphan-css` without `--crawl`. Its output lists candidates only, so grep the PHP and JS for a composed prefix (such as `txn-badge--` or `year-cell`) before calling a class dead. Behavior-preserving work only. Cap: 3 picks, at most 1 from the baseline. Dedupe: by file path against `context.md` and backlog#1463. |
+| `orphanplans` | Plans in `~/claude-plans/*.md` (top level, touched in 45 days) whose slug has no PR in any state and no entry in automouse `queue/`, `done/` or `skipped/`. Read each with `bin/plan-index`, never whole, and check its target still has the problem on master. Unit plans (`<slug>-2-*`) whose earlier unit merged are the best finds. Also worktrees under `~/GitHub/IBL5-worktrees/` with commits ahead of `origin/master` and no PR, and automouse `skipped/` items that stopped on a plan defect while the code was green. Check the queue first: a queued slug's worktree is live work. Skip superseded plans, frontend feature plans, and anything an earlier report skipped on purpose. Cap: 2 picks. Dedupe: by slug against `context.md`. |
+| `bugreports` | The GM bug-report channel and #dev on Discord, read with plain GET calls. #dev is channel `1554593873890775140`, read with `DISCORD_TOKEN` from the IBLbot `.env`. The bug channel id and its token are `BUG_CHANNEL_ID` and the token in the IBLbot `.env.bugbot`. Never print a token and never POST. Read about 7 days of #dev and the last 100 bug-channel messages. A GM report with no "Fixed" reply and no issue in `a-jay85/ibl5-bugs` is a fix candidate. A #dev alert that repeats is a pipeline candidate. Map each one to a repo file. Cap: 2 picks. Dedupe: by symptom against `context.md`. |
+| `cihealth` | Scheduled and push workflow failures on master in the last 14 days (`gh run list -R a-jay85/IBL5 --branch master --status failure --limit 100` plus `--event schedule`), grouped by workflow, job and first real error. Also warnings inside green runs, such as an artifact over its size limit. A test that fails across 3 or more PR runs is a flake candidate. A `markTestSkipped` or Playwright `test.skip` whose reason no longer holds is a test candidate. Never re-run a workflow. Cap: 2 picks. Dedupe: by workflow and job against `context.md`. |
+| `deferred` | Work a reviewer or agent pushed out of scope and nobody picked up. Grep the bodies of PRs merged in the last 21 days for `Watch:`, `follow-up`, `deferred` and `out of scope`, and the review and issue comments of the newest 40. Keep an item only when the code still shows it on master and no backlog issue covers it (`gh issue list -R a-jay85/IBL5-backlog --state all --search`). Cap: 2 picks. Dedupe: by file path against `context.md`. |
+| `docrefs` | Path pointers that `bin/check-docs` misses: relative markdown links in `ibl5/docs/` that resolve from the wrong directory, and pointers to scripts or skill files that moved. Scan `.claude/` and `ibl5/docs/`. Skip ADRs, `archive/` and `retrospective-class-registry.md`, which are historical or append-only. Pointer fixes only. Cap: 1 pick. Dedupe: by doc path against `context.md` and the open PR file lists. |
+| `tooling` | Tool errors in the 30 newest session transcripts under `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/` from the last 3 days. Count `"is_error":true` results by message with `jq` or `grep -c`. Never read a whole transcript. A hook deny or timeout that repeats on the same skill step points at a skill fix. A deny on a harmless pattern is a gate change, so flag it. Cap: 1 pick. Dedupe: by skill or script against `context.md`. |
 
 The burndown loop owns the PHPStan baseline cleanup in backlog#1463, so `codehealth`
 never picks a baseline path that issue lists.
@@ -103,6 +109,10 @@ only when the earlier rounds left frontend candidates unplanned. That includes `
 orphan-CSS candidates the newest `~/claude-plans/_reports/*-reset-ready.md` skipped at a
 cap. Keep its prompt inside the pick rules above. Cap: 2 picks. Dedupe: by CSS file or
 module against `context.md`.
+
+When a round in the last 6 hours already ran `prodlogs`, `perf` and `a11y`, skip them. They read 7-day or weekly sources. The other scouts read sources that change every hour.
+
+Two sources came back empty on 2026-10-22 and run at most once a week. Open code-scanning, Dependabot and secret-scanning alerts plus `composer audit`: the daily CodeQL auto-fix task already clears most of them. Fix-commit hotspots from `git log --since=45.days`: nearly every fix already ships with a test.
 
 These tools are not scout sources. `bin/events-review` spawns `claude -p`, DMs the owner
 and needs the prod credential. `bin/smoke-prod` hits prod, and its workflow result is
@@ -156,6 +166,12 @@ for f in "$D"/prompts/*.md; do bin/plan-now "$f"; echo "$(basename "$f") rc=$?";
 
 Exit 3 means the slug already has a plan, so drop it. Exit 4 means a tier mismatch, so fix
 the directive and fire again. Each clean run queues itself for automouse and DMs the user.
+
+An `orphanplans` pick already has a plan, so it skips plan-now. Queue an unqueued plan
+with `bin/automouse/queue <slug>`. For a finished branch that automouse skipped on a plan
+defect, fix the plan line, run `bin/lib/plan-matrix-assertions` against the branch diff,
+then fire `bin/post-plan-now --auto` from that worktree in a subshell. A destructive or
+security plan goes to the report for the user instead.
 
 ## Step 6: Keep the runners alive across resets
 

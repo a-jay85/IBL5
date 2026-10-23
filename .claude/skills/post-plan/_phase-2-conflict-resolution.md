@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 conflict resolution. Resolves a merge conflict, proves no work was lost, and arms the conflict hold. Loaded only when the Phase 2 merge block prints STOP-AND-RESOLVE.
-last_verified: 2026-10-09
+last_verified: 2026-10-15
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -262,7 +262,7 @@ After the sub-agent returns, print `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=F
 
 On `FOUND-PROBLEM`: continue into step 8 and open the PR. Phase 6.5 condition (14) blocks, and the sticky comment renders the held branch with the findings. Do not re-resolve, do not re-spawn, do not edit the verdict file.
 
-If the sub-agent returns without writing the file, or writes an unreadable one, print `CONFLICT-REVIEW=ABSENT` and continue. Absence holds; no recovery is attempted.
+If the sub-agent returns without writing the file, or writes an unreadable one, spawn the same reviewer once more with the same prompt and the same `<POST_RESOLUTION_SHA>`. Read the file again. If the second spawn also leaves no readable verdict, print `CONFLICT-REVIEW=ABSENT after 1 retry` and continue. Absence still holds; the second spawn is the only recovery, and a `FOUND-PROBLEM` verdict from either spawn is final and is never re-spawned.
 
 ## Step 8: Return to `SKILL.md`
 

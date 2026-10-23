@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
+from . import labels
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
 
@@ -292,11 +293,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(1, "manual-testing-clearance", cond1_held,
                               f"state={clearance}" if cond1_held else ""))
 
-    # Only nit and pre-existing (set by labels.classify) are non-holding. A missing,
-    # empty or unknown label such as "blocker" resolves to Important and holds (fail-closed).
+    # Only labels.NON_HOLDING_LABELS (nit, pre-existing) clear. A missing, empty or unknown
+    # label such as "blocker" or "Nit" holds as Important (fail-closed), like prf_label.
     high = [f for f in inp.findings
             if (f.score or 0) >= 80
-            and (getattr(f, "label", None) or "important") not in ("nit", "pre-existing")]
+            and getattr(f, "label", None) not in labels.NON_HOLDING_LABELS]
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 

@@ -96,8 +96,9 @@ def _labeled(label):
     return f
 
 
-def test_unknown_label_holds_condition_2():
-    d = evaluate(inputs(findings=[_labeled("blocker")]))
+@pytest.mark.parametrize("label", ["blocker", "Nit", "PRE-EXISTING", "", None])
+def test_unknown_label_holds_condition_2(label):
+    d = evaluate(inputs(findings=[_labeled(label)]))
     assert not d.armed and any(c.number == 2 for c in d.holds)
 
 

@@ -186,7 +186,7 @@ if [ "$SCOPE" = "ibl5" ] || [ "$SCOPE" = "all" ]; then
     sleep "$INTERCHECK_DELAY"
     check IBL5 "Standings"    "$BASE/ibl5/modules.php?name=Standings"                "Standings"
     sleep "$INTERCHECK_DELAY"
-    check IBL5 "Team page"    "$BASE/ibl5/modules.php?name=Team&op=team&teamID=1"    "team"
+    check IBL5 "Team page"    "$BASE/ibl5/modules.php?name=Team&op=team&teamid=1"    "team-banner-logo"
     sleep "$INTERCHECK_DELAY"
     check IBL5 "Player page"  "$BASE/ibl5/modules.php?name=Player&pa=showpage&pid=1" "player"
     sleep "$INTERCHECK_DELAY"

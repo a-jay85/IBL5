@@ -572,6 +572,34 @@ def test_phase2_copies_fix_summary_to_result():
     assert res.conflict_fix_summary == "sonnet-fix: x"
 
 
+def test_phase2_onto_path_copies_conflict_review_retries():
+    class _Git:
+        last_conflict_rung = "first-pass"
+        last_conflict_fix_summary = ""
+        last_conflict_files = ()
+        conflict_review_retries = {"conflict-review": 1}
+
+        def head(self):
+            return "abc"
+
+        def branch(self):
+            return "feat"
+
+        def rebase_onto(self):
+            raise HarnessError("rebase-conflict", "d")
+
+        def autoresolve_stacked_rebase(self):
+            return type("R", (), {
+                "resolved": True, "base_sha": "f88df97b0000", "manifest_path": "m",
+                "notes_path": "n", "post_resolution_sha": "abc", "adapted_lines": (),
+                "collapse_warn": "", "resolved_files": ("a.php",),
+            })()
+
+    res = RunResult(terminal=TerminalState.FAILED)
+    runner._phase2_rebase(_Git(), res, lambda *_a, **_k: None)
+    assert res.retries == {"conflict-review": 1}
+
+
 def test_runner_never_imports_conflict_fix():
     tree = ast.parse((_HARNESS_ROOT / "runner.py").read_text())
     for node in ast.walk(tree):

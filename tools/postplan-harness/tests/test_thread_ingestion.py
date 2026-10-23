@@ -998,3 +998,49 @@ def test_posting_procedure_parity_names_both_origins():
         skill_text = open(skill).read()
         assert ti.ORIGIN_PRE_EXISTING in skill_text
         assert ti.ORIGIN_SAME_RUN in skill_text
+
+
+# ---------------------------------------------------------------------------
+# reply_review_thread adapter (gate-hold marker post)
+# ---------------------------------------------------------------------------
+
+def test_recording_gh_reply_review_thread_records_action(tmp_path):
+    gh = _gh(tmp_path)
+    gh.reply_review_thread(7, 111, "x")
+    actions = gh.actions()
+    replies = [a for a in actions if a.get("action") == "pr_reply_thread"]
+    assert len(replies) == 1
+    assert replies[0]["comment_id"] == 111
+    assert [a for a in actions if a.get("action") == "pr_resolve_thread"] == []
+
+
+def test_live_gh_reply_review_thread_shells_reply_helper(tmp_path, monkeypatch):
+    """Mutation caught: shelling resolve_review_finding instead of reply_review_thread."""
+    argvs = []
+
+    def _spy(argv, *a, **k):
+        argvs.append(argv)
+        return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _spy)
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.reply_review_thread(PR, 111, "marker body")
+    script = argvs[0][2]
+    assert "reply_review_thread" in script
+    assert "resolve_review_finding" not in script
+    replies = [a for a in gh.actions() if a.get("action") == "pr_reply_thread"]
+    assert len(replies) == 1
+    assert replies[0]["comment_id"] == 111
+
+
+def test_live_gh_reply_review_thread_failure_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "harness.adapters.llm._run_reaped",
+        lambda argv, *a, **k: subprocess.CompletedProcess(args=argv, returncode=1, stdout="",
+                                                          stderr="boom"),
+    )
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    with pytest.raises(HarnessError) as ei:
+        gh.reply_review_thread(PR, 111, "marker body")
+    assert ei.value.kind == "thread-reply-failed"
+    assert [a for a in gh.actions() if a.get("action") == "pr_reply_thread"] == []

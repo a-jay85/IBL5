@@ -33,18 +33,20 @@ final class AdminChatStatus
 
     /**
      * @param array{last_cause?: ?string, blocked_until?: ?string} $row
+     * @param string $viewerUrl Recap viewer link for the posted/recovered lines; '' omits it.
      */
-    public static function message(string $state, int $sim, array $row, string $host): string
+    public static function message(string $state, int $sim, array $row, string $host, string $viewerUrl = ''): string
     {
         ParkPolicy::assertNotifyState($state);
         ParkPolicy::assertHost($host);
         $cause = $row['last_cause'] ?? null;
         $causeWords = self::CAUSE_WORDS[$cause ?? ''] ?? 'ran into a problem';
         $time = self::formatTime($row['blocked_until'] ?? null);
+        $link = $viewerUrl === '' ? '' : " Review them: {$viewerUrl}";
 
         return match ($state) {
-            'posted' => "Sim {$sim} recaps are posted.",
-            'recovered' => "Sim {$sim} recaps are posted. The earlier problem ({$causeWords}) was worked around.",
+            'posted' => "Sim {$sim} recaps are posted.{$link}",
+            'recovered' => "Sim {$sim} recaps are posted. The earlier problem ({$causeWords}) was worked around.{$link}",
             'retrying' => "Sim {$sim} recap hit a glitch on " . self::HOST_WORDS[$host] . '. '
                 . ($time === null ? 'Retrying now.' : "Retrying at {$time}."),
             'waiting' => "Sim {$sim} recap hit the Claude usage limit. It will retry by itself at "

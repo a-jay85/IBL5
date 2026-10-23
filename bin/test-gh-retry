@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-gh-retry — regression harness for bin/lib/gh-retry.sh (gh_retry).
+# bin/test-gh-retry — regression harness for bin/lib/gh-retry.sh (gh_retry, gh_retry_json).
 #
 # A scripted stub command stands in for `gh`: each invocation consumes the next
 # line of a script file (`<exit-code>|<stderr-text>|<stdout-text>`, last line
@@ -57,7 +57,7 @@ reset_case() {
 # run_case <delays-mode> — runs gh_retry fakegh in a set -euo pipefail subshell.
 # delays-mode: a literal schedule, "UNSET" to unset the var, or "EMPTY".
 run_case() {
-    local mode="$1"
+    local mode="$1" fn="${2:-gh_retry}"
     (
         export T
         export PATH="$T/bin:/usr/bin:/bin"
@@ -67,8 +67,8 @@ run_case() {
             EMPTY) export IBL5_GH_RETRY_DELAYS="" ;;
             *)     export IBL5_GH_RETRY_DELAYS="$mode" ;;
         esac
-        export LIB
-        bash -c 'set -euo pipefail; . "$LIB"; rc=0; gh_retry fakegh api x >"$T/o" 2>"$T/e" || rc=$?; echo "$rc" >"$T/rc"; : >"$T/marker"'
+        export LIB FN="$fn"
+        bash -c 'set -euo pipefail; . "$LIB"; rc=0; "$FN" fakegh api x >"$T/o" 2>"$T/e" || rc=$?; echo "$rc" >"$T/rc"; : >"$T/marker"'
     )
 }
 
@@ -174,5 +174,94 @@ h_eq "G11-source-safe no set/exit lines in lib" "" "$HITS"
 reset_case '1|HTTP 404: Not Found|'
 run_case "0 0 0"
 h_exists "G11-source-safe caller continues past failing gh_retry" "$T/marker"
+
+# --- J1 ---
+reset_case '0||' '0||[{"a":1}]'
+run_case "0 0" gh_retry_json
+h_eq "J1-empty-body-retried rc" "0" "$(slurp "$T/rc")"
+h_eq "J1-empty-body-retried attempts" "2" "$(count_of)"
+h_eq "J1-empty-body-retried stdout" '[{"a":1}]' "$(slurp "$T/o")"
+h_eq "J1-empty-body-retried sleeps" "0" "$(slurp "$T/sleeps")"
+
+# --- J2 ---
+reset_case '0||[{"a":' '0||{"ok":true}'
+run_case "0 0" gh_retry_json
+h_eq "J2-truncated-json-retried rc" "0" "$(slurp "$T/rc")"
+h_eq "J2-truncated-json-retried attempts" "2" "$(count_of)"
+h_eq "J2-truncated-json-retried stdout is only the good body" '{"ok":true}' "$(slurp "$T/o")"
+
+# --- J3 ---
+reset_case '1||' '0||[]'
+run_case "0 0" gh_retry_json
+h_eq "J3-silent-nonzero-retried rc" "0" "$(slurp "$T/rc")"
+h_eq "J3-silent-nonzero-retried attempts" "2" "$(count_of)"
+h_eq "J3-silent-nonzero-retried stdout" "[]" "$(slurp "$T/o")"
+
+# --- J4 ---
+reset_case '1|HTTP 429: Too Many Requests|' '0||[]'
+run_case "0 0" gh_retry_json
+h_eq "J4-429-retried rc" "0" "$(slurp "$T/rc")"
+h_eq "J4-429-retried attempts" "2" "$(count_of)"
+h_contains "J4-429-retried replays 429" "$(slurp "$T/e")" "HTTP 429"
+
+# --- J5 ---
+reset_case '1|unexpected end of JSON input|' '0||[]'
+run_case "0 0" gh_retry_json
+h_eq "J5-eof-json-retried rc" "0" "$(slurp "$T/rc")"
+h_eq "J5-eof-json-retried attempts" "2" "$(count_of)"
+
+# --- J6 ---
+reset_case '1|HTTP 404: Not Found|'
+run_case "0 0" gh_retry_json
+h_eq "J6-404-not-retried rc" "1" "$(slurp "$T/rc")"
+h_eq "J6-404-not-retried attempts" "1" "$(count_of)"
+h_eq "J6-404-not-retried sleeps" "absent" "$(slurp "$T/sleeps")"
+
+# --- J7 ---
+reset_case '1|HTTP 502: Bad Gateway|'
+run_case "0 0" gh_retry_json
+h_eq "J7-always-5xx-exhausts rc" "1" "$(slurp "$T/rc")"
+h_eq "J7-always-5xx-exhausts attempts" "3" "$(count_of)"
+h_eq "J7-always-5xx-exhausts sleeps" "$(printf '0\n0')" "$(slurp "$T/sleeps")"
+
+# --- J8 ---
+reset_case '0||'
+run_case "0 0" gh_retry_json
+h_eq "J8-always-empty-exhausts rc" "65" "$(slurp "$T/rc")"
+h_eq "J8-always-empty-exhausts attempts" "3" "$(count_of)"
+h_eq "J8-always-empty-exhausts stdout empty" "" "$(slurp "$T/o")"
+h_eq "J8-always-empty-exhausts tempfiles cleaned" "" "$(ls -A "$T/tmp")"
+
+# --- J9 ---
+reset_case '0||[]'
+run_case "x" gh_retry_json
+h_eq "J9-bad-delays rc" "64" "$(slurp "$T/rc")"
+h_eq "J9-bad-delays command never ran" "absent" "$(count_of)"
+
+# --- J10 ---
+reset_case '0||[]'
+mkdir -p "$T/nojq"
+( export T LIB; PATH="$T/nojq" /bin/bash -c '. "$LIB"; rc=0; gh_retry_json fakegh api x >"$T/o" 2>"$T/e" || rc=$?; echo "$rc" >"$T/rc"' )
+h_eq "J10-no-jq rc" "1" "$(slurp "$T/rc")"
+h_eq "J10-no-jq command never ran" "absent" "$(count_of)"
+h_eq "J10-no-jq names the cause" "1" "$(grep -c 'jq not found' "$T/e" || true)"
+
+# --- J11 ---
+reset_case '1|HTTP 429: Too Many Requests|' '0||[]'
+run_case "0 0" gh_retry
+h_eq "J11-strict-429-unchanged rc" "1" "$(slurp "$T/rc")"
+h_eq "J11-strict-429-unchanged attempts" "1" "$(count_of)"
+
+# --- J12 ---
+reset_case '1||' '0||[]'
+run_case "0 0" gh_retry
+h_eq "J12-strict-silent-unchanged rc" "1" "$(slurp "$T/rc")"
+h_eq "J12-strict-silent-unchanged attempts" "1" "$(count_of)"
+
+# --- J13 ---
+reset_case '0||'
+run_case "0 0" gh_retry
+h_eq "J13-strict-empty-body-unchanged rc" "0" "$(slurp "$T/rc")"
+h_eq "J13-strict-empty-body-unchanged attempts" "1" "$(count_of)"
 
 h_done

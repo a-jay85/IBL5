@@ -38,6 +38,7 @@ class ModuleAccessControl
      */
     private const TRIVIA_HIDDEN_MODULES = [
         'CareerLeaderboards',
+        'Leaderboards',
         'Player',
         'SeasonLeaderboards',
     ];
@@ -77,7 +78,7 @@ class ModuleAccessControl
      * Checks in order:
      * 1. League context (Olympics disables certain IBL-only modules)
      * 2. Phase restrictions (Draft/FreeAgency only during their phases)
-     * 3. Trivia mode (Player/SeasonLeaderboards hidden when Trivia is on)
+     * 3. Trivia mode (Player/Leaderboards hidden when Trivia is on)
      */
     public function isModuleAccessible(string $moduleName): bool
     {

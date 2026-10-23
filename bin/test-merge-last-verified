@@ -310,13 +310,15 @@ ok_if "check-attr-union-wins: rules doc" \
 
 # --- registration helper ---
 R=$(fresh_path r-helper); new_repo "$R"
-want_tail="'$(main_checkout_root "$R")/bin/lib/merge-last-verified' %O %A %B %L %P"
+# Mirrors `want` in register_last_verified_merge_driver (bin/lib/git-helpers.sh): exact match, so a wrong prefix or path fails.
+want_wrap='test -x "$0" && exec "$0" "$@" || exec git merge-file --marker-size="$4" -L "ours:$5" -L "base:$5" -L "theirs:$5" "$2" "$1" "$3"'
+want="sh -c '$want_wrap' '$(main_checkout_root "$R")/bin/lib/merge-last-verified' %O %A %B %L %P"
 register_last_verified_merge_driver "$R"
 register_last_verified_merge_driver "$R"
 git -C "$R" config --get-all merge.lastverified.driver > "$TMP/helper.vals"
 h_eq "helper-registers-once: count" "1" "$(wc -l < "$TMP/helper.vals" | tr -d ' ')"
 IFS= read -r got < "$TMP/helper.vals"
-ok_if "helper-registers-once: value" test "${got%"$want_tail"}" != "$got"
+h_eq "helper-registers-once: value" "$want" "$got"
 
 R=$(fresh_path r-stale); new_repo "$R"
 git -C "$R" config merge.lastverified.driver "'/old/path' %O %A %B"

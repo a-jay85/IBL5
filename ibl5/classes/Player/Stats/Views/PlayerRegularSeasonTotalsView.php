@@ -49,9 +49,10 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=15 class="player-table-header">Regular Season Totals</td>
+        <td colspan=15 class="player-view-table__title">Regular Season Totals</td>
     </tr>
     <tr>
         <th>year</th>
@@ -70,6 +71,8 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($historicalStats as $row) {
             $gm = $row['games'];
@@ -117,9 +120,9 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <td><a href="modules.php?name=Team&op=team&teamid=<?= (int)$row['teamid'] ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a></td>
         <td><?= (int)$gm ?></td>
         <td><?= (int)$min ?></td>
-        <td><?= (int)$fgm ?>-<?= (int)$fga ?></td>
-        <td><?= (int)$ftm ?>-<?= (int)$fta ?></td>
-        <td><?= (int)$tgm ?>-<?= (int)$tga ?></td>
+        <td sorttable_customkey="<?= (int)$fgm ?>"><?= (int)$fgm ?>-<?= (int)$fga ?></td>
+        <td sorttable_customkey="<?= (int)$ftm ?>"><?= (int)$ftm ?>-<?= (int)$fta ?></td>
+        <td sorttable_customkey="<?= (int)$tgm ?>"><?= (int)$tgm ?>-<?= (int)$tga ?></td>
         <td><?= (int)$orb ?></td>
         <td><?= (int)$reb ?></td>
         <td><?= (int)$ast ?></td>
@@ -135,7 +138,9 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         // Recalculate career total points to ensure accuracy
         $carTotals['pts'] = (2 * $carTotals['fgm']) + $carTotals['ftm'] + $carTotals['tgm'];
         ?>
-    <tr class="player-table-row-bold">
+</tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td><?= (int)$carTotals['gm'] ?></td>
         <td><?= (int)$carTotals['min'] ?></td>
@@ -151,6 +156,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <td><?= (int)$carTotals['pf'] ?></td>
         <td><?= (int)$carTotals['pts'] ?></td>
     </tr>
+</tfoot>
 </table>
         <?php
         return (string) ob_get_clean();

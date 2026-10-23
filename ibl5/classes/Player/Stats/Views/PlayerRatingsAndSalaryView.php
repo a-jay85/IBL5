@@ -43,9 +43,10 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=24 class="player-table-header">Ratings by Year</td>
+        <td colspan=24 class="player-view-table__title">Ratings by Year</td>
     </tr>
     <tr>
         <th>year</th>
@@ -73,6 +74,8 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         <th>Def</th>
         <th>Salary</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($historicalStats as $row) {
             /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_drive_off: int, r_po: int, r_trans_off: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int} $row */
@@ -110,9 +113,12 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         }
 
         ?>
+</tbody>
+<tfoot>
     <tr>
         <td colspan=24 class="text-center font-bold">Total Career Salary Earned: <?= (float) ($totalSalary / 100) ?> million dollars</td>
     </tr>
+</tfoot>
 </table>
         <?php
         return (string) ob_get_clean();

@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-10-19
+last_verified: 2026-10-22
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -41,7 +41,7 @@ The originally-shipped **Layer B** was a runtime strip: `bin/automouse/run`'s `n
 
 The `human-approved` label now covers one specific PR diff. Before this change the label survived every later push, so commits a maintainer never saw inherited the approval.
 
-- **Fingerprint.** The gate job checks out the PR head with full history and computes `git patch-id --verbatim` over `git diff --binary origin/<base>...HEAD` (the merge-base diff). The function is `hs_diff_fingerprint` in `bin/lib/human-signoff-classifier.sh`. `--verbatim` keeps whitespace-only edits visible, matching `diff_patch_id()` in `tools/postplan-harness/harness/fidelity.py`.
+- **Fingerprint.** The gate job checks out the PR head, deepens the history for a `feat:` PR holding the label, and computes `git patch-id --verbatim` over `git diff --binary origin/<base>...HEAD` (the merge-base diff). The function is `hs_diff_fingerprint` in `bin/lib/human-signoff-classifier.sh`. `--verbatim` keeps whitespace-only edits visible, matching `diff_patch_id()` in `tools/postplan-harness/harness/fidelity.py`.
 - **Record.** A `labeled` event for `human-approved` is the approval. The gate passes, and the `human-approved-fingerprint` job posts a `github-actions[bot]` comment whose first line is `<!-- hs-approved-diff: <id> -->`.
 - **Compare.** Every other event on a `feat:` PR holding the label recomputes the id and compares it with the newest marker written by `github-actions[bot]`. Markers from any other author are ignored. A clean rebase keeps the id, so the pipeline's frequent rebases keep the approval.
 - **Drop.** A mismatch, a missing record, or any read or compute error reds the required check in the same run, so auto-merge cannot complete in the gap. The write job then posts a comment with a `revoked` marker and the reason, and removes the label.

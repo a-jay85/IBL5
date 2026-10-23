@@ -105,7 +105,7 @@ jobs:
           # PR skips the deep fetch, the diff, and the comment read.
           FP=""
           COMMENTS="$RUNNER_TEMP/hs-comments.json"
-          if hs_is_feat_title "$TITLE" && printf '%s' ",$LABELS," | grep -q ',human-approved,'; then
+          if hs_is_feat_title "$TITLE" && hs_pr_cleared "$TITLE" "$LABELS"; then
             if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
               git fetch --no-tags --quiet --unshallow origin || echo "::warning::could not deepen history"
             fi
@@ -194,10 +194,7 @@ jobs:
     # Runs only when the gate asked for a write: record on approval, or drop.
     # A cancelled gate was superseded by a newer run, which owns the write.
     # !cancelled() so a cancelled run skips this job even if its gate finished.
-    if: >-
-      !cancelled()
-      && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success')
-      && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop')
+    if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') }}
     runs-on: ubuntu-latest
     permissions:
       issues: write

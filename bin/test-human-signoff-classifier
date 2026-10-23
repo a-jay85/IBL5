@@ -702,8 +702,8 @@ wf_job_block() {
         s { print }
     ' "$1"
 }
-# EXEMPT_HS: dependent jobs that already exclude `skipped` (PR #3346 has not landed).
-EXEMPT_HS=(needs-a-human-label)
+# EXEMPT_HS: dependent jobs that already exclude `skipped`.
+EXEMPT_HS=(needs-a-human-label human-approved-fingerprint)
 # hs_job_ok <workflow-file> <job-id> — 0 when the job is guarded or exempt. Silent.
 hs_job_ok() {
     local ex id ifx blk

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-18
+last_verified: 2026-10-19
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -22,6 +22,8 @@ An assertion whose catching mutation you cannot state is vacuous: it survives a 
 **Non-compliant:** "asserts roster totals are correct" — no mutation named, so nothing distinguishes a real behavioral assertion from a static source grep that is green from birth and stays green through the exact regression it was written to catch.
 
 Write the mutation into the row's **How** cell as a clause on the command, so an implementer cannot substitute a text grep without leaving the stated mutation unmet, and a later reviewer inherits a stated predicate instead of having to re-derive the row's intent. If you cannot state the catching mutation, the row is not yet an assertion — rewrite it until you can.
+
+**Tool-output tokens after the closer.** The consequence after the `⇒` is scanned like any other cell text. Name a PHPStan identifier or any other tool-output string in prose outside backticks, and cite the test or the file the diff carries. `bin/check-plan` gate `[MU]` rejects a backticked identifier that no tracked file holds. A tool-output string the gate does not recognise still leaves the row UNREALISED at Step 6.7, so keep every tool-output string out of backticks. The same gate rejects a backticked directory token with no tracked file beneath it; cite a file the diff creates beneath it instead.
 
 **Non-compliant (bundled claims, one mutation).** Row 17 at `~/claude-plans/plan-review-dm-outcome-update.md` line 510 asserted three claims (the sweep fires on interval, `clearInterval` stops it, a re-entrant call is a no-op) and named one mutation, deleting the `sweeping` flag. The "fires on interval" claim had no catching mutation. The shipped test called `clearInterval` before advancing the fake timers, so it passed with the interval code deleted. It merged in PR #2294 and PR #2636 repaired it. The compliant form is three rows, or one row naming three mutations: delete the `setInterval` call, delete the `clearInterval` call, delete the `sweeping` flag.
 

@@ -573,6 +573,97 @@ srt_run
 srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "cause_store_rejected_flaky"
 srt_log_has "$STUB" tick.out "cause=flaky" "cause_store_rejected_flaky — log names the cause"
 
+# ── agent_allowlist_is_wrapper_only ───────────────────────────────────────────
+# The raw mysql client runs shell commands (system, \!), so the agent may run only
+# bin/sim-recap-mysql. A bare "Write" rule matches any path, so it is gone too;
+# acceptEdits keeps writes inside the temp workdir. --allowedTools is the last
+# flag, so every argv line after it is an allow-list entry.
+SRT_WRAPPER="$SCRIPT_DIR/sim-recap-mysql"
+srt_reset; srt_claim42
+srt_run
+srt_allow="$(sed -n '/^--allowedTools$/,$p' "$STUB/claude.argv" | sed 1d)"
+srt_expect_eq "agent_allowlist_is_wrapper_only" "Bash($SRT_WRAPPER:*)" "$srt_allow"
+srt_log_lacks "$STUB" claude.argv "Bash(mysql:*)" "agent_allowlist_is_wrapper_only — no bare mysql rule"
+srt_log_lacks "$STUB" claude.argv "Bash($STUB/mysql:*)" "agent_allowlist_is_wrapper_only — no absolute mysql rule"
+srt_log_has "$STUB" claude.argv "acceptEdits" "agent_allowlist_is_wrapper_only — scratch-file redirects allowed"
+
+# ── wrapper_refuses_client_commands ───────────────────────────────────────────
+# bin/sim-recap-mysql against a stub client that records its argv. Refused input
+# must exit 2 before the client starts. The real client's own block
+# (--skip-system-command --binary-mode) was proved against a server in PR #3379.
+cat > "$STUB/wrapclient" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$STUB/wrap.argv"
+SH
+chmod +x "$STUB/wrapclient"
+srt_wrap() { # <stdin-text> <args...>
+    local in="$1"; shift
+    rm -f "$STUB/wrap.argv"
+    printf '%s' "$in" | SIM_RECAP_MYSQL_BIN="$STUB/wrapclient" SIM_RECAP_DB_HOST=h \
+        SIM_RECAP_DB_PORT=1 SIM_RECAP_DB_USER=u SIM_RECAP_DB_NAME=ibldb \
+        "$SRT_WRAPPER" "$@" > "$STUB/wrap.out" 2>&1
+    SRT_RC=$?
+}
+srt_wrap_refused() { # <name> <stdin-text> <args...>
+    local name="$1"; shift
+    srt_wrap "$@"
+    srt_expect_eq "$name — exit 2" 2 "$SRT_RC"
+    srt_file_absent "$STUB/wrap.argv" "$name — client never started"
+    srt_log_has "$STUB" wrap.out "refusing" "$name — says why"
+}
+rm -f "$STUB/pwned"
+srt_wrap_refused "wrapper_refuses_bang"          "" -e '\! touch '"$STUB"'/pwned'
+srt_wrap_refused "wrapper_refuses_system_e"      "" -e 'SELECT 1; system touch '"$STUB"'/pwned'
+srt_wrap_refused "wrapper_refuses_system_stdin"  $'SELECT 1;\nSYSTEM touch '"$STUB"$'/pwned\n'
+srt_wrap_refused "wrapper_refuses_tee"           "" -e 'tee /tmp/x; SELECT 1'
+srt_wrap_refused "wrapper_refuses_tee_short"     "" -e $'SELECT 1;\n\\T /tmp/x'
+srt_wrap_refused "wrapper_refuses_source_stdin"  $'source /etc/passwd\n'
+srt_wrap_refused "wrapper_refuses_system_flag"   "" --system-command -e 'SELECT 1'
+srt_wrap_refused "wrapper_refuses_defaults_file" "" --defaults-file=/tmp/x -e 'SELECT 1'
+srt_wrap_refused "wrapper_refuses_positional"    "" -e 'SELECT 1' otherdb
+srt_file_absent "$STUB/pwned" "wrapper_refuses_client_commands — no command ran"
+
+# ── wrapper_runs_sql_with_fixed_flags ─────────────────────────────────────────
+srt_wrap "" -N -e "SELECT name FROM ibl_plr WHERE name = 'D''Angelo'"
+srt_expect_eq "wrapper_runs_sql_with_fixed_flags — exit 0" 0 "$SRT_RC"
+srt_expect_eq "wrapper_runs_sql_with_fixed_flags — --no-defaults first" \
+    "--no-defaults" "$(sed -n 1p "$STUB/wrap.argv")"
+srt_log_has "$STUB" wrap.argv "--skip-system-command" "wrapper_runs_sql_with_fixed_flags — system off"
+srt_log_has "$STUB" wrap.argv "--binary-mode" "wrapper_runs_sql_with_fixed_flags — client commands off"
+srt_log_has "$STUB" wrap.argv "SELECT name FROM ibl_plr WHERE name = 'D''Angelo'" \
+    "wrapper_runs_sql_with_fixed_flags — SQL passed through"
+srt_expect_eq "wrapper_runs_sql_with_fixed_flags — database last" \
+    "ibldb" "$(tail -n 1 "$STUB/wrap.argv")"
+srt_wrap $'SELECT 1;\nSELECT 2;\n' -t
+srt_expect_eq "wrapper_runs_stdin_sql — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" wrap.argv "SELECT 2;" "wrapper_runs_stdin_sql — stdin SQL passed with -e"
+
+# ── no_payload_names_denied_tools ─────────────────────────────────────────────
+srt_reset; srt_claim42
+printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"'"$SRT_WRAPPER"' -e \"SELECT PW-SENTINEL-9f3\""}}]}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "no_payload_names_denied_tools — still parks flaky"
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Bash($SRT_WRAPPER)" "no_payload_names_denied_tools"
+srt_log_lacks "$STUB" tick.out "PW-SENTINEL-9f3" "no_payload_names_denied_tools — denied command arguments never logged"
+
+# ── denied_unknown_command_logs_tool_name_only ────────────────────────────────
+# An env-prefixed first word (MYSQL_PWD=secret) is itself a secret carrier.
+srt_reset; srt_claim42
+printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"MYSQL_PWD=SECRET-SENTINEL-77 mysql -e x"}}]}' \
+    > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Bash" "denied_unknown_command_logs_tool_name_only"
+srt_log_lacks "$STUB" tick.out "SECRET-SENTINEL-77" "denied_unknown_command_logs_tool_name_only — env-prefixed word never logged"
+
+# ── no_payload_denials_survive_stderr_noise ───────────────────────────────────
+srt_reset; srt_claim42
+{ printf 'node: warning: some stderr line\n'
+  printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Write","tool_input":{}}]}'
+} > "$STUB/agent-output"
+srt_run
+srt_log_has "$STUB" tick.out "denied 1 tool call(s): Write" "no_payload_denials_survive_stderr_noise"
+
 # ── agent_cost_logged / agent_cost_unavailable ────────────────────────────────
 # agent-output stands in for claude's stdout+stderr: a stderr line before the
 # result object proves the last-result-line extraction; garbage proves fallback.
@@ -1205,19 +1296,21 @@ _band=$(awk '
     /^\*\*.* [0-9]+ @ .* [0-9]+\*\*$/  { st=1; next }
     st==1 && /^<@/                     { st=2; next }
     st==2 && $0 == ""                  { st=3; next }
-    st==3 && length($0) > 0            { n++; L=length($0);
+    st==3 && length($0) > 0            { n++; L=length($0); sum+=L;
                                          if (mn=="" || L<mn) mn=L; if (L>mx) mx=L;
                                          st=0; next }
                                        { st=0 }
-    END { printf "%d %d %d", n+0, mn+0, mx+0 }
+    END { printf "%d %d %d %.0f", n+0, mn+0, mx+0, (n > 0 ? sum/n : 0) }
 ' "$SRT_EXEMPLAR")
-read -r _bn _bmin _bmax <<BAND_EOF
+read -r _bn _bmin _bmax _bavg <<BAND_EOF
 $_band
 BAND_EOF
-if [ "$_bmin" -ge 504 ] && [ "$_bmax" -le 639 ] && [ "$_bn" -gt 0 ]; then
-    srt_ok "length_band_matches_exemplar — $_bn paragraphs, min $_bmin, max $_bmax inside stated band"
+# The average the prompt states ("averaging NNN"), extracted so drift in either place fails.
+_stated_avg=$(sed -n 's/.*averaging \([0-9][0-9]*\)\..*/\1/p' "$STUB/prompt.out" | head -n 1)
+if [ "$_bmin" -ge 504 ] && [ "$_bmax" -le 639 ] && [ "$_bn" -gt 0 ] && [ "$_bavg" = "$_stated_avg" ]; then
+    srt_ok "length_band_matches_exemplar — $_bn paragraphs, min $_bmin, max $_bmax, avg $_bavg match stated band"
 else
-    srt_fail "length_band_matches_exemplar — exemplar measures '$_band', prompt claims 504..639"
+    srt_fail "length_band_matches_exemplar — exemplar measures '$_band' (n min max avg), prompt claims 504..639 averaging '$_stated_avg'"
 fi
 
 # ── negative_roster_absent ────────────────────────────────────────────────────
@@ -1253,6 +1346,16 @@ MYSQL_PWD="s3cr3t_pw_xyz" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
 srt_log_lacks "$STUB" prompt.out "s3cr3t_pw_xyz" "negative_no_credential_leak"
 srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \
     "negative_no_credential_leak — DB_PASSWORD var name absent from prompt stdout"
+
+# ── prompt_names_wrapper_only ─────────────────────────────────────────────────
+# The allow-list holds only Bash(<wrapper>:*), so the prompt must hand the agent
+# that exact path and never the raw client it wraps.
+SIM_RECAP_MYSQL_BIN="/raw/client/mysql" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
+    "$SRT_PROMPT_BIN" --sim=1 \
+    --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    > "$STUB/prompt.out" 2>"$STUB/prompt.err"
+srt_log_has "$STUB" prompt.out "$SCRIPT_DIR/sim-recap-mysql -e" "prompt_names_wrapper_only"
+srt_log_lacks "$STUB" prompt.out "/raw/client/mysql" "prompt_names_wrapper_only — raw client path absent"
 
 # ── roster_fetched_into_workdir ───────────────────────────────────────────────
 # simRecapContext.php is called over ssh; the result lands in roster-context.json.

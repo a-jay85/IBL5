@@ -2,73 +2,32 @@
 
 declare(strict_types=1);
 
-/**
- * Draft_History Module - Display draft history by year or by team
- *
- * Shows draft picks for a selected year with player info and draft order.
- * Supports team-specific view via ?teamid=N (camelCase ?teamID=N is also accepted for old Discord links).
- *
- * Refactored to use the interface-driven architecture pattern.
- *
- * @see DraftHistory\DraftHistoryRepository For database operations
- * @see DraftHistory\DraftHistoryView For HTML rendering
- */
-
+// Consolidated into modules/DraftInfo (tab: history). Kept so old links still resolve.
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use DraftHistory\DraftHistoryRepository;
-use DraftHistory\DraftHistoryView;
-
-$module_name = basename(dirname(__FILE__));
-
 global $mysqli_db;
 /** @var \mysqli $mysqli_db */
 
-// Route HTMX API requests (no PageLayout, returns HTML fragment only)
-$op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
-if ($op === 'api') {
+// Keep serving op=api HTMX fast path — a redirect here would swap a full page layout
+// into the HTMX target. Route directly to the handler before the redirect.
+$getOp = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
+if ($getOp === 'api') {
     $handler = new DraftHistory\DraftHistoryApiHandler($mysqli_db);
     $handler->handle();
     return;
 }
 
-// Initialize services
-$repository = new DraftHistoryRepository($mysqli_db);
-$view = new DraftHistoryView();
-
-// Check for team ID parameter
-$teamidParam = $_GET['teamid'] ?? $_GET['teamID'] ?? null;
-$teamid = is_string($teamidParam) ? (int) $teamidParam : 0;
-
-$isValidTeam = false;
-if ($teamid > 0) {
-    $team = \Team\Team::initialize($mysqli_db, $teamid);
-    $isValidTeam = ($team->teamid > 0);
+// Old Discord links use camelCase ?teamID=N; accept it alongside ?teamid=N.
+if (!isset($_GET['teamid']) && isset($_GET['teamID'])) {
+    $_GET['teamid'] = $_GET['teamID'];
 }
 
-// Set page title before header
-if ($isValidTeam) {
-    $pagetitle = "- {$team->name} Draft History";
-} else {
-    // Get year range
-    $startYear = $repository->getFirstDraftYear();
-    $endYear = $repository->getLastDraftYear();
-
-    // Get selected year from request, default to most recent draft
-    $year = is_string($_REQUEST['year'] ?? null) ? (int) $_REQUEST['year'] : $endYear;
-    $pagetitle = "- $year Draft";
-}
-
-// Render page
-PageLayout\PageLayout::header();
-
-if ($isValidTeam) {
-    echo $view->renderTeamHistory($team, $repository->getDraftPicksByTeam($team->name));
-} else {
-    $draftPicks = $repository->getDraftPicksByYear($year);
-    echo $view->render($year, $startYear, $endYear, $draftPicks);
-}
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::sendWithPassthrough(
+    'modules.php?name=DraftInfo&tab=history',
+    ['year', 'teamid'],
+    $_GET + $_POST,
+    ['year' => 'ctype_digit', 'teamid' => 'ctype_digit']
+);
+return;

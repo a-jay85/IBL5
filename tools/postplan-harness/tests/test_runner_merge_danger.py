@@ -132,3 +132,19 @@ def test_later_phase_leaves_missing_or_malformed_line_alone(tmp_path):
     for body in ("## Summary\n\nno field here\n",
                  "**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least\n"):
         assert runner._merge_danger_body(body, str(tmp_path), "", lambda *_: None, "phase6") == body
+
+
+def test_phase6_and_phase7_reapplication_leave_the_phase2_line_unchanged(tmp_path):
+    path = "tools/postplan-harness/harness/armable.py"
+    wt = _worktree(tmp_path, {path: "x = 1\n"})
+    diff = _diff(path)
+    body = ("## Summary\n\n**Merge danger:** Door: one-way · Blast radius: site-wide · "
+            "Why: edits the arming predicate library itself")
+    log = lambda *_: None
+    b2 = runner._merge_danger_body(body, wt, diff, log, "phase2")
+    b6 = runner._merge_danger_body(b2, wt, diff, log, "phase6")
+    b7 = runner._merge_danger_body(b6, wt, diff, log, "phase7")
+    assert _field_lines(b2) == _field_lines(b6) == _field_lines(b7)
+    [line] = _field_lines(b2)
+    assert line.count("mechanical:") == 1
+    assert line.endswith("library itself")

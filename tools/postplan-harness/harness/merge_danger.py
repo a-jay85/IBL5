@@ -164,6 +164,16 @@ def _clean_why(text: str | None) -> str:
     return re.sub(r"\s+", " ", (text or "").replace("|", " ")).strip()
 
 
+_MECH_PREFIX_RE = re.compile(r"^mechanical: .*?(?:\. |$)")
+
+
+def _llm_core(text: str | None) -> str:
+    """The LLM's or a human's own words: the Why with any leading `mechanical: ...` prefix
+    removed. A prior phase's line is `mechanical: <triggers>. <words>`, so re-applying the
+    floor must strip that prefix before composing, or the prefix compounds once per phase."""
+    return _MECH_PREFIX_RE.sub("", _clean_why(text), count=1).strip()
+
+
 def merge_verdicts(
     mechanical: MergeDanger,
     llm_door: str | None,
@@ -173,11 +183,13 @@ def merge_verdicts(
     """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers."""
     door = DOORS[max(_rank(mechanical.door, DOORS), _rank(llm_door, DOORS))]
     blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
-    why = _clean_why(llm_why)[:WHY_MAX]
-    if len(why) < WHY_MIN:
+    core = _llm_core(llm_why)[:WHY_MAX]
+    if len(core) < WHY_MIN:
         why = mechanical.why
     elif mechanical.door == "one-way":
-        why = f"{mechanical.why}. {why}"
+        why = f"{mechanical.why}. {core}"
+    else:
+        why = core
     return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers)
 
 

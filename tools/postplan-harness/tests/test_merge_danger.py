@@ -238,6 +238,40 @@ def test_llm_why_is_sanitized_and_clamped():
     assert len(out.why) <= md.WHY_MAX
 
 
+def test_reapplying_merge_verdicts_does_not_duplicate_the_prefix():
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, "drops the trade_mode column data for every team")
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    third = md.merge_verdicts(ONE, second.door, second.blast, second.why)
+    assert second.why == first.why == third.why
+    assert first.why.count("mechanical:") == 1
+    assert first.why.endswith("for every team")
+
+
+def test_reapplication_is_a_fixed_point_after_truncation():
+    llm = "this sentence is exactly forty chars ok " + "y" * 300
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    assert len(first.why) <= md.WHY_MAX
+    assert second.why == first.why
+    assert second.why.count("mechanical:") == 1
+
+
+def test_prefixed_prior_with_short_core_falls_back_to_mechanical():
+    assert md.merge_verdicts(ONE, "one-way", ONE.blast, f"{ONE.why}. tiny").why == ONE.why
+
+
+def test_stale_prefix_is_dropped_when_floor_is_two_way():
+    out = md.merge_verdicts(TWO, None, None,
+                            "mechanical: arming-path:x/y.py. edits the arming predicate library itself")
+    assert out.why == "edits the arming predicate library itself"
+
+
+def test_llm_core_strips_only_the_leading_prefix():
+    assert md._llm_core("mechanical: a:b/c.sql. keep this. and this") == "keep this. and this"
+    assert md._llm_core("mechanical: no one-way trigger in the realized diff") == ""
+    assert md._llm_core("plain words only here") == "plain words only here"
+
+
 # --- render / parse / classify / validate / inject --------------------------------------------
 
 def test_render_parse_roundtrip():

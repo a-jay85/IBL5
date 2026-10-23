@@ -141,6 +141,7 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         $result = $this->runScript([], self::VALID_PAYLOAD);
 
         self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero for missing --sim');
+        self::assertSame('', $result['stdout'], 'argument errors stay off STDOUT');
         self::assertStringContainsString(
             'storeSimRecap: --sim=N is required',
             $result['stderr'],
@@ -197,6 +198,7 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
 
         self::assertSame(1, $result['exit_code'], 'exit 1 expected for malformed JSON');
         self::assertStringContainsString('storeSimRecap:', $result['stderr']);
+        self::assertStringStartsWith('malformed payload:', $this->rejectionError($result['stdout']));
         self::assertNull($this->repo->find(self::SIM), 'no row must be written for malformed JSON');
     }
 
@@ -215,6 +217,7 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         $result = $this->runScript(['--sim=' . self::SIM], $payloadWithoutRecapText);
 
         self::assertSame(1, $result['exit_code'], 'exit 1 expected for missing recap_text');
+        self::assertStringStartsWith('malformed payload:', $this->rejectionError($result['stdout']));
         self::assertNull($this->repo->find(self::SIM), 'no row must be written for missing recap_text');
     }
 
@@ -436,6 +439,109 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
             }
         }
         // Non-zero exit is also acceptable — DATE column coercion may reject the malformed date.
+    }
+
+    // ── Payload rejection reaches STDOUT; intro/outro are no longer stored ──────
+
+    /**
+     * Decodes the one-line rejection JSON and returns its error message.
+     */
+    private function rejectionError(string $stdout): string
+    {
+        $json = json_decode($stdout, true);
+        self::assertIsArray($json, 'a rejected payload must print JSON on STDOUT');
+        self::assertFalse($json['ok'] ?? null, 'ok must be false for a rejected payload');
+        $error = $json['error'] ?? null;
+        self::assertIsString($error, 'a rejected payload must carry an error string');
+
+        return $error;
+    }
+
+    private function payloadWithGameProse(string $prose): string
+    {
+        $doc = json_decode(self::VALID_PAYLOAD, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($doc);
+        self::assertIsArray($doc['games']);
+        self::assertIsArray($doc['games'][0]);
+        $doc['games'][0]['recap_text'] = $prose;
+
+        return json_encode($doc, JSON_THROW_ON_ERROR);
+    }
+
+    private function gameRecapCount(): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) AS `cnt` FROM `ibl_sim_game_recaps` WHERE `sim` = ' . self::SIM);
+        $row = $result instanceof \mysqli_result ? $result->fetch_assoc() : null;
+
+        return (int) ($row['cnt'] ?? 0);
+    }
+
+    private function assertNothingStored(): void
+    {
+        $row = $this->repo->find(self::SIM);
+        self::assertNotSame('done', $row['status'] ?? null, 'a rejected payload must not mark the sim done');
+        self::assertSame(0, $this->gameRecapCount(), 'a rejected payload must write no game recaps');
+    }
+
+    public function testOverLengthGameBlockPrintsOkFalseOnStdoutAndWritesNothing(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        $result = $this->runScript(['--sim=' . self::SIM], $this->payloadWithGameProse(str_repeat('x', 2000)));
+
+        self::assertSame(1, $result['exit_code'], 'exit 1 expected for an over-length block');
+        self::assertStringContainsString(
+            'chars, over the 1900-char Discord block cap',
+            $this->rejectionError($result['stdout'])
+        );
+        $this->assertNothingStored();
+    }
+
+    public function testNonWikipediaLinkPrintsOkFalseOnStdoutAndWritesNothing(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        $result = $this->runScript(
+            ['--sim=' . self::SIM],
+            $this->payloadWithGameProse('A wild one. [x](<https://evil.com>)')
+        );
+
+        self::assertSame(1, $result['exit_code'], 'exit 1 expected for a non-Wikipedia link');
+        self::assertStringContainsString('games[0].recap_text:', $this->rejectionError($result['stdout']));
+        $this->assertNothingStored();
+    }
+
+    public function testPayloadWithoutIntroAndOutroStores(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+        $doc = json_decode(self::VALID_PAYLOAD, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($doc);
+        unset($doc['intro_text'], $doc['outro_text']);
+
+        $result = $this->runScript(['--sim=' . self::SIM], json_encode($doc, JSON_THROW_ON_ERROR));
+
+        self::assertSame(0, $result['exit_code'], 'a payload without intro/outro must store');
+        $json = json_decode($result['stdout'], true);
+        self::assertIsArray($json);
+        self::assertTrue($json['ok'] ?? false, 'ok must be true');
+        $row = $this->repo->find(self::SIM);
+        self::assertNotNull($row);
+        self::assertSame('', $row['intro_text']);
+        self::assertSame('', $row['outro_text']);
+    }
+
+    public function testLegacyIntroAndOutroAreNotStored(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        $result = $this->runScript(['--sim=' . self::SIM], self::VALID_PAYLOAD);
+
+        self::assertSame(0, $result['exit_code'], 'a legacy payload must still store');
+        $row = $this->repo->find(self::SIM);
+        self::assertNotNull($row);
+        self::assertSame('done', $row['status']);
+        self::assertSame('', $row['intro_text'], 'a legacy intro_text must not be stored');
+        self::assertSame('', $row['outro_text'], 'a legacy outro_text must not be stored');
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────

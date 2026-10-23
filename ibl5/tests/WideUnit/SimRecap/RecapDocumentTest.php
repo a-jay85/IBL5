@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\WideUnit\SimRecap;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimRecap\RecapDocument;
 
@@ -21,6 +22,17 @@ final class RecapDocumentTest extends TestCase
 
     /** Exemplar line 129 — the same fixed counts, so a shorter label yields a shorter line. */
     private const MAR_1_RULE = '================================ Mar 1 =========================================';
+
+    private const HOST = 'iblhoops.net';
+
+    /** Box-score footer line for a `game()` fixture dated 2008-02-26 (game 1 of the day). */
+    private const BOX_FEB_26 = '<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-02-26&game=1>';
+
+    /** Box-score footer line for a `game()` fixture dated 2008-03-01. */
+    private const BOX_MAR_1 = '<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-01&game=1>';
+
+    /** Team-page URL prefix; the fixture's teams are 1 (visitor) and 2 (home). */
+    private const TEAM_URL = 'https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=';
 
     /**
      * @return array<string, mixed>
@@ -50,38 +62,40 @@ final class RecapDocumentTest extends TestCase
 
     public function testAssemblesTheWholeDocumentInExemplarShape(): void
     {
-        $doc = RecapDocument::assemble(
-            "IBL SIM RECAPS\n====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n====",
-            [
+        $doc = RecapDocument::assemble([
                 $this->game('2008-02-26', "**A 100 @ B 114**\n<@1> · <@2>\n\nFirst game."),
                 $this->game('2008-02-26', "**C 103 @ D 139**\n<@3> · <@4>\n\nSecond game."),
                 $this->game('2008-03-01', "**E 111 @ F 120**\n<@5> · <@6>\n\nThird game."),
-            ],
-            "====\nEND. 3 games."
-        );
+            ], self::HOST);
 
-        $expected = "IBL SIM RECAPS\n====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n===="
-            . "\n\n\n" . self::FEB_26_RULE
+        $expected = self::FEB_26_RULE
             . "\n\n" . "**A 100 @ B 114**\n<@1> · <@2>\n\nFirst game."
+            . "\n\n" . self::BOX_FEB_26
+            . "\n" . '[A](<' . self::TEAM_URL . '1>)'
+            . "\n" . '[B](<' . self::TEAM_URL . '2>)'
             . "\n\n" . "**C 103 @ D 139**\n<@3> · <@4>\n\nSecond game."
+            . "\n\n" . self::BOX_FEB_26
+            . "\n" . '[C](<' . self::TEAM_URL . '1>)'
+            . "\n" . '[D](<' . self::TEAM_URL . '2>)'
             . "\n\n\n" . self::MAR_1_RULE
             . "\n\n" . "**E 111 @ F 120**\n<@5> · <@6>\n\nThird game."
-            . "\n\n\n" . "====\nEND. 3 games.\n";
+            . "\n\n" . self::BOX_MAR_1
+            . "\n" . '[E](<' . self::TEAM_URL . '1>)'
+            . "\n" . '[F](<' . self::TEAM_URL . '2>)'
+            . "\n";
 
         self::assertSame($expected, $doc);
     }
 
     /**
      * The whole point of the class: `recap_text` on the summary row is a ~220-char
-     * teaser, and the document is only ever the sum of intro + games + outro.
+     * teaser, and the document is only ever the sum of the games.
      */
     public function testDocumentIsNotTheSummaryTeaser(): void
     {
-        $doc = RecapDocument::assemble('Intro.', [$this->game('2008-02-26', 'Only game.')], 'Outro.');
+        $doc = RecapDocument::assemble([$this->game('2008-02-26', 'Only game.')], self::HOST);
 
         self::assertStringContainsString('Only game.', $doc);
-        self::assertStringContainsString('Intro.', $doc);
-        self::assertStringContainsString('Outro.', $doc);
     }
 
     /**
@@ -91,11 +105,7 @@ final class RecapDocumentTest extends TestCase
      */
     public function testInsertsTheMissingBlankLineAfterTheMentionLine(): void
     {
-        $doc = RecapDocument::assemble(
-            null,
-            [$this->game('2008-02-26', "**A 120 @ B 117**\n<@395705560068259840> · <@669349908989345802>\nVancouver's frontcourt.")],
-            null
-        );
+        $doc = RecapDocument::assemble([$this->game('2008-02-26', "**A 120 @ B 117**\n<@395705560068259840> · <@669349908989345802>\nVancouver's frontcourt.")], self::HOST);
 
         self::assertStringContainsString(
             "**A 120 @ B 117**\n<@395705560068259840> · <@669349908989345802>\n\nVancouver's frontcourt.",
@@ -106,9 +116,13 @@ final class RecapDocumentTest extends TestCase
     public function testLeavesAnAlreadyCorrectGameBlockAlone(): void
     {
         $block = "**A 120 @ B 117**\n<@1> · <@2>\n\nProse.";
-        $doc   = RecapDocument::assemble(null, [$this->game('2008-02-26', $block)], null);
+        $doc   = RecapDocument::assemble([$this->game('2008-02-26', $block)], self::HOST);
 
-        self::assertSame(self::FEB_26_RULE . "\n\n" . $block . "\n", $doc);
+        self::assertSame(
+            self::FEB_26_RULE . "\n\n" . $block . "\n\n" . self::BOX_FEB_26
+                . "\n[A](<" . self::TEAM_URL . "1>)\n[B](<" . self::TEAM_URL . "2>)\n",
+            $doc
+        );
     }
 
     /**
@@ -118,7 +132,7 @@ final class RecapDocumentTest extends TestCase
     public function testDoesNotSplitProseThatIsNotAMentionLine(): void
     {
         $block = "**A 120 @ B 117**\nWashington won by 36.\nAnd it wasn't close.";
-        $doc   = RecapDocument::assemble(null, [$this->game('2008-02-26', $block)], null);
+        $doc   = RecapDocument::assemble([$this->game('2008-02-26', $block)], self::HOST);
 
         self::assertStringContainsString($block, $doc);
     }
@@ -129,39 +143,33 @@ final class RecapDocumentTest extends TestCase
      */
     public function testRepairsASingleMentionLine(): void
     {
-        $doc = RecapDocument::assemble(null, [$this->game('2008-02-26', "**A 1 @ B 2**\n<@7>\nProse.")], null);
+        $doc = RecapDocument::assemble([$this->game('2008-02-26', "**A 1 @ B 2**\n<@7>\nProse.")], self::HOST);
 
         self::assertStringContainsString("<@7>\n\nProse.", $doc);
     }
 
     /**
      * A summary row whose games never made it into `ibl_sim_game_recaps` must not
-     * silently produce a two-line "document" that looks like a complete recap — but it
-     * must not fatal either. Intro and outro come through, joined like any two blocks.
+     * fatal. With no intro or outro in the document any more, there is nothing to print.
      */
-    public function testDegradesToIntroAndOutroWhenThereAreNoGames(): void
+    public function testReturnsAnEmptyStringWhenThereAreNoGames(): void
     {
-        self::assertSame("Intro.\n\n\nOutro.\n", RecapDocument::assemble('Intro.', [], 'Outro.'));
+        self::assertSame('', RecapDocument::assemble([], self::HOST));
     }
 
     public function testReturnsAnEmptyStringWhenThereIsNothingToAssemble(): void
     {
-        self::assertSame('', RecapDocument::assemble(null, [], null));
-        self::assertSame('', RecapDocument::assemble('  ', [], "\n"));
+        self::assertSame('', RecapDocument::assemble([$this->game('2008-02-26', "  \n")], self::HOST));
     }
 
     public function testSkipsGameRowsWithNoText(): void
     {
-        $doc = RecapDocument::assemble(
-            null,
-            [
+        $doc = RecapDocument::assemble([
                 $this->game('2008-02-26', ''),
                 $this->game('2008-02-26', 'Real game.'),
-            ],
-            null
-        );
+            ], self::HOST);
 
-        self::assertSame(self::FEB_26_RULE . "\n\nReal game.\n", $doc);
+        self::assertSame(self::FEB_26_RULE . "\n\nReal game.\n\n" . self::BOX_FEB_26 . "\n", $doc);
     }
 
     /**
@@ -170,16 +178,16 @@ final class RecapDocumentTest extends TestCase
      */
     public function testPrintsAnUnparseableDateVerbatim(): void
     {
-        $doc = RecapDocument::assemble(null, [$this->game('not-a-date', 'Game.')], null);
+        $doc = RecapDocument::assemble([$this->game('not-a-date', 'Game.')], self::HOST);
 
         self::assertStringContainsString('================================ not-a-date =', $doc);
     }
 
     public function testOmitsTheRuleWhenTheDateIsMissing(): void
     {
-        $doc = RecapDocument::assemble(null, [$this->game('', 'Game.')], null);
+        $doc = RecapDocument::assemble([$this->game('', 'Game.')], self::HOST);
 
-        self::assertSame("Game.\n", $doc);
+        self::assertSame("Game.\n", $doc, 'no date means no rule and no box-score line');
     }
 
     /**
@@ -192,7 +200,7 @@ final class RecapDocumentTest extends TestCase
         $stored = "Stored monolith including <@7> and <@12> tags.\n\nAll 56 games are here.";
         $game   = $this->game('2026-07-26', "The visitors came out strong.\nThey held the lead."); // line 1 is prose, not a mention
 
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', $stored);
+        $result = RecapDocument::postableText([$game], $stored, self::HOST);
 
         self::assertSame($stored, $result);
     }
@@ -204,9 +212,9 @@ final class RecapDocumentTest extends TestCase
     public function testPostableTextReturnsAssembledDocumentWhenPartsAreWellFormed(): void
     {
         $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', 'Short teaser.');
+        $result = RecapDocument::postableText([$game], 'Short teaser.', self::HOST);
 
-        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
+        self::assertSame(RecapDocument::assemble([$game], self::HOST), $result);
     }
 
     /**
@@ -222,7 +230,7 @@ final class RecapDocumentTest extends TestCase
             $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
         }
 
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+        self::assertSame($stored, RecapDocument::postableText($parts, $stored, self::HOST));
     }
 
     /**
@@ -239,8 +247,8 @@ final class RecapDocumentTest extends TestCase
         }
 
         self::assertSame(
-            RecapDocument::assemble('Intro.', $parts, 'Outro.'),
-            RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored)
+            RecapDocument::assemble($parts, self::HOST),
+            RecapDocument::postableText($parts, $stored, self::HOST)
         );
     }
 
@@ -256,7 +264,7 @@ final class RecapDocumentTest extends TestCase
             $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
         }
 
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+        self::assertSame($stored, RecapDocument::postableText($parts, $stored, self::HOST));
     }
 
     public function testPostableTextCountsRenderedGamesNotRawRowsAgainstTheStoredDocument(): void
@@ -269,7 +277,7 @@ final class RecapDocumentTest extends TestCase
         $parts[] = $this->game('2026-02-26', '');
         $parts[] = $this->game('2026-02-26', '   ');
 
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+        self::assertSame($stored, RecapDocument::postableText($parts, $stored, self::HOST));
     }
 
     public function testPostableTextTreatsThePinnedExemplarAsAnEightGameDocument(): void
@@ -282,7 +290,7 @@ final class RecapDocumentTest extends TestCase
             $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
         }
 
-        self::assertSame($exemplar, RecapDocument::postableText('Intro.', $parts, 'Outro.', $exemplar));
+        self::assertSame($exemplar, RecapDocument::postableText($parts, $exemplar, self::HOST));
     }
 
     /**
@@ -295,7 +303,7 @@ final class RecapDocumentTest extends TestCase
         $wellFormed = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
         $bareProse  = $this->game('2026-02-26', 'Single-line prose.');
 
-        $result = RecapDocument::postableText('Intro.', [$wellFormed, $bareProse], 'Outro.', 'Stored.');
+        $result = RecapDocument::postableText([$wellFormed, $bareProse], 'Stored.', self::HOST);
 
         self::assertSame('Stored.', $result);
     }
@@ -309,11 +317,8 @@ final class RecapDocumentTest extends TestCase
      */
     public function testPostableTextReturnsStoredTextWhenNoGameParts(): void
     {
-        // No intro, no outro, no games → assemble() returns '' → $document === '' guard fires.
-        self::assertSame('Stored.', RecapDocument::postableText(null, [], null, 'Stored.'));
-
-        // Intro + outro, no games → assemble() is non-empty but gamesCarryTheirMentionLines([]) is false.
-        self::assertSame('Stored.', RecapDocument::postableText('Intro.', [], 'Outro.', 'Stored.'));
+        // No games → assemble() returns '' → $document === '' guard fires.
+        self::assertSame('Stored.', RecapDocument::postableText([], 'Stored.', self::HOST));
     }
 
     /**
@@ -326,9 +331,9 @@ final class RecapDocumentTest extends TestCase
         $whitespace = $this->game('2026-02-26', '   ');
         $wellFormed = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
 
-        $result = RecapDocument::postableText('Intro.', [$empty, $whitespace, $wellFormed], 'Outro.', 'Stored.');
+        $result = RecapDocument::postableText([$empty, $whitespace, $wellFormed], 'Stored.', self::HOST);
 
-        self::assertSame(RecapDocument::assemble('Intro.', [$empty, $whitespace, $wellFormed], 'Outro.'), $result);
+        self::assertSame(RecapDocument::assemble([$empty, $whitespace, $wellFormed], self::HOST), $result);
     }
 
     /**
@@ -339,11 +344,11 @@ final class RecapDocumentTest extends TestCase
     public function testPostableTextReturnsAssembledDocumentWhenStoredTextIsEmpty(): void
     {
         $game      = $this->game('2026-02-26', 'Bare prose with no mention line.');
-        $assembled = RecapDocument::assemble(null, [$game], null);
+        $assembled = RecapDocument::assemble([$game], self::HOST);
 
-        self::assertSame($assembled, RecapDocument::postableText(null, [$game], null, null));
-        self::assertSame($assembled, RecapDocument::postableText(null, [$game], null, ''));
-        self::assertSame($assembled, RecapDocument::postableText(null, [$game], null, '   '));
+        self::assertSame($assembled, RecapDocument::postableText([$game], null, self::HOST));
+        self::assertSame($assembled, RecapDocument::postableText([$game], '', self::HOST));
+        self::assertSame($assembled, RecapDocument::postableText([$game], '   ', self::HOST));
     }
 
     /**
@@ -353,9 +358,9 @@ final class RecapDocumentTest extends TestCase
     public function testPostableTextCountsSingleMentionAsWellFormed(): void
     {
         $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@7>\nGame prose.");
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', 'Stored.');
+        $result = RecapDocument::postableText([$game], 'Stored.', self::HOST);
 
-        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
+        self::assertSame(RecapDocument::assemble([$game], self::HOST), $result);
     }
 
     /**
@@ -366,9 +371,9 @@ final class RecapDocumentTest extends TestCase
     public function testPostableTextCountsAlreadyNormalizedPartAsWellFormed(): void
     {
         $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\n\nGame prose.");
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', 'Stored.');
+        $result = RecapDocument::postableText([$game], 'Stored.', self::HOST);
 
-        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
+        self::assertSame(RecapDocument::assemble([$game], self::HOST), $result);
     }
 
     /**
@@ -378,9 +383,9 @@ final class RecapDocumentTest extends TestCase
      */
     public function testPostableTextReturnsEmptyStringWhenThereIsNothingAtAll(): void
     {
-        self::assertSame('', RecapDocument::postableText(null, [], null, null));
-        self::assertSame('', RecapDocument::postableText(null, [], null, ''));
-        self::assertSame('', RecapDocument::postableText(null, [], null, '   '));
+        self::assertSame('', RecapDocument::postableText([], null, self::HOST));
+        self::assertSame('', RecapDocument::postableText([], '', self::HOST));
+        self::assertSame('', RecapDocument::postableText([], '   ', self::HOST));
     }
 
     /**
@@ -396,5 +401,161 @@ final class RecapDocumentTest extends TestCase
         $count = preg_match_all('/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/m', str_replace("\r\n", "\n", $exemplar));
 
         self::assertSame(8, $count, 'The pinned exemplar carries 8 game headers');
+    }
+
+    public function testAppendsLinksFooterAfterProseInExactLayout(): void
+    {
+        $game = [
+            'game_date'        => '2008-02-26',
+            'visitor_teamid'   => 7,
+            'home_teamid'      => 12,
+            'game_of_that_day' => 3,
+            'recap_text'       => "**Celtics 100 @ Heat 114**\n<@111> · <@222>\n\nProse.",
+        ];
+
+        $expected = "**Celtics 100 @ Heat 114**\n"
+            . "<@111> · <@222>\n"
+            . "\n"
+            . "Prose.\n"
+            . "\n"
+            . "<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-02-26&game=3>\n"
+            . "[Celtics](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=7>)\n"
+            . "[Heat](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=12>)";
+
+        self::assertSame($expected, RecapDocument::gameBlock($game, self::HOST));
+    }
+
+    public function testScoreHeaderAndMentionLineCarryNoUrl(): void
+    {
+        $doc = RecapDocument::assemble([
+            $this->game('2008-02-26', "**A 100 @ B 114**\n<@1> · <@2>\n\nFirst game."),
+            $this->game('2008-02-26', "**C 103 @ D 139**\n<@3> · <@4>\n\nSecond game."),
+        ], self::HOST);
+
+        $headerLines = [];
+        $lines       = explode("\n", $doc);
+        foreach ($lines as $i => $line) {
+            if (str_starts_with($line, '**')) {
+                $headerLines[] = [$line, $lines[$i + 1] ?? ''];
+            }
+        }
+
+        self::assertCount(2, $headerLines);
+        foreach ($headerLines as [$header, $mentions]) {
+            self::assertMatchesRegularExpression('/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/', $header);
+            foreach ([$header, $mentions] as $line) {
+                self::assertStringNotContainsString('http', $line);
+                self::assertStringNotContainsString('](', $line);
+            }
+        }
+    }
+
+    public function testAssembledDocumentOpensWithTheFirstDateRule(): void
+    {
+        $doc = RecapDocument::assemble([$this->game('2008-02-26', "**A 1 @ B 2**\n<@1>\n\nProse.")], self::HOST);
+
+        self::assertStringStartsWith('================================ ', $doc);
+    }
+
+    public function testBoxScoreLinkFallsBackToLegacyBoxPageWithoutDotSlash(): void
+    {
+        $game = ['game_of_that_day' => 0, 'box_id' => 55] + $this->game('2008-02-26', 'Only game.');
+
+        self::assertSame(
+            "Only game.\n\n<https://iblhoops.net/ibl5/ibl/IBL/box55.htm>",
+            RecapDocument::gameBlock($game, self::HOST)
+        );
+    }
+
+    public function testOmitsBoxScoreLineWhenNoGameIndexOrBoxId(): void
+    {
+        $game = ['game_of_that_day' => 0] + $this->game('2008-02-26', "**A 1 @ B 2**\n<@1>\n\nProse.");
+
+        self::assertSame(
+            "**A 1 @ B 2**\n<@1>\n\nProse.\n\n"
+                . "[A](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=1>)\n"
+                . "[B](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=2>)",
+            RecapDocument::gameBlock($game, self::HOST)
+        );
+    }
+
+    public function testOmitsTeamLinesWhenHeaderDoesNotParse(): void
+    {
+        self::assertSame(
+            "Only game.\n\n" . self::BOX_FEB_26,
+            RecapDocument::gameBlock($this->game('2008-02-26', 'Only game.'), self::HOST)
+        );
+    }
+
+    public function testOmitsTeamLineForNonIntOrNonPositiveTeamId(): void
+    {
+        $game = ['visitor_teamid' => '7', 'home_teamid' => 0]
+            + $this->game('2008-02-26', "**A 1 @ B 2**\n<@1>\n\nProse.");
+
+        self::assertSame(
+            "**A 1 @ B 2**\n<@1>\n\nProse.\n\n" . self::BOX_FEB_26,
+            RecapDocument::gameBlock($game, self::HOST)
+        );
+    }
+
+    public function testStripsMarkdownBracketsFromTeamLinkText(): void
+    {
+        $block = RecapDocument::gameBlock(
+            $this->game('2008-02-26', "**Ce]lt<ics 1 @ He[at 2**\n<@1>\n\nProse."),
+            self::HOST
+        );
+
+        self::assertStringEndsWith(
+            "\n[Celtics](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=1>)"
+                . "\n[Heat](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=2>)",
+            $block
+        );
+    }
+
+    public function testBoxScoreUrlEncodesTheDate(): void
+    {
+        $block = RecapDocument::gameBlock($this->game('2008-02-26&x=1', 'Only game.'), self::HOST);
+
+        self::assertStringContainsString(
+            "\n<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-02-26%26x%3D1&game=1>",
+            $block
+        );
+    }
+
+    #[DataProvider('badHostProvider')]
+    public function testRejectsAHostThatIsNotABareHostname(string $host): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        RecapDocument::assemble([$this->game('2008-02-26', 'Only game.')], $host);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function badHostProvider(): array
+    {
+        return [
+            'path'       => ['evil.com/x'],
+            'userinfo'   => ['a@b.com'],
+            'port'       => ['host:8080'],
+            'whitespace' => ['two words'],
+        ];
+    }
+
+    public function testEmptyHostFallsBackToProductionHost(): void
+    {
+        $game = $this->game('2008-02-26', "**A 1 @ B 2**\n<@1>\n\nProse.");
+
+        self::assertSame(
+            RecapDocument::gameBlock($game, 'iblhoops.net'),
+            RecapDocument::gameBlock($game, '')
+        );
+        self::assertStringContainsString('<https://iblhoops.net/ibl5/', RecapDocument::gameBlock($game, ''));
+    }
+
+    public function testGameBlockReturnsEmptyStringForBlankText(): void
+    {
+        self::assertSame('', RecapDocument::gameBlock($this->game('2008-02-26', '   '), self::HOST));
     }
 }

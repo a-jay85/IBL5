@@ -8,20 +8,21 @@ namespace SimRecap;
  * Assembles the postable recap document from the parts the generator stored.
  *
  * `ibl_sim_summaries.recap_text` is a ~220-character teaser, not the document — the
- * document only exists as pieces: `intro_text`, one row per game in
- * `ibl_sim_game_recaps`, and `outro_text`. This class is the one place that joins
- * them back into the shape of `bin/lib/sim-recap-exemplar.txt`, which is what a GM
- * actually pastes into Discord.
+ * document only exists as pieces, one row per game in `ibl_sim_game_recaps`. This
+ * class is the one place that joins them back into the shape of
+ * `bin/lib/sim-recap-exemplar.txt`, which is what a GM actually pastes into Discord:
+ * date sections of game blocks, each block ending in a links footer (box score, then
+ * the visitor and home team pages) built here from the row's typed fields.
+ *
+ * Old rows may still carry stored `intro_text` and `outro_text`. They are no longer
+ * part of the document.
  *
  * Plain text in, plain text out — no HTML, no escaping. Callers that put the result
  * in a page still run it through HtmlSanitizer::e() like any other stored value.
  */
 final class RecapDocument
 {
-    /**
-     * Two blank lines separate the top-level blocks: intro, each date section, outro.
-     * Exemplar lines 12-15 (intro rule → blank → blank → date rule) and 263-266.
-     */
+    /** Two blank lines separate one date section from the next. */
     private const BLOCK_GAP = "\n\n\n";
 
     /**
@@ -48,26 +49,29 @@ final class RecapDocument
      */
     private const SCORE_HEADER = '/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/m';
 
+    /** The two team names in a game block's score header, visitor then home. */
+    private const HEADER_TEAMS = '/^\*\*(.+)\s\d+\s@\s(.+)\s\d+\*\*$/u';
+
+    /** A bare hostname: no scheme, path, port, userinfo, or whitespace. */
+    private const HOST = '/^[a-z0-9.\-]+$/i';
+
+    /** Where footer links point when the deployment has no canonical host configured. */
+    public const PRODUCTION_HOST = 'iblhoops.net';
+
+    /** Team page route, the same pattern as Team\TeamTableService. */
+    private const TEAM_PAGE = 'modules.php?name=Team&op=team&teamid=';
+
     /**
      * @param list<array<string, mixed>> $gameRecaps From SimSummaryRepository::findDisplayableGameRecaps(), already in sort order
      */
-    public static function assemble(?string $intro, array $gameRecaps, ?string $outro): string
+    public static function assemble(array $gameRecaps, string $host): string
     {
+        $host   = self::resolveHost($host);
         $blocks = [];
 
-        $introText = self::clean($intro);
-        if ($introText !== '') {
-            $blocks[] = $introText;
-        }
-
-        foreach (self::groupByDate($gameRecaps) as $section) {
+        foreach (self::groupByDate($gameRecaps, $host) as $section) {
             $rule     = $section['date'] === '' ? '' : self::dateRule($section['date']) . self::INNER_GAP;
             $blocks[] = $rule . implode(self::INNER_GAP, $section['texts']);
-        }
-
-        $outroText = self::clean($outro);
-        if ($outroText !== '') {
-            $blocks[] = $outroText;
         }
 
         return $blocks === [] ? '' : implode(self::BLOCK_GAP, $blocks) . "\n";
@@ -96,9 +100,9 @@ final class RecapDocument
      *
      * @param list<array<string, mixed>> $gameRecaps From SimSummaryRepository::findDisplayableGameRecaps(), already in sort order
      */
-    public static function postableText(?string $intro, array $gameRecaps, ?string $outro, ?string $storedText): string
+    public static function postableText(array $gameRecaps, ?string $storedText, string $host): string
     {
-        $document = self::assemble($intro, $gameRecaps, $outro);
+        $document = self::assemble($gameRecaps, $host);
         $stored   = is_string($storedText) ? $storedText : '';
 
         // Nothing to fall back to — the assembled document is all there is, even if degraded.
@@ -136,8 +140,7 @@ final class RecapDocument
      * guard exists to prevent.
      *
      * At least one non-empty part is required. A sim with a full stored document and no
-     * usable parts would otherwise assemble an intro+outro that looks like a complete
-     * recap with every game missing.
+     * usable parts would otherwise return an empty document in place of the stored text.
      *
      * The mention line is checked at index 1 alone, independently of what follows, so a
      * part already in the exemplar's header/mentions/blank/prose shape still counts.
@@ -207,7 +210,7 @@ final class RecapDocument
      * @param  list<array<string, mixed>>                 $gameRecaps
      * @return list<array{date: string, texts: list<string>}>
      */
-    private static function groupByDate(array $gameRecaps): array
+    private static function groupByDate(array $gameRecaps, string $host): array
     {
         $sections = [];
         foreach ($gameRecaps as $game) {
@@ -218,7 +221,7 @@ final class RecapDocument
 
             $date  = self::clean($game['game_date'] ?? null);
             $last  = count($sections) - 1;
-            $block = self::normalizeGameBlock($text);
+            $block = self::gameBlock($game, $host);
 
             if ($last >= 0 && $sections[$last]['date'] === $date) {
                 $sections[$last]['texts'][] = $block;
@@ -229,6 +232,79 @@ final class RecapDocument
         }
 
         return $sections;
+    }
+
+    /**
+     * One game exactly as the document renders it: the stored block with the
+     * mention-line gap repaired, then the links footer. '' when the row has no text.
+     * SimRecapPayload measures the per-block length cap through this method.
+     *
+     * @param array<string, mixed> $game
+     */
+    public static function gameBlock(array $game, string $host): string
+    {
+        $host = self::resolveHost($host);
+        $text = self::clean($game['recap_text'] ?? null);
+        if ($text === '') {
+            return '';
+        }
+
+        $block  = self::normalizeGameBlock($text);
+        $footer = self::linksFooter($game, $block, $host);
+
+        return $footer === '' ? $block : $block . self::INNER_GAP . $footer;
+    }
+
+    /**
+     * '' means the deployment has no canonical host, so links point at production.
+     * Anything else must be a bare hostname, because it is pasted into every URL.
+     */
+    private static function resolveHost(string $host): string
+    {
+        if ($host === '') {
+            return self::PRODUCTION_HOST;
+        }
+
+        if (preg_match(self::HOST, $host) !== 1) {
+            throw new \InvalidArgumentException('canonical host must be a bare hostname');
+        }
+
+        return $host;
+    }
+
+    /**
+     * Box score as a raw angle-bracketed URL, then the visitor and home team pages as
+     * masked links, one per line. Built only from typed row fields and the stored
+     * score header, never from generator prose. A line whose inputs are invalid is
+     * left out, and all three missing gives ''.
+     *
+     * @param array<string, mixed> $game
+     */
+    private static function linksFooter(array $game, string $block, string $host): string
+    {
+        $base  = 'https://' . $host . '/ibl5/';
+        $lines = [];
+
+        $date   = self::clean($game['game_date'] ?? null);
+        $gotd   = is_int($game['game_of_that_day'] ?? null) ? $game['game_of_that_day'] : 0;
+        $boxId  = is_int($game['box_id'] ?? null) ? $game['box_id'] : 0;
+        $boxUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gotd, $boxId);
+        if ($boxUrl !== '') {
+            $lines[] = '<' . $base . (str_starts_with($boxUrl, './') ? substr($boxUrl, 2) : $boxUrl) . '>';
+        }
+
+        $header = explode("\n", $block, 2)[0];
+        if (preg_match(self::HEADER_TEAMS, $header, $teams) === 1) {
+            foreach ([[$teams[1], 'visitor_teamid'], [$teams[2], 'home_teamid']] as [$rawName, $idKey]) {
+                $name   = trim(str_replace(['[', ']', '<', '>'], '', $rawName));
+                $teamId = $game[$idKey] ?? null;
+                if ($name !== '' && is_int($teamId) && $teamId >= 1) {
+                    $lines[] = '[' . $name . '](<' . $base . self::TEAM_PAGE . $teamId . '>)';
+                }
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

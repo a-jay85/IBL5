@@ -6,6 +6,7 @@ namespace Tests\WideUnit\SimRecap;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SimRecap\RecapDocument;
 use SimRecap\SimRecapPayload;
 
 /**
@@ -17,6 +18,8 @@ use SimRecap\SimRecapPayload;
  */
 final class SimRecapPayloadTest extends TestCase
 {
+    private const HOST = 'iblhoops.net';
+
     // ── Fixtures ───────────────────────────────────────────────────────────────
 
     /**
@@ -52,10 +55,8 @@ final class SimRecapPayloadTest extends TestCase
 
     public function testHappyPathAllGettersReturnTypedValues(): void
     {
-        $payload = SimRecapPayload::fromJson($this->makeValidJson());
+        $payload = SimRecapPayload::fromJson($this->makeValidJson(), self::HOST);
 
-        self::assertSame('Great intro.', $payload->getIntroText());
-        self::assertSame('Great outro.', $payload->getOutroText());
         self::assertSame('Full recap prose.', $payload->getRecapText());
         // themes are re-encoded by the DTO — compare against json_encode output
         self::assertSame(json_encode(['comeback', 'blowout']), $payload->getThemesJson());
@@ -74,7 +75,7 @@ final class SimRecapPayloadTest extends TestCase
 
     public function testEmptyGamesListIsAccepted(): void
     {
-        $payload = SimRecapPayload::fromJson($this->makeValidJson(['games' => []]));
+        $payload = SimRecapPayload::fromJson($this->makeValidJson(['games' => []]), self::HOST);
 
         self::assertSame([], $payload->getGames());
     }
@@ -96,14 +97,14 @@ final class SimRecapPayloadTest extends TestCase
             ],
         ]);
 
-        $payload = SimRecapPayload::fromJson($json);
+        $payload = SimRecapPayload::fromJson($json, self::HOST);
 
         self::assertNull($payload->getGames()[0]['box_id']);
     }
 
     public function testMalformedThemesDegradesToNullWithoutThrowing(): void
     {
-        $payload = SimRecapPayload::fromJson($this->makeValidJson(['themes' => 'not-a-list']));
+        $payload = SimRecapPayload::fromJson($this->makeValidJson(['themes' => 'not-a-list']), self::HOST);
 
         self::assertNull($payload->getThemesJson(), 'Malformed themes must degrade to null, not throw');
     }
@@ -114,7 +115,7 @@ final class SimRecapPayloadTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        SimRecapPayload::fromJson('{not valid json[}');
+        SimRecapPayload::fromJson('{not valid json[}', self::HOST);
     }
 
     /**
@@ -132,7 +133,7 @@ final class SimRecapPayloadTest extends TestCase
             'games'      => [],
         ], $fieldOverride);
 
-        SimRecapPayload::fromJson(json_encode($doc, JSON_THROW_ON_ERROR));
+        SimRecapPayload::fromJson(json_encode($doc, JSON_THROW_ON_ERROR), self::HOST);
     }
 
     /**
@@ -141,8 +142,6 @@ final class SimRecapPayloadTest extends TestCase
     public static function missingRequiredStringFieldProvider(): array
     {
         return [
-            'missing intro_text' => [['intro_text' => null]],
-            'missing outro_text' => [['outro_text' => null]],
             'missing recap_text' => [['recap_text' => null]],
         ];
     }
@@ -156,7 +155,7 @@ final class SimRecapPayloadTest extends TestCase
             'outro_text' => 'Outro.',
             'recap_text' => 'Recap.',
             'games'      => ['key' => 'not-a-list'],  // associative — not a list
-        ], JSON_THROW_ON_ERROR));
+        ], JSON_THROW_ON_ERROR), self::HOST);
     }
 
     public function testGameMissingRequiredFieldThrows(): void
@@ -178,7 +177,7 @@ final class SimRecapPayloadTest extends TestCase
                     'recap_text'       => 'Game recap.',
                 ],
             ],
-        ], JSON_THROW_ON_ERROR));
+        ], JSON_THROW_ON_ERROR), self::HOST);
     }
 
     public function testGameIntFieldAsStringThrows(): void
@@ -202,7 +201,7 @@ final class SimRecapPayloadTest extends TestCase
                     'recap_text'       => 'Game recap.',
                 ],
             ],
-        ], JSON_THROW_ON_ERROR));
+        ], JSON_THROW_ON_ERROR), self::HOST);
     }
 
     // ── game_of_that_day floor — fail-closed tests (Phase 1: written red) ──────
@@ -237,7 +236,7 @@ final class SimRecapPayloadTest extends TestCase
                     'recap_text'       => 'Game recap.',
                 ],
             ],
-        ]));
+        ]), self::HOST);
     }
 
     public function testGameOfThatDayBelowOneMessageNamesTheField(): void
@@ -256,7 +255,7 @@ final class SimRecapPayloadTest extends TestCase
                         'recap_text'       => 'Game recap.',
                     ],
                 ],
-            ]));
+            ]), self::HOST);
             self::fail('Expected \InvalidArgumentException was not thrown');
         } catch (\InvalidArgumentException $e) {
             self::assertTrue(str_contains($e->getMessage(), 'games[0].game_of_that_day'));
@@ -290,7 +289,7 @@ final class SimRecapPayloadTest extends TestCase
                         'recap_text'       => 'Game two recap.',
                     ],
                 ],
-            ]));
+            ]), self::HOST);
             self::fail('Expected \InvalidArgumentException was not thrown');
         } catch (\InvalidArgumentException $e) {
             self::assertTrue(str_contains($e->getMessage(), 'games[1].'));
@@ -301,7 +300,7 @@ final class SimRecapPayloadTest extends TestCase
 
     public function testGameOfThatDayOneIsAcceptedAtTheBoundary(): void
     {
-        $payload = SimRecapPayload::fromJson($this->makeValidJson());
+        $payload = SimRecapPayload::fromJson($this->makeValidJson(), self::HOST);
 
         $games = $payload->getGames();
         self::assertSame(1, $games[0]['game_of_that_day']);
@@ -322,7 +321,7 @@ final class SimRecapPayloadTest extends TestCase
                     'recap_text'       => 'Game recap.',
                 ],
             ],
-        ]));
+        ]), self::HOST);
 
         self::assertSame(4, $payload->getGames()[0]['game_of_that_day']);
     }
@@ -342,7 +341,7 @@ final class SimRecapPayloadTest extends TestCase
                     'recap_text'       => 'Game recap.',
                 ],
             ],
-        ]));
+        ]), self::HOST);
 
         self::assertSame(0, $payload->getGames()[0]['sort_order']);
     }
@@ -363,10 +362,160 @@ final class SimRecapPayloadTest extends TestCase
                         'recap_text'       => 'Game recap.',
                     ],
                 ],
-            ]));
+            ]), self::HOST);
             self::fail('Expected \InvalidArgumentException was not thrown');
         } catch (\InvalidArgumentException $e) {
             self::assertTrue(str_contains($e->getMessage(), 'must be an int'));
         }
+    }
+
+    // ── Intro/outro, link policy, and the per-block length cap ─────────────────
+
+    /**
+     * One game row as fromJson() parses it, with $prose as its recap_text.
+     *
+     * @return array{season_year: int, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, box_id: ?int, sort_order: int, recap_text: string}
+     */
+    private function gameRow(string $prose): array
+    {
+        return [
+            'season_year'      => 2025,
+            'game_date'        => '2025-01-01',
+            'visitor_teamid'   => 1,
+            'home_teamid'      => 2,
+            'game_of_that_day' => 1,
+            'box_id'           => 42,
+            'sort_order'       => 0,
+            'recap_text'       => $prose,
+        ];
+    }
+
+    private function jsonWithProse(string $prose): string
+    {
+        return $this->makeValidJson(['games' => [$this->gameRow($prose)]]);
+    }
+
+    /** Prose of $fill repeated so the rendered block is exactly $target characters. */
+    private function proseRenderingTo(int $target, string $fill = 'x'): string
+    {
+        $overhead = mb_strlen(RecapDocument::gameBlock($this->gameRow($fill), self::HOST), 'UTF-8') - 1;
+
+        return str_repeat($fill, $target - $overhead);
+    }
+
+    public function testAcceptsPayloadWithoutIntroAndOutro(): void
+    {
+        $doc = json_decode($this->makeValidJson(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($doc);
+        unset($doc['intro_text'], $doc['outro_text']);
+
+        $payload = SimRecapPayload::fromJson(json_encode($doc, JSON_THROW_ON_ERROR), self::HOST);
+
+        self::assertSame('Full recap prose.', $payload->getRecapText());
+        self::assertSame('Game one recap.', $payload->getGames()[0]['recap_text']);
+    }
+
+    public function testIgnoresLegacyIntroAndOutroFields(): void
+    {
+        $payload = SimRecapPayload::fromJson(
+            $this->makeValidJson(['intro_text' => 5, 'outro_text' => ['x']]),
+            self::HOST
+        );
+
+        self::assertSame('Full recap prose.', $payload->getRecapText());
+    }
+
+    public function testAcceptsGameBlockOfExactlyMaxChars(): void
+    {
+        $prose = $this->proseRenderingTo(SimRecapPayload::MAX_BLOCK_CHARS);
+        self::assertSame(1900, mb_strlen(RecapDocument::gameBlock($this->gameRow($prose), self::HOST), 'UTF-8'));
+
+        $payload = SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+
+        self::assertSame($prose, $payload->getGames()[0]['recap_text']);
+    }
+
+    public function testRejectsGameBlockOfMaxCharsPlusOne(): void
+    {
+        $prose = $this->proseRenderingTo(SimRecapPayload::MAX_BLOCK_CHARS) . 'x';
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('games[0] renders to 1901 chars');
+
+        SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+    }
+
+    public function testLengthCapCountsTheLinksFooter(): void
+    {
+        $header = "**A 100 @ B 99**\n<@1> · <@2>\n\n";
+        $prose  = $header . str_repeat('x', 1850 - mb_strlen($header, 'UTF-8'));
+        self::assertSame(1850, mb_strlen($prose, 'UTF-8'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('over the 1900-char Discord block cap');
+
+        SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+    }
+
+    public function testLengthCapCountsMultibyteCharactersOnce(): void
+    {
+        $prose = $this->proseRenderingTo(SimRecapPayload::MAX_BLOCK_CHARS, 'é');
+        $block = RecapDocument::gameBlock($this->gameRow($prose), self::HOST);
+        self::assertSame(1900, mb_strlen($block, 'UTF-8'));
+        self::assertGreaterThan(1900, strlen($block));
+
+        $payload = SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+
+        self::assertCount(1, $payload->getGames());
+    }
+
+    public function testRejectsGameProseWithNonWikipediaLink(): void
+    {
+        try {
+            SimRecapPayload::fromJson($this->jsonWithProse('A [x](<https://evil.com>) game.'), self::HOST);
+            self::fail('a non-Wikipedia link in game prose must be rejected');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringStartsWith('games[0].recap_text:', $e->getMessage());
+        }
+    }
+
+    public function testRejectsTeaserWithNonWikipediaLink(): void
+    {
+        try {
+            SimRecapPayload::fromJson($this->makeValidJson(['recap_text' => 'Read it at https://evil.com']), self::HOST);
+            self::fail('a non-Wikipedia link in the teaser must be rejected');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringStartsWith('recap_text:', $e->getMessage());
+        }
+    }
+
+    public function testAcceptsGameProseWithWikipediaLink(): void
+    {
+        $prose   = 'Like [the Miracle on Ice](<https://en.wikipedia.org/wiki/Miracle_on_Ice>), nobody saw it coming.';
+        $payload = SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+
+        self::assertSame($prose, $payload->getGames()[0]['recap_text']);
+    }
+
+    public function testReportsBadLinkBeforeLength(): void
+    {
+        $prose = str_pad('A [x](<https://evil.com>) game. ', 2000, 'x');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('games[0].recap_text: link not allowed');
+
+        SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
+    }
+
+    public function testEmptyHostFallsBackToProductionHost(): void
+    {
+        $atCap = $this->proseRenderingTo(SimRecapPayload::MAX_BLOCK_CHARS);
+
+        $payload = SimRecapPayload::fromJson($this->jsonWithProse($atCap), '');
+        self::assertCount(1, $payload->getGames());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('renders to 1901 chars');
+        SimRecapPayload::fromJson($this->jsonWithProse($atCap . 'x'), '');
     }
 }

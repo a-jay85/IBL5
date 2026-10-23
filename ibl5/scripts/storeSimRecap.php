@@ -39,7 +39,7 @@ if ($localClassesDir !== false) {
         if (file_exists($path)) {
             require_once $path;
         }
-    });
+    }, true, true); // prepend: Composer's PSR-4 would otherwise load the main repo's copy first
 }
 
 require_once __DIR__ . '/../config.php';
@@ -47,6 +47,22 @@ require_once __DIR__ . '/../db/db.php';
 
 function fail(string $msg): never
 {
+    fwrite(STDERR, "storeSimRecap: {$msg}\n");
+    exit(1);
+}
+
+/**
+ * A payload the parse seam rejected: bad generator output, not a broken pipe.
+ * The one-line JSON on STDOUT is what makes bin/sim-recap-tick park the sim
+ * as `flaky` (retryable) instead of `transport`. STDERR keeps the human line.
+ */
+function reject(string $msg): never
+{
+    $line = json_encode(
+        ['ok' => false, 'error' => $msg],
+        JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE
+    );
+    echo ($line === false ? '{"ok":false,"error":"malformed payload"}' : $line), "\n";
     fwrite(STDERR, "storeSimRecap: {$msg}\n");
     exit(1);
 }
@@ -80,10 +96,21 @@ $json = stream_get_contents(STDIN);
 if (!is_string($json) || trim($json) === '') {
     fail('no JSON payload on stdin');
 }
+
+// ── Resolve the canonical host (prod-side config only, never from argv) ───────
+// One value feeds three jobs: the length cap in the parse seam renders footer
+// links with it, and the two Discord jobs below use it. A real bare hostname
+// makes Discord's isProduction() true so the post routes to #admin-chat; an
+// empty host — CI, dev, any machine without the constant — leaves it on the
+// testing webhook and keeps the viewer link relative. Empty is the safe
+// default, never an error; the parse seam measures footers against production.
+$rawHost = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
+$host = is_string($rawHost) ? $rawHost : '';
+
 try {
-    $payload = \SimRecap\SimRecapPayload::fromJson($json);
+    $payload = \SimRecap\SimRecapPayload::fromJson($json, $host);
 } catch (\Throwable $e) {
-    fail('malformed payload: ' . $e->getMessage());
+    reject('malformed payload: ' . $e->getMessage());
 }
 
 /** @var \mysqli $mysqli_db */
@@ -108,8 +135,8 @@ foreach ($payload->getGames() as $game) {
 // ── Write, then confirm ───────────────────────────────────────────────────────
 $repo->markDone(
     $sim,
-    $payload->getIntroText(),
-    $payload->getOutroText(),
+    '',
+    '',
     $payload->getRecapText(),
     $games,
     $payload->getThemesJson()
@@ -118,14 +145,6 @@ $row = $repo->find($sim);
 if ($row === null || $row['status'] !== 'done') {
     fail("store failed: sim {$sim} is not in state done after write");
 }
-
-// ── Resolve the canonical host (prod-side config only, never from argv) ───────
-// One value feeds both jobs below. A real bare hostname makes Discord's
-// isProduction() true so the post routes to #admin-chat; an empty host — CI,
-// dev, any machine without the constant — leaves it on the testing webhook and
-// keeps the link relative. Empty is the safe default, never an error.
-$rawHost = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
-$host = is_string($rawHost) ? $rawHost : '';
 
 \Discord\Discord::init($host);
 

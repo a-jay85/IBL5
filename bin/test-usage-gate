@@ -3079,6 +3079,7 @@ ppn_seg_file() {
         SESSION_ID=$SID_A ROOT=$REPO_ROOT LOG=$T/log REBASE_ONLY=0 \
             HARNESS_RUN_DIR=$T/run SLUG=t SAFE_SLUG=t FIX_ROOT=$T
         eval "$(grep -E '^ *GATE_OPEN="if ' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^ *LOG_Q="' "$REPO_ROOT/bin/post-plan-now")"
         eval "$(grep -E '^ *GATE_CLOSE="; elif ' "$REPO_ROOT/bin/post-plan-now")"
         eval "$(grep -E '^PAUSE_SEG="' "$REPO_ROOT/bin/post-plan-now")"
         {

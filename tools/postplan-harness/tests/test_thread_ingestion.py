@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import ReplayGit
+from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
 from harness.thread_ingestion import (
@@ -35,6 +35,38 @@ THREAD_2340 = {
 }
 
 PR = 2340
+
+# Thread anchored on a gate file: the fixer's edit lands under bin/check-*, which
+# harness/fidelity.py::denied_gate_edits refuses.
+GATE_THREAD = dict(THREAD_2340, id="PRRT_gate", commentId=4074926172,
+                   path="bin/check-foo", line=3, body="Tighten this gate condition.")
+
+
+def _live_repo(path):
+    """Tmp git repo with one base commit, for tests that need a real HEAD to move."""
+    os.makedirs(path)
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+    def sh(*a):
+        subprocess.run(["git", "-C", path, *a], check=True, capture_output=True, env=env)
+
+    subprocess.run(["git", "init", "-b", "master", path], check=True, capture_output=True)
+    sh("config", "user.email", "t@t")
+    sh("config", "user.name", "t")
+    open(os.path.join(path, "a.txt"), "w").write("base\n")
+    sh("add", "-A")
+    sh("commit", "-m", "base")
+    return path
+
+
+def _gate_edit_commit(git, repo):
+    """Injected `commit`: stands in for the fixer writing a gate file, then commits it."""
+    def _commit(msg):
+        os.makedirs(os.path.join(repo, "bin"), exist_ok=True)
+        open(os.path.join(repo, "bin", "check-foo"), "w").write("#!/bin/sh\nexit 0\n")
+        return git.commit_all(msg)
+    return _commit
 
 
 def _ledger():
@@ -216,6 +248,39 @@ def test_run_decline_resolves_without_commit(tmp_path):
     resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
     assert len(resolve_actions) == 1
     assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_fix_touching_gate_path_is_dropped_not_pushed(tmp_path):
+    repo = _live_repo(str(tmp_path / "repo"))
+    git = LiveGit(repo)
+    pre = git.head()
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Tightened the gate"}'})
+    logs: list[str] = []
+    pushed_heads: list[str] = []
+
+    def _push():
+        pushed_heads.append(git.head())
+        return git.head()
+
+    result = run_thread_ingestion(
+        gh, llm, git, repo, PR,
+        pre_posting_ids={4074926172},
+        out_dir=str(tmp_path),
+        log=logs.append,
+        commit=_gate_edit_commit(git, repo),
+        push=_push,
+    )
+
+    assert result["skipped"] == 1
+    assert result["fixed"] == 0
+    assert git.head() == pre                                   # local commit undone
+    assert not os.path.exists(os.path.join(repo, "bin", "check-foo"))
+    assert pushed_heads == []                                  # push never called
+    resolve_actions = [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+    assert resolve_actions == []                               # thread left unresolved
+    assert any("fix touches gate path bin/check-foo; dropped, thread left unresolved" in m
+               for m in logs)
 
 
 def test_run_nonempty_snapshot_fetches_once_and_declines(tmp_path):

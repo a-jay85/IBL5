@@ -40,10 +40,10 @@ class PageLayout
         ) {
             $flashMessage = \Security\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
-            echo '<div role="alert" class="d-alert d-alert-success mb-4">' . $flashMessage . '</div>';
+            echo '<div role="status" class="d-alert d-alert-success mb-4">' . $flashMessage . '</div>';
         }
         if (defined('ADMIN_PHASE_GATE_NOTICE')) {
-            echo '<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
+            echo '<div role="status" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
         }
     }
 
@@ -63,10 +63,10 @@ class PageLayout
         ) {
             $flashMessage = \Security\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
-            echo '<div role="alert" class="d-alert d-alert-success mb-4">' . $flashMessage . '</div>';
+            echo '<div role="status" class="d-alert d-alert-success mb-4">' . $flashMessage . '</div>';
         }
         if (defined('ADMIN_PHASE_GATE_NOTICE')) {
-            echo '<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
+            echo '<div role="status" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>';
         }
     }
 

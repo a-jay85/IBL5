@@ -86,7 +86,7 @@ class PageLayoutTest extends TestCase
         $output = (string) ob_get_clean();
 
         self::assertStringContainsString('Operation completed', $output);
-        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
+        self::assertStringContainsString('<div role="status" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
         self::assertArrayNotHasKey('flash_success', $_SESSION);
     }
 
@@ -111,7 +111,7 @@ class PageLayoutTest extends TestCase
         PageLayout::header();
         $output = (string) ob_get_clean();
 
-        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
+        self::assertStringContainsString('<div role="status" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
         self::assertArrayNotHasKey('flash_success', $_SESSION);
     }
 
@@ -462,7 +462,7 @@ class PageLayoutTest extends TestCase
         PageLayout::header();
         $output = (string) ob_get_clean();
 
-        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
+        self::assertStringContainsString('<div role="status" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
         self::assertStringContainsString('Admin mode', $output);
     }
 
@@ -476,7 +476,7 @@ class PageLayoutTest extends TestCase
         PageLayout::header();
         $output = (string) ob_get_clean();
 
-        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
+        self::assertStringContainsString('<div role="status" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
     }
 
     public function testOgMetaTagsNeverReflectMaliciousHost(): void

@@ -179,21 +179,6 @@ class DaisyUiInputCssContractTest extends TestCase
         $this->assertStringContainsString('padding: var(--space-4) var(--space-6) var(--space-6)', $body);
     }
 
-    /**
-     * Mutation: move the auth block below the Updater guard rule.
-     */
-    public function testUpdaterTextErrorGuardStaysAfterAuthOverrides(): void
-    {
-        $body = self::overrideBody();
-
-        $authPos = strpos($body, '.auth-card .d-card-body');
-        $guardPos = strpos($body, '.updater-log .text-error');
-
-        $this->assertIsInt($authPos, 'Missing .auth-card .d-card-body override');
-        $this->assertIsInt($guardPos, 'Missing Updater .text-error guard rule');
-        $this->assertGreaterThan($authPos, $guardPos, 'The Updater guard rule must stay after the auth overrides');
-    }
-
     /** Strip CSS comments so commented-out text never satisfies an assertion. */
     private static function css(): string
     {

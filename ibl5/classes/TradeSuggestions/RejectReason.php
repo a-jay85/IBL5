@@ -18,4 +18,8 @@ enum RejectReason: string
     case PartnerGivesTooMuch = 'their side gives up clearly more value';
     case NoUserGain = 'does not help your team';
     case NoPartnerGain = 'does not help their team';
+    case CapStillOver = 'a team would still be over the hard cap';
+    case OneSided = 'only one side gains';
+    case PaymentShort = 'the sweetener is too small for the salary taken on';
+    case ImportantWorsened = 'a side gives up something it cannot lose';
 }

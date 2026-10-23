@@ -110,9 +110,10 @@ final class HeatChampionAwardParityTest extends DatabaseTestCase
      */
     private function heatRows(array $rows, int $year): array
     {
+        // The UNION with ibl_team_awards widens `year` past a native int, so cast before comparing.
         return array_values(array_filter(
             $rows,
-            static fn (array $row): bool => $row['award'] === self::HEAT_AWARD && $row['year'] === $year
+            static fn (array $row): bool => $row['award'] === self::HEAT_AWARD && (int) $row['year'] === $year
         ));
     }
 

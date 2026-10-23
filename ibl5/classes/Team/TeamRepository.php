@@ -268,7 +268,9 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
             JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC, " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC, id ASC";
+            ORDER BY "
+            // Own literal so the tiebreaker lint reads the full clause, which ends on id ASC.
+            . "year DESC, " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC, id ASC";
     }
 
     /**

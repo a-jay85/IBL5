@@ -178,6 +178,17 @@ test.describe('CSS shared primitives', () => {
     expect(actual.paddingTop).toBe('11.7px');
   });
 
+  test('built CSS emits .d-alert-info for the LeagueConfig info alert', async ({ page }) => {
+    const plain = await probe(page, 'body', '<div data-probe class="d-alert">A</div>', ['backgroundColor']);
+    const info = await probe(
+      page,
+      'body',
+      '<div data-probe role="alert" class="d-alert d-alert-info mb-4">A</div>',
+      ['backgroundColor'],
+    );
+    expect(info.backgroundColor).not.toBe(plain.backgroundColor);
+  });
+
   test('nav section label matches its utility string', async ({ page }) => {
     const control = await probe(page, 'nav', '<div><span data-probe>x</span></div>', LABEL_PROPS);
     const actual = await probe(

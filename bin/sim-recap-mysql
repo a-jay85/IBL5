@@ -55,10 +55,12 @@ done
 
 # The client flags above are the real block. This check refuses the same inputs
 # before the client ever starts, so the refusal is testable without a server.
-# A backslash command (\! \. \T \P \G) is refused only where the client would
-# read one: at the start of a line or statement, or \G ending a statement. The
-# same spots hold for a client command word. A backslash inside a string literal,
-# such as LIKE 'x\.%', passes. \G is plain output formatting; -E gives the same.
+# A backslash command (\! \. \T \P \G) is refused only at the start of a line or
+# statement, or as \G ending a statement; client command words are refused at
+# those spots too. Mid-line forms (SELECT 1 \T /tmp/x) and backslashes in string
+# literals (LIKE 'x\.%') pass, and are NOT verified safe against the client.
+# --binary-mode and --skip-system-command are the real block. \G is plain output
+# formatting; -E gives the same.
 stmts="$(tr ';' '\n' <<< "$sql")"
 if grep -qE '^[[:space:]]*\\[!.TPG]|\\G[[:space:]]*$' <<< "$stmts"; then
     die "refusing client command (backslash command) in SQL; send SQL only"

@@ -638,6 +638,19 @@ srt_wrap $'SELECT 1;\nSELECT 2;\n' -t
 srt_expect_eq "wrapper_runs_stdin_sql — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" wrap.argv "SELECT 2;" "wrapper_runs_stdin_sql — stdin SQL passed with -e"
 
+# A backslash command mid-line is not refused by the pre-check (it refuses only
+# line/statement-start forms and a trailing \G). The client's --binary-mode is
+# what blocks it, so the flag must be in argv. A backslash inside a string
+# literal must also pass.
+srt_wrap "" -e 'SELECT 1 \T /tmp/x'
+srt_expect_eq "wrapper_passes_midline_backslash — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" wrap.argv 'SELECT 1 \T /tmp/x' "wrapper_passes_midline_backslash — SQL reaches the client"
+srt_log_has "$STUB" wrap.argv "--binary-mode" "wrapper_passes_midline_backslash — client is what blocks it"
+srt_wrap "" -e "SELECT 1 FROM t WHERE c LIKE 'x\\.%'"
+srt_expect_eq "wrapper_passes_like_backslash_dot — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" wrap.argv 'LIKE '\''x\.%'\' "wrapper_passes_like_backslash_dot — SQL reaches argv with one backslash"
+srt_log_lacks "$STUB" wrap.argv 'x\\.%' "wrapper_passes_like_backslash_dot — backslash not doubled"
+
 # ── no_payload_names_denied_tools ─────────────────────────────────────────────
 srt_reset; srt_claim42
 printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"'"$SRT_WRAPPER"' -e \"SELECT PW-SENTINEL-9f3\""}}]}' \

@@ -65,7 +65,20 @@ if [ "$IF_EMPTY" = true ] && [ "$FORCE" = true ]; then
     exit 1
 fi
 
-WT_PATH=$(get_worktree_path "$NAME")
+# An absolute path inside the worktrees parent names the directory exactly. The
+# branch lookup below would first match a different worktree that has a branch
+# of the same name checked out (bin/wt-new's abort trap passes the path).
+case "$NAME" in
+    /*)
+        case "$NAME" in
+            "$WT_PARENT"/*) ;;
+            *) echo "Error: '$NAME' is outside $WT_PARENT" >&2; exit 1 ;;
+        esac
+        WT_PATH="$NAME"
+        NAME="$(basename "$NAME")"
+        ;;
+    *) WT_PATH=$(get_worktree_path "$NAME") ;;
+esac
 
 # Fall back to the conventional location if git doesn't know the branch
 # (e.g., branch already deleted but directory remains).

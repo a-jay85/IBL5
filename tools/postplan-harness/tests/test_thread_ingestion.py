@@ -9,9 +9,10 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import ReplayGit
+from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import FixtureLlm
-from harness.state import HarnessError, UsageLedger
+from harness.armable import ArmInputs, evaluate
+from harness.state import Classification, HarnessError, UsageLedger
 from harness.thread_ingestion import (
     _is_trusted,
     fetch_trusted_threads,
@@ -35,6 +36,38 @@ THREAD_2340 = {
 }
 
 PR = 2340
+
+# Thread anchored on a gate file: the fixer's edit lands under bin/check-*, which
+# harness/fidelity.py::denied_gate_edits refuses.
+GATE_THREAD = dict(THREAD_2340, id="PRRT_gate", commentId=4074926172,
+                   path="bin/check-foo", line=3, body="Tighten this gate condition.")
+
+
+def _live_repo(path):
+    """Tmp git repo with one base commit, for tests that need a real HEAD to move."""
+    os.makedirs(path)
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+    def sh(*a):
+        subprocess.run(["git", "-C", path, *a], check=True, capture_output=True, env=env)
+
+    subprocess.run(["git", "init", "-b", "master", path], check=True, capture_output=True)
+    sh("config", "user.email", "t@t")
+    sh("config", "user.name", "t")
+    open(os.path.join(path, "a.txt"), "w").write("base\n")
+    sh("add", "-A")
+    sh("commit", "-m", "base")
+    return path
+
+
+def _gate_edit_commit(git, repo):
+    """Injected `commit`: stands in for the fixer writing a gate file, then commits it."""
+    def _commit(msg):
+        os.makedirs(os.path.join(repo, "bin"), exist_ok=True)
+        open(os.path.join(repo, "bin", "check-foo"), "w").write("#!/bin/sh\nexit 0\n")
+        return git.commit_all(msg)
+    return _commit
 
 
 def _ledger():
@@ -216,6 +249,242 @@ def test_run_decline_resolves_without_commit(tmp_path):
     resolve_actions = [a for a in actions if a.get("action") == "pr_resolve_thread"]
     assert len(resolve_actions) == 1
     assert resolve_actions[0]["body"].startswith("Declined: ")
+
+
+def test_run_fix_touching_gate_path_is_dropped_not_pushed(tmp_path):
+    repo = _live_repo(str(tmp_path / "repo"))
+    git = LiveGit(repo)
+    pre = git.head()
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Tightened the gate"}'})
+    logs: list[str] = []
+    pushed_heads: list[str] = []
+
+    def _push():
+        pushed_heads.append(git.head())
+        return git.head()
+
+    result = run_thread_ingestion(
+        gh, llm, git, repo, PR,
+        pre_posting_ids={4074926172},
+        out_dir=str(tmp_path),
+        log=logs.append,
+        commit=_gate_edit_commit(git, repo),
+        push=_push,
+    )
+
+    assert result["skipped"] == 1
+    assert result["fixed"] == 0
+    assert git.head() == pre                                   # local commit undone
+    assert not os.path.exists(os.path.join(repo, "bin", "check-foo"))
+    assert pushed_heads == []                                  # push never called
+    resolve_actions = [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+    assert resolve_actions == []                               # thread left unresolved
+    assert any("fix touches gate path bin/check-foo; dropped, thread left unresolved" in m
+               for m in logs)
+
+
+class _GateEditGit(ReplayGit):
+    """ReplayGit whose every commit touches a gate path (same shape as
+    test_fidelity_remediation._GateEditGit)."""
+
+    def changed_files(self, base="origin/master"):
+        return ["bin/check-foo"]
+
+
+def test_dropped_thread_leaves_no_unreachable_sha_in_result(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Tightened the gate"}'})
+    git = _GateEditGit({"head_sha": "pre-sha"})
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926172},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "gate-sha",
+        push=lambda: "never-pushed",
+    )
+
+    assert result["skipped"] == 1
+    assert result["fixed"] == 0
+    assert result["last_sha"] is None                 # restore ran before post_sha
+    assert git.drops == ["pre-sha"]                   # undo targeted the pre-commit head
+    with open(os.path.join(str(tmp_path), "thread-ingestion.json")) as fh:
+        payload = json.dumps(json.load(fh))
+    assert "gate-sha" not in payload                  # per_thread[].sha is None too
+    assert "never-pushed" not in payload              # push was never reached
+
+
+class _ResolveFailsGh(RecordingGh):
+    """RecordingGh whose resolve call fails the way LiveGh types it."""
+
+    def resolve_review_thread(self, pr, comment_id, body):
+        raise HarnessError("thread-resolve-failed", "simulated 502")
+
+
+def test_resolve_failed_skip_keeps_pushed_sha(tmp_path):
+    gh = _ResolveFailsGh(str(tmp_path), {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Cached the lookup"}'})
+    git = ReplayGit({"head_sha": "pre-sha"})
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926171},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "abc123",
+        push=lambda: "def456",
+    )
+
+    assert result["skipped"] == 1                     # resolve failure still counts as skipped
+    assert result["last_sha"] == "def456"             # pushed sha is kept: not a drop
+    assert git.drops == []                            # no undo on this path
+
+
+def _two_thread_commit(git, repo):
+    """Injected `commit` for a gate thread followed by an ordinary thread. The commit
+    message carries the thread id, so the edit can be chosen per thread."""
+    def _commit(msg):
+        if str(GATE_THREAD["commentId"]) in msg:
+            os.makedirs(os.path.join(repo, "bin"), exist_ok=True)
+            open(os.path.join(repo, "bin", "check-foo"), "w").write("#!/bin/sh\nexit 0\n")
+        else:
+            open(os.path.join(repo, "a.txt"), "a").write("cached lookup\n")
+        return git.commit_all(msg)
+    return _commit
+
+
+def _ls_tree(repo):
+    return subprocess.run(["git", "-C", repo, "ls-tree", "-r", "--name-only", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.split()
+
+
+def test_gate_thread_dropped_then_ordinary_thread_still_fixed_and_pushed(tmp_path):
+    repo = _live_repo(str(tmp_path / "repo"))
+    git = LiveGit(repo)
+    pre = git.head()
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD, THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Applied the suggestion"}'})
+    pushed_trees: list[list[str]] = []
+
+    def _push():
+        pushed_trees.append(_ls_tree(repo))   # what a real push would ship, at call time
+        return git.head()
+
+    result = run_thread_ingestion(
+        gh, llm, git, repo, PR,
+        pre_posting_ids={GATE_THREAD["commentId"], THREAD_2340["commentId"]},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=_two_thread_commit(git, repo),
+        push=_push,
+    )
+
+    assert result["found"] == 2
+    assert result["skipped"] == 1 and result["fixed"] == 1
+    assert len(pushed_trees) == 1                        # only the ordinary thread pushed
+    assert "bin/check-foo" not in pushed_trees[0]        # the dropped gate edit is not in it
+    assert "a.txt" in pushed_trees[0]
+    assert git.head() != pre                             # ordinary fix is on the branch
+    assert result["last_sha"] == git.head()
+    assert "bin/check-foo" not in _ls_tree(repo)
+    assert open(os.path.join(repo, "a.txt")).read().endswith("cached lookup\n")
+
+    resolved = [a["comment_id"] for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+    assert resolved == [THREAD_2340["commentId"]]        # ordinary resolved, gate not
+
+
+def _arm_inputs(unresolved_findings):
+    """Minimal ArmInputs with every other condition clear, mirroring
+    tests/test_armable_phase4.py::inputs so only condition (11) can hold."""
+    return ArmInputs(pr_body="## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n",
+                     pr_title="chore: x", pr_labels=[], classification=Classification(),
+                     findings=[], unresolved_conformance=[], phase5_status="pass",
+                     plan_auto_merge_false=False, headless=True,
+                     dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
+                     unresolved_findings=unresolved_findings, conflict_resolved=False,
+                     current_tree="a" * 40, merge_danger_state="TWO-WAY")
+
+
+def test_dropped_gate_thread_stays_unresolved_and_holds_condition_11(tmp_path):
+    threads = [GATE_THREAD]
+    gh = _gh(tmp_path, {"trusted_threads": threads, "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Applied the suggestion"}'})
+    git = _GateEditGit({"head_sha": "pre-sha"})
+
+    run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={t["commentId"] for t in threads},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "some-sha",
+        push=lambda: "pushed-sha",
+    )
+
+    resolved = {a["comment_id"] for a in gh.actions() if a.get("action") == "pr_resolve_thread"}
+    assert GATE_THREAD["commentId"] not in resolved
+
+    # What ghad.unresolved_findings would report for the threads still open after
+    # this pass: one `unresolved-finding:<score|->` entry per open thread.
+    still_open = [t for t in threads if t["commentId"] not in resolved]
+    uf = [f"unresolved-finding:{t['score'] if t['score'] is not None else '-'}" for t in still_open]
+    assert uf == ["unresolved-finding:-"]              # exactly the dropped gate thread
+
+    d = evaluate(_arm_inputs(uf))
+    c11 = [c for c in d.conditions if c.number == 11][0]
+    assert c11.blocked is True
+    assert {c.number for c in d.holds} == {11}         # condition (11) is the only hold
+    assert d.armed is False
+    # Control: with the gate thread resolved too, nothing else holds.
+    assert evaluate(_arm_inputs([])).armed is True
+
+
+class _UndoFailsGit(_GateEditGit):
+    """drop_commit reports a git error (a --keep refusal)."""
+
+    def drop_commit(self, pre):
+        self.drops.append(pre)
+        return "error: Entry 'bin/check-foo' not uptodate. Cannot merge."
+
+
+class _HeadDriftsGit(_GateEditGit):
+    """drop_commit reports success but HEAD is not back on `pre`."""
+
+    def drop_commit(self, pre):
+        self.drops.append(pre)
+        self.fx = dict(self.fx, head_sha="not-" + pre)
+        return ""
+
+
+@pytest.mark.parametrize("git_cls,detail_fragment", [
+    (_UndoFailsGit, "not uptodate"),
+    (_HeadDriftsGit, "HEAD mismatch"),
+])
+def test_gate_drop_fails_closed_when_undo_does_not_land(tmp_path, git_cls, detail_fragment):
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD, THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Applied the suggestion"}'})
+    git = git_cls({"head_sha": "pre-sha"})
+
+    def _push():
+        raise AssertionError("push must never run after a failed gate-edit undo")
+
+    with pytest.raises(HarnessError) as ei:
+        run_thread_ingestion(
+            gh, llm, git, str(tmp_path), PR,
+            pre_posting_ids={GATE_THREAD["commentId"], THREAD_2340["commentId"]},
+            out_dir=str(tmp_path),
+            log=lambda msg: None,
+            commit=lambda m: "gate-sha",
+            push=_push,
+        )
+
+    assert ei.value.kind == "gate-path-edit"             # same kind runner.py re-raises
+    assert "gate edit in bin/check-foo" in ei.value.detail
+    assert "undo to pre-sha" in ei.value.detail
+    assert detail_fragment in ei.value.detail
+    assert git.drops == ["pre-sha"]                      # the undo was attempted once
+    assert [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"] == []
 
 
 def test_run_nonempty_snapshot_fetches_once_and_declines(tmp_path):

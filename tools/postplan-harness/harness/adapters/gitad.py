@@ -206,6 +206,26 @@ class LiveGit:
         )
         _sys.stderr.flush()
 
+    def drop_commit(self, pre: str) -> str:
+        """Move HEAD back to `pre`, dropping commits made after it.
+
+        Uses `reset --keep` (refuses to clobber unexpected worktree edits) and names the
+        reflog action `postplan` so collapse-guard.sh, which treats
+        ^(rebase|reset:|filter-branch|amend) reflog subjects as a history rewrite, does
+        not read the dropped commit as lost branch work. Returns "" on success and the
+        git error text on failure. Never raises: the caller compares `head()` to `pre`
+        and fails closed on any mismatch.
+        """
+        proc = subprocess.run(
+            ["git", "-C", self.worktree, "reset", "--keep", pre],
+            env={**os.environ, "GIT_REFLOG_ACTION": "postplan"},
+            capture_output=True, text=True, errors="replace",
+        )
+        if proc.returncode != 0:
+            return (proc.stderr.strip() or proc.stdout.strip() or
+                    f"reset --keep {pre[:12]} exited {proc.returncode}")[:300]
+        return ""
+
     def _run(self, *args: str, check: bool = True) -> str:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
                               capture_output=True, text=True, errors="replace")
@@ -1419,6 +1439,7 @@ class ReplayGit:
         self.pushes = 0
         self.ff_pushes = 0
         self.meta_checks_calls: list[tuple[str, int]] = []
+        self.drops: list[str] = []
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
@@ -1475,6 +1496,11 @@ class ReplayGit:
     def commit_all(self, message: str) -> str:
         self.commit_messages.append(message)
         return "replay-sha-" + self.fx.get("slug", "x")[:12]
+
+    def drop_commit(self, pre: str) -> str:
+        """Record the undo; replay has no tree to move. Returns "" like a successful reset."""
+        self.drops.append(pre)
+        return ""
 
     def head(self) -> str:
         return self.fx.get("head_sha") or ""

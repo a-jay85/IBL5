@@ -347,7 +347,7 @@ if ($csrfField === '') {
         <label for="draftClassFile" class="d-btn d-btn-primary" id="draftClassLabel">Click to choose .csv</label>
         <noscript><button type="submit" class="d-btn d-btn-primary">Upload and Preview</button></noscript>
     </form>
-    <p role="alert" class="d-alert d-alert-error mb-4" id="draftClassClientError" hidden>That is not a .csv file. Choose the draft-class export again.</p>
+    <p role="alert" class="d-alert d-alert-error mb-4 hidden" id="draftClassClientError">That is not a .csv file. Choose the draft-class export again.</p>
 
     <script>
     (function () {
@@ -372,11 +372,11 @@ if ($csrfField === '') {
             }
             if (!/\.csv$/i.test(file.name)) {
                 // Only a filename check — the server still parses and validates every row.
-                clientError.hidden = false;
+                clientError.classList.remove('hidden');
                 input.value = '';
                 return;
             }
-            clientError.hidden = true;
+            clientError.classList.add('hidden');
             label.textContent = 'Uploading ' + file.name + '…';
             form.submit();
         });

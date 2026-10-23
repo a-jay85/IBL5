@@ -24,4 +24,13 @@ interface HeadToHeadRecordsRepositoryInterface
     public function buildGmsMatrix(string $phase, string $scope): array;
 
     public function currentSeasonHasGames(): bool;
+
+    /**
+     * Cheap live fingerprint of the box-score source the matrices are built from.
+     *
+     * Two calls return the same string only while no ibl_box_scores_teams row was
+     * inserted, updated, or deleted and the current season year is unchanged.
+     * Never cached: the decorator compares it against the value stamped on each entry.
+     */
+    public function sourceFingerprint(): string;
 }

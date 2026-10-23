@@ -19,4 +19,31 @@
     background-color: var(--accent-200);
 }
 
+/* ==========================================================================
+   Leaderboards page cell padding (scoped to .leaderboards-page only)
+
+   Tighter stat cells, and player cells padded like .ibl-team-cell--colored.
+   td.ibl-player-cell (0,3,1) ties the mobile
+   .ibl-data-table:not(...):not(...) td rule and wins by source order.
+   ========================================================================== */
+
+.leaderboards-page .ibl-data-table td {
+    padding-inline: var(--space-1);
+}
+
+.leaderboards-page .ibl-data-table td.ibl-player-cell {
+    padding-inline: var(--space-2);
+}
+
+/* Inside the hub .ibl-tab-card: the filter form lines up with the title
+   (16px inset), and the sorted header cell keeps its column tint on the
+   light card header. */
+.leaderboards-page .ibl-tab-card .ibl-filter-form {
+    margin-inline: var(--space-4);
+}
+
+.leaderboards-page .ibl-tab-card .ibl-data-table thead th.sorted-col {
+    background: var(--accent-100);
+}
+
 } /* end @layer components */

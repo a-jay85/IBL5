@@ -1450,8 +1450,8 @@ run_cond15() {
 C15_RED='[{"name":"pytest (stdlib harness)","bucket":"fail"}]'
 C15_PROT_BASE='"Tests and Analysis","E2E Tests","human-signoff","Meta checks","Infection PHP (per-PR diff)"'
 C15_PROT_ABSENT="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE]}}}"
-C15_PROT_PRESENT="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks green\"]}}}"
-C15_PROT_NEARMISS="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks green \"]}}}"
+C15_PROT_PRESENT="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks settled\"]}}}"
+C15_PROT_NEARMISS="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks settled \"]}}}"
 
 if [ -z "$B15" ]; then
     echo "FAIL: no block matching '# condition (15)' in $SKILL — marker drifted"
@@ -1476,7 +1476,7 @@ else
     fi
 
     out="$(run_cond15 "$C15_RED" "$C15_PROT_NEARMISS")"
-    expect_block "(15) red, near-miss context name (trailing space) -> BLOCK" BLOCK "$out"
+    expect_block "(15) red, near-miss context name (trailing space) -> BLOCK (C15 near-miss stays not-required)" BLOCK "$out"
 
     out="$(run_cond15 '[{"name":"human-signoff","bucket":"fail"}]' "$C15_PROT_PRESENT")"
     expect_block "(15) only human-signoff red -> NONE (ignored by design)" NONE "$out"
@@ -1509,7 +1509,7 @@ else
             'source "$1"; pr_aggregator_required' _ "$REPO_ROOT/bin/lib/pr-armable.sh"; then
         echo "ok: pr_aggregator_required returns 0 when the context is listed"
     else
-        echo "FAIL: pr_aggregator_required returned 1 with 'All checks green' listed"
+        echo "FAIL: pr_aggregator_required returned 1 with 'All checks settled' listed"
         FAILED=1
     fi
 fi

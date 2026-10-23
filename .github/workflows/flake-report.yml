@@ -1,9 +1,10 @@
 name: Weekly Flake Report
 
 on:
-  # Sunday ~9:45am ET (13:43 UTC). Offset from log-review's 12:57 so the two DMs do not collide.
+  # Sunday 16:07 UTC = just after the weekly Claude usage reset. Odd minute: GitHub delays top-of-hour crons.
+  # Offset from log-review (16:03) so the two Discord posts to one webhook do not collide.
   schedule:
-    - cron: '43 13 * * 0'
+    - cron: '7 16 * * 0'
 
   workflow_dispatch: {}
 
@@ -78,5 +79,5 @@ jobs:
         if: github.event_name != 'pull_request' && steps.report.outputs.count != '0'
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_REVIEWS_WEBHOOK_URL }}
           fail-on-delivery: 'false'

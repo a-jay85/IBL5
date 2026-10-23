@@ -1,8 +1,8 @@
-<h1 class="ibl-title">Free Agency</h1><div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">PG Test Player - Contract Negotiation</h2>
+<h1 class="ibl-title">Free Agency</h1><div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">PG Test Player - Contract Negotiation</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <div class="offer-player-info">
             <img src="./images/player/42.jpg" alt="Test Player" class="offer-player-img">
             <table class="ibl-data-table offer-ratings">
@@ -61,21 +61,21 @@
     </div>
 </div>
 
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Contract Offer</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Contract Offer</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <div class="ibl-field-group">
-            <span class="ibl-label">Player Demands (base, before team modifiers):</span>
+            <span class="d-label whitespace-normal">Player Demands (base, before team modifiers):</span>
             <div class="ibl-field-group__content">
                 <div class="offer-salary-row">
                     <div class="offer-salary-cell">
-            <div class="ibl-label ibl-label--sm">Yr 1</div>
+            <div class="d-label text-sm">Yr 1</div>
             <div class="offer-salary-cell__value">100</div>
         </div>
                                         <div class="offer-salary-cell">
-            <div class="ibl-label ibl-label--sm">Yr 3</div>
+            <div class="d-label text-sm">Yr 3</div>
             <div class="offer-salary-cell__value">50</div>
         </div>
                                                 </div>
@@ -84,32 +84,32 @@
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
             <input type="hidden" name="_csrf_token" value="__CSRF__">            <div class="ibl-field-group">
-                <span class="ibl-label">Your Custom Offer:</span>
+                <span class="d-label whitespace-normal">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
                     <div class="offer-salary-row offer-salary-row--inputs" data-raise-percentage="0.1">
         <div class="offer-salary-cell">
-        <label for="offeryear1" class="ibl-label ibl-label--sm">Yr 1</label>
-        <input type="number" id="offeryear1" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear1" value="" min="0" max="9999">
+        <label for="offeryear1" class="d-label text-sm">Yr 1</label>
+        <input type="number" id="offeryear1" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear1" value="" min="0" max="9999">
     </div>
         <div class="offer-salary-cell">
-        <label for="offeryear2" class="ibl-label ibl-label--sm">Yr 2</label>
-        <input type="number" id="offeryear2" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear2" value="" min="0" max="9999">
+        <label for="offeryear2" class="d-label text-sm">Yr 2</label>
+        <input type="number" id="offeryear2" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear2" value="" min="0" max="9999">
     </div>
         <div class="offer-salary-cell">
-        <label for="offeryear3" class="ibl-label ibl-label--sm">Yr 3</label>
-        <input type="number" id="offeryear3" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear3" value="" min="0" max="9999">
+        <label for="offeryear3" class="d-label text-sm">Yr 3</label>
+        <input type="number" id="offeryear3" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear3" value="" min="0" max="9999">
     </div>
         <div class="offer-salary-cell">
-        <label for="offeryear4" class="ibl-label ibl-label--sm">Yr 4</label>
-        <input type="number" id="offeryear4" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear4" value="" min="0" max="9999">
+        <label for="offeryear4" class="d-label text-sm">Yr 4</label>
+        <input type="number" id="offeryear4" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear4" value="" min="0" max="9999">
     </div>
         <div class="offer-salary-cell">
-        <label for="offeryear5" class="ibl-label ibl-label--sm">Yr 5</label>
-        <input type="number" id="offeryear5" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear5" value="" min="0" max="9999">
+        <label for="offeryear5" class="d-label text-sm">Yr 5</label>
+        <input type="number" id="offeryear5" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear5" value="" min="0" max="9999">
     </div>
         <div class="offer-salary-cell">
-        <label for="offeryear6" class="ibl-label ibl-label--sm">Yr 6</label>
-        <input type="number" id="offeryear6" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear6" value="" min="0" max="9999">
+        <label for="offeryear6" class="d-label text-sm">Yr 6</label>
+        <input type="number" id="offeryear6" class="d-input d-input-sm w-18 offer-salary-input" name="offeryear6" value="" min="0" max="9999">
     </div>
     </div>
                         </div>
@@ -119,25 +119,25 @@
             <input type="hidden" name="playerID" value="42">
             <input type="hidden" name="offerType" value="0">
 
-            <button type="submit" class="ibl-btn ibl-btn--primary">Offer / Amend Free Agent Contract</button>
+            <button type="submit" class="d-btn d-btn-primary">Offer / Amend Free Agent Contract</button>
         </form>
     </div>
 </div>
 
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Quick Offer Presets</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Quick Offer Presets</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <div class="offer-button-row">
-    <span class="ibl-label">Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):</span>
+    <span class="d-label whitespace-normal">Max Level Contract 10% (click the button that corresponds to the final year you wish to offer):</span>
     <div class="offer-button-row__buttons">
                     <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 1-year offer? 1063">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr1">1063</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr1">1063</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 2-year offer? 1063 / 1169">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
@@ -145,7 +145,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr2">1169</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr2">1169</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 3-year offer? 1063 / 1169 / 1275">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
@@ -154,7 +154,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr3">1275</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr3">1275</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 4-year offer? 1063 / 1169 / 1275 / 1381">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
@@ -164,7 +164,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr4">1381</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr4">1381</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 5-year offer? 1063 / 1169 / 1275 / 1381 / 1487">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
@@ -175,7 +175,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr5">1487</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr5">1487</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 6-year offer? 1063 / 1169 / 1275 / 1381 / 1487 / 1593">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="1063">
@@ -187,19 +187,19 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="0">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-max-yr6">1593</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-max-yr6">1593</button>
 </form>
                     </div>
 </div>
         <div class="offer-button-row">
-    <span class="ibl-label">Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</span>
+    <span class="d-label whitespace-normal">Mid-Level Exception (click the button that corresponds to the final year you wish to offer):</span>
     <div class="offer-button-row__buttons">
                     <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 1-year offer? 450">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="1">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr1">450</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr1">450</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 2-year offer? 450 / 495">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
@@ -207,7 +207,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="2">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr2">495</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr2">495</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 3-year offer? 450 / 495 / 540">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
@@ -216,7 +216,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="3">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr3">540</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr3">540</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 4-year offer? 450 / 495 / 540 / 585">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
@@ -226,7 +226,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="4">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr4">585</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr4">585</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 5-year offer? 450 / 495 / 540 / 585 / 630">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
@@ -237,7 +237,7 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="5">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr5">630</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr5">630</button>
 </form>
                             <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 6-year offer? 450 / 495 / 540 / 585 / 630 / 675">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="450">
@@ -249,42 +249,42 @@
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="6">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-mle-yr6">675</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-mle-yr6">675</button>
 </form>
                     </div>
 </div>
         <div class="offer-button-row">
-    <span class="ibl-label">Lower-Level Exception:</span>
+    <span class="d-label whitespace-normal">Lower-Level Exception:</span>
     <div class="offer-button-row__buttons">
                     <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 1-year offer? 145">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="145">
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="7">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-lle">145</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-lle">145</button>
 </form>
                     </div>
 </div>
         <div class="offer-button-row">
-    <span class="ibl-label">Veterans Exception:</span>
+    <span class="d-label whitespace-normal">Veterans Exception:</span>
     <div class="offer-button-row__buttons">
                     <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline" hx-confirm="Send Test Player a 1-year offer? 70">
     <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeryear1" value="70">
 <input type="hidden" name="teamname" value="TestTeam">
 <input type="hidden" name="playerID" value="42">
 <input type="hidden" name="offerType" value="8">
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary" data-testid="quick-offer-vetmin">70</button>
+    <button type="submit" class="d-btn d-btn-sm d-btn-primary" data-testid="quick-offer-vetmin">70</button>
 </form>
                     </div>
 </div>
             </div>
 </div>
 
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Notes / Reminders</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Notes / Reminders</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <ul class="ibl-notes">
             <li>The maximum contract permitted for this player (based on years of service) starts at 1063 in Year 1.</li>
             <li>You have <strong>500</strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
@@ -311,7 +311,7 @@
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
         <input type="hidden" name="_csrf_token" value="__CSRF__">        <input type="hidden" name="teamname" value="TestTeam">
         <input type="hidden" name="playerID" value="42">
-        <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
+        <button type="submit" class="d-btn d-btn-error">Delete This Offer</button>
     </form>
 </div>
         

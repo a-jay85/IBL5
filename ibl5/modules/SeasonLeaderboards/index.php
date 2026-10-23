@@ -2,81 +2,10 @@
 
 declare(strict_types=1);
 
-use SeasonLeaderboards\CachedSeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsService;
-use SeasonLeaderboards\SeasonLeaderboardsView;
-
+// Retired module: redirects to Leaderboards?tab=season. The query string is dropped.
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-$module_name = basename(dirname(__FILE__));
-
-global $leagueContext;
-/** @var \League\LeagueContext $leagueContext */
-
-$pagetitle = "Season Stats";
-
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
-// Initialize classes
-$dbCache = new \Cache\DatabaseCache($mysqli_db);
-$innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);
-$repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
-$service = new SeasonLeaderboardsService($repository);
-$view = new SeasonLeaderboardsView($service);
-
-// Get filter parameters from POST
-$filters = [
-    'year' => is_string($_POST['year'] ?? null) ? $_POST['year'] : '',
-    'team' => is_string($_POST['team'] ?? null) ? (int) $_POST['team'] : 0,
-    'sortby' => is_string($_POST['sortby'] ?? null) ? $_POST['sortby'] : 'PPG',
-    'limit' => is_string($_POST['limit'] ?? null) ? $_POST['limit'] : '',
-];
-
-// Determine limit: use POST value if provided, otherwise default to 50 on first load
-$isFirstLoad = $_POST === [];
-$limit = 0;
-if ($isFirstLoad) {
-    $limit = 50; // Default limit on first load
-} elseif (is_numeric($filters['limit']) && (int)$filters['limit'] > 0) {
-    $limit = (int)$filters['limit'];
-}
-
-// Render page
-PageLayout\PageLayout::header();
-
-echo '<h1 class="ibl-title">Season Leaders</h1>';
-
-// Get data for dropdowns
-$teams = $repository->getTeams();
-$years = $repository->getYears();
-
-// Render filter form
-echo $view->renderFilterForm($teams, $years, $filters);
-
-// Get and render season leaders
-$leadersData = $service->getFilteredLeaderboard($filters, $limit);
-$rows = $leadersData['results'];
-$numRows = $leadersData['count'];
-
-// Set active sort column for highlighting
-$view->setSortBy($filters['sortby']);
-
-// Render table header
-echo $view->renderTableHeader();
-
-// Render player rows
-$rank = 0;
-foreach ($rows as $row) {
-    $stats = $service->processPlayerRow($row);
-    $rank++;
-    echo $view->renderPlayerRow($stats, $rank);
-}
-
-// Render table footer
-echo $view->renderTableFooter();
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::send('SeasonLeaderboards');
+return;

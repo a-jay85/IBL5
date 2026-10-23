@@ -1,6 +1,6 @@
 ---
 description: ADR for weekly production log review via GitHub Action and Discord DM notification.
-last_verified: 2026-10-03
+last_verified: 2026-10-20
 ---
 
 # ADR-0013: Weekly Log Review Workflow
@@ -14,7 +14,7 @@ Production logs (Monolog JSON, daily rotation, 30-day retention) were never revi
 
 ## Decision
 
-Add a weekly GitHub Action (`log-review.yml`) that SSHes to production, runs `bin/log-fetch-prod` to aggregate logs server-side into a compact digest, and sends the summary as a Discord DM via IBLbot. The digest script runs all aggregation remotely to minimize data transfer, with a `jq` fast path and a `grep`/`sed`/`awk` fallback for hosts without `jq`.
+Add a weekly GitHub Action (`log-review.yml`) that SSHes to production, runs `bin/log-fetch-prod` to aggregate logs server-side into a compact digest, and sends the summary as a Discord DM via IBLbot. From 2026-10-20 the workflow runs Sunday 16:03 UTC (the weekly usage reset) and posts to the #reviews channel through `secrets.DISCORD_REVIEWS_WEBHOOK_URL`; `flake-report.yml` moved the same way. The digest script runs all aggregation remotely to minimize data transfer, with a `jq` fast path and a `grep`/`sed`/`awk` fallback for hosts without `jq`.
 
 ## Alternatives Considered
 

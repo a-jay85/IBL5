@@ -88,7 +88,7 @@ if [ "$MODE" = "up" ]; then
     case "${APPROVER}" in REPLACE_WITH_*) echo "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
 
     # The test bot reads BUG_OPERATOR_DISCORD_ID straight from this file. A placeholder or
-    # empty value starts cleanly and never routes a wake. The E2E wake cases also need the
+    # empty value aborts here, because it could never route a wake. The E2E wake cases also need the
     # app base URL and API key, so read all three here and export them below.
     env_val() { grep -E "^$1=" "$SECRETS" | tail -1 | cut -d= -f2- | tr -d '"'"'"' '; }
     OPERATOR="$(env_val BUG_OPERATOR_DISCORD_ID)"
@@ -187,6 +187,8 @@ SH
     # Covers every production-defaulted seam in bin/bug-pipeline-tick:28-73 (original
     # set) and lines 40, 84, 93-106 (CI-autofix + DM + heartbeat seams added later).
     mkdir -p "$WT_BASE" "$PLANS"
+    # The file carries the real API_KEY: create it owner-only before anything is written.
+    install -m 600 /dev/null "$ENV_FILE"
     cat > "$ENV_FILE" <<EOF
 export DB_HOST="127.0.0.1" DB_USER="root" DB_PASS="root" DB_NAME="${SCRATCH_DB}"
 export BOT_BASE_URL="${BOT_URL}"

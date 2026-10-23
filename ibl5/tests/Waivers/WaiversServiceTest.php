@@ -35,6 +35,7 @@ class WaiversServiceTest extends TestCase
             self::createStub(\Waivers\Contracts\WaiversRosterSlotCounterInterface::class)
         );
 
+        // @phpstan-ignore-next-line (asserting return type as intentional contract test)
         self::assertInstanceOf(WaiversServiceInterface::class, $service);
     }
 

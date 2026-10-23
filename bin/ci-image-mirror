@@ -3,17 +3,18 @@
 # so a Docker Hub timeout cannot fail a CI job. The manifest of record is
 # .github/ci-image-mirror.txt; bin/check-ci-image-registry gates new docker.io refs.
 #
-# Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--manifest=PATH]
+# Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--check] [--manifest=PATH]
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 MANIFEST="$ROOT/.github/ci-image-mirror.txt"
 ONLY_MISSING=0
 DRY_RUN=0
+CHECK=0
 
 usage() {
     cat <<'EOF'
-Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--manifest=PATH]
+Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--check] [--manifest=PATH]
 
 Copies each Docker Hub ref in the manifest to ghcr.io/a-jay85/mirror/<name>:<tag>
 (multi-arch preserving, 3 attempts per ref).
@@ -22,9 +23,10 @@ Options:
   --only-missing   skip a ref whose GHCR mirror already resolves
                    (docker buildx imagetools inspect <ghcr> exits 0)
   --dry-run        print "would copy <hub> -> <ghcr>" per ref; run no docker command
+  --check          probe each GHCR mirror; print present/missing per ref; copy nothing
   --manifest=PATH  default: <repo>/.github/ci-image-mirror.txt
 
-Exit codes: 0 = ok, 1 = a copy failed after 3 tries, 2 = usage error or malformed manifest
+Exit codes: 0 = ok, 1 = a copy failed after 3 tries, 2 = usage error or malformed manifest, 3 = --check found a missing mirror
 EOF
 }
 
@@ -32,12 +34,18 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --only-missing) ONLY_MISSING=1 ;;
         --dry-run) DRY_RUN=1 ;;
+        --check) CHECK=1 ;;
         --manifest=*) MANIFEST="${1#--manifest=}" ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ci-image-mirror: unknown argument: $1" >&2; exit 2 ;;
     esac
     shift
 done
+
+if [ "$CHECK" -eq 1 ] && [ "$DRY_RUN" -eq 1 ]; then
+    echo "ci-image-mirror: --check and --dry-run are mutually exclusive" >&2
+    exit 2
+fi
 
 ghcr_ref() {
     local ref="$1"
@@ -75,10 +83,20 @@ if [ "${#REFS[@]}" -eq 0 ]; then
 fi
 
 rc=0
+missing=0
 for hub in "${REFS[@]}"; do
     ghcr=$(ghcr_ref "$hub")
     if [ "$DRY_RUN" -eq 1 ]; then
         echo "would copy $hub -> $ghcr"
+        continue
+    fi
+    if [ "$CHECK" -eq 1 ]; then
+        if docker buildx imagetools inspect "$ghcr" >/dev/null 2>&1; then
+            echo "present $ghcr"
+        else
+            echo "missing $ghcr"
+            missing=1
+        fi
         continue
     fi
     if [ "$ONLY_MISSING" -eq 1 ] && docker buildx imagetools inspect "$ghcr" >/dev/null 2>&1; then
@@ -103,4 +121,8 @@ for hub in "${REFS[@]}"; do
         rc=1
     fi
 done
+if [ "$CHECK" -eq 1 ]; then
+    [ "$missing" -eq 0 ] && exit 0
+    exit 3
+fi
 exit "$rc"

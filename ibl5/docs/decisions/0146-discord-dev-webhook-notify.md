@@ -1,6 +1,6 @@
 ---
 description: Owner-bound notices post to a private #dev channel webhook, with an opt-in owner @mention for failures that need action.
-last_verified: 2026-10-09
+last_verified: 2026-10-20
 ---
 
 # ADR-0146: Route Owner-Bound Notices to a #dev Channel Webhook with an Opt-In Ping
@@ -55,6 +55,10 @@ repo: curl reads it from a config on stdin.
 ## Addendum: merge notices move to #merged (2026-10-09)
 
 The Decision above sends every action call site to `secrets.DISCORD_DEV_WEBHOOK_URL`. From 2026-10-09, merge-digest-notify.yml posts to the #merged channel through `secrets.DISCORD_MERGED_WEBHOOK_URL` instead, so merge notices stay out of #dev. Its owner ping is unchanged. The end-of-run summary from `bin/pr-cycle` still goes to #dev. The call-site table in `bin/test-discord-dm` now records which webhook each site passes (`webhook=dev` or `webhook=merged`). It holds 16 sites, up from the 15 in Consequences.
+
+## Addendum: weekly reviews move to #reviews (2026-10-20)
+
+`log-review.yml` and `flake-report.yml` now pass `secrets.DISCORD_REVIEWS_WEBHOOK_URL` and post to the #reviews channel. `bin/events-review` and `bin/automouse/comprehension-digest` send their review body through `bin/discord-dm` with `DISCORD_DM_WEBHOOK_FILE=~/.iblbot-reviews-webhook-url`; only the bare gh-failure line from `comprehension-digest` and the failure notices from `bin/events-review` keep the default #dev webhook. The call-site table in `bin/test-discord-dm` records these two sites as `webhook=reviews`.
 
 ## References
 

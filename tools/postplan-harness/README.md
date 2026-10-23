@@ -52,6 +52,7 @@ harness/
   scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
+  reviewer_eval.py        reviewer eval: corpus validate, run, score line, surface hash, mine, compare, check-claim
   ciwatch.py              Phase 7 outcome interpretation
   llm_calls.py            prompt builders for the non-review retained calls
   schemas.py              typed validation for every LLM output
@@ -63,6 +64,7 @@ harness/
     verify.py             LiveVerify (phpunit/phpstan/go) / ReplayVerify (recorded outputs)
 tests/                    27 tests (pure logic + live-git tempdir + full replay runs)
 fixtures/scenarios/<slug>/fixture.json   point-in-time inputs from 8 historical runs
+fixtures/reviewer-eval/corpus.json       confirmed bug cases + clean cases scored by bin/reviewer-eval
 bench/benchmark.py        Method-A replay benchmark + parity gates
 report/report.html        self-contained benchmark report
 out/                      per-run result.json, audit.log, actions.jsonl
@@ -111,7 +113,7 @@ intent log — without touching GitHub.
 - **Phase 4.5b same-run thread remediation.** After the review worker is joined, the harness takes a second `pr_thread_ids` snapshot. Ids absent from the pre-posting snapshot whose `(path, body prefix)` match a finding this process posted through `post_review_findings` are this run's own threads. They go through the same Phase 4.5 fixer, packet, trust contract and commit/push/resolve path (`harness/same_run_threads.py`), once. A fix commit re-keys the Phase 7 CI watch to the new head, re-runs Phase 5.0 conformance, re-pins fidelity verdict 2 when one exists, and triggers one review of the fix delta only; new findings from it are posted and left open. Fixed or declined findings leave the in-memory list arming condition (2) reads. Any thread the fixer skips, and any thread not posted by this process, still holds under condition (11). `result.json` records the pass under `thread_ingestion.same_run` only when it found candidates.
 - **Phase 5.5 file-fix carve-out (ADR-0204).** Before the remediation fixer spawns, `harness/fidelity_filefix.py` reads the `[BLOCKING]` bullets under the verdict's `## FINDINGS` heading and collects every `.claude/rules/*.md` file they name in a code span (full path, or a basename unique among the PR's changed files) that the PR diff against `origin/master` already touches. `fidelity.remediate` tells the fixer that set. After the commit it re-checks with git: each gate-owning hit must be in the set, be a modification, change at most 20 lines with at most 8 deletions, and keep its frontmatter identical apart from `last_verified`; at most 3 files and 40 lines in total. It then reruns `bin/check-rules-byte-budget`, `bin/check-prose --since=origin/master` and `bin/check-docs --since=origin/master --no-staleness`. Any refusal takes the existing `gate-path-edit` exit with the commit left local. Workflows, `bin/check-*`, `harness/armable.py` and the rest of `LOCAL_GATE_PATH_PREFIXES` never enter the set. The run log records the snapshot as `file-fix carve-out active for <files>` or `inactive (<reason>)`.
 - **Phase 7 re-arm after the fix loop.** When Phase 6.5 held and the fix loop ends with CI green, the harness re-runs the post-pr meta-checks on the current head, deletes the pre-push flag only on rc 0, and re-evaluates the same ArmInputs with (15), (16), (17) and current_tree refreshed. Re-arm is refused when the fix loop moved the head tree, because the review, conformance and fidelity evidence belongs to the old tree; the next run reviews the new head. The sticky verdict is re-posted before arming and result.json records the outcome under rearm.
-- **Phase 7 Meta-checks skip.** When the only actionable red is `Meta checks` (the `All checks green` aggregate aside), phase 2 recorded meta-check failures, and every failed step in the job's `--log-failed` output runs a `bin/<X>` matching a recorded name, `_ci_fix_loop` spends no ci-fix attempt and no rerun probe. It posts the survivor comment naming the check and returns the red outcome, so nothing arms. An in-progress, missing or unattributed log, or a second actionable red, runs ci-fix as before. Body checks such as `check-pr-manual-testing` skip in phase 2 and never reach its failure list, so they keep the PR-body proposal flow.
+- **Phase 7 Meta-checks skip.** When the only actionable red is `Meta checks` (the `All checks settled` aggregate aside), phase 2 recorded meta-check failures, and every failed step in the job's `--log-failed` output runs a `bin/<X>` matching a recorded name, `_ci_fix_loop` spends no ci-fix attempt and no rerun probe. It posts the survivor comment naming the check and returns the red outcome, so nothing arms. An in-progress, missing or unattributed log, or a second actionable red, runs ci-fix as before. Body checks such as `check-pr-manual-testing` skip in phase 2 and never reach its failure list, so they keep the PR-body proposal flow.
 - **Local gate auto-fix.** A `local-gate` denial at a commit or push site gets one headless fixer attempt and one retry, once per run (`res.gate_fix` non-empty means the attempt is spent). `harness/gatefix.py` runs `claude-opus-5-5` through `call_tooled` with Read, Grep, Glob, Edit and Write only (no Bash, `max_turns=30`, `timeout=900`), so the fixer can run no git command of its own, and the gate-fix path has no hook bypass. `tests/test_gatefix_no_bypass.py` scans every harness source for one. Its allowlist holds a single line, `core.hooksPath=/dev/null` in `harness/gate_backtest_replay.py`, which keeps hooks from running inside the scratch worktree of the backtest replay. A commit denial is fixed in the same commit and retried once. A push denial gets a separate `chore: auto-fix local pre-push gate denial` commit and one re-push; a dirty tree at a push site skips the fixer. An `adr` denial after the ADR drafter already ran is skipped. The fixer sits outermost, after the ADR drafter and the doc-staleness remediation.
   - **Guard.** A content-hash snapshot is taken before the attempt: a temp-index tree of tracked and untracked files, the bytes of ignored gate files, and the bytes of the out-of-repo roots (`~/.claude/hooks`, `~/.claude/settings*.json`, the git common dir's `hooks` and `config`, and `config.worktree`). Any change under `LOCAL_GATE_PATH_PREFIXES` (the gate-owning prefixes plus the git hooks, `.claude/hooks`, `bin/lib` and the harness itself) or under an out-of-repo root rejects the attempt. A `finally` block puts every changed file back, including on `UsagePause`.
   - **Rules carve-out.** When `bin/check-rules-byte-budget` already fails and a rules `.md` file is in the diff against `origin/master`, the ADR-0184 rules (shrink only, at most one new `*-detail.md` with `paths:`, then the three post checks) apply to that file. That is the only exception to the guard.
@@ -187,6 +189,16 @@ the same kind and detail as before. `Could not read from remote repository` and
 the first error is raised and every wrapped call in the same process makes a
 single attempt for the next 300 seconds. Each retry logs one warning on the
 `harness.netretry` logger.
+
+`gh pr create` also gets one retry after a GitHub API rate-limit error
+(`API rate limit exceeded` or `API rate limit already exceeded`). The harness
+reads the GraphQL reset time with `gh api rate_limit`, waits until two seconds
+after it, then lists open PRs for the head branch. A PR it finds is returned
+without a second create. Otherwise the create runs once more. A reset more than
+15 minutes away, an unreadable reset, a failed listing, or a second rate-limit
+error fails the run with the original `gh` error plus a note that names the rate
+limit and the reset time. The wait never reads or trips the 300-second outage
+latch. Other gh calls fail on a rate limit as before.
 
 The wrapped calls are `LiveGit.fetch_base`, the lease `ls-remote`, `push` and
 `push_ff` in `harness/adapters/gitad.py`, the fetch and `ls-remote` helpers in

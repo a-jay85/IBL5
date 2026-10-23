@@ -44,3 +44,5 @@ ibl5/tests/WideUnit/Scripts/ReconstructAsgNameLookupGuardTest.php
 ibl5/tests/WideUnit/Scripts/RootHtaccessLegacyModulesRedirectGuardTest.php
 # updateAllTheThings.php wires its guards above the try and SeasonRolloverRunner in the non-Olympics branch; the script requires mainfile.php at top level, so there is no seam (behavior: SeasonRolloverRunnerIntegrationTest)
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRolloverWiringTest.php
+# updateAllTheThings.php registers RefreshRecordHoldersStep after ProcessBoxscoresStep and the derived-table refreshes, inside the non-Olympics block; the script requires mainfile.php at top level, so there is no seam (behavior: RefreshRecordHoldersStepTest)
+ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRecordHoldersWiringTest.php

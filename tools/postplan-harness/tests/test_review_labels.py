@@ -156,6 +156,47 @@ def test_nit_hint_cannot_demote_threshold_finding():
     assert [f.label for f in _posted(gh)] == ["important"]
 
 
+def _run_with_scores(canned, scores):
+    """Run with the real verifier records, then overwrite each score.
+
+    Verifier scoring keeps every finding at or above its threshold, so the nit band
+    (NIT_FLOOR <= score < threshold) is unreachable on post-plan today. Injecting the
+    scores tests what happens after scoring: classify, the nit cap, sort and posting."""
+    llm, gh = _Llm(canned), _Gh()
+    phase = ReviewPhase(llm, gh, worktree="/tmp/wt")
+    real_verify = phase.verify_findings
+
+    def verify(findings, filtered_diff):
+        records = real_verify(findings, filtered_diff)
+        for rec, score in zip(records, scores):
+            rec["score"] = score
+        return records
+
+    phase.verify_findings = verify
+    phase.run({}, _cls(), PlanInfo())
+    return gh
+
+
+def test_nit_band_posts_as_nit_and_cap_is_five():
+    """Mutation: remove apply_nit_cap in run => all 7 nits post."""
+    a = [_finding(line=1, severity="nit") for _ in range(7)]
+    gh = _run_with_scores(_canned(a=a, verdicts=[_v(n) for n in range(1, 8)]),
+                          [61, 62, 63, 64, 65, 66, 67])
+    posted = _posted(gh)
+    assert [f.label for f in posted] == ["nit"] * 5
+    assert [f.score for f in posted] == [67, 66, 65, 64, 63]
+
+
+def test_security_nit_hint_is_dropped_and_security_preexisting_is_labeled():
+    """Mutation: delete the source == "code-review" guard in classify => the security nit posts.
+
+    The score is 70, below SEC_THRESHOLD (75), so the nit branch is the only way it posts."""
+    sec = [_finding(line=1, severity="nit"), _finding(line=CONTEXT_LINE, preexisting=True)]
+    gh = _run_with_scores(_canned(security=sec, verdicts=[_v(1), _v(2, 3, True)]), [70, 76])
+    posted = _posted(gh, "Security audit")
+    assert [(f.line, f.label) for f in posted] == [(CONTEXT_LINE, "pre-existing")]
+
+
 def test_security_preexisting_is_labeled():
     """Mutation: skip the security source in the verifier preexisting assignment => fails."""
     sec = [_finding(line=CONTEXT_LINE, preexisting=True)]

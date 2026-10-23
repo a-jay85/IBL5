@@ -304,6 +304,31 @@ def test_guard_rejects_rewritten_parents(tmp_path, key):
     assert "keep-me" not in (Path(d) / "a.txt").read_text()
 
 
+def test_expected_parents_override_guards_single_parent_head(tmp_path, key):
+    d = tmp_path / "repo"
+    d.mkdir()
+    _git(d, "init", "-b", "master")
+    _write(d, {"a.txt": "base\n"})
+    _git(d, "add", "-A")
+    _git(d, "commit", "-m", "base")
+    p = _head(d)
+    _write(d, {"a.txt": "next\n"})
+    _git(d, "add", "-A")
+    _git(d, "commit", "-m", "one parent")
+    g = LiveGit(str(d))
+
+    def ctx(expected):
+        return LadderContext(
+            llm=None, run=g._run, run_out=g._run_out, prove=lambda: (True, ""),
+            worktree=str(d), key=key, master_sha=p, pre_rebase_sha=p,
+            conflicted_files=("a.txt",), expected_parents=expected)
+
+    assert conflict_ladder._parents_reason(ctx((p,))) == ""
+    assert conflict_ladder._parents_reason(ctx(("0" * 40,))).startswith("merge parents changed")
+    # The default () keeps the merge pair, which a one-parent HEAD does not match.
+    assert conflict_ladder._parents_reason(ctx(())).startswith("merge parents changed")
+
+
 def test_ladder_no_rung_passes_reports_full_trail(tmp_path, key):
     d, pre, master, merge = _a_repo(tmp_path)
     ctx = _ctx(d, key, pre, master, ("a.txt",), _keepme_prove(d))

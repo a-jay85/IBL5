@@ -212,4 +212,98 @@ expect 'ID2 original_message_id exact' '1234567890123456794' \
 expect 'pr_number persisted from --pr=42' '42' \
     "$(q "SELECT pr_number FROM ibl_bug_reports WHERE id='$ID'")"
 
+# ── Phase 8: Operator wake E2E ──────────────────────────────────────────────
+# enqueue -> dormant -> (operator @mention) wake -> queued -> classify via a real tick.
+# Every snowflake below is a shell string (never arithmetic); jq gets them via --arg.
+SOURCE3=1234567890123456796
+WAKE_OUT=/tmp/bug-pipeline-test-wake.out
+WAKE_BASE="${BUG_PIPELINE_API_BASE_URL:-}"
+WAKE_KEY="${API_KEY:-}"
+CLAUDE_LOG="$(dirname "$(dirname "$CLAUDE_BIN")")/claude.log"   # the claude stub logs next to its bin/
+
+# wake_post <author_id> <message_id> <content> — POSTs the wake contract, prints the HTTP code.
+# Response body lands in $WAKE_OUT.
+wake_post() {
+    curl -s -o "$WAKE_OUT" -w '%{http_code}' -X POST \
+        -H "X-Api-Key: ${WAKE_KEY}" -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg s "$SOURCE3" --arg t "$THREAD3" --arg m "$2" --arg a "$1" --arg c "$3" \
+            '{source_message_id:$s,thread_id:$t,message_id:$m,author_id:$a,content:$c}')" \
+        "${WAKE_BASE}/api/v1/bug-pipeline/wake"
+}
+
+# 8.1 — enqueue lands in dormant and is invisible to the active-conversation enumerator
+ID3=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php -r '
+require __DIR__."/scripts/bug-pipeline/_bootstrap.php";
+$r = new \BugPipeline\BugReportRepository($mysqli_db);
+echo $r->enqueueAuthorizedAndAdvance("1234567890123456795","1234567890123456790","1234567890123456796","operator wake report"), "\n";
+')
+expect 'status dormant after enqueue' 'dormant' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID3'")"
+expect 'enumerator hides dormant' 0 \
+    "$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php scripts/bug-pipeline/list-active-conversations.php | jq "[.[] | select(.id == $ID3)] | length")"
+
+# The wake endpoint is served by the app behind BUG_PIPELINE_API_BASE_URL (the test bot's
+# configured base URL, from .env.bugbot.test). Without it and an API key, 8.2-8.6 cannot run.
+THREAD3="$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID'")"
+if [ -z "$WAKE_BASE" ] || [ -z "$WAKE_KEY" ]; then
+    echo 'SKIP 8.2-8.6: BUG_PIPELINE_API_BASE_URL and API_KEY must be exported to reach the wake endpoint'
+else
+    # 8.2 — a non-operator author is rejected and nothing is written
+    expect 'non-operator wake 403' 403 "$(wake_post 1 1234567890123456797 'not the operator')"
+    expect 'rejected wake writes nothing' 0 \
+        "$(q "SELECT COUNT(*) FROM ibl_bug_report_operator_context WHERE bug_report_id='$ID3'")"
+    expect 'rejected wake leaves status dormant' 'dormant' \
+        "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID3'")"
+
+    # 8.3 — the accepted wake: dormant -> queued, thread_id and context persisted
+    PHP_OP="$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php -r 'require "scripts/bug-pipeline/_bootstrap.php"; echo Discord\Discord::getBugPipelineApproverDiscordId();')"
+    if [ -z "$PHP_OP" ]; then
+        echo 'SKIP 8.3: PHP bug_pipeline_approver_discord_id unconfigured'
+        expect 'empty operator config fails closed' 403 \
+            "$(wake_post "${BUG_PIPELINE_APPROVER_ID}" 1234567890123456797 'operator says: check the cap calc')"
+    else
+        expect 'wake 200' 200 "$(wake_post "$PHP_OP" 1234567890123456797 'operator says: check the cap calc')"
+        expect 'wake outcome woke' woke "$(jq -r '.data.outcome' "$WAKE_OUT")"
+        expect 'wake status queued' queued "$(jq -r '.data.status' "$WAKE_OUT")"
+        expect 'status queued after wake' 'queued' \
+            "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID3'")"
+        expect 'thread_id persisted' "$THREAD3" \
+            "$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID3'")"
+        expect 'context persisted' 'operator says: check the cap calc' \
+            "$(q "SELECT content FROM ibl_bug_report_operator_context WHERE bug_report_id='$ID3'")"
+
+        # 8.4 — a re-mention appends; a replayed message id is a no-op
+        wake_post "$PHP_OP" 1234567890123456798 'one more thing' >/dev/null
+        expect 're-mention outcome appended' appended "$(jq -r '.data.outcome' "$WAKE_OUT")"
+        expect 're-mention status still queued' queued "$(jq -r '.data.status' "$WAKE_OUT")"
+        expect 'context count 2 after re-mention' 2 \
+            "$(q "SELECT COUNT(*) FROM ibl_bug_report_operator_context WHERE bug_report_id='$ID3'")"
+        wake_post "$PHP_OP" 1234567890123456798 'one more thing' >/dev/null
+        expect 'replay outcome duplicate' duplicate "$(jq -r '.data.outcome' "$WAKE_OUT")"
+        expect 'context count still 2 after replay' 2 \
+            "$(q "SELECT COUNT(*) FROM ibl_bug_report_operator_context WHERE bug_report_id='$ID3'")"
+
+        # 8.5 — real boundary: one real tick classifies the woken row through the stubbed
+        # `claude`. The stub logs "claude <args>" and the prompt is an argv entry, so the
+        # operator's text must appear in $CLAUDE_LOG. The tick does not log its bot calls
+        # (bot_get_thread_messages is silent), so the live-transcript fetch has no log token to
+        # assert; the bot is probed directly instead.
+        (source /tmp/bug-pipeline-test-env.sh && BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick") >/dev/null
+        expect 'operator context reached the prompt' 1 \
+            "$(grep -cF 'operator says: check the cap calc' "$CLAUDE_LOG" | awk '{print ($1 > 0) ? 1 : 0}')"
+        expect 'woken row classified by the tick' 'bug' \
+            "$(q "SELECT class FROM ibl_bug_reports WHERE id='$ID3'")"
+
+        # 8.6 — a stopped row restarts through classify with its lease and attempts cleared
+        q "UPDATE ibl_bug_reports SET status='needs_human', lease_owner='x', hunt_attempts=2 WHERE id='$ID3'"
+        wake_post "$PHP_OP" 1234567890123456799 'try again' >/dev/null
+        expect 'restart outcome restarted' restarted "$(jq -r '.data.outcome' "$WAKE_OUT")"
+        expect 'restart status queued' queued "$(jq -r '.data.status' "$WAKE_OUT")"
+        expect 'restart clears lease_owner' 1 \
+            "$(q "SELECT IF(lease_owner IS NULL, 1, 0) FROM ibl_bug_reports WHERE id='$ID3'")"
+        expect 'restart resets hunt_attempts' 0 \
+            "$(q "SELECT hunt_attempts FROM ibl_bug_reports WHERE id='$ID3'")"
+    fi
+fi
+
 exit "$RC"

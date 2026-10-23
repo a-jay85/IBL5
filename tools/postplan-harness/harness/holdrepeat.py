@@ -39,6 +39,10 @@ STRUCTURAL_CONDITIONS = frozenset({3, 7, 8, 13})
 # a non-empty subset of these only needs a rebase, never a fresh review.
 REBASE_ONLY_CONDITIONS = frozenset({3, 7, 8})
 ELIGIBLE_EXIT = 10
+FIX_ELIGIBLE_EXIT = 10
+FIX_GIVEUP_EXIT = 11
+FIX_ATTEMPTS_PER_PR = 2   # hard ceiling across ALL fingerprints for one branch
+FIX_SCHEMA_VERSION = 1
 
 _RUN_DIR = re.compile(r"live-\S*?-\d{8}-\d{6}-\d+")
 _WT_PATH = re.compile(r"/(?:[^\s/]+/)*IBL5-worktrees/[^\s/]+/")
@@ -506,6 +510,120 @@ def rebase_only_eligible(state_dir, slug) -> bool:
     return nums <= REBASE_ONLY_CONDITIONS
 
 
+def hold_fingerprint(reason: str) -> str:
+    """16-hex hash of the sorted condition-3 parts; "" when there are none.
+
+    Covers the parts only, never the plan hash, so a plan edit that leaves the same
+    parts buys no new fix attempt.
+    """
+    parts = sorted(hold_parts(reason))
+    if not parts:
+        return ""
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
+
+
+def fix_attempts_path(state_dir: str, slug: str) -> str:
+    """Attempt ledger, separate from the hold record so a cleared hold keeps its ceiling."""
+    return os.path.join(state_dir, f"{safe_slug(slug)}.holdrepeat-fix.json")
+
+
+def fix_eligibility(state_dir, slug) -> tuple[str, str, list[str]]:
+    """(verdict_word, fingerprint, sorted_parts) for the last recorded hold.
+
+    Eligible only when the hold set is exactly condition 3 and every normalized
+    condition-3 part is a known `hold_parts` item. Anything else fails toward the owner.
+    """
+    rec = load_record(state_dir, slug)
+    if rec is None:
+        return "no-record", "", []
+    entries = rec.get("hold_set")
+    if not isinstance(entries, list) or not entries:
+        return "other-conditions", "", []
+    for e in entries:
+        if not isinstance(e, list) or not e or e[0] != 3:
+            return "other-conditions", "", []
+    reason = _condition3_reason(rec)
+    parts = hold_parts(reason)
+    if not parts:
+        return "no-parts", "", []
+    for item in normalize_reason(reason).split("; "):
+        if item and item not in parts:
+            return "foreign-part", "", []
+    return "eligible", hold_fingerprint(reason), sorted(parts)
+
+
+def _empty_fix_ledger() -> dict:
+    return {"schema_version": FIX_SCHEMA_VERSION, "attempts": [], "giveup_dm": []}
+
+
+def _load_fix_ledger(state_dir, slug) -> dict:
+    try:
+        with open(fix_attempts_path(state_dir, slug)) as fh:
+            doc = json.load(fh)
+    except (OSError, ValueError):
+        return _empty_fix_ledger()
+    if (not isinstance(doc, dict) or doc.get("schema_version") != FIX_SCHEMA_VERSION
+            or not isinstance(doc.get("attempts"), list)
+            or not isinstance(doc.get("giveup_dm"), list)):
+        return _empty_fix_ledger()
+    return doc
+
+
+def _save_fix_ledger(state_dir, slug, doc) -> None:
+    path = fix_attempts_path(state_dir, slug)
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(tmp, "w") as fh:
+            fh.write(json.dumps(doc, indent=1, default=str))
+        os.replace(tmp, path)
+    except OSError as e:
+        print(f"holdrepeat: fix ledger write failed ({e!r}); continuing", file=sys.stderr)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def fix_attempt_verdict(state_dir, slug, fp: str) -> str:
+    """"repeat" | "ceiling" | "launch". The repeat check runs first so the DM names it."""
+    attempts = _load_fix_ledger(state_dir, slug)["attempts"]
+    for a in attempts:
+        if isinstance(a, dict) and a.get("fingerprint") == fp:
+            return "repeat"
+    if len(attempts) >= FIX_ATTEMPTS_PER_PR:
+        return "ceiling"
+    return "launch"
+
+
+def record_fix_attempt(state_dir, slug, *, fp, pr, parts, now) -> None:
+    """Append a `started` attempt. Called before the session so a crash still consumes it."""
+    doc = _load_fix_ledger(state_dir, slug)
+    doc["attempts"].append({"fingerprint": fp, "pr": pr, "started": now,
+                            "parts": list(parts), "outcome": "started"})
+    _save_fix_ledger(state_dir, slug, doc)
+
+
+def record_fix_outcome(state_dir, slug, *, fp, outcome) -> None:
+    """Set `outcome` on the last attempt with fingerprint `fp`; no match writes nothing."""
+    doc = _load_fix_ledger(state_dir, slug)
+    for a in reversed(doc["attempts"]):
+        if isinstance(a, dict) and a.get("fingerprint") == fp:
+            a["outcome"] = outcome
+            _save_fix_ledger(state_dir, slug, doc)
+            return
+
+
+def mark_fix_giveup_dm(state_dir, slug, fp: str) -> bool:
+    """True the first time for `fp` (and records it); False afterwards, writing nothing."""
+    doc = _load_fix_ledger(state_dir, slug)
+    if fp in doc["giveup_dm"]:
+        return False
+    doc["giveup_dm"].append(fp)
+    _save_fix_ledger(state_dir, slug, doc)
+    return True
+
+
 def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="harness.holdrepeat")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -518,11 +636,54 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="exit 10 when the last hold is a subset of {3,7,8}")
     elig.add_argument("--state-dir", required=True)
     elig.add_argument("--slug", required=True)
+    fe = sub.add_parser("fix-eligible",
+                        help="exit 10 when the last hold is a fixable condition-3 hold")
+    fe.add_argument("--state-dir", required=True)
+    fe.add_argument("--slug", required=True)
+    fe.add_argument("--no-mark", action="store_true",
+                    help="do not consume the one give-up DM for this fingerprint")
+    fr = sub.add_parser("fix-record", help="record a fix attempt or its outcome")
+    fr.add_argument("--state-dir", required=True)
+    fr.add_argument("--slug", required=True)
+    fr.add_argument("--fingerprint", required=True)
+    fr.add_argument("--pr", default="")
+    fr.add_argument("--outcome", required=True)
     return ap
 
 
 def main(argv=None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.cmd == "fix-eligible":
+        try:
+            word, fp, parts = fix_eligibility(args.state_dir, args.slug)
+            if word != "eligible":
+                print(f"holdrepeat: FIX ineligible reason={word}")
+                return 0
+            verdict = fix_attempt_verdict(args.state_dir, args.slug, fp)
+            if verdict != "launch":
+                dm = "no"
+                if not args.no_mark and mark_fix_giveup_dm(args.state_dir, args.slug, fp):
+                    dm = "yes"
+                print(f"holdrepeat: FIX give-up reason={verdict} fingerprint={fp} dm={dm}")
+                return FIX_GIVEUP_EXIT
+            print(f"holdrepeat: FIX eligible fingerprint={fp} parts={len(parts)}")
+            for p in parts:
+                print(f"part: {p}")
+            return FIX_ELIGIBLE_EXIT
+        except Exception as e:  # noqa: BLE001 - every error path ends as "no session"
+            print(f"holdrepeat: FIX ineligible reason=error ({e})")
+            return 0
+    if args.cmd == "fix-record":
+        if args.outcome == "started":
+            from datetime import datetime, timezone
+            _w, _fp, parts = fix_eligibility(args.state_dir, args.slug)
+            record_fix_attempt(args.state_dir, args.slug, fp=args.fingerprint,
+                               pr=args.pr, parts=parts,
+                               now=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        else:
+            record_fix_outcome(args.state_dir, args.slug, fp=args.fingerprint,
+                               outcome=args.outcome)
+        return 0
     if args.cmd == "rebase-eligible":
         try:
             ok = rebase_only_eligible(args.state_dir, args.slug)

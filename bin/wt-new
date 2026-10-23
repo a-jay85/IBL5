@@ -128,7 +128,7 @@ wt_new_abort_cleanup() {
     local rc=$?
     if [ "$rc" != 0 ] && [ -d "$WT_ROOT" ]; then
         cd "$REPO_ROOT" 2>/dev/null || cd /
-        "$SCRIPT_ROOT/bin/wt-remove" "${BRANCH_NAME:-$NAME}" --if-empty || true
+        "$SCRIPT_ROOT/bin/wt-remove" "$NAME" --if-empty || true
     fi
     exit "$rc"
 }

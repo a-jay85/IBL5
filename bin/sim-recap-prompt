@@ -29,7 +29,7 @@
 #   SIM_RECAP_DB_PORT   MySQL port. Default: 13306
 #   SIM_RECAP_DB_USER   MySQL user (no default — must be set in env)
 #   SIM_RECAP_DB_NAME   MySQL database name (no default — must be set in env)
-#   SIM_RECAP_MYSQL_BIN mysql client the agent is told to run.
+#   SIM_RECAP_MYSQL_BIN mysql client that bin/sim-recap-mysql runs for the agent.
 #                       Default: /opt/homebrew/opt/mysql@8.4/bin/mysql
 #                       Pinned deliberately, NOT left as bare `mysql`. The
 #                       launchd PATH resolves `mysql` to Homebrew's current
@@ -60,6 +60,8 @@ SIM_RECAP_DB_PORT="${SIM_RECAP_DB_PORT:-13306}"
 SIM_RECAP_DB_USER="${SIM_RECAP_DB_USER:-}"
 SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
 SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
+# The agent runs this wrapper, never the client above (ADR-0093 addendum).
+SIM_RECAP_MYSQL_WRAPPER="$REPO_ROOT/bin/sim-recap-mysql"
 
 # --- Arg parsing ---
 sim=""
@@ -131,18 +133,20 @@ cat <<DATA_EOF
 
 Sim number: ${sim}
 
-Query live game data using the mysql client. Use this EXACT command — copy the binary
-path and the --default-auth flag verbatim:
+Query live game data with this EXACT command. Copy the path verbatim, start the
+command with it, and pass the SQL with -e:
 
-  ${SIM_RECAP_MYSQL_BIN} --default-auth=mysql_native_password -h ${SIM_RECAP_DB_HOST} -P ${SIM_RECAP_DB_PORT} -u ${SIM_RECAP_DB_USER} ${SIM_RECAP_DB_NAME}
+  ${SIM_RECAP_MYSQL_WRAPPER} -e "SELECT ..."
 
-Do not substitute a bare "mysql". The one on PATH is a 9.x client that has dropped the
-mysql_native_password plugin and cannot authenticate against this server (ERROR 2059).
-The path above is the working client; it is already resolved for you, so do not go
-looking for another one.
+It already connects to the right host, user, and database, so pass no connection
+flags. Allowed extra flags: -N (no column names), -t (table layout), -E (vertical
+layout), -r, -s. Several statements separated by ";" in one -e are fine. Client
+commands (\G, system, tee, source, pager) are refused; use -E instead of \G.
+To save output to a scratch file, redirect it (> file) in this directory.
 
-The database password is available in your environment as MYSQL_PWD. Do not pass it on
-the command line — mysql reads it from MYSQL_PWD automatically.
+Do not run "mysql" or any other client directly; only the command above is
+permitted. Do not prefix it with environment variables or chain other commands
+onto it.
 
 Relevant tables:
 
@@ -307,7 +311,7 @@ The following is the authoritative format reference. Match its structure exactly
     one prose paragraph
 
 Paragraph length is part of the format, not a style preference. Every game paragraph in
-the exemplar below runs between 504 and 639 characters, averaging 568. Hit that band. A
+the exemplar below runs between 504 and 639 characters, averaging 565. Hit that band. A
 paragraph under 500 characters is short of the exemplar and reads thin.
 
 This does not license long sentences. The ANTI-LLM-TELL PROHIBITIONS still bind in full:

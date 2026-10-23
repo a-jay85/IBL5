@@ -109,7 +109,7 @@ class WaiversSubmissionServiceTest extends TestCase
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->never())->method('processDrop');
         $processor->expects($this->once())->method('processAdd')
-            ->with(42, 'Chicago Bulls', 12, 75000000)
+            ->with(42, 'Chicago Bulls', 0, 12, 75000000)
             ->willReturn(['success' => true, 'result' => 'Player added']);
 
         $result = $service->submit(
@@ -119,6 +119,27 @@ class WaiversSubmissionServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame('Player added', $result['result'] ?? '');
+    }
+
+    /**
+     * A team at 15 with two injured players posts rosterslots=0 and healthyrosterslots=2.
+     * The add path forwards both counts, open first.
+     */
+    public function testSubmitForwardsHealthyRosterSlotsToProcessAdd(): void
+    {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
+            ->with('Chicago Bulls')->willReturn(75000000);
+        $processor->expects($this->once())->method('processAdd')
+            ->with(42, 'Chicago Bulls', 0, 2, 75000000)
+            ->willReturn(['success' => true, 'result' => 'Player added']);
+
+        $result = $service->submit(
+            ['Action' => 'add', 'Player_ID' => 42, 'rosterslots' => 0, 'healthyrosterslots' => 2],
+            'Chicago Bulls'
+        );
+
+        $this->assertTrue($result['success']);
     }
 
     public function testSubmitForwardsAuthorizedWaiveToProcessor(): void
@@ -160,9 +181,12 @@ class WaiversSubmissionServiceTest extends TestCase
         $salaryCapRepo->expects($this->never())->method($unusedMethod);
 
         $processorMethod = $action === 'waive' ? 'processDrop' : 'processAdd';
+        $expectedArguments = $action === 'waive'
+            ? [42, 'Miami Heat', 12, $expectedSalary]
+            : [42, 'Miami Heat', 12, 12, $expectedSalary];
         $processor->expects($this->once())
             ->method($processorMethod)
-            ->with(42, 'Miami Heat', 12, $expectedSalary)
+            ->with(...$expectedArguments)
             ->willReturn(['success' => true]);
 
         $service->submit(

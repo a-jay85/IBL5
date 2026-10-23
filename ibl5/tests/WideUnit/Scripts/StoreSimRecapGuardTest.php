@@ -61,14 +61,15 @@ final class StoreSimRecapGuardTest extends TestCase
         self::assertSame(1, substr_count($this->src, '(int)'), 'Exactly one (int) cast expected');
     }
 
-    public function testScriptWritesBeforeItPosts(): void
+    /**
+     * The #admin-chat line (with the viewer link) comes from simRecapQueue.php
+     * notify, which only posts for a row already in state done. A post here as
+     * well sent the commissioner two messages per sim.
+     */
+    public function testScriptLeavesTheAdminChatPostToNotify(): void
     {
-        $writePos = strpos($this->src, 'markDone');
-        $postPos = strpos($this->src, 'postToChannel');
-
-        self::assertNotFalse($writePos, 'markDone not found in script');
-        self::assertNotFalse($postPos, 'postToChannel not found in script');
-        self::assertLessThan($postPos, $writePos, 'markDone must appear before postToChannel');
+        self::assertStringContainsString('markDone', $this->src);
+        self::assertStringNotContainsString('postToChannel', $this->src);
     }
 
     public function testScriptComposesNoSql(): void

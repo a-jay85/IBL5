@@ -503,13 +503,6 @@
     opacity: 0.5;
 }
 
-.ibl-filter-fieldset {
-    margin-bottom: 1rem;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    padding: 0.75rem 1rem;
-}
-
 .ibl-select--auto {
     width: auto;
 }

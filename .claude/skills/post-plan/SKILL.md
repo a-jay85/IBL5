@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ---
 
 # Post-Plan Orchestrator
@@ -619,12 +619,12 @@ To post it:
    body template in the appendix of `.claude/skills/post-plan/_phase-2-conflict-resolution.md`
    into `/tmp/post-plan-conflict-comment-<KEY>.md`, substituting the manifest's paths and
    descriptions and any `COLLAPSE-GUARD: WARN` line.
-3. Post it sticky, reusing the `STICKY_MARKER` + `post_sticky()` **shape** in `bin/pr-canary-check`
-   (grep for them; never trust a line number): find an existing comment id via
+3. Post it sticky, reusing the `pr_sticky_upsert` **shape** in `bin/lib/pr-sticky.sh`
+   (grep for it; never trust a line number): find an existing comment id via
    `gh api "repos/{owner}/{repo}/issues/<PR>/comments" --paginate --jq` selecting on the marker,
    PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
-   The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
-   `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
+   The marker is `<!-- post-plan-conflict-hold -->` and **never**
+   `<!-- pr-ready-verdict -->`. Copy the shape and keep your own marker string, or the conflict hold
    overwrites an unrelated verdict on the same PR.
 
 The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that

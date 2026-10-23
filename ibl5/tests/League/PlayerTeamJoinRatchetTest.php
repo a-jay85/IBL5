@@ -29,10 +29,9 @@ class PlayerTeamJoinRatchetTest extends TestCase
     private const TRAIT_FILE = 'Repositories/PlayerTeamJoinQuery.php';
 
     /**
-     * PlayerSearchRepository joins on unaliased table names because its
-     * QueryConditions builder writes the WHERE against `ibl_plr` columns, so it
-     * cannot take the `p`/`t` alias fragment without rewriting that builder
-     * (backlog 13.12, documented exception).
+     * PlayerSearchRepository still joins on unaliased table names and has not
+     * moved to the `p`/`t` alias fragment yet (backlog 13.12, documented
+     * exception).
      */
     private const UNALIASED_ALLOWLIST = ['PlayerSearch/PlayerSearchRepository.php'];
 

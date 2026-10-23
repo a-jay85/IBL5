@@ -124,10 +124,12 @@ async function captureSnapshot(
     if (tab) {
       // The swap target already exists before the click, so waiting on its
       // visibility alone can pass against the old tab. Start the response wait
-      // before the click so the HTMX GET is confirmed to have landed.
+      // before the click so the HTMX GET is confirmed to have landed. The
+      // module name keeps an unrelated API fetch from satisfying the wait.
       await Promise.all([
         page.waitForResponse(
           (r) =>
+            r.url().includes('name=LeagueStarters') &&
             r.url().includes('op=api') &&
             r.request().method() === 'GET' &&
             r.status() === 200,

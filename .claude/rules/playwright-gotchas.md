@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E gotchas: CSRF/session isolation, hx-boost waits, PRG races, hidden-element fill, axe a11y, URL-flip blast radius, global-table ownership, seed/test-state traps, CI shard load.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-10-19
+last_verified: 2026-10-23
 ---
 
 # Playwright E2E Gotchas
@@ -12,7 +12,7 @@ Hard-won pitfalls, each one broke a real PR. Core rules and templates: `playwrig
 
 - **`request.post()` and `page` are different PHP sessions.** A CSRF token read from the page is rejected by `request.post()` (the standalone `request` fixture has no shared cookies or session state with the page). Submit CSRF-protected forms via `button.click()`; tamper hidden inputs with `evaluate()` if you need a different payload. Never hand a page token to `request.post()`.
 - **Forms inside `hx-boost` never navigate.** `themes/IBL/theme.php` wraps `#site-content` in `hx-boost="true"`, so `waitForLoadState('load')` resolves against the pre-click DOM and stale counts pass. Use `helpers/htmx-swap.ts` `assertHtmxSwap()` for `op=api` swaps, or wrap the click in `Promise.all([page.waitForResponse(r => r.url().includes('<Module>') && r.request().method() === 'POST'), locator.click()])` then `expect.poll` the changed value.
-- **`waitForURL(pattern)` after a submit-click can match the STALE pre-click URL.** In PRG (post-redirect-get) flows the `beforeEach` URL often already matches the pattern, so the wait returns before the redirect lands and a one-shot read (`getAttribute`) reads the OLD document. Failed 100% reproducibly in `depth-chart-entry-submission.spec.ts`. Fix: start the wait before the click (`Promise.all([page.waitForURL(p), locator.click()])`), never one-shot read after it (use `expect(async () => {...}).toPass()` or a destination-only assertion), and `waitForLoadState('networkidle')` before navigating away — otherwise the in-flight redirect's own AJAX dies with `net::ERR_ABORTED`.
+- **`waitForURL(pattern)` after a submit-click can match the STALE pre-click URL**. In PRG (post-redirect-get) flows the `beforeEach` URL often already matches the pattern, so the wait returns before the redirect lands and a one-shot read (`getAttribute`) reads the OLD document. Failed 100% reproducibly in `depth-chart-entry-submission.spec.ts`. Fix: start the wait before the click (`Promise.all([page.waitForURL(p), locator.click()])`) and never one-shot read after it (use `expect(async () => {...}).toPass()` or a destination-only assertion). Started that way, `waitForURL` resolves on the redirect target's `load` event, so the PRG GET has landed before the next `page.goto()`. The `net::ERR_ABORTED` failures came from the stale-URL early return, which let the next `page.goto()` abort the still-in-flight redirect. Add `waitForLoadState('load')` when the spec should state that wait explicitly. Never wait on `networkidle`: `playwright/no-networkidle` is an error in `ibl5/eslint.config.js`.
 - **Serial `describe` blocks hide failures.** Once one test fails, the rest of the block is skipped, so CI's "1 failed" is a lower bound. Fix the first, re-run, expect the next to surface.
 
 ## Selectors

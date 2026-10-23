@@ -114,16 +114,16 @@ async function captureSnapshot(
   const title = filename.replace(/\.png$/, '');
   const anchor = page.locator(row.anchor).first();
 
-  // Re-establish the same visual state after a (re)load: settle the network,
-  // wait for the anchor, and re-trigger the HTMX tab swap if any. Runs after
-  // both the initial navigation and the render-B reload.
+  // Re-establish the same visual state after a (re)load: wait for the anchor,
+  // and re-trigger the HTMX tab swap if any. Runs after both the initial
+  // navigation and the render-B reload. Late image/font loads settle inside
+  // captureStable() and the toHaveScreenshot() gate, which both re-sample
+  // until two consecutive shots agree.
   async function settle(): Promise<void> {
-    await page.waitForLoadState('networkidle');
     await anchor.waitFor({ state: 'visible' });
     if (tab) {
       await page.locator(tab.trigger).first().click();
       await page.locator(tab.swapTarget).first().waitFor({ state: 'visible' });
-      await page.waitForLoadState('networkidle');
     }
   }
 

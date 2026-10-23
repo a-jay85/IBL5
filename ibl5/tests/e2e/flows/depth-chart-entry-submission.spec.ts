@@ -171,7 +171,10 @@ test.describe('Depth Chart submission', () => {
       page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 }),
       page.locator('.depth-chart-buttons .depth-chart-submit-btn').click(),
     ]);
-    await page.waitForLoadState('networkidle');
+    // waitForURL above already waits for the redirect target's load event.
+    // This explicit load wait documents that the PRG GET has fully landed
+    // before page.goto() below starts a new navigation.
+    await page.waitForLoadState('load');
 
     // Leave the depth chart page and come back — minimal reliable repro of
     // the "user returns to the form later" pattern.

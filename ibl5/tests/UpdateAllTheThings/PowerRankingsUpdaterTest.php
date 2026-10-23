@@ -293,10 +293,14 @@ class PowerRankingsUpdaterTest extends TestCase
         ], 1);
 
         $queries = $this->mockDb->getPreparedQueries();
-        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_olympics_standings WHERE teamid = ?', $queries);
+        $this->assertCount(
+            1,
+            array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_olympics_standings'))
+        );
+        $this->assertSame([2], $this->mockDb->getLastBoundParams());
         $this->assertCount(
             0,
-            array_filter($queries, static fn (string $q): bool => str_contains($q, 'FROM ibl_standings WHERE'))
+            array_filter($queries, static fn (string $q): bool => str_contains($q, 'FROM ibl_standings'))
         );
     }
 

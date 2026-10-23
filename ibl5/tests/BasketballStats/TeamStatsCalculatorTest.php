@@ -48,6 +48,19 @@ class TeamStatsCalculatorTest extends TestCase
         ));
     }
 
+    /**
+     * Prepared statements that hit ibl_standings.
+     *
+     * @return list<string>
+     */
+    private function standingsQueries(MockDatabase $db): array
+    {
+        return array_values(array_filter(
+            $db->getPreparedQueries(),
+            static fn (string $query): bool => str_contains($query, 'ibl_standings')
+        ));
+    }
+
     public function testCalculateInitializesCorrectlyWithEmptyGames(): void
     {
         $games = [];
@@ -581,7 +594,8 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(1, $result['wins']);
         // Opponent has no standings row, so winPoints stays 0.
         $this->assertSame(0, $result['winPoints']);
-        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', $this->mockDb->getPreparedQueries());
+        $this->assertCount(1, $this->standingsQueries($this->mockDb));
+        $this->assertSame([2], $this->mockDb->getLastBoundParams());
     }
 
     public function testLossPointsDefaultToZeroWithMockDb(): void
@@ -597,7 +611,8 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(1, $result['losses']);
         // Opponent has no standings row, so lossPoints stays 0.
         $this->assertSame(0, $result['lossPoints']);
-        $this->assertContains('SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', $this->mockDb->getPreparedQueries());
+        $this->assertCount(1, $this->standingsQueries($this->mockDb));
+        $this->assertSame([2], $this->mockDb->getLastBoundParams());
     }
 
     public function testPreloadedOpponentRecordsWeightWinAndLossPoints(): void
@@ -647,10 +662,8 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(1, $result['losses']);
         $this->assertSame(30, $result['winPoints']);
         $this->assertSame(10, $result['lossPoints']);
-        $this->assertSame(
-            ['SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?', 'SELECT wins AS win, losses AS loss FROM ibl_standings WHERE teamid = ?'],
-            $db->getPreparedQueries()
-        );
+        $this->assertCount(2, $this->standingsQueries($db));
+        $this->assertSame([2], $db->getLastBoundParams());
     }
 
     public function testOpponentMissingFromPreloadContributesZero(): void

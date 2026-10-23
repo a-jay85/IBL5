@@ -132,8 +132,11 @@ jobs:
           to_move=$(awk '/^DIR /{ split($5, kv, "="); m += kv[2] } END { print m + 0 }' "$RUNNER_TEMP/vr-proj.txt")
           dir_before=$(awk '/^DIR /{ split($3, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
           dir_after=$(awk '/^DIR /{ split($4, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
-          if [ "$to_move" -gt 0 ] && [ "$dir_after" -ge $(( dir_before / 2 )) ]; then
-            echo "::error::Rewritten dirs project to ${dir_after} B, not under half of ${dir_before} B."
+          # New blobs count against the rewritten dirs, so a dedupe that copies every
+          # reference still fails.
+          dir_projected=$(( dir_after + store - store_before ))
+          if [ "$to_move" -gt 0 ] && [ "$dir_projected" -ge $(( dir_before / 2 )) ]; then
+            echo "::error::Rewritten dirs plus new blobs project to ${dir_projected} B, not under half of ${dir_before} B."
             exit 1
           fi
           if [ "$projected" -gt 1073741824 ]; then

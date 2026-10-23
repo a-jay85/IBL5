@@ -178,8 +178,8 @@ def _llm_core(text: str | None) -> str:
 # Why names an effect `git revert` cannot undo. Later phases pass llm_raise_bar=False: they
 # cannot tell an LLM raise from a human one, and a human raise must survive.
 _IRREVERSIBLE_RE = re.compile(
-    r"\b(drop(s|ped)?|delet(e|es|ed|ion)|truncat(e|es|ed|ion)|renam(e|es|ed)"
-    r"|overwr(ite|ites|itten|ote)|purg(e|es|ed)|destroy(s|ed)?|wip(e|es|ed)"
+    r"\b(drop(s|ped|ping)?|delet(e|es|ed|ing|ion)|truncat(e|es|ed|ing|ion)|renam(e|es|ed|ing)"
+    r"|overwr(ite|ites|iting|itten|ote)|purg(e|es|ed|ing)|destroy(s|ed|ing)?|wip(e|es|ed|ing)"
     r"|lost|loss|irreversibl[ey]|unrecoverabl[ey]|cannot be (undone|restored|recalled|reverted)"
     r"|send(s|ing)?|sent|recall(ed)?|notif(y|ies|ied|ication)|email(s|ed)?|discord"
     r"|prod(uction)?[- ]?(sync|data|db|database|rows?))\b",

@@ -298,7 +298,7 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
                 gh.reply_review_thread(pr, cid, gate_hold_body(why))
             except Exception as e:  # noqa: BLE001 - a lost marker costs one more fixer attempt next run
                 log(f"thread {cid}: gate-hold marker post failed ({e!r}); thread stays open")
-        post_sha =last_sha_box[0] if last_sha_box[0] != pre_sha else None
+        post_sha = last_sha_box[0] if last_sha_box[0] != pre_sha else None
         if outcome == "fixed":
             fixed += 1
         elif outcome == "declined":

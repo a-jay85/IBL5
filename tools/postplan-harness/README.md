@@ -38,6 +38,17 @@ Every retained call: single turn, no tools, byte-capped input packet, JSON
 output validated by `harness/schemas.py`, one bounded retry, usage recorded.
 Invalid output is a typed failure — never silently accepted.
 
+Two arming inputs get one stage-level retry when they miss. A real verdict is never retried. The read-only
+`conflict-review` call is asked again once when its reply carries no verdict token or the
+call failed for a non-terminal reason (a usage limit or expired login is never re-asked); a
+second miss writes `CONFLICT-REVIEW=ABSENT` and condition (14) holds with `after 1 retry`.
+Phase 6.5 re-applies this run's Phase 2 `**Merge danger:**` line once when the live body has
+lost it; a clean-tree rerun wrote no line and never refills, and `ONE-WAY` or `MALFORMED` is a
+verdict, so condition (18) holds with `state=MISSING after 1 retry` only after a refill that did
+not land. `result.json` carries `retries` (`{"conflict-review": 1, "merge-danger": 1}` at most)
+only when a retry ran. No per-run call cap exists to raise: the budget grows by at most one
+`conflict-review` call per run.
+
 ## Layout
 
 ```
@@ -158,7 +169,7 @@ probes and reports without writing to the PR.
 |----|---------|
 | 0 | Success: PR opened, held for a manual gate, or already merged. |
 | 1 | Generic harness failure. `bin/post-plan-now` falls back to the Sonnet `/post-plan` skill session. |
-| 3 | Fail-closed sentinel. No skill fallback fires. Causes include: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, regenerates a flagged generated file (today `ibl5/phpstan-baseline.neon`) instead of resolving it, attempts bounded per-file resolution on the rest, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; a branch-added line the resolver adapted to a rewrite master made in the same file passes the proof only with a deterministic near-match, the resolver's own ADAPTED-LINE justification, and a per-line CONFIRMED verdict from a separate read-only reviewer, and every accepted line is written to audit.log; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget); (c) an expired Claude CLI login (`llm-auth-expired`); the skill session would use the same login, so run `claude`, complete `/login`, and re-run `bin/post-plan-now`. A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md` for the full decision. |
+| 3 | Fail-closed sentinel. No skill fallback fires. Causes include: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, regenerates a flagged generated file (today `ibl5/phpstan-baseline.neon`) instead of resolving it, attempts bounded per-file resolution on the rest, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; a branch-added line the resolver adapted to a rewrite master made in the same file passes the proof only with a deterministic near-match, the resolver's own ADAPTED-LINE justification, and a per-line CONFIRMED verdict from a separate read-only reviewer, and every accepted line is written to audit.log; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget); (c) an expired Claude CLI login (`llm-auth-expired`); the skill session would use the same login, so run `claude`, complete `/login`, and re-run `bin/post-plan-now`. Before it declines, the stacked replay squashes a conflicting linear range, retries a declined file once on Opus (2 per run, shared with the plain path), and gives the proof's LOST lines to one Opus retry (5 files at most). A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md` for the full decision. |
 
 ## Retries on LLM output and on the base fetch
 

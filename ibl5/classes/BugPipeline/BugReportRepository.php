@@ -222,9 +222,8 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     /**
      * Operator @mention wake: log the operator's message, then move the row per its status.
      * Duplicate message ids are a no-op (bot retry safety); an unknown report id writes nothing.
-     * dormant -> queued; stopped rows (needs_human/parked_idle) restart through classify;
-     * every other status only gains context (and a thread_id if it had none). A dropped row
-     * stays dropped: its only writer is a deleted source message, so a mention must not revive it.
+     * dormant -> queued; stopped rows (needs_human/parked_idle/dropped) restart through classify;
+     * every other status only gains context (and a thread_id if it had none).
      * The row is read FOR UPDATE, so the status branch below sees what the transition writes over.
      *
      * @return array{outcome: 'woke'|'restarted'|'appended'|'duplicate'|'unknown', status: ?string}
@@ -245,7 +244,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
                 $this->claims->transition($id, 'queued', ['thread_id' => $threadId], true);
                 return ['outcome' => 'woke', 'status' => 'queued'];
             }
-            if (in_array($row['status'], ['needs_human', 'parked_idle'], true)) {
+            if (in_array($row['status'], ['needs_human', 'parked_idle', 'dropped'], true)) {
                 $this->claims->transition($id, 'queued', [
                     'thread_id' => $threadId,
                     'class' => null,

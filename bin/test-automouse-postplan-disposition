@@ -378,6 +378,56 @@ else
 fi
 rm -rf "$D"
 
+# d8: the two inline skip sites in run (attempts-exhausted, unusable impl_model) stamp the
+# moved skipped/ entry with a DISPOSITION-time mtime. The blocks are not functions, so they
+# are cut out of $RUNNER by their unique log-string anchors and eval'd against a fixture whose
+# queue symlink is pinned to the past. Same find -newermt predicate as d7.
+# The block runs from the anchor echo line to the first `rm -f "$ATTEMPT_FILE"` after it, so a
+# deleted touch line makes the block shorter, never longer (it cannot swallow a later site).
+extract_run_block() {
+    awk -v a="$1" '
+        !cap && index($0, a) { cap = 1 }
+        cap { print }
+        cap && /^[[:space:]]*rm -f "\$ATTEMPT_FILE"/ { exit }
+    ' "$RUNNER"
+}
+d8_check() {  # $1 = case label, $2 = anchor string, $3 = ATTEMPTS value, $4 = BASE_MODEL value
+    local label="$1" anchor="$2" block D d8_since
+    block="$(extract_run_block "$anchor")"
+    # anchor-on-target guard: the block must contain the skip mv and end at the rm -f line
+    if ! grep -qF -- 'mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"' <<< "$block" \
+       || ! grep -qE -- '^[[:space:]]*rm -f "\$ATTEMPT_FILE"' <<< "$block"; then
+        echo "FAIL: $label — could not extract the inline skip block from $RUNNER (anchor drifted?)"
+        FAILED=1
+        return
+    fi
+    D=$(make_fixture)
+    touch -h -t 200001010000 "$D/queue/p.md"
+    if [ -n "$(find "$D/queue" -maxdepth 1 -name p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
+        echo "FAIL: $label-vacuity — fixture symlink was not pinned to the past"
+        FAILED=1
+    fi
+    (
+        NIGHTLY_DIR="$D"; LOG="$D/run.log"; PLAN_NAME="p.md"; NEXT_PLAN="$D/queue/p.md"
+        ATTEMPTS="$3"; BASE_MODEL="$4"
+        ATTEMPT_FILE="$D/a"; FAILURE_FILE="$D/f"; CAP_REFUND_FILE="$D/c"; PLAN_DEFECT_FILE="$D/d"
+        eval "$block"
+    ) >/dev/null 2>&1
+    d8_since="$(date -v-1H '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d '1 hour ago' '+%Y-%m-%d %H:%M:%S')"
+    if [ -z "$(find "$D/skipped" -maxdepth 1 -name p.md 2>/dev/null)" ]; then
+        echo "FAIL: $label — p.md was not moved to skipped/ (block did not run as expected)"
+        FAILED=1
+    elif [ -n "$(find "$D/skipped" -maxdepth 1 -name p.md -newermt "$d8_since" 2>/dev/null)" ]; then
+        echo "ok: $label"
+    else
+        echo "FAIL: $label — skipped/p.md kept queue-time mtime; the digest will not see it"
+        FAILED=1
+    fi
+    rm -rf "$D"
+}
+d8_check d8-skip-attempts-mtime 'failed $ATTEMPTS times — moving to skipped/' 3 ""
+d8_check d8-skip-model-mtime 'declares an unusable impl_model' 0 "bad-model"
+
 # ---------------------------------------------------------------------------
 # Group c — claim-time call site (Phase 4), static assertions over $RUNNER
 # ---------------------------------------------------------------------------

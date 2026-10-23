@@ -120,4 +120,12 @@ class JsbImportRepository extends \Database\BaseMysqliRepository implements JsbI
     {
         return $this->his->hasChampionForSeason($seasonYear);
     }
+
+    /**
+     * @see JsbImportRepositoryInterface::hasRetiredPlayersForYear()
+     */
+    public function hasRetiredPlayersForYear(int $retirementYear): bool
+    {
+        return $this->ret->hasRetiredPlayersForYear($retirementYear);
+    }
 }

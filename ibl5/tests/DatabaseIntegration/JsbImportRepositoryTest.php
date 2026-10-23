@@ -911,6 +911,30 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertSame(200050001, $row['pid']);
     }
 
+    public function testHasRetiredPlayersForYearReturnsTrueWhenRowExists(): void
+    {
+        $this->repo->upsertRetiredPlayer([
+            'jsb_pid' => 99903,
+            'retirement_year' => 2095,
+            'player_name' => 'Prior Retiree',
+            'pid' => null,
+        ]);
+
+        self::assertTrue($this->repo->hasRetiredPlayersForYear(2095));
+    }
+
+    public function testHasRetiredPlayersForYearReturnsFalseForYearWithNoRows(): void
+    {
+        $this->repo->upsertRetiredPlayer([
+            'jsb_pid' => 99903,
+            'retirement_year' => 2095,
+            'player_name' => 'Prior Retiree',
+            'pid' => null,
+        ]);
+
+        self::assertFalse($this->repo->hasRetiredPlayersForYear(2094));
+    }
+
     // ── markPlayerRetired ────────────────────────────────────────
 
     /** @return array<string, int|string|null> */

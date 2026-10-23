@@ -122,7 +122,18 @@ async function captureSnapshot(
   async function settle(): Promise<void> {
     await anchor.waitFor({ state: 'visible' });
     if (tab) {
-      await page.locator(tab.trigger).first().click();
+      // The swap target already exists before the click, so waiting on its
+      // visibility alone can pass against the old tab. Start the response wait
+      // before the click so the HTMX GET is confirmed to have landed.
+      await Promise.all([
+        page.waitForResponse(
+          (r) =>
+            r.url().includes('op=api') &&
+            r.request().method() === 'GET' &&
+            r.status() === 200,
+        ),
+        page.locator(tab.trigger).first().click(),
+      ]);
       await page.locator(tab.swapTarget).first().waitFor({ state: 'visible' });
     }
   }

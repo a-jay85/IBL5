@@ -256,6 +256,14 @@ def test_reapplication_is_a_fixed_point_after_truncation():
     assert second.why.count("mechanical:") == 1
 
 
+def test_reapplication_is_a_fixed_point_with_a_long_prefix():
+    long_mech = md.MergeDanger("one-way", ONE.blast, "m" * 185)
+    first = md.merge_verdicts(long_mech, "one-way", ONE.blast, "z" * 300)
+    second = md.merge_verdicts(long_mech, first.door, first.blast, first.why)
+    assert first.why == long_mech.why
+    assert second.why == first.why
+
+
 def test_prefixed_prior_with_short_core_falls_back_to_mechanical():
     assert md.merge_verdicts(ONE, "one-way", ONE.blast, f"{ONE.why}. tiny").why == ONE.why
 

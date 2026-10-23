@@ -210,7 +210,11 @@ def merge_verdicts(
     if len(core) < WHY_MIN:
         why = mechanical.why
     elif mechanical.door == "one-way":
-        why = f"{mechanical.why}. {core}"
+        # Cut first, then re-check: a long prefix can leave under WHY_MIN core chars, and a
+        # later re-application would see that short core and fall back, breaking the fixed point.
+        why = f"{mechanical.why}. {core}"[:WHY_MAX]
+        if len(why) - len(mechanical.why) - 2 < WHY_MIN:
+            why = mechanical.why
     else:
         why = core
     return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers)

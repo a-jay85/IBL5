@@ -49,10 +49,12 @@ ALTER TABLE ibl_box_scores_teams_franchise_names_backup
     MODIFY calc_rebounds smallint(5) unsigned NULL,
     MODIFY calc_fg_made  smallint(5) unsigned NULL;
 
-CREATE TEMPORARY TABLE tmp_bst_targets (
-    id INT NOT NULL PRIMARY KEY,
-    target_name VARCHAR(16) NOT NULL
-);
+-- target_name copies ibl_franchise_seasons.team_name's type and collation. A literal
+-- column type would take the database default collation, which can differ from the
+-- live tables (ERROR 1267 on the name comparisons). The wider type also lets guard G1
+-- see a too-long name instead of the INSERT truncating or rejecting it first.
+CREATE TEMPORARY TABLE tmp_bst_targets (id INT NOT NULL PRIMARY KEY)
+SELECT 0 AS id, team_name AS target_name FROM ibl_franchise_seasons WHERE 1 = 0;
 
 INSERT INTO tmp_bst_targets (id, target_name)
 SELECT r.id,

@@ -71,6 +71,8 @@ GUARD_KINDS = [
 COMPILED = [(lang, kind, re.compile(pat), paired)
             for lang, kind, pat, paired in GUARD_KINDS]
 KNOWN_KINDS = sorted({kind for _, kind, _, _ in GUARD_KINDS})
+# Kinds whose text is generic and repeats across blocks in one file.
+BARE_KINDS = {"try", "catch", "finally", "except", "strict-mode", "trap"}
 EXIT_STMT = re.compile(r"\b(return|throw|exit|raise|continue)\b")
 
 SKIP_PATHS = [re.compile(p) for p in (
@@ -152,9 +154,13 @@ def unquote(token):
 
 
 def strip_prefix(token, prefix):
-    """Unquote a ---/+++ path and drop its a/ or b/ prefix, else None."""
+    """Unquote a ---/+++ path and drop its one-letter prefix, else None.
+
+    prefix is the default (a/ or b/); git's mnemonicPrefix also emits
+    i/, w/, c/ and o/, so any single lowercase letter plus "/" is accepted.
+    """
     token = unquote(token)
-    return token[2:] if token.startswith(prefix) else None
+    return token[2:] if re.match(r"^[a-z]/", token) else None
 
 
 def parse_diff(text):
@@ -169,7 +175,7 @@ def parse_diff(text):
     old_path = new_path = None
     for raw in text.splitlines():
         if raw.startswith("diff --git "):
-            m = re.match(r"^diff --git a/(.*) b/(.*)$", raw)
+            m = re.match(r"^diff --git [a-z]/(.*) [a-z]/(.*)$", raw)
             if not m:
                 m = re.match(r'^diff --git (".*") (".*")$', raw)
                 path = strip_prefix(m.group(2), "b/") if m else None
@@ -252,6 +258,12 @@ def find_removed_guards(files):
                 if sign == "+":
                     added[norm] = added.get(norm, 0) + 1
         for hunk in rec["hunks"]:
+            # Bare lines (`try {`, `finally:`, `set -euo pipefail`) repeat all
+            # over a file, so they only cancel against an add in the same hunk.
+            local_added = {}
+            for sign, norm in hunk:
+                if sign == "+":
+                    local_added[norm] = local_added.get(norm, 0) + 1
             # Old-file view: removed and context lines in order, so an exit
             # statement left behind as context still pairs with the guard.
             old = [(s, n) for s, n in hunk if s != "+"]
@@ -264,8 +276,11 @@ def find_removed_guards(files):
                 if paired and not any(EXIT_STMT.search(r)
                                       for _, r in old[i:i + 3]):
                     continue
-                if added.get(norm, 0) > 0:
-                    added[norm] -= 1
+                pool = local_added if kind in BARE_KINDS else added
+                if pool.get(norm, 0) > 0:
+                    pool[norm] -= 1
+                    if pool is local_added:
+                        added[norm] = max(0, added.get(norm, 0) - 1)
                     continue
                 key = guard_key(kind, path, norm)
                 if key in seen:

@@ -7,6 +7,7 @@ commits so HEAD has parents (pre, master). `prove` is a stub closure over the wo
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import shutil
@@ -25,16 +26,27 @@ from harness.adapters.gitad import LiveGit
 from harness.adapters.llm import MODEL_MAP, FixtureLlm
 from harness.conflict import extract_stages, resolve_one
 from harness.conflict_ladder import (
+    BOTH_MODIFIED,
     GENERATED_FILES,
+    LADDER_TRAIL_CAP,
     OPUS_MAX_FILES,
+    PUSH_WRAPPER_DENIED,
+    SESSION_DENIED,
+    VR_SNAPSHOT_GLOB,
     GeneratedFile,
     LadderContext,
     RungAttempt,
+    command_outputs,
+    is_pattern,
     ladder_failure_reason,
     make_opus_rung,
     make_regen_rung,
     make_session_rung,
+    match_generated,
+    matching_paths,
     parse_lost_lines,
+    path_matches,
+    pre_resolve_targets,
     run_ladder,
 )
 from harness.rebase_cause import CAUSE_TREE_PROOF, classify_rebase_block
@@ -72,7 +84,10 @@ def _write(d, files):
     for rel, text in files.items():
         full = Path(d) / rel
         full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_text(text)
+        if isinstance(text, bytes):
+            full.write_bytes(text)
+        else:
+            full.write_text(text)
 
 
 def _build_merge_repo(d, base, feat, master, resolved):
@@ -109,12 +124,12 @@ def _build_merge_repo(d, base, feat, master, resolved):
     return pre, master_sha, _git(d, "rev-parse", "HEAD").stdout.strip()
 
 
-def _ctx(d, key, pre, master, conflicted, prove, llm=None):
+def _ctx(d, key, pre, master, conflicted, prove, llm=None, stage_sets=None):
     g = LiveGit(str(d))
     return LadderContext(
         llm=llm, run=g._run, run_out=g._run_out, prove=prove, worktree=str(d),
         key=key, master_sha=master, pre_rebase_sha=pre,
-        conflicted_files=tuple(conflicted))
+        conflicted_files=tuple(conflicted), stage_sets=stage_sets or {})
 
 
 def _head(d):
@@ -299,6 +314,31 @@ def test_guard_rejects_rewritten_parents(tmp_path, key):
     assert "parents" in out.trail[0]
     assert _head(d) == merge
     assert "keep-me" not in (Path(d) / "a.txt").read_text()
+
+
+def test_expected_parents_override_guards_single_parent_head(tmp_path, key):
+    d = tmp_path / "repo"
+    d.mkdir()
+    _git(d, "init", "-b", "master")
+    _write(d, {"a.txt": "base\n"})
+    _git(d, "add", "-A")
+    _git(d, "commit", "-m", "base")
+    p = _head(d)
+    _write(d, {"a.txt": "next\n"})
+    _git(d, "add", "-A")
+    _git(d, "commit", "-m", "one parent")
+    g = LiveGit(str(d))
+
+    def ctx(expected):
+        return LadderContext(
+            llm=None, run=g._run, run_out=g._run_out, prove=lambda: (True, ""),
+            worktree=str(d), key=key, master_sha=p, pre_rebase_sha=p,
+            conflicted_files=("a.txt",), expected_parents=expected)
+
+    assert conflict_ladder._parents_reason(ctx((p,))) == ""
+    assert conflict_ladder._parents_reason(ctx(("0" * 40,))).startswith("merge parents changed")
+    # The default () keeps the merge pair, which a one-parent HEAD does not match.
+    assert conflict_ladder._parents_reason(ctx(())).startswith("merge parents changed")
 
 
 def test_ladder_no_rung_passes_reports_full_trail(tmp_path, key):
@@ -489,14 +529,20 @@ def test_generated_registry_matches_repo():
         ["git", "rev-parse", "--show-toplevel"], cwd=Path(__file__).resolve().parent,
         capture_output=True, text=True, check=True).stdout.strip())
     for g in GENERATED_FILES:
-        assert (root / g.path).exists(), g.path
+        if is_pattern(g.path):
+            assert glob.glob(str(root / g.path)), g.path
+        else:
+            assert (root / g.path).exists(), g.path
         if g.command is not None:
             assert (root / g.command[0]).exists(), g.command[0]
     assert (root / "ibl5/bin/check-baseline-drift").exists()
     by_path = {g.path: g for g in GENERATED_FILES}
-    for copy_only in ("ibl5/docs/schema/current-schema.sql", "ibl5/coverage-baseline.json"):
+    for copy_only in ("ibl5/docs/schema/current-schema.sql", "ibl5/coverage-baseline.json",
+                      VR_SNAPSHOT_GLOB):
         assert by_path[copy_only].command is None
         assert by_path[copy_only].why_copy_only
+        if copy_only == VR_SNAPSHOT_GLOB:
+            assert by_path[VR_SNAPSHOT_GLOB].regen_on_conflict
 
 
 # -- Phase 4: Opus rung ----------------------------------------------------------
@@ -744,6 +790,17 @@ def test_run_result_writes_conflict_rung_when_set():
     assert data["conflict_rung"] == "regen"
 
 
+def test_run_result_omits_retries_when_empty():
+    data = json.loads(RunResult(terminal=TerminalState.SHIPPED_HELD).to_json())
+    assert "retries" not in data
+
+
+def test_run_result_writes_retries_when_set():
+    data = json.loads(RunResult(terminal=TerminalState.SHIPPED_HELD,
+                                retries={"conflict-review": 1}).to_json())
+    assert data["retries"] == {"conflict-review": 1}
+
+
 def test_ladder_failure_reason_keeps_proof_prefix():
     proof = "".join(f"LOST: f.txt: +line {i} padding padding\n" for i in range(30))
     trail = ("regen: skipped (no generated file involved)", "opus-retry: boom")
@@ -760,6 +817,61 @@ def test_ladder_failure_reason_keeps_proof_prefix():
     assert classify(reason).cause == classify(old).cause == CAUSE_TREE_PROOF
 
 
+def test_ladder_failure_reason_keeps_last_trail_entry():
+    proof = "".join(f"LOST: f.txt: +line {i} padding padding\n" for i in range(30))
+    trail = tuple(f"opus-retry: {'x' * 290} {i}" for i in range(4)) + (
+        "sonnet-fix: already attempted head abc1234 on master def5678",)
+    reason = ladder_failure_reason(proof, trail)
+    assert reason.endswith(trail[-1])
+    assert " ...; " in reason
+    assert len(reason.split(" | ladder: ", 1)[1]) <= LADDER_TRAIL_CAP
+    assert reason.startswith("tree proof failed: ")
+    cause = classify_rebase_block(
+        ("f.txt",), reason, head_sha="h", branch="feat",
+        run_git=lambda args: (0, ""), run_gh=lambda args: (0, "")).cause
+    assert cause == CAUSE_TREE_PROOF
+
+
+def test_ladder_failure_reason_short_trail_unchanged():
+    proof = "LOST: f.txt: +line padding\n"
+    trail = ("regen: skipped (no generated file involved)", "opus-retry: boom")
+    reason = ladder_failure_reason(proof, trail)
+    assert reason == (f"tree proof failed: {proof.strip()[:400]}"
+                      f" | ladder: {'; '.join(trail)}")
+    assert ladder_failure_reason(proof, ()).endswith(" | ladder: ")
+
+
+def test_ladder_failure_reason_caps_oversized_last_entry():
+    trail = ("regen: skipped", "sonnet-fix: " + "y" * 1000)
+    ladder = ladder_failure_reason("LOST: f.txt\n", trail).split(" | ladder: ", 1)[1]
+    assert len(ladder) <= LADDER_TRAIL_CAP
+    assert ladder.startswith("regen: skipped")
+    assert "sonnet-fix: yyy" in ladder
+
+
+def test_session_denied_covers_push_wrapper_forms():
+    from harness.conflict_fix import FIX_DENIED
+    assert "Bash(*/git push:*)" in PUSH_WRAPPER_DENIED
+    assert "Bash(git * push *)" in PUSH_WRAPPER_DENIED
+    probe_added = (
+        "Bash(*/git push *)", "Bash(*/git push)",
+        "Bash(*/gh *)", "Bash(*/gh)", "Bash(*/curl *)", "Bash(*/curl)",
+        "Bash(*/wget *)", "Bash(*/wget)", "Bash(*/ssh *)", "Bash(*/ssh)",
+        "Bash(*/scp *)", "Bash(*/scp)",
+        "Bash(bash -c:*)", "Bash(sh -c:*)", "Bash(zsh -c:*)",
+    )
+    for entry in probe_added:
+        assert entry in PUSH_WRAPPER_DENIED
+    for entry in PUSH_WRAPPER_DENIED:
+        assert entry in SESSION_DENIED
+        assert entry in FIX_DENIED
+
+
+def test_session_denied_leaves_read_only_git_usable():
+    for entry in ("Bash", "Bash(git:*)", "Bash(*/git:*)", "Bash(git *)", "Bash(git * *)"):
+        assert entry not in SESSION_DENIED
+
+
 # --- pre-resolver regen selection (gitad._rebase_onto) ----------------------------
 
 _BASELINE_PATH = "ibl5/phpstan-baseline.neon"
@@ -768,6 +880,9 @@ _REGEN_OUTPUTS = {
     "ibl5/phpstan-tests-baseline.neon",
     "ibl5/phpstan-baseline-counts.json",
 }
+_SNAP_DIR = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+_VR_PNG = f"{_SNAP_DIR}/player-mobile.png"
+_VR_WHY = "CI update-baselines regenerates VR PNGs"
 
 
 def _with_autoload(tmp_path: Path) -> str:
@@ -802,3 +917,115 @@ def test_command_outputs_covers_shared_generator():
     outputs = conflict_ladder.command_outputs((baseline,))
     assert outputs == _REGEN_OUTPUTS
     assert ".claude/rules/codebase-map.md" not in outputs
+
+
+def test_path_matches_exact_entry_is_literal():
+    assert path_matches("ibl5/phpstan-baseline.neon", "ibl5/phpstan-baseline.neon")
+    assert not path_matches("ibl5/phpstan-baseline.neon", "ibl5/phpstan-baseline.neon.bak")
+    assert not path_matches("ibl5/phpstan-baseline.neon", "x/ibl5/phpstan-baseline.neon")
+
+
+def test_match_generated_expands_vr_png_glob():
+    got = match_generated([_VR_PNG, f"{_SNAP_DIR}/last-sim-recap.png", "ibl5/x.php"])
+    assert [g.path for g in got] == [f"{_SNAP_DIR}/last-sim-recap.png", _VR_PNG]
+    for g in got:
+        assert g.command is None
+        assert g.regen_on_conflict is True
+        assert g.why_copy_only == _VR_WHY
+
+
+def test_match_generated_rejects_png_outside_snapshot_dir():
+    assert match_generated([
+        "ibl5/images/a.png",
+        "ibl5/tests/e2e/other.spec.ts-snapshots/a.png",
+        f"{_SNAP_DIR}/sub/a.png",
+    ]) == ()
+
+
+def test_match_generated_rejects_non_png_in_snapshot_dir():
+    assert match_generated([f"{_SNAP_DIR}/a.txt", f"{_SNAP_DIR}/a.png.orig"]) == ()
+
+
+def test_match_generated_keeps_exact_entries_exact():
+    got = match_generated(["ibl5/phpstan-baseline.neon"])
+    assert len(got) == 1
+    assert got[0] is GENERATED_FILES[0]
+    assert match_generated(["ibl5/phpstan-baseline.neon.bak"]) == ()
+
+
+def test_matching_paths_filters_to_registered():
+    assert matching_paths([_VR_PNG, "ibl5/x.php", "ibl5/coverage-baseline.json"]) \
+        == frozenset({_VR_PNG, "ibl5/coverage-baseline.json"})
+
+
+def test_pre_resolve_targets_selects_copy_only_vr_png_when_both_modified(tmp_path):
+    got = pre_resolve_targets([_VR_PNG], worktree=str(tmp_path),
+                              stage_sets={_VR_PNG: BOTH_MODIFIED})
+    assert [g.path for g in got] == [_VR_PNG]
+
+
+def test_pre_resolve_targets_skips_copy_only_without_stage_sets(tmp_path):
+    assert pre_resolve_targets([_VR_PNG], worktree=str(tmp_path)) == ()
+
+
+def test_pre_resolve_targets_skips_copy_only_modify_delete(tmp_path):
+    for stages in (frozenset({1, 3}), frozenset({1, 2})):
+        assert pre_resolve_targets([_VR_PNG], worktree=str(tmp_path),
+                                   stage_sets={_VR_PNG: stages}) == ()
+
+
+def test_pre_resolve_targets_exact_copy_only_entries_still_skipped(tmp_path):
+    path = "ibl5/docs/schema/current-schema.sql"
+    assert pre_resolve_targets([path], worktree=str(tmp_path),
+                               stage_sets={path: BOTH_MODIFIED}) == ()
+
+
+def test_command_outputs_empty_for_copy_only_glob():
+    assert command_outputs(match_generated([_VR_PNG])) == frozenset()
+
+
+_PNG_MASTER = b"\x89PNG\r\n\x1a\nmaster"
+_PNG_BRANCH = b"\x89PNG\r\n\x1a\nbranch"
+
+
+def _png_repo(tmp_path, rel):
+    d = tmp_path / "png"
+    pre, master, merge = _build_merge_repo(
+        d,
+        {rel: b"\x89PNG\r\n\x1a\nbase", "keep.txt": "k\n"},
+        {rel: _PNG_BRANCH},
+        {rel: _PNG_MASTER},
+        {rel: _PNG_BRANCH})
+    return d, pre, master
+
+
+def test_regen_rung_takes_master_png_via_glob(tmp_path, key):
+    d, pre, master = _png_repo(tmp_path, _VR_PNG)
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"),
+               stage_sets={_VR_PNG: frozenset({1, 2, 3})})
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt.applied is True
+    assert (Path(d) / _VR_PNG).read_bytes() == _PNG_MASTER
+    assert _VR_PNG in attempt.touched
+    assert f"{_VR_PNG}: master copy only ({_VR_WHY})" in attempt.note
+
+
+@pytest.mark.parametrize("stages", [frozenset({1, 2}), frozenset({1, 3}), None])
+def test_regen_rung_skips_vr_png_unless_both_modified(tmp_path, key, stages):
+    # Modify/delete ({1,2} or {1,3}) went to the resolver on purpose; no stage set means
+    # the rung cannot prove both sides modified it. Either way the branch bytes stay.
+    d, pre, master = _png_repo(tmp_path, _VR_PNG)
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"),
+               stage_sets=None if stages is None else {_VR_PNG: stages})
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt == RungAttempt(False, (), "no generated file involved")
+    assert (Path(d) / _VR_PNG).read_bytes() == _PNG_BRANCH
+
+
+def test_regen_rung_ignores_png_outside_snapshot_dir(tmp_path, key):
+    rel = "ibl5/images/logo.png"
+    d, pre, master = _png_repo(tmp_path, rel)
+    ctx = _ctx(d, key, pre, master, (rel,), lambda: (True, "TREE-EQUIVALENT\n"))
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt == RungAttempt(False, (), "no generated file involved")
+    assert (Path(d) / rel).read_bytes() == _PNG_BRANCH

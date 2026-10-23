@@ -80,6 +80,68 @@ class SuggestionRankerTest extends TestCase
         $this->assertSame([3, 2], array_map(static fn (ScoredCandidate $s): int => $s->candidate->partnerTid, $kept));
     }
 
+    public function testSelectCapsAtThreeWithOnePerPartnerInRankOrder(): void
+    {
+        // Partner 2 holds ranks 1 and 2, so dropping the one-per-partner guard
+        // would keep partner 2 twice.
+        $scored = [
+            self::scoredFor(4, 7),
+            self::scoredFor(2, 2),
+            self::scoredFor(5, 5),
+            self::scoredFor(3, 6),
+            self::scoredFor(2, 1),
+            self::scoredFor(4, 4),
+            self::scoredFor(3, 3),
+        ];
+
+        $kept = (new SuggestionRanker())->select($scored, static fn (ScoredCandidate $s): bool => true);
+
+        $this->assertCount(3, $kept);
+        $partners = array_map(static fn (ScoredCandidate $s): int => $s->candidate->partnerTid, $kept);
+        $this->assertSame($partners, array_values(array_unique($partners)));
+        $this->assertSame([2, 3, 4], $partners);
+        $this->assertSame([1, 3, 4], array_map(self::rankOrderOf(...), $kept));
+    }
+
+    public function testSelectConsultsValidatorInRankOrderAndSkipsRejected(): void
+    {
+        $scored = [
+            self::scoredFor(3, 3),
+            self::scoredFor(2, 2),
+            self::scoredFor(4, 4),
+            self::scoredFor(2, 1),
+        ];
+
+        $seen = [];
+        $kept = (new SuggestionRanker())->select($scored, static function (ScoredCandidate $s) use (&$seen): bool {
+            $seen[] = self::rankOrderOf($s);
+
+            return self::rankOrderOf($s) !== 1;
+        });
+
+        $sorted = $seen;
+        sort($sorted);
+        $this->assertSame($sorted, $seen);
+        $this->assertSame(array_values(array_unique($seen)), $seen);
+        $this->assertNotContains(1, array_map(self::rankOrderOf(...), $kept));
+        $this->assertSame([2, 3, 4], array_map(self::rankOrderOf(...), $kept));
+        $this->assertSame(2, $kept[0]->candidate->partnerTid);
+    }
+
+    /**
+     * Builds a candidate that ranks at $rankOrder (lower = better). Pins build
+     * candidates only through here, so a ranking-field change edits this body.
+     */
+    private static function scoredFor(int $partnerTid, int $rankOrder): ScoredCandidate
+    {
+        return self::scored($partnerTid, 1000 + $rankOrder, 100.0 - $rankOrder, 100.0 - $rankOrder);
+    }
+
+    private static function rankOrderOf(ScoredCandidate $s): int
+    {
+        return $s->candidate->userPids[0] - 1000;
+    }
+
     private static function scored(int $partnerTid, int $userPid, float $userGain, float $partnerGain, float $significance = 0.0): ScoredCandidate
     {
         return new ScoredCandidate(

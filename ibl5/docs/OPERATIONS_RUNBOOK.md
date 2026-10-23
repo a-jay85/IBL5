@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 ---
 
 # IBL5 Operations Runbook
@@ -283,6 +283,8 @@ bin/wt-up <worktree-name> --snapshot ibl5/backups/phase-snapshots/2026-regular-s
 ```
 
 Snapshot mode never contacts production — it needs no prod credentials and no local `mariadb` client. It preserves the same local-only tables a `--prod` sync does (`ibl_api_keys` and the bug-pipeline tables), so re-loading a snapshot into an existing container will not destroy the local bug-bot's API key. Preservation is preserve-**if-exists**: on a brand-new container those tables do not exist yet, so they are created from the snapshot and the local bug-bot still needs its key minted.
+
+The nightly local restore runs the same snapshot mode. The launchd job `com.ibl5.db-sync-nightly` (installed by `bin/db-sync-cron-setup`, 03:20 daily) runs `ibl5/bin/db-sync-now --from-backup`, which downloads the newest prod backup and loads it with `bin/db-sync-prod --snapshot`. The local-only tables survive the nightly restore the same way. Before 2026-10-23 that job imported the backup directly and dropped them every night, which deleted the bug-bot's API key. If the key row is gone, `bin/bug-pipeline-check` reports `VERDICT: degraded` with the `botkey:missing` signal. Re-mint the key to clear it.
 
 **Sampling blind spot:** The snapshot inherits `bin/rehearsal-prod-dump`'s sampling: rows with `season_year < MAX(season_year)-1` are excluded from `ibl_box_scores`, `ibl_box_scores_teams`, `ibl_plr_snapshots`, and `ibl_plb_snapshots`. A phase snapshot is accurate for the current and previous season; older-season comparisons may miss data in those four tables.
 

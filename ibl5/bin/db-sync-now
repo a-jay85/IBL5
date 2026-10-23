@@ -21,6 +21,9 @@
 # A sync that passes this assertion writes an OK marker; a failed sync writes BROKEN
 # and exits 1. The BROKEN state is visible via --status and prevents throttle resets.
 #
+# --from-backup loads the artifact through `bin/db-sync-prod --snapshot`, which
+# preserves the local-only tables (ibl_api_keys, ibl_bug_*) across the restore.
+#
 # Prereqs: .env with REMOTE_* creds (live mode) or PROD_SSH_HOST (--from-backup).
 #          ibl5-mariadb container running.
 
@@ -38,7 +41,6 @@ DB_SYNC_PGREP_BIN="${DB_SYNC_PGREP_BIN:-pgrep}"
 DB_SYNC_SSH_BIN="${DB_SYNC_SSH_BIN:-ssh}"
 DB_SYNC_SCP_BIN="${DB_SYNC_SCP_BIN:-scp}"
 DB_SYNC_BACKUP_DIR="${DB_SYNC_BACKUP_DIR:-backups/db}"
-DB_SYNC_DB_HELPERS="${DB_SYNC_DB_HELPERS:-$REPO_ROOT/bin/lib/db-helpers.sh}"
 
 log() {
     printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -271,11 +273,16 @@ from_backup_mode() {
         exit 1
     fi
 
-    log "restoring $artifact_name into $DB_SYNC_CONTAINER..."
-    # shellcheck source=bin/lib/db-helpers.sh
-    source "$DB_SYNC_DB_HELPERS"
-    if ! gunzip -c "$tmp/$artifact_name" | db_import_sql "$DB_SYNC_CONTAINER"; then
-        log "ERROR: db_import_sql failed during --from-backup restore"
+    log "restoring $artifact_name into $DB_SYNC_CONTAINER via db-sync-prod --snapshot..."
+    # Route through db-sync-prod's snapshot mode so PRESERVE_TABLES (ibl_api_keys
+    # and the four ibl_bug_* tables) survive the restore. A direct import drops
+    # them every night. db-sync-prod picks its container from $PWD: inside a
+    # worktree it targets ibl5-db-<slug>. Run it from / so it always resolves
+    # to ibl5-mariadb, the same container as DB_SYNC_CONTAINER above.
+    local snap_rc=0
+    ( cd / && "$DB_SYNC_PROD_BIN" --snapshot "$tmp/$artifact_name" ) || snap_rc=$?
+    if [ "$snap_rc" -ne 0 ]; then
+        log "ERROR: db-sync-prod --snapshot failed during --from-backup restore (exit $snap_rc)"
         write_marker_broken
         exit 1
     fi

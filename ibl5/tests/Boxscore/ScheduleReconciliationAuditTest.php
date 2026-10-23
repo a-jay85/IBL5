@@ -47,6 +47,7 @@ final class ScheduleReconciliationAuditTest extends TestCase
             public function deletePreseasonBoxScores(int $seasonBeginningYear): bool { throw new \RuntimeException('not implemented'); }
             public function deleteHeatBoxScores(int $seasonStartingYear): bool { throw new \RuntimeException('not implemented'); }
             public function deleteRegularSeasonAndPlayoffsBoxScores(int $seasonStartingYear): bool { throw new \RuntimeException('not implemented'); }
+            public function findFranchiseTeamName(int $franchiseId, int $seasonEndingYear): ?string { return null; }
             public function findTeamBoxscore(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): ?array { throw new \RuntimeException('not implemented'); }
             public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int { throw new \RuntimeException('not implemented'); }
             public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int { throw new \RuntimeException('not implemented'); }

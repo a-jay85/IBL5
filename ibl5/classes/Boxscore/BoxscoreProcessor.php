@@ -58,7 +58,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $this->progressReporter = $progressReporter ?? new FlushProgressReporter();
         $resolver = new GameUpsertResolver($this->repository);
         $writer = new GameLineWriter($db, $this->repository);
-        $this->regularSeasonProcessor = $regularSeasonProcessor ?? new RegularSeasonGameProcessor($resolver, $writer);
+        $this->regularSeasonProcessor = $regularSeasonProcessor ?? new RegularSeasonGameProcessor($resolver, $writer, $this->repository);
         $this->risingStarsProcessor = $risingStarsProcessor ?? new RisingStarsGameProcessor($resolver, $writer);
         $this->allStarProcessor = $allStarProcessor ?? new AllStarGameProcessor(
             $resolver,

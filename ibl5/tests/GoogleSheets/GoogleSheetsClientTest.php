@@ -88,7 +88,7 @@ class GoogleSheetsClientTest extends TestCase
         }
     }
 
-    public function testOverwriteTabBatchWritesThenClearsTailHeaderAndRowsRaw(): void
+    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);
@@ -98,8 +98,11 @@ class GoogleSheetsClientTest extends TestCase
 
         self::assertCount(2, $this->http->requests);
         self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
-        self::assertStringEndsWith('/values/' . rawurlencode("'Players'!A4:ZZZ") . ':clear', $this->http->requests[1]['url']);
-        self::assertSame('{}', $this->http->requests[1]['body']);
+        self::assertStringEndsWith('/values:batchClear', $this->http->requests[1]['url']);
+        self::assertSame(
+            ['ranges' => ["'Players'!A4:ZZZ", "'Players'!C1:ZZZ3"]],
+            $this->body(1)
+        );
         $body = $this->body(0);
         self::assertSame('RAW', $body['valueInputOption']);
         self::assertCount(1, $body['data']);
@@ -118,10 +121,31 @@ class GoogleSheetsClientTest extends TestCase
         // The header plus rows are written RAW in one batch first, then the tail below them is cleared.
         self::assertCount(2, $this->http->requests);
         self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
-        self::assertStringEndsWith(':clear', $this->http->requests[1]['url']);
+        self::assertStringEndsWith('/values:batchClear', $this->http->requests[1]['url']);
         $body = $this->body(0);
         self::assertSame('RAW', $body['valueInputOption']);
         self::assertSame($rows, $body['data'][0]['values']);
+    }
+
+    public function testNarrowerSecondWriteClearsOldRightHandColumns(): void
+    {
+        $this->http->queue(200, []);
+        $this->http->queue(200, []);
+
+        $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', [['a', 'b'], ['1', '2'], ['3', '4']]);
+
+        // Width 2 means columns C onward are cleared for rows 1..3.
+        self::assertContains("'Players'!C1:ZZZ3", $this->body(1)['ranges']);
+    }
+
+    public function testColumnClearStartsAfterTwentySixthColumn(): void
+    {
+        $this->http->queue(200, []);
+        $this->http->queue(200, []);
+
+        $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', [array_fill(0, 26, 'h')]);
+
+        self::assertContains("'Players'!AA1:ZZZ1", $this->body(1)['ranges']);
     }
 
     public function testForbiddenPermissionDeniedIsNotTreatedAsMissingSheet(): void
@@ -153,7 +177,7 @@ class GoogleSheetsClientTest extends TestCase
         self::assertCount(3, $this->http->requests);
         self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
         self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[1]['url']);
-        self::assertStringEndsWith(':clear', $this->http->requests[2]['url']);
+        self::assertStringEndsWith('/values:batchClear', $this->http->requests[2]['url']);
 
         $first = $this->body(0)['data'];
         self::assertCount(1, $first);

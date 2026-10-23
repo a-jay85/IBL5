@@ -75,7 +75,11 @@ class GoogleSheetRefreshWorker
                 }
             }
             if ($buildFailure !== null) {
-                $this->connections->markRefreshed($row['user_id'], 'error', 'internal: ' . $buildFailure);
+                try {
+                    $this->connections->markRefreshed($row['user_id'], 'error', 'internal: ' . $buildFailure);
+                } catch (\Throwable $e) {
+                    $this->logger?->error('google sheet markRefreshed failed', ['exception' => $e::class]);
+                }
                 $out('user_id=' . $row['user_id'] . ' status=' . GoogleSheetExportService::RESULT_ERROR);
                 $processed++;
                 $failures++;

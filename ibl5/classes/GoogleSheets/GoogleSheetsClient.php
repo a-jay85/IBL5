@@ -128,7 +128,7 @@ class GoogleSheetsClient
     }
 
     /**
-     * Write $rows starting at A1 as RAW values, in chunks, then clear the rows below them.
+     * Write $rows starting at A1 as RAW values, in chunks, then clear the rows below them and the columns right of them.
      *
      * @param list<list<mixed>> $rows Header row first
      * @throws GoogleSheetMissingException When the spreadsheet is gone
@@ -157,7 +157,26 @@ class GoogleSheetsClient
                 ]],
             ], true);
         }
-        $this->clearRange($accessToken, $base, $range . '!A' . (count($rows) + 1) . ':ZZZ');
+        // One batchClear wipes the rows below the data and the columns right of the
+        // header width, so a narrower export leaves no stale cells.
+        $count = count($rows);
+        $width = max(1, count($rows[0]));
+        $this->send($accessToken, 'POST', $base . '/values:batchClear', ['ranges' => [
+            $range . '!A' . ($count + 1) . ':ZZZ',
+            $range . '!' . self::columnLetter($width + 1) . '1:ZZZ' . $count,
+        ]], true);
+    }
+
+    private static function columnLetter(int $number): string
+    {
+        $letters = '';
+        while ($number > 0) {
+            $number--;
+            $letters = chr(65 + ($number % 26)) . $letters;
+            $number = intdiv($number, 26);
+        }
+
+        return $letters;
     }
 
     private function clearRange(#[\SensitiveParameter] string $accessToken, string $base, string $range): void

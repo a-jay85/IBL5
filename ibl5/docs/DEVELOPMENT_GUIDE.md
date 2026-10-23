@@ -1,13 +1,13 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-10-03
+last_verified: 2026-10-22
 ---
 
 # Development Guide
 
 **Status:** 31/31 total modules refactored (100% complete) ✅ • ~80% coverage • Goal: 80% ✅ • See `composer test` for current test count.
 
-> 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.claude/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
+> 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.claude/skills/`. See [SKILLS_GUIDE.md](../../.github/SKILLS_GUIDE.md).
 
 ---
 
@@ -450,8 +450,8 @@ Power Rankings is computed by `classes/Updater/PowerRankingsUpdater.php` (not a 
 |----------|---------|
 | [DATABASE_GUIDE.md](DATABASE_GUIDE.md) | Schema, indexes, views |
 | [API_GUIDE.md](API_GUIDE.md) | REST API development |
-| [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md) | Skills creation guide |
-| [ibl5/docs/archive/](ibl5/docs/archive/) | Archived detailed workflows |
+| [SKILLS_GUIDE.md](../../.github/SKILLS_GUIDE.md) | Skills creation guide |
+| [ibl5/docs/archive/](archive/) | Archived detailed workflows |
 
 ---
 

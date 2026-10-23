@@ -13,7 +13,7 @@ $module_name = basename(dirname(__FILE__));
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
 // inputs are now read from $_REQUEST explicitly here.
 $op     = is_string($_REQUEST['op']     ?? null) ? $_REQUEST['op']     : '';
-$teamidInput = $_REQUEST['teamid'] ?? $_REQUEST['tid'] ?? null;
+$teamidInput = $_REQUEST['teamid'] ?? $_REQUEST['tid'] ?? $_REQUEST['teamID'] ?? null;
 $teamid = is_numeric($teamidInput) ? (int) $teamidInput : 0;
 
 $pagetitle = "- Team Pages";

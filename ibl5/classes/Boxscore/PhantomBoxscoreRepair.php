@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Boxscore;
 
+use BasketballStats\StatsSanitizer;
+
 /**
  * One-shot repair for phantom season-2008 boxscore rows.
  *
@@ -548,7 +550,7 @@ final class PhantomBoxscoreRepair extends \Database\BaseMysqliRepository
 
         $copies = [];
         foreach ($rows as $row) {
-            $copies[self::toInt($row['gotd'] ?? null)] = self::toInt($row['score_matches'] ?? null) === 1;
+            $copies[StatsSanitizer::toInt($row['gotd'] ?? null)] = StatsSanitizer::toInt($row['score_matches'] ?? null) === 1;
         }
 
         return $copies;
@@ -620,12 +622,7 @@ final class PhantomBoxscoreRepair extends \Database\BaseMysqliRepository
     {
         $row = $this->fetchOne($query, $types, ...$params);
 
-        return $row === null ? 0 : self::toInt($row['c'] ?? null);
-    }
-
-    private static function toInt(mixed $value): int
-    {
-        return is_numeric($value) ? (int) $value : 0;
+        return $row === null ? 0 : StatsSanitizer::toInt($row['c'] ?? null);
     }
 
     private function assertBackupCount(string $query, string $backupTable, int $expected): void

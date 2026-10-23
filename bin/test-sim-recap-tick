@@ -638,6 +638,19 @@ srt_wrap $'SELECT 1;\nSELECT 2;\n' -t
 srt_expect_eq "wrapper_runs_stdin_sql — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" wrap.argv "SELECT 2;" "wrapper_runs_stdin_sql — stdin SQL passed with -e"
 
+# A backslash command mid-line is not refused by the pre-check (it refuses only
+# line/statement-start forms and a trailing \G). The client's --binary-mode is
+# what blocks it, so the flag must be in argv. A backslash inside a string
+# literal must also pass.
+srt_wrap "" -e 'SELECT 1 \T /tmp/x'
+srt_expect_eq "wrapper_passes_midline_backslash — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" wrap.argv 'SELECT 1 \T /tmp/x' "wrapper_passes_midline_backslash — SQL reaches the client"
+srt_log_has "$STUB" wrap.argv "--binary-mode" "wrapper_passes_midline_backslash — client is what blocks it"
+srt_wrap "" -e "SELECT 1 FROM t WHERE c LIKE 'x\\.%'"
+srt_expect_eq "wrapper_passes_like_backslash_dot — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" wrap.argv 'LIKE '\''x\.%'\' "wrapper_passes_like_backslash_dot — SQL reaches argv with one backslash"
+srt_log_lacks "$STUB" wrap.argv 'x\\.%' "wrapper_passes_like_backslash_dot — backslash not doubled"
+
 # ── no_payload_names_denied_tools ─────────────────────────────────────────────
 srt_reset; srt_claim42
 printf '%s\n' '{"result":"blocked","permission_denials":[{"tool_name":"Bash","tool_input":{"command":"'"$SRT_WRAPPER"' -e \"SELECT PW-SENTINEL-9f3\""}}]}' \
@@ -2065,6 +2078,123 @@ wf_stray_hits=$(srt_workflow_hygiene "$STUB/wf-stray.yml" 2>&1 \
 wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-gating:' || true)
 srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
 srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
+
+# INSTALL-STEP: run the "Install mysql client, jq, claude CLI" run: block under
+# bash -e (GitHub's default step shell) with stub sudo/curl in a hermetic env.
+# Cases: curl fails (429), installer leaves no claude, installer works, curl argv.
+srt_install_step_script() {  # <workflow> <out-script>; fails if fewer than 3 lines
+    awk '
+        function ind(s) { match(s, /^ */); return RLENGTH }
+        /- name: Install mysql client, jq, claude CLI[[:space:]]*$/ { instep = 1; next }
+        instep && !inrun && /^[[:space:]]*- name:/ { exit }
+        instep && !inrun && /^[[:space:]]*run: \|[[:space:]]*$/ { inrun = 1; runind = ind($0); next }
+        inrun {
+            if ($0 ~ /^[[:space:]]*$/) { print ""; next }
+            if (ind($0) <= runind) exit
+            if (!bodyind) bodyind = ind($0)
+            print substr($0, bodyind + 1)
+        }
+    ' "$1" > "$2"
+    [ "$(grep -c . "$2" || true)" -ge 3 ]
+}
+
+SRT_INST_BIN="$STUB/inst-bin"
+mkdir -p "$SRT_INST_BIN"
+printf '#!/bin/sh\nexit 0\n' > "$SRT_INST_BIN/sudo"
+cat > "$SRT_INST_BIN/curl" <<'SRT_CURL'
+#!/bin/bash
+printf '%s\n' "$@" > "$SRT_CURL_ARGV"
+out=""
+while [ $# -gt 0 ]; do
+    if [ "$1" = "-o" ]; then out="$2"; shift; fi
+    shift
+done
+case "$SRT_CURL_MODE" in
+    fail) echo "curl: (22) The requested URL returned error: 429" >&2; exit 22 ;;
+    noclaude) body='exit 0' ;;
+    claude) body='mkdir -p "$HOME/.local/bin" && printf "#!/bin/sh\nexit 0\n" > "$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"' ;;
+esac
+if [ -n "$out" ]; then printf '%s\n' "$body" > "$out"; else printf '%s\n' "$body"; fi
+SRT_CURL
+chmod +x "$SRT_INST_BIN/sudo" "$SRT_INST_BIN/curl"
+
+srt_install_run() {  # <script> <curl-mode> <case-dir>; returns the step's exit code
+    local d="$3"
+    rm -rf "$d"; mkdir -p "$d/home" "$d/tmp"; : > "$d/github_path"
+    env -i PATH="$SRT_INST_BIN:/usr/bin:/bin" HOME="$d/home" RUNNER_TEMP="$d/tmp" \
+        GITHUB_PATH="$d/github_path" SRT_CURL_MODE="$2" SRT_CURL_ARGV="$d/curl.argv" \
+        bash -e "$1" > "$d/out" 2>&1
+}
+
+srt_install_argv_ok() {  # <case-dir>; checks the recorded curl argv
+    local a
+    a=" $(tr '\n' ' ' < "$1/curl.argv")"
+    grep -qF -- ' --retry 4 ' <<< "$a" || { echo "argv lacks --retry 4" >&2; return 1; }
+    grep -qF -- ' --retry-all-errors ' <<< "$a" || { echo "argv lacks --retry-all-errors" >&2; return 1; }
+    grep -qF -- ' --retry-delay 10 ' <<< "$a" || { echo "argv lacks --retry-delay 10" >&2; return 1; }
+    grep -qF -- " -o $1/tmp/claude-install.sh " <<< "$a" || { echo "argv lacks -o under RUNNER_TEMP" >&2; return 1; }
+    [ "$(tail -n 1 "$1/curl.argv")" = "https://claude.ai/install.sh" ] \
+        || { echo "last argv is not https://claude.ai/install.sh" >&2; return 1; }
+}
+
+if env -i PATH=/usr/bin:/bin bash -c 'command -v claude' >/dev/null 2>&1; then
+    srt_fail "INSTALL-STEP precondition: claude already on /usr/bin:/bin, harness cannot see a missing install"
+fi
+if srt_install_step_script "$SRT_WORKFLOW" "$STUB/inst-step.sh"; then
+    srt_ok "INSTALL-STEP: run block extracted from the committed workflow"
+else
+    srt_fail "INSTALL-STEP: run block not found in $SRT_WORKFLOW"
+fi
+
+srt_install_run "$STUB/inst-step.sh" fail "$STUB/inst-c1" && rc=0 || rc=$?
+srt_expect_eq "INSTALL-CURL-FAIL: step exits 22 when curl fails" 22 "$rc"
+srt_expect_eq "INSTALL-CURL-FAIL: GITHUB_PATH left empty" 0 "$(grep -c . "$STUB/inst-c1/github_path" || true)"
+
+srt_install_run "$STUB/inst-step.sh" noclaude "$STUB/inst-c2" && rc=0 || rc=$?
+srt_expect_eq "INSTALL-NO-CLAUDE: step exits 1 when installer leaves no claude" 1 "$rc"
+if grep -qF '::error title=sim-recap::claude CLI not found on PATH after install' "$STUB/inst-c2/out"; then
+    srt_ok "INSTALL-NO-CLAUDE: ::error line names the missing CLI"
+else
+    srt_fail "INSTALL-NO-CLAUDE: ::error line names the missing CLI"
+fi
+srt_expect_eq "INSTALL-NO-CLAUDE: GITHUB_PATH left empty" 0 "$(grep -c . "$STUB/inst-c2/github_path" || true)"
+
+srt_install_run "$STUB/inst-step.sh" claude "$STUB/inst-c3" && rc=0 || rc=$?
+srt_expect_eq "INSTALL-OK: step exits 0 when installer drops claude" 0 "$rc"
+srt_expect_eq "INSTALL-OK: GITHUB_PATH holds HOME/.local/bin" \
+    "$STUB/inst-c3/home/.local/bin" "$(< "$STUB/inst-c3/github_path")"
+if srt_install_argv_ok "$STUB/inst-c3" 2>"$STUB/inst-argv.err"; then
+    srt_ok "INSTALL-ARGV: curl gets --retry 4, --retry-all-errors, --retry-delay 10, -o RUNNER_TEMP, exact URL"
+else
+    srt_fail "INSTALL-ARGV: $(tr '\n' ';' < "$STUB/inst-argv.err")"
+fi
+
+# LEGACY-SEES-BUG: the pre-fix step shape must exit 0 on a failed curl, which
+# proves this harness can see the original bug (run 39736079105).
+printf '%s\n' '      - name: Install mysql client, jq, claude CLI' \
+    "        if: steps.secrets.outputs.configured == 'true'" \
+    '        run: |' \
+    '          sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client jq >/dev/null' \
+    '          curl -fsSL https://claude.ai/install.sh | bash >/dev/null' \
+    '          echo "$HOME/.local/bin" >> "$GITHUB_PATH"' > "$STUB/wf-inst-legacy.yml"
+srt_install_step_script "$STUB/wf-inst-legacy.yml" "$STUB/inst-legacy.sh" || true
+srt_install_run "$STUB/inst-legacy.sh" fail "$STUB/inst-legacy" && rc=0 || rc=$?
+srt_expect_eq "LEGACY-SEES-BUG: pipe form exits 0 when curl fails" 0 "$rc"
+
+# MUT-*: mutated copies of the committed workflow. Each must flip its case.
+grep -vF 'command -v claude' "$SRT_WORKFLOW" > "$STUB/wf-inst-noguard.yml"
+grep -vF 'export PATH="$HOME/.local/bin:$PATH"' "$SRT_WORKFLOW" > "$STUB/wf-inst-noexport.yml"
+sed 's/ --retry-all-errors//' "$SRT_WORKFLOW" > "$STUB/wf-inst-noretryall.yml"
+srt_install_step_script "$STUB/wf-inst-noguard.yml" "$STUB/inst-noguard.sh" || true
+srt_install_run "$STUB/inst-noguard.sh" noclaude "$STUB/inst-mg" && rc=0 || rc=$?
+srt_expect_eq "MUT-NOGUARD: dropping the command -v guard lets a missing claude exit 0" 0 "$rc"
+srt_install_step_script "$STUB/wf-inst-noexport.yml" "$STUB/inst-noexport.sh" || true
+srt_install_run "$STUB/inst-noexport.sh" claude "$STUB/inst-me" && rc=0 || rc=$?
+srt_expect_eq "MUT-NOEXPORT: dropping the step PATH export fails the guard" 1 "$rc"
+srt_install_step_script "$STUB/wf-inst-noretryall.yml" "$STUB/inst-noretryall.sh" || true
+srt_install_run "$STUB/inst-noretryall.sh" claude "$STUB/inst-mr" || true
+srt_install_argv_ok "$STUB/inst-mr" 2>/dev/null && rc=0 || rc=$?
+srt_expect_eq "MUT-NORETRYALL: dropping --retry-all-errors fails the argv pin" 1 "$rc"
 
 # PR-RUN-DONE: opt-in live check, run after the PR is open and its run has finished.
 # Set SRT_CHECK_PR_RUN=<branch> to read that branch's latest pull_request run.

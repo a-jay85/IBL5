@@ -43,7 +43,7 @@ jobs:
   rebase:
     name: Rebase open PRs onto master
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75   # up to 45 min bot-commit wait, then the rebase pass
     steps:
       - name: Checkout master
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,6 +59,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # A rebase onto master before its bot commits land wastes every rebased PR's CI run:
+      # the bot commit makes them all BEHIND again. Wait those runs out (see the helper's
+      # header), then refetch master so the rebase below uses the tip with the bot commits.
+      # A dry run pushes nothing, so it skips the wait.
+      - name: Wait for master CI that can push a bot commit
+        if: inputs.dry_run == false
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          source bin/lib/master-bot-wait.sh
+          master_bot_wait "$REPO"
+          git fetch origin master
 
       - name: Rebase open PR branches
         env:

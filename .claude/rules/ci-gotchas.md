@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 paths: ".github/workflows/**"
 ---
 
@@ -44,7 +44,7 @@ A new protection context is a separate decision (ADR-0120, ADR-0145). The workfl
 
 ## Mutation testing: per-PR diff job required, full suite label-gated
 
-`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M4) enforces the trigger, name, `if:`, and threshold.
+`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M5) enforces the trigger, name, `if:`, threshold, and diff resolution. Never set `git config diff.relative` in that workflow. With it, Infection joins `classes/X.php` to the repo root, prints `No source file found`, and exits 0 with zero mutants, so class changes passed the required check unmutated ([#3443](https://github.com/a-jay85/IBL5/pull/3443)). The Infection step tees its output to a log and then runs `ibl5/bin/check-infection-ran`, which exits 5 when Infection matched no source but a changed class sits outside `source.excludes`. A diff that touches only excluded classes still passes.
 
 ## `ssh-keyscan` needs `|| true`
 

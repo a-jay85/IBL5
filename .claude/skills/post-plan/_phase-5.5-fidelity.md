@@ -275,6 +275,15 @@ echo "RE_REVIEW=$([ "$AUTO_MERGE" = false ] && echo skip || echo spawn)"
 
 On `RE_REVIEW=skip`, do not spawn. The plan's author already decided a human merges this PR, so a second Opus verdict changes nothing that will happen to it. Terminal line for that case is the `auto_merge: false` row in the terminal-line recipe above.
 
+On `RE_REVIEW=spawn`, first delete any second verdict a previous run left at this PR's `-2` path. The findings render below and condition (12) both read that path, so a leftover file would stand in for this run's re-review. Verdict 1 stays in place.
+
+```bash
+# phase 5.5 clear stale verdict 2
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE_2="${FIDELITY_VERDICT_FILE_2:-/tmp/post-plan-fidelity-verdict-$PR_NUM-2.md}"
+rm -f "$FIDELITY_VERDICT_FILE_2"
+```
+
 On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5-5` pin wins. An `Agent` spawn. This skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
 
 **Output path:** `/tmp/post-plan-fidelity-verdict-<N>-2.md` (substitute `<N>` = step 1's `$PR_NUM`). PR-number-keyed, never `$$`/`$PPID`-keyed — condition (12) reads it from a different shell. The `-2` suffix ensures verdict 2 can never overwrite verdict 1.

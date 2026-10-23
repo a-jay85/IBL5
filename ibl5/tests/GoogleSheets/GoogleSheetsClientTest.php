@@ -88,7 +88,7 @@ class GoogleSheetsClientTest extends TestCase
         }
     }
 
-    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    public function testOverwriteTabBatchWritesHeaderAndRowsRawThenClearsTail(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);

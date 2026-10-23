@@ -71,6 +71,30 @@ class DraftHistoryEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted('ibl_team_info');
     }
 
+    public function testCamelCaseTeamIDShowsSameTeamHistoryAsLowercase(): void
+    {
+        $this->mockDb->setMockData([]);
+        $yearView = $this->runModule('DraftHistory');
+
+        $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 3, 'team_name' => 'TestTeam'])]);
+        $lower = $this->runModule('DraftHistory', ['teamid' => '3']);
+        $camel = $this->runModule('DraftHistory', ['teamID' => '3']);
+
+        $this->assertSame($lower, $camel);
+        $this->assertNotSame($yearView, $camel);
+    }
+
+    public function testCamelCaseTeamIDZeroShowsYearView(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $yearView = $this->runModule('DraftHistory');
+        $camel = $this->runModule('DraftHistory', ['teamID' => '0']);
+
+        $this->assertSame($yearView, $camel);
+        $this->assertQueryExecuted('draftyear');
+    }
+
     public function testTeamIdTakesPriorityOverYear(): void
     {
         // When both teamid and year are set, teamid path wins (checked first)

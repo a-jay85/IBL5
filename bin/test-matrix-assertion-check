@@ -272,7 +272,7 @@ step67-skipped-no-plan() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
-    if echo "$out" | grep -q 'MATRIX_VERDICT=skipped'; then
+    if grep -q 'MATRIX_VERDICT=skipped' <<< "$out"; then
         h_pass "step67-skipped-no-plan"
     else
         h_fail "step67-skipped-no-plan — expected MATRIX_VERDICT=skipped, got: $out"
@@ -304,7 +304,7 @@ step67-unrealised() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
-    if echo "$out" | grep -q 'MATRIX_VERDICT=unrealised' && echo "$out" | grep -q 'UNREALISED-ASSERTION: row'; then
+    if grep -q 'MATRIX_VERDICT=unrealised' <<< "$out" && grep -q 'UNREALISED-ASSERTION: row' <<< "$out"; then
         h_pass "step67-unrealised"
     else
         h_fail "step67-unrealised — expected unrealised verdict, got: $out"
@@ -336,7 +336,7 @@ step67-clean() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
-    if echo "$out" | grep -q 'MATRIX_VERDICT=clean'; then
+    if grep -q 'MATRIX_VERDICT=clean' <<< "$out"; then
         h_pass "step67-clean"
     else
         h_fail "step67-clean — expected MATRIX_VERDICT=clean, got: $out"
@@ -366,7 +366,7 @@ step67-uncommitted() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" bash -c "$block" 2>&1)
-    if echo "$out" | grep -q 'MATRIX_VERDICT=uncommitted'; then
+    if grep -q 'MATRIX_VERDICT=uncommitted' <<< "$out"; then
         h_pass "step67-uncommitted"
     else
         h_fail "step67-uncommitted — expected MATRIX_VERDICT=uncommitted, got: $out"
@@ -403,7 +403,7 @@ step67-unavailable() {
 
     local out
     out=$(cd "$repo" && PLAN_PATH="$plan" MATRIX_SCRIPT="$stub_checker" bash -c "$block" 2>&1)
-    if echo "$out" | grep -q 'MATRIX_VERDICT=unavailable'; then
+    if grep -q 'MATRIX_VERDICT=unavailable' <<< "$out"; then
         h_pass "step67-unavailable"
     else
         h_fail "step67-unavailable — expected MATRIX_VERDICT=unavailable, got: $out"
@@ -447,7 +447,7 @@ prefire-rule-staged-new-file-realised() {
     out=$(cd "$repo" && eval "$cmd" 2>&1)
     local rc=$?
 
-    if [ $rc -eq 0 ] && ! echo "$out" | grep -q 'UNREALISED-ASSERTION'; then
+    if [ $rc -eq 0 ] && ! grep -q 'UNREALISED-ASSERTION' <<< "$out"; then
         h_pass "prefire-rule-staged-new-file-realised"
     else
         h_fail "prefire-rule-staged-new-file-realised — expected no UNREALISED-ASSERTION and exit 0, got rc=$rc out=$out"
@@ -511,7 +511,7 @@ step67-routing() {
     # Step 6.6 section must have zero occurrences of "proceed to Step 7" or "proceeding to Step 7"
     local section66
     section66=$(awk "NR==$line66{found=1} found && NR>$line66 && /^## /{exit} found{print}" "$prompt_file")
-    if echo "$section66" | grep -q 'proceed to Step 7\|proceeding to Step 7'; then
+    if grep -q 'proceed to Step 7\|proceeding to Step 7' <<< "$section66"; then
         h_fail "step67-routing — Step 6.6 still routes to Step 7"
         return 1
     fi
@@ -519,11 +519,11 @@ step67-routing() {
     # Step 6.7 section must contain the no-handoff and never-proceeds sentences
     local section67
     section67=$(awk "NR==$line67{found=1} found && NR>$line67 && /^## /{exit} found{print}" "$prompt_file")
-    if ! echo "$section67" | grep -q 'Do NOT write the handoff file'; then
+    if ! grep -q 'Do NOT write the handoff file' <<< "$section67"; then
         h_fail "step67-routing — Step 6.7 missing 'Do NOT write the handoff file'"
         return 1
     fi
-    if ! echo "$section67" | grep -q 'never proceeds to Step 7'; then
+    if ! grep -q 'never proceeds to Step 7' <<< "$section67"; then
         h_fail "step67-routing — Step 6.7 missing 'never proceeds to Step 7'"
         return 1
     fi
@@ -574,7 +574,7 @@ absent-new-token)
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
     lines=$(printf '%s\n' "$out" | grep -c 'UNREALISED-ASSERTION' || true)
-    if [ "$rc" -eq 0 ] && [ "$lines" -eq 1 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+    if [ "$rc" -eq 0 ] && [ "$lines" -eq 1 ] && grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
         ok "absent-new-token"
     else
         fail "absent-new-token (rc=$rc, lines=$lines, out=$out)"
@@ -709,8 +709,8 @@ dup-guard-regression)
     err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF 'UNREALISED-ASSERTION: row 8' \
-        && printf '%s' "$err" | grep -qF 'PLAN_NOW_DUP_CHECK'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 8' <<< "$out" \
+        && grep -qF 'PLAN_NOW_DUP_CHECK' <<< "$err"; then
         ok "dup-guard-regression"
     else
         fail "dup-guard-regression (rc=$rc, out=$out, err=$err)"
@@ -769,7 +769,7 @@ empty-range)
     printf '' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -qF 'UNREALISED-ASSERTION: row 12'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 12' <<< "$out"; then
         ok "empty-range"
     else
         fail "empty-range (rc=$rc, out=$out)"
@@ -795,7 +795,7 @@ multi-arg-call-mutation)
     out=$(printf '+        self::assertCount(99, $something);\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out"; then
         ok "multi-arg-call-mutation"
     else
         fail "multi-arg-call-mutation (rc=$rc, out=$out)"
@@ -821,7 +821,7 @@ shell-var-default-mutation)
     out=$(printf '+some unrelated added line\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" - 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out"; then
         ok "shell-var-default-mutation"
     else
         fail "shell-var-default-mutation (rc=$rc, out=$out)"
@@ -1045,7 +1045,7 @@ skip-equals-class4)
         > "$root/plan2.md"
     out2=$(printf '+    run(current_tree="$T2")\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan2.md" - 2>/dev/null)
-    if [ "$rc" -eq 0 ] && [ -z "$out" ] && printf '%s\n' "$out2" | grep -qF 'UNREALISED-ASSERTION: row 2'; then
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && grep -qF 'UNREALISED-ASSERTION: row 2' <<< "$out2"; then
         ok "skip-equals-class4"
     else
         fail "skip-equals-class4 (rc=$rc, out=$out, out2=$out2)"
@@ -1064,7 +1064,7 @@ skip-equals-class5)
         > "$root/plan2.md"
     out2=$(printf '+    monkeypatch.setattr(fidelity, "REVIEW_OWED_TIMEOUT", 1)\n' \
         | MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan2.md" - 2>/dev/null)
-    if [ "$rc" -eq 0 ] && [ -z "$out" ] && printf '%s\n' "$out2" | grep -qF 'UNREALISED-ASSERTION: row 2'; then
+    if [ "$rc" -eq 0 ] && [ -z "$out" ] && grep -qF 'UNREALISED-ASSERTION: row 2' <<< "$out2"; then
         ok "skip-equals-class5"
     else
         fail "skip-equals-class5 (rc=$rc, out=$out, out2=$out2)"
@@ -1094,7 +1094,7 @@ tag-untagged-same-row-flags)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
         ok "tag-untagged-same-row-flags"
     else
         fail "tag-untagged-same-row-flags (rc=$rc, out=$out)"
@@ -1111,7 +1111,7 @@ tag-malformed-checked)
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
     ignored=$(printf '%s\n' "$err" | grep -c '^ONE-TIME-CHECK-IGNORED: row 7 ' || true)
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7' && [ "$ignored" -eq 1 ]; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out" && [ "$ignored" -eq 1 ]; then
         ok "tag-malformed-checked"
     else
         fail "tag-malformed-checked (rc=$rc, ignored=$ignored, out=$out, err=$err)"
@@ -1125,7 +1125,7 @@ tag-short-reason-checked)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
         ok "tag-short-reason-checked"
     else
         fail "tag-short-reason-checked (rc=$rc, out=$out)"
@@ -1139,7 +1139,7 @@ tag-wrong-type-checked)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     rc=$?
-    if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 7'; then
+    if [ "$rc" -eq 0 ] && grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
         ok "tag-wrong-type-checked"
     else
         fail "tag-wrong-type-checked (rc=$rc, out=$out)"
@@ -1360,7 +1360,7 @@ path-token-absent-still-flags)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
-    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+    if grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out" \
         && grep -qF 'ibl5/blocks/block-Nope.php' <<< "$err"; then
         ok "path-token-absent-still-flags"
     else
@@ -1378,7 +1378,7 @@ path-token-not-aligned-still-flags)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
-    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+    if grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out" \
         && grep -qF 'Chunk_Leaders.php' <<< "$err" \
         && grep -qF 'lock-Chunk_Leaders.php' <<< "$err"; then
         ok "path-token-not-aligned-still-flags"
@@ -1397,7 +1397,7 @@ path-token-bare-word-not-path-shaped)
     printf '+unrelated line\n' > "$root/diff.txt"
     out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
     err=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>&1 1>/dev/null)
-    if printf '%s\n' "$out" | grep -qF 'UNREALISED-ASSERTION: row 1' \
+    if grep -qF 'UNREALISED-ASSERTION: row 1' <<< "$out" \
         && grep -qF 'STRAYFILE' <<< "$err"; then
         ok "path-token-bare-word-not-path-shaped"
     else

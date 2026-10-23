@@ -1,6 +1,6 @@
 ---
 description: Index of all IBL5 project documentation.
-last_verified: 2026-10-15
+last_verified: 2026-10-22
 ---
 
 # IBL5 Documentation Index
@@ -42,7 +42,7 @@ This directory is the primary home for all project documentation.
 Component-specific docs live next to their code in `ibl5/classes/`:
 
 - [Player/README.md](../classes/Player/README.md) - Player module architecture
-- [Statistics/README.md](../classes/Statistics/README.md) - StatsFormatter usage
+- [BasketballStats/README.md](../classes/BasketballStats/README.md) - StatsFormatter usage
 - [DepthChart/README.md](../classes/DepthChart/README.md) - DepthChart architecture
 - [DepthChart/SECURITY.md](../classes/DepthChart/SECURITY.md) - Security patterns
 - [Draft/README.md](../classes/Draft/README.md) - Draft module

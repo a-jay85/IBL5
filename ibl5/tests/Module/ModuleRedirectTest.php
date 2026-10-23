@@ -15,10 +15,7 @@ class ModuleRedirectTest extends TestCase
     {
         $this->assertSame('modules.php?name=ApiKeys', ModuleRedirect::targetFor('PlayerExportGuide'));
         $this->assertSame('modules.php?name=Voting', ModuleRedirect::targetFor('VotingResults'));
-        $this->assertSame(
-            'modules.php?name=RecordHolders&op=allstar',
-            ModuleRedirect::targetFor('AllStarAppearances')
-        );
+        $this->assertNull(ModuleRedirect::targetFor('AllStarAppearances'));
         $this->assertSame(
             'modules.php?name=Leaderboards&tab=season',
             ModuleRedirect::targetFor('SeasonLeaderboards')
@@ -27,6 +24,8 @@ class ModuleRedirectTest extends TestCase
             'modules.php?name=Leaderboards&tab=career',
             ModuleRedirect::targetFor('CareerLeaderboards')
         );
+        $this->assertSame('modules.php?name=Contracts&tab=teams', ModuleRedirect::targetFor('CapSpace'));
+        $this->assertSame('modules.php?name=Contracts&tab=players', ModuleRedirect::targetFor('ContractList'));
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void

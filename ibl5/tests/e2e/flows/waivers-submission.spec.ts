@@ -360,7 +360,7 @@ test.describe('Waivers: server-side roster recount (backlog#1538)', () => {
     await assertNoPhpErrors(page);
   });
 
-  test('add without a CSRF token is refused before any roster recount', async ({
+  test('add without a CSRF token is refused and the player is not added', async ({
     appState,
     page,
   }) => {

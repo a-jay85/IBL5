@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -122,6 +122,15 @@ The word lands before `## DIGEST`, so Step 3's canonical parse reads it unchange
 ## Step 2 — Gather the seven inputs, then spawn exactly one reviewer
 
 Skip this step when Step 1b printed `FIDELITY_GATE=skip`. The spawn budget below applies only to the spawn path.
+
+Before the spawn, delete any verdict a previous run left at this PR's path. Step 3 only checks that the file is non-empty, so a leftover file from an earlier run would pass as this run's verdict. A skip run never reaches this block, so the verdict Step 1c carried forward stays in place.
+
+```bash
+# phase 5.5 clear stale verdict 1
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+rm -f "$FIDELITY_VERDICT_FILE"
+```
 
 **Bounded-re-spawn rule:** at most two `Agent` spawns per `/post-plan` run, and never more. Spawn the first reviewer now. **Exactly one re-spawn** is permitted, in step 4b, and only when **both** hold: (a) step 4's remediation addressed **every** `Mode: in-PR` finding, and (b) the plan does **not** declare `auto_merge: false`.
 

@@ -15,22 +15,17 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
   // PHP-Nuke legacy palette debt. See a-jay85/IBL5-backlog (label: a11y-contrast).
   'color-contrast': new Set([
     // Public pages
-    'cap space',
+    'contracts teams',
     'player page',
     'activity tracker',
     'all-star appearances',
-    'contract list',
+    'contracts players',
     'draft pick locator',
     'franchise history',
     'franchise record book',
     'injuries',
     'player movement',
     'projected draft order',
-    // Search page with a transactions preset (modules.php?name=Search plus a preset).
-    // Verified 2026-09-23: every failing node is pre-existing results markup
-    // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
-    // none is the new preset select. .ibl-search__btn is fixed in design/components/forms.css.
-    'search transactions preset',
     'season archive',
     'season highs',
     'team off/def stats',
@@ -135,28 +130,28 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'standings', url: 'modules.php?name=Standings' },
   { name: 'season leaderboards', url: 'modules.php?name=Leaderboards&tab=season&submitted=1' },
   { name: 'career leaderboards', url: 'modules.php?name=Leaderboards&tab=career&submitted=1' },
-  { name: 'draft history', url: 'modules.php?name=DraftHistory' },
-  { name: 'cap space', url: 'modules.php?name=CapSpace' },
+  { name: 'draft history', url: 'modules.php?name=DraftInfo&tab=history' },
+  { name: 'contracts teams', url: 'modules.php?name=Contracts&tab=teams' },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1' },
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamid=1' },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker' },
-  { name: 'all-star appearances', url: 'modules.php?name=RecordHolders&op=allstar' },
+  { name: 'all-star appearances', url: 'modules.php?name=AllStarAppearances' },
   { name: 'award history', url: 'modules.php?name=AwardHistory' },
-  { name: 'contract list', url: 'modules.php?name=ContractList' },
-  { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator' },
+  { name: 'contracts players', url: 'modules.php?name=Contracts&tab=players' },
+  { name: 'draft pick locator', url: 'modules.php?name=DraftInfo&tab=picks' },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory' },
-  { name: 'franchise record book', url: 'modules.php?name=FranchiseRecordBook' },
+  { name: 'franchise record book', url: 'modules.php?name=Records&tab=byfranchise' },
   { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview' },
   { name: 'injuries', url: 'modules.php?name=Injuries' },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters' },
   { name: 'one on one game', url: 'modules.php?name=OneOnOneGame' },
   { name: 'player database', url: 'modules.php?name=PlayerSearch' },
   { name: 'player movement', url: 'modules.php?name=SeasonRosterChanges' },
-  { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder' },
-  { name: 'record holders', url: 'modules.php?name=RecordHolders' },
+  { name: 'projected draft order', url: 'modules.php?name=DraftInfo&tab=order' },
+  { name: 'record holders', url: 'modules.php?name=Records&tab=alltime' },
   { name: 'schedule', url: 'modules.php?name=Schedule' },
   { name: 'season archive', url: 'modules.php?name=SeasonArchive' },
-  { name: 'season highs', url: 'modules.php?name=SeasonHighs' },
+  { name: 'season highs', url: 'modules.php?name=Records&tab=thisseason' },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords' },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats' },
   { name: 'search transactions preset', url: 'modules.php?name=Search&preset=transactions' },
@@ -174,6 +169,11 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 
+// Pages whose entrance animation (.search-result searchResultIn) would be sampled mid-fade by
+// axe, which reads transient colours. These pages load under prefers-reduced-motion: reduce
+// (design/base.css zeroes animations) so axe sees the settled colours. Keyed on a publicPages name.
+const SETTLED_ANIMATION_PAGES = new Set(['search transactions preset']);
+
 publicTest.describe('Public page accessibility', () => {
   publicTest.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off' });
@@ -181,6 +181,9 @@ publicTest.describe('Public page accessibility', () => {
 
   for (const { name, url } of publicPages) {
     publicTest(`${name} has no accessibility violations`, async ({ page }) => {
+      if (SETTLED_ANIMATION_PAGES.has(name)) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+      }
       await page.goto(url);
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
@@ -251,6 +254,41 @@ publicTest.describe('Sign-in divider contrast (WCAG 1.4.3)', () => {
     expect(
       ratio,
       `divider color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// --- Search pagination link contrast ---
+// The CI seed paginates the transactions preset (10 results plus a Next link). Pin the
+// link colour to --accent-800 (#9a3412) and its ratio on the page background, so a
+// revert to --accent-500 (2.41:1 on #eee) fails here directly. The VR baselines cannot
+// catch it: two recoloured words fall under the 0.5% maxDiffPixelRatio.
+
+publicTest.describe('Search pagination link contrast (WCAG 1.4.3)', () => {
+  publicTest('.search-pagination__link uses accent-800 and meets 4.5:1', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoWithRetry(page, 'modules.php?name=Search&preset=transactions');
+
+    const link = page.locator('.search-pagination__link').first();
+    await expect(link).toBeVisible();
+
+    const { color, backgrounds } = await link.evaluate((el) => {
+      const chain: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        chain.push(getComputedStyle(node).backgroundColor);
+      }
+      return { color: getComputedStyle(el).color, backgrounds: chain };
+    });
+
+    expect(color).toBe('rgb(154, 52, 18)');
+
+    const solid = backgrounds.map(parseCssRgb).find(({ alpha }) => alpha > 0);
+    const background: Rgb = solid?.rgb ?? [255, 255, 255];
+
+    const ratio = contrastRatio(parseCssRgb(color).rgb, background);
+    expect(
+      ratio,
+      `pagination link color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
     ).toBeGreaterThanOrEqual(4.5);
   });
 });

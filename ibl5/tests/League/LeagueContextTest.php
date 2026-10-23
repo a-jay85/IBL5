@@ -233,6 +233,37 @@ class LeagueContextTest extends TestCase
     }
 
     /**
+     * Test isModuleEnabled returns false for Contracts in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('Contracts'));
+    }
+
+    /**
+     * Test isModuleEnabled returns false for ContractList in Olympics
+     */
+    public function testIsModuleEnabledOlympicsDisablesContractList(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
+     * Test isModuleEnabled returns true for Contracts and ContractList in IBL
+     */
+    public function testIsModuleEnabledIblEnablesContracts(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+
+        $this->assertTrue($this->leagueContext->isModuleEnabled('Contracts'));
+        $this->assertTrue($this->leagueContext->isModuleEnabled('ContractList'));
+    }
+
+    /**
      * Test isModuleEnabled returns false for FranchiseHistory in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesFranchiseHistory(): void
@@ -526,10 +557,24 @@ class LeagueContextTest extends TestCase
             'CareerLeaderboards',
             'SeasonLeaderboards',
             'RecordHolders',
+            'Records',
+            'AllStarAppearances',
         ];
 
         foreach ($disabledModules as $module) {
             $this->assertFalse($context->isModuleEnabled($module), "$module should be disabled in Olympics");
+        }
+    }
+
+    public function testSeasonHighsStaysEnabledInOlympics(): void
+    {
+        $_GET['league'] = 'olympics';
+        try {
+            $context = new LeagueContext();
+
+            $this->assertTrue($context->isModuleEnabled('SeasonHighs'));
+        } finally {
+            unset($_GET['league']);
         }
     }
 
@@ -542,5 +587,14 @@ class LeagueContextTest extends TestCase
         $this->assertTrue($context->isModuleEnabled('Trading'));
         $this->assertTrue($context->isModuleEnabled('Standings'));
         $this->assertTrue($context->isModuleEnabled('Team'));
+    }
+
+    public function testDraftInfoDisabledForOlympics(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+        $this->assertFalse($this->leagueContext->isModuleEnabled('DraftInfo'));
+
+        $_SESSION['current_league'] = 'ibl';
+        $this->assertTrue($this->leagueContext->isModuleEnabled('DraftInfo'));
     }
 }

@@ -18,21 +18,20 @@ use Security\HtmlSanitizer;
 class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 {
     private const OLYMPICS_HIDDEN_NAV_MODULES = [
-        'CapSpace',
+        'Contracts',
+        'DraftInfo',
         'ProjectedDraftOrder',
         'DraftPickLocator',
         'TrainingCampRatingsDiff',
         'FreeAgencyPreview',
-        'ContractList',
         'SeasonRosterChanges',
         'FranchiseHistory',
         'DraftHistory',
         'AllStarAppearances',
         'OneOnOneGame',
         'AwardHistory',
-        'FranchiseRecordBook',
+        'Records',
         'Leaderboards',
-        'RecordHolders',
     ];
 
     private NavigationConfig $config;
@@ -64,16 +63,15 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerSearch'],
                     ['label' => 'Player Export', 'url' => 'modules.php?name=ApiKeys'],
-                    ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
+                    ['label' => 'Contracts', 'url' => 'modules.php?name=Contracts'],
                     $this->config->isDraftOrderFinalized
                         ? ($this->config->seasonPhase === 'Draft'
-                            ? ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder', 'badge' => 'FINAL']
-                            : ['label' => 'Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder'])
-                        : ['label' => 'Projected Draft Order', 'url' => 'modules.php?name=ProjectedDraftOrder'],
-                    ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftPickLocator'],
+                            ? ['label' => 'Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order', 'badge' => 'FINAL']
+                            : ['label' => 'Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order'])
+                        : ['label' => 'Projected Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order'],
+                    ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftInfo&tab=picks'],
                     ['label' => 'Training Camp Ratings Diff', 'url' => 'modules.php?name=TrainingCampRatingsDiff'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
-                    ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=SeasonRosterChanges'],
                     ['label' => 'JSB Export', 'url' => 'ibl/IBL', 'external' => true],
                 ],
@@ -83,7 +81,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                 'links' => [
                     ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters'],
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
-                    ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
                     ['label' => 'Head-to-Head Records', 'url' => 'modules.php?name=HeadToHeadRecords'],
                     ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=TeamOffDefStats'],
                 ],
@@ -93,11 +90,10 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                 'links' => [
                     ['label' => 'Franchise History', 'url' => 'modules.php?name=FranchiseHistory'],
                     ['label' => 'Transaction History', 'url' => 'modules.php?name=Search&preset=transactions'],
-                    ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory'],
+                    ['label' => 'Draft History', 'url' => 'modules.php?name=DraftInfo&tab=history'],
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
-                    ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
-                    ['label' => 'Franchise Record Book', 'url' => 'modules.php?name=FranchiseRecordBook'],
-                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=RecordHolders&op=allstar'],
+                    ['label' => 'Records', 'url' => 'modules.php?name=Records'],
+                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
                     ['label' => 'Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
@@ -119,6 +115,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
 
         if ($this->config->currentLeague === 'olympics') {
             $menus = $this->filterOlympicsMenus($menus);
+            $menus['Stats']['links'][] = ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'];
         }
 
         return $menus;
@@ -208,7 +205,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
         ];
 
-        $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
+        $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftInfo&tab=history&teamid=' . $teamId];
 
         if ($this->areWaiversAllowed()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];

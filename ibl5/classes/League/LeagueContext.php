@@ -171,6 +171,7 @@ class LeagueContext
         if ($currentLeague === self::LEAGUE_OLYMPICS) {
             $iblOnlyModules = [
                 'Draft',
+                'DraftInfo',
                 'DraftPickLocator',
                 'FreeAgency',
                 'Waivers',
@@ -178,6 +179,8 @@ class LeagueContext
                 'Voting',
                 'VotingResults',
                 'CapSpace',
+                'ContractList',
+                'Contracts',
                 'FranchiseHistory',
                 'AwardHistory',
                 'FranchiseRecordBook',
@@ -185,6 +188,8 @@ class LeagueContext
                 'SeasonLeaderboards',
                 'Leaderboards',
                 'RecordHolders',
+                'Records',
+                'AllStarAppearances',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

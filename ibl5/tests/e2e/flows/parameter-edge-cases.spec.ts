@@ -25,7 +25,7 @@ test.describe('Parameter edge cases', () => {
   // smoke/module-routing.spec.ts (one canonical copy across the suite).
 
   test('DraftHistory with invalid teamID shows no PHP errors', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory&teamid=999');
+    await page.goto('modules.php?name=DraftInfo&tab=history&teamid=999');
     await assertNoPhpErrors(page, 'on DraftHistory with invalid teamID');
     // Should either show empty state or all teams
   });

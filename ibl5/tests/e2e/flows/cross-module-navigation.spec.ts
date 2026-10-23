@@ -63,7 +63,7 @@ test.describe('Cross-module navigation', () => {
   });
 
   test('draft history → click player → player page loads', async ({ page }) => {
-    await page.goto('modules.php?name=DraftHistory');
+    await page.goto('modules.php?name=DraftInfo&tab=history');
     await assertNoPhpErrors(page, 'on Draft History');
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
@@ -95,7 +95,7 @@ test.describe('Cross-module navigation', () => {
   });
 
   test('all-star appearances → click player → player page loads', async ({ page }) => {
-    await page.goto('modules.php?name=RecordHolders&op=allstar');
+    await page.goto('modules.php?name=AllStarAppearances');
     await assertNoPhpErrors(page, 'on All-Star Appearances');
 
     const playerLink = page.locator('.ibl-data-table a[href*="pid="]');

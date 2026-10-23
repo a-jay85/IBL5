@@ -105,7 +105,7 @@ test.describe('ProjectedDraftOrder save_order: non-admin gets 403 JSON', () => {
     request,
   }) => {
     const response = await request.post(
-      'modules.php?name=ProjectedDraftOrder&op=save_order',
+      'modules.php?name=DraftInfo&op=save_order',
       {
         data: { order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +125,7 @@ test.describe('ProjectedDraftOrder index: admin controls hidden for non-admin', 
   test('non-admin sees the draft order table without admin drag JS', async ({
     page,
   }) => {
-    const response = await page.goto('modules.php?name=ProjectedDraftOrder');
+    const response = await page.goto('modules.php?name=DraftInfo&tab=order');
     expect(response?.status()).toBe(200);
 
     const table = page

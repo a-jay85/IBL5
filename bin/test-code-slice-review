@@ -406,6 +406,11 @@ case_byte_budget_partial() {
     MAXB=250
     csr --dry-run --slice=Alpha
     expect_has "partial slice printed" "$OUT" "partial slice (2/3 files, byte budget 250)"
+    local prompt_in
+    prompt_in="$(cat "$STUB_DIR/claude.1.stdin")"
+    expect_has "stdin names Alpha.php" "$prompt_in" "Alpha/Alpha.php"
+    expect_has "stdin names B.php" "$prompt_in" "Alpha/B.php"
+    expect_lacks "stdin omits the file over budget" "$prompt_in" "Alpha/C.php"
     MAXB=""
     csr --dry-run --slice=Alpha
     expect_lacks "empty value means the default budget" "$OUT" "partial slice"
@@ -435,6 +440,8 @@ case_prompt_excludes_diff_sections() {
     expect_lacks "no common preamble" "$OUT" "## Common preamble"
     expect_lacks "no git history section" "$OUT" "### Section 1: Git history"
     expect_lacks "no previous PRs agent" "$OUT" "## Agent C"
+    expect_lacks "no pattern detection section" "$OUT" "## Pattern detection"
+    expect_lacks "no E2E spec patterns section" "$OUT" "## E2E spec patterns"
 }
 
 case_missing_anchor_exits_1() {
@@ -572,6 +579,14 @@ case_floor_boundaries() {
     expect_lacks "code 79 dropped" "$OUT" "Alpha: C79"
     expect_has "security 75 kept" "$OUT" "Alpha: S75"
     expect_lacks "security 74 dropped" "$OUT" "Alpha: S74"
+    local c_line s_line
+    c_line="$(grep -nF 'Alpha: C80' <<< "$OUT" | head -1 | cut -d: -f1)"
+    s_line="$(grep -nF 'Alpha: S75' <<< "$OUT" | head -1 | cut -d: -f1)"
+    if [ -n "$c_line" ] && [ -n "$s_line" ] && [ "$c_line" -lt "$s_line" ]; then
+        ok "code/80 listed before security/75"
+    else
+        fail "code/80 listed before security/75 - lines [$c_line] [$s_line]"
+    fi
 }
 
 case_budget_split() {

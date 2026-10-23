@@ -536,19 +536,10 @@ describe('upsertAgentShots', () => {
     // The end marker sits after a blank line, outside the <picture> paragraph.
     expect(e).toMatch(/<\/picture><\/a>\n\n<!-- \/vr-agent-shot -->$/);
   });
-});
 
-describe('pairPicture', () => {
-  it('14a: desktop source is the side-by-side, the fallback img is the stack', () => {
-    expect(pairPicture('S.png', 'T.png', 'x')).toBe(
-      '<a href="S.png"><picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture></a>'
-    );
-    expect(PAIR_MEDIA).toBe('(min-width: 768px)');
-  });
-
-  // The old hasBlock check used startsWith and so prepended a second block here. 10h pins the
+  // The old hasBlock check used startsWith and so prepended a second block here. 10i pins the
   // insert point to the first block: body.lastIndexOf(PR_BODY_MARKER_END) would edit the stale one.
-  it('10g: upsert into a block at offset > 0 edits that block and adds none', () => {
+  it('10h: upsert into a block at offset > 0 edits that block and adds none', () => {
     const body = `Intro.\n\n${block({ spots: [makeSpot()] })}\n\nOutro.`;
     const out = upsertAgentShots(body, [entry('a')]);
     expect(findManagedBlocks(out)).toHaveLength(1);
@@ -558,7 +549,7 @@ describe('pairPicture', () => {
     expect(markers(out, 'a')).toBe(1);
   });
 
-  it('10h: upsert with two blocks writes only the first', () => {
+  it('10i: upsert with two blocks writes only the first', () => {
     const first = block({ spots: [makeSpot()] });
     const second = block({ spots: [makeSpot({ title: 'other' })] });
     const out = upsertAgentShots(`${first}\n\nmiddle\n\n${second}`, [entry('a')]);
@@ -566,5 +557,14 @@ describe('pairPicture', () => {
     expect(markers(out, 'a')).toBe(1);
     expect(findManagedBlocks(out)).toHaveLength(2);
     expect(extractAgentShots(out)).toContain('<!-- vr-agent-shot:a -->');
+  });
+});
+
+describe('pairPicture', () => {
+  it('14a: desktop source is the side-by-side, the fallback img is the stack', () => {
+    expect(pairPicture('S.png', 'T.png', 'x')).toBe(
+      '<a href="S.png"><picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture></a>'
+    );
+    expect(PAIR_MEDIA).toBe('(min-width: 768px)');
   });
 });

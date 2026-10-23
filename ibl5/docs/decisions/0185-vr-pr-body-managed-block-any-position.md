@@ -1,6 +1,6 @@
 ---
 description: The vr-new-screens managed block is found at any position in the PR body (own-line markers outside code fences); spliceBody replaces the first block in place and strips later stale blocks. Supersedes ADR-0076's offset-0-only clause.
-last_verified: 2026-10-08
+last_verified: 2026-10-22
 ---
 
 # ADR-0185: Find and replace the VR managed block at any position in the PR body
@@ -51,6 +51,6 @@ in a block below offset 0 were also invisible to `extractAgentShots`, so a refre
 ## References
 
 - `ibl5/tests/e2e/vr-pr-body.ts`: `findManagedBlocks`, `spliceBody`, `extractAgentShots`, `upsertAgentShots`.
-- `ibl5/tests/ts-unit/vr-pr-body.test.ts`: tests 5d to 5j, 7c, 7d, 10g, 10h and 15a to 15f.
+- `ibl5/tests/ts-unit/vr-pr-body.test.ts`: tests 5d to 5j, 7c, 7d, 10h, 10i and 15a to 15f.
 - `ibl5/docs/decisions/0076-vr-new-screens-in-pr-body.md`: the offset-0 clause this record supersedes.
 - `ibl5/docs/decisions/0181-vr-pr-body-changed-screens.md`: the changed-screens section and agent-shot sub-block inside the block.

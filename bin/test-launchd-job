@@ -896,7 +896,7 @@ reset_ctl
 ) >/dev/null 2>&1
 SA_LINE="$(cat "$T/ctl/launchctl_calls" 2>/dev/null || true)"
 SA_GOLD="$(cat <<'GOLD_EOF'
-launchctl submit -l com.ibl5.t-1 -o @T@/sub/L.log -e @T@/sub/L.log -- /usr/bin/env HOME=/test-home PATH=/usr/local/bin:/opt/homebrew/bin:/test-home/.bun/bin:/test-home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin /bin/bash -lc if ! mkdir '@T@/sub/S.sh.once' 2>/dev/null; then trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1'; rmdir '@T@/sub/S.sh.once'; exit 0; fi; '@T@/sub/S.sh'; rc=$?; trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1'; rmdir '@T@/sub/S.sh.once'; exit $rc
+launchctl submit -l com.ibl5.t-1 -o @T@/sub/L.log -e @T@/sub/L.log -- /usr/bin/env HOME=/test-home PATH=/usr/local/bin:/opt/homebrew/bin:/test-home/.bun/bin:/test-home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin /bin/bash -lc if ! mkdir '@T@/sub/S.sh.once' 2>/dev/null; then trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rmdir '@T@/sub/S.sh.once'; exit 0; fi; '@T@/sub/S.sh'; rc=$?; trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rmdir '@T@/sub/S.sh.once'; exit $rc
 GOLD_EOF
 )"
 SA_GOLD="${SA_GOLD//@T@/$T}"

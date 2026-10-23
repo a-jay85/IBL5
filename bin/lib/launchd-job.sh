@@ -227,7 +227,8 @@ ljob_bootstrap() {
 # until the label is removed. The wrapper's once-guard (atomic mkdir of
 # "<script>.once") turns any respawn into "remove the label, exit 0" so the
 # script body runs at most once. The normal tail ignores TERM, removes the
-# label, then removes the marker, and exits with the script's status.
+# label, then removes the marker only if the remove worked (else the marker stays
+# so a respawn still hits the guard), and exits with the script's status.
 # ---------------------------------------------------------------------------
 _ljob_valid_label() { [[ "$1" =~ ^com\.ibl5\.[A-Za-z0-9._-]+$ ]]; }
 
@@ -236,7 +237,7 @@ ljob_submit_wrapper_text() {
     local label="$1" script="$2" ctl l s m c
     ctl="$(command -v "${LAUNCHCTL_CMD:-launchctl}" 2>/dev/null || printf '%s' "${LAUNCHCTL_CMD:-launchctl}")"
     l="$(shq "$label")"; s="$(shq "$script")"; m="$(shq "${script}.once")"; c="$(shq "$ctl")"
-    printf '%s' "if ! mkdir $m 2>/dev/null; then trap '' TERM; $c remove $l; rmdir $m; exit 0; fi; $s; rc=\$?; trap '' TERM; $c remove $l; rmdir $m; exit \$rc"
+    printf '%s' "if ! mkdir $m 2>/dev/null; then trap '' TERM; $c remove $l && rmdir $m; exit 0; fi; $s; rc=\$?; trap '' TERM; $c remove $l && rmdir $m; exit \$rc"
 }
 
 # Builds LJOB_SUBMIT_ARGV. Returns 2 (nothing built) on a usage error.

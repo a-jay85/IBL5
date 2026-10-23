@@ -1,6 +1,6 @@
 ---
 description: Store VR gallery before/after/diff PNGs once in a shared _vr-blobs/ store at the gh-pages root so the Pages artifact stops growing with PR volume.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # ADR-0211: Shared blob store for VR gallery images
@@ -61,6 +61,7 @@ the artifact, so the sharing is by reference.
 - Positive: links and anchors in open PRs keep working, because only image `src` values change.
 - Negative: a blob GC could race a concurrent publish. The age gate keeps any blob committed within the cutoff, and the refs check runs after every rebase and before every push and upload, so a dangling tree never reaches the served site.
 - Negative: a PR that republishes an old-form dir leaves its legacy PNGs unreferenced until retention prunes that dir.
+- Negative: the first cleanup run rewrites every legacy dir, so each dir's newest commit time becomes the migration time. Dir age is read from that commit time, so for one retention window (7 days) the age-based prune and the stale-gallery refresh see those dirs as new. Size stays bounded, because migrated dirs hold HTML only and the 150-dir cap still applies. Dirs tied on age are evicted in SHA-name order until real ages build up again. The effect happens once and is accepted.
 - Follow-up: arm a hard size fail in `pages-deploy.yml` after one clean cycle of telemetry.
 - Follow-up, out of scope here: ADR-0180 drift fills every gallery with about 54 changed cells, which deserves its own look.
 

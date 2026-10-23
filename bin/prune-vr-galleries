@@ -245,8 +245,9 @@ fi
 # gallery index references it and its newest commit is older than the cutoff.
 # Dirs this run pruned (pruned_set) no longer count as referrers; keep-file and
 # no-history dirs never enter pruned_set, so their references always count.
-# GC messages go to stderr in live mode, stdout under --dry-run, and never
-# change the stdout integer (it counts pruned dirs only).
+# The per-blob lines go to stderr in live mode and stdout under --dry-run (WOULD GC
+# lines). The "GC:" summary line always goes to stderr. Neither changes the stdout
+# integer in live mode (it counts pruned dirs only).
 if [[ -d _vr-blobs ]]; then
   gc_tmp=$(mktemp -d)
   trap 'rm -rf "$gc_tmp"' EXIT

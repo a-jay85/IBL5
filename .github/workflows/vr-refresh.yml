@@ -107,11 +107,12 @@ jobs:
       # Prod-clone rehearsal of the blob-store migration on this runner's throwaway
       # gh-pages checkout (contents: read; nothing is committed or pushed). Asserts the
       # live tree's refs are clean before, the dry-run projection at least halves the
-      # tree, the live migrate leaves no dangling ref, a second migrate is a no-op, and
-      # the post-migration GC dry-run still runs.
+      # dirs it rewrites, the live migrate leaves no dangling ref, a second migrate is a
+      # no-op, and the post-migration GC dry-run still runs.
       - name: Rehearse blob-store migration on the live gh-pages tree
         if: steps.checkout-pages.outcome == 'success' && (github.event_name == 'pull_request' || inputs.dry_run)
         run: |
+          set -o pipefail
           cd gh-pages
           ../bin/check-vr-gallery-refs --root .
           ../bin/vr-dedupe-gallery --migrate --root . --dry-run > "$RUNNER_TEMP/vr-proj.txt"
@@ -125,11 +126,14 @@ jobs:
           projected=$(( after + store ))
           { echo "### Blob-store migration projection"; echo '```'; echo "$total"; echo "projected_tree_bytes=${projected}"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "projected_tree_bytes=${projected}"
-          # Once the live tree is already migrated nothing moves and the projection
-          # cannot halve it, so the halving assertion applies only while images remain.
+          # The halving assertion looks only at the dirs the migration rewrites, so a stray
+          # legacy dir on an already-migrated tree (a late publish from an old workflow
+          # run) cannot trip it. Once nothing moves there is nothing to assert.
           to_move=$(awk '/^DIR /{ split($5, kv, "="); m += kv[2] } END { print m + 0 }' "$RUNNER_TEMP/vr-proj.txt")
-          if [ "$to_move" -gt 0 ] && [ "$projected" -ge $(( before / 2 )) ]; then
-            echo "::error::Projected tree ${projected} B is not under half of ${before} B."
+          dir_before=$(awk '/^DIR /{ split($3, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
+          dir_after=$(awk '/^DIR /{ split($4, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
+          if [ "$to_move" -gt 0 ] && [ "$dir_after" -ge $(( dir_before / 2 )) ]; then
+            echo "::error::Rewritten dirs project to ${dir_after} B, not under half of ${dir_before} B."
             exit 1
           fi
           if [ "$projected" -gt 1073741824 ]; then

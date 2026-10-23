@@ -14,7 +14,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # Visual-review PRs
@@ -42,7 +42,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
    each row, and writes the static side-by-side `index.html` (with `<title>` anchors) + per-SHA
    artifacts into `ibl5/vr-gallery`, plus the pre-classified `gallery.json`
    (`changedCells`/`newCells`/`flakeCells`).
-3. **Deploy gallery to per-SHA Pages** — pushes `ibl5/vr-gallery` to the `gh-pages` branch under
+3. **Deploy gallery to per-SHA Pages.** `bin/vr-dedupe-gallery` re-shapes `ibl5/vr-gallery` into a stage dir, `ibl5/vr-pages-stage` (example), which is pushed to the `gh-pages` branch under
    `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
    preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
    durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
@@ -54,10 +54,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
    over-suppresses one push instead of silently no-opping. The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
-   out of the count, so one stuck run cannot block every later deploy. This stops a push fan-out (one
-   master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
-   concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
-   plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   out of the count, so one stuck run cannot block every later deploy. Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
    collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
    `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
    fail. The retries absorb contention and never soften the gate. The per-cell before/after/diff PNGs
@@ -87,7 +84,7 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 - **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
 - **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
 - **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 150-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
-- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
+- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, `bin/prune-vr-galleries`, `bin/vr-dedupe-gallery`, or `bin/check-vr-gallery-refs` runs the read-only `VR refresh select` job, which prints both lists and rehearses the migration.
 
 ## Reading the comment
 

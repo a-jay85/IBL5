@@ -424,6 +424,21 @@ jobs:
       # partial dedupe or a failed refs check never leaves a tree to publish), every
       # deploy attempt then fails, and the assert step below fails the job, the same
       # loud path as a missing gallery tree.
+      # The scripts come from the workflow's own ref (github.sha), never from the
+      # checked-out PR head: a PR branch cut before bin/vr-dedupe-gallery landed has no
+      # such script, and the stage step would exit 127 on a branch nobody changed.
+      - name: Checkout VR gallery scripts from the workflow ref
+        if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /bin/
+          path: vr-scripts
+          persist-credentials: false
+
       - name: Stage VR gallery in blob-store form
         id: vr-stage
         if: always() && env.VRCTX_PUBLISH == 'true' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && env.VRCTX_SAME_REPO == 'true'
@@ -432,11 +447,11 @@ jobs:
           set -e
           trap 'rc=$?; [ "$rc" -eq 0 ] || rm -rf ibl5/vr-pages-stage' EXIT
           rm -rf ibl5/vr-pages-stage
-          bin/vr-dedupe-gallery \
+          vr-scripts/bin/vr-dedupe-gallery \
             --gallery-dir ibl5/vr-gallery \
             --key "$VRCTX_KEY" \
             --stage-dir ibl5/vr-pages-stage
-          bin/check-vr-gallery-refs --root ibl5/vr-pages-stage
+          vr-scripts/bin/check-vr-gallery-refs --root ibl5/vr-pages-stage
 
       # gh-pages is a single shared ref and EVERY open PR's VR job pushes its own
       # <sha>/visual-review/ dir to it, so runs that finish together collide on the

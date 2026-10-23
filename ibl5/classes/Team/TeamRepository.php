@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team;
 
 use League\LeagueContext;
+use Repositories\TeamAwardSql;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
@@ -251,12 +252,7 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
                     psr.winner AS name,
                     CONCAT(lc.conference, ' Conference Champions') AS award,
                     COUNT(*) OVER (PARTITION BY psr.year, lc.conference) AS series_in_conf
-                FROM vw_playoff_series_results psr
-                LEFT JOIN `ibl_franchise_seasons` fs
-                    ON fs.franchise_id = psr.winner_tid AND fs.season_ending_year = psr.year
-                JOIN `ibl_league_config` lc
-                    ON lc.season_ending_year = psr.year
-                   AND lc.team_name = COALESCE(fs.team_name, psr.winner)
+                " . TeamAwardSql::CONFERENCE_CHAMPION_JOIN . "
                 WHERE psr.round = 3
                   AND psr.winner_games >= NULLIF(CAST(SUBSTRING_INDEX(lc.playoff_round3_format, ' ', 1) AS UNSIGNED), 0)
             ) ranked
@@ -267,55 +263,15 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
 
             SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
-                SELECT
-                    YEAR(bst.game_date) AS year,
-                    CASE
-                        WHEN COALESCE(bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
-                                      + COALESCE(bst.home_ot_points, 0),
-                                      FIRST_VALUE(bst.calc_points) OVER (
-                                          PARTITION BY bst.game_date, bst.visitor_teamid, bst.home_teamid, bst.game_of_that_day
-                                          ORDER BY bst.id DESC))
-                           > COALESCE(bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
-                                      + COALESCE(bst.visitor_ot_points, 0),
-                                      FIRST_VALUE(bst.calc_points) OVER (
-                                          PARTITION BY bst.game_date, bst.visitor_teamid, bst.home_teamid, bst.game_of_that_day
-                                          ORDER BY bst.id ASC))
-                        THEN bst.home_teamid
-                        ELSE bst.visitor_teamid
-                    END AS winner_tid,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY YEAR(bst.game_date)
-                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC, bst.id ASC
-                    ) AS rn
-                FROM `ibl_box_scores_teams` bst
-                WHERE bst.game_type = 3
+                " . TeamAwardSql::HEAT_WINNER_SUBSELECT
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (WHERE fixes name and uk_year_award_name makes (year, award) unique, so the trailing "award ASC" completes a total order)
+            . "
             ) hc
             JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC, " . self::AWARD_HIERARCHY_CASE . ", award ASC";
+            ORDER BY year DESC, " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC";
     }
-
-    /**
-     * Hierarchical award ordering used by accomplishments queries.
-     *
-     * Orders awards from hardest to easiest to win so team-history displays are
-     * deterministic (avoids flaky e2e tests when multiple awards share a year):
-     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
-     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
-     */
-    private const AWARD_HIERARCHY_CASE = "CASE award
-                WHEN 'IBL Champions' THEN 1
-                WHEN 'IBL HEAT Champions' THEN 2
-                WHEN 'Eastern Conference Champions' THEN 3
-                WHEN 'Western Conference Champions' THEN 4
-                WHEN 'Atlantic Division Champions' THEN 5
-                WHEN 'Central Division Champions' THEN 6
-                WHEN 'Midwest Division Champions' THEN 7
-                WHEN 'Pacific Division Champions' THEN 8
-                WHEN 'IBL Draft Lottery Winners' THEN 9
-                ELSE 10
-            END";
 
     /**
      * @see TeamRepositoryInterface::getPlayoffResults()

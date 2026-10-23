@@ -160,7 +160,7 @@ test.describe('Free Agency -- negotiation page', () => {
     });
 
   test('player info card shows ratings', async ({ page }) => {
-    await expect(page.locator('.ibl-card__title').first()).toContainText('Contract Negotiation');
+    await expect(page.locator('.d-card-title').first()).toContainText('Contract Negotiation');
     // Ratings table headers
     await expect(page.locator('th').filter({ hasText: '2ga' }).first()).toBeVisible();
   });
@@ -180,7 +180,7 @@ test.describe('Free Agency -- negotiation page', () => {
   });
 
   test('quick offer presets present', async ({ page }) => {
-    await expect(page.locator('.ibl-card__title').filter({ hasText: 'Quick Offer Presets' })).toBeVisible();
+    await expect(page.locator('.d-card-title').filter({ hasText: 'Quick Offer Presets' })).toBeVisible();
     const body = await page.locator('body').textContent();
     expect(body).toContain('Max Level Contract');
     expect(body).toContain('Mid-Level Exception');
@@ -190,8 +190,8 @@ test.describe('Free Agency -- negotiation page', () => {
 
   test('notes/reminders card shows rules', async ({ page }) => {
     const notes = page
-      .locator('.ibl-card')
-      .filter({ has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }) });
+      .locator('.d-card')
+      .filter({ has: page.locator('.d-card-title', { hasText: 'Notes / Reminders' }) });
     await expect(notes).toBeVisible();
     // [rendered] PHP-emitted static rule text from FreeAgencyOfferView.php — env-independent.
     await expect(notes).toContainText('soft cap space available');

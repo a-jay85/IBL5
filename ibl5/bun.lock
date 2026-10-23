@@ -9,6 +9,7 @@
         "@lhci/cli": "^0.15.1",
         "@playwright/test": "1.64.0",
         "@tailwindcss/cli": "^4.3.3",
+        "daisyui": "5",
         "eslint": "^10.12.0",
         "eslint-plugin-playwright": "^2.12.1",
         "pixelmatch": "^8.0.0",
@@ -344,6 +345,8 @@
     "crypto-random-string": ["crypto-random-string@2.0.0", "", {}, "sha512-v1plID3y9r/lPhviJ1wrXpLeyUIGAZ2SHNYTEapm7/8A9nLPoyvVp3RK/EPFqn5kEznyWgYZNsRtYYIWbuG8KA=="],
 
     "csp_evaluator": ["csp_evaluator@1.1.5", "", {}, "sha512-EL/iN9etCTzw/fBnp0/uj0f5BOOGvZut2mzsiiBZ/FdT6gFQCKRO/tmcKOxn5drWZ2Ndm/xBb1SI4zwWbGtmIw=="],
+
+    "daisyui": ["daisyui@5.7.50", "", {}, "sha512-+/LRqnTCoc7s/bJEKKwtJSwzeXCVdAmRdNmZeZzgHCaQ9PJyl7j+2V2U32GQDMyD+VDkP9e/+JGoC72Y1hLk7w=="],
 
     "data-uri-to-buffer": ["data-uri-to-buffer@6.0.2", "", {}, "sha512-7hvf7/GW8e86rW0ptuwS3OcBGDjIi6SZva7hCyWC0yYry2cOPmLIjXAUHI6DK2HsnwJd9ifmt57i8eV2n4YNpw=="],
 

@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-10-11
+last_verified: 2026-10-21
 paths: ".github/workflows/**"
 ---
 
@@ -40,7 +40,7 @@ Branch protection on master names job-level contexts. `Tests and Analysis` is th
 
 A new protection context is a separate decision (ADR-0120, ADR-0145). The workflow that emits it must report on every PR: no `paths` or `branches` filter and no job-level `if:`. A context with no matching check run leaves the PR pending forever. Add it with the append-only `POST .../required_status_checks/contexts` and check it with `bin/check-composite-contracts --protection-readback`. Never use the protection `PUT`, which replaces the whole object. Live list: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.
 
-`All checks green` (`.github/workflows/all-checks-green.yml`, ADR-0149) is the required cross-workflow aggregator. A red check anywhere on the head blocks the merge, and a pending one holds it until it finishes. After you re-run one flaky job, re-run the aggregator run too: `gh run list --workflow all-checks-green.yml --branch <head-branch> --limit 1 --json databaseId --jq '.[0].databaseId' | xargs gh run rerun`. The excluded names live in the workflow's `--ignore=`. To make a new job advisory, add its name there. Never delete a check to get a merge through. On a PR whose base is not master or develop (a stacked PR), the aggregator fails within about a minute with `FAIL: stacked on <base>`, because the master-only workflows never report there. After the parent merges and GitHub retargets the PR, push (merge or rebase onto `origin/master`) to start CI. Re-running the aggregator does not help, since the re-run replays the old base.
+`All checks settled` (`.github/workflows/all-checks-settled.yml`, ADR-0149 addendum) is the required cross-workflow aggregator. It is a commit status on the PR head, posted from master each time a PR workflow completes, and it never waits. A red check anywhere on the head turns it `failure`, and a pending one keeps it `pending` until the last check finishes. A re-run of one flaky job re-settles it when that job completes. If the status is stuck, settle it by hand: `gh workflow run all-checks-settled.yml -f pr_number=N`. The excluded names live in that workflow's `--ignore=`. To make a new job advisory, add its name there. A new workflow with a `pull_request` trigger must also join its `workflow_run.workflows:` list, or its completion never settles the status (`bin/check-composite-contracts` A6). Never delete a check to get a merge through. On a PR whose base is not master or develop (a stacked PR), the status goes `failure` with `FAIL: stacked on <base>`, because the master-only workflows never report there. After the parent merges and GitHub retargets the PR, push (merge or rebase onto `origin/master`) to start CI. The legacy waiter in `.github/workflows/all-checks-green.yml` still runs until the cutover runbook in the ADR-0149 addendum retires it.
 
 ## Mutation testing: per-PR diff job required, full suite label-gated
 

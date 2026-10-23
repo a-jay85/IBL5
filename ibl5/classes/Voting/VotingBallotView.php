@@ -71,7 +71,7 @@ class VotingBallotView implements VotingBallotViewInterface
     {
         $html = $this->renderShowHideScript('Results');
         $html .= '<div class="voting-category" onclick="ShowAndHideResults()">';
-        $html .= '<h2 class="ibl-title voting-category-title">Voting Results</h2>';
+        $html .= '<h2 class="ibl-title voting-category-title"><button type="button" class="voting-category-toggle" aria-expanded="false" aria-controls="Results">Voting Results</button></h2>';
         $html .= '<p class="voting-category-instruction"><em>Tap/click to reveal/hide results.</em></p>';
         $html .= '</div>';
         $html .= '<div id="Results" class="voting-collapsed">' . $resultsHtml . '</div>';
@@ -87,13 +87,16 @@ class VotingBallotView implements VotingBallotViewInterface
         return "<script>
 function ShowAndHide{$categoryCode}() {
     var x = document.getElementById('{$categoryCode}');
+    var t = document.querySelector('[aria-controls=\"{$categoryCode}\"]');
     if (x.classList.contains('voting-collapsed')) {
         x.classList.remove('voting-collapsed');
+        t.setAttribute('aria-expanded', 'true');
         if (typeof window.IBL_refreshResponsiveTables === 'function') {
             window.IBL_refreshResponsiveTables();
         }
     } else {
         x.classList.add('voting-collapsed');
+        t.setAttribute('aria-expanded', 'false');
     }
 }
 </script>";
@@ -108,7 +111,9 @@ function ShowAndHide{$categoryCode}() {
         $safeInstruction = HtmlSanitizer::safeHtmlOutput($instruction);
 
         return "<div class=\"voting-category\" onclick=\"ShowAndHide{$code}()\">"
-            . "<h2 class=\"ibl-title voting-category-title\">{$safeTitle}</h2>"
+            . '<h2 class="ibl-title voting-category-title">'
+            . "<button type=\"button\" class=\"voting-category-toggle\" aria-expanded=\"false\" aria-controls=\"{$code}\">{$safeTitle}</button>"
+            . '</h2>'
             . "<p class=\"voting-category-instruction\">{$safeInstruction}</p>"
             . '</div>';
     }

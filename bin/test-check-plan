@@ -861,13 +861,13 @@ _f="$TMP/gate13-sonnet46-manual.md"
 printf '%s\n' '---
 impl_model: claude-sonnet-5-5
 ---'"$M_MANUAL" > "$_f"
-"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+_g13_out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
 if [ "$_ec" -eq 0 ]; then
     echo "FAIL: gate13-sonnet46-manual — expected nonzero exit, got 0"; FAILED=1
 else
     echo "ok: gate13-sonnet46-manual (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-5-5'; then
+if grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-5-5' <<< "$_g13_out"; then
     echo "ok: gate13-sonnet46-manual (substring confirmed)"
 else
     echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-5-5'"; FAILED=1
@@ -878,13 +878,13 @@ _f="$TMP/gate13-haiku45-manual.md"
 printf '%s\n' '---
 impl_model: claude-haiku-4-5
 ---'"$M_MANUAL" > "$_f"
-"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+_g13_out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
 if [ "$_ec" -eq 0 ]; then
     echo "FAIL: gate13-haiku45-manual — expected nonzero exit, got 0"; FAILED=1
 else
     echo "ok: gate13-haiku45-manual (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-haiku-4-5'; then
+if grep -qF 'Truly-manual row forbids impl_model: claude-haiku-4-5' <<< "$_g13_out"; then
     echo "ok: gate13-haiku45-manual (substring confirmed)"
 else
     echo "FAIL: gate13-haiku45-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-4-5'"; FAILED=1
@@ -895,13 +895,13 @@ _f="$TMP/gate13-haiku55-manual.md"
 printf '%s\n' '---
 impl_model: claude-haiku-5-5
 ---'"$M_MANUAL" > "$_f"
-"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+_g13_out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
 if [ "$_ec" -eq 0 ]; then
     echo "FAIL: gate13-haiku55-manual — expected nonzero exit, got 0"; FAILED=1
 else
     echo "ok: gate13-haiku55-manual (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-haiku-5-5'; then
+if grep -qF 'Truly-manual row forbids impl_model: claude-haiku-5-5' <<< "$_g13_out"; then
     echo "ok: gate13-haiku55-manual (substring confirmed)"
 else
     echo "FAIL: gate13-haiku55-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-5-5'"; FAILED=1
@@ -918,13 +918,13 @@ _f="$TMP/gate13-unknown-gpt4.md"
 printf '%s\n' '---
 impl_model: gpt-4
 ---'"$M" > "$_f"
-"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+_g13_out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
 if [ "$_ec" -eq 0 ]; then
     echo "FAIL: gate13-unknown-gpt4 — expected nonzero exit, got 0"; FAILED=1
 else
     echo "ok: gate13-unknown-gpt4 (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF 'is not a recognized model'; then
+if grep -qF 'is not a recognized model' <<< "$_g13_out"; then
     echo "ok: gate13-unknown-gpt4 (substring confirmed)"
 else
     echo "FAIL: gate13-unknown-gpt4 — expected 'is not a recognized model'"; FAILED=1
@@ -934,13 +934,13 @@ _f="$TMP/gate13-fable.md"
 printf '%s\n' '---
 impl_model: fable
 ---'"$M" > "$_f"
-"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+_g13_out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
 if [ "$_ec" -eq 0 ]; then
     echo "FAIL: gate13-fable — expected nonzero exit, got 0"; FAILED=1
 else
     echo "ok: gate13-fable (exit $_ec)"
 fi
-if "$GUARD" "$_f" 2>&1 | grep -qF '.claude/rules/agent-tiering.md'; then
+if grep -qF '.claude/rules/agent-tiering.md' <<< "$_g13_out"; then
     echo "ok: gate13-fable (substring confirmed)"
 else
     echo "FAIL: gate13-fable — expected '.claude/rules/agent-tiering.md' in output"; FAILED=1
@@ -4128,10 +4128,14 @@ D_BODY5=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: 
 D_BODY6=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n\n%s Phase 5: e\n\ntext\n\n%s Phase 6: f\n\ntext\n' "$H" "$H" "$H" "$H" "$H" "$H")
 
 # 1. Over-complete: scaffold 4, body 6 → exit 1 with [D] and "over by 2"
-assert_draft "gateD-over-complete-violation" 1 "$(printf '%s\n%s' "$D_SCAF4" "$D_BODY6")"
 _f_d="$TMP/gateD-over-complete-violation.md"
 printf '%s\n%s\n' "$D_SCAF4" "$D_BODY6" > "$_f_d"
-_out_d=$("$GUARD" --draft "$_f_d" 2>&1)
+_out_d=$("$GUARD" --draft "$_f_d" 2>&1); _ec_d=$?
+if [ "$_ec_d" -ne 1 ]; then
+    h_fail "gateD-over-complete-violation" "expected exit 1, got $_ec_d"
+else
+    h_pass "gateD-over-complete-violation (exit $_ec_d)"
+fi
 if printf '%s' "$_out_d" | grep -qF '[D]' && printf '%s' "$_out_d" | grep -q 'over by 2'; then
     echo "ok: gateD-over-complete-violation-message"
 else

@@ -417,7 +417,7 @@ pcw_conflict_probe() {
             printf 'head %s missing after fetch\n' "${head:0:7}"; return 2
         fi
     fi
-    out="$(git -C "$root" merge-tree --write-tree --name-only "$tip" "$head" 2>/dev/null)" \
+    out="$(git -C "$root" -c core.quotePath=false merge-tree --write-tree --name-only "$tip" "$head" 2>/dev/null)" \
         && mrc=0 || mrc=$?
     if [[ "$mrc" -eq 0 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
         return 0
@@ -425,6 +425,11 @@ pcw_conflict_probe() {
     if [[ "$mrc" -eq 1 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
         paths="$(awk 'NR == 1 { next } /^$/ { stop = 1 } !stop { print }' <<< "$out" \
             | LC_ALL=C sort -u)"
+        # quotePath=false leaves only paths with quotes, backslashes or control characters
+        # C-quoted. A quoted name cannot be looked up later, so treat it as "cannot tell".
+        if [[ "$paths" == *'"'* ]]; then
+            printf 'conflicted path is C-quoted\n'; return 2
+        fi
         if [[ -n "$paths" ]]; then printf '%s\n' "$paths"; return 1; fi
     fi
     printf 'merge-tree output unrecognised (exit %s)\n' "$mrc"; return 2

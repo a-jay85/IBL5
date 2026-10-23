@@ -88,6 +88,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-prose": _SINCE,
     "bin/check-numbering": _SINCE,
     "bin/check-engine-freeze": _SINCE,
+    "bin/check-pipefail-grep-q": _SINCE,
     "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
     "bin/check-ci-image-registry": _TREE,
@@ -110,6 +111,9 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-pr-manual-testing": _PR_BODY,
     "bin/check-post-merge-recipe": ReplaySpec(
         argv=("--body-file", "{body_file}", "--repo-slug", "a-jay85/IBL5"),
+    ),
+    "bin/check-reviewer-eval": ReplaySpec(
+        argv=("--body-file", "{body_file}", "--base", "{base}"),
     ),
     # Diff-scoped hygiene: --pr diffs against the env base, set to the PR's own base.
     "bin/check-e2e-hygiene": ReplaySpec(

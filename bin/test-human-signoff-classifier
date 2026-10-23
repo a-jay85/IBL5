@@ -293,4 +293,647 @@ jq --arg b "$(record_body "$A")" \
 recorded_of "$FIX_USER"; rc=$?
 expect "real comments: user-authored marker -> rc 1" 1 "$rc"
 
+# ---- workflow job `if:` characterization (event-payload fixtures) ----
+# These rows pin the invariant any label/event filter on the signoff workflows
+# must respect: a job runs on every event where the classifier would FAIL, and
+# on every event type whose payload cannot prove irrelevance. The workflows now
+# carry the filters (ADR-0210), and these rows must stay green with them.
+EVAL="$REPO_ROOT/bin/lib/gha-if-eval.py"
+WF_DIR="$REPO_ROOT/.github/workflows"
+
+# wf_job_if <workflow-file> <job-id> — print the job's one-line `if:` expression
+# (the `${{ }}` wrapper stripped). Exit 0 = printed, 1 = job has no `if:`,
+# 2 = job id not found, 3 = the `if:` is multi-line (unsupported).
+wf_job_if() {
+    awk -v job="$2" '
+        BEGIN { start = "  " job ":"; state = 0; hasif = 0 }
+        state == 0 { if ($0 == start) state = 1; next }
+        state == 1 {
+            if ($0 ~ /^  [A-Za-z0-9_-]+:$/ || $0 ~ /^[A-Za-z_]/) { exit }
+            if (!hasif && index($0, "    if: ") == 1) {
+                hasif = 1
+                expr = substr($0, 9)
+            }
+        }
+        END {
+            if (state == 0) exit 2
+            if (!hasif) exit 1
+            sub(/[ \t]+$/, "", expr)
+            if (expr ~ /[|>][-+]?$/) { multi = 1 }
+            sub(/^\$\{\{[ ]*/, "", expr)
+            sub(/[ ]*\}\}$/, "", expr)
+            open = gsub(/\(/, "(", expr)
+            close_n = gsub(/\)/, ")", expr)
+            if (open != close_n) { multi = 1 }
+            if (multi) {
+                print "multi-line if: not supported" > "/dev/stderr"
+                exit 3
+            }
+            print expr
+            exit 0
+        }
+    ' "$1"
+}
+
+# wf_concurrency_group <workflow-file> — print the first `group:` value after the
+# top-level `concurrency:` line, `${{ }}` stripped. Exit 0 = printed, 1 = none.
+wf_concurrency_group() {
+    awk '
+        BEGIN { state = 0; found = 0 }
+        state == 0 { if ($0 == "concurrency:") state = 1; next }
+        state == 1 {
+            if ($0 ~ /^[A-Za-z_]/) { exit }
+            if ($0 ~ /^ +group: /) {
+                found = 1
+                val = $0
+                sub(/^ +group: /, "", val)
+                sub(/[ \t]+$/, "", val)
+                gsub(/\$\{\{[ ]*/, "", val)
+                gsub(/[ ]*\}\}/, "", val)
+                exit
+            }
+        }
+        END {
+            if (!found) exit 1
+            print val
+            exit 0
+        }
+    ' "$1"
+}
+
+h_tmp EV_DIR
+
+# mk_event <action> <title> <label-name|-> <changes-title: y|n|b> <pr-labels csv|->
+# Writes a pull_request event payload under $EV_DIR and prints its path.
+# changes-title: y = title edited, n = no `changes` keys, b = body-only edit,
+# r = base-only edit (`changes.base.ref.from`), m = no `changes` keys and the PR
+# is already merged.
+# Built by python3 from positional args (never string interpolation) so a title
+# cannot inject.
+mk_event() {
+    local path
+    path=$(mktemp "$EV_DIR/ev.XXXXXX") || return 1
+    python3 -I -c '
+import json, sys
+action, title, label, ch, labels, path = sys.argv[1:7]
+ev = {"event_name": "pull_request", "action": action}
+if label != "-":
+    ev["label"] = {"name": label}
+if ch == "y":
+    ev["changes"] = {"title": {"from": "old title"}}
+elif ch == "b":
+    ev["changes"] = {"body": {"from": "old body"}}
+elif ch == "r":
+    ev["changes"] = {"base": {"ref": {"from": "develop"}}}
+else:
+    ev["changes"] = {}
+names = [] if labels == "-" else labels.split(",")
+ev["pull_request"] = {
+    "number": 1,
+    "title": title,
+    "merged": ch == "m",
+    "auto_merge": None,
+    "labels": [{"name": n} for n in names],
+}
+with open(path, "w") as fh:
+    json.dump(ev, fh)
+' "$1" "$2" "$3" "$4" "$5" "$path" || return 1
+    printf '%s\n' "$path"
+}
+
+# job_would_run <workflow-file> <job-id> <event.json> — sets JOB_RESULT to `run`,
+# `skip`, or `error`. A global rather than stdout so h_fail runs in this shell
+# (a $(...) subshell would lose the failure count).
+JOB_RESULT=""
+job_would_run() {
+    local expr rc out erc
+    JOB_RESULT="error"
+    expr=$(wf_job_if "$1" "$2" 2>&1)
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+        JOB_RESULT="run"
+        return 0
+    fi
+    if [ "$rc" -ne 0 ]; then
+        h_fail "job_would_run $(basename "$1") $2" "wf_job_if rc=$rc: $expr"
+        return 0
+    fi
+    out=$(python3 -I "$EVAL" "$3" <<< "$expr" 2>&1)
+    erc=$?
+    if [ "$erc" -ne 0 ]; then
+        h_fail "job_would_run $(basename "$1") $2" "evaluator rc=$erc for [$expr]: $out"
+        return 0
+    fi
+    case "$out" in
+        true) JOB_RESULT="run" ;;
+        false) JOB_RESULT="skip" ;;
+        *) h_fail "job_would_run $(basename "$1") $2" "unexpected evaluator output [$out] for [$expr]" ;;
+    esac
+    return 0
+}
+
+# Fixture rows: action|label|changes-title|pr-labels (each runs with a feat: and
+# a fix: title). changes-title: y = title edited, n = none, b = body-only edit.
+HS_FIXTURES="
+opened|-|n|-
+reopened|-|n|-
+synchronize|-|n|-
+ready_for_review|-|n|-
+labeled|human-approved|n|human-approved
+unlabeled|human-approved|n|-
+labeled|needs-a-human|n|needs-a-human
+unlabeled|needs-a-human|n|-
+labeled|auto-mergeable|n|auto-mergeable
+unlabeled|auto-mergeable|n|-
+labeled|mutation-test|n|mutation-test
+unlabeled|mutation-test|n|-
+edited|-|y|-
+edited|-|b|-
+auto_merge_enabled|-|n|-
+auto_merge_disabled|-|n|-
+"
+# Title-superset probes (regex-vs-contains), labeled|mutation-test only.
+HS_VARIANT_TITLES="feat(ui): x|FEAT: x|feat!: x"
+
+# check_fixture <action> <title> <label> <changes-title> <pr-labels>
+check_fixture() {
+    local action=$1 title=$2 label=$3 ch=$4 prl=$5 ev tag cls_labels nonfilt hs_rc
+    ev=$(mk_event "$action" "$title" "$label" "$ch" "$prl") || {
+        h_fail "mk_event $action $title $label"
+        return 0
+    }
+    tag="$action $title $label"
+    cls_labels=$prl
+    [ "$cls_labels" = "-" ] && cls_labels=""
+
+    # Run invariant: wherever the classifier FAILS, the human-signoff job runs.
+    run_pr "$title" "$cls_labels"
+    hs_rc=$?
+    if [ "$hs_rc" -eq 1 ]; then
+        job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+        if [ "$JOB_RESULT" = "run" ]; then
+            h_pass "hs run-invariant $tag"
+        else
+            h_fail "hs run-invariant $tag" "classifier FAILS but job result is $JOB_RESULT"
+        fi
+    else
+        h_pass "hs run-invariant $tag (classifier passes; no constraint)"
+    fi
+
+    # Non-filterable events: payload cannot prove irrelevance.
+    nonfilt=0
+    case "$action" in
+        opened | reopened | synchronize | ready_for_review | auto_merge_enabled | auto_merge_disabled) nonfilt=1 ;;
+    esac
+    [ "$label" = "human-approved" ] && nonfilt=1
+    { [ "$action" = "edited" ] && [ "$ch" = "y" ]; } && nonfilt=1
+    if [ "$nonfilt" -eq 1 ]; then
+        case "$action" in
+            auto_merge_*) ;; # human-signoff.yml lists no auto_merge_* types
+            *)
+                job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+                if [ "$JOB_RESULT" = "run" ]; then
+                    h_pass "nonfilterable human-signoff.yml human-signoff $tag"
+                else
+                    h_fail "nonfilterable human-signoff.yml human-signoff $tag" "result $JOB_RESULT"
+                fi
+                ;;
+        esac
+    fi
+    if [ "$nonfilt" -eq 1 ] || [ "$label" = "auto-mergeable" ]; then
+        job_would_run "$WF_DIR/auto-mergeable-label.yml" sync-label "$ev"
+        if [ "$JOB_RESULT" = "run" ]; then
+            h_pass "nonfilterable auto-mergeable-label.yml sync-label $tag"
+        else
+            h_fail "nonfilterable auto-mergeable-label.yml sync-label $tag" "result $JOB_RESULT"
+        fi
+    fi
+}
+
+while IFS='|' read -r fx_action fx_label fx_ch fx_prl; do
+    [ -n "$fx_action" ] || continue
+    check_fixture "$fx_action" "feat: x" "$fx_label" "$fx_ch" "$fx_prl"
+    check_fixture "$fx_action" "fix: x" "$fx_label" "$fx_ch" "$fx_prl"
+done <<< "$HS_FIXTURES"
+
+while IFS= read -r fx_title; do
+    check_fixture labeled "$fx_title" mutation-test n mutation-test
+done <<< "$(tr '|' '\n' <<< "$HS_VARIANT_TITLES")"
+
+# `Meta checks` is never filtered: no job-level `if:`.
+wf_job_if "$WF_DIR/pr-meta-checks.yml" meta-checks > /dev/null 2>&1
+expect "meta-checks has no job if" 1 "$?"
+
+# ---- evaluator self-tests (pure expressions) ----
+EV_OPENED=$(mk_event opened "feat: x" - n -)
+EV_TITLE_Y=$(mk_event edited "feat: x" - y -)
+
+# ev_expr <event.json> <expression> — sets EV_OUT (stdout) and EV_RC.
+EV_OUT=""
+EV_RC=0
+ev_expr() {
+    EV_OUT=$(python3 -I "$EVAL" "$1" <<< "$2" 2> /dev/null)
+    EV_RC=$?
+}
+# ev_check <name> <event.json> <expression> <expected-output>
+ev_check() {
+    ev_expr "$2" "$3"
+    if [ "$EV_RC" -eq 0 ] && [ "$EV_OUT" = "$4" ]; then
+        h_pass "$1"
+    else
+        h_fail "$1" "expected [$4] got rc=$EV_RC out=[$EV_OUT] for [$3]"
+    fi
+}
+ev_check "contains case-insensitive: Feature flags" "$EV_OPENED" "contains('Feature flags', 'feat')" true
+ev_check "contains case-insensitive: FEAT: x" "$EV_OPENED" "contains('FEAT: x', 'feat')" true
+ev_check "== string case-insensitive" "$EV_OPENED" "'A' == 'a'" true
+ev_check "changes.title == null on n fixture" "$EV_OPENED" "github.event.changes.title == null" true
+ev_check "changes.title == null on y fixture" "$EV_TITLE_Y" "github.event.changes.title == null" false
+ev_check "absent label.name != 'human-approved' is true" "$EV_OPENED" "github.event.label.name != 'human-approved'" true
+ev_check "|| returns deciding operand" "$EV_OPENED" "github.event.label.name || 'x' == 'X'" true
+ev_check "contains over label list" "$(mk_event labeled "feat: x" human-approved n human-approved)" \
+    "contains(github.event.pull_request.labels.*.name, 'HUMAN-APPROVED')" true
+ev_expr "$EV_OPENED" "nope()"
+expect "unknown function exits 2" 2 "$EV_RC"
+ev_expr "$EV_OPENED" "github.event.pull_request.title =="
+expect "dangling expression exits 2" 2 "$EV_RC"
+
+# ---- awk helper smoke: negative, positive, not-found, multi-line ----
+HS_JOB_IF_RC_EXPECTED=0 # human-signoff carries the payload-provable skip (ADR-0210)
+out=$(wf_job_if "$WF_DIR/human-signoff.yml" needs-a-human-label)
+rc=$?
+if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
+    h_pass "wf_job_if needs-a-human-label prints always()..."
+else
+    h_fail "wf_job_if needs-a-human-label prints always()..." "rc=$rc out=[$out]"
+fi
+out=$(wf_job_if "$WF_DIR/human-signoff.yml" human-signoff 2>&1)
+rc=$?
+expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$rc"
+if [ "${out#'!('}" != "$out" ]; then
+    h_pass "wf_job_if human-signoff prints !(..."
+else
+    h_fail "wf_job_if human-signoff prints !(..." "out=[$out]"
+fi
+# Negative path: a scratch copy of auto-mergeable-label.yml with the job `if:` deleted.
+sed '/^    if: /d' "$WF_DIR/auto-mergeable-label.yml" > "$EV_DIR/am-noif.yml"
+wf_job_if "$EV_DIR/am-noif.yml" sync-label > /dev/null 2>&1
+expect "wf_job_if sync-label without if: exits 1" 1 "$?"
+wf_job_if "$WF_DIR/human-signoff.yml" no-such-job > /dev/null 2>&1
+expect "wf_job_if no-such-job exits 2" 2 "$?"
+out=$(wf_job_if "$WF_DIR/auto-mergeable-label.yml" sync-label)
+rc=$?
+if [ "$rc" -eq 0 ] && [ "${out#'github.event.pull_request.merged != true && !('}" != "$out" ]; then
+    h_pass "wf_job_if sync-label positive path"
+else
+    h_fail "wf_job_if sync-label positive path" "rc=$rc out=[$out]"
+fi
+# shellcheck disable=SC2016 # literal workflow expression text, not shell expansion
+printf 'jobs:\n  a:\n    if: |\n      x\n  b:\n    if: ${{ (x &&\n' > "$EV_DIR/multi.yml"
+wf_job_if "$EV_DIR/multi.yml" a > /dev/null 2>&1
+expect "wf_job_if multi-line (block scalar) exits 3" 3 "$?"
+wf_job_if "$EV_DIR/multi.yml" b > /dev/null 2>&1
+expect "wf_job_if multi-line (unbalanced paren) exits 3" 3 "$?"
+out=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
+rc=$?
+if [ "$rc" -eq 0 ] && [[ "$out" == *"|| format('human-signoff-{0}', github.event.pull_request.number)" ]]; then
+    h_pass "wf_concurrency_group human-signoff"
+else
+    h_fail "wf_concurrency_group human-signoff" "rc=$rc out=[$out]"
+fi
+
+# ---- workflow structure guards (Phase 4) ----
+# Every expectation below is a literal. Nothing is computed from workflow text
+# except the two `if:` / `group:` strings the identity rows compare to each other.
+
+# group_pred <workflow-file> <group-prefix> — sets GP to the predicate P of the
+# group shape `(P) && format('<prefix>-{0}-skip-{1}', ...) || format('<prefix>-{0}', ...)`.
+# Returns 1 (GP empty) when the group is absent or has another shape. Silent.
+GP=""
+group_pred() {
+    local grp re
+    GP=""
+    grp=$(wf_concurrency_group "$1") || return 1
+    re="^\\((.*)\\) && format\\('$2-\\{0\\}-skip-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| format\\('$2-\\{0\\}', github\\.event\\.pull_request\\.number\\)\$"
+    if [[ "$grp" =~ $re ]]; then
+        GP="${BASH_REMATCH[1]}"
+        return 0
+    fi
+    return 1
+}
+
+# hs_ident_ok / am_ident_ok <workflow-file> — 0 when the job `if:` equals the
+# negated group predicate (4a). Silent, so mutants can reuse them.
+hs_ident_ok() {
+    local ifx
+    group_pred "$1" human-signoff || return 1
+    ifx=$(wf_job_if "$1" human-signoff) || return 1
+    [ "$ifx" = "!($GP)" ]
+}
+am_ident_ok() {
+    local ifx
+    group_pred "$1" auto-mergeable-label || return 1
+    ifx=$(wf_job_if "$1" sync-label) || return 1
+    [ "$ifx" = "github.event.pull_request.merged != true && !($GP)" ]
+}
+
+# ---- 4a. predicate identity ----
+if ! group_pred "$WF_DIR/human-signoff.yml" human-signoff; then
+    h_fail "group shape human-signoff.yml"
+fi
+if hs_ident_ok "$WF_DIR/human-signoff.yml"; then
+    h_pass "hs if == !(group predicate)"
+else
+    h_fail "hs if == !(group predicate)" "job if and negated group predicate differ"
+fi
+HS_P=""
+group_pred "$WF_DIR/human-signoff.yml" human-signoff && HS_P=$GP
+if ! group_pred "$WF_DIR/auto-mergeable-label.yml" auto-mergeable-label; then
+    h_fail "group shape auto-mergeable-label.yml"
+fi
+if am_ident_ok "$WF_DIR/auto-mergeable-label.yml"; then
+    h_pass "am if == merged-guard && !(group predicate)"
+else
+    h_fail "am if == merged-guard && !(group predicate)" "job if and merged-guard + negated group predicate differ"
+fi
+AM_P=""
+group_pred "$WF_DIR/auto-mergeable-label.yml" auto-mergeable-label && AM_P=$GP
+
+# ---- 4b. guard contents ----
+FEAT_LIT="!contains(github.event.pull_request.title, 'feat') && "
+case "$HS_P" in
+    "$FEAT_LIT"*) h_pass "hs predicate carries feat guard" ;;
+    *) h_fail "hs predicate carries feat guard" "predicate must start with the feat guard so it binds over both arms: [$HS_P]" ;;
+esac
+HS_IF=$(wf_job_if "$WF_DIR/human-signoff.yml" human-signoff 2>/dev/null)
+case "$HS_IF" in
+    "!($FEAT_LIT"*) h_pass "hs job if carries feat guard" ;;
+    *) h_fail "hs job if carries feat guard" "job if must start with !( plus the feat guard: [$HS_IF]" ;;
+esac
+h_contains "hs predicate names human-approved" "$HS_P" "github.event.label.name != 'human-approved'"
+HS_ACTIONS=$(grep -o "github\\.event\\.action == '[a-z_]*'" <<< "$HS_P" | sed "s/.*== '//; s/'\$//" | sort -u | tr '\n' ' ')
+h_eq "hs predicate skips only labeled/unlabeled/edited" "edited labeled unlabeled " "$HS_ACTIONS"
+am_bad=""
+case "$AM_P" in *"!= 'human-approved'"*) ;; *) am_bad="$am_bad missing human-approved;" ;; esac
+case "$AM_P" in *"!= 'auto-mergeable'"*) ;; *) am_bad="$am_bad missing auto-mergeable;" ;; esac
+case "$AM_P" in
+    *"contains(github.event.pull_request.title"*) am_bad="$am_bad title guard present: update Phase 3's reasoning in the ADR (the am title guard is deliberately absent);" ;;
+esac
+if [ -z "$am_bad" ]; then
+    h_pass "am predicate names both labels"
+else
+    h_fail "am predicate names both labels" "$am_bad"
+fi
+
+# ---- 4c. every job is guarded or explicitly exempt ----
+# wf_job_ids <workflow-file> — job ids under the top-level `jobs:` key.
+wf_job_ids() {
+    awk '
+        /^jobs:/ { s = 1; next }
+        s && /^[A-Za-z_]/ { s = 0 }
+        s && /^  [A-Za-z0-9_-]+:$/ { sub(/^  /, ""); sub(/:$/, ""); print }
+    ' "$1"
+}
+# wf_job_block <workflow-file> <job-id> — the job's lines.
+wf_job_block() {
+    awk -v job="$2" '
+        $0 == "  " job ":" { s = 1; print; next }
+        s && (/^  [A-Za-z0-9_-]+:$/ || /^[A-Za-z_]/) { exit }
+        s { print }
+    ' "$1"
+}
+# EXEMPT_HS: dependent jobs that already exclude `skipped` (PR #3346 has not landed).
+EXEMPT_HS=(needs-a-human-label)
+# hs_job_ok <workflow-file> <job-id> — 0 when the job is guarded or exempt. Silent.
+hs_job_ok() {
+    local ex id ifx blk
+    id=$2
+    for ex in "${EXEMPT_HS[@]}"; do
+        if [ "$ex" = "$id" ]; then
+            blk=$(wf_job_block "$1" "$id")
+            grep -qxF "    needs: human-signoff" <<< "$blk" || return 1
+            ifx=$(wf_job_if "$1" "$id") || return 1
+            case "$ifx" in *"needs.human-signoff.result == 'failure'"*) return 0 ;; esac
+            return 1
+        fi
+    done
+    group_pred "$1" human-signoff || return 1
+    ifx=$(wf_job_if "$1" "$id") || return 1
+    [ "$ifx" = "!($GP)" ]
+}
+# am_job_ok <workflow-file> <job-id> — EXEMPT_AM is empty: every job must equal the 4a string.
+am_job_ok() {
+    local ifx
+    group_pred "$1" auto-mergeable-label || return 1
+    ifx=$(wf_job_if "$1" "$2") || return 1
+    [ "$ifx" = "github.event.pull_request.merged != true && !($GP)" ]
+}
+HS_IDS=$(wf_job_ids "$WF_DIR/human-signoff.yml")
+if [ -z "$HS_IDS" ]; then
+    h_fail "hs job ids found" "wf_job_ids printed nothing"
+fi
+while IFS= read -r job_id; do
+    [ -n "$job_id" ] || continue
+    if hs_job_ok "$WF_DIR/human-signoff.yml" "$job_id"; then
+        h_pass "hs job $job_id guarded-or-exempt"
+    else
+        h_fail "hs job $job_id guarded-or-exempt" "neither equals !(group predicate) nor a needs: human-signoff dependent excluding skipped"
+    fi
+done <<< "$HS_IDS"
+AM_IDS=$(wf_job_ids "$WF_DIR/auto-mergeable-label.yml")
+if [ -z "$AM_IDS" ]; then
+    h_fail "am job ids found" "wf_job_ids printed nothing"
+fi
+while IFS= read -r job_id; do
+    [ -n "$job_id" ] || continue
+    if am_job_ok "$WF_DIR/auto-mergeable-label.yml" "$job_id"; then
+        h_pass "am job $job_id guarded-or-exempt"
+    else
+        h_fail "am job $job_id guarded-or-exempt" "job if differs from merged-guard && !(group predicate)"
+    fi
+done <<< "$AM_IDS"
+
+# pr-meta-checks stays unfiltered: one plain concurrency group (Phase 5 decision).
+# shellcheck disable=SC2016 # literal workflow expression text, not shell expansion
+PMC_GROUP_EXPECT='  group: ${{ github.workflow }}-${{ github.ref }}'
+PMC_GROUP_ACTUAL=$(grep -m1 '^  group: ' "$WF_DIR/pr-meta-checks.yml")
+h_eq "pr-meta-checks has no skip group" "$PMC_GROUP_EXPECT" "$PMC_GROUP_ACTUAL"
+
+# ---- 4d. the full run/skip table (literal expectations) ----
+# Row: workflow|job|action|title|label|changes|pr-labels|expected
+EXPECT=()
+tbl() { EXPECT+=("$1|$2|$3|$4|$5|$6|$7"); }
+HS_WF="human-signoff.yml|human-signoff"
+AM_WF="auto-mergeable-label.yml|sync-label"
+
+for t_act in opened reopened synchronize ready_for_review; do
+    for t_title in "feat: x" "fix: x"; do
+        tbl "$HS_WF" "$t_act" "$t_title" - n - run
+    done
+done
+for t_title in "feat: x" "fix: x"; do
+    tbl "$HS_WF" labeled "$t_title" human-approved n human-approved run
+    tbl "$HS_WF" unlabeled "$t_title" human-approved n - run
+done
+for t_lbl in needs-a-human auto-mergeable mutation-test; do
+    tbl "$HS_WF" labeled "fix: x" "$t_lbl" n "$t_lbl" skip
+    tbl "$HS_WF" unlabeled "fix: x" "$t_lbl" n - skip
+    for t_title in "feat: x" "FEAT: x" "feat(ui): x" "feat!: x" "chore: refactor feature flags"; do
+        tbl "$HS_WF" labeled "$t_title" "$t_lbl" n "$t_lbl" run
+        tbl "$HS_WF" unlabeled "$t_title" "$t_lbl" n - run
+    done
+done
+for t_title in "feat: x" "fix: x"; do
+    tbl "$HS_WF" edited "$t_title" - y - run
+done
+tbl "$HS_WF" edited "fix: x" - b - skip
+tbl "$HS_WF" edited "feat: x" - b - run
+tbl "$HS_WF" edited "fix: x" - r - skip
+tbl "$HS_WF" edited "feat: x" - r - run
+
+for t_act in opened reopened synchronize ready_for_review auto_merge_enabled auto_merge_disabled; do
+    for t_title in "feat: x" "fix: x"; do
+        tbl "$AM_WF" "$t_act" "$t_title" - n - run
+    done
+done
+for t_title in "feat: x" "fix: x"; do
+    for t_lbl in human-approved auto-mergeable; do
+        tbl "$AM_WF" labeled "$t_title" "$t_lbl" n "$t_lbl" run
+        tbl "$AM_WF" unlabeled "$t_title" "$t_lbl" n - run
+    done
+    for t_lbl in needs-a-human mutation-test; do
+        tbl "$AM_WF" labeled "$t_title" "$t_lbl" n "$t_lbl" skip
+        tbl "$AM_WF" unlabeled "$t_title" "$t_lbl" n - skip
+    done
+    tbl "$AM_WF" edited "$t_title" - y - run
+    tbl "$AM_WF" edited "$t_title" - b - skip
+    tbl "$AM_WF" edited "$t_title" - r - run
+done
+tbl "$AM_WF" opened "fix: x" - m - skip
+
+# Vacuity guard: enough rows, and every job has at least one run and one skip row.
+if [ "${#EXPECT[@]}" -ge 60 ]; then
+    h_pass "table vacuity guard: at least 60 rows"
+else
+    h_fail "table vacuity guard: at least 60 rows" "only ${#EXPECT[@]} rows"
+fi
+for t_key in "human-signoff.yml|human-signoff" "auto-mergeable-label.yml|sync-label"; do
+    t_run=0
+    t_skip=0
+    for t_row in "${EXPECT[@]}"; do
+        case "$t_row" in
+            "$t_key|"*"|run") t_run=$((t_run + 1)) ;;
+            "$t_key|"*"|skip") t_skip=$((t_skip + 1)) ;;
+        esac
+    done
+    if [ "$t_run" -ge 1 ] && [ "$t_skip" -ge 1 ]; then
+        h_pass "table vacuity guard: $t_key has run and skip rows"
+    else
+        h_fail "table vacuity guard: $t_key has run and skip rows" "run=$t_run skip=$t_skip"
+    fi
+done
+
+for t_row in "${EXPECT[@]}"; do
+    IFS='|' read -r t_wf t_job t_action t_title t_label t_ch t_prl t_want <<< "$t_row"
+    t_name="table $t_wf $t_job $t_action $t_title $t_label $t_ch"
+    t_ev=$(mk_event "$t_action" "$t_title" "$t_label" "$t_ch" "$t_prl") || {
+        h_fail "$t_name" "mk_event failed"
+        continue
+    }
+    job_would_run "$WF_DIR/$t_wf" "$t_job" "$t_ev"
+    if [ "$JOB_RESULT" = "$t_want" ]; then
+        h_pass "$t_name"
+    else
+        h_fail "$t_name" "expected $t_want got $JOB_RESULT"
+    fi
+    # Feed this table's fixtures the Phase 1 run-invariant check where Phase 1
+    # had none (base-only edits and the superset chore title).
+    if [ "$t_wf" = "human-signoff.yml" ]; then
+        case "$t_ch:$t_title" in
+            r:* | *:"chore: refactor feature flags") check_fixture "$t_action" "$t_title" "$t_label" "$t_ch" "$t_prl" ;;
+        esac
+    fi
+done
+
+# ---- 4e. permanent mutation checks (forced-trigger rows) ----
+# mutate <name> <orig> <out> <sed-arg>... — build the mutant; fail loudly if identical.
+mutate() {
+    local name=$1 orig=$2 out=$3
+    shift 3
+    sed "$@" "$orig" > "$out"
+    if cmp -s "$orig" "$out"; then
+        h_fail "mutant identical: $name"
+        return 1
+    fi
+    return 0
+}
+
+# 1. hs-if-drops-feat: feat clause removed from the job `if:` only.
+M1="$EV_DIR/m-hs-if-drops-feat.yml"
+if mutate hs-if-drops-feat "$WF_DIR/human-signoff.yml" "$M1" -e "/^    if: /s/!contains(github.event.pull_request.title, 'feat') && //"; then
+    EV_M1=$(mk_event labeled "feat: x" mutation-test n mutation-test)
+    job_would_run "$M1" human-signoff "$EV_M1"
+    if [ "$JOB_RESULT" = "skip" ]; then
+        h_pass "mutant hs-if-drops-feat evaluator exposes the hole"
+    else
+        h_fail "mutant hs-if-drops-feat evaluator exposes the hole" "result $JOB_RESULT"
+    fi
+    if hs_ident_ok "$M1"; then
+        h_fail "mutant hs-if-drops-feat identity guard catches it" "identity still equal"
+    else
+        h_pass "mutant hs-if-drops-feat identity guard catches it"
+    fi
+fi
+
+# 2. hs-group-drops-feat: same deletion on the `  group:` line only.
+M2="$EV_DIR/m-hs-group-drops-feat.yml"
+if mutate hs-group-drops-feat "$WF_DIR/human-signoff.yml" "$M2" -e "/^  group: /s/!contains(github.event.pull_request.title, 'feat') && //"; then
+    if hs_ident_ok "$M2"; then
+        h_fail "mutant hs-group-drops-feat identity guard catches it" "identity still equal"
+    else
+        h_pass "mutant hs-group-drops-feat identity guard catches it"
+    fi
+fi
+
+# 3. hs-if-removed: the human-signoff job `if:` line deleted.
+M3="$EV_DIR/m-hs-if-removed.yml"
+# shellcheck disable=SC2016 # literal sed pattern, not shell expansion
+if mutate hs-if-removed "$WF_DIR/human-signoff.yml" "$M3" -e '/^    if: [$]{{ !(/d'; then
+    wf_job_if "$M3" human-signoff > /dev/null 2>&1
+    expect "mutant hs-if-removed wf_job_if exits 1" 1 "$?"
+    if hs_job_ok "$M3" human-signoff; then
+        h_fail "mutant hs-if-removed per-job guard catches it" "hs_job_ok accepted a job with no if:"
+    else
+        h_pass "mutant hs-if-removed per-job guard catches it"
+    fi
+fi
+
+# 4. am-if-drops-auto-mergeable: label clause removed from the sync-label `if:` only.
+M4="$EV_DIR/m-am-if-drops-auto-mergeable.yml"
+if mutate am-if-drops-auto-mergeable "$WF_DIR/auto-mergeable-label.yml" "$M4" -e "/^    if: /s/ && github.event.label.name != 'auto-mergeable'//"; then
+    EV_M4=$(mk_event unlabeled "fix: x" auto-mergeable n -)
+    job_would_run "$M4" sync-label "$EV_M4"
+    if [ "$JOB_RESULT" = "skip" ]; then
+        h_pass "mutant am-if-drops-auto-mergeable evaluator exposes the hole"
+    else
+        h_fail "mutant am-if-drops-auto-mergeable evaluator exposes the hole" "result $JOB_RESULT"
+    fi
+    if am_ident_ok "$M4"; then
+        h_fail "mutant am-if-drops-auto-mergeable identity guard catches it" "identity still equal"
+    else
+        h_pass "mutant am-if-drops-auto-mergeable identity guard catches it"
+    fi
+fi
+
+# 5. meta-checks-adds-if: a job `if:` inserted under `name: Meta checks`.
+M5="$EV_DIR/m-meta-checks-adds-if.yml"
+awk '{ print } $0 == "    name: Meta checks" { print "    if: ${{ github.event.action != '"'"'edited'"'"' }}" }' \
+    "$WF_DIR/pr-meta-checks.yml" > "$M5"
+if cmp -s "$WF_DIR/pr-meta-checks.yml" "$M5"; then
+    h_fail "mutant identical: meta-checks-adds-if"
+else
+    wf_job_if "$M5" meta-checks > /dev/null 2>&1
+    expect "mutant meta-checks-adds-if wf_job_if exits 0" 0 "$?"
+fi
+
 h_done

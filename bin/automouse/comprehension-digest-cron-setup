@@ -2,8 +2,10 @@
 # One-time setup for the automouse comprehension-digest cron (launchd LaunchAgent).
 #
 # Installs a Mac-local launchd LaunchAgent (com.ibl5.automouse-comprehension-digest)
-# that fires bin/automouse/comprehension-digest every Sunday at 10:00 local time via
-# StartCalendarInterval — host-durable, calendar-scheduled.  The plist
+# that fires bin/automouse/comprehension-digest --at-reset every Sunday at 16:03 UTC (the weekly
+# usage reset) via StartCalendarInterval — host-durable, calendar-scheduled. launchd times are
+# local only, so the plist has two Sunday entries (08:03 and 09:03 local) and --at-reset lets
+# only the one that lands on 16:xx UTC through; that survives the PDT/PST switch.  The plist
 # ProgramArguments / WorkingDirectory point at the durable MAIN checkout
 # (never a worktree, which gets torn down after its PR merges).
 #
@@ -73,9 +75,9 @@ plist_body() {
   fi
 
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_program_arguments "$PROGRAM"
+  lsched_program_arguments "$PROGRAM" "--at-reset"
   lsched_key_string WorkingDirectory "$MAIN_WT"
-  lsched_calendar "Weekday=0" "Hour=10" "Minute=0"
+  lsched_calendar_multi "Weekday=0,Hour=8,Minute=3" "Weekday=0,Hour=9,Minute=3"
   lsched_key_bool RunAtLoad false
   lsched_env_open
   cat <<PLIST
@@ -115,7 +117,7 @@ case "$ACTION" in
       exit 1
     fi
     lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$LOG_DIR"
-    echo "Installed ${PLIST_LABEL} (StartCalendarInterval Weekday=0 Hour=10 Minute=0). Program: $PROGRAM"
+    echo "Installed ${PLIST_LABEL} (Sundays 08:03 and 09:03 local; --at-reset passes the one at 16:03 UTC). Program: $PROGRAM"
     ;;
   uninstall)
     lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"

@@ -39,23 +39,61 @@ interface CareerLeaderboardsServiceInterface
     public function processPlayerRow(array $row, string $tableType): array;
 
     /**
-     * Get map of board types to table names
+     * Phase select options
      *
-     * Returns mapping of database table names to display labels.
-     *
-     * @return array<string, string> Associative array [table_name => display_label]
+     * @return array<string, string> [phase_key => display_label]
      */
-    public function getBoardTypes(): array;
+    public function getPhases(): array;
 
     /**
-     * Get map of sort categories to column names
-     *
-     * Returns mapping of database columns to display labels for sort dropdown.
-     *
-     * @return array<string, string> Associative array [column_name => display_label]
-     *
-     * **Note:** Percentage columns (fgpct, ftpct, tpct) only work correctly
-     * with average tables, not totals tables.
+     * Whether the phase has an averages table (rookie and sophomore do not)
      */
-    public function getSortCategories(): array;
+    public function phaseHasAverages(string $phase): bool;
+
+    /**
+     * Whether the phase shows a games column (rookie and sophomore are one game each)
+     */
+    public function phaseShowsGames(string $phase): bool;
+
+    /**
+     * Allowlist a phase key; unknown values become 'regular'
+     */
+    public function resolvePhase(string $phase): string;
+
+    /**
+     * Allowlist a mode; unknown values and averages on a phase without averages become 'totals'
+     *
+     * @return 'totals'|'averages'
+     */
+    public function resolveMode(string $phase, string $mode): string;
+
+    /**
+     * Resolve phase + mode to a repository table key
+     *
+     * Unknown phase falls back to regular season, unknown mode or averages
+     * on a phase without an averages table falls back to totals.
+     */
+    public function resolveTableKey(string $phase, string $mode): string;
+
+    /**
+     * Sort By options for the given mode (PPG reads "PTS" on totals)
+     *
+     * @return array<string, string> [sort_key => display_label], in Season-tab order minus QA
+     */
+    public function getSortOptions(string $mode): array;
+
+    /**
+     * Whether a sort key is a known option (every key works in both modes)
+     */
+    public function isSortAvailable(string $key, string $mode): bool;
+
+    /**
+     * Allowlist a sort key for the mode; unknown or unavailable keys become 'PPG'
+     */
+    public function resolveSortKey(string $key, string $mode): string;
+
+    /**
+     * Resolve a sort key to a repository sort column (see VALID_SORT_COLUMNS)
+     */
+    public function resolveSortColumn(string $key, string $mode): string;
 }

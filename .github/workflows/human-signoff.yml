@@ -33,12 +33,24 @@ name: Human Sign-off
 # compares the current id with the newest bot record. A mismatch, a missing
 # record, or any error reds the gate in the same run (so auto-merge cannot
 # complete first), and the write job removes the label and comments why.
+#
+# Job-level skip (ADR 0210, see ibl5/docs/decisions/): the `human-signoff` job
+# skips a labeled/unlabeled event for any label except `human-approved`, and an
+# `edited` event that did not change the title, but ONLY when the title contains
+# no `feat` substring. The verdict reads only the title and that one label, and a
+# title with no `feat` can never fail, so the skipped run (which GitHub reports
+# as success) equals the verdict under either same-name check-run precedence.
+# A feat* title always runs. The skipped runs use a per-run concurrency group so
+# they never cancel a real queued run (the ADR-0145 incident). The predicate is
+# copied verbatim into the concurrency group; bin/test-human-signoff-classifier
+# asserts the two copies are identical and that a feat title never skips.
 
 on:
   pull_request:
     branches: [ master ]
-    # labeled/unlabeled re-run the gate so applying the label flips red→green;
-    # edited re-runs when the title (the classifier input) changes.
+    # labeled/unlabeled re-run the gate so applying `human-approved` flips red→green;
+    # edited re-runs when the title (the classifier input) changes. The job-level
+    # `if:` below skips the label and edit events the verdict cannot depend on.
     types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]
 
 permissions:
@@ -47,12 +59,13 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: human-signoff-${{ github.event.pull_request.number }}
+  group: ${{ (!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) && format('human-signoff-{0}-skip-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
   cancel-in-progress: true
 
 jobs:
   human-signoff:
     name: human-signoff
+    if: ${{ !(!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) }}
     runs-on: ubuntu-latest
     outputs:
       verdict: ${{ steps.eval.outputs.verdict }}

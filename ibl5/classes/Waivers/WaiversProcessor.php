@@ -108,26 +108,6 @@ class WaiversProcessor implements WaiversProcessorInterface
     }
 
     /**
-     * @see WaiversProcessorInterface::getWaiverWaitTime()
-     */
-    public function getWaiverWaitTime(int $dropTime, int $currentTime): string
-    {
-        $timeDiff = $currentTime - $dropTime;
-        $waitPeriod = 86400; // 24 hours in seconds
-
-        if ($timeDiff >= $waitPeriod) {
-            return '';
-        }
-
-        $remainingTime = $waitPeriod - $timeDiff;
-        $hours = floor($remainingTime / 3600);
-        $minutes = floor(($remainingTime - $hours * 3600) / 60);
-        $seconds = $remainingTime % 60;
-
-        return "(Clears in $hours h, $minutes m, $seconds s)";
-    }
-
-    /**
      * @see WaiversProcessorInterface::determineContractData()
      *
      * @param PlayerRow $playerData
@@ -139,10 +119,8 @@ class WaiversProcessor implements WaiversProcessorInterface
 
         if ($season->isOffseasonPhase()) {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
-            $experience = ($playerDataObj->yearsOfExperience ?? 0) + 1;
         } else {
             $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
-            $experience = $playerDataObj->yearsOfExperience ?? 0;
         }
 
         $hasExistingContract = $currentSeasonSalary > 0;
@@ -154,12 +132,34 @@ class WaiversProcessor implements WaiversProcessorInterface
             ];
         }
 
-        $vetMinSalary = $this->calculateVeteranMinimumSalary($experience);
+        $vetMinSalary = $this->resolveVeteranMinimum($playerData, $season);
 
         return [
             'hasExistingContract' => false,
             'salary' => $vetMinSalary
         ];
+    }
+
+    /**
+     * Single source for the veteran minimum, shared by the signed contract
+     * (determineContractData) and the validator's over-cap check (processAdd).
+     *
+     * @param PlayerRow $playerData
+     */
+    private function resolveVeteranMinimum(array $playerData, Season $season): int
+    {
+        return $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerData, $season));
+    }
+
+    /**
+     * Experience used for contract math: one extra year during the offseason phase.
+     *
+     * @param PlayerRow $playerData
+     */
+    private function resolveContractExperience(array $playerData, Season $season): int
+    {
+        $yearsOfExperience = PlayerDataConverter::arrayToPlayerData($playerData)->yearsOfExperience ?? 0;
+        return $season->isOffseasonPhase() ? $yearsOfExperience + 1 : $yearsOfExperience;
     }
 
     /**
@@ -214,7 +214,7 @@ class WaiversProcessor implements WaiversProcessorInterface
      *
      * @return array{success: bool, result?: string, error?: string}
      */
-    public function processAdd(?int $playerID, string $teamName, int $healthyRosterSlots, int $totalSalary): array
+    public function processAdd(?int $playerID, string $teamName, int $openRosterSlots, int $healthyRosterSlots, int $totalSalary): array
     {
         if ($playerID === null || $playerID === 0) {
             return ['success' => false, 'error' => "You didn't select a valid player. Please select a player and try again."];
@@ -230,7 +230,16 @@ class WaiversProcessor implements WaiversProcessorInterface
         $contractData = $this->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
 
-        $addValidation = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $veteranMinimum = $this->resolveVeteranMinimum($player, $season);
+
+        $addValidation = $this->validator->validateAdd(
+            $playerID,
+            $openRosterSlots,
+            $healthyRosterSlots,
+            $totalSalary,
+            $playerSalary,
+            $veteranMinimum
+        );
         if (!$addValidation->isValid()) {
             return ['success' => false, 'error' => implode(' ', $addValidation->getErrors())];
         }

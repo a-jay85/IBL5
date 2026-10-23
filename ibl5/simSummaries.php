@@ -48,6 +48,11 @@ if ($sim !== null) {
     }
 }
 
+// The links footer points at the canonical host, the same prod-side constant
+// scripts/storeSimRecap.php reads. Empty means production (RecapDocument resolves it).
+$rawHost       = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
+$canonicalHost = is_string($rawHost) ? $rawHost : '';
+
 // Plain-text export of a single recap body
 if ($wantsTxt) {
     if ($sim === null || $row === null || $row['recap_text'] === null) {
@@ -57,15 +62,12 @@ if ($wantsTxt) {
         exit;
     }
 
-    // recap_text is usually a ~220-char teaser; assemble the full document from parts
-    // before emitting headers so a fatal in assembly cannot produce partial output.
-    $introText = $row['intro_text'] ?? null;
-    $outroText = $row['outro_text'] ?? null;
+    // recap_text is usually a ~220-char teaser; assemble the full document from the game
+    // parts before emitting headers so a fatal in assembly cannot produce partial output.
     $document  = \SimRecap\RecapDocument::postableText(
-        is_string($introText) ? $introText : null,
         $repo->findDisplayableGameRecaps($sim),
-        is_string($outroText) ? $outroText : null,
-        (string) $row['recap_text']
+        (string) $row['recap_text'],
+        $canonicalHost
     );
     $orphanCount = count($repo->findOrphanedGameRecaps($sim));
 
@@ -95,4 +97,4 @@ if ($simError === 'malformed') {
 }
 
 // $sim is passed so the 'notfound' notice can name the sim it could not find.
-echo (new \SimRecap\SimSummariesView())->render($rows, $row, $gameRecaps, $simError, $sim, $orphanedGames);
+echo (new \SimRecap\SimSummariesView($canonicalHost))->render($rows, $row, $gameRecaps, $simError, $sim, $orphanedGames);

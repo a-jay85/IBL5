@@ -14,6 +14,9 @@ class Discord
     /** @var string Testing/development Discord server snowflake ID */
     public const IBL_GUILD_ID_TESTING = '399119059771195392';
 
+    /** @var string The production site's bare hostname, the one this class treats as production */
+    public const PRODUCTION_HOST = 'iblhoops.net';
+
     private TeamIdentityRepositoryInterface $commonRepo;
 
     /**
@@ -66,7 +69,7 @@ class Discord
     {
         $serverName = self::$serverName;
 
-        return $serverName === 'iblhoops.net' || $serverName === 'www.iblhoops.net';
+        return $serverName === self::PRODUCTION_HOST || $serverName === 'www.iblhoops.net';
     }
 
     /**

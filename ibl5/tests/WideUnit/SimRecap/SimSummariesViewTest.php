@@ -18,7 +18,7 @@ final class SimSummariesViewTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->view = new SimSummariesView();
+        $this->view = new SimSummariesView('iblhoops.net');
     }
 
     /**
@@ -219,9 +219,9 @@ final class SimSummariesViewTest extends TestCase
 
         // None of the LLM-sourced payloads may appear unescaped anywhere in the output.
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
-        // 3 occurrences in the per-field display panels (intro <p>, game <p>, outro <p>)
-        // plus 3 more in the assembled document inside the textarea (intro + game + outro) = 6.
-        self::assertSame(6, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
+        // One occurrence in the game <p> panel plus one in the assembled document inside
+        // the textarea = 2. The legacy intro/outro carry the payload too but never render.
+        self::assertSame(2, substr_count($html, '&lt;script&gt;alert(1)&lt;/script&gt;'));
     }
 
     /**
@@ -240,13 +240,9 @@ final class SimSummariesViewTest extends TestCase
             null
         );
 
-        self::assertStringContainsString('<p id="recap-intro" class="whitespace-pre-line">', $html);
         self::assertStringContainsString('<p class="recap-game__text whitespace-pre-line">', $html);
-        self::assertStringContainsString('<p id="recap-outro" class="whitespace-pre-line">', $html);
         // The newlines themselves must survive escaping — pre-line has nothing to act on otherwise.
-        self::assertStringContainsString("Intro line one\nIntro line two", $html);
         self::assertStringContainsString("**A 1 @ B 2**\nGame prose.", $html);
-        self::assertStringContainsString("Outro line one\nOutro line two", $html);
     }
 
     public function testOmitsPerGameListWhenRecapTextIsNull(): void
@@ -279,8 +275,8 @@ final class SimSummariesViewTest extends TestCase
     }
 
     /**
-     * The textarea must carry the full assembled document (intro + date rules + game prose +
-     * outro), not merely the ~220-char teaser stored in recap_text.
+     * The textarea must carry the full assembled document (date rules + game prose + links
+     * footers), not merely the ~220-char teaser stored in recap_text.
      */
     public function testTextareaCarriesAssembledDocumentNotTeaser(): void
     {
@@ -310,7 +306,7 @@ final class SimSummariesViewTest extends TestCase
     }
 
     /**
-     * When there is nothing to assemble (no intro, no games, no outro), the textarea
+     * When there is nothing to assemble (no games), the textarea
      * must fall back to the teaser so Copy is never empty.
      */
     public function testTextareaFallsBackToTeaserWhenAssemblyIsEmpty(): void
@@ -566,7 +562,10 @@ final class SimSummariesViewTest extends TestCase
 
         $html = $this->view->render($rows, $recap, $gameRecaps, null, null, $orphanedGames);
 
-        $document = \SimRecap\RecapDocument::postableText($intro, $gameRecaps, $outro, $body);
+        $document = \SimRecap\RecapDocument::postableText($gameRecaps, $body, 'iblhoops.net');
+        // The row still carries hostile intro/outro text; neither may reach the document.
+        self::assertStringNotContainsString('Intro', $document);
+        self::assertStringNotContainsString('Outro', $document);
 
         $indexRows = <<<'HTML'
             <tr>
@@ -599,7 +598,6 @@ HTML;
             <li class="recap-orphan">&lt;x&gt; · team  at team h&lt; · game  of that day</li>
             </ul>
         </div>
-        <p id="recap-intro" class="whitespace-pre-line">Intro &lt;b&gt;bold&lt;/b&gt; &amp; &quot;quoted&quot;</p>
         <ol id="recap-games">
             <li class="recap-game">
                 <span class="recap-game__meta">2026-02-20 · team 5 at team 12</span>
@@ -610,7 +608,6 @@ HTML;
                 <p class="recap-game__text whitespace-pre-line">Game &quot;two&quot;</p>
             </li>
         </ol>
-        <p id="recap-outro" class="whitespace-pre-line">Outro &lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</p>
         <textarea id="recap-body" readonly rows="24" cols="100">{{DOC}}</textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>
@@ -680,15 +677,63 @@ HTML;
     {
         $reflection = new \ReflectionClass(SimSummariesView::class);
 
-        self::assertSame([], $reflection->getProperties(), 'A DB handle or session would have to live in a property');
-        self::assertNull($reflection->getConstructor(), 'Nothing can be injected');
+        // The canonical host string is the only state. A DB handle or session would have
+        // to live in a property, so any other property, or a non-string one, fails here.
+        $properties = array_map(
+            static fn (\ReflectionProperty $p): string => $p->getName() . ':' . (string) $p->getType(),
+            $reflection->getProperties()
+        );
+        self::assertSame(['canonicalHost:string'], $properties, 'A DB handle or session would have to live in a property');
+        $constructor = $reflection->getConstructor();
+        self::assertNotNull($constructor);
         self::assertSame(
-            ['render'],
+            ['canonicalHost:string'],
+            array_map(
+                static fn (\ReflectionParameter $p): string => $p->getName() . ':' . (string) $p->getType(),
+                $constructor->getParameters()
+            ),
+            'Only the canonical host can be injected'
+        );
+        self::assertSame(
+            ['__construct', 'render'],
             array_map(
                 static fn (\ReflectionMethod $m): string => $m->getName(),
                 $reflection->getMethods(\ReflectionMethod::IS_PUBLIC)
             ),
             'render() is the only public entry point'
         );
+    }
+
+    // ── Intro/outro removal and the links footer ───────────────────────────────
+
+    public function testOldRowWithIntroAndOutroRendersWithoutThem(): void
+    {
+        $game = ['game_date' => '2026-02-20', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => "**A 1 @ B 2**\n<@1> · <@2>\n\nProse."];
+        $html = $this->view->render([], $this->recapRow('Teaser.', null, 'Legacy intro.', 'Legacy outro.'), [$game], null);
+
+        self::assertStringNotContainsString('recap-intro', $html);
+        self::assertStringNotContainsString('recap-outro', $html);
+        self::assertStringNotContainsString('Legacy intro.', $html);
+        self::assertStringNotContainsString('Legacy outro.', $html);
+    }
+
+    public function testTextareaCarriesLinksFooterForEachGame(): void
+    {
+        $game = ['game_date' => '2026-02-20', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => "**A 1 @ B 2**\n<@1> · <@2>\n\nProse."];
+        $html = $this->view->render([], $this->recapRow('Teaser.'), [$game], null);
+
+        self::assertStringContainsString(
+            '[A](&lt;https://iblhoops.net/ibl5/modules.php?name=Team&amp;op=team&amp;teamid=1&gt;)',
+            $this->textareaBody($html)
+        );
+    }
+
+    public function testFooterTeamNameIsEscapedInsideTextarea(): void
+    {
+        $game = ['game_date' => '2026-02-20', 'visitor_teamid' => 1, 'home_teamid' => 2, 'game_of_that_day' => 1, 'sort_order' => 0, 'recap_text' => "**X</textarea><script>alert(1)</script> 1 @ B 2**\n<@1> · <@2>\n\nProse."];
+        $html = $this->view->render([], $this->recapRow('Teaser.'), [$game], null);
+
+        self::assertSame(1, substr_count($html, '</textarea>'));
+        self::assertStringNotContainsString('<script>alert(1)', $html);
     }
 }

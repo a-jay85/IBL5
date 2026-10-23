@@ -55,8 +55,11 @@ final class RecapDocument
     /** A bare hostname: no scheme, path, port, userinfo, or whitespace. */
     private const HOST = '/^[a-z0-9.\-]+$/i';
 
-    /** Where footer links point when the deployment has no canonical host configured. */
-    public const PRODUCTION_HOST = 'iblhoops.net';
+    /**
+     * Where footer links point when the deployment has no canonical host configured.
+     * The literal lives in Discord, the one class allowed to name the production host.
+     */
+    public const PRODUCTION_HOST = \Discord\Discord::PRODUCTION_HOST;
 
     /** Team page route, the same pattern as Team\TeamTableService. */
     private const TEAM_PAGE = 'modules.php?name=Team&op=team&teamid=';

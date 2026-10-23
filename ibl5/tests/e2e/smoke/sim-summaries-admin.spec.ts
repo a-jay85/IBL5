@@ -14,16 +14,19 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // Full assembled recap document for sim 689 (RecapDocument::postableText output) — the
 // textarea and plain-text export must reproduce it byte-for-byte without HTML wrapping.
 // Game rows include score header + mention line + blank + prose — the shape
-// normalizeGameBlock() enforces (seeded via ci-seed.sql with \n-separated parts).
-const SIM_689_BODY = `Another week of IBL action delivered drama from tip-off to the final buzzer.
-
-
-================================ Feb 20 =========================================
+// normalizeGameBlock() enforces (seeded via ci-seed.sql with \n-separated parts) — and
+// each ends in its links footer. The seeded row still carries an intro and an outro;
+// neither is rendered any more.
+const SIM_689_BODY = `================================ Feb 20 =========================================
 
 **Metros 105 @ Stars 98**
 <@1> · <@2>
 
 The Metros dominated from the opening tip, cruising to a 105-98 victory.
+
+<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2026-02-20&game=1>
+[Metros](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=1>)
+[Stars](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=2>)
 
 
 ================================ Mar 3 =========================================
@@ -33,6 +36,10 @@ The Metros dominated from the opening tip, cruising to a 105-98 victory.
 
 A balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.
 
+<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2026-03-03&game=1>
+[Metros](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=1>)
+[Cougars](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=3>)
+
 
 ================================ Mar 5 =========================================
 
@@ -41,8 +48,9 @@ A balanced offensive attack lifted the Metros past the Cougars in a tightly cont
 
 The Stars held off a late Metros rally to steal a road win, 95-88.
 
-
-The Cannons are one to watch as the season reaches its final stretch.
+<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2026-03-05&game=1>
+[Stars](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=2>)
+[Metros](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=1>)
 `;
 
 const SEEDED_ROW_COUNT = 5;
@@ -71,12 +79,8 @@ test.describe('Sim recap admin viewer', () => {
     expect(response?.status()).toBe(200);
     await expect(page.locator('#recap-body')).toHaveValue(SIM_689_BODY);
     await expect(page.locator('#recap-themes')).toContainText('comeback');
-    await expect(page.locator('#recap-intro')).toContainText(
-      'Another week of IBL action delivered drama from tip-off to the final buzzer.',
-    );
-    await expect(page.locator('#recap-outro')).toContainText(
-      'The Cannons are one to watch as the season reaches its final stretch.',
-    );
+    await expect(page.locator('#recap-intro')).toHaveCount(0);
+    await expect(page.locator('#recap-outro')).toHaveCount(0);
     const gameItems = page.locator('#recap-games li');
     await expect(gameItems).toHaveCount(3);
     // Games must appear in sort_order order: 2026-02-20 → 2026-03-03 → 2026-03-05.
@@ -187,6 +191,15 @@ test.describe('Sim recap plain-text export', () => {
     // markup is displayed as text rather than sniffed as HTML.
     expect(response.headers()['x-content-type-options']).toBe('nosniff');
     expect(await response.text()).toBe(SIM_689_BODY);
+  });
+
+  test('text download drops intro and outro and carries the links footer', async ({ page }) => {
+    const response = await page.request.get('simSummaries.php?sim=689&format=txt');
+
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).not.toContain('Another week of IBL action');
+    expect(body).toContain('[Cougars](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=3>)');
   });
 
   test('format=txt without a sim is a 400 text response, not the HTML index', async ({

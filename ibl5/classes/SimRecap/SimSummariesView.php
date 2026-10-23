@@ -22,7 +22,14 @@ use Security\HtmlSanitizer;
 class SimSummariesView
 {
     /**
-     * @param list<array<string, mixed>> $rows          From SimSummaryRepository::listAll()
+     * @param string $canonicalHost The host the links footer points at; '' means production (resolved by RecapDocument)
+     */
+    public function __construct(private readonly string $canonicalHost)
+    {
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows         From SimSummaryRepository::listAll()
      * @param array<string, mixed>|null  $recap         From SimSummaryRepository::find(), or null
      * @param list<array<string, mixed>> $gameRecaps    From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
      * @param string|null                $error         'malformed' | 'notfound' | null
@@ -125,28 +132,15 @@ class SimSummariesView
 <?php if (!is_string($body)): ?>
         <p id="recap-missing">No recap text stored yet — status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?>.</p>
 <?php else: ?>
-<?php $intro = $recap['intro_text'] ?? null; ?>
-<?php if (is_string($intro) && $intro !== ''): ?>
-        <p id="recap-intro" class="whitespace-pre-line"><?= HtmlSanitizer::e($intro) ?></p>
-<?php endif; ?>
 <?php if ($gameRecaps !== []): ?>
 <?php $this->renderGameRecaps($gameRecaps); ?>
 <?php endif; ?>
-<?php $outro = $recap['outro_text'] ?? null; ?>
-<?php if (is_string($outro) && $outro !== ''): ?>
-        <p id="recap-outro" class="whitespace-pre-line"><?= HtmlSanitizer::e($outro) ?></p>
-<?php endif; ?>
 <?php
         // recap_text is usually a ~220-char teaser; the postable document only exists as
-        // intro + per-game rows + outro. postableText() falls back to the stored text
-        // when there is nothing to assemble or the parts lost their GM mention lines,
-        // so Copy is never empty and never silently drops a tag.
-        $document = RecapDocument::postableText(
-            is_string($intro) ? $intro : null,
-            $gameRecaps,
-            is_string($outro) ? $outro : null,
-            $body
-        );
+        // the per-game rows, each ending in its links footer. postableText() falls back to
+        // the stored text when there is nothing to assemble or the parts lost their GM
+        // mention lines, so Copy is never empty and never silently drops a tag.
+        $document = RecapDocument::postableText($gameRecaps, $body, $this->canonicalHost);
 ?>
         <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($document) ?></textarea>
         <p>

@@ -201,6 +201,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
             && str_starts_with($line, 'user_id=')));
     }
 
+    public function testBuildFailureLeavesEveryRowPendingAndReturnsOne(): void
+    {
+        $this->connect(1);
+        $this->connect(2);
+        $this->repo->markAllActivePending();
+
+        $exit = $this->worker(new FixedClock(1000), null, true)->run(100, 240, false, false, $this->collect());
+
+        self::assertSame(1, $exit);
+        self::assertSame([], $this->http->requests);
+        self::assertSame(1, $this->repo->rows[1]['refresh_pending']);
+        self::assertSame(1, $this->repo->rows[2]['refresh_pending']);
+        self::assertContains('processed=0 failed=1 deferred=2', $this->output);
+    }
+
     public function testRunLogsNoTokens(): void
     {
         $this->connect(1);
@@ -258,10 +273,14 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         $this->http->queue(200, []);
     }
 
-    private function worker(ClockInterface $clock, ?Logger $logger = null): GoogleSheetRefreshWorker
+    private function worker(ClockInterface $clock, ?Logger $logger = null, bool $buildFails = false): GoogleSheetRefreshWorker
     {
         $players = self::createStub(ApiPlayerRepository::class);
-        $players->method('getAllPlayersForExport')->willReturn([]);
+        if ($buildFails) {
+            $players->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
+        } else {
+            $players->method('getAllPlayersForExport')->willReturn([]);
+        }
         $transformer = self::createStub(PlayerExportTransformer::class);
         $transformer->method('getHeaders')->willReturn(['Name', 'Team']);
 

@@ -60,30 +60,19 @@ class GoogleSheetRefreshWorker
         $processed = 0;
         $failures = 0;
         $exportRows = null;
-        $buildFailure = null;
         foreach ($rows as $row) {
             if ($this->clock->now() - $start >= $budgetSeconds) {
                 break;
             }
 
-            if ($buildFailure === null) {
-                try {
-                    $exportRows ??= $this->export->buildRows();
-                } catch (\Throwable $e) {
-                    $buildFailure = $e::class;
-                    $this->logger?->error('google sheet export rows build failed', ['exception' => $buildFailure]);
-                }
-            }
-            if ($buildFailure !== null) {
-                try {
-                    $this->connections->markRefreshed($row['user_id'], 'error', 'internal: ' . $buildFailure);
-                } catch (\Throwable $e) {
-                    $this->logger?->error('google sheet markRefreshed failed', ['exception' => $e::class]);
-                }
-                $out('user_id=' . $row['user_id'] . ' status=' . GoogleSheetExportService::RESULT_ERROR);
-                $processed++;
+            // A build failure is a server-side glitch, not a GM's fault. Leave every
+            // remaining row pending so the next tick retries them.
+            try {
+                $exportRows ??= $this->export->buildRows();
+            } catch (\Throwable $e) {
+                $this->logger?->error('google sheet export rows build failed', ['exception' => $e::class]);
                 $failures++;
-                continue;
+                break;
             }
             $status = $this->export->refreshConnection($row, $exportRows);
             $out('user_id=' . $row['user_id'] . ' status=' . $status);

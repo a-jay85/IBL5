@@ -12,7 +12,9 @@ use RecordHolders\Contracts\RecordHoldersServiceInterface;
  *
  * Wraps an inner service and caches the getAllRecords() result via DatabaseCacheInterface.
  * On cache hit, returns data from the cache without calling the inner service.
- * On expiration, serves the stale entry; the cron calls rebuildCache() to refresh it.
+ * On expiration, serves the stale entry. rebuildCache() refreshes it from two callers:
+ * Updater\Steps\RefreshRecordHoldersStep after each sim's box scores are imported, and
+ * the 5 AM cron. The updater step skips when its run is over budget; the cron is the backstop.
  * On a cold miss (no row at all), delegates to the inner service and stores the result.
  *
  * @phpstan-import-type AllRecordsData from RecordHoldersServiceInterface
@@ -35,8 +37,8 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
      * Serve-stale-first read.
      *
      * 1. Fresh hit: return it.
-     * 2. Expired entry present: serve the stale value immediately. The cron (rebuildCache)
-     *    is the refresher, so no heavy inline rebuild happens on a user's request.
+     * 2. Expired entry present: serve the stale value immediately. rebuildCache() runs from
+     *    the updater step and the cron, so no heavy inline rebuild happens on a user's request.
      * 3. Cold (no row at all): build inline from the inner service, store it, return it.
      *    Two concurrent cold requests may both build; the cache write is idempotent.
      *

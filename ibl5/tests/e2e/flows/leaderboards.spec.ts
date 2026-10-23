@@ -156,9 +156,6 @@ test.describe('Leaderboards flow', () => {
     await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Homepage');
 
-    await expect(page.locator('a[href="modules.php?name=Leaderboards"]')).toHaveCount(
-      await page.locator('a[href="modules.php?name=Leaderboards"]').count(),
-    );
     const leaderboardLinks = page.locator('a[href="modules.php?name=Leaderboards"]');
     const count = await leaderboardLinks.count();
     expect(count).toBeGreaterThanOrEqual(1);

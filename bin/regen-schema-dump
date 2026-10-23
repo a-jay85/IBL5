@@ -22,7 +22,7 @@
 #   -d DB    scratch DB name        (default ibl5_schema)
 #
 # NOTE: uses the `mysqldump` binary (NOT the `mariadb`/`mariadb-dump` alias) on
-# purpose — the host-mariadb-guard CI check (tests.yml) greps for a bare
+# purpose — the host-mariadb grep step in the `static-guards` job of tests.yml greps for a bare
 # `mariadb` client invocation in bin/ scripts; switching to that alias would
 # trip it. Do not "modernize" the binary name.
 set -euo pipefail

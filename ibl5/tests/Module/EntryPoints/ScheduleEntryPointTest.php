@@ -41,6 +41,30 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase
         $this->assertQueryExecuted('ibl_team_info');
     }
 
+    public function testCamelCaseTeamIDShowsSameTeamScheduleAsLowercase(): void
+    {
+        $this->mockDb->setMockTeamData([self::fullTeamData(['teamid' => 5])]);
+        $this->mockDb->setMockData([]);
+
+        $league = $this->runModule('Schedule');
+        $lower = $this->runModule('Schedule', ['teamid' => '5']);
+        $camel = $this->runModule('Schedule', ['teamID' => '5']);
+
+        $this->assertSame($lower, $camel);
+        $this->assertNotSame($league, $camel);
+    }
+
+    public function testNonNumericCamelCaseTeamIDShowsLeagueSchedule(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $league = $this->runModule('Schedule');
+        $camel = $this->runModule('Schedule', ['teamID' => 'abc']);
+
+        $this->assertSame($league, $camel);
+        $this->assertQueryExecuted('ibl_schedule');
+    }
+
     public function testNegativeTeamIdShowsLeagueSchedule(): void
     {
         $this->mockDb->setMockData([]);

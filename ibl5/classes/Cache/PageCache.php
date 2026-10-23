@@ -26,7 +26,6 @@ final class PageCache
         'Team'                => self::TTL_LONG,
         'Standings'           => self::TTL_LONG,
         'Leaderboards'        => self::TTL_LONG,
-        'DraftHistory'        => self::TTL_LONG,
         'AwardHistory'        => self::TTL_LONG,
         'FranchiseHistory'    => self::TTL_LONG,
         'Schedule'            => self::TTL_DEFAULT,

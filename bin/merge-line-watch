@@ -3,7 +3,8 @@
 #
 # bin/merge-line-watch — local stand-in for the update-behind-prs workflow.
 #
-# Polls master. Each time it moves, waits for GitHub to settle, asks
+# Polls master. Each time it moves, waits for GitHub to settle and for master
+# CI that can push a bot commit to finish (bin/lib/master-bot-wait.sh), asks
 # bin/merge-line-select for the head of the armed-PR merge line, and calls
 # update-branch on that PR when the selector says action=update. Same decision
 # the workflow makes (.github/workflows/update-behind-prs.yml, ADR-0081), run
@@ -20,6 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Seams for bin/test-merge-line-watch. The colon form treats empty like unset.
 GH_CMD="${GH_CMD:-gh}"
 SELECT_CMD="${MERGE_LINE_SELECT_CMD:-$SCRIPT_DIR/merge-line-select}"
+# shellcheck source=bin/lib/master-bot-wait.sh
+. "$SCRIPT_DIR/lib/master-bot-wait.sh"
 
 REPO="a-jay85/IBL5"
 INTERVAL=30
@@ -39,8 +42,10 @@ Watch master and keep the head of the armed-PR merge line up to date.
   --repo <o/n>      Repository (default a-jay85/IBL5).
   --interval <s>    Seconds between master polls (default 30).
   --settle <s>      Seconds to wait after master moves before selecting,
-                    so GitHub recomputes mergeability (default 45).
-  --once            Run one pass now (no settle wait) and exit.
+                    so GitHub recomputes mergeability (default 45). Then
+                    waits, up to 45 min, for master CI that can push a
+                    bot commit to finish.
+  --once            Run one pass now (no settle or bot-commit wait) and exit.
   --dry-run         Print what would happen; never call update-branch.
   -h, --help        Show this message.
 
@@ -137,5 +142,9 @@ while true; do
     last=$cur
     say "master moved to ${cur:0:8}; running merge-line pass"
     sleep "$SETTLE"
+    master_bot_wait "$REPO" say
+    # A bot commit that landed during the wait is already in this pass's master.
+    # Taking the new tip here keeps it from setting off a second pass.
+    cur=$(master_sha) && [ -n "$cur" ] && last=$cur
     run_pass
 done

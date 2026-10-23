@@ -255,12 +255,14 @@ if ($csrfField === '') {
 
 <?php if ($errors !== []): ?>
     <div role="alert" class="d-alert d-alert-error mb-4">
-        <strong>This file was not imported. Fix the following and upload it again:</strong>
-        <ul>
-        <?php foreach ($errors as $error): ?>
-            <li><?= HtmlSanitizer::e($error) ?></li>
-        <?php endforeach; ?>
-        </ul>
+        <div>
+            <strong>This file was not imported. Fix the following and upload it again:</strong>
+            <ul class="list-disc pl-5">
+            <?php foreach ($errors as $error): ?>
+                <li><?= HtmlSanitizer::e($error) ?></li>
+            <?php endforeach; ?>
+            </ul>
+        </div>
     </div>
 <?php endif; ?>
 

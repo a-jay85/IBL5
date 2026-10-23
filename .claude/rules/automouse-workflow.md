@@ -21,7 +21,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Reorder / dispose | `queue reorder <slug>…` · `queue dispose <slug> <done\|skipped>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
-| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; defaults to the next such time, local TZ) |
+| Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, or tomorrow if that time has passed; TZ to local) |
 | Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for one plan, then stops; auto-queues if absent, rest of queue untouched) |
 | Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms ~1 h after the skipped run; a manual `launchctl unload` stays off until re-armed by hand) |
 | Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms at the given time; a bare time already passed today means tomorrow; same caveat) |
@@ -44,14 +44,14 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
   queue/    NNN-<slug>.md symlinks to ~/claude-plans/ (run order below)
-  done/     symlinks moved here after successful execution, or when the impl agent
-            detects the plan is already merged (its work shipped under a prior PR)
+  done/     symlinks moved here after success, or when the impl agent finds the plan
+            already merged under a prior PR
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
-  reports/  per-run reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md),
-            YYYY-MM-DD-canary-park.md (failed master check at a plan boundary, so no slug)
-            and YYYY-MM-DD-costs.md (per-phase token cost roll-up from bin/automouse/run)
+  reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md
+            and YYYY-MM-DD-canary-park.md, slug-less, written at a plan boundary when the
+            master health check fails); plus YYYY-MM-DD-costs.md (per-phase cost roll-up)
   logs/     claude -p output logs + launchd stdout/stderr
   force-overrides.log  one line per `queue --force` add
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are

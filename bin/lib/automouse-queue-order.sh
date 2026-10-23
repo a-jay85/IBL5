@@ -168,13 +168,18 @@ normalize_queue() {
         return 0
     fi
     local -a order=()
+    # Prefixed entries keep their lexical order (an explicit reorder is not
+    # undone by a late bare arrival); bare entries follow, oldest mtime first.
     while IFS= read -r e; do order+=("$e"); done < <(
         for e in "$dir"/*.md; do
             if [ -L "$e" ] || [ -e "$e" ]; then
-                printf '%s %s\n' "$(lstat_mtime "$e" || echo 0)" "${e##*/}"
+                case "${e##*/}" in
+                    ([0-9][0-9][0-9]-*.md) printf '0 0 %s\n' "${e##*/}" ;;
+                    (*) printf '1 %s %s\n' "$(lstat_mtime "$e" || echo 0)" "${e##*/}" ;;
+                esac
             fi
-        done | LC_ALL=C sort -k1,1n -k2 | while IFS= read -r line; do
-            printf '%s\n' "${line#* }"
+        done | LC_ALL=C sort -k1,1n -k2,2n -k3 | while IFS= read -r line; do
+            printf '%s\n' "${line#* * }"
         done
     )
     renumber_queue "$dir" ${order[@]+"${order[@]}"} || true

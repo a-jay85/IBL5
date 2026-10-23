@@ -901,8 +901,8 @@ h_eq "row42 no bare entry survives" "0" "$bare_left"
 dups=$(queue_entries "$NDIR/queue" | cut -c1-3 | sort | uniq -d | tr '\n' ' ')
 h_eq "row42 no duplicate prefix" "" "$dups"
 h_eq "row42 each plan present exactly once" "4" "$(queue_entries "$NDIR/queue" | wc -l | tr -d ' ')"
-assert_entries "row42 converged to contiguous prefixes in lstat order" \
-               "010-plan-c.md 020-plan-a.md 030-plan-d.md 040-plan-b.md"
+assert_entries "row42 prefixed keep their order, bare follow in lstat order" \
+               "010-plan-a.md 020-plan-b.md 030-plan-c.md 040-plan-d.md"
 before="$(qls)"
 normalize_queue "$NDIR/queue"
 h_eq "row42 second normalize_queue renames nothing" "$before" "$(qls)"
@@ -1501,6 +1501,33 @@ if [ "$rc" -eq 0 ] && [ "$(head -1 <<< "$out")" = "Automouse queue (next to run 
     h_pass "row-status-show-queue-unchanged"
 else
     h_fail "row-status-show-queue-unchanged (rc=$rc): $out"
+fi
+
+# ---------------------------------------------------------------------------
+# Full queue — 89 entries leave no prefix band; add must fail loudly, never
+# write an unnumbered entry that would re-trigger the legacy mtime cutover
+# ---------------------------------------------------------------------------
+setup
+for i in $(seq 1 89); do
+    touch "$PDIR/full-$i.md"
+    ln -s "$PDIR/full-$i.md" "$NDIR/queue/$(printf '%03d' $((i * 10)))-full-$i.md"
+done
+mkplan plan-over.md
+rq plan-over
+assert_not_queued "full queue: overflow plan not queued" plan-over
+if [ "$RC" -ne 0 ] && grep -qF "queue is full" <<< "$OUT"; then
+    h_pass "full queue — add fails loudly"
+else
+    h_fail "full queue — add fails loudly (rc=$RC): $OUT"
+fi
+UNNUMBERED=0
+for f in "$NDIR"/queue/-*; do
+    if [ -e "$f" ] || [ -L "$f" ]; then UNNUMBERED=1; fi
+done
+if [ "$UNNUMBERED" -eq 1 ]; then
+    h_fail "full queue — no unnumbered entry written"
+else
+    h_pass "full queue — no unnumbered entry written"
 fi
 
 if grep -qE '^MAX_ATTEMPTS=3([[:space:]]|$)' "$SCRIPT_DIR/automouse/run"; then

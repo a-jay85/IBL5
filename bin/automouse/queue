@@ -90,9 +90,16 @@ evict_dispositions() {
 append_entry() {
     local source=$1 name=$2 prefix tries=0
     while [ "$tries" -lt 5 ]; do
+        # A racing enqueue of the same slug may have landed since our last look.
+        if queue_entry_for_slug "$QUEUE_DIR" "$name" >/dev/null; then
+            return 0
+        fi
         if ! prefix=$(next_prefix "$QUEUE_DIR"); then
             renumber_queue "$QUEUE_DIR"
-            prefix=$(next_prefix "$QUEUE_DIR")
+            if ! prefix=$(next_prefix "$QUEUE_DIR"); then
+                echo "Error: could not queue $name — the queue is full (89 entries); dispose or remove a plan first." >&2
+                return 1
+            fi
         fi
         if ln -s "$source" "$QUEUE_DIR/${prefix}-${name}" 2>/dev/null; then
             return 0

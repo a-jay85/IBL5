@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # bin/test-launchd-health-check — stubbed regression harness for bin/launchd-health-check.
 #
-# Stubs out launchctl, docker, db-query, discord-dm, and sleep through a temp
-# PATH dir + env overrides. Runs on Linux CI (ubuntu-latest) — no real launchd.
+# Stubs out launchctl, docker, db-query, discord-dm, bug-pipeline-check, and sleep
+# through a temp PATH dir + env overrides. Runs on Linux CI (ubuntu-latest) — no real launchd.
 #
 # Run: bin/test-launchd-health-check  (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -78,6 +78,18 @@ STUB
     chmod +x "$CASE/bin/fake-dm"
     printf '0\n' > "$CASE/dm-rc"
 
+    # bug-pipeline-check stub: record each run, cat bpc.out, exit bpc-rc (default healthy, 0)
+    cat > "$CASE/bin/bug-pipeline-check" <<'STUB'
+#!/bin/sh
+CASE_DIR="$(dirname "$0")/.."
+echo ran >> "$CASE_DIR/bpc-ran"
+cat "$CASE_DIR/bpc.out"
+exit "$(cat "$CASE_DIR/bpc-rc" 2>/dev/null || echo 0)"
+STUB
+    chmod +x "$CASE/bin/bug-pipeline-check"
+    printf 'VERDICT: healthy\n' > "$CASE/bpc.out"
+    printf '0\n' > "$CASE/bpc-rc"
+
     # Export all test seams so run_checker and direct invocations pick them up
     export HOME="$CASE/home"
     export PATH="$CASE/bin:$BASE_PATH"
@@ -86,6 +98,7 @@ STUB
     export DISCORD_DM_BIN="$CASE/bin/fake-dm"
     export LAUNCHD_HEALTH_LOG_DIR="$CASE/logs"
     export LAUNCHD_HEALTH_TODAY=2026-09-28
+    export BUG_PIPELINE_CHECK_BIN="$CASE/bin/bug-pipeline-check"
     unset LAUNCHD_HEALTH_JOBS_LIB
 
     # Hermeticity abort: stubs must shadow the real binaries
@@ -95,6 +108,10 @@ STUB
     }
     [ "$(command -v sleep)" = "$CASE/bin/sleep" ] || {
         printf 'HARNESS NOT HERMETIC: sleep resolves to %s\n' "$(command -v sleep)"
+        exit 3
+    }
+    [ "$BUG_PIPELINE_CHECK_BIN" = "$CASE/bin/bug-pipeline-check" ] || {
+        printf 'HARNESS NOT HERMETIC: BUG_PIPELINE_CHECK_BIN is %s\n' "$BUG_PIPELINE_CHECK_BIN"
         exit 3
     }
 }

@@ -26,10 +26,7 @@ class RookieOptionView implements RookieOptionViewInterface
 <div class="ibl-form-container">
         <?php
 
-        echo \UI\AlertRenderer::fromCodeDaisy($result, [
-            'rookie_option_success' => ['variant' => 'success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
-            'email_failed' => ['variant' => 'warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
-        ], $error);
+        echo HtmlSanitizer::trusted($this->renderBanner($result, $error));
 
         // Title, then the flippable trading card (unwrapped), then the option card
         ?>
@@ -38,6 +35,35 @@ class RookieOptionView implements RookieOptionViewInterface
 
         <?php
         return (string) ob_get_clean() . ($cardHtml ?? '') . $this->renderOptionCard($playerID, $teamName, $rookieOptionValue, $from) . "</div>\n";
+    }
+
+    /**
+     * Error wins over a result code; an unknown or null code renders nothing.
+     * Escapes with HtmlSanitizer::safeHtmlOutput, the same call UI\AlertRenderer makes.
+     *
+     * Kept private on purpose: UI\AlertRenderer still emits legacy alert markup for its
+     * unconverted callers, and a daisyUI switch there would collide across rollout batches.
+     */
+    private function renderBanner(?string $result, ?string $error): string
+    {
+        $banners = [
+            'rookie_option_success' => ['variant' => 'success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['variant' => 'warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ];
+
+        if ($error !== null) {
+            $variant = 'error';
+            $message = $error;
+        } elseif ($result !== null && isset($banners[$result])) {
+            $variant = $banners[$result]['variant'];
+            $message = $banners[$result]['message'];
+        } else {
+            return '';
+        }
+
+        return '<div role="alert" class="d-alert d-alert-' . $variant . ' mb-4">'
+            . HtmlSanitizer::safeHtmlOutput($message)
+            . '</div>';
     }
 
     private function renderOptionCard(int $playerID, string $teamName, int $rookieOptionValue, ?string $from): string

@@ -37,34 +37,6 @@ class AlertRenderer implements AlertRendererInterface
     }
 
     /**
-     * Same lookup rules as fromCode(), but emits a daisyUI alert (d-alert-<variant>)
-     *
-     * @param string|null $code Result code from query parameter
-     * @param array<string, array{variant: string, message: string}> $banners Map of code → daisyUI variant + message
-     * @param string|null $error Optional error message (takes priority over $code)
-     * @return string HTML alert div or empty string
-     */
-    public static function fromCodeDaisy(?string $code, array $banners, ?string $error = null): string
-    {
-        if ($error !== null) {
-            return self::renderDaisy($error, 'error');
-        }
-
-        if ($code === null || !isset($banners[$code])) {
-            return '';
-        }
-
-        return self::renderDaisy($banners[$code]['message'], $banners[$code]['variant']);
-    }
-
-    private static function renderDaisy(string $message, string $variant): string
-    {
-        return '<div role="alert" class="d-alert d-alert-' . $variant . ' mb-4">'
-            . HtmlSanitizer::safeHtmlOutput($message)
-            . '</div>';
-    }
-
-    /**
      * Render an arbitrary alert message
      *
      * @param string $message Alert message (will be HTML-escaped)

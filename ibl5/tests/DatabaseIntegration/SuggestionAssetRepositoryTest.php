@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
+use TradeSuggestions\ProductionSource;
 use TradeSuggestions\SuggestionAssetRepository;
 use TradeSuggestions\SuggestionPlayer;
 
@@ -14,6 +15,8 @@ use TradeSuggestions\SuggestionPlayer;
 #[Group('database')]
 class SuggestionAssetRepositoryTest extends DatabaseTestCase
 {
+    private const int LAST_SEASON = 2089;
+
     private SuggestionAssetRepository $repo;
 
     protected function setUp(): void
@@ -32,7 +35,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000002, 'Suggest Two', ['teamid' => 2]);
         $this->insertTestPlayer(200000003, 'Suggest Retired', ['teamid' => 1, 'retired' => 1]);
 
-        $rosters = $this->repo->getRostersForTeams([1, 2], self::maximums(), false);
+        $rosters = $this->repo->getRostersForTeams([1, 2], self::maximums(), false, self::LAST_SEASON);
 
         $team1Pids = array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rosters[1] ?? []);
         $team2Pids = array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rosters[2] ?? []);
@@ -59,9 +62,44 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         self::assertSame('C', $one->pos);
     }
 
+    public function testRosterCarriesDepthRoleAndLastSeasonLine(): void
+    {
+        $this->insertTestPlayer(200000031, 'Suggest Starter', [
+            'teamid' => 1, 'pos' => 'PG', 'dc_pg_depth' => 1, 'dc_minutes' => 34, 'stats_min' => 120,
+        ]);
+        $this->insertRow('ibl_hist', ['pid' => 200000031, 'year' => self::LAST_SEASON, 'name' => 'Suggest Starter', 'minutes' => 2400, 'pts' => 1200]);
+
+        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000031];
+
+        self::assertSame('PG', $player->starterSlot());
+        self::assertSame(34, $player->dcMinutes);
+        self::assertNotNull($player->production);
+        self::assertSame(ProductionSource::LastSeason, $player->production->source);
+        self::assertSame(1200, $player->production->points);
+    }
+
+    public function testLastSeasonFetchIgnoresOtherYears(): void
+    {
+        $this->insertTestPlayer(200000032, 'Suggest Other Year', ['teamid' => 1, 'stats_min' => 120]);
+        $this->insertRow('ibl_hist', ['pid' => 200000032, 'year' => self::LAST_SEASON + 1, 'name' => 'Suggest Other Year', 'minutes' => 2400, 'pts' => 1200]);
+
+        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000032];
+
+        self::assertNull($player->production);
+    }
+
+    public function testRookieWithoutHistoryHasNoProduction(): void
+    {
+        $this->insertTestPlayer(200000033, 'Suggest Rookie', ['teamid' => 1, 'stats_min' => 50]);
+
+        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000033];
+
+        self::assertFalse($player->hasProduction());
+    }
+
     public function testRostersForTeamsEmptyListReturnsEmpty(): void
     {
-        self::assertSame([], $this->repo->getRostersForTeams([], self::maximums(), false));
+        self::assertSame([], $this->repo->getRostersForTeams([], self::maximums(), false, self::LAST_SEASON));
     }
 
     /**
@@ -74,8 +112,8 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000011, 'Suggest Expiring', ['teamid' => 1, 'cy' => 2, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900]);
         $this->insertTestPlayer(200000012, 'Suggest Last Year', ['teamid' => 1, 'cy' => 1, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900]);
 
-        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false)[1] ?? []);
-        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true)[1] ?? []);
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? []);
 
         self::assertSame(1, $inSeason[200000011]->yearsRemaining);
         self::assertTrue($inSeason[200000011]->tradeable);
@@ -99,8 +137,8 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000031, 'Suggest Expiring', ['teamid' => 1, 'cy' => 2, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900, 'salary_yr3' => 0]);
         $this->insertTestPlayer(200000032, 'Suggest Signed Rookie', ['teamid' => 1, 'cy' => 0, 'cyt' => 3, 'salary_yr1' => 500]);
 
-        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true)[1] ?? []);
-        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false)[1] ?? []);
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? []);
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
 
         self::assertFalse($offseason[200000031]->countsOnRoster);
         self::assertTrue($offseason[200000032]->countsOnRoster);
@@ -117,7 +155,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000021, 'Suggest Waived', ['teamid' => 1, 'ordinal' => \League\JsbConstants::WAIVERS_ORDINAL + 1]);
         $this->insertTestPlayer(200000022, 'Suggest Unsigned', ['teamid' => 1, 'cy' => 0]);
 
-        $players = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false)[1] ?? []);
+        $players = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
 
         self::assertArrayNotHasKey(200000021, $players);
         self::assertFalse($players[200000022]->tradeable);

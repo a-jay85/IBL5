@@ -65,7 +65,7 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
 
         $endingYear = $this->season->endingYear;
         $advances = $this->season->advancesContractYears();
-        $rosters = $this->assetRepo->getRostersForTeams($allTids, $this->ratingMaximums->getMarketMaximums(), $advances);
+        $rosters = $this->assetRepo->getRostersForTeams($allTids, $this->ratingMaximums->getMarketMaximums(), $advances, $endingYear - 1);
         $pickRows = $this->assetRepo->getPicksForTeams($allTids, $endingYear);
         $order = $this->draftOrderService->calculateDraftOrder($endingYear);
         $slotIndex = $this->pickValuer->buildSlotIndex($order);

@@ -467,6 +467,12 @@ def verdict_ok_path(key: str, sha: str) -> str:
     return f"/tmp/postplan-conflict-verdict-{key}-{sha}.ok"
 
 
+# Terminal LLM failures: both sit in runner._FAIL_CLOSED_KINDS, and a second ask after
+# either one only repeats the failure. Everything else (tooled-cli, tooled-empty, a
+# subprocess error, a tokenless reply) gets the one re-ask.
+_NO_RETRY_KINDS = ("llm-usage-limit", "llm-auth-expired")
+
+
 def review_resolution(
     llm,
     run: Callable[..., str],
@@ -476,8 +482,11 @@ def review_resolution(
     resolved_files: tuple[str, ...],
     proof_out: str,
     adaptations: tuple = (),
+    retries_out: dict[str, int] | None = None,
 ) -> str:
     """Run a read-only conflict review. Writes verdict and sidecar files. Returns verdict line.
+    A reply with no verdict token (or a non-terminal exception) is re-asked once; when that
+    happens and retries_out is given, retries_out["conflict-review"] is set to 1.
     `adaptations` holds the AcceptedAdaptation records the tree proof let through; when
     non-empty they are written to adaptations.txt and named in the prompt."""
     review_dir = Path(f"/tmp/postplan-conflict-review-{key}")
@@ -521,18 +530,25 @@ def review_resolution(
         )
 
     reply = ""
-    try:
-        reply = llm.call_tooled(
-            "conflict-review",
-            "sonnet",
-            prompt,
-            cwd=worktree,
-            allowed_tools=("Read",),
-            denied_tools=("Bash", "Agent", "Write", "Edit"),
-            add_dirs=(str(review_dir),),
-        )
-    except Exception:
-        reply = ""
+    for attempt in range(2):   # one retry, never a loop: attempt 0, then exactly one re-ask
+        try:
+            reply = llm.call_tooled(
+                "conflict-review",
+                "sonnet",
+                prompt,
+                cwd=worktree,
+                allowed_tools=("Read",),
+                denied_tools=("Bash", "Agent", "Write", "Edit"),
+                add_dirs=(str(review_dir),),
+            )
+        except Exception as exc:
+            reply = ""
+            if getattr(exc, "kind", "") in _NO_RETRY_KINDS:
+                break   # a usage limit or expired login does not improve on a second ask
+        if parse_verdict(reply) != VERDICT_ABSENT:
+            break
+        if attempt == 0 and retries_out is not None:
+            retries_out["conflict-review"] = 1
 
     verdict_line = parse_verdict(reply)
 

@@ -769,6 +769,17 @@ def test_run_result_writes_conflict_rung_when_set():
     assert data["conflict_rung"] == "regen"
 
 
+def test_run_result_omits_retries_when_empty():
+    data = json.loads(RunResult(terminal=TerminalState.SHIPPED_HELD).to_json())
+    assert "retries" not in data
+
+
+def test_run_result_writes_retries_when_set():
+    data = json.loads(RunResult(terminal=TerminalState.SHIPPED_HELD,
+                                retries={"conflict-review": 1}).to_json())
+    assert data["retries"] == {"conflict-review": 1}
+
+
 def test_ladder_failure_reason_keeps_proof_prefix():
     proof = "".join(f"LOST: f.txt: +line {i} padding padding\n" for i in range(30))
     trail = ("regen: skipped (no generated file involved)", "opus-retry: boom")

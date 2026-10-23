@@ -8,7 +8,10 @@ namespace Rivalries\Contracts;
  * Game-level data access for rivalries. W/L counts come from the H2H matrix;
  * this repository supplies dates, margins, series, and performers only.
  *
- * Pair keys are canonical: a < b (int compare for franchises, strcmp for GM names).
+ * Pair keys are canonical: a < b by int compare for franchises. For GM names the
+ * repository orders by SQL LEAST/GREATEST (column collation, case-insensitive), which
+ * can differ from strcmp. Callers that need strcmp order must re-sort, as
+ * CachedRivalriesRepository::gmsKey does.
  * `*_side` holds the pair key that owned that team in that game.
  *
  * @phpstan-type PairStat array{a: string, b: string, close_games: int, recent_games: int, playoff_games: int, playoff_series: int}

@@ -286,7 +286,7 @@ git commit -m "<type>: <what this checkpoint covers>"
 git push origin <slug>
 ```
 
-If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (never a raw `mv`) and write a report explaining what information is needed, and STOP.
+If implementation requires information you do not have — external resources, unclear requirements, missing context — do NOT guess. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (never a raw `mv`), then `touch -h "$NIGHTLY_DIR/skipped/$PLAN_FILE"` so the entry carries the skip time the morning digest selects on. Write a report explaining what information is needed, and STOP.
 
 ## Step 6.5: Empty-Diff Backstop (run AFTER implementation, BEFORE the handoff)
 
@@ -458,7 +458,7 @@ STOP after writing and verifying the handoff file. The bash loop will fire the p
 If ANY step fails after worktree creation (Step 5):
 1. Commit and push whatever work exists on the branch (incremental checkpoint — do not lose progress)
 2. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
-3. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (not done/; never a raw `mv` of the queue entry)
+3. Dispose the plan with `bin/automouse/queue dispose "${PLAN_FILE%.md}" skipped` (not done/; never a raw `mv` of the queue entry), then `touch -h "$NIGHTLY_DIR/skipped/$PLAN_FILE"` so the entry carries the skip time the morning digest selects on
 4. Do NOT delete the worktree — preserve it for morning debugging or resume
 5. Do NOT write a handoff file — this signals failure to the bash loop
 6. STOP

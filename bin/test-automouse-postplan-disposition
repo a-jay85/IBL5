@@ -401,22 +401,22 @@ extract_run_block() {
 d8_check() {  # $1 = case label, $2 = anchor string, $3 = ATTEMPTS value, $4 = BASE_MODEL value
     local label="$1" anchor="$2" block D d8_since
     block="$(extract_run_block "$anchor")"
-    # anchor-on-target guard: the block must contain the skip mv and end at the rm -f line
-    if ! grep -qF -- 'mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"' <<< "$block" \
+    # anchor-on-target guard: the block must contain the skip dispose and end at the rm -f line
+    if ! grep -qF -- 'dispose_entry "$PLAN_NAME" skipped' <<< "$block" \
        || ! grep -qE -- '^[[:space:]]*rm -f "\$ATTEMPT_FILE"' <<< "$block"; then
         echo "FAIL: $label — could not extract the inline skip block from $RUNNER (anchor drifted?)"
         FAILED=1
         return
     fi
     D=$(make_fixture)
-    touch -h -t 200001010000 "$D/queue/p.md"
-    if [ -n "$(find "$D/queue" -maxdepth 1 -name p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
+    touch -h -t 200001010000 "$D/queue/010-p.md"
+    if [ -n "$(find "$D/queue" -maxdepth 1 -name 010-p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
         echo "FAIL: $label-vacuity — fixture symlink was not pinned to the past"
         FAILED=1
     fi
     # shellcheck disable=SC2034  # these vars are read by the eval'd block
     (
-        NIGHTLY_DIR="$D"; LOG="$D/run.log"; PLAN_NAME="p.md"; NEXT_PLAN="$D/queue/p.md"
+        NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; LOG="$D/run.log"; PLAN_NAME="p.md"; NEXT_PLAN="$D/queue/010-p.md"
         ATTEMPTS="$3"; BASE_MODEL="$4"
         ATTEMPT_FILE="$D/a"; FAILURE_FILE="$D/f"; CAP_REFUND_FILE="$D/c"; PLAN_DEFECT_FILE="$D/d"
         eval "$block"
@@ -1518,14 +1518,23 @@ AUTOMOUSE_DIR="${AUTOMOUSE_DIR:-$SCRIPT_DIR/automouse}"
 disposition_mv_scan() {  # prints "OK|BAD <file>:<line>: <text>" per disposition mv line
     local f
     for f in "$@"; do
+        # A dispose call (dispose_entry in run, or `queue dispose` in the agent prompts) is the
+        # disposition mv now that queue entries carry an NNN- prefix; neither helper stamps mtime.
         awk -v file="$f" '
+            BEGIN {
+                pre = "(dispose_entry|queue dispose)[[:space:]]+\"[^\"]*\"[[:space:]]+\"?"
+                disp = pre "(done|skipped)"
+            }
             { L[NR] = $0 }
             END {
                 for (i = 1; i <= NR; i++) {
                     line = L[i]
                     if (line ~ "^[[:space:]]*#") continue
-                    if (line !~ "(^|[^[:alnum:]_./-])mv[[:space:]].*(done|skipped)/") continue
-                    dir = (line ~ "skipped/") ? "skipped/" : "done/"
+                    if (line ~ disp) {
+                        dir = (line ~ (pre "skipped")) ? "skipped/" : "done/"
+                    } else if (line ~ "(^|[^[:alnum:]_./-])mv[[:space:]].*(done|skipped)/") {
+                        dir = (line ~ "skipped/") ? "skipped/" : "done/"
+                    } else continue
                     ok = 0
                     for (j = i; j <= i + 6 && j <= NR; j++) {
                         if (index(L[j], "touch -h") && index(L[j], dir)) { ok = 1; break }
@@ -1562,6 +1571,10 @@ w_expect w5-touch-wrong-dir BAD 'mv "$A" "$ND/done/"' 'touch -h "$ND/skipped/x"'
 w_expect w6-non-disposition-mv-ignored NONE 'mv "$tmp" "$dest/"'
 w_expect w7-plain-touch-not-enough BAD 'mv "$A" "$ND/done/"' 'touch "$ND/done/x"'
 w_expect w8-same-line-touch OK '1. `mv "$A" "$ND/done/"`, then `touch -h "$ND/done/x"`'
+w_expect w9-dispose-entry-touch-present OK 'dispose_entry "$P" skipped' 'touch -h "$ND/skipped/$P"'
+w_expect w10-queue-dispose-touch-missing BAD '`bin/automouse/queue dispose "$S" done`' 'echo hi'
+w_expect w11-dispose-wrong-dir BAD 'dispose_entry "$P" "done"' 'touch -h "$ND/skipped/$P"'
+w_expect w12-dispose-usage-line-ignored NONE 'Usage: bin/automouse/queue dispose <slug> <done|skipped>'
 }
 
 w_all=""

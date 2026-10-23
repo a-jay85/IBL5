@@ -654,7 +654,8 @@ class LiveGit:
         caller then runs exactly today's path. Never runs the generator; see
         _regen_generated."""
         from .. import conflict_ladder
-        targets = conflict_ladder.pre_resolve_targets(inventory.files, worktree=self.worktree)
+        targets = conflict_ladder.pre_resolve_targets(
+            inventory.files, worktree=self.worktree, stage_sets=inventory.stage_sets)
         if not targets:
             return inventory, ()
         skip = {t.path for t in targets}
@@ -715,14 +716,15 @@ class LiveGit:
         return undo
 
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
-                             lostwork_path, conflicted, proof_out, regen_exempt=()):
+                             lostwork_path, conflicted, proof_out, regen_exempt=(),
+                             stage_sets=None):
         from ..conflict_ladder import LadderContext, default_rungs, run_ladder
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
             worktree=self.worktree, key=key, master_sha=master_sha,
             pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted,
-            state_dir=self.state_dir,
+            state_dir=self.state_dir, stage_sets=dict(stage_sets or {}),
             extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
                 key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
                 exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
@@ -937,7 +939,12 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}")
 
-                text_reason = assert_text_only(self.worktree, inventory.files)
+                # A copy-only target was taken from master byte-for-byte, never
+                # three-way merged, so the text guard does not apply to it. Every
+                # LLM-resolved and generator-regenerated path is still checked.
+                binary_exempt = {t.path for t in regen_targets if t.command is None}
+                text_reason = assert_text_only(
+                    self.worktree, [p for p in inventory.files if p not in binary_exempt])
                 if text_reason:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -974,7 +981,7 @@ class LiveGit:
                             key=key, branch=branch, master_sha=master_sha,
                             pre_rebase_sha=pre_rebase_sha, lostwork_path=lostwork_path,
                             conflicted=tuple(inventory.files), proof_out=first_proof,
-                            regen_exempt=regen_exempt)
+                            regen_exempt=regen_exempt, stage_sets=inventory.stage_sets)
                     except HarnessError as exc:
                         # The outer `except HarnessError: raise` does not restore, so a
                         # HarnessError escaping the ladder restores here.

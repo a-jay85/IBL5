@@ -12,7 +12,7 @@ use SeasonLeaderboards\SeasonLeaderboardsRepository;
 /**
  * Database integration tests for SeasonLeaderboardsRepository.
  *
- * Tests dynamic WHERE via QueryConditions, LEFT JOIN ibl_hist + team_info,
+ * Tests dynamic WHERE building, LEFT JOIN ibl_hist + team_info,
  * and whitelisted ORDER BY expressions.
  */
 #[Group('database')]

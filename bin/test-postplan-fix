@@ -338,7 +338,7 @@ need "origin.git unchanged" test "$(git --git-dir="$TMP/origin.git" rev-parse re
 need "origin/master unchanged" test "$(git -C "$WTC" rev-parse refs/remotes/origin/master)" = "$REMOTE0"
 need "no MERGE_HEAD" no_merge
 # shellcheck disable=SC2088  # the prompt holds a literal ~/claude-plans/
-for tok in "argv:" "--model" "claude-sonnet-5-5" "--disallowedTools" "Bash(git push:*)" "Bash(gh:*)" \
+for tok in "argv:" "--model" "claude-sonnet-5-5" "--disallowedTools" "Bash(git push:*)" "Bash(gh:*)" "Bash(*/git push:*)" "Bash(git * push *)" \
     "Bash(git -C:*)" "--max-budget-usd" "SUMMARY:" "RESOLVED" "FAILED" "Do NOT commit" "~/claude-plans/"; do
     need "stdout has '$tok'" has_s "$STDOUT" "$tok"
 done

@@ -435,21 +435,20 @@ final class HeatPhaseRecapPipelineDbTest extends DatabaseTestCase
         $this->storeHeatRecap();
 
         $doc = RecapDocument::assemble(
-            'HEAT intro.',
             $this->repo->findDisplayableGameRecaps(self::HEAT_SIM),
-            'HEAT outro.'
+            'iblhoops.net'
         );
 
         $offsets = [];
-        foreach (['HEAT intro.', 'HEAT recap G1.', 'HEAT recap G2.', 'HEAT recap G3.', 'HEAT outro.'] as $needle) {
+        foreach (['HEAT recap G1.', 'HEAT recap G2.', 'HEAT recap G3.'] as $needle) {
             $pos = strpos($doc, $needle);
             self::assertNotFalse($pos, "Document must contain '{$needle}'");
             $offsets[] = $pos;
         }
         $sorted = $offsets;
         sort($sorted);
-        self::assertSame($sorted, $offsets, 'intro < G1 < G2 < G3 < outro');
-        self::assertCount(5, array_unique($offsets));
+        self::assertSame($sorted, $offsets, 'G1 < G2 < G3');
+        self::assertCount(3, array_unique($offsets));
 
         self::assertStringNotContainsString('HEAT recap G4 orphan.', $doc);
     }

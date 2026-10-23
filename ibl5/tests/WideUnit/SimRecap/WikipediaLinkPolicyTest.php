@@ -101,7 +101,9 @@ final class WikipediaLinkPolicyTest extends TestCase
     public function testStateFreeInvariantDetectsForbiddenProperty(): void
     {
         $planted = new class {
-            private ?\mysqli $db = null;
+            public function __construct(private ?\mysqli $db = null)
+            {
+            }
 
             public static function check(int $teamId): bool
             {

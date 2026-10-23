@@ -440,7 +440,7 @@ final class SimRecapPayloadTest extends TestCase
         $prose = $this->proseRenderingTo(SimRecapPayload::MAX_BLOCK_CHARS) . 'x';
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('games[0] renders to 1901 chars');
+        $this->expectExceptionMessageIsOrContains('games[0] renders to 1901 chars');
 
         SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
     }
@@ -452,7 +452,7 @@ final class SimRecapPayloadTest extends TestCase
         self::assertSame(1850, mb_strlen($prose, 'UTF-8'));
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('over the 1900-char Discord block cap');
+        $this->expectExceptionMessageIsOrContains('over the 1900-char Discord block cap');
 
         SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
     }
@@ -502,7 +502,7 @@ final class SimRecapPayloadTest extends TestCase
         $prose = str_pad('A [x](<https://evil.com>) game. ', 2000, 'x');
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('games[0].recap_text: link not allowed');
+        $this->expectExceptionMessageIsOrContains('games[0].recap_text: link not allowed');
 
         SimRecapPayload::fromJson($this->jsonWithProse($prose), self::HOST);
     }
@@ -515,7 +515,7 @@ final class SimRecapPayloadTest extends TestCase
         self::assertCount(1, $payload->getGames());
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('renders to 1901 chars');
+        $this->expectExceptionMessageIsOrContains('renders to 1901 chars');
         SimRecapPayload::fromJson($this->jsonWithProse($atCap . 'x'), '');
     }
 }

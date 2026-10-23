@@ -43,7 +43,7 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
             ],
             'storeSimRecap' => [
                 'storeSimRecap.php',
-                ['1', '1', '0'],
+                ['1', '1', '1', '0'],
                 ['--sim must be >= 1', '--sim=', '--sim=N is required'],
             ],
             'jsbExport' => ['jsbExport.php', [''], []],

@@ -3750,11 +3750,14 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
     """Decline before any LLM call when condition 3's MISSING set or an UNREALISED-ASSERTION-only set repeats the prior hold.
 
     True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
-    returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
+    returns. Fail-open: any exception, POSTPLAN_FORCE=1, POSTPLAN_STATE_CHANGED=1, no plan, or no matching
     record returns False and the run proceeds. Never touches res.pr_number or res.arm.
     """
     if os.environ.get("POSTPLAN_FORCE") == "1":
         log("phase2 early hold-repeat: skipped (POSTPLAN_FORCE=1)")
+        return False
+    if os.environ.get("POSTPLAN_STATE_CHANGED") == "1":
+        log("phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)")
         return False
     if not (live or state_dir is not None) or not (plan and plan.found):
         return False

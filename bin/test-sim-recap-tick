@@ -1249,7 +1249,7 @@ run_prompt() {
 # ── exemplar_embedded ─────────────────────────────────────────────────────────
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
     --roster="$_FIX/roster-context.json"
-srt_log_has "$STUB" prompt.out "WHERE THINGS STAND" "exemplar_embedded — WHERE THINGS STAND"
+srt_log_has "$STUB" prompt.out "**Houston Rockets 103 @ Washington Bullets 139**" "exemplar_embedded — first game header"
 srt_log_has "$STUB" prompt.out "===== "             "exemplar_embedded — date separator"
 
 # ── anti_tell_list_present ────────────────────────────────────────────────────
@@ -1258,11 +1258,17 @@ srt_log_has "$STUB" prompt.out "load-bearing"          "anti_tell_list_present �
 srt_log_has "$STUB" prompt.out "em-dash"               "anti_tell_list_present — em-dash"
 srt_log_has "$STUB" prompt.out "and here's the thing"  "anti_tell_list_present — and here's the thing"
 
-# ── standings_placement_singular ─────────────────────────────────────────────
-srt_log_has  "$STUB" prompt.out "before any per-game recaps" \
-    "standings_placement_singular — exemplar-authoritative ordering present"
+# ── no_intro_or_outro_requested ──────────────────────────────────────────────
+srt_log_has  "$STUB" prompt.out "do not write an intro, a standings section, or a closing section" \
+    "no_intro_or_outro_requested — start-with-the-games instruction present"
+srt_log_lacks "$STUB" prompt.out "WHERE THINGS STAND" \
+    "no_intro_or_outro_requested — no standings section asked for"
+srt_log_lacks "$STUB" prompt.out '"intro_text"' \
+    "no_intro_or_outro_requested — intro_text gone from the JSON shape"
+srt_log_lacks "$STUB" prompt.out '"outro_text"' \
+    "no_intro_or_outro_requested — outro_text gone from the JSON shape"
 srt_log_lacks "$STUB" prompt.out "paragraph at the end" \
-    "standings_placement_singular — superseded 'at the end' phrasing absent"
+    "no_intro_or_outro_requested — superseded 'at the end' phrasing absent"
 
 # ── mentions_render_as_strings ────────────────────────────────────────────────
 # Snowflake digit-for-digit in output (same run, but rerun for clarity).
@@ -1334,6 +1340,24 @@ srt_log_has "$STUB" prompt.out "504 and 639 characters" \
     "prose_length_band_present — exemplar band stated"
 srt_log_has "$STUB" prompt.out "ANTI-LLM-TELL PROHIBITIONS still bind" \
     "prose_length_band_present — band reconciled with the hard bans"
+
+# ── wikipedia_link_rules_present ──────────────────────────────────────────────
+srt_log_has "$STUB" prompt.out "Never link a player's name" \
+    "wikipedia_link_rules_present — player-name ban stated"
+srt_log_has "$STUB" prompt.out "Never write a team page URL" \
+    "wikipedia_link_rules_present — site-URL ban stated"
+srt_log_has "$STUB" prompt.out "[the '85 Bears](<https://en.wikipedia.org/wiki/1985_Chicago_Bears_season>)" \
+    "wikipedia_link_rules_present — good example shows the masked form"
+
+# ── exemplar_carries_one_wikipedia_link ───────────────────────────────────────
+# The generator copies the exemplar, so it shows exactly one good link and no site URL.
+_wiki_n=$(grep -c '](<https://en.wikipedia.org/wiki/' "$SRT_EXEMPLAR")
+_site_n=$(grep -cE 'teamid=|GameBoxscore|iblhoops' "$SRT_EXEMPLAR")
+if [ "$_wiki_n" = 1 ] && [ "$_site_n" = 0 ]; then
+    srt_ok "exemplar_carries_one_wikipedia_link — 1 Wikipedia link, 0 site URLs"
+else
+    srt_fail "exemplar_carries_one_wikipedia_link — $_wiki_n Wikipedia links, $_site_n site URLs"
+fi
 
 # ── anti_tell_bans_survive_length_band ────────────────────────────────────────
 # Negative path: the length anchor must not have softened the sentence-shape ban.

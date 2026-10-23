@@ -10,14 +10,14 @@ use SimRecap\RecapDocument;
 
 /**
  * The expected strings here are transcribed from `bin/lib/sim-recap-exemplar.txt`,
- * which is the format contract — the date rules on its lines 15 and 129, and the
+ * which is the format contract — the date rules on its line 1, and the
  * blank-line counts between its blocks. They are written out literally rather than
  * rebuilt with str_repeat() so the test is an independent oracle, not a mirror of
  * the implementation.
  */
 final class RecapDocumentTest extends TestCase
 {
-    /** Exemplar line 15 — 32 '=', the label, 41 '='. */
+    /** Exemplar line 1 — 32 '=', the label, 41 '='. */
     private const FEB_26_RULE = '================================ Feb 26 =========================================';
 
     /** Exemplar line 129 — the same fixed counts, so a shorter label yields a shorter line. */
@@ -557,5 +557,55 @@ final class RecapDocumentTest extends TestCase
     public function testGameBlockReturnsEmptyStringForBlankText(): void
     {
         self::assertSame('', RecapDocument::gameBlock($this->game('2008-02-26', '   '), self::HOST));
+    }
+
+    private function exemplar(): string
+    {
+        $exemplar = file_get_contents(dirname(__DIR__, 4) . '/bin/lib/sim-recap-exemplar.txt');
+        self::assertIsString($exemplar);
+
+        return str_replace("\r\n", "\n", $exemplar);
+    }
+
+    public function testExemplarHasNoIntroOrOutro(): void
+    {
+        $exemplar = $this->exemplar();
+
+        self::assertStringStartsWith(str_repeat('=', 32) . ' ', $exemplar);
+        self::assertStringNotContainsString('WHERE THINGS STAND', $exemplar);
+        self::assertStringNotContainsString('END —', $exemplar);
+    }
+
+    public function testExemplarPassesTheWikipediaLinkPolicy(): void
+    {
+        self::assertNull(\SimRecap\WikipediaLinkPolicy::violation($this->exemplar()));
+    }
+
+    public function testExemplarGameAssemblesWithLinksFooter(): void
+    {
+        $lines = explode("\n", $this->exemplar());
+        $start = array_search('**Houston Rockets 103 @ Washington Bullets 139**', $lines, true);
+        self::assertIsInt($start);
+
+        $block = implode("\n", array_slice($lines, $start, 4));
+        $game  = [
+            'game_date'        => '2008-02-26',
+            'visitor_teamid'   => 10,
+            'home_teamid'      => 20,
+            'game_of_that_day' => 1,
+            'sort_order'       => 0,
+            'recap_text'       => $block,
+        ];
+
+        $assembled = RecapDocument::gameBlock($game, self::HOST);
+
+        self::assertStringEndsWith(
+            "\n\n<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-02-26&game=1>"
+            . "\n[Houston Rockets](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=10>)"
+            . "\n[Washington Bullets](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=20>)",
+            $assembled
+        );
+        $firstTwo = implode("\n", array_slice(explode("\n", $assembled), 0, 2));
+        self::assertStringNotContainsString('http', $firstTwo);
     }
 }

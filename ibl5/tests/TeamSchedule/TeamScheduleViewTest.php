@@ -152,6 +152,95 @@ class TeamScheduleViewTest extends TestCase
         $this->assertStringNotContainsString('<script>alert(1)</script>', $result);
     }
 
+    public function testRenderIncludesSharedScrollScriptTag(): void
+    {
+        $html = $this->view->render($this->createMockTeam(), [], 7, 'Regular Season');
+
+        $this->assertSame(1, substr_count($html, '<script src="jslib/schedule-scroll.js" defer></script>'));
+        $this->assertStringNotContainsString('<script>', $html);
+    }
+
+    public function testRenderOmitsInlineScrollHandlers(): void
+    {
+        $nextGame = $this->createMockGame('October', '2025-10-15', true);
+        $nextGame['highlight'] = 'next-sim';
+
+        $html = $this->view->render($this->createMockTeam(), [$nextGame], 7, 'Regular Season');
+
+        foreach (['onclick=', 'scrollToMonth', 'scrollToNextGames', 'headerOffset'] as $legacy) {
+            $this->assertStringNotContainsString($legacy, $html);
+        }
+    }
+
+    public function testMonthLinkCarriesTeamScrollTargetAttribute(): void
+    {
+        $html = $this->view->render(
+            $this->createMockTeam(),
+            [$this->createMockGame('October', '2025-10-15')],
+            7,
+            'Regular Season',
+        );
+
+        $this->assertStringContainsString(
+            '<a href="#team-month-2025-10" class="ibl-jump-menu__link schedule-months__link" data-scroll-target="team-month-2025-10">',
+            $html,
+        );
+        $this->assertStringNotContainsString('data-scroll-next', $html);
+    }
+
+    public function testNextGamesLinkCarriesTargetAndNextFlag(): void
+    {
+        $nextGame = $this->createMockGame('October', '2025-10-15', true);
+        $nextGame['highlight'] = 'next-sim';
+
+        $html = $this->view->render($this->createMockTeam(), [$nextGame], 7, 'Regular Season');
+
+        $this->assertStringContainsString(
+            '<a href="#team-game-12345" class="schedule-jump-btn" data-scroll-target="team-game-12345" data-scroll-next>',
+            $html,
+        );
+    }
+
+    public function testNextGamesLinkAbsentWithoutNextSimGame(): void
+    {
+        $html = $this->view->render(
+            $this->createMockTeam(),
+            [$this->createMockGame('October', '2025-10-15')],
+            7,
+            'Regular Season',
+        );
+
+        $this->assertStringNotContainsString('schedule-jump-btn', $html);
+        $this->assertStringNotContainsString('data-scroll-next', $html);
+    }
+
+    public function testRenderEscapesHostileScrollIds(): void
+    {
+        // Month keys come from date('Y-m') and game ids from an integer box score ID, so render()
+        // cannot carry a hostile id. Drive the three private emit sites directly.
+        $hostile = '"><b>';
+        $monthData = ['2025-10' . $hostile => ['label' => 'October', 'dates' => []]];
+
+        $header = new \ReflectionMethod($this->view, 'renderHeader');
+        $nav = new \ReflectionMethod($this->view, 'renderMonthNav');
+        $months = new \ReflectionMethod($this->view, 'renderGamesByMonth');
+
+        $headerHtml = $header->invoke($this->view, 7, 'team-game-1' . $hostile);
+        $navHtml = $nav->invoke($this->view, $monthData, false, null);
+        $monthsHtml = $months->invoke($this->view, $monthData, 1, 'Test Team', false, null);
+        $this->assertIsString($headerHtml);
+        $this->assertIsString($navHtml);
+        $this->assertIsString($monthsHtml);
+        $html = $headerHtml . $navHtml . $monthsHtml;
+
+        $this->assertStringNotContainsString($hostile, $html);
+        $this->assertStringContainsString('href="#team-game-1&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('data-scroll-target="team-game-1&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('href="#team-month-2025-10&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('data-scroll-target="team-month-2025-10&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('id="team-month-2025-10&quot;&gt;&lt;b&gt;"', $html);
+    }
+
     public function testRenderShowsWinResult(): void
     {
         $mockTeam = $this->createMockTeam();

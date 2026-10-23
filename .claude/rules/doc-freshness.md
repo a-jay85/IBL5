@@ -1,6 +1,6 @@
 ---
 description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, the engine lint-pin rule, and required-status claims enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-10-06
+last_verified: 2026-10-22
 paths: "**/*.md"
 ---
 
@@ -38,6 +38,8 @@ Enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that c
 
 Never set a future date. The local `date +%F` (never `date -u`) is always the right value, even when master already carries it. A strictly-newer value is rejected as `` `last_verified` in the future ``. Run `bin/check-docs --since=master --no-staleness` on the dirty tree before shipping. `--since` sees uncommitted edits (base...HEAD, unstaged, and staged); untracked files are excluded. Detail: `doc-freshness-detail.md` § On-touch gate mechanics.
 
+**Date-only merge conflicts.** Two branches that each bump `last_verified` on one doc conflict on that line. `.gitattributes` routes these docs through `bin/lib/merge-last-verified`, which keeps the newer date when that line is the only conflict and leaves standard markers for anything else. `bin/install-git-hooks` and `bin/wt-new` register it in the common `.git/config`. A clone without the registration gets git's plain conflict. Decision: `ibl5/docs/decisions/0203-last-verified-merge-driver.md`.
+
 ## Dead-Reference Rule
 
 `bin/check-docs` scans doc bodies for repo-path tokens (`bin/<name>`, `ibl5/<path>`, `.claude/<path>`, `.github/<path>`) and fails on any token that does not resolve to an existing file or directory. Shell variables like `$FOO/bar` and paths with glob characters (`*`, `?`, `[`, `]`) are skipped. For intentional non-resolving literal paths, append `(example)` immediately after the closing backtick, e.g. `` `bin/some-path` (example) ``, and the reference is skipped.
@@ -64,6 +66,6 @@ Adding an entry is a high bar: only when the retired form is distinctive enough 
 
 ## Required-Status Claims Rule
 
-Branch-protection contexts are live GitHub state, so a rule doc must not restate the list. Cite the readback command `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'` and point at `.claude/rules/ci-gotchas.md`, which explains each context. The full scan of `bin/check-docs` fails with `FAIL required-status claims drift` when a doc listed in its `REQUIRED_CLAIMS_DOCS` constant names two or more required contexts or drops the readback command. The same scan checks the offline facts behind `.claude/rules/engine-go.md`: the `Engine` check and its lint job must stay out of the `--ignore=` list in `.github/workflows/all-checks-green.yml`, and `Engine` must stay out of `--anchor=`. The live list itself is never checked here, because a `gh api` call would tie the `Meta checks` job to a token and the network.
+Branch-protection contexts are live GitHub state, so a rule doc must not restate the list. Cite the readback command `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'` and point at `.claude/rules/ci-gotchas.md`, which explains each context. The full scan of `bin/check-docs` fails with `FAIL required-status claims drift` when a doc listed in its `REQUIRED_CLAIMS_DOCS` constant names two or more required contexts or drops the readback command. The same scan checks the offline facts behind `.claude/rules/engine-go.md`: the `Engine` check and its lint job must stay out of the `--ignore=` list in `.github/workflows/all-checks-settled.yml`, and `Engine` must stay out of `--anchor=`. The live list itself is never checked here, because a `gh api` call would tie the `Meta checks` job to a token and the network.
 
 When a PR body, commit message, or merge digest describes what a rule file now says, copy the wording from `git diff origin/master -- <file>`. Never write it from memory. No gate checks this half, because PR bodies have no tracked source to compare against.

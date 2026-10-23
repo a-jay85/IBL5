@@ -79,6 +79,13 @@ class NukeCompatTest extends TestCase
         $this->assertStringContainsString('March', $html);
     }
 
+    public function testFormatLocalTimeParsesSingleDigitDatetimeParts(): void
+    {
+        $html = $this->compat->formatLocalTime('2026-3-5 7:04:09');
+
+        $this->assertStringContainsString('datetime="2026-03-05T07:04:09+00:00"', $html);
+    }
+
     public function testFormatLocalTimeMalformedStringReturnsEpoch(): void
     {
         // Malformed string can't be parsed → falls back to timestamp 0

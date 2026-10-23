@@ -184,8 +184,14 @@
         <testsuite name="ContractList Module Tests">
             <directory>tests/ContractList</directory>
         </testsuite>
+        <testsuite name="Contracts Module Tests">
+            <directory>tests/Contracts</directory>
+        </testsuite>
         <testsuite name="DraftHistory Module Tests">
             <directory>tests/DraftHistory</directory>
+        </testsuite>
+        <testsuite name="DraftInfo Module Tests">
+            <directory>tests/DraftInfo</directory>
         </testsuite>
         <testsuite name="FreeAgencyPreview Module Tests">
             <directory>tests/FreeAgencyPreview</directory>
@@ -249,6 +255,9 @@
         </testsuite>
         <testsuite name="FranchiseRecordBook Module Tests">
             <directory>tests/FranchiseRecordBook</directory>
+        </testsuite>
+        <testsuite name="Records Module Tests">
+            <directory>tests/Records</directory>
         </testsuite>
         <testsuite name="LeagueControlPanel Module Tests">
             <directory>tests/LeagueControlPanel</directory>

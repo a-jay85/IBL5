@@ -1,9 +1,9 @@
 name: Weekly Log Review
 
 on:
-  # Sunday ~9am ET (13:00 UTC; ~8am EST in winter). Offset from :00.
+  # Sunday 16:03 UTC = the weekly Claude usage reset. Odd minute: GitHub delays top-of-hour crons.
   schedule:
-    - cron: '57 12 * * 0'
+    - cron: '3 16 * * 0'
 
   workflow_dispatch: {}
 
@@ -85,5 +85,5 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_REVIEWS_WEBHOOK_URL }}
           fail-on-delivery: 'false'

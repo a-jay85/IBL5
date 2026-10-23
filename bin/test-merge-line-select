@@ -3,7 +3,7 @@
 # shellcheck disable=SC2016  # W-case patterns are literal workflow text, not shell expansions
 #
 # bin/test-merge-line-select — regression harness for bin/merge-line-select and
-# the two workflows that call it (update-behind-prs.yml, pr-canary.yml).
+# the workflow that calls it (update-behind-prs.yml).
 #
 # Every decision rule runs against synthetic GraphQL snapshots piped in on
 # --input. The live-GraphQL path runs against a stub gh (GH_CMD / PATH). No
@@ -573,8 +573,10 @@ e13_ok=1
 e13_msg=""
 for tok in \
     'pullRequests(states:OPEN, baseRefName:"master", first:$first, after:$after)' \
-    'pageInfo { hasNextPage endCursor }' \
-    'contexts(first:100)' \
+    '      pageInfo { hasNextPage endCursor }' \
+    'contexts(first:100) { pageInfo { hasNextPage endCursor } nodes' \
+    'contexts(first:100, after:$cafter)' \
+    'MAX_CTX_PAGES=50' \
     'PAGE_SIZE=10' \
     'MAX_PAGES=50'; do
     cnt=$(grep -cF -- "$tok" "$SEL" || true)
@@ -588,6 +590,71 @@ if [ "$e13_ok" = 1 ]; then
 else
     failcase "E13-query-paging-shape —$e13_msg"
 fi
+
+# E14: a PR with 250 contexts has its required check on context page 3 (index
+# 220). The first 100 are green, so a selector that stops there would pick PR 1
+# as head; paging every context marks it red and passes over it to PR 2.
+mkdir -p "$TMP/pg14"
+cat > "$TMP/ctxgh" <<'STUB'
+#!/usr/bin/env bash
+key=first
+line=''
+for a in "$@"; do
+    case "$a" in
+        cafter=*) key="${a#cafter=}"; line="$line $a" ;;
+        query=*) ;;
+        *) line="$line $a" ;;
+    esac
+done
+n=$(cat "$PG_DIR/count" 2>/dev/null || true); n=$(( ${n:-0} + 1 ))
+printf '%s\n' "$n" > "$PG_DIR/count"
+printf '%s\n' "$line" >> "$PG_DIR/argv"
+if [ "$n" -gt 20 ]; then
+    echo 'ctxgh: runaway loop' >&2
+    exit 1
+fi
+cat "$PG_DIR/page-$key.json"
+STUB
+chmod +x "$TMP/ctxgh"
+# ctx_range <from> <to> — contexts "check-<i>" (green); i=220 is the failing required check.
+ctx_range() {
+    jq -cn --argjson a "$1" --argjson b "$2" '[range($a; $b) | if . == 220
+        then {__typename:"CheckRun", name:"E2E Tests", status:"COMPLETED", conclusion:"FAILURE"}
+        else {__typename:"CheckRun", name:"check-\(.)", status:"COMPLETED", conclusion:"SUCCESS"} end]'
+}
+# ctx_page <ctx-array> <hasNext> <endCursor-json> — a follow-up node(id) response.
+ctx_page() {
+    jq -cn --argjson n "$1" --argjson has "$2" --argjson cur "$3" \
+        '{data:{node:{commits:{nodes:[{commit:{statusCheckRollup:{contexts:
+            {pageInfo:{hasNextPage:$has, endCursor:$cur}, nodes:$n}}}}]}}}}'
+}
+PR14A=$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$(ctx_range 0 100)" \
+    | jq -c '.id = "PR_1" | .commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {hasNextPage:true, endCursor:"C1"}')
+PR14B=$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX" | jq -c '.id = "PR_2"')
+snapshot "$PR14A" "$PR14B" > "$TMP/pg14/page-first.json"
+ctx_page "$(ctx_range 100 200)" true '"C2"' > "$TMP/pg14/page-C1.json"
+ctx_page "$(ctx_range 200 250)" false null > "$TMP/pg14/page-C2.json"
+rm -f "$TMP/pg14/count" "$TMP/pg14/argv"
+RC=0
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' PG_DIR="$TMP/pg14" GH_CMD="$TMP/ctxgh" \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err") || RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E14-over-100-contexts exit" "$RC" "0"
+assert_match "E14-over-100-contexts head skips red PR" '^head=2$' "$OUT"
+assert_match "E14-over-100-contexts skipped" '^skipped=1:red$' "$OUT"
+assert_eq "E14-over-100-contexts calls" "$(cat "$TMP/pg14/count")" "3"
+assert_match "E14-over-100-contexts page 2 sends id and cursor" 'id=PR_1 -f cafter=C1' "$(sed -n 2p "$TMP/pg14/argv")"
+assert_match "E14-over-100-contexts page 3 sends cursor" 'cafter=C2' "$(sed -n 3p "$TMP/pg14/argv")"
+
+# E15: a failing follow-up contexts page fails closed with no partial line.
+rm -f "$TMP/pg14/count" "$TMP/pg14/argv" "$TMP/pg14/page-C2.json"
+RC=0
+OUT=$(IBL5_GH_RETRY_DELAYS='0 0 0' PG_DIR="$TMP/pg14" GH_CMD="$TMP/ctxgh" \
+    "$SEL" --live --repo a-jay85/IBL5 2>"$TMP/err") || RC=$?
+ERR=$(cat "$TMP/err")
+assert_eq "E15-ctx-page-failure-fails-closed exit" "$RC" "1"
+assert_match "E15-ctx-page-failure-fails-closed message" 'GraphQL fetch failed' "$ERR"
+assert_eq "E15-ctx-page-failure-fails-closed no partial line" "$OUT" ""
 
 # --- R: snapshot validation and record-and-replay ---
 
@@ -637,10 +704,9 @@ else
     printf '%s\n' "$OUT" | sed 's/^/    /'
 fi
 
-# --- W: static shape of the two workflows that call the selector ---
+# --- W: static shape of the workflow that calls the selector ---
 
 UPDATE_WF="$REPO_ROOT/.github/workflows/update-behind-prs.yml"
-CANARY_WF="$REPO_ROOT/.github/workflows/pr-canary.yml"
 
 # count_lines <fixed-string> <file> — number of lines containing the string.
 count_lines() { grep -cF -- "$1" "$2" || true; }
@@ -665,15 +731,6 @@ if [ "$W2_GROUP" = 1 ] && [ "$W2_GUARDS" = 2 ] && [ "$W2_DAILY" = 0 ] \
     pass "W2-dryrun-guards"
 else
     failcase "W2-dryrun-guards — group=$W2_GROUP guards=$W2_GUARDS daily=$W2_DAILY scope=$W2_SCOPE dispatch_pr=$W2_PR dry_run=$W2_DRY"
-fi
-
-W3_SELECTOR=$(grep -E 'bin/merge-line-select' "$CANARY_WF" | grep -cF -- '--list' || true)
-W3_OLD=$(count_lines 'gh pr list' "$CANARY_WF")
-W3_GUARD=$(count_lines "if: needs.enumerate.outputs.count != '0'" "$CANARY_WF")
-if [ "$W3_SELECTOR" -ge 1 ] && [ "$W3_OLD" = 0 ] && [ "$W3_GUARD" = 1 ]; then
-    pass "W3-canary-uses-selector"
-else
-    failcase "W3-canary-uses-selector — selector-list=$W3_SELECTOR gh-pr-list=$W3_OLD count-guard=$W3_GUARD"
 fi
 
 # The workflow path is a variable so a counterfactual copy can be swapped in.

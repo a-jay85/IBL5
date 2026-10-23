@@ -101,74 +101,106 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
         foreach ($stats as $index => $row) {
             $rank = $index + 1;
-            /** @var string $name */
-            $name = HtmlSanitizer::safeHtmlOutput($row['name']);
-            /** @var string $date */
-            $date = HtmlSanitizer::safeHtmlOutput($row['date']);
-            $value = $row['value'];
-            $teamid = 0;
-            $teamCell = '';
-            $isTeamStat = false;
+            $date = $this->linkDate($row);
 
-            // Link player names to their profile page when pid is available
-            if (isset($row['pid'])) {
-                $pid = $row['pid'];
-                $name = PlayerImageHelper::renderPlayerLink((int) $pid, (string) $row['name']);
-
-                // Build team cell for player stats
-                if ($isPlayerStats) {
-                    $teamid = $row['teamid'] ?? 0;
-                    $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent(
-                        $teamid,
-                        $row['teamname'] ?? '',
-                        $row['color1'] ?? 'FFFFFF',
-                        $row['color2'] ?? '000000',
-                        '',
-                        'FA',
-                    );
-                }
-            } elseif (isset($row['teamid'])) {
-                // Style team names with colored cell for team stats
-                $isTeamStat = true;
-            }
-
-            // Link dates to box score when gameOfThatDay is available
-            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl(
-                $row['date'],
-                $row['gameOfThatDay'] ?? 0,
-                $row['boxId'] ?? 0
-            );
-            if ($boxScoreUrl !== '') {
-                /** @var string $safeUrl */
-                $safeUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
-                /** @var string $date */
-                $date = "<a href=\"{$safeUrl}\">{$date}</a>";
-            }
-
-            // Render row differently for team stats (styled team cell) vs player stats
-            if ($isTeamStat) {
-                $teamId = (int) ($row['teamid'] ?? 0);
-                $teamStatCell = TeamCellHelper::renderTeamCell($teamId, $row['name'], $row['color1'] ?? 'FFFFFF', $row['color2'] ?? '000000');
-
-                $output .= "<tr data-team-id=\"{$teamId}\">"
-                    . "<td class=\"rank-cell\">{$rank}</td>"
-                    . $teamStatCell
-                    . "<td class=\"date-cell\">{$date}</td>"
-                    . "<td class=\"value-cell\">{$value}</td>"
-                    . '</tr>';
+            // Team-stat rows have a teamid but no pid; everything else is a player row
+            if (!isset($row['pid']) && isset($row['teamid'])) {
+                $output .= $this->renderTeamStatRow($rank, $row, $date);
             } else {
-                $output .= "<tr data-team-id=\"{$teamid}\">
+                $output .= $this->renderPlayerStatRow($rank, $row, $date, $isPlayerStats);
+            }
+        }
+
+        $output .= '</tbody></table></div>';
+        return $output;
+    }
+
+    /**
+     * Escaped date, wrapped in a box score link when one can be built.
+     *
+     * @param SeasonHighEntry $row
+     */
+    private function linkDate(array $row): string
+    {
+        /** @var string $date */
+        $date = HtmlSanitizer::safeHtmlOutput($row['date']);
+
+        // Link dates to box score when gameOfThatDay is available
+        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl(
+            $row['date'],
+            $row['gameOfThatDay'] ?? 0,
+            $row['boxId'] ?? 0
+        );
+        if ($boxScoreUrl !== '') {
+            /** @var string $safeUrl */
+            $safeUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
+            /** @var string $date */
+            $date = "<a href=\"{$safeUrl}\">{$date}</a>";
+        }
+
+        return $date;
+    }
+
+    /**
+     * Multi-line player row. Linked name when pid is set, escaped plain name otherwise.
+     *
+     * @param SeasonHighEntry $row
+     * @param string $date Already escaped (and possibly linked) by linkDate()
+     */
+    private function renderPlayerStatRow(int $rank, array $row, string $date, bool $isPlayerStats): string
+    {
+        /** @var string $name */
+        $name = HtmlSanitizer::safeHtmlOutput($row['name']);
+        $value = $row['value'];
+        $teamid = 0;
+        $teamCell = '';
+
+        // Link player names to their profile page when pid is available
+        if (isset($row['pid'])) {
+            $pid = $row['pid'];
+            $name = PlayerImageHelper::renderPlayerLink((int) $pid, (string) $row['name']);
+
+            // Build team cell for player stats
+            if ($isPlayerStats) {
+                $teamid = $row['teamid'] ?? 0;
+                $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent(
+                    $teamid,
+                    $row['teamname'] ?? '',
+                    $row['color1'] ?? 'FFFFFF',
+                    $row['color2'] ?? '000000',
+                    '',
+                    'FA',
+                );
+            }
+        }
+
+        return "<tr data-team-id=\"{$teamid}\">
     <td class=\"rank-cell\">{$rank}</td>
     <td class=\"name-cell\">{$name}</td>
     {$teamCell}
     <td class=\"date-cell\">{$date}</td>
     <td class=\"value-cell\">{$value}</td>
 </tr>";
-            }
-        }
+    }
 
-        $output .= '</tbody></table></div>';
-        return $output;
+    /**
+     * Single-line team row with a styled team cell.
+     *
+     * @param SeasonHighEntry $row
+     * @param string $date Already escaped (and possibly linked) by linkDate()
+     */
+    private function renderTeamStatRow(int $rank, array $row, string $date): string
+    {
+        $value = $row['value'];
+        $teamId = (int) ($row['teamid'] ?? 0);
+        $teamStatCell = TeamCellHelper::renderTeamCell($teamId, $row['name'], $row['color1'] ?? 'FFFFFF', $row['color2'] ?? '000000');
+
+        return "<tr data-team-id=\"{$teamId}\">"
+            . "<td class=\"rank-cell\">{$rank}</td>"
+            . $teamStatCell
+            . "<td class=\"date-cell\">{$date}</td>"
+            . "<td class=\"value-cell\">{$value}</td>"
+            . '</tr>';
     }
 
     /**

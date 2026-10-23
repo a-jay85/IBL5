@@ -1,6 +1,6 @@
 ---
 description: Team page — roster, stats, history, and accomplishments — following Controller/Service/View/Repository pattern with multiple stat display modes.
-last_verified: 2026-09-04
+last_verified: 2026-10-22
 ---
 
 # Team Module
@@ -115,7 +115,7 @@ $controller->displayTeamPage(-1);  // Display entire league roster
 The controller reads the `yr` parameter via the injected `Http\HttpRequest` for historical year queries:
 
 ```
-modules.php?name=Team&op=team&teamID=5&yr=2023
+modules.php?name=Team&op=team&teamid=5&yr=2023
 ```
 
 ## Database Tables

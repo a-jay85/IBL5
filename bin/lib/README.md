@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-11
+last_verified: 2026-10-22
 ---
 
 # bin/lib — Shared Library Files
@@ -15,6 +15,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `gh-retry.sh` | `gh_retry <cmd> [args...]` reruns a `gh` call on a transient failure (HTTP 5xx, timeout, connection reset or refused) with the backoff in `IBL5_GH_RETRY_DELAYS` (default `5 20 60`); never retries a 4xx; sourced by `bin/lib/burndown.sh` and `bin/merge-line-select`; exercised by `bin/test-gh-retry` |
+| `master-bot-wait.sh` | `master_bot_wait <repo> [say-cmd]` blocks until no master-push run of Tests and Analysis or Migration Safety (the workflows that push `[auto]` bot commits) is queued or running, capped at 45 min and failing open; called before a PR is updated or rebased onto master so the bot commit cannot knock it BEHIND. Sourced by `bin/merge-line-watch`, `.github/workflows/update-behind-prs.yml` and `.github/workflows/rebase-prs.yml`; tested by `bin/test-merge-line-watch` |
 | `harness.sh` | Shared assertion, counter, skip, summary, tmpdir and fake-git-repo helpers (`h_*`) sourced by `bin/test-*` harnesses. `h_mark`/`h_rewind` save and restore the counters, `H_FAIL_FD=2` sends `FAIL:` lines to stderr, and `H_SKIP_OK=1` lets an all-skipped run pass. Exercised by `bin/test-harness-lib` |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `gate-common.php` | PHP helpers `require_once`d by `bin/adr-check` and `bin/refactor-flag`: `runCmd`, `fetchPrBody`, `gateDiffNames`, `gateExtractBypassReason`; per-gate regex, minimum length and diff range stay in each gate |
@@ -23,13 +24,14 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `hold-check-patterns.txt` | Ask-shaped-sentence patterns for `## Automouse Hold Justification` sections; one pattern per line, read by both `bin/lib/hold-check.sh` (POSIX ERE via `grep -E`) and `harness/planfile.py` (Python `re`) — see the file header for the two-language portable subset |
 | `hold-check.sh` | Hold-section extraction (`hold_check_section`), ask-shaped-sentence detection (`hold_check_violations`), the Decision paragraph reader (`hold_decision_paragraphs`), and the manual-confirmation block renderer (`hold_manual_confirmation_block`); sourced by `bin/check-plan` gate `[H]` and by `/post-plan` Phase 6's hold-notice step |
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
-| `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
+| `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution, `main_checkout_root`, and `register_last_verified_merge_driver` (idempotent `merge.lastverified.driver` registration, called by `bin/install-git-hooks` and `bin/wt-new`) |
+| `merge-last-verified` | Git merge driver (git executes it; nothing sources it) for markdown whose only conflict is the frontmatter `last_verified` date; keeps the newer date, else leaves standard markers and exits 1; exercised by `bin/test-merge-last-verified` |
 | `numbering.sh` | Shared ADR and migration numbering grammar: allocator name regexes, gate collision keys, and `numbering_next`. Sourced by `bin/next-number` and `bin/check-numbering`; source-safe (no `set`, no `exit`) |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
 | `dm.sh` | Discord-DM sender helpers. `dm_bin` resolves the `discord-dm` binary from a caller's seam variables, so an empty seam falls back to the default. `dm_ping` sends with `--ping` and puts the message last. Sourced by `bin/pr-cycle`, `bin/pr-cycle-tick`, `bin/post-plan-fail-dm`, `bin/plan-now`, `bin/post-plan-fleet`, `bin/pr-review-now` and `bin/db-backups-pull`; tested by `bin/test-discord-dm` |
 | `launchd-job.sh` | Shared launchd background-job plumbing: one-shot `launchctl list` snapshot and label lookup, fail-closed pgrep liveness probe, TERM-then-KILL stop and slot release, compact runner plist emission, bootout/bootstrap, slot count / stale reap / wait-for-slot, the loaded-idle job reaper, runner-embeddable finish-DM helpers, and `xml_escape` / `shq`. Sourced by `bin/post-plan-fleet`, `bin/pr-review-now`, `bin/post-plan-now`, `bin/plan-now`, `bin/docfix-run` and `bin/pr-cycle`; tested by `bin/test-launchd-job` |
 | `launchd-expected-jobs.sh` | Single source of truth for the launchd health check: the expected long-lived `com.ibl5.*` labels with their check mode (`standard` / `keepalive` / `phase-gated`), the one-shot label prefixes, and the required main-stack containers. Sourced by `bin/launchd-health-check` (example) and `bin/test-launchd-health-check` (example) |
-| `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
+| `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/check-pr-collisions` and `bin/post-plan-now` |
 | `scan-scope.sh` | Shared `--pr` / `--base` / `--help` arg parsing, base-ref resolution and changed-file listing for `bin/check-e2e-hygiene`, `bin/check-phpunit-hygiene` and `bin/check-hot-files` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |

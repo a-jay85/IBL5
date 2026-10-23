@@ -195,6 +195,11 @@ fi
 # branch's real parent instead of assuming origin/master (see ADR-0117).
 git -C "$WT_ROOT" config "branch.$BRANCH_NAME.iblBase" "$BASE_BRANCH"
 
+# Self-heal the last_verified merge driver registration (common .git/config,
+# shared by every worktree) so clones that never re-ran bin/install-git-hooks
+# still get it. Never fails worktree creation.
+register_last_verified_merge_driver "$REPO_ROOT"
+
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker
 # container, so every app request 500s (`Failed to open stream`). config.php is

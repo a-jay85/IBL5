@@ -105,6 +105,40 @@ main_checkout_root() {
     (cd "$(dirname "$gcd")" 2>/dev/null && pwd -P) || return 1
 }
 
+# Register the last_verified merge driver (bin/lib/merge-last-verified) in the
+# COMMON git config of the repo containing <dir> (default: cwd). Worktrees share
+# that config, so one registration covers the main checkout, every worktree, and
+# the post-plan harness merge that runs inside a PR worktree. The driver path is
+# the MAIN checkout's absolute path, so git can run it from any cwd.
+# Idempotent: writes only when the stored value differs (also heals a stale path).
+# Never fails the caller: an unregistered or broken driver degrades to git's
+# plain text merge, so a failed write warns and returns 0.
+register_last_verified_merge_driver() {
+    local dir="${1:-.}" root want have
+    root=$(main_checkout_root "$dir") || return 0
+    case "$root" in
+        *"'"*)
+            echo "warning: main checkout path contains a single quote; skipping merge.lastverified registration" >&2
+            return 0
+            ;;
+    esac
+    # The sh -c wrapper falls back to git's own 3-way merge (conflict markers) when the
+    # script is missing or not executable; a bare missing path exits 127, which git
+    # treats as a conflict while leaving %A as plain "ours" with no markers.
+    local wrap='test -x "$0" && exec "$0" "$@" || exec git merge-file --marker-size="$4" -L "ours:$5" -L "base:$5" -L "theirs:$5" "$2" "$1" "$3"'
+    want="sh -c '$wrap' '$root/bin/lib/merge-last-verified' %O %A %B %L %P"
+    have=$(git -C "$dir" config --get merge.lastverified.driver 2>/dev/null) || have=""
+    if [ "$have" = "$want" ]; then
+        return 0
+    fi
+    if ! git -C "$dir" config merge.lastverified.name \
+            "last_verified frontmatter date merge (newer date wins)" \
+        || ! git -C "$dir" config merge.lastverified.driver "$want"; then
+        echo "warning: could not register merge.lastverified.driver; date-only conflicts stay manual" >&2
+    fi
+    return 0
+}
+
 # Materialize a REAL config.php at <dest> from <main_ibl5_dir>.
 # config.php can't be a symlink into a worktree: the absolute host target doesn't
 # resolve inside Docker, so every request 500s (`Failed to open stream`). It's

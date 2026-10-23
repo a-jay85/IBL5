@@ -12,6 +12,21 @@ bin/* text eol=lf
 *.php text eol=lf
 ibl5/bin/* text eol=lf
 
+# Markdown docs whose frontmatter carries `last_verified: YYYY-MM-DD` merge
+# through bin/lib/merge-last-verified: a conflict confined to that date keeps
+# the newer date; any other conflict gets standard markers. The driver is
+# registered per clone by bin/install-git-hooks / bin/wt-new; a clone without
+# the registration falls back to git's plain text merge. Keep this block ABOVE
+# the ADR-index union line below, which must stay last so it still wins.
+/README.md merge=lastverified
+.claude/**/*.md merge=lastverified
+engine/.claude/**/*.md merge=lastverified
+engine/docs/**/*.md merge=lastverified
+ibl5/docs/**/*.md merge=lastverified
+ibl5/classes/**/*.md merge=lastverified
+ibl5/scripts/**/*.md merge=lastverified
+bin/lib/*.md merge=lastverified
+
 # ADR index rows are append-only; union merge keeps both sides of a concurrent
 # append instead of raising a rebase conflict. Duplicate rows that union can
 # produce from a non-append edit are caught by bin/check-numbering.

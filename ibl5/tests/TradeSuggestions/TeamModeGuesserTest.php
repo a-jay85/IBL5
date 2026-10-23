@@ -170,7 +170,6 @@ class TeamModeGuesserTest extends TestCase
             name: 'Player ' . $pid,
             pos: 'SF',
             age: $age,
-            ovr: 0,
             injured: false,
             currentSalary: $salary,
             yearsRemaining: $years,

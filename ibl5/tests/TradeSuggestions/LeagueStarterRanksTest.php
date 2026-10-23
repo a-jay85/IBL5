@@ -73,7 +73,6 @@ final class LeagueStarterRanksTest extends TestCase
             name: 'Player ' . $pid,
             pos: 'C',
             age: 26,
-            ovr: 0,
             injured: false,
             currentSalary: 1000,
             yearsRemaining: 1,

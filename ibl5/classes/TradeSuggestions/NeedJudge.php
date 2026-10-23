@@ -44,8 +44,8 @@ final class NeedJudge
 
         $dumpShape = $p->pairing === Pairing::SalaryDump || $p->pairing === Pairing::LengthForExpiring;
         if (
-            $this->worsened($user, $userAfter, $userCard, $userOut, $partnerOut, $ranks, $dumpShape)
-            || $this->worsened($partner, $partnerAfter, $partnerCard, $partnerOut, $userOut, $ranks, $dumpShape)
+            $this->worsened($user, $userAfter, $userCard, $userOut, $partnerOut, $dumpShape)
+            || $this->worsened($partner, $partnerAfter, $partnerCard, $partnerOut, $userOut, $dumpShape)
         ) {
             return RejectReason::ImportantWorsened;
         }
@@ -119,7 +119,6 @@ final class NeedJudge
         NeedsCard $card,
         array $out,
         array $in,
-        LeagueStarterRanks $ranks,
         bool $dumpShape,
     ): bool {
         $depth = SlotMapper::depthFor($before->players);
@@ -127,11 +126,6 @@ final class NeedJudge
             $slot = $depth->slotOf($player->pid);
             if ($slot === null) {
                 continue;
-            }
-            $rank = $ranks->rankOf($player->pid, $slot);
-            $topHalf = $rank !== null && $rank * 2 <= $ranks->countFor($slot);
-            if ($topHalf && $card->mode !== TeamMode::Rebuild && !self::anyEligible($in, $slot)) {
-                return true;
             }
             if ($card->mode === TeamMode::WinNow) {
                 return true;

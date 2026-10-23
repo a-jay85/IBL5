@@ -4,140 +4,168 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions;
 
+use League\League;
 use PHPUnit\Framework\TestCase;
 use Tests\TradeSuggestions\Fixtures\RosterFactory;
 use TradeSuggestions\Judgment;
+use TradeSuggestions\LeagueStarterRanks;
 use TradeSuggestions\Need;
 use TradeSuggestions\NeedKind;
 use TradeSuggestions\NeedsCard;
 use TradeSuggestions\PairedCandidate;
 use TradeSuggestions\Pairing;
 use TradeSuggestions\ReasonBuilder;
-use TradeSuggestions\TradeCandidate;
 use TradeSuggestions\SuggestionPick;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\TeamAssets;
 use TradeSuggestions\TeamMode;
-use TradeSuggestions\TeamNeedsScorer;
-use TradeSuggestions\TeamScore;
+use TradeSuggestions\TradeCandidate;
 
 /**
- * Every line must be true for the numbers in the deal. v1 printed canned text
- * ("Adds a rotation player signed beyond this season" for one-year players).
+ * Every line must be true for the numbers in the deal, and quotes only raw
+ * stats, ranks within a slot, money, years, age or record.
  */
 class ReasonBuilderTest extends TestCase
 {
-    private ReasonBuilder $builder;
-
-    protected function setUp(): void
-    {
-        $this->builder = new ReasonBuilder();
-    }
-
-    public function testYearsLeftMatchesTheContract(): void
-    {
-        self::assertSame('1 year left on contract', ReasonBuilder::yearsLeft(self::player(1, 60, years: 1)));
-        self::assertSame('3 years left on contract', ReasonBuilder::yearsLeft(self::player(1, 60, years: 3)));
-    }
-
-    public function testRankClaimMatchesTheRosterAfterTheTrade(): void
-    {
-        $incoming = self::player(50, 64, years: 1);
-        $after = new TeamAssets(1, [self::player(1, 70), self::player(2, 66), $incoming, self::player(3, 60)], []);
-
-        $options = $this->options(TeamMode::WinNow, $after, [$incoming], []);
-
-        self::assertSame("Adds Player 50 (ovr 64, age 27, 1 year left on contract), who would be the team's 3rd-best player.", $options[0]);
-    }
-
-    public function testPlayerOutsideTopEightGetsNoRotationClaim(): void
-    {
-        $incoming = self::player(50, 50);
-        $roster = [$incoming];
-        for ($i = 1; $i <= 8; $i++) {
-            $roster[] = self::player($i, 60);
-        }
-
-        $options = $this->options(TeamMode::WinNow, new TeamAssets(1, $roster, []), [$incoming], []);
-
-        foreach ($options as $option) {
-            self::assertStringNotContainsString('best player', $option);
-        }
-        self::assertContains('Adds Player 50 (ovr 50, age 27, 2 years left on contract).', $options);
-    }
-
-    public function testConsolidationOnlyWhenTheOnePlayerIsBetter(): void
-    {
-        $better = self::player(50, 68);
-        $worse = self::player(51, 60);
-        $out = [self::player(1, 62), self::player(2, 61)];
-
-        $yes = $this->options(TeamMode::WinNow, new TeamAssets(1, [$better], []), [$better], $out);
-        $no = $this->options(TeamMode::WinNow, new TeamAssets(1, [$worse], []), [$worse], $out);
-
-        self::assertContains('Turns Player 1 (ovr 62) and Player 2 (ovr 61) into one better player, Player 50 (ovr 68).', $yes);
-        foreach ($no as $option) {
-            self::assertStringNotContainsString('one better player', $option);
-        }
-    }
-
-    public function testFreedSalaryIsTheRealDifference(): void
-    {
-        $out = [self::player(1, 60, years: 3, futureSalary: 3200)];
-        $in = [self::player(50, 58, years: 1, futureSalary: 0)];
-
-        $options = $this->options(TeamMode::Rebuild, new TeamAssets(1, $in, []), $in, $out);
-
-        self::assertContains('Frees $3,200K of salary owed in later contract years.', $options);
-    }
-
-    public function testNoSalaryLineWhenSalaryGrows(): void
-    {
-        $out = [self::player(1, 60, years: 1, futureSalary: 0)];
-        $in = [self::player(50, 62, years: 3, futureSalary: 3000)];
-
-        foreach ($this->options(TeamMode::Rebuild, new TeamAssets(1, $in, []), $in, $out) as $option) {
-            self::assertStringNotContainsString('Frees', $option);
-        }
-    }
-
-    public function testPickAndGapLinesUseRealValues(): void
-    {
-        $pick = new SuggestionPick(9, 3, 2028, 2, 2.0);
-        $before = new TeamScore(0.0, ['guard' => 3, 'wing' => 4, 'big' => 1], ['big' => 1]);
-        $after = new TeamScore(0.0, ['guard' => 3, 'wing' => 3, 'big' => 2], []);
-
-        $options = $this->builder->options(TeamMode::WinNow, new TeamAssets(1, [], []), [], [], [$pick], $before, $after);
-
-        self::assertContains('Adds a 2028 second-round pick.', $options);
-        self::assertContains('Fills a gap at big: its top eight goes from 1 to 2 bigs.', $options);
-    }
-
-    /**
-     * @param list<SuggestionPlayer> $in
-     * @param list<SuggestionPlayer> $out
-     * @return list<string>
-     */
-    private function options(TeamMode $mode, TeamAssets $after, array $in, array $out): array
-    {
-        $score = new TeamScore(0.0, array_fill_keys(TeamNeedsScorer::GROUPS, 2), []);
-
-        return $this->builder->options($mode, $after, $in, $out, [], $score, $score);
-    }
-
-    private static function player(int $pid, int $ovr, int $years = 2, int $futureSalary = 1000): SuggestionPlayer
-    {
-        return new SuggestionPlayer($pid, 'Player ' . $pid, 'SF', 27, $ovr, false, 1000, $years, $futureSalary);
-    }
-
     public function testOverHardCapReasonStatesOverageAndMargin(): void
     {
         self::assertSame("You're 653 over the hard cap. This gets you 47 under.", self::overCapReason(true));
     }
 
+    public function testOverHardCapReasonSaysExactlyWhenUnderIsZero(): void
+    {
+        $over = RosterFactory::team(1, [RosterFactory::player(10, 'C', salary: 653)], 7653);
+
+        $reason = self::reason(
+            new NeedsCard(1, [new Need(NeedKind::OverHardCap, 653)], 7653, [], TeamMode::Rebuild, 0.5),
+            $over,
+            RosterFactory::team(2, [], 5000),
+            self::paired([10], [], []),
+            RosterFactory::emptyRanks(),
+            new Judgment(100, 30, 0, 0, League::HARD_CAP_MAX, 5653),
+        );
+
+        self::assertSame("You're 653 over the hard cap. This gets you exactly to the hard cap.", $reason);
+    }
+
     public function testPartnerVoiceUsesThey(): void
     {
         self::assertSame("They're 653 over the hard cap. This gets them 47 under.", self::overCapReason(false));
+    }
+
+    public function testWeakStarterReasonStatesRanks(): void
+    {
+        self::assertSame(
+            'Your starting C ranks 26th of 28 starting Cs in points per 36. Player 20 would rank 9th (14.2 ppg).',
+            self::weakStarter(),
+        );
+    }
+
+    public function testLogjamReasonCountsPlayersAtSlot(): void
+    {
+        self::assertSame(
+            'You have 3 SFs getting minutes. This turns Player 10 into a starting C.',
+            self::logjam(),
+        );
+    }
+
+    public function testSweetenerClauseNamesYearsAndPick(): void
+    {
+        $dumped = RosterFactory::player(10, 'C', salary: 700, years: 3);
+        $pick = new SuggestionPick(100, 1, 2027, 2, 0.0);
+        $user = new TeamAssets(1, [$dumped, RosterFactory::player(11, 'C')], [$pick], null, League::HARD_CAP_MAX - 7653);
+
+        $reason = self::reason(
+            new NeedsCard(1, [new Need(NeedKind::OverHardCap, 653)], 7653, [], TeamMode::Rebuild, 0.5),
+            $user,
+            RosterFactory::team(2, [], 5000),
+            self::paired([10], [100], []),
+            RosterFactory::emptyRanks(),
+            new Judgment(100, 30, 1, 1, 6953, 5700),
+        );
+
+        self::assertSame(
+            "You're 653 over the hard cap. This gets you 47 under. They take on 3 more years of salary, so you send the 2027 Round 2 pick.",
+            $reason,
+        );
+    }
+
+    public function testBadContractReasonGolden(): void
+    {
+        self::assertSame('Player 10 is owed 2500 after this season at age 31. This clears it.', self::badContract());
+    }
+
+    public function testDeadWeightReasonGolden(): void
+    {
+        self::assertSame('Player 10 plays 4 minutes and costs 650. This frees the salary.', self::deadWeight());
+    }
+
+    public function testExpiringStarReasonGolden(): void
+    {
+        self::assertSame(
+            'Player 10 is in the last year of his deal and you win 30% of games. This turns him into the 2027 Round 1 pick.',
+            self::expiringStar(),
+        );
+    }
+
+    public function testCappedOutReasonGolden(): void
+    {
+        self::assertSame(
+            "You're 200 under the hard cap. This swaps 2 years of Player 10's salary for an expiring deal.",
+            self::cappedOut(),
+        );
+    }
+
+    public function testConsolidateReasonGolden(): void
+    {
+        self::assertSame(
+            'You get Player 20, 1st of 2 starting Cs in points per 36 (14.2 ppg, 0.0 rpg, 0.0 apg).',
+            self::consolidate(),
+        );
+    }
+
+    public function testRoomToAbsorbReasonGolden(): void
+    {
+        self::assertSame(
+            'You have 2000 of room under the hard cap. Taking on Player 20 earns you the 2027 Round 1 pick.',
+            self::roomToAbsorb(),
+        );
+    }
+
+    public function testRebuildReasonGolden(): void
+    {
+        self::assertSame('Player 20 (age 22) for Player 10, age 31, fits your rebuild.', self::rebuild());
+    }
+
+    public function testWinNowReasonGolden(): void
+    {
+        self::assertSame(
+            'Player 20 (14.2 ppg) would start at C for you, 1st of 3 in points per 36, up from 3rd.',
+            self::winNow(),
+        );
+    }
+
+    public function testReasonsNeverMentionRating(): void
+    {
+        $reasons = [
+            self::overCapReason(true),
+            self::overCapReason(false),
+            self::weakStarter(),
+            self::logjam(),
+            self::badContract(),
+            self::deadWeight(),
+            self::expiringStar(),
+            self::cappedOut(),
+            self::consolidate(),
+            self::roomToAbsorb(),
+            self::rebuild(),
+            self::winNow(),
+        ];
+
+        foreach ($reasons as $reason) {
+            self::assertNotNull($reason);
+            self::assertDoesNotMatchRegularExpression('/\b(ovr|rating|value)\b/i', $reason);
+        }
     }
 
     public function testOrdinalSuffixesTeens(): void
@@ -154,13 +182,11 @@ class ReasonBuilderTest extends TestCase
         $user = RosterFactory::team(1, [RosterFactory::player(10, 'C', dcMinutes: 30)]);
         $partner = RosterFactory::team(2, [RosterFactory::player(20, 'C', dcMinutes: 30, points: 300)]);
 
-        $reason = (new ReasonBuilder())->forSide(
-            self::paired([], [20]),
-            new Judgment(50, 50, 0, 0, 6000, 6000),
-            true,
+        $reason = self::reason(
             new NeedsCard(1, [new Need(NeedKind::WeakStarter, 3, 'C')], 6000, [], TeamMode::Rebuild, 0.5),
             $user,
             $partner,
+            self::paired([], [], [20]),
             RosterFactory::ranks('C', null, [400, 200]),
         );
 
@@ -174,7 +200,6 @@ class ReasonBuilderTest extends TestCase
             name: '<script>alert(1)</script>',
             pos: 'C',
             age: 29,
-            ovr: 0,
             injured: false,
             currentSalary: 650,
             yearsRemaining: 1,
@@ -183,13 +208,11 @@ class ReasonBuilderTest extends TestCase
         );
         $user = RosterFactory::team(1, [$dead, RosterFactory::player(11, 'C')]);
 
-        $reason = (new ReasonBuilder())->forSide(
-            self::paired([10], []),
-            new Judgment(20, 20, 0, 0, 5350, 5650),
-            true,
+        $reason = self::reason(
             new NeedsCard(1, [new Need(NeedKind::DeadWeight, 650, null, [10])], 6000, [], TeamMode::Rebuild, 0.5),
             $user,
             RosterFactory::team(2, [], 5000),
+            self::paired([10], [], []),
             RosterFactory::emptyRanks(),
         );
 
@@ -203,7 +226,7 @@ class ReasonBuilderTest extends TestCase
         $card = new NeedsCard($userSide ? 1 : 2, [new Need(NeedKind::OverHardCap, 653)], 7653, [], TeamMode::Rebuild, 0.5);
 
         return (new ReasonBuilder())->forSide(
-            $userSide ? self::paired([10], []) : self::paired([], [10]),
+            $userSide ? self::paired([10], [], []) : self::paired([], [], [10]),
             new Judgment(100, 30, 0, 0, $userSide ? 6953 : 5700, $userSide ? 5700 : 6953),
             $userSide,
             $card,
@@ -213,14 +236,161 @@ class ReasonBuilderTest extends TestCase
         );
     }
 
+    private static function weakStarter(): ?string
+    {
+        $starter = RosterFactory::player(10, 'C', dcMinutes: 30, points: 100);
+        $rivals = [50, 60];
+        for ($i = 0; $i < 17; $i++) {
+            $rivals[] = 200 + $i;
+        }
+        for ($i = 0; $i < 8; $i++) {
+            $rivals[] = 500 + $i;
+        }
+
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::WeakStarter, 25, 'C')], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [$starter]),
+            RosterFactory::team(2, [RosterFactory::player(20, 'C', points: 426)]),
+            self::paired([], [], [20]),
+            RosterFactory::ranks('C', $starter, $rivals),
+        );
+    }
+
+    private static function logjam(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::Logjam, 3, 'SF', [10])], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [RosterFactory::player(10, 'SF', dcMinutes: 20)]),
+            RosterFactory::team(2, [RosterFactory::player(20, 'C')]),
+            self::paired([10], [], [20]),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function badContract(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::BadContract, 1, null, [10])], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [RosterFactory::player(10, 'C', age: 31, salary: 900, years: 3, laterSalaries: [1200, 1300])]),
+            RosterFactory::team(2, [], 5000),
+            self::paired([10], [], []),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function deadWeight(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::DeadWeight, 650, null, [10])], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [RosterFactory::player(10, 'C', salary: 650, dcMinutes: 4)]),
+            RosterFactory::team(2, [], 5000),
+            self::paired([10], [], []),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function expiringStar(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::ExpiringStarOnLoser, 1, 'C', [10])], 6000, [], TeamMode::Rebuild, 0.3),
+            RosterFactory::team(1, [RosterFactory::player(10, 'C')]),
+            self::withPick(RosterFactory::team(2, []), new SuggestionPick(200, 2, 2027, 1, 0.0)),
+            self::paired([10], [], [], [200]),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function cappedOut(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::CappedOut, 1, null, [10])], 6800, [], TeamMode::WinNow, 0.5),
+            RosterFactory::team(1, [RosterFactory::player(10, 'C', years: 3, laterSalaries: [900, 800])], 6800),
+            RosterFactory::team(2, [], 5000),
+            self::paired([10], [], []),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function consolidate(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::Consolidate, 1)], 6000, [], TeamMode::WinNow, 0.5),
+            RosterFactory::team(1, []),
+            RosterFactory::team(2, [RosterFactory::player(20, 'C', points: 426)]),
+            self::paired([], [], [20]),
+            RosterFactory::ranks('C', null, [100, 200]),
+        );
+    }
+
+    private static function roomToAbsorb(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::RoomToAbsorb, 2000)], 5000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [], 5000),
+            self::withPick(RosterFactory::team(2, [RosterFactory::player(20, 'C')]), new SuggestionPick(200, 2, 2027, 1, 0.0)),
+            self::paired([], [], [20], [200]),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function rebuild(): ?string
+    {
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::Rebuild, 1)], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [RosterFactory::player(10, 'C', age: 31)]),
+            RosterFactory::team(2, [RosterFactory::player(20, 'C', age: 22)]),
+            self::paired([10], [], [20]),
+            RosterFactory::emptyRanks(),
+        );
+    }
+
+    private static function winNow(): ?string
+    {
+        $starter = RosterFactory::player(10, 'C', dcMinutes: 30, points: 100);
+
+        return self::reason(
+            new NeedsCard(1, [new Need(NeedKind::WinNow, 1)], 6000, [], TeamMode::WinNow, 0.5),
+            RosterFactory::team(1, [$starter]),
+            RosterFactory::team(2, [RosterFactory::player(20, 'C', points: 426)]),
+            self::paired([], [], [20]),
+            RosterFactory::ranks('C', $starter, [400, 300]),
+        );
+    }
+
+    private static function reason(
+        NeedsCard $card,
+        TeamAssets $self,
+        TeamAssets $other,
+        PairedCandidate $paired,
+        LeagueStarterRanks $ranks,
+        ?Judgment $judgment = null,
+    ): ?string {
+        return (new ReasonBuilder())->forSide(
+            $paired,
+            $judgment ?? new Judgment(50, 50, 0, 0, 6000, 6000),
+            true,
+            $card,
+            $self,
+            $other,
+            $ranks,
+        );
+    }
+
+    private static function withPick(TeamAssets $team, SuggestionPick $pick): TeamAssets
+    {
+        return new TeamAssets($team->tid, $team->players, [$pick], $team->rosterCount, $team->capRoom);
+    }
+
     /**
      * @param list<int> $userPids
+     * @param list<int> $userPickIds
      * @param list<int> $partnerPids
+     * @param list<int> $partnerPickIds
      */
-    private static function paired(array $userPids, array $partnerPids): PairedCandidate
+    private static function paired(array $userPids, array $userPickIds, array $partnerPids, array $partnerPickIds = []): PairedCandidate
     {
         return new PairedCandidate(
-            new TradeCandidate(1, 2, $userPids, [], $partnerPids, []),
+            new TradeCandidate(1, 2, $userPids, $userPickIds, $partnerPids, $partnerPickIds),
             Pairing::SalaryDump,
             new Need(NeedKind::OverHardCap, 1),
             new Need(NeedKind::RoomToAbsorb, 1),

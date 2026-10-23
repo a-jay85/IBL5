@@ -134,12 +134,13 @@ class NewsController implements NewsControllerInterface
         // The panel is optional; a failure in it must not take down the homepage.
         try {
             $panel = $service->buildForTeam($tid);
+            $html = $panel === null ? null : $view->render($panel, isset($_GET['trade_mode_error']));
         } catch (\Throwable $e) {
             \Logging\LoggerFactory::getChannel('app')->error('Trade suggestions panel failed', ['tid' => $tid, 'error' => $e->getMessage()]);
             return;
         }
-        if ($panel !== null) {
-            $this->htmlResponder->html($view->render($panel, isset($_GET['trade_mode_error'])));
+        if ($html !== null) {
+            $this->htmlResponder->html($html);
         }
     }
 

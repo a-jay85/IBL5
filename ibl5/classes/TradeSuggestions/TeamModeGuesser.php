@@ -29,11 +29,20 @@ final class TeamModeGuesser
     public const float W_AGE = 0.15;
     public const float W_CONTRACTS = 0.15;
 
-    public function guess(ModeInputs $in): ModeGuess
+    /**
+     * This season's win% blended with last season's (PRIOR_GAMES games of it).
+     */
+    public static function recordPct(ModeInputs $in): float
     {
         $priorGames = $in->priorWins + $in->priorLosses;
         $priorPct = $priorGames > 0 ? $in->priorWins / $priorGames : 0.5;
-        $recordPct = ($in->wins + self::PRIOR_GAMES * $priorPct) / ($in->wins + $in->losses + self::PRIOR_GAMES);
+
+        return ($in->wins + self::PRIOR_GAMES * $priorPct) / ($in->wins + $in->losses + self::PRIOR_GAMES);
+    }
+
+    public function guess(ModeInputs $in): ModeGuess
+    {
+        $recordPct = self::recordPct($in);
 
         $score = self::W_RECORD * self::clamp(($recordPct - 0.5) / self::RECORD_SPAN)
             + self::W_AGE * self::clamp(($in->rotationAge - self::AGE_PIVOT) / self::AGE_SPAN)

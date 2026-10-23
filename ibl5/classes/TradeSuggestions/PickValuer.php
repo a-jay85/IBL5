@@ -16,7 +16,7 @@ namespace TradeSuggestions;
  */
 final class PickValuer
 {
-    // On AssetValuer's scale: a top projected first is worth about a 62-ovr player.
+    // A pick's value is a unit-free number; only its ordering and tier are shown.
     public const float R1_FLOOR = 8.0;
     public const float R1_SPREAD = 22.0;
     public const float R2_FLOOR = 1.0;

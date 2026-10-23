@@ -116,7 +116,6 @@ final class SlotMapperTest extends TestCase
             name: 'Player ' . $pid,
             pos: $pos,
             age: 26,
-            ovr: 0,
             injured: false,
             currentSalary: 1000,
             yearsRemaining: 1,

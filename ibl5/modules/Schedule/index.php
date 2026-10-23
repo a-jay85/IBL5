@@ -28,7 +28,7 @@ global $mysqli_db, $leagueContext;
 /** @var \mysqli $mysqli_db */
 /** @var \League\LeagueContext $leagueContext */
 
-$teamidParam = $_GET['teamid'] ?? null;
+$teamidParam = $_GET['teamid'] ?? $_GET['teamID'] ?? null;
 $teamid = is_string($teamidParam) ? (int) $teamidParam : 0;
 $controller = new ScheduleController(
     $mysqli_db,

@@ -62,6 +62,8 @@ For either success outcome:
    NNN- queue entry yourself, since its prefix is run-order state):
    ```bash
    bin/automouse/queue dispose "<plan-filename>" done
+   # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
+   touch -h "$NIGHTLY_DIR/done/<plan-filename>"
    ```
    Do this even when auto-merge was held. Leaving the plan in queue/ does not
    "wait for the merge" — it makes the loop re-claim the plan and re-run post-plan
@@ -94,6 +96,8 @@ If ANY step fails:
 2. Dispose the plan to $NIGHTLY_DIR/skipped/ (not done/; never a raw `mv`):
    ```bash
    bin/automouse/queue dispose "<plan-filename>" skipped
+   # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
+   touch -h "$NIGHTLY_DIR/skipped/<plan-filename>"
    ```
 3. Delete the handoff file (the branch has committed work for manual recovery):
    ```bash

@@ -385,6 +385,57 @@ else
 fi
 rm -rf "$D"
 
+# d8: the two inline skip sites in run (attempts-exhausted, unusable impl_model) stamp the
+# moved skipped/ entry with a DISPOSITION-time mtime. The blocks are not functions, so they
+# are cut out of $RUNNER by their unique log-string anchors and eval'd against a fixture whose
+# queue symlink is pinned to the past. Same find -newermt predicate as d7.
+# The block runs from the anchor echo line to the first `rm -f "$ATTEMPT_FILE"` after it, so a
+# deleted touch line makes the block shorter, never longer (it cannot swallow a later site).
+extract_run_block() {
+    awk -v a="$1" '
+        !cap && index($0, a) { cap = 1 }
+        cap { print }
+        cap && /^[[:space:]]*rm -f "\$ATTEMPT_FILE"/ { exit }
+    ' "$RUNNER"
+}
+d8_check() {  # $1 = case label, $2 = anchor string, $3 = ATTEMPTS value, $4 = BASE_MODEL value
+    local label="$1" anchor="$2" block D d8_since
+    block="$(extract_run_block "$anchor")"
+    # anchor-on-target guard: the block must contain the skip mv and end at the rm -f line
+    if ! grep -qF -- 'mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"' <<< "$block" \
+       || ! grep -qE -- '^[[:space:]]*rm -f "\$ATTEMPT_FILE"' <<< "$block"; then
+        echo "FAIL: $label — could not extract the inline skip block from $RUNNER (anchor drifted?)"
+        FAILED=1
+        return
+    fi
+    D=$(make_fixture)
+    touch -h -t 200001010000 "$D/queue/p.md"
+    if [ -n "$(find "$D/queue" -maxdepth 1 -name p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
+        echo "FAIL: $label-vacuity — fixture symlink was not pinned to the past"
+        FAILED=1
+    fi
+    # shellcheck disable=SC2034  # these vars are read by the eval'd block
+    (
+        NIGHTLY_DIR="$D"; LOG="$D/run.log"; PLAN_NAME="p.md"; NEXT_PLAN="$D/queue/p.md"
+        ATTEMPTS="$3"; BASE_MODEL="$4"
+        ATTEMPT_FILE="$D/a"; FAILURE_FILE="$D/f"; CAP_REFUND_FILE="$D/c"; PLAN_DEFECT_FILE="$D/d"
+        eval "$block"
+    ) >/dev/null 2>&1
+    d8_since="$(date -v-1H '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d '1 hour ago' '+%Y-%m-%d %H:%M:%S')"
+    if [ -z "$(find "$D/skipped" -maxdepth 1 -name p.md 2>/dev/null)" ]; then
+        echo "FAIL: $label — p.md was not moved to skipped/ (block did not run as expected)"
+        FAILED=1
+    elif [ -n "$(find "$D/skipped" -maxdepth 1 -name p.md -newermt "$d8_since" 2>/dev/null)" ]; then
+        echo "ok: $label"
+    else
+        echo "FAIL: $label — skipped/p.md kept queue-time mtime; the digest will not see it"
+        FAILED=1
+    fi
+    rm -rf "$D"
+}
+d8_check d8-skip-attempts-mtime 'failed $ATTEMPTS times — moving to skipped/' 3 ""
+d8_check d8-skip-model-mtime 'declares an unusable impl_model' 0 "bad-model"
+
 # ---------------------------------------------------------------------------
 # Group c — claim-time call site (Phase 4), static assertions over $RUNNER
 # ---------------------------------------------------------------------------
@@ -1455,6 +1506,86 @@ if grep -qF 'if [ "$PP_CAP" -eq 1 ]; then' <<<"$RL_WIRE" \
     echo "ok: rl4-wired-after-pp-cap"
 else echo "FAIL: rl4-wired-after-pp-cap"; FAILED=1; fi
 rm -rf "$RL_DIR"
+
+# ---------------------------------------------------------------------------
+# Group w — every mv into done/ or skipped/ under bin/automouse/ is followed by touch -h
+# ---------------------------------------------------------------------------
+# The morning digest selects done/ and skipped/ entries by the entry's OWN mtime, and mv keeps
+# the queue symlink's queue-time mtime. A disposition mv with no touch -h of the same directory
+# within the mv line plus the next 6 lines puts the entry outside the digest window.
+AUTOMOUSE_DIR="${AUTOMOUSE_DIR:-$SCRIPT_DIR/automouse}"
+
+disposition_mv_scan() {  # prints "OK|BAD <file>:<line>: <text>" per disposition mv line
+    local f
+    for f in "$@"; do
+        awk -v file="$f" '
+            { L[NR] = $0 }
+            END {
+                for (i = 1; i <= NR; i++) {
+                    line = L[i]
+                    if (line ~ "^[[:space:]]*#") continue
+                    if (line !~ "(^|[^[:alnum:]_./-])mv[[:space:]].*(done|skipped)/") continue
+                    dir = (line ~ "skipped/") ? "skipped/" : "done/"
+                    ok = 0
+                    for (j = i; j <= i + 6 && j <= NR; j++) {
+                        if (index(L[j], "touch -h") && index(L[j], dir)) { ok = 1; break }
+                    }
+                    printf "%s %s:%d: %s\n", (ok ? "OK" : "BAD"), file, i, line
+                }
+            }' "$f"
+    done
+}
+
+W_DIR=$(mktemp -d)
+w_expect() {  # $1 = label, $2 = OK | BAD | NONE (first scan result), rest = fixture file lines
+    local label="$1" want="$2" f out first
+    shift 2
+    f="$(mktemp "$W_DIR/fx.XXXXXX")"
+    printf '%s\n' "$@" > "$f"
+    out="$(disposition_mv_scan "$f")"
+    if [ -z "$out" ]; then first="NONE"; else first="${out%% *}"; fi
+    if [ "$first" = "$want" ]; then
+        echo "ok: $label"
+    else
+        echo "FAIL: $label — wanted $want, got $first"
+        FAILED=1
+    fi
+}
+# shellcheck disable=SC2016  # fixture lines are literal text; nothing here should expand.
+{
+w_expect w1-touch-present OK 'mv "$A" "$ND/done/"' 'touch -h "$ND/done/x"'
+w_expect w2-touch-missing BAD 'mv "$A" "$ND/skipped/"' 'echo hi'
+w_expect w3-touch-at-window-edge OK 'mv "$A" "$ND/skipped/"' 'echo 1' 'echo 2' 'echo 3' 'echo 4' 'echo 5' 'touch -h "$ND/skipped/x"'
+w_expect w3-touch-outside-window BAD 'mv "$A" "$ND/skipped/"' 'echo 1' 'echo 2' 'echo 3' 'echo 4' 'echo 5' 'echo 6' 'touch -h "$ND/skipped/x"'
+w_expect w4-comment-line-skipped NONE '# mv "$A" "$ND/skipped/"'
+w_expect w5-touch-wrong-dir BAD 'mv "$A" "$ND/done/"' 'touch -h "$ND/skipped/x"'
+w_expect w6-non-disposition-mv-ignored NONE 'mv "$tmp" "$dest/"'
+w_expect w7-plain-touch-not-enough BAD 'mv "$A" "$ND/done/"' 'touch "$ND/done/x"'
+w_expect w8-same-line-touch OK '1. `mv "$A" "$ND/done/"`, then `touch -h "$ND/done/x"`'
+}
+
+w_all=""
+while IFS= read -r w_file; do
+    w_all+="$(disposition_mv_scan "$w_file")"$'\n'
+done <<< "$(find "$AUTOMOUSE_DIR" -type f | sort)"
+w_total=$(grep -cE '^(OK|BAD) ' <<< "$w_all" || true)
+w_bad=$(grep -c '^BAD ' <<< "$w_all" || true)
+# vacuity guard: the baseline run found 12 candidates, so a scan that finds fewer than 10 has
+# lost its mv pattern (or its file list) and would pass while checking nothing.
+if [ "$w_total" -ge 10 ]; then
+    echo "ok: w-scan-not-vacuous ($w_total disposition mv lines)"
+else
+    echo "FAIL: w-scan-not-vacuous — only $w_total disposition mv lines found under $AUTOMOUSE_DIR"
+    FAILED=1
+fi
+if [ "$w_bad" -eq 0 ]; then
+    echo "ok: w-all-dispositions-stamped"
+else
+    echo "FAIL: w-all-dispositions-stamped — $w_bad mv into done/ or skipped/ with no touch -h within 6 lines:"
+    grep '^BAD ' <<< "$w_all"
+    FAILED=1
+fi
+rm -rf "$W_DIR"
 
 # ---------------------------------------------------------------------------
 # Tail

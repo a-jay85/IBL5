@@ -370,8 +370,6 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         check = _mechanical_body_pass(git, gh, copy, copy_degraded, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
-            for f in check.get("findings", []):
-                log(f"phase2 finding: {f}")
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
@@ -960,7 +958,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
-                                           outcome, out_dir)
+                                           outcome, out_dir,
+                                           run_started=run_started)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -1082,6 +1081,17 @@ def _last_remediation_commit(fid: dict) -> str | None:
     return None
 
 
+def _prior_packet_body(out_dir: str, round_num: int) -> str | None:
+    """The PR body the immediately-preceding review read: fidelity-packet/pr-body.md for
+    round 1, fidelity-packet-{round_num}/pr-body.md after. None when unreadable."""
+    name = "fidelity-packet" if round_num == 1 else f"fidelity-packet-{round_num}"
+    try:
+        with open(os.path.join(out_dir, name, "pr-body.md")) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
 def _body_signature(body: str | None) -> str:
     """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
@@ -1112,6 +1122,11 @@ def _round_model(round_num: int) -> str:
     return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
 _DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
+# Expected length of one BEHIND re-rebase pass (rebase, push, full CI watch).
+# Observed CI runs 57-61 min; 3720s adds margin. This is a CI-length figure and
+# is NOT derived from MAX_PP_SECS. The budget it is compared against is
+# _CI_FIX_WALL_BUDGET_SECS (defined below; resolved at call time).
+_BEHIND_CI_EXPECTED_SECS = 3720
 
 
 def _retry_key(branch: str, attempt: int) -> str:
@@ -1477,13 +1492,18 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
     return sha, bg_ci
 
 
-def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
+def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
+                    *, run_started=None):
     """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
     and the branch is still BEHIND, auto-merge stays armed and the PR is handed
     to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
     set here. Divergence inside the loop still disarms (see the disarm=True
-    call sites below)."""
+    call sites below). When run_started is given, a pass is skipped once the
+    remaining _CI_FIX_WALL_BUDGET_SECS budget is below
+    max(_BEHIND_CI_EXPECTED_SECS, the longest pass measured so far); auto-merge
+    stays armed and the same update-behind-prs.yml hand-off applies."""
     strict = gh.branch_protection_strict()
+    longest_pass = 0.0
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
         if mss != "BEHIND":
@@ -1492,6 +1512,17 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
             log("phase7: BEHIND but required checks are not strict — "
                 "leaving auto-merge armed")
             return sha, outcome
+        if run_started is not None:
+            remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            need = max(_BEHIND_CI_EXPECTED_SECS, longest_pass)
+            if remaining < need:
+                log(f"phase7: BEHIND re-rebase {attempt}/{_MAX_BEHIND_RETRIES} "
+                    f"skipped: wall budget {int(remaining)}s left < {int(need)}s "
+                    "expected CI pass; leaving auto-merge armed; "
+                    ".github/workflows/update-behind-prs.yml (ADR-0081) "
+                    "carries the PR to merge")
+                return sha, outcome
+        pass_started = time.time()
         log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
         if worktree and os.path.isdir(worktree):
             r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
@@ -1514,6 +1545,7 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.head_sha:
             sha = outcome.head_sha
         ciwatch.reap_background_watch(bg)
+        longest_pass = max(longest_pass, time.time() - pass_started)
         log(f"phase7 ci(re-rebase {attempt}): exit={outcome.exit_code} "
             f"failed={outcome.failed}")
         if outcome.exit_code != 0:
@@ -2955,7 +2987,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         rec = {"round": round_num, "model": model,
                "work_list_sizes": fidelity.work_list_sizes(work),
                "retries": 0, "outcome": None, "remediation_sha": None,
-               "verdict": None, "reviewed_tree": None, "verdict_path": None}
+               "verdict": None, "reviewed_tree": None, "verdict_path": None,
+               "review_kind": None, "recheck_fallback_reason": None}
         log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
@@ -3092,7 +3125,23 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # which is the accurate label for a round that produced no commit. This is why
         # fidelity.re_review() needs no signature change.
         v_n = tree_n = path_n = None
-        for rr_attempt in range(_MAX_ROUND_RETRIES + 1):
+        review_kind, recheck_reason = "full", None
+        if sha == BODY_ONLY_SHA:
+            prior_body = _prior_packet_body(out_dir, round_num)
+            if prior_body is None:
+                recheck_reason = "prior-body-missing"
+            else:
+                v_n, tree_n, path_n, recheck_reason = fidelity.body_recheck(
+                    llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
+                    pr, current_verdict_path, name_status_text(git.diff_vs_base()),
+                    res.fidelity.get("plan_hash"), _plan_hash(plan),
+                    round_num=round_num, log=log)
+                if v_n is not None:
+                    review_kind = "body-recheck"
+            if v_n is None:
+                log(f"phase5.5 round {round_num}: body recheck fell back to full "
+                    f"re-review ({recheck_reason})")
+        for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
                 current_verdict_path, round_num=round_num, log=log)
@@ -3105,7 +3154,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             log(f"phase5.5 round {round_num}: re-review indeterminate "
                 f"(attempt {rr_attempt + 1}/{_MAX_ROUND_RETRIES + 1})")
         rec.update({"remediation_sha": str(sha), "verdict": v_n,
-                    "reviewed_tree": tree_n, "verdict_path": path_n})
+                    "reviewed_tree": tree_n, "verdict_path": path_n,
+                    "review_kind": review_kind, "recheck_fallback_reason": recheck_reason})
         if v_n is None:
             rec["outcome"] = "re-review-indeterminate"
         # Truthiness, never sha-shape: a body-only round records BODY_ONLY_SHA here and
@@ -3118,6 +3168,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
             f"outcome={rec['outcome']} sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'}")
+        log(f"phase5.5 round {round_num}: review_kind={review_kind}")
         if v_n is None:
             break
         final_verdict, final_err = v_n, ""

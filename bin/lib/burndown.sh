@@ -264,18 +264,26 @@ bd_inflight() {
     # Source 5: live worktrees. A worktree whose state is "idle" (clean, 0 ahead,
     # no PR) no longer holds its issue; every other state, including a failed
     # probe, keeps it in-flight.
-    local wt_list wt_rc=0 wpath wbranch
+    local wt_list wt_rc=0 wpath wbranch wt_map="" wt_have_ledger=0
     wt_list="$(bd_wt_list)" || wt_rc=$?
     [ "$wt_rc" -eq 0 ] || bd_die 3 "git worktree list failed"
+    # One jq pass over every ledger builds a slug<TAB>issue_num map; each
+    # worktree is then looked up by awk. Matches on .slug only and emits
+    # .issue_num only, in ledger glob order, same as the old per-ledger jq.
+    for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
+        [ -e "$ledger" ] && wt_have_ledger=1
+    done
+    if [ "$wt_have_ledger" -eq 1 ]; then
+        wt_map="$(jq -r '.items[]
+            | select((.slug | type) == "string")
+            | "\(.slug)\t\(.issue_num)"' \
+            "$BD_REPORTS_DIR"/burndown-batch-*.json 2>/dev/null)" || true
+    fi
     while IFS=$'\t' read -r wpath wbranch; do
         [ -n "$wbranch" ] || continue
         local wnums="" wplan="$BD_PLANS_DIR/$wbranch.md" wstate
-        for ledger in "$BD_REPORTS_DIR"/burndown-batch-*.json; do
-            [ -e "$ledger" ] || continue
-            wnums+="$(jq -r --arg b "$wbranch" \
-                '.items[] | select(.slug == $b) | .issue_num | tostring' \
-                "$ledger" 2>/dev/null)"$'\n'
-        done
+        wnums="$(awk -F'\t' -v b="$wbranch" '$1 == b { print $2 }' \
+            <<< "$wt_map")"$'\n'
         if [ -f "$wplan" ]; then
             wnums+="$(grep -oE 'IBL5-backlog#[0-9]+' "$wplan" 2>/dev/null \
                 | sed 's/.*#//')"$'\n' || true

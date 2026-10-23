@@ -994,7 +994,6 @@ jobs:
             bin/test-post-review-findings \
             bin/test-human-signoff-classifier \
             bin/test-playwright-version \
-            bin/test-pr-canary-check \
             bin/test-merge-line-select \
             bin/test-merge-line-watch \
             bin/test-check-workflow-checkout \

@@ -37,13 +37,7 @@ final class RefreshPlayoffSeriesResultsStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            $this->dbExec('DELETE FROM `ibl_playoff_series_results`');
-            $rowCount = $this->dbExec(
-                'INSERT INTO `ibl_playoff_series_results` '
-                . '(`year`, `round`, `winner_tid`, `loser_tid`, `winner`, `loser`, '
-                . '`winner_games`, `loser_games`, `total_games`) '
-                . self::SELECT_SQL,
-            );
+            $rowCount = $this->rebuildWithinCurrentTransaction();
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
@@ -54,29 +48,70 @@ final class RefreshPlayoffSeriesResultsStep implements PipelineStepInterface
     }
 
     /**
-     * The canonical SELECT that derives playoff series rows from the
-     * deduplicated game-by-game ibl_box_scores_teams. Identical to the CTE
-     * embedded in migration 123.
+     * DELETE + INSERT with no transaction control of its own.
+     *
+     * execute() wraps this in begin_transaction()/commit(). DatabaseIntegration
+     * tests call it directly so the rebuild runs inside the per-test outer
+     * transaction and is rolled back in tearDown; calling execute() there would
+     * commit that outer transaction.
+     *
+     * @return int affected-row count of the INSERT
+     * @throws \RuntimeException when a statement fails to prepare or execute
+     */
+    public function rebuildWithinCurrentTransaction(): int
+    {
+        $this->dbExec('DELETE FROM `ibl_playoff_series_results`');
+
+        return $this->dbExec(
+            'INSERT INTO `ibl_playoff_series_results` '
+            . '(`year`, `round`, `winner_tid`, `loser_tid`, `winner`, `loser`, '
+            . '`winner_games`, `loser_games`, `total_games`) '
+            . self::SELECT_SQL,
+        );
+    }
+
+    /**
+     * The canonical SELECT that derives playoff series rows from
+     * ibl_box_scores_teams, counting each date/visitor/home game once
+     * (lowest game_of_that_day wins). Migration 123 embeds an older form
+     * that grouped by the 4-tuple including game_of_that_day; that applied
+     * migration is left as is, and every pipeline run rebuilds the table
+     * from this constant.
      */
     private const string SELECT_SQL = <<<'SQL'
-WITH playoff_games AS (
-    SELECT
-        game_date,
-        YEAR(game_date) AS `year`,
-        visitor_teamid,
-        home_teamid,
-        game_of_that_day,
-        (visitor_q1_points + visitor_q2_points + visitor_q3_points + visitor_q4_points
-         + COALESCE(visitor_ot_points, 0)) AS v_total,
-        (home_q1_points + home_q2_points + home_q3_points + home_q4_points
-         + COALESCE(home_ot_points, 0)) AS h_total
+WITH canonical_games AS (
+    SELECT game_date, visitor_teamid, home_teamid,
+           MIN(game_of_that_day) AS game_of_that_day
     FROM `ibl_box_scores_teams`
     WHERE game_type = 2
-    -- LOAD-BEARING: ibl_box_scores_teams stores one row per TEAM side (two rows
-    -- per game; uq_game_team spans these four columns plus `name`). Without this
-    -- GROUP BY every series is counted twice — a 4-1 becomes 8-2. Same idiom in
-    -- migrations 123 and 124 and RefreshTeamSeasonRecordsStep. Do not remove.
-    GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
+    GROUP BY game_date, visitor_teamid, home_teamid
+),
+playoff_games AS (
+    SELECT
+        b.game_date,
+        YEAR(b.game_date) AS `year`,
+        b.visitor_teamid,
+        b.home_teamid,
+        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
+         + COALESCE(b.visitor_ot_points, 0)) AS v_total,
+        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
+         + COALESCE(b.home_ot_points, 0)) AS h_total
+    FROM `ibl_box_scores_teams` b
+    JOIN canonical_games c
+      ON c.game_date = b.game_date
+     AND c.visitor_teamid = b.visitor_teamid
+     AND c.home_teamid = b.home_teamid
+     AND c.game_of_that_day <=> b.game_of_that_day
+    WHERE b.game_type = 2
+    -- LOAD-BEARING: ibl_box_scores_teams stores one row per TEAM side, two rows
+    -- per game (uq_game_team spans date, visitor, home, game_of_that_day and name).
+    -- canonical_games keeps the lowest game_of_that_day per date/visitor/home
+    -- triple. The league plays no doubleheaders, so a repeated triple with a
+    -- different ordinal is a phantom import and is dropped here. The <=> join
+    -- keeps a game whose ordinal is NULL. This GROUP BY then collapses the two
+    -- team-side rows; without it every series counts twice and a 4-1 becomes
+    -- 8-2. Same shape as RefreshTeamSeasonRecordsStep. Do not remove.
+    GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
 game_results AS (
     SELECT *,

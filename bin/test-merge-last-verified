@@ -185,6 +185,8 @@ ok_if "mixed-conflict-keeps-markers: unmerged" unmerged "$R" "$FX"
 ok_if "mixed-conflict-keeps-markers: markers" has_text "$R/$FX" "<<<<<<<"
 ok_if "mixed-conflict-keeps-markers: original ours date" has_text "$R/$FX" "2026-10-15"
 ok_if "mixed-conflict-keeps-markers: original theirs date" has_text "$R/$FX" "2026-10-18"
+ok_if "mixed-conflict-keeps-markers: ours label" has_text "$R/$FX" "<<<<<<< ours:$FX"
+ok_if "mixed-conflict-keeps-markers: theirs label" has_text "$R/$FX" ">>>>>>> theirs:$FX"
 
 R=$(fresh_path r-oneside); new_repo "$R"; register_direct "$R"
 three_way "$R" "$FX" "2026-10-14 base base" "2026-10-14 ours base" "2026-10-18 base base"

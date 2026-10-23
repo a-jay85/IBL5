@@ -421,6 +421,8 @@ MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $
 DG_SCRIPT="${DG_SCRIPT:-$MAIN_CHECKOUT/bin/lib/deleted-guards}"
 DG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 DG_BASE="$(git config "branch.$DG_BRANCH.iblBase" || echo master)"
+# Bash calls do not share variables, so rebuild the plan path the way Phase 6.5 condition (19) does
+PLAN_PATH="${PLAN_PATH:-$HOME/claude-plans/$DG_BRANCH.md}"
 if [ ! -x "$DG_SCRIPT" ]; then
     DG_VERDICT=unavailable
 else

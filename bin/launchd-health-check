@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # bin/launchd-health-check — daily and at-login check for com.ibl5.* launchd jobs.
+# Also runs bin/bug-pipeline-check and reports each degraded or unknown signal.
 #
 # Test seams (env overrides; production never sets these):
 #   DOCKER_BIN                override the docker binary
 #   DB_QUERY_BIN              override bin/db-query for the phase lookup
+#   BUG_PIPELINE_CHECK_BIN    override bin/bug-pipeline-check (unset or empty = sibling script)
 #   DISCORD_DM_BIN            override bin/discord-dm for DM sends
 #   LAUNCHD_HEALTH_JOBS_LIB   override bin/lib/launchd-expected-jobs.sh
 #   LAUNCHD_HEALTH_LOG_DIR    override the log/stamp directory root

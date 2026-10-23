@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -385,6 +386,37 @@ def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
         fh.write("ok\n")
     sha = g.commit_all("chore: accepted")
     assert len(sha) == 40, f"expected a full sha, got {sha!r}"
+
+
+def test_drop_commit_restores_head_with_postplan_reflog_subject(repo):
+    """LiveGit.drop_commit(pre) moves HEAD back and writes a reflog subject
+    collapse-guard.sh does not read as a history rewrite."""
+    g = LiveGit(repo)
+    pre = g.head()
+    os.makedirs(os.path.join(repo, "bin"), exist_ok=True)
+    open(os.path.join(repo, "bin", "check-x"), "w").write("#!/bin/sh\n")
+    sha = g.commit_all("fix(review): gate edit")
+    assert sha and sha != pre
+
+    assert g.drop_commit(pre) == ""
+
+    assert g.head() == pre
+    assert not os.path.exists(os.path.join(repo, "bin", "check-x"))      # dropped file is gone
+    assert not g.is_dirty()
+    status = subprocess.run(["git", "-C", repo, "status", "--porcelain"],
+                            capture_output=True, text=True).stdout
+    assert status == ""
+    subject = subprocess.run(["git", "-C", repo, "reflog", "-1", "--format=%gs"],
+                             capture_output=True, text=True).stdout.strip()
+    assert subject == "postplan: updating HEAD"
+    assert not re.match(r"^(rebase|reset:|filter-branch|amend)", subject)
+
+
+def test_drop_commit_returns_error_text_on_bad_target(repo):
+    g = LiveGit(repo)
+    err = g.drop_commit("0000000000000000000000000000000000000000")
+    assert err != ""
+    assert g.head() != ""            # HEAD untouched, repo still usable
 
 
 def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, monkeypatch):

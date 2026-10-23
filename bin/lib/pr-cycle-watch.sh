@@ -397,10 +397,74 @@ pcw_master_tip() {
     [[ "$tip" =~ ^[0-9a-f]{40}$ ]] && printf '%s\n' "$tip"
     return 0
 }
-# conflict-hold/<pr> holds the origin/master tip recorded at the launch of a rescue that
-# settled `conflict`, or `unknown` when that launch had no readable tip. settle writes it on
-# `conflict` and clears it on every other settled outcome.
-pcw_record_conflict_hold() { _pcw_write "$1/conflict-hold/$2" "${3:-unknown}"; }
+# pcw_conflict_probe <root> <pr> <tip> <head>: would <head> merge onto <tip> cleanly?
+#   0 = clean (prints nothing)
+#   1 = conflicted: prints the conflicted paths, LC_ALL=C sorted and unique, one per line
+#   2 = cannot tell: prints a one-line reason. Callers fall back to today's behavior.
+# Runs `git merge-tree --write-tree --name-only`, which writes objects but no ref and never
+# touches a worktree. When <head> is not a local object it fetches refs/pull/<pr>/head once,
+# without writing FETCH_HEAD or any ref. A conflict needs exit 1 AND a 40-hex tree OID on
+# line 1 AND at least one path: a missing object also exits 1 but prints no OID line.
+pcw_conflict_probe() {
+    local root="$1" pr="$2" tip="$3" head="$4" out="" mrc=0 paths=""
+    if [[ ! "$tip" =~ ^[0-9a-f]{40}$ || ! "$head" =~ ^[0-9a-f]{40}$ ]]; then
+        printf 'tip or head is not a 40-hex SHA\n'; return 2
+    fi
+    if ! git -C "$root" cat-file -e "$head^{commit}" 2>/dev/null; then
+        [[ "$pr" =~ ^[0-9]+$ ]] && git -C "$root" fetch --quiet --no-write-fetch-head \
+            origin "refs/pull/$pr/head" 2>/dev/null || true
+        if ! git -C "$root" cat-file -e "$head^{commit}" 2>/dev/null; then
+            printf 'head %s missing after fetch\n' "${head:0:7}"; return 2
+        fi
+    fi
+    out="$(git -C "$root" -c core.quotePath=false merge-tree --write-tree --name-only "$tip" "$head" 2>/dev/null)" \
+        && mrc=0 || mrc=$?
+    if [[ "$mrc" -eq 0 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
+        return 0
+    fi
+    if [[ "$mrc" -eq 1 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
+        paths="$(awk 'NR == 1 { next } /^$/ { stop = 1 } !stop { print }' <<< "$out" \
+            | LC_ALL=C sort -u)"
+        # quotePath=false leaves only paths with quotes, backslashes or control characters
+        # C-quoted. A quoted name cannot be looked up later, so treat it as "cannot tell".
+        if [[ "$paths" == *'"'* ]]; then
+            printf 'conflicted path is C-quoted\n'; return 2
+        fi
+        if [[ -n "$paths" ]]; then printf '%s\n' "$paths"; return 1; fi
+    fi
+    printf 'merge-tree output unrecognised (exit %s)\n' "$mrc"; return 2
+}
+# conflict-hold/<pr>: line 1 is the origin/master tip recorded at the launch of a rescue that
+# settled `conflict`, or `unknown` when that launch had no readable tip. When the conflict
+# probe succeeded at record time, line 2 is `head <sha>`, line 3 `paths <N>`, and lines 4..
+# the N conflicted paths. settle writes it on `conflict` and clears it on every other outcome.
+# pcw_record_conflict_hold <dir> <pr> [tip] [head] [paths, newline-separated]
+pcw_record_conflict_hold() {
+    local tip="${3:-unknown}" head="${4:-}" paths="${5:-}" n
+    if [[ "$tip" =~ ^[0-9a-f]{40}$ && "$head" =~ ^[0-9a-f]{40}$ && -n "$paths" ]]; then
+        n="$(grep -c . <<< "$paths")"
+        _pcw_write "$1/conflict-hold/$2" "$tip"$'\n'"head $head"$'\n'"paths $n"$'\n'"$paths"
+    else
+        _pcw_write "$1/conflict-hold/$2" "$tip"
+    fi
+}
+# pcw_conflict_hold_head <dir> <pr>: print the head recorded with the hold, or nothing.
+pcw_conflict_hold_head() {
+    local f="$1/conflict-hold/$2"
+    [[ -f "$f" ]] && sed -n '2s/^head \([0-9a-f]\{40\}\)$/\1/p' "$f"
+    return 0
+}
+# pcw_conflict_hold_paths <dir> <pr>: print the recorded path set. Returns 1 (prints nothing)
+# when there is none: a legacy one-line hold, or a `paths <N>` count that does not match.
+pcw_conflict_hold_paths() {
+    local f="$1/conflict-hold/$2" n="" body=""
+    [[ -f "$f" ]] || return 1
+    n="$(sed -n '3s/^paths \([0-9][0-9]*\)$/\1/p' "$f")"
+    [[ -n "$n" && "$n" -gt 0 ]] || return 1
+    body="$(sed -n '4,$p' "$f")"
+    [[ "$(grep -c . <<< "$body")" == "$n" ]] || return 1
+    printf '%s\n' "$body"
+}
 pcw_clear_conflict_hold()  { rm -f "$1/conflict-hold/$2"; }
 # retries/<pr> holds "<YYYY-MM-DD> <n>": DIRTY rescue launches for the PR on that local day.
 pcw_today() { date +%F; }
@@ -418,18 +482,24 @@ pcw_bump_retry() {    # <dir> <pr> <day>: writes "<day> <count+1>"
     n=$(( $(pcw_retry_count "$1" "$2" "$3") + 1 ))
     _pcw_write "$1/retries/$2" "$3 $n"
 }
-# pcw_conflict_retry_due <dir> <pr> <tip> <day>: may a retry-capped PR relaunch?
-#   0 = yes: a conflict hold exists, <tip> is 40 hex and differs from the held tip, and the
-#       day's launch count is below PCW_CONFLICT_RETRY_DAILY_CAP
+# pcw_conflict_retry_due <dir> <pr> <tip> <day> [<head>]: may a retry-capped PR relaunch?
+#   0 = yes: a conflict hold exists, <tip> is 40 hex, and either <tip> differs from the held
+#       tip or <head> differs from the head recorded with the hold; and the day's launch
+#       count is below PCW_CONFLICT_RETRY_DAILY_CAP
 #   1 = no conflict hold (today's retry-cap rule applies unchanged)
-#   2 = conflict hold, but <tip> is unreadable or equals the held tip
-#   3 = conflict hold and a new tip, but the daily cap is spent
+#   2 = conflict hold, but <tip> is unreadable, or equals the held tip with the head
+#       unchanged or unrecorded (and always when <head> is omitted)
+#   3 = conflict hold and something new, but the daily cap is spent
+# Only line 1 of the hold is the tip; later lines belong to the probe.
 pcw_conflict_retry_due() {
-    local f="$1/conflict-hold/$2" held=""
+    local f="$1/conflict-hold/$2" held="" rhead=""
     [[ -f "$f" ]] || return 1
     [[ "$3" =~ ^[0-9a-f]{40}$ ]] || return 2
-    held="$(cat "$f")"
-    [[ "$held" != "$3" ]] || return 2
+    held="$(sed -n '1p' "$f")"
+    if [[ "$held" == "$3" ]]; then
+        rhead="$(pcw_conflict_hold_head "$1" "$2")"
+        [[ -n "${5:-}" && -n "$rhead" && "$rhead" != "$5" ]] || return 2
+    fi
     (( $(pcw_retry_count "$1" "$2" "$4") < PCW_CONFLICT_RETRY_DAILY_CAP )) || return 3
     return 0
 }
@@ -442,7 +512,7 @@ _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves 
 pcw_prune() {
     local dir="$1" open="$2" f
     for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
-             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* \
+             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* "$dir"/dm-probe/* \
              "$dir"/conflict-hold/* "$dir"/retries/* "$dir"/gate-reruns/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"

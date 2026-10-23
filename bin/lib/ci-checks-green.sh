@@ -61,3 +61,32 @@ ccg_drop_failed() { jq --argjson ignore "$1" '
   [ .check_runs[] | select(((.name | IN($ignore[])) and (.status == "completed")
       and ((.conclusion // "unknown") | IN("success","skipped","neutral") | not)) | not) ]
   | { total_count: length, check_runs: . }'; }
+
+# ccg_ghost_reason <now-epoch> <grace-seconds> — decides whether a workflow run that
+#   the runs API still reports as NOT completed is a "ghost": every job of its latest
+#   attempt completed inside the pass set, and the run's updated_at has been frozen
+#   for longer than the grace window. Input: {run: <workflow_run>, jobs: [<job>...]}
+#   (jobs as returned by GET /actions/runs/{id}/jobs, any attempt mix). Output: one
+#   line, "settled" or a reason. Every unknown is a reason (fail-closed): a missing
+#   id, run_attempt or updated_at, an unparseable date, zero jobs on the latest
+#   attempt, a job not completed, a job outside {success, skipped, neutral} (null
+#   reads as "unknown"), or an age of grace seconds or less. Only jobs whose
+#   run_attempt equals the run's run_attempt count; an older attempt's red job is
+#   neither a pass nor a hold here (the check-run verdict V1-V3 still sees it).
+#   Age is strictly greater than grace: at exactly grace the run is still "young".
+ccg_ghost_reason() { jq -r --argjson now "$1" --argjson grace "$2" '
+  .run as $r
+  | ($r.updated_at | if type == "string" then (try fromdateiso8601 catch null) else null end) as $upd
+  | [ .jobs[] | select(.run_attempt == $r.run_attempt) ] as $jobs
+  | if ($r.id | type) != "number" then "no-run-id"
+    elif ($r.run_attempt | type) != "number" then "no-run-attempt"
+    elif $upd == null then "no-updated-at"
+    elif ($jobs | length) == 0 then "zero-jobs"
+    elif ([ $jobs[] | select(.status != "completed") ] | length) > 0 then
+      "job-pending: " + ([ $jobs[] | select(.status != "completed") | .name ] | join(", "))
+    elif ([ $jobs[] | select((.conclusion // "unknown") | IN("success","skipped","neutral") | not) ] | length) > 0 then
+      "job-red: " + ([ $jobs[] | select((.conclusion // "unknown") | IN("success","skipped","neutral") | not)
+                      | .name + " (" + (.conclusion // "unknown") + ")" ] | join(", "))
+    elif ($now - $upd) <= $grace then
+      "young: " + (($now - $upd) | tostring) + "s <= " + ($grace | tostring) + "s"
+    else "settled" end'; }

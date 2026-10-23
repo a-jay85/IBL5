@@ -45,7 +45,7 @@ class TransactionHistoryViewTest extends TestCase
         $this->assertStringContainsString('<form', $html);
         $this->assertStringContainsString('<select', $html);
         $this->assertStringContainsString('<select id="txn-cat" name="cat" class="d-select d-select-sm w-auto">', $html);
-        $this->assertStringContainsString('<button type="submit" class="d-btn d-btn-primary">Filter</button>', $html);
+        $this->assertStringContainsString('<button type="submit" class="d-btn d-btn-primary d-btn-sm">Filter</button>', $html);
         $this->assertStringContainsString('class="d-btn d-btn-ghost d-btn-sm txn-reset">Reset</a>', $html);
     }
 

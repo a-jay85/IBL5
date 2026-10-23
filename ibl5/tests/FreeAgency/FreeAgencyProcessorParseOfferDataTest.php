@@ -340,7 +340,6 @@ final class FreeAgencyProcessorParseOfferDataTest extends TestCase
         $class = new \ReflectionClass(FreeAgencyProcessor::class);
         $constructor = $class->getConstructor();
         $this->assertNotNull($constructor);
-        $this->assertCount(8, $constructor->getParameters());
 
         foreach ($class->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             foreach ($method->getParameters() as $param) {

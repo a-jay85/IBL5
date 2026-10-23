@@ -38,14 +38,12 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
     /**
      * Entry points whose terminating gate precedes all composition today. Each
      * gate token must appear above the first wiring token once the module converts.
-     * Phase 7 adds ProjectedDraftOrder when it converts that module.
      *
      * @var array<string, list<string>>
      */
     private const GATED_BEFORE_WIRING = [
         'LeagueControlPanel' => ['->isAuthenticated(', '->isAdmin('],
         'NextSim' => ['->loginBox('],
-        'ProjectedDraftOrder' => ['->isAdmin('],
         'TrainingCampRatingsDiff' => ['->loginBox('],
     ];
 
@@ -59,11 +57,11 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
      */
     private const GATE_TOKEN_BASELINE = [
         'DepthChartEntry' => 2,
+        'DraftInfo' => 2,
         'LeagueControlPanel' => 9,
         'NextSim' => 1,
         'OneOnOneGame' => 1,
         'Player' => 2,
-        'ProjectedDraftOrder' => 2,
         'TrainingCampRatingsDiff' => 1,
         'YourAccount' => 4,
     ];
@@ -345,7 +343,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
             $counts[basename(dirname($file))] = $count;
         }
 
-        foreach (['LeagueControlPanel', 'NextSim', 'TrainingCampRatingsDiff', 'DepthChartEntry', 'Player', 'ProjectedDraftOrder', 'YourAccount'] as $required) {
+        foreach (['LeagueControlPanel', 'NextSim', 'TrainingCampRatingsDiff', 'DepthChartEntry', 'Player', 'DraftInfo', 'YourAccount'] as $required) {
             $this->assertArrayHasKey($required, self::GATE_TOKEN_BASELINE, "{$required} must stay in GATE_TOKEN_BASELINE");
         }
 

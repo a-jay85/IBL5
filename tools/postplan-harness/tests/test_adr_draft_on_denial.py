@@ -40,7 +40,7 @@ from harness.adapters.gitad import (
 )
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.llm import MODEL_MAP, FixtureLlm, UsageLedger
-from harness.state import SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState
+from harness.state import PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState
 
 # ---------------------------------------------------------------------------
 # Hook text fixtures (exact text bin/pre-push-adr-hook emits, as LiveGit wraps it)
@@ -1977,3 +1977,53 @@ def test_stage_all_precedes_the_commit_site_draft():
     stage = src.index("            git.stage_all()")
     draft = src.index("        _commit_with_adr_draft(git, log, \"phase2\"")
     assert stage < draft, "git.stage_all() must run before _commit_with_adr_draft"
+
+
+_HOOK_HANG_DETAIL = "pre-commit hook hung past 300s and was killed (step 'commit (pre-commit hook)')"
+
+
+def test_commit_with_adr_draft_reraises_precommit_hang_as_is(tmp_path, monkeypatch):
+    """A hook hang inside the drafter's commit_all keeps kind precommit-hang.
+
+    Mutation caught: revert the commit-site guard to `== SUBPROCESS_TIMEOUT` and the
+    raised kind becomes local-gate."""
+    _patch_commit_gate_denied_and_draft_raises(
+        monkeypatch, HarnessError(PRECOMMIT_HANG, _HOOK_HANG_DETAIL))
+    res = RunResult(terminal=TerminalState.FAILED)
+    logged: list[str] = []
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), logged.append, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    exc = exc_info.value
+    assert exc.kind == PRECOMMIT_HANG
+    assert exc.kind != "local-gate"
+    assert exc.detail == _HOOK_HANG_DETAIL
+    assert res.adr_drafted is False
+
+
+def test_push_with_adr_draft_reraises_precommit_hang_as_is(tmp_path, monkeypatch):
+    """Mutation caught: revert the push-site guard and `raise e from e2` surfaces the
+    push local-gate error instead."""
+    def _denied(*a, **k):
+        raise HarnessError("local-gate", _ADR_TEXT)
+
+    monkeypatch.setattr(runner, "_push_with_lease_retry", _denied)
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(HarnessError(PRECOMMIT_HANG, _HOOK_HANG_DETAIL)),
+    )
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._push_with_adr_draft(
+            FakeGit(), _noop_log, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    assert exc_info.value.kind == PRECOMMIT_HANG
+    assert exc_info.value.detail == _HOOK_HANG_DETAIL
+    assert res.adr_drafted is False

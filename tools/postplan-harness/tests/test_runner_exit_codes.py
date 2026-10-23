@@ -553,3 +553,7 @@ run_bounded(["bash", {str(child)!r}], step="probe", timeout=120)
     assert alive.read_text() == "0"
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
+
+
+def test_precommit_hang_exits_3():
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "precommit-hang")) == 3

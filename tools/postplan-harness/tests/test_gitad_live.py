@@ -419,8 +419,8 @@ def test_drop_commit_returns_error_text_on_bad_target(repo):
     assert g.head() != ""            # HEAD untouched, repo still usable
 
 
-def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, monkeypatch):
-    """A pre-commit hook that hangs is bounded: typed subprocess-timeout (not local-gate),
+def test_commit_all_timeout_raises_precommit_hang_and_reaps(repo, tmp_path, monkeypatch):
+    """A pre-commit hook that hangs is bounded: typed precommit-hang (not local-gate),
     the hook's process group is reaped, and the index.lock git left behind is cleared.
 
     Mutation caught: drop _clear_stale_index_lock() and the lock assertion fails; drop
@@ -435,7 +435,7 @@ def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, 
     with pytest.raises(HarnessError) as ei:
         g.commit_all("chore: hook hangs")
     assert time.monotonic() - start < 15
-    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert ei.value.kind == "precommit-hang", f"kind was {ei.value.kind!r}"
     assert "commit" in ei.value.detail
     grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
     deadline = time.monotonic() + 5
@@ -658,6 +658,7 @@ def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monk
         LiveGit(repo).commit_all("m")
     assert time.monotonic() - start < 15
     assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert ei.value.kind != "precommit-hang"
     assert "step 'git add'" in ei.value.detail
     post = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
                           capture_output=True, text=True).stdout.strip()
@@ -700,3 +701,25 @@ def test_network_subcommands_use_git_net_timeout(repo, monkeypatch):
     g._run_out("ls-remote", "origin")
     g._run("status")
     assert recorded == [7, 7, 7, 3]
+
+
+def test_precommit_hang_makes_no_commit(repo, tmp_path, monkeypatch):
+    """Mutation caught: pass timeout=None on the commit leg and the hook exits 0 after
+    30s, the commit lands, so the raise and HEAD assertions fail."""
+    _install_reject_hook(repo, "#!/bin/bash\nsleep 30\nexit 0\n")
+    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 1)
+    with open(os.path.join(repo, "slow.txt"), "w") as fh:
+        fh.write("slow\n")
+    pre = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                         capture_output=True, text=True).stdout.strip()
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).commit_all("m")
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "precommit-hang", f"kind was {ei.value.kind!r}"
+    assert "hung past 1s" in ei.value.detail
+    assert "commit (pre-commit hook)" in ei.value.detail
+    post = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+    assert post == pre
+    assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))

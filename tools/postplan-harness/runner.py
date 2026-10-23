@@ -75,7 +75,7 @@ from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
 from harness import review_depth
 from harness import baseline_guard
-from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
+from harness.state import (PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
                            UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
@@ -1358,7 +1358,7 @@ def _commit_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res)
                                   plan_path=plan_path, check_mode="commit",
                                   commit=False)
     except HarnessError as e2:
-        if e2.kind == SUBPROCESS_TIMEOUT:
+        if e2.kind in (SUBPROCESS_TIMEOUT, PRECOMMIT_HANG):
             log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
             raise
         if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
@@ -1401,7 +1401,7 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res,
             drafted = adr_draft.draft(llm, git, worktree, out_dir, log,
                                       phase=phase, plan_path=plan_path)
         except HarnessError as e2:
-            if e2.kind == SUBPROCESS_TIMEOUT:
+            if e2.kind in (SUBPROCESS_TIMEOUT, PRECOMMIT_HANG):
                 log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
                 raise
             if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
@@ -3311,7 +3311,7 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "llm-usage-limit", "llm-auth-expired",
                       "usage-pause-unconfirmed", "usage-pause-dirty",
-                      SUBPROCESS_TIMEOUT)
+                      SUBPROCESS_TIMEOUT, PRECOMMIT_HANG)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
@@ -4012,6 +4012,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == PRECOMMIT_HANG:
+            m = re.search(r"hung past (\d+)s", res.error or "")
+            secs = f"{m.group(1)}s" if m else "its timeout"
+            return ("RESULT: post-plan BLOCKED — the pre-commit hook hung past "
+                    f"{secs} and was killed; ERROR terminal=failed kind=precommit-hang. "
+                    "Step: commit (pre-commit hook). That commit did not land. Run "
+                    "bin/pre-commit-hook by hand in the worktree to find the hanging "
+                    "check, then re-run bin/post-plan-now.")
         if res.error_kind == SUBPROCESS_TIMEOUT:
             detail = _flat(res.error) or "a phase-2 subprocess timed out"
             cmd = _cmd_text(res.error_cmd)

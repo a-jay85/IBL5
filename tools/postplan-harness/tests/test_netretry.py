@@ -334,12 +334,13 @@ def test_call_rate_limited_non_rate_limit_error_is_untouched():
     assert fn.calls == 1
 
 
-def test_subprocess_timeout_is_never_retried(sleeps):
+@pytest.mark.parametrize("kind", ["subprocess-timeout", "precommit-hang"])
+def test_subprocess_timeout_is_never_retried(kind, sleeps):
     calls = []
 
     def fn():
         calls.append(1)
-        raise HarnessError("subprocess-timeout", "step 'git fetch' timed out after 600s",
+        raise HarnessError(kind, "step 'git fetch' timed out after 600s",
                            output="ssh: connect to host github.com port 22: Operation timed out")
 
     with pytest.raises(HarnessError):

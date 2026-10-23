@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from .. import netretry
-from ..state import SUBPROCESS_TIMEOUT, HarnessError
+from ..state import PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
 
@@ -421,9 +421,16 @@ class LiveGit:
                                step="commit (pre-commit hook)",
                                timeout=COMMIT_HOOK_TIMEOUT, errors="replace")
         except HarnessError as e:
-            if e.kind == SUBPROCESS_TIMEOUT:
-                self._clear_stale_index_lock()
-            raise
+            if e.kind != SUBPROCESS_TIMEOUT:
+                raise
+            self._clear_stale_index_lock()
+            # Distinct kind so the RESULT line and DM say the HOOK hung, not "a subprocess".
+            # The add/diff legs above keep subprocess-timeout: their hang is not the hook's.
+            raise HarnessError(
+                PRECOMMIT_HANG,
+                f"pre-commit hook hung past {COMMIT_HOOK_TIMEOUT}s and was killed "
+                "(step 'commit (pre-commit hook)')",
+                cmd="git commit", output=e.output) from None
         if proc.returncode != 0:
             detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
             raise HarnessError("local-gate",

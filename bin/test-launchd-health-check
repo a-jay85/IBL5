@@ -954,6 +954,14 @@ run_checker
 eq "B5b one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
 has "B5b names rc 143" "$OUT" "exited 143 —"
 
+# B5c: a checker that never returns is killed; the verdict and DM still go out
+healthy_fixture B5c
+printf '#!/bin/sh\nexec /bin/sleep 300\n' > "$CASE/bin/bug-pipeline-check"
+BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
+eq "B5c one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B5c says it timed out" "$OUT" "did not finish in 1s"
+eq "B5c one DM" 1 "$(dm_blocks)"
+
 # B6: rc 1 with no SIGNAL line fails loud
 healthy_fixture B6
 bpc_set 1 'VERDICT: degraded []'

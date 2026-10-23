@@ -86,7 +86,7 @@ class TeamView implements TeamViewInterface
             return $this->renderTeamBanner($teamid, $team, $imagesPath, $userTeamName, $isOwnTeam);
         }
 
-        return '<div class="team-logo-fallback"><img src="./' . HtmlSanitizer::e($imagesPath) . 'logo/' . $teamid . '.jpg" alt=""></div>';
+        return '<div class="team-logo-fallback"></div>';
     }
 
     /**

@@ -531,8 +531,15 @@ _SIX_D_LINE_RE = re.compile(r"^\s*\**([1-6])([abc]?)[.)]\s+(.*)$")
 # The whole verdict must open with a pass word followed by end/punctuation. A pass word
 # that starts a longer clause ("None of these edits...", "Pass with one gap") is a fail.
 # A dash counts only at end of line ("None —"); "None — the test row is missing" is a fail.
+# A reason after "." or "!" passes ("pass. No UI surface.") unless it reads as a failure
+# ("None. But the diff drops X"). A false fail only costs the body-only fast path. The word
+# list is a denylist: a failure reason worded outside it still passes, as it did before.
+_SIX_D_FAIL_WORDS = (r"but|however|except|although|though|yet|missing|absent|lacks?|lacking"
+                     r"|fail\w*|drops?|dropped|omit\w*|unrealised|contradict\w*"
+                     r"|mismatch\w*|gaps?|wrong|broken|not|cannot|\w+n['’]t")
 _SIX_D_PASS_RE = re.compile(
-    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*(?:[.!]|[-\u2013\u2014]\s*$|$)")
+    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*"
+    r"(?:[.!](?!.*\b(?:" + _SIX_D_FAIL_WORDS + r")\b)|[-\u2013\u2014]\s*$|$)")
 # Every number in a citation like "check 4", "checks 3 and 4", "checks 3/4", "Check 4 & 3".
 _BULLET_CHECK_RE = re.compile(
     r"(?i)\bchecks?\b\s*#?\s*([1-6][abc]?(?:\s*(?:,|/|&|and/or|and|or|to|-)\s*#?\s*[1-6][abc]?)*)\b")

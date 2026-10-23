@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Draft_History Module - Display draft history by year or by team
  *
  * Shows draft picks for a selected year with player info and draft order.
- * Supports team-specific view via ?teamid=N parameter.
+ * Supports team-specific view via ?teamid=N (camelCase ?teamID=N is also accepted for old Discord links).
  *
  * Refactored to use the interface-driven architecture pattern.
  *
@@ -39,7 +39,8 @@ $repository = new DraftHistoryRepository($mysqli_db);
 $view = new DraftHistoryView();
 
 // Check for team ID parameter
-$teamid = is_string($_GET['teamid'] ?? null) ? (int) $_GET['teamid'] : 0;
+$teamidParam = $_GET['teamid'] ?? $_GET['teamID'] ?? null;
+$teamid = is_string($teamidParam) ? (int) $teamidParam : 0;
 
 $isValidTeam = false;
 if ($teamid > 0) {

@@ -1,0 +1,277 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-check-reviewer-eval — Fixture self-test for bin/check-reviewer-eval and the
+# compare-base resolver in bin/reviewer-eval. Cases (a) through (v), each asserting an
+# exit code and one output token. Runs under `env -i PATH=/usr/bin:/bin`.
+
+set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHECK="$SCRIPT_DIR/check-reviewer-eval"
+EVAL="$SCRIPT_DIR/reviewer-eval"
+
+h_tmp WORK
+FIX="$WORK/fix"
+STUBS="$WORK/stubs"
+mkdir -p "$STUBS"
+
+SURFACE_FILES=(
+    "tools/postplan-harness/harness/review.py"
+    ".claude/review-shared/_review-agents.md"
+    ".claude/review-shared/_security-agents.md"
+    ".claude/review-shared/_review-rubric.md"
+    ".claude/skills/post-plan/_phase-4-review-audit.md"
+)
+LLM="tools/postplan-harness/harness/adapters/llm.py"
+CORPUS="tools/postplan-harness/fixtures/reviewer-eval/corpus.json"
+
+h_git_repo "$FIX" --no-commit
+for f in "${SURFACE_FILES[@]}"; do
+    mkdir -p "$FIX/$(dirname "$f")"
+    printf 'one\n' > "$FIX/$f"
+done
+mkdir -p "$FIX/$(dirname "$LLM")" "$FIX/$(dirname "$CORPUS")"
+printf 'MODEL_MAP = {\n    "a": "b",\n}\n' > "$FIX/$LLM"
+cat > "$FIX/$CORPUS" <<'EOF'
+{"schema_version": 1, "window_days": 30,
+ "cases": [{"id": "bug-one", "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "confirmed",
+            "expected": [{"path": "a.php", "start": 1, "end": 2}]}],
+ "clean": [{"id": "clean-one", "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}
+EOF
+DOC="ibl5/docs/reviewer-eval.md"
+# baseline_doc <hits>: a baseline doc whose score line records <hits>/6 recall.
+baseline_doc() {
+    mkdir -p "$FIX/$(dirname "$DOC")"
+    printf '# Baseline\n\nreviewer-eval v=%s c=%s recall=%s/6 false_alarms=0 clean_flagged=0/9 degraded=0\n' \
+        "aaaaaaaaaaaa" "bbbbbbbbbbbb" "$1" > "$FIX/$DOC"
+}
+baseline_doc 2
+git -C "$FIX" add -A
+git -C "$FIX" commit -q -m base
+git -C "$FIX" tag base
+
+# The baseline doc is outside the review surface, so these bases share base's surface hash.
+git -C "$FIX" checkout -q -b baselines base
+baseline_doc 0
+git -C "$FIX" commit -q -am "zero baseline"
+git -C "$FIX" tag base_zero
+git -C "$FIX" rm -q "$DOC"
+git -C "$FIX" commit -q -m "no baseline"
+git -C "$FIX" tag base_nodoc
+git -C "$FIX" checkout -q -
+
+printf 'x\n' > "$FIX/unrelated.txt"
+git -C "$FIX" add -A
+git -C "$FIX" commit -q -m unrelated
+git -C "$FIX" tag head_same
+
+git -C "$FIX" checkout -q -b changed base
+printf 'two\n' > "$FIX/.claude/review-shared/_review-rubric.md"
+git -C "$FIX" add -A
+git -C "$FIX" commit -q -m "rubric edit"
+git -C "$FIX" tag head_changed
+
+git -C "$FIX" checkout -q -b nomap base
+printf '# no map here\n' > "$FIX/$LLM"
+git -C "$FIX" add -A
+git -C "$FIX" commit -q -m "delete MODEL_MAP"
+git -C "$FIX" tag head_nomap
+git -C "$FIX" checkout -q changed
+
+# hash_field <ref> <v|c>: one field of `bin/reviewer-eval hash`.
+hash_field() {
+    local line
+    line="$("$EVAL" hash --repo "$FIX" --ref "$1")"
+    line="${line#*"$2"=}"
+    printf '%s' "${line%% *}"
+}
+VB="$(hash_field base v)"
+VH="$(hash_field head_changed v)"
+CH="$(hash_field head_changed c)"
+ZERO="000000000000"
+
+# score <v> <c> <hits> <degraded>: a score line over the 1-bug, 1-clean fixture corpus.
+score() {
+    printf 'reviewer-eval v=%s c=%s recall=%s/1 false_alarms=0 clean_flagged=0/1 degraded=%s' \
+        "$1" "$2" "$3" "$4"
+}
+
+BODY="$WORK/body.md"
+# write_body <before-line> <after-line> [extra]
+write_body() {
+    printf 'Summary\n\nReviewer eval before: %s\nReviewer eval after: %s\n%s\n' "$1" "$2" "${3:-}" > "$BODY"
+}
+
+OUT=""
+RC=0
+# run_check <label> <want-rc> <token> <args...>: runs bin/check-reviewer-eval, asserts exit code and one token.
+run_check() {
+    local label="$1" want_rc="$2" token="$3"
+    shift 3
+    RC=0
+    OUT="$("$CHECK" "$@" 2>&1)" || RC=$?
+    h_eq "$label: exit code" "$want_rc" "$RC"
+    h_contains "$label: output token" "$OUT" "$token"
+}
+
+GOOD_B="$(score "$VB" "$CH" 1 0)"
+GOOD_A="$(score "$VH" "$CH" 1 0)"
+
+# Stub gh: touches GH_MARKER when called; GH_STUB_FAIL=1 exits 1; else prints $GH_STUB_BODY.
+cat > "$STUBS/gh" <<'EOF'
+#!/bin/sh
+: > "${GH_MARKER:?}"
+if [ "${GH_STUB_FAIL:-}" = "1" ]; then exit 1; fi
+cat "${GH_STUB_BODY:?}"
+EOF
+chmod +x "$STUBS/gh"
+MARKER="$WORK/gh-called"
+
+# (a) unchanged surface: exit 0 and gh is never called
+write_body "$GOOD_B" "$GOOD_A"
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_CMD= GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" \
+    "$CHECK" --pr 1 --base base --head head_same --repo "$FIX" 2>&1)" || RC=$?
+h_eq "case a: unchanged surface exit code" 0 "$RC"
+h_contains "case a: unchanged surface token" "$OUT" "review surface unchanged"
+h_absent "case a: gh never called" "$MARKER"
+
+# (b) changed surface, no lines
+printf 'Summary only\n' > "$BODY"
+run_check "case b: no claim lines" 1 "exactly one" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (c) valid pair
+write_body "$GOOD_B" "$GOOD_A"
+run_check "case c: valid pair" 0 "claim matches" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (d) before.v wrong
+write_body "$(score "$ZERO" "$CH" 1 0)" "$GOOD_A"
+run_check "case d: before.v wrong" 1 "before.v mismatch" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (e) after.v wrong
+write_body "$GOOD_B" "$(score "$ZERO" "$CH" 1 0)"
+run_check "case e: after.v wrong" 1 "after.v mismatch" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (f) corpus digest mismatch
+write_body "$(score "$VB" "$ZERO" 1 0)" "$GOOD_A"
+run_check "case f: c mismatch" 1 "before.c mismatch" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (g) degraded run on the after line
+write_body "$GOOD_B" "$(score "$VH" "$CH" 1 1)"
+run_check "case g: degraded after" 1 "degraded" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (h) after has fewer hits
+WORSE_A="$(score "$VH" "$CH" 0 0)"
+write_body "$GOOD_B" "$WORSE_A"
+run_check "case h: fewer hits" 1 "got worse" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (i) fewer hits plus a 20-char regression waiver
+write_body "$GOOD_B" "$WORSE_A" '<!-- reviewer-eval-regression-ok: reason twenty chars! -->'
+run_check "case i: regression waiver" 0 "reviewer-eval-regression-ok:" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (j) 20-char skip waiver
+printf 'Summary\n<!-- reviewer-eval-skip: reason twenty chars! -->\n' > "$BODY"
+run_check "case j: skip waiver" 0 "reviewer-eval-skip:" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (k) 14-char skip waiver
+printf 'Summary\n<!-- reviewer-eval-skip: exactly14chars -->\n' > "$BODY"
+run_check "case k: short skip waiver" 1 "malformed reviewer-eval-skip waiver" \
+    --body-file "$BODY" --base base --head head_changed --repo "$FIX"
+
+# (l) MODEL_MAP block deleted at head
+write_body "$GOOD_B" "$GOOD_A"
+run_check "case l: MODEL_MAP deleted" 2 "MODEL_MAP" \
+    --body-file "$BODY" --base base --head head_nomap --repo "$FIX"
+
+# (t) zero baseline at base: a finding warns and exits 0
+printf 'Summary only\n' > "$BODY"
+run_check "case t: zero baseline warns" 0 "WARNING: not blocking" \
+    --body-file "$BODY" --base base_zero --head head_changed --repo "$FIX"
+h_contains "case t: names the finding" "$OUT" "exactly one"
+h_contains "case t: names the zero baseline" "$OUT" "is 0"
+
+# (u) no baseline doc at base: warns and exits 0
+run_check "case u: absent baseline warns" 0 "WARNING: not blocking" \
+    --body-file "$BODY" --base base_nodoc --head head_changed --repo "$FIX"
+h_contains "case u: names the absent baseline" "$OUT" "is absent"
+
+# (v) a zero baseline does not soften a usage error
+write_body "$GOOD_B" "$GOOD_A"
+run_check "case v: zero baseline keeps exit 2" 2 "MODEL_MAP" \
+    --body-file "$BODY" --base base_zero --head head_nomap --repo "$FIX"
+
+# (m) bad base ref
+run_check "case m: bad base ref" 2 "bad ref" \
+    --body-file "$BODY" --base no-such-ref --head head_changed --repo "$FIX"
+
+# (n) missing --base
+run_check "case n: missing --base" 2 "--base is required" \
+    --body-file "$BODY" --repo "$FIX"
+
+# (o) unknown flag
+run_check "case o: unknown flag" 2 "unknown option" \
+    --bogus --body-file "$BODY" --base base --repo "$FIX"
+
+# (p) --pr with GH_CMD unset: falls back to the stub gh on PATH
+write_body "$GOOD_B" "$GOOD_A"
+rm -f "$MARKER"
+RC=0
+OUT="$(env -u GH_CMD PATH="$STUBS:$PATH" GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" \
+    "$CHECK" --pr 1 --base base --head head_changed --repo "$FIX" 2>&1)" || RC=$?
+h_eq "case p: GH_CMD unset exit code" 0 "$RC"
+h_contains "case p: GH_CMD unset token" "$OUT" "claim matches"
+h_exists "case p: stub gh was called" "$MARKER"
+
+# (q) same with GH_CMD empty
+rm -f "$MARKER"
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_CMD= GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" \
+    "$CHECK" --pr 1 --base base --head head_changed --repo "$FIX" 2>&1)" || RC=$?
+h_eq "case q: GH_CMD empty exit code" 0 "$RC"
+h_contains "case q: GH_CMD empty token" "$OUT" "claim matches"
+
+# (r) gh exits 1
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_CMD= GH_STUB_FAIL=1 GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" \
+    "$CHECK" --pr 1 --base base --head head_changed --repo "$FIX" 2>&1)" || RC=$?
+h_eq "case r: gh failure exit code" 2 "$RC"
+h_contains "case r: gh failure token" "$OUT" "gh pr view failed"
+
+# (s) compare resolves a stacked base from branch.<name>.iblBase, else origin/master
+SCR="$WORK/scratch"
+mkdir -p "$SCR/bin/lib" "$SCR/tools/postplan-harness/harness"
+cp "$EVAL" "$SCR/bin/reviewer-eval"
+cp "$SCRIPT_DIR/lib/branch-base.sh" "$SCR/bin/lib/branch-base.sh"
+: > "$SCR/tools/postplan-harness/harness/__init__.py"
+printf 'import sys\nprint(" ".join(sys.argv[1:]))\n' > "$SCR/tools/postplan-harness/harness/reviewer_eval.py"
+h_git_repo "$SCR" --no-commit
+git -C "$SCR" add -A
+git -C "$SCR" commit -q -m scratch
+git -C "$SCR" checkout -q -b feat
+git -C "$SCR" update-ref refs/remotes/origin/stackparent HEAD
+git -C "$SCR" config branch.feat.iblBase stackparent
+RC=0
+OUT="$("$SCR/bin/reviewer-eval" compare 2>&1)" || RC=$?
+h_eq "case s: stacked base exit code" 0 "$RC"
+h_contains "case s: stacked base token" "$OUT" "--base origin/stackparent"
+
+git -C "$SCR" config --unset branch.feat.iblBase
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_STUB_FAIL=1 GH_MARKER="$WORK/gh-called-s" GH_STUB_BODY="$BODY" \
+    "$SCR/bin/reviewer-eval" compare 2>&1)" || RC=$?
+h_eq "case s: default base exit code" 0 "$RC"
+h_contains "case s: default base token" "$OUT" "--base origin/master"
+
+h_done

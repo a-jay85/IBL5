@@ -22,6 +22,7 @@ final readonly class SuggestionPlayer
 
     /**
      * @param array<string, int> $depth
+     * @param list<int> $laterSalaries Salary for effective year +1, +2, ... through cyt
      */
     public function __construct(
         public int $pid,
@@ -39,6 +40,7 @@ final readonly class SuggestionPlayer
         public int $dcMinutes = 0,
         public int $exp = 0,
         public ?ProductionLine $production = null,
+        public array $laterSalaries = [],
     ) {
     }
 

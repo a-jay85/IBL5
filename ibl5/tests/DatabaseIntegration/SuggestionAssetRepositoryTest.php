@@ -127,6 +127,21 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         self::assertSame(0, $offseason[200000012]->futureSalary);
     }
 
+    public function testLaterSalariesListFollowsEffectiveYear(): void
+    {
+        $this->insertTestPlayer(200000041, 'Suggest Later', [
+            'teamid' => 1, 'cy' => 2, 'cyt' => 4, 'salary_yr1' => 900, 'salary_yr2' => 1000, 'salary_yr3' => 1100, 'salary_yr4' => 1200,
+        ]);
+
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000041];
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? [])[200000041];
+
+        self::assertSame(1000, $inSeason->currentSalary);
+        self::assertSame([1100, 1200], $inSeason->laterSalaries);
+        self::assertSame(1100, $offseason->currentSalary);
+        self::assertSame([1200], $offseason->laterSalaries);
+    }
+
     /**
      * The roster count must match TradeFormRepository::getTeamPlayerCount(),
      * which in the offseason counts anyone with a salary next contract year,

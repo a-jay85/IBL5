@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check
-# (16 stub cases + R1-R11 real-DB cases + B1-B4 bot-reachability cases
-#  + L1-L3 bot-launchd-load cases)
+# (16 stub cases + R1-R13 real-DB cases + B1-B4 bot-reachability cases
+#  + L1-L3 bot-launchd-load cases + K1-K5 bot-key cases)
 #
 # No set -e (constraint a). Verdict assertions use tail -n 1 (constraint b).
 # BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 pinned per case (constraint c).
@@ -84,6 +84,19 @@ if [ -f "$STUB/db-unparseable" ]; then
     exit 0
 fi
 case "$sql" in
+    *ibl_api_keys*)
+        if [ -f "$STUB/db-botkey-unavailable" ]; then
+            echo "DB connection error" >&2
+            exit 1
+        fi
+        if [ -f "$STUB/db-botkey-unparseable" ]; then
+            exit 0
+        fi
+        printf '| n |\n|---|\n| %s |\n' "$(cat "$STUB/db-count-botkey" 2>/dev/null || echo 1)"
+        exit 0
+        ;;
+esac
+case "$sql" in
     *blocked*) cnt="$(cat "$STUB/db-count-blocked" 2>/dev/null || echo 0)" ;;
     *hunting*) cnt="$(cat "$STUB/db-count-hunting" 2>/dev/null || echo 0)" ;;
     *)         cnt="$(cat "$STUB/db-count-other"   2>/dev/null || echo 0)" ;;
@@ -115,6 +128,7 @@ reset_case() {
     rm -f "$STUB/launchctl-list-rc" "$STUB/launchctl-bot-list-rc" "$STUB/launchctl-print-out" \
           "$STUB/db-unavailable" "$STUB/db-unparseable" \
           "$STUB/db-count-blocked" "$STUB/db-count-hunting" "$STUB/db-count-other" \
+          "$STUB/db-count-botkey" "$STUB/db-botkey-unavailable" "$STUB/db-botkey-unparseable" \
           "$STUB/curl-exit" "$STUB/curl-code" \
           "$STUB/sql.log" "$STUB/out.txt" "$STUB/err.txt" "$STUB/rc"
     # healthy launchctl
@@ -128,6 +142,8 @@ reset_case() {
     printf '0\n' > "$STUB/db-count-blocked"
     printf '0\n' > "$STUB/db-count-hunting"
     printf '0\n' > "$STUB/db-count-other"
+    # bot key: one active bug-bot row present
+    printf '1\n' > "$STUB/db-count-botkey"
     # bot reachable, HTTP 200
     printf '0\n'   > "$STUB/curl-exit"
     printf '200\n' > "$STUB/curl-code"
@@ -378,7 +394,7 @@ if [ -f "$STUB/sql.log" ]; then
         bpt_ok "14: sql.log contains only SELECT statements"
     fi
     _sql_count="$(grep -c 'SELECT' "$STUB/sql.log" 2>/dev/null || echo 0)"
-    bpt_expect_eq "14: sql.log has 3 SELECT calls" "3" "$_sql_count"
+    bpt_expect_eq "14: sql.log has 4 SELECT calls" "4" "$_sql_count"
 else
     bpt_fail "14: sql.log not found (db stub was not called)"
 fi
@@ -539,6 +555,82 @@ else
     bpt_ok "L3: bot:unloaded absent (unprobeable not conflated with down)"
 fi
 
+# ── Case K1: active bug-bot key present → healthy, probe ran once ─────────────
+# The sql.log assertions are what fail against a checker that never queries
+# ibl_api_keys. The key-material check pins that the probe only counts rows.
+reset_case
+run_check
+bpt_expect_eq "K1: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K1: rc=0" "0" "$CHECK_RC"
+if grep -q 'SIGNAL: botkey:' "$STUB/out.txt"; then
+    bpt_fail "K1: no botkey SIGNAL expected — got $(grep 'SIGNAL: botkey:' "$STUB/out.txt")"
+else
+    bpt_ok "K1: no botkey SIGNAL with an active bug-bot key"
+fi
+_k1_calls="$(grep -c 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null)"
+bpt_expect_eq "K1: ibl_api_keys probe ran exactly once" "1" "${_k1_calls:-0}"
+if grep 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null | grep -qE 'key_hash|key_prefix'; then
+    bpt_fail "K1: key SQL must not name key_hash or key_prefix"
+else
+    bpt_ok "K1: key SQL names no key material"
+fi
+
+# ── Case K2: zero active bug-bot keys → botkey:missing (DEGRADED) ─────────────
+reset_case
+printf '0\n' > "$STUB/db-count-botkey"
+run_check
+if grep -q 'SIGNAL: botkey:missing' "$STUB/out.txt"; then
+    bpt_ok "K2: SIGNAL botkey:missing present"
+else
+    bpt_fail "K2: SIGNAL botkey:missing absent — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "K2: verdict" "VERDICT: degraded [botkey:missing]" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K2: rc=1" "1" "$CHECK_RC"
+
+# ── Case K3: key query fails → botkey:db-unavailable (UNKNOWN), isolated ──────
+reset_case
+: > "$STUB/db-botkey-unavailable"
+run_check
+if grep -q 'SIGNAL: botkey:db-unavailable' "$STUB/out.txt"; then
+    bpt_ok "K3: SIGNAL botkey:db-unavailable present"
+else
+    bpt_fail "K3: SIGNAL botkey:db-unavailable absent — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "K3: verdict" "VERDICT: unknown [botkey:db-unavailable]" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K3: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: stale:db-unavailable' "$STUB/out.txt"; then
+    bpt_fail "K3: stale:db-unavailable must be absent (staleness queries still answered)"
+else
+    bpt_ok "K3: stale:db-unavailable absent (key-query failure is isolated)"
+fi
+
+# ── Case K4: key query output unparseable → botkey:db-parse-failed (UNKNOWN) ──
+reset_case
+: > "$STUB/db-botkey-unparseable"
+run_check
+if grep -q 'SIGNAL: botkey:db-parse-failed' "$STUB/out.txt"; then
+    bpt_ok "K4: SIGNAL botkey:db-parse-failed present"
+else
+    bpt_fail "K4: SIGNAL botkey:db-parse-failed absent — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "K4: verdict" "VERDICT: unknown [botkey:db-parse-failed]" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K4: rc=2" "2" "$CHECK_RC"
+
+# ── Case K5: two active bug-bot keys → still healthy (boundary) ───────────────
+# Catches a checker that tests n -ne 1 instead of n -eq 0.
+reset_case
+printf '2\n' > "$STUB/db-count-botkey"
+run_check
+bpt_expect_eq "K5: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K5: rc=0" "0" "$CHECK_RC"
+if grep -q 'SIGNAL: botkey:' "$STUB/out.txt"; then
+    bpt_fail "K5: no botkey SIGNAL expected for two active keys"
+else
+    bpt_ok "K5: no botkey SIGNAL for two active keys"
+fi
+_k5_calls="$(grep -c 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null)"
+bpt_expect_eq "K5: ibl_api_keys probe ran exactly once" "1" "${_k5_calls:-0}"
+
 # ── Real-DB gate ──────────────────────────────────────────────────────────────
 REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
 if ! DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" "SELECT 1" >/dev/null 2>&1; then
@@ -563,6 +655,19 @@ fi
 if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
         "$(cat "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql")" >/dev/null 2>&1; then
     bpt_fail "real-DB schema load: migration 158 failed"
+    bpt_finish
+fi
+# ibl_api_keys DDL from ibl5/docs/schema/current-schema.sql, minus the
+# fk_api_keys_auth_user constraint and its user_id index (no auth_users here).
+# The seed hash is a fixed dummy, not a real key.
+if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+        "CREATE TABLE ibl_api_keys (id int(11) NOT NULL AUTO_INCREMENT, user_id int(10) unsigned DEFAULT NULL, key_hash char(64) NOT NULL, key_prefix char(8) NOT NULL, owner_name varchar(64) NOT NULL, permission_level enum('public','team_owner','commissioner') NOT NULL DEFAULT 'public', rate_limit_tier enum('standard','elevated','unlimited') NOT NULL DEFAULT 'standard', is_active tinyint(1) NOT NULL DEFAULT 1, last_used_at timestamp NULL DEFAULT NULL, created_at timestamp NOT NULL DEFAULT current_timestamp(), updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (id), UNIQUE KEY key_hash (key_hash), KEY idx_is_active (is_active)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" >/dev/null 2>&1; then
+    bpt_fail "real-DB schema load: ibl_api_keys create failed"
+    bpt_finish
+fi
+if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+        "INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, is_active) VALUES (REPEAT('0', 64), 'testtest', 'bug-bot (Buggsy)', 1)" >/dev/null 2>&1; then
+    bpt_fail "real-DB seed: bug-bot api key row failed"
     bpt_finish
 fi
 
@@ -750,6 +855,30 @@ run_real_check
 _r11_after="$(DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
     "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
 bpt_expect_eq "R11: no writes — scratch DB snapshot unchanged" "$_r11_before" "$_r11_after"
+
+# ── Case R12: revoked bug-bot key (is_active = 0) → botkey:missing ────────────
+truncate_table
+DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+    "UPDATE ibl_api_keys SET is_active = 0 WHERE owner_name = 'bug-bot (Buggsy)'" >/dev/null 2>&1
+run_real_check
+if grep -q 'SIGNAL: botkey:missing' "$STUB/out.txt"; then
+    bpt_ok "R12: SIGNAL botkey:missing for a revoked bug-bot key"
+else
+    bpt_fail "R12: expected SIGNAL botkey:missing for a revoked key — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R12: rc=1" "1" "$CHECK_RC"
+
+# ── Case R13: an active non-bot key does not count → botkey:missing ───────────
+# The bug-bot row stays revoked from R12.
+DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+    "INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, is_active) VALUES (REPEAT('1', 64), 'othrothr', 'IBLbot', 1)" >/dev/null 2>&1
+run_real_check
+if grep -q 'SIGNAL: botkey:missing' "$STUB/out.txt"; then
+    bpt_ok "R13: SIGNAL botkey:missing with only a non-bot active key"
+else
+    bpt_fail "R13: expected SIGNAL botkey:missing with only a non-bot key — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R13: rc=1" "1" "$CHECK_RC"
 
 
 # ── Summary ───────────────────────────────────────────────────────────────────

@@ -112,6 +112,16 @@ case "\$*" in
     *"pr list"*"--json number,url,title,state"*)
         [[ -f "\$S/gh-fail-prlist" ]] && exit 5
         [[ -f "\$S/prlist.tsv" ]] && cat "\$S/prlist.tsv" ;;
+    *"pr view"*"--json mergeStateStatus,mergeable"*)
+        # Replays mss-<num>, one line per call; the last line repeats.
+        # Records the value served in mss-last-<num> so a triage hook can see "GitHub state".
+        k=0; [[ -f "\$S/mss-\$num.n" ]] && k=\$(cat "\$S/mss-\$num.n"); k=\$((k + 1))
+        echo "\$k" > "\$S/mss-\$num.n"
+        if [[ -f "\$S/mss-\$num" ]]; then
+            v=\$(sed -n "\${k}p" "\$S/mss-\$num"); [[ -n "\$v" ]] || v=\$(tail -n 1 "\$S/mss-\$num")
+        else v=CLEAN; fi
+        echo "\$v" > "\$S/mss-last-\$num"
+        echo "\$v" ;;
     *"--json state"*)
         if [[ -f "\$S/state-\$num" ]]; then cat "\$S/state-\$num"; else echo OPEN; fi ;;
     *"--json comments,headRefOid"*)
@@ -260,6 +270,19 @@ triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
         printf '%-8s %-18s %-24s\n' "#$1" "$2" "$3"
     done
 }
+# fleet_skip_row PR MSG: one post-plan-fleet skip-table row, same printf shape as
+# post-plan-fleet's skip table (`printf '%-6s %-34s %s %s\n' ... "SKIP ($_smsg)"`).
+fleet_skip_row() { printf '%-6s %-34s %s %s\n' "$1" '-' '—' "SKIP ($2)"; }
+# triage_row PR BUCKET ACTION: one report row whose ACTION may contain spaces.
+# triage_report() word-splits its triples, so it cannot carry "re-check (state unknown)".
+triage_row() { printf '%-8s %-18s %s\n' "#$1" "$2" "$3"; }
+# sleep shim: records argv, never sleeps. Install per case; remove at end_case.
+install_sleep_shim() {
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/sleep.argv"\n' "$SCRATCH" > "$BIN/sleep"
+    chmod +x "$BIN/sleep"; : > "$SCRATCH/sleep.argv"
+}
+remove_sleep_shim() { rm -f "$BIN/sleep"; }
+view_calls() { grep -c -- "pr view $1 --json mergeStateStatus,mergeable" "$SCRATCH/gh.argv" || true; }
 
 # Two distinct 40-hex tree SHAs. TREE_A is "the tree /pr-ready reviewed"; TREE_B is any
 # other tree, used to stage the stale-verdict case.
@@ -323,8 +346,9 @@ reset_state() {
           "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict \
           "$SCRATCH"/prlist.tsv "$SCRATCH"/gh-fail-prlist \
           "$SCRATCH"/armed-state.json "$SCRATCH"/gh-fail-armed \
-          "$SCRATCH"/patchid-*.txt
+          "$SCRATCH"/patchid-*.txt "$SCRATCH"/mss-* "$SCRATCH"/sleep.argv
     rm -rf "$SCRATCH/harness-out"
+    rm -f "$BIN/sleep"
     rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
     rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
@@ -675,6 +699,53 @@ _ln_fin="$(grep -n 'pr-cycle finished' <<< "$OUT" | head -1 | cut -d: -f1)"
 [[ -n "$_ln_pr" && -n "$_ln_fin" && "$_ln_pr" -lt "$_ln_fin" ]] \
     || fail "case 11c: per-PR lines do not precede the finish line ($_ln_pr vs $_ln_fin)"
 end_case "case 11c all outcome buckets"
+
+# ==========================================================================================
+# fleet-skip-baseline — a fleet-skipped (bot-authored) PR has no log; characterize its report
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' '# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #101 first-slug | none | no |
+| 2 | #3478 bot-slug | none | no |
+' > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "3478 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs" "$SCRATCH/res"; mkdir -p "$SCRATCH/fleetlogs"
+echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+# 3478 is skipped by the fleet, so it has no log at all.
+{   printf '%-6s %-34s %s %s\n' 101 first-slug '—' 'WOULD FIRE'
+    fleet_skip_row 3478 'bot- or other-authored — skipped'
+} > "$SCRATCH/ready-out"
+PR_CYCLE_RESULT_FILE="$SCRATCH/res/result.tsv" run --worker
+[[ $RC -eq 0 ]] || fail "fleet-skip-baseline: exit $RC, want 0"
+grep -qxF '#3478 failed no-log' <<< "$OUT" || fail "fleet-skip-baseline: '#3478 failed no-log' missing (out: $OUT)"
+_want_fsb='fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
+grep -qF "$_want_fsb" <<< "$OUT" || fail "fleet-skip-baseline: finish line lacks '$_want_fsb' (out: $OUT)"
+[[ "$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)" == "$(printf '3478\tfired\tfailed\tno-log')" ]] \
+    || fail "fleet-skip-baseline: result row is '$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)'"
+end_case "fleet-skip-baseline"
+
+# ==========================================================================================
+# your-turn-unknown-baseline — three NOT-MERGEABLE rows each render as their own DM row
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+{   triage_row 201 NOT-MERGEABLE 're-check (state unknown)'
+    triage_row 202 NOT-MERGEABLE 're-check (state unknown)'
+    triage_row 203 NOT-MERGEABLE 'resolve conflicts'
+} > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "your-turn-unknown-baseline: exit $RC, want 0"
+_dm="$(cat "$SCRATCH/dm.argv")"
+for _n in 201 202 203; do
+    grep -qF "#$_n — NOT-MERGEABLE — " <<< "$_dm" \
+        || fail "your-turn-unknown-baseline: row #$_n missing or wrong shape (dm: $_dm)"
+done
+end_case "your-turn-unknown-baseline"
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it

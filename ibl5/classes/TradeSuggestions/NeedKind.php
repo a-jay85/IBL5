@@ -22,6 +22,25 @@ enum NeedKind
     case Rebuild;
     case FutureCapStrain;
 
+    /**
+     * Two needs clash when they are the same kind or both want a scarce
+     * currency: less salary, picks, young players or veterans.
+     */
+    public static function sameWant(self $a, self $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        $scarce = [Asset::LessSalary, Asset::Picks, Asset::YoungPlayers, Asset::Veterans];
+        foreach ($a->wants() as $asset) {
+            if (in_array($asset, $scarce, true) && in_array($asset, $b->wants(), true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function priority(): int
     {
         return match ($this) {

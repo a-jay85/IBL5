@@ -55,4 +55,12 @@ final class NeedThresholds
 
     /** Players this age or younger count as young. */
     public const int YOUNG_MAX_AGE = 24;
+
+    /** Mirrors the roster limit TradeValidator checks. */
+    public const int ROSTER_MAX = 15;
+
+    /** Candidate size limits for NeedPairMatcher. */
+    public const int MAX_PICKS_PER_SIDE = 2;
+    public const int MAX_PER_PAIRING = 4;
+    public const int MAX_PER_PARTNER = 12;
 }

@@ -576,6 +576,8 @@ run_mut "mut-m4-msi-99" 1 m4-msi-99
 run_mut "mut-m4-msi-extra" 1 m4-msi-extra
 run_mut "mut-m4-msi-missing" 1 m4-msi-missing
 run_mut "mut-m4-coe-infection" 1 m4-coe-infection
+# mut-m1..m4 above run against the same good base, which now carries the
+# check-infection-ran line, so they also prove M1-M4 stay green with the guard.
 run_mut "mut-m5-diff-relative" 1 m5-diff-relative
 run_mut "mut-m5-diff-relative-comment" 0 m5-diff-relative-comment
 run_mut "mut-m5-no-guard" 1 m5-no-guard

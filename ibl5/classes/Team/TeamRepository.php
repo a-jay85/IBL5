@@ -263,14 +263,12 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
 
             SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
-                " . TeamAwardSql::HEAT_WINNER_SUBSELECT
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (WHERE fixes name and uk_year_award_name makes (year, award) unique, so the trailing "award ASC" completes a total order)
-            . "
+                " . TeamAwardSql::HEAT_WINNER_SUBSELECT . "
             ) hc
             JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1 AND ti.team_name = ?
 
-            ORDER BY year DESC, " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC";
+            ORDER BY year DESC, " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC, id ASC";
     }
 
     /**

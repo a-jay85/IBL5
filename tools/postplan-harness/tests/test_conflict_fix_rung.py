@@ -85,7 +85,9 @@ def test_fix_rung_argv_model_and_denied(tmp_path, key):
     assert _flag_value(argv, "--max-budget-usd") == "5.00"
     denied = _flag_value(argv, "--disallowedTools").split(",")
     for entry in ("Bash(git push:*)", "Bash(git -C:*)", "Bash(git update-ref:*)",
-                  "Bash(git stash:*)", "Bash(claude:*)", "WebFetch"):
+                  "Bash(git stash:*)", "Bash(claude:*)", "WebFetch",
+                  "Bash(*/git push:*)", "Bash(git * push *)", "Bash(git * push)",
+                  "Bash(*/gh:*)", "Bash(*/git push *)", "Bash(*/gh *)"):
         assert entry in denied
 
 
@@ -570,6 +572,34 @@ def test_phase2_copies_fix_summary_to_result():
     with pytest.raises(HarnessError):
         runner._phase2_rebase(_Git(), res, lambda *_a, **_k: None)
     assert res.conflict_fix_summary == "sonnet-fix: x"
+
+
+def test_phase2_onto_path_copies_conflict_review_retries():
+    class _Git:
+        last_conflict_rung = "first-pass"
+        last_conflict_fix_summary = ""
+        last_conflict_files = ()
+        conflict_review_retries = {"conflict-review": 1}
+
+        def head(self):
+            return "abc"
+
+        def branch(self):
+            return "feat"
+
+        def rebase_onto(self):
+            raise HarnessError("rebase-conflict", "d")
+
+        def autoresolve_stacked_rebase(self):
+            return type("R", (), {
+                "resolved": True, "base_sha": "f88df97b0000", "manifest_path": "m",
+                "notes_path": "n", "post_resolution_sha": "abc", "adapted_lines": (),
+                "collapse_warn": "", "resolved_files": ("a.php",),
+            })()
+
+    res = RunResult(terminal=TerminalState.FAILED)
+    runner._phase2_rebase(_Git(), res, lambda *_a, **_k: None)
+    assert res.retries == {"conflict-review": 1}
 
 
 def test_runner_never_imports_conflict_fix():

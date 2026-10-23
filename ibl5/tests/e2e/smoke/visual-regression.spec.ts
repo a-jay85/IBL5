@@ -117,8 +117,8 @@ async function captureSnapshot(
   // Re-establish the same visual state after a (re)load: wait for the anchor,
   // and re-trigger the HTMX tab swap if any. Runs after both the initial
   // navigation and the render-B reload. Late image/font loads settle inside
-  // captureStable() and the toHaveScreenshot() gate, which both re-sample
-  // until two consecutive shots agree.
+  // captureStable() (re-samples until two consecutive shots differ by at most
+  // STABLE_MAX_DIFF_RATIO) and the toHaveScreenshot() gate.
   async function settle(): Promise<void> {
     await anchor.waitFor({ state: 'visible' });
     if (tab) {

@@ -160,21 +160,19 @@ test.describe('Depth Chart submission', () => {
       .locator('.depth-chart-table select[name^="pg"]')
       .first();
     await firstPg.selectOption('3');
-    // Set up the URL wait BEFORE clicking (Promise.all), not after: beforeEach
-    // already navigated to a URL matching this same pattern, so a wait started
-    // AFTER the click can observe the still-current pre-submit URL as an
-    // immediate "match" and resolve before the PRG redirect actually lands —
-    // which then let the very next page.goto() below abort that still-in-flight
-    // navigation (net::ERR_ABORTED). Starting the wait first ties it to the
-    // navigation the click triggers, not to whatever URL happened to be current.
+    // Wait for the NEXT document's load event, started before the click.
+    // beforeEach already loaded a URL matching the pattern below, and
+    // waitForURL returns at once (via waitForLoadState) when the current URL
+    // already matches, even if started before the click. So waitForURL alone
+    // can resolve before the PRG redirect lands, and the page.goto() below
+    // then aborts the in-flight navigation (net::ERR_ABORTED). The current
+    // document's load event already fired, so waitForEvent('load') can only
+    // resolve on the redirect target.
     await Promise.all([
-      page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 }),
+      page.waitForEvent('load', { timeout: 15_000 }),
       page.locator('.depth-chart-buttons .depth-chart-submit-btn').click(),
     ]);
-    // waitForURL above already waits for the redirect target's load event.
-    // This explicit load wait documents that the PRG GET has fully landed
-    // before page.goto() below starts a new navigation.
-    await page.waitForLoadState('load');
+    await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
 
     // Leave the depth chart page and come back — minimal reliable repro of
     // the "user returns to the form later" pattern.

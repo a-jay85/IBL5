@@ -125,7 +125,7 @@ const RETIRED_FIGURES = [
         'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
     ],
     [
-        'pattern' => '~(?:git (?:branch|checkout -b|switch -c) |refs/heads/)\S*-(?:backup|local)-[0-9]{8}\b~',
+        'pattern' => '~(?:git (?:branch(?: -[fcmM])?|checkout -[bB]|switch -[cC]) |refs/heads/)\S*-(?:backup|local)-[0-9]{8}\b~',
         'label'   => 'undated-namespace backup branch <slug>-backup-<YYYYMMDD>',
         'why'     => 'backup branches moved to backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>; a <slug>-backup-<date> or <slug>-local-<date> branch is invisible to a backup/* sweep',
         'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
@@ -1429,6 +1429,9 @@ function selfTestRetiredFigures(): int
         ['fenced flat shape flags', "# Doc\n\n```bash\ngit branch backup/foo-pre-rebase\n```\n", 1],
         ['dated-suffix branch flags', "# Doc\n\ngit branch my-slug-backup-20261022 HEAD\n", 1],
         ['local-date branch flags', "# Doc\n\ngit checkout -b xm-local-20261022\n", 1],
+        ['branch -f dated name flags', "# Doc\n\ngit branch -f xm-backup-20261022 HEAD\n", 1],
+        ['checkout -B local-date flags', "# Doc\n\ngit checkout -B xm-local-20261022\n", 1],
+        ['switch -C local-date flags', "# Doc\n\ngit switch -C xm-local-20261022\n", 1],
         ['new namespace with local in slug does not flag', "# Doc\n\ngit branch backup/fix-local-dev/20261022-120000-pre-rebase HEAD\n", 0],
         ['new namespace does not flag', "# Doc\n\ngit branch backup/my-slug/20261022-120000-pre-rebase HEAD\n", 0],
         ['dated backup directory does not flag', "# Doc\n\nSee ~/decom-backup-20260727/ for the crontab.\n", 0],

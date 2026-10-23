@@ -230,7 +230,44 @@ def test_corpus_digest_scope():
     assert re_.corpus_digest(c) != base
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+def test_corpus_digest_pinned_without_also_accept():
+    assert re_.corpus_digest(_corpus()) == "9e2372cc67c5"
+
+
+def test_case_digest_pinned():
+    assert re_.case_digest(_corpus()["cases"][0], "bug") == "6f88e391853a"
+
+
+def test_corpus_digest_also_accept():
+    base = re_.corpus_digest(_corpus())
+    c = _corpus()
+    c["cases"][0]["also_accept"] = [{"path": "a.php", "start": 30, "end": 30}]
+    first = re_.corpus_digest(c)
+    assert first != base
+    c["cases"][0]["also_accept"][0]["end"] = 31
+    assert re_.corpus_digest(c) != first
+    c = _corpus()
+    c["cases"].append({**c["cases"][0], "id": "b2", "status": "unconfirmed",
+                       "also_accept": [{"path": "a.php", "start": 30, "end": 30}]})
+    assert re_.corpus_digest(c) == base
+
+
+def test_case_digest_ignores_also_accept():
+    case = _corpus()["cases"][0]
+    with_key = {**case, "also_accept": [{"path": "a.php", "start": 30, "end": 30}]}
+    assert re_.case_digest(with_key, "bug") == re_.case_digest(case, "bug")
+
+
+def test_accepted_ranges_and_file_only():
+    case = {"expected": [{"path": "a.php", "start": 10, "end": 14}],
+            "also_accept": [{"path": "b.php", "start": 40, "end": 40}]}
+    assert re_.accepted_ranges(case) == [R("a.php", 10, 14), R("b.php", 40, 40)]
+    assert re_.file_only_count([_f("b.php", 0)], re_.accepted_ranges(case)) == 1
+    assert not re_.case_hit([_f("b.php", 0)], re_.accepted_ranges(case))
+    assert re_.accepted_ranges({"expected": case["expected"]}) == [R("a.php", 10, 14)]
+
+
+REPO_ROOT =Path(__file__).resolve().parents[3]
 TRADE_CASE = "trade-preview-unbounded-cash-years"
 TRADE_PATH = "ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php"
 
@@ -556,6 +593,23 @@ def test_run_canned_hit_and_miss(tmp_path):
     assert rc == 0
     assert _last(text).endswith("recall=1/2 false_alarms=1 clean_flagged=1/1 degraded=0")
     assert "case b1 bug HIT" in text and "case b2 bug MISS" in text
+
+
+def test_run_hit_via_also_accept(tmp_path):
+    r = _eval_repo(tmp_path)
+    canned = _canned_by_case()
+    corpus = _eval_corpus(r)
+    corpus["cases"][1]["also_accept"] = [{"path": FOO, "start": 48, "end": 48}]
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(canned[cid]))
+    assert rc == 0
+    assert "case b2 bug HIT" in text
+    assert _last(text).endswith("recall=2/2 false_alarms=1 clean_flagged=1/1 degraded=0")
+    corpus = _eval_corpus(r)
+    corpus["cases"][1]["also_accept"] = [{"path": FOO, "start": 56, "end": 56}]
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(canned[cid]))
+    assert rc == 0
+    assert "case b2 bug MISS" in text
+    assert _last(text).endswith("recall=1/2 false_alarms=1 clean_flagged=1/1 degraded=0")
 
 
 def test_run_all_verifiers_reject_not_counted(tmp_path):

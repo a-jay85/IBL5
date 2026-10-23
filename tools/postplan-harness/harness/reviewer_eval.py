@@ -213,12 +213,18 @@ def surface_hash_ref(root: Path, ref: str) -> str:
     return surface_hash(lambda r: read_git_ref(root, ref, r))
 
 
+def _digest_case(c: dict) -> dict:
+    d = {"id": c["id"], "commit": c["commit"],
+         "expected": sorted([[e["path"], e["start"], e["end"]] for e in c["expected"]])}
+    if "also_accept" in c:
+        d["also_accept"] = sorted([[e["path"], e["start"], e["end"]] for e in c["also_accept"]])
+    return d
+
+
 def corpus_digest(corpus: dict) -> str:
     proj = {
         "bugs": sorted(
-            [{"id": c["id"], "commit": c["commit"],
-              "expected": sorted([[e["path"], e["start"], e["end"]] for e in c["expected"]])}
-             for c in corpus["cases"] if c["status"] == "confirmed"],
+            [_digest_case(c) for c in corpus["cases"] if c["status"] == "confirmed"],
             key=lambda d: d["id"]),
         "clean": sorted([{"id": c["id"], "commit": c["commit"]} for c in corpus["clean"]],
                         key=lambda d: d["id"]),
@@ -630,6 +636,8 @@ def case_input(root: Path, commit: str) -> tuple[dict, Classification]:
     return meta, cls
 
 
+# The cache key covers what review_case reads. Accepted ranges (`also_accept`) only
+# affect scoring after the fact, so editing them must reuse cached findings.
 def case_digest(case: dict, kind: str) -> str:
     blob = json.dumps({"kind": kind, "commit": case["commit"],
                        "expected": case.get("expected", [])}, sort_keys=True)
@@ -761,7 +769,7 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
                   f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
         suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
         if kind == "bug":
-            expected = [ExpectedRange(e["path"], e["start"], e["end"]) for e in case["expected"]]
+            expected = accepted_ranges(case)
             hit = case_hit(findings, expected)
             bug_out.append(CaseOutcome(cid, "bug", tuple(findings), tuple(degraded), hit))
             print(f"case {cid} bug {'HIT' if hit else 'MISS'} findings={len(findings)} "

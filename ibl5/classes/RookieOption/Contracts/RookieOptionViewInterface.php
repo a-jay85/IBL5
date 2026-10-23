@@ -21,7 +21,7 @@ interface RookieOptionViewInterface
      *
      * Displays the confirmation form for exercising a rookie option,
      * including player image, option value, and warning text.
-     * Uses design system classes (ibl-card, ibl-alert, ibl-btn).
+     * Uses prefixed daisyUI component classes (d-card, d-alert, d-btn).
      *
      * @param Player $player Player object
      * @param string $teamName User's team name for form submission
@@ -33,11 +33,11 @@ interface RookieOptionViewInterface
      * @return string Rendered HTML
      *
      * **HTML Structure:**
-     * - Error banner (if $error set) with ibl-alert--error
-     * - Result banner (if $result set) with ibl-alert--success/warning
-     * - ibl-card with player image (flex layout) and option value
-     * - Warning card with ibl-alert--warning for exercise consequences
-     * - Form with hidden fields and ibl-btn--danger submit button
+     * - Error banner (if $error set) with d-alert-error; it wins over $result
+     * - Result banner (if $result set) with d-alert-success/warning
+     * - d-card with player image (flex layout) and option value
+     * - Warning card with d-alert-warning for exercise consequences
+     * - Form with hidden fields and d-btn-error submit button
      *
      * **Form Fields:**
      * - teamname: Team name

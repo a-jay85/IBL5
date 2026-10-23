@@ -26,10 +26,7 @@ class RookieOptionView implements RookieOptionViewInterface
 <div class="ibl-form-container">
         <?php
 
-        echo \UI\AlertRenderer::fromCode($result, [
-            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
-            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
-        ], $error);
+        echo HtmlSanitizer::trusted($this->renderBanner($result, $error));
 
         // Title, then the flippable trading card (unwrapped), then the option card
         ?>
@@ -40,16 +37,42 @@ class RookieOptionView implements RookieOptionViewInterface
         return (string) ob_get_clean() . ($cardHtml ?? '') . $this->renderOptionCard($playerID, $teamName, $rookieOptionValue, $from) . "</div>\n";
     }
 
+    /**
+     * Error wins over a result code; an unknown or null code renders nothing.
+     * Escapes with HtmlSanitizer::safeHtmlOutput, the same call UI\AlertRenderer makes.
+     */
+    private function renderBanner(?string $result, ?string $error): string
+    {
+        $banners = [
+            'rookie_option_success' => ['variant' => 'success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['variant' => 'warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ];
+
+        if ($error !== null) {
+            $variant = 'error';
+            $message = $error;
+        } elseif ($result !== null && isset($banners[$result])) {
+            $variant = $banners[$result]['variant'];
+            $message = $banners[$result]['message'];
+        } else {
+            return '';
+        }
+
+        return '<div role="alert" class="d-alert d-alert-' . $variant . ' mb-4">'
+            . HtmlSanitizer::safeHtmlOutput($message)
+            . '</div>';
+    }
+
     private function renderOptionCard(int $playerID, string $teamName, int $rookieOptionValue, ?string $from): string
     {
         ob_start();
         ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Rookie Option Value: <?= HtmlSanitizer::e($rookieOptionValue) ?></h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Rookie Option Value: <?= HtmlSanitizer::e($rookieOptionValue) ?></h2>
     </div>
-    <div class="ibl-card__body text-center">
-        <div class="ibl-alert ibl-alert--warning">
+    <div class="d-card-body text-center">
+        <div role="alert" class="d-alert d-alert-warning mb-4">
             By exercising this option, you cannot use an in-season contract extension on this player next season. They will become a free agent after the option year.
         </div>
 
@@ -59,7 +82,7 @@ class RookieOptionView implements RookieOptionViewInterface
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
             <input type="hidden" name="rookieOptionValue" value="<?= HtmlSanitizer::e($rookieOptionValue) ?>">
             <input type="hidden" name="from" value="<?= HtmlSanitizer::e($from ?? '') ?>">
-            <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
+            <button type="submit" class="d-btn d-btn-error">Exercise Rookie Option</button>
         </form>
     </div>
 </div>

@@ -12,7 +12,7 @@ into the run notes before step 1, verbatim:
 - `Mode: standalone` — invoked from `/fix-and-prevent`. You own the ship step:
   after step 5, return to `/fix-and-prevent` Step 3, which fires
   `bin/post-plan-now --auto`.
-- `Mode: in-PR` — invoked from `/pr-ready` Phase 6.5. You do NOT own the ship
+- `Mode: in-PR`: invoked from `/post-plan` Phase 5.5 step 4. You do NOT own the ship
   step: no `bin/post-plan-now`, no `gh pr create`, no auto-merge arming, no
   worktree creation, no worktree teardown, no merge. The caller commits and
   pushes.

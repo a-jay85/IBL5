@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
-description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, pr-ready verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-21
+description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
+last_verified: 2026-10-23
 ---
 
 # /pr-burndown
@@ -74,7 +74,7 @@ Re-fetch the PR right before you show it. Then collect:
   ```bash
   gh api graphql -f query='query{repository(owner:"a-jay85",name:"IBL5"){pullRequest(number:N){reviewThreads(first:50){nodes{isResolved isOutdated path line comments(first:3){nodes{author{login} body}}}}}}}'
   ```
-- **pr-ready verdict:** the last comment holding `<!-- pr-ready-verdict -->`. Check
+- **post-plan verdict:** the last comment holding `<!-- pr-ready-verdict -->`. Check
   whether it reviewed the current head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
 - **Visual links:** the "Visual review" comment's `a-jay85.github.io/IBL5/...` URLs.
@@ -96,7 +96,7 @@ Write the card in this shape:
 **State**
 - **CI:** <green / which real check failed>, on head `<sha>`.
 - **Review comments:** <open count; what each said; which commit fixed it>.
-- **pr-ready verdict:** <verdict>. <Current or stale>. <Its notes, short>.
+- **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
 - **Conflicts:** <none / which files clash and with which PR>.
 - **Why it's held:** <each reason by number; mark stale ones as stale>.
@@ -143,13 +143,26 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
 4. Run <the tests and composer run analyse> in the worktree's Docker. Fix what broke.
 5. Push (force-with-lease after a rebase).
-6. Re-run /pr-ready so the verdict covers the new head.
+6. Re-verdict the new head: run bin/post-plan-now --pr N --foreground and wait for it
+   to exit. Use exactly those flags. The bare form is required because the auto-arm
+   flag is skipped under CLAUDE_HEADLESS=1, a rebase-only run stops before review and
+   writes no verdict, and a run without --foreground detaches and returns at once. The
+   run refreshes the sticky post-plan verdict comment for the new head. Post-plan's
+   Phase 6.5 can arm auto-merge on its own when every condition passes. You do not own
+   arming: step 7 arms, and only after the owner approved this PR.
+   If the command exits non-zero (5, 6, 7, 8, or any other code), do not merge and do
+   not arm. Comment on the PR with the exit code and what blocks, then write the
+   .result file.
 7. <One of:>
-   - Ship: if the verdict has no blocking finding and CI is green, add human-approved
-     (feat only), tick the manual boxes the owner confirmed, arm gh pr merge N --auto --squash,
-     and comment "Owner approved <date>: <words>."
+   - Ship: read the sticky post-plan verdict comment that step 6 refreshed. It must
+     cover the new head. The line above its hidden marker
+     starts with READY or NOT READY, and you ship only on READY.
+     If that holds and CI is green, add human-approved (feat only), tick the manual
+     boxes the owner confirmed, arm gh pr merge N --auto --squash, and comment "Owner
+     approved <date>: <words>."
    - Come back: push, save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
-     and do NOT sign off or arm.
+     and do NOT sign off or arm. Step 6 may have armed the PR, so run
+     gh pr view N --json autoMergeRequest. If it is set, run gh pr merge N --disable-auto.
    If anything blocks, do not merge. Comment on the PR saying what blocks.
 Write a 5-line outcome to $D/jobs/pN.result: head SHA and CI, what changed, what blocks, live URLs.
 ```

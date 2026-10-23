@@ -198,6 +198,10 @@ final class RecordsControllerTest extends TestCase
             'modules.php?name=Records&tab=thisseason&seasonPhase=Playoffs',
             RecordsController::legacyRedirectUrl('SeasonHighs', ['seasonPhase' => 'Playoffs'])
         );
+        self::assertSame(
+            'modules.php?name=Records&tab=thisseason',
+            RecordsController::legacyRedirectUrl('SeasonHighs', ['seasonPhase' => ''])
+        );
     }
 
     public function testLegacyRedirectUrlReturnsNullForFranchiseApiOp(): void

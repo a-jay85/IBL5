@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use Cache\DatabaseCache;
+use HeadToHeadRecords\CachedHeadToHeadRecordsRepository;
 use HeadToHeadRecords\Contracts\HeadToHeadRecordsRepositoryInterface;
 use HeadToHeadRecords\HeadToHeadRecordsRepository;
 use League\League;
@@ -19,6 +21,7 @@ use PHPUnit\Framework\Attributes\Group;
  * Game date '1901-03-15': MONTH=3 < 10 → season_year=1901, MONTH≠6/10 → game_type=1.
  *
  * @phpstan-import-type AxisEntry from HeadToHeadRecordsRepositoryInterface
+ * @phpstan-import-type MatrixPayload from HeadToHeadRecordsRepositoryInterface
  */
 #[Group('database')]
 class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
@@ -179,12 +182,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
             default      => throw new \InvalidArgumentException("Unhandled dimension: {$dimension}"),
         };
 
-        $total = 0;
-        foreach ($payload['records'] as $oppMap) {
-            foreach ($oppMap as $matchup) {
-                $total += $matchup['wins'] + $matchup['losses'];
-            }
-        }
+        $total = $this->sumWinsAndLosses($payload);
 
         $expected = $this->computeDeduplicatedCount($dimension, $phase, $scope);
         self::assertSame(
@@ -294,6 +292,63 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $repo = new HeadToHeadRecordsRepository($this->db, 1902);
 
         self::assertFalse($repo->currentSeasonHasGames());
+    }
+
+    // -------------------------------------------------------------------------
+    // sourceFingerprint(): the live stamp the cache decorator compares against
+    // -------------------------------------------------------------------------
+
+    public function testSourceFingerprintIsStableWhileTheSourceIsUnchanged(): void
+    {
+        self::assertSame($this->repo->sourceFingerprint(), $this->repo->sourceFingerprint());
+    }
+
+    public function testSourceFingerprintChangesWhenACurrentSeasonHeatGameIsInserted(): void
+    {
+        $before = $this->repo->sourceFingerprint();
+
+        // October 1900 => generated game_type 3 (HEAT), season_year 1901.
+        $this->insertFixtureTeamsGame('1900-10-05');
+
+        self::assertNotSame($before, $this->repo->sourceFingerprint());
+    }
+
+    public function testSourceFingerprintDiffersBetweenSeasonYears(): void
+    {
+        $other = new HeadToHeadRecordsRepository($this->db, 1902);
+
+        self::assertNotSame($this->repo->sourceFingerprint(), $other->sourceFingerprint());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function currentScopePhasesAffectedByHeatProvider(): array
+    {
+        return [
+            'heat' => ['heat'],
+            'all'  => ['all'],
+        ];
+    }
+
+    /**
+     * A cache warmed by rebuildCache() must not keep serving its payload after
+     * another HEAT game is imported (the stale-snapshot undercount).
+     */
+    #[DataProvider('currentScopePhasesAffectedByHeatProvider')]
+    public function testWarmedCacheReflectsAHeatGameImportedAfterTheRebuild(string $phase): void
+    {
+        $cached = new CachedHeadToHeadRecordsRepository($this->repo, new DatabaseCache($this->db));
+        $cached->rebuildCache();
+        $before = $this->sumWinsAndLosses($cached->buildFranchisesMatrix($phase, 'current'));
+
+        // One more HEAT game between the fixture teams: October 1900 => game_type 3, season_year 1901.
+        $this->insertFixtureTeamsGame('1900-10-07');
+
+        $after = $this->sumWinsAndLosses($cached->buildFranchisesMatrix($phase, 'current'));
+        $cached->invalidate();
+
+        self::assertSame($before + 2, $after, "cached {$phase}/current must include the game imported after the rebuild");
     }
 
     // -------------------------------------------------------------------------
@@ -764,6 +819,68 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Sum wins + losses over every matchup cell; one game adds exactly 2.
+     *
+     * @param MatrixPayload $payload
+     */
+    private function sumWinsAndLosses(array $payload): int
+    {
+        $total = 0;
+        foreach ($payload['records'] as $oppMap) {
+            foreach ($oppMap as $matchup) {
+                $total += $matchup['wins'] + $matchup['losses'];
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Insert one game (two perspective rows) where visitor 22 beats home 17.
+     */
+    private function insertFixtureTeamsGame(string $gameDate): void
+    {
+        $game = [
+            'game_date'          => $gameDate,
+            'name'               => 'Supersonics',
+            'game_of_that_day'   => 2,
+            'visitor_teamid'     => 22,
+            'home_teamid'        => 17,
+            'attendance'         => 10000,
+            'capacity'           => 15000,
+            'visitor_wins'       => 0,
+            'visitor_losses'     => 0,
+            'home_wins'          => 0,
+            'home_losses'        => 0,
+            'visitor_q1_points'  => 30,
+            'visitor_q2_points'  => 25,
+            'visitor_q3_points'  => 25,
+            'visitor_q4_points'  => 25,
+            'visitor_ot_points'  => 0,
+            'home_q1_points'     => 20,
+            'home_q2_points'     => 20,
+            'home_q3_points'     => 20,
+            'home_q4_points'     => 20,
+            'home_ot_points'     => 0,
+            'game_2gm'           => 30,
+            'game_2ga'           => 60,
+            'game_ftm'           => 15,
+            'game_fta'           => 20,
+            'game_3gm'           => 8,
+            'game_3ga'           => 22,
+            'game_orb'           => 10,
+            'game_drb'           => 30,
+            'game_ast'           => 20,
+            'game_stl'           => 8,
+            'game_tov'           => 12,
+            'game_blk'           => 5,
+            'game_pf'            => 18,
+        ];
+        $this->insertRow('ibl_box_scores_teams', $game);
+        $this->insertRow('ibl_box_scores_teams', array_merge($game, ['name' => 'Spurs']));
+    }
 
     /**
      * Compute the de-duplicated game count for the given (dimension, phase, scope)

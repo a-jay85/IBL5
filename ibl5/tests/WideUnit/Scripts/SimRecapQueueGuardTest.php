@@ -85,6 +85,16 @@ final class SimRecapQueueGuardTest extends TestCase
         }
     }
 
+    /**
+     * Without Discord::init the host is '' and isProduction() is false, so every
+     * status line went to the testing webhook instead of #admin-chat (sim 739).
+     */
+    public function testScriptInitialisesDiscordWithTheCanonicalHost(): void
+    {
+        self::assertStringContainsString("constant('IBL5_CANONICAL_HOST')", $this->src);
+        self::assertStringContainsString('Discord::init(canonicalHost())', $this->src);
+    }
+
     public function testScriptNeverPrintsExceptionMessage(): void
     {
         self::assertFalse(str_contains($this->src, 'getMessage()'), 'Exception text can carry secrets; log the class only');

@@ -6,7 +6,7 @@ vi.mock('../config.js', () => ({
     },
 }));
 
-import { boxScoreUrl, siteBase } from './common.js';
+import { boxScoreUrl, draftHistoryUrl, scheduleUrl, siteBase, teamUrl, teamYearUrl } from './common.js';
 
 describe('boxScoreUrl', () => {
     it('builds a PHP GameBoxscore URL on the ibl5 origin', () => {
@@ -29,5 +29,30 @@ describe('boxScoreUrl', () => {
 
     it('returns an empty string when the game number is negative', () => {
         expect(boxScoreUrl('2008-03-10', -1)).toBe('');
+    });
+});
+
+describe('team URL builders', () => {
+    it('teamUrl emits lowercase teamid', () => {
+        expect(teamUrl(5)).toBe('https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=5');
+    });
+
+    it('scheduleUrl emits lowercase teamid', () => {
+        expect(scheduleUrl(5)).toBe('https://iblhoops.net/ibl5/modules.php?name=Schedule&teamid=5');
+    });
+
+    it('draftHistoryUrl emits lowercase teamid', () => {
+        expect(draftHistoryUrl(5)).toBe('https://iblhoops.net/ibl5/modules.php?name=DraftHistory&teamid=5');
+    });
+
+    it('teamYearUrl emits lowercase teamid and keeps yr', () => {
+        expect(teamYearUrl(5, 2023)).toBe('https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=5&yr=2023');
+    });
+
+    it('no team builder emits the camelCase teamID key', () => {
+        for (const url of [teamUrl(1), scheduleUrl(1), draftHistoryUrl(1), teamYearUrl(1, 2023)]) {
+            expect(url).not.toContain('teamID=');
+            expect(url.startsWith(`${siteBase}/modules.php`)).toBe(true);
+        }
     });
 });

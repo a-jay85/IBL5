@@ -1,6 +1,6 @@
 ---
-description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, and the post-plan race fix in both directions.
-last_verified: 2026-10-19
+description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, the post-plan race fix in both directions, and the gate-timeout rerun.
+last_verified: 2026-10-21
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -95,3 +95,18 @@ The tick now records `conflict-hold/<pr>` when a rescue settles with outcome `co
 A capped DIRTY PR with a conflict hold skips only the attempted-key check, and only when the current tip differs from the held one. Every DIRTY launch bumps `retries/<pr>` for the local calendar day. The bypass stops at `PCW_CONFLICT_RETRY_DAILY_CAP` (2) launches per PR per day. An unreadable tip never opens the bypass. The `PR_CYCLE_MASTER_TIP_CMD` seam replaces the tip read in tests.
 
 Non-conflict holds keep the until-the-diff-changes rule. That covers red CI, failed and held rescues, holdrepeat declines, and strikes. The post-plan harness needs no change: holdrepeat and the held-unfixable marker record only evaluated ship conditions, and a rebase conflict exits before conditions are evaluated.
+
+## Addendum 2026-10-21: gate-timeout reruns
+
+The `All checks green` gate (`.github/workflows/all-checks-green.yml`) fails closed when an anchor check has not reported within its 2400 s wait. On 2026-10-21 runner queueing pushed anchors past that deadline on PRs 3404, 3403, 3399, 3390, 3335, 3353 and 3004. Each gate went red, and its anchors finished green later. The tick read each one as a red PR and launched a Claude rescue, which cannot fix a timeout. A manual `gh run rerun <id> --failed` cleared each one.
+
+The tick now reruns the gate's failed job in place of a rescue when all of these hold for the PR's head SHA:
+
+- The gate check-run is the only failure, apart from `human-signoff`.
+- The newest gate run for the SHA is completed with conclusion `failure`.
+- Its failed log carries `TIMEOUT: WAIT: anchors not reported/completed: <names>`.
+- Every named anchor now has a completed check-run with conclusion `success`.
+
+Reruns per (PR, head SHA) stop at `PCW_GATE_RERUN_CAP` (2), counted in `gate-reruns/<pr>`. That ledger is separate from `strikes/`, so a rerun never spends the no-op rescue cap. A gh read failure skips the PR for the tick. Any other failure shape falls through to the rescue as before. `bin/pr-cycle-tick --dry-run` prints the would-rerun line and writes nothing.
+
+The gate keeps its fail-closed semantics. The rerun sends the same check back through the same wait and timeout. This change leaves the gate workflow, `bin/check-pr-checks-green`, the timeouts and the concurrency groups as they were.

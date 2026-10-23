@@ -226,6 +226,183 @@ def test_behind_cap_terminal_is_shipped_armed(monkeypatch):
     assert "auto-merge=armed" in line
 
 
+# ---------------------------------------------------------------------------
+# _resolve_behind wall budget
+# ---------------------------------------------------------------------------
+
+_T0 = 100_000.0
+
+
+def _make_clocked_ci_patches(monkeypatch, pass_secs, outcomes=None):
+    """Patch time.time to a mutable clock and ciwatch so each watch_or_reuse
+    call advances the clock by pass_secs[i]. Returns (clock, watched_shas)."""
+    clock = [_T0]
+    monkeypatch.setattr(runner.time, "time", lambda: clock[0])
+    watched = _make_ci_patches(monkeypatch, outcomes)
+    outcome_seq = list(outcomes or [CiOutcome(0, [])])
+    n = [0]
+
+    def fake_watch(worktree, pr, sha, out_dir, bg):
+        i = n[0]
+        n[0] += 1
+        clock[0] += pass_secs[min(i, len(pass_secs) - 1)]
+        return outcome_seq[min(i, len(outcome_seq) - 1)]
+
+    monkeypatch.setattr(runner.ciwatch, "watch_or_reuse", fake_watch)
+    return clock, watched
+
+
+def _started_with_remaining(remaining):
+    """run_started value that leaves exactly `remaining` seconds of
+    _CI_FIX_WALL_BUDGET_SECS at clock _T0."""
+    return _T0 - (runner._CI_FIX_WALL_BUDGET_SECS - remaining)
+
+
+def test_behind_budget_low_skips_rerebase(monkeypatch):
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    logs = []
+    initial = CiOutcome(0, [])
+    _, watched = _make_clocked_ci_patches(monkeypatch, [0])
+    got_sha, got_outcome = runner._resolve_behind(
+        git, gh, logs.append, res, "/wt", 1, sha, initial, "/out",
+        run_started=_started_with_remaining(runner._BEHIND_CI_EXPECTED_SECS - 1),
+    )
+    assert git.rebases == 0
+    assert git.pushes == 0
+    assert watched == []
+    assert gh.disarms == 0
+    assert res.retry_cap is None
+    assert got_sha == sha
+    assert got_outcome is initial
+    skips = [m for m in logs if "skipped: wall budget" in m]
+    assert len(skips) == 1
+    assert ".github/workflows/update-behind-prs.yml (ADR-0081)" in skips[0]
+    assert not any("BEHIND cap hit" in m for m in logs)
+
+
+def test_behind_budget_ample_runs_three_rerebases(monkeypatch):
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    logs = []
+    _, watched = _make_clocked_ci_patches(
+        monkeypatch, [0], outcomes=[CiOutcome(0, [])] * 4)
+    runner._resolve_behind(
+        git, gh, logs.append, res, "/wt", 1, sha, CiOutcome(0, []), "/out",
+        run_started=_started_with_remaining(runner._CI_FIX_WALL_BUDGET_SECS),
+    )
+    assert git.rebases == 3
+    assert len(watched) == 3
+    assert gh.disarms == 0
+    assert ("phase7: BEHIND cap hit after 3 re-rebases — leaving auto-merge armed; "
+            ".github/workflows/update-behind-prs.yml (ADR-0081) carries the PR to merge"
+            ) in logs
+    assert not any("skipped: wall budget" in m for m in logs)
+
+
+# Generated ids: [0-1] runs one pass at the threshold, [-1-0] skips one second under.
+@pytest.mark.parametrize("delta,expected_rebases", [(0, 1), (-1, 0)])
+def test_behind_budget_boundary(monkeypatch, delta, expected_rebases):
+    """Remaining exactly at the threshold runs the pass; one second under skips."""
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND", "CLEAN"], strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    _make_clocked_ci_patches(monkeypatch, [0])
+    runner._resolve_behind(
+        git, gh, _noop_log, res, "/wt", 1, sha, CiOutcome(0, []), "/out",
+        run_started=_started_with_remaining(runner._BEHIND_CI_EXPECTED_SECS + delta),
+    )
+    assert git.rebases == expected_rebases
+
+
+def test_behind_budget_measured_pass_raises_threshold(monkeypatch):
+    """A slow first pass raises the bar for pass 2 above the fixed constant."""
+    monkeypatch.setattr(runner, "_BEHIND_CI_EXPECTED_SECS", 100)
+    assert 100 <= runner._CI_FIX_WALL_BUDGET_SECS - 3000 < 3000
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    logs = []
+    _, watched = _make_clocked_ci_patches(monkeypatch, [3000])
+    runner._resolve_behind(
+        git, gh, logs.append, res, "/wt", 1, sha, CiOutcome(0, []), "/out",
+        run_started=_started_with_remaining(runner._CI_FIX_WALL_BUDGET_SECS),
+    )
+    assert git.rebases == 1
+    assert len(watched) == 1
+    assert any("re-rebase 2/3 skipped" in m for m in logs)
+
+
+def test_behind_no_run_started_is_unguarded(monkeypatch):
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    logs = []
+    clock, _ = _make_clocked_ci_patches(
+        monkeypatch, [0], outcomes=[CiOutcome(0, [])] * 4)
+    clock[0] = 10**9
+    runner._resolve_behind(
+        git, gh, logs.append, res, "/wt", 1, sha, CiOutcome(0, []), "/out")
+    assert git.rebases == 3
+    assert not any("skipped: wall budget" in m for m in logs)
+
+
+def test_behind_budget_divergence_still_disarms(tmp_path, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(runner, "_refresh_and_reprove",
+                        lambda git, log, phase, attempt: refresh_calls.append(attempt))
+    monkeypatch.setattr(runner.gitutil, "reconcile_remote_head",
+                        lambda *a, **kw: gitutil.Reconcile(
+                            "diverged", "bbb" + "0" * 37,
+                            "remote head bbb diverged from aaa with different content"))
+    monkeypatch.setattr(runner.os.path, "isdir", lambda p: True)
+    monkeypatch.setattr(runner.ciwatch, "start_background_watch",
+                        lambda *a, **kw: object())
+    monkeypatch.setattr(runner.ciwatch, "watch_or_reuse",
+                        lambda *a, **kw: CiOutcome(0, []))
+    monkeypatch.setattr(runner.ciwatch, "reap_background_watch",
+                        lambda *a, **kw: None)
+    monkeypatch.setattr(runner.time, "time", lambda: _T0)
+    sha = "aaa" + "0" * 37
+    git = FakeGit(head_shas=[sha])
+    gh = FakeGh(states=["BEHIND"])
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    with pytest.raises(HarnessError) as exc_info:
+        runner._resolve_behind(
+            git, gh, _noop_log, res, str(tmp_path), 42, sha,
+            CiOutcome(0, []), str(tmp_path / "out"),
+            run_started=_started_with_remaining(runner._CI_FIX_WALL_BUDGET_SECS),
+        )
+    assert exc_info.value.kind == "remote-head-diverged"
+    assert refresh_calls == []
+    assert gh.disarms >= 1
+
+
+def test_behind_budget_skip_terminal_is_shipped_armed(monkeypatch):
+    """A budget skip still resolves to SHIPPED_ARMED with an armed verdict line."""
+    sha = "sha" + "0" * 37
+    git = FakeGit(head_shas=[sha] * 4)
+    gh = FakeGh(states=["BEHIND"] * 10, strict=True)
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, arm=ArmDecision(armed=True))
+    _make_clocked_ci_patches(monkeypatch, [0])
+    runner._resolve_behind(
+        git, gh, _noop_log, res, "/wt", 1, sha, CiOutcome(0, []), "/out",
+        run_started=_started_with_remaining(runner._BEHIND_CI_EXPECTED_SECS - 1),
+    )
+    assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_ARMED
+    res.terminal = runner._compute_terminal(res, armed=True)
+    line = runner.verdict_line(res, rc=0)
+    assert "auto-merge=armed" in line
+    assert "BLOCKED" not in line
+
+
 def test_behind_non_strict_no_rebase(monkeypatch):
     git = FakeGit()
     gh = FakeGh(states=["BEHIND"], strict=False)

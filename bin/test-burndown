@@ -1785,6 +1785,69 @@ OUT="$(bd burndown-sweep extra 2>&1)"; RC=$?
 [ "$RC" -eq 2 ] && ok "C50o: burndown-sweep with an argument exits 2" \
     || fail "C50o: burndown-sweep with an argument exits 2 (got $RC)"
 
+# ── CJQ: Source 5 builds the slug map once (jq forks do not grow with worktrees)
+# A counting jq shim sits first on PATH for the two bd_b calls only. Run A has
+# 1 worktree, run B has 12; the unrelated jq calls elsewhere cancel out in B - A.
+CJQ_REAL_JQ="$(command -v jq)"
+mkdir -p "$T/jqshim"
+cat > "$T/jqshim/jq" <<SHIM
+#!/usr/bin/env bash
+printf 'x\n' >> "\${JQ_COUNT_LOG:-/dev/null}"
+exec "$CJQ_REAL_JQ" "\$@"
+SHIM
+chmod +x "$T/jqshim/jq"
+cat > "$T/fx/issues.json" <<'JSON'
+[{"number":471,"title":"Cjq-a","body":"bin/cjqa:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+ {"number":472,"title":"Cjq-b","body":"bin/cjqb:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+ {"number":473,"title":"Cjq-c","body":"bin/cjqc:1 stuff","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}]
+JSON
+cat > "$T/home/claude-plans/_reports/burndown-batch-cjq-1.json" <<'LEDGER'
+{"items":[{"issue_num":471,"also_closes":[472],"slug":"wt-cjq-3","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}]}
+LEDGER
+cat > "$T/home/claude-plans/_reports/burndown-batch-cjq-2.json" <<'LEDGER'
+{"items":[{"issue_num":473,"also_closes":[],"slug":"wt-cjq-3","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}]}
+LEDGER
+for k in 3 4 5 6; do
+    cat > "$T/home/claude-plans/_reports/burndown-batch-cjq-$k.json" <<LEDGER
+{"items":[{"issue_num":9$k,"also_closes":[],"slug":"cjq-unused-$k","status":"skipped","route":"ad-hoc","pr_url":"","units_used":1}]}
+LEDGER
+done
+mkdir -p "$T/fx/wt"
+printf ' M bin/x\n' > "$T/fx/wt/wt-cjq-3.status"
+# Rank the three issues: append them to the Phase 3 report, restored below
+CJQ_REPORT="$T/home/claude-plans/_reports/backlog-triage-2026-09-28.md"
+cp "$CJQ_REPORT" "$T/cjq-report.bak"
+printf -- '- [#471](u471) Cjq-a — ref\n- [#472](u472) Cjq-b — ref\n- [#473](u473) Cjq-c — ref\n' >> "$CJQ_REPORT"
+# Run A: one worktree
+printf 'worktree /some/wt-cjq-3\nHEAD abc123\nbranch refs/heads/wt-cjq-3\n\n' > "$T/fx/worktrees.txt"
+: > "$T/cjq-a.log"
+OUT_A="$(PATH="$T/jqshim:$PATH" JQ_COUNT_LOG="$T/cjq-a.log" bd_b 2>&1)"; RC_A=$?
+JQ_A=$(wc -l < "$T/cjq-a.log" | tr -d ' ')
+# Run B: the same worktree plus eleven pads no ledger names
+printf 'worktree /some/wt-cjq-3\nHEAD abc123\nbranch refs/heads/wt-cjq-3\n\n' > "$T/fx/worktrees.txt"
+for i in 1 2 3 4 5 6 7 8 9 10 11; do
+    printf 'worktree /some/wt-cjq-pad-%s\nHEAD abc123\nbranch refs/heads/wt-cjq-pad-%s\n\n' "$i" "$i" >> "$T/fx/worktrees.txt"
+done
+: > "$T/cjq-b.log"
+OUT_B="$(PATH="$T/jqshim:$PATH" JQ_COUNT_LOG="$T/cjq-b.log" bd_b 2>&1)"; RC_B=$?
+JQ_B=$(wc -l < "$T/cjq-b.log" | tr -d ' ')
+[ "$RC_A" -eq 0 ] && [ "$RC_B" -eq 0 ] && ok "CJQ1: both runs exit 0" \
+    || fail "CJQ1: both runs exit 0 (A=$RC_A B=$RC_B)"
+[ $((JQ_B - JQ_A)) -lt 11 ] && ok "CJQ2: jq forks do not grow with worktree count" \
+    || fail "CJQ2: jq forks do not grow with worktree count (A=$JQ_A B=$JQ_B B - A = $((JQ_B - JQ_A)))"
+[ "$JQ_A" -gt 0 ] && ok "CJQ3: jq shim was exercised" || fail "CJQ3: jq shim was exercised (A=$JQ_A)"
+want "CJQ4: ledger slug holds issue_num" "$OUT_B" "worktree wt-cjq-3"
+grep -qE 'SKIP[[:space:]]+#471' <<< "$OUT_B" && ok "CJQ4: #471 is SKIPped" || fail "CJQ4: #471 is SKIPped"
+grep -qE 'SKIP[[:space:]]+#473' <<< "$OUT_B" && ok "CJQ5: same slug in a second ledger also holds" \
+    || fail "CJQ5: same slug in a second ledger also holds"
+grep -qE 'PICK[[:space:]]+#472' <<< "$OUT_B" && ok "CJQ6: also_closes is not held by Source 5" \
+    || fail "CJQ6: also_closes is not held by Source 5"
+cp "$T/cjq-report.bak" "$CJQ_REPORT"
+rm -rf "$T/jqshim" "$T/fx/wt"
+rm -f "$T/cjq-report.bak" "$T"/cjq-*.log "$T/home/claude-plans/_reports"/burndown-batch-cjq-*.json
+: > "$T/fx/worktrees.txt"
+echo '[]' > "$T/fx/prs-open.json"
+
 # ── C52: HELD reporting (burndown-sweep) and the read-only burndown-held ──────
 # Same clock as C50: cutoff 2026-09-29T00:00:00. #300 dirty, #301 committed-ahead, #302 idle,
 # #303 has a PR, #304 plan route, #305 no worktree, #306 probe failure, #307 young ledger.

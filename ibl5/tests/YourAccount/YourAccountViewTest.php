@@ -37,7 +37,7 @@ class YourAccountViewTest extends TestCase
 
         $this->assertStringContainsString('auth-page', $result);
         $this->assertStringContainsString('auth-card', $result);
-        $this->assertStringContainsString('ibl-card', $result);
+        $this->assertStringContainsString('d-card', $result);
         $this->assertStringContainsString('Sign In', $result);
     }
 
@@ -48,8 +48,8 @@ class YourAccountViewTest extends TestCase
         $this->assertStringContainsString('name="username"', $result);
         $this->assertStringContainsString('name="user_password"', $result);
         $this->assertStringContainsString('name="op" value="login"', $result);
-        $this->assertStringContainsString('ibl-btn--primary', $result);
-        $this->assertStringContainsString('ibl-btn--block', $result);
+        $this->assertStringContainsString('d-btn-primary', $result);
+        $this->assertStringContainsString('d-btn-block', $result);
     }
 
     public function testRenderLoginPageContainsCsrfToken(): void
@@ -71,7 +71,8 @@ class YourAccountViewTest extends TestCase
     {
         $result = $this->view->renderLoginPage('Login failed');
 
-        $this->assertStringContainsString('ibl-alert--error', $result);
+        $this->assertStringContainsString('d-alert-error', $result);
+        $this->assertStringContainsString('role="alert"', $result);
         $this->assertStringContainsString('Login failed', $result);
     }
 
@@ -79,7 +80,7 @@ class YourAccountViewTest extends TestCase
     {
         $result = $this->view->renderLoginPage(null);
 
-        $this->assertStringNotContainsString('ibl-alert--error', $result);
+        $this->assertStringNotContainsString('d-alert-error', $result);
     }
 
     public function testRenderLoginPageContainsCrossNavLinks(): void
@@ -168,7 +169,7 @@ class YourAccountViewTest extends TestCase
     {
         $result = $this->view->renderRegistrationErrorPage('Username is taken');
 
-        $this->assertStringContainsString('ibl-alert--error', $result);
+        $this->assertStringContainsString('d-alert-error', $result);
         $this->assertStringContainsString('Username is taken', $result);
         $this->assertStringContainsString('Try again', $result);
     }

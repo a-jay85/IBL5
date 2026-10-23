@@ -168,6 +168,7 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
         return "declined"
 
     # Step 4: FIX
+    pre = git.head()
     sha = commit(f"fix(review): address thread {cid} - {reason[:60]}")
     if sha == "":
         log(f"thread {cid}: FIX verdict but no edits")
@@ -175,7 +176,19 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
 
     hits = denied_gate_edits(git.changed_files(f"{sha}^"))
     if hits:
-        raise HarnessError("gate-path-edit", f"thread {cid}: gate edit in {', '.join(hits)}")
+        # Soft drop: undo the local commit and leave the thread open so arming
+        # condition (11) holds the PR for a human. Fail closed if the undo did not
+        # land, so the next thread's push() can never carry a gate edit.
+        err = git.drop_commit(pre)
+        if err or git.head() != pre:
+            raise HarnessError(
+                "gate-path-edit",
+                f"thread {cid}: gate edit in {', '.join(hits)}; undo to {pre[:12]} failed: "
+                f"{err or 'HEAD mismatch'}")
+        log(f"thread {cid}: fix touches gate path {', '.join(hits)}; dropped, thread left unresolved")
+        if info is not None:
+            info["dropped"] = True
+        return "skipped"
 
     pushed = push()
     sha = pushed or sha
@@ -231,6 +244,11 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
                 raise
             log(f"thread {cid}: resolve failed ({e.detail}); counting as skipped")
             outcome = "skipped"
+        if thread_info.get("dropped"):
+            # Phase 4.5 soft drop: the gate-edit commit was undone, so forget its sha
+            # before post_sha is derived; last_sha and per_thread[].sha must never
+            # name an unreachable commit.
+            last_sha_box[0] = pre_sha
         post_sha = last_sha_box[0] if last_sha_box[0] != pre_sha else None
         if outcome == "fixed":
             fixed += 1

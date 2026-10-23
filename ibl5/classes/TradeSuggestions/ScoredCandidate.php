@@ -8,19 +8,18 @@ namespace TradeSuggestions;
  * A candidate that leaves both sides better off by their own needs, with the
  * plain-language "why" for each side.
  *
- * Gains are the change in each team's TeamNeedsScorer total. significance is
- * the base value of the best player moved, used to favor real deals over
- * bench swaps.
+ * weakerSideGain is min(userGain, partnerGain) from the judge. paired and
+ * judgment carry the deal's motive and numbers for the reason text.
  */
 final readonly class ScoredCandidate
 {
     public function __construct(
         public TradeCandidate $candidate,
-        public float $userGain,
-        public float $partnerGain,
+        public int $weakerSideGain,
         public string $userReason,
         public string $partnerReason,
-        public float $significance = 0.0,
+        public ?PairedCandidate $paired = null,
+        public ?Judgment $judgment = null,
     ) {
     }
 }

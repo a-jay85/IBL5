@@ -192,8 +192,8 @@ test.describe('Waivers: waive player', () => {
 //
 // This lives in this serial waiver-mutation owner file (not a standalone security/
 // spec) to avoid a fullyParallel cross-worker race on shared roster state. The forged
-// POST replicates a legitimate add (real rosterslots/healthyrosterslots read from the
-// rendered form, so validateAdd passes) and tampers ONLY Team_Name.
+// POST is a legitimate add (the server recounts the roster from ibl_plr, so no roster
+// slot fields are posted) and tampers ONLY Team_Name.
 test.describe('Waivers: IDOR — add binds to session team', () => {
   test('add with tampered Team_Name signs to the session team (Metros), not the victim (Stars)', async ({
     appState,
@@ -214,10 +214,8 @@ test.describe('Waivers: IDOR — add binds to session team', () => {
     expect(playerID, 'expected at least one free-agent option').toBeTruthy();
     expect(playerNameOnly, 'expected a player display label').toBeTruthy();
 
-    // Replicate the legitimate add payload (so roster validation passes), then tamper Team_Name.
+    // Post the legitimate add payload, then tamper Team_Name. Roster counts are recomputed server-side (backlog#1538).
     const csrfToken = await form.locator('input[name="_csrf_token"]').inputValue();
-    const rosterslots = await form.locator('input[name="rosterslots"]').inputValue();
-    const healthyrosterslots = await form.locator('input[name="healthyrosterslots"]').inputValue();
     expect(csrfToken).toBeTruthy();
 
     const response = await page.request.post('modules.php?name=Waivers', {
@@ -225,8 +223,6 @@ test.describe('Waivers: IDOR — add binds to session team', () => {
         Action: 'add',
         Player_ID: playerID!,
         Team_Name: 'Stars', // tampered — server must ignore and use the session team
-        rosterslots,
-        healthyrosterslots,
         _csrf_token: csrfToken,
       },
       maxRedirects: 0,
@@ -254,6 +250,144 @@ test.describe('Waivers: IDOR — add binds to session team', () => {
       form: { Action: 'waive', Player_ID: playerID!, Team_Name: 'Metros', _csrf_token: waiveToken },
       maxRedirects: 0,
     });
+  });
+});
+
+// ============================================================
+// Server-side roster recount (backlog#1538)
+// ============================================================
+//
+// The roster-slot counts are recomputed from ibl_plr on the server. A client that
+// posts any rosterslots/healthyrosterslots values must not change the outcome, and the
+// form no longer ships those fields.
+test.describe('Waivers: server-side roster recount (backlog#1538)', () => {
+  test('add succeeds when the client posts rosterslots=0 and healthyrosterslots=0', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Waivers');
+
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
+
+    const playerOption = form.locator('select[name="Player_ID"] option[value]:not([value=""])').first();
+    await expect(playerOption).toBeAttached({ timeout: 5000 });
+    const playerID = await playerOption.getAttribute('value');
+    const optionLabel = (await playerOption.textContent())?.trim() ?? '';
+    const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
+    expect(playerID, 'expected at least one free-agent option').toBeTruthy();
+    expect(playerNameOnly, 'expected a player display label').toBeTruthy();
+
+    const csrfToken = await form.locator('input[name="_csrf_token"]').inputValue();
+    expect(csrfToken).toBeTruthy();
+
+    const response = await page.request.post('modules.php?name=Waivers', {
+      form: {
+        Action: 'add',
+        Player_ID: playerID!,
+        Team_Name: 'Metros',
+        rosterslots: '0', // tampered: would fail validateAdd (< 1 open) if trusted
+        healthyrosterslots: '0', // tampered: would trip the hard-cap branch if trusted
+        _csrf_token: csrfToken,
+      },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `server must recount from ibl_plr; got ${location}`).toContain('result=player_added');
+
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    await expect(page.locator('body'), 'player must join the session team (Metros)').toContainText(
+      playerNameOnly,
+      { timeout: 5000 },
+    );
+
+    // Cleanup: waive the player back off the Metros roster.
+    await page.goto('modules.php?name=Waivers&action=waive');
+    const waiveToken = await page
+      .locator('form[name="Waiver_Move"] input[name="_csrf_token"]')
+      .inputValue();
+    await page.request.post('modules.php?name=Waivers', {
+      form: { Action: 'waive', Player_ID: playerID!, Team_Name: 'Metros', _csrf_token: waiveToken },
+      maxRedirects: 0,
+    });
+  });
+
+  test('drop succeeds when the client posts rosterslots=14', async ({ appState, page }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Waivers&action=waive');
+
+    const csrfToken = await page
+      .locator('form[name="Waiver_Move"] input[name="_csrf_token"]')
+      .inputValue();
+    expect(csrfToken).toBeTruthy();
+
+    const response = await page.request.post('/ibl5/modules.php?name=Waivers', {
+      form: {
+        Action: 'waive',
+        Player_ID: '200000031',
+        Team_Name: 'Metros',
+        rosterslots: '14', // tampered: validateDrop rejects > 2 open slots if trusted
+        healthyrosterslots: '14',
+        _csrf_token: csrfToken,
+      },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `drop must ignore posted rosterslots; got ${location}`).toContain('result=player_dropped');
+  });
+
+  test('waiver form carries no roster-slot hidden inputs and still shows the counts header', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Waivers');
+
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
+    await expect(form.locator('input[name="rosterslots"]')).toHaveCount(0);
+    await expect(form.locator('input[name="healthyrosterslots"]')).toHaveCount(0);
+    await expect(page.locator('h2.ibl-card__title')).toHaveText(
+      /\d+ OPEN SPOTS \/ \d+ HEALTHY SPOTS/,
+    );
+    await assertNoPhpErrors(page);
+  });
+
+  test('add without a CSRF token is refused before any roster recount', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes', 'Current Season Ending Year': '2026' });
+    await page.goto('modules.php?name=Waivers');
+
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
+
+    const playerOption = form.locator('select[name="Player_ID"] option[value]:not([value=""])').first();
+    await expect(playerOption).toBeAttached({ timeout: 5000 });
+    const playerID = await playerOption.getAttribute('value');
+    const optionLabel = (await playerOption.textContent())?.trim() ?? '';
+    const playerNameOnly = optionLabel.replace(/\s+\d.*$/, '').trim();
+    expect(playerID, 'expected at least one free-agent option').toBeTruthy();
+    expect(playerNameOnly, 'expected a player display label').toBeTruthy();
+
+    const response = await page.request.post('modules.php?name=Waivers', {
+      form: { Action: 'add', Player_ID: playerID!, Team_Name: 'Metros' },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location, `missing CSRF token must be refused; got ${location}`).toContain('error=');
+    expect(location).not.toContain('result=player_added');
+
+    await page.goto('modules.php?name=Team&op=team&teamid=1');
+    await expect(page.locator('body'), 'refused add must not reach the Metros roster').not.toContainText(
+      playerNameOnly,
+    );
+  });
+
+  test.afterAll(async ({ request }) => {
+    await resetWaiverPlayer(request, 200000031);
   });
 });
 

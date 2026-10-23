@@ -141,6 +141,35 @@ function postStatus(\SimRecap\SimSummaryRepository $repo, int $sim, string $host
     return $next;
 }
 
+/**
+ * Post the one-time "Sim N recap started on <host>." line after this host
+ * claimed $sim. Returns 'started', 'unchanged' (already announced, or a
+ * re-claim after a park), or 'failed'. The claim is already committed, so a
+ * failed post never undoes it and never changes the exit code. Only the
+ * exception class is logged: the message can carry the webhook host.
+ */
+function announceStart(\SimRecap\SimSummaryRepository $repo, int $sim, string $host): string
+{
+    $announcer = new \SimRecap\ClaimAnnouncer(
+        $repo,
+        static function (string $text): void {
+            \Discord\Discord::postToChannel('admin-chat', $text);
+        },
+    );
+    try {
+        $result = $announcer->announceStart($sim, $host);
+    } catch (\Throwable $e) {
+        fwrite(STDERR, 'simRecapQueue: start announcement failed (' . get_class($e) . ")\n");
+
+        return 'failed';
+    }
+    if ($result['error'] !== null) {
+        fwrite(STDERR, 'simRecapQueue: admin-chat post failed (' . $result['error'] . ")\n");
+    }
+
+    return $result['notified'];
+}
+
 // ── Argv parse — positional verb, then flags (mirrors bug-pipeline/transition.php).
 //    Runs entirely before any repository is constructed.
 $verb = null;
@@ -229,12 +258,16 @@ switch ($verb) {
     case 'claim-next':
         $phase = $seasonQuery->getSeasonPhase();
         /** @var string $host */
+        $claimedSim = $repo->claimNextPending($host);
+        // A recaps-disabled phase still drains the claimed sim (the tick runs
+        // it to a skip), so the start line is still true there.
         $out = [
             'ok' => true,
             'cmd' => 'claim-next',
-            'sim' => $repo->claimNextPending($host),
+            'sim' => $claimedSim,
             'phase' => $phase,
             'recaps_enabled' => \SimRecap\RecapPhasePolicy::isEnabled($phase),
+            'notified' => $claimedSim === null ? 'skipped' : announceStart($repo, $claimedSim, $host),
         ];
         break;
 
@@ -243,7 +276,14 @@ switch ($verb) {
             fail('sim number is required for this verb');
         }
         /** @var string $host */
-        $out = ['ok' => true, 'cmd' => 'claim', 'sim' => $sim, 'claimed' => $repo->claimPending($sim, $host)];
+        $claimed = $repo->claimPending($sim, $host);
+        $out = [
+            'ok' => true,
+            'cmd' => 'claim',
+            'sim' => $sim,
+            'claimed' => $claimed,
+            'notified' => $claimed ? announceStart($repo, $sim, $host) : 'skipped',
+        ];
         break;
 
     case 'reclaim-stale':

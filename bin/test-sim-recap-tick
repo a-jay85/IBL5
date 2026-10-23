@@ -430,6 +430,47 @@ srt_run
 srt_expect_eq "park_failed_is_terminal — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" tick.out "TERMINAL — no route left" "park_failed_is_terminal — terminal log line"
 
+# ── claim_notified_key_is_inert ───────────────────────────────────────────────
+# Prod adds "notified" (started|unchanged|failed|skipped) to the claim reply
+# (sim-recap-started-status). The tick must not read it: same exit, same ssh
+# call sequence, and a "failed" value fires no ops-thread fallback.
+srt_claim_trace() {
+    grep -oE 'simRecapQueue\.php [a-z-]+|storeSimRecap|simRecapContext' \
+        "$STUB/ssh.log" 2>/dev/null | tr '\n' ' '
+}
+# srt_ops_posts is defined further down (after this block runs), so count the
+# curl stub's ops-thread posts directly.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+cni_base_rc=$SRT_RC
+cni_base_trace="$(srt_claim_trace)"
+cni_base_ops="$(srt_matches curl.log '/post-to-thread')"
+srt_log_has "$STUB" tick.out "claimed sim 42" "claim_notified_key_is_inert — baseline claims 42"
+
+for cni_value in started failed; do
+    srt_reset
+    printf '{"ok":true,"cmd":"claim-next","sim":"42","notified":"%s"}' "$cni_value" \
+        > "$STUB/resp.claim-next"
+    srt_run
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: same exit" \
+        "$cni_base_rc" "$SRT_RC"
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: same ssh calls" \
+        "$cni_base_trace" "$(srt_claim_trace)"
+    srt_log_has "$STUB" tick.out "claimed sim 42" \
+        "claim_notified_key_is_inert — notified=$cni_value: claims 42"
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: no ops post" \
+        "$cni_base_ops" "$(srt_matches curl.log '/post-to-thread')"
+done
+
+# ── no_host_side_status_text ──────────────────────────────────────────────────
+# Prod writes every #admin-chat line (ADR-0154). The tick never posts to
+# Discord itself and never carries the start-line wording.
+srt_expect_eq "no_host_side_status_text — tick never calls postToChannel" \
+    0 "$(grep -c postToChannel "$SRT_DRIVER" || true)"
+srt_expect_eq "no_host_side_status_text — tick has no start-line wording" \
+    0 "$(grep -c 'recap started' "$SRT_DRIVER" || true)"
+
 # ── missing_payload_parks_not_stores ─────────────────────────────────────────
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"

@@ -26,7 +26,12 @@ from harness.conflict_fix import (
     record_attempt,
     summarize,
 )
-from harness.conflict_ladder import SESSION_PROOF_CAP, default_rungs, run_ladder
+from harness.conflict_ladder import (
+    BOTH_MODIFIED,
+    SESSION_PROOF_CAP,
+    default_rungs,
+    run_ladder,
+)
 from harness.state import HarnessError
 from test_conflict_ladder import (  # noqa: F401  (key is a fixture)
     _KEEPME_PROOF,
@@ -194,11 +199,32 @@ def test_fix_rung_allows_vr_snapshot_png_via_glob(tmp_path, key):
         target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
 
     d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
-    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png))
+    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png),
+                              stage_sets={png: BOTH_MODIFIED})
     out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
     assert not any("outside its remit" in t for t in out.trail)
     assert out.rung == "sonnet-fix"
     assert png in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+
+
+def test_fix_rung_text_guards_modify_delete_vr_snapshot_png(tmp_path, key):
+    # Master deleted a snapshot the branch changed ({1,2}). A rung must not bring it back.
+    png = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/player-mobile.png"
+
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / png
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png),
+                              stage_sets={png: frozenset({1, 2})})
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+    _assert_untouched(d, merge)
 
 
 def test_fix_rung_text_guards_non_conflicted_vr_snapshot_png(tmp_path, key):

@@ -395,8 +395,9 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
     unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
     # Phase 6.5 (17), (18) and (19): read from the body, so pr-triage holds the same PRs
-    # post-plan held. (19) is advisory here: without the run-local flagged keys it
-    # sees only a listed-but-unjustified guard, never an unlisted one. Without them --arm armed a PR whose body declared a one-way door.
+    # post-plan held. (19) holds here too, but without the run-local flagged keys it
+    # sees only a listed-but-unjustified or malformed block, never an unlisted removal.
+    # (17) and (18) are needed because --arm once armed a PR whose body declared a one-way door.
     # A body with no merge-danger line holds too (fail-closed, as in Phase 6.5): an old
     # PR needs a two-way `**Merge danger:**` line before sign-off can arm it.
     backtest="$(pr_gate_backtest_hold "$body")"

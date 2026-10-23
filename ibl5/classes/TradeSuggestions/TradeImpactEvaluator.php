@@ -108,7 +108,7 @@ final class TradeImpactEvaluator
             $significance = max($significance, AssetValuer::baseValue($player->ovr));
         }
 
-        return new ScoredCandidate($c, $userGain, $partnerGain, $userReason, $partnerReason, $significance);
+        return new ScoredCandidate($c, (int) round(min($userGain, $partnerGain) + 0.1 * $significance), $userReason, $partnerReason);
     }
 
     /**

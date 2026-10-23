@@ -97,12 +97,10 @@ class TradeImpactEvaluatorTest extends TestCase
         $result = $this->evaluator->evaluate($candidate, $user, $partner, TeamMode::WinNow, TeamMode::Rebuild);
 
         self::assertInstanceOf(ScoredCandidate::class, $result);
-        self::assertGreaterThanOrEqual(TradeImpactEvaluator::MIN_GAIN, $result->userGain);
-        self::assertGreaterThanOrEqual(TradeImpactEvaluator::MIN_GAIN, $result->partnerGain);
+        self::assertGreaterThanOrEqual(TradeImpactEvaluator::MIN_GAIN, $result->weakerSideGain);
         self::assertSame('Turns Player 101 (ovr 62) and Player 102 (ovr 61) into one better player, Player 200 (ovr 68).', $result->userReason);
         self::assertNotSame($result->userReason, $result->partnerReason);
         self::assertStringContainsString('Player 101', $result->partnerReason);
-        self::assertSame(52.9, round($result->significance, 1));
     }
 
     public function testPartnerSkipsAReasonIdenticalToTheUsers(): void

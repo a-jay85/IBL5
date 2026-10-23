@@ -17,7 +17,6 @@ final class SuggestionRanker
 {
     public const int MAX_SUGGESTIONS = 3;
     public const int MAX_VALIDATIONS = 40;
-    public const float SIGNIFICANCE_WEIGHT = 0.1;
 
     /**
      * @param list<ScoredCandidate> $scored
@@ -31,8 +30,8 @@ final class SuggestionRanker
             $sa = $scored[$a];
             $sb = $scored[$b];
 
-            return [self::rankScore($sb), $sb->userGain, $a]
-                <=> [self::rankScore($sa), $sa->userGain, $b];
+            return [self::rankScore($sb), self::largerGain($sb), self::assetCount($sa), $a]
+                <=> [self::rankScore($sa), self::largerGain($sa), self::assetCount($sb), $b];
         });
 
         $kept = [];
@@ -80,8 +79,22 @@ final class SuggestionRanker
         return $kept;
     }
 
-    public static function rankScore(ScoredCandidate $s): float
+    public static function rankScore(ScoredCandidate $s): int
     {
-        return min($s->userGain, $s->partnerGain) + self::SIGNIFICANCE_WEIGHT * $s->significance;
+        return $s->weakerSideGain;
+    }
+
+    private static function largerGain(ScoredCandidate $s): int
+    {
+        return $s->judgment === null
+            ? $s->weakerSideGain
+            : max($s->judgment->userGain, $s->judgment->partnerGain);
+    }
+
+    private static function assetCount(ScoredCandidate $s): int
+    {
+        $c = $s->candidate;
+
+        return count($c->userPids) + count($c->userPickIds) + count($c->partnerPids) + count($c->partnerPickIds);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions;
 
 use PHPUnit\Framework\TestCase;
+use TradeSuggestions\Judgment;
 use TradeSuggestions\ScoredCandidate;
 use TradeSuggestions\SuggestionRanker;
 use TradeSuggestions\TradeCandidate;
@@ -67,17 +68,21 @@ class SuggestionRankerTest extends TestCase
     }
 
     /**
-     * A deal that moves a meaningful player outranks a slightly better-scoring
-     * bench swap.
+     * The deal both sides like most wins: 40/45 beats 90/30 even though the
+     * second helps the user more. A tie on the weaker side goes to the larger
+     * gain.
      */
-    public function testSignificanceLiftsDealsThatMoveARealPlayer(): void
+    public function testRankScoreIsWeakerSideGain(): void
     {
-        $bench = self::scored(2, 11, 3.0, 3.0);
-        $star = self::scored(3, 12, 2.0, 2.0, significance: 40.0);
+        $lopsided = self::judged(2, 11, 90, 30);
+        $balanced = self::judged(3, 12, 40, 45);
+        $tieLow = self::judged(4, 13, 40, 41);
 
-        $kept = (new SuggestionRanker())->select([$bench, $star], static fn (ScoredCandidate $s): bool => true);
+        self::assertSame(40, SuggestionRanker::rankScore($balanced));
 
-        $this->assertSame([3, 2], array_map(static fn (ScoredCandidate $s): int => $s->candidate->partnerTid, $kept));
+        $kept = (new SuggestionRanker())->select([$lopsided, $tieLow, $balanced], static fn (ScoredCandidate $s): bool => true);
+
+        $this->assertSame([3, 4, 2], array_map(static fn (ScoredCandidate $s): int => $s->candidate->partnerTid, $kept));
     }
 
     public function testSelectCapsAtThreeWithOnePerPartnerInRankOrder(): void
@@ -142,15 +147,24 @@ class SuggestionRankerTest extends TestCase
         return $s->candidate->userPids[0] - 1000;
     }
 
-    private static function scored(int $partnerTid, int $userPid, float $userGain, float $partnerGain, float $significance = 0.0): ScoredCandidate
+    private static function scored(int $partnerTid, int $userPid, float $userGain, float $partnerGain): ScoredCandidate
     {
         return new ScoredCandidate(
             new TradeCandidate(1, $partnerTid, [$userPid], [], [$partnerTid * 100], []),
-            $userGain,
-            $partnerGain,
+            (int) min($userGain, $partnerGain),
             'user reason',
             'partner reason',
-            $significance,
+        );
+    }
+
+    private static function judged(int $partnerTid, int $userPid, int $userGain, int $partnerGain): ScoredCandidate
+    {
+        return new ScoredCandidate(
+            new TradeCandidate(1, $partnerTid, [$userPid], [], [$partnerTid * 100], []),
+            min($userGain, $partnerGain),
+            'user reason',
+            'partner reason',
+            judgment: new Judgment($userGain, $partnerGain, 0, 0, 6000, 6000),
         );
     }
 }

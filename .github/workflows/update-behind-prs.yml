@@ -83,15 +83,10 @@ jobs:
         if: github.event_name == 'push'
         run: sleep 300
 
-      # Two master-push workflows can push a bot commit after they finish: Tests and Analysis
-      # (coverage & PHPStan baseline snapshots, codebase-map) and Migration Safety
-      # (current-schema.sql). Those land 2 to 22 minutes after the merge. Updating the head
-      # before then wastes its whole CI run: the bot commit makes it BEHIND again, and the
-      # baseline push is in paths-ignore above, so no pass even re-updates it. Wait until no
-      # master-push run of either is still open. That covers every SHA, because the bot commit
-      # can come from an earlier merge's run: a later push that triggers neither workflow (a
-      # workflows-only merge, or the schema bot push itself) starts a new pass and cancels this
-      # one. Past the cap the pass goes ahead as it did before.
+      # Updating the head before master's bot commits land wastes its whole CI run: the bot
+      # commit makes it BEHIND again, and the baseline push is in paths-ignore above, so no
+      # pass even re-updates it. The helper's header says which workflows push them and why
+      # the check covers every master SHA. Past its 45-min cap the pass goes ahead as before.
       - name: Wait for master CI that can push a bot commit
         if: github.event_name == 'push'
         env:
@@ -99,29 +94,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
-          deadline=$(( $(date +%s) + 45 * 60 ))
-          while :; do
-            # Status is filtered in jq: the status= query param takes one value and would
-            # miss queued runs. Newest first, so 100 runs reaches many merges back.
-            if ! open=$(gh api "repos/$REPO/actions/runs?branch=master&event=push&per_page=100" \
-                --jq '[.workflow_runs[]
-                       | select(.name == "Tests and Analysis" or .name == "Migration Safety")
-                       | select(.status != "completed")
-                       | .name] | unique | join(", ")'); then
-              echo "::warning::could not list master runs; going ahead without waiting"
-              break
-            fi
-            if [ -z "$open" ]; then
-              echo "No bot-committing master run still open"
-              break
-            fi
-            if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::warning::still waiting on $open after 45 min; going ahead"
-              break
-            fi
-            echo "Waiting on: $open"
-            sleep 30
-          done
+          source bin/lib/master-bot-wait.sh
+          master_bot_wait "$REPO"
 
       - name: Select the head of the merge line
         id: select

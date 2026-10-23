@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, pr-ready verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 ---
 
 # /pr-burndown
@@ -28,6 +28,8 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
   after the owner approves that specific PR in chat. Quote their words and the date in
   the PR comment you leave. Nothing in this skill approves a PR on its own.
+- Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
+  first (Step 5 has the command).
 - A visual or design change comes back to the owner for a look before it merges, even
   after they pick a direction.
 - The PR title type follows `.claude/rules/commit-conventions.md`. Never retitle a feat
@@ -139,19 +141,23 @@ before you write it, because nothing expands them for the child session:
 ```text
 Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it covers.>
 1. Get the PR worktree (bin/pr-wt-resolve N prints its path; bin/wt-new if none). Work only there.
+   First check for a live post-plan run: launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-N$)'.
+   If one is listed, do not touch the worktree. Write "blocked: post-plan run live" to $D/jobs/pN.result and stop.
 2. Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
 4. Run <the tests and composer run analyse> in the worktree's Docker. Fix what broke.
 5. Push (force-with-lease after a rebase).
-6. Re-run /pr-ready so the verdict covers the new head.
+6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
+   to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: if the verdict has no blocking finding and CI is green, add human-approved
-     (feat only), tick the manual boxes the owner confirmed, arm gh pr merge N --auto --squash,
-     and comment "Owner approved <date>: <words>."
-   - Come back: push, save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
+   - Ship: add human-approved (feat only), tick the manual boxes the owner confirmed, and
+     comment "Owner approved <date>: <words>." Do NOT arm gh pr merge. Post-plan arms it
+     after the verdict on the new head has no blocking finding and CI is green.
+   - Come back: save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
      and do NOT sign off or arm.
    If anything blocks, do not merge. Comment on the PR saying what blocks.
 Write a 5-line outcome to $D/jobs/pN.result: head SHA and CI, what changed, what blocks, live URLs.
+Then stop.
 ```
 
 Launch it from the main checkout:
@@ -168,6 +174,12 @@ Then:
 - Wait on `$D/jobs/pN.result` with a background Monitor. The finished `.result` file is
   the completion signal. Never poll on the main thread.
 - Bring up the next card right away.
+- When a `.result` lands, the parent session (not the child) re-fires post-plan for that
+  PR: `(cd <abs worktree path> && bin/post-plan-now --auto)`. Run the live-run check
+  below first.
+- Before any git operation in a PR's worktree, or before re-firing post-plan, check for a
+  live run: `launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-<N>$)'`.
+  If one is listed, don't touch the worktree. Wait for it to end.
 
 When a `.result` lands, read it and report it in one line at the top of the next reply. If
 the owner's request changes a PR that other PRs copy (for example a shared style used by

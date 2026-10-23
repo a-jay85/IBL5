@@ -1,11 +1,13 @@
 ---
 description: Tracks all-time IBL statistical records, detects record-breaking performances after each sim, and sends Discord notifications.
-last_verified: 2026-09-22
+last_verified: 2026-10-23
 ---
 
 # RecordHolders
 
 Maintains and displays the canonical list of all-time IBL statistical records. After each simulation, `RecordBreakingDetector` scans for broken or tied records and dispatches announcements via `DiscordAnnouncementDispatcher`. `CachedRecordHoldersService` decorates the live service with a `DatabaseCache`-backed layer for fast page loads. `RecordStatDefinitions` is the single source of truth for all tracked record categories. Entry point: `ibl5/modules/RecordHolders/index.php`.
+
+The `record_holders` cache row has two refreshers. `RefreshRecordHoldersStep` rebuilds it during each updater run, after the box scores and the derived playoff and season tables are refreshed. The 5 AM cron runs `ibl5/bin/rebuild-record-holders-cache` as the backstop. The updater step skips its rebuild when the run has already used more than 180 of its 300 seconds, so after a long catch-up sim the records page can stay stale until the cron runs.
 
 | Class | Role |
 |---|---|

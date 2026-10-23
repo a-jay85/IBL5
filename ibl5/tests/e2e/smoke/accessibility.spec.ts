@@ -26,11 +26,6 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'injuries',
     'player movement',
     'projected draft order',
-    // Search page with a transactions preset (modules.php?name=Search plus a preset).
-    // Verified 2026-09-23: every failing node is pre-existing results markup
-    // (.search-result__meta-item, .search-result__title, .search-pagination__link, <time>);
-    // none is the new preset select. .ibl-search__btn is fixed in design/components/forms.css.
-    'search transactions preset',
     'season archive',
     'season highs',
     'team off/def stats',
@@ -174,6 +169,11 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'sign in', url: 'modules.php?name=YourAccount' },
 ];
 
+// Pages whose entrance animation (.search-result searchResultIn) would be sampled mid-fade by
+// axe, which reads transient colours. These pages load under prefers-reduced-motion: reduce
+// (design/base.css zeroes animations) so axe sees the settled colours. Keyed on a publicPages name.
+const SETTLED_ANIMATION_PAGES = new Set(['search transactions preset']);
+
 publicTest.describe('Public page accessibility', () => {
   publicTest.beforeEach(async ({ appState }) => {
     await appState({ 'Trivia Mode': 'Off' });
@@ -181,6 +181,9 @@ publicTest.describe('Public page accessibility', () => {
 
   for (const { name, url } of publicPages) {
     publicTest(`${name} has no accessibility violations`, async ({ page }) => {
+      if (SETTLED_ANIMATION_PAGES.has(name)) {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+      }
       await page.goto(url);
       await assertNoA11yViolations(page, `on ${url}`, getA11yOptions(name));
     });
@@ -251,6 +254,41 @@ publicTest.describe('Sign-in divider contrast (WCAG 1.4.3)', () => {
     expect(
       ratio,
       `divider color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// --- Search pagination link contrast ---
+// The CI seed paginates the transactions preset (10 results plus a Next link). Pin the
+// link colour to --accent-800 (#9a3412) and its ratio on the page background, so a
+// revert to --accent-500 (2.41:1 on #eee) fails here directly. The VR baselines cannot
+// catch it: two recoloured words fall under the 0.5% maxDiffPixelRatio.
+
+publicTest.describe('Search pagination link contrast (WCAG 1.4.3)', () => {
+  publicTest('.search-pagination__link uses accent-800 and meets 4.5:1', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoWithRetry(page, 'modules.php?name=Search&preset=transactions');
+
+    const link = page.locator('.search-pagination__link').first();
+    await expect(link).toBeVisible();
+
+    const { color, backgrounds } = await link.evaluate((el) => {
+      const chain: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        chain.push(getComputedStyle(node).backgroundColor);
+      }
+      return { color: getComputedStyle(el).color, backgrounds: chain };
+    });
+
+    expect(color).toBe('rgb(154, 52, 18)');
+
+    const solid = backgrounds.map(parseCssRgb).find(({ alpha }) => alpha > 0);
+    const background: Rgb = solid?.rgb ?? [255, 255, 255];
+
+    const ratio = contrastRatio(parseCssRgb(color).rgb, background);
+    expect(
+      ratio,
+      `pagination link color ${color} on rgb(${background.join(', ')}) = ${ratio.toFixed(2)}:1`,
     ).toBeGreaterThanOrEqual(4.5);
   });
 });

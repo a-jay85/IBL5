@@ -1536,7 +1536,7 @@ fi
 
 # ── prompt_data_access_declares_fact_sheet_authoritative ─────────────────────
 if grep -qF -- "complete and authoritative" "$STUB/prompt.out" \
-    && grep -qF -- "--default-auth=mysql_native_password" "$STUB/prompt.out"; then
+    && grep -qE -- 'sim-recap-mysql -e "SELECT' "$STUB/prompt.out"; then
     srt_ok "prompt_data_access_declares_fact_sheet_authoritative — sheet authoritative, mysql command kept"
 else
     srt_fail "prompt_data_access_declares_fact_sheet_authoritative — declaration or mysql command absent"
@@ -1575,6 +1575,7 @@ srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \
 SIM_RECAP_MYSQL_BIN="/raw/client/mysql" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 srt_log_has "$STUB" prompt.out "$SCRIPT_DIR/sim-recap-mysql -e" "prompt_names_wrapper_only"
 srt_log_lacks "$STUB" prompt.out "/raw/client/mysql" "prompt_names_wrapper_only — raw client path absent"

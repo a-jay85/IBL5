@@ -161,9 +161,8 @@ Do not run "mysql" or any other client directly; only the command above is
 permitted. Do not prefix it with environment variables or chain other commands
 onto it.
 
-A bare "mysql" on PATH cannot authenticate (ERROR 2059). The password is already in
-MYSQL_PWD; never pass it on the command line. Useful tables: ibl_box_scores (player
-lines), ibl_box_scores_teams (quarter scores), ibl_jsb_transactions.
+Useful tables: ibl_box_scores (player lines), ibl_box_scores_teams (quarter scores),
+ibl_jsb_transactions.
 
 DATA_EOF
 

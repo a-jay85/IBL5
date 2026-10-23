@@ -118,7 +118,7 @@ final class HeatChampionAwardParityTest extends DatabaseTestCase
 
     /**
      * Two rows for one game with every quarter and OT column NULL. calc_points is
-     * game_2gm * 2 + 12 + 2 * 3, so 45 gives 108 and 55 gives 136.
+     * game_2gm * 2 + 12 + 2 * 3, so 45 gives 108 and 55 gives 128.
      *
      * @return array{0: int, 1: int} visitor row id, home row id
      */
@@ -141,7 +141,7 @@ final class HeatChampionAwardParityTest extends DatabaseTestCase
     }
 
     /**
-     * Quarters say home 104 beats visitor 85. calc_points says visitor 159 beats home 99.
+     * Quarters say home 104 beats visitor 85. calc_points says visitor 138 beats home 78.
      */
     private function seedRealQuarterGameWithMisleadingCalcPoints(
         string $date,

@@ -42,10 +42,7 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
     toHaveScreenshot: {
-      // TEMP (PR #2625): tightened so the slate-navy shift fails VR and the
-      // update-baselines regen fires. Reverted in the next commit.
-      maxDiffPixelRatio: 0.001,
-      threshold: 0.04,
+      maxDiffPixelRatio: 0.005,
     },
   },
 

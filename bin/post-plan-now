@@ -347,9 +347,10 @@ Options:
   --allow-test-only  Skip only the test-only exit-5 guard. Unlike --force it keeps
                    the in-flight, fleet-slot and holdrepeat (exit 8) guards. Passed
                    by bin/pr-cycle rescues through bin/post-plan-fleet. Bare flag only.
-  --state-changed  Skip only the repeat-hold decline (exit 8). Unlike --force it
-                   keeps the in-flight and production-file guards. Passed by
-                   bin/pr-cycle for DIRTY or red-check rescues through
+  --state-changed  Skip only the repeat-hold decline (exit 8) and the harness's
+                   in-run copy of it (sent as POSTPLAN_STATE_CHANGED=1). Unlike
+                   --force it keeps the in-flight and production-file guards.
+                   Passed by bin/pr-cycle for DIRTY or red-check rescues through
                    bin/post-plan-fleet. Bare flag only.
   --rebase-only    Pass --rebase-only to the harness: when the last hold was only
                    human conditions (3, 7, 8), merge origin/master, push, and stop
@@ -769,25 +770,33 @@ ENGINE="Sonnet 5.5 /post-plan skill session"
 # the harness adapter turns the gate on for its own claude children after checking
 # this context, so an older harness never gates.
 HARNESS_GATE_CTX="IBL5_USAGE_GATE_RUNNER=post-plan-now IBL5_USAGE_GATE_RESUME_BIN=$(shq "$ROOT/bin/post-plan-now") IBL5_USAGE_GATE_SESSION_ID=$(shq "$SESSION_ID") "
-# The runner's in-run hold-repeat decline (runner.py _early_hold_repeat) reads this.
+# The runner's in-run hold-repeat decline (runner.py _early_hold_repeat) reads this and POSTPLAN_STATE_CHANGED below.
 # Always set, so an ambient POSTPLAN_FORCE in the caller's shell can never leak in.
 if [ "${FORCE:-0}" -eq 1 ]; then
     HARNESS_FORCE_ENV="POSTPLAN_FORCE=1 "
 else
     HARNESS_FORCE_ENV="POSTPLAN_FORCE=0 "
 fi
+# Same contract for --state-changed: runner.py _early_hold_repeat skips its decline on
+# POSTPLAN_STATE_CHANGED=1. Always set, so an ambient value in the caller's shell can
+# never leak in. --rebase-only already sets STATE_CHANGED=1 in the arg parser.
+if [ "${STATE_CHANGED:-0}" -eq 1 ]; then
+    HARNESS_STATE_CHANGED_ENV="POSTPLAN_STATE_CHANGED=1 "
+else
+    HARNESS_STATE_CHANGED_ENV="POSTPLAN_STATE_CHANGED=0 "
+fi
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_STARTED:-0}" != 1 ]; then
     FALLBACK_FN="$(declare -f should_fallback blocked_ship_block); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     REBASE_ONLY_ARG="$(rebase_only_harness_arg "$REBASE_ONLY")"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
+    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
     # Foreground has no launchd job, so nothing points stdout at $LOG. Without the tee, $LOG
     # never exists: the RESULT capture below comes back empty and the Log line in the
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && should_fallback \"\$rc\" $REBASE_ONLY && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only

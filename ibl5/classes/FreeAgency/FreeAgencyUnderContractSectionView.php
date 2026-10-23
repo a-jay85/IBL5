@@ -46,6 +46,27 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
     <?= HtmlSanitizer::trusted($this->tableRenderer->renderTableHeader('Players Under Contract', false, $team, false, false, $season)) ?>
     <tbody>
         <?php foreach ($players as $entry): ?>
+<?= HtmlSanitizer::trusted($this->renderPlayerRow($entry, $season)) ?>
+        <?php endforeach; ?>
+        <?php foreach ($cashPlayers as $cashEntry): ?>
+<?= HtmlSanitizer::trusted($this->renderCashRow($cashEntry)) ?>
+        <?php endforeach; ?>
+    </tbody>
+<?= HtmlSanitizer::trusted($this->renderFooter($team, $capMetrics)) ?>
+</table>
+</div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array{player: Player, contractAction: 'rookie_option'|'extension'|null} $entry
+     */
+    private function renderPlayerRow(array $entry, Season $season): string
+    {
+        ob_start();
+        ?>
             <?php
             $player = $entry['player'];
             if (!$player->isPlayerFreeAgent($season) || $player->isSalaryPlaceholder()):
@@ -95,11 +116,19 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerPreferences($player)) ?>
         </tr>
             <?php endif; ?>
-        <?php endforeach; ?>
-        <?php foreach ($cashPlayers as $cashEntry):
-            $cashPlayer = $cashEntry['player'];
-            $cashLabel = $cashEntry['label'];
-            $cashFutureSalaries = $cashPlayer->getFutureSalaries();
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array{player: Player, label: string} $cashEntry
+     */
+    private function renderCashRow(array $cashEntry): string
+    {
+        $cashPlayer = $cashEntry['player'];
+        $cashLabel = $cashEntry['label'];
+        $cashFutureSalaries = $cashPlayer->getFutureSalaries();
+        ob_start();
         ?>
         <tr>
             <td></td>
@@ -114,8 +143,17 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             <td class="col-salary"><?= HtmlSanitizer::e($cashFutureSalaries[5]) ?></td>
             <?= HtmlSanitizer::trusted($this->tableRenderer->renderPlayerPreferences($cashPlayer)) ?>
         </tr>
-        <?php endforeach; ?>
-    </tbody>
+<?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param CapMetrics $capMetrics
+     */
+    private function renderFooter(Team $team, array $capMetrics): string
+    {
+        ob_start();
+        ?>
     <tfoot>
         <tr>
             <td colspan="17" class="cap-footer-spacer"></td>
@@ -126,10 +164,7 @@ final class FreeAgencyUnderContractSectionView implements FreeAgencyUnderContrac
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
     </tfoot>
-</table>
-</div>
-</div>
-        <?php
+<?php
         return (string) ob_get_clean();
     }
 }

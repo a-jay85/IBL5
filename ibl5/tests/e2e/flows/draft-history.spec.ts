@@ -172,6 +172,14 @@ test.describe('HTMX year switching', () => {
   test('year change updates URL', async ({ page }) => {
     await page.goto('modules.php?name=DraftInfo&tab=history');
 
+    // Register before the swap so the op=api response is not missed.
+    const apiResponsePromise = page.waitForResponse(
+      (r) =>
+        r.url().includes('name=DraftInfo') &&
+        r.url().includes('op=api') &&
+        r.status() === 200,
+    );
+
     await assertHtmxSwap(page, {
       trigger: () =>
         page.locator('#draft-year-select').selectOption(YEAR_WITH_ONE_PICK),
@@ -179,6 +187,13 @@ test.describe('HTMX year switching', () => {
       expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
       contentSelector: '#draft-history-content',
     });
+
+    // The pushed URL must come from the HX-Push-Url response header and keep
+    // tab=history; fails if DraftHistoryApiHandler drops or rewrites it.
+    const apiResponse = await apiResponsePromise;
+    const pushUrl = apiResponse.headers()['hx-push-url'] ?? '';
+    expect(pushUrl).toContain('tab=history');
+    expect(pushUrl).toContain('year=' + YEAR_WITH_ONE_PICK);
   });
 });
 

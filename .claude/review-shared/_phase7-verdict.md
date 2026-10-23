@@ -1,6 +1,6 @@
 ---
 description: Phase 7 arm-hold evaluation, provenance line, sticky verdict comment, and hard terminator. Loaded via git show at Phase 7.
-last_verified: 2026-10-16
+last_verified: 2026-10-22
 ---
 
 # Phase 7 — holds, sticky verdict, terminator
@@ -49,7 +49,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
 
    Both are plain `cat`s of literal paths — no `$(…)`. The trailing-`cat` rationale above applies identically to the digest lines file.
 
-   There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (see its `STICKY_MARKER` constant and the `post_sticky()` below it — grep the symbols rather than trusting a line number, which drifts).
+   Use the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh` (with `pr_sticky_find` and `pr_sticky_delete` beside it). Grep the symbols rather than trusting a line number, which drifts.
 
    **Provenance line — the second line of the body, immediately after the `**Reviewed tree:**` contract line and above every heading.** Emit exactly one line, in backticks, using the three literals captured in step 2:
 

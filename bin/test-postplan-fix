@@ -20,8 +20,14 @@
 #  12. env -i probe: no HOME, no Homebrew, bash with pipefail; POSTPLAN_LOG_DIR forwarded.
 #  13. POSTPLAN_LOG_DIR unset or empty: the private log dir is not read.
 #  14-24. --headless [--dry-run]: flag rejection, dry run, main-checkout refusal, dirty
-#      tree, resolve-and-commit, FAILED verdict, leftover markers, moved ref, clean merge,
-#      missing harness, env -i. Each prints one "case ok headless-<name>" line.
+#      tree, resolve-and-commit, FAILED verdict, leftover markers, moved ref (restored
+#      with a reflog message), clean merge, missing harness, env -i.
+#      21d-21i: the ref guard covers only the session branch's own two refs. An
+#      unrelated master move and an unrelated branch create/delete are kept; an own ref
+#      that moves again before the restore is left as is (compare-and-swap); an own ref
+#      the session deleted is restored and one it created is removed. A sibling ref
+#      under the own remote ref's name does not abort the run.
+#      Each prints one "case ok headless-<name>" line.
 #
 # Run: bin/test-postplan-fix  (exit 0 = all pass, 1 = a case failed)
 
@@ -282,6 +288,32 @@ printf 'SUMMARY: kept both\nRESOLVED\n' > "$TMP/reply-resolved"
 printf 'SUMMARY: gave up\nFAILED\n' > "$TMP/reply-failed"
 printf 'printf "feature\\nmaster\\n" > a.txt\ngit add a.txt\n' > "$TMP/effects/resolve.sh"
 printf 'git update-ref "refs/remotes/origin/%s" HEAD\n' "$B_CONFLICT" > "$TMP/effects/moveref.sh"
+MASTER_TIP=$(git -C "$MAIN" rev-parse refs/heads/master)
+REAL_GIT=$(command -v git)
+B_GONE="pfx$$-gone"; B_NEW="pfx$$-new"; R_SIB="refs/remotes/origin/$B_CONFLICT-sib"
+RESTORE_MSG="postplan-fix: restore after session moved refs"
+{ cat "$TMP/effects/resolve.sh"; printf 'git update-ref refs/heads/master %s\n' "$INIT_SHA"; } \
+    > "$TMP/effects/move-master.sh"
+{ cat "$TMP/effects/resolve.sh"
+  printf 'git update-ref refs/heads/%s %s\n' "$B_NEW" "$INIT_SHA"
+  printf 'git update-ref -d refs/heads/%s\n' "$B_GONE"
+  printf 'git update-ref %s %s\n' "$R_SIB" "$INIT_SHA"; } > "$TMP/effects/branch-churn.sh"
+printf 'git update-ref -d "refs/remotes/origin/%s"\n' "$B_CONFLICT" > "$TMP/effects/delref.sh"
+# Test-only git shim: just before postplan-fix's restore update-ref runs, move the
+# own remote-tracking ref once more, as a concurrent fetch would.
+mkdir -p "$TMP/gitshim"
+cat > "$TMP/gitshim/git" <<SHIMEOF
+#!/bin/bash
+case " \$* " in
+    *" $RESTORE_MSG "*)
+        if [ ! -e "$TMP/race.done" ]; then
+            : > "$TMP/race.done"
+            "$REAL_GIT" -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$MASTER_TIP"
+        fi ;;
+esac
+exec "$REAL_GIT" "\$@"
+SHIMEOF
+chmod +x "$TMP/gitshim/git"
 printf 'printf "feature\\nmaster\\n" > a.txt\ngit add a.txt\nprintf stray > stray.txt\n' > "$TMP/effects/untracked.sh"
 
 # 14
@@ -306,7 +338,7 @@ need "origin.git unchanged" test "$(git --git-dir="$TMP/origin.git" rev-parse re
 need "origin/master unchanged" test "$(git -C "$WTC" rev-parse refs/remotes/origin/master)" = "$REMOTE0"
 need "no MERGE_HEAD" no_merge
 # shellcheck disable=SC2088  # the prompt holds a literal ~/claude-plans/
-for tok in "argv:" "--model" "claude-sonnet-5-5" "--disallowedTools" "Bash(git push:*)" "Bash(gh:*)" \
+for tok in "argv:" "--model" "claude-sonnet-5-5" "--disallowedTools" "Bash(git push:*)" "Bash(gh:*)" "Bash(*/git push:*)" "Bash(git * push *)" \
     "Bash(git -C:*)" "--max-budget-usd" "SUMMARY:" "RESOLVED" "FAILED" "Do NOT commit" "~/claude-plans/"; do
     need "stdout has '$tok'" has_s "$STDOUT" "$tok"
 done
@@ -374,6 +406,7 @@ run_fix "$SUT" --headless "$B_CONFLICT"
 need "rc 1" test "$RC" = 1
 need "stderr names moved refs" has_s "$ERR" "session moved refs"
 need "ref restored" test "$(git -C "$WTC" rev-parse "refs/remotes/origin/$B_CONFLICT")" = "$INIT_SHA"
+need "restore reflog message" test "$(git -C "$WTC" reflog show -1 --format=%gs "refs/remotes/origin/$B_CONFLICT")" = "postplan-fix: restore after session moved refs"
 need "no MERGE_HEAD" no_merge
 case_end headless-moved-ref
 
@@ -395,6 +428,77 @@ need "rc 0 (stderr: $ERR)" test "$RC" = 0
 need "prompt read from stdin" has_s "$PROMPT" "Headless remit"
 need "prompt is not an argv element" test "$(grep -c 'Headless remit' "$TMP/claude.args")" = 0
 case_end headless-stdin-and-stderr
+
+# 21d: another checkout moving refs/heads/master during the session is kept, not rolled back
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/move-master.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "no session-moved-refs abort" eval '! has_s "$ERR" "session moved refs"'
+need "master keeps its new value" test "$(git -C "$MAIN" rev-parse refs/heads/master)" = "$INIT_SHA"
+need "no restore entry in master's reflog" eval '! git -C "$MAIN" reflog show -1 --format=%gs refs/heads/master | grep -qF "$RESTORE_MSG"'
+git -C "$MAIN" update-ref refs/heads/master "$MASTER_TIP"
+case_end headless-unrelated-master-moved
+
+# 21e: an unrelated branch created and another deleted during the session stay that way
+hl_reset
+git -C "$MAIN" update-ref "refs/heads/$B_GONE" "$INIT_SHA"
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/branch-churn.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "no session-moved-refs abort" eval '! has_s "$ERR" "session moved refs"'
+need "created branch kept" git -C "$MAIN" rev-parse -q --verify "refs/heads/$B_NEW"
+need "deleted branch stays deleted" eval '! git -C "$MAIN" rev-parse -q --verify "refs/heads/$B_GONE"'
+need "name-prefix sibling ref kept" git -C "$MAIN" rev-parse -q --verify "$R_SIB"
+git -C "$MAIN" update-ref -d "refs/heads/$B_NEW"
+git -C "$MAIN" update-ref -d "$R_SIB"
+case_end headless-unrelated-branch-churn
+
+# 21f: the own ref moves again after REFS1 is read; the CAS restore leaves the new value
+hl_reset
+rm -f "$TMP/race.done"
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/moveref.sh"
+PATH="$TMP/gitshim:$PATH" run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "shim raced the restore" test -e "$TMP/race.done"
+need "stderr names moved refs" has_s "$ERR" "session moved refs"
+need "stderr names the CAS miss" has_s "$ERR" "moved again after the session; left as is"
+need "raced value survives" test "$(git -C "$WTC" rev-parse "refs/remotes/origin/$B_CONFLICT")" = "$MASTER_TIP"
+need "no MERGE_HEAD" no_merge
+case_end headless-restore-cas
+
+# 21g: the session deleted its own remote-tracking ref; restore recreates it
+hl_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/delref.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "stderr names moved refs" has_s "$ERR" "session moved refs"
+need "ref recreated" test "$(git -C "$WTC" rev-parse -q --verify "refs/remotes/origin/$B_CONFLICT")" = "$INIT_SHA"
+need "restore reflog message" test "$(git -C "$WTC" reflog show -1 --format=%gs "refs/remotes/origin/$B_CONFLICT")" = "$RESTORE_MSG"
+case_end headless-own-ref-deleted
+
+# 21h: the session created its own remote-tracking ref; restore deletes it
+hl_reset
+git -C "$MAIN" update-ref -d "refs/remotes/origin/$B_CONFLICT"
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/moveref.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "stderr names moved refs" has_s "$ERR" "session moved refs"
+need "created own ref removed" eval '! git -C "$WTC" rev-parse -q --verify "refs/remotes/origin/$B_CONFLICT"'
+case_end headless-own-ref-created
+
+# 21i: a sibling ref under the own remote ref's name is not an own-ref move
+hl_reset
+git -C "$MAIN" update-ref -d "refs/remotes/origin/$B_CONFLICT"
+printf 'git update-ref "refs/remotes/origin/%s/x" %s\n' "$B_CONFLICT" "$INIT_SHA" > "$TMP/effects/sibling.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-failed" CLAUDE_STUB_EFFECT="$TMP/effects/sibling.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "no session-moved-refs abort" eval '! has_s "$ERR" "session moved refs"'
+need "stderr names the verdict" has_s "$ERR" "session ended FAILED"
+need "sibling ref kept" git -C "$MAIN" rev-parse -q --verify "refs/remotes/origin/$B_CONFLICT/x"
+git -C "$MAIN" update-ref -d "refs/remotes/origin/$B_CONFLICT/x"
+case_end headless-own-ref-sibling
 
 # 22
 hl_reset

@@ -1746,6 +1746,59 @@ def test_detached_cmd_carries_postplan_force(tmp_path):
     assert "POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain
 
 
+_STATE_CHANGED_PROBE_HARNESS = (
+    '#!/bin/sh\nprintf \'%s\' "${POSTPLAN_STATE_CHANGED-unset}" > "$FORCE_PROBE"\nexit 0\n')
+
+
+def test_state_changed_threads_env_to_harness(tmp_path, monkeypatch):
+    """--state-changed reaches the harness process as POSTPLAN_STATE_CHANGED=1 (foreground)."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_STATE_CHANGED", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--state-changed",),
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_rebase_only_threads_state_changed_env_to_harness(tmp_path, monkeypatch):
+    """--rebase-only implies --state-changed, so the harness also sees POSTPLAN_STATE_CHANGED=1."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_STATE_CHANGED", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--rebase-only",),
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_no_state_changed_passes_zero_not_ambient(tmp_path, monkeypatch):
+    """Without the flag the harness sees POSTPLAN_STATE_CHANGED=0 even if the caller exported 1."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.setenv("POSTPLAN_STATE_CHANGED", "1")
+    _run_foreground(tmp_path, 0, with_claude_stub=True,
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "0"
+
+
+def test_detached_cmd_carries_postplan_state_changed(tmp_path):
+    """Both HARNESS_SEG lines carry the var; the detached one is checked here, FORCE order intact."""
+    cmd = _generate_cmd(tmp_path, args=("--state-changed",))
+    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in cmd
+    rebase = _generate_cmd(tmp_path / "rebase", args=("--rebase-only",))
+    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in rebase
+    plain = _generate_cmd(tmp_path / "plain")
+    assert "POSTPLAN_STATE_CHANGED=0 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain
+    assert "POSTPLAN_STATE_CHANGED=1" not in plain
+
+
+def test_state_changed_rejects_value_form(tmp_path):
+    """--state-changed is a BARE flag. Catches a permissive `--state-changed=*)` arm."""
+    r = _run_ppn(tmp_path, args=("--state-changed=1",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 0
+    assert "unknown argument '--state-changed=1'" in r.stderr, f"got {r.stderr!r}"
+
+
 @pytest.mark.parametrize("argv_log_mode", ["unset", "empty"])
 @pytest.mark.parametrize("submit_rc_mode", ["unset", "empty"])
 def test_recording_stub_env_unset_and_empty(tmp_path, argv_log_mode, submit_rc_mode):

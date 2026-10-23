@@ -27,9 +27,12 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
     private const SIM_FIRST_CLAIM = 990104;
     private const SIM_AFTER_PARK = 990105;
     private const SIM_CLAIM_BY_SIM = 990106;
+    private const SIM_PHASE_OFF_NEXT = 990107;
+    private const SIM_PHASE_OFF_BY_SIM = 990108;
 
     private SimSummaryRepository $repo;
     private string $scriptPath;
+    private ?string $originalPhase = null;
 
     protected function setUp(): void
     {
@@ -47,6 +50,16 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
 
         // Leave no other pending row, so claim-next can only pick the seeded one.
         $this->db->query("DELETE FROM `ibl_sim_summaries` WHERE `status` = 'pending'");
+
+        // The child reads the phase on its own connection, so the phase is
+        // committed here and restored in tearDown. Default to a recaps-on phase.
+        $result = $this->db->query(
+            "SELECT `setting_value` FROM `ibl_settings` WHERE `setting_key` = 'Current Season Phase' LIMIT 1"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        $this->originalPhase = is_array($row) && is_string($row['setting_value']) ? $row['setting_value'] : null;
+        $this->setSeasonPhase('Regular Season');
     }
 
     protected function tearDown(): void
@@ -56,8 +69,12 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
                 $this->db->query(
                     'DELETE FROM `ibl_sim_summaries` WHERE `sim` IN ('
                     . self::SIM_PENDING . ', ' . self::SIM_DONE . ', ' . self::SIM_EMPTY_QUEUE . ', '
-                    . self::SIM_FIRST_CLAIM . ', ' . self::SIM_AFTER_PARK . ', ' . self::SIM_CLAIM_BY_SIM . ')'
+                    . self::SIM_FIRST_CLAIM . ', ' . self::SIM_AFTER_PARK . ', ' . self::SIM_CLAIM_BY_SIM . ', '
+                    . self::SIM_PHASE_OFF_NEXT . ', ' . self::SIM_PHASE_OFF_BY_SIM . ')'
                 );
+                if ($this->originalPhase !== null) {
+                    $this->setSeasonPhase($this->originalPhase);
+                }
             }
         } catch (\Throwable) {
             // Best-effort — connection may be in an unrecoverable state.
@@ -207,7 +224,61 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
         self::assertSame('skipped', $json['notified']);
     }
 
+    /**
+     * Negative path: in a recaps-off phase claim-next still claims the leftover
+     * sim, but posts no start line and leaves notified_state NULL.
+     */
+    public function testClaimNextInRecapsOffPhaseSkipsTheAnnouncement(): void
+    {
+        $this->setSeasonPhase('Playoffs');
+        $this->seedRow(self::SIM_PHASE_OFF_NEXT, 'pending');
+
+        $result = $this->runScript(['claim-next', '--host=actions']);
+
+        self::assertSame(0, $result['exit_code'], 'stderr: ' . $result['stderr']);
+        $json = $this->decode($result['stdout']);
+        self::assertSame(self::SIM_PHASE_OFF_NEXT, $json['sim']);
+        self::assertFalse($json['recaps_enabled']);
+        self::assertSame('skipped', $json['notified']);
+
+        $row = $this->repo->find(self::SIM_PHASE_OFF_NEXT);
+        self::assertNotNull($row);
+        self::assertSame('actions', $row['claimed_by']);
+        self::assertNull($row['notified_state']);
+    }
+
+    /**
+     * Negative path: claim --sim follows the same phase gate as claim-next.
+     */
+    public function testClaimBySimInRecapsOffPhaseSkipsTheAnnouncement(): void
+    {
+        $this->setSeasonPhase('Playoffs');
+        $this->seedRow(self::SIM_PHASE_OFF_BY_SIM, 'pending');
+
+        $result = $this->runScript(['claim', '--sim=' . self::SIM_PHASE_OFF_BY_SIM, '--host=mac']);
+
+        self::assertSame(0, $result['exit_code'], 'stderr: ' . $result['stderr']);
+        $json = $this->decode($result['stdout']);
+        self::assertTrue($json['claimed']);
+        self::assertSame('skipped', $json['notified']);
+
+        $row = $this->repo->find(self::SIM_PHASE_OFF_BY_SIM);
+        self::assertNotNull($row);
+        self::assertNull($row['notified_state']);
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    private function setSeasonPhase(string $phase): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE `ibl_settings` SET `setting_value` = ? WHERE `setting_key` = \'Current Season Phase\''
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('s', $phase);
+        self::assertTrue($stmt->execute());
+        $stmt->close();
+    }
 
     private function seedRow(int $sim, string $status, ?string $notifiedState = null): void
     {

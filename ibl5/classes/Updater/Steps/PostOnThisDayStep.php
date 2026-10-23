@@ -19,7 +19,7 @@ class PostOnThisDayStep implements PipelineStepInterface
     public function __construct(
         private readonly \OnThisDay\Contracts\OnThisDayServiceInterface $service,
         private readonly \OnThisDay\Contracts\SimPostClaimInterface $claims,
-        private readonly \Season\SeasonQueryRepository $seasonQuery,
+        private readonly \Season\Contracts\SeasonQueryRepositoryInterface $seasonQuery,
         private readonly \OnThisDay\Contracts\MomentPosterInterface $poster,
         private readonly \OnThisDay\MomentFormatter $formatter = new \OnThisDay\MomentFormatter(),
         private readonly \OnThisDay\OnThisDayCalendar $calendar = new \OnThisDay\OnThisDayCalendar(),

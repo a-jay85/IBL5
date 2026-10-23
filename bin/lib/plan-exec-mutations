@@ -259,6 +259,10 @@ if [ -n "$PLAN" ]; then
         *) PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")" ;;
     esac
 fi
+case "$ROOT" in
+    /*) : ;;
+    *) ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || usage ;;
+esac
 cd "$ROOT" || usage
 GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null) || usage
 JDIR="$GITDIR/exec-mutations"

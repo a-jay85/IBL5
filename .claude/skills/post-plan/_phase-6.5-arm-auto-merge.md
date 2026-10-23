@@ -371,12 +371,14 @@ if bin/lib/plan-exec-mutations pending --root "$(git rev-parse --show-toplevel)"
 fi
 if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
   # Drop the old block, so a clean rerun clears a stale HELD block. Strip only when
-  # both markers are present and in order; a lone begin marker would make sed delete to EOF.
+  # the first begin marker and the first end marker are present and in order, the same pairing
+  # as classify.upsert_exec_mutations. Delete by line number, so a stray later begin marker
+  # cannot widen the range to EOF.
   XM_NEW="$XM_BODY"
   XM_B=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:begin -->' | cut -d: -f1)
-  XM_E=$(printf '%s\n' "$XM_BODY" | grep -n '<!-- exec-mutations:end -->' | tail -n1 | cut -d: -f1)
+  XM_E=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:end -->' | cut -d: -f1)
   if [ -n "$XM_B" ] && [ -n "$XM_E" ] && [ "$XM_B" -lt "$XM_E" ]; then
-    XM_NEW=$(printf '%s\n' "$XM_BODY" | sed '/<!-- exec-mutations:begin -->/,/<!-- exec-mutations:end -->/d')
+    XM_NEW=$(printf '%s\n' "$XM_BODY" | sed "${XM_B},${XM_E}d")
   fi
   if [ -s "$XMF" ]; then
     XM_BLOCK=$(printf '<!-- exec-mutations:begin -->\n### Executable mutations\n\n'

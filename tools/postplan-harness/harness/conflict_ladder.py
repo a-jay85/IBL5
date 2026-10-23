@@ -468,7 +468,14 @@ PUSH_WRAPPER_DENIED = (
     "Bash(*/scp *)", "Bash(*/scp)",
     # Probe showed `bash -c '...; git push ...'` slips past the matcher, which only unwraps
     # a lone simple command. A fix session has no need for a nested shell.
+    # This list only reduces risk. It cannot be complete: the prompt tells the session to
+    # run `bash /tmp/postplan-lostwork-<key>.sh`, so script execution stays allowed, and
+    # a script written with Write can still push. The push guard is the harness, which
+    # re-checks the tree and does the only push; the session gets no push authority.
     "Bash(bash -c:*)", "Bash(sh -c:*)", "Bash(zsh -c:*)",
+    "Bash(bash -*c:*)", "Bash(sh -*c:*)", "Bash(zsh -*c:*)",
+    "Bash(*/bash -*c:*)", "Bash(*/sh -*c:*)", "Bash(*/zsh -*c:*)",
+    "Bash(env:*)", "Bash(eval:*)", "Bash(python3 -c:*)", "Bash(python -c:*)",
 )
 SESSION_DENIED = (
     "Agent", "WebFetch", "WebSearch",

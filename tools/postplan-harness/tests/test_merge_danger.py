@@ -54,6 +54,65 @@ def test_destructive_text_outside_a_migration_is_ignored():
     assert _derive([("A", MIG), ("A", "docs/x.md")], diff).door == "two-way"
 
 
+@pytest.mark.parametrize("stmt", [
+    "ALTER TABLE t DROP COLUMN c;",
+    "DROP TABLE t;",
+    "TRUNCATE t;",
+    "ALTER TABLE t RENAME COLUMN a TO b;",
+    "ALTER TABLE t RENAME TO u;",
+])
+def test_each_destructive_statement_still_forces_one_way(stmt):
+    d = _derive([("A", MIG)], _migration_diff(MIG, stmt))
+    assert d.door == "one-way"
+    assert f"destructive-migration:{MIG}" in d.triggers
+
+
+def test_comment_only_destructive_text_in_migration_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "-- Rollback: ALTER TABLE t DROP COLUMN c;",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+    assert d.triggers == ()
+
+
+def test_hash_comment_destructive_text_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "# TRUNCATE t before rerun",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+
+
+def test_block_comment_destructive_text_in_migration_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/*", "DROP TABLE t", "*/",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+
+
+def test_destructive_statement_with_trailing_comment_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "ALTER TABLE t DROP COLUMN c; -- bye"))
+    assert d.door == "one-way"
+    assert f"destructive-migration:{MIG}" in d.triggers
+
+
+def test_destructive_after_closed_block_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/* note */ ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_destructive_inside_unterminated_block_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/* start", "ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_dash_dash_inside_string_does_not_hide_statement():
+    d = _derive([("A", MIG)], _migration_diff(
+        MIG, "INSERT INTO t VALUES ('x -- y'); ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_executable_comment_drop_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/*!40000 DROP TABLE t */"))
+    assert d.door == "one-way"
+
+
 def test_db_sync_prod_is_external_one_way():
     d = _derive([("M", "bin/db-sync-prod")])
     assert (d.door, d.blast) == ("one-way", "external")

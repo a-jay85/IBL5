@@ -588,3 +588,31 @@ def test_condition_3_blocks_on_missing_phase_item():
     result_clean = evaluate(clean_inputs)
     cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
     assert cond3_clean.blocked is False
+
+
+# --- condition (9): migration blindness ----------------------------------------------------------
+
+def test_condition_9_never_sees_migration_sections():
+    from dataclasses import replace
+    from harness.armable import deterministic_safety_holds
+    from harness.classify import filter_diff
+    diff = ("diff --git a/ibl5/migrations/201_x.sql b/ibl5/migrations/201_x.sql\n"
+            "+++ b/ibl5/migrations/201_x.sql\n"
+            "@@ -0,0 +1 @@\n"
+            "+ALTER TABLE t DROP COLUMN c;\n"
+            "diff --git a/docs/x.md b/docs/x.md\n"
+            "+++ b/docs/x.md\n"
+            "@@ -0,0 +1 @@\n"
+            "+prose\n")
+    filtered = filter_diff(diff)
+    assert "migrations/" not in filtered
+    assert "+prose" in filtered
+    cls = replace(Classification(), has_migration=True, filtered_diff=filtered)
+    assert deterministic_safety_holds(cls, "chore: x") == []
+
+
+def test_condition_9_still_holds_on_destructive_text_outside_migrations():
+    from harness.armable import deterministic_safety_holds
+    cls = Classification(has_migration=True, filtered_diff="+DROP TABLE t\n")
+    assert deterministic_safety_holds(cls, "chore: x") == [
+        "destructive/schema-tightening migration in realized diff"]

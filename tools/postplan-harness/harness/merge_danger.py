@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from harness.armable import DESTRUCTIVE_SQL
+from harness.sql_comments import strip_added_sql_comments
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
@@ -113,10 +114,13 @@ def derive_merge_danger(
         if trigger not in triggers:
             triggers.append(trigger)
 
-    # 1. Destructive migration. The `-- destructive-migration[trigger]:` bypass marker is never
-    # read: a bypassed destructive migration is still irreversible.
+    # 1. Destructive migration. SQL comments on added lines are blanked first, so a rollback
+    # note or a `-- G1: ... would truncate` remark does not force the door; an unterminated
+    # block or quote is matched raw (fail closed). The `-- destructive-migration[trigger]:`
+    # bypass marker is never read: a bypassed destructive migration is still irreversible.
     migrations = [p for p in paths if _MIGRATION_RE.match(p)]
-    if migrations and DESTRUCTIVE_SQL.search(_migration_sections(diff_text or "")):
+    if migrations and DESTRUCTIVE_SQL.search(
+            strip_added_sql_comments(_migration_sections(diff_text or ""))):
         for p in migrations:
             add(f"destructive-migration:{p}")
 

@@ -884,8 +884,9 @@ echo "$*" >> "$PFIX/calls.log"
 case "$*" in
     *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
     *pulls\?state=open*)  cat "$PFIX/open.json" ;;
-    *commits/*/status)    [ -f "$PFIX/status-fail" ] && exit 1
-                          p="$*"; p="${p##*commits/}"; cat "$PFIX/status-${p%%/*}.json" ;;
+    *commits/*/status)    p="$*"; p="${p##*commits/}"
+                          [ -f "$PFIX/status-fail-${p%%/*}" ] && exit 1
+                          cat "$PFIX/status-${p%%/*}.json" ;;
     *actions/workflows/all-checks-settled.yml/dispatches*)
                           [ -f "$PFIX/dispatch-fail" ] && exit 1
                           jq -c . >> "$PFIX/dispatched.jsonl" ;;
@@ -1266,15 +1267,20 @@ if [ "$RC" -eq 2 ] && grep -qF 'SWEEP: dispatch failed for PR 7' "$ERR" \
     ok "S25 (plan S19) dispatch failure exits 2 and is named"
 else fail "S25 (plan S19) dispatch failure exits 2 and is named (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
 
-# S25b (plan S19b): a status read error aborts the sweep with exit 2 and no dispatch.
+# S25b (plan S19b): a status read error on one PR is counted and the sweep carries on:
+# PR 7's read fails, stale PR 8 is still dispatched, and the sweep exits 2.
 new_case s25b
-sw_stale7
-: > "$PFIX/status-fail"
+sw_open "$(sw_pr 7 "$P_SHA")" "$(sw_pr 8 "$S2_SHA")"
+sw_status "$S2_SHA" pending "$T0"
+: > "$PFIX/status-fail-$P_SHA"
 CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
-if [ "$RC" -eq 2 ] && [ "$(dispatched)" = "0" ] \
-        && grep -qF 'API read error: repos/a-jay85/IBL5/commits/' "$ERR"; then
-    ok "S25b (plan S19b) status read error aborts the sweep"
-else fail "S25b (plan S19b) status read error aborts the sweep (rc=$RC n=$(dispatched) err=$(cat "$ERR"))"; fi
+if [ "$RC" -eq 2 ] && [ "$(dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/dispatched.jsonl")" = '{"ref":"master","inputs":{"pr_number":"8"}}' ] \
+        && grep -qF 'API read error: repos/a-jay85/IBL5/commits/' "$ERR" \
+        && grep -qF "SWEEP: PR 7 head $P_SHA: status read failed" "$ERR" \
+        && grep -qE '1 dispatched, 1 failed$' "$OUT"; then
+    ok "S25b (plan S19b) status read error is counted and the sweep continues"
+else fail "S25b (plan S19b) status read error is counted and the sweep continues (rc=$RC n=$(dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
 
 # S26 (plan S20): rejected forms.
 new_case s26

@@ -129,18 +129,32 @@ renumber_queue() {
     fi
     n=${#order[@]}
     if [ "$n" -eq 0 ]; then return 0; fi
+    # The runner may dispose an entry (move it out of the queue) while this
+    # runs, so a vanished source is skipped, never fatal: aborting between the
+    # phases would strand entries in the 900-999 band.
     local -a staged=()
+    local name
     i=0
     for e in "${order[@]}"; do
+        if [ ! -L "$dir/$e" ] && [ ! -e "$dir/$e" ]; then continue; fi
         slug=$(entry_to_slug "$e")
-        staged[i]="$(printf '%03d' $((900 + i)))-$slug.md"
-        if [ "$e" != "${staged[i]}" ]; then mv "$dir/$e" "$dir/${staged[i]}"; fi
+        name="$(printf '%03d' $((900 + i)))-$slug.md"
+        if [ "$e" != "$name" ]; then
+            if ! mv "$dir/$e" "$dir/$name"; then
+                if [ -L "$dir/$e" ] || [ -e "$dir/$e" ]; then return 1; fi
+                continue
+            fi
+        fi
+        staged+=("$name")
         i=$((i + 1))
     done
     i=0
-    for e in "${staged[@]}"; do
+    for e in ${staged[@]+"${staged[@]}"}; do
         slug=$(entry_to_slug "$e")
-        mv "$dir/$e" "$dir/$(printf '%03d' $(((i + 1) * 10)))-$slug.md"
+        if ! mv "$dir/$e" "$dir/$(printf '%03d' $(((i + 1) * 10)))-$slug.md"; then
+            if [ -L "$dir/$e" ] || [ -e "$dir/$e" ]; then return 1; fi
+            continue
+        fi
         i=$((i + 1))
     done
 }

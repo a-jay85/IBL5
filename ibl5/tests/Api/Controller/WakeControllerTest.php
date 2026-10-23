@@ -40,10 +40,14 @@ class WakeControllerTest extends TestCase
             ->with(7, '222', '333', self::OPERATOR_ID, 'text')
             ->willReturn(['outcome' => 'woke', 'status' => 'queued']);
 
+        // Response shape {id,outcome,status}: exactly these keys, in this order, nothing else.
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())
             ->method('success')
-            ->with(['id' => 7, 'outcome' => 'woke', 'status' => 'queued']);
+            ->with(self::callback(static function (mixed $data): bool {
+                self::assertSame(['id' => 7, 'outcome' => 'woke', 'status' => 'queued'], $data);
+                return true;
+            }));
 
         (new WakeController($bugRepo, self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
     }

@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # /burndown
@@ -190,7 +190,9 @@ A pathless item (empty `.paths`) carries no path list, so the helper prompt says
 the change to the files the issue body names.
 
 When a helper returns, read `git -C <wt> diff --stat` and re-run the helper's named
-test. Only when that passes:
+test in a subshell: `(cd <wt>/ibl5 && vendor/bin/phpunit <test>)` for a PHP test, or
+`(cd <wt> && bash <test-script>)` for a `bin/` harness. A bare `cd <wt>` is denied in
+a headless run, so keep the parentheses. Only when that passes:
 
 ```bash
 (cd <wt> && bin/post-plan-now --auto)

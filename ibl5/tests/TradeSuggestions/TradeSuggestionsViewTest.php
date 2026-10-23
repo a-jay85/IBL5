@@ -76,6 +76,24 @@ class TradeSuggestionsViewTest extends TestCase
         self::assertStringContainsString('Joe &quot;Quote&quot; O&apos;Neil', $html);
     }
 
+    public function testReasonWithScriptTagInPlayerNameIsEscaped(): void
+    {
+        $item = new SuggestionItem(
+            partnerTeamName: 'Heat',
+            giveLabels: ['<script>alert(1)</script> PG'],
+            getLabels: ['Plain Name'],
+            userReason: 'Moving <script>alert(1)</script> clears room.',
+            partnerReason: 'They add a starter.',
+            prefillUrl: 'modules.php?name=Trading&op=offertrade&partner=Heat',
+        );
+
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$item]));
+
+        self::assertStringContainsString('Moving &lt;script&gt;alert(1)&lt;/script&gt; clears room.', $html);
+        self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt; PG', $html);
+        self::assertStringNotContainsString('<script>alert', $html);
+    }
+
     public function testShowsGuessLabelAndOverrideLabel(): void
     {
         $guess = $this->render(new TradeSuggestionsPanelData(

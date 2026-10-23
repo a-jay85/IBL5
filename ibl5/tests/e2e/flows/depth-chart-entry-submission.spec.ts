@@ -186,9 +186,10 @@ test.describe('Depth Chart submission', () => {
       .first()
       .selectOption('4');
     await Promise.all([
-      page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 }),
+      page.waitForEvent('load', { timeout: 15_000 }),
       page.locator('.depth-chart-buttons .depth-chart-submit-btn').click(),
     ]);
+    await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
 
     // The pre-PRG regression symptom: a stale-token resubmit rendered this error.
     // Redirected back to the module URL (asserted above) with that error absent is

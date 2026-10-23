@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ---
 
 # IBL5 Architecture Decision Records
@@ -79,6 +79,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0202](0202-review-depth-by-merge-danger.md) | Phase 4 review depth follows the Merge danger line | Accepted | Phase 4 review depth is standard or deep from the PR body's Merge danger line; one-way, site-wide, external, or a missing line selects deep, which raises agent tiers and never skips an agent. |
 | [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
 | [0207](0207-same-run-review-thread-remediation.md) | Same-run review thread remediation | Accepted | Phase 4.5 also fixes or declines the review threads the same run posted, one round, then re-reviews the fix delta; arming predicates are unchanged. |
+| [0210](0210-required-context-payload-provable-job-skip.md) | Payload-provable job-level skips on PR label and edit events | Accepted | `human-signoff` and `auto-mergeable label` skip label and edit events their verdict cannot read, with the predicate copied into a per-run concurrency group; `Meta checks` stays unfiltered. |
 
 ## When an ADR is Required
 

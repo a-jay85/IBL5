@@ -15,6 +15,9 @@ use JsbParser\ScoFileParser;
  */
 class RegularSeasonGameProcessor implements GameTypeProcessorInterface
 {
+    /** @var array<string, string|null> */
+    private array $franchiseNameCache = [];
+
     public function __construct(
         private GameUpsertResolver $resolver,
         private GameLineWriter $writer,
@@ -36,10 +39,23 @@ class RegularSeasonGameProcessor implements GameTypeProcessorInterface
             return ['action' => 'skip', 'linesProcessed' => 0, 'messages' => []];
         }
 
-        $visitorTeamName = $this->repository->findFranchiseTeamName($boxscoreGameInfo->visitor_teamid, $seasonEndingYear);
-        $homeTeamName = $this->repository->findFranchiseTeamName($boxscoreGameInfo->home_teamid, $seasonEndingYear);
+        $visitorTeamName = $this->franchiseTeamName($boxscoreGameInfo->visitor_teamid, $seasonEndingYear);
+        $homeTeamName = $this->franchiseTeamName($boxscoreGameInfo->home_teamid, $seasonEndingYear);
         $linesProcessed = $this->writer->write($line, $boxscoreGameInfo, $visitorTeamName, $homeTeamName);
 
         return ['action' => $upsertAction, 'linesProcessed' => $linesProcessed, 'messages' => []];
+    }
+
+    /**
+     * Look up a franchise's team name once per (season, franchise) for the life of this processor
+     */
+    private function franchiseTeamName(int $franchiseId, int $seasonEndingYear): ?string
+    {
+        $key = $seasonEndingYear . ':' . $franchiseId;
+        if (!array_key_exists($key, $this->franchiseNameCache)) {
+            $this->franchiseNameCache[$key] = $this->repository->findFranchiseTeamName($franchiseId, $seasonEndingYear);
+        }
+
+        return $this->franchiseNameCache[$key];
     }
 }

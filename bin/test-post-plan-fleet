@@ -122,8 +122,14 @@ clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
 
 # Run the driver in a sealed environment: scratch HOME (so plists land in the scratch
 # tree), stubbed claude, seamed gh identity, shim dir on PATH.
+# A runner that sees a hold-repeat decline calls bin/postplan-fix --holdrepeat. No case may
+# reach the real one, so every driver call defaults POST_PLAN_FLEET_POSTPLAN_FIX to this no-op
+# (an UNSET var only: the empty-env case needs an empty value to pass through).
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/postplan-fix-noop"
+chmod +x "$SCRATCH/.local/bin/postplan-fix-noop"
 run_driver() {
     env HOME="$SCRATCH" \
+        POST_PLAN_FLEET_POSTPLAN_FIX="${POST_PLAN_FLEET_POSTPLAN_FIX-$SCRATCH/.local/bin/postplan-fix-noop}" \
         PATH="$SCRATCH/.local/bin:$PATH" \
         POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
         POST_PLAN_FLEET_GH_USER=a-jay85 \
@@ -1104,6 +1110,7 @@ printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/.local/bin/gh-fail"
 chmod +x "$SCRATCH/.local/bin/gh-fail"
 run_dm_driver() {
     env HOME="$SCRATCH" \
+        POST_PLAN_FLEET_POSTPLAN_FIX="${POST_PLAN_FLEET_POSTPLAN_FIX-$SCRATCH/.local/bin/postplan-fix-noop}" \
         PATH="$SCRATCH/.local/bin:$PATH" \
         POST_PLAN_FLEET_GH="${POST_PLAN_FLEET_GH:-$SCRATCH/.local/bin/gh-fail}" \
         POST_PLAN_FLEET_GH_USER=a-jay85 \
@@ -3163,6 +3170,144 @@ grep -qF 'STOPPED' "$_DM_CAPTURE" 2>/dev/null \
 ! grep -qF 'DECLINED (same hold' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/110: decline overrode STOP:"
 clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
 end_case declined-dm
+
+# --- holdrepeat autofix cases -----------------------------------------------------------
+# The runner runs `bin/postplan-fix --holdrepeat <PR>` (POST_PLAN_FLEET_POSTPLAN_FIX) when the
+# first post-plan pass declined on a repeat hold, or INSTEAD of that pass for a PR passed in
+# --holdrepeat-fix-prs=. The fix must run while the slot plist still exists. Two recorder
+# stubs write one line per call: the post-plan-now stub (POST_PLAN_FLEET_CLAUDE) and the fix
+# stub (POST_PLAN_FLEET_POSTPLAN_FIX, which also records `plist-present=yes|no`).
+_HR_PPOUT="$SCRATCH/hr-pp-out.txt"; _HR_FIXOUT="$SCRATCH/hr-fix-out.txt"
+_HR_PPREC="$SCRATCH/hr-pp-calls.txt"; _HR_FIXREC="$SCRATCH/hr-fix-calls.txt"
+_HR_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist"
+_HR_PPSTUB="$SCRATCH/.local/bin/hr-pp-stub"
+_HR_FIXSTUB="$SCRATCH/.local/bin/hr-fix-stub"
+TMP_LOGS+=("$_DM_LOG.declined" "$_DM_LOG.holdrepeat-fix")
+cat > "$_HR_PPSTUB" <<'HRSTUB'
+#!/usr/bin/env bash
+echo "argv=$*" >> "$HR_PPREC"
+cat "$HR_PPOUT"
+HRSTUB
+cat > "$_HR_FIXSTUB" <<'HRSTUB'
+#!/usr/bin/env bash
+echo "argv=$* plist-present=$([ -f "$HR_PLIST" ] && echo yes || echo no)" >> "$HR_FIXREC"
+cat "$HR_FIXOUT"
+HRSTUB
+chmod +x "$_HR_PPSTUB" "$_HR_FIXSTUB"
+_hr_run() {  # $1 = post-plan-now stub stdout, $2 = fix stub stdout; rest = extra driver args
+    local pp_out="$1" fix_out="$2"
+    shift 2
+    clean_slots
+    rm -f "$_DM_LOG" "$_DM_LOG.declined" "$_DM_LOG.holdrepeat-fix" "$_DM_CAPTURE" "$_HR_PPREC" "$_HR_FIXREC"
+    printf '%s\n' "$pp_out" > "$_HR_PPOUT"
+    printf '%s\n' "$fix_out" > "$_HR_FIXOUT"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_HR_PPSTUB" \
+        POST_PLAN_FLEET_POSTPLAN_FIX="$_HR_FIXSTUB" \
+        run_dm_driver --go "$@" >/dev/null 2>&1
+    HOME="$SCRATCH" HR_PPOUT="$_HR_PPOUT" HR_FIXOUT="$_HR_FIXOUT" HR_PPREC="$_HR_PPREC" \
+        HR_FIXREC="$_HR_FIXREC" HR_PLIST="$_HR_PLIST" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+}
+_hr_calls() { local f="$1"; if [[ -f "$f" ]]; then wc -l < "$f" | tr -d ' '; else echo 0; fi; }
+_hr_decline_line='RESULT: post-plan DECLINED — terminal=hold-repeat-declined; declined: same hold as last run (missing files: a.md), no tokens spent.'
+
+# --- case: holdrepeat-decline-fires-fix -------------------------------------------------
+begin_case
+_hr_run "$_hr_decline_line" 'postplan-fix: holdrepeat result=gave-up-repeat'
+[[ "$(_hr_calls "$_HR_FIXREC")" == 1 ]] \
+    || fail "holdrepeat-decline-fires-fix: want exactly one fix call, got $(_hr_calls "$_HR_FIXREC")"
+grep -qF -- "argv=--holdrepeat ${_DM_PR} " "$_HR_FIXREC" 2>/dev/null \
+    || fail "holdrepeat-decline-fires-fix: fix argv is not '--holdrepeat ${_DM_PR}' ($(cat "$_HR_FIXREC" 2>/dev/null))"
+grep -qF 'plist-present=yes' "$_HR_FIXREC" 2>/dev/null \
+    || fail "holdrepeat-decline-fires-fix: fix ran after the slot plist was released ($(cat "$_HR_FIXREC" 2>/dev/null))"
+[[ "$(_outcome_of)" == declined ]] || fail "holdrepeat-decline-fires-fix: outcome '$(_outcome_of)'"
+grep -qF 'post-plan-fleet: holdrepeat-fix=gave-up-repeat' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-decline-fires-fix: log lacks holdrepeat-fix=gave-up-repeat"
+grep -qF 'autofix: gave-up-repeat' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-decline-fires-fix: DM lacks 'autofix: gave-up-repeat' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+end_case holdrepeat-decline-fires-fix
+
+# --- case: holdrepeat-fix-replaces-log --------------------------------------------------
+begin_case
+_hr_run "$_hr_decline_line" $'RESULT: post-plan READY — terminal=shipped-armed auto-merge=armed PR #9901\npostplan-fix: holdrepeat result=fixed'
+[[ "$(_outcome_of)" == shipped ]] || fail "holdrepeat-fix-replaces-log: outcome '$(_outcome_of)'"
+grep -qF 'RESULT: post-plan DECLINED' "$_DM_LOG.declined" 2>/dev/null \
+    || fail "holdrepeat-fix-replaces-log: LOG.declined lacks the DECLINED line"
+! grep -qF 'RESULT: post-plan DECLINED' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-fix-replaces-log: LOG still holds the DECLINED line"
+grep -qF 'post-plan-fleet: holdrepeat-fix=fixed' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-fix-replaces-log: log lacks holdrepeat-fix=fixed"
+end_case holdrepeat-fix-replaces-log
+
+# --- case: holdrepeat-no-decline-no-fix -------------------------------------------------
+begin_case
+_hr_run 'RESULT: post-plan READY — terminal=shipped-armed PR #9901' 'postplan-fix: holdrepeat result=fixed'
+[[ "$(_hr_calls "$_HR_FIXREC")" == 0 ]] \
+    || fail "holdrepeat-no-decline-no-fix: fix ran without a decline ($(cat "$_HR_FIXREC" 2>/dev/null))"
+! grep -qF 'holdrepeat-fix=' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-no-decline-no-fix: log has a holdrepeat-fix= line"
+[[ "$(_outcome_of)" == shipped ]] || fail "holdrepeat-no-decline-no-fix: outcome '$(_outcome_of)'"
+end_case holdrepeat-no-decline-no-fix
+
+# --- case: holdrepeat-routed-pr ---------------------------------------------------------
+begin_case
+_hr_run 'RESULT: post-plan READY — terminal=shipped-armed PR #9901' 'postplan-fix: holdrepeat result=skip-live-postplan-now' \
+    "--holdrepeat-fix-prs=${_DM_PR}"
+[[ "$(_hr_calls "$_HR_PPREC")" == 0 ]] \
+    || fail "holdrepeat-routed-pr: post-plan-now ran for a routed PR ($(cat "$_HR_PPREC" 2>/dev/null))"
+[[ "$(_hr_calls "$_HR_FIXREC")" == 1 ]] \
+    || fail "holdrepeat-routed-pr: want exactly one fix call, got $(_hr_calls "$_HR_FIXREC")"
+grep -qF -- "argv=--holdrepeat ${_DM_PR} " "$_HR_FIXREC" 2>/dev/null \
+    || fail "holdrepeat-routed-pr: fix argv is not '--holdrepeat ${_DM_PR}' ($(cat "$_HR_FIXREC" 2>/dev/null))"
+[[ "$(_outcome_of)" == declined ]] || fail "holdrepeat-routed-pr: outcome '$(_outcome_of)'"
+grep -qF 'RESULT: post-plan DECLINED (holdrepeat autofix skip-live-postplan-now)' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-routed-pr: log lacks the quiet-decline RESULT line"
+grep -qF 'post-plan-fleet: holdrepeat-fix=skip-live-postplan-now' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-routed-pr: log lacks holdrepeat-fix=skip-live-postplan-now"
+[[ ! -e "$_DM_CAPTURE" ]] \
+    || fail "holdrepeat-routed-pr: a quiet skip sent a DM ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+end_case holdrepeat-routed-pr
+
+# --- case: holdrepeat-flag-rejects ------------------------------------------------------
+begin_case
+_hr_e="$(run_driver --holdrepeat-fix-prs=abc 2>&1)"; _hr_rc=$?
+[[ $_hr_rc -eq 2 ]] || fail "holdrepeat-flag-rejects: =abc exited $_hr_rc, want 2"
+grep -qF -- "--holdrepeat-fix-prs= needs a comma list of PR numbers, got: 'abc'" <<< "$_hr_e" \
+    || fail "holdrepeat-flag-rejects: =abc wrong message (out: $_hr_e)"
+_hr_e="$(run_driver --holdrepeat-fix-prs 12 2>&1)"; _hr_rc=$?
+[[ $_hr_rc -ne 0 ]] || fail "holdrepeat-flag-rejects: space form exited 0"
+grep -qF 'unknown flag: --holdrepeat-fix-prs' <<< "$_hr_e" \
+    || fail "holdrepeat-flag-rejects: space form not rejected as unknown flag (out: $_hr_e)"
+_hr_e="$(run_driver --holdrepeat-fix-prs=12 --rebase-only-prs=12 2>&1)"; _hr_rc=$?
+[[ $_hr_rc -eq 2 ]] || fail "holdrepeat-flag-rejects: overlap exited $_hr_rc, want 2"
+grep -qF -- 'PR #12 is in --holdrepeat-fix-prs= and --rebase-only-prs=' <<< "$_hr_e" \
+    || fail "holdrepeat-flag-rejects: overlap message does not name both flags (out: $_hr_e)"
+_hr_e="$(run_driver --state-changed-prs=7,12 --holdrepeat-fix-prs=12 2>&1)"; _hr_rc=$?
+[[ $_hr_rc -eq 2 ]] || fail "holdrepeat-flag-rejects: state-changed overlap exited $_hr_rc, want 2"
+grep -qF -- 'PR #12 is in --holdrepeat-fix-prs= and --state-changed-prs=' <<< "$_hr_e" \
+    || fail "holdrepeat-flag-rejects: state-changed overlap message does not name both flags (out: $_hr_e)"
+end_case holdrepeat-flag-rejects
+
+# --- case: holdrepeat-fix-bin-empty-env -------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_RUNNER"
+_hr_out="$(POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_POSTPLAN_FIX='' \
+    run_dm_driver --dry-run --holdrepeat-fix-prs="${_DM_PR}" 2>&1)"
+grep -qF "DRY(invocation) PR #${_DM_PR}: $SCRIPT_DIR/../bin/postplan-fix --holdrepeat ${_DM_PR}" <<< "$_hr_out" \
+    || fail "holdrepeat-fix-bin-empty-env: empty env did not default to \$ROOT/bin/postplan-fix (out: $_hr_out)"
+! grep -qF 'bin/post-plan-now --pr' <<< "$_hr_out" \
+    || fail "holdrepeat-fix-bin-empty-env: routed PR still prints a post-plan-now invocation"
+grep -qE '^POSTPLAN_FIX_BIN=.*/bin/postplan-fix$' "$_DM_RUNNER" 2>/dev/null \
+    || fail "holdrepeat-fix-bin-empty-env: runner header lacks the default POSTPLAN_FIX_BIN"
+grep -qE '^HOLDREPEAT_FIX_ARG=1$' "$_DM_RUNNER" 2>/dev/null \
+    || fail "holdrepeat-fix-bin-empty-env: runner header lacks HOLDREPEAT_FIX_ARG=1"
+clean_slots; rm -f "$_DM_RUNNER"
+_hr_out="$(POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_POSTPLAN_FIX=/x/stub-fix \
+    run_dm_driver --dry-run --holdrepeat-fix-prs="${_DM_PR}" 2>&1)"
+grep -qF "DRY(invocation) PR #${_DM_PR}: /x/stub-fix --holdrepeat ${_DM_PR}" <<< "$_hr_out" \
+    || fail "holdrepeat-fix-bin-empty-env: set env not honoured (out: $_hr_out)"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
+end_case holdrepeat-fix-bin-empty-env
 
 # --- case 23: usage-gate-paused ----------------------------------------------------------
 # ADR-0143: a worktree holding a post-plan run paused by the usage gate is skipped (no

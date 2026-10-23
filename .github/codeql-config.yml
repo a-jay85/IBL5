@@ -1,6 +1,8 @@
 name: CodeQL config
 
 paths-ignore:
-  # Rendered-HTML test snapshots are fixtures, never served. CodeQL re-flags them
-  # (js/xss-through-dom) every time a snapshot changes.
+  # Rendered-HTML test snapshots and HTML fixtures are never served. CodeQL re-flags
+  # them (js/xss-through-dom) every time one changes. Keep the directory ignore so
+  # non-HTML files under __snapshots__/ stay covered.
   - ibl5/tests/**/__snapshots__
+  - ibl5/tests/**/*.html

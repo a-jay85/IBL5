@@ -1,6 +1,6 @@
 ---
 description: The post-plan lost-work proof reads the post-rebase tree per branch line instead of comparing numstat rows, so master edits to the same file no longer block; ambiguity still blocks.
-last_verified: 2026-10-14
+last_verified: 2026-10-19
 ---
 
 # ADR-0174: Lost-work proof compares branch changes against the post-rebase tree
@@ -102,6 +102,44 @@ file: `ibl5/phpstan-baseline.neon`.
   line text makes the per-line count read `h >= m`. Fixing that needs per-block identity
   counting; the block parser added here is its foundation. Until then that class still blocks,
   which is the accepted fail-closed side.
+
+## Addendum 2026-10-19: type-change pairs and the stacked-path proof base
+
+Decision 1 says a file entry for a deletion must "still be absent" at `HEAD`. PR #3105
+(run `live-automouse-queue-numeric-order-20261018-075009-99132`) showed one input where
+that reading is wrong. `git diff` writes a regular-file to symlink change (or the reverse)
+as two entries on the same path: `deleted file mode 100644` followed by `new file mode
+120000`. The branch replaced `bin/automouse/lib-queue-order` with a symlink; the delete
+half found the path at `HEAD` and the proof printed `LOST: deletion lost, still at HEAD:`
+against the branch's own tree, with no conflict involved. The conflict ladder then stopped.
+
+Rule change. The parser now records the mode from each `new file mode` header. A deleted
+path that is still at `HEAD` is honoured only when the same patch also creates that path
+and `git ls-tree HEAD` reports the mode the create header recorded. The create entry's
+content check is unchanged (for a symlink the content is its target). Any other case is
+still a lost deletion: no create entry, a different mode (the resolver kept the old regular
+file), or a retargeted symlink (caught by the create half). This is a narrow widening of
+what the gate accepts, keyed to an exact same-path delete+create pair plus a mode match.
+No allowlist and no downgrade of `LOST` were added.
+
+Proof base in the stacked path. `bin/wt-new` records `iblBase=master` for every branch, so
+`_autoresolve_stacked_rebase` diffed from the local `master` ref, which can sit behind
+`origin/master` after a merge-pull. A stale base charges master's own commits to the
+branch; a deletion master made and later reversed then reads as a branch deletion. The
+stacked path now pins `origin/master` first and, when `iblBase` is an ancestor of it, takes
+the pre-patch, the squash parent and the replay upstream from `merge-base(origin/master,
+HEAD)`, the same range the plain merge path already used. A true stacked parent that is
+not an ancestor keeps the `iblBase` range. For #3105 this was not the cause; it closes the
+narrower case the investigation found.
+
+The harness loads the proof from the pinned `origin/master` SHA, so the rule change applies
+to runs started after this merges. The skill engine
+(`.claude/skills/post-plan/_phase-2-conflict-resolution.md`) runs the same script and
+inherits it. Tests: `tools/postplan-harness/tests/test_lostwork_change_level.py` (both
+type-change directions, the mode-mismatch and retargeted negatives, the unchanged real
+lost deletion), `tools/postplan-harness/tests/test_gitad_squash_before_onto.py` (stale
+base with a reversed master deletion, a branch deletion still charged, the non-ancestor
+parent), and `bin/test-postplan-arm-conditions` §5.9g.
 
 ## References
 

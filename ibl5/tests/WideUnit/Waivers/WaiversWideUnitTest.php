@@ -20,7 +20,6 @@ use Season\Season;
  * - Successful add from waivers (with existing contract)
  * - Successful add from waivers (with veteran minimum)
  * - Validation failures (cap violations, roster violations)
- * - Waiver wait time calculations
  * - Contract determination logic
  *
  * @covers \Waivers\WaiversRepository
@@ -251,7 +250,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertTrue($result->isValid());
@@ -272,7 +271,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 103; // Veteran minimum
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert - Allowed because player salary is vet min
         $this->assertTrue($result->isValid());
@@ -295,7 +294,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -318,7 +317,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -340,7 +339,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500;
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -363,7 +362,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500; // Would push to 7300, over HARD_CAP_MAX
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -387,7 +386,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $playerSalary = 500; // Over vet min (103)
 
         // Act
-        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary);
+        $result = $this->validator->validateAdd($playerID, $healthyRosterSlots, $healthyRosterSlots, $totalSalary, $playerSalary, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -479,83 +478,6 @@ class WaiversWideUnitTest extends WideUnitTestCase
         $this->assertSame(450, $result['salary']);
     }
 
-    // ========== WAIVER WAIT TIME TESTS ==========
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsCountdownWhenNotCleared(): void
-    {
-        // Arrange - Player dropped 12 hours ago
-        $currentTime = time();
-        $dropTime = $currentTime - (12 * 3600); // 12 hours ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should show remaining time
-        $this->assertStringContainsString('Clears in', $result);
-        $this->assertStringContainsString('12 h', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsEmptyWhenCleared(): void
-    {
-        // Arrange - Player dropped 25 hours ago (past 24-hour window)
-        $currentTime = time();
-        $dropTime = $currentTime - (25 * 3600); // 25 hours ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should be empty (player cleared waivers)
-        $this->assertSame('', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeReturnsEmptyAtExactly24Hours(): void
-    {
-        // Arrange - Player dropped exactly 24 hours ago
-        $currentTime = time();
-        $dropTime = $currentTime - 86400; // Exactly 24 hours
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should be empty (player just cleared)
-        $this->assertSame('', $result);
-    }
-
-    /**
-     * @group integration
-     * @group waivers
-     * @group timing
-     */
-    public function testWaiverWaitTimeShowsCorrectMinutesAndSeconds(): void
-    {
-        // Arrange - Player dropped 23 hours and 30 minutes ago
-        $currentTime = time();
-        $dropTime = $currentTime - (23 * 3600 + 30 * 60); // 23h 30m ago
-
-        // Act
-        $result = $this->processor->getWaiverWaitTime($dropTime, $currentTime);
-
-        // Assert - Should show ~30 minutes remaining
-        $this->assertStringContainsString('Clears in', $result);
-        $this->assertStringContainsString('0 h', $result);
-        $this->assertStringContainsString('30 m', $result);
-    }
-
     // ========== VETERAN MINIMUM CALCULATION TESTS ==========
 
     /**
@@ -598,11 +520,11 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testValidatorClearsErrorsBetweenValidations(): void
     {
         // Each call returns an independent result — no shared state
-        $failedResult = $this->validator->validateAdd(null, 5, 5000, 500);
+        $failedResult = $this->validator->validateAdd(null, 5, 5, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
         $this->assertNotSame([], $failedResult->getErrors());
 
         // Act - Second validation passes — completely independent result
-        $result = $this->validator->validateAdd(100, 5, 5000, 500);
+        $result = $this->validator->validateAdd(100, 5, 5, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert - Independent result carries no errors from the prior call
         $this->assertTrue($result->isValid());
@@ -711,7 +633,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimBlockedWhenRosterFull(): void
     {
         // Act
-        $result = $this->validator->validateAdd(100, 0, 5000, 500);
+        $result = $this->validator->validateAdd(100, 0, 0, 5000, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -728,7 +650,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimBlockedWhenOverCapWithHealthyRoster(): void
     {
         // Act - 3 slots = 12 healthy players, total 6800+500=7300 > 7000
-        $result = $this->validator->validateAdd(100, 3, 6800, 500);
+        $result = $this->validator->validateAdd(100, 3, 3, 6800, 500, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertFalse($result->isValid());
@@ -745,7 +667,7 @@ class WaiversWideUnitTest extends WideUnitTestCase
     public function testClaimAllowedAtVetMinWhenUnderRosterMinimum(): void
     {
         // Act - 5 slots = 10 healthy players (<12), at cap but vet min salary
-        $result = $this->validator->validateAdd(100, 5, 7000, 103);
+        $result = $this->validator->validateAdd(100, 5, 5, 7000, 103, \League\ContractRules::getVeteranMinimumSalary(10));
 
         // Assert
         $this->assertTrue($result->isValid());

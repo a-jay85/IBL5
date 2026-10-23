@@ -57,6 +57,27 @@ final class AdminChatStatusTest extends TestCase
         self::assertStringContainsString("couldn't reach the league server", $message);
     }
 
+    public function testPostedAndRecoveredMessagesCarryTheViewerLink(): void
+    {
+        $url = 'https://iblhoops.net/ibl5/simSummaries.php?sim=812';
+
+        $posted = AdminChatStatus::message('posted', 812, [], 'actions', $url);
+        $recovered = AdminChatStatus::message('recovered', 812, ['last_cause' => 'flaky'], 'mac', $url);
+
+        self::assertSame("Sim 812 recaps are posted. Review them: {$url}", $posted);
+        self::assertStringEndsWith(" Review them: {$url}", $recovered);
+    }
+
+    public function testFailureMessagesNeverCarryTheViewerLink(): void
+    {
+        $url = 'https://iblhoops.net/ibl5/simSummaries.php?sim=812';
+
+        $retrying = AdminChatStatus::message('retrying', 812, ['last_cause' => 'flaky'], 'actions', $url);
+
+        self::assertStringNotContainsString($url, $retrying);
+        self::assertSame('Sim 812 recaps are posted.', AdminChatStatus::message('posted', 812, [], 'actions'));
+    }
+
     public function testNoTemplateContainsMention(): void
     {
         $rows = [['last_cause' => null, 'blocked_until' => null]];

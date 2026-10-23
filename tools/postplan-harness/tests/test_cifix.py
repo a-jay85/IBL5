@@ -30,6 +30,11 @@ class TestTriage:
             "rollup-only", ["Tests and Analysis"]
         )
 
+    def test_triage_treats_all_checks_settled_status_as_rollup(self):
+        # A red `All checks settled` is a commit status with no Actions job link.
+        assert cifix.triage(["All checks settled", "PHPUnit"]) == ("actionable", ["PHPUnit"])
+        assert cifix.triage(["All checks settled"]) == ("rollup-only", ["All checks settled"])
+
     def test_triage_dedupes_preserving_order(self):
         assert cifix.triage(["B", "A", "B"]) == ("actionable", ["B", "A"])
 
@@ -298,13 +303,13 @@ BODY_LINE = ("Meta checks\tRun bin/check-pr-manual-testing\t﻿"
 
 
 def test_meta_only_true_with_all_checks_green_aggregate():
-    assert cifix.meta_only(["All checks green", "Meta checks"])
+    assert cifix.meta_only(["All checks settled", "Meta checks"])
     assert cifix.meta_only(["Meta checks"])
 
 
 def test_meta_only_false_with_other_actionable_or_aggregate_alone():
     assert not cifix.meta_only(["Meta checks", "PHPUnit"])
-    assert not cifix.meta_only(["All checks green"])
+    assert not cifix.meta_only(["All checks settled"])
     assert not cifix.meta_only([])
 
 

@@ -76,8 +76,8 @@ final class BoxScoreTeamNameBackfillMigrationTest extends DatabaseTestCase
         self::assertSame(self::HOME_NAME, $this->nameOf($b));
         self::assertSame(self::VISITOR_NAME, $this->nameOf($controlA));
         self::assertSame(self::HOME_NAME, $this->nameOf($controlB));
-        self::assertSame(self::STALE_NAME, $this->backupNameOf($a));
-        self::assertNull($this->backupNameOf($b));
+        self::assertSame(self::STALE_NAME, $this->backupNameOf($a), 'backupNameOf(A) holds the pre-state name of the changed row');
+        self::assertNull($this->backupNameOf($b), 'the unchanged sibling is not backed up');
     }
 
     public function testRepairsCollidingPairWhereSiblingHoldsVisitorName(): void
@@ -88,8 +88,8 @@ final class BoxScoreTeamNameBackfillMigrationTest extends DatabaseTestCase
 
         self::assertSame(0, $this->runMigration($this->db));
 
-        self::assertSame(self::VISITOR_NAME, $this->nameOf($a));
-        self::assertSame(self::HOME_NAME, $this->nameOf($b));
+        self::assertSame(self::VISITOR_NAME, $this->nameOf($a), 'bad_id holds its target_name');
+        self::assertSame(self::HOME_NAME, $this->nameOf($b), 'sibling_id holds the other franchise name');
         self::assertSame(self::STALE_NAME, $this->backupNameOf($a));
         self::assertSame(self::VISITOR_NAME, $this->backupNameOf($b));
     }

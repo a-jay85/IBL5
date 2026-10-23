@@ -389,6 +389,8 @@ def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
 
 
 def test_drop_commit_restores_head_with_postplan_reflog_subject(repo):
+    """LiveGit.drop_commit(pre) moves HEAD back and writes a reflog subject
+    collapse-guard.sh does not read as a history rewrite."""
     g = LiveGit(repo)
     pre = g.head()
     os.makedirs(os.path.join(repo, "bin"), exist_ok=True)

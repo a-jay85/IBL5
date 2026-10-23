@@ -85,12 +85,15 @@ evict_dispositions() {
 # inside queue/, so editing a queued plan's file never moves it.
 
 # append_entry <source-path> <name> — link <source-path> into the queue as the
-# LAST entry. Compacts once if the prefix band is exhausted. `ln -s` fails on
-# EEXIST when two enqueues race for one prefix, so retry with a fresh prefix.
+# LAST entry. Compacts once if the prefix band is exhausted. The link name
+# includes the slug, so `ln -s` fails on EEXIST only when two enqueues race for
+# the same slug and prefix. Two different slugs that read the same max prefix
+# both succeed with the same NNN and then sort by slug, not by enqueue order.
 append_entry() {
     local source=$1 name=$2 prefix tries=0
     while [ "$tries" -lt 5 ]; do
-        # A racing enqueue of the same slug may have landed since our last look.
+        # A racing enqueue of the same slug may have landed since our last look
+        # (it may carry a different prefix, so the EEXIST retry cannot see it).
         if queue_entry_for_slug "$QUEUE_DIR" "$name" >/dev/null; then
             return 0
         fi

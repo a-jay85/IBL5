@@ -22,13 +22,14 @@ branch; it survives you closing Claude Code. Engine selection:
 - **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy, never the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session, used if the harness
-  fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
+- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session when the harness is
+  absent or exits other than 0, 3 or 7. It triages the crash and holds the PR; it never arms.
+  `POST_PLAN_SKILL=1` forces it.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
-  verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
-  no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
-  Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
+  verdict to arming condition (12). It exits **0**, **1** or **3** only (exit **7** is
+  `bin/post-plan-now`'s main-checkout refusal). There is no exit 4 and no Phase-5.5 re-entry.
+  Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
   These reach it: a rebase conflict, a **diverged remote head** (the PR branch was rewritten
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
   refusal), a **usage limit** (`llm-usage-limit`),

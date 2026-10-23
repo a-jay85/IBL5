@@ -452,6 +452,63 @@ if grep -qF -- "RESULT paused" <<< "$P7_OUT"; then fail "auth error: wrongly rep
 [ "$P7_MARKERS" = 0 ] || fail "auth error: a marker was written"
 [ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
 
+# Case 7b — a harness crash that reaches the skill fallback sends exactly one DM.
+# The caffeinate shim routes both the harness and the skill claude through FAKE_CLAUDE.
+# In triage mode the harness call (argv starts with `isolated`) exits 1, and the skill
+# call runs the real crash-triage block from SKILL.md. Both possible DM senders, the
+# triage block and FAILDM_SEG, resolve to the $WT6/bin/post-plan-fail-dm shim.
+H7B="$TMP/fake-harness"; mkdir -p "$H7B"
+printf '#!/bin/sh\nexit 1\n' > "$H7B/run"; chmod +x "$H7B/run"
+SKILL_MD="$REPO/.claude/skills/post-plan/SKILL.md"
+# The plist CMD puts /usr/local/bin ahead of the shims, so the triage block gets its own
+# gh stub first on PATH. It reports an open, unarmed PR and logs every call it gets.
+GH7B_DIR="$TMP/gh7b"; GH7B_LOG="$TMP/gh7b.log"; mkdir -p "$GH7B_DIR"
+cat > "$GH7B_DIR/gh" << 'GH_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH7B_LOG"
+case "$*" in "pr view"*) printf '%s\n' '{"number":42,"state":"OPEN","autoMergeRequest":null}' ;; esac
+exit 0
+GH_EOF
+chmod +x "$GH7B_DIR/gh"
+export SKILL_MD GH7B_DIR GH7B_LOG
+cat > "$FAKE_CLAUDE.triage" << 'SHIM_EOF'
+#!/usr/bin/env bash
+[ "${1:-}" = isolated ] && { echo "RESULT: post-plan FAILED (fake harness crash)"; exit 1; }
+block=$(sed -n '/^# --- harness-crash triage ---$/,/^# --- end harness-crash triage ---$/p' "$SKILL_MD")
+[ -n "$block" ] || { echo "triage block not found in $SKILL_MD"; exit 1; }
+PATH="$GH7B_DIR:$PATH" bash -c "$block"
+exit 0
+SHIM_EOF
+chmod +x "$FAKE_CLAUDE.triage"
+FAIL_BEFORE=$H_FAIL
+rm -f "$FAILDM_LOG"
+rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
+# Read the runner script and log from post-plan-now's own output, as run_far_side does.
+set +e
+P7B_PPN=$(cd "$WT6" && env -u POST_PLAN_SKILL HARNESS="$H7B" HOME="$HOME7" \
+    "$REPO/bin/post-plan-now" 2>/dev/null)
+set -e
+P7B_SCRIPT=$(sed -n 's/^  script: \([^ ]*\).*/\1/p' <<< "$P7B_PPN")
+P7B_LOG=$(sed -n 's/^  log:    \([^ ]*\).*/\1/p' <<< "$P7B_PPN")
+if [ -z "$P7B_SCRIPT" ] || [ -z "$P7B_LOG" ]; then
+    fail "harness crash: no runner script written (got: $P7B_PPN)"
+else
+    set +e
+    HOME="$HOME7" FAKE_CLAUDE="$FAKE_CLAUDE.triage" GH_CMD="$SHIMS/gh-none" \
+        /bin/bash "$P7B_SCRIPT" > "$P7B_LOG" 2>&1
+    set -e
+    P7B_OUT=$(cat "$P7B_LOG")
+    rm -f "$P7B_LOG" "${P7B_LOG%.log}.session" "$P7B_SCRIPT"
+    grep -qF -- "CRASH-TRIAGE: harness-rc=1 pr=42 state=OPEN armed=no" <<< "$P7B_OUT" \
+        || fail "harness crash: skill triage block did not report the PR (got: $P7B_OUT)"
+    if grep -qE '^(pr comment|pr merge|api)' "$GH7B_LOG" 2>/dev/null; then
+        fail "harness crash: skill triage wrote to GitHub ($(cat "$GH7B_LOG"))"
+    fi
+    P7B_DMS=$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')
+    [ "${P7B_DMS:-0}" = 1 ] || fail "harness crash: FAIL-DM count is ${P7B_DMS:-0}, expected 1"
+fi
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "harness crash with skill triage: exactly one FAIL-DM"
+
 # ==========================================================================
 # Case 8 — wt-new failure (e.g. slug collision) is reported and exits 1
 # ==========================================================================

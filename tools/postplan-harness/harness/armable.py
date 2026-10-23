@@ -1,15 +1,15 @@
-"""Phase 6.5 — the seventeen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the eighteen ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..17} with no gaps: condition (11) shells out to
+now {1..18} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
 probes for already-red CI checks at arm time, condition (16) checks the
 pre-push local meta-check gate, and condition (17) holds when the gate backtest
 flagged clean PRs or could not run.
 
-Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
-bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
+Sole arming authority. Ported from the retired post-plan skill Phase 6.5 (2026-10-19); the skill carries no arming logic.
+Shell halves live in bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
 Bash turn; here the whole AND-of-not-blocked set is one deterministic pass.
 
 Fail-closed: any indeterminate input BLOCKS (a false HOLD costs one manual

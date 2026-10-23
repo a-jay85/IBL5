@@ -59,7 +59,7 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
     if not pre_posting_ids:
         # Empty or failed snapshot: the snapshot filter below drops every row, so the
         # second prf_review_threads query is dead work. Mirrors the skill path's
-        # `[ -s "$PRE4D_IDS" ]` skip in _phase-4-review-audit.md section 4.5.
+        # `[ -s "$PRE4D_IDS" ]` skip in the retired post-plan skill Phase 4 text (ported 2026-10-19) section 4.5.
         return []
     rows = gh.trusted_open_threads(pr)
     if rows is None:

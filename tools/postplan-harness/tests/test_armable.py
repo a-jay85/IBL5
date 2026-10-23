@@ -146,7 +146,7 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..18} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push

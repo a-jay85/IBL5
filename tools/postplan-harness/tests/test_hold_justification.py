@@ -3,7 +3,6 @@ import os
 import pathlib
 import sys
 
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -191,19 +190,6 @@ def test_hostile_hold_does_not_truncate_real_held_window():
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-
-
-def test_post_plan_skill_contains_manual_confirmation():
-    skill = (REPO_ROOT / ".claude/skills/post-plan/SKILL.md").read_text()
-    assert "Manual confirmation needed" in skill
-
-
-def test_phase4b_contains_diff_bounds():
-    """_phase-4-review-audit.md must carry the Diff bounds block."""
-    audit = (REPO_ROOT / ".claude/skills/post-plan/_phase-4-review-audit.md").read_text()
-    assert "Diff bounds" in audit
-    assert "git diff --name-only origin/master...HEAD" in audit
-
 
 
 def test_runner_contains_upsert_manual_confirmation():

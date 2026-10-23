@@ -1,7 +1,7 @@
 """Phase 1 — plan location + parsing (frontmatter, matrix, critical files, backlog issues).
 
 Deterministic port of post-plan SKILL.md Phase 1, Phase 6.5 condition (7)'s
-frontmatter awk, and _phase-5-final-verification.md's matrix/Critical-Files parsing.
+frontmatter awk, and the retired post-plan skill Phase 5 text's (ported 2026-10-19) matrix/Critical-Files parsing.
 Single source of truth for Critical Files exemption: bin/lib/critical-files.sh
 (Python cannot source shell; this module mirrors it and is pinned by test_planfile.py).
 """
@@ -845,7 +845,7 @@ _INLINE_LIST_RE = re.compile(
 def parse_required_test_methods(content: str) -> list[str]:
     """List of bare method names from `## Required Test Methods` (fenced blocks stripped).
 
-    Mirrors the bash idiom in _phase-5-final-verification.md: `cf_section_named` +
+    Mirrors the bash idiom in the retired post-plan skill Phase 5 text (ported 2026-10-19): `cf_section_named` +
     sed bullet extraction. Absent section → []. Fenced examples are stripped by
     _strip_fenced before the section is extracted, so illustrative bullets inside a
     fence never yield phantom entries (the failure `critical-files-parser-unification`

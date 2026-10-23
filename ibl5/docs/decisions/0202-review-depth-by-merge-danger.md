@@ -1,6 +1,6 @@
 ---
 description: Phase 4 review depth is standard or deep, picked from the PR body's Merge danger line. One-way doors, site-wide or external blast radius, and a missing line select deep, which raises agent tiers and never skips an agent.
-last_verified: 2026-10-19
+last_verified: 2026-10-20
 ---
 
 # ADR-0202: Phase 4 review depth follows the Merge danger line
@@ -39,4 +39,4 @@ The harness reads the deeper of the Phase-2 body and the live PR body (`tools/po
 - [`bin/lib/review-depth.sh`](../../../bin/lib/review-depth.sh): the shell twin the skill runs from master.
 - `tools/postplan-harness/harness/review_depth.py`: the Python classifier.
 - `tools/postplan-harness/tests/test_review_depth_parity.py`: the parity test over the shared case table.
-- `.claude/skills/post-plan/_phase-4-review-audit.md`: the skill prose that selects the depth.
+- `tools/postplan-harness/harness/review_depth.py`: the harness selects the depth.

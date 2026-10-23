@@ -1009,6 +1009,7 @@ def test_posting_procedure_parity_names_both_origins():
 # ---------------------------------------------------------------------------
 
 def test_recording_gh_reply_review_thread_records_action(tmp_path):
+    """RecordingGh.reply_review_thread records a reply and never a resolve."""
     gh = _gh(tmp_path)
     gh.reply_review_thread(7, 111, "x")
     actions = gh.actions()
@@ -1019,7 +1020,10 @@ def test_recording_gh_reply_review_thread_records_action(tmp_path):
 
 
 def test_live_gh_reply_review_thread_shells_reply_helper(tmp_path, monkeypatch):
-    """Mutation caught: shelling resolve_review_finding instead of reply_review_thread."""
+    """LiveGh.reply_review_thread shells the reply helper, never the resolve helper.
+
+    Mutation caught: shelling resolve_review_finding instead of reply_review_thread.
+    """
     argvs = []
 
     def _spy(argv, *a, **k):

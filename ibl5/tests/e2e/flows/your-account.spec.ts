@@ -62,7 +62,7 @@ test.describe('Registration validation errors', () => {
 
     await submitBtn.click();
 
-    await expect(page.locator('.ibl-alert--error')).toContainText(
+    await expect(page.locator('.d-alert-error[role="alert"]')).toContainText(
       /passwords you entered do not match/i,
     );
   });
@@ -81,7 +81,7 @@ test.describe('Registration validation errors', () => {
 
     await submitBtn.click();
 
-    await expect(page.locator('.ibl-alert--error')).toContainText(
+    await expect(page.locator('.d-alert-error[role="alert"]')).toContainText(
       /password must be at least/i,
     );
   });
@@ -326,5 +326,19 @@ test.describe('Reset password form', () => {
       'modules.php?name=YourAccount&op=reset_password&selector=test_sel&token=test_tok',
     );
     await assertNoPhpErrors(page, 'on reset password form');
+  });
+});
+
+test.describe('Login page input icon', () => {
+  test('username input text starts right of the icon', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount');
+    const input = page.locator('#login-username');
+    await expect(input).toBeVisible();
+    const pad = await input.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { left: parseFloat(s.paddingLeft), right: parseFloat(s.paddingRight) };
+    });
+    expect(pad.left).toBeGreaterThan(pad.right);
+    await assertNoPhpErrors(page);
   });
 });

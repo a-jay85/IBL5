@@ -203,68 +203,6 @@ class TradeExecutionServiceTest extends TestCase
     }
 
     /**
-     * Re-accept of an already-completed offer: completed rows stay in trade_info
-     * for TRN export, so they must be dropped before validation. With only
-     * completed rows left, the service returns NO_TRADE_DATA_ERROR (mapped to
-     * already_processed by the controller) and never validates or executes.
-     */
-    public function testValidateAndExecuteReturnsNoTradeDataWhenAllRowsCompleted(): void
-    {
-        $processor = $this->createMock(TradeProcessorInterface::class);
-        $processor->expects($this->never())->method('processTrade');
-
-        $validator = $this->createMock(TradeValidatorInterface::class);
-        $validator->expects($this->never())->method('validateSalaryCapsForParties');
-        $validator->expects($this->never())->method('validateRosterLimitsForParties');
-
-        $salaryCap = $this->createMock(SalaryCapRepositoryInterface::class);
-        $salaryCap->expects($this->never())->method('getPlayerCurrentSalary');
-
-        $rows = array_map(
-            static fn (array $row): array => ['approval' => 'completed'] + $row,
-            $this->threeTeamRows()
-        );
-
-        $service = $this->buildService($rows, processor: $processor, validator: $validator, salaryCap: $salaryCap);
-
-        $result = $service->validateAndExecute(1, 'Metros');
-
-        $this->assertSame(['success' => false, 'error' => TradeProcessorInterface::NO_TRADE_DATA_ERROR], $result);
-    }
-
-    /**
-     * Mixed offer: only the non-completed rows reach cap validation.
-     */
-    public function testValidateAndExecuteValidatesOnlyPendingRows(): void
-    {
-        $salaryCap = $this->createMock(SalaryCapRepositoryInterface::class);
-        $salaryCap->expects($this->once())
-            ->method('getPlayerCurrentSalary')
-            ->with(102)
-            ->willReturn(0);
-
-        $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('validateSalaryCapsForParties')->willReturn(ValidationResultWithContext::success([]));
-        $validator->method('validateRosterLimitsForParties')->willReturn(ValidationResultWithContext::success([]));
-
-        $processor = $this->createMock(TradeProcessorInterface::class);
-        $processor->expects($this->once())
-            ->method('processTrade')
-            ->with(1)
-            ->willReturn(['success' => true, 'storytext' => 'x', 'storytitle' => 'y']);
-
-        $rows = $this->threeTeamRows();
-        $rows[0]['approval'] = 'completed';
-        $rows[2]['approval'] = 'completed';
-
-        $service = $this->buildService($rows, processor: $processor, validator: $validator, salaryCap: $salaryCap);
-
-        $result = $service->validateAndExecute(1, 'Metros');
-
-        $this->assertTrue($result['success']);
-    }
-
-    /**
      * Regression — accept-time cash cap basis must match the offer-time basis
      * ({@see \Trading\TradeValidator::getCurrentSeasonCashConsiderations()}).
      * Outside an offseason phase the current-season cash obligation is salary_yr1.

@@ -247,11 +247,31 @@ def run_ladder(ctx: LadderContext, proof_out: str, rungs) -> LadderOutcome:
     return LadderOutcome("", (), current_proof, tuple(trail))
 
 
+LADDER_TRAIL_CAP = 800
+LADDER_TRAIL_ELISION = " ...; "
+
+
+def _trail_text(trail) -> str:
+    """Join the trail within LADDER_TRAIL_CAP chars, always keeping the last entry.
+
+    A trail that fits is returned unchanged, so short reasons stay byte-identical.
+    Otherwise the earlier entries are cut from their end and the last entry (capped at
+    half the budget) follows an elision marker."""
+    entries = tuple(trail)
+    joined = "; ".join(entries)
+    if len(joined) <= LADDER_TRAIL_CAP or len(entries) < 2:
+        return joined[:LADDER_TRAIL_CAP]
+    last = entries[-1][:LADDER_TRAIL_CAP // 2]
+    head_room = LADDER_TRAIL_CAP - len(LADDER_TRAIL_ELISION) - len(last)
+    head = "; ".join(entries[:-1])[:head_room]
+    return head + LADDER_TRAIL_ELISION + last
+
+
 def ladder_failure_reason(first_proof: str, trail) -> str:
     """Same `tree proof failed: ` prefix and 400-char cut as `_prove_tree_equivalent`,
-    so rebase_cause.py classifies the block unchanged."""
+    so rebase_cause.py classifies the block unchanged. The trail keeps its last entry."""
     return (f"tree proof failed: {first_proof.strip()[:400]}"
-            f" | ladder: {'; '.join(trail)[:800]}")
+            f" | ladder: {_trail_text(trail)}")
 
 
 # --- Rung 1: generated-file regeneration (no model call) -------------------------
@@ -437,6 +457,28 @@ SESSION_TIMEOUT = 1200
 SESSION_MAX_TURNS = 80
 SESSION_PROOF_CAP = 60_000
 SESSION_ALLOWED = ("Read", "Write", "Edit", "Glob", "Grep", "Bash")
+PUSH_WRAPPER_DENIED = (
+    "Bash(*/git push:*)", "Bash(git * push)", "Bash(git * push *)",
+    "Bash(*/git * push)", "Bash(*/git * push *)",
+    "Bash(*/gh:*)", "Bash(*/curl:*)", "Bash(*/wget:*)", "Bash(*/ssh:*)", "Bash(*/scp:*)",
+    # Live probe with user settings off: a leading `*` before `/git push:*` or `/gh:*`
+    # never matched, but the space-glob form does. The colon entries above stay for
+    # Claude Code versions that honor them.
+    "Bash(*/git push *)", "Bash(*/git push)",
+    "Bash(*/gh *)", "Bash(*/gh)", "Bash(*/curl *)", "Bash(*/curl)",
+    "Bash(*/wget *)", "Bash(*/wget)", "Bash(*/ssh *)", "Bash(*/ssh)",
+    "Bash(*/scp *)", "Bash(*/scp)",
+    # Probe showed `bash -c '...; git push ...'` slips past the matcher, which only unwraps
+    # a lone simple command. A fix session has no need for a nested shell.
+    # This list only reduces risk. It cannot be complete: the prompt tells the session to
+    # run `bash /tmp/postplan-lostwork-<key>.sh`, so script execution stays allowed, and
+    # a script written with Write can still push. The push guard is the harness, which
+    # re-checks the tree and does the only push; the session gets no push authority.
+    "Bash(bash -c:*)", "Bash(sh -c:*)", "Bash(zsh -c:*)",
+    "Bash(bash -*c:*)", "Bash(sh -*c:*)", "Bash(zsh -*c:*)",
+    "Bash(*/bash -*c:*)", "Bash(*/sh -*c:*)", "Bash(*/zsh -*c:*)",
+    "Bash(env:*)", "Bash(eval:*)", "Bash(python3 -c:*)", "Bash(python -c:*)",
+)
 SESSION_DENIED = (
     "Agent", "WebFetch", "WebSearch",
     "Bash(git push:*)", "Bash(git commit:*)", "Bash(git reset:*)",
@@ -445,6 +487,11 @@ SESSION_DENIED = (
     "Bash(git switch:*)", "Bash(git tag:*)", "Bash(git remote:*)",
     "Bash(gh:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(ssh:*)", "Bash(scp:*)",
     "Bash(bin/post-plan-now:*)", "Bash(bin/discord-dm:*)",
+    # Forms the prefix entries above miss (headless probe, 2026-10-21): an absolute-path
+    # binary, git global options before the subcommand (`git -c k=v push`), and nested
+    # `bash -c`, `sh -c` and `zsh -c` shells. PUSH_WRAPPER_DENIED lists them.
+    # `Bash(git * push *)` also blocks read-only calls like `git log --grep push`; accepted.
+    *PUSH_WRAPPER_DENIED,
 )
 
 

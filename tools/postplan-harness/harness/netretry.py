@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import datetime, timezone
 from typing import Callable, Optional, Sequence, TypeVar
 
 from .state import HarnessError
@@ -33,6 +34,11 @@ TRANSIENT_MARKERS: tuple[str, ...] = (
 HTTP_EOF_RE = re.compile(r'\b[A-Z][a-z]+ "https?://[^"\s]+": EOF\b')
 _HARNESS_TIMEOUT_RE = re.compile(r"exceeded \d+(?:\.\d+)?s\b")  # LiveGh._gh timeout text
 _NEVER_RETRY_KINDS = frozenset({"local-gate"})
+# GitHub primary rate limit, GraphQL or REST shape. The secondary (abuse) limit
+# reads "exceeded a secondary rate limit" and is deliberately not matched.
+RATE_LIMIT_RE = re.compile(r"\bAPI rate limit (?:already )?exceeded\b")
+RATE_LIMIT_MAX_WAIT = 900.0   # 15 minutes: the whole added wait for one call
+RATE_LIMIT_MARGIN = 2.0       # reset is whole seconds; wake just after it
 
 GH_RETRY_SAFE_SUBCOMMANDS = frozenset({
     ("repo", "view"), ("pr", "view"), ("pr", "list"), ("pr", "checks"),
@@ -68,6 +74,11 @@ def match_transient(text: str) -> Optional[str]:
         if marker in text:
             return marker
     m = HTTP_EOF_RE.search(text)
+    return m.group(0) if m else None
+
+
+def match_rate_limit(text: str) -> Optional[str]:
+    m = RATE_LIMIT_RE.search(text)
     return m.group(0) if m else None
 
 
@@ -134,6 +145,67 @@ def call(fn: Callable[[], T], *, label: str,
     log.warning("netretry %s: %d retries exhausted; single-attempt mode for %gs",
                 label, len(delays), OUTAGE_LATCH_SECONDS)
     raise original
+
+
+def _utc(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _rate_limited(e: HarnessError, note: str) -> HarnessError:
+    return HarnessError(e.kind, f"{e.detail} [GitHub API rate limit: {note}]",
+                        cmd=e.cmd, output=e.output)
+
+
+def call_rate_limited(fn: Callable[[], T], *, label: str,
+                      landed: Optional[Callable[[], tuple[bool, Optional[T]]]],
+                      reset_at: Callable[[], float],
+                      sleep: Optional[Callable[[float], None]] = None,
+                      now: Optional[Callable[[], float]] = None,
+                      max_wait: float = RATE_LIMIT_MAX_WAIT) -> T:
+    """Run fn; on a GitHub primary rate-limit error wait once until the bucket
+    resets (bounded by max_wait), check landed(), and retry fn exactly once.
+
+    Independent of the transient outage latch: never reads or trips it."""
+    try:
+        return fn()
+    except HarnessError as first:
+        if (first.kind in _NEVER_RETRY_KINDS
+                or match_rate_limit(f"{first.detail}\n{first.output}") is None):
+            raise
+        err = first
+    if landed is None:
+        raise _rate_limited(err, "no landed check for this call, so it was not retried")
+    try:
+        reset = float(reset_at())
+    except Exception:
+        raise _rate_limited(err, "reset time unreadable, so it was not retried") from None
+    # Resolved here, not earlier: tests replace netretry.time with a namespace
+    # that has no time(), and non-rate-limit errors must never reach this line.
+    clock = now if now is not None else time.time
+    wait = max(0.0, reset - clock()) + RATE_LIMIT_MARGIN
+    if wait > max_wait:
+        raise _rate_limited(
+            err, f"resets at {_utc(reset)}, {wait:.0f}s away, over the "
+                 f"{max_wait:.0f}s bound, so it was not retried")
+    log.warning("netretry %s: GitHub API rate limit, waiting %.0fs until %s, then one retry",
+                label, wait, _utc(reset))
+    (sleep if sleep is not None else time.sleep)(wait)
+    try:
+        done, value = landed()
+    except Exception:
+        raise _rate_limited(
+            err, f"landed check failed after waiting {wait:.0f}s "
+                 f"(reset {_utc(reset)}), so it was not retried") from None
+    if done:
+        return value  # type: ignore[return-value]
+    try:
+        return fn()
+    except HarnessError as e:
+        if match_rate_limit(f"{e.detail}\n{e.output}") is not None:
+            raise _rate_limited(
+                e, f"still limited after waiting {wait:.0f}s for reset "
+                   f"{_utc(reset)}; gave up after one retry") from None
+        raise
 
 
 def _rc_marker(r: object) -> Optional[str]:

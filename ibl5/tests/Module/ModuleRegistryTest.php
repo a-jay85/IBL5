@@ -16,6 +16,13 @@ final class ModuleRegistryTest extends TestCase
         self::assertTrue(ModuleRegistry::isValid('YourAccount'));
     }
 
+    public function testContractsAndLegacyStubsAreValid(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Contracts'));
+        self::assertTrue(ModuleRegistry::isValid('CapSpace'));
+        self::assertTrue(ModuleRegistry::isValid('ContractList'));
+    }
+
     public function testLeagueControlPanelIsRegistered(): void
     {
         self::assertTrue(ModuleRegistry::isValid('LeagueControlPanel'));
@@ -62,6 +69,13 @@ final class ModuleRegistryTest extends TestCase
         self::assertNotContains('SeriesRecords', ModuleRegistry::getAllModules());
     }
 
+    public function testRecordsIsRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Records'));
+        self::assertContains('Records', ModuleRegistry::getAllModules());
+        self::assertFalse(ModuleRegistry::isValid('records'));
+    }
+
     public function testLeaderboardsAndRetiredLeaderboardStubsAreRegistered(): void
     {
         self::assertTrue(ModuleRegistry::isValid('Leaderboards'));
@@ -73,6 +87,7 @@ final class ModuleRegistryTest extends TestCase
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';
+        self::assertDirectoryExists($modulesDir . '/Records', 'modules/Records/ must exist so this disk-vs-registry check covers it');
         $entries = scandir($modulesDir);
         $dirs = array_filter(
             $entries ? $entries : [],

@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-11
+last_verified: 2026-10-22
 ---
 
 # bin/lib — Shared Library Files
@@ -15,6 +15,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `headless-elapsed-hook.sh` | PostToolUse hook that appends an elapsed-clock line (`elapsed <E>s / <B>s`) after every tool call in opt-in runs; activated by `IBL5_BUDGET_START_EPOCH` and `IBL5_BUDGET_SECS` set by `bin/automouse/run` on the impl invocation; exits 0 with no output in all other sessions |
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `gh-retry.sh` | `gh_retry <cmd> [args...]` reruns a `gh` call on a transient failure (HTTP 5xx, timeout, connection reset or refused) with the backoff in `IBL5_GH_RETRY_DELAYS` (default `5 20 60`); never retries a 4xx; sourced by `bin/lib/burndown.sh` and `bin/merge-line-select`; exercised by `bin/test-gh-retry` |
+| `master-bot-wait.sh` | `master_bot_wait <repo> [say-cmd]` blocks until no master-push run of Tests and Analysis or Migration Safety (the workflows that push `[auto]` bot commits) is queued or running, capped at 45 min and failing open; called before a PR is updated or rebased onto master so the bot commit cannot knock it BEHIND. Sourced by `bin/merge-line-watch`, `.github/workflows/update-behind-prs.yml` and `.github/workflows/rebase-prs.yml`; tested by `bin/test-merge-line-watch` |
 | `harness.sh` | Shared assertion, counter, skip, summary, tmpdir and fake-git-repo helpers (`h_*`) sourced by `bin/test-*` harnesses. `h_mark`/`h_rewind` save and restore the counters, `H_FAIL_FD=2` sends `FAIL:` lines to stderr, and `H_SKIP_OK=1` lets an all-skipped run pass. Exercised by `bin/test-harness-lib` |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `gate-common.php` | PHP helpers `require_once`d by `bin/adr-check` and `bin/refactor-flag`: `runCmd`, `fetchPrBody`, `gateDiffNames`, `gateExtractBypassReason`; per-gate regex, minimum length and diff range stay in each gate |

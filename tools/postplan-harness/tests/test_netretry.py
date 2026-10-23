@@ -240,3 +240,95 @@ def test_gh_retry_safe_allows(args):
 ])
 def test_gh_retry_safe_rejects(args):
     assert not netretry.gh_retry_safe(args)
+
+
+RATE = "GraphQL: API rate limit already exceeded for user ID 10329097."
+
+
+def rl_err():
+    return HarnessError("gh", "gh pr create --title: " + RATE)
+
+
+def test_match_rate_limit_matches_graphql_and_rest_shapes():
+    assert netretry.match_rate_limit(RATE)
+    assert netretry.match_rate_limit("API rate limit exceeded for installation ID 7.")
+    assert netretry.match_rate_limit("You have exceeded a secondary rate limit.") is None
+    assert netretry.match_rate_limit("HTTP 422: Unprocessable Entity") is None
+    assert netretry.match_rate_limit('Post "https://api.github.com/graphql": EOF') is None
+
+
+def test_call_rate_limited_waits_until_reset_then_retries_once():
+    fn = Flaky([rl_err(), "ok"])
+    recorded = []
+    out = netretry.call_rate_limited(fn, label="t", landed=lambda: (False, None),
+                                     reset_at=lambda: 1060.0, sleep=recorded.append,
+                                     now=lambda: 1000.0)
+    assert out == "ok"
+    assert fn.calls == 2
+    assert recorded == [62.0]
+
+
+@pytest.mark.parametrize("reset,allowed", [(1898.0, True), (1899.0, False)])
+def test_call_rate_limited_wait_bound_is_inclusive(reset, allowed):
+    fn = Flaky([rl_err(), "ok"])
+    recorded = []
+    kw = dict(label="t", landed=lambda: (False, None), reset_at=lambda: reset,
+              sleep=recorded.append, now=lambda: 1000.0)
+    if allowed:
+        assert netretry.call_rate_limited(fn, **kw) == "ok"
+        assert recorded == [900.0]
+        assert fn.calls == 2
+        return
+    with pytest.raises(HarnessError) as ei:
+        netretry.call_rate_limited(fn, **kw)
+    assert recorded == []
+    assert fn.calls == 1
+    assert "GitHub API rate limit" in ei.value.detail
+    assert "resets at 1970-01-01 00:31:39 UTC" in ei.value.detail
+    assert "900s bound" in ei.value.detail
+
+
+def test_call_rate_limited_past_reset_waits_margin_only():
+    fn = Flaky([rl_err(), "ok"])
+    recorded = []
+    netretry.call_rate_limited(fn, label="t", landed=lambda: (False, None),
+                               reset_at=lambda: 900.0, sleep=recorded.append,
+                               now=lambda: 1000.0)
+    assert recorded == [2.0]
+
+
+def test_call_rate_limited_ignores_and_never_trips_outage_latch():
+    netretry._trip_latch()
+    fn = Flaky([rl_err()])
+    recorded = []
+    kw = dict(label="t", landed=lambda: (False, None), reset_at=lambda: 1010.0,
+              sleep=recorded.append, now=lambda: 1000.0)
+    with pytest.raises(HarnessError) as ei:
+        netretry.call_rate_limited(fn, **kw)
+    assert fn.calls == 2
+    assert recorded == [12.0]
+    assert "gave up after one retry" in ei.value.detail
+    netretry.reset_outage_latch()
+    with pytest.raises(HarnessError):
+        netretry.call_rate_limited(Flaky([rl_err()]), **kw)
+    assert netretry.outage_latched() is False
+
+
+def test_call_rate_limited_non_rate_limit_error_is_untouched():
+    boom = HarnessError("gh", "HTTP 422: Unprocessable Entity")
+    fn = Flaky([boom])
+    resets = []
+    recorded = []
+
+    def reset_at():
+        resets.append(1)
+        return 0.0
+
+    with pytest.raises(HarnessError) as ei:
+        netretry.call_rate_limited(fn, label="t", landed=lambda: (False, None),
+                                   reset_at=reset_at, sleep=recorded.append,
+                                   now=lambda: 1000.0)
+    assert ei.value is boom
+    assert resets == []
+    assert recorded == []
+    assert fn.calls == 1

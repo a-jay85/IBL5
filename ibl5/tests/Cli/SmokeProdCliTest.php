@@ -10,6 +10,13 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('cli')]
 final class SmokeProdCliTest extends TestCase
 {
+    /** Path substring smoke-prod's Team check requests. Case-sensitive: `teamID=1` does not match. */
+    private const TEAM_PAGE_PATH = 'name=Team&op=team&teamid=1';
+    /** Minimal real-team body: carries the banner marker only TeamView::renderTeamBanner() emits. */
+    private const TEAM_PAGE_BODY = 'IBL team <div class="team-banner-logo"><h1><img src="./images/logo/1.jpg" alt="Team"></h1></div>';
+    /** Free Agents shape: contains "team" (the old expect string) but no banner marker. */
+    private const FREE_AGENTS_BODY = 'IBL team <h1 class="ibl-title">Free Agents</h1><div class="team-logo-fallback"></div>';
+
     private string $scriptPath;
     private string $fixtureDir;
 
@@ -72,6 +79,20 @@ final class SmokeProdCliTest extends TestCase
 
         self::assertSame(1, $result['exit']);
         self::assertStringContainsString('FAIL: Homepage', $result['output']);
+    }
+
+    public function testTeamPageServingFreeAgentsBodyExitsOne(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathBodyOverrides: [
+            self::TEAM_PAGE_PATH => self::FREE_AGENTS_BODY,
+        ]);
+
+        $result = $this->runSmoke(scope: 'all');
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('FAIL: Team page', $result['output']);
+        self::assertStringContainsString('missing expected content: team-banner-logo', $result['output']);
+        self::assertStringContainsString('OK: Homepage', $result['output']);
     }
 
     // =========================================================================
@@ -224,32 +245,44 @@ final class SmokeProdCliTest extends TestCase
 
     /**
      * @param array<string, int> $pathStatusOverrides path-substring => HTTP status
+     * @param array<string, string> $pathBodyOverrides path-substring => HTTP 200 body; healthy servers only, checked after status overrides
      */
     private function startServer(
         string $name,
         bool $healthy,
         array $pathStatusOverrides = [],
+        array $pathBodyOverrides = [],
     ): void {
         $port = $this->findFreePort();
         $this->ports[$name] = $port;
 
-        if ($pathStatusOverrides !== []) {
-            $cases = '';
-            foreach ($pathStatusOverrides as $pathMatch => $status) {
+        $cases = '';
+        foreach ($pathStatusOverrides as $pathMatch => $status) {
+            $cases .= sprintf(
+                'if (strpos($_SERVER["REQUEST_URI"], %s) !== false) { http_response_code(%d); echo ""; exit; } ',
+                var_export($pathMatch, true),
+                $status,
+            );
+        }
+        if ($healthy) {
+            // A healthy server serves a real team page on the Team path unless a test overrides it.
+            $bodies = $pathBodyOverrides + [self::TEAM_PAGE_PATH => self::TEAM_PAGE_BODY];
+            foreach ($bodies as $pathMatch => $body) {
                 $cases .= sprintf(
-                    'if (strpos($_SERVER["REQUEST_URI"], %s) !== false) { http_response_code(%d); echo ""; exit; } ',
+                    'if (strpos($_SERVER["REQUEST_URI"], %s) !== false) { http_response_code(200); echo %s; exit; } ',
                     var_export($pathMatch, true),
-                    $status,
+                    var_export($body, true),
                 );
             }
-            $defaultStatus = $healthy ? 200 : 500;
-            $defaultBody = $healthy ? 'IBL Standings team player Sign In' : 'Server Error';
-            $routerContent = "<?php {$cases} http_response_code({$defaultStatus}); echo \"{$defaultBody}\";";
-        } else {
-            $routerContent = $healthy
-                ? '<?php http_response_code(200); echo "IBL Standings team player Sign In";'
-                : '<?php http_response_code(500); echo "Server Error";';
         }
+        $defaultStatus = $healthy ? 200 : 500;
+        $defaultBody = $healthy ? 'IBL Standings team player Sign In' : 'Server Error';
+        $routerContent = sprintf(
+            '<?php %s http_response_code(%d); echo %s;',
+            $cases,
+            $defaultStatus,
+            var_export($defaultBody, true),
+        );
 
         $routerFile = $this->fixtureDir . "/router-{$name}.php";
         file_put_contents($routerFile, $routerContent);

@@ -1,12 +1,14 @@
 ---
-description: A weekly launchd job reviews one ibl5/classes module with the PR-review agent prompts, scores the findings with a second model call, and files the survivors in the backlog. It never fixes anything.
-last_verified: 2026-10-19
+description: A weekly scheduled job reviews one ibl5/classes module with the PR-review agent prompts, scores the findings with a second model call, and files the survivors in the backlog. It never fixes anything.
+last_verified: 2026-10-22
 ---
 
 # ADR-0200: Weekly rotating review of existing code
 
 **Status:** Accepted
 **Date:** 2026-10-19
+
+**Amended 2026-10-22 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly code slice review", which fires Saturdays at 05:20 local time. The task runs `bin/code-slice-review` unchanged. The `com.ibl5.code-slice-review` launchd job is unloaded and removed from `bin/lib/launchd-expected-jobs.sh`. `--install-schedule` and `--uninstall-schedule` still exist, but they are no longer the live trigger.
 
 ## Context
 

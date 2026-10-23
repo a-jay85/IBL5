@@ -47,10 +47,13 @@ dsn_setup() {
     STUB="$(mktemp -d)"
     trap 'rm -rf "$STUB"' EXIT
 
-    # db-sync-prod stub: appends "called" per invocation; fails if sync-fails sentinel exists
+    # db-sync-prod stub: appends "called <argv>" per invocation; logs a --snapshot path that exists; fails if sync-fails sentinel exists
     cat > "$STUB/db-sync-prod" <<'SH'
 #!/bin/bash
-echo "called" >> "$STUB/calls"
+{ printf 'called'; printf ' %s' "$@"; printf '\n'; } >> "$STUB/calls"
+if [ "${1:-}" = "--snapshot" ] && [ -f "${2:-}" ]; then
+    echo "snapshot-file-exists $2" >> "$STUB/snapshot-files"
+fi
 [ -f "$STUB/sync-fails" ] && exit 1
 exit 0
 SH
@@ -357,6 +360,7 @@ touch "$STUB/corrupt-artifact"
 rc="$(dsn_run_backup)"
 dsn_expect_eq "FB-4: corrupt artifact exits 1" "1" "$rc"
 dsn_count 0 "$STUB/import-calls"
+dsn_count 0 "$STUB/calls"
 dsn_log_has "FB-4: integrity check logged" "integrity check"
 
 # FB-5: Marker newer than artifact date → freshness skip
@@ -376,6 +380,39 @@ rc="$(dsn_run_backup)"
 scp_cnt="$(grep -c . "$STUB/scp-calls" 2>/dev/null || echo 0)"
 if [ "${scp_cnt:-0}" -ge 1 ]; then dsn_ok "FB-6: scp called for older marker"
 else dsn_fail "FB-6: scp not called — freshness skip fired incorrectly"; fi
+
+# FB-7: the restore routes through db-sync-prod --snapshot, never a direct import
+dsn_setup
+printf 'OK\n1\n2000-01-01T00:00:00+0000\t2000-01-01\n' > "$STUB/marker"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-7: snapshot restore exits 0" "0" "$rc"
+dsn_expect_eq "FB-7: one snapshot call with the artifact path" "1" \
+    "$(grep -cE '^called --snapshot /.+/ibl5-2026-08-10\.sql\.gz$' "$STUB/calls" 2>/dev/null || echo 0)"
+dsn_count 1 "$STUB/calls"
+dsn_count 0 "$STUB/import-calls"
+dsn_count 1 "$STUB/snapshot-files"
+dsn_expect_eq "FB-7: marker OK" "OK" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+dsn_log_has "FB-7: restore complete logged" "restore complete"
+
+# FB-8: a failing snapshot load writes BROKEN and exits 1, with no fallback import
+dsn_setup
+printf 'OK\n1\n2000-01-01T00:00:00+0000\t2000-01-01\n' > "$STUB/marker"
+touch "$STUB/sync-fails"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-8: snapshot failure exits 1" "1" "$rc"
+dsn_expect_eq "FB-8: marker BROKEN" "BROKEN" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+dsn_count 0 "$STUB/import-calls"
+dsn_log_has "FB-8: snapshot failure logged" "db-sync-prod --snapshot failed"
+
+# FB-9: the post-restore emptiness assertion still fails closed after a snapshot load
+dsn_setup
+printf 'OK\n1\n2000-01-01T00:00:00+0000\t2000-01-01\n' > "$STUB/marker"
+touch "$STUB/db-empty"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-9: empty DB after snapshot exits 1" "1" "$rc"
+dsn_expect_eq "FB-9: marker BROKEN" "BROKEN" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+dsn_count 1 "$STUB/calls"
+dsn_log_has "FB-9: assertion failure logged" "post-restore assertion failed"
 
 # ── Schedule cases (Darwin only) ──────────────────────────────────────────────
 if [ "$(uname)" = "Darwin" ] && [ -x "$CRON_SETUP" ]; then

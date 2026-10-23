@@ -375,10 +375,10 @@ if [ "$_starts_degraded" -eq 1 ] && echo "$_v13" | grep -q 'process:unloaded'; t
 else
     bpt_fail "13: verdict should be VERDICT: degraded [...process:unloaded...] — got [$_v13]"
 fi
-if grep -qF 'UNKNOWN: [stale:db-unavailable]' "$STUB/out.txt"; then
-    bpt_ok "13: UNKNOWN: [stale:db-unavailable] line present above verdict"
+if grep -qF 'UNKNOWN: [stale:db-unavailable, botkey:db-unavailable]' "$STUB/out.txt"; then
+    bpt_ok "13: UNKNOWN: [stale:db-unavailable, botkey:db-unavailable] line present above verdict"
 else
-    bpt_fail "13: UNKNOWN: [stale:db-unavailable] line expected"
+    bpt_fail "13: UNKNOWN: [stale:db-unavailable, botkey:db-unavailable] line expected"
 fi
 
 # ── Case 14: NEG — checker performs no writes ─────────────────────────────────

@@ -2912,7 +2912,74 @@ else
     [[ ! -f "$_HOLD_PLIST" ]] || fail "runner-real-timeout: plist not removed (slot leaked)"
     (( _T_ELAPSED <= 10 )) \
         || fail "runner-real-timeout: runner took ${_T_ELAPSED}s; the 1 s timeout never fired"
+    # No run dir in this arm, so the timeout wording must stay as it was.
+    ! grep -qF "timed-out run's last step" "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log names a last step with no run dir"
+    ! grep -qF 'last step reached' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-real-timeout: DM names a last step with no run dir"
     end_case runner-real-timeout
+
+    # A timed-out run with a run dir and audit.log: the last "starting" line is named in the
+    # log (after the unchanged TIMED OUT line) and in the DM above the re-run hint. The stub
+    # runs with HOME=$SCRATCH, so it builds its run dir under $HOME.
+    _STEP_BODY='d="$HOME/run65s"; mkdir -p "$d"; printf "[11:30:01] phase2: starting scope check\n[11:30:05] phase2: starting commit (pre-commit hook)\n[11:30:06] phase2: hook output follows\n" > "$d/audit.log"; echo "post-plan-now: postplan-rc=143 harness-rc=0 harness-run-dir=$d"; '
+    begin_case
+    _dm_timeout_arm 65s "${_STEP_BODY}exec sleep 30"
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks the TIMED OUT rc=124 line ($(cat "$_DM_LOG" 2>/dev/null))"
+    grep -qxF "post-plan-now: timed-out run's last step: phase2: starting commit (pre-commit hook)" "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks the last-step line ($(cat "$_DM_LOG" 2>/dev/null))"
+    _to_ln=$(grep -nxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null | head -n 1 | cut -d: -f1 || true)
+    _st_ln=$(grep -nxF "post-plan-now: timed-out run's last step: phase2: starting commit (pre-commit hook)" "$_DM_LOG" 2>/dev/null | head -n 1 | cut -d: -f1 || true)
+    { [[ -n "$_to_ln" && -n "$_st_ln" ]] && (( _st_ln > _to_ln )); } \
+        || fail "runner-timeout-names-last-step: step line (${_st_ln:-none}) not after TIMED OUT line (${_to_ln:-none})"
+    grep -qxF 'post-plan-fleet: outcome=timed-out' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks 'post-plan-fleet: outcome=timed-out'"
+    _s_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_s_dms" == 1 ]] || fail "runner-timeout-names-last-step: want exactly one DM, got '${_s_dms:-0}'"
+    grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks TIMED OUT"
+    grep -qF 'last step reached: phase2: starting commit (pre-commit hook)' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks the last-step line ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    grep -qF 're-run with' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks the re-run hint"
+    end_case runner-timeout-names-last-step
+
+    # Run dir exists but has no audit.log: wording unchanged.
+    begin_case
+    _dm_timeout_arm 65n 'd="$HOME/run65n"; mkdir -p "$d"; echo "post-plan-now: postplan-rc=143 harness-rc=0 harness-run-dir=$d"; exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: log lacks the TIMED OUT rc=124 line"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: DM names a last step"
+    end_case runner-timeout-no-audit-log-unchanged
+
+    # Run dir reported as 'none': wording unchanged.
+    begin_case
+    _dm_timeout_arm 65z 'echo "post-plan-now: postplan-rc=143 harness-rc=none harness-run-dir=none"; exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: log lacks the TIMED OUT rc=124 line"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: DM names a last step"
+    end_case runner-timeout-run-dir-none-unchanged
+
+    # Negative control: the same audit.log as 65s, but the stub exits 1 at once, so there is no
+    # timeout and no step line. The step is named only on rc 124.
+    begin_case
+    _dm_timeout_arm 65g "${_STEP_BODY}exit 1"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: DM names a last step"
+    ! grep -qF 'TIMED OUT' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: log says TIMED OUT for a fast stub"
+    ! grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: DM says TIMED OUT for a fast stub"
+    end_case runner-fast-fail-with-audit-no-step
 
     # Negative control: same sed rewrite, stub exits 0 at once -> no timeout path at all.
     begin_case

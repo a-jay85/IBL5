@@ -5,7 +5,7 @@ Format per game: score header, then GM Discord mentions (away · home).
 
 WHERE THINGS STAND
 
-Utah is still Utah. The Jazz sit at 48-13, the best record in the league by a comfortable margin, and they spent this week doing exactly what the best team is supposed to do: beat the teams beneath them and go home early. Behind them the Clippers have quietly turned into a monster. LA is 45-15 now, they hung 162 on Chicago and 139 on Golden State in the same week, and Stephen Curry is out here handing out assists like campaign flyers. The Braves (45-20) keep winning because Devin Booker keeps scoring 40, which at this point is just weather. The Knicks (42-16), Bullets (40-16) and Hawks (41-20) round out a top tier that is deep and mean, and James Harden dropping 40, 35 and 32 in the same week is the reason Washington won't go away.
+Utah is still Utah. The Jazz sit at 48-13, the best record in the league by a comfortable margin, and they keep doing exactly what the best team is supposed to do: beat the teams beneath them and go home early. Behind them the Clippers have quietly turned into a monster. LA is 45-15 now, and Stephen Curry is out here handing out assists like campaign flyers. The Braves (45-20) keep winning because Devin Booker keeps scoring 40, which at this point is just weather. The Knicks (42-16), Bullets (40-16) and Hawks (41-20) round out a top tier that is deep and mean, and James Harden is the reason Washington won't go away.
 
 The Central is a street fight. Atlanta (41-20) and Charlotte (39-19) are separated by half a game and a bad mood. And then, as always, we descend into the basement, where the ping-pong balls are getting a real workout. The Pacers are 5-51. Five. Fifty-one. That's not a season, that's a cry for help. Portland is 8-50 with a 7-foot Latvian who occasionally forgets the team around him is terrible. The Wolves are 11-48, the Raptors 11-45. The lone bright spot down there belongs to the Celtics, who are 10-48 and pulled off the single most improbable result of the week, an upset so unlikely it gets its own paragraph later, because miracles should not be buried in the middle of a recap. On to the games.
 
@@ -51,7 +51,7 @@ Orlando won its third straight, 133-114, and Ricky Rubio dropped 18 assists, whi
 **Orlando Magic 113 @ New York Knicks 139**
 <@830100995676569600> · <@669365599184617473>
 
-Erick Dampier blocked ELEVEN shots. Eleven! That's not rim protection, that's a permit violation. He added 13 boards and turned the paint into a place where layups go to file for hazard pay, and New York ended Orlando's four-game win streak 139-113. Tyreke Evans and Immanuel Quickley each had 27, Drazen Dalipagic added 22. The Magic, so hot all week, ran into a buzzsaw and got 28 from Hezonja and little else. The Knicks are 42-16 and back atop the Atlantic. Dampier with 11 blocks means the Magic spent the second half checking whether the rim was legal. It was. He just wasn't letting them use it.
+Erick Dampier blocked ELEVEN shots. Eleven! That's not rim protection, that's a permit violation. He added 13 boards and turned the paint into a place where layups go to file for hazard pay, and New York ended Orlando's three-game win streak 139-113. Tyreke Evans and Immanuel Quickley each had 27, Drazen Dalipagic added 22. The Magic, so hot all week, ran into a buzzsaw and got 28 from Hezonja and little else. The Knicks are 42-16 and back atop the Atlantic. Dampier with 11 blocks means the Magic spent the second half checking whether the rim was legal. It was. He just wasn't letting them use it.
 
 **Charlotte Sting 117 @ Boston Celtics 130**
 <@710928347403780156> · <@518041859881304074>
@@ -64,7 +64,7 @@ Stop everything. The Boston Celtics, owners of a 9-48 record, beat the 39-19 Cha
 **Sacramento Kings 120 @ Las Vegas Aces 122**
 <@792231509872476161> · <@454639880245477377>
 
-The Aces closed the week with another upset, holding off Sacramento 122-120 behind a 29-15 from Spencer Haywood and 24 and 10 from Don Nelson. Vegas beating a winning team twice in one week is a genuine feel-good story for a 18-38 club that doesn't get many. Sacramento was terrific and lost anyway: Blake Griffin went for 33 and 13, Ray Allen added 26, and Nancy Lieberman had 20 and nine assists, and it came down to the final possession. The Kings are 32-26 and this one stings because they did enough to win on most nights. Just not this one. The Aces earned their party.
+The Aces closed the week with an upset, holding off Sacramento 122-120 behind a 29-15 from Spencer Haywood and 24 and 10 from Don Nelson. Vegas beating a winning team is a genuine feel-good story for a 18-38 club that doesn't get many. Sacramento was terrific and lost anyway: Blake Griffin went for 33 and 13, Ray Allen added 26, and Nancy Lieberman had 20 and nine assists, and it came down to the final possession. The Kings are 32-26 and this one stings because they did enough to win on most nights. Just not this one. The Aces earned their party.
 
 
 ================================================================================

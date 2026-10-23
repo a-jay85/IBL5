@@ -198,8 +198,8 @@ class WaiversViewTest extends TestCase
             1,
             'add',
             [
-                ['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => ''],
-                ['playerID' => 43, 'playerName' => 'John Roe', 'contract' => '205', 'waitTime' => ''],
+                ['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103'],
+                ['playerID' => 43, 'playerName' => 'John Roe', 'contract' => '205'],
             ],
             5,
             5
@@ -211,20 +211,6 @@ class WaiversViewTest extends TestCase
         $this->assertStringNotContainsString('&lt;option', $output);
     }
 
-    public function testRenderWaiverFormAppendsWaitTimeWhenPresent(): void
-    {
-        $output = $this->view->renderWaiverForm(
-            'Test Team',
-            1,
-            'add',
-            [['playerID' => 42, 'playerName' => 'Jane Doe', 'contract' => '103', 'waitTime' => '(Clears in 5 h)']],
-            5,
-            5
-        );
-
-        $this->assertStringContainsString('<option value="42">Jane Doe 103 (Clears in 5 h)</option>', $output);
-    }
-
     public function testRenderWaiverFormRendersOneOptionPerPlayer(): void
     {
         $output = $this->view->renderWaiverForm(
@@ -232,8 +218,8 @@ class WaiversViewTest extends TestCase
             1,
             'waive',
             [
-                ['playerID' => 1, 'playerName' => 'A', 'contract' => '100', 'waitTime' => ''],
-                ['playerID' => 2, 'playerName' => 'B', 'contract' => '200', 'waitTime' => ''],
+                ['playerID' => 1, 'playerName' => 'A', 'contract' => '100'],
+                ['playerID' => 2, 'playerName' => 'B', 'contract' => '200'],
             ],
             5,
             5
@@ -243,10 +229,13 @@ class WaiversViewTest extends TestCase
         $this->assertStringContainsString('<option value="2">B 200</option>', $output);
     }
 
-    public function testEmptyWaitTimeOmitsTrailingSpace(): void
+    public function testBuildPlayerOptionHasNoWaitTimeParameter(): void
     {
-        $option = $this->view->buildPlayerOption(5, 'Jane Doe', '103', '');
+        $m = new \ReflectionMethod(\Waivers\WaiversView::class, 'buildPlayerOption');
 
-        $this->assertSame('<option value="5">Jane Doe 103</option>', $option);
+        $this->assertSame(
+            ['playerID', 'playerName', 'contract'],
+            array_map(static fn (\ReflectionParameter $p): string => $p->getName(), $m->getParameters())
+        );
     }
 }

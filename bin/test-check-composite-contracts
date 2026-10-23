@@ -6,7 +6,8 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) and the all-checks-green.yml invariants (A1-A5), the
+# invariants (M1-M4) and the all-checks-settled.yml invariants (A1-A6) against
+# mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
@@ -72,7 +73,7 @@ put_nd() {
 
 # put_promote <dir> <variant>
 # Writes a minimal but structurally faithful promote-to-production.yml to <dir>.
-# The base ("good") satisfies all P1-P8 invariants; each variant mutates exactly
+# The base ("good") satisfies all P1-P10 invariants; each variant mutates exactly
 # one invariant so a failure names its own cause.
 # ${{ secrets.CI_PAT }} and "$SHA:..." are intentionally literal YAML, not expanded.
 put_promote() {
@@ -81,6 +82,12 @@ put_promote() {
   local tmp
   # shellcheck disable=SC2016
   cat > "$f" << 'PPEOF'
+on:
+  workflow_run:
+    workflows:
+      - Tests and Analysis
+    types: [completed]
+    branches: [master]
 permissions:
   contents: read
 jobs:
@@ -98,6 +105,8 @@ jobs:
         env:
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
+          IGNORE_PENDING_CHECKS: Aggregate check status
+          IGNORE_FAILED_CHECKS: Aggregate check status
         run: |
           git push origin "$SHA:refs/heads/production"
   paused:
@@ -153,6 +162,13 @@ PPEOF
     p7-comma-in-name)
       tmp="$(mktemp)"
       sed 's/^    name: Promote master to production$/    name: Promote master, then notify/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p9-no-branches)
+      tmp="$(mktemp)"
+      sed '/^    branches: \[master\]$/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-no-ignore-aggregate)
+      # Break the name in IGNORE_FAILED_CHECKS only; the pending knob stays intact.
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check statuz/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     *)
       echo "put_promote: unknown variant '${2:-}'" >&2; return 1 ;;
   esac
@@ -162,7 +178,7 @@ PPEOF
 # Writes a minimal merge-script stub whose SKIP_CHECKS matches <skip-list>.
 put_merge() {
   # shellcheck disable=SC2016
-  printf 'SKIP_CHECKS="%s" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
+  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status" \\\nIGNORE_FAILED_CHECKS="Aggregate check status" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
 # put_mutation_pr <wf-dir> <variant>
@@ -294,7 +310,7 @@ d="$(fresh_actions)"; put_nd "$d" false lead
 
 # Permanent fixtures reused across promote-to-production cases
 CLEAN_PROMOTE="$TMP/promote-clean"
-printf '#!/bin/bash\ngit push origin production\n' > "$CLEAN_PROMOTE"
+printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
 chmod +x "$CLEAN_PROMOTE"
 FORCE_PROMOTE="$TMP/promote-force"
 printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
@@ -387,6 +403,26 @@ d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
 merge_bad="$TMP/merge-bad"; put_merge "$merge_bad" "Only One Job"
 "$CHECK" "$d_a" "$d_wf" "$merge_bad" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "pp-p8-merge-script-mismatch" 1 $?
+
+# P9: workflow_run without the branches: [master] head-branch filter → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p9-no-branches
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P9 rejects promote without branches master" 1 "$rc"
+if grep -qF '(P9) —' <<< "$out"; then
+  h_pass "P9 rejects promote without branches master names P9"
+else
+  h_fail "P9 rejects promote without branches master names P9" "output: $out"
+fi
+
+# P10: promote caller that does not ignore the aggregate check name → exit 1
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-no-ignore-aggregate
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a promote caller that does not ignore the aggregate check" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a promote caller that does not ignore the aggregate check names P10"
+else
+  h_fail "P10 rejects a promote caller that does not ignore the aggregate check names P10" "output: $out"
+fi
 
 # pp-absent-skips: no promote-to-production workflow → exit 0 with skip line
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
@@ -546,99 +582,103 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# all-checks-green invariants (A1-A5)
+# all-checks-settled invariants (A1-A6). The fixture is a copy of the real
+# .github/workflows tree; each mutation edits the copy, never the tree, and the
+# case also asserts the invariant tag so a failure elsewhere cannot pass it.
 # ---------------------------------------------------------------------------
 
-AGG_LITERAL='All checks green'
+AGG_LITERAL='All checks settled'
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REAL_ACT="$REPO_ROOT/.github/actions"
+REAL_WF="$REPO_ROOT/.github/workflows"
+REAL_DEC="$REPO_ROOT/ibl5/docs/decisions"
+REAL_MERGE="$REPO_ROOT/bin/merge-master-to-prod"
+REAL_PROMOTE="$REPO_ROOT/bin/promote-master-to-production"
 
-# put_agg <workflows-dir> <variant> — writes all-checks-green.yml, good or one defect.
-put_agg() {
-  local on_extra="" types="[opened, reopened, synchronize, ready_for_review, edited, labeled, unlabeled]"
-  local job_name="All checks green" job_if="" timeout="    timeout-minutes: 45" wait="--wait "
-  # shellcheck disable=SC2016  # literal fixture YAML and shell text
-  local base_env='        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}' base_flag='--base-ref="$BASE_REF" '
-  local perms="  contents: read
-  checks: read
-  actions: read
-  pull-requests: read"
-  case "$2" in
-    good) ;;
-    a1-paths) on_extra="    paths: ['ibl5/**']" ;;
-    a1-branches) on_extra="    branches: [master]" ;;
-    a1-types) types="[opened, reopened, synchronize]" ;;
-    a2-name) job_name="All checks green!" ;;
-    a3-if) job_if="    if: github.event.pull_request.draft == false" ;;
-    a4-timeout) timeout="" ;;
-    a4-wait) wait="" ;;
-    a4-write) perms="  contents: read
-  checks: write" ;;
-    a4-inject)
-      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
-      wait='--wait --title="${{ github.event.pull_request.title }}" ' ;;
-    a5-no-flag) base_flag="" ;;
-    a5-no-env) base_env="" ;;
-    a5-inline)
-      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
-      base_flag='--base-ref="${{ github.event.pull_request.base.ref }}" ' ;;
-    a5-comment)
-      # shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
-      wait='--wait # ${{ github.event.pull_request.base.ref }} ' ;;
-    *) echo "put_agg: unknown variant $2" >&2; return 1 ;;
-  esac
-  {
-    printf 'name: All checks green\n\non:\n  pull_request:\n'
-    [ -n "$on_extra" ] && printf '%s\n' "$on_extra"
-    printf '    types: %s\n\npermissions:\n%s\n\n' "$types" "$perms"
-    printf 'jobs:\n  all-checks-green:\n    name: %s\n    runs-on: ubuntu-latest\n' "$job_name"
-    [ -n "$job_if" ] && printf '%s\n' "$job_if"
-    [ -n "$timeout" ] && printf '%s\n' "$timeout"
-    printf '    steps:\n      - name: Wait\n'
-    [ -n "$base_env" ] && printf '%s\n' "$base_env"
-    printf '        run: |\n'
-    printf "          bin/check-pr-checks-green --sha=x %s%s--self='All checks green' --timeout-seconds=2400\n" "$base_flag" "$wait"
-  } > "$1/all-checks-green.yml"
+# agg_copy → echoes a fresh copy of the real workflows dir.
+agg_copy() {
+  local d
+  d="$(fresh_workflows)"
+  cp "$REAL_WF"/*.yml "$d/"
+  printf '%s' "$d"
 }
 
-put_agg_adr() {
-  mkdir -p "$1"
-  printf '# ADR-0998\n\nRequired context: %s\n' "$2" > "$1/0998-required-ci-aggregator-all-checks-green.md"
+# agg_edit <file> <perl-expr> — edits a fixture copy in place (portable across BSD/GNU).
+agg_edit() {
+  perl -0pi -e "$2" "$1"
 }
 
-# run_agg <case-name> <want-exit> <variant> [adr-literal|-none-]
-run_agg() {
-  local name="$1" want="$2" variant="$3" adr="${4:-$AGG_LITERAL}"
-  local d_a d_wf d_dec
-  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
-  put_agg "$d_wf" "$variant"
-  if [ "$adr" != "-none-" ]; then put_agg_adr "$d_dec" "$adr"; fi
-  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
-  expect "$name" "$want" $?
+# run_agg_mut <case-name> <tag> <workflows-dir> — expects exit 1 and the tag in stderr.
+run_agg_mut() {
+  local name="$1" tag="$2" d_wf="$3" out rc
+  out="$("$CHECK" "$REAL_ACT" "$d_wf" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?
+  expect "$name" 1 "$rc"
+  if grep -qF -- "$tag —" <<< "$out"; then
+    h_pass "$name names $tag"
+  else
+    h_fail "$name names $tag" "output: $out"
+  fi
 }
 
-run_agg "agg-good" 0 good
-run_agg "agg-a1-paths" 1 a1-paths
-run_agg "agg-a1-branches" 1 a1-branches
-run_agg "agg-a1-types" 1 a1-types
-run_agg "agg-a2-name" 1 a2-name
-run_agg "agg-a2-adr-drift" 1 good 'All checks pass'
-run_agg "agg-a2-adr-absent" 1 good -none-
-run_agg "agg-a3-if" 1 a3-if
-run_agg "agg-a4-timeout" 1 a4-timeout
-run_agg "agg-a4-wait" 1 a4-wait
-run_agg "agg-a4-write" 1 a4-write
-run_agg "agg-a4-inject" 1 a4-inject
-run_agg "agg-a5-no-flag" 1 a5-no-flag
-run_agg "agg-a5-no-env" 1 a5-no-env
-run_agg "agg-a5-inline" 1 a5-inline
-run_agg "agg-a5-comment" 1 a5-comment
+# A-block passes on the real tree
+out="$("$CHECK" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?
+expect "A-block passes on the real tree" 0 "$rc"
+if grep -qF '(A6)' <<< "$out" && ! grep -qF 'all-checks-settled absent' <<< "$out"; then
+  h_pass "A-block passes on the real tree ran A1-A6"
+else
+  h_fail "A-block passes on the real tree ran A1-A6" "output: $out"
+fi
 
-# agg-a2-duplicate-name: a second workflow names a job with the same context
-d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
-put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
-printf 'name: Other\njobs:\n  other:\n    name: All checks green\n' > "$d_wf/other.yml"
-"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
-expect "agg-a2-duplicate-name" 1 $?
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^on:\n/on:\n  pull_request:\n/m'
+run_agg_mut "A1 rejects a pull_request trigger" "(A1)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" "s/--context='All checks settled'/--context='All checks done'/"
+run_agg_mut "A2 rejects a drifted --context literal" "(A2)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/--ignore-workflows=/--wait --ignore-workflows=/'
+run_agg_mut "A3 rejects a --wait token" "(A3)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" "s/github\\.event\\.workflow_run\\.event == 'pull_request'/github.event.workflow_run.event != 'push'/"
+run_agg_mut "A3 rejects a widened job if" "(A3)" "$d_wf"
+
+d_wf="$(agg_copy)"
+# shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+agg_edit "$d_wf/all-checks-settled.yml" 's/--target-url="\$RUN_URL"/--target-url="\${{ github.event.workflow_run.html_url }}"/'
+run_agg_mut "A4 rejects an expression inside run" "(A4)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^  contents: read$/  contents: write/m'
+run_agg_mut "A4 rejects contents write" "(A4)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" "s/,All checks green' \\\\\$/' \\\\/m"
+run_agg_mut "A5 rejects a missing All checks green ignore while the legacy file exists" "(A5)" "$d_wf"
+
+d_wf="$(agg_copy)"
+printf 'name: Unlisted PR Gate\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/unlisted-pr-gate.yml"
+run_agg_mut "A6 rejects an unlisted PR workflow" "(A6)" "$d_wf"
+
+d_wf="$(agg_copy)"
+printf 'name: Commented PR Gate\non:\n  pull_request: # every PR\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/commented-pr-gate.yml"
+run_agg_mut "A6 rejects an unlisted PR workflow whose trigger carries a comment" "(A6)" "$d_wf"
+
+d_wf="$(agg_copy)"
+printf 'name: Flow PR Gate\non:\n  pull_request: {types: [opened]}\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/flow-pr-gate.yml"
+run_agg_mut "A6 rejects an unlisted PR workflow with a flow-map trigger" "(A6)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^      - VR Refresh$/      - VR Refresh\n      - Phantom Workflow/m'
+run_agg_mut "A6 rejects a listed name without a PR trigger" "(A6)" "$d_wf"
+
+# A5 flips once the legacy waiter is retired: the shim must go with it.
+d_wf="$(agg_copy)"
+rm "$d_wf/all-checks-green.yml"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^      - All checks green\n//m'
+run_agg_mut "A5 rejects a leftover All checks green ignore after the legacy file is gone" "(A5)" "$d_wf"
 
 # agg-a2-lib-drift: the check reads pr-armable.sh and armable.py from its own
 # repo root, so run a copy of it in a throwaway tree whose shell literal drifted.
@@ -646,10 +686,8 @@ LD="$TMP/libdrift"
 mkdir -p "$LD/bin/lib" "$LD/tools/postplan-harness/harness"
 cp "$CHECK" "$LD/bin/check-composite-contracts"
 printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks'\n" > "$LD/bin/lib/pr-armable.sh"
-printf 'AGGREGATOR_CONTEXT = "All checks green"\n' > "$LD/tools/postplan-harness/harness/armable.py"
-d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
-put_agg "$d_wf" good; put_agg_adr "$d_dec" "$AGG_LITERAL"
-out="$("$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+printf 'AGGREGATOR_CONTEXT = "All checks settled"\n' > "$LD/tools/postplan-harness/harness/armable.py"
+out="$("$LD/bin/check-composite-contracts" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?
 expect "agg-a2-lib-drift" 1 "$rc"
 if printf '%s' "$out" | grep -qF 'pr-armable.sh does not set'; then
   h_pass "agg-a2-lib-drift-names-lib"
@@ -657,18 +695,18 @@ else
   h_fail "agg-a2-lib-drift" "output does not name pr-armable.sh: $out"
 fi
 # Same tree with the shell literal fixed passes, so the case above failed on the drift.
-printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks green'\n" > "$LD/bin/lib/pr-armable.sh"
-"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks settled'\n" > "$LD/bin/lib/pr-armable.sh"
+"$LD/bin/check-composite-contracts" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" >/dev/null 2>&1
 expect "agg-a2-lib-aligned" 0 $?
 printf 'AGGREGATOR_CONTEXT = "All checks"\n' > "$LD/tools/postplan-harness/harness/armable.py"
-"$LD/bin/check-composite-contracts" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
+"$LD/bin/check-composite-contracts" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" >/dev/null 2>&1
 expect "agg-a2-harness-drift" 1 $?
 
-# agg-absent-skips: no all-checks-green.yml → exit 0 with a visible skip line
+# agg-absent-skips: no all-checks-settled.yml → exit 0 with a visible skip line
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
 expect "agg-absent-skips" 0 "$rc"
-if printf '%s' "$out" | grep -q 'all-checks-green absent — skipped'; then
+if printf '%s' "$out" | grep -q 'all-checks-settled absent — skipped'; then
   h_pass "agg-absent-skips-skip-visible"
 else
   h_fail "agg-absent-skips" "no skip line in output; output: $out"

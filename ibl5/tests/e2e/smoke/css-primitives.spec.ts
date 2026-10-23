@@ -177,4 +177,23 @@ test.describe('CSS shared primitives', () => {
     expect(actual).toEqual(EXPECTED_LABEL);
     expect(differsFromControl(EXPECTED_LABEL, control)).toBe(true);
   });
+
+  test('updater .text-error keeps its #ef4444 red under the daisyUI theme', async ({ page }) => {
+    const log = await probe(
+      page,
+      'body',
+      '<div class="updater-log"><span data-probe class="text-error">x</span></div>',
+      ['color'],
+    );
+    const details = await probe(
+      page,
+      'body',
+      '<div class="updater-details__content"><span data-probe class="text-error">x</span></div>',
+      ['color'],
+    );
+    const control = await probe(page, 'body', '<span class="text-error">x</span>', ['color']);
+    expect(log.color, 'updater-log').toBe('rgb(239, 68, 68)');
+    expect(details.color, 'updater-details__content').toBe('rgb(239, 68, 68)');
+    expect(control.color, 'bare .text-error').toBe('rgb(220, 38, 38)');
+  });
 });

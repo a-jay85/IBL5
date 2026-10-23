@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mail;
 
+use Bootstrap\AppPaths;
 use Mail\Contracts\MailServiceInterface;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
@@ -87,8 +88,8 @@ class MailService implements MailServiceInterface
             return new self($envConfig);
         }
 
-        $configPath = self::resolveConfigDir() . '/mail.config.php';
-        $examplePath = self::resolveConfigDir() . '/mail.config.example.php';
+        $configPath = AppPaths::configDir() . '/mail.config.php';
+        $examplePath = AppPaths::configDir() . '/mail.config.example.php';
 
         if (file_exists($configPath)) {
             $config = require $configPath; /** @phpstan-ignore ibl.requireOnce (config file returns array; not a class) */
@@ -214,21 +215,5 @@ class MailService implements MailServiceInterface
             'body_length' => strlen($body),
         ]);
         return true;
-    }
-
-    private static function resolveConfigDir(): string
-    {
-        // When running from ibl5/ directory (normal app context)
-        if (is_dir('config')) {
-            return 'config';
-        }
-
-        // When running from project root or tests
-        if (is_dir('ibl5/config')) {
-            return 'ibl5/config';
-        }
-
-        // Absolute fallback based on this file's location
-        return dirname(__DIR__, 2) . '/config';
     }
 }

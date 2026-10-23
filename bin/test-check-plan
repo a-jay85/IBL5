@@ -4813,7 +4813,7 @@ for L_CASE in overflow verbatim; do
 done
 
 # ---------------------------------------------------------------------------
-# Gate [AB] fixtures (29 assert_viol cases + 1 deny-message case)
+# Gate [AB] fixtures (30 assert_viol cases + 1 deny-message case)
 # A post-impl CLI-executable row with a negated grep must name a durable
 # in-repo check that contains the grepped token, or carry
 # (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
@@ -4833,6 +4833,10 @@ printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bi
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
 printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-unwired"
+# Gate [BX] wants every named bin/ script to exist; the (one-shot) cases name this one.
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/check-foo"
+# A prefix of a wired script: a substring match would count it as wired.
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-hol"
 printf '%s\n' '#!/bin/sh' 'echo bgcolor2' > "$AB_REPO/vendor/bin/test-ab-holds"
 printf '%s\n' '<?php // asserts no reader of bgcolor2' > "$AB_REPO/ibl5/tests/Ab/NoBgcolor2Test.php"
 AB_GUARD_SAVED="$GUARD"
@@ -4908,6 +4912,8 @@ assert_viol "AB-pass-critical-files" 0 '[AB]' "$AB_BASE"'
 '
 # An unwired harness is not durable, even when a (one-shot) note makes [G] skip the cell.
 ab_row "AB-fail-unwired-one-shot" 1 'bin/test-ab-unwired && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# A path that only prefixes a wired script is not wired.
+ab_row "AB-fail-wired-prefix" 1 'bin/test-ab-hol && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
 # Regex escapes and anchors do not stick to the token.
 ab_row "AB-pass-word-boundary" 0 "! grep -rqE '\\bbgcolor2\\b' ibl5/modules && bin/test-ab-holds"
 ab_row "AB-pass-end-anchor" 0 "! grep -rqE 'bgcolor2\$' ibl5/modules && bin/test-ab-holds"

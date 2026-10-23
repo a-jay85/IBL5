@@ -1621,7 +1621,8 @@ _ab_path_ok() {
         bin/*)
             case "$2" in
                 *'(wired in this PR)'*) : ;;
-                *) grep -rqF -- "$_abp_p" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
+                *) _abp_re="$(sed 's/[.]/\\./g' <<< "$_abp_p")"
+                   grep -rqE -- "(^|[^A-Za-z0-9_./-])${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
             esac ;;
     esac
     grep -qxF -- "$_abp_p" <<< "$_ab_cf" && return 0

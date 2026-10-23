@@ -10,6 +10,7 @@ use Season\Season;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use Team\Team;
 use Waivers\Contracts\WaiversProcessorInterface;
+use Waivers\Contracts\WaiversRosterSlotCounterInterface;
 use Waivers\Contracts\WaiversServiceInterface;
 
 /**
@@ -28,19 +29,22 @@ class WaiversService implements WaiversServiceInterface
      * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
+    private WaiversRosterSlotCounterInterface $slotCounter;
 
     public function __construct(
         \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         WaiversProcessorInterface $processor,
         TeamQueryRepositoryInterface $teamQueryRepo,
         \mysqli $db,
-        ?Season $season = null
+        ?Season $season = null,
+        ?WaiversRosterSlotCounterInterface $slotCounter = null
     ) {
         $this->commonRepository = $commonRepository;
         $this->processor = $processor;
         $this->teamQueryRepo = $teamQueryRepo;
         $this->db = $db;
         $this->season = $season;
+        $this->slotCounter = $slotCounter ?? new WaiversRosterSlotCounter($teamQueryRepo);
     }
 
     /**
@@ -57,7 +61,7 @@ class WaiversService implements WaiversServiceInterface
         $tableData = $this->getTableResultAndStyle($team, $season, $action);
         $players = $this->buildPlayerOptions($tableData['tableResult'], $season);
 
-        $slots = (new WaiversRosterSlotCounter($this->teamQueryRepo))->countOpenSlots($team->teamid, $season);
+        $slots = $this->slotCounter->countOpenSlots($team->teamid, $season);
         $openRosterSpots = $slots['open'];
         $healthyOpenRosterSpots = $slots['healthy'];
 

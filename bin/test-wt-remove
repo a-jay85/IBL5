@@ -281,6 +281,10 @@ h_exists "case 18: same-named branch's directory kept" "$WTS/swap-b"
 run_rm /tmp --if-empty
 h_eq "case 18: path outside the parent rc 1" 1 "$RC"
 h_contains "case 18: path outside the parent message" "$OUT" "is outside"
+run_rm "$WTS/../IBL5" --if-empty
+h_eq "case 18: dot segments rc 1" 1 "$RC"
+h_contains "case 18: dot segments message" "$OUT" "dot segments"
+h_exists "case 18: dot segments left swap-b alone" "$WTS/swap-b"
 
 echo "== case 19: bin/wt-new removes only a worktree it created"
 WN="$SCRIPT_DIR/wt-new"

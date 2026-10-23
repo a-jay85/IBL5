@@ -71,6 +71,7 @@ fi
 case "$NAME" in
     /*)
         case "$NAME" in
+            */..|*/../*|*/.|*/./*) echo "Error: '$NAME' is outside $WT_PARENT (dot segments are not resolved)" >&2; exit 1 ;;
             "$WT_PARENT"/*) ;;
             *) echo "Error: '$NAME' is outside $WT_PARENT" >&2; exit 1 ;;
         esac

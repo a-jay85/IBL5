@@ -23,11 +23,11 @@ final class UpdateAllTheThingsRecordHoldersWiringTest extends TestCase
     {
         $this->src = (string) file_get_contents(dirname(__DIR__, 3) . '/scripts/updateAllTheThings.php');
 
-        $h2h = strpos($this->src, 'new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db)');
-        self::assertNotFalse($h2h, 'head-to-head step registration not found');
-        $blockStart = strrpos(substr($this->src, 0, $h2h), 'if (!$isOlympics) {');
+        $iblHist = strpos($this->src, 'new Updater\Steps\RefreshIblHistStep($mysqli_db)');
+        self::assertNotFalse($iblHist, 'ibl_hist step registration not found');
+        $blockStart = strrpos(substr($this->src, 0, $iblHist), 'if (!$isOlympics) {');
         self::assertNotFalse($blockStart, 'non-Olympics block start not found');
-        $blockEnd = strpos($this->src, "\n    }\n", $h2h);
+        $blockEnd = strpos($this->src, "\n    }\n", $iblHist);
         self::assertNotFalse($blockEnd, 'non-Olympics block end not found');
 
         $this->blockStart = $blockStart;

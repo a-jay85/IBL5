@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 conflict resolution. Resolves a merge conflict, proves no work was lost, and arms the conflict hold. Loaded only when the Phase 2 merge block prints STOP-AND-RESOLVE.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/review-shared/_rebase-and-conflicts.md
@@ -63,7 +63,7 @@ nothing to squash or replay.
 
 ## Step 3: Collapse guard, before the merge
 
-A backup branch, if you keep one before this merge, takes its name from `wt_backup_branch_name` in `bin/lib/git-helpers.sh` (usage: `.claude/rules/linear-history-squash-merge.md` § Rebasing a stacked branch after its parent merged). The Phase 2 pre-rebase capture block already holds the diff and SHA this step needs. Leave its marker comment in `.claude/skills/post-plan/SKILL.md` unchanged, because `bin/test-postplan-arm-conditions:3198` greps it.
+A backup branch, if you keep one before this merge, takes its name from `wt_backup_branch_name` in `bin/lib/git-helpers.sh` (usage: `.claude/rules/linear-history-squash-merge.md` § Rebasing a stacked branch after its parent merged). The Phase 2 pre-rebase capture block already holds the diff and SHA this step needs. Leave its marker comment in `.claude/skills/post-plan/SKILL.md` unchanged, because `bin/test-postplan-arm-conditions` greps it (search that file for `# phase 2 pre-rebase capture`).
 
 An `--onto` rebase is the one shape that can silently drop commits, and this guard is the
 only thing that notices a *prior* run already did so. Run `check` first:

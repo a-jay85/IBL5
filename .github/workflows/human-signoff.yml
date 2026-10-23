@@ -193,8 +193,9 @@ jobs:
     needs: human-signoff
     # Runs only when the gate asked for a write: record on approval, or drop.
     # A cancelled gate was superseded by a newer run, which owns the write.
+    # !cancelled() so a cancelled run skips this job even if its gate finished.
     if: >-
-      always()
+      !cancelled()
       && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success')
       && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop')
     runs-on: ubuntu-latest

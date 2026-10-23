@@ -43,14 +43,14 @@ Write the mutation into the row's **How** cell as a clause on the command, so an
 
 A plan states each catching mutation as data in a `## Executable Mutations` section. One entry per post-impl CLI-executable row:
 
-```text
+````text
 ```mutation
 row: 20
 file: .github/workflows/merge-digest-notify.yml
 match: <one line copied verbatim from the file>
 replace: <the same line with the mutation applied>
 ```
-```
+````
 
 - **Keys.** `row:` names a post-impl CLI-executable matrix row. `file:` is a repo-relative path. `match:` is a single-line literal that must occur exactly once in the file. `replace:` is a literal; an empty value deletes the match. `check:` is optional and defaults to the row's location cell after gate `[V]` strips its backticks. An override must itself pass gate `[V]`'s runnable test.
 - **Literals.** Both values are single lines, compared byte for byte. No regex and no escapes.

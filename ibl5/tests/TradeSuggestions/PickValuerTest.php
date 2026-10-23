@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions;
 
 use PHPUnit\Framework\TestCase;
+use TradeSuggestions\PickTier;
 use TradeSuggestions\PickValuer;
 
 /**
@@ -59,6 +60,36 @@ class PickValuerTest extends TestCase
         $this->assertSame(self::ENDING_YEAR, $picks[0]->year);
         $this->assertSame(1, $picks[0]->round);
         $this->assertSame(30.0, $picks[0]->value);
+    }
+
+    public function testCurrentYearFirstTierFollowsProjectedSlot(): void
+    {
+        $index = $this->valuer->buildSlotIndex(self::draftOrder(28));
+
+        $this->assertSame(PickTier::Lottery, $this->valuer->tier(self::ENDING_YEAR, 1, 5, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::High, $this->valuer->tier(self::ENDING_YEAR, 1, 6, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::High, $this->valuer->tier(self::ENDING_YEAR, 1, 14, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Late, $this->valuer->tier(self::ENDING_YEAR, 1, 15, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Late, $this->valuer->tier(self::ENDING_YEAR, 1, 99, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Second, $this->valuer->tier(self::ENDING_YEAR, 2, 1, $index, self::ENDING_YEAR));
+    }
+
+    public function testFutureFirstDropsOneTierWithLateFloor(): void
+    {
+        $index = $this->valuer->buildSlotIndex(self::draftOrder(28));
+
+        $this->assertSame(PickTier::High, $this->valuer->tier(self::ENDING_YEAR + 1, 1, 1, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Late, $this->valuer->tier(self::ENDING_YEAR + 1, 1, 10, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Late, $this->valuer->tier(self::ENDING_YEAR + 1, 1, 20, $index, self::ENDING_YEAR));
+        $this->assertSame(PickTier::Second, $this->valuer->tier(self::ENDING_YEAR + 1, 2, 1, $index, self::ENDING_YEAR));
+    }
+
+    public function testPastYearAndThirdRoundHaveNoTier(): void
+    {
+        $index = $this->valuer->buildSlotIndex(self::draftOrder(28));
+
+        $this->assertNull($this->valuer->tier(self::ENDING_YEAR - 1, 1, 1, $index, self::ENDING_YEAR));
+        $this->assertNull($this->valuer->tier(self::ENDING_YEAR, 3, 1, $index, self::ENDING_YEAR));
     }
 
     public function testSlotIndexUsesListPositionNotPickNumber(): void

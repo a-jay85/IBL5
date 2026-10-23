@@ -5,6 +5,9 @@
 # Also probes the com.ibl5.bug-bot LaunchAgent's loopback Express port. The cron
 # and the bot are separate jobs: the cron can tick green forever while the bot is
 # dead and no Discord report reaches the queue at all.
+#
+# Also counts active bug-bot rows in ibl_api_keys (metadata only). A restore
+# that wipes that table leaves the bot running but unable to write reports.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +32,7 @@ usage() {
     printf '\n'
     printf 'Read-only liveness + staleness diagnostic for the %s LaunchAgent,\n' "$LAUNCHD_LABEL"
     printf 'plus an HTTP reachability probe of the bug-bot at %s.\n' "$BOT_BASE_URL"
+    printf 'Also reports degraded when no active bug-bot row exists in ibl_api_keys.\n'
     printf '\n'
     printf 'Options:\n'
     printf '  --help, -h    Show this help and exit\n'
@@ -177,6 +181,31 @@ check_staleness() {
     [ "$n" -gt 0 ] && emit DEGRADED stale:rows-stuck "$n non-terminal row(s) past their per-status staleness threshold"
 }
 
+# check_bot_key — the bug-bot authenticates its queue writes with an
+# ibl_api_keys row (owner_name 'bug-bot (Buggsy)'). A db-sync restore that
+# drops local-only tables deletes that row, and the bot then fails every write
+# while launchd and HTTP still look healthy. Metadata only: the query counts
+# rows and never selects key_hash or key_prefix.
+check_bot_key() {
+    local sql out rc n
+    sql="SELECT COUNT(*) AS n FROM ibl_api_keys WHERE is_active = 1 AND owner_name LIKE 'bug-bot%'"
+    out="$("$DB_QUERY_BIN" "$sql" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        emit UNKNOWN botkey:db-unavailable "db-query exited $rc — bug-bot API key unprobeable (${out%%$'\n'*})"
+        return 0
+    fi
+    n="$(printf '%s\n' "$out" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+    if [ -z "$n" ]; then
+        emit UNKNOWN botkey:db-parse-failed "could not parse a count from db-query output"
+        return 0
+    fi
+    if [ "$n" -eq 0 ]; then
+        emit DEGRADED botkey:missing "no active ibl_api_keys row with owner_name LIKE 'bug-bot%' — the bug-bot cannot write reports; re-mint its key"
+    else
+        emit OK botkey:present "$n active bug-bot API key row(s)"
+    fi
+}
+
 # check_bot_loaded — launchd-level companion to check_bot_reachability below.
 # The two answer different questions and neither subsumes the other: launchctl
 # says whether the job is REGISTERED, curl says whether it is SERVING. A job
@@ -226,6 +255,7 @@ main() {
     check_bot_loaded
     check_bot_reachability
     check_staleness
+    check_bot_key
 
     if [ -n "$DEGRADED_SIGNALS" ]; then
         if [ -n "$UNKNOWN_SIGNALS" ]; then

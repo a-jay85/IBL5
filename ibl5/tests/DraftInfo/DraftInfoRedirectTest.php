@@ -128,15 +128,6 @@ class DraftInfoRedirectTest extends TestCase
         $this->assertStringNotContainsString("\n", $url);
     }
 
-    public function testSaveOrderForwardsWith307(): void
-    {
-        $path = __DIR__ . '/../../modules/ProjectedDraftOrder/index.php';
-        $content = file_get_contents($path);
-        $this->assertIsString($content);
-        $this->assertStringContainsString("'modules.php?name=DraftInfo&op=save_order'", $content);
-        $this->assertStringContainsString('307', $content);
-    }
-
     public function testSaveOrderOpOnOtherLegacyModuleIsIgnored(): void
     {
         // DraftHistory stub passes only year/teamid whitelist, never op

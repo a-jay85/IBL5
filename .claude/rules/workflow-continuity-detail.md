@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -85,6 +85,7 @@ uncommitted edit or a master merge can realise a row. A hold that mixes MISSING 
 UNREALISED rows keeps the MISSING rule above.
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
+`bin/post-plan-now --state-changed` (and `--rebase-only`, which implies it) passes `POSTPLAN_STATE_CHANGED=1` the same way, so the harness logs `phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)` and proceeds without writing the marker; every other launch passes `POSTPLAN_STATE_CHANGED=0`, and only the exact value `1` skips.
 The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
 `tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
 `.gitignore` already covers. It stores a hash of condition (3)'s MISSING items and

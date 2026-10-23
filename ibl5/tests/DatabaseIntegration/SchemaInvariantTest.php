@@ -168,8 +168,6 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_box_scores_season2007_phantom_backup.visitor_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
         'ibl_box_scores_teams_season2007_phantom_backup.home_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
         'ibl_box_scores_teams_season2007_phantom_backup.visitor_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
-        'ibl_box_scores_teams_franchise_names_backup.home_teamid' => 'franchise-name backfill undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_team_info can never erase the rows the rollback restores from',
-        'ibl_box_scores_teams_franchise_names_backup.visitor_teamid' => 'franchise-name backfill undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_team_info can never erase the rows the rollback restores from',
         'ibl_cash_considerations.counterparty_teamid' => 'secondary team reference; the primary teamid column is FK-constrained',
         'ibl_hist.pid' => 'append-only transaction log; retains rows for deleted players (no cascade)',
         'ibl_hist.teamid' => 'append-only transaction log; team marker retained across franchise changes',

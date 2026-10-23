@@ -35,19 +35,13 @@
 --      SET t.name = CONCAT('~', t.id) WHERE t.id = b.id;
 --   UPDATE ibl_box_scores_teams t, ibl_box_scores_teams_franchise_names_backup b
 --      SET t.name = b.name WHERE t.id = b.id;
--- Lossless: every changed row's full pre-state is in the backup, keyed by id.
+-- Lossless: name is the only column written, and every changed row's old name is in
+-- the backup, keyed by id.
 
-CREATE TABLE IF NOT EXISTS ibl_box_scores_teams_franchise_names_backup LIKE ibl_box_scores_teams;
-
--- The generated columns are copied by LIKE with their AS (...) STORED clause, which an
--- INSERT cannot write. Store them as plain NULL-able columns (same shape as migration 170).
--- destructive-migration[narrow-type]: same types as the LIKE source; only the STORED GENERATED clause is dropped on a new empty backup table
-ALTER TABLE ibl_box_scores_teams_franchise_names_backup
-    MODIFY game_type     tinyint(3) unsigned NULL,
-    MODIFY season_year   smallint(5) unsigned NULL,
-    MODIFY calc_points   smallint(5) unsigned NULL,
-    MODIFY calc_rebounds smallint(5) unsigned NULL,
-    MODIFY calc_fg_made  smallint(5) unsigned NULL;
+-- The backup holds only (id, name). It copies their types and collation from the live
+-- table, and it carries no team id columns, so it needs no FK allowlist entry.
+CREATE TABLE IF NOT EXISTS ibl_box_scores_teams_franchise_names_backup (PRIMARY KEY (id))
+SELECT id, name FROM ibl_box_scores_teams WHERE 1 = 0;
 
 -- target_name copies ibl_franchise_seasons.team_name's type and collation. A literal
 -- column type would take the database default collation, which can differ from the
@@ -102,8 +96,8 @@ SELECT x INTO @abort_stale_ph FROM (SELECT 1 AS x FROM DUAL WHERE @stale_ph > 0 
 
 START TRANSACTION;
 
-INSERT IGNORE INTO ibl_box_scores_teams_franchise_names_backup
-SELECT t.* FROM ibl_box_scores_teams t JOIN tmp_bst_targets x ON x.id = t.id;
+INSERT IGNORE INTO ibl_box_scores_teams_franchise_names_backup (id, name)
+SELECT t.id, t.name FROM ibl_box_scores_teams t JOIN tmp_bst_targets x ON x.id = t.id;
 
 -- Step one: a per-row placeholder no franchise name can equal, unique within a pair.
 UPDATE ibl_box_scores_teams t, tmp_bst_targets x SET t.name = CONCAT('~', t.id) WHERE t.id = x.id;

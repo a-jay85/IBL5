@@ -960,6 +960,7 @@ td.ibl-team-cell--colored {
     gap: var(--space-2);
     font-weight: var(--font-weight-semibold);
     color: var(--team-cell-color);
+    text-shadow: 1px 1px 0 var(--team-cell-shadow, transparent);
     text-decoration: none;
     white-space: nowrap;
     overflow: hidden;

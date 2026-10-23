@@ -99,12 +99,10 @@
     }
 }
 
-/* The shared .ibl-team-cell--colored rule paints the label text in the team's
-   secondary colour, which on this page lands green-on-purple, blue-on-red and
-   pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
-   standings, free agency, trading and the draft tables keep the team colour. */
+/* Keep the row label's white/black name on hover. Without this the global
+   .ibl-data-table a:hover recolors it to the accent over the team color. */
 .h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
-    color: var(--white);
+    color: var(--team-cell-color);
 }
 
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */

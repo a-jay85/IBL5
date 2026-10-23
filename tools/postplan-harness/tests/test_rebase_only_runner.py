@@ -27,7 +27,6 @@ SLUG = "rebase-only-run"
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit",
                 "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},

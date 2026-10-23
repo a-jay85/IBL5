@@ -55,7 +55,6 @@ def load(slug):
 
 CANNED = {
     "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
-    "body-check": {"corrected_body": "## Summary\n- replay body\n", "findings": []},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -509,7 +508,7 @@ def test_red_ci_checks_warns_not_blocks_when_aggregator_required(tmp_path):
     assert c15["blocked"] is False
     c15_live = [c for c in res.arm.conditions if c.number == 15][0]
     assert "pytest (stdlib harness)" in c15_live.warning
-    assert "All checks green" in c15_live.warning
+    assert "All checks settled" in c15_live.warning
 
 
 def test_red_ci_checks_no_warning_when_green(tmp_path):
@@ -1254,7 +1253,7 @@ def test_live_arm_consults_aggregator_required(monkeypatch, tmp_path):
 
     monkeypatch.setattr(RecordingGh, "aggregator_required", _fake)
     c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
-    assert calls == ["All checks green"]
+    assert calls == ["All checks settled"]
     assert c15.blocked is False
     assert "pytest (stdlib harness)" in c15.warning
 
@@ -2375,7 +2374,7 @@ def test_scope_check_timeout_fails_run_closed_with_named_step(tmp_path, monkeypa
 
 def test_replay_phase2_logs_how_to_revert_once(tmp_path):
     """Phase 2 logs one `how-to-revert source=` line, between the merge danger line and the
-    commit ADR gate, and the advisory field never produces a body-check finding.
+    commit ADR gate, and the advisory field never produces a phase2 finding.
 
     Mutation caught: delete the `_inject_how_to_revert(...)` call in runner.run.
     """
@@ -2389,4 +2388,4 @@ def test_replay_phase2_logs_how_to_revert_once(tmp_path):
     adr_idx = [i for i, ln in enumerate(lines) if "phase2: starting commit ADR gate" in ln]
     assert md_idx and adr_idx, lines
     assert md_idx[0] < htr_idx[0] < adr_idx[0], (md_idx, htr_idx, adr_idx)
-    assert not any("body-check finding: how-to-revert" in ln for ln in lines), lines
+    assert not any("phase2 finding: how-to-revert" in ln for ln in lines), lines

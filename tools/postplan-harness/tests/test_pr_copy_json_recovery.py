@@ -85,9 +85,9 @@ def test_still_failing_raw_ids_match_table():
 
 def test_purpose_key_matches_peer_tests_and_runner():
     """_extractor_for dispatches on the literal "pr-copy"; the runner and the peer-owned
-    test_body_check.py (DegradingLlm bad-purpose set) must spell it the same way."""
+    test_body_pass.py (DegradingLlm bad-purpose set) must spell it the same way."""
     here = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(here, "test_body_check.py"), encoding="utf-8") as fh:
+    with open(os.path.join(here, "test_body_pass.py"), encoding="utf-8") as fh:
         assert '"pr-copy"' in fh.read()
     with open(os.path.join(os.path.dirname(here), "runner.py"), encoding="utf-8") as fh:
         assert "schemas.PR_COPY_PURPOSE" in fh.read()

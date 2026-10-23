@@ -3,8 +3,10 @@ validates what the model returns; invalid output is a typed failure, never
 silently accepted."""
 from __future__ import annotations
 
+import functools
 import json
 import re
+from collections import Counter
 
 from .state import Classification, HarnessError
 
@@ -331,17 +333,85 @@ def extract_pr_copy_json(text: str):
         f"no parseable JSON in pr-copy reply ({parse_err}); {PR_COPY_JSON_HINT}")
 
 
-def validate_body_check(data) -> None:
-    """{corrected_body, findings} — PR-body-vs-diff verification."""
+BODY_RECHECK_FINDING_STATUSES = ("resolved", "unresolved")
+BODY_RECHECK_HUNK_STATUSES = ("supported", "unsupported")
+_BODY_RECHECK_ENVELOPE_KEYS = ("result", "body_recheck", "recheck", "data", "output")
+_BODY_RECHECK_ITEM_KEYS = {"id", "status", "evidence"}
+
+
+def unwrap_body_recheck_envelope(data):
+    """Tolerant pre-pass for the body-only recheck reply.
+
+    A one-key dict whose key is in _BODY_RECHECK_ENVELOPE_KEYS and whose value is a dict
+    is unwrapped once. Inside a dict, a missing 'hunks' key becomes [] and each item's
+    str 'status' is stripped and lower-cased. Anything else (a bare list, a string, a
+    dict with two keys) is returned unchanged for the validator to reject.
+    """
+    if (isinstance(data, dict) and len(data) == 1
+            and next(iter(data)) in _BODY_RECHECK_ENVELOPE_KEYS
+            and isinstance(next(iter(data.values())), dict)):
+        data = next(iter(data.values()))
     if not isinstance(data, dict):
-        raise HarnessError("schema", "body check must be a JSON object")
-    if "corrected_body" not in data or not isinstance(data["corrected_body"], str):
-        raise HarnessError("schema", "body check missing string field 'corrected_body'")
-    if "findings" not in data or not isinstance(data["findings"], list):
-        raise HarnessError("schema", "body check findings must be a JSON array")
-    for i, item in enumerate(data["findings"]):
-        if not isinstance(item, str):
-            raise HarnessError("schema", f"body check finding[{i}] must be a string")
+        return data
+    data = dict(data)
+    data.setdefault("hunks", [])
+    for key in ("findings", "hunks"):
+        items = data.get(key)
+        if not isinstance(items, list):
+            continue
+        fixed = []
+        for item in items:
+            if isinstance(item, dict) and isinstance(item.get("status"), str):
+                item = {**item, "status": item["status"].strip().lower()}
+            fixed.append(item)
+        data[key] = fixed
+    return data
+
+
+def _check_recheck_items(items, kind: str, expected: list[str], statuses) -> None:
+    if not isinstance(items, list):
+        raise HarnessError("schema", f"body recheck '{kind}' must be a JSON array")
+    ids = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict) or set(item) != _BODY_RECHECK_ITEM_KEYS:
+            raise HarnessError("schema", f"body recheck {kind}[{i}] must have exactly "
+                                         "the keys id, status, evidence")
+        if not isinstance(item["id"], str):
+            raise HarnessError("schema", f"body recheck {kind}[{i}].id must be a string")
+        if not isinstance(item["evidence"], str) or not item["evidence"].strip():
+            raise HarnessError("schema", f"body recheck {kind}[{i}].evidence is empty")
+        if item["status"] not in statuses:
+            raise HarnessError("schema", f"body recheck {kind}[{i}].status "
+                                         f"{item['status']!r} not in {statuses}")
+        ids.append(item["id"])
+    # Counter, never set: a duplicate F1 must not stand in for a missing F2.
+    if Counter(ids) != Counter(expected):
+        raise HarnessError("schema", f"body recheck {kind} ids {ids} != {expected}")
+
+
+def validate_body_recheck(data, *, finding_ids: list[str], hunk_ids: list[str]) -> None:
+    """Every expected finding and hunk id exactly once, closed statuses, no extra keys."""
+    if not isinstance(data, dict) or set(data) != {"findings", "hunks"}:
+        raise HarnessError("schema", "body recheck must be a JSON object with exactly "
+                                     "the keys findings, hunks")
+    _check_recheck_items(data["findings"], "findings", finding_ids,
+                         BODY_RECHECK_FINDING_STATUSES)
+    _check_recheck_items(data["hunks"], "hunks", hunk_ids, BODY_RECHECK_HUNK_STATUSES)
+
+
+def body_recheck_validator(finding_ids, hunk_ids):
+    """The `validate` callable handed to llm.call, with the expected ids bound."""
+    return functools.partial(validate_body_recheck, finding_ids=list(finding_ids),
+                             hunk_ids=list(hunk_ids))
+
+
+def body_recheck_passed(data) -> bool:
+    """True iff findings is non-empty, every finding resolved and every hunk supported."""
+    findings = data.get("findings") or []
+    if not findings:
+        return False
+    return (all(f.get("status") == "resolved" for f in findings)
+            and all(h.get("status") == "supported" for h in data.get("hunks") or []))
 
 
 def coerce_commit_subject(subject: str, cls: Classification) -> str:

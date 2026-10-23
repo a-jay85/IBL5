@@ -34,7 +34,7 @@ class FranchiseRecordBookApiHandler
             $teamId = 0;
         }
 
-        $pushUrl = 'modules.php?name=FranchiseRecordBook';
+        $pushUrl = 'modules.php?name=Records&tab=byfranchise';
         if ($teamId > 0) {
             $pushUrl .= '&teamid=' . $teamId;
         }

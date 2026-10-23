@@ -273,12 +273,12 @@ def _meta_run(monkeypatch, tmp_path, gh, *, failed, recorded):
     return r, llm
 
 
-def test_char_meta_body_check_failure_still_runs_cifix(monkeypatch, tmp_path):
-    """Body checks skip in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
+def test_char_meta_body_pass_skipped_still_runs_cifix(monkeypatch, tmp_path):
+    """The body pass skips in phase 2, so nothing is recorded; ci-fix owns the proposal flow."""
     gh = MetaLogGh(logs={"9001": META_BODY_LOG})
     gh.checks = [META_CHECKS_ROW]
     _r, llm = _meta_run(monkeypatch, tmp_path, gh,
-                        failed=["All checks green", "Meta checks"], recorded=[])
+                        failed=["All checks settled", "Meta checks"], recorded=[])
     assert len(llm.calls) == 1
     assert llm.calls[0][0] == "ci-fix"
 
@@ -287,7 +287,7 @@ def test_char_meta_unattributed_log_still_runs_cifix(monkeypatch, tmp_path):
     gh = MetaLogGh(logs={"9001": META_BODY_LOG})
     gh.checks = [META_CHECKS_ROW]
     _r, llm = _meta_run(monkeypatch, tmp_path, gh,
-                        failed=["All checks green", "Meta checks"],
+                        failed=["All checks settled", "Meta checks"],
                         recorded=_PROSE_RECORDED)
     assert len(llm.calls) == 1
     assert llm.calls[0][0] == "ci-fix"
@@ -297,7 +297,7 @@ def test_char_meta_missing_log_still_runs_cifix(monkeypatch, tmp_path):
     gh = MetaLogGh(logs={})
     gh.checks = [META_CHECKS_ROW]
     _r, llm = _meta_run(monkeypatch, tmp_path, gh,
-                        failed=["All checks green", "Meta checks"],
+                        failed=["All checks settled", "Meta checks"],
                         recorded=_PROSE_RECORDED)
     assert len(llm.calls) == 1
     assert llm.calls[0][0] == "ci-fix"
@@ -319,13 +319,13 @@ def test_meta_prose_failure_recorded_skips_cifix_and_names_check(monkeypatch, tm
     gh = MetaLogGh(logs={"9001": META_PROSE_LOG})
     gh.checks = [META_CHECKS_ROW]
     r, llm = _meta_run(monkeypatch, tmp_path, gh,
-                       failed=["All checks green", "Meta checks"],
+                       failed=["All checks settled", "Meta checks"],
                        recorded=_PROSE_RECORDED)
     assert len(llm.calls) == 0
     assert gh.reruns == []
     assert r.watched == []
     assert r.out[1].exit_code == 8
-    assert r.out[1].failed == ["All checks green", "Meta checks"]
+    assert r.out[1].failed == ["All checks settled", "Meta checks"]
     assert _has(r.lines, "phase7 ci-fix: skipped - Meta checks red on check-prose-since")
     assert gh.comments[0][1] == cifix.SURVIVOR_TITLE
     assert "check-prose-since" in _trail_text(gh)

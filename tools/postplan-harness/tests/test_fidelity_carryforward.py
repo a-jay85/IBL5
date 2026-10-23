@@ -311,7 +311,8 @@ def _git(head_trees=None):
 
 def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=DIFF,
               tree=TREE, git_shim_fixture=None, verdict_text="6d checks\n\nREADY\n",
-              cache_rec=None, cache_version="", conflict_only=False, purposes_out=None):
+              cache_rec=None, cache_version="", conflict_only=False, purposes_out=None,
+              body_hash=""):
     """Run _run_fidelity in live mode against RecordingGh.
 
     verdict_text=None leaves the verdict file absent.
@@ -353,7 +354,8 @@ def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=D
         runner._run_fidelity(
             llm, str(tmp_path), str(tmp_path), _git(head_trees=[tree, tree]),
             gh, plan_obj, diff, "body", 99, "dead" * 10, tree, True, logs.append, res,
-            cache_rec=cache_rec, cache_version=cache_version, conflict_only=conflict_only)
+            cache_rec=cache_rec, cache_version=cache_version, conflict_only=conflict_only,
+            body_hash=body_hash)
     finally:
         runner.fidelity.review = orig_review
         runner.fidelity.verdict_path = orig_verdict_path
@@ -367,7 +369,7 @@ PRIOR_RUN = "live-prior"
 
 
 def _record(diff_id, plan_hash, version=VERSION, verdict="READY", remediated=False,
-            key_diff_id=None, run_id=PRIOR_RUN, files=None):
+            key_diff_id=None, run_id=PRIOR_RUN, files=None, body_hash=""):
     """A review-cache record carrying a clean fidelity arm, built through the real builder.
 
     `diff_id` / `plan_hash` go on the fidelity arm; `key_diff_id` (default `diff_id`) is the
@@ -378,6 +380,8 @@ def _record(diff_id, plan_hash, version=VERSION, verdict="READY", remediated=Fal
                                file_list=files or ["a.py"])
     arm = {"run_id": run_id, "verdict": verdict, "diff_id": diff_id,
            "plan_hash": plan_hash, "remediated": remediated}
+    if body_hash:
+        arm["body_hash"] = body_hash
     return reviewcache.build_record(slug="s", pr_number=99, run_id=run_id, key=key,
                                     per_file_ids={"a.py": "1" * 40}, fidelity=arm)
 
@@ -472,6 +476,26 @@ def test_carried_forward_log_line(tmp_path):
     assert any("carry-forward declined: diff-changed" in ln for ln in logs_miss)
     assert not any("carried forward" in ln for ln in logs_miss)
     assert not any("carry-forward declined" in ln for ln in logs_match)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_rewritten_body_not_graded_declines_fidelity_reuse(tmp_path):
+    plan_body = b"# plan\n"
+    plan_hash = hashlib.sha256(plan_body).hexdigest()
+    diff_id = fidelity.diff_patch_id(DIFF)
+    sticky = _sticky(verdict="READY", diff_id=diff_id, plan_hash=plan_hash)
+    canned = {"plan-fidelity-review": "6d checks\n\nREADY\n"}
+
+    # Phase 2 rewrote the body; the cached arm never graded that prose -> full review.
+    _, spawns, logs = _drive_cf(tmp_path / "new", prior_sticky=sticky, plan_body=plan_body,
+                                body_hash="b" * 64, canned=canned, **_cache(plan_body))
+    assert spawns == 1
+    assert any("carry-forward declined: body-changed" in ln for ln in logs)
+
+    # The arm graded this exact prose -> reused.
+    _, spawns, _ = _drive_cf(tmp_path / "same", prior_sticky=sticky, plan_body=plan_body,
+                             body_hash="b" * 64, **_cache(plan_body, body_hash="b" * 64))
+    assert spawns == 0
 
 
 @pytest.mark.usefixtures("git_shim")

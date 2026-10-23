@@ -78,16 +78,6 @@ def test_vet_review_rejects_unscored_finding():
     assert reviewcache.vet_review("not-a-list", [], [], dict(GATES), RUN) is None
 
 
-def test_vet_body_check_rejects_degraded_and_empty_hash():
-    result = {"corrected_body": "b", "findings": []}
-    ok = reviewcache.vet_body_check("h" * 64, result, [], RUN)
-    assert ok == {"run_id": RUN, "input_hash": "h" * 64, "result": result}
-    assert reviewcache.vet_body_check("h" * 64, result, ["body-check"], RUN) is None
-    assert reviewcache.vet_body_check("", result, [], RUN) is None
-    assert reviewcache.vet_body_check("h" * 64, {"findings": "nope"}, [], RUN) is None
-    assert reviewcache.vet_body_check("h" * 64, None, [], RUN) is None
-
-
 @pytest.mark.parametrize("over", [
     {"verdict_1": "NOT READY"},
     {"verdict_2": "READY"},
@@ -109,7 +99,7 @@ def test_build_record_roundtrips_through_load_record(tmp_path):
     doc = reviewcache.build_record(slug=SLUG, pr_number=PR, run_id=RUN, key=KEY, per_file_ids=FILES,
                                    review=review, now=now)
     assert doc["written_at"] == "2026-10-10T12:30:05Z"
-    assert doc["body_check"] is None and doc["fidelity"] is None
+    assert doc["fidelity"] is None
     reviewcache.save_record(str(tmp_path), SLUG, doc)
     loaded = reviewcache.load_record(str(tmp_path), SLUG)
     assert loaded == doc
@@ -162,13 +152,13 @@ def _record_bytes(tmp_path, name):
         return fh.read()
 
 
-def test_clean_run_writes_all_three_arms(monkeypatch, tmp_path):
+def test_clean_run_writes_both_arms(monkeypatch, tmp_path):
     res, out = _drive(monkeypatch, tmp_path, name="clean", canned=CANNED_FINDINGS)
     assert res.terminal != TerminalState.FAILED, res.error
     rec = _load(tmp_path, "clean")
     assert rec is not None
     run = os.path.basename(out)
-    for arm in ("review", "body_check", "fidelity"):
+    for arm in ("review", "fidelity"):
         assert isinstance(rec[arm], dict), arm
         assert rec[arm]["run_id"] == run, arm
     assert rec["run_id"] == run
@@ -187,18 +177,6 @@ def test_degraded_review_agent_writes_null_review_arm(monkeypatch, tmp_path):
     rec = _load(tmp_path, "degraded")
     assert rec is not None
     assert rec["review"] is None
-    assert isinstance(rec["body_check"], dict)
-    assert isinstance(rec["fidelity"], dict)
-
-
-def test_degraded_body_check_writes_null_body_arm(monkeypatch, tmp_path):
-    llm = DegradingLlm(UsageLedger(), CANNED_FINDINGS, {"body-check"})
-    res, _ = _drive(monkeypatch, tmp_path, name="degraded-bc", canned=None, llm=llm)
-    assert "body-check" in res.degraded_agents, (res.terminal, res.error)
-    rec = _load(tmp_path, "degraded-bc")
-    assert rec is not None
-    assert rec["body_check"] is None
-    assert isinstance(rec["review"], dict)
     assert isinstance(rec["fidelity"], dict)
 
 
@@ -218,7 +196,6 @@ def test_not_ready_fidelity_writes_null_fidelity_arm(monkeypatch, tmp_path):
     assert rec is not None
     assert rec["fidelity"] is None
     assert isinstance(rec["review"], dict)
-    assert isinstance(rec["body_check"], dict)
 
 
 def test_remediated_fidelity_writes_null_fidelity_arm(monkeypatch, tmp_path):
@@ -236,7 +213,6 @@ def test_remediated_fidelity_writes_null_fidelity_arm(monkeypatch, tmp_path):
     assert rec is not None
     assert rec["fidelity"] is None
     assert isinstance(rec["review"], dict)
-    assert isinstance(rec["body_check"], dict)
 
 
 def test_failed_run_leaves_prior_record_untouched(monkeypatch, tmp_path):

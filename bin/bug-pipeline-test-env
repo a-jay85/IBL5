@@ -87,6 +87,16 @@ if [ "$MODE" = "up" ]; then
     [ -n "${APPROVER:-}" ] || { echo "BUG_PIPELINE_APPROVER_ID unset or empty in $SECRETS" >&2; exit 1; }
     case "${APPROVER}" in REPLACE_WITH_*) echo "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
 
+    # The test bot reads BUG_OPERATOR_DISCORD_ID straight from this file. A placeholder or
+    # empty value starts cleanly and never routes a wake. The E2E wake cases also need the
+    # app base URL and API key, so read all three here and export them below.
+    env_val() { grep -E "^$1=" "$SECRETS" | tail -1 | cut -d= -f2- | tr -d '"'"'"' '; }
+    OPERATOR="$(env_val BUG_OPERATOR_DISCORD_ID)"
+    [ -n "${OPERATOR:-}" ] || { echo "BUG_OPERATOR_DISCORD_ID unset or empty in $SECRETS" >&2; exit 1; }
+    case "${OPERATOR}" in REPLACE_WITH_*) echo "BUG_OPERATOR_DISCORD_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
+    API_BASE="$(env_val BUG_PIPELINE_API_BASE_URL)"
+    API_KEY_VAL="$(env_val API_KEY)"
+
     # Step 2.3 — Create scratch DB and load the bug-pipeline migrations via bin/db-migrate.
     # db-migrate globs every *.sql in a dir, so we point it at a staging dir holding
     # only these — that gives us schema_migrations tracking + skip-if-applied.
@@ -193,7 +203,9 @@ export BUG_PIPELINE_SCRIPTS_DIR="${REPO_ROOT}/ibl5/scripts/bug-pipeline"
 export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="/tmp/bug-pipeline-test-attachments"
 export BUG_PIPELINE_HUNT_LOG="/tmp/bug-pipeline-test-hunt.log"
 export BUG_PIPELINE_APPROVER_ID="${APPROVER}"
-export BUG_OPERATOR_DISCORD_ID="${APPROVER}"
+export BUG_OPERATOR_DISCORD_ID="${OPERATOR}"
+export BUG_PIPELINE_API_BASE_URL="${API_BASE}"
+export API_KEY="${API_KEY_VAL}"
 export BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bug-pipeline-test-tick-heartbeat"
 export BUG_PIPELINE_CI_AUTOFIX_ENABLED="0"
 export BUG_PIPELINE_CI_AUTOFIX_LEDGER="/tmp/bug-pipeline-test-ci-autofix-ledger.json"

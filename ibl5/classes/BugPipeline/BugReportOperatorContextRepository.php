@@ -18,8 +18,10 @@ class BugReportOperatorContextRepository extends \Database\BaseMysqliRepository
     private const MAX_CONTENT_CHARS = 4000;
 
     /**
-     * Append one operator message. INSERT IGNORE against UNIQUE (discord_message_id): a replayed
-     * wake call inserts nothing. Returns true only when a new row was written.
+     * Append one operator message. ON DUPLICATE KEY UPDATE against UNIQUE (discord_message_id): a
+     * replayed wake call changes nothing (0 affected rows). Unlike INSERT IGNORE it does not
+     * downgrade FK, truncation, or bad-value errors to warnings; those still throw.
+     * Returns true only when a new row was written.
      *
      * Snowflakes bind 's' (never int-cast). bug_report_id is the local AUTO_INCREMENT id.
      */
@@ -27,9 +29,10 @@ class BugReportOperatorContextRepository extends \Database\BaseMysqliRepository
     {
         $content = mb_substr($content, 0, self::MAX_CONTENT_CHARS);
         return $this->execute(
-            'INSERT IGNORE INTO `ibl_bug_report_operator_context`
+            'INSERT INTO `ibl_bug_report_operator_context`
                 (bug_report_id, discord_message_id, discord_author_id, content, created_at)
-             VALUES (?, ?, ?, ?, NOW())',
+             VALUES (?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE discord_message_id = discord_message_id',
             'isss',
             $reportId,
             $messageId,

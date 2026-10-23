@@ -45,6 +45,8 @@
 #   PR_CYCLE_READY_CMD       Path to the ready tool.          Default: bin/post-plan-fleet
 #   PR_CYCLE_DM_CMD          Path to the notifier.            Default: bin/discord-dm
 #   PR_CYCLE_GH_CMD          The gh binary.                   Default: gh
+#   PR_CYCLE_UNKNOWN_POLLS   UNKNOWN warm-up rounds, 0 = off. Default: 4
+#   PR_CYCLE_UNKNOWN_SLEEP   Seconds between warm-up rounds.  Default: 20
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
 #   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
@@ -118,7 +120,8 @@
 #   * Arming is exactly one call to the triage tool, with no added flags. This script never
 #     judges eligibility, never widens a bucket, never relaxes a human sign-off, and never
 #     sources or reimplements the armable library.
-#   * This script never polls for merges and never sleeps. .github/workflows/update-behind-prs.yml
+#   * This script never polls for merges. Its only sleep is the bounded UNKNOWN warm-up in
+#     _unknown_warmup (at most 120s). .github/workflows/update-behind-prs.yml
 #     re-BEHINDs open PRs after each merge, and merge-digest-notify.yml sends the per-merge
 #     digest DM. This script's only DM is the your-turn summary at the end of a run.
 #   * Stage 1 is exactly one post-plan-fleet --pr-list call. The call carries
@@ -176,6 +179,8 @@ PR_CYCLE_PATCH_ID_CMD="${PR_CYCLE_PATCH_ID_CMD:-}"
 PR_CYCLE_HARNESS_OUT="${PR_CYCLE_HARNESS_OUT:-$ROOT/tools/postplan-harness/out}"
 PR_CYCLE_FLEET_LOG_DIR="${PR_CYCLE_FLEET_LOG_DIR:-/tmp}"
 PR_CYCLE_SKIP_HELD_UNCHANGED="${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}"
+PR_CYCLE_UNKNOWN_POLLS="${PR_CYCLE_UNKNOWN_POLLS:-4}"   # warm-up rounds; 0 = off
+PR_CYCLE_UNKNOWN_SLEEP="${PR_CYCLE_UNKNOWN_SLEEP:-20}"  # seconds between rounds
 PR_CYCLE_REBASE_ONLY_HELD="${PR_CYCLE_REBASE_ONLY_HELD:-1}"
 PR_CYCLE_HOLDREPEAT_HARNESS="${PR_CYCLE_HOLDREPEAT_HARNESS:-$PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness}"
 PR_CYCLE_HOLDREPEAT_STATE_DIR="${PR_CYCLE_HOLDREPEAT_STATE_DIR:-$PR_CYCLE_HOLDREPEAT_HARNESS/out/state}"
@@ -260,6 +265,16 @@ if [ "$GO" = "1" ] && [ "$STOP" = "1" ]; then usage >&2; exit 2; fi
 # Refused rather than merged: `--only 101 --skip 101` has no honest reading, and the
 # --go/--stop line above is this file's existing precedent for refusing over picking.
 if [ -n "$ONLY" ] && [ -n "$SKIP" ]; then usage >&2; exit 2; fi
+for _uv in PR_CYCLE_UNKNOWN_POLLS PR_CYCLE_UNKNOWN_SLEEP; do
+    case "${!_uv}" in
+        *[!0-9]*|0[0-9]*) echo "pr-cycle: $_uv must be a non-negative integer, got '${!_uv}'" >&2; exit 2 ;;
+    esac
+done
+if [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] \
+    && [ $(( (PR_CYCLE_UNKNOWN_POLLS - 1) * PR_CYCLE_UNKNOWN_SLEEP )) -gt 120 ]; then
+    echo "pr-cycle: UNKNOWN warm-up would wait over 120s (PR_CYCLE_UNKNOWN_POLLS x PR_CYCLE_UNKNOWN_SLEEP)" >&2
+    exit 2
+fi
 
 # --- --stop ------------------------------------------------------------------------------
 # Handled before every other guard so it works from any cwd, including a worktree.
@@ -1074,6 +1089,24 @@ _fleet_outcome() {
     printf '%s\t%s\n' "$_fo_o" "$_fo_r"
 }
 
+# _stage1_outcome PR — the outcome the end-of-run REPORT shows: "skipped\t<reason>" when
+# post-plan-fleet skipped the PR this run, else _fleet_outcome. Report-only: the v1 result
+# file keeps raw _fleet_outcome (bin/pr-cycle-tick's settle_row reads that vocabulary).
+_stage1_outcome() {
+    local _so_m
+    _so_m="$(awk -F'\t' -v n="$1" '$1 == n { m = $2 } END { if (m != "") print m }' \
+        "$RUNDIR/fleet-skips.tsv" 2>/dev/null || true)"
+    if [ -n "$_so_m" ]; then printf 'skipped\t%s\n' "$_so_m"; return 0; fi
+    _fleet_outcome "$1"
+}
+
+# _stage1_skip_count — how many stage1.txt PRs the fleet skipped this run.
+_stage1_skip_count() {
+    if [ ! -s "$RUNDIR/fleet-skips.tsv" ] || [ ! -s "$RUNDIR/stage1.txt" ]; then echo 0; return 0; fi
+    awk -F'\t' 'NR == FNR { s[$1] = 1; next } ($1 in s) { c++ } END { print c + 0 }' \
+        "$RUNDIR/fleet-skips.tsv" "$RUNDIR/stage1.txt"
+}
+
 # _stage1_outcome_summary — read per-PR outcome lines from post-plan-fleet logs and
 # return a summary, e.g. "shipped 1, held 2, rebased 0, declined 0, paused 0, conflict 1,
 # failed 3, timed out 1". A PR with no outcome line counts as failed.
@@ -1083,7 +1116,7 @@ _stage1_outcome_summary() {
     local _s_shipped=0 _s_held=0 _s_rebased=0 _s_declined=0 _s_paused=0 _s_conflict=0 _s_failed=0 _s_timed=0
     local _s_pr _s_outcome _s_reason
     while IFS= read -r _s_pr; do
-        IFS=$'\t' read -r _s_outcome _s_reason <<< "$(_fleet_outcome "$_s_pr")"
+        IFS=$'\t' read -r _s_outcome _s_reason <<< "$(_stage1_outcome "$_s_pr")"
         case "$_s_outcome" in
             shipped)   _s_shipped=$(( _s_shipped + 1 )) ;;
             held)      _s_held=$(( _s_held + 1 )) ;;
@@ -1092,6 +1125,7 @@ _stage1_outcome_summary() {
             paused)    _s_paused=$(( _s_paused + 1 )) ;;
             conflict)  _s_conflict=$(( _s_conflict + 1 )) ;;
             timed-out) _s_timed=$(( _s_timed + 1 )) ;;
+            skipped)   continue ;;
             *)         _s_failed=$(( _s_failed + 1 )) ;;
         esac
     done < "$RUNDIR/stage1.txt"
@@ -1105,7 +1139,7 @@ _stage1_result_lines() {
     local _rl_pr _rl_outcome _rl_reason
     if [ -n "${READIED:-}" ] && [ -s "$RUNDIR/stage1.txt" ]; then
         while IFS= read -r _rl_pr; do
-            IFS=$'\t' read -r _rl_outcome _rl_reason <<< "$(_fleet_outcome "$_rl_pr")"
+            IFS=$'\t' read -r _rl_outcome _rl_reason <<< "$(_stage1_outcome "$_rl_pr")"
             echo "#$_rl_pr $_rl_outcome${_rl_reason:+ $_rl_reason}"
         done < "$RUNDIR/stage1.txt"
     fi
@@ -1141,6 +1175,7 @@ _stage1_result_file() {
                 _rf_status=holdrepeat; _rf_o="-"; _rf_r="-"
             elif [ -n "$STAGE1_FIRED" ] && grep -qxF -- "$_rf_pr" "$RUNDIR/stage1.txt" 2>/dev/null; then
                 _rf_status=fired
+                # Raw _fleet_outcome on purpose: "skipped" is report-only; v1 rows keep their vocabulary.
                 IFS=$'\t' read -r _rf_o _rf_r <<< "$(_fleet_outcome "$_rf_pr")"
                 _rf_r="$(printf '%s' "$_rf_r" | tr '\t\n' '  ')"
                 [ -n "$_rf_r" ] || _rf_r="-"
@@ -1152,6 +1187,22 @@ _stage1_result_file() {
         done < "$_rf_scope"
     } > "$_rf_tmp" || return 1
     mv -f "$_rf_tmp" "$PR_CYCLE_RESULT_FILE"
+}
+
+# _fleet_skips_build — one "<pr>\t<reason>" row per post-plan-fleet skip-table row in
+# ready.out (`<pr>  <branch>  <pre>  SKIP (<msg>)`). The fleet writes no per-PR log for a
+# skipped PR, so without this the PR reads as failed/no-log. A skip row beats any log:
+# a log for a skipped PR can only be stale scratch from an earlier run.
+_fleet_skips_build() {
+    : > "$RUNDIR/fleet-skips.tsv"
+    [ -f "$RUNDIR/ready.out" ] || return 0
+    awk '$1 ~ /^#?[0-9]+$/ && match($0, / SKIP \(.*\)$/) {
+        n = $1; sub(/^#/, "", n)
+        m = substr($0, RSTART + 7, RLENGTH - 8)
+        sub(/( —|;) skipped$/, "", m)
+        if (m ~ /bot- or other-authored/) m = "bot"
+        printf "%s\t%s\n", n, m
+    }' "$RUNDIR/ready.out" > "$RUNDIR/fleet-skips.tsv" || true
 }
 
 # _stage1_fire — run post-plan-fleet with the stage1.txt list. Returns 0 on empty or
@@ -1178,6 +1229,7 @@ _stage1_fire() {
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
+    _fleet_skips_build
     cat "$RUNDIR/ready.out" || true
     cat "$RUNDIR/ready.err" >&2 || true
     if [ "$_rc" -ne 0 ]; then
@@ -1189,7 +1241,47 @@ _stage1_fire() {
 
 # _arm_and_classify — the one arming call, then parse every PR's bucket from the report.
 # Sets ARMED and LEFT. Returns non-zero (with HALT set) only on an unusable report.
+# >>> unknown-warmup: the only sleep in bin/pr-cycle
+# _unknown_warmup — poll PRs whose mergeStateStatus may still be UNKNOWN until each
+# settles or the rounds run out, so the single --arm triage call sees settled states.
+# Candidates: every PR stage 1 just fired (a fleet push resets GitHub's computation) plus
+# precheck rows triage marked "re-check (state unknown)". Read-only; never arms.
+# One gh pr view per still-UNKNOWN PR per round, one sleep per round, stop when none left.
+# A failed gh call counts as still UNKNOWN. Field order keeps `--json state` out of the
+# argv (the merge-poll guard g_no_poll and the shim's state arm both key on it).
+_unknown_warmup() {
+    local _uw_round=1 _uw_n _uw_s
+    [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] || return 0
+    : > "$RUNDIR/unknown-poll.txt"
+    if [ -f "$RUNDIR/precheck.txt" ]; then
+        awk -F"  +" '$1 ~ /^#[0-9]+$/ { a = $3; sub(/ +$/, "", a)
+            if (a == "re-check (state unknown)") { sub(/^#/, "", $1); print $1 } }' \
+            "$RUNDIR/precheck.txt" >> "$RUNDIR/unknown-poll.txt" || true
+    fi
+    [ -f "$RUNDIR/stage1.txt" ] && cat "$RUNDIR/stage1.txt" >> "$RUNDIR/unknown-poll.txt"
+    sort -un -o "$RUNDIR/unknown-poll.txt" "$RUNDIR/unknown-poll.txt" || true
+    while [ -s "$RUNDIR/unknown-poll.txt" ]; do
+        : > "$RUNDIR/unknown-left.txt"
+        while IFS= read -r _uw_n; do
+            [ -n "$_uw_n" ] || continue
+            if _uw_s="$("$PR_CYCLE_GH_CMD" pr view "$_uw_n" --json mergeStateStatus,mergeable,state \
+                    --jq 'select(.state == "OPEN") | .mergeStateStatus' 2>/dev/null)"; then
+                [ "$_uw_s" != "UNKNOWN" ] && continue
+            fi
+            echo "$_uw_n" >> "$RUNDIR/unknown-left.txt"
+        done < "$RUNDIR/unknown-poll.txt"
+        mv -f "$RUNDIR/unknown-left.txt" "$RUNDIR/unknown-poll.txt"
+        [ -s "$RUNDIR/unknown-poll.txt" ] || return 0
+        [ "$_uw_round" -lt "$PR_CYCLE_UNKNOWN_POLLS" ] || return 0
+        _uw_round=$(( _uw_round + 1 ))
+        sleep "$PR_CYCLE_UNKNOWN_SLEEP"
+    done
+    return 0
+}
+# <<< unknown-warmup
+
 _arm_and_classify() {
+    _unknown_warmup || true
 
     # A second, separate stop check: readying can take an hour, so the top-of-loop check
     # is far too stale to gate the side effect that follows.
@@ -1331,15 +1423,26 @@ _your_turn_lines() {
     set -e
     [ "$_yl_rc" -ne 0 ] && : > "$RUNDIR/prlist.tsv"
 
+    rm -f "$RUNDIR/yt-computing.txt"
     rm -f "$RUNDIR"/yt-g[1-4].txt
     awk -F'\t' -v d="$RUNDIR" 'NF {
-        b = $2
+        b = $2; a = $3; sub(/ +$/, "", a)
+        if (b == "NOT-MERGEABLE" && a == "re-check (state unknown)") { print > (d "/yt-computing.txt"); next }
         g = (b == "DIRTY" || b == "NOT-MERGEABLE") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
         print > (d "/yt-g" g ".txt") }' "$RUNDIR/your-turn.txt" || true
 
     _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
     _yt_shown=0
     _yt_running=0
+    if [ -s "$RUNDIR/yt-computing.txt" ]; then
+        _yc_n="$(wc -l < "$RUNDIR/yt-computing.txt" | tr -d ' ')"
+        _yc_prs="$(cut -f1 "$RUNDIR/yt-computing.txt" | sed 's/^/#/' | paste -sd, - | sed 's/,/, /g')"
+        if [ "$_yc_n" -eq 1 ]; then _yc_noun="PR"; else _yc_noun="PRs"; fi
+        _yc_line="- $_yc_n $_yc_noun still computing (GitHub merge state UNKNOWN): $_yc_prs"
+        echo "$_yc_line"
+        _yt_running=$((_yt_running + ${#_yc_line} + 1))
+        _yt_shown=$((_yt_shown + _yc_n))
+    fi
     for _yg in 1 2 3 4; do
         [ -s "$RUNDIR/yt-g$_yg.txt" ] || continue
         case "$_yg" in
@@ -1361,7 +1464,7 @@ _your_turn_lines() {
             _ynote="$(awk -F'\t' -v n="$_yn" '$1 == n { print $3; exit }' "$RUNDIR/skip-notes.tsv" 2>/dev/null || true)"
             [ -n "$_ynote" ] && _yact="$_yact (skipped: $_ynote)"
             if grep -qxF "$_yn" "$RUNDIR/stage1.txt" 2>/dev/null; then
-                _yact="$_yact (rescue: $(_fleet_outcome "$_yn" | cut -f1))"
+                _yact="$_yact (rescue: $(_stage1_outcome "$_yn" | cut -f1))"
             fi
             _row="$(awk -F'\t' -v n="$_yn" '$1 == n { print; exit }' "$RUNDIR/prlist.tsv" 2>/dev/null || true)"
             if [ -n "$_row" ]; then
@@ -1432,7 +1535,11 @@ _worker() {
     _stage1_result_lines
     _stage1_result_file || echo "pr-cycle: WARN result file write failed: $PR_CYCLE_RESULT_FILE" >&2
     _OUTCOME_SUMMARY="$(_stage1_outcome_summary)"
-    _FIRED_SUMMARY="${READIED:+fired $READIED (${_OUTCOME_SUMMARY})}"
+    _SKIPPED="$(_stage1_skip_count)"
+    _FIRED_SUMMARY="${READIED:+fired $(( READIED - _SKIPPED )) (${_OUTCOME_SUMMARY})}"
+    if [ -n "${READIED:-}" ] && [ "$_SKIPPED" -gt 0 ]; then
+        _FIRED_SUMMARY="$_FIRED_SUMMARY, skipped $_SKIPPED"
+    fi
     _FIRED_SUMMARY="${_FIRED_SUMMARY:-fired 0}"
     echo "pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason"
 

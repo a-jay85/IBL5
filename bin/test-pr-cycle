@@ -113,6 +113,7 @@ case "\$*" in
         [[ -f "\$S/gh-fail-prlist" ]] && exit 5
         [[ -f "\$S/prlist.tsv" ]] && cat "\$S/prlist.tsv" ;;
     *"pr view"*"--json mergeStateStatus,mergeable"*)
+        [[ -f "\$S/gh-fail-view" ]] && exit 5
         # Replays mss-<num>, one line per call; the last line repeats.
         # Records the value served in mss-last-<num> so a triage hook can see "GitHub state".
         k=0; [[ -f "\$S/mss-\$num.n" ]] && k=\$(cat "\$S/mss-\$num.n"); k=\$((k + 1))
@@ -282,7 +283,61 @@ install_sleep_shim() {
     chmod +x "$BIN/sleep"; : > "$SCRATCH/sleep.argv"
 }
 remove_sleep_shim() { rm -f "$BIN/sleep"; }
+# install_triage_hook PR...: on an --arm call, a PR whose last served mergeStateStatus is CLEAN
+# is ARMABLE and every other PR is UNKNOWN; a plain call replays $S/triage-src-pre.
+install_triage_hook() {
+    local _p
+    {   printf '%s\n' 'if [[ "$*" == *--arm* ]]; then'
+        printf '%s\n' "  { printf '%-8s %-18s %-24s\\n' PR# BUCKET NEXT-ACTION"
+        for _p in "$@"; do
+            printf '%s\n' "    if [[ \"\$(cat \"\$S/mss-last-$_p\" 2>/dev/null)\" == CLEAN ]]; then"
+            printf '%s\n' "      printf '%-8s %-18s %s\\n' '#$_p' ARMABLE armed"
+            printf '%s\n' "    else printf '%-8s %-18s %s\\n' '#$_p' NOT-MERGEABLE 're-check (state unknown)'; fi"
+        done
+        printf '%s\n' '  } > "$S/triage-out"'
+        printf '%s\n' 'elif [[ -f "$S/triage-src-pre" ]]; then cp "$S/triage-src-pre" "$S/triage-out"; fi'
+    } > "$SCRATCH/triage-hook"
+}
+# unk_setup PR...: stage 1 fires every PR; the plain precheck call lists them all NEEDS-WORK.
+unk_setup() {
+    local _p _atk _i=0 _prl=()
+    reset_state
+    _atk='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+'
+    for _p in "$@"; do
+        _i=$((_i + 1)); _atk+="| $_i | #$_p slug-$_p | none | no |"$'\n'
+        _prl+=("$_p NEEDS-WORK rebase")
+    done
+    printf '%s' "$_atk" > "$SCRATCH/attack-out"
+    triage_report "${_prl[@]}" > "$SCRATCH/triage-src-pre"
+    install_triage_hook "$@"
+    install_sleep_shim
+}
+# Sleep lines recorded by the sleep shim (0 when none).
+sleeps() { wc -l < "$SCRATCH/sleep.argv" | tr -d ' '; }
 view_calls() { grep -c -- "pr view $1 --json mergeStateStatus,mergeable" "$SCRATCH/gh.argv" || true; }
+# fsk_setup PR...: stage 1 fires/skips these PRs; each has a NEEDS-WORK row; fleetlogs is empty.
+fsk_setup() {
+    local _p _atk _i=0
+    reset_state
+    _atk='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+'
+    : > "$SCRATCH/triage-out"
+    for _p in "$@"; do
+        _i=$((_i + 1))
+        _atk+="| $_i | #$_p slug-$_p | none | no |"$'\n'
+    done
+    printf '%s' "$_atk" > "$SCRATCH/attack-out"
+    triage_report "${@/%/ NEEDS-WORK rebase}" > "$SCRATCH/triage-out"
+    rm -rf "$SCRATCH/fleetlogs" "$SCRATCH/res"; mkdir -p "$SCRATCH/fleetlogs"
+}
+
 
 # Two distinct 40-hex tree SHAs. TREE_A is "the tree /pr-ready reviewed"; TREE_B is any
 # other tree, used to stage the stale-verdict case.
@@ -346,7 +401,7 @@ reset_state() {
           "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict \
           "$SCRATCH"/prlist.tsv "$SCRATCH"/gh-fail-prlist \
           "$SCRATCH"/armed-state.json "$SCRATCH"/gh-fail-armed \
-          "$SCRATCH"/patchid-*.txt "$SCRATCH"/mss-* "$SCRATCH"/sleep.argv
+          "$SCRATCH"/patchid-*.txt "$SCRATCH"/mss-* "$SCRATCH"/sleep.argv "$SCRATCH"/gh-fail-view
     rm -rf "$SCRATCH/harness-out"
     rm -f "$BIN/sleep"
     rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
@@ -370,6 +425,8 @@ run_in() {
     [[ -n "${SKIPARM+x}" ]]   && extra+=("PR_CYCLE_SKIP_READY_WHEN_ARMABLE=$SKIPARM")
     [[ -n "${AUTHPROBE+x}" ]] && extra+=("PR_CYCLE_AUTH_PROBE_CMD=$AUTHPROBE")
     [[ -n "${SKIPHELD+x}" ]]  && extra+=("PR_CYCLE_SKIP_HELD_UNCHANGED=$SKIPHELD")
+    [[ -n "${UPOLLS+x}" ]]    && extra+=("PR_CYCLE_UNKNOWN_POLLS=$UPOLLS")
+    [[ -n "${USLEEP+x}" ]]    && extra+=("PR_CYCLE_UNKNOWN_SLEEP=$USLEEP")
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
@@ -701,19 +758,10 @@ _ln_fin="$(grep -n 'pr-cycle finished' <<< "$OUT" | head -1 | cut -d: -f1)"
 end_case "case 11c all outcome buckets"
 
 # ==========================================================================================
-# fleet-skip-baseline — a fleet-skipped (bot-authored) PR has no log; characterize its report
+# fleet-skip-* — a fleet-skipped PR writes no log; the report shows it as skipped, not failed
 # ==========================================================================================
 begin_case
-reset_state
-printf '%s' '# Plan of attack
-
-| # | PR | Constraint | Needs you? |
-|---|----|-----------|------------|
-| 1 | #101 first-slug | none | no |
-| 2 | #3478 bot-slug | none | no |
-' > "$SCRATCH/attack-out"
-triage_report "101 NEEDS-WORK rebase" "3478 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
-rm -rf "$SCRATCH/fleetlogs" "$SCRATCH/res"; mkdir -p "$SCRATCH/fleetlogs"
+fsk_setup 101 3478
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
 # 3478 is skipped by the fleet, so it has no log at all.
 {   printf '%-6s %-34s %s %s\n' 101 first-slug '—' 'WOULD FIRE'
@@ -721,15 +769,187 @@ echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-10
 } > "$SCRATCH/ready-out"
 PR_CYCLE_RESULT_FILE="$SCRATCH/res/result.tsv" run --worker
 [[ $RC -eq 0 ]] || fail "fleet-skip-baseline: exit $RC, want 0"
-grep -qxF '#3478 failed no-log' <<< "$OUT" || fail "fleet-skip-baseline: '#3478 failed no-log' missing (out: $OUT)"
-_want_fsb='fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
+grep -qxF '#3478 skipped bot' <<< "$OUT" || fail "fleet-skip-baseline: '#3478 skipped bot' missing (out: $OUT)"
+_want_fsb='fired 1 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 0, timed out 0), skipped 1'
 grep -qF "$_want_fsb" <<< "$OUT" || fail "fleet-skip-baseline: finish line lacks '$_want_fsb' (out: $OUT)"
+grep -qF "$_want_fsb" "$SCRATCH/dm.argv" || fail "fleet-skip-baseline: DM lacks '$_want_fsb'"
+_full_fsb="pr-cycle finished — $_want_fsb, armed 0, your turn 2 — done"
+grep -qF "$_full_fsb" <<< "$OUT" || fail "fleet-skip-baseline: stdout finish line is not '$_full_fsb' (out: $OUT)"
+grep -qF "$_full_fsb" "$SCRATCH/dm.argv" || fail "fleet-skip-baseline: DM body lacks '$_full_fsb'"
 [[ "$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)" == "$(printf '3478\tfired\tfailed\tno-log')" ]] \
     || fail "fleet-skip-baseline: result row is '$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)'"
 end_case "fleet-skip-baseline"
 
+# A stale log from an earlier run loses to this run's SKIP row.
+begin_case
+fsk_setup 101 3478
+echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-3478.log"
+fleet_skip_row 3478 'bot- or other-authored — skipped' > "$SCRATCH/ready-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "fleet-skip-stale-log: exit $RC, want 0"
+grep -qxF '#3478 skipped bot' <<< "$OUT" || fail "fleet-skip-stale-log: '#3478 skipped bot' missing (out: $OUT)"
+grep -qF 'fired 1 (shipped 1,' <<< "$OUT" || fail "fleet-skip-stale-log: want shipped 1 (101 only) (out: $OUT)"
+end_case "fleet-skip-stale-log"
+
+# A fired PR with no log and no SKIP row is still a real failure.
+begin_case
+fsk_setup 101 103 3478
+echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+fleet_skip_row 3478 'bot- or other-authored — skipped' > "$SCRATCH/ready-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "fleet-skip-real-failure: exit $RC, want 0"
+grep -qxF '#103 failed no-log' <<< "$OUT" || fail "fleet-skip-real-failure: '#103 failed no-log' missing (out: $OUT)"
+grep -qF 'fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0), skipped 1' <<< "$OUT" \
+    || fail "fleet-skip-real-failure: summary wrong (out: $OUT)"
+end_case "fleet-skip-real-failure"
+
+# Non-bot SKIP reasons keep their text.
+begin_case
+fsk_setup 104 105
+{   fleet_skip_row 104 'no worktree'
+    fleet_skip_row 105 'already running — skipped'
+} > "$SCRATCH/ready-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "fleet-skip-other-reason: exit $RC, want 0"
+grep -qxF '#104 skipped no worktree' <<< "$OUT" || fail "fleet-skip-other-reason: '#104 skipped no worktree' missing (out: $OUT)"
+grep -qxF '#105 skipped already running' <<< "$OUT" || fail "fleet-skip-other-reason: '#105 skipped already running' missing (out: $OUT)"
+end_case "fleet-skip-other-reason"
+
+# The parser keys on a numeric first field and a trailing SKIP (...); a note line and a fired row are out.
+begin_case
+fsk_setup 101 3478
+{   printf 'note: see SKIP (bot- or other-authored — skipped)\n'
+    printf '%-6s %-34s %s %s\n' 101 branch-x '—' fired
+    fleet_skip_row 3478 'bot- or other-authored — skipped'
+} > "$SCRATCH/ready-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "fleet-skip-parse-filter: exit $RC, want 0"
+[[ "$(cat "$(rundir)/fleet-skips.tsv" 2>/dev/null)" == "$(printf '3478\tbot')" ]] \
+    || fail "fleet-skip-parse-filter: fleet-skips.tsv is '$(cat "$(rundir)/fleet-skips.tsv" 2>/dev/null)'"
+end_case "fleet-skip-parse-filter"
+
 # ==========================================================================================
-# your-turn-unknown-baseline — three NOT-MERGEABLE rows each render as their own DM row
+# unknown-warmup-* — bounded pre-arm re-poll of UNKNOWN merge states
+# ==========================================================================================
+begin_case
+unk_setup 101
+printf 'UNKNOWN\nCLEAN\n' > "$SCRATCH/mss-101"
+run --worker
+[[ $RC -eq 0 ]] || fail "unknown-warmup-resolves: exit $RC, want 0"
+[[ "$(view_calls 101)" == 2 ]] || fail "unknown-warmup-resolves: views $(view_calls 101), want 2"
+[[ "$(cat "$SCRATCH/sleep.argv")" == "20" ]] || fail "unknown-warmup-resolves: sleep.argv is '$(cat "$SCRATCH/sleep.argv")'"
+[[ "$(arm_calls)" == 1 ]] || fail "unknown-warmup-resolves: arm_calls $(arm_calls), want 1"
+grep -q '^101' "$(rundir)/your-turn.txt" && fail "unknown-warmup-resolves: #101 still listed in your-turn.txt"
+remove_sleep_shim
+end_case "unknown-warmup-resolves"
+
+begin_case
+unk_setup 101 102 103
+for _n in 101 102 103; do printf 'UNKNOWN\n' > "$SCRATCH/mss-$_n"; done
+UPOLLS=3 run --worker
+unset UPOLLS
+[[ $RC -eq 0 ]] || fail "unknown-warmup-bounded: exit $RC, want 0"
+for _n in 101 102 103; do
+    [[ "$(view_calls $_n)" == 3 ]] || fail "unknown-warmup-bounded: views for $_n $(view_calls $_n), want 3"
+done
+[[ "$(sleeps)" == 2 ]] || fail "unknown-warmup-bounded: sleeps $(sleeps), want 2"
+[[ "$(arm_calls)" == 1 ]] || fail "unknown-warmup-bounded: arm_calls $(arm_calls), want 1"
+remove_sleep_shim
+end_case "unknown-warmup-bounded"
+
+begin_case
+unk_setup 101
+printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
+run --worker
+[[ "$(view_calls 101)" == 4 ]] || fail "unknown-warmup-defaults-unset: views $(view_calls 101), want 4"
+[[ "$(sleeps)" == 3 && "$(sort -u "$SCRATCH/sleep.argv")" == "20" ]] \
+    || fail "unknown-warmup-defaults-unset: sleeps $(sleeps) / '$(sort -u "$SCRATCH/sleep.argv")'"
+remove_sleep_shim
+end_case "unknown-warmup-defaults-unset"
+
+begin_case
+unk_setup 101
+printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
+UPOLLS='' USLEEP='' run --worker
+unset UPOLLS USLEEP
+[[ "$(view_calls 101)" == 4 ]] || fail "unknown-warmup-defaults-empty: views $(view_calls 101), want 4"
+[[ "$(sleeps)" == 3 && "$(sort -u "$SCRATCH/sleep.argv")" == "20" ]] \
+    || fail "unknown-warmup-defaults-empty: sleeps $(sleeps) / '$(sort -u "$SCRATCH/sleep.argv")'"
+remove_sleep_shim
+end_case "unknown-warmup-defaults-empty"
+
+begin_case
+unk_setup 101
+printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
+UPOLLS=0 run --worker
+unset UPOLLS
+[[ "$(view_calls 101)" == 0 ]] || fail "unknown-warmup-off: views $(view_calls 101), want 0"
+[[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-off: sleeps $(sleeps), want 0"
+remove_sleep_shim
+end_case "unknown-warmup-off"
+
+begin_case
+unk_setup 101
+{   triage_report "101 NEEDS-WORK rebase"
+    triage_row 201 NOT-MERGEABLE 're-check (state unknown)'
+} > "$SCRATCH/triage-src-pre"
+printf 'CLEAN\n' > "$SCRATCH/mss-201"
+run --worker --only 101
+[[ -f "$(rundir)/precheck.txt" ]] || fail "unknown-warmup-precheck-source: precheck.txt missing"
+[[ "$(view_calls 201)" == 1 ]] || fail "unknown-warmup-precheck-source: views for 201 $(view_calls 201), want 1"
+[[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-precheck-source: sleeps $(sleeps), want 0"
+remove_sleep_shim
+end_case "unknown-warmup-precheck-source"
+
+begin_case
+unk_setup 101
+run --worker
+[[ "$(view_calls 101)" == 1 ]] || fail "unknown-warmup-none: views $(view_calls 101), want 1"
+[[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-none: sleeps $(sleeps), want 0"
+remove_sleep_shim
+end_case "unknown-warmup-none"
+
+begin_case
+unk_setup 101
+touch "$SCRATCH/gh-fail-view"
+UPOLLS=2 run --worker
+unset UPOLLS
+[[ $RC -eq 0 ]] || fail "unknown-warmup-gh-fail: exit $RC, want 0"
+[[ "$(sleeps)" == 1 ]] || fail "unknown-warmup-gh-fail: sleeps $(sleeps), want 1"
+[[ "$(arm_calls)" == 1 ]] || fail "unknown-warmup-gh-fail: arm_calls $(arm_calls), want 1"
+grep -qF ' — done' <<< "$OUT" || fail "unknown-warmup-gh-fail: finished line does not end '— done' (out: $OUT)"
+remove_sleep_shim
+end_case "unknown-warmup-gh-fail"
+
+begin_case
+unk_setup 101
+UPOLLS=abc run --worker
+[[ $RC -eq 2 && "$(arm_calls)" == 0 ]] || fail "unknown-env-reject: abc rc=$RC arm_calls=$(arm_calls)"
+grep -qF 'pr-cycle: PR_CYCLE_UNKNOWN_POLLS must be a non-negative integer' "$ERR" \
+    || fail "unknown-env-reject: abc stderr: $(cat "$ERR")"
+UPOLLS=08 run --worker
+[[ $RC -eq 2 && "$(arm_calls)" == 0 ]] || fail "unknown-env-reject: 08 rc=$RC arm_calls=$(arm_calls)"
+grep -qF 'pr-cycle: PR_CYCLE_UNKNOWN_POLLS must be a non-negative integer' "$ERR" \
+    || fail "unknown-env-reject: 08 stderr: $(cat "$ERR")"
+UPOLLS=4 USLEEP=61 run --worker
+[[ $RC -eq 2 && "$(arm_calls)" == 0 ]] || fail "unknown-env-reject: 4x61 rc=$RC arm_calls=$(arm_calls)"
+grep -qF 'pr-cycle: UNKNOWN warm-up would wait over 120s' "$ERR" \
+    || fail "unknown-env-reject: 4x61 stderr: $(cat "$ERR")"
+unset UPOLLS USLEEP
+remove_sleep_shim
+end_case "unknown-env-reject"
+
+begin_case
+unk_setup 101
+printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
+run --dry-run
+[[ "$(view_calls 101)" == 0 ]] || fail "unknown-warmup-dry-run: views $(view_calls 101), want 0"
+remove_sleep_shim
+end_case "unknown-warmup-dry-run"
+
+# ==========================================================================================
+# your-turn-unknown-* — still-UNKNOWN NOT-MERGEABLE rows collapse into one line
 # ==========================================================================================
 begin_case
 reset_state
@@ -738,14 +958,60 @@ printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
     triage_row 202 NOT-MERGEABLE 're-check (state unknown)'
     triage_row 203 NOT-MERGEABLE 'resolve conflicts'
 } > "$SCRATCH/triage-out"
-run --worker
+UPOLLS=0 run --worker
+unset UPOLLS
 [[ $RC -eq 0 ]] || fail "your-turn-unknown-baseline: exit $RC, want 0"
-_dm="$(cat "$SCRATCH/dm.argv")"
-for _n in 201 202 203; do
-    grep -qF "#$_n — NOT-MERGEABLE — " <<< "$_dm" \
-        || fail "your-turn-unknown-baseline: row #$_n missing or wrong shape (dm: $_dm)"
+_dmt="$(cat "$SCRATCH/dm.argv")"
+_posu() { local _pre="${_dmt%%"$1"*}"; if [[ "$_pre" == "$_dmt" ]]; then echo -1; else echo "${#_pre}"; fi; }
+_cl='- 2 PRs still computing (GitHub merge state UNKNOWN): #201, #202'
+[[ "$(grep -oF -- "$_cl" <<< "$_dmt" | wc -l | tr -d ' ')" == 1 ]] \
+    || fail "your-turn-unknown-baseline: want exactly one '$_cl' (dm: $_dmt)"
+for _n in 201 202; do
+    grep -qF "#$_n — NOT-MERGEABLE — " <<< "$_dmt" \
+        && fail "your-turn-unknown-baseline: #$_n still has its own row (dm: $_dmt)"
 done
+grep -qF '#203 — NOT-MERGEABLE — ' <<< "$_dmt" || fail "your-turn-unknown-baseline: #203 row missing (dm: $_dmt)"
+grep -qF '**Conflicts (1)**' <<< "$_dmt" || fail "your-turn-unknown-baseline: '**Conflicts (1)**' missing (dm: $_dmt)"
+_pc="$(_posu "$_cl")"; _ph="$(_posu '**Conflicts (1)**')"
+[[ "$_pc" -ge 0 && "$_pc" -lt "$_ph" ]] || fail "your-turn-unknown-baseline: computing line not before Conflicts ($_pc vs $_ph)"
+grep -qF 'your turn 3' <<< "$OUT" || fail "your-turn-unknown-baseline: finished line lacks 'your turn 3' (out: $OUT)"
 end_case "your-turn-unknown-baseline"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_row 201 NOT-MERGEABLE 're-check (state unknown)' > "$SCRATCH/triage-out"
+UPOLLS=0 run --worker
+unset UPOLLS
+grep -qF -- '- 1 PR still computing (GitHub merge state UNKNOWN): #201' "$SCRATCH/dm.argv" \
+    || fail "your-turn-unknown-single: line missing (dm: $(cat "$SCRATCH/dm.argv"))"
+end_case "your-turn-unknown-single"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+{   triage_row 201 NOT-MERGEABLE 're-check (state unknown) '
+    triage_row 202 NOT-MERGEABLE 're-check (state unknown)'
+} > "$SCRATCH/triage-out"
+UPOLLS=0 run --worker
+unset UPOLLS
+grep -qF -- '- 2 PRs still computing (GitHub merge state UNKNOWN): #201, #202' "$SCRATCH/dm.argv" \
+    || fail "your-turn-unknown-padded: trailing space broke the collapse (dm: $(cat "$SCRATCH/dm.argv"))"
+end_case "your-turn-unknown-padded"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+{   triage_row 201 NOT-MERGEABLE 're-check (state unknown)'
+    triage_row 202 NOT-MERGEABLE 're-check (state unknown)'
+} > "$SCRATCH/triage-out"
+UPOLLS=0 run --worker
+unset UPOLLS
+grep -qF -- '- 2 PRs still computing (GitHub merge state UNKNOWN): #201, #202' "$SCRATCH/dm.argv" \
+    || fail "your-turn-unknown-only: line missing (dm: $(cat "$SCRATCH/dm.argv"))"
+grep -qF '**Conflicts' "$SCRATCH/dm.argv" && fail "your-turn-unknown-only: Conflicts header printed"
+grep -qF '…and' "$SCRATCH/dm.argv" && fail "your-turn-unknown-only: overflow line printed"
+end_case "your-turn-unknown-only"
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it
@@ -1307,11 +1573,28 @@ g_bucket_spans_close() {
     noncomment "$1" \
         | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
 }
-g_no_sleep()       { ! noncomment "$1" | grep -qE '(^|[^A-Za-z_])sleep[[:space:]]'; }
+# The only sleep bin/pr-cycle may contain sits between the two unknown-warmup markers.
+g_no_sleep() {
+    local b e
+    b="$(grep -cF '# >>> unknown-warmup: the only sleep in bin/pr-cycle' "$1" || true)"
+    e="$(grep -cF '# <<< unknown-warmup' "$1" || true)"
+    [[ "$b" == 1 && "$e" == 1 ]] || return 1
+    awk '/^# >>> unknown-warmup: the only sleep in bin\/pr-cycle/ { r = 1; next }
+         /^# <<< unknown-warmup/ { r = 0; next }
+         /^[[:space:]]*#/ { next }
+         /(^|[^A-Za-z_])sleep[[:space:]]/ { if (r) i++; else o++ }
+         END { exit (o == 0 && i <= 1) ? 0 : 1 }' "$1"
+}
 g_no_poll()        { ! noncomment "$1" | grep -qE -- '--json state|_poll_merge|_reconcile'; }
 g_one_ready()      { [[ "$(noncomment "$1" | grep -cE '"\$PR_CYCLE_READY_CMD" --pr-list ')" == 1 ]] \
                        && ! noncomment "$1" | grep -qE '"\$PR_CYCLE_READY_CMD" --pr[[:space:]]'; }
 g_no_timeout_grep(){ ! noncomment "$1" | grep -qF 'TIMED OUT waiting for'; }
+# pr-cycle's UNKNOWN warm-up and collapse match pr-triage's action text verbatim.
+g_unknown_action_contract() {
+    local triage="${2:-$SCRIPT_DIR/pr-triage}"
+    grep -qF 'UNKNOWN) echo "re-check (state unknown)" ;;' "$triage" \
+        && [[ "$(noncomment "$1" | grep -cF '"re-check (state unknown)"')" == 2 ]]
+}
 g_cmd_prefix() {
     ! noncomment "$1" | grep -E '^[A-Z_]+_CMD=' | grep -qv '^PR_CYCLE_'
 }
@@ -1397,7 +1680,8 @@ g_bucket_emoji_pure_map() {
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond g_bucket_spans_close \
          g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
-         g_cmd_prefix g_no_digest_fetch g_scope_selection_only g_bucket_emoji_pure_map; do
+         g_cmd_prefix g_no_digest_fetch g_scope_selection_only g_bucket_emoji_pure_map \
+         g_unknown_action_contract; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -1433,6 +1717,24 @@ sed 's/^}[[:space:]]*$/ };/' "$DRIVER" > "$SCRATCH/mutant"
 g_bucket_spans_close "$SCRATCH/mutant" && fail "vacuous: g_bucket_spans_close passed an unclosed _bucket_emoji span"
 mutant; echo 'sleep 1' >> "$SCRATCH/mutant"
 g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a driver with sleep"
+awk '{print} /^# <<< unknown-warmup/{print "sleep 1"}' "$DRIVER" > "$SCRATCH/mutant"
+[[ "$(grep -c '^sleep 1$' "$SCRATCH/mutant")" == 1 ]] || fail "mutant did not land: sleep after end marker"
+g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a sleep after the end marker"
+awk '{print} /^# >>> unknown-warmup/{print}' "$DRIVER" > "$SCRATCH/mutant"
+[[ "$(grep -c '^# >>> unknown-warmup' "$SCRATCH/mutant")" == 2 ]] || fail "mutant did not land: duplicated begin marker"
+g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a duplicated begin marker"
+awk '{print} /^_arm_and_classify\(\) \{/{print "    sleep 1"}' "$DRIVER" > "$SCRATCH/mutant"
+[[ "$(grep -c '^    sleep 1$' "$SCRATCH/mutant")" == 1 ]] || fail "mutant did not land: sleep in _arm_and_classify"
+g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a sleep in _arm_and_classify"
+awk '{print} /^_unknown_warmup\(\) \{/{print "    sleep 2"}' "$DRIVER" > "$SCRATCH/mutant"
+[[ "$(grep -c '^    sleep 2$' "$SCRATCH/mutant")" == 1 ]] || fail "mutant did not land: second sleep in _unknown_warmup"
+g_no_sleep "$SCRATCH/mutant" && fail "vacuous: g_no_sleep passed a second sleep in the region"
+sed 's/"re-check (state unknown)"/"re-check"/g' "$DRIVER" > "$SCRATCH/mutant"
+[[ "$(grep -c 'a == "re-check"' "$SCRATCH/mutant")" -ge 1 ]] || fail "mutant did not land: pr-cycle action literal"
+g_unknown_action_contract "$SCRATCH/mutant" && fail "vacuous: g_unknown_action_contract passed a rewritten pr-cycle literal"
+sed 's/echo "re-check (state unknown)"/echo "re-check later"/' "$SCRIPT_DIR/pr-triage" > "$SCRATCH/triage-mutant"
+[[ "$(grep -c 're-check later' "$SCRATCH/triage-mutant")" -ge 1 ]] || fail "mutant did not land: pr-triage action literal"
+g_unknown_action_contract "$DRIVER" "$SCRATCH/triage-mutant" && fail "vacuous: g_unknown_action_contract passed a rewritten pr-triage literal"
 mutant; echo '_poll_merge 1' >> "$SCRATCH/mutant"
 g_no_poll "$SCRATCH/mutant" && fail "vacuous: g_no_poll passed a driver with _poll_merge"
 mutant; echo '"$PR_CYCLE_READY_CMD" --pr-list 1 --go' >> "$SCRATCH/mutant"

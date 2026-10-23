@@ -17,6 +17,7 @@ const UNGATED = [
   'Build VR gallery',
   'Copy new-screen renders into gallery deploy tree',
   'Crop changed-screen pairs into gallery deploy tree',
+  'Stamp VR gallery publish time',
   'Deploy VR gallery to per-SHA GitHub Pages',
   'Deploy VR gallery to per-SHA GitHub Pages (retry 1)',
   'Deploy VR gallery to per-SHA GitHub Pages (retry 2)',
@@ -33,6 +34,7 @@ const GATED = [
 
 const CROP = 'Crop changed-screen pairs into gallery deploy tree';
 const SPLICE = 'Splice new-screen images into PR body';
+const STAMP = 'Stamp VR gallery publish time';
 const DEPLOY = 'Deploy VR gallery to per-SHA GitHub Pages';
 const REGEN = 'Regenerate visual regression baselines';
 const MANUAL_COPY = 'Copy manual-row screenshots into gallery deploy tree';
@@ -230,5 +232,20 @@ describe('publishStepViolations', () => {
     const [, deployBlock] = cutStep(without, DEPLOY);
     const mutant = without.replace(deployBlock, deployBlock + block);
     expect(publishStepViolations(mutant)).toEqual([`order: ${MANUAL_COPY}`]);
+  });
+
+  it("12j: re-adding !contains(…'update-baselines') to the Stamp step is reported", () => {
+    const mutant = mutateStep(REAL, STAMP, (b) => b.replace(/( {8}if: [^\n]*)/, `$1 && ${LABEL_GUARD}`));
+    expect(publishStepViolations(mutant)).toEqual([`label-gated: ${STAMP}`]);
+  });
+
+  it('12k: deleting continue-on-error from the Stamp step is reported', () => {
+    const mutant = mutateStep(REAL, STAMP, (b) => b.replace(/ {8}continue-on-error: [^\n]*\n/, ''));
+    expect(publishStepViolations(mutant)).toEqual([`no-coe: ${STAMP}`]);
+  });
+
+  it('12l: removing the Stamp step is reported', () => {
+    const [without] = cutStep(REAL, STAMP);
+    expect(publishStepViolations(without)).toEqual([`missing: ${STAMP}`]);
   });
 });

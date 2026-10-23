@@ -56,6 +56,7 @@ on:
 permissions:
   contents: write        # update-branch writes a merge commit onto the PR head branch
   pull-requests: write   # enumerate PRs and invoke the update-branch endpoint
+  actions: read          # list this SHA's master runs before updating the head
 
 concurrency:
   # A dry-run dispatch gets its own group so it never cancels a live push pass in flight.
@@ -69,7 +70,7 @@ jobs:
   update-behind:
     name: Keep the merge-line head current
     runs-on: ubuntu-latest
-    timeout-minutes: 30   # coalesce wait + mergeability retries only; no CI wait remains
+    timeout-minutes: 60   # coalesce wait + bot-commit wait (capped at 45 min) + mergeability retries
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,6 +82,43 @@ jobs:
       - name: Coalesce a burst of master merges
         if: github.event_name == 'push'
         run: sleep 300
+
+      # Two master-push workflows can push a bot commit after they finish: Tests and Analysis
+      # (coverage & PHPStan baseline snapshots, codebase-map) and Migration Safety
+      # (current-schema.sql). Those land 2 to 22 minutes after the merge. Updating the head
+      # before then wastes its whole CI run: the bot commit makes it BEHIND again, and the
+      # baseline push is in paths-ignore above, so no pass even re-updates it. Wait for this
+      # SHA's runs of both to finish first. A workflow that did not trigger on this push has
+      # no run, so the wait ends at once. Past the cap the pass goes ahead as it did before.
+      - name: Wait for master CI that can push a bot commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          deadline=$(( $(date +%s) + 45 * 60 ))
+          while :; do
+            if ! open=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&event=push&per_page=100" \
+                --jq '[.workflow_runs[]
+                       | select(.name == "Tests and Analysis" or .name == "Migration Safety")
+                       | select(.status != "completed")
+                       | .name] | unique | join(", ")'); then
+              echo "::warning::could not list master runs for $SHA; going ahead without waiting"
+              break
+            fi
+            if [ -z "$open" ]; then
+              echo "No bot-committing master run still open for $SHA"
+              break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::warning::still waiting on $open after 45 min; going ahead"
+              break
+            fi
+            echo "Waiting on: $open"
+            sleep 30
+          done
 
       - name: Select the head of the merge line
         id: select

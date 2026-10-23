@@ -151,6 +151,18 @@ def amend_merge(ctx: LadderContext, touched) -> str:
     return ""
 
 
+def _is_master_bytes(ctx: LadderContext, path: str) -> bool:
+    """True when the worktree file at `path` equals master's blob byte for byte."""
+    proc = subprocess.run(["git", "-C", ctx.worktree, "show", f"{ctx.master_sha}:{path}"],
+                          capture_output=True)
+    if proc.returncode != 0:
+        return False
+    try:
+        return Path(ctx.worktree, path).read_bytes() == proc.stdout
+    except OSError:
+        return False
+
+
 def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     """Parents, markers, text-only, then the proof. The first failure is structural."""
     from .adapters.gitad import _CONFLICT_MARKER_RE
@@ -168,12 +180,14 @@ def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
         return GuardVerdict(False, False,
                             f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}", "")
     # A both-modified glob-matched copy-only path (a VR PNG) is binary, so the UTF-8 guard
-    # skips it. A PNG that never conflicted, or conflicted as modify/delete, gets no
-    # exemption, so a rung that writes one is rejected here (backlog#1553).
+    # skips it, but only while its bytes are still master's. A PNG that never conflicted,
+    # conflicted as modify/delete, or holds any other bytes gets no exemption, so a rung
+    # that writes one is rejected here (backlog#1553).
     checked = tuple(dict.fromkeys(tuple(touched) + tuple(ctx.conflicted_files)))
     binary_exempt = {g.path for g in match_generated(ctx.conflicted_files)
                      if g.command is None and _is_glob_match(g.path)
-                     and frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED}
+                     and frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED
+                     and _is_master_bytes(ctx, g.path)}
     text_reason = assert_text_only(
         ctx.worktree, [p for p in checked if p not in binary_exempt])
     if text_reason:

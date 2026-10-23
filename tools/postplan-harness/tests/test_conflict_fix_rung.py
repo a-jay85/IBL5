@@ -202,9 +202,11 @@ def test_fix_rung_allows_vr_snapshot_png_via_glob(tmp_path, key):
     ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png),
                               stage_sets={png: BOTH_MODIFIED})
     out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    # The glob widens the remit, but the bytes are not master's, so the text guard rejects.
     assert not any("outside its remit" in t for t in out.trail)
-    assert out.rung == "sonnet-fix"
-    assert png in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
 
 
 def test_fix_rung_text_guards_modify_delete_vr_snapshot_png(tmp_path, key):

@@ -457,6 +457,7 @@ final class RecapDocumentTest extends TestCase
         self::assertStringStartsWith('================================ ', $doc);
     }
 
+    /** With no game index, the box id gives the legacy `box{id}.htm` page, with the builder's `./` removed. */
     public function testBoxScoreLinkFallsBackToLegacyBoxPageWithoutDotSlash(): void
     {
         $game = ['game_of_that_day' => 0, 'box_id' => 55] + $this->game('2008-02-26', 'Only game.');
@@ -548,7 +549,7 @@ final class RecapDocumentTest extends TestCase
         $game = $this->game('2008-02-26', "**A 1 @ B 2**\n<@1>\n\nProse.");
 
         self::assertSame(
-            RecapDocument::gameBlock($game, 'iblhoops.net'),
+            RecapDocument::gameBlock($game, RecapDocument::PRODUCTION_HOST),
             RecapDocument::gameBlock($game, '')
         );
         self::assertStringContainsString('<https://iblhoops.net/ibl5/', RecapDocument::gameBlock($game, ''));

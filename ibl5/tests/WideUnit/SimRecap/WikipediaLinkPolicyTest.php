@@ -71,6 +71,7 @@ final class WikipediaLinkPolicyTest extends TestCase
             'empty link text' => ['[](<https://en.wikipedia.org/wiki/X>)'],
             'bare https url' => ['see https://en.wikipedia.org/wiki/X for more'],
             'bare uppercase scheme' => ['see HTTPS://evil.com'],
+            'bare non-web scheme://' => ['grab it at ftp://evil.com/recap'],
             'bare angle url' => ['see <https://evil.com>'],
             'team page url written by generator' => ['[Celtics](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=2>)'],
             'one good one bad' => [$good . ' then [y](<https://evil.com>)'],

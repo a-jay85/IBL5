@@ -9,6 +9,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
  * (686 failed, 687 pending, 688 done, 689 done, 690 done) after clearing the
  * single row migration 155 plants. Sim 999999 is deliberately left unseeded so
  * the "valid but absent" path has a stable fixture.
+ *
+ * Pre-prod live render: `bin/wt-up <slug> --seed`, then `bin/e2e-wt <slug>` runs
+ * this spec against `<slug>.localhost`. The links-footer PR first ran it on
+ * `sim-recap-masked-links.localhost` and got absolute iblhoops.net footers.
  */
 
 // Full assembled recap document for sim 689 (RecapDocument::postableText output) — the

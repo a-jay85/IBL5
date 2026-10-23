@@ -137,6 +137,9 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         )->execute();
     }
 
+    /**
+     * A rejected source surfaces its reason in StepResult::$messages.
+     */
     public function testReportsRejectedSourceInMessages(): void
     {
         $result = $this->buildStep(

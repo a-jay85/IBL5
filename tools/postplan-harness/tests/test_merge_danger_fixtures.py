@@ -56,6 +56,14 @@ def test_pr3472_additive_migration_is_two_way():
     d = _replay("pr3472.diff")
     assert d.door == "two-way"
     assert d.blast == "site-wide"
+    # Additive DDL stays below the floor. PR #3472 widens an ENUM and creates a table; an
+    # added column is the same class. Appending `ADD\s+COLUMN` to DESTRUCTIVE_SQL turns this red.
+    text = (FIXTURES / "pr3472.diff").read_text(encoding="utf-8")
+    if not text.endswith("\n"):
+        text += "\n"
+    d = _replay_text(text + "+ALTER TABLE `ibl_bug_reports` ADD COLUMN `note` TEXT NULL;\n")
+    assert d.door == "two-way"
+    assert d.triggers == ()
 
 
 @pytest.mark.parametrize("name", NAMES)

@@ -2907,7 +2907,7 @@ YROW='| 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |'
 # 1 of 4 tagged, well-formed, CLI-executable: the honored shape.
 assert_viol "gateY-tagged-cli-row-ok" 0 '[Y]' "$FM$YHDR"'
-| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | corpus diff prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate Y props -->
 '
@@ -2918,41 +2918,41 @@ assert_viol "gateY-tag-on-e2e-row-fires" 1 '[Y]' "$FM$YHDR"'
 '
 # Tag not trailing: malformed.
 assert_viol "gateY-tag-not-trailing-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` |
+| 1 | (one-time-check: one-shot corpus diff over local transcripts) prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Reason under 15 chars.
 assert_viol "gateY-short-reason-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one shot) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Escaped pipe inside the reason: the helper restores it to | and rejects it.
 assert_viol "gateY-pipe-in-reason-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: corpus diff via grep \| sort at plan time) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 '
 # Tag in the location cell: not the What-to-verify cell.
 assert_viol "gateY-tag-in-location-cell-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/x` (one-time-check: one-shot corpus diff over local transcripts) |
+| 1 | prints `CORPUS-DIFF OK` | CLI-executable | post-impl | `bin/db-query` (one-time-check: one-shot corpus diff over local transcripts) |
 '"$YROW"'
 '
 # Share boundary: 1 of 3 is exactly a third and passes.
 assert_viol "gateY-share-at-third-ok" 0 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | `pinned_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 <!-- no-test-methods: fixture rows are gate Y props -->
 '
 # Share over a third: 2 of 4.
 assert_viol "gateY-share-over-third-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
 | 3 | `other_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 | 4 | `third_thing` works | PHPUnit | post-impl | `tests/XTest.php` |
 '
 # Every row tagged.
 assert_viol "gateY-all-tagged-fires" 1 '[Y]' "$FM$YHDR"'
-| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/x` |
+| 1 | prints `CORPUS-DIFF OK` (one-time-check: one-shot corpus diff over local transcripts) | CLI-executable | post-impl | `bin/db-query` |
 | 2 | prints `appeared=0` (one-time-check: one-shot counterfactual mutation run at plan time) | CLI-executable | post-impl | `bin/y` |
 '
 
@@ -3123,7 +3123,7 @@ assert_viol "gateMT-fenced-matrix-silent" 0 '[MT]' "$FM$YHDR"'
 '
 # A one-time-check row is skipped by the helper, so the gate skips it too.
 assert_viol "gateMT-tagged-row-silent" 0 '[MT]' "$FM$YHDR"'
-| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/x` |
+| 1 | grep printed `x.php:12` (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `bin/db-query` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
@@ -3182,6 +3182,207 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [MU] fixtures (22 cases)
+# ---------------------------------------------------------------------------
+# A throwaway repo: one tracked file under e2e/, one tracked PHPStan identifier,
+# one directory named only in tracked text. The helper's tree arm reads this repo
+# through CHECK_PLAN_MT_GIT_ROOT, the same seam gate MT uses.
+MU_REPO="$TMP/mu-repo"
+mkdir -p "$MU_REPO/e2e"
+git -C "$MU_REPO" init -q
+printf "test('x', async () => {});\n" > "$MU_REPO/e2e/vr.spec.ts"
+printf 'parameters:\n  ignoreErrors:\n    -\n      identifier: argument.type\n' > "$MU_REPO/baseline.neon"
+printf 'The modules/Old/ tree was retired.\n' > "$MU_REPO/README.md"
+printf 'snapshot\n' > "$MU_REPO/snap.golden"
+git -C "$MU_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$MU_REPO"
+# Tokens the realiser would find in this very file are spliced from variables, so no
+# contiguous copy of them exists in tracked text.
+MU_DOT='.'
+MU_SL='/'
+# (a) identifier after the Mutation closer (the game-line-writer-write-split row 20 shape).
+assert_viol "gateMU-phpstan-id-after-arrow-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | Test-code analysis is clean. Mutation: annotate `$calls` as a list ⇒ PHPStan `offsetAccess'"$MU_DOT"'notFound` errors, exit nonzero | CLI-executable | post-impl | `cd ibl5 && composer run analyse:tests` |
+'"$YROW"'
+'
+# (a) identifier outside any Mutation label (the sco-process-split row 12 shape); the
+# method name beside it is also missing but has no category, so one violation only.
+assert_viol "gateMU-phpstan-id-outside-mutation-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | no `return'"$MU_DOT"'type` finding on `buildSplitCondition` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# The message tells the planner how to rewrite.
+assert_msg "gateMU-id-message-says-prose" 1 'Put the identifier in prose outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | no `return'"$MU_DOT"'type` finding on `buildSplitCondition` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# Two identifiers on one row: one violation per token. The exit code is 1 for any
+# violation, so count the [MU] lines instead.
+_mu_name='gateMU-two-ids-two-violations'
+_mu_body="$FM$YHDR"'
+| 1 | neither `return'"$MU_DOT"'type` nor `missingType'"$MU_DOT"'parameter` is reported | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
+if [ "$_mu_n" = "2" ]; then
+    h_pass "$_mu_name (2 [MU] lines)"
+else
+    h_fail "$_mu_name" "expected 2 [MU] lines, got $_mu_n"
+fi
+# An identifier whose every occurrence sits inside the Mutation clause (no closer, so
+# the clause runs to the cell end) is blanked by the helper: silent.
+assert_viol "gateMU-phpstan-id-in-mutation-clause-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | PHPStan is clean. Mutation: drop the PHPDoc from the builder, and `missingType'"$MU_DOT"'iterableValue` fires | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# An identifier present in a tracked file is pre-existing (helper arm 3): silent.
+assert_viol "gateMU-phpstan-id-tracked-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `argument.type` entry count unchanged | CLI-executable | post-impl | `grep -c argument.type ibl5/phpstan-baseline.neon` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# Dotted tokens whose first segment is not a PHPStan category: the no-false-positive
+# case (bundle.Validate, llm.door, controls.ok, file names, a domain). All are missing
+# from the fixture repo and all stay silent.
+assert_viol "gateMU-non-category-dotted-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | calls `bundle.Validate` once, sets `llm.door`, reads `controls.ok`, writes `final.tsv` and `top.jsonl`, reaches `accounts.google.com` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# A bare file name whose stem is a category word is a file, not an identifier: silent.
+assert_viol "gateMU-category-stem-file-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | writes `enum'"$MU_DOT"'ts` and `class'"$MU_DOT"'php` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# Categories outside the first list (ignore, if, greaterOrEqual) still fire.
+_mu_name='gateMU-more-categories-fire'
+_mu_body="$FM$YHDR"'
+| 1 | no `ignore'"$MU_DOT"'unmatchedIdentifier`, `if'"$MU_DOT"'alwaysTrue` or `greaterOrEqual'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
+if [ "$_mu_n" = "3" ]; then
+    h_pass "$_mu_name (3 [MU] lines)"
+else
+    h_fail "$_mu_name" "expected 3 [MU] lines, got $_mu_n"
+fi
+# An extension only a tracked file uses (snap.golden) also marks a file name: silent.
+assert_viol "gateMU-tracked-extension-file-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | writes `match'"$MU_DOT"'golden` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# A ~~~ example matrix is kept by GATEP_MATRIX but skipped by the helper, so its row 1
+# comes first, and it holds one of the same tokens. Both violations still land on the
+# real row 1, the row the helper read.
+_mu_name='gateMU-blames-row-helper-read'
+_mu_body="$FM"'
+~~~markdown'"$YHDR"'
+| 1 | example: no `if'"$MU_DOT"'alwaysTrue` finding | PHPUnit | post-impl | `tests/XTest.php` |
+~~~
+'"$YHDR"'
+| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding in `modules/Zq'"$MU_SL"'` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] .*REALROW' <<< "$_mu_out")"
+_mu_all="$(grep -c '^\[MU\] ' <<< "$_mu_out")"
+if [ "$_mu_n" = "2" ] && [ "$_mu_all" = "2" ]; then
+    h_pass "$_mu_name (2 [MU] lines, both on the real row)"
+else
+    h_fail "$_mu_name" "expected 2 [MU] lines on REALROW, got $_mu_n of $_mu_all"
+fi
+# A placeholder row with an empty-looking What cell is skipped by the helper, so the
+# violation lands on the next row with the same id.
+_mu_name='gateMU-skips-placeholder-row'
+_mu_body="$FM$YHDR"'
+| 1 | - | PHPUnit | post-impl | `tests/XTest.php` |
+| 1 | REALROW no `if'"$MU_DOT"'alwaysTrue` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+printf '%s\n' "$_mu_body" > "$TMP/$_mu_name.md"
+_mu_out="$("$GUARD" "$TMP/$_mu_name.md" 2>&1)"
+_mu_n="$(grep -c '^\[MU\] .*REALROW' <<< "$_mu_out")"
+if [ "$_mu_n" = "1" ]; then
+    h_pass "$_mu_name (on the real row)"
+else
+    h_fail "$_mu_name" "expected 1 [MU] line on REALROW, got $_mu_n"
+fi
+# require is not a category: a Node name like require.main stays silent, while
+# requireOnce is one and fires.
+assert_viol "gateMU-require-code-name-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | reads `require'"$MU_DOT"'main` | CLI-executable | post-impl | `go test ./...` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+assert_viol "gateMU-requireonce-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | no `requireOnce'"$MU_DOT"'fileNotFound` finding | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# (b) a new directory: no tracked file beneath it, no tracked text names it (the
+# records-hub row 11 shape).
+assert_viol "gateMU-new-dir-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | module directory `modules/Records'"$MU_SL"'` present with an index | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+'
+# The message names the file-path rewrite.
+assert_msg "gateMU-dir-message-names-file-cite" 1 'Cite the path of a file the diff creates beneath it' '[Z]' "$FM$YHDR"'
+| 1 | module directory `modules/Records'"$MU_SL"'` present with an index | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+'
+# A directory with a tracked file beneath it is outside the gate's scope even though
+# no tracked text names it: silent.
+assert_viol "gateMU-dir-with-tracked-file-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `e2e/` holds the spec | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# A directory named in tracked text is realised by helper arm 3: silent.
+assert_viol "gateMU-dir-named-in-text-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `modules/Old/` stays retired | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# A matrix inside a fenced example is never scanned (MT_FENCE is defined above).
+assert_viol "gateMU-fenced-matrix-silent" 0 '[MU]' "$FM$YHDR"'
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+
+'"$MT_FENCE$YHDR"'
+| 9 | PHPStan `offsetAccess'"$MU_DOT"'notFound` reported in `modules/Records'"$MU_SL"'` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$MT_FENCE"'
+'
+# A one-time-check row is skipped by the helper, so the gate skips it too.
+assert_viol "gateMU-tagged-row-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | analyse printed `offsetAccess'"$MU_DOT"'notFound` once (one-time-check: one command printed output at plan time) | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# Not a git repo: the gate is skipped outright (the helper would call everything missing).
+mkdir -p "$TMP/mu-nogit"
+export CHECK_PLAN_MT_GIT_ROOT="$TMP/mu-nogit"
+assert_viol "gateMU-nogit-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | PHPStan `offsetAccess'"$MU_DOT"'notFound` reported in `modules/Records'"$MU_SL"'` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# Seam unset: the real repo. argument.type lives in ibl5/phpstan-baseline.neon and
+# bin/lib/ has tracked files beneath it, so a corrected plan passes.
+unset CHECK_PLAN_MT_GIT_ROOT
+assert_viol "gateMU-seam-unset-real-repo-ok" 0 '[MU]' "$FM$YHDR"'
+| 1 | `argument.type` count unchanged and `bin/lib/` helpers green | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+
+# ---------------------------------------------------------------------------
 # Gate [ND] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Marker with a 15+ character reason inside a phase body: the honored shape.
@@ -3235,10 +3436,49 @@ assert_viol "gateG-wired-script-ok" 0 '[G]' "$FM"'
 '
 
 # (one-shot) annotation as shell comment inside backticks exempts the unwired script — must pass.
+# The script is listed in ## Critical Files (the plan creates it) so gate [BX] stays silent.
 assert_viol "gateG-unwired-oneshot-ok" 0 '[G]' "$FM"'
+## Critical Files
+
+- `bin/test-nonexistent-thing` (NEW)
+
+## Verification Matrix
+
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | run script | CLI-executable | post-impl | `bin/test-nonexistent-thing # (one-shot)` |
+'
+
+# ---------------------------------------------------------------------------
+# Gate [BX] fixtures: a bin/ path the location cell runs must exist or be a
+# Critical Files entry. The PR #3264 shape: a (one-shot) row naming a missing script.
+# ---------------------------------------------------------------------------
+assert_viol "gateBX-missing-oneshot-script-flags" 1 '[BX]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | help clean | CLI-executable | post-impl | `bin/check-plan --help >/dev/null && bin/check-bin-help bin/check-plan # (one-shot)` |
+'
+
+# Existing scripts at the root and under ibl5/, and vendor/bin (not a repo bin/ path).
+assert_viol "gateBX-existing-paths-ok" 0 '[BX]' "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | query runs | CLI-executable | post-impl | `bin/db-query "SELECT 1"` |
+| 2 | drift clean | CLI-executable | post-impl | `cd ibl5 && php bin/check-baseline-drift # (one-shot)` |
+| 3 | unit tests | CLI-executable | post-impl | `cd ibl5 && vendor/bin/phpunit --filter Foo` |
+'
+
+# A missing script the plan creates (named in ## Critical Files) is silent.
+assert_viol "gateBX-new-script-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `bin/brand-new-tool` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/brand-new-tool --help` |
 '
 
 # Legacy annotation form: a note after the closing backtick leaves a stray
@@ -3824,7 +4064,7 @@ assert_viol gate-I-full-flags-clean 0 '[I]' "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
-| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/foo |"
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/db-query |"
 
 # No shellcheck row at all — gate is silent ([I] must NOT appear, exit 0).
 assert_viol gate-I-no-shellcheck-row-clean 0 '[I]' "$FM_OPUS
@@ -3864,7 +4104,7 @@ Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
 
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | mutation score | Infection | post-impl | bin/infection-run ibl5/classes/Foo/BarService.php |"
+| 1 | mutation score | Infection | post-impl | cd ibl5 && vendor/bin/infection --filter=classes/Foo/BarService.php |"
 
 # No creation verb — gate is silent ([J] must NOT appear).
 assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS

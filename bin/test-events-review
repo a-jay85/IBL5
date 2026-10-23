@@ -102,6 +102,7 @@ d="${STUB_DIR:?}"
 n=$(( $(cat "$d/dm.n" 2>/dev/null || echo 0) + 1 ))
 printf '%s' "$n" > "$d/dm.n"
 printf '%s\n' "$*" > "$d/dm.$n.argv"
+printf '%s\n' "${DISCORD_DM_WEBHOOK_FILE-<unset>}" > "$d/dm.$n.wh"
 cat > "$d/dm.$n.stdin"
 exit "${STUB_DM_RC:-0}"
 SH
@@ -596,6 +597,87 @@ $(cat "$b1800")" "$(dm_payload 1)"
     run_er "--from-tsv=$CORPUS"
     expect_eq "row23: DM stub exit 0 exits 0" 0 "$ER_RC"
 
+    # The review goes to the #reviews webhook file; the failure notice stays on the default.
+    new_case dm-webhook-default
+    tsv_env; ER_ENV+=("HOME=$SD/home")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "reviews: review uses ~/.iblbot-reviews-webhook-url by default" \
+        "$SD/home/.iblbot-reviews-webhook-url" "$(cat "$SD/dm.1.wh")"
+    new_case dm-webhook-override
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_WEBHOOK_FILE=$SD/custom-hook")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "reviews: EVENTS_REVIEW_WEBHOOK_FILE overrides the review webhook" \
+        "$SD/custom-hook" "$(cat "$SD/dm.1.wh")"
+    new_case dm-webhook-skip
+    local sparse="$T/sparse.tsv"; make_tsv "$sparse" 3
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_WEBHOOK_FILE=$SD/custom-hook")
+    run_er "--from-tsv=$sparse"
+    expect_eq "reviews: the skip line uses the reviews webhook" "$SD/custom-hook" "$(cat "$SD/dm.1.wh")"
+    new_case dm-webhook-fail
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_WEBHOOK_FILE=$SD/custom-hook" "STUB_CLAUDE_RC=1")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "reviews: the model-failure notice stays on the default webhook" "<unset>" "$(cat "$SD/dm.1.wh")"
+
+    # --at-reset: only the 16:xx UTC fire runs.
+    # Sunday pre-reset hours skip even with no marker; later hours skip once a
+    # review went out in the last 6 days.
+    local h
+    for h in 15 08 00; do
+        new_case "atreset-sun-$h"
+        tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=$h" "EVENTS_REVIEW_UTC_DOW=0" "EVENTS_REVIEW_STATE_FILE=$T/none-$h")
+        run_er --at-reset "--from-tsv=$CORPUS"
+        expect_eq "at-reset: Sunday UTC hour $h exits 0" 0 "$ER_RC"
+        expect_eq "at-reset: Sunday UTC hour $h sends nothing" 0 "$(call_count "$SD/dm.n")"
+        expect_has "at-reset: Sunday UTC hour $h logs one skip line" "$ER_ERR" "--at-reset: UTC hour is $h"
+    done
+    printf '%s\n' 1000000 > "$T/sent-fresh"
+    # Hour 09 runs on a Monday so the Sunday-morning rule does not exit first.
+    local dow
+    for h in 17 09; do
+        dow=0; [ "$h" = 09 ] && dow=1
+        new_case "atreset-fresh-$h"
+        tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=$h" "EVENTS_REVIEW_UTC_DOW=$dow" \
+            "EVENTS_REVIEW_NOW_EPOCH=1003600" "EVENTS_REVIEW_STATE_FILE=$T/sent-fresh")
+        run_er --at-reset "--from-tsv=$CORPUS"
+        expect_eq "at-reset: UTC hour $h after a recent send exits 0" 0 "$ER_RC"
+        expect_eq "at-reset: UTC hour $h after a recent send sends nothing" 0 "$(call_count "$SD/dm.n")"
+    done
+    new_case atreset-catchup
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=17" "EVENTS_REVIEW_UTC_DOW=0" \
+        "EVENTS_REVIEW_NOW_EPOCH=2000000" "EVENTS_REVIEW_STATE_FILE=$T/sent-fresh")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: late fire with no review this week exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: late fire with no review this week sends the review" 1 "$(cat "$SD/dm.n")"
+    expect_has "at-reset: late fire logs the catch-up" "$ER_ERR" "catch-up"
+    new_case atreset-16
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=16" "EVENTS_REVIEW_STATE_FILE=$T/sent-16")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: UTC hour 16 exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: UTC hour 16 sends the review" 1 "$(cat "$SD/dm.n")"
+    expect_eq "at-reset: UTC hour 16 writes the sent marker" 1 "$([ -s "$T/sent-16" ] && echo 1 || echo 0)"
+    # The marker the 16:xx run wrote must make the 17:xx run skip (PST double-post guard).
+    new_case atreset-16-then-17
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=16" "EVENTS_REVIEW_UTC_DOW=0" "EVENTS_REVIEW_STATE_FILE=$T/sent-chain")
+    rm -f "$T/sent-chain"
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: 16:xx run sends before the 17:xx run" 1 "$(cat "$SD/dm.n")"
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=17" "EVENTS_REVIEW_UTC_DOW=0" "EVENTS_REVIEW_STATE_FILE=$T/sent-chain")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: 17:xx run after the 16:xx marker exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: 17:xx run after the 16:xx marker does not post again" 1 "$(cat "$SD/dm.n")"
+    expect_has "at-reset: 17:xx run after the 16:xx marker logs the skip" "$ER_ERR" "a review already went out"
+    # A late Monday fire landing on 16:xx UTC must not re-post after Sunday's review.
+    new_case atreset-monday-16
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=16" "EVENTS_REVIEW_UTC_DOW=1" \
+        "EVENTS_REVIEW_NOW_EPOCH=1003600" "EVENTS_REVIEW_STATE_FILE=$T/sent-fresh")
+    run_er --at-reset "--from-tsv=$CORPUS"
+    expect_eq "at-reset: Monday 16:xx after a recent send exits 0" 0 "$ER_RC"
+    expect_eq "at-reset: Monday 16:xx after a recent send sends nothing" 0 "$(call_count "$SD/dm.n")"
+    new_case atreset-absent
+    tsv_env; ER_ENV+=("EVENTS_REVIEW_UTC_HOUR=03")
+    run_er "--from-tsv=$CORPUS"
+    expect_eq "at-reset: manual run without the flag ignores the hour" 1 "$(cat "$SD/dm.n")"
+
     # Row 24: the real bin/discord-dm with curl and the webhook file stubbed.
     if ! command -v jq >/dev/null 2>&1; then
         echo "SKIP: row24 (jq not installed)"
@@ -614,7 +696,7 @@ $(cat "$b1800")" "$(dm_payload 1)"
         "DISCORD_DM_TO=283183467804491776"
         "DISCORD_DM_CURL_BIN=$STUBS/curl"
         "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
-        "DISCORD_DM_WEBHOOK_FILE=$wh"
+        "EVENTS_REVIEW_WEBHOOK_FILE=$wh"
         "DISCORD_DM_SPOOL=$T/spool.log"
     )
     run_er "--from-tsv=$CORPUS"
@@ -713,12 +795,23 @@ group_schedule() {
     expect_has "row28: plist points at the main checkout" "$out" "<string>$main_real/bin/events-review</string>"
     expect_lacks "row28: plist never points at the worktree" "$out" "$wt/bin/events-review"
     expect_has "row28: Label" "$out" "<string>com.ibl5.events-review</string>"
-    expect_has "row28: Weekday 1" "$out" "<key>Weekday</key>
-		<integer>1</integer>"
-    expect_has "row28: Hour 9" "$out" "<key>Hour</key>
-		<integer>9</integer>"
-    expect_has "row28: Minute 17" "$out" "<key>Minute</key>
-		<integer>17</integer>"
+    expect_has "row28: first Sunday entry is 08:03" "$out" "<dict>
+			<key>Weekday</key>
+			<integer>0</integer>
+			<key>Hour</key>
+			<integer>8</integer>
+			<key>Minute</key>
+			<integer>3</integer>
+		</dict>"
+    expect_has "row28: second Sunday entry is 09:03" "$out" "<dict>
+			<key>Weekday</key>
+			<integer>0</integer>
+			<key>Hour</key>
+			<integer>9</integer>
+			<key>Minute</key>
+			<integer>3</integer>
+		</dict>"
+    expect_has "row28: plist passes --at-reset" "$out" "<string>--at-reset</string>"
     if command -v plutil >/dev/null 2>&1; then
         printf '%s\n' "$out" > "$SD/out.plist"
         if plutil -lint "$SD/out.plist" >/dev/null 2>&1; then ok "row28: plutil -lint passes"; else fail "row28: plutil -lint failed"; fi
@@ -842,7 +935,7 @@ SH
             "DISCORD_DM_TO=283183467804491776"
             "DISCORD_DM_CURL_BIN=$STUBS/curl"
             "DISCORD_DM_SSH_BIN=$STUBS/dm-ssh"
-            "DISCORD_DM_WEBHOOK_FILE=$wh"
+            "EVENTS_REVIEW_WEBHOOK_FILE=$wh"
             "DISCORD_DM_SPOOL=$T/e2e-spool.log"
         )
         run_er

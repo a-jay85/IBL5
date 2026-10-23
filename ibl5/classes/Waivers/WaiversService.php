@@ -28,22 +28,19 @@ class WaiversService implements WaiversServiceInterface
      * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
-    private \Clock\ClockInterface $clock;
 
     public function __construct(
         \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepository,
         WaiversProcessorInterface $processor,
         TeamQueryRepositoryInterface $teamQueryRepo,
         \mysqli $db,
-        ?Season $season = null,
-        ?\Clock\ClockInterface $clock = null
+        ?Season $season = null
     ) {
         $this->commonRepository = $commonRepository;
         $this->processor = $processor;
         $this->teamQueryRepo = $teamQueryRepo;
         $this->db = $db;
         $this->season = $season;
-        $this->clock = $clock ?? new \Clock\SystemClock();
     }
 
     /**
@@ -58,7 +55,7 @@ class WaiversService implements WaiversServiceInterface
         $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
         $tableData = $this->getTableResultAndStyle($team, $season, $action);
-        $players = $this->buildPlayerOptions($tableData['tableResult'], $action, $season);
+        $players = $this->buildPlayerOptions($tableData['tableResult'], $season);
 
         $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamid, $season));
         $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->teamid, $season));
@@ -76,12 +73,11 @@ class WaiversService implements WaiversServiceInterface
 
     /**
      * @param array<int, array<string, mixed>|\Player\Player> $result
-     * @return list<array{playerID: int, playerName: string, contract: string, waitTime: string}>
+     * @return list<array{playerID: int, playerName: string, contract: string}>
      */
-    private function buildPlayerOptions(array $result, string $action, Season $season): array
+    private function buildPlayerOptions(array $result, Season $season): array
     {
-        $timeNow = $this->clock->now();
-        /** @var list<array{playerID: int, playerName: string, contract: string, waitTime: string}> $players */
+        /** @var list<array{playerID: int, playerName: string, contract: string}> $players */
         $players = [];
 
         foreach ($result as $playerRow) {
@@ -92,11 +88,6 @@ class WaiversService implements WaiversServiceInterface
                 $player = Player::withPlrRow($this->db, $playerRow);
             }
             $contract = $this->processor->getPlayerContractDisplay($player, $season);
-            $waitTime = '';
-
-            if ($action === 'add' && $player->getTimeDroppedOnWaivers() !== null && $player->getTimeDroppedOnWaivers() > 0) {
-                $waitTime = $this->processor->getWaiverWaitTime($player->getTimeDroppedOnWaivers(), $timeNow);
-            }
 
             $playerID = $player->getPlayerID() ?? 0;
             $playerName = $player->getName() ?? '';
@@ -104,7 +95,6 @@ class WaiversService implements WaiversServiceInterface
                 'playerID' => $playerID,
                 'playerName' => $playerName,
                 'contract' => $contract,
-                'waitTime' => $waitTime,
             ];
         }
 

@@ -68,22 +68,6 @@ class NukeCompat
     }
 
     /**
-     * Format a Unix timestamp using the site's date format.
-     */
-    public function formatTimestamp(int|string $timestamp): string
-    {
-        $time = $timestamp;
-        if (is_string($time) && !is_numeric($time)) {
-            if (preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts) === 1) {
-                $time = gmmktime((int) $dtParts[4], (int) $dtParts[5], (int) $dtParts[6], (int) $dtParts[2], (int) $dtParts[3], (int) $dtParts[1]);
-            }
-        }
-        $unixTime = (int) $time - (int) date("Z");
-        $format = defined('_DATESTRING') ? _DATESTRING : 'l, F d, Y @ H:i';
-        return ucfirst(date($format, $unixTime));
-    }
-
-    /**
      * Format a timestamp as a <time> element for client-side local timezone display.
      *
      * Returns an HTML <time> element with an ISO 8601 UTC datetime attribute.
@@ -150,35 +134,10 @@ class NukeCompat
     }
 
     /**
-     * Get the current theme name.
-     */
-    public function getTheme(): string
-    {
-        return 'IBL';
-    }
-
-    /**
      * Display block content for a position (e.g., "Center", "Down").
      */
     public function blocks(string $position): void
     {
         blocks($position);
-    }
-
-
-    /**
-     * Output the theme header.
-     */
-    public function themeHeader(): void
-    {
-        themeheader();
-    }
-
-    /**
-     * Output the theme footer.
-     */
-    public function themeFooter(): void
-    {
-        themefooter();
     }
 }

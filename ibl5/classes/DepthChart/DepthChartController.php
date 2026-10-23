@@ -110,7 +110,7 @@ class DepthChartController implements DepthChartControllerInterface
         $responder->html('<h1 class="ibl-title">Depth Chart Entry</h1>');
 
         if ($flashErrorsHtml !== '') {
-            $responder->html('<div class="ibl-alert ibl-alert--error">' . $flashErrorsHtml . '</div>');
+            $responder->html('<div role="alert" class="d-alert d-alert-error mb-4">' . $flashErrorsHtml . '</div>');
         }
 
         $this->view->renderTeamLogo($teamid);

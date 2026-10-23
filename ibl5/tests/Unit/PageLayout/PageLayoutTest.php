@@ -86,7 +86,7 @@ class PageLayoutTest extends TestCase
         $output = (string) ob_get_clean();
 
         self::assertStringContainsString('Operation completed', $output);
-        self::assertStringContainsString('ibl-alert--success', $output);
+        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
         self::assertArrayNotHasKey('flash_success', $_SESSION);
     }
 
@@ -100,6 +100,19 @@ class PageLayoutTest extends TestCase
         self::assertStringContainsString('<!DOCTYPE html>', $output);
         self::assertStringContainsString('THEMEHEADER_CALLED', $output);
         self::assertStringContainsString('<title>', $output);
+        self::assertStringNotContainsString('d-alert-success', $output);
+    }
+
+    public function testHeaderNonBoostedShowsFlashMessage(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        $_SESSION['flash_success'] = 'Operation completed';
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-success mb-4">Operation completed</div>', $output);
+        self::assertArrayNotHasKey('flash_success', $_SESSION);
     }
 
     public function testHeaderNonBoostedEmitsExpectedHeadResources(): void
@@ -449,8 +462,21 @@ class PageLayoutTest extends TestCase
         PageLayout::header();
         $output = (string) ob_get_clean();
 
-        self::assertStringContainsString('ibl-alert--warning', $output);
+        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
         self::assertStringContainsString('Admin mode', $output);
+    }
+
+    public function testHeaderNonBoostedShowsAdminPhaseGateNotice(): void
+    {
+        unset($_SERVER['HTTP_HX_BOOSTED']);
+        if (!defined('ADMIN_PHASE_GATE_NOTICE')) {
+            define('ADMIN_PHASE_GATE_NOTICE', true);
+        }
+        ob_start();
+        PageLayout::header();
+        $output = (string) ob_get_clean();
+
+        self::assertStringContainsString('<div role="alert" class="d-alert d-alert-warning mb-4">Admin mode: You can view this module, but it is currently closed to non-admin GMs.</div>', $output);
     }
 
     public function testOgMetaTagsNeverReflectMaliciousHost(): void

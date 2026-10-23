@@ -51,6 +51,8 @@ class DaisyUiPilotViewsTest extends TestCase
             'uploadDraftClass' => [dirname(__DIR__, 2) . '/uploadDraftClass.php'],
             'TransactionHistoryView' => [$classes . '/TransactionHistory/TransactionHistoryView.php'],
             'LeagueConfigView' => [$classes . '/LeagueConfig/LeagueConfigView.php'],
+            'PageLayout' => [$classes . '/PageLayout/PageLayout.php'],
+            'DepthChartController' => [$classes . '/DepthChart/DepthChartController.php'],
         ];
     }
 

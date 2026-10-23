@@ -1241,8 +1241,6 @@ _stage1_fire() {
     return 0
 }
 
-# _arm_and_classify — the one arming call, then parse every PR's bucket from the report.
-# Sets ARMED and LEFT. Returns non-zero (with HALT set) only on an unusable report.
 # >>> unknown-warmup: the only sleep in bin/pr-cycle
 # _unknown_warmup — poll PRs whose mergeStateStatus may still be UNKNOWN until each
 # settles or the rounds run out, so the single --arm triage call sees settled states.
@@ -1282,6 +1280,8 @@ _unknown_warmup() {
 }
 # <<< unknown-warmup
 
+# _arm_and_classify — the one arming call, then parse every PR's bucket from the report.
+# Sets ARMED and LEFT. Returns non-zero (with HALT set) only on an unusable report.
 _arm_and_classify() {
     _unknown_warmup || true
 

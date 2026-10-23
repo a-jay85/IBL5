@@ -50,7 +50,7 @@ hs_eval_pull_request() {
 # id and compares. A clean rebase keeps the id. A real diff change, a missing
 # record, or any read/compute error drops the approval (fail closed).
 # Marker value: 40 lowercase hex, or `revoked` (written when an approval drops).
-HS_FP_MARKER_RE='<!-- hs-approved-diff: (?<v>[0-9a-f]{40}|revoked) -->'
+HS_FP_MARKER_RE='\A<!-- hs-approved-diff: (?<v>[0-9a-f]{40}|revoked) -->'
 
 # hs_is_fingerprint <s> — 0 iff <s> is exactly 40 lowercase hex chars.
 hs_is_fingerprint() {

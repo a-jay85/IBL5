@@ -163,6 +163,8 @@ jobs:
           --cache-directory=/tmp/phpunit-cache \
           --testdox \
           --coverage-clover coverage/clover.xml \
+          --display-phpunit-deprecations \
+          --display-phpunit-notices \
           --colors=always 2>&1 | tee /tmp/phpunit-output.txt
         PHPUNIT_EXIT=${PIPESTATUS[0]}
         set -eo pipefail
@@ -419,7 +421,7 @@ jobs:
         DB_USER: root
         DB_PASS: root
         DB_NAME: ibl5
-      run: vendor/bin/phpunit --group database --no-progress --testdox-summary
+      run: vendor/bin/phpunit --group database --no-progress --testdox-summary --display-phpunit-deprecations --display-phpunit-notices
 
   phpstan:
     name: PHPStan Analysis

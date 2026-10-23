@@ -65,15 +65,7 @@ case "$MODE" in
     *) [ -z "$PLAN" ] || usage ;;
 esac
 
-# Fail closed before anything touches the tree: run needs a timeout binary.
 TO=""
-if [ "$MODE" = run ]; then
-    TO=$(command -v gtimeout || command -v timeout) || TO=""
-    if [ -z "$TO" ]; then
-        echo "NO-TIMEOUT — neither gtimeout nor timeout is on PATH; no mutation applied"
-        exit 1
-    fi
-fi
 
 MSEN=$'\001'
 mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
@@ -379,6 +371,15 @@ fi
 if [ ! -s "$RECS" ]; then
     rm -f "$RECS"
     exit 0
+fi
+
+# Fail closed before anything mutates the tree: a plan with entries needs a
+# timeout binary. A plan with no section never reaches here.
+TO=$(command -v gtimeout || command -v timeout) || TO=""
+if [ -z "$TO" ]; then
+    echo "NO-TIMEOUT — neither gtimeout nor timeout is on PATH; no mutation applied"
+    rm -f "$RECS"
+    exit 1
 fi
 
 mkdir -p "$JDIR" || exit 3

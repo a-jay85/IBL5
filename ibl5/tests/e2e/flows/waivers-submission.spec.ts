@@ -335,6 +335,12 @@ test.describe('Waivers: server-side roster recount (backlog#1538)', () => {
     });
     const location = response.headers()['location'] ?? '';
     expect(location, `drop must ignore posted rosterslots; got ${location}`).toContain('result=player_dropped');
+
+    // A waived player (ordinal=1000) disappears from the waive-form select.
+    await page.goto('modules.php?name=Waivers&action=waive');
+    await expect(
+      page.locator('select[name="Player_ID"] option[value="200000031"]'),
+    ).toHaveCount(0);
   });
 
   test('waiver form carries no roster-slot hidden inputs and still shows the counts header', async ({

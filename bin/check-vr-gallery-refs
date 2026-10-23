@@ -16,7 +16,7 @@ visual-review/index.html. Prints "DANGLING <sha>/visual-review/index.html -> <va
 for each relative .png reference whose target file is missing.
 
 Exit 0 and "OK dirs=<n> refs=<m>" when clean; exit 1 on any dangling reference;
-exit 2 on a usage error.
+exit 2 on a usage error or when a directory or index.html cannot be read.
 EOF
 }
 
@@ -69,6 +69,18 @@ dirs=0
 refs=0
 dangling=0
 
+# Process substitution hides the producer's exit status from set -e, so run find
+# and awk into temp files and fail closed on a non-zero status. An unreadable
+# index.html must never count as zero refs and print OK.
+tmp_dir=$(mktemp -d)
+trap 'rm -rf "$tmp_dir"' EXIT
+
+if ! find "$root" -mindepth 1 -maxdepth 1 -type d > "$tmp_dir/dirs.raw"; then
+  echo "check-vr-gallery-refs: find failed under $root" >&2
+  exit 2
+fi
+sort "$tmp_dir/dirs.raw" > "$tmp_dir/dirs.txt"
+
 while IFS= read -r dir; do
   b="${dir##*/}"
   [ "${#b}" -eq 40 ] || continue
@@ -76,6 +88,10 @@ while IFS= read -r dir; do
   index="$dir/visual-review/index.html"
   [[ -f "$index" ]] || continue
   dirs=$(( dirs + 1 ))
+  if ! awk "$EXTRACT_AWK" "$index" > "$tmp_dir/values.txt"; then
+    echo "check-vr-gallery-refs: could not read $index" >&2
+    exit 2
+  fi
   while IFS= read -r value; do
     [[ -n "$value" ]] || continue
     case "$value" in
@@ -99,8 +115,8 @@ while IFS= read -r dir; do
         dangling=$(( dangling + 1 ))
       fi
     fi
-  done < <(awk "$EXTRACT_AWK" "$index")
-done < <(find "$root" -mindepth 1 -maxdepth 1 -type d | sort)
+  done < "$tmp_dir/values.txt"
+done < "$tmp_dir/dirs.txt"
 
 if [[ "$dangling" -gt 0 ]]; then
   echo "check-vr-gallery-refs: $dangling dangling reference(s)" >&2

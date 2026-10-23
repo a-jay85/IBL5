@@ -146,7 +146,12 @@ jobs:
           [ "$second" = "0" ] || { echo "::error::second --migrate was not a no-op (${second})"; exit 1; }
           git add -u
           if [ -d _vr-blobs ]; then git add -A -- _vr-blobs; fi
-          ../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt" | tail -n 1
+          prune_out=$(../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+          removed=$(tail -n 1 <<< "$prune_out")
+          case "$removed" in
+            (''|*[!0-9]*) echo "::error::post-migration prune dry-run did not end with a dir count (got '${removed}')"; exit 1 ;;
+          esac
+          echo "post-migration prune dry-run would remove ${removed} dir(s)"
 
   refresh:
     name: VR refresh (PR ${{ matrix.target.pr }})

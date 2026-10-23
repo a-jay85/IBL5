@@ -82,6 +82,10 @@ def test_escaped_and_doubled_quotes_keep_quote_state():
     assert out.startswith("SELECT 'it''s', 'a\\'b'; ")
     assert "DROP" not in out
     assert not _hits("+" + out)
+    # A doubled quote that ended the string would let the `--` inside it hide the DROP.
+    inp = "SELECT 'it''s -- x'; DROP TABLE t;"
+    assert strip_sql_comments(inp) == inp
+    assert _hits("+" + strip_sql_comments(inp))
 
 
 def test_backtick_identifier_with_dashes_is_not_a_comment():
@@ -112,6 +116,9 @@ def test_unterminated_quote_returns_input_unchanged():
     inp = "SELECT 'open; DROP TABLE t;"
     assert strip_sql_comments(inp) == inp
     assert _hits("+" + strip_sql_comments(inp))
+    # The comment before the open quote stays raw too: the whole text is returned unchanged.
+    inp = "-- note\nSELECT 'open; DROP TABLE t;"
+    assert strip_sql_comments(inp) == inp
 
 
 def test_stray_close_is_code():

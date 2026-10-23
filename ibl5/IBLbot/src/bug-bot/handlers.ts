@@ -21,12 +21,21 @@ export interface RoutableMessage {
     channelId: string;
     isThread: boolean;
     parentId: string | null;
+    mentionedUserIds: string[];
 }
-export type Route = 'enqueue' | 'thread-reply' | 'ignore';
+export type Route = 'enqueue' | 'thread-reply' | 'wake' | 'ignore';
 
 export function classifyMessage(msg: RoutableMessage, clientUserId: string): Route {
     if (msg.isBot || msg.authorId === clientUserId) return 'ignore';
     if (msg.channelId === config.bugChannelId && !msg.isThread) return 'enqueue';
+    // Authorization keys on the AUTHOR id; the @mention is only the trigger. Anyone
+    // else mentioning the bot in a bug thread is an ordinary thread-reply.
+    if (
+        msg.isThread &&
+        msg.parentId === config.bugChannelId &&
+        msg.authorId === config.operatorDiscordId &&
+        msg.mentionedUserIds.includes(clientUserId)
+    ) return 'wake';
     if (msg.isThread && msg.parentId === config.bugChannelId) return 'thread-reply';
     return 'ignore';
 }
@@ -41,6 +50,7 @@ export function toRoutable(message: Message): RoutableMessage {
         channelId: message.channelId,
         isThread: inThread,
         parentId: inThread ? message.channel.parentId : null,
+        mentionedUserIds: [...message.mentions.users.keys()],
     };
 }
 
@@ -49,7 +59,7 @@ export function toRoutable(message: Message): RoutableMessage {
 // keeps a 10-image report near one download's latency, not ten sequential ones — critical
 // because backfill.ts awaits handleEnqueue in a loop with no per-message catch. The whole
 // block degrades to [] on any failure: a broken capture must cost the screenshots, never
-// the report (the same posture as the swallowed react ack below).
+// the report (the same posture as the swallowed 👀 ack in handleWake).
 async function captureAttachments(msg: Message): Promise<phpClient.AttachmentInput[]> {
     try {
         const survivors = [...msg.attachments.values()]
@@ -83,23 +93,57 @@ export async function handleEnqueue(msg: Message): Promise<void> {
         text: msg.content,
         attachments,
     });
-    // Instant ack (bot-side of "ack + thread"): react ✴️ so a GM sees pickup with no
-    // cron round-trip. Also fires for Phase-6 backfilled messages (same shared path) —
-    // desirable: it signals the bot picked the report up on catch-up, not just live.
-    // Must never throw past this handler — Phase-6 backfill (backfill.ts) awaits
-    // handleEnqueue in a plain loop with no per-message try/catch, so an uncaught
-    // react rejection here would abort replay of every message after it.
-    try {
-        await msg.react('✴️');
-    } catch (err) {
-        console.error('handleEnqueue: react ack failed (swallowed):', err);
-    }
 }
 
 // A thread's own channel id IS the thread id — that's what §3b thread-reply
 // stamps last_gm_reply_at against.
 export async function handleThreadReply(msg: Message): Promise<void> {
     await phpClient.threadReply({ thread_id: msg.channelId, message_id: msg.id });
+}
+
+// ── Operator wake ───────────────────────────────────────────────────────────
+// The route guarantees msg.channel is a thread under the bug channel and the author is
+// the configured operator. PHP re-checks the author id and owns every state decision.
+export async function handleWake(msg: Message): Promise<void> {
+    const thread = msg.channel;
+    if (!thread.isThread()) return;   // unreachable via the 'wake' route; narrows the type
+
+    // A thread opened on a message shares that message's id, so thread.id is the fallback
+    // when the starter can no longer be fetched.
+    const starter = await thread.fetchStarterMessage().catch(() => null);
+    const sourceId = starter?.id ?? thread.id;
+    const body: phpClient.WakeBody = {
+        source_message_id: sourceId,
+        thread_id: thread.id,
+        message_id: msg.id,
+        author_id: msg.author.id,
+        content: msg.content,
+    };
+
+    let result: phpClient.WakeResult;
+    try {
+        result = await phpClient.wake(body);
+    } catch (err) {
+        if (err instanceof phpClient.ApiError && err.statusCode === 404 && starter !== null) {
+            // No report row for the thread starter (never enqueued, e.g. posted while the
+            // bot was down): enqueue it now, then wake exactly once more.
+            await handleEnqueue(starter);
+            result = await phpClient.wake(body);
+        } else if (err instanceof phpClient.ApiError && (err.statusCode === 404 || err.statusCode === 403)) {
+            console.error(`handleWake: wake rejected (${err.statusCode}):`, err.message);
+            return;
+        } else {
+            throw err;
+        }
+    }
+
+    if (result.outcome === 'duplicate') return;
+    // Must never throw past this handler: a react failure is cosmetic once PHP woke the row.
+    try {
+        await msg.react('👀');
+    } catch (err) {
+        console.error('handleWake: react ack failed (swallowed):', err);
+    }
 }
 
 // ── Reaction handler — resolves partials, ignores the bot's own reactions ────
@@ -211,5 +255,6 @@ export async function routeAndHandle(message: Message, clientUserId: string): Pr
     const route = classifyMessage(toRoutable(message), clientUserId);
     if (route === 'enqueue') await handleEnqueue(message);
     else if (route === 'thread-reply') await handleThreadReply(message);
+    else if (route === 'wake') await handleWake(message);
     // 'ignore' → no-op
 }

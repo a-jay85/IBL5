@@ -2,8 +2,8 @@
 # Canonical find-by-HTML-marker sticky PR comment helpers, sourced by bin/ scripts.
 #
 # Marker ownership stays with the CALLER: these functions never append the marker
-# to the body. Pass a body that already contains it (bin/pr-canary-check builds it
-# into render_body; bin/check-pr-collisions concatenates it at the call site).
+# to the body. Pass a body that already contains it (bin/check-pr-collisions
+# concatenates it at the call site).
 #
 # Honours $GH_CMD so test harnesses can substitute a stub gh.
 

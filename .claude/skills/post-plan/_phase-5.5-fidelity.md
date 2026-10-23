@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-20
+last_verified: 2026-10-22
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -206,7 +206,7 @@ On `NOT READY`, run the same remediation for every `Mode: in-PR` finding, then s
 
 ### Terminal-line recipe
 
-The last line of the sticky comment, immediately above the `<!-- pr-ready-verdict -->` marker. The row is chosen by two lookups, not by judgement. Column 1 is the step-3 `FIDELITY` literal. Column 2 is decided by re-reading `$FIDELITY_VERDICT_FILE`'s finding list — `Mode: in-PR` treats every Phase 6 finding, notes and blockers alike — and checking each one against what step 4's commit actually changed. Every finding addressed is the "fixed" row; anything else is the "left unfixed" row, and the unfixed finding is named in the line by copying its title verbatim. Re-read the file; do not answer this from memory of what step 4 did. The `READY`/`NOT READY` **prefix** is load-bearing: `bin/pr-cycle`'s verdict parse anchors on it (`"NOT READY"*` is a prefix glob) and `bin/pr-ready-now`'s `derive_status` anchors likewise, so a trailing ` — <reason>` is invisible to both. Never put the reason *before* the word.
+The last line of the sticky comment, immediately above the `<!-- pr-ready-verdict -->` marker. The row is chosen by two lookups, not by judgement. Column 1 is the step-3 `FIDELITY` literal. Column 2 is decided by re-reading `$FIDELITY_VERDICT_FILE`'s finding list — `Mode: in-PR` treats every Phase 6 finding, notes and blockers alike — and checking each one against what step 4's commit actually changed. Every finding addressed is the "fixed" row; anything else is the "left unfixed" row, and the unfixed finding is named in the line by copying its title verbatim. Re-read the file; do not answer this from memory of what step 4 did. The `READY`/`NOT READY` **prefix** is load-bearing: `bin/pr-cycle`'s verdict parse anchors on it (`"NOT READY"*` is a prefix glob) and `bin/post-plan-fleet`'s `derive_status` anchors likewise, so a trailing ` — <reason>` is invisible to both. Never put the reason *before* the word. <!-- slop-ok -->
 
 | Step-3 `FIDELITY` | Step 4 outcome | Terminal line |
 |---|---|---|
@@ -384,6 +384,6 @@ The disclosure line sits directly under `**Plan hash:**`. In the skill layout th
 
 Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s and must not be renamed or reformatted. `.github/workflows/merge-digest-notify.yml` selects the **last** comment containing that HTML marker and pipes it into `bin/digest-dm-build`'s `_digest_labels`, which anchors on that exact heading. Renaming either silently degrades every DM to the fallback message while every test stays green.
 
-Post with the find-and-update-else-create shape from `bin/pr-canary-check` — grep its `STICKY_MARKER` constant and the `post_sticky()` below it rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
+Post with the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh`. Grep the function name rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
 
 After posting, when `FIDELITY=missing` or `FIDELITY=NOT READY`: STOP with instructions to remediate the reviewer's findings and re-run `/post-plan`. Never hand-edit the verdict file to clear it — an absent file is itself a blocking state for condition (12).

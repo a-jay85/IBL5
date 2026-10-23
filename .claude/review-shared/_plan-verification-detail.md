@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-10-17
+last_verified: 2026-10-22
 ---
 
 # _plan-verification Detail
@@ -54,7 +54,7 @@ Only an *intrinsic* deploy-dependency that survives that challenge may be record
 | A `--dry-run` / `--once` flag | `bin/sim-recap-tick` already ships `--dry-run --sim=N`, which touches no queue row and performs no DB write — copy that shape instead of inventing one |
 | Record-and-replay over a genuinely captured response | Replaces a hand-written double with a real payload |
 | Scoped live smoke against a **test** channel / endpoint | Crosses the real boundary without touching prod traffic |
-| `workflow_dispatch` / `workflow_call` on the PR branch | Environment 2 — `.github/workflows/pr-canary.yml` and `.github/workflows/deploy-rehearsal.yml` both already do this |
+| `workflow_dispatch` / `workflow_call` on the PR branch | Environment 2. `.github/workflows/deploy-rehearsal.yml` already does this |
 | Prod-clone dry-run via `.github/workflows/deploy-rehearsal.yml` | Environment 3 — for the migration half |
 | DatabaseIntegration test | For the schema/state effects the tick produces |
 

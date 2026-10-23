@@ -1,5 +1,5 @@
 ---
-description: A required aggregator blocks auto-merge on any red check on the PR head; the 2026-10-21 addendum replaces the polling All checks green job with the All checks settled commit status. Condition (15) demotes to a warning only while protection lists the aggregator.
+description: A required aggregator blocks auto-merge on any red check on the PR head; the 2026-10-21 addendum replaces the polling All checks green job with the All checks settled commit status. Condition (15) demotes to a warning only while protection lists the aggregator. A 2026-10-22 addendum retries the settle job's API reads and closes an empty-body fail-open.
 last_verified: 2026-10-22
 owner: ajaynicolas
 ---
@@ -225,3 +225,11 @@ so the status can read `failure` while `gh pr checks` shows pending. The replace
 completion re-settles it. The lib is unchanged here, and the fix is a follow-up. A workflow added
 later with a `pull_request` trigger but left out of the `workflows:` list would never
 fire a settle; A6 fails the PR that adds it.
+
+## Addendum 2026-10-22: API read retry in the settle job
+
+On 2026-10-22, 25 of about 220 `all-checks-settled.yml` runs exited 2 with `API read error: ...: unexpected end of JSON input` during a GitHub incident. A failed run posts no status, so the PR kept a stale one until a sibling completion re-settled it.
+
+`bin/settle-pr-status` and `bin/check-pr-checks-green` now send their GitHub API reads through `gh_retry_json` in `bin/lib/gh-retry.sh` (ADR-0195 addendum 2026-10-22). Each read gets 3 attempts, with 2s and then 5s between them. A read retries on a non-zero exit, an empty body, a body that does not parse as JSON, HTTP 5xx and HTTP 429. Any other HTTP 4xx fails at once. Both scripts set the budget with `: "${IBL5_GH_RETRY_DELAYS:=2 5}"`, so the workflow file and the A-block of `bin/check-composite-contracts` are unchanged. The added sleep is at most 7s per read and under 30s for the whole job, well inside `timeout-minutes: 5`.
+
+The job stays fail-closed. An exhausted read still exits 2 and writes no status. The `--head-sha` path now also rejects a `commits/<sha>/pulls` body that is not a JSON array. Before this, an empty body reached the `NOTHING: no open PR has head` exit 0 and silently skipped the PR. The status POST is not retried, because its payload arrives on stdin and a rerun would send an empty body. Cases S11-S16 and P25-P29 in `bin/test-ci-checks-green` pin this.

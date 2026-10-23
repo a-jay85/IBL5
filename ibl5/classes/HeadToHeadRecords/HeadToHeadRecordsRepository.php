@@ -569,6 +569,45 @@ perspectives AS (
     }
 
     /**
+     * @see HeadToHeadRecordsRepositoryInterface::sourceFingerprint()
+     */
+    public function sourceFingerprint(): string
+    {
+        $sql = 'SELECT COUNT(*) AS total_rows,
+                       COALESCE(MAX(id), 0) AS max_id,
+                       COALESCE(MAX(updated_at), \'\') AS max_updated,
+                       COALESCE(SUM(season_year = ?), 0) AS current_rows
+                FROM `ibl_box_scores_teams`';
+
+        $stmt = $this->db->prepare($sql);
+        if ($stmt === false) {
+            throw new \RuntimeException('sourceFingerprint prepare failed: ' . $this->db->error);
+        }
+        $year = $this->currentSeasonYear;
+        $stmt->bind_param('i', $year);
+        if (!$stmt->execute()) {
+            $err = $stmt->error;
+            $stmt->close();
+            throw new \RuntimeException('sourceFingerprint execute failed: ' . $err);
+        }
+        $result = $stmt->get_result();
+        $row = $result !== false ? $result->fetch_assoc() : null;
+        $stmt->close();
+        $row ??= [];
+
+        $maxUpdated = $row['max_updated'] ?? '';
+
+        return sprintf(
+            '%d:%d:%d:%s:%d',
+            $this->currentSeasonYear,
+            self::intFromMixed($row['total_rows'] ?? 0),
+            self::intFromMixed($row['max_id'] ?? 0),
+            is_string($maxUpdated) ? $maxUpdated : '',
+            self::intFromMixed($row['current_rows'] ?? 0),
+        );
+    }
+
+    /**
      * Execute a zero-parameter SQL statement and return all rows as associative arrays.
      *
      * @return list<array<string, mixed>>

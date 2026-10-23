@@ -530,8 +530,9 @@ _CHECK_LINE_RE = re.compile(r"^\s*\**([1-6])[abc]?[.)]\s", re.M)
 _SIX_D_LINE_RE = re.compile(r"^\s*\**([1-6])([abc]?)[.)]\s+(.*)$")
 # The whole verdict must open with a pass word followed by end/punctuation. A pass word
 # that starts a longer clause ("None of these edits...", "Pass with one gap") is a fail.
+# A dash counts only at end of line ("None —"); "None — the test row is missing" is a fail.
 _SIX_D_PASS_RE = re.compile(
-    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*(?:[.!]|[-\u2013\u2014]|$)")
+    r"(?i)^(?:pass(?:es|ed)?|ok|clean|n/a|none|no findings?|no issues?)\s*(?:[.!]|[-\u2013\u2014]\s*$|$)")
 # Every number in a citation like "check 4", "checks 3 and 4", "checks 3/4", "Check 4 & 3".
 _BULLET_CHECK_RE = re.compile(
     r"(?i)\bchecks?\b\s*#?\s*([1-6][abc]?(?:\s*(?:,|/|&|and/or|and|or|to|-)\s*#?\s*[1-6][abc]?)*)\b")

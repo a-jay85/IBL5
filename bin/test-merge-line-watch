@@ -108,6 +108,62 @@ assert_absent "I: no comment posted" 'comments' "$GH"
 SEL_OUT=$'action=none\nhead=8\nskipped=' run "$WATCH" --once
 assert_absent "J: no skipped line" 'skipped:' "$OUT"
 
+# K-P: bin/lib/master-bot-wait.sh, which the watch loop calls after its settle.
+# The stub gh stands in for gh's --jq output: it prints "Tests and Analysis"
+# until call number $BOT_OPEN_UNTIL, then nothing (no open run).
+BOT_LOG="$TMP/bot.log"
+cat > "$TMP/botgh" <<EOF
+#!/bin/sh
+echo "\$1 \$2 \$3" >> "$BOT_LOG"
+[ -n "\${BOT_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }
+n=\$(wc -l < "$BOT_LOG")
+[ "\$n" -lt "\${BOT_OPEN_UNTIL:-1}" ] && echo "Tests and Analysis"
+exit 0
+EOF
+chmod +x "$TMP/botgh"
+
+bot_wait() {
+    : > "$BOT_LOG"
+    OUT=$(
+        # shellcheck source=bin/lib/master-bot-wait.sh
+        . "$SCRIPT_DIR/lib/master-bot-wait.sh"
+        GH_CMD="$TMP/botgh" MASTER_BOT_WAIT_POLL=0 master_bot_wait "$@" 2>&1
+    )
+    RC=$?
+    CALLS=$(wc -l < "$BOT_LOG" | tr -d ' ')
+}
+
+# K: nothing open returns at once, after one call on the branch-wide runs list.
+BOT_OPEN_UNTIL=1 bot_wait o/r
+assert_match "K: clear message" 'no bot-committing master run open' "$OUT"
+assert_eq "K: one API call" 1 "$CALLS"
+assert_match "K: master-wide query" '^api repos/o/r/actions/runs\?branch=master&event=push&per_page=100 ' "$(cat "$BOT_LOG")"
+assert_eq "K: exit 0" 0 "$RC"
+
+# L: an open run is polled until it finishes.
+BOT_OPEN_UNTIL=3 bot_wait o/r
+assert_match "L: names the open run" 'waiting on Tests and Analysis' "$OUT"
+assert_match "L: then clear" 'no bot-committing master run open' "$OUT"
+assert_eq "L: three API calls" 3 "$CALLS"
+
+# M: an API failure goes ahead (fail open), exit 0.
+BOT_FAIL=1 bot_wait o/r
+assert_match "M: failure goes ahead" 'could not list master runs; going ahead' "$OUT"
+assert_eq "M: exit 0" 0 "$RC"
+
+# N: the cap ends the wait even while a run is still open.
+MASTER_BOT_WAIT_CAP=0 BOT_OPEN_UNTIL=99 bot_wait o/r
+assert_match "N: cap goes ahead" 'still open after 0s \(Tests and Analysis\); going ahead' "$OUT"
+assert_eq "N: one API call" 1 "$CALLS"
+
+# O: progress goes through the caller's say command.
+tag() { echo "TAG $*"; }
+BOT_OPEN_UNTIL=1 bot_wait o/r tag
+assert_match "O: custom say used" '^TAG bot-commit wait: no bot-committing' "$OUT"
+
+# P: the watch loop calls the wait between the settle and the pass.
+assert_match "P: loop waits before the pass" 'master_bot_wait "\$REPO" say' "$(sed -n '/sleep "\$SETTLE"/,/run_pass/p' "$WATCH")"
+
 # H: usage errors exit 2.
 run "$WATCH" --interval abc
 assert_eq "H: bad --interval exits 2" 2 "$RC"

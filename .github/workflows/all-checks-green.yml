@@ -55,5 +55,5 @@ jobs:
             --repo="$REPO" --sha="$HEAD_SHA" --base-ref="$BASE_REF" --wait \
             --self='All checks green' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
-            --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure' \
+            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure' \
             --interval-seconds=60 --timeout-seconds=2400 --startup-grace-seconds=60

@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-09-26
+last_verified: 2026-10-22
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -37,6 +37,18 @@ The automouse bot runs as the repo owner with the owner's `gh` credentials, so G
 
 The originally-shipped **Layer B** was a runtime strip: `bin/automouse/run`'s `neutralize_feat_signoff()` stripped `--auto` arming and any `human-approved` label from bot-authored `feat:` PRs *after* each post-plan run. Because post-plan arms `--auto` then watches CI to completion before returning to `automouse-run`, that cleanup ran too late to beat a label applied mid-watch — best-effort, not deterministic. PR #1137 **removed `neutralize_feat_signoff()`** and replaced the arm-then-strip pattern with the upstream deterministic refusal now described in the Decision (Phase 6.5 condition (8)): post-plan never arms a `feat:` PR, so nothing needs stripping. Layer A — this ADR's core decision, the required `human-signoff` check — is unchanged. The same refactor moved the general merge-hold lever from the inert `auto_postplan: false` plan-frontmatter key to `auto_merge: false`, read deterministically at Phase 6.5 condition (7).
 
+## Update (2026-10-19): approval is pinned to the PR diff
+
+The `human-approved` label now covers one specific PR diff. Before this change the label survived every later push, so commits a maintainer never saw inherited the approval.
+
+- **Fingerprint.** The gate job checks out the PR head, deepens the history for a `feat:` PR holding the label, and computes `git patch-id --verbatim` over `git diff --binary origin/<base>...HEAD` (the merge-base diff). The function is `hs_diff_fingerprint` in `bin/lib/human-signoff-classifier.sh`. `--verbatim` keeps whitespace-only edits visible, matching `diff_patch_id()` in `tools/postplan-harness/harness/fidelity.py`.
+- **Record.** A `labeled` event for `human-approved` is the approval. The gate passes, and the `human-approved-fingerprint` job posts a `github-actions[bot]` comment whose first line is `<!-- hs-approved-diff: <id> -->`.
+- **Compare.** Every other event on a `feat:` PR holding the label recomputes the id and compares it with the newest marker written by `github-actions[bot]`. Markers from any other author are ignored. A clean rebase keeps the id, so the pipeline's frequent rebases keep the approval.
+- **Drop.** A mismatch, a missing record, or any read or compute error reds the required check in the same run, so auto-merge cannot complete in the gap. The write job then posts a comment with a `revoked` marker and the reason, and removes the label.
+- **Missing record drops.** A cancelled or failed `labeled` run leaves no record. Treating that as unchanged would let a later real diff change inherit the approval, so it drops instead. Zero open PRs carried the label when this shipped, so no approval was lost.
+- **Conservative edge.** patch-id hashes hunk context. An upstream edit inside the three context lines of a PR hunk changes the id after a clean rebase and drops the label. The maintainer re-applies it.
+- **Residual.** A same-repo PR can still edit this workflow or the classifier it sources, as before this change. The bot-author filter stops outside commenters from forging a record.
+
 ## Lineage
 
 Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merge.md`), which established auto-merge for dependabot PRs — that path is gated separately on `dependabot[bot]` authorship and is unaffected. This ADR corrects the gap left by #1072, which is retained only as the de-facto first attempt.
@@ -47,3 +59,4 @@ Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merg
 - `bin/automouse/run` — formerly held Layer B (`neutralize_feat_signoff`), removed by PR #1137; the `feat:` block now lives upstream in post-plan Phase 6.5 condition (8) (see Update).
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5 arms `gh pr merge --auto` (the behaviour this gate constrains).
 - `.claude/rules/automouse-workflow.md` — automouse pipeline overview.
+- `bin/lib/human-signoff-classifier.sh`: the classifier and the diff-pinned approval functions, sourced by the workflow and by `bin/test-human-signoff-classifier`.

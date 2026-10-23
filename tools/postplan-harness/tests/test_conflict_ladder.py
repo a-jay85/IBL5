@@ -124,12 +124,12 @@ def _build_merge_repo(d, base, feat, master, resolved):
     return pre, master_sha, _git(d, "rev-parse", "HEAD").stdout.strip()
 
 
-def _ctx(d, key, pre, master, conflicted, prove, llm=None):
+def _ctx(d, key, pre, master, conflicted, prove, llm=None, stage_sets=None):
     g = LiveGit(str(d))
     return LadderContext(
         llm=llm, run=g._run, run_out=g._run_out, prove=prove, worktree=str(d),
         key=key, master_sha=master, pre_rebase_sha=pre,
-        conflicted_files=tuple(conflicted))
+        conflicted_files=tuple(conflicted), stage_sets=stage_sets or {})
 
 
 def _head(d):
@@ -1001,12 +1001,25 @@ def _png_repo(tmp_path, rel):
 
 def test_regen_rung_takes_master_png_via_glob(tmp_path, key):
     d, pre, master = _png_repo(tmp_path, _VR_PNG)
-    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"))
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"),
+               stage_sets={_VR_PNG: frozenset({1, 2, 3})})
     attempt = make_regen_rung()[1](ctx, "")
     assert attempt.applied is True
     assert (Path(d) / _VR_PNG).read_bytes() == _PNG_MASTER
     assert _VR_PNG in attempt.touched
     assert f"{_VR_PNG}: master copy only ({_VR_WHY})" in attempt.note
+
+
+@pytest.mark.parametrize("stages", [frozenset({1, 2}), frozenset({1, 3}), None])
+def test_regen_rung_skips_vr_png_unless_both_modified(tmp_path, key, stages):
+    # Modify/delete ({1,2} or {1,3}) went to the resolver on purpose; no stage set means
+    # the rung cannot prove both sides modified it. Either way the branch bytes stay.
+    d, pre, master = _png_repo(tmp_path, _VR_PNG)
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"),
+               stage_sets=None if stages is None else {_VR_PNG: stages})
+    attempt = make_regen_rung()[1](ctx, "")
+    assert attempt == RungAttempt(False, (), "no generated file involved")
+    assert (Path(d) / _VR_PNG).read_bytes() == _PNG_BRANCH
 
 
 def test_regen_rung_ignores_png_outside_snapshot_dir(tmp_path, key):

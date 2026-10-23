@@ -16,7 +16,7 @@ import os
 import subprocess
 from dataclasses import dataclass, replace as _dc_replace
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Mapping, Optional
 
 from .state import HarnessError
 
@@ -45,6 +45,7 @@ class LadderContext:
     state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
     extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
     expected_parents: tuple[str, ...] = ()   # () = merge pair (pre_rebase_sha, master_sha); the stacked path passes HEAD's parents
+    stage_sets: Mapping[str, frozenset[int]] = dataclasses.field(default_factory=dict)  # ConflictInventory.stage_sets
 
 
 @dataclass(frozen=True)
@@ -166,10 +167,11 @@ def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     if sweep_rc != 1:
         return GuardVerdict(False, False,
                             f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}", "")
-    # A glob-matched copy-only path (a VR PNG) is master's bytes or a session-written
-    # screenshot, never a text merge, so the UTF-8 guard does not apply to it.
+    # A conflicted glob-matched copy-only path (a VR PNG) is binary, so the UTF-8 guard
+    # skips it. A PNG that never conflicted gets no exemption, so a rung that writes one
+    # is rejected here (backlog#1553).
     checked = tuple(dict.fromkeys(tuple(touched) + tuple(ctx.conflicted_files)))
-    binary_exempt = {g.path for g in match_generated(checked)
+    binary_exempt = {g.path for g in match_generated(ctx.conflicted_files)
                      if g.command is None and _is_glob_match(g.path)}
     text_reason = assert_text_only(
         ctx.worktree, [p for p in checked if p not in binary_exempt])
@@ -419,11 +421,12 @@ def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> R
         lost, structural = parse_lost_lines(proof_out)
         involved = (set(ctx.conflicted_files) | set(lost)
                     | {line.rsplit(": ", 1)[1] for line in structural if ": " in line})
-        # A glob (VR PNG) entry applies only to a file that conflicted; a path that is
-        # merely named in LOST lines keeps the branch's bytes.
-        conflicted = set(ctx.conflicted_files)
+        # A glob (VR PNG) entry applies only to a file both sides modified, the same rule
+        # as pre_resolve_targets. A modify/delete PNG, or one merely named in LOST lines,
+        # keeps its resolver outcome.
         candidates = [g for g in match_generated(involved, registry=registry)
-                      if g.path in conflicted or not _is_glob_match(g.path)]
+                      if not _is_glob_match(g.path)
+                      or frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED]
         if not candidates:
             return RungAttempt(False, (), "no generated file involved")
         notes = regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,

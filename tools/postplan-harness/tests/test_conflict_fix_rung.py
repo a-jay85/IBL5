@@ -201,6 +201,25 @@ def test_fix_rung_allows_vr_snapshot_png_via_glob(tmp_path, key):
     assert png in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
 
 
+def test_fix_rung_text_guards_non_conflicted_vr_snapshot_png(tmp_path, key):
+    # backlog#1553: the test-path remit lets the session write here, but only a PNG that
+    # conflicted skips the UTF-8 guard. A never-conflicted one is rejected.
+    png = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/player-mobile.png"
+
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / png
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+    _assert_untouched(d, merge)
+
+
 def test_fix_rung_rejects_png_outside_snapshot_dir(tmp_path, key):
     def effect(cwd):
         _edit_keepme(cwd)

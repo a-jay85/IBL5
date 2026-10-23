@@ -252,6 +252,7 @@ done <<< "$SNAP"
 DECLINED_MSG='pr-cycle-watch: PR #%s on head %s was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.'
 STRIKE_MSG='pr-cycle-watch: PR #%s on head %s: the rescue never reached post-plan %s times (last: %s %s %s). Skipping it until its diff changes.'
 PATCHID_MSG='pr-cycle-watch: PR #%s on head %s: could not compute its patch-id, so its retry cap is keyed on the head SHA for now and a rebase-only push will re-qualify it. See the tick log.'
+PROBE_MSG='pr-cycle-watch: PR #%s on head %s: the conflict probe could not run (%s), so the PR re-fires on every new master tip as before, up to the daily cap. See the tick log.'
 
 # strike <pr> <sha> <key> <status> <outcome> <reason>: one no-op rescue; DM once when the cap is hit.
 strike() {
@@ -266,17 +267,88 @@ strike() {
     fi
 }
 
+# probe_fallback <pr> <sha> <reason>: the conflict probe could not decide, so the PR re-fires
+# on the new master tip exactly as before. Loud by design.
+probe_fallback() {
+    local msg
+    log "WARN PR $1: conflict probe unavailable ($3); re-firing on the new master tip as before"
+    pcw_kind_dm_due "$STATE" probe "$1" "$2" || return 0
+    # shellcheck disable=SC2059  # the message is a fixed printf template
+    msg="$(printf "$PROBE_MSG" "$1" "${2:0:7}" "$3")"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        log "would DM: $DM_CMD --ping $msg"
+    else
+        dm_ping "$msg" || true
+        pcw_kind_mark_dm "$STATE" probe "$1" "$2"
+    fi
+}
+# conflict_files_same <hold-file> <tip> <paths>: is every conflicted path byte-identical on
+# <tip> and on the tip recorded in the hold? Same path names are not enough: master can move
+# again inside a conflicted file. A path absent on both sides counts as the same.
+conflict_files_same() {
+    local old p a b
+    old="$(sed -n '1p' "$1")"
+    [[ "$old" =~ ^[0-9a-f]{40}$ ]] || return 1
+    while IFS= read -r p; do
+        [[ -n "$p" ]] || continue
+        a="$(git -C "$ROOT" rev-parse -q --verify "$old:$p" 2>/dev/null || true)"
+        b="$(git -C "$ROOT" rev-parse -q --verify "$2:$p" 2>/dev/null || true)"
+        [[ "$a" == "$b" ]] || return 1
+    done <<< "$3"
+    return 0
+}
+# conflict_refire <pr> <sha> <tip>: called only when pcw_conflict_retry_due said due and the
+# head is attempted. 0 = re-fire. 4 = the conflict is unchanged: skip, with CONFLICT_NP set to
+# the path count, and the hold's tip advanced to <tip> (not under --dry-run).
+conflict_refire() {
+    local pr="$1" sha="$2" tip="$3" rhead held pout prc
+    CONFLICT_NP=0
+    rhead="$(pcw_conflict_hold_head "$STATE" "$pr")"
+    if [[ -n "$rhead" && "$rhead" != "$sha" ]]; then
+        log "PR $pr: conflict re-try (head changed ${rhead:0:7} -> ${sha:0:7})"; return 0
+    fi
+    if ! held="$(pcw_conflict_hold_paths "$STATE" "$pr")"; then
+        probe_fallback "$pr" "$sha" "no path set recorded with the hold"; return 0
+    fi
+    pout="$(pcw_conflict_probe "$ROOT" "$pr" "$tip" "$sha")" && prc=0 || prc=$?
+    case "$prc" in
+        0) log "PR $pr: conflict re-try (merges clean on master ${tip:0:7})"; return 0 ;;
+        1) if [[ "$pout" == "$held" ]] && conflict_files_same "$STATE/conflict-hold/$pr" "$tip" "$held"; then
+               CONFLICT_NP="$(grep -c . <<< "$pout")"
+               [[ "$DRY_RUN" -eq 1 ]] \
+                   || pcw_record_conflict_hold "$STATE" "$pr" "$tip" "$sha" "$pout"
+               return 4
+           fi
+           log "PR $pr: conflict re-try (conflicted paths or their content changed on master: $(grep -c . <<< "$held") -> $(grep -c . <<< "$pout"))"
+           return 0 ;;
+        *) probe_fallback "$pr" "$sha" "$pout"; return 0 ;;
+    esac
+}
 # settle_row <pr> <sha> <key> <status> <outcome> <reason> [<tip>]: the outcome table, one PR.
 settle_row() {
-    local pr="$1" sha="$2" key="$3" status="$4" outcome="$5" reason="$6" tip="${7:-}" t7 msg
+    local pr="$1" sha="$2" key="$3" status="$4" outcome="$5" reason="$6" tip="${7:-}" t7 msg pout prc np
     # conflict-hold/<pr>: only a settled rebase conflict may later re-try on a new master tip.
     # A paused rescue never ran, so it keeps any hold. Every other fired or holdrepeat
     # outcome is a determinate result and drops the hold back to the plain retry cap.
     case "$status:$outcome" in
         fired:conflict)
-            pcw_record_conflict_hold "$STATE" "$pr" "$tip"
-            t7="${tip:-unknown}"
-            log "PR $pr: conflict hold recorded (master ${t7:0:7})" ;;
+            # Record the merge-tree path set at the launch tip, so a later tick can tell
+            # whether master's move touched the conflict. No set recorded = today's rule.
+            prc=2; pout="no master tip at launch"
+            if [[ -n "$tip" ]]; then
+                pout="$(pcw_conflict_probe "$ROOT" "$pr" "$tip" "$sha")" && prc=0 || prc=$?
+            fi
+            [[ "$prc" -eq 0 ]] && pout="merges clean at the launch tip"
+            if [[ "$prc" -eq 1 ]]; then
+                pcw_record_conflict_hold "$STATE" "$pr" "$tip" "$sha" "$pout"
+                np="$(grep -c . <<< "$pout")"
+                log "PR $pr: conflict hold recorded (master ${tip:0:7}; $np conflicted paths)"
+            else
+                pcw_record_conflict_hold "$STATE" "$pr" "$tip"
+                t7="${tip:-unknown}"
+                log "PR $pr: conflict hold recorded (master ${t7:0:7})"
+                log "WARN PR $pr: conflict probe at hold time: $pout; a new master tip re-fires this PR as before"
+            fi ;;
         fired:paused) ;;
         fired:*|holdrepeat:*) pcw_clear_conflict_hold "$STATE" "$pr" ;;
     esac
@@ -499,12 +571,17 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
     # Only a DIRTY PR qualifies. Every other capped PR keeps the until-the-diff-changes rule.
     crd=1
     if [[ "$kind" == DIRTY ]]; then
-        pcw_conflict_retry_due "$STATE" "$pr" "$tip" "$TODAY"; crd=$?
+        pcw_conflict_retry_due "$STATE" "$pr" "$tip" "$TODAY" "$sha"; crd=$?
+        # Due by tip or head: re-fire only when the conflict could have changed.
+        if [[ "$crd" -eq 0 ]] && pcw_attempted_head "$STATE" "$pr" "$key" "$sha"; then
+            conflict_refire "$pr" "$sha" "$tip"; crd=$?
+        fi
     fi
     if [[ "$crd" -ne 0 ]] && pcw_attempted_head "$STATE" "$pr" "$key" "$sha"; then
         case "$crd" in
             2) skip "$pr" "retry cap (head ${sha:0:7}; rebase conflict, waiting for a new master tip)" ;;
             3) skip "$pr" "retry cap (head ${sha:0:7}; rebase conflict, daily cap of $PCW_CONFLICT_RETRY_DAILY_CAP launches reached)" ;;
+            4) skip "$pr" "retry cap (head ${sha:0:7}; rebase conflict unchanged ($CONFLICT_NP paths))" ;;
             *) skip "$pr" "retry cap (head ${sha:0:7})" ;;
         esac
         if pcw_dm_due "$STATE" "$pr" "$key" "$sha"; then

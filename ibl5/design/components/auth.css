@@ -37,17 +37,11 @@
     margin: 0 auto;
 }
 
-.auth-card .ibl-card__header,
 .auth-card__header {
     text-align: center;
     padding: var(--space-6) var(--space-6) var(--space-4);
 }
 
-.auth-card .ibl-card__body {
-    padding: var(--space-4) var(--space-6) var(--space-6);
-}
-
-.auth-card .ibl-card__footer,
 .auth-card__footer {
     text-align: center;
     padding: var(--space-4) var(--space-6);
@@ -214,16 +208,10 @@
         max-width: 100%;
     }
 
-    .auth-card .ibl-card__header,
     .auth-card__header {
         padding: var(--space-4) var(--space-4) var(--space-3);
     }
 
-    .auth-card .ibl-card__body {
-        padding: var(--space-3) var(--space-4) var(--space-4);
-    }
-
-    .auth-card .ibl-card__footer,
     .auth-card__footer {
         padding: var(--space-3) var(--space-4);
     }

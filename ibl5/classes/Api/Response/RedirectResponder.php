@@ -12,8 +12,14 @@ namespace Api\Response;
  */
 class RedirectResponder
 {
-    public function redirect(string $url): void
+    public function redirect(string $url, int $status = 302): void
     {
-        header('Location: ' . $url);
+        header('Location: ' . $url, true, $status);
+    }
+
+    /** Tells HTMX to perform a client-side navigation to $url. */
+    public function hxRedirect(string $url): void
+    {
+        header('HX-Redirect: ' . $url);
     }
 }

@@ -244,12 +244,49 @@ import pytest
     "5. Visual baselines: no issue with layout, but the baseline is missing.",
     "1. Intent coverage: Pass with one gap: Phase 2 is absent.",
     "3. Scope creep: FAIL. Unplanned edit, and there is no issue reference.",
+    "6. Tests named by the matrix: None \u2014 the plan's test row is missing",
+    "2. Plan text kept: No findings. But the diff drops plan Phase 3 text.",
+    "6. Tests named by the matrix: None. The plan's test row is missing.",
+    "3. Scope creep: Pass! Except the edit to bin/foo.",
+    "6. Tests named by the matrix: None. The test row doesn’t exist.",
+    "5. Plan text kept: OK. Phase 3 text was omitted.",
 ])
 def test_predicate_6d_loose_pass_wording_declines(line):
     num = line.split(".")[0]
     text = VERDICT1_SIX_D_PURE_BODY
     old = next(ln for ln in text.splitlines() if ln.startswith(num + "."))
     assert fidelity.body_only_findings_text(text.replace(old, line)) is None
+
+
+@pytest.mark.parametrize("verdict", ["None \u2014", "None \u2014  ", "None -", "None \u2013 "])
+def test_six_d_bare_trailing_dash_still_passes(verdict):
+    text = VERDICT1_SIX_D_PURE_BODY.replace(
+        "6. Tests named by the matrix: pass.", f"6. Tests named by the matrix: {verdict}")
+    assert fidelity._six_d_failing(text) == {4}
+
+
+@pytest.mark.parametrize("verdict", [
+    "None.", "None. ", "Pass!", "OK", "No findings.", "n/a", "Clean",
+    "pass. No UI surface.", "None. Every planned test is present.",
+])
+def test_six_d_pass_word_or_benign_reason_still_passes(verdict):
+    text = VERDICT1_SIX_D_PURE_BODY.replace(
+        "6. Tests named by the matrix: pass.", f"6. Tests named by the matrix: {verdict}")
+    assert fidelity._six_d_failing(text) == {4}
+
+
+def test_six_d_period_followed_by_failure_text_is_not_a_pass():
+    text = VERDICT1_SIX_D_PURE_BODY.replace(
+        "6. Tests named by the matrix: pass.",
+        "6. Tests named by the matrix: None. The plan's test row is missing.")
+    assert fidelity._six_d_failing(text) == {4, 6}
+
+
+def test_six_d_dash_followed_by_failure_text_is_not_a_pass():
+    text = VERDICT1_SIX_D_PURE_BODY.replace(
+        "6. Tests named by the matrix: pass.",
+        "6. Tests named by the matrix: None \u2014 the plan's test row is missing")
+    assert fidelity._six_d_failing(text) == {4, 6}
 
 
 @pytest.mark.parametrize("cite", [

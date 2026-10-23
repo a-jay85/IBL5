@@ -77,6 +77,36 @@ class TeamEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Team not found', $output);
     }
 
+    public function testOpTeamWithCamelCaseTeamIDRendersTeamPage(): void
+    {
+        $this->seedTeamPageMocks();
+
+        $output = $this->runModule('Team', ['op' => 'team', 'teamID' => '1']);
+
+        $this->assertStringContainsString('team-banner-logo', $output);
+        $this->assertStringNotContainsString('Team not found', $output);
+    }
+
+    public function testOpTeamWithNonNumericCamelCaseTeamIDRendersFreeAgents(): void
+    {
+        $this->seedTeamPageMocks();
+
+        $output = $this->runModule('Team', ['op' => 'team', 'teamID' => 'abc']);
+
+        $this->assertStringContainsString('team-logo-fallback', $output);
+        $this->assertStringNotContainsString('team-banner-logo', $output);
+    }
+
+    public function testLowercaseTeamidTakesPriorityOverCamelCaseTeamID(): void
+    {
+        $this->seedTeamPageMocks();
+
+        $output = $this->runModule('Team', ['op' => 'team', 'teamid' => '0', 'teamID' => '1']);
+
+        $this->assertStringContainsString('team-logo-fallback', $output);
+        $this->assertStringNotContainsString('team-banner-logo', $output);
+    }
+
     public function testOpApiReturnsHtmlOutput(): void
     {
         $team = self::fullTeamData(['teamid' => 1, 'team_name' => 'Miami Heat']);

@@ -1,6 +1,6 @@
 ---
 description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and DMs recommendations to the owner. Raw URIs, user agents and identities never leave the database.
-last_verified: 2026-10-03
+last_verified: 2026-10-21
 ---
 
 # 0168. Weekly product-analytics review from ibl_events
@@ -39,3 +39,11 @@ Enforcement lives in `bin/test-events-review`, which runs in CI and pins the SQL
 - `bin/test-events-review`
 - `ibl5/classes/EventLog/README.md`
 - ADR-0016 (removed analytics layer) and ADR-0093 (SELECT-only production credential)
+
+## Addendum — channel delivery and Sunday schedule (2026-10-20) <!-- slop-ok -->
+
+The Decision above says the output is sent only to the owner through `bin/discord-dm`. That changed. The defanged output is now posted to the #reviews channel through `bin/discord-dm` and the `~/.iblbot-reviews-webhook-url` webhook. Failure notices stay on the default #dev webhook.
+
+The job also gained a fixed schedule. It fires on Sunday at 16:03 UTC, the weekly Claude usage reset. launchd times are local only, so the plist holds two Sunday entries (08:03 and 09:03 local) and passes `--at-reset`. At any other UTC hour the script exits 0, so exactly one of the two fires runs in both PDT and PST. The exception is a catch-up: if launchd ran a fire late (the Mac was asleep) and no review went out in the last 6 days, the script runs at that hour, except on Sunday before 16 UTC, which waits for the 16:xx fire.
+
+Everything else in the Decision is unchanged, including the SELECT-only credential, the tool-less model run, and the defanging.

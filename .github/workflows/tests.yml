@@ -163,6 +163,8 @@ jobs:
           --cache-directory=/tmp/phpunit-cache \
           --testdox \
           --coverage-clover coverage/clover.xml \
+          --display-phpunit-deprecations \
+          --display-phpunit-notices \
           --colors=always 2>&1 | tee /tmp/phpunit-output.txt
         PHPUNIT_EXIT=${PIPESTATUS[0]}
         set -eo pipefail
@@ -419,7 +421,7 @@ jobs:
         DB_USER: root
         DB_PASS: root
         DB_NAME: ibl5
-      run: vendor/bin/phpunit --group database --no-progress --testdox-summary
+      run: vendor/bin/phpunit --group database --no-progress --testdox-summary --display-phpunit-deprecations --display-phpunit-notices
 
   phpstan:
     name: PHPStan Analysis
@@ -504,21 +506,6 @@ jobs:
         DRIFT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       run: php bin/check-baseline-drift --base="$DRIFT_BASE"
 
-  phpunit-hygiene:
-    name: PHPUnit hygiene gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      # Scans every test file. A scan of only the PR's changed files let two
-      # PRs each pass and still leave master red together (#3142 + #3148).
-      # The merge line reruns CI on the latest master, so a full scan catches
-      # that before merge. The scan takes about 2 seconds.
-      - name: Ban silently-disabled tests (markTestSkipped)
-        run: bin/check-phpunit-hygiene
-
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
     needs: [ci-memo-check]
@@ -566,121 +553,6 @@ jobs:
           printf '%s\0' "${scripts[@]}" \
             | xargs -0 -P "$(nproc)" -n 30 shellcheck --severity=warning --shell=bash \
                 --exclude=SC2034,SC1090,SC2207
-
-  pinact-check:
-    name: Action SHA-pin drift guard
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install pinact
-        run: go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.10.1
-
-      - name: Verify every external action is SHA-pinned
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: '"$(go env GOPATH)/bin/pinact" run --check'
-
-  actionlint:
-    name: Workflow lint (actionlint)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Explicit setup-go rather than the runner's preinstalled toolchain:
-      # actionlint v1.7.12's go.mod requires go >= 1.25.0, and `go install`
-      # hard-fails when the toolchain is older. The sibling pinact-check job
-      # rides the preinstalled Go only because its pin needs less.
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.25'
-
-      # Version-pinned, not @latest: a new upstream rule would otherwise land as
-      # a red X on an unrelated PR that touched no workflow logic. Bump
-      # deliberately, with the resulting findings in the same commit.
-      - name: Install actionlint
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-
-      # Installed explicitly, exactly as the sibling ShellCheck job does — this
-      # repo does not assume the runner image ships it. actionlint's run:-block
-      # pass is half this gate; bin/lint-workflows hard-fails without it rather
-      # than letting actionlint skip the pass and still exit 0.
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-
-      # No working-directory — the script lives in repo-root bin/ and cds to the
-      # repo root itself. Shell policy (severity + excludes) lives in the script
-      # so a local run and this job cannot drift.
-      - name: Lint workflows
-        run: bin/lint-workflows
-
-  host-mariadb-guard:
-    name: Host mariadb grep guard
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Grep for host mariadb invocations outside bin/db-query
-        run: |
-          set -e
-          # Worktrees run a separate dockerized MariaDB per worktree. Calling the host
-          # `mariadb` client with -h 127.0.0.1 bypasses worktree isolation and will read
-          # or mutate the wrong database. Only bin/db-query is allowed to do this, and
-          # only on one branch: it routes by its own script location, so the host client
-          # runs solely for the main checkout's copy (or under DB_QUERY_TARGET=main).
-          # A worktree's copy goes through `docker exec ibl5-db-<slug>` and fails loudly
-          # if that container is not running. On ERROR 1049 it also names the $dbname it
-          # used and where that name came from. See .claude/rules/database-access.md.
-          offenders=$(
-            grep -rEn '^[[:space:]]*mariadb[[:space:]]+(-h[[:space:]]*127|-u[[:space:]]*root)' \
-              bin/ ibl5/bin/ 2>/dev/null \
-              | grep -v -E '(bin/db-query|\.md|tests\.yml)' \
-              || true
-          )
-
-          if [ -n "$offenders" ]; then
-            echo "FAIL: direct host mariadb invocations found in shell scripts."
-            echo ""
-            echo "$offenders"
-            echo ""
-            echo "Worktrees have isolated dockerized MariaDB instances. Use bin/db-query"
-            echo "or 'docker exec <container> mariadb ...' instead of calling the host client."
-            exit 1
-          fi
-
-          echo "OK: no host mariadb invocations found outside bin/db-query."
-
-  automouse-impl-model-test:
-    name: Automouse impl-model parser test
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Run automouse impl-model parser regression test
-        run: bin/test-automouse-impl-model
-      - name: Run automouse env-breaker regression test
-        run: bin/test-automouse-env-breaker
-      - name: Run automouse login-preflight regression test
-        run: bin/test-automouse-login-preflight
-      - name: Run headless elapsed-clock hook regression test
-        run: bin/test-headless-elapsed-hook
-      - name: Run post-merge hook change-detection regression test
-        run: bin/test-post-merge-hook
-      - name: Run automouse impl cap-timeout regression test
-        run: bin/test-automouse-impl-cap-timeout
-      - name: Run automouse postplan terminal-disposition regression test
-        run: bin/test-automouse-postplan-disposition
-      - name: Run automouse postplan worktree-resolution regression test
-        run: bin/test-automouse-postplan-worktree
 
   update-baselines:
     name: Update coverage & PHPStan baselines
@@ -787,50 +659,62 @@ jobs:
     name: Static guards
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Folds three unconditional micro-guards into one sequential job to save runner
-    # startup overhead (mirrors the PR #1269 meta-checks fold). NO `if:` and NO
-    # `needs:` — every check below runs unconditionally because none is covered by a
-    # path filter, so a filter gate would skip exactly when the bug lands (ADR-0186).
-    # Each check is a few seconds of grep/bash with no dependencies.
+    # Folds every unconditional guard in this workflow into one sequential job to
+    # save runner slots (PR #1269 meta-checks fold, ADR-0186).
+    # The job has NO `if:` and NO `needs:`: no path filter covers these checks, so a
+    # filter gate would skip exactly when the bug lands (ADR-0186).
+    # Every step after `Checkout code` carries `if: ${{ !cancelled() }}`, so one
+    # failing guard never hides another. A failed step still fails the job, so the
+    # job goes red when any guard is red. Never add `continue-on-error` to a step
+    # here: that would turn a red guard green.
+    # A new unconditional guard belongs here as a new step with the same `if:`,
+    # never as a new job.
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # infection-excludes: a stale exclude can be introduced by editing
       # ibl5/infection.json5 alone, which no path-filter covers.
       - name: Check infection.json5 file excludes resolve
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-infection-excludes
       # csrf-field-name: a wrong CSRF field name (name="csrf_token" without the
       # leading underscore) silently rejects every form submission and is invisible
       # to PHPStan/tests.
       - name: Check CSRF form field names
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-csrf-field-name
       # seed-id-uniqueness: seed fixtures load with ON DUPLICATE KEY UPDATE, so a
       # reused pid/teamid silently clobbers an earlier row instead of failing
       # (PR #1024). Also catches hand-picked duplicate migration numbers.
       - name: Check seed ids and migration numbers are unique
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-seed-id-uniqueness
       # config-example: CI copies config.php.example verbatim to config.php, so an
       # empty/zero placeholder becomes the CI test environment (PR #1008).
       # Also pins the config.local.php contract (template shape, fail-closed require).
       - name: Check config.php.example placeholders
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-config-example
       # th-aria-label: aria-label on <th> silently fails axe empty-table-header;
       # the correct fix is a sr-only span inside the th (PR postmortem, a11y audit).
       - name: Check th aria-label usage
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-th-aria-label
       # xml-class-refs: phpunit XML configs silently ignore missing suite directories,
       # so a renamed/moved test directory leaves a stale ref with no error.
       - name: Check phpunit XML file/directory references
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: php bin/check-xml-class-refs
       # phpstan-bin-coverage: extension-less PHP scripts in bin/ dodge PHPStan's
       # directory scan. This guard ensures every new one is explicitly listed.
       - name: Check PHP bin scripts covered by PHPStan
+        if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-phpstan-bin-coverage
       # workflow-lint: a job that `uses:` a local ./.github/actions/* action without
@@ -838,28 +722,34 @@ jobs:
       # behavior contract fails silently. NOTE: NO working-directory — these scripts
       # live in repo-root bin/ and scan repo-root .github/.
       - name: Local-action checkout ordering
+        if: ${{ !cancelled() }}
         run: bin/check-workflow-checkout
       # ci-image-registry: CI pulls Docker Hub images only through the GHCR mirror
       # listed in .github/ci-image-mirror.txt, and mirror consumers are wired to it.
       - name: CI image registry
+        if: ${{ !cancelled() }}
         run: bin/check-ci-image-registry
       # run-body interpolation: ${{ env.* }} / string ${{ inputs.* }} pasted into a
       # run: script is shell injection (backlog#1387). Route it through env: instead.
       - name: Run-body expression interpolation
+        if: ${{ !cancelled() }}
         run: bin/check-workflow-run-interpolation
       - name: Composite behavior contracts
+        if: ${{ !cancelled() }}
         run: bin/check-composite-contracts
       # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
       # into every session's context) can grow past its token budget via an edit
       # that no path filter covers. bin/check-rules-byte-budget (NEW,
       # Phase 1) caps it. Backlog: token-spend-backlog T2.
       - name: Check path-unscoped rules byte budget
+        if: ${{ !cancelled() }}
         run: bin/check-rules-byte-budget
       # claude-dir-placement: a worktree's cwd is <worktree>/ibl5, so a skill or
       # agent def authored relative to cwd lands at ibl5/.claude/... — one level
       # too deep. The harness discovers neither, so the file merges CI-green and
       # the skill is simply never available (PR #1831 shipped /pr-attack dead).
       - name: Check skill/agent defs live in repo-root .claude
+        if: ${{ !cancelled() }}
         run: bin/check-claude-dir-placement
       # skill-arguments: the harness substitutes the caller's FULL invocation text
       # into EVERY `$ARGUMENTS` occurrence in a SKILL.md. /plan carried 10 of them,
@@ -867,6 +757,7 @@ jobs:
       # skill body. check-rules-byte-budget cannot see this (wrong tree, and it
       # measures the file on disk, not the injected size). Backlog: token-spend.
       - name: Check SKILL.md files quote $ARGUMENTS once
+        if: ${{ !cancelled() }}
         run: |
           bin/check-skill-arguments --self-test
           bin/check-skill-arguments
@@ -879,6 +770,7 @@ jobs:
       # post-plan run). Shallow flags must sit behind an is-shallow-repository
       # guard and carry a `# shallow-ok` marker on the line.
       - name: Check shallow git fetches are guarded
+        if: ${{ !cancelled() }}
         run: |
           set +e
           # NO \b — git grep -E is POSIX ERE and silently matches NOTHING on \b,
@@ -898,6 +790,109 @@ jobs:
             exit 1
           fi
           echo "OK: no unguarded shallow git fetch"
+      # Explicit setup-go rather than the runner's preinstalled toolchain:
+      # actionlint v1.7.12's go.mod requires go >= 1.25.0, and `go install`
+      # hard-fails when the toolchain is older. pinact v3.10.1's go.mod requires
+      # go >= 1.26.3 and setup-go sets GOTOOLCHAIN=local, so this one pin must
+      # satisfy the higher of the two. Bump it with the pinact version below.
+      - name: Setup Go
+        if: ${{ !cancelled() }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.3'
+      - name: Install pinact
+        if: ${{ !cancelled() }}
+        run: go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.10.1
+      # Version-pinned, not @latest: a new upstream rule would otherwise land as
+      # a red X on an unrelated PR that touched no workflow logic. Bump
+      # deliberately, with the resulting findings in the same commit.
+      - name: Install actionlint
+        if: ${{ !cancelled() }}
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      # Installed explicitly, exactly as the sibling ShellCheck job does — this
+      # repo does not assume the runner image ships it. actionlint's run:-block
+      # pass is half this gate; bin/lint-workflows hard-fails without it rather
+      # than letting actionlint skip the pass and still exit 0.
+      - name: Install shellcheck
+        if: ${{ !cancelled() }}
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Verify every external action is SHA-pinned
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"$(go env GOPATH)/bin/pinact" run --check'
+      # No working-directory — the script lives in repo-root bin/ and cds to the
+      # repo root itself. Shell policy (severity + excludes) lives in the script
+      # so a local run and this job cannot drift.
+      - name: Lint workflows
+        if: ${{ !cancelled() }}
+        run: bin/lint-workflows
+      # Scans every test file. A scan of only the PR's changed files let two
+      # PRs each pass and still leave master red together (#3142 + #3148).
+      # The merge line reruns CI on the latest master, so a full scan catches
+      # that before merge. The scan takes about 2 seconds.
+      - name: Ban silently-disabled tests (markTestSkipped)
+        if: ${{ !cancelled() }}
+        run: bin/check-phpunit-hygiene
+      - name: Grep for host mariadb invocations outside bin/db-query
+        if: ${{ !cancelled() }}
+        run: |
+          set -e
+          # Worktrees run a separate dockerized MariaDB per worktree. Calling the host
+          # `mariadb` client with -h 127.0.0.1 bypasses worktree isolation and will read
+          # or mutate the wrong database. Only bin/db-query is allowed to do this, and
+          # only on one branch: it routes by its own script location, so the host client
+          # runs solely for the main checkout's copy (or under DB_QUERY_TARGET=main).
+          # A worktree's copy goes through `docker exec ibl5-db-<slug>` and fails loudly
+          # if that container is not running. On ERROR 1049 it also names the $dbname it
+          # used and where that name came from. See .claude/rules/database-access.md.
+          offenders=$(
+            grep -rEn '^[[:space:]]*mariadb[[:space:]]+(-h[[:space:]]*127|-u[[:space:]]*root)' \
+              bin/ ibl5/bin/ 2>/dev/null \
+              | grep -v -E '(bin/db-query|\.md|tests\.yml)' \
+              || true
+          )
+
+          if [ -n "$offenders" ]; then
+            echo "FAIL: direct host mariadb invocations found in shell scripts."
+            echo ""
+            echo "$offenders"
+            echo ""
+            echo "Worktrees have isolated dockerized MariaDB instances. Use bin/db-query"
+            echo "or 'docker exec <container> mariadb ...' instead of calling the host client."
+            exit 1
+          fi
+
+          echo "OK: no host mariadb invocations found outside bin/db-query."
+      - name: Run automouse impl-model parser regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-impl-model
+      - name: Run automouse env-breaker regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-env-breaker
+      - name: Run automouse login-preflight regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-login-preflight
+      - name: Run headless elapsed-clock hook regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-headless-elapsed-hook
+      - name: Run post-merge hook change-detection regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-post-merge-hook
+      - name: Run automouse impl cap-timeout regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-impl-cap-timeout
+      - name: Run automouse postplan terminal-disposition regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-postplan-disposition
+      - name: Run automouse postplan worktree-resolution regression test
+        if: ${{ !cancelled() }}
+        run: bin/test-automouse-postplan-worktree
+      # Moved here from its own job in e2e-tests.yml. The step name keeps the old
+      # job name because ADR-0070 cites it. Runs on every PR via this job.
+      - name: Playwright version drift guard
+        if: ${{ !cancelled() }}
+        run: bin/check-playwright-pinning
 
   harness-tests:
     name: Shell harness regression tests
@@ -987,6 +982,7 @@ jobs:
             bin/test-plan-tier-hint \
             bin/test-backlog \
             bin/test-adr-check \
+            bin/test-merge-last-verified \
             bin/test-check-docs \
             bin/test-check-numbering \
             bin/test-postplan-arm-conditions \
@@ -1000,7 +996,6 @@ jobs:
             bin/test-post-review-findings \
             bin/test-human-signoff-classifier \
             bin/test-playwright-version \
-            bin/test-pr-canary-check \
             bin/test-merge-line-select \
             bin/test-merge-line-watch \
             bin/test-check-workflow-checkout \
@@ -1093,7 +1088,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, pinact-check, actionlint, mirror-ready]
+    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, shellcheck, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, mirror-ready]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The memo is written only here: after a clean aggregate, on a run that was a miss.

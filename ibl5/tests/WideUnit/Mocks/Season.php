@@ -72,14 +72,6 @@ class Season
     }
 
     /**
-     * Check if current season phase is free agency (mock implementation)
-     */
-    public function isFreeAgencyPhase(): bool
-    {
-        return $this->phase === 'Free Agency';
-    }
-
-    /**
      * Check if current season phase is an offseason phase (Draft or Free Agency)
      */
     public function isOffseasonPhase(): bool

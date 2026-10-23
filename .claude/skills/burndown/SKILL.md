@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-11
+last_verified: 2026-10-23
 ---
 
 # /burndown
@@ -89,6 +89,8 @@ W="${TMPDIR:-/tmp}/burndown-run"
 bin/backlog burndown [--pair A,B]... > "$W/select.txt"; rc=$?
 grep -E '^SKIP|^LEDGER:' "$W/select.txt"; echo "exit $rc"
 ```
+
+Run this block as one Bash tool call with `timeout: 600000`. The select can take several minutes on a box with many worktrees, and the default 120-second limit moves the call to the background. Never pass `run_in_background` here. The headless hook denies it and the turn is lost.
 
 The full output stays in `$W/select.txt`. Only `SKIP` rows and the `LEDGER:` line reach
 the transcript. The redirect keeps `rc`, so exit 3 stops the run with stderr shown to
@@ -188,7 +190,9 @@ A pathless item (empty `.paths`) carries no path list, so the helper prompt says
 the change to the files the issue body names.
 
 When a helper returns, read `git -C <wt> diff --stat` and re-run the helper's named
-test. Only when that passes:
+test in a subshell: `(cd <wt>/ibl5 && vendor/bin/phpunit <test>)` for a PHP test, or
+`(cd <wt> && bash <test-script>)` for a `bin/` harness. A bare `cd <wt>` is denied in
+a headless run, so keep the parentheses. Only when that passes:
 
 ```bash
 (cd <wt> && bin/post-plan-now --auto)
@@ -217,6 +221,8 @@ n=$(wc -l < "$W/select.txt")
 bin/backlog burndown --after <L1> [--after <L2>]... [--pair A,B]... >> "$W/select.txt"; rc=$?
 tail -n +"$((n + 1))" "$W/select.txt" | grep -E '^SKIP|^LEDGER:'; echo "exit $rc"
 ```
+
+Run this block as one Bash tool call with `timeout: 600000`. Do not pass `run_in_background`. Step 4 gives the reason.
 
 The `tail` prints only this round's rows, so the final `LEDGER:` line shown is this round's. Exit 3 stops the run as in step 4.
 

@@ -158,15 +158,72 @@ class LeagueScheduleViewTest extends TestCase
         $this->assertStringContainsString('schedule-game--upcoming', $html);
     }
 
-    public function testRenderIncludesScrollScripts(): void
+    public function testRenderIncludesSharedScrollScriptTag(): void
     {
-        $pageData = $this->createPageData();
+        $html = $this->view->render($this->createPageData());
 
-        $html = $this->view->render($pageData);
+        $this->assertSame(1, substr_count($html, '<script src="jslib/schedule-scroll.js" defer></script>'));
+        $this->assertStringNotContainsString('<script>', $html);
+    }
 
-        $this->assertStringContainsString('<script>', $html);
-        $this->assertStringContainsString('scrollToMonth', $html);
-        $this->assertStringContainsString('scrollToNextGames', $html);
+    public function testRenderOmitsInlineScrollHandlers(): void
+    {
+        $html = $this->view->render($this->createPageData(
+            gamesByMonth: ['2026-02' => ['label' => 'February', 'dates' => []]],
+            firstUnplayedId: 'game-77',
+        ));
+
+        foreach (['onclick=', 'scrollToMonth', 'scrollToNextGames', 'headerOffset'] as $legacy) {
+            $this->assertStringNotContainsString($legacy, $html);
+        }
+    }
+
+    public function testMonthLinkCarriesScrollTargetAttribute(): void
+    {
+        $html = $this->view->render($this->createPageData(
+            gamesByMonth: ['2026-02' => ['label' => 'February', 'dates' => []]],
+        ));
+
+        $this->assertStringContainsString(
+            '<a href="#month-2026-02" class="ibl-jump-menu__link schedule-months__link" data-scroll-target="month-2026-02">',
+            $html,
+        );
+        $this->assertStringNotContainsString('data-scroll-next', $html);
+    }
+
+    public function testNextGamesLinkCarriesTargetAndNextFlag(): void
+    {
+        $html = $this->view->render($this->createPageData(firstUnplayedId: 'game-77'));
+
+        $this->assertStringContainsString(
+            '<a href="#game-77" class="schedule-jump-btn" data-scroll-target="game-77" data-scroll-next>',
+            $html,
+        );
+    }
+
+    public function testNextGamesLinkAbsentWithoutUpcomingGame(): void
+    {
+        $html = $this->view->render($this->createPageData(firstUnplayedId: null));
+
+        $this->assertStringNotContainsString('schedule-jump-btn', $html);
+        $this->assertStringNotContainsString('data-scroll-next', $html);
+        // The script tag is unconditional, so a page with no upcoming game still loads it.
+        $this->assertStringContainsString('<script src="jslib/schedule-scroll.js" defer></script>', $html);
+    }
+
+    public function testRenderEscapesHostileScrollIds(): void
+    {
+        $html = $this->view->render($this->createPageData(
+            gamesByMonth: ['2026-02"><b>' => ['label' => 'February', 'dates' => []]],
+            firstUnplayedId: 'game-1"><b>',
+        ));
+
+        $this->assertStringNotContainsString('"><b>', $html);
+        $this->assertStringContainsString('href="#game-1&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('data-scroll-target="game-1&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('href="#month-2026-02&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('data-scroll-target="month-2026-02&quot;&gt;&lt;b&gt;"', $html);
+        $this->assertStringContainsString('id="month-2026-02&quot;&gt;&lt;b&gt;"', $html);
     }
 
     public function testRenderShowsPlayoffHeader(): void

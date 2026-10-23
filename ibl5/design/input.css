@@ -4,6 +4,13 @@
 
 @import 'tailwindcss';
 
+/* The tailwind container mounts only ibl5/, so the repo-root .gitignore never reaches the
+   class scanner. Without these excludes it walks the main checkout's multi-GB backups and
+   logs and gets OOM-killed. None of these paths is tracked. */
+@source not "../backups";
+@source not "../shellScripts";
+@source not "../*.log";
+
 /* daisyUI 5: component classes carry the d- prefix so they cannot collide with ibl-* or
    Tailwind classes. The excludes keep daisyUI from restyling :root colors, the scrollbar
    gutter, and scrollbars on every page. */

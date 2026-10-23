@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-20
+last_verified: 2026-10-23
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -123,6 +123,15 @@ The word lands before `## DIGEST`, so Step 3's canonical parse reads it unchange
 
 Skip this step when Step 1b printed `FIDELITY_GATE=skip`. The spawn budget below applies only to the spawn path.
 
+Before the spawn, delete any verdict a previous run left at this PR's path. Step 3 only checks that the file is non-empty, so a leftover file from an earlier run would pass as this run's verdict. A skip run never reaches this block, so the verdict Step 1c carried forward stays in place.
+
+```bash
+# phase 5.5 clear stale verdict 1
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+rm -f "$FIDELITY_VERDICT_FILE"
+```
+
 **Bounded-re-spawn rule:** at most two `Agent` spawns per `/post-plan` run, and never more. Spawn the first reviewer now. **Exactly one re-spawn** is permitted, in step 4b, and only when **both** hold: (a) step 4's remediation addressed **every** `Mode: in-PR` finding, and (b) the plan does **not** declare `auto_merge: false`.
 
 **The first verdict is never replaced.** The re-review writes a **separate file** (`/tmp/post-plan-fidelity-verdict-<N>-2.md`); verdict 1's word, findings and digest stay exactly as the reviewer wrote them. The record grows, it never gets rewritten. Never hand-edit or regenerate verdict 1 to flip its word.
@@ -206,7 +215,7 @@ On `NOT READY`, run the same remediation for every `Mode: in-PR` finding, then s
 
 ### Terminal-line recipe
 
-The last line of the sticky comment, immediately above the `<!-- pr-ready-verdict -->` marker. The row is chosen by two lookups, not by judgement. Column 1 is the step-3 `FIDELITY` literal. Column 2 is decided by re-reading `$FIDELITY_VERDICT_FILE`'s finding list — `Mode: in-PR` treats every Phase 6 finding, notes and blockers alike — and checking each one against what step 4's commit actually changed. Every finding addressed is the "fixed" row; anything else is the "left unfixed" row, and the unfixed finding is named in the line by copying its title verbatim. Re-read the file; do not answer this from memory of what step 4 did. The `READY`/`NOT READY` **prefix** is load-bearing: `bin/pr-cycle`'s verdict parse anchors on it (`"NOT READY"*` is a prefix glob) and `bin/pr-ready-now`'s `derive_status` anchors likewise, so a trailing ` — <reason>` is invisible to both. Never put the reason *before* the word.
+The last line of the sticky comment, immediately above the `<!-- pr-ready-verdict -->` marker. The row is chosen by two lookups, not by judgement. Column 1 is the step-3 `FIDELITY` literal. Column 2 is decided by re-reading `$FIDELITY_VERDICT_FILE`'s finding list — `Mode: in-PR` treats every Phase 6 finding, notes and blockers alike — and checking each one against what step 4's commit actually changed. Every finding addressed is the "fixed" row; anything else is the "left unfixed" row, and the unfixed finding is named in the line by copying its title verbatim. Re-read the file; do not answer this from memory of what step 4 did. The `READY`/`NOT READY` **prefix** is load-bearing: `bin/pr-cycle`'s verdict parse anchors on it (`"NOT READY"*` is a prefix glob) and `bin/post-plan-fleet`'s `derive_status` anchors likewise, so a trailing ` — <reason>` is invisible to both. Never put the reason *before* the word. <!-- slop-ok -->
 
 | Step-3 `FIDELITY` | Step 4 outcome | Terminal line |
 |---|---|---|
@@ -265,6 +274,15 @@ echo "RE_REVIEW=$([ "$AUTO_MERGE" = false ] && echo skip || echo spawn)"
 ```
 
 On `RE_REVIEW=skip`, do not spawn. The plan's author already decided a human merges this PR, so a second Opus verdict changes nothing that will happen to it. Terminal line for that case is the `auto_merge: false` row in the terminal-line recipe above.
+
+On `RE_REVIEW=spawn`, first delete any second verdict a previous run left at this PR's `-2` path. The findings render below and condition (12) both read that path, so a leftover file would stand in for this run's re-review. Verdict 1 stays in place.
+
+```bash
+# phase 5.5 clear stale verdict 2
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE_2="${FIDELITY_VERDICT_FILE_2:-/tmp/post-plan-fidelity-verdict-$PR_NUM-2.md}"
+rm -f "$FIDELITY_VERDICT_FILE_2"
+```
 
 On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5-5` pin wins. An `Agent` spawn. This skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
 
@@ -384,6 +402,6 @@ The disclosure line sits directly under `**Plan hash:**`. In the skill layout th
 
 Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s and must not be renamed or reformatted. `.github/workflows/merge-digest-notify.yml` selects the **last** comment containing that HTML marker and pipes it into `bin/digest-dm-build`'s `_digest_labels`, which anchors on that exact heading. Renaming either silently degrades every DM to the fallback message while every test stays green.
 
-Post with the find-and-update-else-create shape from `bin/pr-canary-check` — grep its `STICKY_MARKER` constant and the `post_sticky()` below it rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
+Post with the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh`. Grep the function name rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
 
 After posting, when `FIDELITY=missing` or `FIDELITY=NOT READY`: STOP with instructions to remediate the reviewer's findings and re-run `/post-plan`. Never hand-edit the verdict file to clear it — an absent file is itself a blocking state for condition (12).

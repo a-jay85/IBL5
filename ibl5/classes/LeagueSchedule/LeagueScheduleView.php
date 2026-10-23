@@ -37,7 +37,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
         $html .= $this->renderGamesByMonth($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
         $html .= '</div>';
-        $html .= $this->renderScrollScripts($firstUnplayedId);
+        $html .= $this->renderScrollScript();
 
         return $html;
     }
@@ -52,7 +52,8 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $html .= '<div class="schedule-header__center">';
 
         if ($firstUnplayedId !== null) {
-            $html .= '<a href="#' . $firstUnplayedId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
+            $safeNextId = HtmlSanitizer::e($firstUnplayedId);
+            $html .= '<a href="#' . $safeNextId . '" class="schedule-jump-btn" data-scroll-target="' . $safeNextId . '" data-scroll-next>';
             $html .= '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
             $html .= 'Next Games';
             $html .= '</a>';
@@ -88,7 +89,8 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
             }
             $monthTimestamp = strtotime($key . '-01');
             $abbrev = ($monthTimestamp !== false) ? date('M', $monthTimestamp) : '';
-            $html .= '<a href="#month-' . $key . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
+            $safeMonthId = HtmlSanitizer::e('month-' . $key);
+            $html .= '<a href="#' . $safeMonthId . '" class="ibl-jump-menu__link schedule-months__link" data-scroll-target="' . $safeMonthId . '">';
             $html .= '<span class="schedule-months__full">' . $data['label'] . '</span>';
             $html .= '<span class="schedule-months__abbr">' . $abbrev . '</span>';
             $html .= '</a>';
@@ -109,7 +111,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         foreach ($gamesByMonth as $monthKey => $data) {
             $monthLabel = $data['label'];
 
-            $html .= '<div class="schedule-month" id="month-' . $monthKey . '">';
+            $html .= '<div class="schedule-month" id="month-' . HtmlSanitizer::e($monthKey) . '">';
             $headerClass = 'ibl-card__header schedule-month__header';
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 $headerClass .= ' schedule-month__header--playoffs';
@@ -211,34 +213,10 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
     }
 
     /**
-     * Render JavaScript for smooth scrolling
+     * Load the shared smooth-scroll script; the anchors carry data-scroll-* attributes
      */
-    private function renderScrollScripts(?string $firstUnplayedId): string
+    private function renderScrollScript(): string
     {
-        return '<script>
-var headerOffset = 70;
-
-function scrollToMonth(e, monthKey) {
-    e.preventDefault();
-    var el = document.getElementById("month-" + monthKey);
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - headerOffset;
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-
-function scrollToNextGames(e) {
-    e.preventDefault();
-    var el = document.getElementById("' . ($firstUnplayedId ?? '') . '");
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-</script>';
+        return '<script src="jslib/schedule-scroll.js" defer></script>';
     }
 }

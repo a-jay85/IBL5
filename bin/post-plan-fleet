@@ -656,6 +656,10 @@ notify() {
     if [ -n "$stop_line" ]; then
         stop_text=$(printf '%s' "$stop_line" | sed 's/.*STOP:[[:space:]]*//' | cut -c1-120)
     fi
+    # First RESULT: line, the same one the fleet-outcome block reads further down. A hold-repeat
+    # decline is recognised from it before the RC check, so rc=0 (harness) and rc=8 (post-plan-now) agree.
+    local first_result="" decl_text=""
+    first_result=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
     if [ "$RC" = 124 ]; then
         verdict="TIMED OUT"
     elif grep -q 'postplan-rc=75' "$LOG" 2>/dev/null \
@@ -664,6 +668,12 @@ notify() {
         verdict="PAUSED"
     elif [ -n "$stop_line" ]; then
         verdict="STOPPED"
+    elif [[ "$first_result" == "RESULT: post-plan DECLINED"* ]]; then
+        verdict="DECLINED"
+        decl_text="${first_result#RESULT: post-plan DECLINED}"
+        decl_text="${decl_text# — }"
+        decl_text="${decl_text#terminal=hold-repeat-declined; }"
+        decl_text=$(printf '%s' "$decl_text" | cut -c1-200)
     else
         # Primary: find harness-run-dir from log and read result.json
         local run_dir=""
@@ -767,6 +777,8 @@ for c in (d.get("arm") or {}).get("conditions") or []:
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"
                             DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`" ;;
+        DECLINED)           DM_ICON="🚫"; DM_VERDICT="DECLINED (same hold as last run)"
+                            DM_NEXT="$decl_text" ;;
         *)
             if [ "$RC" != 0 ]; then
                 DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="$bail_lines"

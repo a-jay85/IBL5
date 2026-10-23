@@ -20,9 +20,10 @@ interface SuggestionAssetRepositoryInterface
      * @param list<int> $tids
      * @param MarketMaximums $maximums League rating maximums for PlayerRating::overall()
      * @param bool $advancesContractYears True in the offseason phases: contracts are read one year ahead
+     * @param int $lastSeasonYear ibl_hist year read as the fallback production line (ending year - 1)
      * @return array<int, list<SuggestionPlayer>> Keyed by teamid; an empty $tids returns []
      */
-    public function getRostersForTeams(array $tids, array $maximums, bool $advancesContractYears): array;
+    public function getRostersForTeams(array $tids, array $maximums, bool $advancesContractYears, int $lastSeasonYear): array;
 
     /**
      * Regular-season wins and losses per team for one season ending year.

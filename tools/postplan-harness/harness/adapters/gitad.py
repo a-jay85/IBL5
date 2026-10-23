@@ -16,6 +16,22 @@ from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
 
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
+GIT_OP_TIMEOUT = 300    # seconds; every other local git call routed through _run/_run_out/_run_bytes
+GIT_NET_TIMEOUT = 600   # seconds; fetch, push (runs bin/pre-push-adr-hook), ls-remote, pull
+# A hang in any git call fails closed with subprocess-timeout naming `git <subcommand>`.
+# Added after the 2026-10-23 run (PR 3352) sat 90 min after "starting commit (pre-commit
+# hook)" with no FAILED line: the bounded commit leg was ruled out, which left the then
+# unbounded `git add -A` / `git diff --cached` calls at the top of commit_all.
+_NET_SUBCOMMANDS = frozenset({"fetch", "push", "ls-remote", "pull"})
+
+
+def _git_timeout(args: tuple[str, ...]) -> int:
+    """Read at call time, so tests can monkeypatch either constant."""
+    return GIT_NET_TIMEOUT if args and args[0] in _NET_SUBCOMMANDS else GIT_OP_TIMEOUT
+
+
+def _git_step(args: tuple[str, ...]) -> str:
+    return f"git {args[0]}" if args else "git"
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
 
@@ -228,8 +244,8 @@ class LiveGit:
         return ""
 
     def _run(self, *args: str, check: bool = True) -> str:
-        proc = subprocess.run(["git", "-C", self.worktree, *args],
-                              capture_output=True, text=True, errors="replace")
+        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
+                           timeout=_git_timeout(args), errors="replace")
         if check and proc.returncode != 0:
             # Scan BOTH streams: bin/pre-commit-hook runs its checks with `2>&1` and
             # echoes guidance to stdout, so stderr-only detection misses every
@@ -245,8 +261,9 @@ class LiveGit:
         return proc.stdout
 
     def _run_out(self, *args: str) -> tuple[int, str]:
-        proc = subprocess.run(["git", "-C", self.worktree, *args],
-                              capture_output=True, text=True, errors="replace")
+        """Raises HarnessError(subprocess-timeout) on a hang. Only a completed git returns an rc."""
+        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
+                           timeout=_git_timeout(args), errors="replace")
         return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
 
     def _run_bytes(self, *args: str, check: bool = True) -> bytes:
@@ -255,8 +272,8 @@ class LiveGit:
         the CR from CRLF files and replaces non-UTF-8 bytes with U+FFFD, which
         makes lostwork.sh report every CRLF line as LOST (13 blocked runs,
         2026-10-09/10)."""
-        proc = subprocess.run(["git", "-C", self.worktree, *args],
-                              capture_output=True)
+        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
+                           timeout=_git_timeout(args), text=False)
         if check and proc.returncode != 0:
             stdout = proc.stdout.decode("utf-8", errors="replace")
             stderr = proc.stderr.decode("utf-8", errors="replace")

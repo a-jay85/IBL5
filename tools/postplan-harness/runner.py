@@ -81,7 +81,7 @@ from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
                                     is_stale_base, is_stale_lease)
-from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
+from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT, reap_live_groups
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
@@ -123,6 +123,12 @@ def _install_sigterm_handler() -> None:
     import signal
 
     def _sigterm_handler(signum: int, frame: object) -> None:  # type: ignore[type-arg]
+        # Kill bounded children (git, hooks, claude -p) first: they run in their own
+        # sessions, and emergency_abort's git calls would race a live child's index.lock.
+        try:
+            reap_live_groups()
+        except Exception:
+            pass
         git = _active_git
         if git is not None:
             try:

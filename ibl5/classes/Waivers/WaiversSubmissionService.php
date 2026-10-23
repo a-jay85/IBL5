@@ -58,6 +58,6 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
             return $this->processor->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);
         }
 
-        return $this->processor->processAdd($playerID, $teamName, $healthyRosterSlots, $totalSalary);
+        return $this->processor->processAdd($playerID, $teamName, $rosterSlots, $healthyRosterSlots, $totalSalary);
     }
 }

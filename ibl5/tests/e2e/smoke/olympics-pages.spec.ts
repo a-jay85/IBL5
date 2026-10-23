@@ -52,7 +52,7 @@ test.describe('Olympics nav filtering', () => {
     await nav.getByRole('button', { name: 'Season' }).click();
 
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Standings' }).first()).toBeVisible();
-    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Cap Space' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Contracts' })).not.toBeAttached();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Draft Pick Locator' })).not.toBeAttached();
   });
 
@@ -78,7 +78,7 @@ test.describe('Olympics nav filtering', () => {
     const nav = desktopNav(page);
 
     await nav.getByRole('button', { name: 'Season' }).click();
-    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Cap Space' }).first()).toBeVisible();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Contracts' }).first()).toBeVisible();
 
     await nav.getByRole('button', { name: 'History' }).click();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Franchise History' }).first()).toBeVisible();

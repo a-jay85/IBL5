@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Boxscore\Legacy;
 
+use BasketballStats\StatsSanitizer;
 use Boxscore\Boxscore;
 use mysqli;
 use RuntimeException;
@@ -313,20 +314,7 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return self::toInt($row[0] ?? 0);
-    }
-
-    /**
-     * Narrow one numeric mysqli column value to int.
-     *
-     * fetch_row()/fetch_all(MYSQLI_NUM) type every column as mixed, and
-     * mysqli_stmt::$affected_rows is int|string, so a bare (int) cast is a cast of a
-     * non-int type rather than a narrowing. Every call site here reads COUNT(*), SUM(),
-     * an INT column, or a row count — a non-numeric value means the query changed shape.
-     */
-    private static function toInt(mixed $value): int
-    {
-        return is_numeric($value) ? (int) $value : 0;
+        return StatsSanitizer::toInt($row[0] ?? 0);
     }
 
     private function count2008TeamRows(): int
@@ -345,7 +333,7 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return self::toInt($row[0] ?? 0);
+        return StatsSanitizer::toInt($row[0] ?? 0);
     }
 
     private function count2008PlayerRows(): int
@@ -364,7 +352,7 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return self::toInt($row[0] ?? 0);
+        return StatsSanitizer::toInt($row[0] ?? 0);
     }
 
     // --------------------------------------------------------------- writes
@@ -393,7 +381,7 @@ final class Season2008Finals4Restore
             ];
 
             $this->bindAndExecute($stmt, 'ss' . str_repeat('i', 32), $values);
-            $inserted += self::toInt($stmt->affected_rows);
+            $inserted += StatsSanitizer::toInt($stmt->affected_rows);
         }
         $stmt->close();
 
@@ -425,7 +413,7 @@ final class Season2008Finals4Restore
             ];
 
             $this->bindAndExecute($stmt, 'ssss' . str_repeat('i', 25), $values);
-            $inserted += self::toInt($stmt->affected_rows);
+            $inserted += StatsSanitizer::toInt($stmt->affected_rows);
         }
         $stmt->close();
 
@@ -458,7 +446,7 @@ final class Season2008Finals4Restore
         $scores = [];
         $rows = $result->fetch_all(MYSQLI_NUM);
         foreach ($rows as $row) {
-            $scores[self::toInt($row[0] ?? 0)] = self::toInt($row[1] ?? 0);
+            $scores[StatsSanitizer::toInt($row[0] ?? 0)] = StatsSanitizer::toInt($row[1] ?? 0);
         }
         $stmt->close();
 

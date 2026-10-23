@@ -182,6 +182,60 @@ class RefreshPlayoffSeriesResultsDedupTest extends DatabaseTestCase
         self::assertSame(5, (int) $row['total_games'], 'MIN ignores NULL, so the ordinal-1 copy is canonical');
     }
 
+    public function testNullQuarterPlayoffGameCountsCalcPointsWinner(): void
+    {
+        $this->seedNullQuarterGame('2098-06-10', $this->tidB, $this->tidA, 45, 55);
+
+        (new RefreshPlayoffSeriesResultsStep($this->db))->rebuildWithinCurrentTransaction();
+
+        $result = $this->db->query(
+            'SELECT winner_tid, winner_games, loser_games FROM vw_playoff_series_results WHERE `year` = 2098'
+        );
+        self::assertNotFalse($result);
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+
+        self::assertCount(1, $rows, 'Expected one series row for 2098');
+        self::assertSame($this->tidA, (int) $rows[0]['winner_tid'], 'Home calc_points 136 beats visitor 108');
+        self::assertSame(1, (int) $rows[0]['winner_games']);
+        self::assertSame(0, (int) $rows[0]['loser_games']);
+    }
+
+    /**
+     * Two rows for one game with every quarter and OT column NULL, so each side's
+     * total falls back to its own row's calc_points (45 two-pointers gives 108, 55 gives 136).
+     * The quarter keys are omitted because insertRow() cannot bind a SQL NULL.
+     */
+    private function seedNullQuarterGame(string $date, int $visitorTid, int $homeTid, int $visitor2gm, int $home2gm): void
+    {
+        $common = [
+            'game_date' => $date,
+            'game_of_that_day' => 1,
+            'visitor_teamid' => $visitorTid,
+            'home_teamid' => $homeTid,
+            'attendance' => 10000,
+            'capacity' => 15000,
+            'visitor_wins' => 0,
+            'visitor_losses' => 0,
+            'home_wins' => 0,
+            'home_losses' => 0,
+            'game_ftm' => 12,
+            'game_fta' => 16,
+            'game_3gm' => 2,
+            'game_3ga' => 8,
+            'game_2ga' => 80,
+            'game_orb' => 10,
+            'game_drb' => 30,
+            'game_ast' => 20,
+            'game_stl' => 8,
+            'game_tov' => 12,
+            'game_blk' => 5,
+            'game_pf' => 18,
+        ];
+        $visitorId = $this->insertRow('ibl_box_scores_teams', $common + ['name' => 'NQ-V', 'game_2gm' => $visitor2gm]);
+        $homeId = $this->insertRow('ibl_box_scores_teams', $common + ['name' => 'NQ-H', 'game_2gm' => $home2gm]);
+        self::assertLessThan($homeId, $visitorId, 'visitor row must carry the lower id');
+    }
+
     /**
      * Five playoff games between tidA and tidB, each written as TWO rows — one
      * per team side, distinguished by `name`, exactly as the importer writes

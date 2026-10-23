@@ -178,60 +178,6 @@ class SeasonQueryRepository extends \Database\BaseMysqliRepository implements Se
     }
 
     /**
-     * Get allow trades status
-     *
-     * @return string Status of allowing trades ('Yes' or 'No')
-     */
-    public function getAllowTradesStatus(): string
-    {
-        /** @var array{setting_value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
-            "ss",
-            "Allow Trades",
-            $this->league
-        );
-
-        return $result['setting_value'] ?? '';
-    }
-
-    /**
-     * Get allow waivers status
-     *
-     * @return string Status of allowing waivers ('Yes' or 'No')
-     */
-    public function getAllowWaiversStatus(): string
-    {
-        /** @var array{setting_value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
-            "ss",
-            "Allow Waiver Moves",
-            $this->league
-        );
-
-        return $result['setting_value'] ?? '';
-    }
-
-    /**
-     * Get free agency notifications state
-     *
-     * @return string State of free agency notifications ('On' or 'Off')
-     */
-    public function getFreeAgencyNotificationsState(): string
-    {
-        /** @var array{setting_value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = ? AND league = ? LIMIT 1",
-            "ss",
-            "Free Agency Notifications",
-            $this->league
-        );
-
-        return $result['setting_value'] ?? '';
-    }
-
-    /**
      * Calculate phase-specific sim number for any sim/phase/season combination
      *
      * Counts sims within the phase's date range up to the given overall sim number.

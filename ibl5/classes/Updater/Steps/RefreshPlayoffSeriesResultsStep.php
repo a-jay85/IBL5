@@ -92,10 +92,8 @@ playoff_games AS (
         YEAR(b.game_date) AS `year`,
         b.visitor_teamid,
         b.home_teamid,
-        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
-         + COALESCE(b.visitor_ot_points, 0)) AS v_total,
-        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
-         + COALESCE(b.home_ot_points, 0)) AS h_total
+        MIN(b.id) AS visitor_row_id,
+        MAX(b.id) AS home_row_id
     FROM `ibl_box_scores_teams` b
     JOIN canonical_games c
       ON c.game_date = b.game_date
@@ -113,11 +111,28 @@ playoff_games AS (
     -- 8-2. Same shape as RefreshTeamSeasonRecordsStep. Do not remove.
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
+scored_playoff_games AS (
+    -- Quarter columns are identical on both rows of a game, so they read from the
+    -- visitor row. A NULL quarter falls back to each side's own calc_points:
+    -- v.calc_points for the visitor, h.calc_points for the home team.
+    SELECT
+        u.game_date,
+        u.`year`,
+        u.visitor_teamid,
+        u.home_teamid,
+        COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points
+                 + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS v_total,
+        COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points
+                 + COALESCE(v.home_ot_points, 0), h.calc_points) AS h_total
+    FROM playoff_games u
+    JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
+    JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
+),
 game_results AS (
     SELECT *,
         CASE WHEN v_total > h_total THEN visitor_teamid ELSE home_teamid END AS winner_tid,
         CASE WHEN v_total > h_total THEN home_teamid ELSE visitor_teamid END AS loser_tid
-    FROM playoff_games
+    FROM scored_playoff_games
 ),
 team_wins AS (
     SELECT

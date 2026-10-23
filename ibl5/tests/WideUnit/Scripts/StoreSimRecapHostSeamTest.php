@@ -21,9 +21,9 @@ final class StoreSimRecapHostSeamTest extends TestCase
         $this->src = (string) file_get_contents(__DIR__ . '/../../../scripts/storeSimRecap.php');
     }
 
-    public function testScriptInitialisesDiscordWithHost(): void
+    public function testScriptBuildsTheViewerUrlFromTheHost(): void
     {
-        self::assertStringContainsString('Discord::init(', $this->src);
+        self::assertStringContainsString('SimSummaryLink::absolute($sim, $host)', $this->src);
     }
 
     public function testScriptContainsNoHardcodedHostname(): void

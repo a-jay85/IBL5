@@ -174,7 +174,12 @@ class DaisyUiInputCssContractTest extends TestCase
         $content = file_get_contents($path);
         self::assertIsString($content);
 
-        $stripped = preg_replace('#/\*.*?\*/#s', '', $content);
+        // Match quoted strings too and keep them, so a glob like "../*.log" never opens a comment.
+        $stripped = preg_replace_callback(
+            '#"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|/\*.*?\*/#s',
+            static fn (array $m): string => str_starts_with($m[0], '/*') ? '' : $m[0],
+            $content
+        );
         self::assertIsString($stripped);
 
         return $stripped;

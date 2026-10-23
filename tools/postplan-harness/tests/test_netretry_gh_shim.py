@@ -19,6 +19,9 @@ from harness.state import Finding, HarnessError
 
 EOF_MSG = 'Post "https://api.github.com/graphql": EOF'
 TLS_MSG = "net/http: TLS handshake timeout"
+# Verbatim from /tmp/post-plan-now-gm-digest-league-rules-20261020-143516-68382.log
+RATE_MSG = "GraphQL: API rate limit already exceeded for user ID 10329097."
+FAKE_NOW = 1_800_000_000.0
 
 SHIM = f"""#!{sys.executable}
 import json, os, sys
@@ -48,7 +51,7 @@ def opt(name):
 msg = os.environ.get("GH_SHIM_MSG", "")
 if key == os.environ.get("GH_SHIM_ALWAYS_FAIL"):
     fail(os.environ.get("GH_SHIM_ALWAYS_MSG", msg))
-if key == os.environ.get("GH_SHIM_FAIL_ONCE") and key not in state["failed_once"]:
+if key in os.environ.get("GH_SHIM_FAIL_ONCE", "").split(",") and key not in state["failed_once"]:
     state["failed_once"].append(key)
     save()
     fail(msg)
@@ -69,6 +72,8 @@ elif args[0] == "api" and args[1].endswith("/reviews"):
 elif key == "pr view" and "--json" in args:
     field = opt("--json")
     out = json.dumps({{field: [{{"body": b}} for b in state.get(field, [])]}})
+elif key == "api rate_limit":
+    out = os.environ.get("GH_SHIM_RESET", "")
 elif key == "issue create":
     out = "https://github.com/a-jay85/IBL5-backlog/issues/9"
 if land_then_fail:
@@ -91,6 +96,15 @@ def sleeps(monkeypatch):
 
 
 @pytest.fixture
+def rl_sleeps(monkeypatch):
+    """Like `sleeps`, plus a frozen wall clock for the rate-limit wait."""
+    recorded = []
+    monkeypatch.setattr(netretry, "time", SimpleNamespace(
+        sleep=recorded.append, monotonic=time.monotonic, time=lambda: FAKE_NOW))
+    return recorded
+
+
+@pytest.fixture
 def shim(tmp_path, monkeypatch):
     bindir = tmp_path / "bin"
     bindir.mkdir()
@@ -106,7 +120,7 @@ def shim(tmp_path, monkeypatch):
     monkeypatch.setenv("GH_SHIM_LOG", str(log))
     monkeypatch.setenv("GH_SHIM_STATE", str(state))
     for var in ("GH_SHIM_FAIL_ONCE", "GH_SHIM_LAND_THEN_FAIL", "GH_SHIM_ALWAYS_FAIL",
-                "GH_SHIM_ALWAYS_MSG", "GH_SHIM_MSG"):
+                "GH_SHIM_ALWAYS_MSG", "GH_SHIM_MSG", "GH_SHIM_RESET"):
         monkeypatch.delenv(var, raising=False)
     g = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
     return g, log, state
@@ -161,6 +175,19 @@ def test_pr_create_snapshot_failure_is_single_attempt(shim, monkeypatch, sleeps)
         g.pr_create("chore: t", "body", "master")
     assert ei.value.kind == "gh"
     assert _lines(log, "pr create") == 1
+    assert sleeps == []
+
+
+def test_pr_create_non_rate_limit_error_is_single_attempt(shim, monkeypatch, sleeps):
+    g, log, _ = shim
+    monkeypatch.setenv("GH_SHIM_ALWAYS_FAIL", "pr create")
+    monkeypatch.setenv("GH_SHIM_ALWAYS_MSG", "HTTP 422: Unprocessable Entity")
+    monkeypatch.setenv("GH_SHIM_RESET", str(int(FAKE_NOW) + 60))
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert ei.value.kind == "gh"
+    assert _lines(log, "pr create") == 1
+    assert _lines(log, "api rate_limit") == 0
     assert sleeps == []
 
 
@@ -222,3 +249,102 @@ def test_non_allowlisted_mutation_without_landed_is_single_attempt(shim, monkeyp
     assert ei.value.kind == "gh"
     assert _lines(log, "issue create") == 1
     assert sleeps == []
+
+
+def _open_prs(state):
+    return json.loads(state.read_text())["open_prs"]
+
+
+def _rl_env(monkeypatch, reset_in=60):
+    monkeypatch.setenv("GH_SHIM_MSG", RATE_MSG)
+    monkeypatch.setenv("GH_SHIM_RESET", str(int(FAKE_NOW) + reset_in))
+
+
+def test_pr_create_rate_limit_then_success_creates_one_pr(shim, monkeypatch, rl_sleeps):
+    g, log, state = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_FAIL_ONCE", "pr create")
+    assert g.pr_create("chore: t", "body", "master") == 4242
+    assert _lines(log, "pr create") == 2
+    assert len(_open_prs(state)) == 1
+    assert rl_sleeps == [62.0]
+    assert _lines(log, "api rate_limit") == 1
+    assert _lines(log, "pr list") == 2
+
+
+def test_pr_create_rate_limit_then_pr_found_does_not_recreate(shim, monkeypatch, rl_sleeps):
+    g, log, state = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_LAND_THEN_FAIL", "pr create")
+    assert g.pr_create("chore: t", "body", "master") == 4242
+    assert _lines(log, "pr create") == 1
+    assert len(_open_prs(state)) == 1
+    assert rl_sleeps == [62.0]
+
+
+def test_pr_create_rate_limit_reset_beyond_bound_fails_fast(shim, monkeypatch, rl_sleeps):
+    g, log, _ = shim
+    _rl_env(monkeypatch, reset_in=3600)
+    monkeypatch.setenv("GH_SHIM_FAIL_ONCE", "pr create")
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert ei.value.kind == "gh"
+    for part in ("API rate limit already exceeded", "GitHub API rate limit",
+                 "resets at 2027-01-15 09:00:00 UTC", "over the 900s bound"):
+        assert part in ei.value.detail
+    assert rl_sleeps == []
+    assert _lines(log, "pr create") == 1
+
+
+def test_pr_create_rate_limit_on_retry_gives_up(shim, monkeypatch, rl_sleeps):
+    g, log, _ = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_ALWAYS_FAIL", "pr create")
+    monkeypatch.setenv("GH_SHIM_ALWAYS_MSG", RATE_MSG)
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert "gave up after one retry" in ei.value.detail
+    assert _lines(log, "pr create") == 2
+    assert rl_sleeps == [62.0]
+    assert netretry.outage_latched() is False
+
+
+def test_pr_create_snapshot_rate_limited_then_empty_listing_retries_once(
+        shim, monkeypatch, rl_sleeps):
+    g, log, state = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_FAIL_ONCE", "pr list,pr create")
+    assert g.pr_create("chore: t", "body", "master") == 4242
+    assert _lines(log, "pr create") == 2
+    assert len(_open_prs(state)) == 1
+    assert rl_sleeps == [62.0]
+
+
+def test_pr_create_snapshot_and_listing_fail_is_single_create(shim, monkeypatch, rl_sleeps):
+    g, log, _ = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_ALWAYS_FAIL", "pr list")
+    monkeypatch.setenv("GH_SHIM_ALWAYS_MSG", RATE_MSG)
+    monkeypatch.setenv("GH_SHIM_FAIL_ONCE", "pr create")
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert "landed check failed" in ei.value.detail
+    assert _lines(log, "pr create") == 1
+    assert rl_sleeps == [62.0]
+
+
+@pytest.mark.parametrize("mode", ["gh-401", "null"])
+def test_pr_create_rate_limit_reset_unreadable_fails(shim, monkeypatch, rl_sleeps, mode):
+    g, log, _ = shim
+    _rl_env(monkeypatch)
+    monkeypatch.setenv("GH_SHIM_FAIL_ONCE", "pr create")
+    if mode == "gh-401":
+        monkeypatch.setenv("GH_SHIM_ALWAYS_FAIL", "api rate_limit")
+        monkeypatch.setenv("GH_SHIM_ALWAYS_MSG", "HTTP 401: Bad credentials")
+    else:
+        monkeypatch.setenv("GH_SHIM_RESET", "null")
+    with pytest.raises(HarnessError) as ei:
+        g.pr_create("chore: t", "body", "master")
+    assert "reset time unreadable" in ei.value.detail
+    assert _lines(log, "pr create") == 1
+    assert rl_sleeps == []

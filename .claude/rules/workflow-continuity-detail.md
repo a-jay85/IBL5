@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-19
+last_verified: 2026-10-23
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -85,6 +85,7 @@ uncommitted edit or a master merge can realise a row. A hold that mixes MISSING 
 UNREALISED rows keeps the MISSING rule above.
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
+`bin/post-plan-now --state-changed` (and `--rebase-only`, which implies it) passes `POSTPLAN_STATE_CHANGED=1` the same way, so the harness logs `phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)` and proceeds without writing the marker; every other launch passes `POSTPLAN_STATE_CHANGED=0`, and only the exact value `1` skips.
 The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
 `tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
 `.gitignore` already covers. It stores a hash of condition (3)'s MISSING items and
@@ -116,7 +117,7 @@ arms. A failed proof stops before the push. When the patch-id is unchanged, the 
 the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
 record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
 back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
-without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove.
+without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove. When a PR's only failure is the `All checks green` gate timing out on anchors that have since gone green on the same head, the tick runs `gh run rerun <id> --failed` in place of a rescue, at most `PCW_GATE_RERUN_CAP` (2) times per head SHA, and the gate's fail-closed check is unchanged (ADR-0167, addendum `gate-timeout reruns`).
 
 ## What `--auto` adds
 

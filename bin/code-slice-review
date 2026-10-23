@@ -247,7 +247,7 @@ mode_name() {
     fi
 }
 
-# Rotation state is written only by a real, unpinned run; --print-prompt never writes it.
+# Rotation state is written (and the run lock taken) only by a real, unpinned run (never --print-prompt).
 state_is_writable() { [ "$DRY_RUN" -eq 0 ] && [ -z "$SLICE" ] && [ "$MODE" != "prompt" ]; }
 
 # ── Rotation state (Phase 2) ──────────────────────────────────────────────────
@@ -894,6 +894,17 @@ run_pipeline() {
     command -v jq >/dev/null 2>&1 || { log "jq is required"; exit 1; }
     command -v git >/dev/null 2>&1 || { log "git is required"; exit 1; }
 
+    # The lock covers the whole run, including select_slice and the empty-slice
+    # rotation_advance, so overlapping runs cannot race on rotation.state.
+    if [ "$MODE" != "prompt" ] && state_is_writable; then
+        mkdir -p "$STATE_DIR"
+        LOCK_FILE="$STATE_DIR/run.lock"
+        tick_lock_acquire "$LOCK_FILE" _csr_lock_event || rc=$?
+        if [ "$rc" -eq 1 ]; then LOCK_FILE=""; return 0; fi
+        if [ "$rc" -ne 0 ]; then LOCK_FILE=""; exit 1; fi
+    fi
+    trap cleanup EXIT
+
     if [ -n "$SLICE" ]; then
         MODULE="$SLICE"; SLICE_CYCLE="-"
     else
@@ -920,15 +931,7 @@ run_pipeline() {
         return 0
     fi
 
-    if state_is_writable; then
-        mkdir -p "$STATE_DIR"
-        LOCK_FILE="$STATE_DIR/run.lock"
-        tick_lock_acquire "$LOCK_FILE" _csr_lock_event || rc=$?
-        if [ "$rc" -eq 1 ]; then LOCK_FILE=""; return 0; fi
-        if [ "$rc" -ne 0 ]; then LOCK_FILE=""; exit 1; fi
-    fi
     init_workdir
-    trap cleanup EXIT
 
     prompt_file="$WORKDIR/review.prompt"
     compose_prompt "$MODULE" "$SLICE_FILE_LIST" > "$prompt_file"

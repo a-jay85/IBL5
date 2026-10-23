@@ -11,31 +11,32 @@ namespace CareerLeaderboards\Contracts;
  * output buffering pattern for clean, maintainable HTML.
  *
  * @phpstan-import-type FormattedPlayerStats from CareerLeaderboardsServiceInterface
- * @phpstan-type FilterParams array{boards_type?: string, sort_cat?: string, active?: string, display?: int|string}
+ * @phpstan-type FilterParams array{phase?: string, mode?: string, sortby?: string, retirees?: bool, display?: int|string}
  */
 interface CareerLeaderboardsViewInterface
 {
     /**
      * Render the filter form
      *
-     * Generates HTML form with dropdowns for board type, sort category,
-     * active/retired filter, and record limit.
+     * Generates HTML form with a phase select, totals/averages segmented
+     * control, sort select, retirees switch, and results limit.
      *
      * @param FilterParams $currentFilters Current filter values
      * @return string HTML form output
      *
      * **Form Fields:**
-     * - boards_type: Dropdown with 8 board type options
-     * - sort_cat: Dropdown with 20 sort category options
-     * - active: Yes/No dropdown for including retirees
-     * - display: Number input for record limit
+     * - phase: Dropdown of 7 phases
+     * - mode: Totals/Averages radios (averages disabled for phases without an averages table)
+     * - sortby: Dropdown of sort options (all available in both modes)
+     * - retirees: Switch, checked = include retirees
+     * - display: Number input for results limit
      * - submitted: Hidden field set to "1"
      *
      * **Behaviors:**
-     * - Form submits to modules.php?name=CareerLeaderboards
+     * - Form submits to modules.php?name=Leaderboards&tab=career
      * - Pre-selects current filter values
      * - HTML-escapes all values for XSS protection
-     * - Board types and sort categories from CareerLeaderboardsService
+     * - Phases and sort options from CareerLeaderboardsService
      */
     public function renderFilterForm(array $currentFilters): string;
 
@@ -47,8 +48,8 @@ interface CareerLeaderboardsViewInterface
      * @return string HTML table header
      *
      * **Columns:**
-     * Rank, Name, Games, Minutes, FGM, FGA, FG%, FTM, FTA, FT%,
-     * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, FOULS, PTS
+     * #, Name, G (omitted for one-game phases), MIN, FGM, FGA, FG%, FTM, FTA, FT%,
+     * 3GM, 3GA, 3P%, ORB, DRB, REB, AST, STL, TVR, BLK, PF, PTS
      *
      * **Styling:**
      * - Class: sortable (for JavaScript table sorting)

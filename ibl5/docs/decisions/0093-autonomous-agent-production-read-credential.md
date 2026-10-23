@@ -1,6 +1,6 @@
 ---
 description: An unattended agent is given a production-reaching credential safely by starving it to one SELECT-only MySQL user over an SSH tunnel while every privileged write happens prod-side behind a CLI guard.
-last_verified: 2026-09-29
+last_verified: 2026-10-21
 ---
 
 # ADR-0093: An autonomous agent holding a production read-only credential
@@ -39,6 +39,16 @@ The agent is made **incapable by construction**, not trusted to behave. Four str
 - **Negative — a sleeping or offline Mac silently delays the recap.** There is no alerting, and nothing distinguishes "late" from "broken": the queue row simply stays `pending`. Accepted, because the consumer is a non-time-critical human review step and the admin viewer shows queue state on demand.
 - **Negative — the prompt-injection surface is real and is not sanitized.** Player names, team names, and transaction text reach the prompt straight from the database. The mitigation is *structural*: a prompt-injected agent's maximum achievable outcome is a bad recap in a temp file, because it holds no credential able to do anything else. That is stronger than input filtering and does not degrade the output.
 - **Negative — prose quality is not testable.** Every automated check in this unit verifies plumbing, format, and permissions; whether a recap is *good* is a human reading it — which is exactly why the pipeline posts recaps for review rather than publishing them.
+
+## Addendum: agent tool flags (2026-10-20)
+
+The Decision limited `--allowedTools` to `Bash(mysql:*)` and `Write`. That rule matches the literal command prefix. The prompt runs mysql by absolute path, so on the GitHub Actions runner every query was denied and sim 739 parked as flaky. The Mac never hit it because its user settings allow Bash.
+
+Allowing the raw client would have broken this ADR's boundary. The mysql client runs shell commands (`system`, `\!`), writes any file (`tee`), and reads any file (`source`). On the Actions runner that reaches the runner env, secrets, ssh identity, and tunnel config.
+
+So the agent's whole allow-list is now `Bash(<repo>/bin/sim-recap-mysql:*)`. That wrapper takes SQL only, by `-e` or stdin, plus a few output flags. It refuses every other argument and any client command in the SQL. It then runs the pinned client with `--no-defaults --skip-system-command --binary-mode --batch --local-infile=0` and fixed connection flags. `--binary-mode` turns off every client command in non-interactive input. Both flags were proved against Ubuntu's mysql-client 8.0.46, the client the workflow installs, and against the Mac's Homebrew mysql 8.4.11. Claude Code denies an env-prefixed, chained, or `$(...)` form of the wrapper command. The bare `Write` rule is gone because it matched any path, including files outside the workdir.
+
+The tick also passes `--permission-mode acceptEdits`. That mode auto-approves Edit and Write, plus common filesystem Bash commands (`mkdir`, `touch`, `cp`, `mv`, redirects), inside the agent's temp workdir only. The agent uses it for scratch files and `payload.json`. The boundary is still the SELECT-only credential over the tunnel. These flags confine the agent on Actions only. The Mac's user settings allow bare `Bash`, so there the credential split stays the only boundary, as the Decision says. The tick also logs which tools were denied when no payload comes back.
 
 ## References
 

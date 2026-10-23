@@ -458,7 +458,7 @@ final class PeriodAveragesTest extends TestCase
         ));
 
         $this->assertSame(
-            ['renderHeader', 'renderPlayerRow', 'renderTeamFooterRow'],
+            ['renderPlayerRow', 'renderTeamFooterRow'],
             array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $helpers)
         );
 

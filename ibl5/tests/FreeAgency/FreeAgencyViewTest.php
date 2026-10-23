@@ -135,6 +135,70 @@ class FreeAgencyViewTest extends TestCase
         $this->assertStringNotContainsString('pa=rookieoption', $html);
     }
 
+    /**
+     * Characterization pin for the cash-consideration rows, captured from the
+     * pre-split render(). Cash rows come from the buyout ledger via the DB
+     * handle, so a third contracted Player built by the real Service is moved
+     * into cashPlayers with a label. The label carries '&' so the pin also
+     * locks the escaping done inside renderFlexiblePlayerCell.
+     */
+    public function testUnderContractTableWithCashRowGoldenUnchanged(): void
+    {
+        $rookie = $this->getBasePlayerData();
+        $rookie['pid'] = 101;
+        $rookie['name'] = 'Rookie Optionee';
+        $rookie['cy'] = 1;
+        $rookie['draftround'] = 1;
+        $rookie['exp'] = 3;
+        $rookie['salary_yr1'] = 500;
+        $rookie['salary_yr2'] = 510;
+        $rookie['salary_yr3'] = 520;
+        $rookie['salary_yr4'] = 0;
+        $rookie['salary_yr5'] = 0;
+        $rookie['salary_yr6'] = 0;
+
+        $neither = $this->getBasePlayerData();
+        $neither['pid'] = 102;
+        $neither['name'] = 'Plain Contract';
+        $neither['cy'] = 2;
+        $neither['draftround'] = 0;
+        $neither['exp'] = 5;
+        $neither['salary_yr1'] = 700;
+        $neither['salary_yr2'] = 720;
+        $neither['salary_yr3'] = 740;
+        $neither['salary_yr4'] = 0;
+        $neither['salary_yr5'] = 0;
+        $neither['salary_yr6'] = 0;
+
+        $cashSource = $this->getBasePlayerData();
+        $cashSource['pid'] = 301;
+        $cashSource['name'] = 'Cash Source';
+        $cashSource['cy'] = 1;
+        $cashSource['draftround'] = 0;
+        $cashSource['exp'] = 4;
+        $cashSource['salary_yr1'] = 150;
+        $cashSource['salary_yr2'] = 175;
+        $cashSource['salary_yr3'] = 0;
+        $cashSource['salary_yr4'] = 0;
+        $cashSource['salary_yr5'] = 0;
+        $cashSource['salary_yr6'] = 0;
+
+        $mainPageData = $this->buildMainPageData([$rookie, $neither, $cashSource]);
+        $this->assertCount(3, $mainPageData['playersUnderContract']);
+        $cashPlayer = $mainPageData['playersUnderContract'][2]['player'];
+        $this->assertSame(301, $cashPlayer->getPlayerID());
+
+        $mainPageData['playersUnderContract'] = array_slice($mainPageData['playersUnderContract'], 0, 2);
+        $mainPageData['cashPlayers'] = [
+            ['player' => $cashPlayer, 'label' => 'Cash from Other Team & Co'],
+        ];
+
+        $html = $this->makeView()->render($mainPageData);
+
+        $this->assertStringContainsString('pid=0"> Cash from Other Team &amp; Co</a>', $html);
+        $this->assertGolden(__DIR__ . '/fixtures/fa-under-contract-cash.golden.html', $html);
+    }
+
     public function testHostileFreeAgentNameEscapedExactlyOnceNextToThumbnail(): void
     {
         $row = $this->getBasePlayerData();

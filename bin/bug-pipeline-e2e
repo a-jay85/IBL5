@@ -287,12 +287,17 @@ else
         # `claude`. The stub logs "claude <args>" and the prompt is an argv entry, so the
         # operator's text must appear in $CLAUDE_LOG. The tick does not log its bot calls
         # (bot_get_thread_messages is silent), so the live-transcript fetch has no log token to
-        # assert; the bot is probed directly instead.
+        # assert; the same endpoint is called directly with the tick's own request shape.
         (source /tmp/bug-pipeline-test-env.sh && BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick") >/dev/null
         expect 'operator context reached the prompt' 1 \
             "$(grep -cF 'operator says: check the cap calc' "$CLAUDE_LOG" | awk '{print ($1 > 0) ? 1 : 0}')"
         expect 'woken row classified by the tick' 'bug' \
             "$(q "SELECT class FROM ibl_bug_reports WHERE id='$ID3'")"
+        # Live boundary: the real test bot serves the thread the tick fetched from.
+        expect 'test bot /get-thread-messages returns messages' 1 \
+            "$(curl -s -X POST -H 'Content-Type: application/json' \
+                -d "$(jq -nc --arg t "$THREAD3" '{thread_id:$t}')" \
+                "${BOT_BASE_URL}/get-thread-messages" | jq '((.messages // []) | length) > 0 | if . then 1 else 0 end')"
 
         # 8.6 — a stopped row restarts through classify with its lease and attempts cleared
         q "UPDATE ibl_bug_reports SET status='needs_human', lease_owner='x', hunt_attempts=2 WHERE id='$ID3'"

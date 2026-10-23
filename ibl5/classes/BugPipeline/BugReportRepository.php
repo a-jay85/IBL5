@@ -222,8 +222,10 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     /**
      * Operator @mention wake: log the operator's message, then move the row per its status.
      * Duplicate message ids are a no-op (bot retry safety); an unknown report id writes nothing.
-     * dormant -> queued; stopped rows (needs_human/parked_idle/dropped) restart through classify;
-     * every other status only gains context (and a thread_id if it had none).
+     * dormant -> queued; stopped rows (needs_human/parked_idle) restart through classify;
+     * every other status only gains context (and a thread_id if it had none). A dropped row
+     * stays dropped: its only writer is a deleted source message, so a mention must not revive it.
+     * The row is read FOR UPDATE, so the status branch below sees what the transition writes over.
      *
      * @return array{outcome: 'woke'|'restarted'|'appended'|'duplicate'|'unknown', status: ?string}
      */
@@ -231,7 +233,8 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     {
         /** @var array{outcome: 'woke'|'restarted'|'appended'|'duplicate'|'unknown', status: ?string} $result */
         $result = $this->transactional(function () use ($id, $threadId, $messageId, $authorId, $content): array {
-            $row = $this->findById($id);
+            $locked = $this->fetchOne('SELECT * FROM `ibl_bug_reports` WHERE id = ? LIMIT 1 FOR UPDATE', 'i', $id);
+            $row = $locked === null ? null : $this->castRow($locked);
             if ($row === null) {
                 return ['outcome' => 'unknown', 'status' => null];
             }
@@ -242,7 +245,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
                 $this->claims->transition($id, 'queued', ['thread_id' => $threadId], true);
                 return ['outcome' => 'woke', 'status' => 'queued'];
             }
-            if (in_array($row['status'], ['needs_human', 'parked_idle', 'dropped'], true)) {
+            if (in_array($row['status'], ['needs_human', 'parked_idle'], true)) {
                 $this->claims->transition($id, 'queued', [
                     'thread_id' => $threadId,
                     'class' => null,

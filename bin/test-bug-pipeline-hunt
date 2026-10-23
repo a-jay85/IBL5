@@ -32,6 +32,23 @@ bpt_expect_eq "r4: exit 0" 0 "$BPT_RC"
 bpt_log_has  "$STUB" tick.out "claimed bug 7 into hunting" "r4: claims bug into hunting"
 bpt_count    "r4: hunter dispatched exactly once" 1 "$STUB/hunt-models.log"
 
+# ── ★ operator guidance reaches the hunter prompt inside <operator>, not the transcript ──
+OPCTX_CLAIM='{"id":"7","status":"hunting","class":"bug","thread_id":"880000000000000001","issue_number":"4242","original_text":"the trade button is broken","hunt_attempts":0,"operator_context":[{"message_id":"987654321098765432","created_at":"2026-10-22 10:00:00","content":"check the cap calc"}]}'
+bpt_reset
+bpt_set_claim "$OPCTX_CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_set_transcript '{"messages":[{"id":"987654321098765432","author_id":"555","content":"OPERATOR_LINE"},{"id":"987654321098765433","author_id":"111","content":"GM_LINE"}]}'
+bpt_run
+bpt_expect_eq "operator ctx: hunt exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" claude.args.log "check the cap calc" "operator ctx: guidance reaches the hunter prompt"
+if awk '/<operator id=/{f=1; next} f && /check the cap calc/{ok=1} /<\/operator id=/{f=0} END{exit !ok}' "$STUB/claude.args.log"; then
+    bpt_ok "operator ctx: guidance sits inside the <operator> block"
+else
+    bpt_fail "operator ctx: guidance not inside the <operator> block"
+fi
+bpt_log_lacks "$STUB" claude.args.log "{{operator_context}}" "operator ctx: hunter placeholder substituted"
+bpt_log_lacks "$STUB" claude.args.log "OPERATOR_LINE" "operator ctx: operator mention omitted from the hunter transcript"
+bpt_log_has   "$STUB" claude.args.log "GM_LINE" "operator ctx: GM message stays in the hunter transcript"
+
 # ── Row 5 — NEG single-flight: claim-next empty → no hunter, tick exits 0 ──
 bpt_reset
 bpt_set_actionable '[]'   # claim-next.out empty by default

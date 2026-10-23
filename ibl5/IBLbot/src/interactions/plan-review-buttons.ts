@@ -1,7 +1,7 @@
 import { MessageFlags } from 'discord.js';
 import type { ButtonInteraction } from 'discord.js';
 import { config } from '../config.js';
-import { PLAN_SLUG_RE, buildPlanReviewRow } from '../server/plan-review-dm.js';
+import { PLAN_SLUG_RE, buildPlanReviewRow, derivePlanButtons } from '../server/plan-review-dm.js';
 import { appendDecision, hasDecision } from '../server/decision-store.js';
 
 const OUTCOME = {
@@ -58,6 +58,10 @@ export async function handlePlanReviewButton(interaction: ButtonInteraction, dir
 
     await interaction.deferUpdate();
 
+    // Rebuild with the set the DM was sent with, so a discard-only DM never
+    // regains a Queue button. No components (or none matching) means both.
+    const verbs = derivePlanButtons(interaction.message?.components, slug);
+
     // Disk first, UI second: if editReply throws on an expired token the decision
     // is already durable and the drain still finds it. The reverse order shows
     // the owner a confirmation for a record no drain will ever see.
@@ -75,7 +79,7 @@ export async function handlePlanReviewButton(interaction: ButtonInteraction, dir
             // Buttons stay enabled so the press can be retried.
             await interaction.editReply({
                 content: 'Could not record that decision — please press again.',
-                components: [buildPlanReviewRow(slug)],
+                components: [buildPlanReviewRow(slug, false, verbs)],
             });
         } catch {
             // Interaction may have expired — nothing we can do
@@ -87,6 +91,6 @@ export async function handlePlanReviewButton(interaction: ButtonInteraction, dir
     // as an audit trail.
     await interaction.editReply({
         content: OUTCOME[action],
-        components: [buildPlanReviewRow(slug, true)],
+        components: [buildPlanReviewRow(slug, true, verbs)],
     });
 }

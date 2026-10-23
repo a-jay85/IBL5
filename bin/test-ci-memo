@@ -21,8 +21,8 @@ unset GITHUB_OUTPUT GITHUB_STEP_SUMMARY 2>/dev/null || true
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MEMO="$SCRIPT_DIR/ci-memo"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-WF_TESTS="$REPO_ROOT/.github/workflows/tests.yml"
-WF_E2E="$REPO_ROOT/.github/workflows/e2e-tests.yml"
+WF_TESTS="${CI_MEMO_WF_TESTS:-$REPO_ROOT/.github/workflows/tests.yml}"
+WF_E2E="${CI_MEMO_WF_E2E:-$REPO_ROOT/.github/workflows/e2e-tests.yml}"
 
 ONLY_CASE=""
 
@@ -56,7 +56,7 @@ vr_if_shape() {
 # images. mirror-ready reads no path-filter output, so it adds no filter skip.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
 MEMO_ONLY_JOBS="test harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
-UNCONDITIONAL_JOBS="phpunit-hygiene host-mariadb-guard automouse-impl-model-test actionlint"
+UNCONDITIONAL_JOBS="static-guards"
 filter_free_topology() {
     local wf="$1" got bad=0 j
     got=$(awk '
@@ -638,7 +638,7 @@ if should_run gate-topology-mutants; then
     # 7b: harness job re-adds changes to needs
     sed "/^  harness-tests:/,/^    needs:/ s|^    needs: \[ci-memo-check|    needs: [changes, ci-memo-check|" "$WF_TESTS" > "$m/tests-7b.yml"
     # 7c: an unconditional job regains a job-level needs:
-    awk '/^  actionlint:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
+    awk '/^  static-guards:/{a=1} a && /^    runs-on:/{print "    needs: [changes]"; a=0} {print}' "$WF_TESTS" > "$m/tests-7c.yml"
     # 7d: iblbot loses its filter, so the allowlist no longer matches exactly
     sed "/^  iblbot:/,/^    if:/ s|^    if: needs.changes.outputs.iblbot == 'true' \&\& |    if: |" "$WF_TESTS" > "$m/tests-7d.yml"
     mt_check() {
@@ -678,6 +678,106 @@ if should_run memo-only-salt; then
         pass "memo-only-salt: tests.yml salts the tests key"
     else
         fail "memo-only-salt: tests.yml Compute memo key lacks --extra gating=memo-only"
+    fi
+fi
+
+# =========================================================================
+# Case: guard-fold
+# =========================================================================
+# Aggregator completeness is a memo-safety property: the Tests and Analysis gate
+# writes the memo when needs.*.result holds no failure, so a job left out of
+# gate.needs can be red while the memo records the tree as clean.
+if should_run guard-fold; then
+    # Top-level job ids (under jobs:) of a workflow, one per line.
+    gf_jobs() {
+        awk '
+            /^jobs:/ { in_jobs = 1; next }
+            /^[a-zA-Z]/ { in_jobs = 0 }
+            in_jobs && /^  [a-z0-9-]+:$/ { j = substr($0, 3); sub(/:$/, "", j); print j }
+        ' "$1"
+    }
+    # Jobs with neither a 4-space needs: nor a 4-space if: line, sorted, space-joined.
+    gf_unconditional() {
+        awk '
+            /^jobs:/ { in_jobs = 1; next }
+            /^[a-zA-Z]/ { in_jobs = 0 }
+            in_jobs && /^  [a-z0-9-]+:$/ {
+                if (job != "" && !cond) print job
+                job = substr($0, 3); sub(/:$/, "", job); cond = 0; next
+            }
+            in_jobs && /^    (needs|if):/ { cond = 1 }
+            END { if (job != "" && !cond) print job }
+        ' "$1" | sort | paste -sd' ' -
+    }
+
+    # 1. gate-needs-complete
+    for wf_pair in "tests.yml|$WF_TESTS|" "e2e-tests.yml|$WF_E2E|merge-reports vr-pages-cleanup"; do
+        IFS='|' read -r wf_name wf_path wf_exempt <<< "$wf_pair"
+        gate_needs=$(awk '
+            /^  gate:$/ { b = 1; next }
+            b && /^  [a-zA-Z]/ { exit }
+            b && /^    needs: \[/ { print; exit }
+        ' "$wf_path")
+        if [[ -z "$gate_needs" ]]; then
+            fail "guard-fold[gate-needs-complete]: $wf_name gate has no one-line 'needs: [...]'"
+            continue
+        fi
+        gate_list=" $(sed -e 's/^    needs: \[//' -e 's/\].*$//' -e 's/,/ /g' <<< "$gate_needs") "
+        gf_missing=""
+        while IFS= read -r jid; do
+            [[ "$jid" == "gate" ]] && continue
+            [[ " $wf_exempt " == *" $jid "* ]] && continue
+            [[ "$gate_list" == *" $jid "* ]] || gf_missing="$gf_missing $jid"
+        done < <(gf_jobs "$wf_path")
+        if [[ -n "$gf_missing" ]]; then
+            fail "guard-fold[gate-needs-complete]: $wf_name gate.needs is missing:$gf_missing"
+        else
+            pass "guard-fold[gate-needs-complete]: $wf_name"
+        fi
+    done
+
+    # 2. unconditional-jobs-allowlist
+    for wf_pair in "tests.yml|$WF_TESTS|mirror-ready changes ci-memo-check static-guards" \
+                   "e2e-tests.yml|$WF_E2E|mirror-ready changes ci-memo-check"; do
+        IFS='|' read -r wf_name wf_path wf_want <<< "$wf_pair"
+        wf_want=$(tr ' ' '\n' <<< "$wf_want" | sort | paste -sd' ' -)
+        wf_got=$(gf_unconditional "$wf_path")
+        if [[ "$wf_got" == "$wf_want" ]]; then
+            pass "guard-fold[unconditional-jobs-allowlist]: $wf_name"
+        else
+            fail "guard-fold[unconditional-jobs-allowlist]: $wf_name got [$wf_got] want [$wf_want]"
+        fi
+    done
+
+    # 3. static-guards-no-short-circuit
+    sg=$(awk '/^  static-guards:$/{b=1;print;next} b && /^  [a-zA-Z]/{exit} b{print}' "$WF_TESTS")
+    read -r sg_steps sg_bad sg_joblvl sg_coe < <(printf '%s\n' "$sg" | awk '
+        /^      - /                         { if (n >= 2 && !ok) bad++; n++; ok = 0 }
+        /^        if: \$\{\{ !cancelled\(\) \}\}$/ { ok = 1 }
+        /^    (if|needs):/                  { jl = 1 }
+        /^ *(- )?continue-on-error:/        { coe = 1 }   # key only; comments may mention it
+        END { if (n >= 2 && !ok) bad++; print n + 0, bad + 0, jl + 0, coe + 0 }')
+    if [[ "$sg_steps" -ge 2 && "$sg_bad" -eq 0 && "$sg_joblvl" -eq 0 && "$sg_coe" -eq 0 ]]; then
+        pass "guard-fold[static-guards-no-short-circuit]: $sg_steps steps"
+    else
+        fail "guard-fold[static-guards-no-short-circuit]: steps=$sg_steps missing-!cancelled()=$sg_bad job-level-if/needs=$sg_joblvl continue-on-error=$sg_coe"
+    fi
+
+    # 4. static-guards-holds-folded
+    gf_absent=""
+    for s in 'bin/check-phpunit-hygiene' 'pinact" run --check' 'bin/lint-workflows' \
+             'Grep for host mariadb invocations outside bin/db-query' \
+             'bin/test-automouse-impl-model' 'bin/test-automouse-env-breaker' \
+             'bin/test-automouse-login-preflight' 'bin/test-headless-elapsed-hook' \
+             'bin/test-post-merge-hook' 'bin/test-automouse-impl-cap-timeout' \
+             'bin/test-automouse-postplan-disposition' 'bin/test-automouse-postplan-worktree' \
+             'bin/check-playwright-pinning'; do
+        grep -qF -- "$s" <<< "$sg" || gf_absent="$gf_absent [$s]"
+    done
+    if [[ -z "$gf_absent" ]]; then
+        pass "guard-fold[static-guards-holds-folded]"
+    else
+        fail "guard-fold[static-guards-holds-folded]: static-guards lacks:$gf_absent"
     fi
 fi
 

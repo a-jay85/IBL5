@@ -1,7 +1,7 @@
 ---
-description: Go engine workflow. Run the CI-pinned golangci-lint locally before pushing (a red Engine check holds auto-merge through All checks green, and master pushes are ungated), the two lint rules it enforces, and the real measured runtime of an archive A/B walk. Also the engine/ freeze plus decompile-token gates.
+description: Go engine workflow. Run the CI-pinned golangci-lint locally before pushing (a red Engine check holds auto-merge through All checks settled, and master pushes are ungated), the two lint rules it enforces, and the real measured runtime of an archive A/B walk. Also the engine/ freeze plus decompile-token gates.
 paths: "engine/**"
-last_verified: 2026-10-10
+last_verified: 2026-10-22
 ---
 
 # Engine (Go) Workflow
@@ -33,12 +33,12 @@ into this file. A restated list goes stale, and `bin/check-docs` fails this doc 
 names two or more contexts.
 
 On a PR, engine lint still gates merge through the aggregator. The workflow's `gate`
-job reports a check named `Engine`. `All checks green`
-(`.github/workflows/all-checks-green.yml`, ADR-0149) is required, and it fails on any
-red check on the head and waits on any pending one, except names in its `--ignore=`
-list. `Engine` is not on that list, so `gh pr merge --auto` holds until `engine.yml`
-passes. A lint failure found there still costs a red-PR round trip: fix, push, wait for
-CI again. `bin/check-docs` fails if `Engine` ever joins `--ignore=`.
+job reports a check named `Engine`. `All checks settled`
+(`.github/workflows/all-checks-settled.yml`, ADR-0149) is required, and it turns `failure` on any
+red check on the head and holds `pending` while any check is still running, except names
+in its `--ignore=` list. `Engine` is not on that list, so the status stays `pending` until the `Engine`
+check reports, and `gh pr merge --auto` holds until `engine.yml` passes. A lint failure
+found there still costs a red-PR round trip: fix, push, wait for CI again. `bin/check-docs` fails if `Engine` ever joins `--ignore=`.
 
 Before ADR-0149, auto-merge raced ahead of `engine.yml` and lint failures landed on
 **master** (the PR9b / #933 red-master incident: errcheck flagged unchecked

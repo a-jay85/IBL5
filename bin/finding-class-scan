@@ -645,7 +645,7 @@ classify_batch() {
 }
 
 classify_unseen() {
-    local f k=0 valid
+    local f k=0 valid rejected n_rejected
     if [ ! -s "$WORK/unseen.jsonl" ]; then return 0; fi
     split -l 60 "$WORK/unseen.jsonl" "$WORK/batch-"
     for f in "$WORK"/batch-*; do
@@ -662,11 +662,24 @@ classify_unseen() {
         fi
         # Classes made by this batch are visible to the next one, so keys stay
         # stable inside one run.
-        # A thread the model skipped, or sent to a rejected class, is recorded
-        # as unclassed so later runs do not page it again.
-        jq -c --slurpfile b <(jq -c '.id' "$f") '
+        # A thread the model skipped is recorded as unclassed so later runs do
+        # not page it again. A thread it sent to a class that failed validation
+        # keeps no row, so the next run that re-fetches its PR (inside the
+        # 7-day lookback, or on --backfill) classifies it again.
+        rejected="$WORK/rejected-$k.json"
+        jq -c --slurpfile b <(jq -c '.id' "$f") --slurpfile v "$valid" \
+            "$JQ_PAYLOAD"' | ($v[0].assignments | map(.thread_id)) as $got
+            | [.assignments[] | select(type == "object" and (.thread_id | type == "string") and .class_key != null)
+               | .thread_id]
+            | unique | map(select(IN($b[]) and (IN($got[]) | not)))' \
+            "$WORK/classify-$k.out" > "$rejected" || fail_classify "rejected-thread scan failed"
+        n_rejected="$(jq 'length' "$rejected")"
+        if [ "$n_rejected" -gt 0 ]; then
+            say "batch $k: threads left unseen for retry (rejected class): $n_rejected"
+        fi
+        jq -c --slurpfile b <(jq -c '.id' "$f") --slurpfile r "$rejected" '
             (.assignments | map(.thread_id)) as $got
-            | .assignments[], ($b | map(select(IN($got[]) | not)) | .[] | {thread_id: ., class_key: null})' "$valid" >> "$WORK/run-assign-raw.jsonl"
+            | .assignments[], ($b | map(select((IN($got[]) or IN($r[0][])) | not)) | .[] | {thread_id: ., class_key: null})' "$valid" >> "$WORK/run-assign-raw.jsonl"
         jq -c --slurpfile v "$valid" '. + ($v[0].classes | map({key, number: null, state: null, title, description, check_kind}))' \
             "$WORK/classes-all.json" > "$WORK/classes-all.tmp" && mv "$WORK/classes-all.tmp" "$WORK/classes-all.json"
         jq -c --slurpfile v "$valid" '. + ($v[0].classes | map({key: .key, value: .}) | from_entries)' \

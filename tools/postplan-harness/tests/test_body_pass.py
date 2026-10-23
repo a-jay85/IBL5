@@ -283,3 +283,23 @@ def test_body_pass_uses_worktree_for_head_total(tmp_path):
     assert "[harness: measured" not in clean["corrected_body"]
     flagged = _tc_check(9, diff=diff, worktree=str(tmp_path))
     assert f"[harness: measured 3 added / 7 total in `{_TC_PATH}`]" in flagged["corrected_body"]
+
+
+def test_body_pass_corrects_numbers_before_annotating_test_counts():
+    """Order guard: correct_body_numbers must run before annotate_test_count_mismatches.
+
+    The diff adds 3 test lines plus 4 other lines (7 added in total, 2 files). The body has a
+    wrong file count (corrected to 2) and a wrong test-count claim (annotated with
+    `3 added / 3 total`). If the passes were swapped, the inserted note's `3 added` would match
+    the insertions rule and be rewritten to `7 added`.
+    """
+    other = "docs/notes.md"
+    diff = (_tc_diff()
+            + f"diff --git a/{other} b/{other}\nnew file mode 100644\n--- /dev/null\n"
+            + f"+++ b/{other}\n@@ -1,0 +1,4 @@\n" + "+x\n" * 4)
+    body = f"- `{_TC_PATH}` adds 5 tests\n- 9 files changed\n"
+    result = runner._mechanical_body_pass(
+        _TcGit(diff), _TcGh(), {"summary_md": body}, False, lambda _m: None)
+    assert result["corrected_body"] == (
+        f"- `{_TC_PATH}` adds 5 tests [harness: measured 3 added / 3 total in `{_TC_PATH}`]\n"
+        "- 2 files changed\n")

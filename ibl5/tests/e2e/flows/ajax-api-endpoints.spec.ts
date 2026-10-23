@@ -339,7 +339,7 @@ test.describe('FranchiseRecordBook API', () => {
     );
 
     const pushUrl = response.headers()['hx-push-url'] ?? '';
-    expect(pushUrl).toContain('FranchiseRecordBook');
+    expect(pushUrl).toContain('name=Records&tab=byfranchise');
   });
 });
 

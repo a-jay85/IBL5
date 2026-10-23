@@ -5,6 +5,11 @@ byte-caps, single-turns, and validates every call.
 """
 from __future__ import annotations
 
+import difflib
+import re
+
+from .classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END, MERGE_DIGEST_BEGIN,
+                       MERGE_DIGEST_END)
 from .state import ArmDecision, Classification, PlanInfo
 
 # Probe allowlist sentence for manual_recheck_prompt.  Keep `at most 8 elements`
@@ -115,6 +120,114 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         "Both strings must be <= 72 chars and must each start with their own "
         "conventional-commit type. They are two separate artifacts and must NOT be "
         "identical -- write commit_subject from the diff, then title from the purpose."
+    )
+
+
+# --- Body-only fidelity recheck (Phase 5.5 body-only rounds) -----------------
+
+FILES_CHANGED_BLOCK_RE = re.compile(
+    re.escape(FILES_CHANGED_BEGIN) + r".*?" + re.escape(FILES_CHANGED_END), re.S)
+MERGE_DIGEST_BLOCK_RE = re.compile(
+    re.escape(MERGE_DIGEST_BEGIN) + r".*?" + re.escape(MERGE_DIGEST_END), re.S)
+_DIFF_SECTION_RE = re.compile(r"^diff --git ", re.M)
+_DIFF_PATHS_RE = re.compile(r"^diff --git a/(\S+) b/(\S+)")
+
+# Per-field byte caps for pr_body_recheck_prompt. They sum under MAX_PROMPT_BYTES
+# (adapters/llm.py) with room for the fixed prose; ClaudeCli's own cap is a backstop.
+_RECHECK_CAPS = {"findings": 12_000, "hunks": 12_000, "old_body": 24_000,
+                 "new_body": 24_000, "name_status": 8_000, "evidence": 36_000}
+
+
+def _cap(s: str, n: int) -> str:
+    raw = s.encode()
+    if len(raw) <= n:
+        return s
+    return raw[:n].decode(errors="ignore") + "\n[TRUNCATED]"
+
+
+def strip_machine_blocks(body: str) -> str:
+    """Remove the two runner-generated blocks check 4 excludes; everything else stays."""
+    return MERGE_DIGEST_BLOCK_RE.sub("", FILES_CHANGED_BLOCK_RE.sub("", body or ""))
+
+
+def body_hunks(old_body: str, new_body: str) -> list[dict]:
+    """Numbered added/changed hunks, old -> new, after strip_machine_blocks on both.
+
+    One hunk per difflib 'insert' or 'replace' opcode, in document order, ids H1..Hn:
+    {"id": "H1", "op": "insert"|"replace", "old": [lines], "new": [lines]}.
+    'delete' and 'equal' produce nothing: removing a claim cannot add an unsupported one.
+    """
+    old_lines = strip_machine_blocks(old_body).splitlines()
+    new_lines = strip_machine_blocks(new_body).splitlines()
+    sm = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
+    hunks: list[dict] = []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op not in ("insert", "replace"):
+            continue
+        hunks.append({"id": f"H{len(hunks) + 1}", "op": op,
+                      "old": old_lines[i1:i2], "new": new_lines[j1:j2]})
+    return hunks
+
+
+def diff_sections_for(diff: str, paths: set[str], cap: int = 40_000) -> str:
+    """Per-file sections of a unified diff whose a/ or b/ path is in `paths`.
+
+    Sections keep diff order and are byte-capped. When no section matches, the first
+    `cap` bytes of the whole diff stand in. Pure string work.
+    """
+    diff = diff or ""
+    starts = [m.start() for m in _DIFF_SECTION_RE.finditer(diff)]
+    picked: list[str] = []
+    for k, start in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(diff)
+        section = diff[start:end]
+        m = _DIFF_PATHS_RE.match(section)
+        if m and (m.group(1) in paths or m.group(2) in paths):
+            picked.append(section)
+    return _cap("".join(picked) if picked else diff, cap)
+
+
+def pr_body_recheck_prompt(findings: list[str], hunks: list[dict], old_body: str,
+                           new_body: str, name_status: str, evidence: str) -> str:
+    """Single-turn, no-tools recheck of a PR body after a body-only remediation round.
+
+    Every prior finding is enumerated F1..Fn and every added or changed body hunk
+    H1..Hm; schemas.validate_body_recheck demands each id back exactly once.
+    """
+    f_block = "\n".join(f"F{i}: {text}" for i, text in enumerate(findings, 1))
+    h_parts = []
+    for h in hunks:
+        lines = [f"- {ln}" for ln in h["old"]] + [f"+ {ln}" for ln in h["new"]]
+        h_parts.append(f"{h['id']} ({h['op']}):\n" + "\n".join(lines))
+    h_block = "\n\n".join(h_parts) if h_parts else "(none)"
+    return (
+        "You are rechecking a PR body after a body-only remediation. The code tree is "
+        "unchanged since the prior review and every prior finding was about the PR body. "
+        "You have no tools; judge only from this packet.\n\n"
+        "A hand-written body claim the diff evidence contradicts is unresolved or "
+        "unsupported. Counts, file names, test names and \"no behavior change\" claims "
+        "must be confirmed against the evidence shown, never assumed.\n\n"
+        "A claim about state the diff cannot show (an issue number, a deploy, a sibling "
+        "repo, \"all tests pass locally\") is unsupported unless the body line itself "
+        "cites evidence that is visible in this packet. You cannot run commands, so a "
+        "bare claim of that kind is unsupported.\n\n"
+        "When the packet does not let you ground a claim, answer `unresolved` / "
+        "`unsupported`. A wrong `resolved` arms a merge; a wrong `unresolved` only costs "
+        "a fuller review.\n\n"
+        "## PRIOR FINDINGS\n" + _cap(f_block, _RECHECK_CAPS["findings"])
+        + "\n\n## ADDED OR CHANGED BODY HUNKS\n" + _cap(h_block, _RECHECK_CAPS["hunks"])
+        + "\n\n## OLD BODY\n" + _cap(old_body or "", _RECHECK_CAPS["old_body"])
+        + "\n\n## NEW BODY\n" + _cap(new_body or "", _RECHECK_CAPS["new_body"])
+        + "\n\n## CHANGED FILES (git diff --name-status)\n"
+        + _cap(name_status or "", _RECHECK_CAPS["name_status"])
+        + "\n\n## DIFF EVIDENCE\n" + _cap(evidence or "", _RECHECK_CAPS["evidence"])
+        + "\n\nReply with ONLY a JSON object: "
+        '{"findings": [{"id": "F1", "status": "resolved"|"unresolved", '
+        '"evidence": "<one sentence citing the body line and the diff line>"}], '
+        '"hunks": [{"id": "H1", "status": "supported"|"unsupported", '
+        '"evidence": "<one sentence>"}]}. '
+        "Include every F-id and every H-id exactly once. No other keys, no prose. "
+        'When the hunk list is (none), "hunks": [] is required.'
     )
 
 

@@ -29,11 +29,17 @@ branch; it survives you closing Claude Code. Engine selection:
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Five kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  These kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
   rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
   or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), a
   **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
   message), and an **expired login** (`llm-auth-expired`: the Claude CLI login expired).
+  A **hung step** reaches it too. `subprocess-timeout` is a bounded step past its timeout.
+  Every harness `git` call is bounded: 300 s local, 600 s for fetch, push and ls-remote.
+  `precommit-hang` is `bin/pre-commit-hook` past its 300 s `COMMIT_HOOK_TIMEOUT`. Neither
+  commits, pushes or arms, and the `RESULT:` line names the step. When `bin/post-plan-fleet`'s
+  90-minute timeout fires, its log and DM name the last step the harness started. A killed
+  run is never reported as a usage-gate pause.
   A skill re-run would hit the same wall on each one, so the run stops for a human.
   For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
   login, run `claude`, complete `/login`, then re-run it.

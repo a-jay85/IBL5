@@ -64,4 +64,55 @@ class RefreshTeamSeasonRecordsStepTest extends TestCase
 
         $this->assertCount(2, array_values($insertQueries), 'Expected two INSERTs into ibl_team_season_records');
     }
+
+    public function testRebuildWithinCurrentTransactionIssuesNoTransactionControl(): void
+    {
+        $mockDb = new MockDatabase();
+        $result = (new RefreshTeamSeasonRecordsStep($mockDb))->rebuildWithinCurrentTransaction();
+
+        $log = $mockDb->getOperationLog();
+        $this->assertNotContains('BEGIN', $log);
+        $this->assertNotContains('COMMIT', $log);
+        $this->assertNotContains('ROLLBACK', $log);
+
+        $queries = $mockDb->getExecutedQueries();
+        $this->assertCount(3, $queries);
+        $this->assertStringStartsWith('DELETE', $queries[0]);
+        $this->assertStringContainsString('ibl_team_season_records', $queries[0]);
+        $this->assertStringStartsWith('INSERT', $queries[1]);
+        $this->assertStringContainsString('ibl_team_season_records', $queries[1]);
+        $this->assertStringStartsWith('INSERT', $queries[2]);
+        $this->assertStringContainsString('ibl_team_season_records', $queries[2]);
+        $this->assertSame(['regular', 'heat'], array_keys($result));
+    }
+
+    public function testExecuteRollsBackAndReportsFailureWhenInsertFails(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->failOnNthInsert(2);
+
+        $result = (new RefreshTeamSeasonRecordsStep($mockDb))->execute();
+
+        $log = $mockDb->getOperationLog();
+        $this->assertFalse($result->success);
+        $this->assertContains('BEGIN', $log);
+        $this->assertContains('ROLLBACK', $log);
+        $this->assertNotContains('COMMIT', $log);
+    }
+
+    public function testRebuildWithinCurrentTransactionPropagatesInsertFailure(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->failOnNthInsert(2);
+
+        $caught = false;
+        try {
+            (new RefreshTeamSeasonRecordsStep($mockDb))->rebuildWithinCurrentTransaction();
+        } catch (\RuntimeException) {
+            $caught = true;
+        }
+
+        $this->assertTrue($caught, 'INSERT failure must escape rebuildWithinCurrentTransaction()');
+        $this->assertNotContains('ROLLBACK', $mockDb->getOperationLog());
+    }
 }

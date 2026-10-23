@@ -178,12 +178,17 @@ class LeagueContext
                 'Voting',
                 'VotingResults',
                 'CapSpace',
+                'ContractList',
+                'Contracts',
                 'FranchiseHistory',
                 'AwardHistory',
                 'FranchiseRecordBook',
                 'CareerLeaderboards',
                 'SeasonLeaderboards',
+                'Leaderboards',
                 'RecordHolders',
+                'Records',
+                'AllStarAppearances',
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);

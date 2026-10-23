@@ -20,7 +20,7 @@ test.describe('Player Database flow', () => {
 
   test('search by name returns results', async ({ page }) => {
     await page.locator('input[name="search_name"]').fill('a');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
 
     // After search, a results table should appear
     await expect(page.locator('table').first()).toBeVisible();
@@ -30,7 +30,7 @@ test.describe('Player Database flow', () => {
 
   test('filter by position returns results', async ({ page }) => {
     await page.locator('select[name="pos"]').selectOption('SG');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
 
     await expect(page.locator('table').first()).toBeVisible();
     const rows = page.locator('table tbody tr');
@@ -43,7 +43,7 @@ test.describe('Player Database flow', () => {
     await page.locator('select[name="pos"]').selectOption('SG');
 
     // Click reset
-    const resetButton = page.locator('.ibl-btn.ibl-btn--ghost').first();
+    const resetButton = page.getByRole('button', { name: 'Reset' });
     await expect(resetButton).toBeVisible();
     await resetButton.click();
     // Name input should be cleared
@@ -55,14 +55,14 @@ test.describe('Player Database flow', () => {
     // No=0 (exclude → ibl_plr.retired = 0). Retired players render as a separator
     // row, so count whole tbody rows rather than a stat cell.
     await page.locator('select[name="active"]').selectOption('1');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
     const allCount = await page.locator('table.sortable tbody tr').count();
 
     // Now navigate back and submit with active=0 (exclude retirees)
     await gotoWithRetry(page, 'modules.php?name=PlayerSearch');
     await page.locator('select[name="active"]').selectOption('0');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
     const activeOnlyCount = await page.locator('table.sortable tbody tr').count();
 
@@ -71,14 +71,14 @@ test.describe('Player Database flow', () => {
 
   test('experience range filter narrows results', async ({ page }) => {
     // Submit with no filters to get the unfiltered count
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
     const unfilteredCount = await page.locator('table.sortable tbody tr td:nth-child(5)').count();
 
     // Navigate back, apply exp_max=2, resubmit
     await gotoWithRetry(page, 'modules.php?name=PlayerSearch');
     await page.locator('input[name="exp_max"]').fill('2');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
     await expect(page.locator('table.sortable').first()).toBeVisible();
 
     const expCells = page.locator('table.sortable tbody tr td:nth-child(5)');
@@ -95,7 +95,7 @@ test.describe('Player Database flow', () => {
 
   test('sort by Exp column produces non-increasing order on first click', async ({ page }) => {
     // Submit empty search to get all results
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
 
     const table = page.locator('table.sortable').first();
     await expect(table).toBeVisible();
@@ -127,7 +127,7 @@ test.describe('Player Database flow', () => {
 
   test('no PHP errors after search', async ({ page }) => {
     await page.locator('input[name="search_name"]').fill('test');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.getByRole('button', { name: 'Search for Player' }).click();
 
     await assertNoPhpErrors(page, 'after search');
   });

@@ -81,11 +81,11 @@ class WaiversRosterSlotCounterTest extends TestCase
         $repo = $this->createMock(TeamQueryRepositoryInterface::class);
         $repo->expects($this->once())
             ->method('getHealthyAndInjuredPlayersOrderedByName')
-            ->with(7, $this->identicalTo($season))
+            ->with(7, self::identicalTo($season))
             ->willReturn([]);
         $repo->expects($this->once())
             ->method('getHealthyPlayersOrderedByName')
-            ->with(7, $this->identicalTo($season))
+            ->with(7, self::identicalTo($season))
             ->willReturn([]);
 
         (new WaiversRosterSlotCounter($repo))->countOpenSlots(7, $season);

@@ -3,6 +3,8 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import {
   assertScheduleStructure,
   assertUnplayedGameDash,
+  injectScrollRoom,
+  readTargetPosition,
 } from '../helpers/schedule-page';
 
 const TEAM_SCHEDULE_URL = 'modules.php?name=Schedule&teamid=1'; // Metros
@@ -73,6 +75,60 @@ test.describe('Team Schedule — jump button', () => {
     // CI seed has unplayed games for Metros
     const upcoming = page.locator('.schedule-game--upcoming');
     await expect(upcoming.first()).toBeVisible();
+  });
+});
+
+// ============================================================
+// Team Schedule — scroll behavior (characterization, jslib extract)
+// ============================================================
+
+test.describe('Team Schedule — scroll behavior', () => {
+  // league-schedule.spec.ts also loads modules.php?name=Schedule in the same shard.
+  // Both files use 60s (playwright-gotchas.md, CI & environment).
+  test.describe.configure({ timeout: 60000 });
+
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto(TEAM_SCHEDULE_URL);
+  });
+
+  test('month link scrolls its target to the 70px header offset', async ({ page }) => {
+    const monthLink = page.locator('.schedule-months__link').last();
+    const href = await monthLink.getAttribute('href');
+    expect(href).toMatch(/^#team-month-\d{4}-\d{2}$/);
+    const targetId = (href ?? '').slice(1);
+
+    await injectScrollRoom(page, targetId);
+    const before = await readTargetPosition(page, targetId);
+    // Precondition: the target starts below the fold, so the click must scroll.
+    expect(before.top).toBeGreaterThan(before.viewport);
+
+    await monthLink.click();
+    await expect
+      .poll(async () => Math.abs((await readTargetPosition(page, targetId)).top - 70), { timeout: 10000 })
+      .toBeLessThanOrEqual(2);
+  });
+
+  test('Next Games button centres its target vertically', async ({ page }) => {
+    const jumpBtn = page.locator('.schedule-jump-btn');
+    const href = await jumpBtn.getAttribute('href');
+    expect(href).toMatch(/^#team-game-.+/);
+    const targetId = (href ?? '').slice(1);
+
+    await injectScrollRoom(page, targetId);
+    const before = await readTargetPosition(page, targetId);
+    expect(before.top).toBeGreaterThan(before.viewport);
+
+    await jumpBtn.click();
+    await expect
+      .poll(async () => {
+        const pos = await readTargetPosition(page, targetId);
+        return Math.abs(pos.centre - pos.viewport / 2);
+      }, { timeout: 10000 })
+      .toBeLessThanOrEqual(2);
+    // Centred, not header-offset: the top edge sits well below the 70px offset.
+    const after = await readTargetPosition(page, targetId);
+    expect(Math.abs(after.top - 70)).toBeGreaterThan(20);
   });
 });
 

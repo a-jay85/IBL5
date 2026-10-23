@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -227,6 +228,44 @@ def test_corpus_digest_scope():
     c = _corpus()
     c["clean"][0]["commit"] = "d" * 40
     assert re_.corpus_digest(c) != base
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+TRADE_CASE = "trade-preview-unbounded-cash-years"
+TRADE_PATH = "ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php"
+
+
+def _real_corpus():
+    return re_.load_corpus(REPO_ROOT / re_.DEFAULT_CORPUS)
+
+
+def _real_case(cid):
+    return next(c for c in _real_corpus()["cases"] if c["id"] == cid)
+
+
+PINNED_EXPECTED = {
+    "depth-chart-log-after-commit": [("ibl5/classes/DepthChartSnapshot/DepthChartSnapshotService.php", 148, 154)],
+    "playoff-series-invalid-group-by": [("ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", 78, 78)],
+    "saved-dc-sum-is-int": [("ibl5/classes/SavedDepthChart/SavedDepthChartRepository.php", 312, 313)],
+    "table-dropdown-unencoded-param": [("ibl5/classes/UI/Components/TableViewDropdown.php", 68, 68)],
+    "team-page-missing-pick-team": [("ibl5/classes/Team/TeamPageDataPreparer.php", 370, 371)],
+    "trade-preview-unbounded-cash-years": [("ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php", 39, 40)],
+}
+
+
+def test_real_corpus_expected_ranges_pinned():
+    got = {
+        c["id"]: [(e["path"], e["start"], e["end"]) for e in c["expected"]]
+        for c in _real_corpus()["cases"] if c["status"] == "confirmed"
+    }
+    assert got == PINNED_EXPECTED
+
+
+def test_real_corpus_trade_line_63_misses_expected_only():
+    expected = [R(e["path"], e["start"], e["end"]) for e in _real_case(TRADE_CASE)["expected"]]
+    assert not re_.case_hit([_f(TRADE_PATH, 63)], expected)
+    assert re_.case_hit([_f(TRADE_PATH, 45)], expected)
+    assert not re_.case_hit([_f(TRADE_PATH, 46)], expected)
 
 
 # ---------------------------------------------------------------------------

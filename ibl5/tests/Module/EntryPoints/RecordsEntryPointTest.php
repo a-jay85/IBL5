@@ -23,7 +23,7 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Regular Season', $output);
         $this->assertStringContainsString('Playoffs', $output);
         $this->assertStringContainsString('H.E.A.T.', $output);
-        $this->assertStringContainsString('data-tab="alltime"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="alltime"', $output);
         $this->assertSame(1, substr_count($output, 'ibl-tab--active'));
     }
 
@@ -31,7 +31,7 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Records', ['tab' => 'byfranchise', 'teamid' => '1'], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('data-tab="byfranchise"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="byfranchise"', $output);
         $this->assertQueryNotExecuted('ibl_awards');
     }
 
@@ -39,7 +39,7 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Records', ['tab' => 'thisseason', 'seasonPhase' => 'Playoffs'], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('data-tab="thisseason"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="thisseason"', $output);
         $this->assertStringContainsString('Playoffs', $output);
         $this->assertQueryNotExecuted('ibl_awards');
     }
@@ -49,7 +49,9 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Records', ['tab' => $tab], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('data-tab="alltime"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="alltime"', $output);
+        $this->assertStringNotContainsString('class="ibl-tab-panel" data-tab="byfranchise"', $output);
+        $this->assertStringNotContainsString('class="ibl-tab-panel" data-tab="thisseason"', $output);
         $this->assertStringContainsString('Regular Season', $output);
     }
 
@@ -69,14 +71,14 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
     {
         $output = $this->runModule('Records', ['tab' => 'thisseason', 'seasonPhase' => ['Playoffs']], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('data-tab="thisseason"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="thisseason"', $output);
     }
 
     public function testZeroStringSeasonPhaseFallsBackToCurrentPhase(): void
     {
         $output = $this->runModule('Records', ['tab' => 'thisseason', 'seasonPhase' => '0'], [], $this->dbGlobals());
 
-        $this->assertStringContainsString('data-tab="thisseason"', $output);
+        $this->assertStringContainsString('class="ibl-tab-panel" data-tab="thisseason"', $output);
         $this->assertStringNotContainsString("Players' 0 Highs", $output);
     }
 }

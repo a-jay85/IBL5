@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# merge-last-verified: git merge driver for markdown files whose first
+# frontmatter block carries `last_verified: YYYY-MM-DD`. Registered per clone
+# (common .git/config, shared by every worktree) as
+#   merge.lastverified.driver = sh -c '<exec this script, else git merge-file>' '<main checkout>/bin/lib/merge-last-verified' %O %A %B %L %P
+# by register_last_verified_merge_driver in bin/lib/git-helpers.sh; selected
+# per path by `merge=lastverified` in .gitattributes.
+#
+# Contract: performs the full 3-way merge into %A. When the only conflict is
+# that frontmatter date, the result keeps the newer date and exits 0. Any other
+# conflict leaves standard markers (original dates intact) and exits 1, the
+# same outcome as git's built-in text merge, except the marker labels. Git
+# passes a driver no branch names, so labels read `ours:<path>`, `base:<path>`
+# and `theirs:<path>` instead of HEAD / the branch. During a rebase "ours" is
+# the branch being rebased onto, as with the built-in merge. A clone without the registration
+# never runs this file: git falls back to the plain text merge.
+#
+# Git does not pass strategy options (-X ours, -X theirs, -X ignore-space-change)
+# to a custom merge driver. A favor merge or rebase that conflicts on a
+# merge=lastverified path therefore stops with markers. To favor one side for a
+# single command, swap the driver for a favoring merge-file:
+#   drv='git merge-file --theirs --marker-size=%L %A %O %B'
+#   git -c merge.lastverified.driver="$drv" rebase -X theirs <base>
+# (--ours for -X ours). Do not set the driver to empty: git then reports the
+# conflict but leaves our version with no markers. For -X ignore-space-change,
+# put `*.md merge=text` in "$(git rev-parse --git-common-dir)/info/attributes"
+# for the command and remove it afterwards. Every worktree sees that file while
+# it exists.
+set -euo pipefail
+
+usage() {
+    cat <<'USAGE'
+Usage: merge-last-verified <ancestor> <current> <other> [marker-size] [pathname]
+
+Git merge driver (merge.lastverified.driver). Merges <ancestor>, <current> and
+<other> into <current> in place. A conflict confined to the frontmatter
+`last_verified: YYYY-MM-DD` line resolves to the newer date (exit 0). Any other
+conflict writes standard conflict markers into <current> (exit 1).
+USAGE
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+if [ "$#" -lt 3 ] || [ "$#" -gt 5 ]; then
+    usage >&2
+    exit 2
+fi
+
+O=$1
+A=$2
+B=$3
+MARKER=${4:-7}
+case "$MARKER" in
+    ''|*[!0-9]*) MARKER=7 ;;
+esac
+PATHNAME=${5:-file}
+
+# git merge-file with histogram diff, the algorithm git's own merge-ort uses
+# for content merges, so hunks align as in a plain git merge. A git without
+# --diff-algorithm (before 2.44) exits >= 128 on the unknown flag without
+# touching any file; retry with the default algorithm.
+merge_file() {
+    local rc=0
+    git merge-file --diff-algorithm=histogram "$@" || rc=$?
+    if [ "$rc" -ge 128 ]; then
+        rc=0
+        git merge-file "$@" || rc=$?
+    fi
+    return "$rc"
+}
+
+# Plain 3-way merge on the originals; exits the script.
+plain_merge() {
+    local rc=0
+    merge_file --marker-size="$MARKER" \
+        -L "ours:$PATHNAME" -L "base:$PATHNAME" -L "theirs:$PATHNAME" \
+        "$A" "$O" "$B" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        exit 0
+    fi
+    exit 1
+}
+
+# Print the first-frontmatter-block last_verified date of <file>, or nothing.
+lv_of() {
+    awk '
+        NR == 1 { if ($0 != "---" && $0 != "---\r") exit; infm = 1; next }
+        infm && ($0 == "---" || $0 == "---\r") { exit }
+        infm && /^last_verified:[ \t]*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][ \t\r]*$/ {
+            v = $0
+            sub(/^last_verified:[ \t]*/, "", v)
+            sub(/[ \t\r]*$/, "", v)
+            print v
+            exit
+        }
+    ' "$1"
+}
+
+# Copy <src> to <dest> with only the first-frontmatter last_verified date
+# replaced by <date>.
+set_lv() {
+    awk -v t="$2" '
+        NR == 1 { print; if ($0 == "---" || $0 == "---\r") infm = 1; next }
+        infm && ($0 == "---" || $0 == "---\r") { infm = 0 }
+        infm && !done && /^last_verified:[ \t]*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][ \t\r]*$/ {
+            sub(/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/, t)
+            done = 1
+        }
+        { print }
+    ' "$1" > "$3"
+}
+
+for f in "$O" "$A" "$B"; do
+    if [ ! -f "$f" ] || [ ! -s "$f" ]; then
+        plain_merge
+    fi
+    if [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" != "1" ]; then
+        plain_merge
+    fi
+done
+
+lo=$(lv_of "$O")
+la=$(lv_of "$A")
+lb=$(lv_of "$B")
+if [ -z "$lo" ] || [ -z "$la" ] || [ -z "$lb" ]; then
+    plain_merge
+fi
+
+if [ "$la" = "$lo" ]; then
+    target=$lb
+elif [ "$lb" = "$lo" ]; then
+    target=$la
+elif [[ "$la" > "$lb" ]]; then
+    target=$la
+else
+    target=$lb
+fi
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/merge-lv.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+set_lv "$O" "$target" "$tmp/o"
+set_lv "$A" "$target" "$tmp/a"
+set_lv "$B" "$target" "$tmp/b"
+
+rc=0
+merge_file -p --marker-size="$MARKER" "$tmp/a" "$tmp/o" "$tmp/b" \
+    > "$tmp/out" || rc=$?
+if [ "$rc" -eq 0 ]; then
+    cat "$tmp/out" > "$A"
+    exit 0
+fi
+plain_merge

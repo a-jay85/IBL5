@@ -105,7 +105,7 @@ test.describe('ProjectedDraftOrder save_order: non-admin gets 403 JSON', () => {
     request,
   }) => {
     const response = await request.post(
-      'modules.php?name=ProjectedDraftOrder&op=save_order',
+      'modules.php?name=DraftInfo&op=save_order',
       {
         data: { order: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +125,7 @@ test.describe('ProjectedDraftOrder index: admin controls hidden for non-admin', 
   test('non-admin sees the draft order table without admin drag JS', async ({
     page,
   }) => {
-    const response = await page.goto('modules.php?name=ProjectedDraftOrder');
+    const response = await page.goto('modules.php?name=DraftInfo&tab=order');
     expect(response?.status()).toBe(200);
 
     const table = page
@@ -207,23 +207,23 @@ test.describe('Trivia-mode hidden modules: non-admin sees notice', () => {
     expect(body).toContain(MODULE_NOT_ACTIVE);
   });
 
-  test('CareerLeaderboards hidden when Trivia Mode is On', async ({
+  test('Leaderboards career tab hidden when Trivia Mode is On', async ({
     appState,
     page,
   }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=CareerLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=career');
 
     const body = await page.locator('body').textContent();
     expect(body).toContain(MODULE_NOT_ACTIVE);
   });
 
-  test('SeasonLeaderboards hidden when Trivia Mode is On', async ({
+  test('Leaderboards season tab hidden when Trivia Mode is On', async ({
     appState,
     page,
   }) => {
     await appState({ 'Trivia Mode': 'On' });
-    await page.goto('modules.php?name=SeasonLeaderboards');
+    await page.goto('modules.php?name=Leaderboards&tab=season');
 
     const body = await page.locator('body').textContent();
     expect(body).toContain(MODULE_NOT_ACTIVE);

@@ -51,8 +51,14 @@ jobs:
       - name: Install mysql client, jq, claude CLI
         if: steps.secrets.outputs.configured == 'true'
         run: |
+          set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client jq >/dev/null
-          curl -fsSL https://claude.ai/install.sh | bash >/dev/null
+          # Download to a file so a failed fetch (e.g. HTTP 429) fails the step instead of piping nothing into bash.
+          curl --retry 4 --retry-all-errors --retry-delay 10 -fsSL \
+            -o "$RUNNER_TEMP/claude-install.sh" https://claude.ai/install.sh
+          bash "$RUNNER_TEMP/claude-install.sh" >/dev/null
+          export PATH="$HOME/.local/bin:$PATH"
+          command -v claude >/dev/null || { echo "::error title=sim-recap::claude CLI not found on PATH after install"; exit 1; }
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: SSH key and ControlMaster config
         if: steps.secrets.outputs.configured == 'true'

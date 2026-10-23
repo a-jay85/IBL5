@@ -93,6 +93,29 @@ if [[ "\${1:-}" == "api" ]]; then
             exit 0 ;;
     esac
 fi
+if [[ "\${1:-}" == "run" ]]; then
+    case "\${2:-}" in
+        list)
+            # Pins the call shape: the tick must name the gate workflow file and --commit <sha>.
+            grep -qF -- '--workflow=all-checks-green.yml' <<< "\$*" || exit 1
+            sha=""; prev=""
+            for a in "\$@"; do [[ "\$prev" == "--commit" ]] && sha="\$a"; prev="\$a"; done
+            [[ ! -e "$SCRATCH/runs-fail" ]] || exit 1
+            [[ -f "$SCRATCH/runs-\$sha.json" ]] || exit 1
+            cat "$SCRATCH/runs-\$sha.json"
+            exit 0 ;;
+        view)
+            grep -qF -- '--log-failed' <<< "\$*" || exit 1
+            [[ ! -e "$SCRATCH/runlog-fail" ]] || exit 1
+            [[ -f "$SCRATCH/runlog-\${3:-}.txt" ]] || exit 1
+            cat "$SCRATCH/runlog-\${3:-}.txt"
+            exit 0 ;;
+        rerun)
+            printf '%s\n' "\${*:3}" >> "$SCRATCH/gh-rerun.log"
+            [[ ! -e "$SCRATCH/rerun-fail" ]] || exit 1
+            exit 0 ;;
+    esac
+fi
 echo "gh shim: unexpected args: \$*" >&2
 exit 1
 GH_EOF
@@ -224,6 +247,7 @@ reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
     rm -f "$SCRATCH"/key-*
+    rm -f "$SCRATCH"/runs-*.json "$SCRATCH"/runlog-*.txt "$SCRATCH/runs-fail" "$SCRATCH/runlog-fail" "$SCRATCH/rerun-fail"
     rm -f "$SCRATCH/prs-closed.json" "$SCRATCH"/timeline-*.json "$SCRATCH"/timeline-fail-* \
         "$SCRATCH"/delete-fail-* "$SCRATCH/ps-fail" "$SCRATCH/lsof-fail" \
         "$SCRATCH/launchctl-fail" "$SCRATCH/lsof.txt"
@@ -255,7 +279,7 @@ set_prs() {
     printf '%s\n' "$out" > "$SCRATCH/prs.json"
 }
 
-# set_checks <sha> green|pending|red|none
+# set_checks <sha> green|pending|red|none|signoff|signoff-red|gate-timeout|gate-anchor-failed
 set_checks() {
     local f="$SCRATCH/checks-$1.json"
     case "$2" in
@@ -265,6 +289,23 @@ set_checks() {
         none)    echo '{"total_count":0,"check_runs":[]}' > "$f" ;;
         signoff) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"success","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
         signoff-red) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        gate-timeout|gate-anchor-failed|gate-anchor-missing|gate-cancelled|gate-plus-other-red)
+            # gate-anchor-failed: E2E Tests failed. gate-anchor-missing: E2E Tests never reported.
+            # gate-cancelled: the gate itself was cancelled. gate-plus-other-red: a Lint failure
+            # sits next to the timed-out gate.
+            local e2e=success gate=failure
+            [[ "$2" == "gate-anchor-failed" ]] && e2e=failure
+            [[ "$2" == "gate-cancelled" ]] && gate=cancelled
+            jq -nc --arg e2e "$e2e" --arg gate "$gate" --arg v "$2" '
+                def cr($n; $c): {name:$n, status:"completed", conclusion:$c, completed_at:"2026-10-22T03:38:07Z"};
+                [cr("Tests and Analysis"; "success"),
+                 cr("E2E Tests"; $e2e),
+                 cr("Meta checks"; "success"),
+                 cr("Infection PHP (per-PR diff)"; "success"),
+                 cr("All checks green"; $gate)]
+                | (if $v == "gate-anchor-missing" then map(select(.name != "E2E Tests")) else . end)
+                | (if $v == "gate-plus-other-red" then . + [cr("Lint"; "failure")] else . end)
+                | {total_count: length, check_runs: .}' > "$f" ;;
     esac
 }
 
@@ -337,6 +378,27 @@ set_ps_fail() { touch "$SCRATCH/ps-fail"; }
 set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
 set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
 set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
+# set_gate_run <sha> <databaseId> <status> <conclusion|"">: the one run `gh run list` returns.
+# An unsettled run keeps conclusion "" because that is the live gh shape (not null).
+set_gate_run() {
+    jq -nc --arg sha "$1" --argjson id "$2" --arg st "$3" --arg c "$4" \
+        '[{databaseId:$id, status:$st, conclusion:$c,
+           headSha:$sha, createdAt:"2026-10-22T02:58:00Z"}]' > "$SCRATCH/runs-$1.json"
+}
+# set_gate_log <databaseId> timeout|other: the `gh run view <id> --log-failed` output.
+# `timeout` is the line captured verbatim from run 39712872847 on 2026-10-21 (record and
+# replay): job TAB step TAB timestamp, then the U+2014 dash written as octal bytes.
+set_gate_log() {
+    case "$2" in
+        timeout) printf 'All checks green\tWait for every other check on this head to settle green\t2026-10-22T03:38:07.0456222Z TIMEOUT: WAIT: anchors not reported/completed: Tests and Analysis, E2E Tests \342\200\224 failing closed after 2426s\n' ;;
+        other)   printf 'All checks green\tWait for every other check on this head to settle green\t2026-10-22T03:38:07.0456222Z FAIL: E2E Tests concluded failure\n' ;;
+    esac > "$SCRATCH/runlog-$1.txt"
+}
+set_runs_fail() { touch "$SCRATCH/runs-fail"; }
+set_runlog_fail() { touch "$SCRATCH/runlog-fail"; }
+set_rerun_fail() { touch "$SCRATCH/rerun-fail"; }
+rerun_log() { cat "$SCRATCH/gh-rerun.log" 2>/dev/null || true; }
+gate_reruns() { cat "$STATE_DIR/gate-reruns/$1" 2>/dev/null; }
 
 # _stamp_at <epoch>: touch -t stamp. The one platform branch in this harness: BSD date -r
 # on macOS, GNU date -d @ on Linux CI.
@@ -550,6 +612,126 @@ run_tick
 grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
     || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
+
+# Characterization (matrix rows 1, 2): a gate-only-red PR that is NOT a recoverable
+# timeout launches the normal rescue. Passes on the pre-rescue tick; Phase 3 must keep it.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 other
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-nontimeout-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-nontimeout-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-nontimeout-falls-through: issued a rerun: $(rerun_log)"
+end_case gate-nontimeout-falls-through
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-anchor-failed
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-anchor-failed-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-anchor-failed-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-anchor-failed-falls-through: issued a rerun: $(rerun_log)"
+end_case gate-anchor-failed-falls-through
+
+# Case a (row 8): a gate-only-red PR whose named anchors are now green is rerun, not rescued.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-timeout-reruns: rc $RC, want 0"
+[[ "$(rerun_log)" == "39712872847 --failed" ]] || fail "gate-timeout-reruns: rerun argv was '$(rerun_log)'"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-timeout-reruns: a Claude rescue launched"
+[[ "$(gate_reruns 101)" == "aaa1111 1" ]] || fail "gate-timeout-reruns: gate-reruns/101 is '$(gate_reruns 101)'"
+no_file "$STATE_DIR/strikes/101" || fail "gate-timeout-reruns: the rerun spent a strike"
+[[ "$(pending_count)" == "0" ]] || fail "gate-timeout-reruns: a pending entry was written"
+out_has 'reran gate run 39712872847 (1 of 2)' || fail "gate-timeout-reruns: no rerun log line: $OUT"
+grep -qxF 'run list --workflow=all-checks-green.yml --commit aaa1111 --json databaseId,conclusion,status,headSha,createdAt --limit 20' "$SCRATCH/gh.log" \
+    || fail "gate-timeout-reruns: gh run list call shape changed"
+grep -qxF 'run view 39712872847 --log-failed' "$SCRATCH/gh.log" || fail "gate-timeout-reruns: gh run view call shape changed"
+end_case gate-timeout-reruns
+
+# Case b, missing anchor (row 9).
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-anchor-missing
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-anchor-missing-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-anchor-missing-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-anchor-missing-falls-through: issued a rerun: $(rerun_log)"
+no_file "$STATE_DIR/gate-reruns/101" || fail "gate-anchor-missing-falls-through: wrote the gate ledger"
+end_case gate-anchor-missing-falls-through
+
+# Case d (rows 10, 11): the cap is two reruns per head, and a new head resets it.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick; run_tick; run_tick
+[[ "$(rerun_log | wc -l | tr -d ' ')" == "2" ]] || fail "gate-rerun-cap: want 2 reruns, got: $(rerun_log)"
+[[ "$(gate_reruns 101)" == "aaa1111 2" ]] || fail "gate-rerun-cap: gate-reruns/101 is '$(gate_reruns 101)'"
+out_has 'skip PR 101: gate-timeout rerun cap (head aaa1111; 2 of 2 reruns used)' || fail "gate-rerun-cap: no cap log line: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-rerun-cap: a Claude rescue launched"
+set_prs '101|branch-one|bbb2222|BLOCKED|false'; set_checks bbb2222 gate-timeout
+set_gate_run bbb2222 39712872848 completed failure; set_gate_log 39712872848 timeout
+run_tick
+[[ "$(rerun_log | tail -n 1)" == "39712872848 --failed" ]] || fail "gate-rerun-cap: new head not rerun: $(rerun_log)"
+[[ "$(gate_reruns 101)" == "bbb2222 1" ]] || fail "gate-rerun-cap: new-head ledger is '$(gate_reruns 101)'"
+end_case gate-rerun-cap
+
+# Case e (row 12): --dry-run declares the rerun and writes nothing.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick --dry-run
+[[ $RC -eq 0 ]] || fail "gate-rerun-dry-run: rc $RC, want 0"
+out_has 'dry-run: PR 101 would rerun gate run 39712872847 (timed out; anchors now green: Tests and Analysis, E2E Tests)' \
+    || fail "gate-rerun-dry-run: no would-rerun line: $OUT"
+[[ -z "$(rerun_log)" ]] || fail "gate-rerun-dry-run: issued a rerun: $(rerun_log)"
+if grep -q '^run rerun' "$SCRATCH/gh.log"; then fail "gate-rerun-dry-run: gh run rerun was called"; fi
+no_file "$STATE_DIR/gate-reruns" || fail "gate-rerun-dry-run: wrote gate-reruns/"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-rerun-dry-run: launched"
+end_case gate-rerun-dry-run
+
+# Rows 13-16: every gh failure on the rerun path skips the PR; none launches a rescue or spends the cap.
+begin_case
+for v in list-fail no-run running view-fail rerun-fail; do
+    reset
+    set_prs "$RED101"; set_checks aaa1111 gate-timeout
+    set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+    case "$v" in
+        list-fail)  set_runs_fail;   want='gate run lookup failed (gh run list)' ;;
+        no-run)     echo '[]' > "$SCRATCH/runs-aaa1111.json"; want='no gate run found for head aaa1111' ;;
+        running)    set_gate_run aaa1111 39712872847 in_progress ""; want='gate run 39712872847 is in_progress/null' ;;
+        view-fail)  set_runlog_fail; want='gate log read failed (gh run view 39712872847)' ;;
+        rerun-fail) set_rerun_fail;  want='gate rerun failed (gh run rerun 39712872847)' ;;
+    esac
+    run_tick
+    [[ $RC -eq 0 ]] || fail "gate-gh-fail-closed ($v): rc $RC, want 0"
+    out_has "$want" || fail "gate-gh-fail-closed ($v): no '$want' line: $OUT"
+    no_file "$SCRATCH/pr-cycle.log" || fail "gate-gh-fail-closed ($v): a Claude rescue launched"
+    no_file "$STATE_DIR/gate-reruns/101" || fail "gate-gh-fail-closed ($v): spent the rerun cap"
+    if [[ "$v" != "rerun-fail" ]]; then
+        [[ -z "$(rerun_log)" ]] || fail "gate-gh-fail-closed ($v): issued a rerun: $(rerun_log)"
+    fi
+done
+end_case gate-gh-fail-closed
+
+# Rows 17, 18: a cancelled gate, or a timed-out gate beside another red check, is today's rescue.
+for pair in gate-cancelled:gate-cancelled-falls-through \
+            gate-plus-other-red:gate-plus-other-red-falls-through; do
+    variant="${pair%%:*}"; cname="${pair##*:}"
+    reset; begin_case
+    set_prs "$RED101"; set_checks aaa1111 "$variant"
+    set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+    run_tick
+    [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+        || fail "$cname: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+    [[ -z "$(rerun_log)" ]] || fail "$cname: issued a rerun: $(rerun_log)"
+    if grep -q '^run ' "$SCRATCH/gh.log"; then fail "$cname: made a gh run call"; fi
+    end_case "$cname"
+done
 
 # gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.
 reset; begin_case
@@ -1696,7 +1878,10 @@ end_case conflict-retry-due-codes
 
 # prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
 reset; begin_case
-for l in conflict-hold retries; do
+for l in conflict-hold retries gate-reruns; do
+    mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
+done
+for l in conflict-hold retries dm-probe; do
     mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
 done
 set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
@@ -1705,7 +1890,48 @@ no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict
 no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
 [[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
 [[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
+no_file "$STATE_DIR/gate-reruns/999" || fail "prune-conflict-ledgers: gate-reruns/999 survived"
+[[ -f "$STATE_DIR/gate-reruns/101" ]] || fail "prune-conflict-ledgers: gate-reruns/101 was pruned"
+no_file "$STATE_DIR/dm-probe/999" || fail "prune-conflict-ledgers: dm-probe/999 survived"
+[[ -f "$STATE_DIR/dm-probe/101" ]] || fail "prune-conflict-ledgers: dm-probe/101 was pruned"
 end_case prune-conflict-ledgers
+
+# gate-lib-helpers (matrix rows 3, 4, 5): the pure gate helpers, sourced from the fixture
+# copy of the lib. The timeout log is the line captured from run 39712872847.
+reset; begin_case
+set_gate_log 39712872847 timeout; set_gate_log 39712872848 other
+printf 'All checks green\tWait\t2026-10-22T03:38:07Z TIMEOUT: WAIT: checks still running: ci \342\200\224 failing closed after 2426s\n' \
+    > "$SCRATCH/runlog-39712872849.txt"
+set_checks aaa1111 gate-timeout; set_checks bbb2222 red; set_checks ccc3333 gate-anchor-failed
+set_gate_run aaa1111 39712872847 completed failure
+GD="$SCRATCH/gate-ledger"; rm -rf "$GD"; mkdir -p "$GD"
+res="$(
+    . "$REPO/bin/lib/pr-cycle-watch.sh"
+    a="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872847.txt")"; echo "anchors-rc=$?"
+    echo "anchors=$(tr '\n' '|' <<< "$a")"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872848.txt")"; echo "other-rc=$?"; echo "other-out=[$o]"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872849.txt")"; echo "running-rc=$?"; echo "running-out=[$o]"
+    echo "count0=$(pcw_gate_rerun_count "$GD" 101 aaa1111)"
+    echo "add1=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "add2=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "ledger=$(cat "$GD/gate-reruns/101")"
+    echo "add-new-head=$(pcw_add_gate_rerun "$GD" 101 bbb2222)"
+    pcw_gate_run_pick aaa1111 <<< '[]' >/dev/null; echo "pick-empty-rc=$?"
+    echo "pick=$(pcw_gate_run_pick aaa1111 < "$SCRATCH/runs-aaa1111.json")"
+    pcw_gate_failed < "$SCRATCH/checks-aaa1111.json"; echo "failed-gate-rc=$?"
+    pcw_gate_failed < "$SCRATCH/checks-bbb2222.json"; echo "failed-red-rc=$?"
+    names="$(printf 'Tests and Analysis\nE2E Tests')"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-aaa1111.json"; echo "green-ok-rc=$?"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-ccc3333.json"; echo "green-failed-rc=$?"
+    pcw_anchors_green "" < "$SCRATCH/checks-aaa1111.json"; echo "green-empty-rc=$?"
+)"
+for want in 'anchors-rc=0' 'anchors=Tests and Analysis|E2E Tests|' 'other-rc=1' 'other-out=[]' \
+            'running-rc=1' 'running-out=[]' 'count0=0' 'add1=1' 'add2=2' 'ledger=aaa1111 2' \
+            'add-new-head=1' 'pick-empty-rc=1' 'pick=39712872847 completed failure' \
+            'failed-gate-rc=0' 'failed-red-rc=1' 'green-ok-rc=0' 'green-failed-rc=1' 'green-empty-rc=1'; do
+    grep -qxF -- "$want" <<< "$res" || fail "gate-lib-helpers: missing '$want' in: $res"
+done
+end_case gate-lib-helpers
 
 # conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
 # settle records, even though master moved before the rescue settled.
@@ -1825,6 +2051,7 @@ for oc in "held\t-" "failed\tterminal=x"; do
     [[ "$(launch_count)" == "1" ]] || fail "non-conflict-new-tip-skipped($oc): relaunched on a new tip"
     out_has 'skip PR 101: retry cap (head aaa1111)' || fail "non-conflict-new-tip-skipped($oc): no plain note: $OUT"
     out_has 'rebase conflict' && fail "non-conflict-new-tip-skipped($oc): conflict wording on a non-conflict hold"
+    no_file "$STATE_DIR/dm-probe/101" || fail "non-conflict-new-tip-skipped($oc): probe ledger written"
     end_case non-conflict-new-tip-skipped
 done
 reset; begin_case
@@ -1882,6 +2109,303 @@ out_has 'would run:' || fail "conflict-dry-run-no-ledger: dry run did not qualif
 [[ "$(pending_count)" == "0" ]] || fail "conflict-dry-run-no-ledger: dry run wrote pending/"
 [[ "$(launch_count)" == "1" ]] || fail "conflict-dry-run-no-ledger: dry run launched"
 end_case conflict-dry-run-no-ledger
+
+# --- conflict probe on real commits --------------------------------------------------------
+# merge-tree needs real objects. Built with plumbing in $REPO so HEAD, the index and the
+# branch-one worktree stay untouched; reset() never removes objects, so build them once.
+_pc_blob() { printf '%s\n' "$1" | git -C "$REPO" hash-object -w --stdin; }
+# _pc_commit <parent[,parent2]|-> <path=content>...: a commit whose tree holds exactly those
+# files. Two comma-separated parents make a merge commit.
+_pc_commit() {
+    local parent="$1" idx="$SCRATCH/probe-index" kv tree; shift
+    rm -f "$idx"
+    for kv in "$@"; do
+        GIT_INDEX_FILE="$idx" git -C "$REPO" update-index --add \
+            --cacheinfo "100644,$(_pc_blob "${kv#*=}"),${kv%%=*}"
+    done
+    tree="$(GIT_INDEX_FILE="$idx" git -C "$REPO" write-tree)"
+    if [[ "$parent" == - ]]; then
+        git -C "$REPO" commit-tree "$tree" -m probe < /dev/null
+    elif [[ "$parent" == *,* ]]; then
+        git -C "$REPO" commit-tree "$tree" -p "${parent%%,*}" -p "${parent#*,}" -m probe < /dev/null
+    else
+        git -C "$REPO" commit-tree "$tree" -p "$parent" -m probe < /dev/null
+    fi
+}
+P_BASE="$(_pc_commit - a.txt=base b.txt=base c.txt=base z.txt=base)"
+P_M1="$(_pc_commit "$P_BASE" a.txt=master b.txt=master c.txt=base z.txt=base)"
+P_M2="$(_pc_commit "$P_M1" a.txt=master b.txt=master c.txt=base z.txt=m2)"
+P_M3="$(_pc_commit "$P_M1" a.txt=master b.txt=master c.txt=master z.txt=base)"
+P_CLEAN="$(_pc_commit "$P_BASE" a.txt=base b.txt=base c.txt=base z.txt=clean)"
+P_BR="$(_pc_commit "$P_BASE" a.txt=branch b.txt=branch c.txt=branch z.txt=base)"
+P_BR2="$(_pc_commit "$P_BR" a.txt=branch b.txt=branch c.txt=branch z.txt=base y.txt=new)"
+for v in P_BASE P_M1 P_M2 P_M3 P_CLEAN P_BR P_BR2; do
+    [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || fail "probe-fixture: $v is not a commit: '${!v}'"
+done
+set_tip_raw() { printf '%s\n' "$1" > "$SCRATCH/master-tip"; }
+DIRTY_BR="101|branch-one|$P_BR|DIRTY|false"
+DIRTY_BR2="101|branch-one|$P_BR2|DIRTY|false"
+
+# pc_probe <root> <pr> <tip> <head>: runs pcw_conflict_probe in a subshell; sets PC_RC, PC_OUT.
+pc_probe() {
+    PC_RC=0
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    PC_OUT="$(source "$RGLIB"; pcw_conflict_probe "$@")" && PC_RC=0 || PC_RC=$?
+}
+
+reset; begin_case
+pc_probe "$REPO" 101 "$P_M1" "$P_BR"
+[[ "$PC_RC" == 1 ]] || fail "probe-conflict-paths: M1 want rc 1 got $PC_RC"
+[[ "$PC_OUT" == $'a.txt\nb.txt' ]] || fail "probe-conflict-paths: M1 paths '$PC_OUT'"
+pc_probe "$REPO" 101 "$P_M3" "$P_BR"
+[[ "$PC_RC" == 1 ]] || fail "probe-conflict-paths: M3 want rc 1 got $PC_RC"
+[[ "$PC_OUT" == $'a.txt\nb.txt\nc.txt' ]] || fail "probe-conflict-paths: M3 paths '$PC_OUT'"
+end_case probe-conflict-paths
+
+reset; begin_case
+pc_probe "$REPO" 101 "$P_CLEAN" "$P_BR"
+[[ "$PC_RC" == 0 ]] || fail "probe-clean: want rc 0 got $PC_RC ($PC_OUT)"
+[[ -z "$PC_OUT" ]] || fail "probe-clean: printed '$PC_OUT'"
+end_case probe-clean
+
+reset; begin_case
+pc_probe "$REPO" 101 "$(key_of e0001)" "$P_BR"
+[[ "$PC_RC" == 2 ]] || fail "probe-missing-object: want rc 2 got $PC_RC"
+[[ "$PC_OUT" == "merge-tree output unrecognised (exit 1)" ]] || fail "probe-missing-object: reason '$PC_OUT'"
+end_case probe-missing-object
+
+reset; begin_case
+pc_probe "$REPO" 101 "$P_M1" "$(key_of aaa1111)"
+[[ "$PC_RC" == 2 ]] || fail "probe-unfetchable-head: want rc 2 got $PC_RC"
+[[ "$PC_OUT" == "head aaa1111 missing after fetch" ]] || fail "probe-unfetchable-head: reason '$PC_OUT'"
+end_case probe-unfetchable-head
+
+reset; begin_case
+pc_probe "$REPO" 101 "" "$P_BR"
+[[ "$PC_RC" == 2 ]] || fail "probe-bad-input: want rc 2 got $PC_RC"
+[[ "$PC_OUT" == "tip or head is not a 40-hex SHA" ]] || fail "probe-bad-input: reason '$PC_OUT'"
+end_case probe-bad-input
+
+reset; begin_case
+PO="$SCRATCH/probe-origin.git"; PR_ROOT="$SCRATCH/probe-root"
+rm -rf "$PO" "$PR_ROOT"
+git init -q --bare "$PO"
+git -C "$REPO" push -q "$PO" "$P_M1:refs/heads/master" "$P_BR:refs/pull/101/head"
+git init -q "$PR_ROOT"; git -C "$PR_ROOT" remote add origin "$PO"
+git -C "$PR_ROOT" fetch -q origin master; rm -f "$PR_ROOT/.git/FETCH_HEAD"
+! git -C "$PR_ROOT" cat-file -e "$P_BR^{commit}" 2>/dev/null \
+    || fail "probe-fetches-missing-head: precondition, head already present"
+pc_probe "$PR_ROOT" 101 "$P_M1" "$P_BR"
+[[ "$PC_RC" == 1 ]] || fail "probe-fetches-missing-head: want rc 1 got $PC_RC ($PC_OUT)"
+[[ "$PC_OUT" == $'a.txt\nb.txt' ]] || fail "probe-fetches-missing-head: paths '$PC_OUT'"
+no_file "$PR_ROOT/.git/FETCH_HEAD" || fail "probe-fetches-missing-head: fetch wrote FETCH_HEAD"
+[[ -z "$(git -C "$PR_ROOT" for-each-ref refs/pr-cycle)" ]] \
+    || fail "probe-fetches-missing-head: fetch left a refs/pr-cycle ref"
+end_case probe-fetches-missing-head
+
+# conflict-hold-layout: full record = tip, head, paths N, paths; degraded records stay one line.
+reset; begin_case
+HL="$SCRATCH/hl"; rm -rf "$HL"; mkdir -p "$HL"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    pcw_record_conflict_hold "$HL" 7 "$P_M1" "$P_BR" $'a.txt\nb.txt'
+    pcw_conflict_hold_head "$HL" 7 > "$SCRATCH/hl-head7"
+    r=0; pcw_conflict_hold_paths "$HL" 7 > "$SCRATCH/hl-paths7" || r=$?; echo "$r" > "$SCRATCH/hl-rc7"
+    pcw_record_conflict_hold "$HL" 8 "" "$P_BR" a.txt
+    pcw_record_conflict_hold "$HL" 9 "$P_M1" "$P_BR" ""
+    pcw_conflict_hold_head "$HL" 9 > "$SCRATCH/hl-head9"
+    r=0; pcw_conflict_hold_paths "$HL" 9 > /dev/null || r=$?; echo "$r" > "$SCRATCH/hl-rc9"
+    printf '%s\nhead %s\npaths 3\na.txt\nb.txt\n' "$P_M1" "$P_BR" > "$HL/conflict-hold/10"
+    r=0; pcw_conflict_hold_paths "$HL" 10 > /dev/null || r=$?; echo "$r" > "$SCRATCH/hl-rc10"
+)
+[[ "$(cat "$HL/conflict-hold/7")" == "$P_M1"$'\n'"head $P_BR"$'\npaths 2\na.txt\nb.txt' ]] \
+    || fail "conflict-hold-layout: full record layout wrong: $(cat "$HL/conflict-hold/7")"
+[[ "$(cat "$SCRATCH/hl-head7")" == "$P_BR" ]] || fail "conflict-hold-layout: head reader"
+[[ "$(cat "$SCRATCH/hl-rc7")" == 0 && "$(cat "$SCRATCH/hl-paths7")" == $'a.txt\nb.txt' ]] \
+    || fail "conflict-hold-layout: paths reader"
+[[ "$(cat "$HL/conflict-hold/8")" == "unknown" ]] || fail "conflict-hold-layout: empty tip not unknown"
+[[ "$(cat "$HL/conflict-hold/9")" == "$P_M1" ]] || fail "conflict-hold-layout: empty paths not one line"
+[[ -z "$(cat "$SCRATCH/hl-head9")" ]] || fail "conflict-hold-layout: head reader on one-line hold"
+[[ "$(cat "$SCRATCH/hl-rc9")" == 1 ]] || fail "conflict-hold-layout: paths reader on one-line hold"
+[[ "$(cat "$SCRATCH/hl-rc10")" == 1 ]] || fail "conflict-hold-layout: count mismatch accepted"
+end_case conflict-hold-layout
+
+# conflict-retry-due-head-arg: the optional 5th arg opens the head arm; 4-arg is unchanged.
+reset; begin_case
+CR="$SCRATCH/crh"; rm -rf "$CR"; mkdir -p "$CR"
+(
+    # shellcheck source=bin/lib/pr-cycle-watch.sh
+    source "$RGLIB"
+    T1="$(key_of e0001)"; D=2026-10-19
+    rc() { local r=0; "$@" || r=$?; printf '%s' "$r"; }
+    {
+        pcw_record_conflict_hold "$CR" 5 "$T1" "$P_BR" a.txt
+        rc pcw_conflict_retry_due "$CR" 5 "$T1" "$D" "$P_BR"
+        rc pcw_conflict_retry_due "$CR" 5 "$T1" "$D" "$P_BR2"
+        rc pcw_conflict_retry_due "$CR" 5 "$T1" "$D"
+        pcw_record_conflict_hold "$CR" 6 "$T1"
+        rc pcw_conflict_retry_due "$CR" 6 "$T1" "$D" "$P_BR2"
+        pcw_bump_retry "$CR" 5 "$D"; pcw_bump_retry "$CR" 5 "$D"
+        rc pcw_conflict_retry_due "$CR" 5 "$T1" "$D" "$P_BR2"
+    } > "$SCRATCH/crh-codes"
+)
+[[ "$(cat "$SCRATCH/crh-codes")" == "20223" ]] \
+    || fail "conflict-retry-due-head-arg: want 2,0,2,2,3 got $(cat "$SCRATCH/crh-codes")"
+end_case conflict-retry-due-head-arg
+
+# conflict-hold-records-probe-set: tick 1 launches, tick 2 settles `conflict` and probes.
+reset; begin_case
+set_prs "$DIRTY_BR"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_M1"
+run_tick; run_tick
+[[ "$(conflict_hold 101)" == "$P_M1"$'\n'"head $P_BR"$'\npaths 2\na.txt\nb.txt' ]] \
+    || fail "conflict-hold-records-probe-set: hold is '$(conflict_hold 101)'"
+out_has "PR 101: conflict hold recorded (master ${P_M1:0:7}; 2 conflicted paths)" \
+    || fail "conflict-hold-records-probe-set: no recorded line: $OUT"
+end_case conflict-hold-records-probe-set
+
+reset; begin_case
+set_prs "101|branch-one|$(key_of aaa1111)|DIRTY|false"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_M1"
+run_tick; run_tick
+[[ "$(conflict_hold 101)" == "$P_M1" ]] \
+    || fail "conflict-hold-probe-error-one-line: hold is '$(conflict_hold 101)'"
+out_has "WARN PR 101: conflict probe at hold time: head aaa1111 missing after fetch; a new master tip re-fires this PR as before" \
+    || fail "conflict-hold-probe-error-one-line: no WARN line: $OUT"
+end_case conflict-hold-probe-error-one-line
+
+reset; begin_case
+set_prs "$DIRTY_BR"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_CLEAN"
+run_tick; run_tick
+[[ "$(conflict_hold 101)" == "$P_CLEAN" ]] \
+    || fail "conflict-hold-probe-clean-one-line: hold is '$(conflict_hold 101)'"
+out_has "WARN PR 101: conflict probe at hold time: merges clean at the launch tip; a new master tip re-fires this PR as before" \
+    || fail "conflict-hold-probe-clean-one-line: no WARN line: $OUT"
+end_case conflict-hold-probe-clean-one-line
+
+# Re-fire rule. Every case shares this prefix: tick 1 launches on $P_M1, tick 2 settles the
+# conflict and records the path set (a.txt, b.txt) with the head $P_BR.
+conflict_prefix() {
+    reset; begin_case
+    set_prs "$DIRTY_BR"; set_result "101\tfired\tconflict\trebase-conflict"
+    set_tip_raw "$P_M1"
+    run_tick; run_tick
+}
+UNCH_NOTE="skip PR 101: retry cap (head ${P_BR:0:7}; rebase conflict unchanged (2 paths))"
+
+conflict_prefix
+set_tip_raw "$P_M2"; run_tick
+[[ "$(launch_count)" == "1" ]] || fail "conflict-unchanged-skipped: relaunched, count $(launch_count)"
+out_has "$UNCH_NOTE" || fail "conflict-unchanged-skipped: no unchanged note: $OUT"
+[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-unchanged-skipped: retries/101 is '$(retries 101)'"
+[[ "$(sed -n '1p' "$STATE_DIR/conflict-hold/101")" == "$P_M2" ]] \
+    || fail "conflict-unchanged-skipped: hold tip not advanced"
+run_tick
+out_has "skip PR 101: retry cap (head ${P_BR:0:7}; rebase conflict, waiting for a new master tip)" \
+    || fail "conflict-unchanged-skipped: no waiting note on the next tick: $OUT"
+end_case conflict-unchanged-skipped
+
+conflict_prefix
+P_M4="$(_pc_commit "$P_BASE" a.txt=master b.txt=base c.txt=master z.txt=base)"
+set_tip_raw "$P_M4"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-path-dropped-content-changed-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (conflicted paths or their content changed on master: 2 -> 2)" \
+    || fail "conflict-path-dropped-content-changed-fired: no re-try line: $OUT"
+end_case conflict-path-dropped-content-changed-fired
+
+# conflict-paths-changed-fired: the path set changes from {a,b} to {a,c} at an equal count,
+# and a.txt and b.txt are byte-identical on both tips, so only the path-set compare re-fires.
+# The head's first commit (b only) is merged into master, which moves the merge base there:
+# b.txt then merges clean while c.txt starts to conflict.
+P_BX1="$(_pc_commit "$P_BASE" a.txt=base b.txt=branch c.txt=base z.txt=base)"
+P_BX="$(_pc_commit "$P_BX1" a.txt=branch b.txt=branch c.txt=branch z.txt=base)"
+P_M6="$(_pc_commit "$P_M1,$P_BX1" a.txt=master b.txt=master c.txt=master z.txt=base)"
+reset; begin_case
+set_prs "101|branch-one|$P_BX|DIRTY|false"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_M1"
+run_tick; run_tick
+[[ "$(sed -n '3,$p' "$STATE_DIR/conflict-hold/101")" == $'paths 2\na.txt\nb.txt' ]] \
+    || fail "conflict-paths-changed-fired: hold set is '$(conflict_hold 101)'"
+pc_probe "$REPO" 101 "$P_M6" "$P_BX"
+[[ "$PC_RC" == 1 && "$PC_OUT" == $'a.txt\nc.txt' ]] \
+    || fail "conflict-paths-changed-fired: M6 probe rc $PC_RC paths '$PC_OUT'"
+set_tip_raw "$P_M6"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-paths-changed-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (conflicted paths or their content changed on master: 2 -> 2)" \
+    || fail "conflict-paths-changed-fired: no re-try line: $OUT"
+end_case conflict-paths-changed-fired
+
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; set_key 101 "$(key_of c0ffee)"
+set_prs "$DIRTY_BR"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_M1"
+run_tick; run_tick
+set_prs "$DIRTY_BR2"
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-head-changed-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (head changed ${P_BR:0:7} -> ${P_BR2:0:7})" \
+    || fail "conflict-head-changed-fired: no re-try line: $OUT"
+end_case conflict-head-changed-fired
+
+conflict_prefix
+P_M5="$(_pc_commit "$P_M1" a.txt=master-again b.txt=master c.txt=base z.txt=base)"
+set_tip_raw "$P_M5"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-same-paths-edited-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (conflicted paths or their content changed on master: 2 -> 2)" \
+    || fail "conflict-same-paths-edited-fired: no re-try line: $OUT"
+end_case conflict-same-paths-edited-fired
+
+conflict_prefix
+set_tip_raw "$P_CLEAN"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-probe-clean-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (merges clean on master ${P_CLEAN:0:7})" \
+    || fail "conflict-probe-clean-fired: no re-try line: $OUT"
+end_case conflict-probe-clean-fired
+
+conflict_prefix
+set_tip_raw "$P_M2"; run_tick --dry-run
+out_has "$UNCH_NOTE" || fail "conflict-unchanged-dry-run: no unchanged note: $OUT"
+[[ "$(sed -n '1p' "$STATE_DIR/conflict-hold/101")" == "$P_M1" ]] \
+    || fail "conflict-unchanged-dry-run: dry run advanced the hold tip"
+end_case conflict-unchanged-dry-run
+
+# Probe-failure fallback: re-fires as before, WARNs, and DMs once per (PR, head).
+probe_dm_count() { grep -c 'the conflict probe could not run' "$SCRATCH/dm.log" 2>/dev/null || true; }
+
+conflict_prefix
+set_tip e0002; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-probe-error-fallback-fired: want 2 launches got $(launch_count)"
+out_has "WARN PR 101: conflict probe unavailable (merge-tree output unrecognised (exit 1)); re-firing on the new master tip as before" \
+    || fail "conflict-probe-error-fallback-fired: no WARN line: $OUT"
+[[ "$(probe_dm_count)" == "1" ]] || fail "conflict-probe-error-fallback-fired: probe DMs $(probe_dm_count), want 1"
+[[ "$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)" == "$P_BR" ]] \
+    || fail "conflict-probe-error-fallback-fired: dm-probe/101 is '$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)'"
+end_case conflict-probe-error-fallback-fired
+
+reset; begin_case
+set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip e0001
+run_tick; run_tick
+set_tip e0002; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-legacy-hold-fallback-dm-once: want 2 launches got $(launch_count)"
+out_has "WARN PR 101: conflict probe unavailable (no path set recorded with the hold); re-firing on the new master tip as before" \
+    || fail "conflict-legacy-hold-fallback-dm-once: no WARN line: $OUT"
+[[ "$(probe_dm_count)" == "1" ]] || fail "conflict-legacy-hold-fallback-dm-once: probe DMs $(probe_dm_count), want 1"
+printf '2000-01-01 2\n' > "$STATE_DIR/retries/101"
+set_tip e0003; run_tick
+[[ "$(launch_count)" == "3" ]] || fail "conflict-legacy-hold-fallback-dm-once: want 3 launches got $(launch_count)"
+[[ "$(probe_dm_count)" == "1" ]] || fail "conflict-legacy-hold-fallback-dm-once: second probe DM on the same head ($(probe_dm_count))"
+end_case conflict-legacy-hold-fallback-dm-once
+
+conflict_prefix
+set_tip e0002; run_tick --dry-run
+out_has 'would DM: ' || fail "conflict-probe-fallback-dry-run: no would-DM line: $OUT"
+out_has 'the conflict probe could not run' || fail "conflict-probe-fallback-dry-run: DM text missing: $OUT"
+[[ "$(probe_dm_count)" == "0" ]] || fail "conflict-probe-fallback-dry-run: dry run sent a probe DM"
+no_file "$STATE_DIR/dm-probe/101" || fail "conflict-probe-fallback-dry-run: dry run wrote dm-probe/101"
+end_case conflict-probe-fallback-dry-run
 
 # --- summary -------------------------------------------------------------------------------
 h_done

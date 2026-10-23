@@ -37,22 +37,28 @@ class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implemen
             GROUP BY game_date, visitor_teamid, home_teamid
         ), unique_games AS (
             SELECT b.game_date, b.visitor_teamid, b.home_teamid,
-                   b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points + COALESCE(b.visitor_ot_points, 0) AS visitor_total,
-                   b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points + COALESCE(b.home_ot_points, 0) AS home_total
+                   MIN(b.id) AS visitor_row_id, MAX(b.id) AS home_row_id
             FROM `ibl_box_scores_teams` b
             JOIN canonical_games c
               ON c.game_date = b.game_date AND c.visitor_teamid = b.visitor_teamid
              AND c.home_teamid = b.home_teamid AND c.game_of_that_day <=> b.game_of_that_day
             WHERE b.game_type = 1 AND b.game_date >= ? AND b.game_date < ?
             GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
+        ), scored_games AS (
+            SELECT u.game_date, u.visitor_teamid, u.home_teamid,
+                   COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS visitor_total,
+                   COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points + COALESCE(v.home_ot_points, 0), h.calc_points) AS home_total
+            FROM unique_games u
+            JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
+            JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
         ), team_games AS (
             SELECT visitor_teamid AS teamid, game_date,
                    IF(visitor_total > home_total, 1, 0) AS win, IF(visitor_total < home_total, 1, 0) AS loss
-            FROM unique_games
+            FROM scored_games
             UNION ALL
             SELECT home_teamid AS teamid, game_date,
                    IF(home_total > visitor_total, 1, 0) AS win, IF(home_total < visitor_total, 1, 0) AS loss
-            FROM unique_games
+            FROM scored_games
         ), season_rows AS (
             SELECT CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END AS year,
                    ti.team_name AS currentname,

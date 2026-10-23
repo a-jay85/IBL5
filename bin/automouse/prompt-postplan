@@ -61,6 +61,8 @@ For either success outcome:
 1. Move the plan symlink from queue/ to done/:
    ```bash
    mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/done/"
+   # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
+   touch -h "$NIGHTLY_DIR/done/<plan-filename>"
    ```
    Do this even when auto-merge was held. Leaving the plan in queue/ does not
    "wait for the merge" — it makes the loop re-claim the plan and re-run post-plan
@@ -93,6 +95,8 @@ If ANY step fails:
 2. Move the plan symlink to $NIGHTLY_DIR/skipped/ (not done/):
    ```bash
    mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/skipped/"
+   # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
+   touch -h "$NIGHTLY_DIR/skipped/<plan-filename>"
    ```
 3. Delete the handoff file (the branch has committed work for manual recovery):
    ```bash

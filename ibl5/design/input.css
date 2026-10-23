@@ -4,6 +4,58 @@
 
 @import 'tailwindcss';
 
+/* The tailwind container mounts only ibl5/, so the repo-root .gitignore never reaches the
+   class scanner. Without these excludes it walks the main checkout's multi-GB backups and
+   logs and gets OOM-killed. None of these paths is tracked. */
+@source not "../backups";
+@source not "../shellScripts";
+@source not "../*.log";
+
+/* daisyUI 5: component classes carry the d- prefix so they cannot collide with ibl-* or
+   Tailwind classes. The excludes keep daisyUI from restyling :root colors, the scrollbar
+   gutter, and scrollbars on every page. */
+@plugin "daisyui" {
+  prefix: "d-";
+  themes: ibl --default;
+  exclude: rootcolor, rootscrollgutter, scrollbar, properties;
+  logs: false;
+}
+
+/* The ibl theme points at the @theme palette below, so it cannot drift from it. */
+@plugin "daisyui/theme" {
+  name: "ibl";
+  default: true;
+  color-scheme: light;
+  --color-base-100: var(--color-white);
+  --color-base-200: var(--color-gray-50);
+  --color-base-300: var(--color-gray-200);
+  --color-base-content: var(--color-gray-800);
+  --color-primary: var(--color-navy-800);
+  --color-primary-content: var(--color-white);
+  --color-secondary: var(--color-navy-600);
+  --color-secondary-content: var(--color-white);
+  --color-accent: var(--color-accent-500);
+  --color-accent-content: var(--color-white);
+  --color-neutral: var(--color-navy-700);
+  --color-neutral-content: var(--color-white);
+  --color-info: var(--color-info-500);
+  --color-info-content: var(--color-white);
+  --color-success: var(--color-success-600);
+  --color-success-content: var(--color-white);
+  --color-warning: var(--color-warning-500);
+  --color-warning-content: var(--color-navy-800);
+  --color-error: var(--color-error-600);
+  --color-error-content: var(--color-white);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
 /* Tailwind Theme - registers custom values so the compiler generates utility classes
    (e.g., bg-navy-800, text-accent-500, font-display). These values match what
    the CDN play script previously provided at runtime. */
@@ -189,5 +241,33 @@
     vertical-align: top;
     text-align: center;
     overflow-x: clip; /* Prevent wide content (tables, selects) from expanding body width beyond viewport — this breaks position:fixed nav in mobile browsers */
+  }
+}
+
+/* daisyUI overrides. daisyUI nests its component rules in sublayers of @layer utilities,
+   so an override in @layer components always loses. Rules here sit unnested in
+   @layer utilities, which beats every nested daisyUI sublayer. Use bare token aliases. */
+@layer utilities {
+  .d-label,
+  .d-card-title,
+  .d-fieldset-legend,
+  .d-btn {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+  }
+
+  /* :where() keeps specificity at zero so text-sm and friends still win on the element. */
+  :where(.d-label) {
+    font-size: 1rem;
+    color: var(--gray-600);
+    white-space: normal;
+  }
+
+  /* The ibl theme makes Tailwind emit a .text-error utility. Keep the Updater's own red. */
+  .updater-log .text-error,
+  .updater-details__content .text-error {
+    color: var(--error-500);
   }
 }

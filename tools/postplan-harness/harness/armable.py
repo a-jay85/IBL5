@@ -35,8 +35,8 @@ DOCS_REFRESH_BRANCH_PREFIX = "docs-stale-refresh-"
 _DOCS_REFRESH_CLASS_README = re.compile(r"ibl5/classes/.*/README\.md")
 
 # Required aggregator context (ADR-0149). bin/check-composite-contracts A2 pins this
-# literal to the workflow job name and to bin/lib/pr-armable.sh.
-AGGREGATOR_CONTEXT = "All checks green"
+# literal to the --context= of .github/workflows/all-checks-settled.yml and to bin/lib/pr-armable.sh.
+AGGREGATOR_CONTEXT = "All checks settled"
 
 FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
@@ -203,6 +203,7 @@ class ArmInputs:
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
+    retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -429,8 +430,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
             r = ""
         else:
             observed = repr(verdict) if verdict is not None else "ABSENT"
+            retried = (" after 1 retry"
+                       if verdict == "CONFLICT-REVIEW=ABSENT"
+                       and "conflict-review" in inp.retried_stages else "")
             r = (f"this branch carries a /post-plan auto-resolved rebase conflict — "
-                 f"conflict-review verdict={observed}; need CONFLICT-REVIEW=CLEAN")
+                 f"conflict-review verdict={observed}{retried}; need CONFLICT-REVIEW=CLEAN")
     else:
         r = ""
     cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))
@@ -472,6 +476,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # Condition (18) — merge danger door: only a well-formed two-way line arms.
     md = inp.merge_danger_state
     md_blocked = md != "TWO-WAY"
-    cs.append(ConditionResult(18, "merge-danger", md_blocked, f"state={md}" if md_blocked else ""))
+    md_retried = " after 1 retry" if md == "MISSING" and "merge-danger" in inp.retried_stages else ""
+    cs.append(ConditionResult(18, "merge-danger", md_blocked,
+                              f"state={md}{md_retried}" if md_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

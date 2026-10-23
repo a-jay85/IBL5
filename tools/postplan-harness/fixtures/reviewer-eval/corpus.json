@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "window_days": 60,
+  "cases": [
+    {
+      "id": "depth-chart-label-start-after-end",
+      "kind": "bug",
+      "status": "unconfirmed",
+      "pr": 2956,
+      "commit": "fa67dde851417a817ed88d1cb7de18df84c0485f",
+      "fix_pr": 3049,
+      "fix_commit": "af8564882bb78ba25f22f7c25d91491f77337bf2",
+      "expected": [{"path": "ibl5/classes/DepthChartSnapshot/DepthChartLabelBuilder.php", "start": 101, "end": 101}],
+      "description": "Wrong branch: a strict equality check labels a depth chart that starts after the end sim as a reversed range. Fails the diff-alone test: the start-after-end state comes from callers outside the diff."
+    },
+    {
+      "id": "depth-chart-log-after-commit",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 3288,
+      "commit": "c1c6f475fd974d08656c7a07708a609453a31a50",
+      "fix_pr": 3293,
+      "fix_commit": "0649d90a191258ece430c80e40f35207303316ba",
+      "expected": [{"path": "ibl5/classes/DepthChartSnapshot/DepthChartSnapshotService.php", "start": 148, "end": 154}],
+      "description": "Missing guard: the audit-log call runs after commit inside the try whose catch rolls back, so a logger failure reports a committed save as failed."
+    },
+    {
+      "id": "playoff-series-invalid-group-by",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 663,
+      "commit": "88cdbb4f3f0f3c443eb8c6c5da33a5b3c168fea3",
+      "fix_pr": 1906,
+      "fix_commit": "9328b5c5b8ac342b332e534eae61342cd0a0a207",
+      "expected": [{"path": "ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", "start": 78, "end": 78}],
+      "description": "Wrong query: the refresh CTE groups by four columns while selecting ungrouped ones, so the step errors under strict SQL group-by mode."
+    },
+    {
+      "id": "saved-dc-sum-is-int",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 750,
+      "commit": "9025fa0a3f02cffdcce8b1a70ffa332b10faa3a5",
+      "fix_pr": 1016,
+      "fix_commit": "5b805df1cd07163115658d7410b2a0ac0fc3f5d1",
+      "expected": [{"path": "ibl5/classes/SavedDepthChart/SavedDepthChartRepository.php", "start": 312, "end": 313}],
+      "description": "Wrong value: is_int on mysqli SUM() results, which arrive as numeric strings, makes every saved depth chart record read 0-0."
+    },
+    {
+      "id": "table-dropdown-unencoded-param",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 314,
+      "commit": "7d3c1df5b60dbc63beb5662f6202b67306a3d2bf",
+      "fix_pr": 1659,
+      "fix_commit": "2e698ce01eaf405f46d3a761dc81996a620bedb7",
+      "expected": [{"path": "ibl5/classes/UI/Components/TableViewDropdown.php", "start": 68, "end": 68}],
+      "description": "Injection: the dropdown onchange script concatenates the selected value into the URL without encodeURIComponent, so a crafted option value injects query parameters."
+    },
+    {
+      "id": "team-page-missing-pick-team",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 1144,
+      "commit": "98c6998c08845c5547830cc17e48a823a76ecc1f",
+      "fix_pr": 3195,
+      "fix_commit": "8ecadfcc0841e6edb74039156aeb01b9ec543111",
+      "expected": [{"path": "ibl5/classes/Team/TeamPageDataPreparer.php", "start": 370, "end": 371}],
+      "description": "Crash: an unchecked array lookup dereferences a missing team object when a draft pick's original team is absent, breaking the team page."
+    },
+    {
+      "id": "trade-preview-unbounded-cash-years",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 1687,
+      "commit": "71c0512e203be95c7aade35698acd0f933798835",
+      "fix_pr": 1897,
+      "fix_commit": "15f0a0c46365f986712825d7aae3d39d8910a27c",
+      "expected": [{"path": "ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php", "start": 39, "end": 40}],
+      "description": "Missing bound: cash start and end years come straight from GET parameters with no upper limit, so a crafted end year drives the row-building loop far past the six contract years."
+    }
+  ],
+  "clean": [
+    {"id": "clean-navigation-voting-link", "pr": 976, "commit": "0cb7fd11d39adf7bd5703b6ee5ba42e39ab0f5d0", "checked_through": "2026-10-19"},
+    {"id": "clean-perf-logger-injectable", "pr": 1214, "commit": "41178e951ea3736c5aa6a24be375f5b6e0fe3bcc", "checked_through": "2026-10-19"},
+    {"id": "clean-quad-double-cte", "pr": 1276, "commit": "c178f35e1bfd345ed7d462351bf2daf9fa98cb0a", "checked_through": "2026-10-19"},
+    {"id": "clean-rookie-option-rename", "pr": 1031, "commit": "539b47666e22c29efb6dbb65bfa261b354ef6d5b", "checked_through": "2026-10-19"},
+    {"id": "clean-season-archive-collector", "pr": 1206, "commit": "3ba2aec78c8b9a94a265bb1a0f12d5f780e7d9b7", "checked_through": "2026-10-19"},
+    {"id": "clean-sim-recap-linebreaks", "pr": 1656, "commit": "b43b9cd77d4c724d08ab89834921a9143e63c2ce", "checked_through": "2026-10-19"},
+    {"id": "clean-standings-pythagorean", "pr": 1217, "commit": "4bf058c77bcf72b5e39393dd2ebccc9c98cc541d", "checked_through": "2026-10-19"},
+    {"id": "clean-standings-updater-constant", "pr": 1212, "commit": "4f64e9eee81911dec9b13bf784cb998dc53107d2", "checked_through": "2026-10-19"},
+    {"id": "clean-topics-service", "pr": 1030, "commit": "f3309930ff29d254bd8cc9e5b86b162a461182be", "checked_through": "2026-10-19"}
+  ]
+}

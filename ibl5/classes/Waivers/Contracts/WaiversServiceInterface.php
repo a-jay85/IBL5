@@ -15,7 +15,7 @@ namespace Waivers\Contracts;
  *
  * @phpstan-type WaiverFormData array{
  *     team: \Team\Team,
- *     players: list<array{playerID: int, playerName: string, contract: string, waitTime: string}>,
+ *     players: list<array{playerID: int, playerName: string, contract: string}>,
  *     openRosterSpots: int,
  *     healthyOpenRosterSpots: int,
  *     tableResult: array<int, array<string, mixed>|\Player\Player>,

@@ -7,8 +7,15 @@
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
 # L1-L9  source the lib and call its functions directly.
-# P1-P17 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+# P1-P41 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
+# P25-P29 pin the poll_once read retry; P30-P41 pin the ghost-aware V4
+#        (labels carry the plan's original id, e.g. "P30 (plan P25)").
+# S1-S10 run bin/settle-pr-status against a `gh` shim that dispatches on the API path
+#        and records the commit-status POST body in $PFIX/posted.json.
+# S11-S16 pin the API read retry and the fail-closed body guard in bin/settle-pr-status.
+# S17-S27 (plan S11-S21) pin the ghost description and sweep mode, which also records
+#        workflow_dispatch bodies in $PFIX/dispatched.jsonl.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
@@ -26,6 +33,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$SCRIPT_DIR/check-master-ci-green"
 LIB="$SCRIPT_DIR/lib/ci-checks-green.sh"
 TMP="$(mktemp -d)"
+# Retries re-invoke the gh shims: retry at once, never really sleep.
+export IBL5_GH_RETRY_DELAYS="0 0"
 trap 'rm -rf "$TMP"; h_cleanup' EXIT
 
 ok()   { h_pass "$1"; }
@@ -319,7 +328,58 @@ else
     fail "L1-L9 cannot run: $LIB is missing"
 fi
 
-# --- P1-P17: bin/check-pr-checks-green (PR-head poller) ---------------------
+# --- G1-G9: ccg_ghost_reason (ghost workflow run) -----------------------------
+G_RUN='"id":39824169608,"name":"Dependabot Auto-Merge","status":"in_progress","conclusion":null,"run_attempt":1,"updated_at":"2026-10-22T17:36:22Z"'
+G_UPD=1792690582            # 2026-10-22T17:36:22Z
+G_OLD=$((G_UPD + 601))      # one second past the 600 s window
+G_SKIP='{"name":"Enable auto-merge","status":"completed","conclusion":"skipped","run_attempt":1}'
+# ghost <now> <grace> <run-fields> <jobs-json-array> -> stdout of ccg_ghost_reason
+ghost() { printf '{"run":{%s},"jobs":%s}' "$3" "$4" | ccg_ghost_reason "$1" "$2"; }
+gcase() { # gcase <id> <label> <want> <got>
+    if [ "$4" = "$3" ]; then ok "$1 $2"; else fail "$1 $2 (want '$3' got '$4')"; fi; }
+# Job fixtures live in single-quoted top-level variables: bash 3.2 (macOS /bin/bash)
+# brace-expands a {"a":1,"b":2} literal inside "$(... "...")" and splits the argument.
+G_BUILD_PENDING='{"name":"build","status":"in_progress","conclusion":null,"run_attempt":1}'
+G_BUILD_FAIL='{"name":"build","status":"completed","conclusion":"failure","run_attempt":1}'
+G_BUILD_NULL='{"name":"build","status":"completed","conclusion":null,"run_attempt":1}'
+G_BUILD_CANCEL='{"name":"build","status":"completed","conclusion":"cancelled","run_attempt":1}'
+G_BUILD_OK2='{"name":"build","status":"completed","conclusion":"success","run_attempt":2}'
+G_A_FAIL='{"name":"a","status":"completed","conclusion":"failure","run_attempt":1}'
+G_B_QUEUED='{"name":"b","status":"queued","conclusion":null,"run_attempt":1}'
+
+gcase G1 "all-skipped ghost past grace is settled" "settled" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_SKIP]")"
+gcase G2 "zero jobs holds" "zero-jobs" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" '[]')"
+gcase G3 "one in-progress job holds and is named" "job-pending: build" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_SKIP,$G_BUILD_PENDING]")"
+gcase G4 "failed job is red, never settled" "job-red: build (failure)" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_SKIP,$G_BUILD_FAIL]")"
+gcase G4b "completed job with null conclusion is red (unknown)" "job-red: build (unknown)" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_BUILD_NULL]")"
+gcase G4c "cancelled job is red" "job-red: build (cancelled)" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_BUILD_CANCEL]")"
+gcase G5 "run younger than grace holds" "young: 45s <= 600s" \
+    "$(ghost $((G_UPD + 45)) 600 "$G_RUN" "[$G_SKIP]")"
+gcase G6 "age exactly grace still holds (strict >)" "young: 600s <= 600s" \
+    "$(ghost $((G_UPD + 600)) 600 "$G_RUN" "[$G_SKIP]")"
+G_RUN2='"id":39824169608,"name":"Dependabot Auto-Merge","status":"in_progress","conclusion":null,"run_attempt":2,"updated_at":"2026-10-22T17:36:22Z"'
+gcase G7 "rerun: only latest-attempt jobs count" "settled" \
+    "$(ghost "$G_OLD" 600 "$G_RUN2" "[$G_BUILD_FAIL,$G_BUILD_OK2]")"
+gcase G7b "rerun: zero jobs on the latest attempt holds" "zero-jobs" \
+    "$(ghost "$G_OLD" 600 "$G_RUN2" "[$G_SKIP]")"
+gcase G8 "missing updated_at holds" "no-updated-at" \
+    "$(ghost "$G_OLD" 600 '"id":1,"run_attempt":1' "[$G_SKIP]")"
+gcase G8b "unparseable updated_at holds" "no-updated-at" \
+    "$(ghost "$G_OLD" 600 '"id":1,"run_attempt":1,"updated_at":"yesterday"' "[$G_SKIP]")"
+gcase G8c "missing run id holds" "no-run-id" \
+    "$(ghost "$G_OLD" 600 '"run_attempt":1,"updated_at":"2026-10-22T17:36:22Z"' "[$G_SKIP]")"
+gcase G8d "missing run_attempt holds" "no-run-attempt" \
+    "$(ghost "$G_OLD" 600 '"id":1,"updated_at":"2026-10-22T17:36:22Z"' "[$G_SKIP]")"
+gcase G9 "mixed: pending wins over red in the reason" "job-pending: b" \
+    "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_A_FAIL,$G_B_QUEUED]")"
+
+# --- P1-P41: bin/check-pr-checks-green (PR-head poller) ---------------------
 POLL="$SCRIPT_DIR/check-pr-checks-green"
 P_SHA="0123456789abcdef0123456789abcdef01234567"
 
@@ -327,14 +387,27 @@ P_SHA="0123456789abcdef0123456789abcdef01234567"
 # the counter; an actions/runs call serves $PFIX/N-runs.json for the current N.
 # A missing N falls back to the highest-numbered fixture, so a one-poll case
 # serves poll 1 forever. PSHIM_FAIL=1 makes every call exit 1 (API error).
+# Every call is appended to $PFIX/calls.log. $PFIX/cr-fail-once and $PFIX/wr-fail-once
+# make the first check-runs / actions/runs call exit 1 before the counter moves.
+# A latest-attempt jobs call (actions/runs/<id>/jobs?filter=latest) serves
+# $PFIX/N-jobs-<run-id>.json and appends the run id to $PFIX/jobs-calls;
+# PJOBS_FAIL=1 makes it exit 1. A jobs URL without filter=latest exits 1.
 PSHIM="$TMP/pshim"
 cat > "$PSHIM" <<'SHIM'
 #!/usr/bin/env bash
+echo "$*" >> "$PFIX/calls.log"
 [ "${PSHIM_FAIL:-0}" = "1" ] && exit 1
+[ -f "$PFIX/cr-fail-once" ] && [[ "$*" == *check-runs* ]] && { rm -f "$PFIX/cr-fail-once"; exit 1; }
+[ -f "$PFIX/wr-fail-once" ] && [[ "$*" == *actions/runs* ]] && { rm -f "$PFIX/wr-fail-once"; exit 1; }
 counter="$PFIX/counter"
 n="$(cat "$counter" 2>/dev/null || echo 0)"
 case "$*" in
     *check-runs*) n=$((n + 1)); echo "$n" > "$counter"; kind=checkruns ;;
+    *actions/runs/*/jobs\?filter=latest*)
+        [ "${PJOBS_FAIL:-0}" = "1" ] && exit 1
+        id="$*"; id="${id#*actions/runs/}"; id="${id%%/*}"
+        echo "$id" >> "$PFIX/jobs-calls"; kind="jobs-$id" ;;
+    *actions/runs/*/jobs*) exit 1 ;;
     *actions/runs*) kind=runs ;;
     *) exit 1 ;;
 esac
@@ -351,6 +424,12 @@ new_case() { PFIX="$TMP/p-$1"; rm -rf "$PFIX"; mkdir -p "$PFIX"; export PFIX; }
 cr() { printf '[{"check_runs":%s}]' "$2" > "$PFIX/$1-checkruns.json"; }
 # wr <n> <runs-json-array>  — write poll n's workflow runs as a one-page slurped array.
 wr() { printf '[{"workflow_runs":%s}]' "$2" > "$PFIX/$1-runs.json"; }
+# jr <n> <run-id> <jobs-json-array> — write poll n's jobs for one run (latest attempt URL only).
+jr() { printf '[{"jobs":%s}]' "$3" > "$PFIX/$1-jobs-$2.json"; }
+jobs_calls() { if [ -f "$PFIX/jobs-calls" ]; then wc -l < "$PFIX/jobs-calls" | tr -d ' '; else echo 0; fi; }
+GHOST_ID=39824169608
+GHOST_RUN="[{\"id\":$GHOST_ID,\"name\":\"Dependabot Auto-Merge\",\"status\":\"in_progress\",\"conclusion\":null,\"run_attempt\":1,\"updated_at\":\"2026-10-22T17:36:22Z\"}]"
+GHOST_PASS_PREFIX="PASS: ghost-settled by jobs: Dependabot Auto-Merge#$GHOST_ID; 1 check-run(s) settled green on $P_SHA"
 # run_poll <args...> → OUT, ERR, RC (GITHUB_WORKFLOW cleared unless the caller exports PGW)
 run_poll() {
     OUT="$TMP/pout"; ERR="$TMP/perr"
@@ -389,7 +468,7 @@ else fail "P3 anchor missing holds (rc=$RC err=$(tail -3 "$ERR"))"; fi
 new_case p4
 cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"E2E Tests","status":"in_progress"}]'
 run_poll --anchor=A
-if [ "$RC" -eq 1 ] && grep -qF 'workflow runs still active: E2E Tests' "$ERR"; then
+if [ "$RC" -eq 3 ] && grep -qF 'workflow runs still active: E2E Tests' "$ERR"; then
     ok "P4 active workflow run holds"
 else fail "P4 active workflow run holds (rc=$RC err=$(cat "$ERR"))"; fi
 
@@ -401,7 +480,7 @@ PGW="" run_poll --anchor=A
 p5_empty_rc=$RC
 ( unset GITHUB_WORKFLOW PGW; GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" \
     --anchor=A >/dev/null 2>&1 ); p5_unset_rc=$?
-if [ "$p5_rc" -eq 0 ] && [ "$p5_empty_rc" -eq 1 ] && [ "$p5_unset_rc" -eq 1 ]; then
+if [ "$p5_rc" -eq 0 ] && [ "$p5_empty_rc" -eq 3 ] && [ "$p5_unset_rc" -eq 3 ]; then
     ok "P5 self workflow run does not deadlock"
 else fail "P5 self workflow run does not deadlock (self=$p5_rc empty=$p5_empty_rc unset=$p5_unset_rc)"; fi
 
@@ -424,12 +503,14 @@ else fail "P7 wait then pass (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
 new_case p8
 PSHIM_FAIL=1 run_poll --anchor=A --wait --timeout-seconds=1
 p8_rc=$RC; p8_err="$(cat "$ERR")"
+rm -f "$PFIX/calls.log"
 PSHIM_FAIL=1 run_poll --anchor=A
 p8_oneshot_rc=$RC
+p8_calls="$(grep -c 'check-runs' "$PFIX/calls.log" || true)"
 if [ "$p8_rc" -eq 1 ] && [[ "$p8_err" == *"api error"* ]] && [[ "$p8_err" == *"TIMEOUT:"* ]] \
-        && [ "$p8_oneshot_rc" -eq 2 ]; then
+        && [ "$p8_oneshot_rc" -eq 2 ] && [ "$p8_calls" = "3" ]; then
     ok "P8 api error is pending then fail-closed"
-else fail "P8 api error is pending then fail-closed (wait rc=$p8_rc oneshot rc=$p8_oneshot_rc)"; fi
+else fail "P8 api error is pending then fail-closed (wait rc=$p8_rc oneshot rc=$p8_oneshot_rc check-runs calls=$p8_calls)"; fi
 
 # P9: the failure sits on the second slurped page. Mutation: reading `.[0].check_runs`
 # only (first page) would miss Engine and pass.
@@ -546,5 +627,692 @@ p17_try '--base-ref=a b'
 p17_try --startup-grace-seconds=x
 p17_try --base-ref master
 if [ "$p17_ok" -eq 1 ]; then ok "P17 rejected base-ref and grace forms"; else fail "P17 rejected base-ref and grace forms"; fi
+
+# P18: one-shot, everything settled green -> 0.
+new_case p18
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT"; then
+    ok "P18 one-shot all green exits 0"
+else fail "P18 one-shot all green exits 0 (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P19: one-shot, a failed check -> 1 and names it.
+new_case p19
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'FAIL: checks failed:' "$ERR" && grep -qF 'B (failure)' "$ERR"; then
+    ok "P19 one-shot failed check exits 1 and names it"
+else fail "P19 one-shot failed check exits 1 and names it (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P20: one-shot, anchor absent -> 3 (pending, not failed).
+new_case p20
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A,B
+if [ "$RC" -eq 3 ] && grep -qF 'WAIT: anchors not reported' "$ERR"; then
+    ok "P20 one-shot anchor missing exits 3"
+else fail "P20 one-shot anchor missing exits 3 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P21: one-shot, a non-anchor check still running -> 3.
+new_case p21
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",\"status\":\"in_progress\",\"conclusion\":null}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF 'WAIT: checks still running' "$ERR"; then
+    ok "P21 one-shot pending check exits 3"
+else fail "P21 one-shot pending check exits 3 (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P22: --self is a CSV; both names are excluded.
+new_case p22
+cr 1 '[{"name":"Aggregate check status","status":"in_progress","conclusion":null},{"name":"All checks settled","status":"in_progress","conclusion":null}]'; wr 1 "$RUNS_DONE"
+run_poll --self='Aggregate check status,All checks settled'
+if [ "$RC" -eq 0 ] && grep -qF 'ignored: Aggregate check status, All checks settled' "$OUT"; then
+    ok "P22 --self CSV excludes both names"
+else fail "P22 --self CSV excludes both names (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P23: --ignore-workflows drops a named active workflow run from V4.
+new_case p23
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"Legacy waiter","status":"in_progress"}]'
+run_poll --anchor=A --ignore-workflows='Legacy waiter'
+p23_with=$RC
+run_poll --anchor=A
+p23_without=$RC
+if [ "$p23_with" -eq 0 ] && [ "$p23_without" -eq 3 ]; then
+    ok "P23 --ignore-workflows drops the legacy waiter from V4"
+else fail "P23 --ignore-workflows drops the legacy waiter from V4 (with=$p23_with without=$p23_without)"; fi
+
+# P24: the space form of --ignore-workflows is an unknown flag.
+new_case p24
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --ignore-workflows 'Legacy waiter'
+if [ "$RC" -eq 2 ] && grep -qF 'unknown flag' "$ERR"; then
+    ok "P24 space-form --ignore-workflows is rejected"
+else fail "P24 space-form --ignore-workflows is rejected (rc=$RC err=$(head -1 "$ERR"))"; fi
+
+# P25: one silent check-runs failure is retried inside the poll; the one-shot passes.
+new_case p25
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+: > "$PFIX/cr-fail-once"
+run_poll --anchor=A
+p25_calls="$(grep -c 'check-runs' "$PFIX/calls.log" || true)"
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && [ "$(counter)" = "1" ] && [ "$p25_calls" = "2" ]; then
+    ok "P25 one silent check-runs failure is retried and passes"
+else fail "P25 one silent check-runs failure is retried and passes (rc=$RC counter=$(counter) check-runs calls=$p25_calls err=$(head -2 "$ERR"))"; fi
+
+# P26: one silent actions/runs failure is retried inside the poll; the one-shot passes.
+new_case p26
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+: > "$PFIX/wr-fail-once"
+run_poll --anchor=A
+p26_calls="$(grep -c 'actions/runs' "$PFIX/calls.log" || true)"
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && [ "$p26_calls" = "2" ]; then
+    ok "P26 one silent actions/runs failure is retried and passes"
+else fail "P26 one silent actions/runs failure is retried and passes (rc=$RC actions/runs calls=$p26_calls err=$(head -2 "$ERR"))"; fi
+
+# P27: an empty check-runs body (exit 0, no JSON) is retried. Attempt 1 serves the empty
+# poll-1 fixture, attempt 2 serves poll 2.
+new_case p27
+: > "$PFIX/1-checkruns.json"
+cr 2 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --anchor=A
+if [ "$RC" -eq 0 ] && grep -q '^PASS:' "$OUT" && [ "$(counter)" = "2" ]; then
+    ok "P27 empty check-runs body is retried and passes"
+else fail "P27 empty check-runs body is retried and passes (rc=$RC counter=$(counter) err=$(head -2 "$ERR"))"; fi
+
+# P28 (a persistent failure stays apierr, exit 2) is pinned by the call-count assert in P8.
+
+# P30-P41 (plan P25-P36): ghost-aware V4. A run the runs API still calls active settles only when every
+# latest-attempt job completed green and updated_at is older than --ghost-grace-seconds.
+unset CCG_NOW_EPOCH
+GHOST_LOG="GHOST: run $GHOST_ID (Dependabot Auto-Merge) status=in_progress run_attempt=1 updated_at=2026-10-22T17:36:22Z age=601s > grace 600s: every latest-attempt job completed green; treating as settled"
+
+# P30 (plan P25): an all-skipped ghost past the grace window passes, loudly.
+new_case p30
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$GHOST_PASS_PREFIX"* ]] \
+        && grep -qxF "$GHOST_LOG" "$ERR" && [ "$(jobs_calls)" = "1" ]; then
+    ok "P30 (plan P25) ghost with all-skipped jobs past grace passes and is loud"
+else fail "P30 (plan P25) ghost with all-skipped jobs past grace passes and is loud (rc=$RC jobs=$(jobs_calls) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P31 (plan P26): zero jobs on the latest attempt holds.
+new_case p31
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" '[]'
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && [ ! -s "$OUT" ] \
+        && grep -qxF 'WAIT: workflow runs still active: Dependabot Auto-Merge' "$ERR" \
+        && grep -qF "ghost-check: run $GHOST_ID (Dependabot Auto-Merge): zero-jobs; still holding" "$ERR"; then
+    ok "P31 (plan P26) ghost with zero jobs holds"
+else fail "P31 (plan P26) ghost with zero jobs holds (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P32 (plan P27): one in-progress job holds.
+new_case p32
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP,$G_BUILD_PENDING]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF "ghost-check: run $GHOST_ID (Dependabot Auto-Merge): job-pending: build; still holding" "$ERR"; then
+    ok "P32 (plan P27) ghost with an in-progress job holds"
+else fail "P32 (plan P27) ghost with an in-progress job holds (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P33 (plan P28): a failed job never passes, even with a green check-run set.
+new_case p33
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_BUILD_FAIL]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && [ ! -s "$OUT" ] \
+        && grep -qF "ghost-check: run $GHOST_ID (Dependabot Auto-Merge): job-red: build (failure); still holding" "$ERR"; then
+    ok "P33 (plan P28) ghost with a failed job holds"
+else fail "P33 (plan P28) ghost with a failed job holds (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P33b (plan P28b): V1 fails a red check-run before any jobs read.
+new_case p33b
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"build\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_BUILD_FAIL]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 1 ] && grep -qF 'FAIL: checks failed: build (failure)' "$ERR" && [ "$(jobs_calls)" = "0" ]; then
+    ok "P33b (plan P28b) red check-run fails before any jobs read"
+else fail "P33b (plan P28b) red check-run fails before any jobs read (rc=$RC jobs=$(jobs_calls) err=$(cat "$ERR"))"; fi
+
+# P34 (plan P29): a jobs API error is apierr (exit 2 one-shot, TIMEOUT under --wait).
+new_case p34
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+PJOBS_FAIL=1 CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+p29_rc=$RC
+p29_err="$(cat "$ERR")"
+PJOBS_FAIL=1 CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A --wait --timeout-seconds=1
+if [ "$p29_rc" -eq 2 ] \
+        && grep -qF "WAIT: api error (1 consecutive): jobs read failed for run $GHOST_ID (Dependabot Auto-Merge)" <<< "$p29_err" \
+        && [ "$RC" -eq 1 ] && grep -q 'TIMEOUT:' "$ERR"; then
+    ok "P34 (plan P29) jobs API error is apierr, never a pass"
+else fail "P34 (plan P29) jobs API error is apierr, never a pass (one-shot rc=$p29_rc err=$p29_err; wait rc=$RC err=$(tail -1 "$ERR"))"; fi
+
+# P35 (plan P30): a ghost younger than the grace window holds.
+new_case p35
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+CCG_NOW_EPOCH=$((G_UPD + 45)) run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF 'young: 45s <= 600s; still holding' "$ERR"; then
+    ok "P35 (plan P30) ghost younger than grace holds"
+else fail "P35 (plan P30) ghost younger than grace holds (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P36 (plan P31): at exactly the grace window the run holds; --ghost-grace-seconds moves the line.
+new_case p36
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+CCG_NOW_EPOCH=$((G_UPD + 600)) run_poll --anchor=A
+p31_rc=$RC
+p31_err="$(cat "$ERR")"
+CCG_NOW_EPOCH=$((G_UPD + 600)) run_poll --anchor=A --ghost-grace-seconds=599
+if [ "$p31_rc" -eq 3 ] && grep -qF 'young: 600s <= 600s' <<< "$p31_err" \
+        && [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$GHOST_PASS_PREFIX"* ]]; then
+    ok "P36 (plan P31) age exactly grace holds; --ghost-grace-seconds=599 passes"
+else fail "P36 (plan P31) age exactly grace holds; --ghost-grace-seconds=599 passes (hold rc=$p31_rc err=$p31_err; flag rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# P37 (plan P32): a ghost plus an honest active run holds on the honest run only.
+new_case p37
+cr 1 "[{\"name\":\"A\",$G}]"
+wr 1 "${GHOST_RUN%]},{\"id\":77,\"name\":\"E2E Tests\",\"status\":\"in_progress\",\"conclusion\":null,\"run_attempt\":1,\"updated_at\":\"2026-10-22T17:36:22Z\"}]"
+jr 1 "$GHOST_ID" "[$G_SKIP]"; jr 1 77 '[{"name":"e2e","status":"in_progress","conclusion":null,"run_attempt":1}]'
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qxF 'WAIT: workflow runs still active: E2E Tests' "$ERR" \
+        && grep -qxF "$GHOST_LOG" "$ERR" && [ "$(jobs_calls)" = "2" ]; then
+    ok "P37 (plan P32) ghost plus honest active run holds on the honest run only"
+else fail "P37 (plan P32) ghost plus honest active run holds on the honest run only (rc=$RC jobs=$(jobs_calls) err=$(cat "$ERR"))"; fi
+
+# P37b (plan P32b): --ignore-workflows still drops a run before any jobs read.
+new_case p37b
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A --ignore-workflows='Dependabot Auto-Merge'
+if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "PASS: 1 check-run(s)"* ]] && [ "$(jobs_calls)" = "0" ]; then
+    ok "P37b (plan P32b) --ignore-workflows short-circuits the ghost check"
+else fail "P37b (plan P32b) --ignore-workflows short-circuits the ghost check (rc=$RC jobs=$(jobs_calls) out=$(cat "$OUT"))"; fi
+
+# P38 (plan P33): on a rerun only the latest attempt's jobs count.
+new_case p38
+cr 1 "[{\"name\":\"A\",$G}]"
+wr 1 "[{\"id\":$GHOST_ID,\"name\":\"Dependabot Auto-Merge\",\"status\":\"in_progress\",\"conclusion\":null,\"run_attempt\":2,\"updated_at\":\"2026-10-22T17:36:22Z\"}]"
+jr 1 "$GHOST_ID" "[$G_BUILD_FAIL,$G_BUILD_OK2]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 0 ] && grep -qF "GHOST: run $GHOST_ID (Dependabot Auto-Merge) status=in_progress run_attempt=2 " "$ERR"; then
+    ok "P38 (plan P33) rerun: latest-attempt jobs settle the ghost"
+else fail "P38 (plan P33) rerun: latest-attempt jobs settle the ghost (rc=$RC err=$(cat "$ERR"))"; fi
+
+# P39 (plan P34): the space form and a non-integer --ghost-grace-seconds are usage errors.
+new_case p39
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$RUNS_DONE"
+run_poll --ghost-grace-seconds 600
+p34_space_rc=$RC
+p34_space_err="$(head -1 "$ERR")"
+run_poll --ghost-grace-seconds=abc
+if [ "$p34_space_rc" -eq 2 ] && [[ "$p34_space_err" == "unknown flag: --ghost-grace-seconds" ]] \
+        && [ "$RC" -eq 2 ] && grep -qF 'invalid --ghost-grace-seconds' "$ERR"; then
+    ok "P39 (plan P34) rejected --ghost-grace-seconds forms"
+else fail "P39 (plan P34) rejected --ghost-grace-seconds forms (space rc=$p34_space_rc err=$p34_space_err; abc rc=$RC err=$(head -1 "$ERR"))"; fi
+
+# P40 (plan P35): CCG_NOW_EPOCH unset or empty uses the wall clock; anything else is a usage error.
+new_case p40
+cr 1 "[{\"name\":\"A\",$G}]"
+wr 1 "[{\"id\":$GHOST_ID,\"name\":\"Dependabot Auto-Merge\",\"status\":\"in_progress\",\"conclusion\":null,\"run_attempt\":1,\"updated_at\":\"2026-01-01T00:00:00Z\"}]"; jr 1 "$GHOST_ID" "[$G_SKIP]"
+run_poll --anchor=A
+p35_unset=$RC
+CCG_NOW_EPOCH='' run_poll --anchor=A
+p35_empty=$RC
+CCG_NOW_EPOCH=abc run_poll --anchor=A
+if [ "$p35_unset" -eq 0 ] && [ "$p35_empty" -eq 0 ] && [ "$RC" -eq 2 ] && grep -qF 'invalid CCG_NOW_EPOCH' "$ERR"; then
+    ok "P40 (plan P35) CCG_NOW_EPOCH unset/empty is the wall clock, abc is rejected"
+else fail "P40 (plan P35) CCG_NOW_EPOCH unset/empty is the wall clock, abc is rejected (unset=$p35_unset empty=$p35_empty abc=$RC err=$(head -1 "$ERR"))"; fi
+
+# P41 (plan P36): a run without an id holds without a jobs call (P4 unchanged).
+new_case p41
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 '[{"name":"E2E Tests","status":"in_progress"}]'
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF 'ghost-check: run ? (E2E Tests): no-run-id; still holding' "$ERR" \
+        && [ "$(jobs_calls)" = "0" ]; then
+    ok "P41 (plan P36) run without an id holds with no jobs call"
+else fail "P41 (plan P36) run without an id holds with no jobs call (rc=$RC jobs=$(jobs_calls) err=$(cat "$ERR"))"; fi
+
+# --- S1-S27: bin/settle-pr-status against a URL-dispatch gh shim ---------------
+SETTLE="$SCRIPT_DIR/settle-pr-status"
+S_SHA2="fedcba9876543210fedcba9876543210fedcba98"
+
+# The shim dispatches on the API path. Fixtures live in $PFIX: assoc.json (commits/S/pulls),
+# pull.json (pulls/N), cr.json (check-runs, slurped), wr.json (actions/runs, slurped),
+# jobs.json (actions/runs/<id>/jobs?filter=latest, slurped; absent = exit 1).
+# A -X POST to statuses copies stdin to $PFIX/posted.json. $PFIX/cr-fail makes check-runs exit 1.
+# $PFIX/assoc-fail-once makes the first commits/S/pulls read fail with a truncated-body error;
+# $PFIX/assoc-empty-once makes the first one print nothing and exit 0; $PFIX/pull-404 makes
+# pulls/N fail with HTTP 404. Every call is appended to $PFIX/calls.log.
+SSHIM_DIR="$TMP/sshim"
+mkdir -p "$SSHIM_DIR"
+cat > "$SSHIM_DIR/gh" <<'SHIM'
+#!/bin/bash
+echo "$*" >> "$PFIX/calls.log"
+case "$*" in
+    *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
+    *pulls\?state=open*)  cat "$PFIX/open.json" ;;
+    *commits/*/status)    p="$*"; p="${p##*commits/}"
+                          [ -f "$PFIX/status-fail-${p%%/*}" ] && exit 1
+                          cat "$PFIX/status-${p%%/*}.json" ;;
+    *actions/workflows/all-checks-settled.yml/dispatches*)
+                          [ -f "$PFIX/dispatch-fail" ] && exit 1
+                          jq -c . >> "$PFIX/dispatched.jsonl" ;;
+    *commits/*/pulls*)    if [ -f "$PFIX/assoc-fail-once" ]; then rm -f "$PFIX/assoc-fail-once"; echo 'unexpected end of JSON input' >&2; exit 1; fi
+                          if [ -f "$PFIX/assoc-empty-once" ]; then rm -f "$PFIX/assoc-empty-once"; exit 0; fi; cat "$PFIX/assoc.json" ;;
+    */pulls/[0-9]*)       [ -f "$PFIX/pull-404" ] && { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
+                          cat "$PFIX/pull.json" ;;
+    *check-runs*)         [ -f "$PFIX/cr-fail" ] && exit 1; cat "$PFIX/cr.json" ;;
+    *actions/runs/*/jobs\?filter=latest*) [ -f "$PFIX/jobs.json" ] || exit 1; cat "$PFIX/jobs.json" ;;
+    *actions/runs*)       cat "$PFIX/wr.json" ;;
+    *)                    echo "sshim: unexpected: $*" >&2; exit 1 ;;
+esac
+SHIM
+chmod +x "$SSHIM_DIR/gh"
+mkdir -p "$TMP/sleepstub"
+printf '#!/bin/bash\necho "$1" >> "$PFIX/sleeps"\n' > "$TMP/sleepstub/sleep"
+chmod +x "$TMP/sleepstub/sleep"
+
+# s_case <name> [base-ref] [pull-head-sha] — fresh fixtures: one open PR #7 with an all-green
+# check-run set for the anchors A,B.
+s_case() {
+    new_case "s-$1"
+    local base="${2:-master}" head="${3:-$P_SHA}"
+    printf '[{"number":7,"state":"open","base":{"ref":"%s","repo":{"full_name":"a-jay85/IBL5"}}}]' \
+        "$base" > "$PFIX/assoc.json"
+    printf '{"number":7,"state":"open","head":{"sha":"%s"},"base":{"ref":"%s"}}' \
+        "$head" "$base" > "$PFIX/pull.json"
+    cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G}]"
+    cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+    wr 1 "$RUNS_DONE"
+    cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+    rm -f "$PFIX/calls.log"
+}
+
+# run_settle <args...> — sets OUT, ERR, RC; always passes --repo and the anchors A,B.
+run_settle() {
+    OUT="$TMP/s-out"; ERR="$TMP/s-err"
+    GITHUB_WORKFLOW="" GH_API_CMD="$SSHIM_DIR/gh api" \
+        "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B "$@" >"$OUT" 2>"$ERR"
+    RC=$?
+}
+
+s_state() { jq -r .state "$PFIX/posted.json" 2>/dev/null; }
+s_desc()  { jq -r .description "$PFIX/posted.json" 2>/dev/null; }
+
+# Sweep-mode helpers (S13-S21). Fixtures: open.json (one slurped page of open PRs),
+# status-<sha>.json (combined status), dispatched.jsonl (workflow_dispatch bodies, one per line).
+S2_SHA=89abcdef0123456789abcdef0123456789abcdef
+# sw_open <pr-json...> — write open.json as ONE slurped page [[...]].
+sw_open() { local IFS=,; printf '[[%s]]' "$*" > "$PFIX/open.json"; }
+# sw_pr <n> <sha> — one open-PR object.
+sw_pr() { printf '{"number":%s,"state":"open","head":{"sha":"%s"}}' "$1" "$2"; }
+# sw_status <sha> <state> <updated_at> [context] — combined status with one status entry.
+sw_status() {
+    printf '{"state":"%s","statuses":[{"context":"%s","state":"%s","updated_at":"%s"}]}' \
+        "$2" "${4:-All checks settled}" "$2" "$3" > "$PFIX/status-$1.json"
+}
+# run_sweep <args...> — sets OUT, ERR, RC; always passes --repo and a 15 minute window.
+run_sweep() {
+    OUT="$TMP/s-out"; ERR="$TMP/s-err"
+    GH_API_CMD="$SSHIM_DIR/gh api" "$SETTLE" --repo=a-jay85/IBL5 --sweep-stale-minutes=15 "$@" >"$OUT" 2>"$ERR"
+    RC=$?
+}
+dispatched() { if [ -f "$PFIX/dispatched.jsonl" ]; then wc -l < "$PFIX/dispatched.jsonl" | tr -d ' '; else echo 0; fi; }
+
+# S1: all green -> success posted.
+s_case s1
+run_settle --head-sha="$P_SHA" --target-url=https://example.test/run/1
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] \
+        && [ "$(jq -r .context "$PFIX/posted.json")" = "All checks settled" ] \
+        && [ "$(jq -r .target_url "$PFIX/posted.json")" = "https://example.test/run/1" ] \
+        && [[ "$(s_desc)" == PASS:* ]]; then
+    ok "S1 all green posts success"
+else fail "S1 all green posts success (rc=$RC state=$(s_state) desc=$(s_desc) err=$(cat "$ERR"))"; fi
+
+# S2: a failed check -> failure naming it.
+s_case s2
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},{\"name\":\"Lint broke\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"Lint broke"* ]]; then
+    ok "S2 failed check posts failure naming it"
+else fail "S2 failed check posts failure naming it (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S3: a missing anchor -> pending.
+s_case s3
+cr 1 "[{\"name\":\"A\",$G}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] && [[ "$(s_desc)" == *"anchors not reported"* ]]; then
+    ok "S3 missing anchor posts pending"
+else fail "S3 missing anchor posts pending (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S4: the PR head moved past the event head -> nothing posted.
+s_case s4 master "$S_SHA2"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'STALE:' "$OUT"; then
+    ok "S4 stale event head posts nothing"
+else fail "S4 stale event head posts nothing (rc=$RC posted=$([ -f "$PFIX/posted.json" ] && echo yes || echo no) out=$(cat "$OUT"))"; fi
+
+# S5: no open PR owns the head -> nothing posted.
+s_case s5
+printf '[]' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] && grep -qF 'NOTHING:' "$OUT"; then
+    ok "S5 no open PR posts nothing"
+else fail "S5 no open PR posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S6: a stacked base -> failure with the retarget message, resolved from the API.
+s_case s6 feature
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [[ "$(s_desc)" == *"stacked on feature"* ]]; then
+    ok "S6 stacked base posts failure with retarget message"
+else fail "S6 stacked base posts failure with retarget message (rc=$RC state=$(s_state) desc=$(s_desc))"; fi
+
+# S7: a bad --pr and both selectors are usage errors.
+s_case s7
+s7_ok=1
+for bad in "--pr=abc" "--pr=1 --head-sha=$P_SHA" "--pr=12345678" ""; do
+    # shellcheck disable=SC2086
+    run_settle $bad
+    if [ "$RC" -ne 2 ] || ! grep -qiE 'unknown|usage|invalid' "$ERR" || [ -f "$PFIX/posted.json" ]; then
+        s7_ok=0; echo "  S7 '$bad' -> rc=$RC: $(head -1 "$ERR")" >&2
+    fi
+done
+if [ "$s7_ok" -eq 1 ]; then ok "S7 bad --pr and both-selectors are usage errors"
+else fail "S7 bad --pr and both-selectors are usage errors"; fi
+
+# S8: --dry-run prints the payload and posts nothing (also covers the --pr path).
+s_case s8
+run_settle --pr=7 --dry-run
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/posted.json" ] \
+        && grep -qF 'would POST repos/a-jay85/IBL5/statuses/' "$OUT" \
+        && grep -qF '"state": "success"' "$OUT"; then
+    ok "S8 dry-run prints payload and posts nothing"
+else fail "S8 dry-run prints payload and posts nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S9: a check-runs API error -> nothing posted, exit 2.
+s_case s9
+: > "$PFIX/cr-fail"
+run_settle --head-sha="$P_SHA"
+s9_calls="$(grep -c 'check-runs' "$PFIX/calls.log" || true)"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && [ "$s9_calls" = "3" ]; then
+    ok "S9 check-runs API error posts nothing and exits 2"
+else fail "S9 check-runs API error posts nothing and exits 2 (rc=$RC check-runs calls=$s9_calls err=$(cat "$ERR"))"; fi
+
+# S10: the description is capped at 140 bytes (the statuses API rejects longer).
+s_case s10
+long_runs=""
+for i in $(seq 1 30); do
+    long_runs="${long_runs}{\"name\":\"long-running-check-number-$i\",\"status\":\"in_progress\",\"conclusion\":null},"
+done
+cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},${long_runs%,}]"
+cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] \
+        && [ "$(jq -r .description "$PFIX/posted.json" | wc -c)" -le 141 ]; then
+    ok "S10 description is capped at 140 bytes"
+else fail "S10 description is capped at 140 bytes (rc=$RC state=$(s_state) len=$(jq -r .description "$PFIX/posted.json" | wc -c))"; fi
+
+# calls_of <ere> — how many shim calls matched the pattern in this case.
+calls_of() { if [ -f "$PFIX/calls.log" ]; then grep -cE "$1" "$PFIX/calls.log" || true; else echo 0; fi; }
+ASSOC_RE='commits/[0-9a-f]+/pulls'
+
+# S11: the default read budget is 2s then 5s whether the var is unset or empty.
+s_case s11
+printf '' > "$PFIX/assoc.json"
+s11_ok=1
+for form in unset empty; do
+    rm -f "$PFIX/sleeps" "$PFIX/calls.log" "$PFIX/posted.json"
+    if [ "$form" = unset ]; then
+        env -u IBL5_GH_RETRY_DELAYS PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$SSHIM_DIR/gh api" PFIX="$PFIX" \
+            "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B --head-sha="$P_SHA" >"$TMP/s-out" 2>"$TMP/s-err"
+    else
+        env IBL5_GH_RETRY_DELAYS="" PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$SSHIM_DIR/gh api" PFIX="$PFIX" \
+            "$SETTLE" --repo=a-jay85/IBL5 --anchor=A,B --head-sha="$P_SHA" >"$TMP/s-out" 2>"$TMP/s-err"
+    fi
+    rc=$?
+    sleeps="$(cat "$PFIX/sleeps" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+    if [ "$rc" -ne 2 ] || [ "$sleeps" != "2 5" ] || [ "$(calls_of "$ASSOC_RE")" != 3 ] \
+            || [ -f "$PFIX/posted.json" ]; then
+        s11_ok=0; echo "  S11 $form -> rc=$rc sleeps='$sleeps' calls=$(calls_of "$ASSOC_RE")" >&2
+    fi
+done
+if [ "$s11_ok" -eq 1 ]; then ok "S11 default read budget is 2s then 5s (unset and empty)"
+else fail "S11 default read budget is 2s then 5s (unset and empty)"; fi
+
+# S12: an empty commits/S/pulls body on every attempt fails closed, never NOTHING.
+s_case s12
+printf '' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && ! grep -qF 'NOTHING:' "$OUT" \
+        && grep -qF 'API read error: repos/a-jay85/IBL5/commits/' "$ERR" \
+        && [ "$(calls_of "$ASSOC_RE")" = 3 ]; then
+    ok "S12 empty assoc body fails closed after 3 reads"
+else fail "S12 empty assoc body fails closed after 3 reads (rc=$RC calls=$(calls_of "$ASSOC_RE") out=$(cat "$OUT") err=$(head -2 "$ERR"))"; fi
+
+# S13: a valid non-array assoc body fails closed and is not retried.
+s_case s13
+printf '{"message":"x"}' > "$PFIX/assoc.json"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && ! grep -qF 'NOTHING:' "$OUT" \
+        && grep -qF 'body is not a JSON array' "$ERR" \
+        && [ "$(calls_of "$ASSOC_RE")" = 1 ]; then
+    ok "S13 non-array assoc body fails closed without retry"
+else fail "S13 non-array assoc body fails closed without retry (rc=$RC calls=$(calls_of "$ASSOC_RE") out=$(cat "$OUT") err=$(head -2 "$ERR"))"; fi
+
+# S14: one transient read error, then success (the 2026-10-22 incident shape).
+s_case s14
+: > "$PFIX/assoc-fail-once"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(calls_of "$ASSOC_RE")" = 2 ] \
+        && grep -qF 'gh-retry: attempt 1/3 failed (transient)' "$ERR"; then
+    ok "S14 one transient read error is retried and settles success"
+else fail "S14 one transient read error is retried and settles success (rc=$RC state=$(s_state) calls=$(calls_of "$ASSOC_RE") err=$(head -3 "$ERR"))"; fi
+
+# S15: a persistent HTTP 404 on pulls/N is read once and fails closed.
+s_case s15
+: > "$PFIX/pull-404"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 2 ] && [ ! -f "$PFIX/posted.json" ] && [ "$(calls_of '/pulls/7')" = 1 ]; then
+    ok "S15 persistent 404 is not retried and posts nothing"
+else fail "S15 persistent 404 is not retried and posts nothing (rc=$RC calls=$(calls_of '/pulls/7') err=$(head -2 "$ERR"))"; fi
+
+# S16: one empty assoc body, then a good one.
+s_case s16
+: > "$PFIX/assoc-empty-once"
+run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(calls_of "$ASSOC_RE")" = 2 ] \
+        && grep -qF 'returned an empty or non-JSON body' "$ERR"; then
+    ok "S16 one empty assoc body is retried and settles success"
+else fail "S16 one empty assoc body is retried and settles success (rc=$RC state=$(s_state) calls=$(calls_of "$ASSOC_RE") err=$(head -3 "$ERR"))"; fi
+
+# P29: the poller's default read budget is 2s then 5s whether the var is unset or empty.
+new_case p29
+p29_ok=1
+for form in unset empty; do
+    rm -f "$PFIX/sleeps" "$PFIX/calls.log"
+    if [ "$form" = unset ]; then
+        env -u IBL5_GH_RETRY_DELAYS PSHIM_FAIL=1 PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" --anchor=A \
+            --startup-grace-seconds=0 >"$TMP/p-out" 2>"$TMP/p-err"
+    else
+        env IBL5_GH_RETRY_DELAYS="" PSHIM_FAIL=1 PATH="$TMP/sleepstub:$PATH" GITHUB_WORKFLOW="" \
+            GH_API_CMD="$PSHIM" "$POLL" --repo=a-jay85/IBL5 --sha="$P_SHA" --anchor=A \
+            --startup-grace-seconds=0 >"$TMP/p-out" 2>"$TMP/p-err"
+    fi
+    rc=$?
+    sleeps="$(tr '\n' ' ' < "$PFIX/sleeps" 2>/dev/null | sed 's/ $//')"
+    if [ "$rc" -ne 2 ] || [ "$sleeps" != "2 5" ]; then
+        p29_ok=0; echo "  P29 $form -> rc=$rc sleeps='$sleeps'" >&2
+    fi
+done
+if [ "$p29_ok" -eq 1 ]; then ok "P29 default poll read budget is 2s then 5s (unset and empty)"
+else fail "P29 default poll read budget is 2s then 5s (unset and empty)"; fi
+# S17 (plan S11): a ghost pass is visible in the posted status description.
+s_case s17
+wr 1 "$GHOST_RUN"; cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+printf '[{"jobs":[%s]}]' "$G_SKIP" > "$PFIX/jobs.json"
+CCG_NOW_EPOCH=$G_OLD run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] \
+        && [[ "$(s_desc)" == "PASS: ghost-settled by jobs: Dependabot Auto-Merge#$GHOST_ID;"* ]] \
+        && grep -qxF "$GHOST_LOG" "$ERR"; then
+    ok "S17 (plan S11) ghost pass posts success with the ghost prefix"
+else fail "S17 (plan S11) ghost pass posts success with the ghost prefix (rc=$RC state=$(s_state) desc=$(s_desc) err=$(cat "$ERR"))"; fi
+
+# S18 (plan S12): a ghost younger than the grace window posts pending naming the run.
+s_case s18
+wr 1 "$GHOST_RUN"; cp "$PFIX/1-runs.json" "$PFIX/wr.json"
+printf '[{"jobs":[%s]}]' "$G_SKIP" > "$PFIX/jobs.json"
+CCG_NOW_EPOCH=$((G_UPD + 45)) run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] \
+        && [ "$(s_desc)" = "WAIT: workflow runs still active: Dependabot Auto-Merge" ] \
+        && grep -qF 'ghost-check: run 39824169608 (Dependabot Auto-Merge): young: 45s <= 600s; still holding' "$ERR"; then
+    ok "S18 (plan S12) young ghost posts pending naming the run"
+else fail "S18 (plan S12) young ghost posts pending naming the run (rc=$RC state=$(s_state) desc=$(s_desc) err=$(cat "$ERR"))"; fi
+
+# S19 (plan S13)-S27: sweep mode. T0 is the status's updated_at; G_UPD is its epoch.
+T0=2026-10-22T17:36:22Z
+SW_WANT_D7='{"ref":"master","inputs":{"pr_number":"7"}}'
+# sw_stale7 — PR 7 at $P_SHA with an All checks settled status pending since T0.
+sw_stale7() { sw_open "$(sw_pr 7 "$P_SHA")"; sw_status "$P_SHA" pending "$T0"; }
+
+# S19 (plan S13): a stale pending status dispatches the aggregator workflow once, from master.
+new_case s19
+sw_stale7
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/dispatched.jsonl")" = "$SW_WANT_D7" ] \
+        && grep -qF "SWEEP: PR 7 head $P_SHA All checks settled pending since $T0 (901s > 900s): dispatching" "$OUT" \
+        && grep -qF 'SWEEP: 1 open PR(s), 1 stale pending (> 15 min), 1 dispatched, 0 failed' "$OUT"; then
+    ok "S19 (plan S13) stale pending dispatches"
+else fail "S19 (plan S13) stale pending dispatches (rc=$RC n=$(dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S19b (plan S13b): zero open PRs is a clean no-op.
+new_case s19b
+sw_open
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/dispatched.jsonl" ] \
+        && grep -qF 'SWEEP: 0 open PR(s), 0 stale pending (> 15 min), 0 dispatched, 0 failed' "$OUT"; then
+    ok "S19b (plan S13b) zero open PRs dispatches nothing"
+else fail "S19b (plan S13b) zero open PRs dispatches nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S20 (plan S14): a pending status younger than the window is skipped.
+new_case s20
+sw_stale7
+CCG_NOW_EPOCH=$((G_UPD + 300)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "0" ] && grep -qF 'skip: pending for 300s (<= 900s)' "$OUT"; then
+    ok "S20 (plan S14) fresh pending is skipped"
+else fail "S20 (plan S14) fresh pending is skipped (rc=$RC n=$(dispatched) out=$(cat "$OUT"))"; fi
+
+# S20b (plan S14b): exactly M minutes old is still inside the window.
+new_case s20b
+sw_stale7
+CCG_NOW_EPOCH=$((G_UPD + 900)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "0" ] && grep -qF 'skip: pending for 900s (<= 900s)' "$OUT"; then
+    ok "S20b (plan S14b) boundary at exactly M is skipped"
+else fail "S20b (plan S14b) boundary at exactly M is skipped (rc=$RC n=$(dispatched) out=$(cat "$OUT"))"; fi
+
+# S21 (plan S15): a non-pending status is never dispatched, however old.
+new_case s21
+sw_open "$(sw_pr 7 "$P_SHA")"; sw_status "$P_SHA" success "$T0"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "0" ] && grep -qF 'skip: state success' "$OUT"; then
+    ok "S21 (plan S15) non-pending (success) is skipped"
+else fail "S21 (plan S15) non-pending (success) is skipped (rc=$RC n=$(dispatched) out=$(cat "$OUT"))"; fi
+
+# S21b (plan S15b): failure is non-pending too.
+new_case s21b
+sw_open "$(sw_pr 7 "$P_SHA")"; sw_status "$P_SHA" failure "$T0"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "0" ] && grep -qF 'skip: state failure' "$OUT"; then
+    ok "S21b (plan S15b) non-pending (failure) is skipped"
+else fail "S21b (plan S15b) non-pending (failure) is skipped (rc=$RC n=$(dispatched) out=$(cat "$OUT"))"; fi
+
+# S22 (plan S16): only the named context counts; --context retargets the sweep.
+new_case s22
+sw_open "$(sw_pr 7 "$P_SHA")"; sw_status "$P_SHA" pending "$T0" Other
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+s16_default_n="$(dispatched)"
+s16_default_out="$(cat "$OUT")"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep --context=Other
+if [ "$s16_default_n" = "0" ] && [[ "$s16_default_out" == *'skip: no All checks settled status'* ]] \
+        && [ "$RC" -eq 0 ] && [ "$(dispatched)" = "1" ]; then
+    ok "S22 (plan S16) other-context status is skipped; --context=Other dispatches"
+else fail "S22 (plan S16) other-context status is skipped; --context=Other dispatches (default n=$s16_default_n out=$s16_default_out; rc=$RC n=$(dispatched) err=$(cat "$ERR"))"; fi
+
+# S23 (plan S17): a mixed list dispatches only the stale pending PR.
+new_case s23
+sw_open "$(sw_pr 7 "$P_SHA")" "$(sw_pr 8 "$S2_SHA")"
+sw_status "$P_SHA" pending "$T0"; sw_status "$S2_SHA" success "$T0"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/dispatched.jsonl")" = "$SW_WANT_D7" ] \
+        && grep -qF 'SWEEP: 2 open PR(s), 1 stale pending' "$OUT"; then
+    ok "S23 (plan S17) mixed list dispatches only the stale pending PR"
+else fail "S23 (plan S17) mixed list dispatches only the stale pending PR (rc=$RC n=$(dispatched) out=$(cat "$OUT"))"; fi
+
+# S24 (plan S18): --dry-run prints the payload and the would-POST line, dispatching nothing.
+new_case s24
+sw_stale7
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep --dry-run
+if [ "$RC" -eq 0 ] && [ ! -f "$PFIX/dispatched.jsonl" ] \
+        && grep -qF '"pr_number": "7"' "$OUT" \
+        && grep -qF 'would POST repos/a-jay85/IBL5/actions/workflows/all-checks-settled.yml/dispatches' "$OUT"; then
+    ok "S24 (plan S18) dry-run prints the payload and dispatches nothing"
+else fail "S24 (plan S18) dry-run prints the payload and dispatches nothing (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S25 (plan S19): a failed dispatch is loud: exit 2, named on stderr, counted in the summary.
+new_case s25
+sw_stale7
+: > "$PFIX/dispatch-fail"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 2 ] && grep -qF 'SWEEP: dispatch failed for PR 7' "$ERR" \
+        && grep -qE '1 failed$' "$OUT"; then
+    ok "S25 (plan S19) dispatch failure exits 2 and is named"
+else fail "S25 (plan S19) dispatch failure exits 2 and is named (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S25b (plan S19b): a status read error on one PR is counted and the sweep carries on:
+# PR 7's read fails, stale PR 8 is still dispatched, and the sweep exits 2.
+new_case s25b
+sw_open "$(sw_pr 7 "$P_SHA")" "$(sw_pr 8 "$S2_SHA")"
+sw_status "$S2_SHA" pending "$T0"
+: > "$PFIX/status-fail-$P_SHA"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 2 ] && [ "$(dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/dispatched.jsonl")" = '{"ref":"master","inputs":{"pr_number":"8"}}' ] \
+        && grep -qF 'API read error: repos/a-jay85/IBL5/commits/' "$ERR" \
+        && grep -qF "SWEEP: PR 7 head $P_SHA: status read failed" "$ERR" \
+        && grep -qE '1 dispatched, 1 failed$' "$OUT"; then
+    ok "S25b (plan S19b) status read error is counted and the sweep continues"
+else fail "S25b (plan S19b) status read error is counted and the sweep continues (rc=$RC n=$(dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S26 (plan S20): rejected forms.
+new_case s26
+sw_stale7
+s20_ok=1
+run_sweep --sweep-stale-minutes=0
+{ [ "$RC" -eq 2 ] && grep -qF 'invalid --sweep-stale-minutes' "$ERR"; } || { s20_ok=0; echo "  S26 =0 -> rc=$RC: $(head -1 "$ERR")" >&2; }
+run_sweep --sweep-stale-minutes=abc
+{ [ "$RC" -eq 2 ] && grep -qF 'invalid --sweep-stale-minutes' "$ERR"; } || { s20_ok=0; echo "  S26 =abc -> rc=$RC: $(head -1 "$ERR")" >&2; }
+OUT="$TMP/s-out"; ERR="$TMP/s-err"
+GH_API_CMD="$SSHIM_DIR/gh api" "$SETTLE" --repo=a-jay85/IBL5 --sweep-stale-minutes 15 >"$OUT" 2>"$ERR"; RC=$?
+{ [ "$RC" -eq 2 ] && grep -qF 'unknown flag' "$ERR"; } || { s20_ok=0; echo "  S26 space form -> rc=$RC: $(head -1 "$ERR")" >&2; }
+run_sweep --pr=7
+{ [ "$RC" -eq 2 ] && grep -qF 'give exactly one of' "$ERR"; } || { s20_ok=0; echo "  S26 with --pr -> rc=$RC: $(head -1 "$ERR")" >&2; }
+CCG_NOW_EPOCH=abc run_sweep
+{ [ "$RC" -eq 2 ] && grep -qF 'invalid CCG_NOW_EPOCH' "$ERR"; } || { s20_ok=0; echo "  S26 bad epoch -> rc=$RC: $(head -1 "$ERR")" >&2; }
+if [ "$s20_ok" -eq 1 ] && [ "$(dispatched)" = "0" ]; then ok "S26 (plan S20) rejected sweep forms exit 2"
+else fail "S26 (plan S20) rejected sweep forms exit 2 (n=$(dispatched))"; fi
+
+# S27 (plan S21): a malformed head sha is skipped without a dispatch; the sweep carries on.
+new_case s27
+rm -f "$PFIX/calls.log"
+sw_open "$(sw_pr 9 not-a-sha)" "$(sw_pr 7 "$P_SHA")"
+sw_status "$P_SHA" pending "$T0"
+CCG_NOW_EPOCH=$((G_UPD + 901)) run_sweep
+if [ "$RC" -eq 0 ] && [ "$(dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/dispatched.jsonl")" = "$SW_WANT_D7" ] \
+        && grep -qF 'SWEEP: PR 9: skip: head.sha or number malformed' "$OUT"; then
+    ok "S27 (plan S21) malformed head is skipped without dispatch"
+else fail "S27 (plan S21) malformed head is skipped without dispatch (rc=$RC n=$(dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+s27_reads="$(calls_of 'commits/not-a-sha/status')"
+if [ "$s27_reads" = "0" ]; then ok "S27 (plan S21) malformed head gets no commits/not-a-sha/status read"
+else fail "S27 (plan S21) malformed head gets no commits/not-a-sha/status read (reads=$s27_reads)"; fi
 
 h_done

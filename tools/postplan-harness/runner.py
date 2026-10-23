@@ -357,6 +357,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                               diff_body=diff, worktree=worktree):
             return _finish(res, out_dir)
 
+        phase2_merge_danger = None   # MergeDanger this run's Phase 2 injected; None on the clean-tree rerun
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
@@ -370,13 +371,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         check = _mechanical_body_pass(git, gh, copy, copy_degraded, log, worktree=worktree)
         if copy["summary_md"] and check.get("corrected_body"):
             copy["summary_md"] = check["corrected_body"]
-            for f in check.get("findings", []):
-                log(f"phase2 finding: {f}")
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             merge_danger_degraded = True
+        phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
         _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
@@ -757,6 +757,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
         _arm_body = gh.pr_body() or body
+        if live and pr:
+            _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
+                                            git.diff_vs_base(), log, res)
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -789,6 +792,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gate_backtest_status=_gb.status,
             gate_backtest_reason=_gb.reason,
             merge_danger_state=merge_danger.classify_body(_arm_body),
+            retried_stages=sorted(res.retries),
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -960,7 +964,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
-                                           outcome, out_dir)
+                                           outcome, out_dir,
+                                           run_started=run_started)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -1082,6 +1087,17 @@ def _last_remediation_commit(fid: dict) -> str | None:
     return None
 
 
+def _prior_packet_body(out_dir: str, round_num: int) -> str | None:
+    """The PR body the immediately-preceding review read: fidelity-packet/pr-body.md for
+    round 1, fidelity-packet-{round_num}/pr-body.md after. None when unreadable."""
+    name = "fidelity-packet" if round_num == 1 else f"fidelity-packet-{round_num}"
+    try:
+        with open(os.path.join(out_dir, name, "pr-body.md")) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
 def _body_signature(body: str | None) -> str:
     """The comparable part of a PR body: everything outside the files-changed and merge-digest blocks.
 
@@ -1112,6 +1128,11 @@ def _round_model(round_num: int) -> str:
     return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
 _DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
+# Expected length of one BEHIND re-rebase pass (rebase, push, full CI watch).
+# Observed CI runs 57-61 min; 3720s adds margin. This is a CI-length figure and
+# is NOT derived from MAX_PP_SECS. The budget it is compared against is
+# _CI_FIX_WALL_BUDGET_SECS (defined below; resolved at call time).
+_BEHIND_CI_EXPECTED_SECS = 3720
 
 
 def _retry_key(branch: str, attempt: int) -> str:
@@ -1477,13 +1498,18 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
     return sha, bg_ci
 
 
-def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
+def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
+                    *, run_started=None):
     """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
     and the branch is still BEHIND, auto-merge stays armed and the PR is handed
     to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
     set here. Divergence inside the loop still disarms (see the disarm=True
-    call sites below)."""
+    call sites below). When run_started is given, a pass is skipped once the
+    remaining _CI_FIX_WALL_BUDGET_SECS budget is below
+    max(_BEHIND_CI_EXPECTED_SECS, the longest pass measured so far); auto-merge
+    stays armed and the same update-behind-prs.yml hand-off applies."""
     strict = gh.branch_protection_strict()
+    longest_pass = 0.0
     for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
         mss = gh.merge_state_status(pr)
         if mss != "BEHIND":
@@ -1492,6 +1518,17 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
             log("phase7: BEHIND but required checks are not strict — "
                 "leaving auto-merge armed")
             return sha, outcome
+        if run_started is not None:
+            remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            need = max(_BEHIND_CI_EXPECTED_SECS, longest_pass)
+            if remaining < need:
+                log(f"phase7: BEHIND re-rebase {attempt}/{_MAX_BEHIND_RETRIES} "
+                    f"skipped: wall budget {int(remaining)}s left < {int(need)}s "
+                    "expected CI pass; leaving auto-merge armed; "
+                    ".github/workflows/update-behind-prs.yml (ADR-0081) "
+                    "carries the PR to merge")
+                return sha, outcome
+        pass_started = time.time()
         log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
         if worktree and os.path.isdir(worktree):
             r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
@@ -1514,6 +1551,7 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
         if outcome.head_sha:
             sha = outcome.head_sha
         ciwatch.reap_background_watch(bg)
+        longest_pass = max(longest_pass, time.time() - pass_started)
         log(f"phase7 ci(re-rebase {attempt}): exit={outcome.exit_code} "
             f"failed={outcome.failed}")
         if outcome.exit_code != 0:
@@ -2258,6 +2296,41 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     return findings
 
 
+def _phase2_merge_danger_of(summary_md: str):
+    """The MergeDanger line Phase 2 injected into `summary_md`, or None when there is none
+    (clean-tree rerun: empty summary) or the line is malformed (a real condition (18)
+    verdict, never refilled)."""
+    try:
+        return merge_danger.parse_merge_danger(summary_md) if summary_md else None
+    except merge_danger.MalformedMergeDanger:
+        return None
+
+
+def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, log, res) -> str:
+    """Phase 6.5: one bounded refill of the Merge danger line this run's Phase 2 wrote.
+
+    Retries only when Phase 2 computed a line this run (phase2_md) and the live body
+    classifies MISSING. ONE-WAY, MALFORMED and UNREADABLE are real verdicts and are never
+    touched; a run whose Phase 2 wrote nothing (clean-tree rerun) never refills. The line
+    re-applied is phase2_md itself, then the raise-only later-phase floor, so the Door can
+    only go up. Returns the body condition (18) should classify. Fail closed: any error
+    leaves the body as is, and the retry is still recorded so the hold says so."""
+    if phase2_md is None or merge_danger.classify_body(body) != "MISSING":
+        return body
+    res.retries["merge-danger"] = 1
+    try:
+        refilled = merge_danger.inject_merge_danger(body, phase2_md)
+        refilled = _merge_danger_body(refilled, worktree, diff_body, log, "phase6.5")
+        gh.pr_edit_body(pr, refilled)
+        fresh = gh.pr_body_fresh() or ""   # what GitHub holds now, never our own last write
+        log("phase6.5: merge-danger line missing from the live body; re-applied the Phase 2 "
+            f"line once -> state={merge_danger.classify_body(fresh)}")
+        return fresh
+    except (HarnessError, OSError, subprocess.SubprocessError, ValueError) as exc:
+        log(f"phase6.5: merge-danger refill failed ({exc}); condition (18) holds")
+        return body
+
+
 def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
     """Phase 2: advisory How to revert line, placed after Merge danger. Log-only: no finding,
     no degraded body check. An empty summary_md is the clean-tree rerun and is left as is."""
@@ -2955,7 +3028,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         rec = {"round": round_num, "model": model,
                "work_list_sizes": fidelity.work_list_sizes(work),
                "retries": 0, "outcome": None, "remediation_sha": None,
-               "verdict": None, "reviewed_tree": None, "verdict_path": None}
+               "verdict": None, "reviewed_tree": None, "verdict_path": None,
+               "review_kind": None, "recheck_fallback_reason": None}
         log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
@@ -3092,7 +3166,23 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # which is the accurate label for a round that produced no commit. This is why
         # fidelity.re_review() needs no signature change.
         v_n = tree_n = path_n = None
-        for rr_attempt in range(_MAX_ROUND_RETRIES + 1):
+        review_kind, recheck_reason = "full", None
+        if sha == BODY_ONLY_SHA:
+            prior_body = _prior_packet_body(out_dir, round_num)
+            if prior_body is None:
+                recheck_reason = "prior-body-missing"
+            else:
+                v_n, tree_n, path_n, recheck_reason = fidelity.body_recheck(
+                    llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
+                    pr, current_verdict_path, name_status_text(git.diff_vs_base()),
+                    res.fidelity.get("plan_hash"), _plan_hash(plan),
+                    round_num=round_num, log=log)
+                if v_n is not None:
+                    review_kind = "body-recheck"
+            if v_n is None:
+                log(f"phase5.5 round {round_num}: body recheck fell back to full "
+                    f"re-review ({recheck_reason})")
+        for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
                 current_verdict_path, round_num=round_num, log=log)
@@ -3105,7 +3195,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             log(f"phase5.5 round {round_num}: re-review indeterminate "
                 f"(attempt {rr_attempt + 1}/{_MAX_ROUND_RETRIES + 1})")
         rec.update({"remediation_sha": str(sha), "verdict": v_n,
-                    "reviewed_tree": tree_n, "verdict_path": path_n})
+                    "reviewed_tree": tree_n, "verdict_path": path_n,
+                    "review_kind": review_kind, "recheck_fallback_reason": recheck_reason})
         if v_n is None:
             rec["outcome"] = "re-review-indeterminate"
         # Truthiness, never sha-shape: a body-only round records BODY_ONLY_SHA here and
@@ -3118,6 +3209,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
             f"outcome={rec['outcome']} sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'}")
+        log(f"phase5.5 round {round_num}: review_kind={review_kind}")
         if v_n is None:
             break
         final_verdict, final_err = v_n, ""
@@ -3573,6 +3665,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     except HarnessError as e:
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
@@ -3585,6 +3680,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         # and merely confirms it in step 7.
         log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
             "-- attempting stacked --onto auto-resolution")
+        log(f"phase2: plain-path decline -- {(e.detail or '')[:600]}")
         plain_conflicted = getattr(git, "last_conflict_files", ())
         log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
         conflict_resolved = git.autoresolve_stacked_rebase()
@@ -3612,6 +3708,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         if conflict_resolved.collapse_warn:
             log(f"phase2: {conflict_resolved.collapse_warn}")
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     sha = git.head()
     if conflict_resolved is not None:
         auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"
@@ -3699,11 +3798,14 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
     """Decline before any LLM call when condition 3's MISSING set or an UNREALISED-ASSERTION-only set repeats the prior hold.
 
     True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
-    returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
+    returns. Fail-open: any exception, POSTPLAN_FORCE=1, POSTPLAN_STATE_CHANGED=1, no plan, or no matching
     record returns False and the run proceeds. Never touches res.pr_number or res.arm.
     """
     if os.environ.get("POSTPLAN_FORCE") == "1":
         log("phase2 early hold-repeat: skipped (POSTPLAN_FORCE=1)")
+        return False
+    if os.environ.get("POSTPLAN_STATE_CHANGED") == "1":
+        log("phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)")
         return False
     if not (live or state_dir is not None) or not (plan and plan.found):
         return False

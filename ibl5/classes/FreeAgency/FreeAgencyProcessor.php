@@ -154,47 +154,26 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $rawOfferType = $postData['offerType'] ?? 0;
         $offerType = is_numeric($rawOfferType) ? (int) $rawOfferType : 0;
 
-        // Parse offer amounts based on exception type
+        // Each branch builds the six-year ladder as a list; one destructure feeds the return shape.
         if (OfferType::isVeteranMinimum($offerType)) {
-            // Veteran's minimum
-            $offer1 = $veteranMinimum;
-            $offer2 = 0;
-            $offer3 = 0;
-            $offer4 = 0;
-            $offer5 = 0;
-            $offer6 = 0;
+            $offers = [$veteranMinimum, 0, 0, 0, 0, 0];
         } elseif (OfferType::isLLE($offerType)) {
-            // Lower-Level Exception
-            $offer1 = \League\ContractRules::LLE_OFFER;
-            $offer2 = 0;
-            $offer3 = 0;
-            $offer4 = 0;
-            $offer5 = 0;
-            $offer6 = 0;
+            $offers = [\League\ContractRules::LLE_OFFER, 0, 0, 0, 0, 0];
         } elseif (OfferType::isMLE($offerType)) {
-            // Mid-Level Exception
-            $mleOffers = \League\ContractRules::MLE_OFFERS;
-            $offer1 = $mleOffers[0];
-            $offer2 = $offerType >= 2 ? $mleOffers[1] : 0;
-            $offer3 = $offerType >= 3 ? $mleOffers[2] : 0;
-            $offer4 = $offerType >= 4 ? $mleOffers[3] : 0;
-            $offer5 = $offerType >= 5 ? $mleOffers[4] : 0;
-            $offer6 = $offerType >= 6 ? $mleOffers[5] : 0;
+            // getMLEOffers() yields keys 0..offerType-1; the keyed pad fills the remaining years 2..6.
+            // Key 0 is always present from the ladder, so the pad starts at key 1 on purpose.
+            $offers = \League\ContractRules::getMLEOffers($offerType) + [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
         } else {
-            // Custom offer
-            $raw1 = $postData['offeryear1'] ?? 0;
-            $raw2 = $postData['offeryear2'] ?? 0;
-            $raw3 = $postData['offeryear3'] ?? 0;
-            $raw4 = $postData['offeryear4'] ?? 0;
-            $raw5 = $postData['offeryear5'] ?? 0;
-            $raw6 = $postData['offeryear6'] ?? 0;
-            $offer1 = is_numeric($raw1) ? (int) $raw1 : 0;
-            $offer2 = is_numeric($raw2) ? (int) $raw2 : 0;
-            $offer3 = is_numeric($raw3) ? (int) $raw3 : 0;
-            $offer4 = is_numeric($raw4) ? (int) $raw4 : 0;
-            $offer5 = is_numeric($raw5) ? (int) $raw5 : 0;
-            $offer6 = is_numeric($raw6) ? (int) $raw6 : 0;
+            $offers = [
+                self::toOfferAmount($postData['offeryear1'] ?? 0),
+                self::toOfferAmount($postData['offeryear2'] ?? 0),
+                self::toOfferAmount($postData['offeryear3'] ?? 0),
+                self::toOfferAmount($postData['offeryear4'] ?? 0),
+                self::toOfferAmount($postData['offeryear5'] ?? 0),
+                self::toOfferAmount($postData['offeryear6'] ?? 0),
+            ];
         }
+        [$offer1, $offer2, $offer3, $offer4, $offer5, $offer6] = $offers;
 
         return [
             'offer1' => $offer1,
@@ -209,6 +188,15 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             'year1Max' => $maxContractYear1,
             'amendedCapSpaceYear1' => $amendedCapSpaceYear1,
         ];
+    }
+
+    /**
+     * Coerce one raw POST offer amount the way the custom branch always has:
+     * numeric strings, floats and ints cast to int; anything else (array, null, '', 'abc') becomes 0.
+     */
+    private static function toOfferAmount(mixed $raw): int
+    {
+        return is_numeric($raw) ? (int) $raw : 0;
     }
 
     /**

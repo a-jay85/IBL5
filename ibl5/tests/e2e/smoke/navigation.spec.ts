@@ -76,10 +76,10 @@ test.describe('Navigation bar smoke tests (public)', () => {
   });
 
   // Repointed entries (PR #2361): pin the exact href so a revert to the old
-  // PlayerExportGuide / AllStarAppearances targets fails here, not only in PHPUnit.
+  // PlayerExportGuide / RecordHolders&op=allstar targets fails here, not only in PHPUnit.
   const repointedLinks = [
     { menu: 'Season', label: 'Player Export', href: 'modules.php?name=ApiKeys' },
-    { menu: 'History', label: 'All-Star Appearances', href: 'modules.php?name=RecordHolders&op=allstar' },
+    { menu: 'History', label: 'All-Star Appearances', href: 'modules.php?name=AllStarAppearances' },
   ];
 
   for (const { menu, label, href } of repointedLinks) {

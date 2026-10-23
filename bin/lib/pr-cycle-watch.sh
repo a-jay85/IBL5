@@ -29,6 +29,14 @@ PCW_STALE_LABEL_MIN=180
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
 # DIRTY rescue launches per PR per local calendar day. Bounds the conflict re-try spend.
 PCW_CONFLICT_RETRY_DAILY_CAP=2
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+# Gate-timeout reruns per (PR, head SHA). Kept in gate-reruns/, apart from strikes/, so a
+# rerun never spends the no-op rescue cap.
+PCW_GATE_RERUN_CAP=2
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_GATE_CHECK="All checks green"         # job name of .github/workflows/all-checks-green.yml
+# shellcheck disable=SC2034  # read by bin/pr-cycle-tick
+PCW_GATE_WORKFLOW="all-checks-green.yml"  # the --workflow value for the run-list call
 
 # State dir: PR_CYCLE_WATCH_STATE_DIR when non-empty, else $HOME/.ibl5-pr-cycle-watch.
 # Unset and empty both mean "use the default". rc 1 when neither it nor HOME is set.
@@ -54,6 +62,56 @@ pcw_check_verdict() {
     [[ -z "$pending" ]] || { echo pending; return 0; }
     failed="$(ccg_failed <<< "$json")"
     if [[ -n "$failed" ]]; then echo red; else echo green; fi
+}
+
+# pcw_gate_failed: {check_runs:[...]} on stdin. rc 0 when the latest check-run named
+# $PCW_GATE_CHECK is completed with conclusion failure. Any other state, or bad JSON, is 1.
+pcw_gate_failed() {
+    local json
+    json="$(ccg_dedupe '[]' 2>/dev/null)" || return 1
+    jq -e --arg g "$PCW_GATE_CHECK" \
+        'any(.check_runs[]; .name == $g and .status == "completed" and .conclusion == "failure")' \
+        >/dev/null 2>&1 <<< "$json"
+}
+# pcw_gate_run_pick <sha>: the run-list JSON (fields databaseId,conclusion,status,headSha,createdAt)
+# on stdin. Prints "<databaseId> <status> <conclusion>" for the newest run whose headSha is
+# <sha>. An unsettled run has conclusion "" (live shape) or null; both print "null". rc 1 on
+# bad JSON or no such run.
+pcw_gate_run_pick() {
+    local out
+    out="$(jq -r --arg s "$1" '[.[] | select(.headSha == $s)] | sort_by(.createdAt) | last
+        | select(. != null) | "\(.databaseId) \(.status) \(if (.conclusion // "") == "" then "null" else .conclusion end)"' 2>/dev/null)" || return 1
+    [[ "$out" =~ ^[0-9]+\ [a-z_]+\ [a-z_]+$ ]] || return 1
+    printf '%s\n' "$out"
+}
+# pcw_gate_timeout_anchors: the failed-log text of a run (--log-failed) on stdin. Prints the anchor
+# names from the first "TIMEOUT: WAIT: anchors not reported/completed: <a>, <b> <dash>
+# failing closed after Ns" line, one per line. rc 1 when no line carries that marker or the
+# list parses empty. The dash is U+2014; the sed matches it as one non-space run, so the
+# parse does not depend on the locale.
+pcw_gate_timeout_anchors() {
+    local line list
+    line="$(grep -F 'TIMEOUT: WAIT: anchors not reported/completed: ' | sed -n '1p')" || return 1
+    [[ -n "$line" ]] || return 1
+    list="${line#*anchors not reported/completed: }"
+    list="$(sed -E 's/ [^ ]+ failing closed after [0-9]+s.*$//' <<< "$list")"
+    list="$(jq -Rr 'split(", ") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0)) | .[]' <<< "$list")" || return 1
+    [[ -n "$list" ]] || return 1
+    printf '%s\n' "$list"
+}
+# pcw_anchors_green <names>: {check_runs:[...]} on stdin, <names> newline separated. rc 0
+# only when every named anchor's latest check-run is completed with conclusion success.
+# Missing, pending, failure, cancelled and skipped all return 1.
+pcw_anchors_green() {
+    local json
+    json="$(ccg_dedupe '[]' 2>/dev/null)" || return 1
+    jq -e --arg names "$1" '
+        . as $root
+        | ($names | split("\n") | map(select(length > 0))) as $want
+        | ($want | length) > 0
+          and all($want[]; . as $n | any($root.check_runs[]; .name == $n
+              and .status == "completed" and .conclusion == "success"))' \
+        >/dev/null 2>&1 <<< "$json"
 }
 
 # pcw_inflight <pr> <branch> <launchctl-snapshot>: 0 when a fleet rescue for the PR
@@ -238,19 +296,32 @@ pcw_mark_dm()        { _pcw_write "$1/dm-sent/$2" "$3"; }
 pcw_declined_head()  { _pcw_holds "$1/declined/$2" "$3" "${4:-}"; }
 pcw_record_declined() { _pcw_write "$1/declined/$2" "$3"; }
 # strikes/<pr> holds "<key> <n>": rescues that never reached post-plan for that key.
-pcw_strike_count() {   # <dir> <pr> <key> [<sha>]: prints n when strikes/<pr> holds the key or sha, else 0
-    local f="$1/strikes/$2" s="" n=""
-    if [[ -f "$f" ]]; then read -r s n < "$f" || true; fi
-    if [[ -n "$s" && ( "$s" == "$3" || "$s" == "${4:-}" ) && "$n" =~ ^[0-9]+$ ]]; then
+# _pcw_keyed_count <file> <key> [<alt-key>]: the n of a "<key> <n>" ledger line when its key
+# equals <key> or <alt-key>, else 0. Shared by strikes/ and gate-reruns/.
+_pcw_keyed_count() {
+    local s="" n=""
+    if [[ -f "$1" ]]; then read -r s n < "$1" || true; fi
+    if [[ -n "$s" && ( "$s" == "$2" || "$s" == "${3:-}" ) && "$n" =~ ^[0-9]+$ ]]; then
         printf '%s\n' "$n"
     else
         printf '0\n'
     fi
 }
+pcw_strike_count() {   # <dir> <pr> <key> [<sha>]: prints n when strikes/<pr> holds the key or sha, else 0
+    _pcw_keyed_count "$1/strikes/$2" "$3" "${4:-}"
+}
 pcw_add_strike() {     # <dir> <pr> <key> [<sha>]: writes "<key> <count+1>" and prints the new count
     local n
     n=$(( $(pcw_strike_count "$1" "$2" "$3" "${4:-}") + 1 ))
     _pcw_write "$1/strikes/$2" "$3 $n" && printf '%s\n' "$n"
+}
+# gate-reruns/<pr> holds "<head-sha> <n>": gate-timeout reruns issued for that head. A new
+# head SHA resets the count, because the gate re-runs on its own for a new push.
+pcw_gate_rerun_count() { _pcw_keyed_count "$1/gate-reruns/$2" "$3"; }   # <dir> <pr> <sha>
+pcw_add_gate_rerun() {  # <dir> <pr> <sha>: writes "<sha> <count+1>", prints the new count
+    local n
+    n=$(( $(pcw_gate_rerun_count "$1" "$2" "$3") + 1 ))
+    _pcw_write "$1/gate-reruns/$2" "$3 $n" && printf '%s\n' "$n"
 }
 # Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the key last DM'd about.
 # Kinds: declined, strikes, patchid. The patchid ledger stores the head SHA, because it
@@ -326,10 +397,74 @@ pcw_master_tip() {
     [[ "$tip" =~ ^[0-9a-f]{40}$ ]] && printf '%s\n' "$tip"
     return 0
 }
-# conflict-hold/<pr> holds the origin/master tip recorded at the launch of a rescue that
-# settled `conflict`, or `unknown` when that launch had no readable tip. settle writes it on
-# `conflict` and clears it on every other settled outcome.
-pcw_record_conflict_hold() { _pcw_write "$1/conflict-hold/$2" "${3:-unknown}"; }
+# pcw_conflict_probe <root> <pr> <tip> <head>: would <head> merge onto <tip> cleanly?
+#   0 = clean (prints nothing)
+#   1 = conflicted: prints the conflicted paths, LC_ALL=C sorted and unique, one per line
+#   2 = cannot tell: prints a one-line reason. Callers fall back to today's behavior.
+# Runs `git merge-tree --write-tree --name-only`, which writes objects but no ref and never
+# touches a worktree. When <head> is not a local object it fetches refs/pull/<pr>/head once,
+# without writing FETCH_HEAD or any ref. A conflict needs exit 1 AND a 40-hex tree OID on
+# line 1 AND at least one path: a missing object also exits 1 but prints no OID line.
+pcw_conflict_probe() {
+    local root="$1" pr="$2" tip="$3" head="$4" out="" mrc=0 paths=""
+    if [[ ! "$tip" =~ ^[0-9a-f]{40}$ || ! "$head" =~ ^[0-9a-f]{40}$ ]]; then
+        printf 'tip or head is not a 40-hex SHA\n'; return 2
+    fi
+    if ! git -C "$root" cat-file -e "$head^{commit}" 2>/dev/null; then
+        [[ "$pr" =~ ^[0-9]+$ ]] && git -C "$root" fetch --quiet --no-write-fetch-head \
+            origin "refs/pull/$pr/head" 2>/dev/null || true
+        if ! git -C "$root" cat-file -e "$head^{commit}" 2>/dev/null; then
+            printf 'head %s missing after fetch\n' "${head:0:7}"; return 2
+        fi
+    fi
+    out="$(git -C "$root" -c core.quotePath=false merge-tree --write-tree --name-only "$tip" "$head" 2>/dev/null)" \
+        && mrc=0 || mrc=$?
+    if [[ "$mrc" -eq 0 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
+        return 0
+    fi
+    if [[ "$mrc" -eq 1 && "$(sed -n '1p' <<< "$out")" =~ ^[0-9a-f]{40}$ ]]; then
+        paths="$(awk 'NR == 1 { next } /^$/ { stop = 1 } !stop { print }' <<< "$out" \
+            | LC_ALL=C sort -u)"
+        # quotePath=false leaves only paths with quotes, backslashes or control characters
+        # C-quoted. A quoted name cannot be looked up later, so treat it as "cannot tell".
+        if [[ "$paths" == *'"'* ]]; then
+            printf 'conflicted path is C-quoted\n'; return 2
+        fi
+        if [[ -n "$paths" ]]; then printf '%s\n' "$paths"; return 1; fi
+    fi
+    printf 'merge-tree output unrecognised (exit %s)\n' "$mrc"; return 2
+}
+# conflict-hold/<pr>: line 1 is the origin/master tip recorded at the launch of a rescue that
+# settled `conflict`, or `unknown` when that launch had no readable tip. When the conflict
+# probe succeeded at record time, line 2 is `head <sha>`, line 3 `paths <N>`, and lines 4..
+# the N conflicted paths. settle writes it on `conflict` and clears it on every other outcome.
+# pcw_record_conflict_hold <dir> <pr> [tip] [head] [paths, newline-separated]
+pcw_record_conflict_hold() {
+    local tip="${3:-unknown}" head="${4:-}" paths="${5:-}" n
+    if [[ "$tip" =~ ^[0-9a-f]{40}$ && "$head" =~ ^[0-9a-f]{40}$ && -n "$paths" ]]; then
+        n="$(grep -c . <<< "$paths")"
+        _pcw_write "$1/conflict-hold/$2" "$tip"$'\n'"head $head"$'\n'"paths $n"$'\n'"$paths"
+    else
+        _pcw_write "$1/conflict-hold/$2" "$tip"
+    fi
+}
+# pcw_conflict_hold_head <dir> <pr>: print the head recorded with the hold, or nothing.
+pcw_conflict_hold_head() {
+    local f="$1/conflict-hold/$2"
+    [[ -f "$f" ]] && sed -n '2s/^head \([0-9a-f]\{40\}\)$/\1/p' "$f"
+    return 0
+}
+# pcw_conflict_hold_paths <dir> <pr>: print the recorded path set. Returns 1 (prints nothing)
+# when there is none: a legacy one-line hold, or a `paths <N>` count that does not match.
+pcw_conflict_hold_paths() {
+    local f="$1/conflict-hold/$2" n="" body=""
+    [[ -f "$f" ]] || return 1
+    n="$(sed -n '3s/^paths \([0-9][0-9]*\)$/\1/p' "$f")"
+    [[ -n "$n" && "$n" -gt 0 ]] || return 1
+    body="$(sed -n '4,$p' "$f")"
+    [[ "$(grep -c . <<< "$body")" == "$n" ]] || return 1
+    printf '%s\n' "$body"
+}
 pcw_clear_conflict_hold()  { rm -f "$1/conflict-hold/$2"; }
 # retries/<pr> holds "<YYYY-MM-DD> <n>": DIRTY rescue launches for the PR on that local day.
 pcw_today() { date +%F; }
@@ -347,18 +482,24 @@ pcw_bump_retry() {    # <dir> <pr> <day>: writes "<day> <count+1>"
     n=$(( $(pcw_retry_count "$1" "$2" "$3") + 1 ))
     _pcw_write "$1/retries/$2" "$3 $n"
 }
-# pcw_conflict_retry_due <dir> <pr> <tip> <day>: may a retry-capped PR relaunch?
-#   0 = yes: a conflict hold exists, <tip> is 40 hex and differs from the held tip, and the
-#       day's launch count is below PCW_CONFLICT_RETRY_DAILY_CAP
+# pcw_conflict_retry_due <dir> <pr> <tip> <day> [<head>]: may a retry-capped PR relaunch?
+#   0 = yes: a conflict hold exists, <tip> is 40 hex, and either <tip> differs from the held
+#       tip or <head> differs from the head recorded with the hold; and the day's launch
+#       count is below PCW_CONFLICT_RETRY_DAILY_CAP
 #   1 = no conflict hold (today's retry-cap rule applies unchanged)
-#   2 = conflict hold, but <tip> is unreadable or equals the held tip
-#   3 = conflict hold and a new tip, but the daily cap is spent
+#   2 = conflict hold, but <tip> is unreadable, or equals the held tip with the head
+#       unchanged or unrecorded (and always when <head> is omitted)
+#   3 = conflict hold and something new, but the daily cap is spent
+# Only line 1 of the hold is the tip; later lines belong to the probe.
 pcw_conflict_retry_due() {
-    local f="$1/conflict-hold/$2" held=""
+    local f="$1/conflict-hold/$2" held="" rhead=""
     [[ -f "$f" ]] || return 1
     [[ "$3" =~ ^[0-9a-f]{40}$ ]] || return 2
-    held="$(cat "$f")"
-    [[ "$held" != "$3" ]] || return 2
+    held="$(sed -n '1p' "$f")"
+    if [[ "$held" == "$3" ]]; then
+        rhead="$(pcw_conflict_hold_head "$1" "$2")"
+        [[ -n "${5:-}" && -n "$rhead" && "$rhead" != "$5" ]] || return 2
+    fi
     (( $(pcw_retry_count "$1" "$2" "$4") < PCW_CONFLICT_RETRY_DAILY_CAP )) || return 3
     return 0
 }
@@ -371,8 +512,8 @@ _pcw_write() {   # atomic: temp file then rename, so a killed tick never leaves 
 pcw_prune() {
     local dir="$1" open="$2" f
     for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
-             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* \
-             "$dir"/conflict-hold/* "$dir"/retries/*; do
+             "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* "$dir"/dm-probe/* \
+             "$dir"/conflict-hold/* "$dir"/retries/* "$dir"/gate-reruns/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"
     done

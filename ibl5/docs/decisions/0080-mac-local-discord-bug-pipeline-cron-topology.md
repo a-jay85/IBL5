@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-10-05
+last_verified: 2026-10-23
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -208,3 +208,16 @@ The Decision above says the cron reaches the Dockerized MySQL on `127.0.0.1` via
 - PR #2369 (merged 2026-09-25) changed the tracked template. `ibl5/config.php.example` now requires the gitignored `ibl5/config.local.php` for `$dbhost`, `$dbuname`, `$dbpass`, and `$dbname`, with no `getenv()` fallback and no `127.0.0.1` default. The 2026-09-22 addendum of `ibl5/docs/decisions/0034-secret-scanning-gate.md` records the move.
 
 The Mac cron host runs the untracked `ibl5/config.php` in its checkout. That file is migrated by hand and may still be the older shape with `getenv('DB_*')` fallbacks. This addendum does not claim it was migrated. Whichever shape it has, the database the cron reaches is the one that file (or the `config.local.php` it requires) names. The topology decision (launchd, poll-only driver, atomic lease, no prod credentials in the plist) is unchanged.
+
+## Addendum (2026-10-23): a fifth signal for the bug-bot's API key, and the nightly restore preserves local-only tables
+
+The 2026-09-14 addendum says local-only tables survive a prod sync. That held for `bin/db-sync-prod` and missed a second restore path. The nightly launchd job `com.ibl5.db-sync-nightly` runs `ibl5/bin/db-sync-now --from-backup` at 03:20. Its first run was 2026-09-21. It piped the prod backup straight into `ibl5-mariadb` with no preservation, so every run that got past the schema drops deleted `ibl_api_keys` and the four `ibl_bug_*` tables. The bug-bot's key row went with them. The bot kept running and answering HTTP, and the checker stayed healthy, while every report write failed. The last acknowledged report was 2026-09-19. Reports from 2026-09-22 on were lost.
+
+Two changes close it:
+
+- `ibl5/bin/db-sync-now --from-backup` now loads the artifact with `bin/db-sync-prod --snapshot`, which backs up the preserved tables, loads the snapshot, and replays the backup. It fails closed on a probe error or an empty backup. Any nonzero exit writes the BROKEN marker. The job now also runs the `schema_migrations` backfill and the migration replay that snapshot mode performs after a load.
+- `bin/bug-pipeline-check` gains a fifth signal. It counts active `ibl_api_keys` rows whose `owner_name` starts with `bug-bot` and reads no key material. Zero rows reports `botkey:missing` (degraded). A failed or unparseable query reports unknown.
+
+Two gaps stay open. An acknowledgement-age signal was left out because no cheap local source exists: the queue tables are empty after a wipe, and the bot's heartbeat file proves it ticks, which is a different fact from acknowledging reports. A degraded verdict still reaches no one on its own. `bin/launchd-health-check` is the smallest existing route to a Discord DM, and wiring the checker into it is a follow-up.
+
+The migration replay cannot recreate the loss. Migrations 153 and 158 use `CREATE TABLE IF NOT EXISTS` with no drop, and both are recorded as applied on the main DB. The topology decision is unchanged.

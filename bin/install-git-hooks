@@ -21,6 +21,7 @@
 # shared common git dir and would orphan the existing untracked hooks (the git-lfs
 # pre-push, post-merge wt-cleanup, post-checkout). Copying/injecting shims is
 # surgical.
+# It also registers merge.lastverified.driver (bin/lib/merge-last-verified).
 #
 # Idempotent: re-running detects our sentinel markers and rewrites/skips in
 # place; a pre-existing NON-shim pre-push (the default git-lfs one) is backed up
@@ -49,10 +50,13 @@ Installed hooks:
   pre-push      Chains git-lfs then exec's bin/pre-push-adr-hook.
   post-merge    Chains git-lfs then exec's bin/post-merge-hook.
   post-checkout, post-merge, post-rewrite  CSS auto-heal trigger.
+  merge.lastverified  git config merge driver for last_verified-only conflicts.
 EOF
     exit 0
 fi
 
+# shellcheck source=bin/lib/git-helpers.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/git-helpers.sh"
 PRECOMMIT_SENTINEL='# IBL5-PRECOMMIT-HOOK'
 
 HOOKS_DIR="$(git rev-parse --git-common-dir)/hooks"
@@ -175,3 +179,9 @@ inject_css_heal() {
 inject_css_heal post-checkout
 inject_css_heal post-merge
 inject_css_heal post-rewrite
+
+# --- merge.lastverified: git merge driver for last_verified-only conflicts ---
+# Registered in the common .git/config (shared by every worktree); selected per
+# path by `merge=lastverified` in .gitattributes. See bin/lib/merge-last-verified.
+register_last_verified_merge_driver .
+echo "Registered merge.lastverified driver: $(git config --get merge.lastverified.driver 2>/dev/null || echo '(not registered)')"

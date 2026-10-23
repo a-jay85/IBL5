@@ -1,0 +1,446 @@
+#!/usr/bin/env bash
+# Tests for bin/lib/merge-last-verified (the last_verified git merge driver), its
+# registration helper (register_last_verified_merge_driver in bin/lib/git-helpers.sh),
+# bin/install-git-hooks registration, and the scoped merge=lastverified attributes
+# in .gitattributes.
+#
+# Every case runs in a temp repo under $TMP with the REAL .gitattributes copied in,
+# so a mutation to the attribute file or the driver turns cases red. Nothing here
+# touches the real repo's merge state.
+#
+# Usage: bin/test-merge-last-verified [--replay]
+#   (no args)  hermetic temp-repo cases (CI)
+#   --replay   local-only: replay the PR #3262 merge (c11e97f + 78fa4cba) in a
+#              throwaway shared clone; SKIPs loudly when the SHAs are absent.
+#              The default run never executes it: CI's shallow checkout lacks
+#              the SHAs, and synthetic-contract-replay carries the same fixture.
+
+set -uo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+h_tmp TMP
+
+# Hermetic: no user or system git config leaks in.
+export HOME="$TMP/home"
+export GIT_CONFIG_NOSYSTEM=1
+mkdir -p "$HOME"
+
+BIN=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib/git-helpers.sh
+source "$BIN/lib/git-helpers.sh"
+
+DRIVER="$BIN/lib/merge-last-verified"
+REAL_ATTRS="$BIN/../.gitattributes"
+
+MODE=default
+case "${1:-}" in
+    '') ;;
+    --replay) MODE=replay ;;
+    -h|--help)
+        echo "Usage: bin/test-merge-last-verified [--replay]"
+        echo "  (no args)  hermetic temp-repo cases (CI)"
+        echo "  --replay   local-only: replay the PR #3262 merge (c11e97f + 78fa4cba) in a"
+        echo "             throwaway shared clone; SKIPs loudly when the SHAs are absent"
+        exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+esac
+
+# new_repo <dir>: repo on master with the real .gitattributes committed.
+new_repo() {
+    git init -q -b master "$1"
+    git -C "$1" config user.name t
+    git -C "$1" config user.email t@example.com
+    git -C "$1" config commit.gpgsign false
+    cp "$REAL_ATTRS" "$1/.gitattributes"
+    git -C "$1" add .gitattributes
+    git -C "$1" commit -q -m attrs
+}
+
+# register_direct <dir>: point the driver at the worktree copy under test.
+register_direct() {
+    git -C "$1" config merge.lastverified.driver "'$DRIVER' %O %A %B %L %P"
+}
+
+# mk_doc <file> <date> <top> <bottom>: date on line 3, top on line 8, bottom on
+# line 21, so the two body edits sit far apart.
+mk_doc() {
+    {
+        printf -- '---\ndescription: fixture\nlast_verified: %s\n---\n\n# Fixture\n\n' "$2"
+        printf 'top: %s\n' "$3"
+        local i
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            printf 'filler %s\n' "$i"
+        done
+        printf 'bottom: %s\n' "$4"
+        printf 'filler 13\nfiller 14\n'
+    } > "$1"
+}
+
+# strip_nl <file>: drop the final newline.
+strip_nl() {
+    local c
+    c=$(cat "$1")
+    printf '%s' "$c" > "$1"
+}
+
+# three_way_raw <repo> <path> <base-file> <ours-file> <theirs-file>
+# Commits base on master, branches `side`, commits theirs on master, then ours on
+# side, and leaves side checked out. Merging master into side reproduces the
+# post-plan harness shape (`git merge --no-edit origin/master` in the PR worktree:
+# ours = branch, theirs = master).
+three_way_raw() {
+    local repo=$1 path=$2
+    mkdir -p "$repo/$(dirname "$path")"
+    cp "$3" "$repo/$path"
+    git -C "$repo" add "$path"
+    git -C "$repo" commit -q -m base
+    git -C "$repo" branch side
+    cp "$5" "$repo/$path"
+    git -C "$repo" commit -q -am theirs
+    git -C "$repo" checkout -q side
+    cp "$4" "$repo/$path"
+    git -C "$repo" commit -q -am ours
+}
+
+# three_way <repo> <path> "<date> <top> <bottom>" (base) (ours) (theirs)
+# NO_NL=1 strips the final newline from all three versions.
+NO_NL=0
+three_way() {
+    local repo=$1 path=$2 d t b
+    read -r d t b <<<"$3"; mk_doc "$TMP/f.base" "$d" "$t" "$b"
+    read -r d t b <<<"$4"; mk_doc "$TMP/f.ours" "$d" "$t" "$b"
+    read -r d t b <<<"$5"; mk_doc "$TMP/f.theirs" "$d" "$t" "$b"
+    if [ "$NO_NL" = 1 ]; then
+        strip_nl "$TMP/f.base"; strip_nl "$TMP/f.ours"; strip_nl "$TMP/f.theirs"
+    fi
+    three_way_raw "$repo" "$path" "$TMP/f.base" "$TMP/f.ours" "$TMP/f.theirs"
+}
+
+# do_merge <repo>: merge master into the checked-out branch; sets MRC.
+MRC=0
+do_merge() {
+    MRC=0
+    git -C "$1" merge --no-edit master > "$TMP/merge.out" 2> "$TMP/merge.err" || MRC=$?
+}
+
+# ok_if <label> <cmd...>: pass when the command succeeds.
+ok_if() {
+    local label=$1
+    shift
+    if "$@"; then
+        h_pass "$label"
+    else
+        h_fail "$label"
+    fi
+}
+
+has_line() { grep -qxF -- "$2" "$1"; }
+lacks_text() { ! grep -qF -- "$2" "$1"; }
+has_text() { grep -qF -- "$2" "$1"; }
+unmerged() { [ -n "$(git -C "$1" ls-files -u -- "$2")" ]; }
+fresh_path() { printf '%s/%s' "$TMP" "$1"; }
+
+FX=.claude/rules/fx.md
+
+if [ "$MODE" = default ]; then
+
+# --- driver CLI ---
+rc=0
+out=$("$DRIVER" --help 2>/dev/null) || rc=$?
+h_eq "help-exits-0" "0" "$rc"
+h_contains "help-exits-0: usage text" "$out" "Usage:"
+rc=0
+"$DRIVER" onlyone > /dev/null 2>&1 || rc=$?
+h_eq "bad-argc-exits-2" "2" "$rc"
+
+# --- date resolution ---
+R=$(fresh_path r-newer); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+do_merge "$R"
+h_eq "date-only-conflict-takes-newer: rc" "0" "$MRC"
+ok_if "date-only-conflict-takes-newer: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+ok_if "date-only-conflict-takes-newer: no markers" lacks_text "$R/$FX" "<<<<<<<"
+
+R=$(fresh_path r-ours-newer); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-18 base base" "2026-10-15 base base"
+do_merge "$R"
+h_eq "date-only-conflict-ours-newer-kept: rc" "0" "$MRC"
+ok_if "date-only-conflict-ours-newer-kept: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+
+R=$(fresh_path r-disjoint); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 ours base" "2026-10-18 base theirs"
+do_merge "$R"
+h_eq "date-plus-disjoint-body-merges: rc" "0" "$MRC"
+ok_if "date-plus-disjoint-body-merges: ours edit" has_line "$R/$FX" "top: ours"
+ok_if "date-plus-disjoint-body-merges: theirs edit" has_line "$R/$FX" "bottom: theirs"
+ok_if "date-plus-disjoint-body-merges: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+
+R=$(fresh_path r-mixed); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 ours base" "2026-10-18 theirs base"
+do_merge "$R"
+ok_if "mixed-conflict-keeps-markers: rc nonzero" test "$MRC" -ne 0
+ok_if "mixed-conflict-keeps-markers: unmerged" unmerged "$R" "$FX"
+ok_if "mixed-conflict-keeps-markers: markers" has_text "$R/$FX" "<<<<<<<"
+ok_if "mixed-conflict-keeps-markers: original ours date" has_text "$R/$FX" "2026-10-15"
+ok_if "mixed-conflict-keeps-markers: original theirs date" has_text "$R/$FX" "2026-10-18"
+ok_if "mixed-conflict-keeps-markers: ours label" has_text "$R/$FX" "<<<<<<< ours:$FX"
+ok_if "mixed-conflict-keeps-markers: theirs label" has_text "$R/$FX" ">>>>>>> theirs:$FX"
+
+R=$(fresh_path r-oneside); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-14 ours base" "2026-10-18 base base"
+do_merge "$R"
+h_eq "one-side-date-change: rc" "0" "$MRC"
+ok_if "one-side-date-change: ours edit" has_line "$R/$FX" "top: ours"
+ok_if "one-side-date-change: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+
+# Ours edits the body so the driver is invoked (git skips it when a side is
+# unchanged); theirs backdates the field alone.
+R=$(fresh_path r-backdate); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-14 ours base" "2026-10-01 base base"
+do_merge "$R"
+h_eq "one-side-backdate-kept: rc" "0" "$MRC"
+ok_if "one-side-backdate-kept: date" has_line "$R/$FX" "last_verified: 2026-10-01"
+
+# --- body lines and frontmatter scoping ---
+R=$(fresh_path r-bodylv); new_repo "$R"; register_direct "$R"
+mk_doc "$TMP/b.base" 2026-10-14 base base
+mk_doc "$TMP/b.ours" 2026-10-15 base base
+mk_doc "$TMP/b.theirs" 2026-10-18 base base
+for v in base ours theirs; do
+    sed -i.bak '8a\
+last_verified: 2020-01-01' "$TMP/b.$v"
+done
+three_way_raw "$R" "$FX" "$TMP/b.base" "$TMP/b.ours" "$TMP/b.theirs"
+do_merge "$R"
+h_eq "body-last-verified-untouched: rc" "0" "$MRC"
+ok_if "body-last-verified-untouched: frontmatter date" has_line "$R/$FX" "last_verified: 2026-10-18"
+ok_if "body-last-verified-untouched: body line" has_line "$R/$FX" "last_verified: 2020-01-01"
+h_eq "body-last-verified-untouched: first date" "last_verified: 2026-10-18" "$(sed -n 3p "$R/$FX")"
+
+# --- no frontmatter ---
+nofm() {
+    local i
+    for i in $(seq 1 25); do
+        if [ "$i" = "$2" ]; then printf 'line %s %s\n' "$i" "$3"; else printf 'line %s\n' "$i"; fi
+    done > "$1"
+}
+R=$(fresh_path r-nofm); new_repo "$R"; register_direct "$R"
+nofm "$TMP/n.base" 0 x; nofm "$TMP/n.ours" 2 ours; nofm "$TMP/n.theirs" 20 theirs
+three_way_raw "$R" "docs/nofm.md" "$TMP/n.base" "$TMP/n.ours" "$TMP/n.theirs"
+do_merge "$R"
+h_eq "no-frontmatter-clean-merge: rc" "0" "$MRC"
+ok_if "no-frontmatter-clean-merge: ours edit" has_line "$R/docs/nofm.md" "line 2 ours"
+ok_if "no-frontmatter-clean-merge: theirs edit" has_line "$R/docs/nofm.md" "line 20 theirs"
+
+R=$(fresh_path r-nofm-c); new_repo "$R"; register_direct "$R"
+nofm "$TMP/n.base" 0 x; nofm "$TMP/n.ours" 2 ours; nofm "$TMP/n.theirs" 2 theirs
+three_way_raw "$R" "docs/nofm.md" "$TMP/n.base" "$TMP/n.ours" "$TMP/n.theirs"
+do_merge "$R"
+ok_if "no-frontmatter-conflict-markers: rc nonzero" test "$MRC" -ne 0
+ok_if "no-frontmatter-conflict-markers: markers" has_text "$R/docs/nofm.md" "<<<<<<<"
+
+R=$(fresh_path r-nonl); new_repo "$R"; register_direct "$R"
+NO_NL=1
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+NO_NL=0
+do_merge "$R"
+ok_if "no-trailing-newline-falls-back: rc nonzero" test "$MRC" -ne 0
+ok_if "no-trailing-newline-falls-back: markers" has_text "$R/$FX" "<<<<<<<"
+
+# --- degradation: a broken or absent driver is git's plain conflict ---
+degraded() { # <label> <repo>
+    ok_if "$1: rc nonzero" test "$MRC" -ne 0
+    ok_if "$1: unmerged" unmerged "$2" "$FX"
+    ok_if "$1: no fatal" lacks_text "$TMP/merge.err" "fatal:"
+    ok_if "$1: MERGE_HEAD live" test -f "$2/.git/MERGE_HEAD"
+}
+
+R=$(fresh_path r-unreg); new_repo "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+do_merge "$R"
+degraded "unregistered-driver-plain-conflict" "$R"
+rc=0
+git -C "$R" merge --abort > /dev/null 2>&1 || rc=$?
+h_eq "unregistered-driver-plain-conflict: abort rc" "0" "$rc"
+
+R=$(fresh_path r-missing); new_repo "$R"
+register_last_verified_merge_driver "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+do_merge "$R"
+degraded "missing-driver-degrades" "$R"
+ok_if "missing-driver-degrades: fallback wrote markers" has_text "$R/$FX" "<<<<<<< ours:$FX"
+rc=0
+git -C "$R" merge --abort > /dev/null 2>&1 || rc=$?
+h_eq "missing-driver-degrades: abort rc" "0" "$rc"
+
+R=$(fresh_path r-nonexec); new_repo "$R"
+mkdir -p "$R/bin/lib"
+cp "$DRIVER" "$R/bin/lib/merge-last-verified"
+chmod 644 "$R/bin/lib/merge-last-verified"
+register_last_verified_merge_driver "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+do_merge "$R"
+ok_if "nonexec-driver-degrades: rc nonzero" test "$MRC" -ne 0
+ok_if "nonexec-driver-degrades: unmerged" unmerged "$R" "$FX"
+ok_if "nonexec-driver-degrades: no fatal" lacks_text "$TMP/merge.err" "fatal:"
+ok_if "nonexec-driver-degrades: fallback wrote markers" has_text "$R/$FX" "<<<<<<< ours:$FX"
+
+# --- other git entry points ---
+R=$(fresh_path r-mtree); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+rc=0
+git -C "$R" merge-tree --write-tree side master > "$TMP/mt.out" 2> "$TMP/mt.err" || rc=$?
+h_eq "merge-tree-honors-driver: rc" "0" "$rc"
+IFS= read -r tree < "$TMP/mt.out"
+git -C "$R" cat-file -p "$tree:$FX" > "$TMP/mt.file" 2>/dev/null
+ok_if "merge-tree-honors-driver: date" has_line "$TMP/mt.file" "last_verified: 2026-10-18"
+
+R=$(fresh_path r-rebase); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
+rc=0
+git -C "$R" rebase master > "$TMP/rb.out" 2>&1 || rc=$?
+h_eq "rebase-honors-driver: rc" "0" "$rc"
+ok_if "rebase-honors-driver: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+
+R=$(fresh_path r-attr); new_repo "$R"
+ok_if "check-attr-union-wins: adr index" \
+    test "$(git -C "$R" check-attr merge -- ibl5/docs/decisions/README.md | awk '{print $NF}')" = union
+ok_if "check-attr-union-wins: rules doc" \
+    test "$(git -C "$R" check-attr merge -- "$FX" | awk '{print $NF}')" = lastverified
+
+# --- registration helper ---
+R=$(fresh_path r-helper); new_repo "$R"
+# Mirrors `want` in register_last_verified_merge_driver (bin/lib/git-helpers.sh): exact match, so a wrong prefix or path fails.
+want_wrap='test -x "$0" && exec "$0" "$@" || exec git merge-file --marker-size="$4" -L "ours:$5" -L "base:$5" -L "theirs:$5" "$2" "$1" "$3"'
+want="sh -c '$want_wrap' '$(main_checkout_root "$R")/bin/lib/merge-last-verified' %O %A %B %L %P"
+register_last_verified_merge_driver "$R"
+register_last_verified_merge_driver "$R"
+git -C "$R" config --get-all merge.lastverified.driver > "$TMP/helper.vals"
+h_eq "helper-registers-once: count" "1" "$(wc -l < "$TMP/helper.vals" | tr -d ' ')"
+IFS= read -r got < "$TMP/helper.vals"
+h_eq "helper-registers-once: value" "$want" "$got"
+
+R=$(fresh_path r-stale); new_repo "$R"
+git -C "$R" config merge.lastverified.driver "'/old/path' %O %A %B"
+register_last_verified_merge_driver "$R"
+h_eq "helper-heals-stale-value" "$(main_checkout_root "$R")" \
+    "$(git -C "$R" config --get merge.lastverified.driver | sed "s#.* '##; s#/bin/lib/merge-last-verified' %O %A %B %L %P\$##")"
+
+NR=$(fresh_path not-a-repo); mkdir -p "$NR"
+rc=0
+err=$(register_last_verified_merge_driver "$NR" 2>&1 > /dev/null) || rc=$?
+h_eq "helper-non-repo-noop: rc" "0" "$rc"
+h_eq "helper-non-repo-noop: stderr empty" "" "$err"
+ok_if "helper-non-repo-noop: no .git" test ! -e "$NR/.git"
+
+R=$(fresh_path r-install); new_repo "$R"
+rc1=0; rc2=0
+( cd "$R" && "$BIN/install-git-hooks" > /dev/null 2>&1 ) || rc1=$?
+( cd "$R" && "$BIN/install-git-hooks" > /dev/null 2>&1 ) || rc2=$?
+h_eq "install-git-hooks-registers-once: first rc" "0" "$rc1"
+h_eq "install-git-hooks-registers-once: second rc" "0" "$rc2"
+git -C "$R" config --get-all merge.lastverified.driver > "$TMP/install.vals"
+h_eq "install-git-hooks-registers-once: count" "1" "$(wc -l < "$TMP/install.vals" | tr -d ' ')"
+ok_if "install-git-hooks-registers-once: value" has_text "$TMP/install.vals" "bin/lib/merge-last-verified' %O %A %B %L %P"
+
+# --- hostile environment ---
+mk_doc "$TMP/e.o" 2026-10-14 base base
+mk_doc "$TMP/e.a" 2026-10-15 base base
+mk_doc "$TMP/e.b" 2026-10-18 base base
+rc=0
+env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; "$1" "$2" "$3" "$4" 7 x' _ \
+    "$DRIVER" "$TMP/e.o" "$TMP/e.a" "$TMP/e.b" > /dev/null 2>&1 || rc=$?
+h_eq "empty-env-driver: rc" "0" "$rc"
+ok_if "empty-env-driver: date" has_line "$TMP/e.a" "last_verified: 2026-10-18"
+
+# --- PR #3262 shape: two contract docs, linked worktree, common-config registration only ---
+MAIN=$(fresh_path r-contract); new_repo "$MAIN"
+C1=.claude/skills/plan/_architect-contract.md
+C2=.claude/skills/plan/_architect-contract-detail.md
+mkdir -p "$MAIN/.claude/skills/plan" "$MAIN/bin/lib"
+mk_doc "$MAIN/$C1" 2026-10-14 base base
+mk_doc "$MAIN/$C2" 2026-10-14 base base
+git -C "$MAIN" add .claude
+git -C "$MAIN" commit -q -m base
+cp "$DRIVER" "$MAIN/bin/lib/merge-last-verified"
+chmod 755 "$MAIN/bin/lib/merge-last-verified"
+register_last_verified_merge_driver "$MAIN"
+WT=$(fresh_path r-contract-wt)
+git -C "$MAIN" worktree add -q "$WT" -b feat
+mk_doc "$WT/$C1" 2026-10-15 ours base
+mk_doc "$WT/$C2" 2026-10-15 ours base
+git -C "$WT" commit -q -am feat
+mk_doc "$MAIN/$C1" 2026-10-18 base theirs
+mk_doc "$MAIN/$C2" 2026-10-18 base theirs
+git -C "$MAIN" commit -q -am master-bump
+rc=0
+git -C "$WT" merge --no-edit master > "$TMP/wt.out" 2> "$TMP/wt.err" || rc=$?
+h_eq "synthetic-contract-replay: rc" "0" "$rc"
+for f in "$C1" "$C2"; do
+    ok_if "synthetic-contract-replay: date $f" has_line "$WT/$f" "last_verified: 2026-10-18"
+    ok_if "synthetic-contract-replay: top $f" has_line "$WT/$f" "top: ours"
+    ok_if "synthetic-contract-replay: bottom $f" has_line "$WT/$f" "bottom: theirs"
+    ok_if "synthetic-contract-replay: no markers $f" lacks_text "$WT/$f" "<<<<<<<"
+done
+
+fi
+
+if [ "$MODE" = replay ]; then
+
+BR=c11e97f
+MS=78fa4cba8d0033c877021323542179eb5e94754a
+SRC=$(main_checkout_root "$BIN")
+F1=.claude/skills/plan/_architect-contract-detail.md
+F2=.claude/skills/plan/_architect-contract.md
+if ! git -C "$SRC" cat-file -e "$BR^{commit}" 2>/dev/null \
+    || ! git -C "$SRC" cat-file -e "$MS^{commit}" 2>/dev/null; then
+    echo "SKIP: replay SHAs $BR / $MS absent from $SRC (gc'd or shallow); the synthetic-contract-replay case covers this fixture" >&2
+    # shellcheck disable=SC2034  # read by h_done in harness.sh
+    H_SKIP_OK=1
+    h_skip "real-sha-replay"
+else
+    R="$TMP/replay"
+    git clone -q --shared --no-checkout "$SRC" "$R"
+    # Unreachable-from-refs SHAs need the source object store; do not rely on
+    # clone --shared having written the alternates file.
+    mkdir -p "$R/.git/objects/info"
+    printf '%s\n' "$(cd "$SRC" && cd "$(git rev-parse --git-common-dir)" && pwd -P)/objects" \
+        >> "$R/.git/objects/info/alternates"
+    BR=$(git -C "$SRC" rev-parse "$BR^{commit}")
+    MS=$(git -C "$SRC" rev-parse "$MS^{commit}")
+    git -C "$R" config user.name t
+    git -C "$R" config user.email t@example.com
+    # The c11e97f tree predates the new attributes, so inject the worktree's
+    # .gitattributes at info/attributes (same file, ordering preserved).
+    mkdir -p "$R/.git/info"
+    cp "$REAL_ATTRS" "$R/.git/info/attributes"
+    # Characterization: without the driver the fixture is still a real conflict
+    # in exactly F1 and F2. If this goes red, the fixture rotted; fix it, do not
+    # weaken the assertion.
+    rc=0
+    git -C "$R" merge-tree --write-tree --name-only --no-messages "$BR" "$MS" \
+        > "$TMP/mt-plain" || rc=$?
+    h_eq "replay-plain-conflicts" "1 $F1 $F2" \
+        "$rc $(sed 1d "$TMP/mt-plain" | LC_ALL=C sort -u | tr '\n' ' ' | sed 's/ $//')"
+    register_direct "$R"
+    rc=0
+    git -C "$R" merge-tree --write-tree "$BR" "$MS" > "$TMP/mt-drv" || rc=$?
+    h_eq "replay-merge-tree-clean" "0" "$rc"
+    git -C "$R" checkout -q --detach "$BR"
+    rc=0
+    git -C "$R" merge --no-edit "$MS" > "$TMP/replay-merge.log" 2>&1 || rc=$?
+    h_eq "replay-merge-clean" "0" "$rc"
+    for f in "$F1" "$F2"; do
+        if grep -qx 'last_verified: 2026-10-18' "$R/$f"; then
+            h_pass "replay-date $f"
+        else
+            h_fail "replay-date $f" "want last_verified: 2026-10-18"
+        fi
+    done
+fi
+
+fi
+
+h_done

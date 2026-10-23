@@ -94,6 +94,19 @@ function collectRecentThemes(\SimRecap\SimSummaryRepository $repo): array
 }
 
 /**
+ * The canonical host from prod-side config, never from argv (mirrors
+ * scripts/storeSimRecap.php). A real host makes Discord's isProduction() true,
+ * so status lines reach #admin-chat; '' (CI, dev) keeps them on the testing
+ * webhook. Without this init every status line went to the testing webhook.
+ */
+function canonicalHost(): string
+{
+    $raw = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
+
+    return is_string($raw) ? $raw : '';
+}
+
+/**
  * Post the #admin-chat line for a state change, at most once per sim and state.
  *
  * Returns 'unchanged' when the state is the same as last time or another host
@@ -112,8 +125,12 @@ function postStatus(\SimRecap\SimSummaryRepository $repo, int $sim, string $host
     }
     $row = $repo->find($sim);
     $context = ['last_cause' => $row['last_cause'] ?? null, 'blocked_until' => $row['blocked_until'] ?? null];
+    $canonical = canonicalHost();
+    $viewerUrl = $canonical === ''
+        ? \SimRecap\SimSummaryLink::path($sim)
+        : \SimRecap\SimSummaryLink::absolute($sim, $canonical);
     try {
-        \Discord\Discord::postToChannel('admin-chat', \SimRecap\AdminChatStatus::message($next, $sim, $context, $host));
+        \Discord\Discord::postToChannel('admin-chat', \SimRecap\AdminChatStatus::message($next, $sim, $context, $host, $viewerUrl));
     } catch (\Throwable $e) {
         $repo->revertNotifiedState($sim, $next, $prior);
         fwrite(STDERR, 'simRecapQueue: admin-chat post failed (' . get_class($e) . ")\n");
@@ -204,6 +221,7 @@ if ($verb === 'notify') {
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
+\Discord\Discord::init(canonicalHost());
 $repo = new \SimRecap\SimSummaryRepository($db);
 $seasonQuery = new \Season\SeasonQueryRepository($db);
 

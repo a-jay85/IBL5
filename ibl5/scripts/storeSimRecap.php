@@ -120,21 +120,16 @@ if ($row === null || $row['status'] !== 'done') {
 }
 
 // ── Resolve the canonical host (prod-side config only, never from argv) ───────
-// One value feeds both jobs below. A real bare hostname makes Discord's
-// isProduction() true so the post routes to #admin-chat; an empty host — CI,
-// dev, any machine without the constant — leaves it on the testing webhook and
-// keeps the link relative. Empty is the safe default, never an error.
+// An empty host (CI, dev, any machine without the constant) keeps the link
+// relative. Empty is the safe default, never an error. The #admin-chat line
+// with this link comes from `simRecapQueue.php notify --event=done`, which the
+// tick calls right after a store; posting here too sent the commissioner two.
 $rawHost = defined('IBL5_CANONICAL_HOST') ? constant('IBL5_CANONICAL_HOST') : '';
 $host = is_string($rawHost) ? $rawHost : '';
-
-\Discord\Discord::init($host);
 
 $viewerUrl = $host === ''
     ? \SimRecap\SimSummaryLink::path($sim)
     : \SimRecap\SimSummaryLink::absolute($sim, $host);
-
-// ── Post to Discord, only after a confirmed write ─────────────────────────────
-\Discord\Discord::postToChannel('#admin-chat', "Sim {$sim} recap is ready for review: {$viewerUrl}");
 
 // ── Success output ────────────────────────────────────────────────────────────
 echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($games), 'url' => $viewerUrl]), "\n";

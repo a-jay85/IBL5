@@ -8,6 +8,10 @@ use Player\CareerArc\Contracts\CareerArcRepositoryInterface;
 
 /**
  * Assembles the immutable CareerArc from the repository rows. No SQL, no HTML.
+ *
+ * @phpstan-type SeasonRow array{year:int, teamid:int, team:string, games:int, pts:int, age:int,
+ *   r_oo:int, r_drive_off:int, r_po:int, r_trans_off:int, r_od:int, r_dd:int, r_pd:int, r_td:int}
+ * @phpstan-type PlayerFacts array{name:string, draftyear:int, draftround:int, draftpickno:int, draftedby:string}
  */
 class CareerArcService
 {
@@ -37,10 +41,50 @@ class CareerArcService
             return null;
         }
 
+        $seasonsByYear = self::buildSeasonsByYear($rows);
+        $stints = self::buildStints($rows);
+
+        $years = array_keys($seasonsByYear);
+        $firstSeason = min($years);
+        $lastSeason = max($years);
+
+        $facts = $this->repository->getPlayerFacts($pid);
+        $name = $facts !== null ? $facts['name'] : '';
+
+        [$axisStart, $draftEvents] = self::buildDraft($facts, $firstSeason);
+        [$axisEnd, $moveEvents] = $this->buildMoveEvents($pid, $axisStart, $lastSeason);
+        [$awardsHidden, $awardEvents] = $this->buildAwardEvents($name, $firstSeason, $lastSeason);
+
+        $events = [...$draftEvents, ...$moveEvents, ...$awardEvents];
+        if ($isRetired) {
+            $events[] = new ArcEvent(ArcEvent::RETIRED, $lastSeason, 'Retired after the ' . $lastSeason . ' season');
+        }
+        $events = self::sortEvents($events);
+
+        [$bestPpgYear, $bestRatingYear] = self::findBestYears($seasonsByYear);
+        $labels = $this->labeler->labelsFor($seasonsByYear, $bestPpgYear);
+
+        return new CareerArc(
+            $axisStart,
+            $axisEnd,
+            $seasonsByYear,
+            array_values($stints),
+            $events,
+            $bestPpgYear,
+            $bestRatingYear,
+            $awardsHidden,
+            $labels,
+        );
+    }
+
+    /**
+     * @param non-empty-list<SeasonRow> $rows
+     * @return non-empty-array<int, ArcSeason> keyed by year; a repeated year overwrites the earlier row
+     */
+    private static function buildSeasonsByYear(array $rows): array
+    {
         /** @var array<int, ArcSeason> $seasonsByYear */
         $seasonsByYear = [];
-        /** @var list<ArcStint> $stints */
-        $stints = [];
         foreach ($rows as $row) {
             $seasonsByYear[$row['year']] = new ArcSeason(
                 $row['year'],
@@ -59,7 +103,22 @@ class CareerArcService
                 ]),
                 $row['age'],
             );
+        }
 
+        return $seasonsByYear;
+    }
+
+    /**
+     * Consecutive rows on the same teamid merge into one stint, regardless of year gaps.
+     *
+     * @param non-empty-list<SeasonRow> $rows
+     * @return array<int, ArcStint> in row order; build() re-lists it with array_values
+     */
+    private static function buildStints(array $rows): array
+    {
+        /** @var list<ArcStint> $stints */
+        $stints = [];
+        foreach ($rows as $row) {
             $lastIndex = count($stints) - 1;
             if ($lastIndex >= 0 && $stints[$lastIndex]->teamid === $row['teamid']) {
                 $previous = $stints[$lastIndex];
@@ -69,13 +128,15 @@ class CareerArcService
             }
         }
 
-        $years = array_keys($seasonsByYear);
-        $firstSeason = min($years);
-        $lastSeason = max($years);
+        return $stints;
+    }
 
-        $facts = $this->repository->getPlayerFacts($pid);
-        $name = $facts !== null ? $facts['name'] : '';
-
+    /**
+     * @param PlayerFacts|null $facts
+     * @return array{int, list<ArcEvent>} axis start, then zero or one draft event
+     */
+    private static function buildDraft(?array $facts, int $firstSeason): array
+    {
         /** @var list<ArcEvent> $events */
         $events = [];
 
@@ -88,6 +149,19 @@ class CareerArcService
             }
             $events[] = new ArcEvent(ArcEvent::DRAFT, max($facts['draftyear'], $axisStart), $draftText);
         }
+
+        return [$axisStart, $events];
+    }
+
+    /**
+     * Trade and waiver events inside [axisStart, lastSeason + 1]; only those moves extend the axis end.
+     *
+     * @return array{int, list<ArcEvent>} axis end, then the move events in repository order
+     */
+    private function buildMoveEvents(int $pid, int $axisStart, int $lastSeason): array
+    {
+        /** @var list<ArcEvent> $events */
+        $events = [];
 
         $axisEnd = $lastSeason;
         foreach ($this->repository->getMoves($pid) as $move) {
@@ -114,6 +188,19 @@ class CareerArcService
             );
         }
 
+        return [$axisEnd, $events];
+    }
+
+    /**
+     * Awards inside [firstSeason, lastSeason], grouped per year. A null lookup hides awards.
+     *
+     * @return array{bool, list<ArcEvent>} awards-hidden flag, then the award events
+     */
+    private function buildAwardEvents(string $name, int $firstSeason, int $lastSeason): array
+    {
+        /** @var list<ArcEvent> $events */
+        $events = [];
+
         $awardsHidden = false;
         if ($name !== '') {
             $awards = $this->repository->getAwardsForUniqueName($name);
@@ -134,16 +221,34 @@ class CareerArcService
             }
         }
 
-        if ($isRetired) {
-            $events[] = new ArcEvent(ArcEvent::RETIRED, $lastSeason, 'Retired after the ' . $lastSeason . ' season');
-        }
+        return [$awardsHidden, $events];
+    }
 
+    /**
+     * Year first, then EVENT_ORDER. usort is stable, so same-year same-type events keep their input order.
+     *
+     * @param list<ArcEvent> $events
+     * @return list<ArcEvent>
+     */
+    private static function sortEvents(array $events): array
+    {
         usort(
             $events,
             static fn (ArcEvent $a, ArcEvent $b): int => [$a->year, self::EVENT_ORDER[$a->type] ?? 99]
                 <=> [$b->year, self::EVENT_ORDER[$b->type] ?? 99],
         );
 
+        return $events;
+    }
+
+    /**
+     * Strict `>` keeps the earliest year on a tie.
+     *
+     * @param array<int, ArcSeason> $seasonsByYear
+     * @return array{?int, ?int} best PPG year, then best rating year
+     */
+    private static function findBestYears(array $seasonsByYear): array
+    {
         $bestPpgYear = null;
         $bestPpg = null;
         $bestRatingYear = null;
@@ -159,19 +264,7 @@ class CareerArcService
             }
         }
 
-        $labels = $this->labeler->labelsFor($seasonsByYear, $bestPpgYear);
-
-        return new CareerArc(
-            $axisStart,
-            $axisEnd,
-            $seasonsByYear,
-            array_values($stints),
-            $events,
-            $bestPpgYear,
-            $bestRatingYear,
-            $awardsHidden,
-            $labels,
-        );
+        return [$bestPpgYear, $bestRatingYear];
     }
 
     /**

@@ -1,4 +1,5 @@
 -- Migration 198 — bug-pipeline operator-mention wake.
+-- rollback-incompatible: production's BugPipelineSchemaTest pins the exact ibl_bug_reports.status enum set, so the appended 'dormant' value fails it; pre-PR PHP never reads or writes 'dormant', and on rollback the backfilled dormant rows just wait unclaimed
 -- Adds the 'dormant' status (a GM post waits there until the operator @mentions the
 -- bot in its thread), the operator-context log table the wake endpoint appends to,
 -- and a one-time backfill that parks never-picked-up rows.

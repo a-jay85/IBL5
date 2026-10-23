@@ -116,7 +116,7 @@ blocked_ship_block() {
 
 # shq <string> — single-quote <string> for the FAR side of the launchd boundary.
 # Everything this script assembles into $CMD is parsed by a shell a SECOND time, when
-# launchd runs `/bin/bash -lc "$CMD"`. Embedding a variable there in DOUBLE quotes leaves
+# bash runs "$CMD" (from the $SCRIPT file, or `/bin/bash -lc` in --foreground). Embedding a variable there in DOUBLE quotes leaves
 # `…`, $(…), $VAR and \ live at that second parse. That is not theoretical: the prompt's
 # literal backticks around <slug>-N.md fired as command substitution in every plan-blind
 # run, bash logged `line 10: slug: No such file or directory`, and the backticked span was
@@ -881,8 +881,8 @@ if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"
     echo "post-plan-now: plan: $PLAN_FILE"
     # exec, not a call: `timeout` signals the whole process group, and a surviving
-    # wrapper shell would outlive the SIGTERM its child just took. `/bin/bash -lc`
-    # matches the ljob_submit wrapper so both modes parse $CMD identically.
+    # wrapper shell would outlive the SIGTERM its child just took. The launchd form
+    # runs $CMD from the $SCRIPT file (#!/bin/bash); both parse it as one bash script.
     exec /bin/bash -lc "$CMD"
 fi
 

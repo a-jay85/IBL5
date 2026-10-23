@@ -60,14 +60,14 @@ class LeagueConfigView
         }
 
         $html = '<div role="alert" class="d-alert d-alert-warning mb-4">'
-            . '<strong>League config cross-check warnings:</strong><ul>';
+            . '<div><strong>League config cross-check warnings:</strong><ul class="list-disc pl-5">';
 
         foreach ($discrepancies as $msg) {
             $msgEscaped = \Security\HtmlSanitizer::safeHtmlOutput($msg);
             $html .= '<li>' . $msgEscaped . '</li>';
         }
 
-        $html .= '</ul></div>';
+        $html .= '</ul></div></div>';
 
         return $html;
     }

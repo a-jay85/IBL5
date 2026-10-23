@@ -90,7 +90,7 @@ final class LeagueConfigViewTest extends TestCase
     {
         $output = $this->view->renderCrossCheckResults(['Team count mismatch', 'Salary cap differs']);
 
-        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-warning mb-4"><strong>League config cross-check warnings:</strong><ul>', $output);
+        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-warning mb-4"><div><strong>League config cross-check warnings:</strong><ul class="list-disc pl-5">', $output);
         $this->assertStringContainsString('<li>Team count mismatch</li>', $output);
         $this->assertStringContainsString('<li>Salary cap differs</li>', $output);
     }

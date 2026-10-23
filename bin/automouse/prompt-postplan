@@ -61,7 +61,7 @@ For either success outcome:
 1. Dispose the plan to done/ (pass the bare plan filename; never `mv` the
    NNN- queue entry yourself, since its prefix is run-order state):
    ```bash
-   bin/automouse/queue dispose "<plan-filename>" done
+   /Users/ajaynicolas/GitHub/IBL5/bin/automouse/queue dispose "<plan-filename>" done
    # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
    touch -h "$NIGHTLY_DIR/done/<plan-filename>"
    ```
@@ -95,7 +95,7 @@ If ANY step fails:
 1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md
 2. Dispose the plan to $NIGHTLY_DIR/skipped/ (not done/; never a raw `mv`):
    ```bash
-   bin/automouse/queue dispose "<plan-filename>" skipped
+   /Users/ajaynicolas/GitHub/IBL5/bin/automouse/queue dispose "<plan-filename>" skipped
    # Stamp the disposition time: the morning digest selects entries by the entry's own mtime.
    touch -h "$NIGHTLY_DIR/skipped/<plan-filename>"
    ```

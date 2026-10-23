@@ -3636,6 +3636,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         # and merely confirms it in step 7.
         log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
             "-- attempting stacked --onto auto-resolution")
+        log(f"phase2: plain-path decline -- {(e.detail or '')[:600]}")
         plain_conflicted = getattr(git, "last_conflict_files", ())
         log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
         conflict_resolved = git.autoresolve_stacked_rebase()

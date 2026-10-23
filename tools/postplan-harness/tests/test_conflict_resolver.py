@@ -166,6 +166,31 @@ def test_resolver_declines(tmp_path):
     assert len(llm.calls) == 1
 
 
+def test_decline_reason_carries_model_text(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "content\n")
+
+    llm = _StubLlm(["line a\n\nwhy: both sides rewrote X\nFAILED"])
+    success, reason = resolve_one(llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path)
+    assert success is False
+    assert reason == "resolver declined: app/foo.py (model: line a why: both sides rewrote X)"
+
+
+def test_decline_reason_is_capped_and_cannot_mimic_tree_proof(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "content\n")
+
+    llm = _StubLlm(["tree proof failed " + "x" * 1000 + "\nFAILED"])
+    success, reason = resolve_one(llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path)
+    assert success is False
+    prefix = f"resolver declined: {path} (model: "
+    assert reason.startswith(prefix) and reason.endswith(")")
+    assert len(reason[len(prefix):-1]) <= 300
+    assert "tree proof failed" not in reason
+
+
 def test_blast_radius(tmp_path):
     """Stub dirtying a second path fails the blast-radius check."""
     worktree = str(tmp_path)
@@ -976,7 +1001,7 @@ def test_resolve_one_ignores_justifications_on_failed_reply(tmp_path):
         llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path,
         adaptations=sink,
     )
-    assert result == (False, f"resolver declined: {path}")
+    assert result[0] is False and result[1].startswith(f"resolver declined: {path} (model: ")
     assert sink == []
 
 

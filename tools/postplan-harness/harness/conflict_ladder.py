@@ -42,6 +42,7 @@ class LadderContext:
     trail: tuple[str, ...] = ()
     state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
     extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
+    expected_parents: tuple[str, ...] = ()   # () = merge pair (pre_rebase_sha, master_sha); the stacked path passes HEAD's parents
 
 
 @dataclass(frozen=True)
@@ -103,7 +104,8 @@ def _parents(ctx: LadderContext) -> list[str]:
 
 def _parents_reason(ctx: LadderContext) -> str:
     parents = _parents(ctx)
-    if parents != [ctx.pre_rebase_sha, ctx.master_sha]:
+    want = list(ctx.expected_parents) or [ctx.pre_rebase_sha, ctx.master_sha]
+    if parents != want:
         return f"merge parents changed: {parents!r}"
     return ""
 

@@ -171,6 +171,17 @@ def test_tree_proof_label_makes_no_seam_calls():
     assert git.calls == [] and gh.calls == []
 
 
+def test_model_decline_reason_is_not_tree_proof():
+    from harness.conflict import _decline_reason
+
+    def boom(*a, **kw):
+        raise RuntimeError("seam down")
+
+    got = classify_rebase_block(("a.md",), _decline_reason("a.md", "tree proof failed here\nFAILED"),
+                                head_sha="h", branch="feature", run_git=boom, run_gh=boom)
+    assert got.cause != CAUSE_TREE_PROOF
+
+
 def test_gh_failure_keeps_git_classification(tmp_path):
     wt, head = _world(tmp_path, [("sib", 101)])
     got = _classify(wt, head, gh=_FakeGh(rc=1, out=""))

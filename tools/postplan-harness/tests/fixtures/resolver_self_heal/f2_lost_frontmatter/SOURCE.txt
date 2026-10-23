@@ -1,0 +1,11 @@
+shape: F2 resolver drops the branch's frontmatter description (tree proof LOST)
+path: .claude/skills/post-plan/_pr-body-claims.md
+branch tip: b5beea607cfc5aa6b1ebf0b3ad457f2c89a14cdc  (git rev-parse 'must-preserve-impl-self-review@{2026-10-22 08:32:00}'; reflog entry present)
+NOTE: the packet required the tip to contain 8427e20851; it does not. 8427e20851 is the 09:51 PDT post-rebase rewrite of this branch, made AFTER the 08:33 failure, and its merge-base with master 440daf063a is 440daf063a itself (no conflict possible). The pre-failure reflog tip b5beea607c is the faithful source, so the 8427e20851 fallback was not used.
+master: 440daf063a7381ba0ea656e41ebe8e01797e5a10  (git rev-list -1 --before='2026-10-22 08:33:00' origin/master)
+merge-base(tip, master): 4c8326d19a769491a145f99fb916cb0f8bc73f46
+base.txt: git show 4c8326d19a769491a145f99fb916cb0f8bc73f46:.claude/skills/post-plan/_pr-body-claims.md
+master.txt: git show 440daf063a7381ba0ea656e41ebe8e01797e5a10:.claude/skills/post-plan/_pr-body-claims.md
+branch.txt: git show b5beea607cfc5aa6b1ebf0b3ad457f2c89a14cdc:.claude/skills/post-plan/_pr-body-claims.md
+resolved.txt: git merge-file -p --ours branch.txt base.txt master.txt (the one conflict is the frontmatter description:/last_verified: pair; the branch's pair is kept). The real lostwork.sh accepts it.
+bad.txt: resolved.txt with the branch description: line replaced by master's description: line

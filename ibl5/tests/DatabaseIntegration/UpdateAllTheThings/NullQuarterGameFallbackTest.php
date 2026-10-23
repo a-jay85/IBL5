@@ -348,7 +348,7 @@ final class NullQuarterGameFallbackTest extends DatabaseTestCase
         return (int) $row['c'];
     }
 
-    private function singleName(string $sql, int $year): ?string
+    private function singleName(string $sql, int $year): string
     {
         $stmt = $this->db->prepare($sql);
         self::assertNotFalse($stmt, 'Failed to prepare name query: ' . $this->db->error);

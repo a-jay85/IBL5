@@ -1,6 +1,6 @@
 ---
 description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation; MentionMapBuilder builds the Discord mention map for the queue script.
-last_verified: 2026-10-14
+last_verified: 2026-10-22
 ---
 
 # SimRecap
@@ -13,10 +13,32 @@ Handles the ingest of externally-generated simulation recap documents into the a
 | `SimRecapPayload` | Parses and validates incoming recap documents |
 | `SimSummaryRepository` | Atomic queue operations, plus the write-time box-score join validation |
 | `SimSummariesView` | Renders sim recap summaries |
-| `RecapDocument` | Assembles the postable document from intro + game rows + outro, shaped like `bin/lib/sim-recap-exemplar.txt`; prefers the stored text when the parts are degraded or incomplete |
+| `RecapDocument` | Assembles the postable document from the game rows, shaped like `bin/lib/sim-recap-exemplar.txt`. Appends each game's links footer: the box score, then the visitor and home team pages, on the production host, angle-bracketed. Prefers the stored text when the parts are degraded or incomplete |
+| `WikipediaLinkPolicy` | State-free check that rejects any URL in generator prose except `[text](<https://en.wikipedia.org/wiki/…>)` |
 | `SimRecapContextRepository` | Precomputes current rosters, active injuries, and in-window trades for a sim |
 | `GitHubDispatchClient` | Posts a `repository_dispatch` of type `sim-recap` to GitHub; `fromConfig()` returns null when the config file or token is missing, and `dispatch()` never throws |
 | `MentionMapBuilder` | Builds the team name to Discord snowflake map for the `simRecapQueue.php mention-map` verb; ids leave as strings and teams with no id are omitted. State-free: its only collaborator is `TeamIdentityRepositoryInterface` |
+
+## Links and the Discord block cap
+
+Each game is posted to Discord as one block:
+
+```
+**Celtics 100 @ Heat 114**
+<@111> · <@222>
+
+Prose.
+
+<https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-02-26&game=3>
+[Celtics](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=7>)
+[Heat](<https://iblhoops.net/ibl5/modules.php?name=Team&op=team&teamid=12>)
+```
+
+Code adds the last three lines at read time. The generator never writes them. The angle brackets stop Discord from showing a preview card.
+
+`SimRecapPayload::fromJson()` renders each game through `RecapDocument::gameBlock()` and rejects the payload when a block runs over `MAX_BLOCK_CHARS` (1,900). It also runs `WikipediaLinkPolicy` on the prose. On a rejection, `ibl5/scripts/storeSimRecap.php` prints `{"ok":false,"error":...}` on STDOUT and exits 1, so `bin/sim-recap-tick` parks the sim `flaky`.
+
+`intro_text` and `outro_text` stay as columns and keep their old data. They are no longer generated or rendered. New rows store `''`.
 
 ## Dispatch and hosts
 

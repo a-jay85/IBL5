@@ -1013,11 +1013,11 @@ if ($localClassesDir !== false) {
         if (file_exists($path)) {
             require_once $path;
         }
-    });
+    }, true, true); // prepend: a worktree's vendor/ may autoload the main checkout's classes
 }
 $json = (string) stream_get_contents(STDIN);
 try {
-    \SimRecap\SimRecapPayload::fromJson($json);
+    \SimRecap\SimRecapPayload::fromJson($json, ''); // '' = production host, as storeSimRecap.php does
     exit(0);
 } catch (Throwable $e) {
     fwrite(STDERR, 'error: ' . $e->getMessage() . PHP_EOL);
@@ -2249,6 +2249,57 @@ wf_stray_hits=$(srt_workflow_hygiene "$STUB/wf-stray.yml" 2>&1 \
 wf_committed_hits=$(srt_workflow_hygiene "$SRT_WORKFLOW" 2>&1 | grep -c 'secret-gating:' || true)
 srt_expect_eq "SMOKE-DONE: stray ungated step yields one secret-gating: line" 1 "$wf_stray_hits"
 srt_expect_eq "SMOKE-DONE: committed file yields zero secret-gating: lines" 0 "$wf_committed_hits"
+
+# ── store_rejects_overlong_block_parks_flaky ──────────────────────────────────
+# storeSimRecap.php's reject() prints this line on STDOUT (pinned by
+# StoreSimRecapCliTest). A non-empty answer is bad output, so the sim parks flaky.
+srt_reset; srt_claim42
+printf '%s\n' '{"ok":false,"error":"malformed payload: games[0] renders to 2082 chars, over the 1900-char Discord block cap"}' > "$STUB/resp.store"
+srt_run
+srt_log_has   "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "store_rejects_overlong_block_parks_flaky"
+srt_log_has   "$STUB" tick.out "1900-char Discord block cap" "store_rejects_overlong_block_parks_flaky — log carries the reason"
+srt_log_lacks "$STUB" ssh.log "--cause=transport" "store_rejects_overlong_block_parks_flaky — not transport"
+
+# ── store_rejects_bad_link_parks_flaky ────────────────────────────────────────
+# The line StoreSimRecapCliTest's non-Wikipedia-link case gets from the real CLI.
+srt_reset; srt_claim42
+printf '%s\n' '{"ok":false,"error":"malformed payload: games[0].recap_text: link not allowed near: A wild one. [x](<https://evil.com>)"}' > "$STUB/resp.store"
+srt_run
+srt_log_has   "$STUB" ssh.log "park --sim=42 --host=mac --cause=flaky" "store_rejects_bad_link_parks_flaky"
+srt_log_has   "$STUB" tick.out "games[0].recap_text:" "store_rejects_bad_link_parks_flaky — log carries the reason"
+srt_log_lacks "$STUB" ssh.log "--cause=transport" "store_rejects_bad_link_parks_flaky — not transport"
+
+# ── store_accepts_payload_without_intro ───────────────────────────────────────
+# The generator no longer writes intro_text or outro_text. The tick must still
+# assemble and store its prose, and must not send either field to the store.
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+{
+    printf '%s' '{"recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":{"g1":"'
+    # shellcheck disable=SC2183  # intentional: printf '%570s' pads with spaces (no args = empty string pads to width)
+    printf '%570s' | tr ' ' 'x'
+    printf '%s' '"}}'
+} > "$STUB/resp.prose"
+srt_run
+srt_expect_eq "store_accepts_payload_without_intro — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" tick.out "stored" "store_accepts_payload_without_intro — stored"
+srt_log_lacks "$STUB" tick.out "parked" "store_accepts_payload_without_intro — nothing parked"
+srt_log_lacks "$STUB" store.stdin "intro_text" "store_accepts_payload_without_intro — no intro_text sent to the store"
+
+# ── dry_run_payload_without_intro_prints_games ────────────────────────────────
+srt_reset
+{
+    printf '%s' '{"recap_text":"recap","themes":["t"],'
+    printf '%s' '"games":{"g1":"'
+    # shellcheck disable=SC2183  # intentional: printf '%570s' pads with spaces (no args = empty string pads to width)
+    printf '%570s' | tr ' ' 'x'
+    printf '%s' '"}}'
+} > "$STUB/resp.prose"
+srt_run --dry-run --sim=42
+srt_expect_eq "dry_run_payload_without_intro_prints_games — exit 0" 0 "$SRT_RC"
+srt_log_has   "$STUB" tick.out '"games"' "dry_run_payload_without_intro_prints_games — games printed"
+srt_log_lacks "$STUB" tick.out "intro_text" "dry_run_payload_without_intro_prints_games — no intro_text"
 
 # PR-RUN-DONE: opt-in live check, run after the PR is open and its run has finished.
 # Set SRT_CHECK_PR_RUN=<branch> to read that branch's latest pull_request run.

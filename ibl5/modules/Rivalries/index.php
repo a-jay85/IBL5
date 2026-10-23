@@ -38,12 +38,16 @@ if ($nukeCompat->isUser($user)) {
 
 $userTeamKey = $userTeamId !== null ? (string) $userTeamId : null;
 $owner  = $userTeamId !== null ? $teamIdentity->getOwnerName($userTeamId) : null;
-$userGm = is_string($owner) && $owner !== '' ? $owner : null;
+
+$rivalriesRepo = \Rivalries\RivalriesServiceFactory::createRepository($mysqli_db);
+
+// The view compares GM names with ===, so use the spelling stored in ibl_gm_tenures.
+$userGm = is_string($owner) && $owner !== '' ? $rivalriesRepo->findGmName($owner) : null;
 
 $controller = new \Rivalries\RivalriesController(
     \Rivalries\RivalriesServiceFactory::create($mysqli_db, $season, $docRoot . '/ibl5/images/logo'),
     new \Rivalries\RivalriesView(),
-    \Rivalries\RivalriesServiceFactory::createRepository($mysqli_db),
+    $rivalriesRepo,
 );
 
 \PageLayout\PageLayout::header();

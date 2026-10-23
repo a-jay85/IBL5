@@ -15,6 +15,7 @@ final readonly class SuggestionPick
         public int $year,
         public int $round,
         public float $value,
+        public ?PickTier $tier = null,
     ) {
     }
 }

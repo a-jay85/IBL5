@@ -113,7 +113,8 @@ final class PickValuer
             if ($value === 0.0) {
                 continue;
             }
-            $picks[] = new SuggestionPick($row['pickid'], $row['teampick_teamid'], $row['year'], $row['round'], $value);
+            $tier = $this->tier($row['year'], $row['round'], $row['teampick_teamid'], $slotIndex, $endingYear);
+            $picks[] = new SuggestionPick($row['pickid'], $row['teampick_teamid'], $row['year'], $row['round'], $value, $tier);
         }
 
         return $picks;

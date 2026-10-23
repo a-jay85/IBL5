@@ -137,4 +137,13 @@ interface JsbImportRepositoryInterface
      * @param int $seasonYear Season ending year (e.g. 2026)
      */
     public function hasChampionForSeason(int $seasonYear): bool;
+
+    /**
+     * Check if the .ret import has already run for a given retirement year.
+     *
+     * Queries ibl_jsb_retired_players for any row with this retirement_year.
+     *
+     * @param int $retirementYear Season ending year the retirements belong to (e.g. 2025)
+     */
+    public function hasRetiredPlayersForYear(int $retirementYear): bool;
 }

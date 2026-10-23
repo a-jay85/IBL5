@@ -56,6 +56,7 @@ def test_run_bounded_nonzero_rc_is_not_an_error(tmp_path):
 
 def test_run_bounded_bytes_mode_preserves_crlf_and_invalid_utf8(tmp_path):
     script = _script(tmp_path, "printf 'a\\r\\nb\\xff\\n'\n")
+    # run_bounded(text=False) returns the exact bytes, so CRLF and invalid UTF-8 survive.
     proc = run_bounded(["bash", script], step="probe", timeout=10, text=False)
     assert proc.stdout == b"a\r\nb\xff\n"
 

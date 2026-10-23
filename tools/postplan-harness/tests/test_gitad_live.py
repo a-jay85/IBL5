@@ -700,7 +700,7 @@ def test_network_subcommands_use_git_net_timeout(repo, monkeypatch):
     g._run_out("push", "origin", "HEAD:refs/heads/x")
     g._run_out("ls-remote", "origin")
     g._run("status")
-    assert recorded == [7, 7, 7, 3]
+    assert recorded == [7,7,7,3]  # fetch, push, ls-remote, then a local call
 
 
 def test_precommit_hang_makes_no_commit(repo, tmp_path, monkeypatch):

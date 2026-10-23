@@ -244,6 +244,11 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
                 raise
             log(f"thread {cid}: resolve failed ({e.detail}); counting as skipped")
             outcome = "skipped"
+        if thread_info.get("dropped"):
+            # Phase 4.5 soft drop: the gate-edit commit was undone, so forget its sha
+            # before post_sha is derived; last_sha and per_thread[].sha must never
+            # name an unreachable commit.
+            last_sha_box[0] = pre_sha
         post_sha = last_sha_box[0] if last_sha_box[0] != pre_sha else None
         if outcome == "fixed":
             fixed += 1

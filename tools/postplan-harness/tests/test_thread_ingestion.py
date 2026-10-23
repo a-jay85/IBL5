@@ -283,6 +283,64 @@ def test_run_fix_touching_gate_path_is_dropped_not_pushed(tmp_path):
                for m in logs)
 
 
+class _GateEditGit(ReplayGit):
+    """ReplayGit whose every commit touches a gate path (same shape as
+    test_fidelity_remediation._GateEditGit)."""
+
+    def changed_files(self, base="origin/master"):
+        return ["bin/check-foo"]
+
+
+def test_dropped_thread_leaves_no_unreachable_sha_in_result(tmp_path):
+    gh = _gh(tmp_path, {"trusted_threads": [GATE_THREAD], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Tightened the gate"}'})
+    git = _GateEditGit({"head_sha": "pre-sha"})
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926172},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "gate-sha",
+        push=lambda: "never-pushed",
+    )
+
+    assert result["skipped"] == 1
+    assert result["fixed"] == 0
+    assert result["last_sha"] is None                 # restore ran before post_sha
+    assert git.drops == ["pre-sha"]                   # undo targeted the pre-commit head
+    with open(os.path.join(str(tmp_path), "thread-ingestion.json")) as fh:
+        payload = json.dumps(json.load(fh))
+    assert "gate-sha" not in payload                  # per_thread[].sha is None too
+    assert "never-pushed" not in payload              # push was never reached
+
+
+class _ResolveFailsGh(RecordingGh):
+    """RecordingGh whose resolve call fails the way LiveGh types it."""
+
+    def resolve_review_thread(self, pr, comment_id, body):
+        raise HarnessError("thread-resolve-failed", "simulated 502")
+
+
+def test_resolve_failed_skip_keeps_pushed_sha(tmp_path):
+    gh = _ResolveFailsGh(str(tmp_path), {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _llm({PURPOSE: '{"verdict":"FIX","reason":"Cached the lookup"}'})
+    git = ReplayGit({"head_sha": "pre-sha"})
+
+    result = run_thread_ingestion(
+        gh, llm, git, str(tmp_path), PR,
+        pre_posting_ids={4074926171},
+        out_dir=str(tmp_path),
+        log=lambda msg: None,
+        commit=lambda m: "abc123",
+        push=lambda: "def456",
+    )
+
+    assert result["skipped"] == 1                     # resolve failure still counts as skipped
+    assert result["last_sha"] == "def456"             # pushed sha is kept: not a drop
+    assert git.drops == []                            # no undo on this path
+
+
 def test_run_nonempty_snapshot_fetches_once_and_declines(tmp_path):
     gh = _CountingGh(str(tmp_path), {
         "trusted_threads": [THREAD_2340],

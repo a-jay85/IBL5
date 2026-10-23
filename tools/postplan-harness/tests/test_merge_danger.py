@@ -272,6 +272,57 @@ def test_llm_core_strips_only_the_leading_prefix():
     assert md._llm_core("plain words only here") == "plain words only here"
 
 
+def test_llm_one_way_naming_an_irreversible_effect_still_raises_under_the_bar():
+    out = md.merge_verdicts(TWO, "one-way", "site-wide", "drops the trade_mode column data for every team",
+                            llm_raise_bar=True)
+    assert out.door == "one-way"
+    assert out.why.endswith("for every team")
+
+
+def test_llm_one_way_without_a_concrete_effect_is_kept_at_the_floor():
+    why = "the migration widens an ENUM and adds a table for the pipeline"
+    out = md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True)
+    assert out.door == "two-way"
+    assert out.blast == "site-wide"
+    assert out.why == why
+
+
+def test_pr3472_style_why_is_kept_at_the_floor():
+    why = "widens the bug status ENUM, adds the operator context table and backfills rows"
+    assert md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True).door == "two-way"
+
+
+def test_bar_never_lowers_a_mechanical_one_way():
+    out = md.merge_verdicts(ONE, "two-way", "localized", "nothing risky here at all really", llm_raise_bar=True)
+    assert out.door == "one-way"
+
+
+def test_bar_is_off_by_default_so_a_human_raise_survives():
+    out = md.merge_verdicts(TWO, "one-way", "localized", "a human marked this as needing careful review")
+    assert out.door == "one-way"
+
+
+def test_bar_does_not_touch_blast_radius():
+    out = md.merge_verdicts(TWO, "one-way", "external", "a vague worry about this change overall",
+                            llm_raise_bar=True)
+    assert out.blast == "external"
+    assert out.door == "two-way"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("sends a Discord DM that cannot be recalled", True),
+    ("truncates ibl_hist before the rerun", True),
+    ("overwrites prod rows in place", True),
+    ("renames a column other code reads", True),
+    ("data loss for every team on revert", True),
+    ("adds a table and widens an ENUM", False),
+    ("edits docs and tests under the harness", False),
+    ("a lossless additive change", False),
+])
+def test_irreversible_lexicon(text, expected):
+    assert bool(md._IRREVERSIBLE_RE.search(text)) == expected
+
+
 # --- render / parse / classify / validate / inject --------------------------------------------
 
 def test_render_parse_roundtrip():

@@ -67,7 +67,7 @@ def test_inject_never_lowers_mechanical_one_way(tmp_path):
 def test_inject_honours_llm_raise(tmp_path):
     wt = _worktree(tmp_path, {"docs/a.md": "x\n"})
     copy = {"summary_md": "## Summary\n\n**Merge danger:** Door: one-way · Blast radius: external · "
-                          "Why: posts to a channel nobody can unsend from"}
+                          "Why: sends a DM that cannot be recalled later"}
     _run(copy, wt, _diff("docs/a.md"))
     [line] = _field_lines(copy["summary_md"])
     assert "Door: one-way" in line and "Blast radius: external" in line
@@ -148,3 +148,39 @@ def test_phase6_and_phase7_reapplication_leave_the_phase2_line_unchanged(tmp_pat
     [line] = _field_lines(b2)
     assert line.count("mechanical:") == 1
     assert line.endswith("library itself")
+
+
+def _docs_body(door, why):
+    return f"## Summary\n\n**Merge danger:** Door: {door} · Blast radius: localized · Why: {why}"
+
+
+def test_phase2_keeps_llm_one_way_at_the_floor_when_why_names_no_effect(tmp_path):
+    wt = _worktree(tmp_path, {"ibl5/docs/x.md": "x\n"})
+    logs = []
+    body = _docs_body("one-way", "the change widens an ENUM and adds a helper table")
+    out = runner._merge_danger_body(body, wt, _diff("ibl5/docs/x.md"), logs.append, "phase2")
+    [line] = _field_lines(out)
+    assert "Door: two-way" in line
+    assert any("kept at the mechanical two-way floor" in ln for ln in logs)
+
+
+def test_phase2_honours_llm_one_way_naming_an_effect(tmp_path):
+    wt = _worktree(tmp_path, {"ibl5/docs/x.md": "x\n"})
+    body = _docs_body("one-way", "sends a DM that cannot be recalled later")
+    out = runner._merge_danger_body(body, wt, _diff("ibl5/docs/x.md"), lambda *_: None, "phase2")
+    [line] = _field_lines(out)
+    assert "Door: one-way" in line
+
+
+def test_phase6_keeps_a_one_way_raise_regardless_of_why(tmp_path):
+    wt = _worktree(tmp_path, {"ibl5/docs/x.md": "x\n"})
+    body = _docs_body("one-way", "the change widens an ENUM and adds a helper table")
+    out = runner._merge_danger_body(body, wt, _diff("ibl5/docs/x.md"), lambda *_: None, "phase6")
+    [line] = _field_lines(out)
+    assert "Door: one-way" in line
+
+
+def test_pr_copy_prompt_states_the_revert_bar():
+    prompt = pr_copy_prompt("some-slug", Classification(), PlanInfo(), "")
+    assert "git revert <merge-sha>" in prompt
+    assert "Add-only migrations" in prompt

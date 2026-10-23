@@ -174,16 +174,39 @@ def _llm_core(text: str | None) -> str:
     return _MECH_PREFIX_RE.sub("", _clean_why(text), count=1).strip()
 
 
+# Phase 2 bar on an LLM-raised door. A one-way the floor did not raise is kept only when the
+# Why names an effect `git revert` cannot undo. Later phases pass llm_raise_bar=False: they
+# cannot tell an LLM raise from a human one, and a human raise must survive.
+_IRREVERSIBLE_RE = re.compile(
+    r"\b(drop(s|ped)?|delet(e|es|ed|ion)|truncat(e|es|ed|ion)|renam(e|es|ed)"
+    r"|overwr(ite|ites|itten|ote)|purg(e|es|ed)|destroy(s|ed)?|wip(e|es|ed)"
+    r"|lost|loss|irreversibl[ey]|unrecoverabl[ey]|cannot be (undone|restored|recalled|reverted)"
+    r"|send(s|ing)?|sent|recall(ed)?|notif(y|ies|ied|ication)|email(s|ed)?|discord"
+    r"|prod(uction)?[- ]?(sync|data|db|database|rows?))\b",
+    re.IGNORECASE,
+)
+
+
 def merge_verdicts(
     mechanical: MergeDanger,
     llm_door: str | None,
     llm_blast: str | None,
     llm_why: str | None,
+    *,
+    llm_raise_bar: bool = False,
 ) -> MergeDanger:
-    """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers."""
-    door = DOORS[max(_rank(mechanical.door, DOORS), _rank(llm_door, DOORS))]
-    blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
+    """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers.
+
+    llm_raise_bar: Phase 2 only. A one-way the floor did not raise is kept only when the Why
+    (prefix stripped) names a concrete irreversible effect per _IRREVERSIBLE_RE; otherwise the
+    door stays at the mechanical floor. Blast radius is never subject to the bar."""
     core = _llm_core(llm_why)[:WHY_MAX]
+    llm_rank = _rank(llm_door, DOORS)
+    if (llm_raise_bar and mechanical.door == "two-way" and llm_door == "one-way"
+            and not _IRREVERSIBLE_RE.search(core)):
+        llm_rank = 0
+    door = DOORS[max(_rank(mechanical.door, DOORS), llm_rank)]
+    blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
     if len(core) < WHY_MIN:
         why = mechanical.why
     elif mechanical.door == "one-way":

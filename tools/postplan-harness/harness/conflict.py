@@ -28,6 +28,10 @@ MODIFY_DELETE_STAGES = (frozenset({1, 2}), frozenset({1, 3}))
 
 # ── Resolution cap ────────────────────────────────────────────────────────────
 MAX_RESOLVE_ROUNDS = 3
+DECLINE_RETRY_MODEL = "opus"
+MAX_DECLINE_RETRIES = 2        # per harness run, shared by the plain and stacked paths
+DECLINE_REASON_CAP = 300       # chars of model text carried into the decline reason
+DECLINE_CONTEXT_CAP = 20_000   # chars per side of diff context in the retry prompt
 STAGE_NAMES = {1: "base", 2: "ours", 3: "theirs"}
 
 
@@ -44,6 +48,7 @@ class ConflictResolutionResult:
     reason: str = ""
     resolved_files: tuple[str, ...] = ()
     adaptations: tuple = ()  # tuple of `Justification` records from the resolver
+    decline_retries: int = 0  # Opus decline retries this call spent
 
 
 def parse_unmerged(text: str) -> dict[str, set[int]]:
@@ -135,6 +140,18 @@ def master_references(run, *, path, master_sha, merge_base) -> tuple[str, ...]:
 
 
 _ABSENT = "(absent: this side deleted the file)"
+
+
+def _decline_reason(path: str, reply: str) -> str:
+    """`resolver declined: <path>` plus the model's own words before FAILED, capped.
+    Lines are joined with a single space and the last DECLINE_REASON_CAP chars are kept;
+    runs of spaces inside a line are not collapsed. A literal `tree proof failed` in the
+    model text is rewritten to `tree-proof failed`, so the reason never contains the key
+    rebase_cause.py classifies on."""
+    lines = [l.strip() for l in reply.splitlines() if l.strip()]
+    said = " ".join(lines[:-1]).replace("tree proof failed", "tree-proof failed")
+    said = said[-DECLINE_REASON_CAP:]
+    return f"resolver declined: {path}" + (f" (model: {said})" if said else "")
 
 
 def resolve_one(
@@ -234,7 +251,7 @@ def resolve_one(
             (l.strip() for l in reversed(reply.splitlines()) if l.strip()), ""
         )
         if last_line == "FAILED":
-            return False, f"resolver declined: {path}"
+            return False, _decline_reason(path, reply)
         if last_line == "DELETED":
             if stages == {1, 2, 3}:
                 last_error = "DELETED is only valid for a modify/delete conflict"
@@ -287,6 +304,26 @@ def resolve_one(
     return False, f"round cap exceeded: {path}"
 
 
+def decline_retry_context(run, *, path: str, pre_sha: str, master_sha: str,
+                          prior_reason: str, replay_base: str = "") -> str:
+    """Both sides' whole change to `path` since the merge base, for one Opus retry.
+
+    `replay_base` scopes the branch diff to the replayed range on the stacked --onto
+    path, where `pre_sha` also carries the parent branch's commits."""
+    mb = run("merge-base", pre_sha, master_sha, check=False).strip()
+    branch_base = replay_base or mb
+    branch = run("diff", f"{branch_base}..{pre_sha}", "--", path, check=False)[:DECLINE_CONTEXT_CAP]
+    master = run("diff", f"{mb}..{master_sha}", "--", path, check=False)[:DECLINE_CONTEXT_CAP]
+    return (
+        f"A first resolver attempt declined this file. Its words: {prior_reason}\n"
+        "The branch's whole change to this file since the merge base. Keep every added "
+        f"line verbatim:\n```diff\n{branch}\n```\n"
+        f"Master's whole change to this file. Keep it too:\n```diff\n{master}\n```\n"
+        "Combine both changes. End with FAILED only if the two changes cannot both hold, "
+        "and say why in one line first."
+    )
+
+
 def resolve_all(
     llm,
     run: Callable[..., str],
@@ -300,9 +337,16 @@ def resolve_all(
     model: str = "sonnet",
     extra_context: str = "",
     max_rounds: int = MAX_RESOLVE_ROUNDS,
+    decline_retry_model: Optional[str] = None,
+    max_decline_retries: int = 0,
+    replay_base: str = "",
 ) -> ConflictResolutionResult:
-    """Attempt to resolve all conflicted files. Returns ConflictResolutionResult."""
+    """Attempt to resolve all conflicted files. Returns ConflictResolutionResult.
+
+    With `decline_retry_model` set, a file the resolver declined is retried once on that
+    model with both sides' whole diffs, at most `max_decline_retries` times per call."""
     sink: list = []
+    retries = 0
     for path in inventory.files:
         success, reason = resolve_one(
             llm, run, worktree=worktree, key=key, path=path,
@@ -311,9 +355,23 @@ def resolve_all(
             adaptations=sink,
             model=model, extra_context=extra_context, max_rounds=max_rounds,
         )
+        if (not success and decline_retry_model and retries < max_decline_retries
+                and reason.startswith("resolver declined: ")):
+            retries += 1
+            ctx = decline_retry_context(run, path=path, pre_sha=pre_sha,
+                                        master_sha=master_sha, prior_reason=reason,
+                                        replay_base=replay_base)
+            success, reason = resolve_one(
+                llm, run, worktree=worktree, key=key, path=path,
+                stages=inventory.stage_sets.get(path, frozenset({1, 2, 3})),
+                branch_stage=branch_stage, master_sha=master_sha, pre_sha=pre_sha,
+                adaptations=sink, model=decline_retry_model, max_rounds=1,
+                extra_context=(extra_context + "\n\n" + ctx) if extra_context else ctx,
+            )
         if not success:
-            return ConflictResolutionResult(False, reason)
-    return ConflictResolutionResult(True, "", tuple(inventory.files), tuple(sink))
+            return ConflictResolutionResult(False, reason, decline_retries=retries)
+    return ConflictResolutionResult(True, "", tuple(inventory.files), tuple(sink),
+                                    decline_retries=retries)
 
 
 def abort_and_restore(

@@ -508,7 +508,7 @@ def test_red_ci_checks_warns_not_blocks_when_aggregator_required(tmp_path):
     assert c15["blocked"] is False
     c15_live = [c for c in res.arm.conditions if c.number == 15][0]
     assert "pytest (stdlib harness)" in c15_live.warning
-    assert "All checks green" in c15_live.warning
+    assert "All checks settled" in c15_live.warning
 
 
 def test_red_ci_checks_no_warning_when_green(tmp_path):
@@ -1253,7 +1253,7 @@ def test_live_arm_consults_aggregator_required(monkeypatch, tmp_path):
 
     monkeypatch.setattr(RecordingGh, "aggregator_required", _fake)
     c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
-    assert calls == ["All checks green"]
+    assert calls == ["All checks settled"]
     assert c15.blocked is False
     assert "pytest (stdlib harness)" in c15.warning
 

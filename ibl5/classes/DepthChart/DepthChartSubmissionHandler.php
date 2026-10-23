@@ -8,6 +8,7 @@ use DepthChart\Contracts\DepthChartSubmissionHandlerInterface;
 use DepthChartSnapshot\DepthChartSnapshotService;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Validation\ValidationResultWithContext;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartProcessorInterface
@@ -61,43 +62,89 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
     {
         $season = $this->season ?? \Season\SharedSeason::get($this->db);
 
-        // Derive the authoritative team from the session, not POST `Team_Name`
-        // (IDOR fix D-09). A logged-in GM cannot replay a valid CSRF token with
-        // another team's name — the write target is always their own team.
-        $sessionTeam = $this->commonRepo->getTeamnameFromUsername($sessionUsername);
-        if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
+        $target = $this->authorizeSessionTeam($sessionUsername);
+        if ($target === null) {
+            return $this->missingTeamResult($postData);
+        }
+        [$teamName, $teamid] = $target;
+
+        $rosterPlayers = $this->repository->getPlayersOnTeam($teamid);
+
+        $parsed = $this->parseAndValidate($postData, $rosterPlayers, $season->phase);
+        if ($parsed['rejection'] !== null) {
             return [
                 'success' => false,
                 'fileOk' => false,
-                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+                'errorsHtml' => DepthChartErrorHtmlRenderer::render($parsed['rejection']->getErrors()),
                 'postData' => $postData,
             ];
+        }
+
+        $fileOk = $this->persist($parsed['processed'], $teamName, $teamid, $postData, $season);
+
+        return [
+            'success' => true,
+            'fileOk' => $fileOk,
+            'errorsHtml' => '',
+            'postData' => [],
+        ];
+    }
+
+    /**
+     * Derive the authoritative team from the session, not POST `Team_Name`
+     * (IDOR fix D-09). A logged-in GM cannot replay a valid CSRF token with
+     * another team's name — the write target is always their own team.
+     *
+     * Session-derived team id keys every write; an unresolvable id is refused
+     * before any read of ibl_plr so a misconfigured team cannot reach the roster query.
+     *
+     * @return array{0: string, 1: int}|null [teamName, teamid]; null when the session cannot be tied to a real team
+     */
+    private function authorizeSessionTeam(string $sessionUsername): ?array
+    {
+        $sessionTeam = $this->commonRepo->getTeamnameFromUsername($sessionUsername);
+        if ($sessionTeam === null || $sessionTeam === '' || $sessionTeam === \League\League::FREE_AGENTS_TEAM_NAME) {
+            return null;
         }
 
         $teamName = $this->sanitizeInput($sessionTeam);
 
         if ($teamName === '') {
-            return [
-                'success' => false,
-                'fileOk' => false,
-                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
-                'postData' => $postData,
-            ];
+            return null;
         }
 
-        // Session-derived team id keys every write below; an unresolvable id is refused
-        // before any read of ibl_plr so a misconfigured team cannot reach the roster query.
         $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
         if ($teamid === 0) {
-            return [
-                'success' => false,
-                'fileOk' => false,
-                'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
-                'postData' => $postData,
-            ];
+            return null;
         }
 
-        $rosterPlayers = $this->repository->getPlayersOnTeam($teamid);
+        return [$teamName, $teamid];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, fileOk: bool, errorsHtml: string, postData: array<string, mixed>}
+     */
+    private function missingTeamResult(array $postData): array
+    {
+        return [
+            'success' => false,
+            'fileOk' => false,
+            'errorsHtml' => '<strong class="ibl-form-error">Error: Missing required team information.</strong>',
+            'postData' => $postData,
+        ];
+    }
+
+    /**
+     * Parse the form rows, then run roster membership before phase rules;
+     * the first failing result is returned so its errors render as before.
+     *
+     * @param array<string, mixed> $postData
+     * @param list<array<string, mixed>> $rosterPlayers
+     * @return array{processed: ProcessedSubmission, rejection: ValidationResultWithContext<null>|null}
+     */
+    private function parseAndValidate(array $postData, array $rosterPlayers, string $phase): array
+    {
         /** @var list<int> $rosterPids */
         $rosterPids = array_column($rosterPlayers, 'pid');
 
@@ -109,24 +156,26 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
 
         $rosterResult = $this->validator->validateRoster($submittedPids, $rosterPids);
         if (!$rosterResult->isValid()) {
-            return [
-                'success' => false,
-                'fileOk' => false,
-                'errorsHtml' => DepthChartErrorHtmlRenderer::render($rosterResult->getErrors()),
-                'postData' => $postData,
-            ];
+            return ['processed' => $processedData, 'rejection' => $rosterResult];
         }
 
-        $validation = $this->validator->validate($processedData, $season->phase);
+        $validation = $this->validator->validate($processedData, $phase);
         if (!$validation->isValid()) {
-            return [
-                'success' => false,
-                'fileOk' => false,
-                'errorsHtml' => DepthChartErrorHtmlRenderer::render($validation->getErrors()),
-                'postData' => $postData,
-            ];
+            return ['processed' => $processedData, 'rejection' => $validation];
         }
 
+        return ['processed' => $processedData, 'rejection' => null];
+    }
+
+    /**
+     * All writes, in the original order; only reached after every check passed.
+     *
+     * @param ProcessedSubmission $processedData
+     * @param array<string, mixed> $postData
+     * @return bool whether the depth chart file was written
+     */
+    private function persist(array $processedData, string $teamName, int $teamid, array $postData, Season $season): bool
+    {
         $this->saveDepthChart($processedData['playerData'], $teamName, $teamid);
 
         $fileOk = $this->saveDepthChartFile($teamName, $processedData['playerData']);
@@ -138,12 +187,7 @@ class DepthChartSubmissionHandler implements DepthChartSubmissionHandlerInterfac
             'team_name' => $teamName,
         ]);
 
-        return [
-            'success' => true,
-            'fileOk' => $fileOk,
-            'errorsHtml' => '',
-            'postData' => [],
-        ];
+        return $fileOk;
     }
 
     private function sanitizeInput(string $input): string

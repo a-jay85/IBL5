@@ -26,7 +26,7 @@ interface WaiversViewInterface
      * @param string $teamName Team name for display and form submission
      * @param int $teamid Team ID for logo display
      * @param string $action Action type ('add' or 'waive')
-     * @param array<int, array{playerID: int, playerName: string, contract: string, waitTime: string}> $players Plain option data for the dropdown
+     * @param array<int, array{playerID: int, playerName: string, contract: string}> $players Plain option data for the dropdown
      *   Each element is rendered through buildPlayerOption()
      * @param int $openRosterSpots Number of open roster spots (0-15)
      * @param int $healthyOpenRosterSpots Number of healthy open roster spots (0-15)
@@ -66,12 +66,10 @@ interface WaiversViewInterface
      * @param int $playerID Player ID for form value
      * @param string $playerName Player display name
      * @param string $contract Contract display string (from WaiversProcessor)
-     * @param string $waitTime Optional waiver wait time display (default: '')
      * @return string HTML <option> element string
      * 
      * **Output Format:**
-     * - Without wait time: `<option value="123">John Smith 500 450 400</option>`
-     * - With wait time: `<option value="123">John Smith 103 (Clears in 5 h, 30 m, 15 s)</option>`
+     * - `<option value="123">John Smith 500 450 400</option>`
      * 
      * **Security:**
      * - All text content is HTML-escaped
@@ -80,8 +78,7 @@ interface WaiversViewInterface
     public function buildPlayerOption(
         int $playerID,
         string $playerName,
-        string $contract,
-        string $waitTime = ''
+        string $contract
     ): string;
 
     /**

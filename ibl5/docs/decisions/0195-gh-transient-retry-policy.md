@@ -1,6 +1,6 @@
 ---
-description: Host-side gh calls in the burndown and merge-line scripts retry only transient GitHub failures through one sourced helper, bin/lib/gh-retry.sh, with a fixed backoff and the final exit code passed through.
-last_verified: 2026-10-11
+description: Host-side gh calls in the burndown and merge-line scripts retry only transient GitHub failures through one sourced helper, bin/lib/gh-retry.sh, with a fixed backoff and the final exit code passed through. A 2026-10-22 addendum adds a read mode, gh_retry_json, for the All checks settled reads.
+last_verified: 2026-10-22
 ---
 
 # ADR-0195: Retry transient gh failures through one sourced helper
@@ -43,3 +43,11 @@ last_verified: 2026-10-11
 - `bin/merge-line-select`
 - `bin/burndown-loop`
 - ADR-0162 (burndown loop weekly pacing)
+
+## Addendum 2026-10-22: read mode for the settle aggregator
+
+`bin/lib/gh-retry.sh` gains `gh_retry_json`, a read mode for idempotent GETs. It shares one loop, `_gh_retry_run`, with `gh_retry`. The strict classifier is unchanged for `bin/lib/burndown.sh` and `bin/merge-line-select`, and strict mode keeps HTTP 429 in the never-retry bucket because no incident justifies changing those callers.
+
+Read mode retries any non-zero exit unless stderr names an HTTP 4xx other than 429, so a silent failure, a network error and HTTP 429 all retry. On exit 0 it checks the body with `jq -e 'true'` and retries an empty or non-JSON body. Exhaustion returns the last non-zero exit, or 65 when the last attempt exited 0 with a bad body. It returns 1 without running the command when `jq` is not on PATH. Read mode must never wrap a command that reads its payload from stdin.
+
+The callers are `bin/settle-pr-status` and `bin/check-pr-checks-green` (ADR-0149 addendum 2026-10-22). Each sets a 2s/5s budget through `IBL5_GH_RETRY_DELAYS`. Cases J1-J13 in `bin/test-gh-retry` pin read mode, and G1-G11 still pin strict mode.

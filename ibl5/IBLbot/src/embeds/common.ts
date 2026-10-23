@@ -88,28 +88,28 @@ export function playerUrl(pid: number): string {
  * Build a URL to a team's page on the site.
  */
 export function teamUrl(teamId: number): string {
-    return `${siteBase}/modules.php?name=Team&op=team&teamID=${teamId}`;
+    return `${siteBase}/modules.php?name=Team&op=team&teamid=${teamId}`;
 }
 
 /**
  * Build a URL to a team's schedule page.
  */
 export function scheduleUrl(teamId: number): string {
-    return `${siteBase}/modules.php?name=Schedule&teamID=${teamId}`;
+    return `${siteBase}/modules.php?name=Schedule&teamid=${teamId}`;
 }
 
 /**
  * Build a URL to a team's draft history page.
  */
 export function draftHistoryUrl(teamId: number): string {
-    return `${siteBase}/modules.php?name=DraftHistory&teamID=${teamId}`;
+    return `${siteBase}/modules.php?name=DraftHistory&teamid=${teamId}`;
 }
 
 /**
  * Build a URL to a team's historical page for a specific season.
  */
 export function teamYearUrl(teamId: number, year: number): string {
-    return `${siteBase}/modules.php?name=Team&op=team&teamID=${teamId}&yr=${year}`;
+    return `${siteBase}/modules.php?name=Team&op=team&teamid=${teamId}&yr=${year}`;
 }
 
 /**

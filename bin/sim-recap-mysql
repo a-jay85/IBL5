@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# bin/sim-recap-mysql — the only command the sim-recap agent may run (ADR-0093).
+#
+# The agent is unattended and prompt-injectable. The raw mysql client is a shell
+# in disguise: `system <cmd>` and `\!` run commands, `tee` writes any file the
+# user can write (on Actions that includes $GITHUB_ENV), `source` reads any file,
+# and a later `--system-command` or `--defaults-file` flag undoes earlier ones.
+# So the agent never gets the raw client. This wrapper takes SQL only and runs it
+# with the connection fixed and every client command switched off.
+#
+# Usage:  sim-recap-mysql [-N] [-t] [-E] [-r] [-s] -e "<SQL>"
+#         sim-recap-mysql [-N] [-t] [-E] [-r] [-s] < query.sql
+#
+# Forced client flags, in this order:
+#   --no-defaults            first, so no option file (~/.my.cnf) can set pager/tee
+#   --skip-system-command    blocks `system` and `\!`
+#   --binary-mode            blocks every client command (tee, source, pager, \T,
+#                            \G, ...) in non-interactive input; SQL still runs
+#   --batch --local-infile=0
+# Proved against the runner's client (Ubuntu mysql-client 8.0.46) on PR #3379.
+# Also proved against the Mac default (Homebrew mysql@8.4, 8.4.11) on a MariaDB
+# 10.11 server: with these flags `system`, `\!`, `tee`, `\T`, and `source` ran
+# nothing and wrote no file; without them all four wrote their file.
+#
+# Env (set by bin/sim-recap-tick, never by the agent — Claude Code denies an
+# env-prefixed command): SIM_RECAP_MYSQL_BIN, SIM_RECAP_DB_HOST, SIM_RECAP_DB_PORT,
+# SIM_RECAP_DB_USER, SIM_RECAP_DB_NAME. The password arrives as MYSQL_PWD.
+set -euo pipefail
+
+die() { printf 'sim-recap-mysql: %s\n' "$1" >&2; exit 2; }
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0
+fi
+
+client="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
+: "${SIM_RECAP_DB_USER:?}" "${SIM_RECAP_DB_NAME:?}"
+
+opts=() sql="" have_sql=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -N|--skip-column-names|-t|--table|-E|--vertical|-r|--raw|-s|--silent)
+            opts+=("$1") ;;
+        -e|--execute)
+            [ $# -ge 2 ] || die "$1 needs the SQL as its next argument"
+            sql="$2" have_sql=1; shift ;;
+        --execute=*)
+            sql="${1#--execute=}" have_sql=1 ;;
+        *)
+            die "refusing argument '$1': pass SQL with -e, or on stdin; allowed flags are -N -t -E -r -s" ;;
+    esac
+    shift
+done
+[ "$have_sql" = 1 ] || sql="$(cat)"
+
+# The client flags above are the real block. This check refuses the same inputs
+# before the client ever starts, so the refusal is testable without a server.
+# A backslash command (\! \. \T \P \G) is refused only at the start of a line or
+# statement, or as \G ending a statement; client command words are refused at
+# those spots too. Mid-line forms (SELECT 1 \T /tmp/x) and backslashes in string
+# literals (LIKE 'x\.%') pass, and are NOT verified safe against the client.
+# --binary-mode and --skip-system-command are the real block. \G is plain output
+# formatting; -E gives the same.
+stmts="$(tr ';' '\n' <<< "$sql")"
+if grep -qE '^[[:space:]]*\\[!.TPG]|\\G[[:space:]]*$' <<< "$stmts"; then
+    die "refusing client command (backslash command) in SQL; send SQL only"
+fi
+if grep -qiE '^[[:space:]]*(system|tee|notee|pager|nopager|source)([[:space:]]|$)' <<< "$stmts"; then
+    die "refusing client command (system/tee/pager/source/...) in SQL; send SQL only"
+fi
+
+exec "$client" --no-defaults --skip-system-command --binary-mode --batch --local-infile=0 \
+    --default-auth=mysql_native_password \
+    -h "${SIM_RECAP_DB_HOST:-127.0.0.1}" -P "${SIM_RECAP_DB_PORT:-13306}" \
+    -u "$SIM_RECAP_DB_USER" ${opts[@]+"${opts[@]}"} -e "$sql" "$SIM_RECAP_DB_NAME"

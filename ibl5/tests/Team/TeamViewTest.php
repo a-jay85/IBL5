@@ -21,7 +21,7 @@ use Discord\Discord;
 class TeamViewTest extends TestCase
 {
     /** Whitespace-normalized render of the default actual-team fixture, captured from master before the #1460 refactor. */
-    private const CHARACTERIZATION_HTML = '<div class="team-page-layout"><div class="team-page-main"><div class="team-stats-block"><div class="team-banner-row" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><a href="modules.php?name=Schedule&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Schedule</span><img src="./images/schedule-icon.svg" alt="Schedule" class="team-action-link__icon"></a><div class="team-banner-logo"><h1><img src="./images/logo/1.jpg" alt="Celtics"></h1></div><a href="modules.php?name=DraftHistory&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Draft History</span><img src="./images/draft-history-icon.svg" alt="Draft History" class="team-action-link__icon"></a></div><div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster"><table><caption class="team-table-caption"><div class="ibl-tabs">tabs</div></caption><tbody><tr><td>roster</td></tr></tbody></table></div></div></div><div class="team-cards-row"><div class="team-card">current season</div><div class="team-card" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><div class="team-card__header"><h2 class="team-card__title">Draft Picks</h2></div><div class="team-card__body--flush"><table>picks</table></div></div><div class="team-card">awards</div></div><div class="franchise-history-wrapper"><div class="team-card">franchise history</div></div><div class="team-page-rafters"><div>banners</div></div></div></div>';
+    private const CHARACTERIZATION_HTML = '<div class="team-page-layout"><div class="team-page-main"><div class="team-stats-block"><div class="team-banner-row" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><a href="modules.php?name=Schedule&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Schedule</span><img src="./images/schedule-icon.svg" alt="Schedule" class="team-action-link__icon"></a><div class="team-banner-logo"><h1><img src="./images/logo/1.jpg" alt="Celtics"></h1></div><a href="modules.php?name=DraftInfo&amp;tab=history&amp;teamid=1" class="team-action-link"><span class="team-action-link__text">Draft History</span><img src="./images/draft-history-icon.svg" alt="Draft History" class="team-action-link__icon"></a></div><div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster"><table><caption class="team-table-caption"><div class="ibl-tabs">tabs</div></caption><tbody><tr><td>roster</td></tr></tbody></table></div></div></div><div class="team-cards-row"><div class="team-card">current season</div><div class="team-card" style="--team-color-primary: #FF0000; --team-color-secondary: #0000FF;"><div class="team-card__header"><h2 class="team-card__title">Draft Picks</h2></div><div class="team-card__body--flush"><table>picks</table></div></div><div class="team-card">awards</div></div><div class="franchise-history-wrapper"><div class="team-card">franchise history</div></div><div class="team-page-rafters"><div>banners</div></div></div></div>';
 
     private TeamView $view;
 
@@ -208,9 +208,10 @@ class TeamViewTest extends TestCase
         $this->assertSame(1, substr_count($output, '<h1'), 'Free Agents page must have exactly one <h1>.');
         // The banner row is NOT rendered for non-actual teams.
         $this->assertStringNotContainsString('team-banner-row', $output);
-        // The decorative fallback logo is present with empty alt (cannot be the h1).
-        $this->assertStringContainsString('team-logo-fallback', $output);
-        $this->assertStringContainsString('alt=""', $output);
+        // The fallback wrapper stays but is empty: logo/0.jpg does not exist, so no <img> is emitted.
+        $this->assertStringContainsString('<div class="team-logo-fallback"></div>', $output);
+        $this->assertStringNotContainsString('logo/0.jpg', $output);
+        $this->assertStringNotContainsString('team-banner-logo', $output);
     }
 
     public function testRenderContainsRaftersForActualTeam(): void

@@ -125,6 +125,10 @@ DRY_RUN=0
 # password — that reaches the agent through MYSQL_PWD at spawn time).
 export SIM_RECAP_DB_HOST SIM_RECAP_DB_PORT SIM_RECAP_DB_USER SIM_RECAP_DB_NAME
 export SIM_RECAP_MYSQL_BIN
+# The only command the agent may run (see run_agent). Fixed, not an env seam: the
+# allow-list and the prompt must name the same path. sim-recap-prompt derives it
+# the same way from its own location.
+SIM_RECAP_MYSQL_WRAPPER="$REPO_ROOT/bin/sim-recap-mysql"
 
 # ── Per-run temp working dir (security constraint 7 / ADR-0062) ───────────────
 # Global so the EXIT trap can see it; assigned in generate()/dry_run().
@@ -624,11 +628,44 @@ run_agent() { # sim prompt
     # supplies. Residual gap, accepted: the agent inherits the Mac's ssh identity
     # and could in principle reach prod that way — the trust boundary here is the
     # code we hand it, not the tool list.
+    #
+    # The Actions runner has no settings file, so the flags below are the whole
+    # allow-list there. The agent never gets the raw mysql client: it can run
+    # shell commands (`system`, `\!`) and write any file (`tee`). It gets
+    # bin/sim-recap-mysql, which takes SQL only and switches every client command
+    # off. Bash rules match the literal command prefix, so the prompt names the
+    # wrapper by the same absolute path. Claude Code denies an env-prefixed,
+    # chained, or $(...) form of it. No bare "Write": that matches any path. Under
+    # acceptEdits the agent may write and redirect into scratch files inside the
+    # temp workdir only, which is where payload.json lands.
     ( cd "$WORKDIR" && MYSQL_PWD="${SIM_RECAP_DB_PASSWORD:-}" \
         timeout "$SIM_RECAP_CLAUDE_TIMEOUT" "$SIM_RECAP_CLAUDE_BIN" -p "$prompt" \
             --model "$SIM_RECAP_MODEL" --output-format json \
-            --allowedTools "Bash(mysql:*)" "Write" ) > "$WORKDIR/agent.json" 2>&1
+            --permission-mode acceptEdits \
+            --allowedTools "Bash(${SIM_RECAP_MYSQL_WRAPPER}:*)" ) \
+        > "$WORKDIR/agent.json" 2>&1
     return $?
+}
+
+# Names what the agent was blocked from running, so a permission gap shows up
+# in the log instead of hiding behind "flaky". Logs the count and each denied
+# command's first word only when that word is the mysql wrapper path
+# ($SIM_RECAP_MYSQL_WRAPPER): arguments and env-prefixed words (MYSQL_PWD=...) can
+# carry secrets, so any other command is logged as the bare tool name.
+log_permission_denials() { # sim
+    local sim="$1" n first
+    # agent.json mixes stderr into stdout, so parse line by line and skip
+    # anything that is not a JSON object.
+    n="$("$SIM_RECAP_JQ_BIN" -n -R '[inputs | fromjson? | objects
+            | .permission_denials // [] | length] | add // 0' "$WORKDIR/agent.json" 2>/dev/null)"
+    case "$n" in ''|*[!0-9]*|0) return 0 ;; esac
+    # shellcheck disable=SC2016  # jq program, not shell expansion
+    first="$("$SIM_RECAP_JQ_BIN" -n -R -r --arg mysql "$SIM_RECAP_MYSQL_WRAPPER" '[inputs | fromjson? | objects | .permission_denials // [] | .[]
+            | ((.tool_input.command // "") | split(" ") | .[0] // "") as $c
+            | if $c != $mysql then .tool_name else "\(.tool_name)(\($c))" end] | unique | join(", ")' \
+        "$WORKDIR/agent.json" 2>/dev/null | tr -cd 'A-Za-z0-9_./(), -')"
+    log "sim $sim: agent was denied $n tool call(s): ${first:-unknown}"
+    gha_annotate warning "sim $sim: agent was denied $n tool call(s): ${first:-unknown}"
 }
 
 # ── log_agent_cost <sim> — one log line with what the agent run cost ──────────
@@ -705,6 +742,7 @@ generate() { # sim
         else
             log "sim $sim: agent produced no valid prose.json (rc=$agent_rc; $ASSEMBLE_DETAIL) — parking"
         fi
+        log_permission_denials "$sim"
         park "$sim" flaky; return 0
     fi
 

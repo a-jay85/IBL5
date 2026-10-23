@@ -149,10 +149,16 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
                 SELECT
                     YEAR(bst.game_date) AS year,
                     CASE
-                        WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
-                              + COALESCE(bst.home_ot_points, 0))
-                           > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
-                              + COALESCE(bst.visitor_ot_points, 0))
+                        WHEN COALESCE(bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
+                                      + COALESCE(bst.home_ot_points, 0),
+                                      FIRST_VALUE(bst.calc_points) OVER (
+                                          PARTITION BY bst.game_date, bst.visitor_teamid, bst.home_teamid, bst.game_of_that_day
+                                          ORDER BY bst.id DESC))
+                           > COALESCE(bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
+                                      + COALESCE(bst.visitor_ot_points, 0),
+                                      FIRST_VALUE(bst.calc_points) OVER (
+                                          PARTITION BY bst.game_date, bst.visitor_teamid, bst.home_teamid, bst.game_of_that_day
+                                          ORDER BY bst.id ASC))
                         THEN bst.home_teamid
                         ELSE bst.visitor_teamid
                     END AS winner_tid,

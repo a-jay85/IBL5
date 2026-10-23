@@ -264,12 +264,12 @@ final class YourAccountFormContractTest extends TestCase
         $xpath = new \DOMXPath($doc);
 
         $forms = [];
-        foreach ($xpath->query('//form') ?: [] as $form) {
+        foreach (self::nodes($xpath, '//form') as $form) {
             if (!$form instanceof \DOMElement) {
                 continue;
             }
             $controls = [];
-            foreach ($xpath->query('.//input|.//select|.//textarea|.//button', $form) ?: [] as $control) {
+            foreach (self::nodes($xpath, './/input|.//select|.//textarea|.//button', $form) as $control) {
                 if (!$control instanceof \DOMElement || !$control->hasAttribute('name')) {
                     continue;
                 }
@@ -284,7 +284,7 @@ final class YourAccountFormContractTest extends TestCase
         }
 
         $hidden = [];
-        foreach ($xpath->query('//input[@type="hidden"]') ?: [] as $input) {
+        foreach (self::nodes($xpath, '//input[@type="hidden"]') as $input) {
             if (!$input instanceof \DOMElement || $input->getAttribute('name') === '_csrf_token') {
                 continue;
             }
@@ -292,12 +292,23 @@ final class YourAccountFormContractTest extends TestCase
         }
 
         $links = [];
-        foreach ($xpath->query('//a') ?: [] as $link) {
+        foreach (self::nodes($xpath, '//a') as $link) {
             if ($link instanceof \DOMElement) {
                 $links[] = $link->getAttribute('href');
             }
         }
 
         return ['forms' => $forms, 'hidden' => $hidden, 'links' => $links];
+    }
+
+    /**
+     * @return \DOMNodeList<\DOMNode>
+     */
+    private static function nodes(\DOMXPath $xpath, string $expression, ?\DOMNode $context = null): \DOMNodeList
+    {
+        $nodes = $xpath->query($expression, $context);
+        self::assertNotFalse($nodes, 'Invalid XPath expression: ' . $expression);
+
+        return $nodes;
     }
 }

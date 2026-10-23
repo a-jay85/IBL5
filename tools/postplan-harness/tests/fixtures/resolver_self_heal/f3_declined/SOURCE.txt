@@ -1,0 +1,9 @@
+shape: F3 resolver declines; the model's reason is dropped from the detail
+path: .claude/skills/post-plan/_phase-4-review-audit.md
+branch tip: 2f1350377f60a2780f6250f7da81fceb55c90bc0  (git rev-parse 'review-preexisting-tag-bug-class@{2026-10-21 15:59:00}'; reflog entry present, equals the worktree-HEAD fallback 2f1350377f; no fallback used)
+master: e79faf40bd16f13dbb1a934a307ea599056d4509  (git rev-list -1 --before='2026-10-21 15:59:00' origin/master)
+merge-base(tip, master): 46209dd9f8a15c6209ab01989ba3a32cba57bc27
+base.txt: git show 46209dd9f8a15c6209ab01989ba3a32cba57bc27:.claude/skills/post-plan/_phase-4-review-audit.md
+master.txt: git show e79faf40bd16f13dbb1a934a307ea599056d4509:.claude/skills/post-plan/_phase-4-review-audit.md
+branch.txt: git show 2f1350377f60a2780f6250f7da81fceb55c90bc0:.claude/skills/post-plan/_phase-4-review-audit.md
+resolved.txt: git merge-file -p --union branch.txt base.txt master.txt, with no hand edit (the real lostwork.sh accepts it)

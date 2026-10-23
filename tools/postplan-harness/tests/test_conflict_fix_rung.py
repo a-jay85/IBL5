@@ -26,7 +26,12 @@ from harness.conflict_fix import (
     record_attempt,
     summarize,
 )
-from harness.conflict_ladder import SESSION_PROOF_CAP, default_rungs, run_ladder
+from harness.conflict_ladder import (
+    BOTH_MODIFIED,
+    SESSION_PROOF_CAP,
+    default_rungs,
+    run_ladder,
+)
 from harness.state import HarnessError
 from test_conflict_ladder import (  # noqa: F401  (key is a fixture)
     _KEEPME_PROOF,
@@ -85,7 +90,9 @@ def test_fix_rung_argv_model_and_denied(tmp_path, key):
     assert _flag_value(argv, "--max-budget-usd") == "5.00"
     denied = _flag_value(argv, "--disallowedTools").split(",")
     for entry in ("Bash(git push:*)", "Bash(git -C:*)", "Bash(git update-ref:*)",
-                  "Bash(git stash:*)", "Bash(claude:*)", "WebFetch"):
+                  "Bash(git stash:*)", "Bash(claude:*)", "WebFetch",
+                  "Bash(*/git push:*)", "Bash(git * push *)", "Bash(git * push)",
+                  "Bash(*/gh:*)", "Bash(*/git push *)", "Bash(*/gh *)"):
         assert entry in denied
 
 
@@ -179,6 +186,80 @@ def test_fix_rung_rejects_non_test_path_outside_branch(tmp_path, key):
     assert out.rung == ""
     assert out.trail[0].startswith("sonnet-fix: session touched other.txt outside its remit: ")
     assert not (Path(d) / "other.txt").exists()
+    _assert_untouched(d, merge)
+
+
+def test_fix_rung_allows_vr_snapshot_png_via_glob(tmp_path, key):
+    png = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/player-mobile.png"
+
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / png
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png),
+                              stage_sets={png: BOTH_MODIFIED})
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    # The glob widens the remit, but the bytes are not master's, so the text guard rejects.
+    assert not any("outside its remit" in t for t in out.trail)
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+
+
+def test_fix_rung_text_guards_modify_delete_vr_snapshot_png(tmp_path, key):
+    # Master deleted a snapshot the branch changed ({1,2}). A rung must not bring it back.
+    png = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/player-mobile.png"
+
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / png
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    ctx = dataclasses.replace(ctx, conflicted_files=("a.txt", png),
+                              stage_sets={png: frozenset({1, 2})})
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+    _assert_untouched(d, merge)
+
+
+def test_fix_rung_text_guards_non_conflicted_vr_snapshot_png(tmp_path, key):
+    # backlog#1553: the test-path remit lets the session write here, but only a PNG that
+    # conflicted skips the UTF-8 guard. A never-conflicted one is rejected.
+    png = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/player-mobile.png"
+
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / png
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert any(f"non-UTF-8 content after resolution in {png}" in t for t in out.trail)
+    assert png not in _git(d, "ls-tree", "-r", "--name-only", "HEAD").stdout.split("\n")
+    _assert_untouched(d, merge)
+
+
+def test_fix_rung_rejects_png_outside_snapshot_dir(tmp_path, key):
+    def effect(cwd):
+        _edit_keepme(cwd)
+        target = Path(cwd) / "ibl5/images/logo.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"\x89PNG\r\n\x1a\nsession")
+
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, effect)
+    out = run_ladder(ctx, _KEEPME_PROOF, (make_fix_rung("feat"),))
+    assert out.rung == ""
+    assert out.trail[0].startswith(
+        "sonnet-fix: session touched ibl5/images/logo.png outside its remit: ")
     _assert_untouched(d, merge)
 
 

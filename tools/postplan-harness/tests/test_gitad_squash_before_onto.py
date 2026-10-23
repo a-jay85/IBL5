@@ -362,6 +362,105 @@ def test_linear_range_is_not_rewritten():
         shutil.rmtree(d, ignore_errors=True)
 
 
+class _NoCallLlm:
+    def call_tooled(self, purpose, *a, **kw):
+        raise AssertionError(f"unexpected model call: {purpose}")
+
+
+def test_linear_range_is_not_rewritten_with_llm():
+    """With a model wired in, a linear range that replays cleanly still keeps its commits."""
+    d, fork_sha, branch, tip = _make_linear_branch(2)
+    try:
+        _sh(d, "checkout", "master")
+        _write(d, "z.txt", "z\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "m1")
+        m1 = _rev(d, "HEAD")
+        _sh(d, "update-ref", "refs/remotes/origin/master", m1)
+        _sh(d, "checkout", branch)
+        _sh(d, "config", f"branch.{branch}.iblBase", fork_sha)
+
+        result = LiveGit(d, llm=_NoCallLlm()).autoresolve_stacked_rebase()
+        assert result.resolved is True, result.reason
+        assert result.squash_note == ""
+        assert _sh(d, "rev-list", "--count", f"{m1}..HEAD").stdout.strip() == "2"
+        assert not any(e.startswith("postplan: squash") for e in _reflog(d, branch))
+    finally:
+        _cleanup_tmp(branch)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def _make_linear_branch(n):
+    """`n` linear branch commits on top of the small repo. Returns (d, fork_sha, branch, tip)."""
+    branch = f"feature-sqb-{uuid.uuid4().hex[:8]}"
+    d, fork_sha = _make_small_repo(branch)
+    _sh(d, "checkout", "-b", branch)
+    for i in range(n):
+        _write(d, f"lin{i}.txt", f"{i}\n")
+        _write(d, "f.txt", f"a\nedit {i}\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", f"feat: linear {i}")
+    return d, fork_sha, branch, _rev(d, "HEAD")
+
+
+def test_linear_squash_net_diff_is_byte_identical():
+    d, fork_sha, branch, tip = _make_linear_branch(3)
+    try:
+        g = LiveGit(d)
+        new, note, fatal = g._squash_merge_range_for_replay(fork_sha, branch, tip, include_linear=True)
+        assert fatal is False and new, note
+        assert note.startswith("squashed 3 commits (0 merges)")
+        pre = subprocess.run(["git", "-C", d, "diff", "--binary", fork_sha, tip],
+                             check=True, capture_output=True).stdout
+        post = subprocess.run(["git", "-C", d, "diff", "--binary", fork_sha, new],
+                              check=True, capture_output=True).stdout
+        assert pre == post and pre
+        assert _sh(d, "rev-list", "--count", f"{fork_sha}..{new}").stdout.strip() == "1"
+        assert _rev(d, f"{new}^{{tree}}") == _rev(d, f"{tip}^{{tree}}")
+        assert g.head() == new
+    finally:
+        _cleanup_tmp(branch)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_squash_identity_guard_declines_without_moving_ref(monkeypatch):
+    d, fork_sha, branch, tip = _make_linear_branch(3)
+    try:
+        g = LiveGit(d)
+        real = g._run_bytes
+        calls = {"diff": 0}
+
+        def tampered(*args, **kw):
+            if args and args[0] == "diff":
+                calls["diff"] += 1
+                if calls["diff"] == 2:
+                    return b"tampered"
+            return real(*args, **kw)
+
+        monkeypatch.setattr(g, "_run_bytes", tampered)
+        new, note, fatal = g._squash_merge_range_for_replay(fork_sha, branch, tip, include_linear=True)
+        assert new == "" and fatal is True
+        assert note.startswith("squash aborted: net diff"), note
+        assert _rev(d, f"refs/heads/{branch}") == tip
+        assert not any(e.startswith("postplan: squash") for e in _reflog(d, branch))
+    finally:
+        _cleanup_tmp(branch)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_linear_single_commit_range_is_not_squashed():
+    d, fork_sha, branch, tip = _make_linear_branch(1)
+    try:
+        g = LiveGit(d)
+        assert g._squash_merge_range_for_replay(
+            fork_sha, branch, tip, include_linear=True) == ("", "", False)
+        assert _rev(d, f"refs/heads/{branch}") == tip
+        assert not any(e.startswith("postplan: squash") for e in _reflog(d, branch))
+    finally:
+        _cleanup_tmp(branch)
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def test_squash_message_uses_first_parent_branch_commit():
     branch = f"feature-sqb-{uuid.uuid4().hex[:8]}"
     key = branch

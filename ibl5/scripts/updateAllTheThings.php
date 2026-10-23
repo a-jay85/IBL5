@@ -281,8 +281,6 @@ try {
         ));
         $updaterService->addStep(new Updater\Steps\RefreshPlayoffSeriesResultsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db));
-        // Last in this block: the record-holders queries read box scores and vw_playoff_series_results, refreshed above
-        $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
     }
 
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $sourceResolver, $season->endingYear));
@@ -330,6 +328,9 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
+        // vw_playoff_series_results, both refreshed earlier in the pipeline.
+        $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

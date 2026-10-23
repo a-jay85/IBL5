@@ -48,6 +48,10 @@ if (!\Security\CsrfGuard::validateToken($csrfToken, 'lcp_update_all')) {
 // Allow up to 5 minutes for the full update (production shared hosting has 30s default)
 set_time_limit(300);
 
+// Wall-clock start of this updater run; RefreshRecordHoldersStep skips its rebuild when too much of the 300 s is gone
+$updaterClock = new Clock\SystemClock();
+$updaterStartedAt = $updaterClock->microtime();
+
 // --- Progressive output: disable every buffering layer ---
 
 // 1. Disable PHP-level gzip compression (ignores flush() when enabled)
@@ -269,7 +273,7 @@ try {
         $boxscoreProcessor, $boxscoreView, $sourceResolver,
     ));
 
-    // IBL-only: Head-to-Head Records, All-Star games, and related steps don't apply to Olympics
+    // IBL-only: Head-to-Head Records, All-Star games, record holders, and related steps don't apply to Olympics
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
@@ -327,6 +331,9 @@ try {
         $updaterService->addStep(new Updater\Steps\QueueGoogleSheetRefreshStep(
             new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
         ));
+        // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
+        // vw_playoff_series_results, both refreshed earlier in the pipeline.
+        $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

@@ -923,7 +923,7 @@ elif [ "$XM_RC" -eq 0 ]; then
                 _xm_cell=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
                 break
             fi
-        done < "$MATRIX_FILE"
+        done < "$GATEP_MATRIX"
         if [ "$_xm_check" != "$_xm_cell" ]; then
             _bad=$(gatev_nonrunnable "$_xm_check")
             [ -z "$_bad" ] || viol "[XM] row ${_xm_row}: check override is not runnable — ${_bad}"
@@ -948,7 +948,7 @@ elif [ "$XM_RC" -eq 0 ]; then
                 continue
             fi
             viol "[XM] row ${MC_NUM} is a post-impl CLI-executable row in an opted-in plan but carries neither a mutation block nor (mutation-prose: <reason ≥15 chars>)"
-        done < "$MATRIX_FILE"
+        done < "$GATEP_MATRIX"
     fi
 fi
 rm -f "$XM_REC"

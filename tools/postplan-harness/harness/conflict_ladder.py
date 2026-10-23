@@ -165,12 +165,13 @@ def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     if sweep_rc != 1:
         return GuardVerdict(False, False,
                             f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}", "")
-    # A conflicted glob-matched copy-only path (a VR PNG) is binary, so the UTF-8 guard
-    # skips it. A PNG that never conflicted gets no exemption, so a rung that writes one
-    # is rejected here (backlog#1553).
+    # A both-modified glob-matched copy-only path (a VR PNG) is binary, so the UTF-8 guard
+    # skips it. A PNG that never conflicted, or conflicted as modify/delete, gets no
+    # exemption, so a rung that writes one is rejected here (backlog#1553).
     checked = tuple(dict.fromkeys(tuple(touched) + tuple(ctx.conflicted_files)))
     binary_exempt = {g.path for g in match_generated(ctx.conflicted_files)
-                     if g.command is None and _is_glob_match(g.path)}
+                     if g.command is None and _is_glob_match(g.path)
+                     and frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED}
     text_reason = assert_text_only(
         ctx.worktree, [p for p in checked if p not in binary_exempt])
     if text_reason:

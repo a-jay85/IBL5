@@ -54,6 +54,7 @@ class PostOnThisDayStep implements PipelineStepInterface
                 return StepResult::skipped($label, "No notable moment within 7 days of {$selection->centerDate}.");
             }
 
+            $sim = $selection->sim;
             if ($this->claims->claimSimPost($sim) === false) {
                 return StepResult::skipped($label, "Already posted for sim {$sim}.");
             }

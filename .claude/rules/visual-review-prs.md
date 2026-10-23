@@ -14,7 +14,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-15
+last_verified: 2026-10-22
 ---
 
 # Visual-review PRs
@@ -48,28 +48,22 @@ They are skipped only during baseline regen (the `update-baselines` label).
    preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
    durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
    source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
-   gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
-   whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
-   not started yet, since that run checks out `gh-pages` *after* this push and already serves it. The
-   status filter is a **denylist** (neither `completed` nor `in_progress`), so a missed spelling
-   over-suppresses one push instead of silently no-opping. The debounce never fires on an
-   `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
-   dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
-   out of the count, so one stuck run cannot block every later deploy. This stops a push fan-out (one
-   master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
-   concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
-   plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
-   collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
-   `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
-   fail. The retries absorb contention and never soften the gate.
+   gh-pages push lands and re-publishes the whole tree. That dispatch is **debounced**: it is skipped
+   when a `pages-deploy` run exists that has not started yet, since that run checks out `gh-pages`
+   *after* this push. The status filter is a **denylist** (neither `completed` nor `in_progress`). The
+   debounce never fires on an `in_progress` run and fails **open**: an API error dispatches. A
+   not-started run older than an hour counts as stuck. The step cancels it and leaves it out of the
+   count. A push fan-out (one master push → N open-PR updates → N gh-pages pushes) thus collapses to
+   about **two** deploys. Every open PR's VR job pushes to the same `gh-pages` ref, so the deploy runs
+   **one attempt plus two retries** (each re-clones `gh-pages`). An **assert step** fails the job if
+   all three fail. The retries absorb contention and never soften the gate.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
 per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
-rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
+rebase-and-retry loop. The job then dispatches `pages-deploy.yml` so the prune reaches the served site.
 It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
 
 ## Refreshing stale galleries
@@ -110,7 +104,11 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 ## Approving (sign-off)
 
 Apply the **`update-baselines`** label. That regenerates the baselines, auto-commits them,
-and re-runs VR green — the auto-commit is the durable approval record. There is no separate
+and re-runs VR green. The auto-commit is the durable approval record. Regen runs on a green
+VR check too and rewrites every snapshot (`--update-snapshots=all`), so it also clears
+sub-gate drift that only the strict pass flags. Whether CI renders are deterministic enough
+for an undrifted snapshot to rewrite byte-identical is unverified. Read the auto-commit diff
+before merging. There is no separate
 approval mechanism. Because the gallery reads master's committed baseline via
 `git show <base.sha>:…`, the before/after evidence survives this regen instead of vanishing.
 

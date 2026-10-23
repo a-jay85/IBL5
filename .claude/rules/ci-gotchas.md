@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 paths: ".github/workflows/**"
 ---
 
@@ -54,7 +54,7 @@ Bare `ssh-keyscan host >> ~/.ssh/known_hosts` can exit non-zero on transient net
 
 The `update-baselines` label in `.github/workflows/e2e-tests.yml` triggers Visual Regression baseline regeneration and commit back to the PR branch. Three fixed bugs to avoid re-learning:
 
-1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. The regen/commit steps must check `steps.visual-regression.outcome == 'failure'` — `outcome` retains the real result.
+1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. Any step that branches on the VR result must read `outcome`, which keeps the real result. The regen and commit steps no longer branch on it. They run on pass or fail and call `--update-snapshots=all`, because the bare flag (`changed`) skips snapshots that pass the gate, so drift that only the gallery's strict pass sees could never clear.
 2. **Missing `always()` on Commit step**: when Regenerate fails, GitHub Actions skips later steps. The Commit step's `if:` must include `always()`.
 3. **Premature label removal**: "Remove update-baselines label" must be gated on `steps.regen-baselines.outcome != 'skipped'`; otherwise a label event where regen is skipped still removes the label, preventing retry.
 

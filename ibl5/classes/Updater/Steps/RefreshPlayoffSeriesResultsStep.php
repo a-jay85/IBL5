@@ -37,13 +37,7 @@ final class RefreshPlayoffSeriesResultsStep implements PipelineStepInterface
         $this->db->begin_transaction();
 
         try {
-            $this->dbExec('DELETE FROM `ibl_playoff_series_results`');
-            $rowCount = $this->dbExec(
-                'INSERT INTO `ibl_playoff_series_results` '
-                . '(`year`, `round`, `winner_tid`, `loser_tid`, `winner`, `loser`, '
-                . '`winner_games`, `loser_games`, `total_games`) '
-                . self::SELECT_SQL,
-            );
+            $rowCount = $this->rebuildWithinCurrentTransaction();
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollback();
@@ -51,6 +45,29 @@ final class RefreshPlayoffSeriesResultsStep implements PipelineStepInterface
         }
 
         return StepResult::success($this->getLabel(), $rowCount . ' rows');
+    }
+
+    /**
+     * DELETE + INSERT with no transaction control of its own.
+     *
+     * execute() wraps this in begin_transaction()/commit(). DatabaseIntegration
+     * tests call it directly so the rebuild runs inside the per-test outer
+     * transaction and is rolled back in tearDown; calling execute() there would
+     * commit that outer transaction.
+     *
+     * @return int affected-row count of the INSERT
+     * @throws \RuntimeException when a statement fails to prepare or execute
+     */
+    public function rebuildWithinCurrentTransaction(): int
+    {
+        $this->dbExec('DELETE FROM `ibl_playoff_series_results`');
+
+        return $this->dbExec(
+            'INSERT INTO `ibl_playoff_series_results` '
+            . '(`year`, `round`, `winner_tid`, `loser_tid`, `winner`, `loser`, '
+            . '`winner_games`, `loser_games`, `total_games`) '
+            . self::SELECT_SQL,
+        );
     }
 
     /**

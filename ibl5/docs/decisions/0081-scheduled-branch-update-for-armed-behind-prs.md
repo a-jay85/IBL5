@@ -1,6 +1,6 @@
 ---
 description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
-last_verified: 2026-10-11
+last_verified: 2026-10-22
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -200,3 +200,7 @@ Two changes close the gap.
 **Prevention.** `bin/merge-line-select` treats a PR carrying the `post-plan-running` label as skipped with reason `running`. The label marks a live run (`bin/post-plan-now` adds it at start and removes it at exit). Precedence is `running`, then `red`, then `dirty`. In line mode the next PR becomes the head. In `--pr` dispatch mode the selector returns `action=none`. The workflow's notice step logs a `::notice::` for `running` and posts no sticky comment, and a running PR is left out of `clear`. The live query now selects `labels`; a snapshot without labels reads as unlabeled.
 
 **Absorption.** The PR-page "Update branch" button can still push mid-run, so prevention alone is incomplete. `update_branch_merge_equivalent` in `tools/postplan-harness/harness/gitutil.py` now walks first parents from the remote head down to the sha the harness pushed. Every commit on that walk must be a two-parent merge whose second parent is an ancestor of `origin/master` and whose tree equals the clean `git merge-tree --write-tree` result. The walk stops at `UPDATE_BRANCH_MERGE_CHAIN_CAP` (10) merges. Any failing arm, git error, timeout, or an over-cap chain leaves the run diverged. The tree-equivalent and patch-series checks are unchanged.
+
+## Addendum - PR Fast-Canary retired (2026-10-22)
+
+The Decision bullet saying `pr-canary.yml` covers the armed line via `bin/merge-line-select --list` no longer holds. The workflow, `bin/pr-canary-check` (example), and its test were removed. Its jobs always exited 0 and only posted an advisory sticky comment that nothing read, while `update-behind-prs.yml` already brings the head PR up to date and its full required CI runs. `--list` stays in the selector but has no caller now.

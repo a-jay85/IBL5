@@ -3,7 +3,7 @@
 # shellcheck disable=SC2016  # W-case patterns are literal workflow text, not shell expansions
 #
 # bin/test-merge-line-select — regression harness for bin/merge-line-select and
-# the two workflows that call it (update-behind-prs.yml, pr-canary.yml).
+# the workflow that calls it (update-behind-prs.yml).
 #
 # Every decision rule runs against synthetic GraphQL snapshots piped in on
 # --input. The live-GraphQL path runs against a stub gh (GH_CMD / PATH). No
@@ -704,10 +704,9 @@ else
     printf '%s\n' "$OUT" | sed 's/^/    /'
 fi
 
-# --- W: static shape of the two workflows that call the selector ---
+# --- W: static shape of the workflow that calls the selector ---
 
 UPDATE_WF="$REPO_ROOT/.github/workflows/update-behind-prs.yml"
-CANARY_WF="$REPO_ROOT/.github/workflows/pr-canary.yml"
 
 # count_lines <fixed-string> <file> — number of lines containing the string.
 count_lines() { grep -cF -- "$1" "$2" || true; }
@@ -732,15 +731,6 @@ if [ "$W2_GROUP" = 1 ] && [ "$W2_GUARDS" = 2 ] && [ "$W2_DAILY" = 0 ] \
     pass "W2-dryrun-guards"
 else
     failcase "W2-dryrun-guards — group=$W2_GROUP guards=$W2_GUARDS daily=$W2_DAILY scope=$W2_SCOPE dispatch_pr=$W2_PR dry_run=$W2_DRY"
-fi
-
-W3_SELECTOR=$(grep -E 'bin/merge-line-select' "$CANARY_WF" | grep -cF -- '--list' || true)
-W3_OLD=$(count_lines 'gh pr list' "$CANARY_WF")
-W3_GUARD=$(count_lines "if: needs.enumerate.outputs.count != '0'" "$CANARY_WF")
-if [ "$W3_SELECTOR" -ge 1 ] && [ "$W3_OLD" = 0 ] && [ "$W3_GUARD" = 1 ]; then
-    pass "W3-canary-uses-selector"
-else
-    failcase "W3-canary-uses-selector — selector-list=$W3_SELECTOR gh-pr-list=$W3_OLD count-guard=$W3_GUARD"
 fi
 
 # The workflow path is a variable so a counterfactual copy can be swapped in.

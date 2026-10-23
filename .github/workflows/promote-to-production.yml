@@ -12,7 +12,7 @@ name: Auto-promote to production
 on:
   workflow_run:
     # ALL master-push workflows, path-filtered or not. The branches filter below keeps PR runs out.
-    # The unfiltered two guarantee an event exists at all; the filtered eleven
+    # The unfiltered two guarantee an event exists at all; the filtered ten
     # guarantee a LATE event, after the slow gates have finished.
     workflows:
       - gitleaks
@@ -26,7 +26,6 @@ on:
       - Python tests (post-plan harness)
       - Cache Dependencies
       - Lighthouse Baseline
-      - PR Fast-Canary
       - Update BEHIND PRs
     types: [completed]
     # Head-branch filter: every listed workflow also runs on pull_request, and each PR

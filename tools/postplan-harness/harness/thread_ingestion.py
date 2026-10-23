@@ -23,12 +23,29 @@ TRUSTED_LOGIN = "a-jay85"
 PURPOSE = "thread-remediation"
 VERDICTS = ("FIX", "DECLINE")
 GATE_HOLD_CATEGORY = "gate-path"
+GATE_HOLD_MARKER = "<!-- postplan-gate-hold -->"
 ORIGIN_PRE_EXISTING = "pre-existing"
 ORIGIN_SAME_RUN = "same-run"
 
 
 def _is_trusted(login: str, typename: str) -> bool:
     return login == TRUSTED_LOGIN or typename == "Bot" or login.endswith("[bot]")
+
+
+def gate_hold_body(why: str) -> str:
+    """Marker reply: hidden marker first, then one visible sentence naming the reason."""
+    return f"{GATE_HOLD_MARKER}\nHeld for a human: the post-plan fixer will not edit gate paths ({why})."
+
+
+def _is_gate_held(thread: dict) -> bool:
+    """True when the thread's LATEST comment is a gate-hold marker from a trusted author.
+
+    A later human reply replaces the latest comment, so the thread becomes eligible
+    again. An untrusted author pasting the marker has no effect.
+    """
+    if GATE_HOLD_MARKER not in (thread.get("lastBody") or ""):
+        return False
+    return _is_trusted(thread.get("lastAuthorLogin") or "", thread.get("lastAuthorType") or "")
 
 
 def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> list[dict] | None:
@@ -58,7 +75,8 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
             continue
         if keep is not None and not keep(t):
             continue
-        kept.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent")})
+        kept.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent",
+                                            "lastBody", "lastAuthorLogin", "lastAuthorType")})
     return kept
 
 
@@ -249,6 +267,12 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
 
     for thread in threads:
         cid = thread.get("commentId")
+        if _is_gate_held(thread):
+            log(f"thread {cid}: latest comment is the gate-hold marker; skipping, no fixer call")
+            skipped += 1
+            per_thread.append({"commentId": cid, "outcome": "skipped", "sha": None,
+                               "path": thread.get("path"), "body_head": (thread.get("body") or "")[:160]})
+            continue
         pre_sha = last_sha_box[0]
         thread_info: dict = {}
         try:
@@ -265,7 +289,16 @@ def run_thread_ingestion(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, l
             # before post_sha is derived; last_sha and per_thread[].sha must never
             # name an unreachable commit.
             last_sha_box[0] = pre_sha
-        post_sha = last_sha_box[0] if last_sha_box[0] != pre_sha else None
+        if thread_info.get("gate_hold") or thread_info.get("dropped"):
+            if thread_info.get("dropped"):
+                why = "its fix commit edited a gate path and was dropped"
+            else:
+                why = thread_info.get("reason") or "the only fix edits a gate path"
+            try:
+                gh.reply_review_thread(pr, cid, gate_hold_body(why))
+            except Exception as e:  # noqa: BLE001 - a lost marker costs one more fixer attempt next run
+                log(f"thread {cid}: gate-hold marker post failed ({e!r}); thread stays open")
+        post_sha =last_sha_box[0] if last_sha_box[0] != pre_sha else None
         if outcome == "fixed":
             fixed += 1
         elif outcome == "declined":

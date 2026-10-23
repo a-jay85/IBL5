@@ -59,7 +59,6 @@ class GoogleSheetRefreshWorker
         $start = $this->clock->now();
         $processed = 0;
         $failures = 0;
-        $exportRows = null;
         foreach ($rows as $row) {
             if ($this->clock->now() - $start >= $budgetSeconds) {
                 break;
@@ -68,7 +67,8 @@ class GoogleSheetRefreshWorker
             // A build failure is a server-side glitch, not a GM's fault. Leave every
             // remaining row pending so the next tick retries them.
             try {
-                $exportRows ??= $this->export->buildRows();
+                // Built per GM so a sim landing mid-tick is never cleared by markRefreshed() against stale rows.
+                $exportRows = $this->export->buildRows();
             } catch (\Throwable $e) {
                 $this->logger?->error('google sheet export rows build failed', ['exception' => $e::class]);
                 $failures++;

@@ -160,7 +160,7 @@ LeagueStarters -> Auth League Player Repositories Season Security Team UI
 Logging -> Bootstrap
 Mail -> Bootstrap
 Maintenance -> League
-Module -> League Season Utilities
+Module -> League Season
 Navigation -> League Security
 Negotiation -> BasketballStats Database League Player Repositories Security Validation
 NextSim -> BasketballStats LeagueSchedule Player Season Security Standings Team TeamSchedule UI

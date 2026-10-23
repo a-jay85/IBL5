@@ -200,6 +200,40 @@ class WaiversProcessorWriteTest extends TestCase
     }
 
     /**
+     * Offseason with an existing contract: the validator receives the next-year salary
+     * and the veteran minimum for exp + 1.
+     */
+    public function testProcessAddOffseasonContractedPlayerPassesNextYearSalaryAndExpPlusOneVetMin(): void
+    {
+        $this->playerLookupRepoStub->method('getPlayerByID')->willReturn([
+            'name' => 'Test Player', 'pid' => 1, 'exp' => 3,
+            'cy' => 1, 'cyt' => 3,
+            'salary_yr1' => 500, 'salary_yr2' => 600, 'salary_yr3' => 700,
+            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
+        ]);
+        $validatorMock = $this->createMock(WaiversValidatorInterface::class);
+        $validatorMock->expects($this->once())->method('validateAdd')
+            ->with(1, 5, 5, 3000, 600, \League\ContractRules::getVeteranMinimumSalary(4))
+            ->willReturn(ValidationResult::failure('stop'));
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->phase = 'Free Agency';
+        $processor = new WaiversProcessor(
+            $this->repoStub,
+            $this->teamIdentityRepoStub,
+            $this->playerLookupRepoStub,
+            $validatorMock,
+            $this->newsServiceStub,
+            self::createStub(\mysqli::class),
+            null,
+            $season
+        );
+
+        $result = $processor->processAdd(1, 'Test Team', 5, 5, 3000);
+
+        self::assertFalse($result['success']);
+    }
+
+    /**
      * A player with an existing contract hands that salary to the validator, and the
      * veteran minimum still comes from the player's own experience.
      */

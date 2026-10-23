@@ -119,6 +119,9 @@ jobs:
           before=$(sed -E 's/.* before=([0-9]+).*/\1/' <<< "$total")
           after=$(sed -E 's/.* after=([0-9]+).*/\1/' <<< "$total")
           store=$(sed -E 's/.* store_after=([0-9]+).*/\1/' <<< "$total")
+          store_before=$(sed -E 's/.* store_before=([0-9]+).*/\1/' <<< "$total")
+          # Compare like with like: both sides count the per-SHA dirs plus the blob store.
+          before=$(( before + store_before ))
           projected=$(( after + store ))
           { echo "### Blob-store migration projection"; echo '```'; echo "$total"; echo "projected_tree_bytes=${projected}"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "projected_tree_bytes=${projected}"

@@ -265,6 +265,11 @@ final class ServiceFakeH2h implements HeadToHeadRecordsRepositoryInterface
         return true;
     }
 
+    public function sourceFingerprint(): string
+    {
+        return 'fp';
+    }
+
     /**
      * @param 'franchises'|'teams'|'gms' $dimension
      * @param array<array-key, array<array-key, MatchupRecord>> $records

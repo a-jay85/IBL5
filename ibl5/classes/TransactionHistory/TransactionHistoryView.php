@@ -93,7 +93,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
                 <?php endforeach; ?>
             </select>
         </div>
-        <button type="submit" class="d-btn d-btn-primary">Filter</button>
+        <button type="submit" class="d-btn d-btn-primary d-btn-sm">Filter</button>
         <a href="modules.php?name=TransactionHistory" class="d-btn d-btn-ghost d-btn-sm txn-reset">Reset</a>
     </div>
 </form>

@@ -143,9 +143,8 @@ test.describe('player view tables (post-conversion)', () => {
       (rows) => rows.map((r) => (r.children[1].textContent ?? '').trim().toLowerCase()),
     );
     expect(teams.length, 'season rows present').toBeGreaterThan(1);
-    for (let i = 1; i < teams.length; i++) {
-      expect(teams[i - 1].localeCompare(teams[i]), `season row ${i - 1} >= row ${i} after descending sort`).toBeGreaterThanOrEqual(0);
-    }
+    const descending = [...teams].sort((a, b) => b.localeCompare(a));
+    expect(teams, 'season rows in descending team order after sort').toEqual(descending);
 
     const lastRow = await table.evaluate((t: HTMLTableElement) => {
       const last = t.rows[t.rows.length - 1];

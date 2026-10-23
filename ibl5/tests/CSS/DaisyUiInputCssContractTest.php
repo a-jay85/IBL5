@@ -166,6 +166,34 @@ class DaisyUiInputCssContractTest extends TestCase
         );
     }
 
+    /**
+     * Mutation: delete the .d-input.auth-input--with-icon rule from input.css.
+     */
+    public function testAuthOverridesRestateIconAndCardBodyPadding(): void
+    {
+        $body = self::overrideBody();
+
+        $this->assertStringContainsString('.d-input.auth-input--with-icon', $body);
+        $this->assertStringContainsString('padding-left: calc(var(--space-3) + 20px + var(--space-2))', $body);
+        $this->assertStringContainsString('.auth-card .d-card-body', $body);
+        $this->assertStringContainsString('padding: var(--space-4) var(--space-6) var(--space-6)', $body);
+    }
+
+    /**
+     * Mutation: move the auth block below the Updater guard rule.
+     */
+    public function testUpdaterTextErrorGuardStaysAfterAuthOverrides(): void
+    {
+        $body = self::overrideBody();
+
+        $authPos = strpos($body, '.auth-card .d-card-body');
+        $guardPos = strpos($body, '.updater-log .text-error');
+
+        $this->assertIsInt($authPos, 'Missing .auth-card .d-card-body override');
+        $this->assertIsInt($guardPos, 'Missing Updater .text-error guard rule');
+        $this->assertGreaterThan($authPos, $guardPos, 'The Updater guard rule must stay after the auth overrides');
+    }
+
     /** Strip CSS comments so commented-out text never satisfies an assertion. */
     private static function css(): string
     {

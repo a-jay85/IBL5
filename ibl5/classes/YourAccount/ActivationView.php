@@ -21,8 +21,8 @@ class ActivationView
         ob_start();
         ?>
 <div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="d-card-body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--success">
                     <?= HtmlSanitizer::trusted($this->checkIcon()) ?>
@@ -32,7 +32,7 @@ class ActivationView
                     <strong><?= HtmlSanitizer::e($username) ?></strong>, your account has been activated successfully. You can now sign in.
                 </div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Sign In</a>
+                    <a href="modules.php?name=YourAccount" class="d-btn d-btn-primary">Sign In</a>
                 </div>
             </div>
         </div>
@@ -56,8 +56,8 @@ class ActivationView
         ob_start();
         ?>
 <div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="d-card-body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--error">
                     <?= HtmlSanitizer::trusted($this->errorIcon()) ?>
@@ -65,7 +65,7 @@ class ActivationView
                 <div class="auth-status__title">Activation Error</div>
                 <div class="auth-status__message"><?= HtmlSanitizer::e($message) ?></div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount&amp;op=new_user" class="ibl-btn ibl-btn--primary">Register Again</a>
+                    <a href="modules.php?name=YourAccount&amp;op=new_user" class="d-btn d-btn-primary">Register Again</a>
                 </div>
             </div>
         </div>

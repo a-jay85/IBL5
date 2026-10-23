@@ -799,6 +799,15 @@ def test_session_denied_covers_push_wrapper_forms():
     from harness.conflict_fix import FIX_DENIED
     assert "Bash(*/git push:*)" in PUSH_WRAPPER_DENIED
     assert "Bash(git * push *)" in PUSH_WRAPPER_DENIED
+    probe_added = (
+        "Bash(*/git push *)", "Bash(*/git push)",
+        "Bash(*/gh *)", "Bash(*/gh)", "Bash(*/curl *)", "Bash(*/curl)",
+        "Bash(*/wget *)", "Bash(*/wget)", "Bash(*/ssh *)", "Bash(*/ssh)",
+        "Bash(*/scp *)", "Bash(*/scp)",
+        "Bash(bash -c:*)", "Bash(sh -c:*)", "Bash(zsh -c:*)",
+    )
+    for entry in probe_added:
+        assert entry in PUSH_WRAPPER_DENIED
     for entry in PUSH_WRAPPER_DENIED:
         assert entry in SESSION_DENIED
         assert entry in FIX_DENIED

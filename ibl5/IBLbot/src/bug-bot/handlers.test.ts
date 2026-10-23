@@ -2,10 +2,22 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Message, MessageReaction, User } from 'discord.js';
 
 vi.mock('./config.js', () => ({
-    config: { bugChannelId: 'BUG_CHANNEL' },
+    config: { bugChannelId: 'BUG_CHANNEL', operatorDiscordId: 'OPERATOR' },
+}));
+
+// ApiError is re-declared locally (not imported from the real module) so the mock factory
+// stays self-contained; handlers.ts only needs `instanceof` + `.statusCode` on it.
+const { MockApiError } = vi.hoisted(() => ({
+    MockApiError: class MockApiError extends Error {
+        constructor(public readonly statusCode: number, public readonly errorCode: string, message: string) {
+            super(message);
+        }
+    },
 }));
 
 vi.mock('./php-client.js', () => ({
+    ApiError: MockApiError,
+    wake: vi.fn().mockResolvedValue({ id: 1, outcome: 'woke', status: 'queued' }),
     enqueue: vi.fn().mockResolvedValue({ authorized: true, report_id: 1 }),
     threadReply: vi.fn().mockResolvedValue({ matched: true }),
     reaction: vi.fn().mockResolvedValue({ advanced: true }),
@@ -25,6 +37,7 @@ import {
     classifyMessage,
     toRoutable,
     handleEnqueue,
+    handleWake,
     handleReaction,
     handleSourceUpdate,
     handleSourceDelete,
@@ -56,6 +69,7 @@ const base: RoutableMessage = {
     channelId: 'BUG_CHANNEL',
     isThread: false,
     parentId: null,
+    mentionedUserIds: [],
 };
 
 describe('classifyMessage', () => {
@@ -86,15 +100,43 @@ describe('classifyMessage', () => {
     });
 });
 
+describe('classifyMessage wake routing', () => {
+    const inThread = { ...base, channelId: 'THREAD', isThread: true, parentId: 'BUG_CHANNEL' };
+
+    it('classifyMessage: operator mention in bug thread -> wake', () => {
+        expect(classifyMessage({ ...inThread, authorId: 'OPERATOR', mentionedUserIds: ['CLIENT'] }, 'CLIENT'))
+            .toBe('wake');
+    });
+
+    it('classifyMessage: GM mention in bug thread -> thread-reply', () => {
+        expect(classifyMessage({ ...inThread, authorId: 'GM', mentionedUserIds: ['CLIENT'] }, 'CLIENT'))
+            .toBe('thread-reply');
+    });
+
+    it('classifyMessage: operator reply without mention -> thread-reply', () => {
+        expect(classifyMessage({ ...inThread, authorId: 'OPERATOR', mentionedUserIds: ['SOMEONE_ELSE'] }, 'CLIENT'))
+            .toBe('thread-reply');
+    });
+
+    it('classifyMessage: operator mention outside bug scope -> ignore', () => {
+        expect(classifyMessage(
+            { ...inThread, authorId: 'OPERATOR', parentId: 'OTHER', mentionedUserIds: ['CLIENT'] },
+            'CLIENT',
+        )).toBe('ignore');
+    });
+});
+
 describe('toRoutable', () => {
     it('maps a non-thread live Message', () => {
         const msg = {
             author: { id: 'A1', bot: false },
             channelId: 'BUG_CHANNEL',
             channel: { isThread: () => false },
+            mentions: { users: new Map<string, unknown>() },
         } as unknown as Message;
         expect(toRoutable(msg)).toEqual({
             authorId: 'A1', isBot: false, channelId: 'BUG_CHANNEL', isThread: false, parentId: null,
+            mentionedUserIds: [],
         });
     });
 
@@ -103,9 +145,11 @@ describe('toRoutable', () => {
             author: { id: 'A2', bot: true },
             channelId: 'THREAD',
             channel: { isThread: () => true, parentId: 'BUG_CHANNEL' },
+            mentions: { users: new Map<string, unknown>([['CLIENT', {}], ['U2', {}]]) },
         } as unknown as Message;
         expect(toRoutable(msg)).toEqual({
             authorId: 'A2', isBot: true, channelId: 'THREAD', isThread: true, parentId: 'BUG_CHANNEL',
+            mentionedUserIds: ['CLIENT', 'U2'],
         });
     });
 });
@@ -138,7 +182,7 @@ describe('handleEnqueue', () => {
         expect(typeof arg.message_id).toBe('string');
     });
 
-    it('reacts ✴️ to the original message after a successful enqueue', async () => {
+    it('handleEnqueue: top-level GM post calls enqueue and never reacts', async () => {
         const msg = {
             author: { id: '111111111111111111' },
             channelId: '222222222222222222',
@@ -151,28 +195,7 @@ describe('handleEnqueue', () => {
         await handleEnqueue(msg);
 
         expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
-        expect(msg.react).toHaveBeenCalledTimes(1);
-        expect(msg.react).toHaveBeenCalledWith('✴️');
-        // enqueue must complete before the ack react fires
-        const enqueueOrder = vi.mocked(phpClient.enqueue).mock.invocationCallOrder[0];
-        const reactOrder = vi.mocked(msg.react).mock.invocationCallOrder[0];
-        expect(enqueueOrder).toBeLessThan(reactOrder);
-    });
-
-    it('swallows a react() rejection — handleEnqueue still resolves, enqueue still fired', async () => {
-        const msg = {
-            author: { id: '111111111111111111' },
-            channelId: '222222222222222222',
-            id: '333333333333333333',
-            content: 'a bug',
-            attachments: new Map(),
-            react: vi.fn().mockRejectedValue(new Error('Missing Permissions')),
-        } as unknown as Message;
-
-        await expect(handleEnqueue(msg)).resolves.toBeUndefined();
-
-        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
-        expect(msg.react).toHaveBeenCalledTimes(1);
+        expect(msg.react).not.toHaveBeenCalled();
     });
 
     function msgWith(attachments: Map<string, unknown>): Message {
@@ -231,6 +254,113 @@ describe('handleEnqueue', () => {
         expect(arg.attachments).toHaveLength(1);
         expect(arg.attachments![0].local_path).toBeNull();
         expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('handleWake', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+
+    function wakeMsg(over: { starter?: unknown } = {}) {
+        const starter = over.starter === undefined
+            ? { id: '444444444444444444', author: { id: 'GM' }, channelId: 'BUG_CHANNEL', content: 'bug', attachments: new Map(), react: vi.fn() }
+            : over.starter;
+        const thread = {
+            id: '555555555555555555',
+            isThread: () => true,
+            fetchStarterMessage: vi.fn().mockResolvedValue(starter),
+        };
+        const msg = {
+            id: '666666666666666666',
+            author: { id: '777777777777777777' },
+            content: '@Buggsy wake up',
+            channel: thread,
+            react: vi.fn().mockResolvedValue(undefined),
+        } as unknown as Message;
+        return { msg, starter: starter as { id: string } | null };
+    }
+
+    it('handleWake: posts the five fields with string snowflakes and reacts on woke', async () => {
+        const { msg } = wakeMsg();
+
+        await handleWake(msg);
+
+        expect(phpClient.wake).toHaveBeenCalledTimes(1);
+        const arg = vi.mocked(phpClient.wake).mock.calls[0][0];
+        expect(arg).toEqual({
+            source_message_id: '444444444444444444',
+            thread_id: '555555555555555555',
+            message_id: '666666666666666666',
+            author_id: '777777777777777777',
+            content: '@Buggsy wake up',
+        });
+        for (const v of Object.values(arg)) expect(typeof v).toBe('string');
+        expect(msg.react).toHaveBeenCalledWith('👀');
+    });
+
+    it('handleWake: falls back to the thread id when the starter cannot be fetched', async () => {
+        const { msg } = wakeMsg();
+        vi.mocked((msg.channel as unknown as { fetchStarterMessage: () => Promise<unknown> }).fetchStarterMessage)
+            .mockRejectedValue(new Error('Unknown Message'));
+
+        await handleWake(msg);
+
+        expect(vi.mocked(phpClient.wake).mock.calls[0][0].source_message_id).toBe('555555555555555555');
+    });
+
+    it('handleWake: duplicate outcome is silent', async () => {
+        vi.mocked(phpClient.wake).mockResolvedValueOnce({ id: 1, outcome: 'duplicate', status: 'queued' });
+        const { msg } = wakeMsg();
+
+        await handleWake(msg);
+
+        expect(msg.react).not.toHaveBeenCalled();
+    });
+
+    it('handleWake: swallows a react rejection', async () => {
+        const { msg } = wakeMsg();
+        vi.mocked(msg.react).mockRejectedValue(new Error('Missing Permissions'));
+
+        await expect(handleWake(msg)).resolves.toBeUndefined();
+    });
+
+    it('handleWake: 404 enqueues the starter then retries wake once', async () => {
+        vi.mocked(phpClient.wake)
+            .mockRejectedValueOnce(new MockApiError(404, 'not_found', 'no report'))
+            .mockResolvedValueOnce({ id: 9, outcome: 'woke', status: 'queued' });
+        const { msg, starter } = wakeMsg();
+
+        await handleWake(msg);
+
+        expect(phpClient.enqueue).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(phpClient.enqueue).mock.calls[0][0].message_id).toBe(starter!.id);
+        expect(phpClient.wake).toHaveBeenCalledTimes(2);
+        expect(msg.react).toHaveBeenCalledWith('👀');
+    });
+
+    it('handleWake: 404 with no starter logs and does not retry', async () => {
+        vi.mocked(phpClient.wake).mockRejectedValueOnce(new MockApiError(404, 'not_found', 'no report'));
+        const { msg } = wakeMsg({ starter: null });
+
+        await handleWake(msg);
+
+        expect(phpClient.enqueue).not.toHaveBeenCalled();
+        expect(phpClient.wake).toHaveBeenCalledTimes(1);
+        expect(msg.react).not.toHaveBeenCalled();
+    });
+
+    it('handleWake: 403 logs and does not react or enqueue', async () => {
+        vi.mocked(phpClient.wake).mockRejectedValueOnce(new MockApiError(403, 'forbidden', 'not operator'));
+        const { msg } = wakeMsg();
+
+        await handleWake(msg);
+
+        expect(console.error).toHaveBeenCalled();
+        expect(phpClient.enqueue).not.toHaveBeenCalled();
+        expect(phpClient.wake).toHaveBeenCalledTimes(1);
+        expect(msg.react).not.toHaveBeenCalled();
     });
 });
 

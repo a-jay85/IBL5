@@ -170,6 +170,7 @@ export function startBugBotServer(client: Client): void {
                 messages: [...msgs.values()]
                     .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
                     .map((m) => ({
+                        id: m.id,                   // string; the tick omits operator mentions by it
                         author_id: m.author.id,     // string
                         content: m.content,
                         ts: m.createdTimestamp,     // numeric

@@ -248,6 +248,12 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     {
         $dateExpr = LastSimRecapRepository::TRANSACTION_DATE_SQL;
 
+        // season_year is the ending year: Sep-Dec dates belong to the next year.
+        // The season_year range is a sargable pre-filter (idx_season); the date
+        // expression stays as the exact check.
+        $startSeason = (int) substr($start, 0, 4) + ((int) substr($start, 5, 2) >= 9 ? 1 : 0);
+        $endSeason = (int) substr($end, 0, 4) + ((int) substr($end, 5, 2) >= 9 ? 1 : 0);
+
         // $dateExpr is a fixed SQL fragment built from column refs and constants
         // (no user input); concatenate rather than interpolate.
         $sql = "SELECT t.pid,
@@ -259,11 +265,12 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
                 JOIN `ibl_plr` p ON p.pid = t.pid
                 WHERE t.transaction_type = 1
                   AND t.injury_games_missed IS NOT NULL
+                  AND t.season_year BETWEEN ? AND ?
                   AND " . $dateExpr . " BETWEEN ? AND ?
                 ORDER BY injury_date ASC, t.id ASC";
 
         /** @var list<array{pid:int,name:string,injury_date:string,injury_description:string|null,injury_games_missed:int}> $rows */
-        $rows = $this->fetchAll($sql, "ss", $start, $end);
+        $rows = $this->fetchAll($sql, "iiss", $startSeason, $endSeason, $start, $end);
 
         $out = [];
         foreach ($rows as $row) {

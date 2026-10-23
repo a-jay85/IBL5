@@ -228,8 +228,12 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       # --- Dependency Caching ---
-      - name: Cache vendor directory
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restore and save are split so refresh mode (vr-refresh.yml: schedule/workflow_dispatch,
+      # default-branch cache scope, PR head checked out) only reads the cache. Saving there
+      # would let PR code write a cache that master and every other PR then restore (CodeQL
+      # actions/cache-poisoning/direct-cache).
+      - name: Restore vendor directory
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: vendor-cache
         with:
           path: ibl5/vendor
@@ -237,8 +241,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vendor-
 
-      - name: Cache node_modules
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Restore node_modules
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: node-modules-cache
         with:
           path: ibl5/node_modules
@@ -255,6 +259,20 @@ jobs:
         if: steps.vendor-cache.outputs.cache-hit != 'true'
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      - name: Save node_modules
+        if: ${{ !inputs.refresh_pr && steps.node-modules-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ibl5/node_modules
+          key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}
+
+      - name: Save vendor directory
+        if: ${{ !inputs.refresh_pr && steps.vendor-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ibl5/vendor
+          key: ${{ steps.vendor-cache.outputs.cache-primary-key }}
 
       # --- Docker E2E Setup ---
       - uses: ./.github/actions/setup-docker-e2e

@@ -234,7 +234,7 @@
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
-    color: var(--accent-500);
+    color: var(--accent-800);
     text-decoration: none;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
@@ -243,7 +243,7 @@
 
 .search-pagination__link:hover {
     background: var(--accent-100);
-    color: var(--accent-600);
+    color: var(--accent-800);
 }
 
 .search-pagination__link--next {

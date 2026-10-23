@@ -30,15 +30,17 @@ class WaiversValidator implements WaiversValidatorInterface
      */
     public function validateAdd(
         ?int $playerID,
+        int $openRosterSlots,
         int $healthyRosterSlots,
         int $totalSalary,
-        int $playerSalary
+        int $playerSalary,
+        int $veteranMinimum
     ): ValidationResult {
         if ($playerID === null || $playerID === 0) {
             return ValidationResult::failure("You didn't select a valid player. Please select a player and try again.");
         }
 
-        if ($healthyRosterSlots < 1) {
+        if ($openRosterSlots < 1) {
             return ValidationResult::failure("You have a full roster. You can't sign another player at this time!");
         }
 
@@ -49,8 +51,8 @@ class WaiversValidator implements WaiversValidatorInterface
             return ValidationResult::failure("You have 12 or more healthy players and this signing will put you over the hard cap. Therefore you cannot make this signing.");
         }
 
-        // If under 12 healthy players but over hard cap and player salary > vet min
-        if ($healthyRosterSlots > 3 && $newTotalSalary > League::HARD_CAP_MAX && $playerSalary > \League\ContractRules::getVeteranMinimumSalary(10)) {
+        // If under 12 healthy players but over hard cap and player salary > the player's own vet min
+        if ($healthyRosterSlots > 3 && $newTotalSalary > League::HARD_CAP_MAX && $playerSalary > $veteranMinimum) {
             return ValidationResult::failure("You are over the hard cap and therefore can only sign players who are making veteran minimum!");
         }
 

@@ -75,7 +75,7 @@ final class RivalriesController
 
     private function parseTeamId(mixed $raw): ?int
     {
-        if (!is_string($raw) || preg_match('/^[1-9][0-9]?$/', $raw) !== 1) {
+        if (!is_string($raw) || preg_match('/^[1-9][0-9]?$/D', $raw) !== 1) {
             return null;
         }
         $id = (int) $raw;

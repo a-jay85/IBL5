@@ -1596,6 +1596,8 @@ _ab_cores() {
             -e|--regexp) _abc_take=1; _abc_e=1 ;;
             --regexp=*) _abc_pats+="${_abc_w#--regexp=}"$'\n'; _abc_e=1 ;;
             -f|-m|-A|-B|-C|-d|-D|-g|-t|-T|-j|-M|--include|--exclude|--exclude-dir|--exclude-from|--glob|--type|--type-not|--max-count|--max-depth|--context|--replace) _abc_skip=1 ;;
+            -[A-Za-z]*e) _abc_take=1; _abc_e=1 ;;
+            -[A-Za-z]*[fmABCdDgtTjM]) _abc_skip=1 ;;
             -*) : ;;
             *) [ -n "$_abc_first" ] || _abc_first="$_abc_w" ;;
         esac
@@ -1622,7 +1624,7 @@ _ab_path_ok() {
             case "$2" in
                 *'(wired in this PR)'*) : ;;
                 *) _abp_re="$(sed 's/[.]/\\./g' <<< "$_abp_p")"
-                   grep -rqE -- "(^|[^A-Za-z0-9_./-])${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
+                   grep -rqE -- "(^|[^A-Za-z0-9_./-]|[^A-Za-z0-9_./-]\./|\}/)${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
             esac ;;
     esac
     grep -qxF -- "$_abp_p" <<< "$_ab_cf" && return 0

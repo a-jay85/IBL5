@@ -69,6 +69,38 @@ final class PickValuer
     }
 
     /**
+     * Tier from the original team's projected slot. Round 1 slots 1-5 are
+     * Lottery, 6-14 High, 15+ Late; every round 2 pick is Second. A pick for a
+     * later year drops one tier, but a first never drops below Late. A first
+     * whose team is not in the projection prices as Late. Past-year and
+     * round 3+ picks have no tier.
+     *
+     * @param SlotIndex $slotIndex
+     */
+    public function tier(int $year, int $round, int $originalTid, array $slotIndex, int $endingYear): ?PickTier
+    {
+        if ($year < $endingYear || $round < 1 || $round > 2) {
+            return null;
+        }
+        if ($round === 2) {
+            return PickTier::Second;
+        }
+
+        $slot = $slotIndex['round1'][$originalTid] ?? null;
+        $tier = match (true) {
+            $slot === null => PickTier::Late,
+            $slot <= 5 => PickTier::Lottery,
+            $slot <= 14 => PickTier::High,
+            default => PickTier::Late,
+        };
+        if ($year > $endingYear) {
+            $tier = PickTier::from(max(PickTier::Late->value, $tier->value - 1));
+        }
+
+        return $tier;
+    }
+
+    /**
      * @param list<SuggestionPickRow> $rows
      * @param SlotIndex $slotIndex
      * @return list<SuggestionPick>

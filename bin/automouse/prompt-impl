@@ -293,7 +293,7 @@ DIRTY=$(git status --porcelain)
 If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean working tree), the branch is identical to master — the plan is already merged. Take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
 1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
-2. `bin/wt-remove <slug> --if-empty` to remove the empty worktree and its local branch. It re-checks emptiness at removal time. If it prints a `kept` line, carry on with steps 3-6 unchanged.
+2. `cd /Users/ajaynicolas/GitHub/IBL5 && bin/wt-remove <slug> --if-empty` to remove the empty worktree and its local branch. It re-checks emptiness at removal time. If it prints a `kept` line, carry on with steps 3-6 unchanged.
 3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`, then `touch -h "$NIGHTLY_DIR/done/$PLAN_FILE"` so the entry carries the completion time the morning digest selects on
 4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
 5. Do NOT write a handoff file.

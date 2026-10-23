@@ -18,7 +18,7 @@ class LeagueConfigView
         $shortEndingYear = substr((string) $seasonEndingYear, 2);
         $seasonLabel = \Security\HtmlSanitizer::safeHtmlOutput($beginningYear . '-' . $shortEndingYear);
 
-        return '<div class="ibl-alert ibl-alert--info">'
+        return '<div role="alert" class="d-alert d-alert-info mb-4">'
             . 'No .lge data found for the ' . $seasonLabel . ' season. '
             . 'Place IBL5.lge in the ibl5/ directory and reload to import.'
             . '</div>';
@@ -34,7 +34,7 @@ class LeagueConfigView
         if (!$result['success']) {
             $error = $result['error'] ?? 'Unknown error';
             $errorEscaped = \Security\HtmlSanitizer::safeHtmlOutput($error);
-            return '<div class="ibl-alert ibl-alert--error">.lge import failed: ' . $errorEscaped . '</div>';
+            return '<div role="alert" class="d-alert d-alert-error mb-4">.lge import failed: ' . $errorEscaped . '</div>';
         }
 
         $seasonEndingYear = $result['season_ending_year'];
@@ -42,7 +42,7 @@ class LeagueConfigView
         $shortEndingYear = substr((string) $seasonEndingYear, 2);
         $teamsStored = $result['teams_stored'];
 
-        return '<div class="ibl-alert ibl-alert--success">'
+        return '<div role="alert" class="d-alert d-alert-success mb-4">'
             . '.lge imported: ' . $beginningYear . '-' . $shortEndingYear
             . ' season, ' . $teamsStored . ' teams stored.'
             . '</div>';
@@ -59,7 +59,7 @@ class LeagueConfigView
             return '';
         }
 
-        $html = '<div class="ibl-alert ibl-alert--warning">'
+        $html = '<div role="alert" class="d-alert d-alert-warning mb-4">'
             . '<strong>League config cross-check warnings:</strong><ul>';
 
         foreach ($discrepancies as $msg) {

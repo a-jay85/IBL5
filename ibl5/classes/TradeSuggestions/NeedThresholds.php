@@ -13,4 +13,7 @@ final class NeedThresholds
 {
     /** A season line counts only past this many minutes (about ten 40-minute games). */
     public const int MIN_SAMPLE_MINUTES = 400;
+
+    /** Depth-chart minutes that mark a real rotation role. */
+    public const int REAL_MINUTES = 15;
 }

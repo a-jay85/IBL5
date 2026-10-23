@@ -159,6 +159,6 @@ class TradeImpactEvaluatorTest extends TestCase
 
     private static function player(int $pid, string $pos, int $ovr, int $age, int $years, int $futureSalary, int $salary = 1000): SuggestionPlayer
     {
-        return new SuggestionPlayer($pid, 'Player ' . $pid, $pos, $age, $ovr, false, $salary, $years, $futureSalary);
+        return new SuggestionPlayer($pid, 'Player ' . $pid, $pos, $age, $ovr, false, $salary, $years, $futureSalary, dcMinutes: $ovr);
     }
 }

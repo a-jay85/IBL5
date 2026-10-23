@@ -182,7 +182,7 @@ def test_decline_reason_is_capped_and_cannot_mimic_tree_proof(tmp_path):
     path = "app/foo.py"
     _make_temp_file(worktree, path, "content\n")
 
-    llm = _StubLlm(["tree proof failed " + "x" * 1000 + "\nFAILED"])
+    llm = _StubLlm(["x" * 1000 + " tree proof failed\nFAILED"])
     success, reason = resolve_one(llm, _StubRun(worktree), worktree=worktree, key="test-key", path=path)
     assert success is False
     prefix = f"resolver declined: {path} (model: "

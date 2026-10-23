@@ -380,10 +380,14 @@ test.describe('Waivers: server-side roster recount (backlog#1538)', () => {
     expect(location, `missing CSRF token must be refused; got ${location}`).toContain('error=');
     expect(location).not.toContain('result=player_added');
 
-    await page.goto('modules.php?name=Team&op=team&teamid=1');
-    await expect(page.locator('body'), 'refused add must not reach the Metros roster').not.toContainText(
-      playerNameOnly,
-    );
+    // A waived player keeps teamid=1 (ordinal 1000), so the Team page cannot prove absence.
+    // The waive form lists only active Metros players (ordinal <= 960): a landed add would
+    // make the picked player appear there.
+    await page.goto('modules.php?name=Waivers&action=waive');
+    await expect(
+      page.locator(`form[name="Waiver_Move"] select[name="Player_ID"] option[value="${playerID}"]`),
+      'refused add must not put the player on the active Metros roster',
+    ).toHaveCount(0);
   });
 
   test.afterAll(async ({ request }) => {

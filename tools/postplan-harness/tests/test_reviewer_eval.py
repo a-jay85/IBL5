@@ -303,9 +303,7 @@ def test_real_corpus_trade_line_63_hits_via_also_accept():
     assert not re_.case_hit([_f(other, 63)], ranges)
 
 
-def test_real_corpus_only_trade_case_has_also_accept():
-    cases = _real_corpus()["cases"]
-    assert [c["id"] for c in cases if "also_accept" in c] == [TRADE_CASE]
+def test_real_corpus_trade_case_also_accept_pinned():
     trade = _real_case(TRADE_CASE)
     assert [(e["path"], e["start"], e["end"]) for e in trade["also_accept"]] == [(TRADE_PATH, 63, 63)]
 

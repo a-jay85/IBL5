@@ -48,6 +48,7 @@ class DaisyUiPilotViewsTest extends TestCase
             'PlayerSearchView' => [$classes . '/PlayerSearch/PlayerSearchView.php'],
             'FreeAgencyOfferView' => [$classes . '/FreeAgency/FreeAgencyOfferView.php'],
             'FreeAgencyFormView' => [$classes . '/FreeAgency/FreeAgencyFormView.php'],
+            'uploadDraftClass' => [dirname(__DIR__, 2) . '/uploadDraftClass.php'],
         ];
     }
 

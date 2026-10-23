@@ -17,6 +17,10 @@ class AlertRendererTest extends TestCase
         'warn_code' => ['class' => 'ibl-alert--warning', 'message' => 'Be careful.'],
     ];
 
+    private const DAISY_BANNERS = [
+        'ok' => ['variant' => 'success', 'message' => 'It worked!'],
+    ];
+
     #[Test]
     public function fromCodeReturnsMatchingBanner(): void
     {
@@ -46,6 +50,29 @@ class AlertRendererTest extends TestCase
         $this->assertStringContainsString('ibl-alert--error', $html);
         $this->assertStringContainsString('Something broke', $html);
         $this->assertStringNotContainsString('It worked!', $html);
+    }
+
+    #[Test]
+    public function fromCodeDaisyReturnsMatchingBanner(): void
+    {
+        $html = AlertRenderer::fromCodeDaisy('ok', self::DAISY_BANNERS);
+
+        $this->assertSame('<div role="alert" class="d-alert d-alert-success mb-4">It worked!</div>', $html);
+    }
+
+    #[Test]
+    public function fromCodeDaisyReturnsEmptyForNullAndUnknownCode(): void
+    {
+        $this->assertSame('', AlertRenderer::fromCodeDaisy(null, self::DAISY_BANNERS));
+        $this->assertSame('', AlertRenderer::fromCodeDaisy('unknown', self::DAISY_BANNERS));
+    }
+
+    #[Test]
+    public function fromCodeDaisyErrorWinsAndEscapesHtml(): void
+    {
+        $html = AlertRenderer::fromCodeDaisy('ok', self::DAISY_BANNERS, '<b>Boom</b>');
+
+        $this->assertSame('<div role="alert" class="d-alert d-alert-error mb-4">&lt;b&gt;Boom&lt;/b&gt;</div>', $html);
     }
 
     #[Test]

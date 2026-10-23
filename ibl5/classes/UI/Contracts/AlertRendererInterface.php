@@ -20,6 +20,16 @@ interface AlertRendererInterface
     public static function fromCode(?string $code, array $banners, ?string $error = null): string;
 
     /**
+     * Same lookup rules as fromCode(), but emits a daisyUI alert (d-alert-<variant>)
+     *
+     * @param string|null $code Result code from query parameter
+     * @param array<string, array{variant: string, message: string}> $banners Map of code → daisyUI variant + message
+     * @param string|null $error Optional error message (takes priority over $code)
+     * @return string HTML alert div or empty string
+     */
+    public static function fromCodeDaisy(?string $code, array $banners, ?string $error = null): string;
+
+    /**
      * Render an arbitrary alert message
      *
      * @param string $message Alert message (will be HTML-escaped)

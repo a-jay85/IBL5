@@ -305,10 +305,14 @@ def resolve_one(
 
 
 def decline_retry_context(run, *, path: str, pre_sha: str, master_sha: str,
-                          prior_reason: str) -> str:
-    """Both sides' whole change to `path` since the merge base, for one Opus retry."""
+                          prior_reason: str, replay_base: str = "") -> str:
+    """Both sides' whole change to `path` since the merge base, for one Opus retry.
+
+    `replay_base` scopes the branch diff to the replayed range on the stacked --onto
+    path, where `pre_sha` also carries the parent branch's commits."""
     mb = run("merge-base", pre_sha, master_sha, check=False).strip()
-    branch = run("diff", f"{mb}..{pre_sha}", "--", path, check=False)[:DECLINE_CONTEXT_CAP]
+    branch_base = replay_base or mb
+    branch = run("diff", f"{branch_base}..{pre_sha}", "--", path, check=False)[:DECLINE_CONTEXT_CAP]
     master = run("diff", f"{mb}..{master_sha}", "--", path, check=False)[:DECLINE_CONTEXT_CAP]
     return (
         f"A first resolver attempt declined this file. Its words: {prior_reason}\n"
@@ -335,6 +339,7 @@ def resolve_all(
     max_rounds: int = MAX_RESOLVE_ROUNDS,
     decline_retry_model: Optional[str] = None,
     max_decline_retries: int = 0,
+    replay_base: str = "",
 ) -> ConflictResolutionResult:
     """Attempt to resolve all conflicted files. Returns ConflictResolutionResult.
 
@@ -354,7 +359,8 @@ def resolve_all(
                 and reason.startswith("resolver declined: ")):
             retries += 1
             ctx = decline_retry_context(run, path=path, pre_sha=pre_sha,
-                                        master_sha=master_sha, prior_reason=reason)
+                                        master_sha=master_sha, prior_reason=reason,
+                                        replay_base=replay_base)
             success, reason = resolve_one(
                 llm, run, worktree=worktree, key=key, path=path,
                 stages=inventory.stage_sets.get(path, frozenset({1, 2, 3})),

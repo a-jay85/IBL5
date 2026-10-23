@@ -533,7 +533,7 @@ class DepthChartControllerTest extends WideUnitTestCase
 
         $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
 
-        $alert = '<div role="alert" class="d-alert d-alert-error mb-4"><ul><li>Bad lineup</li></ul></div>';
+        $alert = '<div role="alert" class="d-alert d-alert-error mb-4"><div class="[&_ul]:list-disc [&_ul]:pl-5"><ul><li>Bad lineup</li></ul></div></div>';
         $title = '<h1 class="ibl-title">Depth Chart Entry</h1>';
         self::assertStringContainsString($alert, $output);
         self::assertStringContainsString($title, $output);

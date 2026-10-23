@@ -6,6 +6,8 @@ set -euo pipefail
 # checkout. Blob refs (../../_vr-blobs/<hash>.png) and legacy per-SHA refs go
 # through one filesystem check. The pr/<N>/ preview tree and every other
 # non-40-hex dir are skipped.
+#
+# gate-backtest-argv: --root .
 
 usage() {
   cat >&2 <<'EOF'

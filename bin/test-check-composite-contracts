@@ -182,7 +182,7 @@ put_merge() {
 }
 
 # put_mutation_pr <wf-dir> <variant>
-# Writes a minimal mutation-pr.yml to <wf-dir>. The base ("good") satisfies M1-M4
+# Writes a minimal mutation-pr.yml to <wf-dir>. The base ("good") satisfies M1-M5
 # and deliberately carries a step-level `if:` and a sticky-step `continue-on-error`,
 # so M3/M4 are shown not to over-match. Each variant mutates exactly one invariant.
 put_mutation_pr() {
@@ -212,6 +212,7 @@ jobs:
         vendor/bin/infection \
           --min-msi=100 \
           --ignore-msi-with-no-mutations
+        bin/check-infection-ran --log /tmp/infection.log --changed /tmp/changed-classes.txt
     - name: Post sticky mutation comment
       uses: marocchino/sticky-pull-request-comment@abc
       continue-on-error: true
@@ -248,6 +249,18 @@ MPEOF
     m4-coe-infection)
       tmp="$(mktemp)"
       awk '{print} /^    - name: Run Infection on diff$/{print "      continue-on-error: true"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m5-diff-relative)
+      tmp="$(mktemp)"
+      awk '{print} /^        vendor\/bin\/infection \\$/{print "          --git-diff-lines \\"} /^      run: \|$/ && !done {print "        git config diff.relative true"; done=1}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m5-diff-relative-comment)
+      tmp="$(mktemp)"
+      awk '{print} /^      run: \|$/ && !done {print "        # never set git config diff.relative here (M5)"; done=1}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m5-no-guard)
+      tmp="$(mktemp)"
+      sed '/check-infection-ran/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m5-guard-commented)
+      tmp="$(mktemp)"
+      sed 's|^        bin/check-infection-ran|        # bin/check-infection-ran|' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     *)
       echo "put_mutation_pr: unknown variant '${2:-}'" >&2; return 1 ;;
   esac
@@ -563,6 +576,10 @@ run_mut "mut-m4-msi-99" 1 m4-msi-99
 run_mut "mut-m4-msi-extra" 1 m4-msi-extra
 run_mut "mut-m4-msi-missing" 1 m4-msi-missing
 run_mut "mut-m4-coe-infection" 1 m4-coe-infection
+run_mut "mut-m5-diff-relative" 1 m5-diff-relative
+run_mut "mut-m5-diff-relative-comment" 0 m5-diff-relative-comment
+run_mut "mut-m5-no-guard" 1 m5-no-guard
+run_mut "mut-m5-guard-commented" 1 m5-guard-commented
 
 # mut-m2-duplicate-name: a second workflow names a job with the same context
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"

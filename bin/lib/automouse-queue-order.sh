@@ -68,11 +68,13 @@ _entry_prefix() {
 
 # queue_entry_for_slug <dir> <slug> — the entry filename for <slug>, or return 1.
 # Two entries for one slug should be unreachable; if it happens, the lexically
-# first wins rather than aborting a nightly run.
+# first wins rather than aborting a nightly run. A bare <slug>.md that landed
+# after normalize_queue ran (queue_entries lists it, so it can be claimed) is the
+# fallback, so every membership check agrees with the claim path.
 queue_entry_for_slug() {
     local dir=$1 slug f
     slug=$(entry_to_slug "$2")
-    for f in "$dir"/[0-9][0-9][0-9]-"$slug".md; do
+    for f in "$dir"/[0-9][0-9][0-9]-"$slug".md "$dir/$slug.md"; do
         if [ -L "$f" ] || [ -e "$f" ]; then
             printf '%s\n' "${f##*/}"
             return 0

@@ -162,14 +162,6 @@ class Season
     }
 
     /**
-     * Check if the current phase is Free Agency
-     */
-    public function isFreeAgencyPhase(): bool
-    {
-        return $this->phase === 'Free Agency';
-    }
-
-    /**
      * Check if the current phase is an offseason phase (Draft or Free Agency)
      *
      * During offseason phases, salary/roster displays shift to show next season's

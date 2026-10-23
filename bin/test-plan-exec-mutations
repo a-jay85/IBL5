@@ -211,7 +211,8 @@ start_case parse_root_checks
 R="$TMP/rootrepo"
 mkrepo "$R" 'true'
 ln -s /etc/hosts "$R/link.txt"
-for spec in "link.txt:1" "new/other.txt:1" "new/file.txt:0" "target.txt:0"; do
+for spec in "link.txt:1" "new/other.txt:1" "new/file.txt:0" "target.txt:0" \
+            "./.git/config:1" "sub/../.git/config:1" "./target.txt:0"; do
     P="$TMP/root.md"
     mkplan "$P" "## Executable Mutations
 
@@ -284,6 +285,18 @@ chk "pending exits 1 after recover" eq "$PRC" 1
 chk "porcelain empty" porcelain_clean "$R"
 end_case
 
+start_case run_baseline_artifact
+R="$TMP/r5b"
+mkrepo "$R" 'touch artifact.out; grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 0 (tripped, artifact is not a mutation side effect)" eq "$RC" 0
+chk "TRIPPED reported" has "$OUT" "TRIPPED row 1"
+chk "no REVERT-FAILED" eq "$(grep -c REVERT-FAILED <<< "$OUT")" 0
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending exits 1" eq "$PRC" 1
+chk "target restored" eq "$(cat "$R/target.txt")" ALPHA
+end_case
+
 start_case run_signals
 R="$TMP/r6"
 mkrepo "$R" 'grep -q ALPHA target.txt || sleep 30'
@@ -348,7 +361,15 @@ chk "wrong sha keeps the entry" test -e "$J/1.meta"
 rm -f "$J/1.meta" "$J/1.orig"
 mkrepo "$R" 'true'
 BEFORE=$(sha "$R/target.txt")
-OUT=$(PATH=/nonexistent/only /bin/bash "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+# A PATH that carries every tool the lib needs except gtimeout/timeout. An empty PATH
+# would hide git too, and the lib would exit 2 on its git check before reaching NO-TIMEOUT.
+NT="$TMP/no-timeout-bin"
+mkdir -p "$NT"
+for t in git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut dirname basename cp mv date env readlink realpath cmp diff touch sha256sum shasum uname; do
+    p=$(command -v "$t" 2>/dev/null) || continue
+    case "$p" in /*) ln -sf "$p" "$NT/$t" ;; esac
+done
+OUT=$(PATH="$NT" /bin/bash "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
 chk "NO-TIMEOUT exits 1" eq "$RC" 1
 chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
 chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"

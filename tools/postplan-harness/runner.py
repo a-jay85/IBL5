@@ -796,7 +796,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
         if live and pr and mutation_report is not None:
             # A second body edit: the Phase 6 body write above runs before this step.
-            gh.pr_edit_body(pr, upsert_exec_mutations(gh.pr_body_fresh() or "", mutation_report))
+            # Log-and-continue like the merge-digest write: a failed or empty read must never
+            # blank the body, and a failed edit must never abort the run.
+            try:
+                _xm_cur = gh.pr_body_fresh() or ""
+                if not _xm_cur:
+                    log("phase6.5: exec-mutations body write skipped (PR body read empty)")
+                else:
+                    _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
+                    if _xm_new != _xm_cur:
+                        gh.pr_edit_body(pr, _xm_new)
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
         _arm_body = gh.pr_body() or body
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),

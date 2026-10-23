@@ -216,7 +216,7 @@ for lineno, e in entries:
         fail("line %d: row %s file must be repo-relative, not absolute" % (lineno, row))
     if b".." in path.split(b"/"):
         fail("line %d: row %s file must not contain a '..' segment" % (lineno, row))
-    if path == b".git" or path.startswith(b".git/"):
+    if b".git" in os.path.normpath(path).split(b"/"):
         fail("line %d: row %s file must not be under .git/" % (lineno, row))
     if not e[b"match"]:
         fail("line %d: row %s has an empty match" % (lineno, row))
@@ -398,7 +398,7 @@ revert_pending() {
     journal_empty && rm -f "$JDIR/status.pre"
     rm -f "$RECS"
 }
-on_signal() { revert_pending; exit "$1"; }
+on_signal() { revert_pending; [ "$FINAL" -ne 3 ] || exit 3; exit "$1"; }
 trap 'revert_pending; exit $FINAL' EXIT
 trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
@@ -423,6 +423,9 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         printf 'BASELINE-FAILED row %s — %s exited %s before mutation\n' "$row" "$check" "$rc"
         FINAL=1; continue
     fi
+    # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
+    # mutation side effect, so the revert check must compare against the tree as it stands here.
+    git status --porcelain=v1 -z > "$JDIR/status.pre" 2>/dev/null
     n=$(lit count "$file" "$match" "$replace") || n="?"
     if [ "$n" != 1 ]; then
         printf 'NOT-APPLIED row %s — match occurs %s times in %s (need exactly 1)\n' "$row" "$n" "$file"

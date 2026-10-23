@@ -938,9 +938,20 @@ elif [ "$XM_RC" -eq 0 ]; then
             case "$MC_WHAT" in *'(one-time-check:'*) continue ;; esac
             case "$XM_ROWS" in *" $MC_NUM "*) continue ;; esac
             if grep -qF '(mutation-prose:' <<< "$MC_WHAT"; then
-                # Text after the tag up to the LAST ")": a reason holding parentheses still gets measured.
-                _xm_reason=${MC_WHAT#*'(mutation-prose:'}
-                _xm_reason=${_xm_reason%')'*}
+                # Text after the tag up to the tag's own closing ")". Nested pairs inside the reason
+                # are kept, so a later "(see row 3)" in the cell cannot pad a short reason.
+                _xm_rest=${MC_WHAT#*'(mutation-prose:'}
+                _xm_reason=""
+                _xm_depth=1
+                while [ -n "$_xm_rest" ]; do
+                    _xm_ch=${_xm_rest:0:1}
+                    _xm_rest=${_xm_rest:1}
+                    case "$_xm_ch" in
+                        '(') _xm_depth=$((_xm_depth + 1)) ;;
+                        ')') _xm_depth=$((_xm_depth - 1)); [ "$_xm_depth" -gt 0 ] || break ;;
+                    esac
+                    _xm_reason="$_xm_reason$_xm_ch"
+                done
                 _xm_reason=$(mtrim "$_xm_reason")
                 if [ "${#_xm_reason}" -lt 15 ]; then
                     viol "[XM] row ${MC_NUM}: mutation-prose reason too short (need 15 or more characters): ${row}"

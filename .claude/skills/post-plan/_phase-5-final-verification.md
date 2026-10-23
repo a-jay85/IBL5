@@ -64,7 +64,7 @@ done
 >
 > Scope: skill path only. As `:54` already states, `tools/postplan-harness` computes conformance in-process and never touches these `/tmp` files; do not port this executor to the harness.
 
-> **Run the executable mutations.** Runs whenever `PLAN_FOUND != none`, even when `! $HAS_MATRIX`: it is not a matrix-derived sub-check, and it is the only writer of the done-marker on that path, so skipping it holds condition (19) forever. Runs after the CLI-row executor above and before any stage or commit. Later blocks (Shellcheck verify, the critical-files check, scope conformance, 5.0d, 5.0e) read the tree after it, which the byte-identical revert makes safe. The lib applies each `## Executable Mutations` entry, requires its check to exit non-zero, reverts, and verifies the tree byte-identical; a plan with no section is a silent no-op.
+> **Run the executable mutations.** Runs whenever `PLAN_FOUND != none`, even when `! $HAS_MATRIX`: it is not a matrix-derived sub-check, and it is the only writer of the done-marker on that path, so skipping it holds condition (19) forever. Runs after the CLI-row executor above and before any later stage or commit in this skill (Phase 5 fix commits, checkpoints). Later blocks (Shellcheck verify, the critical-files check, scope conformance, 5.0d, 5.0e) read the tree after it, which the byte-identical revert makes safe. The lib applies each `## Executable Mutations` entry, requires its check to exit non-zero, reverts, and verifies the tree byte-identical; a plan with no section is a silent no-op.
 
 ```bash
 # Reuses $PLAN_FILE. Worktree root, same as the CLI-row block above.

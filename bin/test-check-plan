@@ -3373,6 +3373,20 @@ assert_viol "xm-coverage-prose-ok" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (mutatio
 $(xm_block bin/check-docs)
 "
 
+assert_viol "xm-coverage-prose-trailing-paren" 1 'too short' "$FM$XM_TWO| 2 | docs again (mutation-prose: n/a) (see row 3 for the long story) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-nested-paren-ok" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (mutation-prose: needs a running Docker DB (see ADR-1)) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
 assert_viol "xm-coverage-prose-short" 1 'too short' "$FM$XM_TWO| 2 | docs again (mutation-prose: db) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
 
 ## Executable Mutations

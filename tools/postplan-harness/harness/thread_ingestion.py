@@ -13,7 +13,8 @@ from __future__ import annotations
 import json
 import os
 
-from .fidelity import REMEDIATION_ALLOWED_TOOLS, REMEDIATION_DENIED_TOOLS, denied_gate_edits
+from .fidelity import (GATE_EDIT_DENY_TEXT, GATE_OWNING_PREFIXES, REMEDIATION_ALLOWED_TOOLS,
+                       REMEDIATION_DENIED_TOOLS, denied_gate_edits)
 from .adapters.llm import extract_json
 from . import outcome_log
 from .state import HarnessError
@@ -21,6 +22,7 @@ from .state import HarnessError
 TRUSTED_LOGIN = "a-jay85"
 PURPOSE = "thread-remediation"
 VERDICTS = ("FIX", "DECLINE")
+GATE_HOLD_CATEGORY = "gate-path"
 ORIGIN_PRE_EXISTING = "pre-existing"
 ORIGIN_SAME_RUN = "same-run"
 
@@ -99,15 +101,23 @@ def thread_prompt(thread: dict, file_excerpt: str) -> str:
         ]
     lines += [
         "",
-        'Required final answer: one JSON object {"verdict": "FIX"|"DECLINE", "reason": "<one sentence>", "category": "wrong"|"intentional"|"already-fixed"|"not-worth-it"} as the last line of your result.',
-        'category is required for DECLINE and ignored for FIX: wrong = the finding is mistaken or not a defect; intentional = the flagged behavior is deliberate; already-fixed = the current tree already addresses it; not-worth-it = real but out of scope or not worth changing here.',
+        f"Gate paths are off-limits. {GATE_EDIT_DENY_TEXT} Gate-path prefixes: "
+        f"{', '.join(GATE_OWNING_PREFIXES)}. If this finding can only be fixed by editing a "
+        f'file under one of those prefixes, do not edit anything: answer DECLINE with '
+        f'category "{GATE_HOLD_CATEGORY}" and a reason naming the gate file. The thread then '
+        "stays open for a human.",
+        'Required final answer: one JSON object {"verdict": "FIX"|"DECLINE", "reason": "<one sentence>", "category": "wrong"|"intentional"|"already-fixed"|"not-worth-it"|"gate-path"} as the last line of your result.',
+        'category is required for DECLINE and ignored for FIX: wrong = the finding is mistaken or not a defect; intentional = the flagged behavior is deliberate; already-fixed = the current tree already addresses it; not-worth-it = real but out of scope or not worth changing here; gate-path = the only fix edits a gate path listed above.',
     ]
     return "\n".join(lines)
 
 
 def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push, model="sonnet",
                        info: dict | None = None) -> str:
-    """Evaluate and action one review thread. Returns 'fixed', 'declined', or 'skipped'."""
+    """Evaluate and action one review thread. Returns 'fixed', 'declined', or 'skipped'.
+
+    A DECLINE with category gate-path returns 'skipped' and sets info["gate_hold"].
+    """
     cid = thread.get("commentId")
     path = thread.get("path") or ""
     line = thread.get("line")
@@ -162,8 +172,14 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
     if info is not None:
         info.update(verdict=verdict, reason=reason, category=verdict_obj.get("category"))
 
-    # Step 3: DECLINE
+    # Step 3: DECLINE. A gate-path decline is a HOLD: never resolve it, so the thread
+    # keeps holding arming condition (11). run_thread_ingestion posts the marker reply.
     if verdict == "DECLINE":
+        if verdict_obj.get("category") == GATE_HOLD_CATEGORY:
+            if info is not None:
+                info["gate_hold"] = True
+            log(f"thread {cid}: gate-path decline; thread held open for a human")
+            return "skipped"
         gh.resolve_review_thread(pr, cid, f"Declined: {reason}")
         return "declined"
 

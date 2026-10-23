@@ -13,8 +13,10 @@ from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification, HarnessError, UsageLedger
+from harness.fidelity import GATE_EDIT_DENY_TEXT, GATE_OWNING_PREFIXES
 from harness.thread_ingestion import (
     _is_trusted,
+    disposition_thread,
     fetch_trusted_threads,
     thread_prompt,
     run_thread_ingestion,
@@ -1044,3 +1046,94 @@ def test_live_gh_reply_review_thread_failure_raises(tmp_path, monkeypatch):
         gh.reply_review_thread(PR, 111, "marker body")
     assert ei.value.kind == "thread-reply-failed"
     assert [a for a in gh.actions() if a.get("action") == "pr_reply_thread"] == []
+
+
+# ---------------------------------------------------------------------------
+# gate-path DECLINE hold
+# ---------------------------------------------------------------------------
+
+GATE_DECLINE = '{"verdict": "DECLINE", "reason": "fix needs .github/workflows/ci.yml", "category": "gate-path"}'
+
+
+def _resolves(gh):
+    return [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+
+
+def _replies(gh):
+    return [a for a in gh.actions() if a.get("action") == "pr_reply_thread"]
+
+
+def _disposition(tmp_path, answer, info):
+    """One disposition_thread call; returns (outcome, gh, commits)."""
+    gh = _gh(tmp_path)
+    commits: list[str] = []
+
+    def _commit(msg):
+        commits.append(msg)
+        return "abc123"
+
+    outcome = disposition_thread(THREAD_2340, _llm({PURPOSE: answer}), ReplayGit({}), str(tmp_path),
+                                 PR, gh, lambda m: None, commit=_commit, push=lambda: "def456",
+                                 info=info)
+    return outcome, gh, commits
+
+
+def test_thread_prompt_lists_gate_paths_and_decline_instruction():
+    prompt = thread_prompt(THREAD_2340, "")
+    for prefix in GATE_OWNING_PREFIXES:
+        assert prefix in prompt
+    assert GATE_EDIT_DENY_TEXT in prompt
+    assert 'category "gate-path"' in prompt
+
+
+def test_gate_path_decline_holds_thread_unresolved(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(tmp_path, GATE_DECLINE, info)
+    assert outcome == "skipped"
+    assert info["gate_hold"] is True
+    assert commits == []
+    assert _resolves(gh) == []
+
+
+def test_non_gate_decline_still_resolves(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(
+        tmp_path, '{"verdict": "DECLINE", "reason": "not a defect", "category": "wrong"}', info)
+    assert outcome == "declined"
+    resolves = _resolves(gh)
+    assert len(resolves) == 1
+    assert resolves[0]["body"].startswith("Declined:")
+    assert "gate_hold" not in info
+    assert commits == []
+
+
+def test_gate_hold_thread_keeps_condition_11(tmp_path):
+    threads = [THREAD_2340]
+    gh = _gh(tmp_path, {"trusted_threads": threads, "pr_number": PR})
+    run_thread_ingestion(
+        gh, _llm({PURPOSE: GATE_DECLINE}), ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids={THREAD_2340["commentId"]}, **_run_kwargs(tmp_path))
+
+    resolved = {a["comment_id"] for a in _resolves(gh)}
+    unresolved = [f"thread:{t['commentId']}" for t in threads if t["commentId"] not in resolved]
+    assert unresolved == [f"thread:{THREAD_2340['commentId']}"]
+
+    d = evaluate(_arm_inputs(unresolved))
+    assert 11 in {c.number for c in d.holds}
+    assert d.armed is False
+    # Control: with nothing unresolved, condition (11) does not hold.
+    assert 11 not in {c.number for c in evaluate(_arm_inputs([])).holds}
+
+
+def test_wrapped_gate_decline_envelope_degrades_to_skip(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(
+        tmp_path,
+        '{"result": {"verdict": "DECLINE", "reason": "fix needs .github/workflows/ci.yml", '
+        '"category": "gate-path"}}',
+        info)
+    assert outcome == "skipped"
+    assert commits == []
+    assert _resolves(gh) == []
+    assert _replies(gh) == []
+    assert "gate_hold" not in info

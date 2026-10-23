@@ -258,7 +258,7 @@ if [ "$HOLDREPEAT" = 1 ]; then
     # the arming conditions and the launch machinery itself.
     _hr_is_gate_path() {  # <repo-relative path>
         case "$1" in
-            bin/check-*|bin/lib/plan-matrix-assertions|bin/lib/critical-files.sh|bin/post-plan-now|bin/post-plan-fleet|bin/postplan-fix|bin/pr-cycle|.github/workflows/*|.claude/settings*.json|.claude/hooks/*|.claude/rules/*|.claude/skills/post-plan/*|tools/postplan-harness/harness/*|tools/postplan-harness/runner.py) return 0 ;;
+            bin/check-*|bin/lib/*|bin/post-plan-now|bin/post-plan-fleet|bin/postplan-fix|bin/pr-cycle|.github/workflows/*|.claude/settings*.json|.claude/hooks/*|.claude/rules/*|.claude/skills/post-plan/*|tools/postplan-harness/harness/*|tools/postplan-harness/runner.py) return 0 ;;
         esac
         return 1
     }
@@ -447,26 +447,9 @@ LAST line of the final message."
         HR_DETAIL="${BASH_REMATCH[2]# }"
     fi
     HR_DETAIL="$(printf '%s' "$HR_DETAIL" | tr -cd '[:print:]' | cut -c1-200)"
-    case "$HR_KIND" in
-        needs-gate-edit)
-            _hr_revert
-            _hr_dm "needs a gate edit: $HR_DETAIL"
-            _hr_record needs-gate-edit
-            _hr_finish "$HR_RC_GAVEUP" gave-up-needs-gate-edit ;;
-        blocked)
-            _hr_revert
-            _hr_dm "${HR_DETAIL:-blocked}"
-            _hr_record blocked
-            _hr_finish "$HR_RC_GAVEUP" gave-up-blocked ;;
-        nothing-to-fix)
-            _hr_revert
-            _hr_dm "session found nothing to fix"
-            _hr_record nothing-to-fix
-            _hr_finish "$HR_RC_GAVEUP" gave-up-nothing-to-fix ;;
-    esac
-
-    # 4a. The session said "fixed". The launcher re-checks everything; each guard runs
-    # before any push, and the first failure reverts and gives up.
+    # 4a. The launcher re-checks every outcome, not only "fixed": a session that ended blocked
+    # may still have retitled the PR or edited a gate. Each guard runs before any push, and the
+    # first failure reverts and gives up. The marker decides the outcome after the guards.
     # 1. refs: the session was told never to commit, so any own-ref move is out of bounds.
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
     if [ "$(git -C "$WT" rev-parse HEAD)" != "$HEAD0" ] || [ "$REFS1" != "$REFS0" ]; then
@@ -513,6 +496,24 @@ LAST line of the final message."
     if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
         _hr_reject gate-path "a file under ~/.claude/hooks changed"
     fi
+    # Marker outcomes other than "fixed" end here, after the guards above.
+    case "$HR_KIND" in
+        needs-gate-edit)
+            _hr_revert
+            _hr_dm "needs a gate edit: $HR_DETAIL"
+            _hr_record needs-gate-edit
+            _hr_finish "$HR_RC_GAVEUP" gave-up-needs-gate-edit ;;
+        blocked)
+            _hr_revert
+            _hr_dm "${HR_DETAIL:-blocked}"
+            _hr_record blocked
+            _hr_finish "$HR_RC_GAVEUP" gave-up-blocked ;;
+        nothing-to-fix)
+            _hr_revert
+            _hr_dm "session found nothing to fix"
+            _hr_record nothing-to-fix
+            _hr_finish "$HR_RC_GAVEUP" gave-up-nothing-to-fix ;;
+    esac
     # 4. plan-note: a plan edit needs a note, and a removed anchor token must be named in it.
     HR_PLAN_CHANGED=0
     if ! cmp -s "$HR_TMP/plan.before" "$HR_PLAN"; then
@@ -558,25 +559,6 @@ LAST line of the final message."
     fi
 
     # 4c. Ship. All guards passed.
-    # 1. The plan comment goes first, so a plan edit is never public without its explanation.
-    if [ "$HR_PLAN_CHANGED" = 1 ]; then
-        HR_FENCE='```'
-        HR_PLAN_DIFF="$(diff -u "$HR_TMP/plan.before" "$HR_PLAN" || true)"
-        {
-            printf 'postplan-fix --holdrepeat edited the plan (fingerprint %s).\n\n' "$HR_FP"
-            cat "$HR_NOTE"
-            printf '\n%s\n' "$HR_FENCE"
-            sed -n '1,200p' <<< "$HR_PLAN_DIFF"
-            printf '%s\n' "$HR_FENCE"
-        } > "$HR_TMP/comment.md"
-        if ! gh pr comment "$PR" --repo a-jay85/IBL5 --body-file "$HR_TMP/comment.md" >/dev/null 2>&1; then
-            _hr_reject plan-comment "gh pr comment failed"
-        fi
-        HR_LAST_COMMENT="$(gh pr view "$PR" --repo a-jay85/IBL5 --json comments --jq '.comments[-1].body' 2>/dev/null)" || HR_LAST_COMMENT=""
-        if [[ "$HR_LAST_COMMENT" != *"fingerprint $HR_FP"* ]]; then
-            _hr_reject plan-comment "the comment did not land"
-        fi
-    fi
     # 2. Commit, when the tree changed.
     HR_COMMITTED=0
     if [ -s "$HR_TMP/cached.diff" ]; then
@@ -598,12 +580,32 @@ LAST line of the final message."
             _hr_finish "$HR_RC_GAVEUP" gave-up-push-mismatch
         fi
     fi
-    # 4. Re-fire post-plan. env -u is required: a caller may have exported CLAUDE_HEADLESS=1,
+    # 4. The plan comment goes after the push, so a failed commit or push never leaves a comment
+    # for reverted edits. The commit is already public here, so a comment failure only DMs.
+    if [ "$HR_PLAN_CHANGED" = 1 ]; then
+        HR_FENCE='```'
+        HR_PLAN_DIFF="$(diff -u "$HR_TMP/plan.before" "$HR_PLAN" || true)"
+        {
+            printf 'postplan-fix --holdrepeat edited the plan (fingerprint %s).\n\n' "$HR_FP"
+            cat "$HR_NOTE"
+            printf '\n%s\n' "$HR_FENCE"
+            sed -n '1,200p' <<< "$HR_PLAN_DIFF"
+            printf '%s\n' "$HR_FENCE"
+        } > "$HR_TMP/comment.md"
+        if ! gh pr comment "$PR" --repo a-jay85/IBL5 --body-file "$HR_TMP/comment.md" >/dev/null 2>&1; then
+            _hr_dm "plan comment failed: gh pr comment error"
+        fi
+        HR_LAST_COMMENT="$(gh pr view "$PR" --repo a-jay85/IBL5 --json comments --jq '.comments[-1].body' 2>/dev/null)" || HR_LAST_COMMENT=""
+        if [[ "$HR_LAST_COMMENT" != *"fingerprint $HR_FP"* ]]; then
+            _hr_dm "plan comment did not land"
+        fi
+    fi
+    # 5. Re-fire post-plan. env -u is required: a caller may have exported CLAUDE_HEADLESS=1,
     # and post-plan-now then skips with "automouse/headless run owns post-plan". --foreground
     # skips the fleet slot check, so a re-fire from inside a fleet runner never refuses itself.
     HR_REFIRE_RC=0
     (cd "$WT" && env -u CLAUDE_HEADLESS "${POSTPLAN_FIX_POST_PLAN_NOW:-$SELF_ROOT/bin/post-plan-now}" --pr "$PR" --foreground) || HR_REFIRE_RC=$?
-    # 5. Post-plan's own finish DM reports the re-fire. The same set coming back is a repeat.
+    # 6. Post-plan's own finish DM reports the re-fire. The same set coming back is a repeat.
     _hr_record "fixed-refire-rc=$HR_REFIRE_RC"
     printf 'postplan-fix: holdrepeat refire rc=%s\n' "$HR_REFIRE_RC"
     _hr_finish "$HR_RC_FIXED" fixed

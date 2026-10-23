@@ -17,7 +17,7 @@
 #   --wait        After all sessions are fired, poll until every launchd plist is gone
 #                 (all sessions finished). For use inside a detached wrapper only —
 #                 never from an interactive main-thread session (foreground poll loop is
-#                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s and then exits 1 after writing the report.
+#                 a spend bug; see .claude/rules/work-triage.md). Times out at 14400s and then exits 1 after writing the report.
 #                 A slot is released only when its label is gone AND no process carries it,
 #                 so a run aborted without --stop holds its slot until the ceiling.
 #                 A session paused by the usage gate (ADR-0143) ends its label, so it counts
@@ -136,7 +136,8 @@ STOP_PRS=()
 SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
 # Two independent literals would drift; one constant cannot.
-CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
+# 14400 covers one runner that holds its slot for a first pass (5400) plus the holdrepeat fix (up to 7200).
+CEILING_SECS="${POST_PLAN_FLEET_CEILING:-14400}"
 # Poll interval of the --wait block. Seam exists so the harness can drive a timeout in seconds.
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 

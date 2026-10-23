@@ -910,7 +910,7 @@ end_case seam-wtl-unset-vs-empty
 # 32b: once that process exits, the next iteration DOES reap it → live_slots reaches 0.
 # The 6s stub straddles the wait block's poll (WAIT_POLL=1 below): iteration 1 (t≈0) preserves the
 # slot, a later iteration (t≈6) reaps it. Never go below 6: a slow driver start would reap on
-# iteration 1 and fail 32a. A longer stub would loop to CEILING_SECS=7200 and hang the harness.
+# iteration 1 and fail 32a. A longer stub would loop to CEILING_SECS=14400 and hang the harness.
 begin_case
 clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"

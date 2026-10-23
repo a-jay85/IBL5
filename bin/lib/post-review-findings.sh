@@ -114,9 +114,11 @@ post_review_findings() {
 
     # Normalize labels, sort Important > Nit > Pre-existing (score desc within a
     # label), and cap nits. Every later count is post-cap by construction.
-    # A `pre-existing` label is only honored on a context line.  A finding the
-    # caller tagged pre-existing that sits on an added (+) line was introduced by
-    # this PR, so it is forced back to important before anything else reads it.
+    # A `pre-existing` label is refused on an added (+) line and on any file this
+    # PR adds, since this PR introduced that code.  It is forced back to important
+    # before anything else reads it.  A context line, an off-diff line, and a
+    # line 0 / missing line on an existing file keep the label (case 38 pins the
+    # off-diff case); those cannot be proven added, so they post as Pre-existing.
     # The diff is fetched once and fails closed: an empty added set from a failed
     # fetch would skip every demotion and post a self-introduced bug as trusted
     # pre-existing.  Both line sets below are built from this one file.

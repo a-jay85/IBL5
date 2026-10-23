@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /pr-review, /security-audit, and /post-plan.
-last_verified: 2026-10-19
+last_verified: 2026-10-23
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -39,7 +39,7 @@ Every finding that survives gets exactly one label; the label can never lower a 
 | Label | Rule | Holds auto-merge |
 |---|---|---|
 | `Important` | score at or above the threshold, unless all three pre-existing conditions hold | yes, as before |
-| `Pre-existing` | score at or above the threshold AND reviewer said `pre-existing: yes` AND scorer said `"preexisting": true` AND the anchor line is a context line (not a `+` line) of the PR diff | no |
+| `Pre-existing` | score at or above the threshold AND reviewer said `pre-existing: yes` AND scorer said `"preexisting": true` AND the anchor is not a `+` line of the PR diff and not in a file the PR adds (the posting helper enforces this; an off-diff or line-0 anchor on an existing file keeps the label) | no |
 | `Nit` | code review only; reviewer said `severity: nit` AND 60 <= score < 80 | no |
 
 Any disagreement among the three pre-existing conditions falls back to `Important`. Security findings are never `Nit`. Below 60, or below threshold without a `nit` hint, a finding is dropped as before. At most 5 nits post per PR (highest score first), and posted findings sort `Important`, `Nit`, `Pre-existing`. The posting helper writes `<!-- label: <label> -->` as the first line of every comment; Phase 6.5 conditions (2) and (11) skip `nit` and `pre-existing`.

@@ -54,7 +54,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
    over-suppresses one push instead of silently no-opping. The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
-   out of the count, so one stuck run cannot block every later deploy. Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   out of the count, so one stuck run cannot block every later deploy. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
    collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
    `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
    fail. The retries absorb contention and never soften the gate. The per-cell before/after/diff PNGs
@@ -204,5 +204,5 @@ in Repo Settings → Pages → Build and deployment → Source, or:
 gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
 ```
 
-Until then, `Deploy VR gallery to Pages` runs fail at the deploy step. After the flip, re-serve
+Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
 once via the workflow's `workflow_dispatch`.

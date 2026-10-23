@@ -93,6 +93,29 @@ if [[ "\${1:-}" == "api" ]]; then
             exit 0 ;;
     esac
 fi
+if [[ "\${1:-}" == "run" ]]; then
+    case "\${2:-}" in
+        list)
+            # Pins the call shape: the tick must name the gate workflow file and --commit <sha>.
+            grep -qF -- '--workflow=all-checks-green.yml' <<< "\$*" || exit 1
+            sha=""; prev=""
+            for a in "\$@"; do [[ "\$prev" == "--commit" ]] && sha="\$a"; prev="\$a"; done
+            [[ ! -e "$SCRATCH/runs-fail" ]] || exit 1
+            [[ -f "$SCRATCH/runs-\$sha.json" ]] || exit 1
+            cat "$SCRATCH/runs-\$sha.json"
+            exit 0 ;;
+        view)
+            grep -qF -- '--log-failed' <<< "\$*" || exit 1
+            [[ ! -e "$SCRATCH/runlog-fail" ]] || exit 1
+            [[ -f "$SCRATCH/runlog-\${3:-}.txt" ]] || exit 1
+            cat "$SCRATCH/runlog-\${3:-}.txt"
+            exit 0 ;;
+        rerun)
+            printf '%s\n' "\${*:3}" >> "$SCRATCH/gh-rerun.log"
+            [[ ! -e "$SCRATCH/rerun-fail" ]] || exit 1
+            exit 0 ;;
+    esac
+fi
 echo "gh shim: unexpected args: \$*" >&2
 exit 1
 GH_EOF
@@ -224,6 +247,7 @@ reset() {
     rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
     rm -f "$SCRATCH"/key-*
+    rm -f "$SCRATCH"/runs-*.json "$SCRATCH"/runlog-*.txt "$SCRATCH/runs-fail" "$SCRATCH/runlog-fail" "$SCRATCH/rerun-fail"
     rm -f "$SCRATCH/prs-closed.json" "$SCRATCH"/timeline-*.json "$SCRATCH"/timeline-fail-* \
         "$SCRATCH"/delete-fail-* "$SCRATCH/ps-fail" "$SCRATCH/lsof-fail" \
         "$SCRATCH/launchctl-fail" "$SCRATCH/lsof.txt"
@@ -255,7 +279,7 @@ set_prs() {
     printf '%s\n' "$out" > "$SCRATCH/prs.json"
 }
 
-# set_checks <sha> green|pending|red|none
+# set_checks <sha> green|pending|red|none|signoff|signoff-red|gate-timeout|gate-anchor-failed
 set_checks() {
     local f="$SCRATCH/checks-$1.json"
     case "$2" in
@@ -265,6 +289,23 @@ set_checks() {
         none)    echo '{"total_count":0,"check_runs":[]}' > "$f" ;;
         signoff) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"success","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
         signoff-red) echo '{"total_count":2,"check_runs":[{"name":"ci","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"},{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-10-03T00:00:00Z"}]}' > "$f" ;;
+        gate-timeout|gate-anchor-failed|gate-anchor-missing|gate-cancelled|gate-plus-other-red)
+            # gate-anchor-failed: E2E Tests failed. gate-anchor-missing: E2E Tests never reported.
+            # gate-cancelled: the gate itself was cancelled. gate-plus-other-red: a Lint failure
+            # sits next to the timed-out gate.
+            local e2e=success gate=failure
+            [[ "$2" == "gate-anchor-failed" ]] && e2e=failure
+            [[ "$2" == "gate-cancelled" ]] && gate=cancelled
+            jq -nc --arg e2e "$e2e" --arg gate "$gate" --arg v "$2" '
+                def cr($n; $c): {name:$n, status:"completed", conclusion:$c, completed_at:"2026-10-22T03:38:07Z"};
+                [cr("Tests and Analysis"; "success"),
+                 cr("E2E Tests"; $e2e),
+                 cr("Meta checks"; "success"),
+                 cr("Infection PHP (per-PR diff)"; "success"),
+                 cr("All checks green"; $gate)]
+                | (if $v == "gate-anchor-missing" then map(select(.name != "E2E Tests")) else . end)
+                | (if $v == "gate-plus-other-red" then . + [cr("Lint"; "failure")] else . end)
+                | {total_count: length, check_runs: .}' > "$f" ;;
     esac
 }
 
@@ -337,6 +378,27 @@ set_ps_fail() { touch "$SCRATCH/ps-fail"; }
 set_lsof() { printf '%s\n' "$@" > "$SCRATCH/lsof.txt"; }
 set_lsof_fail() { touch "$SCRATCH/lsof-fail"; }
 set_launchctl_fail() { touch "$SCRATCH/launchctl-fail"; }
+# set_gate_run <sha> <databaseId> <status> <conclusion|"">: the one run `gh run list` returns.
+# An unsettled run keeps conclusion "" because that is the live gh shape (not null).
+set_gate_run() {
+    jq -nc --arg sha "$1" --argjson id "$2" --arg st "$3" --arg c "$4" \
+        '[{databaseId:$id, status:$st, conclusion:$c,
+           headSha:$sha, createdAt:"2026-10-22T02:58:00Z"}]' > "$SCRATCH/runs-$1.json"
+}
+# set_gate_log <databaseId> timeout|other: the `gh run view <id> --log-failed` output.
+# `timeout` is the line captured verbatim from run 39712872847 on 2026-10-21 (record and
+# replay): job TAB step TAB timestamp, then the U+2014 dash written as octal bytes.
+set_gate_log() {
+    case "$2" in
+        timeout) printf 'All checks green\tWait for every other check on this head to settle green\t2026-10-22T03:38:07.0456222Z TIMEOUT: WAIT: anchors not reported/completed: Tests and Analysis, E2E Tests \342\200\224 failing closed after 2426s\n' ;;
+        other)   printf 'All checks green\tWait for every other check on this head to settle green\t2026-10-22T03:38:07.0456222Z FAIL: E2E Tests concluded failure\n' ;;
+    esac > "$SCRATCH/runlog-$1.txt"
+}
+set_runs_fail() { touch "$SCRATCH/runs-fail"; }
+set_runlog_fail() { touch "$SCRATCH/runlog-fail"; }
+set_rerun_fail() { touch "$SCRATCH/rerun-fail"; }
+rerun_log() { cat "$SCRATCH/gh-rerun.log" 2>/dev/null || true; }
+gate_reruns() { cat "$STATE_DIR/gate-reruns/$1" 2>/dev/null; }
 
 # _stamp_at <epoch>: touch -t stamp. The one platform branch in this harness: BSD date -r
 # on macOS, GNU date -d @ on Linux CI.
@@ -550,6 +612,126 @@ run_tick
 grep -qF "$(printf '101\taaa1111')" "$STATE_DIR"/pending/* 2>/dev/null \
     || fail "red-qualifies: pending entry lacks the 101/aaa1111 line"
 end_case red-qualifies
+
+# Characterization (matrix rows 1, 2): a gate-only-red PR that is NOT a recoverable
+# timeout launches the normal rescue. Passes on the pre-rescue tick; Phase 3 must keep it.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 other
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-nontimeout-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-nontimeout-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-nontimeout-falls-through: issued a rerun: $(rerun_log)"
+end_case gate-nontimeout-falls-through
+
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-anchor-failed
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-anchor-failed-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-anchor-failed-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-anchor-failed-falls-through: issued a rerun: $(rerun_log)"
+end_case gate-anchor-failed-falls-through
+
+# Case a (row 8): a gate-only-red PR whose named anchors are now green is rerun, not rescued.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-timeout-reruns: rc $RC, want 0"
+[[ "$(rerun_log)" == "39712872847 --failed" ]] || fail "gate-timeout-reruns: rerun argv was '$(rerun_log)'"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-timeout-reruns: a Claude rescue launched"
+[[ "$(gate_reruns 101)" == "aaa1111 1" ]] || fail "gate-timeout-reruns: gate-reruns/101 is '$(gate_reruns 101)'"
+no_file "$STATE_DIR/strikes/101" || fail "gate-timeout-reruns: the rerun spent a strike"
+[[ "$(pending_count)" == "0" ]] || fail "gate-timeout-reruns: a pending entry was written"
+out_has 'reran gate run 39712872847 (1 of 2)' || fail "gate-timeout-reruns: no rerun log line: $OUT"
+grep -qxF 'run list --workflow=all-checks-green.yml --commit aaa1111 --json databaseId,conclusion,status,headSha,createdAt --limit 20' "$SCRATCH/gh.log" \
+    || fail "gate-timeout-reruns: gh run list call shape changed"
+grep -qxF 'run view 39712872847 --log-failed' "$SCRATCH/gh.log" || fail "gate-timeout-reruns: gh run view call shape changed"
+end_case gate-timeout-reruns
+
+# Case b, missing anchor (row 9).
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-anchor-missing
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick
+[[ $RC -eq 0 ]] || fail "gate-anchor-missing-falls-through: rc $RC, want 0"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+    || fail "gate-anchor-missing-falls-through: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+[[ -z "$(rerun_log)" ]] || fail "gate-anchor-missing-falls-through: issued a rerun: $(rerun_log)"
+no_file "$STATE_DIR/gate-reruns/101" || fail "gate-anchor-missing-falls-through: wrote the gate ledger"
+end_case gate-anchor-missing-falls-through
+
+# Case d (rows 10, 11): the cap is two reruns per head, and a new head resets it.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick; run_tick; run_tick
+[[ "$(rerun_log | wc -l | tr -d ' ')" == "2" ]] || fail "gate-rerun-cap: want 2 reruns, got: $(rerun_log)"
+[[ "$(gate_reruns 101)" == "aaa1111 2" ]] || fail "gate-rerun-cap: gate-reruns/101 is '$(gate_reruns 101)'"
+out_has 'skip PR 101: gate-timeout rerun cap (head aaa1111; 2 of 2 reruns used)' || fail "gate-rerun-cap: no cap log line: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-rerun-cap: a Claude rescue launched"
+set_prs '101|branch-one|bbb2222|BLOCKED|false'; set_checks bbb2222 gate-timeout
+set_gate_run bbb2222 39712872848 completed failure; set_gate_log 39712872848 timeout
+run_tick
+[[ "$(rerun_log | tail -n 1)" == "39712872848 --failed" ]] || fail "gate-rerun-cap: new head not rerun: $(rerun_log)"
+[[ "$(gate_reruns 101)" == "bbb2222 1" ]] || fail "gate-rerun-cap: new-head ledger is '$(gate_reruns 101)'"
+end_case gate-rerun-cap
+
+# Case e (row 12): --dry-run declares the rerun and writes nothing.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 gate-timeout
+set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+run_tick --dry-run
+[[ $RC -eq 0 ]] || fail "gate-rerun-dry-run: rc $RC, want 0"
+out_has 'dry-run: PR 101 would rerun gate run 39712872847 (timed out; anchors now green: Tests and Analysis, E2E Tests)' \
+    || fail "gate-rerun-dry-run: no would-rerun line: $OUT"
+[[ -z "$(rerun_log)" ]] || fail "gate-rerun-dry-run: issued a rerun: $(rerun_log)"
+if grep -q '^run rerun' "$SCRATCH/gh.log"; then fail "gate-rerun-dry-run: gh run rerun was called"; fi
+no_file "$STATE_DIR/gate-reruns" || fail "gate-rerun-dry-run: wrote gate-reruns/"
+no_file "$SCRATCH/pr-cycle.log" || fail "gate-rerun-dry-run: launched"
+end_case gate-rerun-dry-run
+
+# Rows 13-16: every gh failure on the rerun path skips the PR; none launches a rescue or spends the cap.
+begin_case
+for v in list-fail no-run running view-fail rerun-fail; do
+    reset
+    set_prs "$RED101"; set_checks aaa1111 gate-timeout
+    set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+    case "$v" in
+        list-fail)  set_runs_fail;   want='gate run lookup failed (gh run list)' ;;
+        no-run)     echo '[]' > "$SCRATCH/runs-aaa1111.json"; want='no gate run found for head aaa1111' ;;
+        running)    set_gate_run aaa1111 39712872847 in_progress ""; want='gate run 39712872847 is in_progress/null' ;;
+        view-fail)  set_runlog_fail; want='gate log read failed (gh run view 39712872847)' ;;
+        rerun-fail) set_rerun_fail;  want='gate rerun failed (gh run rerun 39712872847)' ;;
+    esac
+    run_tick
+    [[ $RC -eq 0 ]] || fail "gate-gh-fail-closed ($v): rc $RC, want 0"
+    out_has "$want" || fail "gate-gh-fail-closed ($v): no '$want' line: $OUT"
+    no_file "$SCRATCH/pr-cycle.log" || fail "gate-gh-fail-closed ($v): a Claude rescue launched"
+    no_file "$STATE_DIR/gate-reruns/101" || fail "gate-gh-fail-closed ($v): spent the rerun cap"
+    if [[ "$v" != "rerun-fail" ]]; then
+        [[ -z "$(rerun_log)" ]] || fail "gate-gh-fail-closed ($v): issued a rerun: $(rerun_log)"
+    fi
+done
+end_case gate-gh-fail-closed
+
+# Rows 17, 18: a cancelled gate, or a timed-out gate beside another red check, is today's rescue.
+for pair in gate-cancelled:gate-cancelled-falls-through \
+            gate-plus-other-red:gate-plus-other-red-falls-through; do
+    variant="${pair%%:*}"; cname="${pair##*:}"
+    reset; begin_case
+    set_prs "$RED101"; set_checks aaa1111 "$variant"
+    set_gate_run aaa1111 39712872847 completed failure; set_gate_log 39712872847 timeout
+    run_tick
+    [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 101 --max-ready 1" ]] \
+        || fail "$cname: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+    [[ -z "$(rerun_log)" ]] || fail "$cname: issued a rerun: $(rerun_log)"
+    if grep -q '^run ' "$SCRATCH/gh.log"; then fail "$cname: made a gh run call"; fi
+    end_case "$cname"
+done
 
 # gh_sweep_only accepts the rescue path's own reads and still rejects any other gh call.
 reset; begin_case
@@ -1696,7 +1878,7 @@ end_case conflict-retry-due-codes
 
 # prune-conflict-ledgers: pcw_prune drops the new ledgers of a closed PR (999), keeps PR 101's.
 reset; begin_case
-for l in conflict-hold retries; do
+for l in conflict-hold retries gate-reruns; do
     mkdir -p "$STATE_DIR/$l"; echo x > "$STATE_DIR/$l/999"; echo x > "$STATE_DIR/$l/101"
 done
 set_prs '101|branch-one|aaa1111|CLEAN|false'; set_checks aaa1111 green
@@ -1705,7 +1887,46 @@ no_file "$STATE_DIR/conflict-hold/999" || fail "prune-conflict-ledgers: conflict
 no_file "$STATE_DIR/retries/999" || fail "prune-conflict-ledgers: retries/999 survived"
 [[ -f "$STATE_DIR/conflict-hold/101" ]] || fail "prune-conflict-ledgers: conflict-hold/101 was pruned"
 [[ -f "$STATE_DIR/retries/101" ]] || fail "prune-conflict-ledgers: retries/101 was pruned"
+no_file "$STATE_DIR/gate-reruns/999" || fail "prune-conflict-ledgers: gate-reruns/999 survived"
+[[ -f "$STATE_DIR/gate-reruns/101" ]] || fail "prune-conflict-ledgers: gate-reruns/101 was pruned"
 end_case prune-conflict-ledgers
+
+# gate-lib-helpers (matrix rows 3, 4, 5): the pure gate helpers, sourced from the fixture
+# copy of the lib. The timeout log is the line captured from run 39712872847.
+reset; begin_case
+set_gate_log 39712872847 timeout; set_gate_log 39712872848 other
+printf 'All checks green\tWait\t2026-10-22T03:38:07Z TIMEOUT: WAIT: checks still running: ci \342\200\224 failing closed after 2426s\n' \
+    > "$SCRATCH/runlog-39712872849.txt"
+set_checks aaa1111 gate-timeout; set_checks bbb2222 red; set_checks ccc3333 gate-anchor-failed
+set_gate_run aaa1111 39712872847 completed failure
+GD="$SCRATCH/gate-ledger"; rm -rf "$GD"; mkdir -p "$GD"
+res="$(
+    . "$REPO/bin/lib/pr-cycle-watch.sh"
+    a="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872847.txt")"; echo "anchors-rc=$?"
+    echo "anchors=$(tr '\n' '|' <<< "$a")"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872848.txt")"; echo "other-rc=$?"; echo "other-out=[$o]"
+    o="$(pcw_gate_timeout_anchors < "$SCRATCH/runlog-39712872849.txt")"; echo "running-rc=$?"; echo "running-out=[$o]"
+    echo "count0=$(pcw_gate_rerun_count "$GD" 101 aaa1111)"
+    echo "add1=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "add2=$(pcw_add_gate_rerun "$GD" 101 aaa1111)"
+    echo "ledger=$(cat "$GD/gate-reruns/101")"
+    echo "add-new-head=$(pcw_add_gate_rerun "$GD" 101 bbb2222)"
+    pcw_gate_run_pick aaa1111 <<< '[]' >/dev/null; echo "pick-empty-rc=$?"
+    echo "pick=$(pcw_gate_run_pick aaa1111 < "$SCRATCH/runs-aaa1111.json")"
+    pcw_gate_failed < "$SCRATCH/checks-aaa1111.json"; echo "failed-gate-rc=$?"
+    pcw_gate_failed < "$SCRATCH/checks-bbb2222.json"; echo "failed-red-rc=$?"
+    names="$(printf 'Tests and Analysis\nE2E Tests')"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-aaa1111.json"; echo "green-ok-rc=$?"
+    pcw_anchors_green "$names" < "$SCRATCH/checks-ccc3333.json"; echo "green-failed-rc=$?"
+    pcw_anchors_green "" < "$SCRATCH/checks-aaa1111.json"; echo "green-empty-rc=$?"
+)"
+for want in 'anchors-rc=0' 'anchors=Tests and Analysis|E2E Tests|' 'other-rc=1' 'other-out=[]' \
+            'running-rc=1' 'running-out=[]' 'count0=0' 'add1=1' 'add2=2' 'ledger=aaa1111 2' \
+            'add-new-head=1' 'pick-empty-rc=1' 'pick=39712872847 completed failure' \
+            'failed-gate-rc=0' 'failed-red-rc=1' 'green-ok-rc=0' 'green-failed-rc=1' 'green-empty-rc=1'; do
+    grep -qxF -- "$want" <<< "$res" || fail "gate-lib-helpers: missing '$want' in: $res"
+done
+end_case gate-lib-helpers
 
 # conflict-hold-launch-tip: the tip captured at launch rides the pending row and is what
 # settle records, even though master moved before the rescue settled.

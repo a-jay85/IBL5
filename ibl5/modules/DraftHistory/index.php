@@ -19,6 +19,11 @@ if ($getOp === 'api') {
     return;
 }
 
+// Old Discord links use camelCase ?teamID=N; accept it alongside ?teamid=N.
+if (!isset($_GET['teamid']) && isset($_GET['teamID'])) {
+    $_GET['teamid'] = $_GET['teamID'];
+}
+
 \Module\ModuleRedirect::sendWithPassthrough(
     'modules.php?name=DraftInfo&tab=history',
     ['year', 'teamid'],

@@ -208,9 +208,10 @@ class TeamViewTest extends TestCase
         $this->assertSame(1, substr_count($output, '<h1'), 'Free Agents page must have exactly one <h1>.');
         // The banner row is NOT rendered for non-actual teams.
         $this->assertStringNotContainsString('team-banner-row', $output);
-        // The decorative fallback logo is present with empty alt (cannot be the h1).
-        $this->assertStringContainsString('team-logo-fallback', $output);
-        $this->assertStringContainsString('alt=""', $output);
+        // The fallback wrapper stays but is empty: logo/0.jpg does not exist, so no <img> is emitted.
+        $this->assertStringContainsString('<div class="team-logo-fallback"></div>', $output);
+        $this->assertStringNotContainsString('logo/0.jpg', $output);
+        $this->assertStringNotContainsString('team-banner-logo', $output);
     }
 
     public function testRenderContainsRaftersForActualTeam(): void

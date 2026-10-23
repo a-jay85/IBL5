@@ -102,105 +102,67 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
      */
     public function processPlayerRow(array $row): array
     {
-        $pid = $row['pid'];
-        $name = $row['name'];
-        $year = $row['year'];
-        $teamname = $row['team'];
-        $teamid = $row['teamid'];
-        $teamCity = $row['team_city'] ?? '';
-        $color1 = $row['color1'] ?? 'FFFFFF';
-        $color2 = $row['color2'] ?? '000000';
-
         $games = $row['games'];
-        $minutes = $row['minutes'];
-        $fgm = $row['fgm'];
-        $fga = $row['fga'];
-        $ftm = $row['ftm'];
-        $fta = $row['fta'];
-        $tgm = $row['tgm'];
-        $tga = $row['tga'];
-        $orb = $row['orb'];
-        $reb = $row['reb'];
-        $ast = $row['ast'];
-        $stl = $row['stl'];
-        $tvr = $row['tvr'];
-        $blk = $row['blk'];
-        $pf = $row['pf'];
-
-        // Calculate totals
-        $points = StatsFormatter::calculatePoints($fgm, $ftm, $tgm);
-
-        // Format percentages
-        $fgp = StatsFormatter::formatPercentage($fgm, $fga);
-        $ftp = StatsFormatter::formatPercentage($ftm, $fta);
-        $tgp = StatsFormatter::formatPercentage($tgm, $tga);
-
-        // Format per-game averages
-        $mpg = StatsFormatter::formatPerGameAverage($minutes, $games);
-        $fgmpg = StatsFormatter::formatPerGameAverage($fgm, $games);
-        $fgapg = StatsFormatter::formatPerGameAverage($fga, $games);
-        $ftmpg = StatsFormatter::formatPerGameAverage($ftm, $games);
-        $ftapg = StatsFormatter::formatPerGameAverage($fta, $games);
-        $tgmpg = StatsFormatter::formatPerGameAverage($tgm, $games);
-        $tgapg = StatsFormatter::formatPerGameAverage($tga, $games);
-        $orbpg = StatsFormatter::formatPerGameAverage($orb, $games);
-        $drebpg = StatsFormatter::formatPerGameAverage($reb - $orb, $games);
-        $rpg = StatsFormatter::formatPerGameAverage($reb, $games);
-        $apg = StatsFormatter::formatPerGameAverage($ast, $games);
-        $spg = StatsFormatter::formatPerGameAverage($stl, $games);
-        $tpg = StatsFormatter::formatPerGameAverage($tvr, $games);
-        $bpg = StatsFormatter::formatPerGameAverage($blk, $games);
-        $fpg = StatsFormatter::formatPerGameAverage($pf, $games);
-        $ppg = StatsFormatter::formatPerGameAverage($points, $games);
-
-        // Calculate Quality Assessment (QA)
-        $qa = $this->calculateQualityAssessment($games, $points, $reb, $ast, $stl, $blk, $fga, $fgm, $fta, $ftm, $tvr, $pf);
+        $points = StatsFormatter::calculatePoints($row['fgm'], $row['ftm'], $row['tgm']);
 
         return [
-            'pid' => $pid,
-            'name' => $name,
-            'year' => $year,
-            'teamname' => $teamname,
-            'teamid' => $teamid,
-            'team_city' => $teamCity,
-            'color1' => $color1,
-            'color2' => $color2,
+            'pid' => $row['pid'],
+            'name' => $row['name'],
+            'year' => $row['year'],
+            'teamname' => $row['team'],
+            'teamid' => $row['teamid'],
+            'team_city' => $row['team_city'] ?? '',
+            'color1' => $row['color1'] ?? 'FFFFFF',
+            'color2' => $row['color2'] ?? '000000',
             'games' => $games,
-            'minutes' => $minutes,
-            'fgm' => $fgm,
-            'fga' => $fga,
-            'ftm' => $ftm,
-            'fta' => $fta,
-            'tgm' => $tgm,
-            'tga' => $tga,
-            'orb' => $orb,
-            'reb' => $reb,
-            'ast' => $ast,
-            'stl' => $stl,
-            'tvr' => $tvr,
-            'blk' => $blk,
-            'pf' => $pf,
+            'minutes' => $row['minutes'],
+            'fgm' => $row['fgm'],
+            'fga' => $row['fga'],
+            'ftm' => $row['ftm'],
+            'fta' => $row['fta'],
+            'tgm' => $row['tgm'],
+            'tga' => $row['tga'],
+            'orb' => $row['orb'],
+            'reb' => $row['reb'],
+            'ast' => $row['ast'],
+            'stl' => $row['stl'],
+            'tvr' => $row['tvr'],
+            'blk' => $row['blk'],
+            'pf' => $row['pf'],
             'points' => $points,
-            'fgp' => $fgp,
-            'ftp' => $ftp,
-            'tgp' => $tgp,
-            'mpg' => $mpg,
-            'fgmpg' => $fgmpg,
-            'fgapg' => $fgapg,
-            'ftmpg' => $ftmpg,
-            'ftapg' => $ftapg,
-            'tgmpg' => $tgmpg,
-            'tgapg' => $tgapg,
-            'orbpg' => $orbpg,
-            'drebpg' => $drebpg,
-            'rpg' => $rpg,
-            'apg' => $apg,
-            'spg' => $spg,
-            'tpg' => $tpg,
-            'bpg' => $bpg,
-            'fpg' => $fpg,
-            'ppg' => $ppg,
-            'qa' => $qa,
+            'fgp' => StatsFormatter::formatPercentage($row['fgm'], $row['fga']),
+            'ftp' => StatsFormatter::formatPercentage($row['ftm'], $row['fta']),
+            'tgp' => StatsFormatter::formatPercentage($row['tgm'], $row['tga']),
+            'mpg' => StatsFormatter::formatPerGameAverage($row['minutes'], $games),
+            'fgmpg' => StatsFormatter::formatPerGameAverage($row['fgm'], $games),
+            'fgapg' => StatsFormatter::formatPerGameAverage($row['fga'], $games),
+            'ftmpg' => StatsFormatter::formatPerGameAverage($row['ftm'], $games),
+            'ftapg' => StatsFormatter::formatPerGameAverage($row['fta'], $games),
+            'tgmpg' => StatsFormatter::formatPerGameAverage($row['tgm'], $games),
+            'tgapg' => StatsFormatter::formatPerGameAverage($row['tga'], $games),
+            'orbpg' => StatsFormatter::formatPerGameAverage($row['orb'], $games),
+            'drebpg' => StatsFormatter::formatPerGameAverage($row['reb'] - $row['orb'], $games),
+            'rpg' => StatsFormatter::formatPerGameAverage($row['reb'], $games),
+            'apg' => StatsFormatter::formatPerGameAverage($row['ast'], $games),
+            'spg' => StatsFormatter::formatPerGameAverage($row['stl'], $games),
+            'tpg' => StatsFormatter::formatPerGameAverage($row['tvr'], $games),
+            'bpg' => StatsFormatter::formatPerGameAverage($row['blk'], $games),
+            'fpg' => StatsFormatter::formatPerGameAverage($row['pf'], $games),
+            'ppg' => StatsFormatter::formatPerGameAverage($points, $games),
+            'qa' => $this->calculateQualityAssessment(
+                $games,
+                $points,
+                $row['reb'],
+                $row['ast'],
+                $row['stl'],
+                $row['blk'],
+                $row['fga'],
+                $row['fgm'],
+                $row['fta'],
+                $row['ftm'],
+                $row['tvr'],
+                $row['pf'],
+            ),
         ];
     }
 

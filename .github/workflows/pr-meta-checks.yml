@@ -168,6 +168,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bin/check-post-merge-recipe --pr "${{ github.event.pull_request.number }}"
 
+      - name: Run bin/test-check-reviewer-eval
+        if: ${{ !cancelled() }}
+        run: bin/test-check-reviewer-eval
+
+      # Review-surface edits must carry a before/after score (ADR 0201). No-op when
+      # the surface hash is unchanged. Waivers: reviewer-eval-skip / -regression-ok.
+      # Warn-only (exit 0) while the base ref's baseline recall is 0 or absent.
+      - name: Run bin/check-reviewer-eval
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bin/check-reviewer-eval --pr "${{ github.event.pull_request.number }}" --base "${{ github.event.pull_request.base.sha }}"
+
+      - name: Run bin/reviewer-eval validate
+        if: ${{ !cancelled() }}
+        run: bin/reviewer-eval validate
+
       - name: Run bin/check-registry-trigger-rows
         if: ${{ !cancelled() }}
         run: bin/check-registry-trigger-rows
@@ -192,6 +209,19 @@ jobs:
         run: |
           bin/test-check-engine-freeze
           bin/check-engine-freeze --since="$BASE_SHA"
+
+      # --- Pipefail grep -q guard: no ADDED bin/ line in a pipefail shell file
+      # may pipe echo/printf into grep -q (SIGPIPE false-red, see
+      # .claude/rules/shell-pipefail-grep.md). Diff-only, so existing sites
+      # never block. The harness runs first so a broken pattern fails loudly.
+      # Hard gate. ---
+      - name: Run bin/check-pipefail-grep-q (harness + PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bin/test-check-pipefail-grep-q
+          bin/check-pipefail-grep-q --since="$BASE_SHA"
 
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report

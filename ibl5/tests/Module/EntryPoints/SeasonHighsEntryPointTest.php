@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Module\EntryPoints;
 
-use Module\ModuleRedirect;
-use Records\RecordsController;
-
 class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
 {
     protected function setUp(): void
@@ -57,45 +54,9 @@ class SeasonHighsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Playoffs', $output);
     }
 
-    public function testRedirectUrlWithSeasonPhaseIncludesPhase(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
-            ['seasonPhase'],
-            ['seasonPhase' => 'Playoffs']
-        );
-        $this->assertSame('modules.php?name=Records&tab=thisseason&seasonPhase=Playoffs', $url);
-    }
-
-    public function testRedirectUrlWithoutSeasonPhaseOmitsParam(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
-            ['seasonPhase'],
-            []
-        );
-        $this->assertSame('modules.php?name=Records&tab=thisseason', $url);
-    }
-
-    public function testRedirectUrlWithEmptySeasonPhaseOmitsParam(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
-            ['seasonPhase'],
-            ['seasonPhase' => '']
-        );
-        $this->assertSame('modules.php?name=Records&tab=thisseason', $url);
-    }
-
-    public function testRedirectUrlEncodesSpecialCharsInSeasonPhase(): void
-    {
-        $url = ModuleRedirect::passthroughUrl(
-            'modules.php?name=Records&tab=' . RecordsController::TAB_THISSEASON,
-            ['seasonPhase'],
-            ['seasonPhase' => 'Regular Season']
-        );
-        $this->assertSame('modules.php?name=Records&tab=thisseason&seasonPhase=Regular%20Season', $url);
-    }
+    // Redirect targets (seasonPhase passthrough, omission when empty, URL encoding) are
+    // pinned by RecordsControllerTest::testLegacyRedirectUrl*. The Location header
+    // cannot be captured in the CLI PHPUnit harness.
 
     public function testZeroStringPhaseFallsBackToCurrent(): void
     {

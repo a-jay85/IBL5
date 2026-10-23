@@ -340,6 +340,12 @@ class LiveGh(RecordingGh):
         return json.loads(self._gh("pr", "list", "--head", self.branch, "--state",
                                    "open", "--json", "number,url"))
 
+    def _graphql_reset(self) -> float:
+        """Epoch second the GraphQL bucket refills. `gh api rate_limit` is a REST
+        read that does not spend the GraphQL bucket."""
+        out = self._gh("api", "rate_limit", "--jq", ".resources.graphql.reset").strip()
+        return float(int(out))
+
     def _matching_count(self, pr: int, field: str, body: str) -> int:
         """Count comments (field="comments") or reviews (field="reviews") on the
         PR whose body equals `body` after CRLF/whitespace normalisation."""
@@ -356,18 +362,22 @@ class LiveGh(RecordingGh):
 
     # -- mutations: executed, then recorded ------------------------------
     def pr_create(self, title: str, body: str, base: str) -> int:
-        landed = None
+        def found():
+            rows = self._open_prs_for_branch()
+            return (True, rows[0]["url"]) if rows else (False, None)
         try:
             before = self._open_prs_for_branch()
         except Exception:
             before = None
-        if before == []:  # the runner calls pr_create only when no PR exists
-            def landed():
-                rows = self._open_prs_for_branch()
-                return (True, rows[0]["url"]) if rows else (False, None)
-        out = self._gh_landed(("pr", "create", "--title", title, "--body", body,
-                               "--base", base, "--head", self.branch),
-                              label="gh pr create", landed=landed)
+        # Transient retry needs a clean baseline: with none, one attempt (today).
+        landed = found if before == [] else None  # runner calls this only when no PR exists
+        argv = ("pr", "create", "--title", title, "--body", body,
+                "--base", base, "--head", self.branch)
+        # A rate-limit wait relists after the reset, so a fresh listing is the
+        # baseline even when the pre-create snapshot failed.
+        out = netretry.call_rate_limited(
+            lambda: self._gh_landed(argv, label="gh pr create", landed=landed),
+            label="gh pr create", landed=found, reset_at=self._graphql_reset)
         m = re.search(r"/pull/(\d+)", out)
         if not m:
             raise HarnessError("gh", f"pr create returned no PR URL: {out[:200]}")

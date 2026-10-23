@@ -6,7 +6,7 @@ namespace TradeSuggestions;
 
 /**
  * A deal between the user's team and a partner: up to two players and/or picks
- * a side, as CandidateGenerator builds them.
+ * a side, as NeedPairMatcher builds them.
  */
 final readonly class TradeCandidate
 {

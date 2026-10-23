@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions;
 
 use League\League;
-use Negotiation\Contracts\NegotiationRepositoryInterface;
 use PHPUnit\Framework\TestCase;
+use Tests\TradeSuggestions\Fixtures\RosterFactory;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use Settings\Contracts\SettingsServiceInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeValidatorInterface;
-use TradeSuggestions\CandidateGenerator;
 use TradeSuggestions\Contracts\SuggestionAssetRepositoryInterface;
 use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
 use TradeSuggestions\ModeInputs;
+use TradeSuggestions\NeedJudge;
+use TradeSuggestions\NeedPairMatcher;
+use TradeSuggestions\NeedsCardBuilder;
 use TradeSuggestions\PickValuer;
 use TradeSuggestions\RejectReason;
+use TradeSuggestions\ReasonBuilder;
 use TradeSuggestions\ResolvedTeamMode;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\SuggestionRanker;
@@ -24,14 +27,13 @@ use TradeSuggestions\SuggestionValidationFilter;
 use TradeSuggestions\TeamMode;
 use TradeSuggestions\TeamModeService;
 use TradeSuggestions\TeamModeSetting;
-use TradeSuggestions\TradeImpactEvaluator;
 use TradeSuggestions\TradeSuggestionsService;
 use Validation\ValidationResult;
 use Validation\ValidationResultWithContext;
 
 /**
- * PickValuer, CandidateGenerator, TradeImpactEvaluator, and SuggestionRanker are
- * pure (and mostly final), so they run for real over crafted inputs. Every I/O
+ * The needs engine (card builder, matcher, judge, reason builder), PickValuer and
+ * SuggestionRanker are pure, so they run for real over crafted inputs. Every I/O
  * collaborator is a stub.
  */
 class TradeSuggestionsServiceTest extends TestCase
@@ -137,15 +139,43 @@ class TradeSuggestionsServiceTest extends TestCase
         self::assertSame(count($result->items) + array_sum($d->validatorRejections), $d->validated);
     }
 
-    public function testTeamAtTheHardCapGetsOnlySalaryNeutralOrShedding(): void
+    public function testRejectionsListEveryReason(): void
     {
-        $result = $this->buildService(rosters: self::rosters(), capTotal: League::HARD_CAP_MAX)->buildForTeam(self::USER_TID);
+        $result = $this->buildService(rosters: self::rosters())->buildForTeam(self::USER_TID);
 
         self::assertNotNull($result);
         $d = $result->diagnostics;
         self::assertNotNull($d);
-        self::assertGreaterThan(0, $d->rejections[RejectReason::OverHardCap->value]);
-        self::assertSame([], $d->validatorRejections);
+        foreach (RejectReason::cases() as $reason) {
+            self::assertArrayHasKey($reason->value, $d->rejections);
+        }
+    }
+
+    public function testOverCapUserGetsDealsWithAReasonOnBothSides(): void
+    {
+        $result = $this->buildService(rosters: self::rosters(), capTotal: 3000, userCapTotal: League::HARD_CAP_MAX + 653, picks: self::userPicks(), draftOrder: $this->draftOrderOf2())->buildForTeam(self::USER_TID);
+
+        self::assertNotNull($result);
+        self::assertNotSame([], $result->items);
+        foreach ($result->items as $item) {
+            self::assertSame('Heat', $item->partnerTeamName);
+            self::assertNotSame('', $item->userReason);
+            self::assertNotSame('', $item->partnerReason);
+            self::assertDoesNotMatchRegularExpression('/\b(ovr|rating)\b/i', $item->userReason . ' ' . $item->partnerReason);
+        }
+    }
+
+    public function testEmptyUserRosterKeepsDiagnosticsBalanced(): void
+    {
+        $rosters = self::rosters();
+        $rosters[1] = array_slice($rosters[1], 0, 0);
+
+        $result = $this->buildService(rosters: $rosters)->buildForTeam(self::USER_TID);
+
+        self::assertNotNull($result);
+        $d = $result->diagnostics;
+        self::assertNotNull($d);
+        self::assertSame($d->generated, array_sum($d->rejections) + $d->scored);
     }
 
     public function testReturnsEmptyItemsWhenNothingPasses(): void
@@ -165,6 +195,7 @@ class TradeSuggestionsServiceTest extends TestCase
     /**
      * @param array<int, string> $teams
      * @param array<int, list<SuggestionPlayer>> $rosters
+     * @param array<int, list<array{pickid: int, owner_teamid: int, teampick_teamid: int, year: int, round: int}>> $picks
      */
     private function buildService(
         bool $tradesAllowed = true,
@@ -177,6 +208,8 @@ class TradeSuggestionsServiceTest extends TestCase
         ?TradeFormRepositoryInterface $formRepo = null,
         ?TradeValidatorInterface $validator = null,
         int $capTotal = 5000,
+        ?int $userCapTotal = null,
+        array $picks = [],
     ): TradeSuggestionsService {
         $settings = self::createStub(SettingsServiceInterface::class);
         $settings->method('isTradesAllowed')->willReturn($tradesAllowed);
@@ -194,7 +227,7 @@ class TradeSuggestionsServiceTest extends TestCase
         if ($assetRepo === null) {
             $assetRepo = self::createStub(SuggestionAssetRepositoryInterface::class);
             $assetRepo->method('getRostersForTeams')->willReturn($rosters);
-            $assetRepo->method('getPicksForTeams')->willReturn([]);
+            $assetRepo->method('getPicksForTeams')->willReturn($picks);
         }
 
         if ($draftOrder === null) {
@@ -209,8 +242,18 @@ class TradeSuggestionsServiceTest extends TestCase
                 $rows[] = ['teamid' => $tid, 'team_name' => $name, 'team_city' => 'City', 'color1' => '000000', 'color2' => 'FFFFFF'];
             }
             $formRepo->method('getAllTeamsWithCity')->willReturn($rows);
-            $formRepo->method('getTeamPlayersForTrading')->willReturn([]);
-            $formRepo->method('getTeamDraftPicksForTrading')->willReturn([]);
+            $formRepo->method('getTeamPlayersForTrading')->willReturnCallback(
+                static fn (int $tid): array => array_map(
+                    static fn (SuggestionPlayer $p): array => ['pid' => $p->pid, 'cy' => 1, 'salary_yr1' => $p->currentSalary],
+                    $rosters[$tid] ?? [],
+                ),
+            );
+            $formRepo->method('getTeamDraftPicksForTrading')->willReturnCallback(
+                static fn (int $tid): array => array_map(
+                    static fn (array $row): array => ['pickid' => $row['pickid']],
+                    $picks[$tid] ?? [],
+                ),
+            );
         }
 
         if ($validator === null) {
@@ -223,12 +266,14 @@ class TradeSuggestionsServiceTest extends TestCase
         $season->endingYear = 2027;
 
         $capCalculator = self::createStub(\Trading\TradeCapCalculator::class);
-        $capCalculator->method('calculateSalaryCapData')->willReturn([
-            'userCurrentSeasonCapTotal' => $capTotal,
-            'partnerCurrentSeasonCapTotal' => $capTotal,
-            'userCapSentToPartner' => 0,
-            'partnerCapSentToUser' => 0,
-        ]);
+        $capCalculator->method('calculateSalaryCapData')->willReturnCallback(
+            static fn (array $tradeData): array => [
+                'userCurrentSeasonCapTotal' => $userCapTotal !== null && $tradeData['offeringTeam'] === 'Lakers' ? $userCapTotal : $capTotal,
+                'partnerCurrentSeasonCapTotal' => $capTotal,
+                'userCapSentToPartner' => 0,
+                'partnerCapSentToUser' => 0,
+            ],
+        );
 
         return new TradeSuggestionsService(
             $teamModeService,
@@ -239,11 +284,12 @@ class TradeSuggestionsServiceTest extends TestCase
             $settings,
             $season,
             new PickValuer(),
-            new CandidateGenerator(),
-            new TradeImpactEvaluator(),
+            new NeedsCardBuilder(),
+            new NeedPairMatcher(),
+            new NeedJudge(),
+            new ReasonBuilder(),
             new SuggestionValidationFilter($validator, $capCalculator, $formRepo, $season),
             new SuggestionRanker(),
-            self::createStub(NegotiationRepositoryInterface::class),
         );
     }
 
@@ -260,22 +306,50 @@ class TradeSuggestionsServiceTest extends TestCase
     }
 
     /**
-     * Two nine-man rosters with a spread of ovr, ages, and salaries.
+     * Team 1 is over the hard cap with an old, expensive rotation. Team 2 has
+     * room and young players. Everyone has minutes and a points line.
      *
      * @return array<int, list<SuggestionPlayer>>
      */
     private static function rosters(): array
     {
-        $positions = ['PG', 'SG', 'SF', 'GF', 'PF', 'C', 'G', 'F', 'C'];
+        $positions = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF', 'C'];
         $rosters = [];
         foreach ([1, 2] as $tid) {
             foreach ($positions as $i => $pos) {
                 $pid = $tid * 100 + $i;
-                $ovr = 72 - 2 * $i - $tid;
-                $rosters[$tid][] = new SuggestionPlayer($pid, 'Player ' . $pid, $pos, 22 + $i + $tid, $ovr, false, 400 + 100 * $i, 1 + $i % 4, 500 * ($i % 4));
+                $rosters[$tid][] = RosterFactory::player(
+                    $pid,
+                    $pos,
+                    age: $tid === 1 ? 31 : 22,
+                    salary: $tid === 1 ? 900 : 400,
+                    years: 1 + $i % 4,
+                    dcMinutes: $i < 5 ? 36 - 3 * $i : 0,
+                    points: 700 - 40 * $i - 20 * $tid,
+                    laterSalaries: $tid === 1 ? [900, 900] : [],
+                );
             }
         }
 
         return $rosters;
+    }
+
+    /**
+     * @return array<int, list<array{pickid: int, owner_teamid: int, teampick_teamid: int, year: int, round: int}>>
+     */
+    private static function userPicks(): array
+    {
+        return [1 => [['pickid' => 900, 'owner_teamid' => 1, 'teampick_teamid' => 1, 'year' => 2027, 'round' => 1]]];
+    }
+
+    private function draftOrderOf2(): ProjectedDraftOrderServiceInterface
+    {
+        $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
+        $draftOrder->method('calculateDraftOrder')->willReturn([
+            'round1' => [$this->slot(1, 20, 62), $this->slot(2, 40, 42)],
+            'round2' => [],
+        ]);
+
+        return $draftOrder;
     }
 }

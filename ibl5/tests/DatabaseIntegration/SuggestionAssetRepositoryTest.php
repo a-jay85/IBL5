@@ -28,14 +28,13 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
     public function testRostersForTeamsGroupsByTeamAndExcludesRetired(): void
     {
         $this->insertTestPlayer(200000001, 'Suggest One', [
-            'teamid' => 1, 'pos' => 'C', 'talent' => 5, 'skill' => 5, 'intangibles' => 5,
-            'r_fga' => 50, 'oo' => 25,
+            'teamid' => 1, 'pos' => 'C',
             'cy' => 2, 'cyt' => 4, 'salary_yr1' => 900, 'salary_yr2' => 1000, 'salary_yr3' => 1100, 'salary_yr4' => 1200,
         ]);
         $this->insertTestPlayer(200000002, 'Suggest Two', ['teamid' => 2]);
         $this->insertTestPlayer(200000003, 'Suggest Retired', ['teamid' => 1, 'retired' => 1]);
 
-        $rosters = $this->repo->getRostersForTeams([1, 2], self::maximums(), false, self::LAST_SEASON);
+        $rosters = $this->repo->getRostersForTeams([1, 2], false, self::LAST_SEASON);
 
         $team1Pids = array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rosters[1] ?? []);
         $team2Pids = array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rosters[2] ?? []);
@@ -53,9 +52,6 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($one);
-        // ovr reads the rating fields, not the 1-5 scouting grades: r_fga at the
-        // league max (100%), oo at half of it (50%), the other 19 at zero.
-        self::assertSame((int) round(150 / 21), $one->ovr);
         self::assertSame(1000, $one->currentSalary);
         self::assertSame(3, $one->yearsRemaining);
         self::assertSame(1100 + 1200, $one->futureSalary);
@@ -69,7 +65,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         ]);
         $this->insertRow('ibl_hist', ['pid' => 200000031, 'year' => self::LAST_SEASON, 'name' => 'Suggest Starter', 'minutes' => 2400, 'pts' => 1200]);
 
-        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000031];
+        $player = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? [])[200000031];
 
         self::assertSame('PG', $player->starterSlot());
         self::assertSame(34, $player->dcMinutes);
@@ -83,7 +79,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000032, 'Suggest Other Year', ['teamid' => 1, 'stats_min' => 120]);
         $this->insertRow('ibl_hist', ['pid' => 200000032, 'year' => self::LAST_SEASON + 1, 'name' => 'Suggest Other Year', 'minutes' => 2400, 'pts' => 1200]);
 
-        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000032];
+        $player = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? [])[200000032];
 
         self::assertNull($player->production);
     }
@@ -92,14 +88,14 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200000033, 'Suggest Rookie', ['teamid' => 1, 'stats_min' => 50]);
 
-        $player = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000033];
+        $player = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? [])[200000033];
 
         self::assertFalse($player->hasProduction());
     }
 
     public function testRostersForTeamsEmptyListReturnsEmpty(): void
     {
-        self::assertSame([], $this->repo->getRostersForTeams([], self::maximums(), false, self::LAST_SEASON));
+        self::assertSame([], $this->repo->getRostersForTeams([], false, self::LAST_SEASON));
     }
 
     /**
@@ -112,8 +108,8 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000011, 'Suggest Expiring', ['teamid' => 1, 'cy' => 2, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900]);
         $this->insertTestPlayer(200000012, 'Suggest Last Year', ['teamid' => 1, 'cy' => 1, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900]);
 
-        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
-        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? []);
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], true, self::LAST_SEASON)[1] ?? []);
 
         self::assertSame(1, $inSeason[200000011]->yearsRemaining);
         self::assertTrue($inSeason[200000011]->tradeable);
@@ -133,8 +129,8 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
             'teamid' => 1, 'cy' => 2, 'cyt' => 4, 'salary_yr1' => 900, 'salary_yr2' => 1000, 'salary_yr3' => 1100, 'salary_yr4' => 1200,
         ]);
 
-        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? [])[200000041];
-        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? [])[200000041];
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? [])[200000041];
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], true, self::LAST_SEASON)[1] ?? [])[200000041];
 
         self::assertSame(1000, $inSeason->currentSalary);
         self::assertSame([1100, 1200], $inSeason->laterSalaries);
@@ -180,7 +176,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
                 'teamid' => 1, 'cy' => 1, 'cyt' => 3, 'salary_yr1' => 3500, 'salary_yr2' => 3600, 'salary_yr3' => 3700,
             ]);
         }
-        $all = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), $advancesContractYears, self::LAST_SEASON)[1] ?? []);
+        $all = self::byPid($this->repo->getRostersForTeams([1], $advancesContractYears, self::LAST_SEASON)[1] ?? []);
 
         return [200000051 => $all[200000051], 200000052 => $all[200000052]];
     }
@@ -203,8 +199,8 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000031, 'Suggest Expiring', ['teamid' => 1, 'cy' => 2, 'cyt' => 2, 'salary_yr1' => 800, 'salary_yr2' => 900, 'salary_yr3' => 0]);
         $this->insertTestPlayer(200000032, 'Suggest Signed Rookie', ['teamid' => 1, 'cy' => 0, 'cyt' => 3, 'salary_yr1' => 500]);
 
-        $offseason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), true, self::LAST_SEASON)[1] ?? []);
-        $inSeason = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], true, self::LAST_SEASON)[1] ?? []);
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
 
         self::assertFalse($offseason[200000031]->countsOnRoster);
         self::assertTrue($offseason[200000032]->countsOnRoster);
@@ -221,7 +217,7 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200000021, 'Suggest Waived', ['teamid' => 1, 'ordinal' => \League\JsbConstants::WAIVERS_ORDINAL + 1]);
         $this->insertTestPlayer(200000022, 'Suggest Unsigned', ['teamid' => 1, 'cy' => 0]);
 
-        $players = self::byPid($this->repo->getRostersForTeams([1], self::maximums(), false, self::LAST_SEASON)[1] ?? []);
+        $players = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
 
         self::assertArrayNotHasKey(200000021, $players);
         self::assertFalse($players[200000022]->tradeable);
@@ -235,16 +231,6 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_team_season_records', ['team_id' => 1, 'year' => 2089, 'game_type' => 1, 'currentname' => 'Test', 'namethatyear' => 'Test', 'wins' => 20, 'losses' => 62]);
 
         self::assertSame([1 => ['wins' => 60, 'losses' => 22]], $this->repo->getRegularSeasonRecords(2090));
-    }
-
-    /**
-     * League maximums of 50 for every rating key.
-     *
-     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
-     */
-    private static function maximums(): array
-    {
-        return ['fga' => 50, 'fgp' => 50, 'fta' => 50, 'ftp' => 50, 'tga' => 50, 'tgp' => 50, 'orb' => 50, 'drb' => 50, 'ast' => 50, 'stl' => 50, 'tov' => 50, 'blk' => 50, 'foul' => 50, 'oo' => 50, 'od' => 50, 'do' => 50, 'dd' => 50, 'po' => 50, 'pd' => 50, 'to' => 50, 'td' => 50];
     }
 
     /**

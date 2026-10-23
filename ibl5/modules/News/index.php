@@ -53,8 +53,10 @@ $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
     new \Settings\SettingsService($newsSeason),
     $newsSeason,
     new \TradeSuggestions\PickValuer(),
-    new \TradeSuggestions\CandidateGenerator(),
-    new \TradeSuggestions\TradeImpactEvaluator(),
+    new \TradeSuggestions\NeedsCardBuilder(),
+    new \TradeSuggestions\NeedPairMatcher(),
+    new \TradeSuggestions\NeedJudge(),
+    new \TradeSuggestions\ReasonBuilder(),
     new \TradeSuggestions\SuggestionValidationFilter(
         $tradeValidator,
         new \Trading\TradeCapCalculator(
@@ -67,7 +69,6 @@ $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
         $newsSeason,
     ),
     new \TradeSuggestions\SuggestionRanker(),
-    new \Negotiation\NegotiationRepository($mysqli_db, new \Repositories\SalaryCapRepository($mysqli_db)),
 );
 
 $controller = new \Topics\News\NewsController(

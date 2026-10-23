@@ -45,7 +45,6 @@ final class RosterFactory
             name: 'Player ' . $pid,
             pos: $pos,
             age: $age,
-            ovr: 0,
             injured: false,
             currentSalary: $salary,
             yearsRemaining: $years,

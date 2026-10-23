@@ -8,7 +8,6 @@ use TradeSuggestions\Contracts\SuggestionAssetRepositoryInterface;
 
 /**
  * @phpstan-import-type SuggestionPickRow from SuggestionAssetRepositoryInterface
- * @phpstan-import-type MarketMaximums from PlayerRating
  *
  * @see SuggestionAssetRepositoryInterface
  */
@@ -18,18 +17,16 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
      * @see SuggestionAssetRepositoryInterface::getRostersForTeams()
      *
      * @param list<int> $tids
-     * @param MarketMaximums $maximums
      * @return array<int, list<SuggestionPlayer>>
      */
-    public function getRostersForTeams(array $tids, array $maximums, bool $advancesContractYears, int $lastSeasonYear): array
+    public function getRostersForTeams(array $tids, bool $advancesContractYears, int $lastSeasonYear): array
     {
         $rows = $this->fetchAllInList(
             "SELECT pid, name, pos, age, teamid, injured, cy, cyt, ordinal, exp,
                     dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_minutes,
                     stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta, stats_3gm, stats_3ga,
                     stats_orb, stats_drb, stats_ast, stats_stl, stats_blk, stats_tvr,
-                    salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6,
-                    " . implode(', ', PlayerRating::COLUMNS) . "
+                    salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
              FROM `ibl_plr`
              WHERE retired = 0 AND ordinal <= 960 AND teamid IN ({IN})
              ORDER BY teamid, ordinal, pid",
@@ -45,7 +42,7 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
         $rosters = [];
         foreach ($rows as $row) {
             $hist = $histByPid[self::scalarToInt($row['pid'] ?? null)] ?? null;
-            $rosters[self::scalarToInt($row['teamid'] ?? null)][] = self::toPlayer($row, $maximums, $advancesContractYears, $hist);
+            $rosters[self::scalarToInt($row['teamid'] ?? null)][] = self::toPlayer($row, $advancesContractYears, $hist);
         }
 
         return $rosters;
@@ -152,10 +149,9 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
      * that year has no years left and cannot be dealt.
      *
      * @param array<string, mixed> $row
-     * @param MarketMaximums $maximums
      * @param array<string, mixed>|null $histRow
      */
-    private static function toPlayer(array $row, array $maximums, bool $advancesContractYears, ?array $histRow): SuggestionPlayer
+    private static function toPlayer(array $row, bool $advancesContractYears, ?array $histRow): SuggestionPlayer
     {
         $cy = self::scalarToInt($row['cy'] ?? null);
         $cyt = self::scalarToInt($row['cyt'] ?? null);
@@ -185,7 +181,6 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
             name: self::scalarToString($row['name'] ?? null),
             pos: self::scalarToString($row['pos'] ?? null),
             age: self::scalarToInt($row['age'] ?? null),
-            ovr: PlayerRating::overall($row, $maximums),
             depth: [
                 'PG' => self::scalarToInt($row['dc_pg_depth'] ?? null),
                 'SG' => self::scalarToInt($row['dc_sg_depth'] ?? null),

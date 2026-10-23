@@ -9,7 +9,6 @@ use TradeSuggestions\SuggestionPlayer;
 /**
  * Batched public-data reads for the trade suggestion engine.
  *
- * @phpstan-import-type MarketMaximums from \TradeSuggestions\PlayerRating
  * @phpstan-type SuggestionPickRow array{pickid: int, owner_teamid: int, teampick_teamid: int, year: int, round: int}
  */
 interface SuggestionAssetRepositoryInterface
@@ -18,12 +17,11 @@ interface SuggestionAssetRepositoryInterface
      * Active (non-retired, rostered) players for each team, in one query.
      *
      * @param list<int> $tids
-     * @param MarketMaximums $maximums League rating maximums for PlayerRating::overall()
      * @param bool $advancesContractYears True in the offseason phases: contracts are read one year ahead
      * @param int $lastSeasonYear ibl_hist year read as the fallback production line (ending year - 1)
      * @return array<int, list<SuggestionPlayer>> Keyed by teamid; an empty $tids returns []
      */
-    public function getRostersForTeams(array $tids, array $maximums, bool $advancesContractYears, int $lastSeasonYear): array;
+    public function getRostersForTeams(array $tids, bool $advancesContractYears, int $lastSeasonYear): array;
 
     /**
      * Regular-season wins and losses per team for one season ending year.

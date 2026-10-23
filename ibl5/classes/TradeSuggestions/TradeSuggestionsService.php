@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace TradeSuggestions;
 
-use Negotiation\Contracts\NegotiationRepositoryInterface;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use Season\Season;
 use Settings\Contracts\SettingsServiceInterface;
@@ -35,11 +34,12 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         private readonly SettingsServiceInterface $settingsService,
         private readonly Season $season,
         private readonly PickValuer $pickValuer,
-        private readonly CandidateGenerator $generator,
-        private readonly TradeImpactEvaluator $evaluator,
+        private readonly NeedsCardBuilder $cardBuilder,
+        private readonly NeedPairMatcher $matcher,
+        private readonly NeedJudge $judge,
+        private readonly ReasonBuilder $reasons,
         private readonly SuggestionValidationFilter $filter,
         private readonly SuggestionRanker $ranker,
-        private readonly NegotiationRepositoryInterface $ratingMaximums,
     ) {
     }
 
@@ -65,7 +65,7 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
 
         $endingYear = $this->season->endingYear;
         $advances = $this->season->advancesContractYears();
-        $rosters = $this->assetRepo->getRostersForTeams($allTids, $this->ratingMaximums->getMarketMaximums(), $advances, $endingYear - 1);
+        $rosters = $this->assetRepo->getRostersForTeams($allTids, $advances, $endingYear - 1);
         $pickRows = $this->assetRepo->getPicksForTeams($allTids, $endingYear);
         $order = $this->draftOrderService->calculateDraftOrder($endingYear);
         $slotIndex = $this->pickValuer->buildSlotIndex($order);
@@ -100,14 +100,38 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         }
         $userMode = $modes[$tid];
 
-        $partners = [];
+        /** @var array<int, TeamDepth> $depths */
+        $depths = [];
+        foreach ($allTids as $teamId) {
+            $depths[$teamId] = SlotMapper::depthFor($assets[$teamId]->players);
+        }
+        $ranks = LeagueStarterRanks::build($depths);
+
+        /** @var array<int, NeedsCard> $cards */
+        $cards = [];
+        foreach ($allTids as $teamId) {
+            $cards[$teamId] = $this->cardBuilder->build(
+                $assets[$teamId],
+                $depths[$teamId],
+                $ranks,
+                $modes[$teamId]->mode,
+                TeamModeGuesser::recordPct($inputs[$teamId]),
+            );
+        }
+
+        $partnerCards = [];
+        $partnerAssets = [];
+        $partnerDepths = [];
         foreach ($allTids as $partnerTid) {
             if ($partnerTid !== $tid) {
-                $partners[] = $assets[$partnerTid];
+                $partnerCards[$partnerTid] = $cards[$partnerTid];
+                $partnerAssets[$partnerTid] = $assets[$partnerTid];
+                $partnerDepths[$partnerTid] = $depths[$partnerTid];
             }
         }
 
         $userAssets = $assets[$tid];
+        $userCard = $cards[$tid];
         $generated = 0;
         /** @var array<string, int> $rejections */
         $rejections = [];
@@ -115,21 +139,31 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
             $rejections[$reason->value] = 0;
         }
         $scored = [];
-        foreach ($this->generator->generate($userAssets, $partners) as $candidate) {
+        foreach ($this->matcher->generate($userCard, $userAssets, $partnerCards, $partnerAssets, $depths[$tid], $partnerDepths, $ranks) as $paired) {
             $generated++;
+            $candidate = $paired->candidate;
             $partnerTid = $candidate->partnerTid;
-            $result = $this->evaluator->evaluate(
-                $candidate,
-                $userAssets,
-                $assets[$partnerTid],
-                $userMode->mode,
-                $modes[$partnerTid]->mode,
-            );
-            if ($result instanceof RejectReason) {
-                $rejections[$result->value]++;
-            } else {
-                $scored[] = $result;
+            $judgment = $this->judge->judge($paired, $userCard, $cards[$partnerTid], $userAssets, $assets[$partnerTid], $ranks);
+            if ($judgment instanceof RejectReason) {
+                $rejections[$judgment->value]++;
+                continue;
             }
+
+            $userReason = $this->reasons->forSide($paired, $judgment, true, $userCard, $userAssets, $assets[$partnerTid], $ranks);
+            $partnerReason = $this->reasons->forSide($paired, $judgment, false, $cards[$partnerTid], $assets[$partnerTid], $userAssets, $ranks);
+            if ($userReason === null || $partnerReason === null) {
+                $rejections[RejectReason::NoMotive->value]++;
+                continue;
+            }
+
+            $scored[] = new ScoredCandidate(
+                $candidate,
+                min($judgment->userGain, $judgment->partnerGain),
+                $userReason,
+                $partnerReason,
+                $paired,
+                $judgment,
+            );
         }
 
         $userTeamName = $teamNames[$tid] ?? '';

@@ -2114,7 +2114,8 @@ end_case conflict-dry-run-no-ledger
 # merge-tree needs real objects. Built with plumbing in $REPO so HEAD, the index and the
 # branch-one worktree stay untouched; reset() never removes objects, so build them once.
 _pc_blob() { printf '%s\n' "$1" | git -C "$REPO" hash-object -w --stdin; }
-# _pc_commit <parent|-> <path=content>...: a commit whose tree holds exactly those files.
+# _pc_commit <parent[,parent2]|-> <path=content>...: a commit whose tree holds exactly those
+# files. Two comma-separated parents make a merge commit.
 _pc_commit() {
     local parent="$1" idx="$SCRATCH/probe-index" kv tree; shift
     rm -f "$idx"
@@ -2125,6 +2126,8 @@ _pc_commit() {
     tree="$(GIT_INDEX_FILE="$idx" git -C "$REPO" write-tree)"
     if [[ "$parent" == - ]]; then
         git -C "$REPO" commit-tree "$tree" -m probe < /dev/null
+    elif [[ "$parent" == *,* ]]; then
+        git -C "$REPO" commit-tree "$tree" -p "${parent%%,*}" -p "${parent#*,}" -m probe < /dev/null
     else
         git -C "$REPO" commit-tree "$tree" -p "$parent" -m probe < /dev/null
     fi
@@ -2307,6 +2310,28 @@ end_case conflict-unchanged-skipped
 conflict_prefix
 P_M4="$(_pc_commit "$P_BASE" a.txt=master b.txt=base c.txt=master z.txt=base)"
 set_tip_raw "$P_M4"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-path-dropped-content-changed-fired: want 2 launches got $(launch_count)"
+out_has "PR 101: conflict re-try (conflicted paths or their content changed on master: 2 -> 2)" \
+    || fail "conflict-path-dropped-content-changed-fired: no re-try line: $OUT"
+end_case conflict-path-dropped-content-changed-fired
+
+# conflict-paths-changed-fired: the path set changes from {a,b} to {a,c} at an equal count,
+# and a.txt and b.txt are byte-identical on both tips, so only the path-set compare re-fires.
+# The head's first commit (b only) is merged into master, which moves the merge base there:
+# b.txt then merges clean while c.txt starts to conflict.
+P_BX1="$(_pc_commit "$P_BASE" a.txt=base b.txt=branch c.txt=base z.txt=base)"
+P_BX="$(_pc_commit "$P_BX1" a.txt=branch b.txt=branch c.txt=branch z.txt=base)"
+P_M6="$(_pc_commit "$P_M1,$P_BX1" a.txt=master b.txt=master c.txt=master z.txt=base)"
+reset; begin_case
+set_prs "101|branch-one|$P_BX|DIRTY|false"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_M1"
+run_tick; run_tick
+[[ "$(sed -n '3,$p' "$STATE_DIR/conflict-hold/101")" == $'paths 2\na.txt\nb.txt' ]] \
+    || fail "conflict-paths-changed-fired: hold set is '$(conflict_hold 101)'"
+pc_probe "$REPO" 101 "$P_M6" "$P_BX"
+[[ "$PC_RC" == 1 && "$PC_OUT" == $'a.txt\nc.txt' ]] \
+    || fail "conflict-paths-changed-fired: M6 probe rc $PC_RC paths '$PC_OUT'"
+set_tip_raw "$P_M6"; run_tick
 [[ "$(launch_count)" == "2" ]] || fail "conflict-paths-changed-fired: want 2 launches got $(launch_count)"
 out_has "PR 101: conflict re-try (conflicted paths or their content changed on master: 2 -> 2)" \
     || fail "conflict-paths-changed-fired: no re-try line: $OUT"

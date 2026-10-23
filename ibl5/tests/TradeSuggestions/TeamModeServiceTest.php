@@ -69,6 +69,6 @@ class TeamModeServiceTest extends TestCase
 
     private static function losingTeam(): ModeInputs
     {
-        return new ModeInputs(10, 30, 20, 62, 52.0, 25, 28, 29.0, 0.4);
+        return new ModeInputs(10, 30, 20, 62, 29.0, 0.4);
     }
 }

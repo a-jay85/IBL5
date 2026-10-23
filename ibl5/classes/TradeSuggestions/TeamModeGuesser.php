@@ -7,14 +7,16 @@ namespace TradeSuggestions;
 /**
  * Pure win-now/rebuild guess. No I/O.
  *
- * score = 0.45 * record + 0.35 * roster strength + 0.10 * rotation age
- *       + 0.10 * contract horizon, each term scaled to -1..1. score >= 0 is Win now.
+ * score = 0.70 * record + 0.15 * rotation age + 0.15 * contract horizon, each
+ * term scaled to -1..1. score >= 0 is Win now.
  *
  * - record: this season's win% blended with last season's, which counts as
  *   PRIOR_GAMES games, so a 3-1 start does not outweigh an 82-game season.
- * - strength: league rank of the top-8 average ovr.
  * - age: older rotations lean Win now.
- * - contract horizon: a core signed beyond this season leans Win now.
+ * - contract horizon: the share of rotation depth-chart minutes held by
+ *   players signed beyond this season. A locked core leans Win now.
+ *
+ * The rotation is the top ROTATION_SIZE players by depth-chart minutes.
  */
 final class TeamModeGuesser
 {
@@ -23,10 +25,9 @@ final class TeamModeGuesser
     public const float RECORD_SPAN = 0.2;
     public const float AGE_PIVOT = 26.5;
     public const float AGE_SPAN = 3.5;
-    public const float W_RECORD = 0.45;
-    public const float W_STRENGTH = 0.35;
-    public const float W_AGE = 0.10;
-    public const float W_CONTRACTS = 0.10;
+    public const float W_RECORD = 0.70;
+    public const float W_AGE = 0.15;
+    public const float W_CONTRACTS = 0.15;
 
     public function guess(ModeInputs $in): ModeGuess
     {
@@ -34,12 +35,7 @@ final class TeamModeGuesser
         $priorPct = $priorGames > 0 ? $in->priorWins / $priorGames : 0.5;
         $recordPct = ($in->wins + self::PRIOR_GAMES * $priorPct) / ($in->wins + $in->losses + self::PRIOR_GAMES);
 
-        $strength = $in->teamCount > 1
-            ? ($in->teamCount - $in->strengthRank) / ($in->teamCount - 1)
-            : 0.5;
-
         $score = self::W_RECORD * self::clamp(($recordPct - 0.5) / self::RECORD_SPAN)
-            + self::W_STRENGTH * ($strength - 0.5) * 2
             + self::W_AGE * self::clamp(($in->rotationAge - self::AGE_PIVOT) / self::AGE_SPAN)
             + self::W_CONTRACTS * ($in->lockedShare - 0.5) * 2;
 
@@ -47,8 +43,7 @@ final class TeamModeGuesser
     }
 
     /**
-     * Inputs for every team in $assets. Strength ranks are league-relative, so
-     * this always runs over the whole league at once.
+     * Inputs for every team in $assets.
      *
      * @param array<int, TeamAssets> $assets Keyed by tid
      * @param array<int, array{wins: int, losses: int}> $current This season, keyed by tid
@@ -57,26 +52,15 @@ final class TeamModeGuesser
      */
     public static function inputsForLeague(array $assets, array $current, array $prior): array
     {
-        $rotations = [];
-        $strength = [];
-        foreach ($assets as $tid => $team) {
-            $rotations[$tid] = self::rotation($team->players);
-            $strength[$tid] = self::mean(array_map(static fn (SuggestionPlayer $p): float => $p->ovr, $rotations[$tid]));
-        }
-
-        $order = array_keys($strength);
-        usort($order, static fn (int $a, int $b): int => [$strength[$b], $a] <=> [$strength[$a], $b]);
-        $ranks = array_flip($order);
-
         $inputs = [];
         foreach ($assets as $tid => $team) {
-            $rotation = $rotations[$tid];
-            $ovrTotal = 0;
-            $lockedOvr = 0;
+            $rotation = self::rotation($team->players);
+            $minutesTotal = 0;
+            $lockedMinutes = 0;
             foreach ($rotation as $player) {
-                $ovrTotal += $player->ovr;
+                $minutesTotal += $player->dcMinutes;
                 if ($player->yearsRemaining >= 2) {
-                    $lockedOvr += $player->ovr;
+                    $lockedMinutes += $player->dcMinutes;
                 }
             }
 
@@ -85,11 +69,8 @@ final class TeamModeGuesser
                 losses: $current[$tid]['losses'] ?? 0,
                 priorWins: $prior[$tid]['wins'] ?? 0,
                 priorLosses: $prior[$tid]['losses'] ?? 0,
-                rotationOvr: $strength[$tid],
-                strengthRank: $ranks[$tid] + 1,
-                teamCount: count($assets),
                 rotationAge: self::mean(array_map(static fn (SuggestionPlayer $p): float => $p->age, $rotation)),
-                lockedShare: $ovrTotal > 0 ? $lockedOvr / $ovrTotal : 0.0,
+                lockedShare: $minutesTotal > 0 ? $lockedMinutes / $minutesTotal : 0.0,
             );
         }
 
@@ -97,16 +78,14 @@ final class TeamModeGuesser
     }
 
     /**
-     * Top ROTATION_SIZE players by ovr, ties by lower pid.
+     * Top ROTATION_SIZE players by dcMinutes, then salary, then lower pid.
      *
      * @param list<SuggestionPlayer> $players
      * @return list<SuggestionPlayer>
      */
     public static function rotation(array $players): array
     {
-        usort($players, static fn (SuggestionPlayer $a, SuggestionPlayer $b): int => [$b->ovr, $a->pid] <=> [$a->ovr, $b->pid]);
-
-        return array_slice($players, 0, self::ROTATION_SIZE);
+        return array_slice(SlotMapper::byMinutes($players), 0, self::ROTATION_SIZE);
     }
 
     /**

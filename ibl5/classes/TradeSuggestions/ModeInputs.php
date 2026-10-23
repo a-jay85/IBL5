@@ -7,8 +7,8 @@ namespace TradeSuggestions;
 /**
  * The facts behind a team's win-now/rebuild guess.
  *
- * strengthRank is 1 for the team with the best top-8 average ovr. lockedShare
- * is the share of top-8 ovr held by players with at least two years left.
+ * The rotation is the top 8 by depth-chart minutes. lockedShare is the share
+ * of rotation dc_minutes held by players with at least two years left.
  */
 final readonly class ModeInputs
 {
@@ -17,9 +17,6 @@ final readonly class ModeInputs
         public int $losses,
         public int $priorWins,
         public int $priorLosses,
-        public float $rotationOvr,
-        public int $strengthRank,
-        public int $teamCount,
         public float $rotationAge,
         public float $lockedShare,
     ) {

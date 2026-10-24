@@ -3,6 +3,8 @@ merge-danger validator) and the `pr_copy_prompt` request."""
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
@@ -164,9 +166,13 @@ def test_phase2_keeps_llm_one_way_at_the_floor_when_why_names_no_effect(tmp_path
     assert any("kept at the mechanical two-way floor" in ln for ln in logs)
 
 
-def test_phase2_honours_llm_one_way_naming_an_effect(tmp_path):
+@pytest.mark.parametrize("why", [
+    "drops the trade_mode column data for every team",
+    "dropping the trade_mode column data for every team",
+])
+def test_phase2_honours_llm_one_way_naming_an_effect(tmp_path, why):
     wt = _worktree(tmp_path, {"ibl5/docs/x.md": "x\n"})
-    body = _docs_body("one-way", "sends a DM that cannot be recalled later")
+    body = _docs_body("one-way", why)
     out = runner._merge_danger_body(body, wt, _diff("ibl5/docs/x.md"), lambda *_: None, "phase2")
     [line] = _field_lines(out)
     assert "Door: one-way" in line

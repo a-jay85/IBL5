@@ -1,5 +1,6 @@
 """Unit tests for harness/merge_danger.py — the PR body's Merge danger field."""
 import os
+import re
 import sys
 
 import pytest
@@ -264,6 +265,41 @@ def test_reapplication_is_a_fixed_point_with_a_long_prefix():
     assert second.why == first.why
 
 
+def test_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    pad = md.WHY_MAX - len(ONE.why) - 2
+    llm = "a" * (pad - 1) + " tail words past the cut"
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    assert not first.why.endswith(" ")
+    assert second.why == first.why
+
+
+def test_two_way_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    llm = "b" * (md.WHY_MAX - 1) + " tail words past the cut"
+    first = md.merge_verdicts(TWO, None, None, llm)
+    second = md.merge_verdicts(TWO, first.door, first.blast, first.why)
+    assert not first.why.endswith(" ")
+    assert second.why == first.why
+
+
+def test_long_prefix_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    long_mech = md.MergeDanger("one-way", ONE.blast, "mechanical: " + "m" * 158)
+    llm = "c" * (md.WHY_MAX - len(long_mech.why) - 3) + " " + "d" * 50
+    first = md.merge_verdicts(long_mech, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(long_mech, first.door, first.blast, first.why)
+    third = md.merge_verdicts(long_mech, second.door, second.blast, second.why)
+    assert first.why != long_mech.why
+    assert not first.why.endswith(" ")
+    assert first.why == second.why == third.why
+
+
+def test_doubled_prefix_from_an_older_harness_collapses_to_one():
+    doubled = f"{ONE.why}. {ONE.why}. Harness code, tests and skill docs only"
+    assert md._llm_core(doubled) == "Harness code, tests and skill docs only"
+    out = md.merge_verdicts(ONE, "one-way", ONE.blast, doubled)
+    assert out.why.count("mechanical:") == 1
+
+
 def test_prefixed_prior_with_short_core_falls_back_to_mechanical():
     assert md.merge_verdicts(ONE, "one-way", ONE.blast, f"{ONE.why}. tiny").why == ONE.why
 
@@ -280,11 +316,26 @@ def test_llm_core_strips_only_the_leading_prefix():
     assert md._llm_core("plain words only here") == "plain words only here"
 
 
-def test_llm_one_way_naming_an_irreversible_effect_still_raises_under_the_bar():
-    out = md.merge_verdicts(TWO, "one-way", "site-wide", "drops the trade_mode column data for every team",
-                            llm_raise_bar=True)
+@pytest.mark.parametrize("why", [
+    "drops the trade_mode column data for every team",
+    "dropping the legacy column data for every team",
+])
+def test_llm_one_way_naming_an_irreversible_effect_still_raises_under_the_bar(why):
+    out = md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True)
     assert out.door == "one-way"
     assert out.why.endswith("for every team")
+
+
+def test_row22_whys_need_the_drop_stem():
+    # Plan row 22: the row-22 Whys go red if `drop(s|ped)?` (now `drop(s|ped|ping)?`) is
+    # removed from _IRREVERSIBLE_RE. Prove that against a mutant regex with the stem cut.
+    stem = "drop(s|ped|ping)?|"
+    assert stem in md._IRREVERSIBLE_RE.pattern
+    mutant = re.compile(md._IRREVERSIBLE_RE.pattern.replace(stem, ""), re.IGNORECASE)
+    for why in ("drops the trade_mode column data for every team",
+                "dropping the trade_mode column data for every team"):
+        assert md._IRREVERSIBLE_RE.search(why)
+        assert not mutant.search(why)
 
 
 def test_llm_one_way_without_a_concrete_effect_is_kept_at_the_floor():
@@ -331,6 +382,12 @@ def test_bar_does_not_touch_blast_radius():
     ("wiping the cache table", True),
     ("purging old records", True),
     ("destroying the backup", True),
+    ("notifying every GM by DM", True),
+    ("emailing the commissioner", True),
+    ("recalling the DM is impossible", True),
+    ("losing the old snapshot rows", True),
+    ("prod syncing the league tables", True),
+    ("production synced over the schedule", True),
     ("adds a table and widens an ENUM", False),
     ("edits docs and tests under the harness", False),
     ("a lossless additive change", False),

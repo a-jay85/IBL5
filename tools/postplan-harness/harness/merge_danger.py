@@ -153,7 +153,7 @@ def derive_merge_danger(
     blast = _blast_radius(paths, gate_changes, external)
     why = ("mechanical: " + "; ".join(triggers)) if triggers else \
         "mechanical: no one-way trigger in the realized diff"
-    return MergeDanger(door, blast, why[:WHY_MAX], tuple(triggers))
+    return MergeDanger(door, blast, why[:WHY_MAX].rstrip(), tuple(triggers))
 
 
 def _rank(value: str | None, scale: tuple[str, ...]) -> int:
@@ -164,13 +164,14 @@ def _clean_why(text: str | None) -> str:
     return re.sub(r"\s+", " ", (text or "").replace("|", " ")).strip()
 
 
-_MECH_PREFIX_RE = re.compile(r"^mechanical: .*?(?:\. |$)")
+_MECH_PREFIX_RE = re.compile(r"^(?:mechanical: .*?(?:\. |$))+")
 
 
 def _llm_core(text: str | None) -> str:
-    """The LLM's or a human's own words: the Why with any leading `mechanical: ...` prefix
+    """The LLM's or a human's own words: the Why with every leading `mechanical: ...` prefix
     removed. A prior phase's line is `mechanical: <triggers>. <words>`, so re-applying the
-    floor must strip that prefix before composing, or the prefix compounds once per phase."""
+    floor must strip that prefix before composing, or the prefix compounds once per phase.
+    A line an older harness already doubled loses both copies."""
     return _MECH_PREFIX_RE.sub("", _clean_why(text), count=1).strip()
 
 
@@ -180,9 +181,9 @@ def _llm_core(text: str | None) -> str:
 _IRREVERSIBLE_RE = re.compile(
     r"\b(drop(s|ped|ping)?|delet(e|es|ed|ing|ion)|truncat(e|es|ed|ing|ion)|renam(e|es|ed|ing)"
     r"|overwr(ite|ites|iting|itten|ote)|purg(e|es|ed|ing)|destroy(s|ed|ing)?|wip(e|es|ed|ing)"
-    r"|lost|loss|irreversibl[ey]|unrecoverabl[ey]|cannot be (undone|restored|recalled|reverted)"
-    r"|send(s|ing)?|sent|recall(ed)?|notif(y|ies|ied|ication)|email(s|ed)?|discord"
-    r"|prod(uction)?[- ]?(sync|data|db|database|rows?))\b",
+    r"|los(e|es|ing|t|s)|irreversibl[ey]|unrecoverabl[ey]|cannot be (undone|restored|recalled|reverted)"
+    r"|send(s|ing)?|sent|recall(s|ed|ing)?|notif(y|ies|ied|ying|ication)|email(s|ed|ing)?|discord"
+    r"|prod(uction)?[- ]?(sync(s|ed|ing)?|data|db|database|rows?))\b",
     re.IGNORECASE,
 )
 
@@ -200,7 +201,9 @@ def merge_verdicts(
     llm_raise_bar: Phase 2 only. A one-way the floor did not raise is kept only when the Why
     (prefix stripped) names a concrete irreversible effect per _IRREVERSIBLE_RE; otherwise the
     door stays at the mechanical floor. Blast radius is never subject to the bar."""
-    core = _llm_core(llm_why)[:WHY_MAX]
+    # Every [:WHY_MAX] cut is re-stripped: a cut landing after a space would leave a trailing
+    # space that the next phase's _clean_why drops, so the line would change between phases.
+    core = _llm_core(llm_why)[:WHY_MAX].rstrip()
     llm_rank = _rank(llm_door, DOORS)
     if (llm_raise_bar and mechanical.door == "two-way" and llm_door == "one-way"
             and not _IRREVERSIBLE_RE.search(core)):
@@ -212,7 +215,7 @@ def merge_verdicts(
     elif mechanical.door == "one-way":
         # Cut first, then re-check: a long prefix can leave under WHY_MIN core chars, and a
         # later re-application would see that short core and fall back, breaking the fixed point.
-        why = f"{mechanical.why}. {core}"[:WHY_MAX]
+        why = f"{mechanical.why}. {core}"[:WHY_MAX].rstrip()
         if len(why) - len(mechanical.why) - 2 < WHY_MIN:
             why = mechanical.why
     else:

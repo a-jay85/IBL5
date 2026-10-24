@@ -316,6 +316,144 @@ def parse_run_only_test_paths(content: str) -> list[str]:
     return [p for p in marked if p not in unmarked]
 
 
+# Reference-only markers: EXEMPT_RE minus `conditional`. A conditional Critical
+# File may be edited, so it can exempt MISSING-FILE but never a planned test token.
+_REF_ONLY_CF_RE = re.compile(
+    r"\((?:[^)]*[^0-9A-Za-z])?(?:reference|read-?only|verif(?:y|ication)|template|"
+    r"no[- ]edit|no[- ]change|unchanged|context)(?:[^0-9A-Za-z][^)]*)?\)",
+    re.IGNORECASE,
+)
+# "This file is not edited" phrases an `## Out of Scope` line may use.
+_REF_NO_EDIT_RE = re.compile(
+    r"gets?\s+no\s+edits?|\bno\s+edits?\b|\b(?:not|never)\s+(?:be\s+)?(?:edited|modified|touched|changed)\b"
+    r"|\bun-?edited\b|\bunchanged\b|\buntouched\b|\bbyte-identical\b|\bstays?\s+(?:as\s+is|the\s+same)\b"
+    r"|\bno\s+changes?\b",
+    re.IGNORECASE,
+)
+# Edit verbs that veto an exemption when they share a line with the cited path,
+# checked AFTER the no-edit phrases are cut from the line (the bin/check-plan gate
+# [RO] check 7a subtraction trick, so "unchanged" cannot trip "chang").
+_REF_EDIT_VERB_RE = re.compile(
+    r"\b(?:add(?:s|ed|ing)?|edit(?:s|ed|ing)?|modif(?:y|ies|ied|ying)|chang(?:e|es|ed|ing)"
+    r"|creat(?:e|es|ed|ing)|writ(?:e|es|ing)|written|rewrit(?:e|es|ten|ing)|updat(?:e|es|ed|ing)"
+    r"|remov(?:e|es|ed|ing)|delet(?:e|es|ed|ing)|renam(?:e|es|ed|ing)|mov(?:e|es|ed|ing)"
+    r"|extend(?:s|ed|ing)?|introduc(?:e|es|ed|ing)|touch(?:es|ed|ing)?|bump(?:s|ed|ing)?"
+    r"|append(?:s|ed|ing)?|insert(?:s|ed|ing)?|replac(?:e|es|ed|ing)|regenerat(?:e|es|ed|ing)"
+    r"|fix(?:es|ed|ing)?)\b",
+    re.IGNORECASE,
+)
+# Creation cues on a matrix row (the staleness-guard cue set, case-sensitive on purpose:
+# prose "the new testMatch entry" is not a cue, `— NEW` / `Create` / `Write` are).
+_REF_CREATION_CUE_RE = re.compile(r"\bNEW\b|\bCreate[sd]?\b|\bWrites?\b|\bnew file\b|\bmoved from\b|→")
+
+
+def parse_reference_only_test_paths(content: str) -> tuple[dict[str, str], dict[str, str]]:
+    """(exempt, refused): planned tokens the plan itself declares reference-only.
+
+    exempt maps token -> reason; refused maps token -> reason for a token that had a
+    signal but failed a veto. A token with no signal appears in neither. Signals:
+      S1  a `## Critical Files` bullet for the SAME path whose annotation matches
+          _REF_ONLY_CF_RE (already trusted by conformance for MISSING-FILE).
+      S2  an unfenced `## Out of Scope` line citing the path in backticks that matches
+          _REF_NO_EDIT_RE (an edit verb left on a citing line is V4).
+    Vetoes, each recorded in `refused`:
+      V1  any `## Critical Files` entry for the same path with exempt == False.
+      V2  any `## Phase N` / `## Step N` body line citing the path (a `:L` suffix is
+          stripped) that carries an edit verb after the no-edit phrases are cut.
+      V3  any planning row for the token whose cells carry a creation cue.
+      V4  an `## Out of Scope` line citing the path with an edit verb.
+    Rows marked `(run-only)` after the token, or Visual-regression rows marked
+    `(no-change)`, are neutral: their parsers own them. Fenced content never counts.
+    An `env (N):` cell prefix is NOT a signal on its own.
+    """
+    exempt: dict[str, str] = {}
+    refused: dict[str, str] = {}
+    lines = _strip_fenced(content)
+
+    candidates: list[str] = []
+    cued: set[str] = set()
+    for line in lines:
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        row = " | ".join(cells)
+        p = _planned_token(cells)
+        if p is None:
+            continue
+        tok = r"`" + re.escape(p) + r"`\s*"
+        if re.search(tok + _RUN_ONLY_MARKER, row, re.I):
+            continue  # neutral: the (run-only) parser owns this row
+        if re.search(tok + _NO_CHANGE_MARKER, row, re.I) and _is_visual_regression_row(cells):
+            continue  # neutral: the (no-change) parser owns this row
+        if p not in candidates:
+            candidates.append(p)
+        if any(_REF_CREATION_CUE_RE.search(c) for c in cells):
+            cued.add(p)
+
+    cf_by_path: dict[str, list[tuple[str, bool]]] = {}
+    for path, annotation, is_exempt in parse_critical_files(content):
+        cf_by_path.setdefault(path, []).append((annotation, is_exempt))
+
+    oos_lines: list[str] = []
+    in_oos = False
+    for line in lines:
+        if re.match(r"^#+ *Out of Scope", line, re.I):
+            in_oos = True
+            continue
+        if re.match(r"^#+ ", line):
+            in_oos = False
+            continue
+        if in_oos:
+            oos_lines.append(line)
+    phase_lines: list[str] = []
+    in_phase = False
+    for line in lines:
+        if _PHASE_HEADING_RE.match(line):
+            in_phase = True
+            continue
+        if re.match(r"^## ", line):
+            in_phase = False
+            continue
+        if in_phase:
+            phase_lines.append(line)
+
+    def _cites(line: str, p: str) -> bool:
+        return bool(re.search(r"`" + re.escape(p) + r"(?::L?\d+(?:-L?\d+)?)?`", line))
+
+    def _edit_verb_after_cut(line: str) -> bool:
+        return bool(_REF_EDIT_VERB_RE.search(_REF_NO_EDIT_RE.sub(" ", line)))
+
+    for p in candidates:
+        entries = cf_by_path.get(p, [])
+        s1 = any(_REF_ONLY_CF_RE.search(a) for a, _ in entries)
+        v1 = any(not ex for _, ex in entries)
+        # S2 fires on the no-edit phrase alone; an edit verb left on the same line (or
+        # another Out of Scope line) is V4, so a deferral is recorded as refused.
+        s2 = any(_cites(l, p) and _REF_NO_EDIT_RE.search(l) for l in oos_lines)
+        v4 = any(_cites(l, p) and _edit_verb_after_cut(l) for l in oos_lines)
+        if not (s1 or s2):
+            continue
+        if p in cued:
+            refused[p] = "a planning row carries a creation cue"
+            continue
+        if v1:
+            refused[p] = "a Critical Files entry for this path has no reference marker"
+            continue
+        v2_line = next((l for l in phase_lines if _cites(l, p) and _edit_verb_after_cut(l)), None)
+        if v2_line is not None:
+            refused[p] = f"a phase body line cites it with an edit verb: {v2_line.strip()[:80]}"
+            continue
+        if v4:
+            refused[p] = "an Out of Scope line cites it with an edit verb"
+            continue
+        exempt[p] = (
+            "Critical Files reference marker" if s1 and not s2
+            else "Out of Scope no-edit line" if s2 and not s1
+            else "Critical Files reference marker and Out of Scope no-edit line"
+        )
+    return exempt, refused
+
+
 def parse_matrix(
     content: str,
 ) -> tuple[list[str], list[manual_rows.ManualRow], list[manual_rows.ManualRow]]:
@@ -979,6 +1117,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.executable_row_count = count_executable_matrix_rows(content)
         info.no_change_test_paths = parse_no_change_test_paths(content)
         info.run_only_test_paths = parse_run_only_test_paths(content)
+        info.reference_only_test_paths, info.reference_only_refusals = parse_reference_only_test_paths(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

@@ -10,11 +10,13 @@ A rung's own claim (RESOLVED, a citation, a self-run proof) never counts. Only
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
+import glob
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as _dc_replace
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Mapping, Optional
 
 from .state import HarnessError
 
@@ -43,6 +45,7 @@ class LadderContext:
     state_dir: str = ""                                         # cost-guard marker dir; "" = guard unavailable, rung skips
     extend_pre_patch: Optional[Callable[[tuple[str, ...]], None]] = None  # gitad._rewrite_pre_patch_for_regen wrapper
     expected_parents: tuple[str, ...] = ()   # () = merge pair (pre_rebase_sha, master_sha); the stacked path passes HEAD's parents
+    stage_sets: Mapping[str, frozenset[int]] = dataclasses.field(default_factory=dict)  # ConflictInventory.stage_sets
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,18 @@ def amend_merge(ctx: LadderContext, touched) -> str:
     return ""
 
 
+def _is_master_bytes(ctx: LadderContext, path: str) -> bool:
+    """True when the worktree file at `path` equals master's blob byte for byte."""
+    proc = subprocess.run(["git", "-C", ctx.worktree, "show", f"{ctx.master_sha}:{path}"],
+                          capture_output=True)
+    if proc.returncode != 0:
+        return False
+    try:
+        return Path(ctx.worktree, path).read_bytes() == proc.stdout
+    except OSError:
+        return False
+
+
 def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     """Parents, markers, text-only, then the proof. The first failure is structural."""
     from .adapters.gitad import _CONFLICT_MARKER_RE
@@ -164,7 +179,17 @@ def post_rung_guard(ctx: LadderContext, touched) -> GuardVerdict:
     if sweep_rc != 1:
         return GuardVerdict(False, False,
                             f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}", "")
-    text_reason = assert_text_only(ctx.worktree, tuple(touched) + tuple(ctx.conflicted_files))
+    # A both-modified glob-matched copy-only path (a VR PNG) is binary, so the UTF-8 guard
+    # skips it, but only while its bytes are still master's. A PNG that never conflicted,
+    # conflicted as modify/delete, or holds any other bytes gets no exemption, so a rung
+    # that writes one is rejected here (backlog#1553).
+    checked = tuple(dict.fromkeys(tuple(touched) + tuple(ctx.conflicted_files)))
+    binary_exempt = {g.path for g in match_generated(ctx.conflicted_files)
+                     if g.command is None and _is_glob_match(g.path)
+                     and frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED
+                     and _is_master_bytes(ctx, g.path)}
+    text_reason = assert_text_only(
+        ctx.worktree, [p for p in checked if p not in binary_exempt])
     if text_reason:
         return GuardVerdict(False, False, text_reason, "")
     ok, out = ctx.prove()
@@ -288,6 +313,8 @@ class GeneratedFile:
 
 _BASELINES = ("bin/regen-baselines",)
 _VENDOR = ("ibl5/vendor/autoload.php",)
+VR_SNAPSHOT_GLOB = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/*.png"
+BOTH_MODIFIED = frozenset({1, 2, 3})   # git ls-files --unmerged stages for modify/modify
 GENERATED_FILES: tuple[GeneratedFile, ...] = (
     GeneratedFile("ibl5/phpstan-baseline.neon", _BASELINES, _VENDOR, regen_on_conflict=True),
     GeneratedFile("ibl5/phpstan-tests-baseline.neon", _BASELINES, _VENDOR),
@@ -297,8 +324,49 @@ GENERATED_FILES: tuple[GeneratedFile, ...] = (
                   why_copy_only="needs a MariaDB with every migration applied"),
     GeneratedFile("ibl5/coverage-baseline.json", None,
                   why_copy_only="needs the CI clover artifact"),
+    GeneratedFile(VR_SNAPSHOT_GLOB, None,
+                  why_copy_only="CI update-baselines regenerates VR PNGs",
+                  regen_on_conflict=True),
 )
 REGEN_TIMEOUT = 900   # bin/regen-baselines runs two PHPStan passes, about 2-3 min
+
+
+def is_pattern(path: str) -> bool:
+    """True for a registry path written as a glob (`*`, `?` or `[`)."""
+    return glob.has_magic(path)
+
+
+def path_matches(pattern: str, path: str) -> bool:
+    """An exact entry matches only itself. A pattern entry matches a path with the same
+    number of `/` segments (so `*` never crosses a directory) under fnmatchcase."""
+    if not is_pattern(pattern):
+        return pattern == path
+    return pattern.count("/") == path.count("/") and fnmatch.fnmatchcase(path, pattern)
+
+
+def match_generated(paths, *, registry=None) -> tuple["GeneratedFile", ...]:
+    """Registry entries involved in `paths`, in registry order. A pattern entry yields
+    one concrete copy per matching path with `path` replaced, so regenerate(),
+    command_outputs() and every gitad/conflict_fix consumer keep seeing exact paths."""
+    registry = GENERATED_FILES if registry is None else registry
+    wanted = sorted(set(paths))
+    out: list[GeneratedFile] = []
+    for g in registry:
+        if is_pattern(g.path):
+            out.extend(_dc_replace(g, path=p) for p in wanted if path_matches(g.path, p))
+        elif g.path in wanted:
+            out.append(g)
+    return tuple(out)
+
+
+def _is_glob_match(path: str) -> bool:
+    """True when `path` is covered by a pattern (glob) registry entry."""
+    return any(is_pattern(g.path) and path_matches(g.path, path) for g in GENERATED_FILES)
+
+
+def matching_paths(paths, *, registry=None) -> frozenset[str]:
+    """The subset of `paths` that is a registered generated file (exact or by glob)."""
+    return frozenset(g.path for g in match_generated(paths, registry=registry))
 
 
 def regenerate(run, run_out, *, worktree: str, master_sha: str,
@@ -332,19 +400,29 @@ def regenerate(run, run_out, *, worktree: str, master_sha: str,
     return tuple(notes)
 
 
-def pre_resolve_targets(files, *, worktree: str, registry=None) -> tuple[GeneratedFile, ...]:
-    """Registry entries to regenerate before the resolver: path is in `files`,
-    regen_on_conflict is set, command is not None, and every `requires` path exists.
-    An entry whose requirement is missing is NOT returned, so that file falls through
-    to the ordinary LLM resolver exactly as before this change."""
+def pre_resolve_targets(files, *, worktree: str, registry=None,
+                        stage_sets=None) -> tuple[GeneratedFile, ...]:
+    """Registry entries to resolve before the LLM resolver: path matches `files`
+    (exact or glob) and regen_on_conflict is set. A generator entry also needs every
+    `requires` path to exist; one whose requirement is missing is NOT returned, so that
+    file falls through to the ordinary LLM resolver exactly as before. A copy-only entry
+    (command None) is returned only when `stage_sets` marks the path both-modified
+    ({1,2,3}); with no stage_sets, or a modify/delete set, it also falls through."""
     registry = GENERATED_FILES if registry is None else registry
-    wanted = set(files)
-    return tuple(
-        g for g in registry
-        if g.path in wanted and g.regen_on_conflict and g.command is not None
-        and all(os.path.exists(os.path.join(worktree, r)) for r in g.requires))
+    out: list[GeneratedFile] = []
+    for g in match_generated(files, registry=registry):
+        if not g.regen_on_conflict:
+            continue
+        if g.command is None:
+            if stage_sets is None or frozenset(stage_sets.get(g.path, ())) != BOTH_MODIFIED:
+                continue
+        elif not all(os.path.exists(os.path.join(worktree, r)) for r in g.requires):
+            continue
+        out.append(g)
+    return tuple(out)
 
 
+# A copy-only entry (command None) owns no generator output; a glob entry is always copy-only.
 def command_outputs(targets, *, registry=None) -> frozenset[str]:
     """Every registry path whose command equals some target's command. These are the
     only paths a generator run may change (bin/regen-baselines owns three files)."""
@@ -358,7 +436,12 @@ def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> R
         lost, structural = parse_lost_lines(proof_out)
         involved = (set(ctx.conflicted_files) | set(lost)
                     | {line.rsplit(": ", 1)[1] for line in structural if ": " in line})
-        candidates = [g for g in registry if g.path in involved]
+        # A glob (VR PNG) entry applies only to a file both sides modified, the same rule
+        # as pre_resolve_targets. A modify/delete PNG, or one merely named in LOST lines,
+        # keeps its resolver outcome.
+        candidates = [g for g in match_generated(involved, registry=registry)
+                      if not _is_glob_match(g.path)
+                      or frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED]
         if not candidates:
             return RungAttempt(False, (), "no generated file involved")
         notes = regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,

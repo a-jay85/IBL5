@@ -28,7 +28,7 @@
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
 #                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
-#   all-checks-settled: six invariants (A1-A6) that keep the event-driven
+#   all-checks-settled: seven invariants (A1-A7) that keep the event-driven
 #                   aggregator `All checks settled` (ADR-0149 addendum) safe and
 #                   complete: A1 only workflow_run (completed) and workflow_dispatch
 #                   (pr_number) start it, no pull_request trigger, no head-branch
@@ -40,7 +40,12 @@
 #                   without persisted credentials, event fields only via env; A5 the
 #                   four ADR-0149 anchors and the legacy-waiter ignore shim exactly
 #                   while all-checks-green.yml exists; A6 workflow_run.workflows
-#                   equals every PR-triggered workflow name. P9 (promote) pins the
+#                   equals every PR-triggered workflow name; A7 the schedule-only
+#                   sweep workflow (all-checks-settled-sweep.yml) has only schedule +
+#                   workflow_dispatch triggers, actions as its only write scope, no
+#                   expression inside run:, a credential-free master checkout, timeout
+#                   <= 10, and a --sweep-stale-minutes window of at least GHOST_GRACE
+#                   in bin/check-pr-checks-green. P9 (promote) pins the
 #                   workflow_run `branches: [master]` filter.
 #   step DB env (D1): every step-scoped DB_HOST/DB_USER/DB_PASS/DB_NAME value
 #                   in any workflow must equal the ${DB_*:-default} that
@@ -784,6 +789,56 @@ else
     fail=1
   else
     echo "composite-contracts: all-checks-settled workflow_run.workflows equals every PR-triggered workflow name (A6)"
+  fi
+
+  # A7: the stale-pending sweep (ADR-0149 addendum 2026-10-22). It holds actions: write,
+  # so it must never run on a PR event, never read an expression inside run:, and never
+  # re-settle inside the ghost grace window (M minutes >= GHOST_GRACE seconds).
+  swp_file="$(dirname "$agg_file")/all-checks-settled-sweep.yml"
+  _a7_bad=""
+  if [ ! -f "$swp_file" ]; then
+    _a7_bad="all-checks-settled-sweep.yml absent; a ghost run would leave the status pending forever"
+  else
+    swp_on="$(awk '/^on:/{f=1; print; next} f && /^[^ ]/{f=0} f' "$swp_file")"
+    swp_perms="$(awk '/^permissions:/{f=1; print; next} f && /^[^ ]/{f=0} f' "$swp_file")"
+    swp_jobs="$(awk '/^jobs:/{f=1; print; next} f' "$swp_file")"
+    swp_run="$(grep -E '^[[:space:]]+run:' "$swp_file" || true)"
+    _a7_writes="$(grep -E '^[[:space:]]+[a-z-]+:[[:space:]]*write' <<< "$swp_perms"$'\n'"$swp_jobs" | sed -E 's/^[[:space:]]+//; s/:.*//' | sort -u | tr '\n' ' ')"
+    _a7_timeout="$(sed -nE 's/^    timeout-minutes:[[:space:]]*([0-9]+)[[:space:]]*$/\1/p' <<< "$swp_jobs" | head -1)"
+    _a7_min="$(sed -nE 's/.*--sweep-stale-minutes=([0-9]+).*/\1/p' <<< "$swp_run" | head -1)"
+    _a7_grace="$(sed -nE 's/^GHOST_GRACE=([0-9]+)$/\1/p' "$(dirname "$0")/check-pr-checks-green" | head -1)"
+    _a7_checkout="$(awk '/^      - / { if (blk ~ /actions\/checkout@/) print blk; blk="" } { blk = blk $0 "\n" } END { if (blk ~ /actions\/checkout@/) print blk }' <<< "$swp_jobs")"
+    # shellcheck disable=SC2016  # literal workflow expression opener, not a shell expansion
+    if ! grep -qE '^  schedule:' <<< "$swp_on" || ! grep -qE '^    - cron:' <<< "$swp_on"; then
+      _a7_bad="on: has no schedule cron"
+    elif ! grep -qE '^  workflow_dispatch:' <<< "$swp_on"; then
+      _a7_bad="on: has no workflow_dispatch trigger (operators re-run it by hand)"
+    elif grep -E '^  [A-Za-z_]+:' <<< "$swp_on" | grep -qvE '^  (schedule|workflow_dispatch):'; then
+      _a7_bad="on: has a trigger other than schedule/workflow_dispatch; the sweep holds actions: write"
+    elif [ "$_a7_writes" != "actions " ]; then
+      _a7_bad="write scopes are '${_a7_writes}', want only actions"
+    elif ! grep -qE '^  contents:[[:space:]]*read[[:space:]]*$' <<< "$swp_perms"; then
+      _a7_bad="permissions lack contents: read"
+    elif grep -qF -- '${{' <<< "$swp_run"; then
+      _a7_bad="a \${{ }} expression sits inside a run: block"
+    elif [ -z "$_a7_checkout" ] || grep -qE '^[[:space:]]+ref:' <<< "$_a7_checkout" \
+         || ! grep -qE '^[[:space:]]+persist-credentials:[[:space:]]*false[[:space:]]*$' <<< "$_a7_checkout"; then
+      _a7_bad="checkout must exist, set no ref:, and set persist-credentials: false"
+    elif [ -z "$_a7_timeout" ] || [ "$_a7_timeout" -gt 10 ]; then
+      _a7_bad="job timeout-minutes is '${_a7_timeout:-<unset>}', want at most 10"
+    elif ! grep -qE 'bin/settle-pr-status ' <<< "$swp_run" || grep -qE -- '--(head-sha|pr)=' <<< "$swp_run"; then
+      _a7_bad="run: must call bin/settle-pr-status in sweep mode only (no --head-sha/--pr)"
+    elif [ -z "$_a7_min" ] || [ -z "$_a7_grace" ]; then
+      _a7_bad="cannot read --sweep-stale-minutes ('${_a7_min:-<unset>}') or GHOST_GRACE ('${_a7_grace:-<unset>}')"
+    elif [ $((_a7_min * 60)) -lt "$_a7_grace" ]; then
+      _a7_bad="--sweep-stale-minutes=$_a7_min is below GHOST_GRACE=$_a7_grace s; the sweep would re-settle inside the ghost grace window"
+    fi
+  fi
+  if [ -n "$_a7_bad" ]; then
+    echo "composite-contracts: all-checks-settled-sweep (A7) — $_a7_bad ($swp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: all-checks-settled-sweep is schedule-only, holds only actions: write, and its window ($_a7_min min) covers GHOST_GRACE ($_a7_grace s) (A7)"
   fi
 
 fi  # end agg_file present

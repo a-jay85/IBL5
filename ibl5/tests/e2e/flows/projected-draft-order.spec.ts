@@ -82,12 +82,32 @@ test.describe('Projected Draft Order flow', () => {
     const previous = await setDraftPickNotes(request, year, 1, 'Metros', note);
     try {
       await page.reload();
-      const toggle = page.locator('.projected-draft-order-notes__toggle');
+      const round1 = page.locator('#draft-order-round1');
+      // ci-seed.sql:911: Metros (teamid 1) owns its own 2026 round-1 pick, so its
+      // team cell links to teamid=1.
+      const metrosLink = page.locator('a[href$="teamid=1"]');
+      const metrosRound1Row = round1.locator('tbody tr').filter({ has: metrosLink });
+      const toggle = metrosRound1Row.locator('.projected-draft-order-notes__toggle');
       // The expanded state lives on the cell (td.is-expanded), not on the button.
       const expandedCell = page.locator('td.projected-draft-order-notes.is-expanded');
 
-      // Every other pick's notes are NULL in the seed: no button on those cells.
+      // The projected order lists each team once in round 1.
+      await expect(metrosRound1Row).toHaveCount(1);
       await expect(toggle).toHaveCount(1);
+
+      // Every other pick's notes are NULL in the seed: no button on those cells.
+      await expect(
+        round1
+          .locator('tbody tr')
+          .filter({ hasNot: metrosLink })
+          .locator('.projected-draft-order-notes__toggle'),
+      ).toHaveCount(0);
+      // Round 2 holds the Metros round-2 pick (ci-seed.sql:1990), whose notes stay NULL.
+      await expect(
+        page.locator(
+          '.projected-draft-order-table:not(#draft-order-round1) .projected-draft-order-notes__toggle',
+        ),
+      ).toHaveCount(0);
 
       await expect(toggle).toHaveAttribute('aria-expanded', 'false');
       const collapsed = await toggle.evaluate((el) => {
@@ -129,8 +149,8 @@ test.describe('Projected Draft Order flow', () => {
       expect(await toggle.evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('nowrap');
 
       // Mouse parity: a click on the cell padding outside the button still toggles.
-      await page
-        .locator('td.projected-draft-order-notes:has(.projected-draft-order-notes__toggle)')
+      await metrosRound1Row
+        .locator('td.projected-draft-order-notes')
         .click({ position: { x: 2, y: 2 } });
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     } finally {

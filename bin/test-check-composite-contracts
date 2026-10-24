@@ -6,7 +6,7 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) and the all-checks-settled.yml invariants (A1-A6) against
+# invariants (M1-M4) and the all-checks-settled.yml invariants (A1-A7) against
 # mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
@@ -582,7 +582,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# all-checks-settled invariants (A1-A6). The fixture is a copy of the real
+# all-checks-settled invariants (A1-A7). The fixture is a copy of the real
 # .github/workflows tree; each mutation edits the copy, never the tree, and the
 # case also asserts the invariant tag so a failure elsewhere cannot pass it.
 # ---------------------------------------------------------------------------
@@ -623,10 +623,10 @@ run_agg_mut() {
 # A-block passes on the real tree
 out="$("$CHECK" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?
 expect "A-block passes on the real tree" 0 "$rc"
-if grep -qF '(A6)' <<< "$out" && ! grep -qF 'all-checks-settled absent' <<< "$out"; then
-  h_pass "A-block passes on the real tree ran A1-A6"
+if grep -qF '(A6)' <<< "$out" && grep -qF '(A7)' <<< "$out" && ! grep -qF 'all-checks-settled absent' <<< "$out"; then
+  h_pass "A-block passes on the real tree ran A1-A7"
 else
-  h_fail "A-block passes on the real tree ran A1-A6" "output: $out"
+  h_fail "A-block passes on the real tree ran A1-A7" "output: $out"
 fi
 
 d_wf="$(agg_copy)"
@@ -680,11 +680,50 @@ rm "$d_wf/all-checks-green.yml"
 agg_edit "$d_wf/all-checks-settled.yml" 's/^      - All checks green\n//m'
 run_agg_mut "A5 rejects a leftover All checks green ignore after the legacy file is gone" "(A5)" "$d_wf"
 
+# A7: the schedule-only stale-pending sweep workflow.
+d_wf="$(agg_copy)"
+rm "$d_wf/all-checks-settled-sweep.yml"
+run_agg_mut "a7-absent" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/^  workflow_dispatch:\n/  workflow_dispatch:\n  pull_request:\n/m'
+run_agg_mut "a7-pr-trigger" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/statuses: read/statuses: write/'
+run_agg_mut "a7-statuses-write" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/^  actions: write$/  actions: read/m'
+run_agg_mut "a7-actions-read" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/--sweep-stale-minutes=15/--sweep-stale-minutes=5/'
+run_agg_mut "a7-window-below-grace" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+# shellcheck disable=SC2016  # the ${{ }} expression is literal fixture YAML
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/--sweep-stale-minutes=15/--sweep-stale-minutes=\${{ github.event.inputs.m }}/'
+run_agg_mut "a7-expr-in-run" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/persist-credentials: false/persist-credentials: true/'
+run_agg_mut "a7-persist-credentials" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/timeout-minutes: 5/timeout-minutes: 30/'
+run_agg_mut "a7-timeout" "(A7)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled-sweep.yml" 's/--sweep-stale-minutes=15/--pr=1 --sweep-stale-minutes=15/'
+run_agg_mut "a7-selector" "(A7)" "$d_wf"
+
 # agg-a2-lib-drift: the check reads pr-armable.sh and armable.py from its own
 # repo root, so run a copy of it in a throwaway tree whose shell literal drifted.
 LD="$TMP/libdrift"
 mkdir -p "$LD/bin/lib" "$LD/tools/postplan-harness/harness"
 cp "$CHECK" "$LD/bin/check-composite-contracts"
+cp "$SCRIPT_DIR/check-pr-checks-green" "$LD/bin/check-pr-checks-green"  # A7 reads GHOST_GRACE beside the check
 printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks'\n" > "$LD/bin/lib/pr-armable.sh"
 printf 'AGGREGATOR_CONTEXT = "All checks settled"\n' > "$LD/tools/postplan-harness/harness/armable.py"
 out="$("$LD/bin/check-composite-contracts" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?

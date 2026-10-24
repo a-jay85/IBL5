@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from harness.armable import DESTRUCTIVE_SQL
+from harness.sql_comments import strip_added_sql_comments
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
@@ -113,10 +114,13 @@ def derive_merge_danger(
         if trigger not in triggers:
             triggers.append(trigger)
 
-    # 1. Destructive migration. The `-- destructive-migration[trigger]:` bypass marker is never
-    # read: a bypassed destructive migration is still irreversible.
+    # 1. Destructive migration. SQL comments on added lines are blanked first, so a rollback
+    # note or a `-- G1: ... would truncate` remark does not force the door; an unterminated
+    # block or quote is matched raw (fail closed). The `-- destructive-migration[trigger]:`
+    # bypass marker is never read: a bypassed destructive migration is still irreversible.
     migrations = [p for p in paths if _MIGRATION_RE.match(p)]
-    if migrations and DESTRUCTIVE_SQL.search(_migration_sections(diff_text or "")):
+    if migrations and DESTRUCTIVE_SQL.search(
+            strip_added_sql_comments(_migration_sections(diff_text or ""))):
         for p in migrations:
             add(f"destructive-migration:{p}")
 
@@ -149,7 +153,7 @@ def derive_merge_danger(
     blast = _blast_radius(paths, gate_changes, external)
     why = ("mechanical: " + "; ".join(triggers)) if triggers else \
         "mechanical: no one-way trigger in the realized diff"
-    return MergeDanger(door, blast, why[:WHY_MAX], tuple(triggers))
+    return MergeDanger(door, blast, why[:WHY_MAX].rstrip(), tuple(triggers))
 
 
 def _rank(value: str | None, scale: tuple[str, ...]) -> int:
@@ -160,20 +164,62 @@ def _clean_why(text: str | None) -> str:
     return re.sub(r"\s+", " ", (text or "").replace("|", " ")).strip()
 
 
+_MECH_PREFIX_RE = re.compile(r"^(?:mechanical: .*?(?:\. |$))+")
+
+
+def _llm_core(text: str | None) -> str:
+    """The LLM's or a human's own words: the Why with every leading `mechanical: ...` prefix
+    removed. A prior phase's line is `mechanical: <triggers>. <words>`, so re-applying the
+    floor must strip that prefix before composing, or the prefix compounds once per phase.
+    A line an older harness already doubled loses both copies."""
+    return _MECH_PREFIX_RE.sub("", _clean_why(text), count=1).strip()
+
+
+# Phase 2 bar on an LLM-raised door. A one-way the floor did not raise is kept only when the
+# Why names an effect `git revert` cannot undo. Later phases pass llm_raise_bar=False: they
+# cannot tell an LLM raise from a human one, and a human raise must survive.
+_IRREVERSIBLE_RE = re.compile(
+    r"\b(drop(s|ped|ping)?|delet(e|es|ed|ing|ion)|truncat(e|es|ed|ing|ion)|renam(e|es|ed|ing)"
+    r"|overwr(ite|ites|iting|itten|ote)|purg(e|es|ed|ing)|destroy(s|ed|ing)?|wip(e|es|ed|ing)"
+    r"|los(e|es|ing|t|s)|irreversibl[ey]|unrecoverabl[ey]|cannot be (undone|restored|recalled|reverted)"
+    r"|send(s|ing)?|sent|recall(s|ed|ing)?|notif(y|ies|ied|ying|ication)|email(s|ed|ing)?|discord"
+    r"|prod(uction)?[- ]?(sync(s|ed|ing)?|data|db|database|rows?))\b",
+    re.IGNORECASE,
+)
+
+
 def merge_verdicts(
     mechanical: MergeDanger,
     llm_door: str | None,
     llm_blast: str | None,
     llm_why: str | None,
+    *,
+    llm_raise_bar: bool = False,
 ) -> MergeDanger:
-    """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers."""
-    door = DOORS[max(_rank(mechanical.door, DOORS), _rank(llm_door, DOORS))]
+    """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers.
+
+    llm_raise_bar: Phase 2 only. A one-way the floor did not raise is kept only when the Why
+    (prefix stripped) names a concrete irreversible effect per _IRREVERSIBLE_RE; otherwise the
+    door stays at the mechanical floor. Blast radius is never subject to the bar."""
+    # Every [:WHY_MAX] cut is re-stripped: a cut landing after a space would leave a trailing
+    # space that the next phase's _clean_why drops, so the line would change between phases.
+    core = _llm_core(llm_why)[:WHY_MAX].rstrip()
+    llm_rank = _rank(llm_door, DOORS)
+    if (llm_raise_bar and mechanical.door == "two-way" and llm_door == "one-way"
+            and not _IRREVERSIBLE_RE.search(core)):
+        llm_rank = 0
+    door = DOORS[max(_rank(mechanical.door, DOORS), llm_rank)]
     blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
-    why = _clean_why(llm_why)[:WHY_MAX]
-    if len(why) < WHY_MIN:
+    if len(core) < WHY_MIN:
         why = mechanical.why
     elif mechanical.door == "one-way":
-        why = f"{mechanical.why}. {why}"
+        # Cut first, then re-check: a long prefix can leave under WHY_MIN core chars, and a
+        # later re-application would see that short core and fall back, breaking the fixed point.
+        why = f"{mechanical.why}. {core}"[:WHY_MAX].rstrip()
+        if len(why) - len(mechanical.why) - 2 < WHY_MIN:
+            why = mechanical.why
+    else:
+        why = core
     return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers)
 
 

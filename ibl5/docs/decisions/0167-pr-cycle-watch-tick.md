@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, the post-plan race fix in both directions, and the gate-timeout rerun.
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -110,3 +110,13 @@ The tick now reruns the gate's failed job in place of a rescue when all of these
 Reruns per (PR, head SHA) stop at `PCW_GATE_RERUN_CAP` (2), counted in `gate-reruns/<pr>`. That ledger is separate from `strikes/`, so a rerun never spends the no-op rescue cap. A gh read failure skips the PR for the tick. Any other failure shape falls through to the rescue as before. `bin/pr-cycle-tick --dry-run` prints the would-rerun line and writes nothing.
 
 The gate keeps its fail-closed semantics. The rerun sends the same check back through the same wait and timeout. This change leaves the gate workflow, `bin/check-pr-checks-green`, the timeouts and the concurrency groups as they were.
+
+## Addendum 2026-10-22: conflict holds re-fire only when the conflict changed
+
+A conflict hold re-fired on every master-tip move, capped at two launches a day. PR #3367 spent two rescues ($3.70 and $4.16) on commit 5e05c984 against the same five conflicted paths, because master had moved in other files.
+
+The tick now runs `git merge-tree --write-tree --name-only <tip> <head>` when it records a conflict hold. It stores the head SHA and the sorted conflicted path set under the tip line of `conflict-hold/<pr>`. When a later tick finds the hold due, it re-fires only when the head changed, the probe merges clean, the probe's path set differs from the recorded one, or any conflicted file's content differs between the held tip and the new tip (`conflict_files_same` in `bin/pr-cycle-tick`). An identical set of paths with identical content skips with `rebase conflict unchanged (N paths)` and moves the held tip forward, so later ticks wait for a new master tip without probing again. The probe costs no tokens. It writes objects only, and it fetches the PR head once, with no ref, only when the head object is missing.
+
+A probe that cannot decide falls back to the 2026-10-19 rule and re-fires on the new tip. That covers a missing object, unrecognised merge-tree output, a legacy one-line hold, and an `unknown` tip. Each fallback logs a `WARN` line. The first fallback per (PR, head) also sends a Discord DM through the `dm-probe/<pr>` ledger, which `pcw_prune` sweeps for closed PRs. The daily cap of two launches stays as the backstop.
+
+Record time and compare time use the same instrument. The harness audit's plain-rebase path list was rejected as the record source: a rebase replays commits one at a time and can list different paths than one three-way merge, so the two sets would not be comparable.

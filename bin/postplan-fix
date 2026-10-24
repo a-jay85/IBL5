@@ -290,13 +290,11 @@ if [ "$HOLDREPEAT" = 1 ]; then
         return 1
     }
     # A new path that could shadow a module for a `python3 -m` run from $WT: anything under a
-    # top-level harness/, a top-level .py/.pth, or a .py/.pth in a directory git tracks nothing in.
+    # top-level harness/ or a top-level .py/.pth. The run puts only $WT itself on sys.path, so a
+    # .py in a nested new directory (a new test directory) cannot shadow anything.
     _hr_planted_py() {  # <repo-relative path>
-        local d
-        case "$1" in harness/*) return 0 ;; *.py|*.pth) ;; *) return 1 ;; esac
-        d="${1%/*}"
-        [ "$d" != "$1" ] || return 0
-        [ -z "$(git -C "$WT" ls-files -- "$d/" | head -n 1)" ]
+        case "$1" in harness/*) return 0 ;; */*) return 1 ;; *.py|*.pth) return 0 ;; esac
+        return 1
     }
     # The token a plan edit may not delete without naming it in the plan-change note.
     _hr_anchor() {  # <part text>
@@ -310,8 +308,8 @@ if [ "$HOLDREPEAT" = 1 ]; then
     }
     # title <TAB> sorted labels <TAB> armed. Read with cut, since read would merge empty tab fields.
     _hr_pr_snapshot() {  # <outfile>
-        gh pr view "$PR" --repo a-jay85/IBL5 --json title,labels,autoMergeRequest \
-            --jq '[.title, ([.labels[].name] | sort | join(",")), (if .autoMergeRequest then "yes" else "no" end)] | @tsv' \
+        gh pr view "$PR" --repo a-jay85/IBL5 --json title,labels,autoMergeRequest,baseRefName,isDraft,state,body \
+            --jq '[.title, ([.labels[].name] | sort | join(",")), (if .autoMergeRequest then "yes" else "no" end), "\(.baseRefName)|\(.isDraft)|\(.state)|\(.body | length)"] | @tsv' \
             > "$1" 2>/dev/null
     }
 
@@ -514,6 +512,11 @@ LAST line of the final message."
     HR_L0="$(cut -f2 "$HR_TMP/pr.before")"; HR_L1="$(cut -f2 "$HR_TMP/pr.after")"
     HR_A0="$(cut -f3 "$HR_TMP/pr.before")"; HR_A1="$(cut -f3 "$HR_TMP/pr.after")"
     HR_PRBAD=""
+    # Base branch, draft flag, state and body length: the session has an open Bash tool and only
+    # the prompt forbids gh, so any change here is out of bounds. Detected, not repaired.
+    if [ "$(cut -f4 "$HR_TMP/pr.before")" != "$(cut -f4 "$HR_TMP/pr.after")" ]; then
+        HR_PRBAD+="base, draft, state or body changed; "
+    fi
     if [ "$HR_T0" != "$HR_T1" ]; then
         gh pr edit "$PR" --repo a-jay85/IBL5 --title "$HR_T0" >/dev/null 2>&1 || true
         HR_PRBAD+="title changed; "
@@ -543,6 +546,8 @@ LAST line of the final message."
     # _hr_py sets PYTHONDONTWRITEBYTECODE, so the launcher's own runs write none.
     while IFS= read -r p; do
         [ -n "$p" ] || continue
+        # Only files Python could import or execute count; a log or cache file is harmless.
+        case "$p" in *.py|*.pyc|*.pth|*sitecustomize*|*usercustomize*) ;; *) continue ;; esac
         if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ]; then
             HR_EXTBAD+="main checkout ignored file written ($p); "
             break

@@ -131,7 +131,7 @@ Then run the staleness check against the queue symlink path. The guard resolves 
 If `bin/check-plan-staleness` exits non-zero, the plan is STALE. Take the skip-with-report path IMMEDIATELY — before any worktree is created, no partial work, no handoff:
 
 1. Capture the unresolved paths the helper printed (its `STALE: <token>` lines).
-2. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`
+2. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`, then `touch -h "$NIGHTLY_DIR/skipped/$PLAN_FILE"` so the entry carries the skip time the morning digest selects on
 3. `touch "$NIGHTLY_DIR/skipped/$PLAN_FILE.staleness"` — drop a sidecar marker that records this skip as a **staleness** skip (not ambiguity / already-merged / poison-pill). At the next run's top, `bin/automouse/self-heal` reads this marker and auto-requeues the plan **iff** `bin/check-plan-staleness` now passes against the freshly-pulled master; a skip without the marker is never auto-recovered.
 4. Write a STALENESS-specific report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` (derive `<slug>` from the plan title). The title and body must make it visibly a **staleness skip** — clearly distinct wording from the ambiguity skip — and must list the specific unresolved repo paths the helper emitted.
 5. STOP.
@@ -162,7 +162,7 @@ Read the candidate PRs and JUDGE: does a merged PR clearly implement THIS plan's
 
 If a merged PR clearly implements this plan, take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
-1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+1. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`, then `touch -h "$NIGHTLY_DIR/done/$PLAN_FILE"` so the entry carries the completion time the morning digest selects on
 2. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` (derive `<slug>` from the plan title). Title and body must make it visibly an **already-merged completion** — wording clearly distinct from a normal post-plan completion and from the staleness/ambiguity skips — name the merged PR (number + title), and cite which plan deliverables you confirmed present on master.
 3. STOP — no worktree, no handoff.
 
@@ -177,7 +177,7 @@ The plan must have:
 Scope is NEVER grounds to skip. Large file counts, multi-module cascades, migrations, ADRs, doc updates, and visual verification are all in-bounds — attempt the full plan. If you run out of session budget, commit and push what you have; the post-plan agent will open a draft PR.
 
 Skip ONLY when the plan is genuinely ambiguous: unclear requirements, missing external context, or you cannot determine what specific code changes to make. In that case:
-1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/
+1. Move the symlink to $NIGHTLY_DIR/skipped/ : mv $NIGHTLY_DIR/queue/<filename> $NIGHTLY_DIR/skipped/ && touch -h $NIGHTLY_DIR/skipped/<filename>
 2. Write a report to $NIGHTLY_DIR/reports/YYYY-MM-DD-skipped-<slug>.md explaining exactly WHY the plan was skipped (must cite a specific ambiguity, not scope/size)
 3. Do NOT attempt partial work
 4. STOP
@@ -294,7 +294,7 @@ If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean worki
 
 1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
 2. `bin/wt-remove <slug>` to remove the empty worktree and local branch.
-3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`
+3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`, then `touch -h "$NIGHTLY_DIR/done/$PLAN_FILE"` so the entry carries the completion time the morning digest selects on
 4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
 5. Do NOT write a handoff file.
 6. STOP.

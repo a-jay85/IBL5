@@ -13,7 +13,7 @@ final class LighthouseUrls
         'Team'                => '&op=team&teamid=1',
         'Player'              => '&pa=showpage&pid=1',
         'Schedule'            => '&teamid=1',
-        'DraftHistory'        => '&year=2025',
+        'DraftInfo'           => '&tab=history&year=2025',
         'FranchiseRecordBook' => '&op=team&teamid=1',
         'SeasonArchive'       => '&year=2025',
         'Injuries'            => '&teamid=1',

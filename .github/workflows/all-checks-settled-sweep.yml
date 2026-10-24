@@ -1,0 +1,43 @@
+name: All checks settled sweep (cron)
+# Re-settles an `All checks settled` status that was left pending with no further
+# workflow_run event (a "ghost" run: jobs all done, run never marked completed; ADR-0149
+# addendum 2026-10-22). Stateless: bin/settle-pr-status --sweep-stale-minutes lists open
+# PRs, reads each head's combined status, and dispatches all-checks-settled.yml on master
+# for every pending status older than the window. Nothing from a PR branch is checked out
+# or executed; the only write is the workflow_dispatch POST (actions: write). A dispatch
+# made with GITHUB_TOKEN does start a run: workflow_dispatch is one of the two events
+# GitHub exempts from the "GITHUB_TOKEN events start no workflow" rule.
+# bin/check-composite-contracts A7 pins: schedule + workflow_dispatch only, actions the only
+# write scope, no expression inside run:, master checkout without credentials, and a
+# --sweep-stale-minutes window of at least GHOST_GRACE in bin/check-pr-checks-green.
+# Run by hand: gh workflow run all-checks-settled-sweep.yml
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: all-checks-settled-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    name: Re-dispatch stale pending settles
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout master (for bin/settle-pr-status)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Sweep stale pending statuses
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --sweep-stale-minutes=15

@@ -1,6 +1,6 @@
 ---
 description: Documentation organization, lifecycle rules, and the changelog policy (no CHANGELOG file; where change history lives).
-last_verified: 2026-10-04
+last_verified: 2026-10-23
 ---
 
 # IBL5 Documentation Standards
@@ -13,8 +13,8 @@ last_verified: 2026-10-04
 ## Documentation Locations
 
 ### 1. Root Directory (Minimal)
-- **Only** `README.md` and `CLAUDE.md` live at the repo root
-- README.md is the project introduction; CLAUDE.md is AI agent instructions
+- **Only** `README.md` lives at the repo root
+- README.md is the project introduction. Agent instructions live in `.claude/rules/`.
 - **DO NOT** place guides, summaries, or technical docs at root
 
 ### 2. `ibl5/docs/` (All Project Documentation)

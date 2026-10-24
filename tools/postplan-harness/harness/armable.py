@@ -60,6 +60,9 @@ ROW_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \*\*[^*]+\*\*")
 
 # Condition (9) deterministic hold-trigger surface (the enumerable subset; the
 # bounded LLM verdict may ADD holds on top — never release one).
+# Raw regex: it matches SQL comment text too. merge_danger trigger 1 blanks comments with
+# sql_comments.strip_added_sql_comments first; condition (9) scans filtered_diff, which
+# classify.filter_diff has already stripped of migrations/, so it never meets a migration line.
 DESTRUCTIVE_SQL = re.compile(
     r"^\+.*\b(DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE\s+\S+\s+RENAME|RENAME\s+COLUMN|TRUNCATE)\b",
     re.IGNORECASE | re.MULTILINE,
@@ -207,6 +210,7 @@ class ArmInputs:
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
+    retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -433,8 +437,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
             r = ""
         else:
             observed = repr(verdict) if verdict is not None else "ABSENT"
+            retried = (" after 1 retry"
+                       if verdict == "CONFLICT-REVIEW=ABSENT"
+                       and "conflict-review" in inp.retried_stages else "")
             r = (f"this branch carries a /post-plan auto-resolved rebase conflict — "
-                 f"conflict-review verdict={observed}; need CONFLICT-REVIEW=CLEAN")
+                 f"conflict-review verdict={observed}{retried}; need CONFLICT-REVIEW=CLEAN")
     else:
         r = ""
     cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))
@@ -476,7 +483,9 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # Condition (18) — merge danger door: only a well-formed two-way line arms.
     md = inp.merge_danger_state
     md_blocked = md != "TWO-WAY"
-    cs.append(ConditionResult(18, "merge-danger", md_blocked, f"state={md}" if md_blocked else ""))
+    md_retried = " after 1 retry" if md == "MISSING" and "merge-danger" in inp.retried_stages else ""
+    cs.append(ConditionResult(18, "merge-danger", md_blocked,
+                              f"state={md}{md_retried}" if md_blocked else ""))
 
     # condition (19) — executable mutations: every claimed mutation tripped its check and
     # the tree was verified byte-identical afterwards. Run-local, fail-closed, additive.

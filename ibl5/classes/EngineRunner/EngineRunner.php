@@ -19,7 +19,8 @@ use EngineRunner\Contracts\EngineRunnerInterface;
  * Security: the binary is invoked via proc_open with an EXPLICIT ARGV ARRAY (no
  * shell string), so neither the binary path nor the seed is ever subject to
  * shell interpretation. The binary path is validated before exec, the exit code
- * is checked, and a missing/malformed header or game line is treated as a failure.
+ * is checked, a bundle the engine did not fully read is rejected, and a
+ * missing/malformed header or game line is treated as a failure.
  */
 final class EngineRunner implements EngineRunnerInterface
 {
@@ -69,8 +70,32 @@ final class EngineRunner implements EngineRunnerInterface
             throw new EngineRunnerException("Failed to start engine process: {$this->binaryPath}");
         }
 
-        fwrite($pipes[0], $bundleJson);
-        fclose($pipes[0]);
+        // The engine may exit before reading all of stdin (it can fail fast on a bad
+        // bundle). Writing to its closed pipe raises an E_NOTICE "Broken pipe". This
+        // scoped handler captures that notice so it cannot escape: the exit-code check
+        // below reports the real failure, and the byte-count check after it rejects a
+        // truncated bundle on an exit-0 run. PHP's stream layer already retries partial
+        // writes, so one fwrite either writes everything or stops at the failed write.
+        /** @var list<string> $writeErrors */
+        $writeErrors = [];
+        set_error_handler(
+            static function (int $errno, string $errstr) use (&$writeErrors): bool {
+                $writeErrors[] = $errstr;
+
+                return true;
+            },
+            E_NOTICE | E_WARNING
+        );
+        try {
+            $written = fwrite($pipes[0], $bundleJson);
+        } finally {
+            restore_error_handler();
+            // Close stdin on every path: the engine waits for EOF, and an open pipe
+            // would block the stderr drain and proc_close below.
+            fclose($pipes[0]);
+        }
+        $bytesWritten = $written === false ? 0 : $written;
+        $expectedBytes = strlen($bundleJson);
 
         // Drain stderr before proc_close to avoid a stderr-pipe-full deadlock on a
         // chatty run (stdout goes to the file descriptor, so $pipes[1] is unused).
@@ -78,16 +103,28 @@ final class EngineRunner implements EngineRunnerInterface
         fclose($pipes[2]);
 
         $exitCode = proc_close($process);
+        $detail = trim((string) $stderr);
 
+        // A nonzero exit always wins: it is the engine's own report of what went wrong,
+        // and a broken-pipe write is only a symptom of it.
         if ($exitCode !== 0) {
             @unlink($tmpPath);
-            $detail = trim((string) $stderr);
             throw new EngineRunnerException(
                 "Engine exited with code {$exitCode}" . ($detail !== '' ? ": {$detail}" : '')
             );
         }
 
         try {
+            // Exit 0 with a short write means the engine ran on a truncated bundle;
+            // its output cannot be trusted, so this is a failure, never a success.
+            if ($bytesWritten !== $expectedBytes) {
+                throw new EngineRunnerException(
+                    "Engine exited 0 before reading the full bundle: wrote {$bytesWritten} of {$expectedBytes} bytes"
+                    . ($writeErrors !== [] ? ' (' . implode('; ', $writeErrors) . ')' : '')
+                    . ($detail !== '' ? ": {$detail}" : '')
+                );
+            }
+
             return $this->streamGames($tmpPath, $onGame);
         } finally {
             @unlink($tmpPath);

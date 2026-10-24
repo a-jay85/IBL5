@@ -96,6 +96,66 @@ final class EngineRunnerTest extends TestCase
     }
 
     #[Test]
+    public function closedPipeNonzeroExitReportsExitCodeWithoutNotice(): void
+    {
+        // Same stub as nonzeroExitThrowsWithStderr: never reads stdin. A 1 MiB bundle
+        // cannot fit in the pipe buffer, so the write always lands on a closed pipe.
+        $stub = $this->makeStub("#!/bin/sh\necho 'boom' >&2\nexit 3\n");
+        $runner = new EngineRunner($stub);
+
+        $out = self::runCapturingErrors(
+            static fn (): int => $runner->runStreaming(self::largeBundle(), static function (): void {})
+        );
+
+        self::assertSame(['handler-probe'], $out['errors'], 'no broken-pipe notice may escape the runner');
+        self::assertNull(error_get_last(), 'the runner handler must swallow the notice itself');
+        self::assertInstanceOf(EngineRunnerException::class, $out['thrown']);
+        self::assertMatchesRegularExpression('/exited with code 3.*boom/s', $out['thrown']->getMessage());
+    }
+
+    #[Test]
+    public function shortBundleWriteWithZeroExitThrows(): void
+    {
+        $stub = $this->makeStub(
+            "#!/bin/sh\nhead -c 16 > /dev/null\necho 'short-read' >&2\necho '{\"seed\":1}'\n"
+        );
+        $runner = new EngineRunner($stub);
+
+        /** @var list<int> $calls */
+        $calls = [];
+        $out = self::runCapturingErrors(
+            static fn (): int => $runner->runStreaming(self::largeBundle(), static function () use (&$calls): void {
+                $calls[] = 1;
+            })
+        );
+
+        self::assertSame(['handler-probe'], $out['errors']);
+        self::assertNull(error_get_last());
+        self::assertInstanceOf(EngineRunnerException::class, $out['thrown']);
+        $msg = $out['thrown']->getMessage();
+        self::assertMatchesRegularExpression('/exited 0 before reading the full bundle: wrote \d+ of 1048576 bytes/', $msg);
+        self::assertStringContainsString('errno=32', $msg, 'the captured write error must be surfaced');
+        self::assertStringContainsString('short-read', $msg, 'trimmed stderr must be surfaced');
+        self::assertSame([], $calls, 'a truncated bundle must never reach streamGames');
+        self::assertNull($out['result']);
+    }
+
+    #[Test]
+    public function largeBundleFullyReadSucceedsWithoutNotice(): void
+    {
+        $runner = new EngineRunner($this->ndjsonStub('{"seed":7}', '{"date":"d1"}'));
+
+        $out = self::runCapturingErrors(
+            static fn (): int => $runner->runStreaming(self::largeBundle(), static function (): void {})
+        );
+
+        self::assertSame(['handler-probe'], $out['errors']);
+        self::assertNull(error_get_last());
+        self::assertNull($out['thrown']);
+        self::assertSame(1, $out['result']);
+    }
+
+    #[Test]
     public function malformedHeaderThrows(): void
     {
         $stub = $this->ndjsonStub('{not valid json');
@@ -182,6 +242,42 @@ final class EngineRunnerTest extends TestCase
         self::assertFalse(is_file($sentinel), 'no shell side effect should occur');
         // Defensive: the injection string is never run because seed is an int.
         self::assertStringNotContainsString($injection, (string) $recorded);
+    }
+
+    /** A bundle larger than any OS pipe buffer, so the write always reaches a closed pipe. */
+    private static function largeBundle(): string
+    {
+        return str_repeat('x', 1048576);
+    }
+
+    /**
+     * @param callable(): int $run
+     *
+     * @return array{errors: list<string>, thrown: ?EngineRunnerException, result: ?int}
+     */
+    private static function runCapturingErrors(callable $run): array
+    {
+        /** @var list<string> $errors */
+        $errors = [];
+        $thrown = null;
+        $result = null;
+        error_clear_last();
+        set_error_handler(static function (int $errno, string $errstr) use (&$errors): bool {
+            $errors[] = $errstr;
+
+            return true;
+        });
+        try {
+            $result = $run();
+        } catch (EngineRunnerException $e) {
+            $thrown = $e;
+        } finally {
+            // Lands in $errors only if the runner restored the handler it installed.
+            trigger_error('handler-probe', E_USER_NOTICE);
+            restore_error_handler();
+        }
+
+        return ['errors' => $errors, 'thrown' => $thrown, 'result' => $result];
     }
 
     /**

@@ -20,6 +20,11 @@ on:
     # (marocchino/sticky-pull-request-comment updates in place) and never writes
     # the PR body, so `edited` cannot self-retrigger; the per-PR `concurrency`
     # group below collapses edit storms.
+    # No job-level `if:` here, by decision (ADR 0210): `Meta checks` is required
+    # and its verdict reads the live PR body and the diff, which no `edited`
+    # payload can prove unchanged. A skip would report success over a prior
+    # body-driven failure on the same SHA. bin/test-human-signoff-classifier
+    # pins the absence of a job `if:` and of a skip concurrency group.
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:

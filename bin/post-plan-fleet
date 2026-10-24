@@ -690,6 +690,7 @@ fi
 # Runs while $PLIST still exists (slot held) and before bootout, which ends this job.
 # HR_FIX_TIMEOUT_SECS is HR_TIMEOUT_SECS (1500) + one full post-plan re-fire + 300 s margin.
 _hr_quiet=0
+_hr_timed_out=0
 _hr_first=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
 _hr_run=0
 if [ -n "$HOLDREPEAT_FIX_ARG" ]; then
@@ -735,23 +736,35 @@ if [ "$_hr_run" = 1 ]; then
                 fi ;;
         esac
     fi
-    [ "$_hr_rc" = 124 ] && RC=124
+    if [ "$_hr_rc" = 124 ]; then
+        RC=124
+        _hr_timed_out=1
+        echo "postplan-fix: TIMED OUT after ${HR_FIX_TIMEOUT_SECS}s (rc=124)" >> "$LOG"
+    fi
     echo "post-plan-fleet: holdrepeat-fix=$_hr_word" >> "$LOG"
 fi
 # A timed-out run's last step: the last "starting" line of the harness audit.log, found
-# through post-plan-now's harness-run-dir= line. Empty (and no line written) when either
+# through the hung stage's harness-run-dir= line. Empty (and no line written) when either
 # is missing, so the timeout wording stays as it was.
 TIMEOUT_STEP=""
 if [ "$RC" = 124 ]; then
-    # A fix timeout leaves the run dir in the fix session's log, not in the first pass's.
-    _to_dir=$(cat "$LOG" "${_hr_log:-/dev/null}" 2>/dev/null | grep -m1 'harness-run-dir=' \
+    # A fix timeout names postplan-fix and reads only the fix session's log: the first
+    # pass's run dir belongs to a post-plan-now run that finished.
+    _to_src="$LOG"; _to_stage=post-plan-now
+    if [ "${_hr_timed_out:-0}" = 1 ]; then
+        _to_src="$_hr_log"; _to_stage=postplan-fix
+    fi
+    _to_dir=$(grep -m1 'harness-run-dir=' "$_to_src" 2>/dev/null \
         | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
     if [ -n "$_to_dir" ] && [ "$_to_dir" != none ] && [ -f "$_to_dir/audit.log" ]; then
         TIMEOUT_STEP=$(grep -E '^\[[0-9:]+\] [A-Za-z0-9._-]+: starting ' "$_to_dir/audit.log" 2>/dev/null \
             | tail -n 1 | sed -E 's/^\[[0-9:]+\] //' | cut -c1-160 || true)
     fi
+    if [ "$_to_stage" = postplan-fix ]; then
+        TIMEOUT_STEP="postplan-fix --holdrepeat hung${TIMEOUT_STEP:+ at: $TIMEOUT_STEP}"
+    fi
     if [ -n "$TIMEOUT_STEP" ]; then
-        echo "post-plan-now: timed-out run's last step: $TIMEOUT_STEP" >> "$LOG"
+        echo "$_to_stage: timed-out run's last step: $TIMEOUT_STEP" >> "$LOG"
     fi
 fi
 notify() {

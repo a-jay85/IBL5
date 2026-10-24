@@ -31,6 +31,22 @@ _gc_mtime() {
     stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
 }
 
+# _gc_resolve_bin <name> — absolute path of <name>, searching PATH and then
+# WT_GC_BIN_DIRS (appended, so a PATH entry wins). Prints nothing when absent.
+_gc_resolve_bin() {
+    local search="${PATH:-}" found
+    if [ -n "${WT_GC_BIN_DIRS:-}" ]; then search="${search:+$search:}$WT_GC_BIN_DIRS"; fi
+    [ -n "$search" ] || return 0
+    found="$(PATH="$search" command -v "$1" 2>/dev/null)" || return 0
+    case "$found" in /*) printf '%s\n' "$found" ;; esac
+    return 0
+}
+
+# _gc_have <path> — the resolved binary seam names an executable file.
+_gc_have() {
+    [ -n "$1" ] && [ -f "$1" ] && [ -x "$1" ]
+}
+
 # _gc_epoch_days_ago <N> — epoch seconds N days before now.
 _gc_epoch_days_ago() {
     printf '%s\n' "$(( $(date +%s) - $1 * 86400 ))"
@@ -155,12 +171,13 @@ with open(sys.argv[1]) as fh:
         log "live-work $slug: live Claude session on $branch"
         return 0
     fi
-    # 4. Process cwd. is_worktree_in_use reads a missing lsof as "not in use".
-    if ! command -v lsof >/dev/null 2>&1; then
-        log "live-work probe error $slug: lsof missing"
+    # 4. Process cwd. is_worktree_in_use reads a missing lsof as "not in use"
+    # and calls a bare `lsof`, so put the resolved one first on its PATH.
+    if ! _gc_have "$WT_GC_LSOF"; then
+        log "live-work probe error $slug: lsof not found ('$WT_GC_LSOF')"
         return 2
     fi
-    if LAUNCHCTL_CMD="$WT_GC_LAUNCHCTL" is_worktree_in_use "$wt"; then
+    if PATH="$(dirname "$WT_GC_LSOF"):$PATH" LAUNCHCTL_CMD="$WT_GC_LAUNCHCTL" is_worktree_in_use "$wt"; then
         log "live-work $slug: worktree in use"
         return 0
     fi
@@ -306,6 +323,10 @@ _gc_reap_dirty_one() {
     if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
         log "dirty keep $name: branch unresolved"; return 0
     fi
+    if ! _gc_have "$WT_GC_GH"; then
+        log "dirty keep $name: gh not found ('$WT_GC_GH')"
+        return 1
+    fi
     GH_CMD="$WT_GC_GH" pr_info "$branch" "$wt" || true
     if [ "${PR_STATE:-}" != MERGED ] || [ -z "${PR_OID:-}" ] || [ "$PR_OID" != "$tip" ]; then
         log "dirty keep $name: merge not proven (state=${PR_STATE:-?} oid=${PR_OID:-?})"
@@ -398,6 +419,11 @@ reap_stale_refs() {
                     if [[ "$stem" =~ ^(.*)-[0-9a-f]{7,40}$ ]]; then
                         stem="${BASH_REMATCH[1]}"
                     fi
+                    if ! _gc_have "$WT_GC_GH"; then
+                        log "ref keep $ref: gh not found ('$WT_GC_GH')"
+                        rc=1
+                        continue
+                    fi
                     if ! merged="$(_gc_backup_merged_epoch "$stem")"; then
                         log "ref keep $ref: gh found no merged PR for '$stem'"
                         continue
@@ -433,7 +459,7 @@ reap_stale_refs() {
                 doomed="${doomed}${sha} ${ref}"$'\n' ;;
         esac
     done 3<<< "$listing"
-    [ -n "$doomed" ] || return 0
+    [ -n "$doomed" ] || return "$rc"
     # Tips first: one failure deletes nothing.
     while IFS=' ' read -r sha ref; do
         [ -n "$ref" ] || continue
@@ -474,8 +500,8 @@ reap_tmp_packs() {
         if [ $(( now - mt )) -lt $(( WT_GC_TMP_PACK_DAYS * 86400 )) ]; then
             log "tmp_pack keep $f: age"; continue
         fi
-        if ! command -v "$WT_GC_LSOF" >/dev/null 2>&1; then
-            log "tmp_pack keep $f: lsof missing"; continue
+        if ! _gc_have "$WT_GC_LSOF"; then
+            log "tmp_pack keep $f: lsof not found ('$WT_GC_LSOF')"; continue
         fi
         lrc=0
         "$WT_GC_LSOF" -F p -- "$f" >/dev/null 2>"$errf" || lrc=$?
@@ -497,6 +523,10 @@ docker_prune() {
         return 1
     fi
     log "step docker threshold=$WT_GC_DOCKER_UNTIL"
+    if ! _gc_have "$WT_GC_DOCKER"; then
+        log "docker not found ('$WT_GC_DOCKER') — nothing pruned"
+        return 1
+    fi
     if ! "$WT_GC_DOCKER" info >/dev/null 2>&1; then
         log "docker daemon unreachable — skipped"
         return 0

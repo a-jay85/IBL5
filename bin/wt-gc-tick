@@ -80,16 +80,18 @@ WT_GC_REF_DAYS="${WT_GC_REF_DAYS-14}"
 WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"
 WT_GC_STALE_DAYS="${WT_GC_STALE_DAYS-7}"
 WT_GC_DOCKER_UNTIL="${WT_GC_DOCKER_UNTIL-168h}"
-# Paths / binaries (absolute on purpose, see WT_GC_IOREG).
+# Paths / binaries.
 WT_GC_TIPS_DIR="${WT_GC_TIPS_DIR:-$WT_GC_LOCK_DIR/tips}"
 WT_GC_STALE_FILE="${WT_GC_STALE_FILE:-$WT_GC_LOCK_DIR/stale-worktrees.tsv}"
 WT_GC_WT_REMOVE="${WT_GC_WT_REMOVE:-$SCRIPT_DIR/wt-remove}"
 WT_GC_QUEUE_DIR="${WT_GC_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
 WT_GC_SESSION_REGISTRY="${WT_GC_SESSION_REGISTRY:-$HOME/.claude/session-registry/active.json}"
 WT_GC_LAUNCHCTL="${WT_GC_LAUNCHCTL:-/bin/launchctl}"
-WT_GC_LSOF="${WT_GC_LSOF:-/usr/sbin/lsof}"
-WT_GC_GH="${WT_GC_GH:-/opt/homebrew/bin/gh}"
-WT_GC_DOCKER="${WT_GC_DOCKER:-/usr/local/bin/docker}"
+# The launchd PATH is minimal, so WT_GC_LSOF / WT_GC_GH / WT_GC_DOCKER are
+# resolved after the library loads: PATH first, then these dirs. A seam that
+# is set, even to "", is used as given and never resolved. "" or a missing
+# file means "not found", and the step that needs it keeps everything.
+WT_GC_BIN_DIRS="${WT_GC_BIN_DIRS-/usr/sbin:/opt/homebrew/bin:/usr/local/bin}"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 log() {
@@ -137,6 +139,9 @@ source "$SCRIPT_DIR/lib/git-helpers.sh"
 source "$SCRIPT_DIR/lib/wt-guards.sh"
 # shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
 source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
+[ -n "${WT_GC_LSOF+x}" ]   || WT_GC_LSOF="$(_gc_resolve_bin lsof)"
+[ -n "${WT_GC_GH+x}" ]     || WT_GC_GH="$(_gc_resolve_bin gh)"
+[ -n "${WT_GC_DOCKER+x}" ] || WT_GC_DOCKER="$(_gc_resolve_bin docker)"
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     WT_GC_REPO_ROOT="$(main_checkout_root "$SCRIPT_DIR/..")" || WT_GC_REPO_ROOT=""
 fi
@@ -260,7 +265,9 @@ run_step() {
     local name="$1" sw="$2" swname="$3" fn="$4" rc=0
     if [ "$sw" = 0 ]; then log "step $name disabled ($swname=0)"; return 0; fi
     # Background + wait: a `( ... ) || cmd` list would run the subshell in a
-    # context where bash ignores errexit.
+    # context where bash ignores errexit. errexit covers the step's own
+    # commands; helpers a step calls as `f || rc=1` run without it and rely on
+    # their explicit returns.
     ( set -euo pipefail; "$fn" ) 2> "$TMP_STEP" &
     wait $! || rc=$?
     { cat "$TMP_STEP" >> "$WT_GC_LOG"; } 2>/dev/null || true

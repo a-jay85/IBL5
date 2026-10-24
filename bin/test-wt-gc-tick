@@ -29,6 +29,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TICK="${WT_GC_TICK_UNDER_TEST:-$SCRIPT_DIR/wt-gc-tick}"
 CRON_SETUP="$SCRIPT_DIR/wt-gc-cron-setup"
 
+# A literal docker path in the tick or its library would bypass the PATH stub
+# and reach the real CLI, so refuse to run at all.
+if grep -nE '/bin/docker' "$TICK" "$(dirname "$TICK")/lib/wt-gc-reap.sh" >&2; then
+    echo "ABORT: the tick under test names a docker binary path; a case could prune for real" >&2
+    exit 2
+fi
+
 ROOT="$(mktemp -d)"
 ROOT="$(cd "$ROOT" && pwd -P)"   # physical path: git worktree list reports it
 SLEEPER_PID=""
@@ -239,17 +246,47 @@ final_line() { tail -n 1 "$(LOG)" 2>/dev/null; }
 log_has() { grep -qE -- "$1" "$(LOG)" 2>/dev/null; }
 err_has() { grep -qE -- "$1" "$CD/err" 2>/dev/null; }
 
-# run_tick [VAR=val ...] -- [tick args...]
+# docker_guard <VAR=val ...> — the final env of one run. Aborts the whole
+# suite before the run when that env could let the tick, its resolver or a
+# real bin/cleanup reach a docker binary outside $ROOT (a real prune).
+docker_guard() {
+    local kv p="" dirs="" dk="" dk_set=0 d found bad=""
+    for kv in "$@"; do
+        case "$kv" in
+            PATH=*)           p="${kv#PATH=}" ;;
+            WT_GC_BIN_DIRS=*) dirs="${kv#WT_GC_BIN_DIRS=}" ;;
+            WT_GC_DOCKER=*)   dk="${kv#WT_GC_DOCKER=}"; dk_set=1 ;;
+        esac
+    done
+    if [ "$dk_set" = 1 ]; then
+        case "$dk" in ''|"$ROOT"/*) ;; *) bad="WT_GC_DOCKER=$dk" ;; esac
+    fi
+    found="$(PATH="$p" command -v docker 2>/dev/null)" || found=""
+    case "$found" in ''|"$ROOT"/*) ;; *) bad="${bad:+$bad; }PATH resolves $found" ;; esac
+    local IFS=:
+    for d in $dirs; do
+        { [ -n "$d" ] && [ -e "$d/docker" ]; } || continue
+        case "$d" in "$ROOT"/*) ;; *) bad="${bad:+$bad; }WT_GC_BIN_DIRS has $d/docker" ;; esac
+    done
+    if [ -n "$bad" ]; then
+        printf 'ABORT %s: run could reach a real docker binary (%s)\n' "$CASE" "$bad" >&2
+        exit 2
+    fi
+}
+
+# run_tick [VAR=val ...] [-VAR ...] -- [tick args...]
 # Runs the tick under `env -i` with the stub seams; overrides apply after the
-# base set. NOSTATE=1 (set as a prefix) omits WT_GC_LOCK_DIR so the default path
-# resolves. Sets RC; stdout -> $CD/out, stderr -> $CD/err. Clears and then
-# archives $CD/argv per run (all argv ever seen accumulate in $ROOT/all-argv).
+# base set, and -VAR drops VAR from the env entirely. NOSTATE=1 (set as a
+# prefix) omits WT_GC_LOCK_DIR so the default path resolves. Sets RC; stdout ->
+# $CD/out, stderr -> $CD/err. Clears and then archives $CD/argv per run (all
+# argv ever seen accumulate in $ROOT/all-argv). docker_guard vets every run.
 run_tick() {
-    local envs=()
+    local envs=() final=() drop=" " kv
     while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
     if [ $# -gt 0 ]; then shift; fi
     local base=(
         PATH="$STUBBIN:$PATH"
+        WT_GC_BIN_DIRS="$STUBBIN"
         HOME="$ROOT/home"
         STUB_CASE_DIR="$CD"
         WT_GC_IOREG="$STUBBIN/ioreg"
@@ -275,9 +312,18 @@ run_tick() {
         STUB_GH_DIR="$CD/gh"
     )
     if [ "${NOSTATE:-}" != 1 ]; then base+=(WT_GC_LOCK_DIR="$CD/state"); fi
+    for kv in ${envs[@]+"${envs[@]}"}; do
+        case "$kv" in -*) drop="$drop${kv#-} " ;; esac
+    done
+    for kv in "${base[@]}" ${envs[@]+"${envs[@]}"}; do
+        case "$kv" in -*) continue ;; esac
+        case "$drop" in *" ${kv%%=*} "*) continue ;; esac
+        final+=("$kv")
+    done
+    docker_guard "${final[@]}"
     rm -f "$CD/argv" "$CD/cwd"
     RC=0
-    env -i "${base[@]}" ${envs[@]+"${envs[@]}"} "$TICK" "$@" >"$CD/out" 2>"$CD/err" || RC=$?
+    env -i "${final[@]}" "$TICK" "$@" >"$CD/out" 2>"$CD/err" || RC=$?
     if [ -f "$CD/argv" ]; then cat "$CD/argv" >> "$ROOT/all-argv"; fi
 }
 
@@ -721,11 +767,14 @@ finish_case
 begin_case G12-empty-env
 fresh
 mkdir -p "$CD/state"
-env -i PATH=/usr/bin:/bin STUB_CASE_DIR="$CD" \
-    WT_GC_LOCK_DIR="$CD/state" WT_GC_IOREG="$STUBBIN/ioreg" \
-    WT_GC_CLEANUP="$STUBBIN/cleanup-stub" WT_GC_WT_STATUS="$STUBBIN/wt-status-stub" \
-    WT_GC_REPO_ROOT="$G10_MAIN" \
-    bash -euo pipefail "$TICK" --dry-run --force > "$CD/out" 2>&1
+# The reap steps run at their defaults here, so lsof/gh/docker resolve from
+# the stub dir (first on PATH and the only WT_GC_BIN_DIRS entry).
+G12_ENV=(PATH="$STUBBIN:/usr/bin:/bin" WT_GC_BIN_DIRS="$STUBBIN" STUB_CASE_DIR="$CD"
+    WT_GC_LOCK_DIR="$CD/state" WT_GC_IOREG="$STUBBIN/ioreg"
+    WT_GC_CLEANUP="$STUBBIN/cleanup-stub" WT_GC_WT_STATUS="$STUBBIN/wt-status-stub"
+    WT_GC_REPO_ROOT="$G10_MAIN")
+docker_guard "${G12_ENV[@]}"
+env -i "${G12_ENV[@]}" bash -euo pipefail "$TICK" --dry-run --force > "$CD/out" 2>&1
 RC=$?
 chk_rc "env -i dry-run" 0
 grep -q 'unbound variable' "$CD/out" && note_err "env -i dry-run: unbound variable"
@@ -899,11 +948,12 @@ log_has "invalid WT_GC_DOCKER_UNTIL '168'" || note_err "168 without h accepted"
 grep -q prune "$CD/docker-argv" 2>/dev/null && note_err "168 without h: prune ran"
 finish_case
 
-# H2b — switch and path seams: empty means default, never an error.
+# H2b — switch and path seams: empty means default, never an error. (An empty
+# binary seam means "not found", not default: case P3.)
 fx H2b-path-seams
 rt WT_GC_REAP_EMPTY= WT_GC_REAP_DIRTY_MERGED= WT_GC_REAP_REFS= WT_GC_REAP_TMP_PACK= \
     WT_GC_DOCKER_PRUNE= WT_GC_STALE_LIST= WT_GC_TIPS_DIR= WT_GC_STALE_FILE= \
-    WT_GC_QUEUE_DIR= WT_GC_SESSION_REGISTRY= WT_GC_DOCKER= -- --force
+    WT_GC_QUEUE_DIR= WT_GC_SESSION_REGISTRY= -- --force
 chk_rc "empty switch/path seams" 0
 log_has 'invalid |unbound' && note_err "empty seam rejected"
 err_has 'unbound' && note_err "unbound variable"
@@ -922,6 +972,26 @@ log_has 'step stale-list threshold=' || note_err "later step stale-list did not 
 log_has 'reap done steps_failed=1' || note_err "steps_failed not 1"
 [ -f "$CD/state/last-sweep" ] && note_err "stamp written after a failed step"
 has_ref refs/tmp/old || note_err "ref deleted without a tips line"
+finish_case
+
+# H3b — errexit holds inside a step: a failing command stops the step before
+# a later delete; the tick logs the failure and exits 1. The refs step's
+# `now="$(date +%s)"` fails via a date wrapper; past it, the foreign-remote
+# ref would be deleted (that class has no age test).
+fx H3b-step-errexit
+mk_ref refs/remotes/prh/1 1
+mkdir -p "$CD/datewrap"
+cat > "$CD/datewrap/date" <<SH
+#!/usr/bin/env bash
+[ "\$*" = "+%s" ] && exit 1
+exec "$(command -v date)" "\$@"
+SH
+chmod +x "$CD/datewrap/date"
+rt WT_GC_REAP_REFS=1 WT_GC_REAP_TMP_PACK=1 PATH="$CD/datewrap:$STUBBIN:$PATH" -- --force
+chk_rc H3b 1
+log_has 'step refs failed \(rc=' || note_err "no 'step refs failed'"
+log_has 'step tmp-pack threshold=' || note_err "later step did not run"
+has_ref refs/remotes/prh/1 || note_err "step ran past the failed command and deleted a ref"
 finish_case
 
 # H4 — _gc_tips_record writes and re-reads; an unwritable dir returns 1.
@@ -1036,6 +1106,20 @@ chk_rc E9 0
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would: .*wt-remove e-old --volumes' || note_err "no DRY-RUN wt-remove line"
+finish_case
+
+# E10 — an old worktree whose only work is a new, never-added file in a
+# subdirectory is kept (the root dir mtime and branch tip stay old).
+fx E10-untracked-kept
+mk_wt e-old e-old age_days=10; row EMPTY e-old
+mkdir -p "$(wt_dir e-old)/notes"
+printf 'draft\n' > "$(wt_dir e-old)/notes/new.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 10)")" "$(wt_dir e-old)"
+rt "${E_ON[@]}" -- --force
+chk_rc E10 0
+log_has 'empty keep e-old: dirty' || note_err "untracked-only worktree not kept as dirty"
+[ -f "$(wt_dir e-old)/notes/new.md" ] || note_err "untracked file lost"
+has_branch e-old || note_err "branch deleted"
 finish_case
 
 # ── Merged-but-dirty worktree reap ────────────────────────────────────────────
@@ -1175,6 +1259,18 @@ has_ref refs/remotes/prh/1 && note_err "foreign remote ref kept"
 has_ref refs/remotes/origin/x || note_err "origin ref deleted"
 finish_case
 
+# R7b — a configured remote whose name holds a '/' keeps its refs.
+fx R7b-slash-remote
+git -C "$ENV_MAIN" remote add a/b "$CD/env/origin.git"
+git -C "$ENV_MAIN" remote | grep -qxF a/b || note_err "fixture: remote a/b not configured"
+mk_ref refs/remotes/a/b/x 1
+mk_ref refs/remotes/a/c/y 1
+rt "${R_ON[@]}" -- --force
+chk_rc R7b 0
+has_ref refs/remotes/a/b/x || note_err "ref of configured remote a/b deleted"
+has_ref refs/remotes/a/c/y && note_err "ref of unconfigured remote a/c kept"
+finish_case
+
 fx R8-age-boundary
 mk_ref refs/tmp/a 15
 mk_ref refs/tmp/b 13
@@ -1293,6 +1389,110 @@ log_has 'DRY-RUN would: write stale list \(1 rows\)' || note_err "S2 no DRY-RUN 
 rt WT_GC_STALE_LIST=0 -- --force
 [ -e "$CD/stale.tsv" ] && note_err "S3 switch off wrote the list"
 log_has 'step stale-list disabled \(WT_GC_STALE_LIST=0\)' || note_err "S3 no disabled line"
+finish_case
+
+# ── Binary resolution (lsof / gh / docker) ────────────────────────────────────
+# A launchd-style PATH: one dir of symlinks to every tool on this PATH except
+# docker, gh and lsof. The binary seams are dropped (-VAR) so the tick resolves
+# them from PATH and then WT_GC_BIN_DIRS.
+P_SYS="$ROOT/sys-nobin"
+mkdir -p "$P_SYS" "$ROOT/seam" "$ROOT/seam-empty" "$ROOT/seam-lsof"
+IFS=: read -r -a P_DIRS <<< "$PATH"
+for d in "${P_DIRS[@]}"; do
+    case "$d" in ''|"$ROOT"/*) continue ;; esac
+    for f in "$d"/*; do
+        n="${f##*/}"
+        case "$n" in docker|gh|lsof) continue ;; esac
+        if [ -x "$f" ] && [ ! -d "$f" ] && [ ! -e "$P_SYS/$n" ] && [ ! -L "$P_SYS/$n" ]; then
+            ln -s "$f" "$P_SYS/$n"
+        fi
+    done
+done
+ln -s "$STUBBIN/docker" "$ROOT/seam/docker"
+ln -s "$STUBBIN/gh-stub" "$ROOT/seam/gh"
+ln -s "$STUBBIN/lsof" "$ROOT/seam/lsof"
+ln -s "$STUBBIN/lsof" "$ROOT/seam-lsof/lsof"
+P_RES=(-WT_GC_LSOF -WT_GC_GH -WT_GC_DOCKER PATH="$P_SYS")
+# p_fixture — one candidate per binary: EMPTY worktree (lsof live-work probe),
+# old tmp_pack (lsof), dirty-merged worktree and merged backup branch (gh),
+# docker prune.
+p_fixture() {
+    mk_wt e-old e-old age_days=10; row EMPTY e-old
+    d_wt d2 match
+    mk_ref refs/heads/backup/3382-pre-rebase 1
+    epoch_ago 8 > "$CD/gh/3382.json"
+    mkdir -p "$ENV_MAIN/.git/objects/pack"
+    printf 'x' > "$ENV_MAIN/.git/objects/pack/tmp_pack_old"
+    touch -t "$(epoch_to_touch "$(epoch_ago 2)")" "$ENV_MAIN/.git/objects/pack/tmp_pack_old"
+}
+
+# P1 — found in WT_GC_BIN_DIRS under a PATH that lacks them: each is used.
+fx P1-bins-resolved
+p_fixture
+rt "${ALL_ON[@]}" "${P_RES[@]}" WT_GC_BIN_DIRS="$ROOT/seam" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc P1 0
+log_has 'not found' && note_err "a binary was reported not found"
+grep -q '^image prune' "$CD/docker-argv" 2>/dev/null || note_err "resolved docker not used"
+grep -q '^pr view' "$CD/gh-argv" 2>/dev/null || note_err "resolved gh not used"
+[ -e "$ENV_MAIN/.git/objects/pack/tmp_pack_old" ] && note_err "tmp_pack kept (resolved lsof not used)"
+log_has 'empty reaped e-old' || note_err "EMPTY worktree not reaped (resolved lsof not used)"
+log_has 'dirty reaped d2' || note_err "dirty-merged worktree not reaped"
+has_ref refs/heads/backup/3382-pre-rebase && note_err "merged backup kept"
+finish_case
+
+# P2 — absent from PATH and WT_GC_BIN_DIRS: nothing is deleted, each is named.
+fx P2-bins-missing
+p_fixture
+B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
+rt "${ALL_ON[@]}" "${P_RES[@]}" WT_GC_BIN_DIRS="$ROOT/seam-empty" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc P2 1
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+[ -e "$ENV_MAIN/.git/objects/pack/tmp_pack_old" ] || note_err "tmp_pack deleted"
+[ -e "$CD/docker-argv" ] && note_err "a docker ran"
+log_has "docker not found \(''\) — nothing pruned" || note_err "no docker-not-found line"
+log_has "dirty keep d2: probe error" || note_err "d2 not kept on the lsof probe error"
+log_has "ref keep refs/heads/backup/3382-pre-rebase: gh not found" || note_err "no gh-not-found line (refs)"
+log_has "tmp_pack keep .*tmp_pack_old: lsof not found" || note_err "no lsof-not-found line (tmp_pack)"
+log_has "live-work probe error e-old: lsof not found" || note_err "no lsof-not-found line (live work)"
+finish_case
+
+# P2b — only lsof found: the dirty-merged reap reaches its gh check and keeps.
+fx P2b-gh-missing
+d_wt d2 match
+rt WT_GC_REAP_DIRTY_MERGED=1 "${P_RES[@]}" WT_GC_BIN_DIRS="$ROOT/seam-lsof" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc P2b 1
+log_has "dirty keep d2: gh not found \(''\)" || note_err "no gh-not-found line (dirty)"
+[ -d "$(wt_dir d2)" ] || note_err "removed"
+has_branch d2 || note_err "branch deleted"
+finish_case
+
+# P3 — a binary seam set to "" means not found: never resolved, even with the
+# stubs first on PATH.
+fx P3-empty-bin-seams
+p_fixture
+B_REFS="$(refs_snapshot)"
+rt "${ALL_ON[@]}" WT_GC_DOCKER= WT_GC_GH= WT_GC_LSOF= STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc P3 1
+[ -e "$CD/docker-argv" ] && note_err "empty WT_GC_DOCKER fell back to a docker on PATH"
+[ -e "$CD/gh-argv" ] && note_err "empty WT_GC_GH fell back to a gh on PATH"
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+log_has "docker not found \(''\)" || note_err "no docker-not-found line"
+finish_case
+
+# P4 — _gc_resolve_bin: PATH wins over WT_GC_BIN_DIRS; absent prints nothing.
+begin_case P4-resolve-bin
+mkdir -p "$CD/a" "$CD/b" "$CD/none"
+printf '#!/bin/sh\n' > "$CD/a/tool"; cp "$CD/a/tool" "$CD/b/tool"; chmod +x "$CD/a/tool" "$CD/b/tool"
+P4_OUT="$(
+    # shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
+    source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
+    printf '1=%s\n' "$(PATH="$CD/none" WT_GC_BIN_DIRS="$CD/b" _gc_resolve_bin tool)"
+    printf '2=%s\n' "$(PATH="$CD/a" WT_GC_BIN_DIRS="$CD/b" _gc_resolve_bin tool)"
+    printf '3=%s\n' "$(PATH="$CD/none" WT_GC_BIN_DIRS="$CD/none" _gc_resolve_bin tool)"
+    printf '4=%s\n' "$(PATH="$CD/none" WT_GC_BIN_DIRS='' _gc_resolve_bin tool)"
+)"
+[ "$P4_OUT" = "$(printf '1=%s\n2=%s\n3=\n4=' "$CD/b/tool" "$CD/a/tool")" ] || note_err "resolver output: $P4_OUT"
 finish_case
 
 # ══════════════════════════════════════════════════════════════════════════════

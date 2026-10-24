@@ -48,8 +48,11 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
         self::assertNotFalse($path, 'simRecapQueue.php must exist at the expected path');
         $this->scriptPath = $path;
 
-        // Leave no other pending row, so claim-next can only pick the seeded one.
-        $this->db->query("DELETE FROM `ibl_sim_summaries` WHERE `status` = 'pending'");
+        // claim-next takes the lowest pending sim, so clear only the pending
+        // rows below this test's range; rows other tests seeded stay put.
+        $this->db->query(
+            "DELETE FROM `ibl_sim_summaries` WHERE `status` = 'pending' AND `sim` < " . self::SIM_PENDING
+        );
 
         // The child reads the phase on its own connection, so the phase is
         // committed here and restored in tearDown. Default to a recaps-on phase.

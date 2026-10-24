@@ -277,9 +277,10 @@ switch ($verb) {
             fail('sim number is required for this verb');
         }
         /** @var string $host */
-        $claimed = $repo->claimPending($sim, $host);
-        // Same start-line phase gate as claim-next.
+        // Same start-line phase gate as claim-next. Read the phase before the
+        // claim commits, so a read failure cannot leave a claimed sim unreported.
         $recapsEnabled = \SimRecap\RecapPhasePolicy::isEnabled($seasonQuery->getSeasonPhase());
+        $claimed = $repo->claimPending($sim, $host);
         $out = [
             'ok' => true,
             'cmd' => 'claim',

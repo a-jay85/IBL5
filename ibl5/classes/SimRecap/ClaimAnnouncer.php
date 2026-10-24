@@ -40,7 +40,11 @@ final class ClaimAnnouncer
         try {
             ($this->poster)(AdminChatStatus::message('started', $sim, [], $host));
         } catch (\Throwable $e) {
-            $this->repo->revertNotifiedState($sim, 'started', null);
+            try {
+                $this->repo->revertNotifiedState($sim, 'started', null);
+            } catch (\Throwable) {
+                // The post already failed; a failed revert must not mask that.
+            }
 
             return ['notified' => 'failed', 'error' => get_class($e)];
         }

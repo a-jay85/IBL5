@@ -285,14 +285,31 @@ check_bug_pipeline() {
     # Background job + watchdog: macOS has no GNU timeout, and a hung curl or
     # db-query must not block the verdict, stamps, and DM for every other check.
     tmp="$(mktemp)"
-    DB_QUERY_TARGET=main "$BUG_PIPELINE_CHECK_BIN" >"$tmp" 2>/dev/null &
+    # perl setpgrp gives the checker its own process group (pgid = pid), so a
+    # timeout can kill its curl/db-query children too. macOS has no setsid(1).
+    DB_QUERY_TARGET=main perl -e 'setpgrp(0, 0); exec { $ARGV[0] } @ARGV or exit 127' \
+        "$BUG_PIPELINE_CHECK_BIN" >"$tmp" 2>/dev/null &
     pid=$!
-    ( /bin/sleep "$BUG_PIPELINE_CHECK_TIMEOUT"; : > "$tmp.timeout"; kill "$pid" 2>/dev/null ) >/dev/null 2>&1 &
+    # The watchdog's sleep runs as its own child so the TERM trap can kill it;
+    # a healthy run must not leave a sleep behind for the full timeout.
+    (
+        s=
+        trap 'kill "$s" 2>/dev/null; exit 0' TERM
+        /bin/sleep "$BUG_PIPELINE_CHECK_TIMEOUT" &
+        s=$!
+        wait "$s" || exit 0
+        : > "$tmp.timeout"
+        kill -TERM -- "-$pid" 2>/dev/null
+    ) >/dev/null 2>&1 &
     wd=$!
     wait "$pid"
     rc=$?
     kill "$wd" 2>/dev/null
     wait "$wd" 2>/dev/null
+    if [ -e "$tmp.timeout" ]; then
+        # Backstop for any group member that ignored TERM.
+        kill -KILL -- "-$pid" 2>/dev/null
+    fi
     out="$(<"$tmp")"
     if [ -e "$tmp.timeout" ]; then rc=timeout; fi
     rm -f "$tmp" "$tmp.timeout"

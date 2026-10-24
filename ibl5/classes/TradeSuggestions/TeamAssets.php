@@ -64,8 +64,20 @@ final readonly class TeamAssets
             $picks[] = $pick;
         }
 
-        $removed = count($this->players) + count($inPlayers) - count($players);
-        $rosterCount = $this->rosterCount === null ? null : $this->rosterCount - $removed + count($inPlayers);
+        $rosterCount = null;
+        if ($this->rosterCount !== null) {
+            $rosterCount = $this->rosterCount;
+            foreach ($this->players as $player) {
+                if ($player->countsOnRoster && in_array($player->pid, $outPids, true)) {
+                    $rosterCount--;
+                }
+            }
+            foreach ($inPlayers as $player) {
+                if ($player->countsOnRoster) {
+                    $rosterCount++;
+                }
+            }
+        }
 
         $capRoom = $this->capRoom === null ? null : $this->capRoom + $salaryOut - $salaryIn;
 

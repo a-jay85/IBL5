@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Updater\Steps;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
+use JsbParser\DraFileParser;
+use JsbParser\HofFileParser;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -16,6 +18,10 @@ use Updater\StepResult;
  * Imports the prior season's end-of-season JSB files (.dra, .ret, .hof, .awa)
  * from that season's backup archive once its champion is recorded. Runs after
  * EndOfSeasonImportStep. IBL-only; registered inside the non-Olympics block.
+ *
+ * Each file has its own "already imported?" check against its own table, so a
+ * file missing from the archive on one night is retried on a later night.
+ * Every import is an upsert, so a re-run writes no duplicate rows.
  */
 final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 {
@@ -38,18 +44,18 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
             return StepResult::skipped($this->getLabel(), 'No champion recorded for ' . $this->priorYear);
         }
 
-        if ($this->jsbRepo->hasRetiredPlayersForYear($this->priorYear)) {
-            return StepResult::skipped($this->getLabel(), 'Prior-season imports already ran for ' . $this->priorYear);
-        }
-
         $result = new JsbImportResult();
         /** @var list<string> $messages */
         $messages = [];
 
-        $this->importDra($result, $messages);
-        $this->importRet($result, $messages);
-        $this->importHof($result, $messages);
-        $this->importAwa($result, $messages);
+        $draDone = $this->importDra($result, $messages);
+        $retDone = $this->importRet($result, $messages);
+        $hofDone = $this->importHof($result, $messages);
+        $awaDone = $this->importAwa($result, $messages);
+
+        if ($draDone && $retDone && $hofDone && $awaDone) {
+            return StepResult::skipped($this->getLabel(), 'Prior-season imports already ran for ' . $this->priorYear);
+        }
 
         return StepResult::success(
             $this->getLabel(),
@@ -60,64 +66,114 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
     }
 
     /**
+     * The .dra file holds every draft, and its newest draft year is not the
+     * prior season's year, so the check keys on the newest year in the file.
+     *
      * @param list<string> $messages
+     * @return bool True when the newest draft in the archive is already stored
      */
-    private function importDra(JsbImportResult $result, array &$messages): void
+    private function importDra(JsbImportResult $result, array &$messages): bool
     {
         $data = $this->fetchArchived('dra', $messages);
         if ($data === null) {
-            return;
+            return false;
+        }
+
+        $newestYear = self::newestYear(array_column(DraFileParser::parse($data), 'draft_year'));
+        if ($newestYear !== null && $this->jsbRepo->hasDraftResultsForYear($newestYear)) {
+            return true;
         }
 
         $draResult = $this->jsbService->processDraData($data);
         $result->merge($draResult);
         $messages[] = 'DRA: ' . $draResult->summary();
+
+        return false;
     }
 
     /**
      * @param list<string> $messages
+     * @return bool True when the prior season's retirees are already stored
      */
-    private function importRet(JsbImportResult $result, array &$messages): void
+    private function importRet(JsbImportResult $result, array &$messages): bool
     {
+        if ($this->jsbRepo->hasRetiredPlayersForYear($this->priorYear)) {
+            return true;
+        }
+
         $data = $this->fetchArchived('ret', $messages);
         if ($data === null) {
-            return;
+            return false;
         }
 
         $retResult = $this->jsbService->processRetData($data, $this->priorYear);
         $result->merge($retResult);
         $messages[] = 'RET: ' . $retResult->summary();
+
+        return false;
     }
 
     /**
+     * The .hof file holds every induction and some years have none, so the
+     * check keys on the newest induction year in the file.
+     *
      * @param list<string> $messages
+     * @return bool True when the newest induction in the archive is already stored
      */
-    private function importHof(JsbImportResult $result, array &$messages): void
+    private function importHof(JsbImportResult $result, array &$messages): bool
     {
         $data = $this->fetchArchived('hof', $messages);
         if ($data === null) {
-            return;
+            return false;
+        }
+
+        try {
+            $newestYear = self::newestYear(array_column(HofFileParser::parse($data), 'induction_year'));
+        } catch (\RuntimeException) {
+            // Unparseable: let processHofData run and report the parse error.
+            $newestYear = null;
+        }
+
+        if ($newestYear !== null && $this->jsbRepo->hasHofInducteesForYear($newestYear)) {
+            return true;
         }
 
         $hofResult = $this->jsbService->processHofData($data);
         $result->merge($hofResult);
         $messages[] = 'HOF: ' . $hofResult->summary();
+
+        return false;
     }
 
     /**
      * @param list<string> $messages
+     * @return bool True when the prior season's stat-leader awards are already stored
      */
-    private function importAwa(JsbImportResult $result, array &$messages): void
+    private function importAwa(JsbImportResult $result, array &$messages): bool
     {
+        if ($this->jsbRepo->hasStatLeaderAwardsForYear($this->priorYear)) {
+            return true;
+        }
+
         $awaData = $this->fetchArchived('awa', $messages);
         $carData = $this->fetchArchived('car', $messages);
         if ($awaData === null || $carData === null) {
-            return;
+            return false;
         }
 
         $awaResult = $this->jsbService->processAwaData($awaData, $carData, $this->priorYear);
         $result->merge($awaResult);
         $messages[] = 'AWA: ' . $awaResult->summary();
+
+        return false;
+    }
+
+    /**
+     * @param list<int> $years
+     */
+    private static function newestYear(array $years): ?int
+    {
+        return $years === [] ? null : max($years);
     }
 
     /**
@@ -134,6 +190,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
     {
         $contents = $this->priorSourceResolver->getContents($extension);
         if ($contents === null) {
+            $messages[] = strtoupper($extension) . ': not found in the ' . $this->priorYear . ' archive, will retry next run';
             return null;
         }
 

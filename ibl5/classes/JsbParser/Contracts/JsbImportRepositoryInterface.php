@@ -146,4 +146,32 @@ interface JsbImportRepositoryInterface
      * @param int $retirementYear Season ending year the retirements belong to (e.g. 2025)
      */
     public function hasRetiredPlayersForYear(int $retirementYear): bool;
+
+    /**
+     * Check if any draft pick is stored for a given draft year.
+     *
+     * Queries ibl_jsb_draft_results for any row with this draft_year.
+     *
+     * @param int $draftYear Year from the .dra "***** {year} rookie draft *****" header
+     */
+    public function hasDraftResultsForYear(int $draftYear): bool;
+
+    /**
+     * Check if any Hall of Fame inductee is stored for a given induction year.
+     *
+     * Queries ibl_jsb_hall_of_fame for any row with this induction_year.
+     *
+     * @param int $inductionYear Induction year as written in the .hof file
+     */
+    public function hasHofInducteesForYear(int $inductionYear): bool;
+
+    /**
+     * Check if the .awa stat-leader awards are stored for a season.
+     *
+     * Queries ibl_awards for "<Category> Leader (<rank>)" rows in this year.
+     * Other award rows for the year do not count.
+     *
+     * @param int $year Season ending year (e.g. 2025)
+     */
+    public function hasStatLeaderAwardsForYear(int $year): bool;
 }

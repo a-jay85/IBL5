@@ -281,6 +281,14 @@ chk "exit 3" eq "$RC" 3
 chk "REVERT-FAILED status changed" has "$OUT" "REVERT-FAILED row 1 — status changed"
 "$LIB" pending --root "$R"; PRC=$?
 chk "pending exits 0" eq "$PRC" 0
+"$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?
+chk "recover with the stray still present exits 3" eq "$RRC" 3
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending still exits 0 with the stray present" eq "$PRC" 0
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "run with the stray present exits 3" eq "$RC" 3
+"$LIB" pending --root "$R"; PRC=$?
+chk "run did not clear the journal" eq "$PRC" 0
 rm -f "$R/stray"
 "$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?
 chk "recover exits 0" eq "$RRC" 0

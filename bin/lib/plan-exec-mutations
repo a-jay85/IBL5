@@ -106,9 +106,10 @@ do_parse() {
     ' "$_plan" | while IFS= read -r row; do
         matrix_split "$row" || continue
         [ "$MC_NUM" != "#" ] || continue
-        # Phase 5.0 strips ONE leading and ONE trailing backtick before bash -c
-        # (gate V mirrors it); the default check is that same string.
-        _cmd=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+        # matrix_split already stripped ONE leading and ONE trailing backtick, the same
+        # strip Phase 5.0 applies before bash -c (gate V mirrors it). Strip nothing more:
+        # the default check is exactly that string.
+        _cmd="$MC_LOC"
         printf '%s\037%s\037%s\037%s\n' "$MC_NUM" "$MC_TYPE" "$MC_TIME" "$_cmd"
     done > "$_rows"
     python3 - "$_plan" "$_rows" "$_root" <<'PY'
@@ -288,13 +289,18 @@ with open(path, "r+b") as fh:
 PY
 }
 
-CHECK_STATUS=0
+# snap_status — save the porcelain snapshot next to the journal, atomically, so a
+# killed run never leaves a truncated one for recover to compare against.
+snap_status() {
+    git status --porcelain=v1 -z > "$JDIR/status.pre.tmp" 2>/dev/null \
+        && mv "$JDIR/status.pre.tmp" "$JDIR/status.pre"
+}
 
 # status_diff — prints nothing when the porcelain snapshot matches status.pre,
-# else the first differing entry. Returns 1 on a difference.
+# else the first differing entry. Returns 1 on a difference. recover compares too:
+# the snapshot is written before the first journal entry, so a leftover one is the
+# killed run's own and a stray file it left behind shows up as a difference.
 status_diff() {
-    # Only a run that took its own snapshot may compare; recover sees a stale one.
-    [ "$CHECK_STATUS" = 1 ] || return 0
     [ -f "$JDIR/status.pre" ] || return 0
     _now=$(mktemp "${TMPDIR:-/tmp}/pem-status.XXXXXX")
     git status --porcelain=v1 -z > "$_now" 2>/dev/null
@@ -391,8 +397,7 @@ if [ -z "$TO" ]; then
 fi
 
 mkdir -p "$JDIR" || exit 3
-git status --porcelain=v1 -z > "$JDIR/status.pre" 2>/dev/null
-CHECK_STATUS=1
+snap_status
 
 CHILD=""
 FINAL=0
@@ -434,7 +439,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     fi
     # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
     # mutation side effect, so the revert check must compare against the tree as it stands here.
-    git status --porcelain=v1 -z > "$JDIR/status.pre" 2>/dev/null
+    snap_status
     n=$(lit count "$file" "$match" "$replace") || n="?"
     if [ "$n" != 1 ]; then
         printf 'NOT-APPLIED row %s — match occurs %s times in %s (need exactly 1)\n' "$row" "$n" "$file"

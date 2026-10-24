@@ -18,14 +18,14 @@ from .state import HarnessError
 JOURNAL_DIRNAME = "exec-mutations"
 DEFAULT_LIB = Path(__file__).resolve().parents[3] / "bin" / "lib" / "plan-exec-mutations"
 RESULT_RE = re.compile(
-    r"^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row (\d+) — (.*)$"
+    r"^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ([0-9A-Za-z_-]+) — (.*)$"
 )
 NO_TIMEOUT_PREFIX = "NO-TIMEOUT"
 
 
 @dataclass(frozen=True)
 class MutationResult:
-    row: int
+    row: int | str  # plain digits parse to int; a suffix id such as "12-neg" stays a str
     kind: str
     detail: str
 
@@ -91,7 +91,8 @@ def run_executable_mutations(plan: Path, cwd: Path, *, lib: Path = DEFAULT_LIB,
     for line in proc.stdout.splitlines():
         m = RESULT_RE.match(line)
         if m:
-            res = MutationResult(int(m.group(2)), m.group(1), m.group(3))
+            res = MutationResult(int(m.group(2)) if m.group(2).isdigit() else m.group(2),
+                                m.group(1), m.group(3))
             results.append(res)
             if res.kind != "TRIPPED":
                 holding.append(f"row {res.row} {res.kind} — {res.detail}")

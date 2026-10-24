@@ -68,7 +68,7 @@ def classify_body(body: str, flagged_keys: Optional[Sequence[str]] = None) -> li
         bullet_keys.append(key)
         if not is_substantive(reason):
             out.append(f"removed-guards:UNJUSTIFIED:{key}")
-    if nb == 0:
+    if nb == 0 and ne == 0:
         return [f"removed-guards:UNLISTED:{k}" for k in keys]
     if nb != 1 or ne != 1 or order_bad or nbul == 0 or bad:
         return ["removed-guards:MALFORMED"]

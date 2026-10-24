@@ -328,10 +328,6 @@ if [ "${1:-}" = "--print-critical-files" ]; then
     shift
 fi
 
-# --draft: run ONLY gate [D] (phase-count drift) against an in-progress
-# sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
-# (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
-# [T], [S], [K] — would all fire spuriously; draft mode never reaches them.
 # --require-must-preserve: gate [MP] fails an absent `## Must preserve`
 # section. Only the authoring paths (bin/plan-now, plan SKILL.md Step 5) pass
 # it; plain runs lint the section only when present (the grandfather rule).
@@ -340,6 +336,10 @@ case "${1:-}" in
     --require-must-preserve) REQUIRE_MP=1; shift ;;
     --require-must-preserve=*) usage; exit 2 ;;
 esac
+# --draft: run ONLY gate [D] (phase-count drift) against an in-progress
+# sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
+# (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
+# [T], [S], [K] — would all fire spuriously; draft mode never reaches them.
 DRAFT_MODE=0
 if [ "${1:-}" = "--draft" ]; then
     DRAFT_MODE=1

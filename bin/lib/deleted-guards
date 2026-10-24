@@ -27,7 +27,9 @@
 # INTENDED). Stdlib only, so it runs under a launchd-like empty environment.
 
 import hashlib
+import os
 import re
+import subprocess
 import sys
 
 USAGE = (
@@ -97,6 +99,21 @@ def normalize(line):
     return re.sub(r"\s+", " ", line).strip()
 
 
+_REPO_ROOT = []
+
+
+def _repo_path(path):
+    """Resolve a diff path against the repo root; callers do not cd there."""
+    if not _REPO_ROOT:
+        try:
+            out = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                                 capture_output=True, text=True, check=True)
+            _REPO_ROOT.append(out.stdout.strip())
+        except (OSError, subprocess.CalledProcessError):
+            _REPO_ROOT.append("")
+    return os.path.join(_REPO_ROOT[0], path) if _REPO_ROOT[0] else path
+
+
 def language(path, first_line=None):
     if path.endswith(".php"):
         return "php"
@@ -109,7 +126,7 @@ def language(path, first_line=None):
         first = first_line
         if first is None:
             try:
-                with open(path, encoding="utf-8", errors="replace") as fh:
+                with open(_repo_path(path), encoding="utf-8", errors="replace") as fh:
                     first = fh.readline()
             except OSError:
                 # Type unknown (deleted file, different cwd): match every

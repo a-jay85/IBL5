@@ -181,5 +181,15 @@
       "try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ],
     "expected": []
+  },
+  {
+    "name": "end-marker-only-malformed",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:MALFORMED"
+    ]
   }
 ]

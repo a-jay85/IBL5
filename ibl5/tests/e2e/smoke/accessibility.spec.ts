@@ -190,6 +190,27 @@ publicTest.describe('Public page accessibility', () => {
   }
 });
 
+// --- Season archive detail heading structure ---
+// SeasonDetailView (modules.php?name=SeasonArchive&year=N) stays out of publicPages on purpose.
+// Its team-color cells carry the same DB-configured contrast debt as 'season archive', and a
+// publicPages entry would also join the 375px target-size loop below. This row pins only the
+// heading outline: h1 page title, h2 section headings, h3 roster sub-headings.
+publicTest.describe('Season archive detail heading structure', () => {
+  publicTest.beforeEach(async ({ appState }) => {
+    await appState({ 'Trivia Mode': 'Off', 'Current Season Ending Year': '2026' });
+  });
+
+  publicTest('season archive detail has no heading-order violations', async ({ page }) => {
+    const url = 'modules.php?name=SeasonArchive&year=2026';
+    await gotoWithRetry(page, url);
+    // Guard against a vacuous pass on an empty render (nonexistent-year path renders no sections).
+    await expect(page.locator('.season-archive-section').first()).toBeVisible();
+    await assertNoA11yViolations(page, `heading structure on ${url}`, {
+      onlyRules: ['heading-order', 'page-has-heading-one'],
+    });
+  });
+});
+
 // --- Sign-in divider contrast ---
 // axe skips punctuation-only text, so the "|" in <span class="auth-links__divider">
 // (LoginView) is never contrast-checked by the 'sign in' row above. Compute the WCAG

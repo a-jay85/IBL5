@@ -1021,7 +1021,7 @@ def test_reviewed_tree_invalidated_by_re_rebase(tmp_path, monkeypatch):
         return ArmInputs(
             pr_body="## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n",
             pr_title="chore: x", pr_labels=[], classification=Classification(),
-            findings=[], unresolved_conformance=[], phase5_status="pass",
+            findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False, phase5_status="pass",
             plan_auto_merge_false=False, headless=True,
             dep_state_lookup=lambda n: "MERGED", fidelity_verdict="NOT READY",
             fidelity_verdict_2="READY", fidelity_tree_2=tree2,

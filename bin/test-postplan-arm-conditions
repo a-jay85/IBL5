@@ -1623,6 +1623,48 @@ else
     expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
 fi
 
+# --- condition (19) exec-mutations: behavioral cases ---------------------------
+# The block reads /tmp/post-plan-exec-mutations-$PPID and the -done- marker, and asks
+# bin/lib/plan-exec-mutations whether a journal is pending in the repo it runs in. The
+# prelude runs in the same bash -c as the block, so its $PPID is the block's $PPID.
+# arg1 = marker (yes|no), arg2 = bridge (empty|items), arg3 = journal (pending|clean).
+B19="$(extract_block '# condition (19)')"
+run_cond19() {
+    local c19="$BASE_TMP/c19"
+    rm -rf "$c19"
+    mkdir -p "$c19/bin/lib"
+    git -C "$c19" init -q
+    ln -s "$REPO_ROOT/bin/lib/plan-exec-mutations" "$c19/bin/lib/plan-exec-mutations"
+    if [ "$3" = "pending" ]; then
+        mkdir -p "$c19/.git/exec-mutations"
+        : > "$c19/.git/exec-mutations/1.meta"
+    fi
+    printf '{"number":2100,"body":"## Summary"}' > "$BASE_TMP/fixture.json"
+    ( cd "$c19" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_EDIT_RECORD="$BASE_TMP/c19-edit-record" MARK="$1" BRIDGE="$2" \
+        bash -c 'rm -f "/tmp/post-plan-exec-mutations-$PPID" "/tmp/post-plan-exec-mutations-done-$PPID"
+[ "$MARK" = "yes" ] && touch "/tmp/post-plan-exec-mutations-done-$PPID"
+[ "$BRIDGE" = "items" ] && echo "EXEC-MUTATION: HELD row 1" > "/tmp/post-plan-exec-mutations-$PPID"
+'"$B19"'
+rm -f "/tmp/post-plan-exec-mutations-$PPID" "/tmp/post-plan-exec-mutations-done-$PPID"' 2>&1 )
+}
+
+if [ -z "$B19" ]; then
+    echo "FAIL: no block matching '# condition (19)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(19) no done-marker -> BLOCK (step did not run)" BLOCK \
+        "$(run_cond19 no empty clean)"
+    out="$(run_cond19 yes items clean)"
+    expect_block "(19) marker + bridge item -> BLOCK" BLOCK "$out"
+    expect_c18_text "(19) bridge item is named in the hold" "$out" "EXEC-MUTATION: HELD row 1"
+    expect_block "(19) marker + empty bridge + no journal -> NONE" NONE \
+        "$(run_cond19 yes empty clean)"
+    out="$(run_cond19 yes empty pending)"
+    expect_block "(19) pending journal -> BLOCK (fail-closed)" BLOCK "$out"
+    expect_c18_text "(19) pending journal names the cause" "$out" "journal pending"
+fi
+
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
 # The 5.0d block regenerates /tmp/post-plan-changed-$PPID from
 # `git diff --name-only origin/master...HEAD` when the list is absent. Nothing
@@ -3721,8 +3763,9 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
-have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
+have "§5.9k: SKILL.md counts nineteen conditions"        "$P25_TXT" '**All nineteen conditions**'
+have "§5.9k: the run-only enumeration ends /(14)/(19)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)/(19)'
+have "§5.9k: SKILL list carries the (19) entry"         "$P25_TXT" '**(19)'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
 # Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
@@ -3754,11 +3797,12 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All nineteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
 have  "§5.9l: reference doc has a (15) entry"               "$ARM_TXT" '**(15)'
+have  "§5.9l: reference doc has a # condition (19) block"   "$ARM_TXT" '# condition (19)'
 have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
 lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
 

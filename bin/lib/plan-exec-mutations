@@ -1,0 +1,472 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-exec-mutations — the ONE owner of the `## Executable Mutations`
+# plan grammar (ADR-0199). bin/check-plan gate [XM], the /post-plan skill-path
+# Phase 5.0 block and the compiled harness (harness/mutations.py) all shell out
+# to this script; nothing else parses the form.
+#
+# Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>
+#        bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] <plan>
+#        bin/lib/plan-exec-mutations recover [--root DIR]
+#        bin/lib/plan-exec-mutations pending [--root DIR]
+# ---
+# parse   exit 0 = ok, one record per entry on stdout (nothing when the plan
+#         carries no section); exit 1 = exactly one violation line on stdout;
+#         exit 2 = usage / unreadable plan.
+#         Record: row NUL file NUL check NUL match NUL replace LF.
+# run     baseline, apply, check, revert, verify each entry in order.
+#         exit 0 = every entry TRIPPED (or none); 1 = any HELD,
+#         BASELINE-FAILED, NOT-APPLIED, UNDECIDED (or a parse violation,
+#         or NO-TIMEOUT); 3 = REVERT-FAILED (journal retained).
+# recover restore every journalled entry; exit 0 when the journal is empty
+#         afterwards, 3 otherwise.
+# pending exit 0 when any journal entry exists, 1 otherwise.
+# ---
+# The journal lives at $(git rev-parse --absolute-git-dir)/exec-mutations/:
+# per-worktree and outside the porcelain view.
+
+set -u
+export LC_ALL=C
+
+SELF="${BASH_SOURCE[0]}"
+
+usage() {
+    echo "Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>" >&2
+    echo "       bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] <plan>" >&2
+    echo "       bin/lib/plan-exec-mutations recover [--root DIR]" >&2
+    echo "       bin/lib/plan-exec-mutations pending [--root DIR]" >&2
+    exit 2
+}
+
+MODE="${1:-}"
+case "$MODE" in
+    parse|run|recover|pending) shift ;;
+    *) echo "plan-exec-mutations: unknown subcommand '${MODE}'" >&2; usage ;;
+esac
+
+ROOT=""
+SEC=30
+PLAN=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root) [ $# -ge 2 ] || usage; ROOT="$2"; shift 2 ;;
+        --timeout)
+            [ $# -ge 2 ] || usage
+            case "$2" in ''|*[!0-9]*) usage ;; esac
+            SEC="$2"; shift 2 ;;
+        -*) echo "plan-exec-mutations: unknown flag '$1'" >&2; usage ;;
+        *) [ -z "$PLAN" ] || usage; PLAN="$1"; shift ;;
+    esac
+done
+
+case "$MODE" in
+    parse|run) [ -n "$PLAN" ] && [ -r "$PLAN" ] || usage ;;
+    *) [ -z "$PLAN" ] || usage ;;
+esac
+
+TO=""
+
+MSEN=$'\001'
+mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
+
+# mirrors bin/check-plan matrix_split()
+matrix_split() {
+    case "$1" in
+        *[!\ \|:-]*) : ;;
+        *) return 1 ;;              # separator / all-dashes row
+    esac
+    _r="${1//\\|/$MSEN}"
+    IFS='|' read -r _lead MC_NUM MC_WHAT MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
+    MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
+    MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
+    MC_WHAT=$(mtrim "$MC_WHAT")
+    MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
+    case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
+    [ -n "$MC_LOC" ] || return 1
+    return 0
+}
+
+# do_parse <plan> [root] — writes records to stdout, returns the parse rc.
+do_parse() {
+    _plan="$1"; _root="${2:-}"
+    _rows=$(mktemp "${TMPDIR:-/tmp}/pem-rows.XXXXXX") || return 2
+    awk '
+        # Width-aware fence tracking: rows inside a fenced example are illustration.
+        match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
+            f = substr($0, RSTART, RLENGTH); gsub(/^[[:space:]]+/, "", f)
+            if (!fence) { fence = f; next }
+            if (substr(f, 1, 1) == substr(fence, 1, 1) && length(f) >= length(fence)) { fence = "" }
+            next
+        }
+        fence { next }
+        /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
+        inm && /^[[:space:]]*\|/ { print; next }
+        inm && !/^[[:space:]]*\|/ { inm=0 }
+    ' "$_plan" | while IFS= read -r row; do
+        matrix_split "$row" || continue
+        [ "$MC_NUM" != "#" ] || continue
+        # matrix_split already stripped ONE leading and ONE trailing backtick, the same
+        # strip Phase 5.0 applies before bash -c (gate V mirrors it). Strip nothing more:
+        # the default check is exactly that string.
+        _cmd="$MC_LOC"
+        printf '%s\037%s\037%s\037%s\n' "$MC_NUM" "$MC_TYPE" "$MC_TIME" "$_cmd"
+    done > "$_rows"
+    python3 - "$_plan" "$_rows" "$_root" <<'PY'
+import os, re, sys
+
+plan, rows_path, root = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def fail(msg):
+    sys.stdout.write("plan-exec-mutations: " + msg + "\n")
+    sys.exit(1)
+
+rows = {}
+with open(rows_path, "rb") as fh:
+    for raw in fh.read().split(b"\n"):
+        if not raw:
+            continue
+        parts = raw.split(b"\x1f")
+        if len(parts) != 4:
+            continue
+        rows.setdefault(parts[0].decode("utf-8", "surrogateescape"), parts)
+
+with open(plan, "rb") as fh:
+    lines = fh.read().split(b"\n")
+
+FENCE = re.compile(rb"^ {0,3}(`{3,}|~{3,})(.*)$")
+KEYS = (b"row", b"file", b"check", b"match", b"replace")
+REQUIRED = (b"row", b"file", b"match", b"replace")
+
+in_section = False
+in_crit = False
+crit_tokens = set()
+fence = None          # opening fence string of a non-mutation fence
+entry = None          # dict being built inside a mutation fence
+entries = []
+for lineno, line in enumerate(lines, 1):
+    if entry is not None:
+        stripped = line.rstrip(b" \t\r")
+        if stripped == b"```":
+            entries.append((entry_line, entry))
+            entry = None
+            continue
+        if not line.strip():
+            continue
+        m = re.match(rb"^([A-Za-z_-]+):(?: (.*))?$", line)
+        if not m:
+            fail("line %d: malformed mutation line (expected 'key: value')" % lineno)
+        key, val = m.group(1), m.group(2) or b""
+        if key not in KEYS:
+            fail("line %d: unknown key '%s'" % (lineno, key.decode("utf-8", "replace")))
+        if key in entry:
+            fail("line %d: duplicate key '%s'" % (lineno, key.decode()))
+        if key not in (b"match", b"replace"):
+            val = val.strip()
+        entry[key] = val
+        continue
+    if fence is not None:
+        m = FENCE.match(line)
+        if m and not m.group(2).strip() and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+            fence = None
+        continue
+    m = FENCE.match(line)
+    if m:
+        info = m.group(2).strip()
+        if m.group(1) == b"```" and info == b"mutation":
+            if not in_section:
+                fail("line %d: mutation fence outside the ## Executable Mutations section" % lineno)
+            entry, entry_line = {}, lineno
+            continue
+        fence = m.group(1)
+        continue
+    if line.startswith(b"## "):
+        title = line[3:].strip()
+        in_section = title == b"Executable Mutations"
+        in_crit = title == b"Critical Files"
+        continue
+    if in_crit:
+        for tok in re.findall(rb"`([^`]+)`", line):
+            crit_tokens.add(tok.strip())
+
+if entry is not None:
+    fail("line %d: unterminated mutation fence" % entry_line)
+
+seen = set()
+out = []
+for lineno, e in entries:
+    for k in REQUIRED:
+        if k not in e:
+            fail("line %d: missing key '%s'" % (lineno, k.decode()))
+    row = e[b"row"].decode("utf-8", "surrogateescape")
+    if not re.fullmatch(r"[0-9]+(-[A-Za-z0-9]+)*", row):
+        fail("line %d: row '%s' is not a matrix row id (digits, optional -suffix)" % (lineno, row))
+    if row in seen:
+        fail("line %d: duplicate mutation block for row %s" % (lineno, row))
+    seen.add(row)
+    r = rows.get(row)
+    if r is None:
+        fail("line %d: row %s is not in the Verification Matrix" % (lineno, row))
+    rtype, rtime = r[1].lower(), r[2].lower()
+    if not re.search(rb"cli[- ]executable", rtype) or not rtime.startswith(b"post-impl"):
+        fail("line %d: row %s is not a post-impl CLI-executable row" % (lineno, row))
+    path = e[b"file"]
+    if not path:
+        fail("line %d: row %s has an empty file" % (lineno, row))
+    if path.startswith(b"/"):
+        fail("line %d: row %s file must be repo-relative, not absolute" % (lineno, row))
+    if b".." in path.split(b"/"):
+        fail("line %d: row %s file must not contain a '..' segment" % (lineno, row))
+    if b".git" in os.path.normpath(path).split(b"/"):
+        fail("line %d: row %s file must not be under .git/" % (lineno, row))
+    if not e[b"match"]:
+        fail("line %d: row %s has an empty match" % (lineno, row))
+    if e[b"match"] == e[b"replace"]:
+        fail("line %d: row %s match equals replace" % (lineno, row))
+    if root:
+        full = os.path.join(os.fsencode(root), path)
+        if os.path.islink(full):
+            fail("line %d: row %s file is a symlink" % (lineno, row))
+        if os.path.isfile(full):
+            real_root = os.path.realpath(os.fsencode(root))
+            if not os.path.realpath(full).startswith(real_root + b"/"):
+                fail("line %d: row %s file resolves outside the root" % (lineno, row))
+        elif path not in crit_tokens:
+            fail("line %d: row %s file is neither a regular file under the root nor listed in Critical Files" % (lineno, row))
+    check = e.get(b"check") or r[3]
+    if not check:
+        fail("line %d: row %s has no check command" % (lineno, row))
+    out.append(b"\0".join([e[b"row"], path, check, e[b"match"], e[b"replace"]]) + b"\n")
+
+sys.stdout.buffer.write(b"".join(out))
+PY
+    _rc=$?
+    rm -f "$_rows"
+    return $_rc
+}
+
+if [ "$MODE" = parse ]; then
+    do_parse "$PLAN" "$ROOT"
+    exit $?
+fi
+
+# --- executor modes --------------------------------------------------------
+
+[ -n "$ROOT" ] || ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || usage
+if [ -n "$PLAN" ]; then
+    # Resolve before the cd: a relative plan path would point at the wrong file.
+    case "$PLAN" in
+        /*) : ;;
+        *) PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")" ;;
+    esac
+fi
+case "$ROOT" in
+    /*) : ;;
+    *) ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || usage ;;
+esac
+cd "$ROOT" || usage
+GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null) || usage
+JDIR="$GITDIR/exec-mutations"
+
+sha256() {
+    python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1" 2>/dev/null
+}
+
+# lit <count|apply> <file> <match> <replace> — literals arrive as argv bytes.
+lit() {
+    python3 - "$@" <<'PY'
+import os, sys
+mode, path = sys.argv[1], sys.argv[2]
+m, r = os.fsencode(sys.argv[3]), os.fsencode(sys.argv[4])
+with open(path, "rb") as fh:
+    data = fh.read()
+if mode == "count":
+    print(data.count(m))
+    sys.exit(0)
+with open(path, "r+b") as fh:
+    fh.write(data.replace(m, r, 1))
+    fh.truncate()
+PY
+}
+
+# snap_status — save the porcelain snapshot next to the journal, atomically, so a
+# killed run never leaves a truncated one for recover to compare against.
+snap_status() {
+    git status --porcelain=v1 -z > "$JDIR/status.pre.tmp" 2>/dev/null \
+        && mv "$JDIR/status.pre.tmp" "$JDIR/status.pre"
+}
+
+# status_diff — prints nothing when the porcelain snapshot matches status.pre,
+# else the first differing entry. Returns 1 on a difference. recover compares too:
+# the snapshot is written before the first journal entry, so a leftover one is the
+# killed run's own and a stray file it left behind shows up as a difference.
+status_diff() {
+    [ -f "$JDIR/status.pre" ] || return 0
+    _now=$(mktemp "${TMPDIR:-/tmp}/pem-status.XXXXXX")
+    git status --porcelain=v1 -z > "$_now" 2>/dev/null
+    if cmp -s "$_now" "$JDIR/status.pre"; then
+        rm -f "$_now"; return 0
+    fi
+    python3 - "$JDIR/status.pre" "$_now" <<'PY'
+import sys
+a = open(sys.argv[1], "rb").read().split(b"\0")
+b = open(sys.argv[2], "rb").read().split(b"\0")
+diff = sorted(set(a) ^ set(b))
+print((diff[0] if diff else b"(order)").decode("utf-8", "replace"))
+PY
+    rm -f "$_now"
+    return 1
+}
+
+# restore_entry <meta> — restore from .orig, verify; prints the failure reason.
+restore_entry() {
+    _meta="$1"; _orig="${_meta%.meta}.orig"
+    _path=$(sed -n 's/^path=//p' "$_meta")
+    _want=$(sed -n 's/^sha256-before=//p' "$_meta")
+    if [ -z "$_path" ] || [ ! -f "$_orig" ]; then
+        echo "journal entry incomplete"; return 1
+    fi
+    cat "$_orig" > "$_path" || { echo "restore write failed"; return 1; }
+    if [ "$(sha256 "$_path")" != "$_want" ]; then
+        echo "sha mismatch"; return 1
+    fi
+    if ! _d=$(status_diff); then
+        echo "status changed: $_d"; return 1
+    fi
+    rm -f "$_orig" "$_meta"
+    return 0
+}
+
+journal_empty() {
+    for _m in "$JDIR"/*.meta; do [ -e "$_m" ] && return 1; done
+    return 0
+}
+
+do_recover() {
+    [ -d "$JDIR" ] || return 0
+    for _m in "$JDIR"/*.meta; do
+        [ -e "$_m" ] || continue
+        _p=$(sed -n 's/^path=//p' "$_m")
+        if _why=$(restore_entry "$_m"); then
+            echo "RECOVERED $_p"
+        else
+            echo "REVERT-FAILED $_p — $_why"
+        fi
+    done
+    if journal_empty; then
+        rm -f "$JDIR/status.pre" "$JDIR"/*.orig
+        return 0
+    fi
+    return 3
+}
+
+if [ "$MODE" = pending ]; then
+    [ -d "$JDIR" ] && ! journal_empty && exit 0
+    exit 1
+fi
+
+if [ "$MODE" = recover ]; then
+    do_recover
+    exit $?
+fi
+
+# --- run --------------------------------------------------------------------
+
+do_recover || exit 3
+
+RECS=$(mktemp "${TMPDIR:-/tmp}/pem-recs.XXXXXX") || exit 2
+do_parse "$PLAN" "$ROOT" > "$RECS"
+PRC=$?
+if [ "$PRC" -ne 0 ]; then
+    echo "PARSE-FAILED — $(head -1 "$RECS")"
+    rm -f "$RECS"
+    exit 1
+fi
+if [ ! -s "$RECS" ]; then
+    rm -f "$RECS"
+    exit 0
+fi
+
+# Fail closed before anything mutates the tree: a plan with entries needs a
+# timeout binary. A plan with no section never reaches here.
+TO=$(command -v gtimeout || command -v timeout) || TO=""
+if [ -z "$TO" ]; then
+    echo "NO-TIMEOUT — neither gtimeout nor timeout is on PATH; no mutation applied"
+    rm -f "$RECS"
+    exit 1
+fi
+
+mkdir -p "$JDIR" || exit 3
+snap_status
+
+CHILD=""
+FINAL=0
+revert_pending() {
+    trap - EXIT INT TERM HUP
+    if [ -n "$CHILD" ]; then
+        kill -TERM "$CHILD" 2>/dev/null
+        wait "$CHILD" 2>/dev/null
+        CHILD=""
+    fi
+    do_recover >/dev/null || FINAL=3
+    journal_empty && rm -f "$JDIR/status.pre"
+    rm -f "$RECS"
+}
+on_signal() { revert_pending; [ "$FINAL" -ne 3 ] || exit 3; exit "$1"; }
+trap 'revert_pending; exit $FINAL' EXIT
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
+trap 'on_signal 129' HUP
+
+# run_check <cmd> — backgrounded so a signal interrupts the wait.
+run_check() {
+    "$TO" "$SEC" bash -c "$1" </dev/null >/dev/null 2>&1 &
+    CHILD=$!
+    wait "$CHILD"
+    _crc=$?
+    CHILD=""
+    return $_crc
+}
+
+exec 3< "$RECS"
+while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
+    && IFS= read -r -d '' check <&3 && IFS= read -r -d '' match <&3 \
+    && IFS= read -r replace <&3; do
+    run_check "$check"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf 'BASELINE-FAILED row %s — %s exited %s before mutation\n' "$row" "$check" "$rc"
+        FINAL=1; continue
+    fi
+    # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
+    # mutation side effect, so the revert check must compare against the tree as it stands here.
+    snap_status
+    n=$(lit count "$file" "$match" "$replace") || n="?"
+    if [ "$n" != 1 ]; then
+        printf 'NOT-APPLIED row %s — match occurs %s times in %s (need exactly 1)\n' "$row" "$n" "$file"
+        FINAL=1; continue
+    fi
+    cp -p "$file" "$JDIR/$row.orig" || { FINAL=3; exit 3; }
+    printf 'path=%s\nsha256-before=%s\n' "$file" "$(sha256 "$file")" > "$JDIR/$row.meta.tmp"
+    mv "$JDIR/$row.meta.tmp" "$JDIR/$row.meta" || { FINAL=3; exit 3; }
+    lit apply "$file" "$match" "$replace"
+    run_check "$check"; rc=$?
+    if [ "$rc" -eq 0 ]; then
+        printf 'HELD row %s — %s still exited 0 under mutation\n' "$row" "$check"
+        FINAL=1
+    elif [ "$rc" -eq 124 ]; then
+        printf 'UNDECIDED row %s — %s timed out (124) under mutation\n' "$row" "$check"
+        FINAL=1
+    else
+        printf 'TRIPPED row %s — %s exited %s under mutation\n' "$row" "$check" "$rc"
+    fi
+    if ! why=$(restore_entry "$JDIR/$row.meta"); then
+        printf 'REVERT-FAILED row %s — %s\n' "$row" "$why"
+        FINAL=3
+        trap - EXIT INT TERM HUP
+        rm -f "$RECS"
+        exit 3
+    fi
+done
+exec 3<&-
+rm -f "$JDIR/status.pre"
+exit "$FINAL"

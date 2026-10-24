@@ -1,7 +1,7 @@
-"""Phase 6.5 — the seventeen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the nineteen ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..17} with no gaps: condition (11) shells out to
+now {1..19} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
 probes for already-red CI checks at arm time, condition (16) checks the
@@ -188,6 +188,10 @@ class ArmInputs:
     plan_auto_merge_false: bool
     headless: bool
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
+    # Condition (19) — executable mutation claims (ADR-0199); first defaulted fields, since
+    # a dataclass cannot default a field ahead of the required ones above. None = the step did not run (holds).
+    exec_mutations_holding: Optional[tuple[str, ...]] = None
+    exec_mutations_tree_suspect: bool = True
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
@@ -482,5 +486,17 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     md_retried = " after 1 retry" if md == "MISSING" and "merge-danger" in inp.retried_stages else ""
     cs.append(ConditionResult(18, "merge-danger", md_blocked,
                               f"state={md}{md_retried}" if md_blocked else ""))
+
+    # condition (19) — executable mutations: every claimed mutation tripped its check and
+    # the tree was verified byte-identical afterwards. Run-local, fail-closed, additive.
+    xm = inp.exec_mutations_holding
+    xm_blocked = xm is None or bool(xm) or inp.exec_mutations_tree_suspect
+    if xm is None:
+        xm_reason = "executable-mutation step did not run"
+    else:
+        parts = (["tree not verified clean after mutation"] if inp.exec_mutations_tree_suspect
+                 else []) + list(xm)
+        xm_reason = "; ".join(parts)[:300]
+    cs.append(ConditionResult(19, "exec-mutations", xm_blocked, xm_reason if xm_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

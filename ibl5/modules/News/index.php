@@ -23,7 +23,7 @@ if (!defined('INDEX_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1, $bgcolor2;
+global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1, $bgcolor2, $leagueContext;
 assert($mysqli_db instanceof \mysqli);
 assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
 
@@ -49,6 +49,11 @@ $controller = new \Topics\News\NewsController(
     new \LastSimRecap\LastSimRecapView(),
     new \Topics\News\NewsService($mysqli_db),
     new \Topics\News\NewsView(),
+    onThisDayService: \OnThisDay\OnThisDayFactory::createService(
+        $mysqli_db,
+        $leagueContext instanceof \League\LeagueContext ? $leagueContext : null,
+    ),
+    onThisDayView: new \OnThisDay\OnThisDayView(),
 );
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().

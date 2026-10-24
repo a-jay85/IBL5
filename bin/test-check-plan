@@ -3175,6 +3175,19 @@ assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
 '
 # Seam unset: real repo, a valid plan with corrected forms passes.
 unset CHECK_PLAN_MT_GIT_ROOT
+# Drift guard: _mt_blank_clauses in bin/check-plan is a hand copy of the Mutation-clause
+# loop in bin/lib/plan-matrix-assertions. Compare the two loops line by line, leading
+# whitespace ignored, from the label match through the cut that advances `rest`.
+MT_LOOP_AWK='on && !/^[ \t]*chk = ""; rest/ { sub(/^[ \t]+/, ""); print } /chk = ""; rest = / { on = 1 } on && /rest = substr\(body, stop \+ 1\)/ { exit }'
+MT_LOOP_CP="$(awk "$MT_LOOP_AWK" "$GUARD")"
+MT_LOOP_HELPER="$(awk "$MT_LOOP_AWK" "$SCRIPT_DIR/lib/plan-matrix-assertions")"
+if [ -z "$MT_LOOP_CP" ] || [ -z "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "could not extract the Mutation-clause loop from both files"
+elif [ "$MT_LOOP_CP" != "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "_mt_blank_clauses in bin/check-plan differs from the loop in bin/lib/plan-matrix-assertions"
+else
+    h_pass "gateMT-blanker-loop-parity"
+fi
 assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 | 1 | `mt-orphan-stem` absent and `ibl5/tests/e2e/auth-pages-extended.spec.ts` green | PHPUnit | post-impl | `tests/XTest.php` |
 '"$YROW"'

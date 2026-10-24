@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # Post-Plan Orchestrator
@@ -206,6 +206,8 @@ fi
    > Run the same one-shot `bin/check-digest-prose` voice check on this paragraph and rewrite once on a violation.
 
    > **Declared scope and plan gaps:** when `PLAN_FOUND != none`, run the Phase 5.0 scope helper before writing the body, with an empty body argument: `git diff --name-only origin/master...HEAD > /tmp/post-plan-scope-changed-$PPID; git diff --name-status --diff-filter=A origin/master...HEAD | cut -f2- > /tmp/post-plan-scope-added-$PPID; bin/lib/plan-scope-conformance "$PLAN_FILE" /tmp/post-plan-scope-changed-$PPID "" /tmp/post-plan-scope-added-$PPID; rm -f /tmp/post-plan-scope-changed-$PPID /tmp/post-plan-scope-added-$PPID`. The helper re-reads the changed list once per Critical File, so it needs real files; a process substitution can be read only once. For each `UNPLANNED-FILE:` or `SCOPE-NOTE: unplanned` path that is an intended change, write a bullet under a `## Declared scope` heading: the path plus a one-line reason. Revert an accidental edit instead of declaring it. For each `SCOPE-NOTE: gap` path, write a bullet under a `## Plan gaps` heading: the path plus why the diff lacks it (cut from scope, or already shipped before the branch was cut, with the PR number). The helper strips every generated marker span before it reads a section, so a bullet inside a marker pair clears nothing. Emit neither heading when it would have zero bullets. Format: `.claude/skills/post-plan/_pr-body-claims.md`.
+
+   > **Removed guards:** write the diff to a temp file with `git diff origin/master...HEAD > /tmp/post-plan-rg-diff-$PPID`, then run `bin/lib/deleted-guards --diff /tmp/post-plan-rg-diff-$PPID --plan "$PLAN_FILE"` (omit `--plan` when `PLAN_FOUND = none`) and `rm -f` the file. A failing `git diff` is a Phase 2 failure: report it, skip the block, and continue (condition (19) holds on it). A process substitution would hide that failure and read as "no removals". When it prints `REMOVED-GUARD` lines, render the block from `_pr-body-claims.md` § Removed guards rule beside `## Declared scope` / `## Plan gaps`, one bullet per key. Take each Reason from the reasons file and write the placeholder where none exists. Exit 2 is a Phase 2 failure; report it and continue (condition (19) holds on it). The harness engine renders the same block through `_inject_removed_guards` in `runner.py`.
 
    > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/retrospective-class-registry.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the diff shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
    >
@@ -564,7 +566,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All eighteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All nineteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing is cleared. The PR body carries the `No manual testing needed` sentinel. The skill writes it in Phase 6 step 4; the compiled harness writes `MANUAL_TESTING_SENTINEL_TICKED` in Phase 6.7 once every row it ticked is confirmed on a fresh read. A `## After merge` section, written for plan rows tagged `post-merge:`, sits outside the window `pr_manual_testing_clearance` scans; it neither holds nor clears this condition, and an unchecked row inside `## Manual Testing` still holds it.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -584,6 +586,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 16. **Meta checks.** The local meta checks passed pre-push and post-PR.
 17. **Gate backtest.** A changed ship-pipeline gate flags fewer than 2 clean merged PRs in the Gate backtest block; HELD or UNKNOWN holds.
 18. **Merge danger door.** The body's `**Merge danger:**` line reads `Door: two-way`; one-way, missing, malformed, or unreadable holds.
+19. **Removed guards.** Every guard removal `bin/lib/deleted-guards` flags on the realized diff, net of the plan's `### Intended removals`, has a body bullet with a substantive Reason; an unlisted, unjustified, or malformed entry, a detector error, or an unreadable body holds.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 

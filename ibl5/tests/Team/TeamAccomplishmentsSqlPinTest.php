@@ -76,4 +76,31 @@ class TeamAccomplishmentsSqlPinTest extends TestCase
 
         self::assertStringNotContainsString('Boston Celtics', $repo->sql);
     }
+
+    /**
+     * Pairs each placeholder with the predicate in front of it. Every UNION branch must
+     * filter on the queried team, or other franchises' awards leak onto this page.
+     */
+    #[Test]
+    public function testTeamAccomplishmentsAreScopedToTheQueriedTeam(): void
+    {
+        $repo = $this->capturingRepository();
+        $repo->getTeamAccomplishments('Boston Celtics');
+
+        preg_match_all('/(\S+ \S+ =) \?/', self::normalise($repo->sql), $matches);
+
+        self::assertSame(
+            [
+                'WHERE name = Boston Celtics',
+                'AND ranked.name = Boston Celtics',
+                'AND ranked.name = Boston Celtics',
+                'AND ti.team_name = Boston Celtics',
+            ],
+            array_map(
+                static fn (string $predicate, mixed $value): string => $predicate . ' ' . (is_string($value) ? $value : ''),
+                $matches[1],
+                $repo->params,
+            ),
+        );
+    }
 }

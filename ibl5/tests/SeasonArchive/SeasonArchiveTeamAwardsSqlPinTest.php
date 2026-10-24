@@ -74,4 +74,31 @@ class SeasonArchiveTeamAwardsSqlPinTest extends TestCase
         self::assertStringNotContainsString('2025', $repo->sql);
         self::assertStringNotContainsString('2026', $repo->sql);
     }
+
+    /**
+     * Pairs each placeholder with the predicate in front of it. Only the HEAT branch
+     * may receive $heatYear; the stored, IBL and conference branches take the archive year.
+     */
+    #[Test]
+    public function testSeasonArchiveAwardsUseTheArchiveYearNotTheHeatYear(): void
+    {
+        $repo = $this->capturingRepository();
+        $repo->getTeamAwardsByYear(2025, 2026);
+
+        preg_match_all('/(\S+ \S+ =) \?/', self::normalise($repo->sql), $matches);
+
+        self::assertSame(
+            [
+                'WHERE year = 2025',
+                'WHERE psr.year = 2025',
+                'AND psr.year = 2025',
+                'AND YEAR(bst.game_date) = 2026',
+            ],
+            array_map(
+                static fn (string $predicate, mixed $value): string => $predicate . ' ' . (is_int($value) ? (string) $value : ''),
+                $matches[1],
+                $repo->params,
+            ),
+        );
+    }
 }

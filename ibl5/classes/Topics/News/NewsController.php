@@ -46,6 +46,8 @@ class NewsController implements NewsControllerInterface
         private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
         private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
         private readonly \Api\Contracts\HtmlResponderInterface $htmlResponder = new \Api\Response\HtmlResponder(),
+        private readonly ?\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface $tradeSuggestionsService = null,
+        private readonly ?\TradeSuggestions\Contracts\TradeSuggestionsViewInterface $tradeSuggestionsView = null,
     ) {}
 
     public function main(mixed $new_topic): void
@@ -57,6 +59,7 @@ class NewsController implements NewsControllerInterface
         $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
         $this->renderHeader();
         $this->renderSimRecap($userinfo);
+        $this->renderTradeSuggestions($userinfo);
 
         if (defined('HOME_FILE')) {
             blocks("Center");
@@ -104,6 +107,50 @@ class NewsController implements NewsControllerInterface
      */
     private function renderSimRecap(?array $userinfo): void
     {
+        $tid = $this->resolveGmTid($userinfo);
+        if ($tid !== null) {
+            $recapService = $this->lastSimRecapService;
+            $slate = $recapService->buildSlateForTeam($tid);
+            if ($slate !== null) {
+                $this->htmlResponder->html($this->lastSimRecapView->render($slate));
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function renderTradeSuggestions(?array $userinfo): void
+    {
+        $service = $this->tradeSuggestionsService;
+        $view = $this->tradeSuggestionsView;
+        if ($service === null || $view === null) {
+            return;
+        }
+        $tid = $this->resolveGmTid($userinfo);
+        if ($tid === null) {
+            return;
+        }
+        // The panel is optional; a failure in it must not take down the homepage.
+        try {
+            $panel = $service->buildForTeam($tid);
+        } catch (\Throwable $e) {
+            \Logging\LoggerFactory::getChannel('app')->error('Trade suggestions panel failed', ['tid' => $tid, 'error' => $e->getMessage()]);
+            return;
+        }
+        if ($panel !== null) {
+            $this->htmlResponder->html($view->render($panel, isset($_GET['trade_mode_error'])));
+        }
+    }
+
+    /**
+     * The logged-in GM's real-franchise tid, or null for anonymous visitors,
+     * the Free Agents GM, unknown teams, and non-franchise teams.
+     *
+     * @param array<string, mixed>|null $userinfo
+     */
+    private function resolveGmTid(?array $userinfo): ?int
+    {
         if ($this->authService->isAuthenticated()) {
             $teamRepo = $this->teamIdentityRepository;
             $username = $userinfo['username'] ?? null;
@@ -111,14 +158,12 @@ class NewsController implements NewsControllerInterface
             if ($teamName !== null && $teamName !== \League\League::FREE_AGENTS_TEAM_NAME) {
                 $tid = $teamRepo->getTidFromTeamname($teamName);
                 if ($tid !== null && \League\League::isRealFranchise($tid)) {
-                    $recapService = $this->lastSimRecapService;
-                    $slate = $recapService->buildSlateForTeam($tid);
-                    if ($slate !== null) {
-                        $this->htmlResponder->html($this->lastSimRecapView->render($slate));
-                    }
+                    return $tid;
                 }
             }
         }
+
+        return null;
     }
 
     /**

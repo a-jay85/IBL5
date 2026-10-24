@@ -202,6 +202,9 @@
         <testsuite name="LastSimRecap Module Tests">
             <directory>tests/LastSimRecap</directory>
         </testsuite>
+        <testsuite name="TradeSuggestions Module Tests">
+            <directory>tests/TradeSuggestions</directory>
+        </testsuite>
         <testsuite name="Search Module Tests">
             <directory>tests/Search</directory>
         </testsuite>

@@ -23,6 +23,14 @@ try {
   // .env.test doesn't exist — env vars must be set externally
 }
 
+// Shared-seed-row mutator lists: chromium ignores these specs and the
+// mutators project runs them. Each project below appends
+// projected-draft-order-submission. See the mutators project comment.
+const mutatorSpecs = {
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /trade-suggestions\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /trade-suggestions\.spec\.ts$/],
+};
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -58,7 +66,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /projected-draft-order-submission\.spec\.ts$/],
+      testIgnore: [...mutatorSpecs.testIgnore, /projected-draft-order-submission\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -122,7 +130,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /projected-draft-order-submission\.spec\.ts$/],
+      testMatch: [...mutatorSpecs.testMatch, /projected-draft-order-submission\.spec\.ts$/],
     },
   ],
 });

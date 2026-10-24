@@ -38,10 +38,6 @@
         }
         mobileMenu = replaceWithClone(mobileMenu);
 
-        var hamburgerTop = document.getElementById('hamburger-top');
-        var hamburgerMiddle = document.getElementById('hamburger-middle');
-        var hamburgerBottom = document.getElementById('hamburger-bottom');
-
         // Toggle mobile menu
         hamburger.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -66,49 +62,41 @@
             }
         }, { signal: signal });
 
-        var overlayHideTimer = null;
+        var menuStaggerTimer;
+        var overlayShowTimer;
+        var overlayHideTimer;
 
         function openMenu() {
-            // Cancel any pending overlay hide from a recent closeMenu()
-            clearTimeout(overlayHideTimer);
-            overlayHideTimer = null;
-
             // Slide in menu
             mobileMenu.classList.remove('translate-x-full');
             mobileMenu.classList.add('translate-x-0');
 
             // Add class for staggered animations
-            setTimeout(function() {
+            menuStaggerTimer = setTimeout(function() {
                 mobileMenu.classList.add('mobile-menu-open');
             }, 50);
 
             // Show overlay with fade
             if (menuOverlay) {
+                // A reopen inside the close fade must cancel the pending hide.
+                clearTimeout(overlayHideTimer);
                 menuOverlay.classList.remove('hidden');
-                menuOverlay.style.opacity = '0';
-                setTimeout(function() {
-                    menuOverlay.style.opacity = '1';
+                overlayShowTimer = setTimeout(function() {
+                    menuOverlay.classList.add('nav-overlay--visible');
                 }, 10);
             }
 
-            // Animate hamburger to X
-            // Use rem units so translation scales with container size (h-4 = 1rem)
-            // 0.4375rem = 7px at 16px root font, scales proportionally
-            if (hamburgerTop && hamburgerMiddle && hamburgerBottom) {
-                hamburgerTop.style.transform = 'translateY(0.4375rem) rotate(45deg)';
-                hamburgerMiddle.style.opacity = '0';
-                hamburgerBottom.style.transform = 'translateY(-0.4375rem) rotate(-45deg)';
-            }
-
+            // aria-expanded also drives the hamburger-to-X transform in navigation.css
             hamburger.setAttribute('aria-expanded', 'true');
-            document.body.style.overflow = 'hidden';
+            document.body.classList.add('menu-open');
         }
 
         function closeMenu() {
             // A second close within 300 ms must not orphan the first timer
             clearTimeout(overlayHideTimer);
 
-            // Remove stagger animation class first
+            // Remove stagger animation class first; a close inside the 50ms open window must cancel the pending add.
+            clearTimeout(menuStaggerTimer);
             mobileMenu.classList.remove('mobile-menu-open');
 
             // Slide out menu
@@ -117,21 +105,16 @@
 
             // Fade out and hide overlay
             if (menuOverlay) {
-                menuOverlay.style.opacity = '0';
+                // A close inside the 10ms open window must cancel the pending show.
+                clearTimeout(overlayShowTimer);
+                menuOverlay.classList.remove('nav-overlay--visible');
                 overlayHideTimer = setTimeout(function() {
                     menuOverlay.classList.add('hidden');
                 }, 300);
             }
 
-            // Animate hamburger back to lines
-            if (hamburgerTop && hamburgerMiddle && hamburgerBottom) {
-                hamburgerTop.style.transform = '';
-                hamburgerMiddle.style.opacity = '1';
-                hamburgerBottom.style.transform = '';
-            }
-
             hamburger.setAttribute('aria-expanded', 'false');
-            document.body.style.overflow = '';
+            document.body.classList.remove('menu-open');
         }
 
         // Desktop dropdown click-to-pin

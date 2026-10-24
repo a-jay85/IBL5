@@ -122,5 +122,8 @@ def render_body(f, limit=1000) -> str:
         header += f" · bug class: `{f.bug_class}`"
     if f.other_instances:
         header += " · other instances: " + ", ".join(f"`{o}`" for o in f.other_instances)
+    header_cap = limit // 2
+    if len(header) > header_cap:
+        header = header[:header_cap - 1].rstrip("` ,") + "…"
     header += "\n\n"
     return header + f.body[:max(0, limit - len(header))]

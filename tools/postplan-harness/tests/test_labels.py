@@ -150,6 +150,17 @@ def test_render_body_marker_survives_1000_char_truncation():
     assert labels.parse_label(out) == "pre-existing"
 
 
+def test_render_body_caps_header_with_many_other_instances():
+    """Mutation: leave the header uncapped => total passes 1000 and the body vanishes."""
+    f = _f(label="important", score=91, body="y" * 3000, bug_class="unbounded-fetch",
+           other_instances=[f"ibl5/classes/Some/Long/Path{i}.php:{i}" for i in range(20)])
+    out = labels.render_body(f)
+    assert len(out) <= 1000
+    assert out.startswith("<!-- label: important -->\n<!-- score: 91 -->\n**Important**")
+    assert "yyyy" in out
+    assert labels.parse_label(out) == "important"
+
+
 def test_parse_label_rejects_marker_not_on_first_line_and_unknown_label():
     """Mutation: use re.search instead of \\A => fails."""
     assert labels.parse_label("<!-- label: nit -->\nbody") == "nit"

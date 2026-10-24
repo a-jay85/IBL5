@@ -15,7 +15,7 @@ ALTER TABLE `ibl_bug_reports`
     ) NOT NULL DEFAULT 'queued';
 
 -- One row per operator mention. uq_operator_message makes a replayed wake call a
--- no-op (INSERT IGNORE). No FOREIGN KEY, matching ibl_bug_reports and the copied-
+-- no-op (ON DUPLICATE KEY UPDATE). No FOREIGN KEY, matching ibl_bug_reports and the copied-
 -- subset scratch schema the E2E builds. content is truncated to 4000 chars in PHP.
 CREATE TABLE IF NOT EXISTS `ibl_bug_report_operator_context` (
     `id`                 INT UNSIGNED     NOT NULL AUTO_INCREMENT,

@@ -1255,8 +1255,9 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
                                 log, res, outcome_log_path=None) -> dict:
     """Phase 4.5 wrapper: same commit/push injection as the Phase 5.5 remediation.
     Swallows everything except gate-path-edit (a local commit touched a gate-owning
-    path; shipping it later would bypass the gate) and push-failed (the tree and origin
-    disagree; nothing downstream can reason about the head)."""
+    path; shipping it later would bypass the gate), push-failed (the tree and origin
+    disagree; nothing downstream can reason about the head) and owner-approval-* (a
+    fixer reverted an owner-approved line; the run must hold)."""
     t0 = time.monotonic()
     try:
         out = run_thread_ingestion(
@@ -1269,7 +1270,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
                                              res=res, gh=gh,
                                              pr=(pr if isinstance(git, LiveGit) else None)))
     except HarnessError as e:
-        if e.kind in ("gate-path-edit", "push-failed"):
+        if e.kind in ("gate-path-edit", "push-failed") or e.kind.startswith("owner-approval"):
             raise
         log(f"phase4.5: thread ingestion failed ({e.kind}: {e.detail}); continuing, "
             "condition (11) keeps the hold")
@@ -3132,7 +3133,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         if _rev:
                             gh.pr_edit_body(pr, _fixed)
                             log(f"phase5.5 round {round_num}: reverted fixer edit to ## Manual Testing")
-                if e.kind == "push-failed":
+                if e.kind == "push-failed" or e.kind.startswith("owner-approval"):
                     raise
                 # Keep the hook's own words: "local-gate" alone does not say which hook
                 # said no.

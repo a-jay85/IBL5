@@ -1,0 +1,38 @@
+{
+  "checks_outcome": {
+    "exit": 0,
+    "failed": []
+  },
+  "clean_tree": true,
+  "diff": "diff --git a/ibl5/classes/Trade/TradeExecutionService.php b/ibl5/classes/Trade/TradeExecutionService.php\n--- a/ibl5/classes/Trade/TradeExecutionService.php\n+++ b/ibl5/classes/Trade/TradeExecutionService.php\n@@ -1 +1 @@\n+x\n",
+  "files_at": {
+    "HEAD:ibl5/classes/Trade/TradeExecutionService.php": "<?php\nfunction load($teamId) {\n    $players = $this->repository->activePlayersForTeam($teamId);\n    return $players;\n}\n",
+    "replay-sha-oad3428:ibl5/classes/Trade/TradeExecutionService.php": "<?php\nfunction load($teamId) {\n    $players = $this->repository->activePlayersForTeam($teamId);\n    $players = array_filter($players, fn($p) => $p['retired'] === 0);\n    $players = array_filter($players, fn($p) => $p['tid'] === $teamId);\n    $players = array_filter($players, fn($p) => $p['injured'] === 0);\n    return $players;\n}\n",
+    "replay-sha-oad3428^:ibl5/classes/Trade/TradeExecutionService.php": "<?php\nfunction load($teamId) {\n    $players = $this->repository->activePlayersForTeam($teamId);\n    return $players;\n}\n"
+  },
+  "final_state": "OPEN",
+  "head_sha": "pre-sha",
+  "head_subject": "chore: replay",
+  "labels": [],
+  "plan_content": "# Synthetic plan\n\nBody with no matrix and no frontmatter.\n",
+  "pr_issue_comments": [
+    {
+      "body": "<!-- postplan-owner-approval -->\n```json\n{\"schema\": 1, \"id\": \"oad-3428bbbb\", \"summary\": \"owner moved the filter into the repository\", \"files\": [{\"path\": \"ibl5/classes/Trade/TradeExecutionService.php\", \"keep\": [\"$players = $this->repository->activePlayersForTeam($teamId);\"], \"gone\": [\"$players = array_filter($players, fn($p) => $p['retired'] === 0);\", \"$players = array_filter($players, fn($p) => $p['tid'] === $teamId);\", \"$players = array_filter($players, fn($p) => $p['injured'] === 0);\"]}]}\n```\n",
+      "id": 11,
+      "login": "a-jay85",
+      "type": "User"
+    }
+  ],
+  "pr_meta": {
+    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way \u00b7 Blast radius: localized \u00b7 Why: mechanical: no one-way trigger in the realized diff\n",
+    "headRefOid": "deadbeef",
+    "number": 3428,
+    "title": "fix: synthetic"
+  },
+  "pr_number": 3428,
+  "slug": "oad3428",
+  "verify": {
+    "phpstan": "[OK] No errors",
+    "phpunit": "OK (1 test)"
+  }
+}

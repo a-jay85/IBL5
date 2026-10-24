@@ -1,0 +1,39 @@
+{
+  "checks_outcome": {
+    "exit": 0,
+    "failed": []
+  },
+  "clean_tree": true,
+  "diff": "diff --git a/ibl5/classes/Draft/DraftService.php b/ibl5/classes/Draft/DraftService.php\n--- a/ibl5/classes/Draft/DraftService.php\n+++ b/ibl5/classes/Draft/DraftService.php\n@@ -1 +1 @@\n+x\ndiff --git a/ibl5/classes/Draft/DraftValidator.php b/ibl5/classes/Draft/DraftValidator.php\n--- a/ibl5/classes/Draft/DraftValidator.php\n+++ b/ibl5/classes/Draft/DraftValidator.php\n@@ -1 +1 @@\n+x\n",
+  "files_at": {
+    "replay-sha-oad3520:ibl5/classes/Draft/DraftService.php": "<?php\nfunction pick($pick, $teamId) {\n    return $pick;\n}\n",
+    "replay-sha-oad3520:ibl5/classes/Draft/DraftValidator.php": "<?php\nfunction check($round, $teamId) {\n    if ($round == 1) { $this->lottery->apply($teamId); }\n    return true;\n}\n",
+    "replay-sha-oad3520^:ibl5/classes/Draft/DraftService.php": "<?php\nfunction pick($pick, $teamId) {\n    if ($pick === null) { throw new DomainException('no pick'); }\n    $this->audit->record($pick, $teamId);\n    return $pick;\n}\n",
+    "replay-sha-oad3520^:ibl5/classes/Draft/DraftValidator.php": "<?php\nfunction check($round, $teamId) {\n    if ($round === 1) { $this->lottery->apply($teamId); }\n    return true;\n}\n"
+  },
+  "final_state": "OPEN",
+  "head_sha": "pre-sha",
+  "head_subject": "chore: replay",
+  "labels": [],
+  "plan_content": "# Synthetic plan\n\nBody with no matrix and no frontmatter.\n",
+  "pr_issue_comments": [
+    {
+      "body": "<!-- postplan-owner-approval -->\n```json\n{\"schema\": 1, \"id\": \"oad-3520cccc\", \"summary\": \"owner fixes (a) and (c)\", \"files\": [{\"path\": \"ibl5/classes/Draft/DraftService.php\", \"keep\": [\"if ($pick === null) { throw new DomainException('no pick'); }\", \"$this->audit->record($pick, $teamId);\"], \"gone\": []}, {\"path\": \"ibl5/classes/Draft/DraftValidator.php\", \"keep\": [\"if ($round === 1) { $this->lottery->apply($teamId); }\"], \"gone\": []}]}\n```\n",
+      "id": 11,
+      "login": "a-jay85",
+      "type": "User"
+    }
+  ],
+  "pr_meta": {
+    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way \u00b7 Blast radius: localized \u00b7 Why: mechanical: no one-way trigger in the realized diff\n",
+    "headRefOid": "deadbeef",
+    "number": 3520,
+    "title": "fix: synthetic"
+  },
+  "pr_number": 3520,
+  "slug": "oad3520",
+  "verify": {
+    "phpstan": "[OK] No errors",
+    "phpunit": "OK (1 test)"
+  }
+}

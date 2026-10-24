@@ -1,0 +1,53 @@
+{
+  "checks_outcome": {
+    "exit": 0,
+    "failed": []
+  },
+  "clean_tree": true,
+  "diff": "diff --git a/bin/lib/watchdog.sh b/bin/lib/watchdog.sh\n--- a/bin/lib/watchdog.sh\n+++ b/bin/lib/watchdog.sh\n@@ -1 +1 @@\n+x\n",
+  "files_at": {
+    "replay-sha-oad3514:bin/lib/watchdog.sh": "#!/usr/bin/env bash\nWATCHDOG_INTERVAL_SECONDS=30\nwatchdog_probe_heartbeat() {\n  local last_beat=$(cat \"$HEARTBEAT_FILE\")\n  if [ $((now - last_beat)) -gt \"$WATCHDOG_TIMEOUT_SECONDS\" ]; then\n    kill -TERM \"$WORKER_PID\"\nwatchdog_start_loop &\n"
+  },
+  "final_state": "OPEN",
+  "head_sha": "pre-sha",
+  "head_subject": "chore: replay",
+  "labels": [],
+  "plan_content": "# Synthetic plan\n\nBody with no matrix and no frontmatter.\n",
+  "pr_issue_comments": [
+    {
+      "body": "<!-- postplan-owner-approval -->\n```json\n{\"schema\": 1, \"id\": \"oad-3514aaaa\", \"summary\": \"owner deleted the watchdog on purpose\", \"files\": [{\"path\": \"bin/lib/watchdog.sh\", \"keep\": [], \"gone\": [\"WATCHDOG_INTERVAL_SECONDS=30\", \"watchdog_probe_heartbeat() {\", \"  local last_beat=$(cat \\\"$HEARTBEAT_FILE\\\")\", \"  if [ $((now - last_beat)) -gt \\\"$WATCHDOG_TIMEOUT_SECONDS\\\" ]; then\", \"    kill -TERM \\\"$WORKER_PID\\\"\", \"watchdog_start_loop &\"]}]}\n```\n",
+      "id": 11,
+      "login": "a-jay85",
+      "type": "User"
+    }
+  ],
+  "pr_meta": {
+    "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way \u00b7 Blast radius: localized \u00b7 Why: mechanical: no one-way trigger in the realized diff\n",
+    "headRefOid": "deadbeef",
+    "number": 3514,
+    "title": "fix: synthetic"
+  },
+  "pr_number": 3514,
+  "slug": "oad3514",
+  "thread_ids": [
+    3514001
+  ],
+  "trusted_threads": [
+    {
+      "authorLogin": "a-jay85",
+      "authorType": "User",
+      "body": "Please restore the watchdog.",
+      "commentId": 3514001,
+      "id": "PRRT_wd",
+      "isOutdated": false,
+      "isResolved": false,
+      "line": 3,
+      "path": "bin/lib/watchdog.sh",
+      "score": null
+    }
+  ],
+  "verify": {
+    "phpstan": "[OK] No errors",
+    "phpunit": "OK (1 test)"
+  }
+}

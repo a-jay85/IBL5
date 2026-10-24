@@ -1355,7 +1355,7 @@ class LiveGit:
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
-        self._reconcile_conflict_flag(branch, key, "origin/master")
+        self._reconcile_conflict_flag(branch, key, pre_base)
         purge_verdict_artifacts(key)
 
         # Step 6.5: collapse a merge-carrying range into one tree-identical commit, so the

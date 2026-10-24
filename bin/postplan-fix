@@ -215,9 +215,9 @@ if [ "$HOLDREPEAT" = 1 ]; then
     HR_SESSION_TIPS="" HR_REMOTE_FOREIGN=""
     PF_MOVED=0
 
-    _hr_py() {  # harness.holdrepeat needs the package on the path; -I would drop PYTHONPATH
-        PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$MAIN_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" \
-            python3 -m harness.holdrepeat "$@"
+    _hr_py() {  # -I drops cwd and PYTHONPATH from sys.path; the main checkout's harness is added explicitly
+        python3 -I -B -c 'import runpy, sys; sys.path.insert(0, sys.argv[1]); sys.argv = ["holdrepeat"] + sys.argv[2:]; runpy.run_module("harness.holdrepeat", run_name="__main__", alter_sys=True)' \
+            "$MAIN_ROOT/tools/postplan-harness" "$@"
     }
     # Final stdout line for every --holdrepeat exit; callers parse it with the exit code.
     _hr_finish() {  # <rc> <result word>
@@ -263,6 +263,8 @@ if [ "$HOLDREPEAT" = 1 ]; then
                 *) HR_REMOTE_FOREIGN="$remote_now" ;;
             esac
         fi
+        # A session may have switched or detached HEAD; get back on the branch so the reset moves it.
+        git -C "$WT" checkout -q -f "$branch" >/dev/null 2>&1 || true
         git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         git -C "$WT" clean -fdq >/dev/null 2>&1 || true
         REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}" 2>/dev/null)" || REFS1="$REFS0"
@@ -375,9 +377,11 @@ the worktree's Docker per its rules).
 
 Hard limits. Never edit bin/check-*, bin/lib/*, bin/post-plan*, bin/postplan*, bin/pr-cycle*,
 bin/discord-*, bin/wt-sync-*, anything under .claude/hooks or ~/.claude/hooks,
-.github/workflows/*, tools/postplan-harness/harness/* or any arming condition.
+.github/workflows/*, .claude/settings*.json, .claude/rules/*, .claude/skills/post-plan/*,
+tools/postplan-harness/harness/*, tools/postplan-harness/runner.py or any arming condition.
 If an item can only be fixed by such an edit, stop and use the needs-gate-edit ending.
-Never run git commit, git push, git reset, git rebase, git merge, git stash, gh, or
+Never run git commit, git push, git reset, git rebase, git merge, git stash, git checkout,
+git switch, gh, or
 bin/post-plan-now. You run under CLAUDE_HEADLESS=1, where post-plan-now refuses; the
 launcher commits, pushes, comments and re-fires post-plan after you end. Never add a
 label, never retitle the PR, never arm auto-merge.

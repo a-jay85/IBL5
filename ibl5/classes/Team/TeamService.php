@@ -24,6 +24,7 @@ class TeamService implements TeamServiceInterface
     private League $league;
     private TeamPageDataPreparer $preparer;
     private TeamCardRenderer $cardRenderer;
+    private ?RivalsCardBuilder $rivalsCardBuilder;
 
     public function __construct(
         \mysqli $db,
@@ -33,7 +34,9 @@ class TeamService implements TeamServiceInterface
         ?League $league = null,
         ?TeamPageDataPreparer $preparer = null,
         ?TeamCardRenderer $cardRenderer = null,
+        ?RivalsCardBuilder $rivalsCardBuilder = null,
     ) {
+        $this->rivalsCardBuilder = $rivalsCardBuilder;
         $this->db = $db;
         $this->repository = $repository;
         $this->leagueContext = $leagueContext;
@@ -72,6 +75,7 @@ class TeamService implements TeamServiceInterface
         $awardsCard = "";
         $franchiseHistoryCard = "";
         $rafters = "";
+        $rivalsCard = '';
 
         if ($isActualTeam) {
             $draftPicksData = $this->preparer->prepareDraftPicksData($team);
@@ -90,6 +94,7 @@ class TeamService implements TeamServiceInterface
             $awardsCard = $sidebarData['awardsCard'];
             $franchiseHistoryCard = $sidebarData['franchiseHistoryCard'];
             $rafters = $sidebarData['rafters'];
+            $rivalsCard = $this->rivalsCardBuilder?->build($teamid, $team->color1, $team->color2) ?? '';
         }
 
         return [
@@ -106,6 +111,7 @@ class TeamService implements TeamServiceInterface
             'awardsCard' => $awardsCard,
             'franchiseHistoryCard' => $franchiseHistoryCard,
             'rafters' => $rafters,
+            'rivalsCard' => $rivalsCard,
             'userTeamName' => $userTeamName,
             'isOwnTeam' => ($userTeamName !== '' && $userTeamName === $team->name),
             'extensionResult' => null,

@@ -25,7 +25,15 @@ global $mysqli_db, $authService, $leagueContext;
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $teamRepository = new Team\TeamRepository($mysqli_db);
-$service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext);
+// Rivalries reads IBL tables only, so the Olympics Team page gets no rivals card.
+$docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROOT'] : '';
+$rivalsCardBuilder = $leagueContext->isOlympics()
+    ? null
+    : new Team\RivalsCardBuilder(
+        \Rivalries\RivalriesServiceFactory::create($mysqli_db, \Season\SharedSeason::get($mysqli_db, $leagueContext), $docRoot . '/ibl5/images/logo'),
+        fn (int $tid): ?string => $commonRepo->getOwnerName($tid),
+    );
+$service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext, rivalsCardBuilder: $rivalsCardBuilder);
 $view = new Team\TeamView();
 $controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $service, $view, \Http\HttpRequest::fromGlobals());
 

@@ -8,7 +8,7 @@ use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
 
 /**
- * Rebuild the Head-to-Head Records cache from box-score data.
+ * Rebuild the Head-to-Head Records and Rivalries caches from box-score data.
  *
  * Writes only to DatabaseCache rows — no transaction needed; a cache rebuild
  * that fails must not roll back the import that preceded it.
@@ -33,9 +33,10 @@ final class RefreshHeadToHeadRecordsStep implements PipelineStepInterface
             // dirname(__DIR__, 3) ascends from classes/Updater/Steps → classes/Updater
             // → classes → ibl5 root; the logo directory lives under ibl5/images/logo.
             $ibl5Root = dirname(__DIR__, 3);
+            $endingYear = (new \Season\Season($this->db))->endingYear;
             $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
                 $this->db,
-                (new \Season\Season($this->db))->endingYear,
+                $endingYear,
                 fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $ibl5Root . '/images/logo'),
             );
             $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(
@@ -43,6 +44,10 @@ final class RefreshHeadToHeadRecordsStep implements PipelineStepInterface
                 new \Cache\DatabaseCache($this->db),
             );
             $keys = $cachedH2hRepo->rebuildCache();
+            $keys += (new \Rivalries\CachedRivalriesRepository(
+                new \Rivalries\RivalriesRepository($this->db),
+                new \Cache\DatabaseCache($this->db),
+            ))->rebuildCache(\Rivalries\RivalryScorer::recentWindowStart($endingYear));
         } catch (\Throwable $e) {
             return StepResult::failure($this->getLabel(), $e->getMessage());
         }

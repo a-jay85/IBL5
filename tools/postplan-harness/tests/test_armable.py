@@ -23,7 +23,8 @@ def inputs(**kw):
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY",
+                owner_approval_state="CLEAR")
     base.update(kw)
     return ArmInputs(**base)
 
@@ -146,14 +147,42 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..18, 20}. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
     local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
-    not run. (18) holds unless the body's Merge danger line is well-formed and two-way."""
+    not run. (18) holds unless the body's Merge danger line is well-formed and two-way.
+    (19) is reserved by the removed-guards hold (#3382); (20) holds unless the owner-approval
+    state is CLEAR."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+
+
+def test_owner_approval_default_holds():
+    """The raw dataclass default fails closed; the helper opts in to CLEAR."""
+    assert ArmInputs.__dataclass_fields__["owner_approval_state"].default == "UNKNOWN"
+    raw = inputs()
+    raw.owner_approval_state = ArmInputs.__dataclass_fields__["owner_approval_state"].default
+    assert 20 in {c.number for c in evaluate(raw).holds}
+    assert 20 not in {c.number for c in evaluate(inputs()).holds}
+
+
+@pytest.mark.parametrize("state,arms", [
+    ("CLEAR", True), ("REVERT", False), ("DRIFT", False), ("UNREADABLE", False),
+    ("UNKNOWN", False), ("clear", False), ("", False),
+])
+def test_owner_approval_states(state, arms):
+    d = evaluate(inputs(owner_approval_state=state))
+    assert d.armed is arms
+    assert (20 in {c.number for c in d.holds}) is (not arms)
+
+
+def test_owner_approval_is_additive():
+    """(20) may add a hold; CLEAR never releases (8)."""
+    d = evaluate(inputs(pr_title="feat: shiny new GM power", owner_approval_state="CLEAR"))
+    assert {c.number for c in d.holds} == {8}
+    assert not d.armed
 
 
 def test_fidelity_is_additive_and_releases_nothing():

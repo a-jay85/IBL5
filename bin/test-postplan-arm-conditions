@@ -515,6 +515,7 @@ B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
 B18="$(extract_block '# condition (18)')"
+B20="$(extract_block '# condition (20)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -600,6 +601,7 @@ fi
 assert_self_contained '# condition (15)' "condition (15)"
 assert_self_contained '# condition (17)' "condition (17)"
 assert_self_contained '# condition (18)' "condition (18)"
+assert_self_contained '# condition (20)' "condition (20)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -1621,6 +1623,21 @@ else
     out="$(run_cond18 __fail__)"
     expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
     expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
+fi
+
+# condition (20) — owner-approval hold. The fallback engine cannot verify an approval, so
+# pr_owner_approval_hold holds on any owner User record; Bot authors never count.
+OA_MARK='<!-- postplan-owner-approval -->'
+oa_hold() { ( source "$REPO_ROOT/bin/lib/pr-armable.sh"; pr_owner_approval_hold "$1" ); }
+expect_c18_text "(20) owner User record -> RECORDS:1" \
+    "$(oa_hold "[{\"body\":\"$OA_MARK\\nx\",\"user\":{\"login\":\"a-jay85\",\"type\":\"User\"}}]")" \
+    "owner-approval:RECORDS:1"
+oa_out="$(oa_hold "[{\"body\":\"$OA_MARK\\nx\",\"user\":{\"login\":\"a-jay85\",\"type\":\"Bot\"}}]")"
+if [ -z "$oa_out" ]; then echo "ok: (20) a-jay85 Bot record is ignored"; else echo "FAIL: (20) Bot record should clear, got: '$oa_out'"; FAILED=1; fi
+expect_c18_text "(20) non-JSON input is fail-closed" "$(oa_hold 'not json')" "owner-approval:UNREADABLE"
+if [ -z "$B20" ]; then
+    echo "FAIL: no block matching '# condition (20)' in $SKILL — marker drifted"
+    FAILED=1
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------

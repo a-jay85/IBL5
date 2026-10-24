@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>):
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>; 20: pr_owner_approval_hold <comments_json>):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -208,6 +208,23 @@ pr_merge_danger_hold() {
     well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
     [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
     case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
+}
+
+# pr_owner_approval_hold <comments_json>
+#   Phase 6.5 condition (20). <comments_json> is the PR issue-comments array (REST shape).
+#   The fallback engine has no revert check, so it holds whenever the PR carries any
+#   owner-approval record (marker comment by a-jay85 of type User); the harness engine
+#   verifies them instead. Prints owner-approval:RECORDS:<n> for n > 0, nothing for 0, and
+#   owner-approval:UNREADABLE when jq cannot parse the input (fail-closed).
+pr_owner_approval_hold() {
+    local n
+    n=$(printf '%s' "$1" | jq -r '[.[] | select((.body // "") | contains("<!-- postplan-owner-approval -->")) | select(.user.login == "a-jay85" and .user.type == "User")] | length' 2>/dev/null) \
+        || { echo "owner-approval:UNREADABLE"; return 0; }
+    case "$n" in
+        ''|*[!0-9]*) echo "owner-approval:UNREADABLE" ;;
+        0) ;;
+        *) echo "owner-approval:RECORDS:$n" ;;
+    esac
 }
 
 # pr_docs_refresh_path_ok <repo-relative path>

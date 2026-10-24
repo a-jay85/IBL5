@@ -204,6 +204,8 @@ class ArmInputs:
     gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
     gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
+    owner_approval_state: str = "UNKNOWN"   # owner_approvals: only "CLEAR" arms (fail-closed default)
+    owner_approval_reason: str = ""
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
@@ -482,5 +484,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     md_retried = " after 1 retry" if md == "MISSING" and "merge-danger" in inp.retried_stages else ""
     cs.append(ConditionResult(18, "merge-danger", md_blocked,
                               f"state={md}{md_retried}" if md_blocked else ""))
+
+    # Condition (20) — owner-approval hold: a fixer commit was dropped for reverting an
+    # owner-approved deviation, the record set changed mid-run, or the records could not
+    # be read. (19) is reserved by the removed-guards hold (#3382); the gap is deliberate.
+    oa = inp.owner_approval_state
+    oa_blocked = oa != "CLEAR"
+    oa_reason = f"state={oa}" + (f"; {inp.owner_approval_reason}" if inp.owner_approval_reason else "")
+    cs.append(ConditionResult(20, "owner-approval", oa_blocked, oa_reason if oa_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

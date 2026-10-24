@@ -280,6 +280,11 @@ final class HeatPhaseRecapPipelineDbTest extends DatabaseTestCase
         $this->insertTestPlayer(999110, 'Heat Guard', ['teamid' => self::TEAM_A, 'pos' => 'PG']);
         $this->insertTestPlayer(999111, 'Heat Wing', ['teamid' => self::TEAM_B, 'pos' => 'SF']);
         $this->insertTestPlayer(999112, 'Late Center', ['teamid' => self::TEAM_C, 'pos' => 'C']);
+        // The roster keeps only players who played in the window, so each
+        // player needs a box line on their team's game.
+        $this->insertPlayerBoxscoreRow('2025-10-18', 999110, 'Heat Guard', 'PG', self::TEAM_A, self::TEAM_B, self::TEAM_A);
+        $this->insertPlayerBoxscoreRow('2025-10-18', 999111, 'Heat Wing', 'SF', self::TEAM_A, self::TEAM_B, self::TEAM_B);
+        $this->insertPlayerBoxscoreRow('2025-10-22', 999112, 'Late Center', 'C', self::TEAM_C, self::TEAM_D, self::TEAM_C);
 
         $ctx = $ctxRepo->buildContext(self::HEAT_SIM);
 

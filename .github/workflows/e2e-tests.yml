@@ -584,40 +584,54 @@ jobs:
       # --- Auto-update baselines when label is present ---
       - name: Regenerate visual regression baselines
         id: regen-baselines
-        if: github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
-        env:
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER || 'ci-e2e-user' }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS || 'ci-e2e-pass-not-secret' }}
-          IBL_TEST_USER_REGULAR: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
-          IBL_TEST_PASS_REGULAR: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
+        # Targeted rewrite (ADR-0214): rerun the gallery's strict pass against
+        # this branch's own committed baselines, then copy only the flagged
+        # renders (changed + new, minus flake/infra) over their baselines.
+        # Runs whenever the VR step finished, pass or fail: a sub-gate drift
+        # leaves the VR step green but is still flagged by the strict pass.
+        if: "!cancelled() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines') && (steps.visual-regression.outcome == 'success' || steps.visual-regression.outcome == 'failure')"
         run: |
-          docker run --rm \
-            --network ibl5-e2e \
-            --user "$(id -u):$(id -g)" \
-            -v "${{ github.workspace }}/ibl5:/ibl5" \
-            -w /ibl5 \
-            -e "BASE_URL=http://php/ibl5/" \
-            -e "IBL_TEST_USER=$IBL_TEST_USER" \
-            -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
-            -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
-            -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
-            -e "CI=true" \
-            -e "HOME=/tmp" \
-            "$PW_IMAGE" \
-            npx playwright test --config=playwright.visual.config.ts --update-snapshots
+          set -euo pipefail
+          bin/vr-build-gallery \
+            --base-sha="$(git rev-parse HEAD)" \
+            --actuals=ibl5/vr-actuals \
+            --out-dir=ibl5/vr-gallery-targets \
+            --gallery-json=ibl5/vr-gallery-targets.json
+          bin/vr-apply-baselines \
+            --gallery=ibl5/vr-gallery-targets.json \
+            --actuals=ibl5/vr-actuals \
+            --snapshot-dir=ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots \
+            --list-out="$RUNNER_TEMP/vr-baseline-targets.txt"
 
       - name: Commit and push updated baselines
-        if: always() && github.event_name == 'pull_request' && steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.regen-baselines.outcome != 'skipped'
         run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/vr-baseline-targets.txt"
+          if [ ! -f "$list" ]; then
+            echo "::error::$list missing: the regenerate step did not finish, nothing committed"
+            echo "update-baselines: regenerate step failed, 0 PNG(s) committed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          mapfile -t targets < "$list"
+          if [ "${#targets[@]}" -eq 0 ]; then
+            echo "No snapshots flagged by the strict pass; nothing to commit"
+            echo "update-baselines: 0 PNG(s) committed (no flagged views)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/
+          git add -- "${targets[@]}"
+          bin/vr-apply-baselines --check-staged="$list"
           if git diff --cached --quiet; then
-            echo "No baseline changes detected"
-          else
-            git commit -m "test: update visual regression baselines [auto]"
-            git push
+            echo "Flagged renders match the committed bytes; nothing to commit"
+            echo "update-baselines: 0 PNG(s) committed (flagged renders unchanged)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+          committed=$(git diff --cached --name-only | wc -l | tr -d ' ')
+          git commit -m "test: update visual regression baselines [auto]"
+          git push
+          echo "update-baselines: ${committed} PNG(s) committed" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove update-baselines label
         if: always() && steps.regen-baselines.outcome != 'skipped' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')

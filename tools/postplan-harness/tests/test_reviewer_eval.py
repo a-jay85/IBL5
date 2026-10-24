@@ -280,9 +280,27 @@ def _real_case(cid):
     return next(c for c in _real_corpus()["cases"] if c["id"] == cid)
 
 
-def test_real_corpus_trade_expected_range_pinned():
-    got = [(e["path"], e["start"], e["end"]) for e in _real_case(TRADE_CASE)["expected"]]
-    assert got == [(TRADE_PATH, 39, 40)]
+PINNED_EXPECTED = {
+    "depth-chart-log-after-commit": [
+        ("ibl5/classes/DepthChartSnapshot/DepthChartSnapshotService.php", 148, 154)],
+    "playoff-series-invalid-group-by": [
+        ("ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", 78, 78)],
+    "saved-dc-sum-is-int": [
+        ("ibl5/classes/SavedDepthChart/SavedDepthChartRepository.php", 312, 313)],
+    "table-dropdown-unencoded-param": [
+        ("ibl5/classes/UI/Components/TableViewDropdown.php", 68, 68)],
+    "team-page-missing-pick-team": [
+        ("ibl5/classes/Team/TeamPageDataPreparer.php", 370, 371)],
+    TRADE_CASE: [(TRADE_PATH, 39, 40)],
+}
+
+
+def test_real_corpus_expected_ranges_pinned():
+    confirmed = [c for c in _real_corpus()["cases"] if c["status"] == "confirmed"]
+    assert len(confirmed) == 6
+    got = {c["id"]: [(e["path"], e["start"], e["end"]) for e in c["expected"]]
+           for c in confirmed}
+    assert got == PINNED_EXPECTED
 
 
 def test_real_corpus_trade_line_63_misses_expected_only():
@@ -303,7 +321,9 @@ def test_real_corpus_trade_line_63_hits_via_also_accept():
     assert not re_.case_hit([_f(other, 63)], ranges)
 
 
-def test_real_corpus_trade_case_also_accept_pinned():
+def test_real_corpus_only_trade_case_has_also_accept():
+    cases = _real_corpus()["cases"]
+    assert [c["id"] for c in cases if "also_accept" in c] == [TRADE_CASE]
     trade = _real_case(TRADE_CASE)
     assert [(e["path"], e["start"], e["end"]) for e in trade["also_accept"]] == [(TRADE_PATH, 63, 63)]
 

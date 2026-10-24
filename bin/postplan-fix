@@ -481,26 +481,32 @@ LAST line of the final message."
         gh pr merge "$PR" --repo a-jay85/IBL5 --disable-auto >/dev/null 2>&1 || true
         HR_PRBAD+="auto-merge armed; "
     fi
-    if [ -n "$HR_PRBAD" ]; then _hr_reject pr-state "$HR_PRBAD"; fi
+    # The main checkout and ~/.claude/hooks sit outside the revert, so the DM is the owner's
+    # only signal. Collect them here, before any guard exits, so they always reach the DM.
+    HR_EXTBAD=""
+    git -C "$MAIN_ROOT" status --porcelain > "$HR_TMP/main.after"
+    if ! cmp -s "$HR_TMP/main.before" "$HR_TMP/main.after"; then
+        HR_EXTBAD+="main checkout changed; "
+    fi
+    if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
+        HR_EXTBAD+="a file under ~/.claude/hooks changed; "
+    fi
+    if [ -n "$HR_PRBAD" ]; then _hr_reject pr-state "$HR_PRBAD$HR_EXTBAD"; fi
+    # _hr_revert also restores the refs, so this may run before the refs guard.
+    if [ -n "$HR_EXTBAD" ]; then _hr_reject gate-path "$HR_EXTBAD"; fi
     # 2. refs: the session was told never to commit, so any own-ref move is out of bounds.
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
     if [ "$(git -C "$WT" rev-parse HEAD)" != "$HEAD0" ] || [ "$REFS1" != "$REFS0" ]; then
         _pf_restore_own_refs
         _hr_reject refs "HEAD or the branch refs moved during the session"
     fi
-    # 3. gate-path: gate scripts, the main checkout and user-level hooks stay untouched.
+    # 3. gate-path: gate scripts in the worktree stay untouched (the main checkout and
+    # ~/.claude/hooks were checked above).
     HR_PATHS="$(git -C "$WT" -c core.quotepath=off diff --no-renames --name-only HEAD; git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         if _hr_is_gate_path "$p"; then _hr_reject gate-path "$p"; fi
     done <<< "$HR_PATHS"
-    git -C "$MAIN_ROOT" status --porcelain > "$HR_TMP/main.after"
-    if ! cmp -s "$HR_TMP/main.before" "$HR_TMP/main.after"; then
-        _hr_reject gate-path "main checkout changed"
-    fi
-    if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
-        _hr_reject gate-path "a file under ~/.claude/hooks changed"
-    fi
     # Marker outcomes other than "fixed" end here, after the guards above.
     case "$HR_KIND" in
         needs-gate-edit)

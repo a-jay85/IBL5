@@ -973,6 +973,19 @@ need "final line" final_is "$STDOUT" gave-up-gate-path
 need "DM names the hooks dir" dm_has ".claude/hooks"
 case_end holdrepeat-user-hook-blocked
 
+# 48b (a session that commits AND edits a user hook: the DM still names the hook)
+hr_reset
+{ cat "$TMP/effects/hr-commit.sh"; printf 'printf "x\\n" > "%s/.claude/hooks/sneaky.sh"\n' "$HOME"; } > "$TMP/effects/hr-commit-hook.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-commit-hook.sh"
+hr_run
+rm -f "$HOME/.claude/hooks/sneaky.sh"
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the hooks dir" dm_has ".claude/hooks"
+need "HEAD restored" head_is_tip
+need "origin unchanged" origin_is_tip
+case_end holdrepeat-refs-and-user-hook
+
 # 49 (launch machinery the launcher sources or execs is a gate path)
 for HR_GP in bin/lib/git-helpers.sh bin/lib/new-helper.sh bin/discord-dm bin/post-plan-fail-dm bin/wt-sync-tick; do
     hr_reset

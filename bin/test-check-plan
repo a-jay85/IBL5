@@ -3239,7 +3239,7 @@ assert_viol "gateMT-bare-line-tracked-silent" 0 '[MT]' "$FM$YHDR"'
 '
 # [MT] a host:port token after the arrow keeps its exemption: silent.
 assert_viol "gateMT-host-port-after-arrow-silent" 0 '[MT]' "$FM$YHDR"'
-| 1 | `pinned_thing` holds. Mutation: stop the stack ⇒ `localhost:8080` refuses | PHPUnit | post-impl | `tests/XTest.php` |
+| 1 | `pinned_thing` holds. Mutation: stop the stack ⇒ `wt-x.localhost:8080` refuses | PHPUnit | post-impl | `tests/XTest.php` |
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '

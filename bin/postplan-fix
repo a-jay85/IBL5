@@ -289,6 +289,15 @@ if [ "$HOLDREPEAT" = 1 ]; then
         esac
         return 1
     }
+    # A new path that could shadow a module for a `python3 -m` run from $WT: anything under a
+    # top-level harness/, a top-level .py/.pth, or a .py/.pth in a directory git tracks nothing in.
+    _hr_planted_py() {  # <repo-relative path>
+        local d
+        case "$1" in harness/*) return 0 ;; *.py|*.pth) ;; *) return 1 ;; esac
+        d="${1%/*}"
+        [ "$d" != "$1" ] || return 0
+        [ -z "$(git -C "$WT" ls-files -- "$d/" | head -n 1)" ]
+    }
     # The token a plan edit may not delete without naming it in the plan-change note.
     _hr_anchor() {  # <part text>
         local part="$1" tok=""
@@ -578,6 +587,24 @@ LAST line of the final message."
         case "$p" in */__pycache__/*|*.pyc) continue ;; esac
         if _hr_is_gate_path "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then _hr_reject gate-path "$p (ignored file written)"; fi
     done <<< "$HR_IGN"
+    # 4. planted-python: `python3 -m` puts its cwd first on sys.path, so a new top-level
+    # harness/ package or a new .py/.pth outside every tracked directory can shadow a real
+    # module. _hr_py runs -I and never imports one; this keeps one off the push too.
+    # Ignored ones count only when written since t0. git clean -fd keeps ignored files,
+    # so they are removed here before the revert.
+    HR_PLANTED=()
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if _hr_planted_py "$p"; then HR_PLANTED+=("$p"); fi
+    done < <(git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if _hr_planted_py "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then HR_PLANTED+=("$p"); fi
+    done < <(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)*.pth')
+    if [ "${#HR_PLANTED[@]}" -gt 0 ]; then
+        for p in "${HR_PLANTED[@]}"; do rm -f -- "$WT/$p"; done
+        _hr_reject planted-python "${HR_PLANTED[0]}"
+    fi
     # Python still loads a .pyc it did not write, so drop the skipped bytecode before anything
     # runs from the worktree. It is gitignored, so the staged tree is the same either way.
     if [ -d "$WT/tools/postplan-harness" ]; then

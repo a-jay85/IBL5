@@ -1103,6 +1103,47 @@ need "session env sets PYTHONDONTWRITEBYTECODE=1" test "$(cat "$TMP/pydwb" 2>/de
 need "worktree pyc purged" test ! -e "$WTH/tools/postplan-harness/harness/__pycache__/holdrepeat.cpython-312.pyc"
 case_end holdrepeat-pycache-not-tamper
 
+# 54a (a harness/ package at the worktree root never shadows the real one: the launcher's cwd
+# is $WT, and a planted holdrepeat whose fix-recheck exits 0 must not be what runs. Ignored and
+# older than t0, so no guard removes it and every _hr_py call runs with it in place.)
+hr_plant() {  # <dir>: a harness package that records its import and exits 0 on any subcommand
+    mkdir -p "$1/harness"
+    printf 'open("%s", "a").write("init\\n")\n' "$TMP/planted.hit" > "$1/harness/__init__.py"
+    printf 'import sys\nopen("%s", "a").write("holdrepeat\\n")\nprint("ok")\nsys.exit(0)\n' "$TMP/planted.hit" > "$1/harness/holdrepeat.py"
+}
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"
+printf '/harness/\n' >> "$HR_EXCL"
+hr_plant "$WTH"
+rm -f "$TMP/planted.hit"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-fix.sh"
+hr_run
+cp "$TMP/exclude.orig" "$HR_EXCL"
+rm -rf "$WTH/harness"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+need "planted module never imported" test ! -e "$TMP/planted.hit"
+need "ledger written by the real module" ledger_has "fixed-refire-rc=0"
+case_end holdrepeat-planted-module-not-imported
+
+# 54b (a session that plants an untracked harness/ package at the worktree root is rejected:
+# the files never ride the push and are gone afterwards)
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; declare -f hr_plant; printf 'TMP=%q\nhr_plant .\n' "$TMP"; } > "$TMP/effects/hr-plant.sh"
+rm -f "$TMP/planted.hit"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-plant.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-planted-python
+need "DM names the planted path" dm_has "planted-python: harness/"
+need "origin unchanged" origin_is_tip
+need "no post-plan call" no_ppn
+need "planted files removed" test ! -e "$WTH/harness"
+need "worktree clean" wt_clean
+need "HEAD restored" head_is_tip
+need "planted module never imported" test ! -e "$TMP/planted.hit"
+case_end holdrepeat-planted-module-blocks-push
+
 # 55 (the plan comment is verified by the URL gh pr comment printed, so a first page of
 # comments that misses the new one does not count as "did not land")
 hr_reset

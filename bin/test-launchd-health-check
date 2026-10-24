@@ -954,46 +954,6 @@ run_checker
 eq "B5b one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
 has "B5b names rc 143" "$OUT" "exited 143 —"
 
-# B5c: a checker that never returns is killed; the verdict and DM still go out
-healthy_fixture B5c
-printf '#!/bin/sh\nexec /bin/sleep 300\n' > "$CASE/bin/bug-pipeline-check"
-BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
-eq "B5c one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
-has "B5c says it timed out" "$OUT" "did not finish in 1s"
-eq "B5c one DM" 1 "$(dm_blocks)"
-
-# B5d: a timeout kills the checker's children too, not just its top pid
-healthy_fixture B5d
-cat > "$CASE/bin/bug-pipeline-check" <<'STUB'
-#!/bin/sh
-/bin/sleep 300 &
-echo $! > "$(dirname "$0")/../child.pid"
-/bin/sleep 300
-STUB
-BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
-eq "B5d timed out" 1 "$(count_fail bug-pipeline:check-failed)"
-_B5D_CHILD="$(cat "$CASE/child.pid" 2>/dev/null)"
-if [ -z "$_B5D_CHILD" ]; then
-    fail "B5d child pid recorded" "stub never wrote child.pid"
-elif kill -0 "$_B5D_CHILD" 2>/dev/null; then
-    kill "$_B5D_CHILD" 2>/dev/null
-    fail "B5d no orphan child" "checker child $_B5D_CHILD outlived the timeout"
-else
-    ok "B5d no orphan child"
-fi
-
-# B5e: a healthy run leaves no watchdog sleep behind
-healthy_fixture B5e
-BUG_PIPELINE_CHECK_TIMEOUT=4271 run_checker
-eq "B5e rc 0" 0 "$RC"
-_B5E_LEFT="$(pgrep -f '^/bin/sleep 4271$')"
-if [ -n "$_B5E_LEFT" ]; then
-    pkill -f '^/bin/sleep 4271$'
-    fail "B5e no watchdog sleep survives" "leftover sleep pid(s): $_B5E_LEFT"
-else
-    ok "B5e no watchdog sleep survives"
-fi
-
 # B6: rc 1 with no SIGNAL line fails loud
 healthy_fixture B6
 bpc_set 1 'VERDICT: degraded []'

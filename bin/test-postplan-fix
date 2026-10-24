@@ -931,6 +931,76 @@ need "final line" final_is "$STDOUT" skip-dirty-worktree
 need "no claude call" no_args
 need "no ledger file" no_ledger
 case_end holdrepeat-dirty-worktree
+
+# 46 (a session that retitles, adds human-approved and arms auto-merge, then ends "blocked",
+# is caught and repaired: the pr-state guard runs on every marker outcome)
+printf 'SUMMARY: blocked\nHOLDREPEAT_FIX: blocked could not do it\n' > "$TMP/reply-hr-blocked"
+{ cat "$TMP/effects/hr-fix.sh"; printf 'printf "Other title\\tbug,human-approved\\tyes\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-prall.sh"
+for HR_END in blocked nomarker nothing gate; do
+    hr_reset
+    export CLAUDE_STUB_REPLY="$TMP/reply-hr-$HR_END" CLAUDE_STUB_EFFECT="$TMP/effects/hr-prall.sh"
+    hr_run
+    need "$HR_END: rc 21" test "$RC" = 21
+    need "$HR_END: final line" final_is "$STDOUT" gave-up-pr-state
+    need "$HR_END: title restored" gh_has "--title Fix widget"
+    need "$HR_END: label removed" gh_has "--remove-label human-approved"
+    need "$HR_END: auto-merge disabled" gh_has "--disable-auto"
+    need "$HR_END: DM names pr-state" dm_has "rejected by pr-state"
+    need "$HR_END: worktree clean" wt_clean
+    need "$HR_END: no post-plan call" no_ppn
+done
+case_end holdrepeat-pr-state-every-outcome
+
+# 47 (a session that commits AND retitles still gets its PR state repaired)
+hr_reset
+{ cat "$TMP/effects/hr-commit.sh"; printf 'printf "Other title\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-commit-title.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-commit-title.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "title restored" gh_has "--title Fix widget"
+need "HEAD restored" head_is_tip
+need "origin unchanged" origin_is_tip
+case_end holdrepeat-refs-and-pr-state
+
+# 48 (a ~/.claude/hooks edit behind a "blocked" ending is caught)
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; printf 'printf "x\\n" > "%s/.claude/hooks/sneaky.sh"\n' "$HOME"; } > "$TMP/effects/hr-hook.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-hook.sh"
+hr_run
+rm -f "$HOME/.claude/hooks/sneaky.sh"
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the hooks dir" dm_has ".claude/hooks"
+case_end holdrepeat-user-hook-blocked
+
+# 49 (launch machinery the launcher sources or execs is a gate path)
+for HR_GP in bin/lib/git-helpers.sh bin/lib/new-helper.sh bin/discord-dm bin/post-plan-fail-dm bin/wt-sync-tick; do
+    hr_reset
+    { cat "$TMP/effects/hr-fix.sh"; printf 'mkdir -p "%s"; printf "x\\n" >> "%s"\n' "$(dirname "$HR_GP")" "$HR_GP"; } > "$TMP/effects/hr-gp.sh"
+    export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-gp.sh"
+    hr_run
+    need "$HR_GP: rc 21" test "$RC" = 21
+    need "$HR_GP: final line" final_is "$STDOUT" gave-up-gate-path
+    need "$HR_GP: DM names the path" dm_has "$HR_GP"
+    need "$HR_GP: origin unchanged" origin_is_tip
+    need "$HR_GP: worktree clean" wt_clean
+done
+case_end holdrepeat-launch-machinery-gate
+
+# 50 (a failed push leaves no plan-edit comment)
+hr_reset
+printf '#!/bin/sh\nexit 1\n' > "$TMP/origin.git/hooks/pre-receive"; chmod +x "$TMP/origin.git/hooks/pre-receive"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planedit.sh"
+hr_run
+rm -f "$TMP/origin.git/hooks/pre-receive"
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-push
+need "no pr comment" test "$(gh_has 'pr comment' && echo yes || echo no)" = no
+need "no comment body written" test ! -e "$TMP/gh.comment"
+need "plan restored" plan_is_orig
+need "origin unchanged" origin_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-push-fails-no-comment
 hr_reset
 
 h_done

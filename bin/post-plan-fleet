@@ -135,9 +135,14 @@ MODE=fire         # fire | stop | stop-all
 STOP_PRS=()
 SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
-# Two independent literals would drift; one constant cannot.
-# 14400 covers one runner that holds its slot for a first pass (5400) plus the holdrepeat fix (up to 7200).
-CEILING_SECS="${POST_PLAN_FLEET_CEILING:-14400}"
+# Two independent literals would drift; one constant cannot. The default is derived from the
+# runner's own timeouts, which the runner header carries: a slot can be held for a first
+# post-plan-now pass plus the holdrepeat fix (its session and its post-plan re-fire), so a
+# caller never treats a slot that is still mid-fix as finished or stuck.
+PPN_TIMEOUT_SECS=5400        # one post-plan-now pass in the runner
+HR_FIX_TIMEOUT_SECS=7200     # bin/postplan-fix --holdrepeat: HR_TIMEOUT_SECS (1500) + one re-fire (5400) + 300 margin
+CEILING_MARGIN_SECS=1800     # launchd start, the DM, bootout
+CEILING_SECS="${POST_PLAN_FLEET_CEILING:-$((PPN_TIMEOUT_SECS + HR_FIX_TIMEOUT_SECS + CEILING_MARGIN_SECS))}"
 # Poll interval of the --wait block. Seam exists so the harness can drive a timeout in seconds.
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
@@ -667,6 +672,8 @@ fire_pr() {
         [[ ",$HOLDREPEAT_FIX_PRS," == *",$PR,"* ]] && _hf_arg=1
         printf 'HOLDREPEAT_FIX_ARG=%q\n' "$_hf_arg"
         printf 'POSTPLAN_FIX_BIN=%q\n' "${POST_PLAN_FLEET_POSTPLAN_FIX:-$ROOT/bin/postplan-fix}"
+        printf 'PPN_TIMEOUT_SECS=%q\n' "$PPN_TIMEOUT_SECS"
+        printf 'HR_FIX_TIMEOUT_SECS=%q\n' "$HR_FIX_TIMEOUT_SECS"
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
@@ -674,20 +681,20 @@ cd "$ROOT" || exit 1
 RC=0
 # The timeout line stays flush-left: bin/test-post-plan-fleet greps it as a whole line.
 if [ -z "$HOLDREPEAT_FIX_ARG" ]; then
-timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
+timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
 else
     : > "$LOG"
 fi
 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
 # Holdrepeat autofix: one bounded fix session for a MISSING / UNREALISED repeat hold.
 # Runs while $PLIST still exists (slot held) and before bootout, which ends this job.
-# The 7200 s ceiling is HR_TIMEOUT_SECS (1500) + one full post-plan re-fire (the 5400 above) + 300 s margin.
+# HR_FIX_TIMEOUT_SECS is HR_TIMEOUT_SECS (1500) + one full post-plan re-fire + 300 s margin.
 _hr_quiet=0
 _hr_first=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
 if [ -n "$HOLDREPEAT_FIX_ARG" ] || case "$_hr_first" in "RESULT: post-plan DECLINED"*) true ;; *) false ;; esac; then
     _hr_log="$LOG.holdrepeat-fix"
     _hr_rc=0
-    timeout 7200 "$POSTPLAN_FIX_BIN" --holdrepeat "$PR" > "$_hr_log" 2>&1 || _hr_rc=$?
+    timeout "$HR_FIX_TIMEOUT_SECS" "$POSTPLAN_FIX_BIN" --holdrepeat "$PR" > "$_hr_log" 2>&1 || _hr_rc=$?
     _hr_word=$(grep '^postplan-fix: holdrepeat result=' "$_hr_log" 2>/dev/null | tail -n 1 | sed 's/.*result=//')
     [ -n "$_hr_word" ] || _hr_word="no-result-rc=$_hr_rc"
     if [ "$_hr_rc" = 0 ] && [ "$_hr_word" = fixed ]; then

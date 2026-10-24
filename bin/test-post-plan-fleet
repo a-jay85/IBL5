@@ -256,7 +256,7 @@ end_case plist-shape
 # expands it to zero words.
 begin_case
 if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
-    grep -qxF 'timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
+    grep -qxF 'timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
         /tmp/post-plan-fleet-runner-1901.sh \
         || fail "runner-line-hand-started: runner lacks the post-plan-now line"
     grep -qxF "ALLOW_TEST_ONLY_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
@@ -299,7 +299,7 @@ _allow_stub_run() {  # $1 = runner path, $2 = stub argv output file
     chmod +x "$stub"
     ( ROOT=/tmp PR=1901 LOG=/dev/null RC=0 POST_PLAN_NOW_BIN="$stub"
       eval "$(grep -E '^(ALLOW_TEST_ONLY_ARG|STATE_CHANGED_ARG|REBASE_ONLY_ARG)=' "$runner")"
-      eval "$(grep -E '^timeout 5400 ' "$runner" | sed 's/^timeout 5400 //')" ) 2>/dev/null
+      eval "$(grep -E '^timeout "\$PPN_TIMEOUT_SECS" ' "$runner" | sed 's/^timeout "\$PPN_TIMEOUT_SECS" //')" ) 2>/dev/null
 }
 begin_case
 clean_slots
@@ -2884,8 +2884,8 @@ end_case result-unparseable-strict-holds
 
 # --- 6c.5: runner timeout fires for real (behavioral) -----------------------------------
 # Cases 39 and fleet-outcome-line fake rc=124 with a stub that exits 124. This case drives
-# the REAL timeout binary: the generated runner's 'timeout 5400' becomes 'timeout 1' and
-# the stub sleeps 30 s, so timeout kills it and rc=124 arises naturally.
+# the REAL timeout binary: the generated runner's PPN_TIMEOUT_SECS=5400 header becomes
+# PPN_TIMEOUT_SECS=1 and the stub sleeps 30 s, so timeout kills it and rc=124 arises naturally.
 _dm_timeout_arm() {  # $1 = arm id, $2 = stub body line; sets _T_ELAPSED
     local n="$1" body="$2" t0
     local stub="$SCRATCH/.local/bin/dm-cs-$n"
@@ -2894,11 +2894,11 @@ _dm_timeout_arm() {  # $1 = arm id, $2 = stub body line; sets _T_ELAPSED
     POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
         POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
         run_dm_driver --go >/dev/null 2>&1
-    grep -qF 'timeout 5400 ' "$_DM_RUNNER" 2>/dev/null \
-        || fail "$n: precondition: generated runner has no 'timeout 5400 ' literal"
-    sed 's/timeout 5400 /timeout 1 /' "$_DM_RUNNER" > "$_DM_RUNNER.t1" \
+    grep -qxF 'PPN_TIMEOUT_SECS=5400' "$_DM_RUNNER" 2>/dev/null \
+        || fail "$n: precondition: generated runner has no 'PPN_TIMEOUT_SECS=5400' header"
+    sed 's/^PPN_TIMEOUT_SECS=5400$/PPN_TIMEOUT_SECS=1/' "$_DM_RUNNER" > "$_DM_RUNNER.t1" \
         && mv "$_DM_RUNNER.t1" "$_DM_RUNNER"
-    grep -qF 'timeout 1 ' "$_DM_RUNNER" || fail "$n: sed rewrite to 'timeout 1 ' did not take"
+    grep -qxF 'PPN_TIMEOUT_SECS=1' "$_DM_RUNNER" || fail "$n: sed rewrite to 'PPN_TIMEOUT_SECS=1' did not take"
     t0=$SECONDS
     HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
     _T_ELAPSED=$((SECONDS - t0))
@@ -2962,6 +2962,35 @@ _rpath="$(echo "$out" | tail -1)"
 [[ "$(plist_count)" -eq 1 ]] || fail "wait-timeout-exits-nonzero: slot was removed, want 1 plist"
 clear_live_labels; clean_slots
 end_case wait-timeout-exits-nonzero
+
+# --- ceiling-covers-holdrepeat-fix --------------------------------------------------------
+# The default CEILING_SECS must cover a slot held for a first post-plan-now pass plus the
+# holdrepeat fix, and the fix timeout must cover postplan-fix's session plus one re-fire.
+# The runner must read the same values from its header, so the two cannot drift.
+begin_case
+_ceil="$(env -u POST_PLAN_FLEET_CEILING bash -c 'eval "$(sed -n "/^PPN_TIMEOUT_SECS=/,/^CEILING_SECS=/p" "$1")"; printf "%s %s %s\n" "${PPN_TIMEOUT_SECS:-}" "${HR_FIX_TIMEOUT_SECS:-}" "${CEILING_SECS:-}"' _ "$DRIVER")"
+read -r _c_ppn _c_hr _c_ceil <<< "$_ceil"
+_c_sess="$(sed -n 's/.*readonly HR_TIMEOUT_SECS=\([0-9]*\).*/\1/p' "$SCRIPT_DIR/postplan-fix")"
+if [[ -z "$_c_ppn" || -z "$_c_hr" || -z "$_c_ceil" || -z "$_c_sess" ]]; then
+    fail "ceiling-covers-holdrepeat-fix: could not read the timeouts (got '$_ceil', session '$_c_sess')"
+else
+    [[ $_c_ceil -ge $((_c_ppn + _c_hr)) ]] \
+        || fail "ceiling-covers-holdrepeat-fix: CEILING_SECS $_c_ceil < first pass $_c_ppn + fix $_c_hr"
+    [[ $_c_hr -ge $((_c_sess + _c_ppn)) ]] \
+        || fail "ceiling-covers-holdrepeat-fix: fix timeout $_c_hr < session $_c_sess + re-fire $_c_ppn"
+fi
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr 1901 >/dev/null 2>&1
+grep -qxF "PPN_TIMEOUT_SECS=$_c_ppn" /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "ceiling-covers-holdrepeat-fix: runner header lacks PPN_TIMEOUT_SECS=$_c_ppn"
+grep -qxF "HR_FIX_TIMEOUT_SECS=$_c_hr" /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "ceiling-covers-holdrepeat-fix: runner header lacks HR_FIX_TIMEOUT_SECS=$_c_hr"
+grep -qF 'timeout "$HR_FIX_TIMEOUT_SECS" "$POSTPLAN_FIX_BIN" --holdrepeat' /tmp/post-plan-fleet-runner-1901.sh 2>/dev/null \
+    || fail "ceiling-covers-holdrepeat-fix: runner fix line does not use HR_FIX_TIMEOUT_SECS"
+rm -f /tmp/post-plan-fleet-runner-1901.sh
+clean_slots
+end_case ceiling-covers-holdrepeat-fix
 
 # --- pr-list-fires-each ------------------------------------------------------------------
 begin_case

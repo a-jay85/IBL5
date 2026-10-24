@@ -2993,7 +2993,8 @@ PLANS_DIR="" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
 hm_fires "M-G empty PLANS_DIR"
 hm_cleanup
 
-# M-H: the suppressed PR frees its --max-ready slot for the next ordered PR.
+# M-H: with the autofix on, the marked PR is routed to the fix, and a routed PR counts against
+# --max-ready like any other: it keeps its ordered slot and the next PR is capped out.
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
@@ -3001,10 +3002,34 @@ hm_fixture 101 first-slug
 jq '. + [{"number":102,"headRefName":"second-slug","autoMergeRequest":null,"mergeStateStatus":"CLEAN"}]' \
     "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
     && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
-PR_CYCLE_HOLDREPEAT_AUTOFIX=0 PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
-[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "marker M-H: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
-grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
-grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
+[[ "$(cat "$(rundir)/stage1.txt")" == "101" ]] || fail "marker M-H: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 101"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" || fail "marker M-H: 102 was not capped out (out: $OUT)"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
+    || fail "marker M-H: argv lacks --holdrepeat-fix-prs=101: $(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF -- '--pr-list 101 ' <<< "$(sed -n 1p "$SCRATCH/ready.argv") " \
+    || fail "marker M-H: --pr-list is not just 101: $(sed -n 1p "$SCRATCH/ready.argv")"
+hm_cleanup
+
+# M-H2: two routed PRs and --max-ready 1. Only the first ordered PR reaches the fleet, and
+# the capped one is never handed to --holdrepeat-fix-prs, so no second paid session starts.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 102 second-slug
+cp "$SCRATCH/armed-state.json" "$SCRATCH/armed-state.102"
+hm_fixture 101 first-slug
+jq -s '.[0] + .[1]' "$SCRATCH/armed-state.json" "$SCRATCH/armed-state.102" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+rm -f "$SCRATCH/armed-state.102"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
+grep -qxF 102 "$(rundir)/stage1-holdrepeat-fix.txt" 2>/dev/null \
+    || fail "marker M-H2: precondition: 102 was not routed, the case proves nothing"
+[[ "$(cat "$(rundir)/stage1.txt")" == "101" ]] || fail "marker M-H2: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 101"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" || fail "marker M-H2: 102 was not capped out (out: $OUT)"
+_mh2_argv="$(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$_mh2_argv" || fail "marker M-H2: argv lacks --holdrepeat-fix-prs=101: $_mh2_argv"
+grep -qE -- '--holdrepeat-fix-prs=[0-9,]*102' <<< "$_mh2_argv" && fail "marker M-H2: capped 102 reached --holdrepeat-fix-prs: $_mh2_argv"
 hm_cleanup
 # M-I: an UNREALISED-ASSERTION marker written at another head never suppresses the PR, and an
 # empty headRefOid means the head is unknown, so the PR fires too.

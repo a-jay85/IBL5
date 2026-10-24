@@ -255,10 +255,13 @@ if [ "$HOLDREPEAT" = 1 ]; then
         _hr_finish "$HR_RC_GAVEUP" "gave-up-$1"
     }
     # Paths a fix session may never touch: the gates, the checkers this launcher re-runs,
-    # the arming conditions and the launch machinery itself.
+    # the arming conditions and the launch machinery itself. Prefix rules, so a new helper is
+    # covered without a list edit: bin/lib/* holds everything this script and bin/post-plan-now
+    # source; bin/post-plan* and bin/postplan* cover post-plan-now, post-plan-fail-dm and the
+    # fleet; bin/discord-* is the owner DM; bin/wt-sync-* is the tick post-plan-now runs.
     _hr_is_gate_path() {  # <repo-relative path>
         case "$1" in
-            bin/check-*|bin/lib/*|bin/post-plan-now|bin/post-plan-fleet|bin/postplan-fix|bin/pr-cycle|.github/workflows/*|.claude/settings*.json|.claude/hooks/*|.claude/rules/*|.claude/skills/post-plan/*|tools/postplan-harness/harness/*|tools/postplan-harness/runner.py) return 0 ;;
+            bin/check-*|bin/lib/*|bin/post-plan*|bin/postplan*|bin/pr-cycle*|bin/discord-*|bin/wt-sync-*|.github/workflows/*|.claude/settings*.json|.claude/hooks/*|.claude/rules/*|.claude/skills/post-plan/*|tools/postplan-harness/harness/*|tools/postplan-harness/runner.py) return 0 ;;
         esac
         return 1
     }
@@ -373,8 +376,9 @@ It must print no MISSING, MISSING-FILE or UNREALISED-ASSERTION line for these it
 Run the tests you wrote (bin/test-<x>, pytest under tools/postplan-harness, or phpunit in
 the worktree's Docker per its rules).
 
-Hard limits. Never edit bin/check-*, anything under .claude/hooks or ~/.claude/hooks,
-.github/workflows/*, tools/postplan-harness/harness/arming*.py or any arming condition.
+Hard limits. Never edit bin/check-*, bin/lib/*, bin/post-plan*, bin/postplan*, bin/pr-cycle*,
+bin/discord-*, bin/wt-sync-*, anything under .claude/hooks or ~/.claude/hooks,
+.github/workflows/*, tools/postplan-harness/harness/* or any arming condition.
 If an item can only be fixed by such an edit, stop and use the needs-gate-edit ending.
 Never run git commit, git push, git reset, git rebase, git merge, git stash, gh, or
 bin/post-plan-now. You run under CLAUDE_HEADLESS=1, where post-plan-now refuses; the
@@ -450,14 +454,9 @@ LAST line of the final message."
     # 4a. The launcher re-checks every outcome, not only "fixed": a session that ended blocked
     # may still have retitled the PR or edited a gate. Each guard runs before any push, and the
     # first failure reverts and gives up. The marker decides the outcome after the guards.
-    # 1. refs: the session was told never to commit, so any own-ref move is out of bounds.
-    REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
-    if [ "$(git -C "$WT" rev-parse HEAD)" != "$HEAD0" ] || [ "$REFS1" != "$REFS0" ]; then
-        _pf_restore_own_refs
-        _hr_reject refs "HEAD or the branch refs moved during the session"
-    fi
-    # 2. pr-state: no retitle, no new human-approved label, no armed auto-merge. Repair the
-    # remote first, then reject. A missing reading never counts as a pass.
+    # 1. pr-state: no retitle, no new human-approved label, no armed auto-merge. Repair the
+    # remote first, then reject. A missing reading never counts as a pass. It runs before the
+    # refs guard, because that guard exits and a remote change must be repaired either way.
     if ! _hr_pr_snapshot "$HR_TMP/pr.after"; then
         _hr_reject pr-state-unreadable "gh could not read the PR after the session"
     fi
@@ -483,6 +482,12 @@ LAST line of the final message."
         HR_PRBAD+="auto-merge armed; "
     fi
     if [ -n "$HR_PRBAD" ]; then _hr_reject pr-state "$HR_PRBAD"; fi
+    # 2. refs: the session was told never to commit, so any own-ref move is out of bounds.
+    REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
+    if [ "$(git -C "$WT" rev-parse HEAD)" != "$HEAD0" ] || [ "$REFS1" != "$REFS0" ]; then
+        _pf_restore_own_refs
+        _hr_reject refs "HEAD or the branch refs moved during the session"
+    fi
     # 3. gate-path: gate scripts, the main checkout and user-level hooks stay untouched.
     HR_PATHS="$(git -C "$WT" -c core.quotepath=off diff --no-renames --name-only HEAD; git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)"
     while IFS= read -r p; do

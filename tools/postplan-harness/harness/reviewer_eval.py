@@ -145,7 +145,6 @@ REVIEW_SURFACE_PATHS = (
     ".claude/review-shared/_review-agents.md",
     ".claude/review-shared/_security-agents.md",
     ".claude/review-shared/_review-rubric.md",
-    ".claude/skills/post-plan/_phase-4-review-audit.md",
 )
 MODEL_MAP_SOURCE = "tools/postplan-harness/harness/adapters/llm.py"
 MODEL_MAP_RE = re.compile(r"^MODEL_MAP = \{\n.*?^\}", re.M | re.S)

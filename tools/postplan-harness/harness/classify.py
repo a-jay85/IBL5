@@ -1,5 +1,5 @@
 """Phase 3 — diff classification. Deterministic port of
-.claude/skills/post-plan/_phase-3-classify-diff.md (the bash the model used to run turn-by-turn).
+the retired post-plan skill Phase 3 text (ported 2026-10-19; the bash the model used to run turn-by-turn).
 
 Pure functions: file list + unified diff text in, Classification out.
 """
@@ -53,7 +53,7 @@ _COMMENT_ADDED = re.compile(r"^\+\s*(//|#|/\*|\*)")
 _MODULE_REF = re.compile(r"(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)")
 _RETRO_ROW_RE = re.compile(r"^\|\s*\d{4}-\d{2}-\d{2}\b.*class:.*routed to:")
 
-# Agent E surface (mirrors _phase-3-classify-diff.md exactly)
+# Agent E surface (mirrors the retired post-plan skill Phase 3 text (ported 2026-10-19) exactly)
 _SHELL_INC = re.compile(r"(^|/)bin/|\.sh$")
 _SHELL_EXC = re.compile(r"\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$")
 _WORKFLOW = re.compile(r"^\.github/workflows/.*\.ya?ml$")

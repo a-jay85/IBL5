@@ -285,29 +285,6 @@ def test_tmp_state_shape_matches_what_the_reviewer_reads():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def test_tmp_templates_match_the_skill_engine():
-    """The /tmp path templates in gitad.py are byte-identical to those in _phase-2-conflict-resolution.md."""
-    gitad_path = os.path.join(
-        _REPO_ROOT, "tools", "postplan-harness", "harness", "adapters", "gitad.py"
-    )
-    skill_path = os.path.join(
-        _REPO_ROOT, ".claude", "skills", "post-plan", "_phase-2-conflict-resolution.md"
-    )
-    gitad_content = open(gitad_path).read()
-    skill_content = open(skill_path).read()
-    # Extract /tmp/postplan-conflict-* prefix strings (everything before {key} or <KEY>)
-    gitad_files_prefix = re.search(r'(/tmp/postplan-conflict-files-)', gitad_content)
-    gitad_notes_prefix = re.search(r'(/tmp/postplan-conflict-resolution-)', gitad_content)
-    skill_files_prefix = re.search(r'(/tmp/postplan-conflict-files-)', skill_content)
-    skill_notes_prefix = re.search(r'(/tmp/postplan-conflict-resolution-)', skill_content)
-    assert gitad_files_prefix is not None, "gitad.py missing /tmp/postplan-conflict-files- template"
-    assert gitad_notes_prefix is not None, "gitad.py missing /tmp/postplan-conflict-resolution- template"
-    assert skill_files_prefix is not None, "_phase-2-conflict-resolution.md missing files template"
-    assert skill_notes_prefix is not None, "_phase-2-conflict-resolution.md missing notes template"
-    assert gitad_files_prefix.group(1) == skill_files_prefix.group(1)
-    assert gitad_notes_prefix.group(1) == skill_notes_prefix.group(1)
-
-
 def test_collapse_guard_warn_is_carried_into_the_notes():
     """COLLAPSE-GUARD: WARN reaches collapse_warn and the notes body; absent on a clean run."""
     d, parent_tip, master_sha, key, branch = _make_squash_repo()

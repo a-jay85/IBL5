@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /pr-review, /security-audit, and /post-plan.
-last_verified: 2026-10-19
+last_verified: 2026-10-20
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -30,7 +30,7 @@ For rule-cited issues: **verify the rule is actually stated in the cited `.claud
 
 Return ONLY valid JSON: `[{"n": 1, "score": 75}, {"n": 2, "score": 0}, ...]`
 
-**Post-plan 4D votes instead of scoring.** `/post-plan` Phase 4D and the harness (`tools/postplan-harness/harness/review.py`) no longer request this JSON. Three code-reading verifiers vote `real` or `not-real` per finding, using the Automatic Zero and IBL5-specific false-positive sections below as rejection rules, and the posted score is derived from the tally (see `.claude/skills/post-plan/_phase-4-review-audit.md` § 4D). `/pr-review` and `/security-audit` keep using the scale above.
+**Post-plan 4D votes instead of scoring.** `/post-plan` Phase 4D and the harness (`tools/postplan-harness/harness/review.py`) no longer request this JSON. Three code-reading verifiers vote `real` or `not-real` per finding, using the Automatic Zero and IBL5-specific false-positive sections below as rejection rules, and the posted score is derived from the tally (see `tools/postplan-harness/harness/review.py`). `/pr-review` and `/security-audit` keep using the scale above.
 
 ---
 

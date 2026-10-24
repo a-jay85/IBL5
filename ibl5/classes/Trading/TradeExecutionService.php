@@ -81,7 +81,13 @@ class TradeExecutionService implements TradeExecutionServiceInterface
             return ['success' => false, 'error' => 'You are not authorized to act on this trade.'];
         }
 
-        $rows = $this->offerRepository->getTradesByOfferId($offerId);
+        // Completed rows are preserved for TRN export, so an unfiltered read is non-empty
+        // for an already-accepted offer. Drop them to match processTrade()'s pending-only
+        // lock query; otherwise cap/roster checks run against players who already moved.
+        $rows = array_values(array_filter(
+            $this->offerRepository->getTradesByOfferId($offerId),
+            static fn (array $row): bool => $row['approval'] !== 'completed'
+        ));
         if ($rows === []) {
             return ['success' => false, 'error' => TradeProcessorInterface::NO_TRADE_DATA_ERROR];
         }

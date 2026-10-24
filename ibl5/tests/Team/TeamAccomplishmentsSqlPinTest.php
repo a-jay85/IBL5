@@ -45,6 +45,10 @@ class TeamAccomplishmentsSqlPinTest extends TestCase
         return trim((string) preg_replace('/\s+/', ' ', $sql));
     }
 
+    /**
+     * Kills the Infection ConcatOperandRemoval mutants on the TeamAwardSql concatenations
+     * in TeamRepository::buildTeamAccomplishmentsQuery(): dropping any operand changes the text.
+     */
     #[Test]
     public function teamAccomplishmentsSqlTextIsPinned(): void
     {

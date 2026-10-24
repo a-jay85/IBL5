@@ -60,6 +60,9 @@ ROW_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \*\*[^*]+\*\*")
 
 # Condition (9) deterministic hold-trigger surface (the enumerable subset; the
 # bounded LLM verdict may ADD holds on top — never release one).
+# Raw regex: it matches SQL comment text too. merge_danger trigger 1 blanks comments with
+# sql_comments.strip_added_sql_comments first; condition (9) scans filtered_diff, which
+# classify.filter_diff has already stripped of migrations/, so it never meets a migration line.
 DESTRUCTIVE_SQL = re.compile(
     r"^\+.*\b(DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE\s+\S+\s+RENAME|RENAME\s+COLUMN|TRUNCATE)\b",
     re.IGNORECASE | re.MULTILINE,

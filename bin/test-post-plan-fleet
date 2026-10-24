@@ -3360,7 +3360,7 @@ end_case holdrepeat-fix-replaces-log
 # reports fixed, the DM must judge the re-fire's RESULT, never the stale rc=8. The re-fire
 # line carries no terminal=, so the DM falls to the RC branch and exposes a stale RC.
 _HR_PPRC=8
-_hr_run "$_hr_decline_line" $'RESULT: post-plan READY — PR #9901\npostplan-fix: holdrepeat result=fixed'
+_hr_run "$_hr_decline_line" $'RESULT: post-plan READY — PR #9901\npostplan-fix: holdrepeat refire rc=0\npostplan-fix: holdrepeat result=fixed'
 _HR_PPRC=0
 grep -qF 'post-plan-fleet: holdrepeat-fix=fixed' "$_DM_LOG" 2>/dev/null \
     || fail "holdrepeat-fix-resets-rc: log lacks holdrepeat-fix=fixed"
@@ -3369,6 +3369,38 @@ grep -qF 'post-plan-fleet: holdrepeat-fix=fixed' "$_DM_LOG" 2>/dev/null \
 grep -qF 'unconfirmed — no verdict marker' "$_DM_CAPTURE" 2>/dev/null \
     || fail "holdrepeat-fix-resets-rc: DM did not judge the re-fire's RESULT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 end_case holdrepeat-fix-resets-rc
+
+# --- case: holdrepeat-fix-refire-rc0-clean ----------------------------------------------
+# fixed + a re-fire that exited 0 and shipped: a clean shipped run, no crash DM.
+begin_case
+_hr_run "$_hr_decline_line" $'RESULT: post-plan READY — terminal=shipped-armed auto-merge=armed PR #9901\npostplan-fix: holdrepeat refire rc=0\npostplan-fix: holdrepeat result=fixed'
+[[ "$(_outcome_of)" == shipped ]] || fail "holdrepeat-fix-refire-rc0-clean: outcome '$(_outcome_of)'"
+! grep -qF 'runner exited rc=' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-rc0-clean: a clean re-fire sent a crash DM ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'without a refire rc line' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-rc0-clean: log flags a missing refire line"
+end_case holdrepeat-fix-refire-rc0-clean
+
+# --- case: holdrepeat-fix-refire-crash-dm -----------------------------------------------
+# fixed, but the re-fire crashed (rc=1, no RESULT line). RC takes the re-fire's exit, so the
+# DM is the runner-exited one, never the soft "unconfirmed".
+begin_case
+_hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat refire rc=1\npostplan-fix: holdrepeat result=fixed'
+grep -qF 'runner exited rc=1' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-crash-dm: DM is not 'runner exited rc=1' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'unconfirmed — no verdict marker' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-crash-dm: a crashed re-fire got the soft unconfirmed DM"
+end_case holdrepeat-fix-refire-crash-dm
+
+# --- case: holdrepeat-fix-refire-line-missing -------------------------------------------
+# fixed with no refire rc line: fail loud as rc=1, never read as a clean 0.
+begin_case
+_hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat result=fixed'
+grep -qF 'runner exited rc=1' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-line-missing: DM is not 'runner exited rc=1' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -qF 'post-plan-fleet: holdrepeat fixed without a refire rc line (rc=1)' "$_DM_LOG" 2>/dev/null \
+    || fail "holdrepeat-fix-refire-line-missing: log lacks the missing-line note"
+end_case holdrepeat-fix-refire-line-missing
 
 # --- case: holdrepeat-no-decline-no-fix -------------------------------------------------
 begin_case

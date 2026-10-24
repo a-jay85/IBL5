@@ -714,10 +714,13 @@ if [ "$_hr_run" = 1 ]; then
         cp "$LOG" "$LOG.declined" 2>/dev/null || true
         cp "$_hr_log" "$LOG"
         # RC still holds the first pass's decline exit (8). notify() must judge the re-fire.
-        # RC takes the re-fire's own exit. A missing line (older fix, stub) reads as 0.
+        # RC takes the re-fire's own exit. postplan-fix prints the line on every fixed path, so
+        # a missing or garbled line fails loud as rc=1, never a clean 0.
         _hr_refire_rc=$(grep '^postplan-fix: holdrepeat refire rc=' "$_hr_log" 2>/dev/null | tail -n 1 | sed 's/.*rc=//')
         case "$_hr_refire_rc" in
-            ''|*[!0-9]*) RC=0 ;;
+            ''|*[!0-9]*)
+                RC=1
+                echo "post-plan-fleet: holdrepeat fixed without a refire rc line (rc=1)" >> "$LOG" ;;
             *) RC="$_hr_refire_rc" ;;
         esac
     else

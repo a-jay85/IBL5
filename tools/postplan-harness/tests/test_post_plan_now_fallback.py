@@ -1,6 +1,8 @@
 import os, pathlib, re, shlex, shutil, subprocess
 import pytest
 
+import ppn_launch
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
 
@@ -320,7 +322,7 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
     shim = tmp_path / "shim"; shim.mkdir()
-    (shim / "launchctl").write_text(launchctl_stub or "#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").write_text(launchctl_stub or ppn_launch.RECORDING_LAUNCHCTL)
     (shim / "launchctl").chmod(0o755)
     (shim / "gh").write_text(
         '#!/bin/sh\nif [ -n "${FAKE_PR_NUMBER:-}" ]; then echo "$FAKE_PR_NUMBER"; fi\nexit 0\n')
@@ -330,6 +332,7 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
     (harness / "run").chmod(0o755)
 
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               LCTL_ARGV_LOG=str(tmp_path / "launchctl.argv"),
                PATH=f"{shim}:{os.environ['PATH']}")
     env.pop("POST_PLAN_SKILL", None)
     env.pop("FAKE_PR_NUMBER", None)
@@ -344,11 +347,7 @@ def _generate_cmd(tmp_path, extra_env=None, args=()):
     r = _run_ppn(tmp_path, args=args, extra_env=extra_env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"expected one generated plist, got {plists}"
-    body = plists[0].read_text()
-    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
-    return cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    return ppn_launch.launched_cmd(r.stdout, home)
 
 def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
@@ -838,20 +837,51 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False, extra_args=(),
     )
 
 
-def test_detached_default_still_bootstraps(tmp_path):
-    """Row 1: detached default (no flag) still writes the plist and CMD ends launchctl bootout.
+def test_detached_default_submits_script(tmp_path):
+    """Row 1: detached default (no flag) submits a per-run script and writes no plist.
 
-    $LABEL is already interpolated when post-plan-now assembles the CMD string, so the
-    CMD tail reads 'launchctl bootout gui/$(id -u)/com.ibl5.postplan-now-<slug>-<ts>'.
+    One `launchctl submit` carries the label, the log twice, and a /bin/bash -lc wrapper
+    that runs the script; the script's CMD ends by removing itself.
     """
-    cmd = _generate_cmd(tmp_path)
+    r = _run_ppn(tmp_path)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     home = tmp_path / "home"
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"detached mode must write exactly one plist, found: {plists}"
-    assert re.search(
-        r'launchctl bootout gui/\$\(id -u\)/com\.ibl5\.postplan-now-wt-feature-\S+$',
-        cmd
-    ), f"CMD must end with launchctl bootout: {cmd[-160:]!r}"
+    assert list((home / "Library" / "LaunchAgents").iterdir()) == [], "detached mode must write no plist"
+    cmd = ppn_launch.launched_cmd(r.stdout, home)
+    script = re.search(r"^  script: (\S+)", r.stdout, re.M).group(1)
+    log = re.search(r"^  log:    (\S+)", r.stdout, re.M).group(1)
+    calls = ppn_launch.submit_calls(tmp_path / "launchctl.argv")
+    assert len(calls) == 1, calls
+    call = calls[0]
+    label = call[2]
+    assert re.match(r"^com\.ibl5\.postplan-now-wt-feature-\d{8}-\d{6}-\d+$", label), label
+    assert call[1:5] == ["-l", label, "-o", log], call
+    assert call[5:7] == ["-e", log], call
+    assert call[7:9] == ["--", "/usr/bin/env"], call
+    assert f"HOME={home}" in call[9:], call
+    assert any(a.startswith("PATH=") and "/usr/bin" in a for a in call[9:]), call
+    assert call[-3] == "/bin/bash" and call[-2] == "-lc", call
+    wrapper = call[-1]
+    assert script in wrapper and f"{script}.once" in wrapper, wrapper
+    assert "bootout" not in cmd
+    assert cmd.endswith(f"""conclude_status_badge "$pp_rc"; rm -f '{script}'"""), cmd[-160:]
+
+
+def test_script_sets_path_and_cwd_first(tmp_path):
+    """The script runs under a bare launchd env: PATH is exported and the cd happens
+    before the first claude call."""
+    cmd = _generate_cmd(tmp_path)
+    assert cmd.startswith("export PATH="), cmd[:60]
+    assert cmd.index('cd "') < cmd.index("claude -p")
+
+
+def test_submit_failure_removes_script(tmp_path):
+    """A failed `launchctl submit` exits 1, says so, and leaves no per-run script behind."""
+    r = _run_ppn(tmp_path, extra_env={"LCTL_SUBMIT_RC": "1"})
+    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "launchctl submit failed" in r.stderr
+    leftovers = list(pathlib.Path(os.environ["POSTPLAN_LOG_DIR"]).glob("post-plan-now-wt-feature-*.sh"))
+    assert leftovers == [], leftovers
 
 
 def test_rejects_misspelled_foreground():
@@ -866,12 +896,15 @@ def test_rejects_misspelled_foreground():
 
 
 def test_foreground_writes_no_plist(tmp_path):
-    """Row 3: --foreground writes no file under $HOME/Library/LaunchAgents/."""
+    """Row 3: the foreground path writes neither a plist nor a script, and submits nothing."""
     r = _run_foreground(tmp_path, 0)
     home = tmp_path / "home"
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert len(plists) == 0, \
-        f"--foreground must write no plist (exec happens before plist code), found: {plists}"
+        f"--foreground must write no plist (exec happens before launch code), found: {plists}"
+    scripts = list(pathlib.Path(os.environ["POSTPLAN_LOG_DIR"]).glob("post-plan-now-*.sh"))
+    assert scripts == [], f"--foreground must write no per-run script, found: {scripts}"
+    assert ppn_launch.submit_calls(tmp_path / "launchctl.argv") == []
     # Secondary: no 'launchctl bootstrap' should appear in stdout or stderr.
     assert "launchctl bootstrap" not in r.stdout + r.stderr
 
@@ -1053,7 +1086,7 @@ def test_pr_flag_refuses_a_fork_pr(tmp_path):
 
 
 def test_pr_flag_targets_the_matching_worktree_and_exports_plan_slug(tmp_path):
-    """--pr resolves the worktree, writes one plist, and injects PLAN_SLUG before cd."""
+    """--pr resolves the worktree, writes one script, and injects PLAN_SLUG before cd."""
     main_root, wt_root = _fixture_worktree(tmp_path, "pr-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
@@ -1075,11 +1108,7 @@ def test_pr_flag_targets_the_matching_worktree_and_exports_plan_slug(tmp_path):
                        capture_output=True, text=True,
                        cwd=str(wt_root), env=env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"expected one plist, got {plists}"
-    body = plists[0].read_text()
-    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
-    cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    cmd = ppn_launch.launched_cmd(r.stdout, home)
     assert "export PLAN_SLUG=" in cmd
     assert "pr-branch" in cmd
     assert f'cd "{wt_root}"' in cmd
@@ -1111,13 +1140,9 @@ def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
                        capture_output=True, text=True,
                        cwd=str(wt_root), env=env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"expected one plist, got {plists}"
     assert "plan-blind" in r.stderr or "no plan at" in r.stderr, \
         f"expected plan-missing warning in stderr: {r.stderr!r}"
-    body = plists[0].read_text()
-    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
-    cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    cmd = ppn_launch.launched_cmd(r.stdout, home)
     assert "export PLAN_SLUG=" in cmd, "PLAN_SLUG must be in CMD even in plan-blind mode"
     assert "pr-branch" in cmd
 
@@ -1435,15 +1460,11 @@ def test_ci_clause_exits_zero_on_garbage_file(tmp_path):
 
 # --- Phase 2: session-id sidecar tests ---------------------------------------------------
 
-def _plist_log_path(tmp_path):
-    """Return the log path embedded in the generated plist's StandardOutPath."""
-    home = tmp_path / "home"
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"expected one plist, got {plists}"
-    body = plists[0].read_text()
-    m = re.search(r"<key>StandardOutPath</key>\s*<string>(.*?)</string>", body, re.S)
-    assert m, "StandardOutPath not found in plist"
-    return m.group(1).replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+def _run_log_path(tmp_path):
+    """Return the one run log the detached launch wrote into POSTPLAN_LOG_DIR."""
+    logs = list(pathlib.Path(os.environ["POSTPLAN_LOG_DIR"]).glob("post-plan-now-wt-feature-*.log"))
+    assert len(logs) == 1, f"expected one log, got {logs}"
+    return str(logs[0])
 
 
 def test_generated_cmd_pins_exactly_one_session_id(tmp_path):
@@ -1466,7 +1487,7 @@ def test_session_id_matches_the_sidecar(tmp_path):
     assert matches, "no --session-id found in cmd"
     uuid = matches[0]
 
-    log_path = _plist_log_path(tmp_path)
+    log_path = _run_log_path(tmp_path)
     sidecar = pathlib.Path(log_path[:-4] + ".session")
     try:
         assert sidecar.exists(), f"sidecar not found at {sidecar}"
@@ -1723,3 +1744,79 @@ def test_detached_cmd_carries_postplan_force(tmp_path):
     assert "POSTPLAN_FORCE=1 POSTPLAN_LOG_PATH=" in cmd
     plain = _generate_cmd(tmp_path / "plain")
     assert "POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain
+
+
+_STATE_CHANGED_PROBE_HARNESS = (
+    '#!/bin/sh\nprintf \'%s\' "${POSTPLAN_STATE_CHANGED-unset}" > "$FORCE_PROBE"\nexit 0\n')
+
+
+def test_state_changed_threads_env_to_harness(tmp_path, monkeypatch):
+    """--state-changed reaches the harness process as POSTPLAN_STATE_CHANGED=1 (foreground)."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_STATE_CHANGED", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--state-changed",),
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_rebase_only_threads_state_changed_env_to_harness(tmp_path, monkeypatch):
+    """--rebase-only implies --state-changed, so the harness also sees POSTPLAN_STATE_CHANGED=1."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.delenv("POSTPLAN_STATE_CHANGED", raising=False)
+    _run_foreground(tmp_path, 0, with_claude_stub=True, extra_args=("--rebase-only",),
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "1"
+
+
+def test_no_state_changed_passes_zero_not_ambient(tmp_path, monkeypatch):
+    """Without the flag the harness sees POSTPLAN_STATE_CHANGED=0 even if the caller exported 1."""
+    probe = tmp_path / "sc-probe.txt"
+    monkeypatch.setenv("FORCE_PROBE", str(probe))
+    monkeypatch.setenv("POSTPLAN_STATE_CHANGED", "1")
+    _run_foreground(tmp_path, 0, with_claude_stub=True,
+                    harness_body=_STATE_CHANGED_PROBE_HARNESS)
+    assert probe.read_text() == "0"
+
+
+def test_detached_cmd_carries_postplan_state_changed(tmp_path):
+    """Both HARNESS_SEG lines carry the var; the detached one is checked here, FORCE order intact."""
+    cmd = _generate_cmd(tmp_path, args=("--state-changed",))
+    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in cmd
+    rebase = _generate_cmd(tmp_path / "rebase", args=("--rebase-only",))
+    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in rebase
+    plain = _generate_cmd(tmp_path / "plain")
+    assert "POSTPLAN_STATE_CHANGED=0 POSTPLAN_FORCE=0 POSTPLAN_LOG_PATH=" in plain
+    assert "POSTPLAN_STATE_CHANGED=1" not in plain
+
+
+def test_state_changed_rejects_value_form(tmp_path):
+    """--state-changed is a BARE flag. Catches a permissive `--state-changed=*)` arm."""
+    r = _run_ppn(tmp_path, args=("--state-changed=1",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode != 0
+    assert "unknown argument '--state-changed=1'" in r.stderr, f"got {r.stderr!r}"
+
+
+@pytest.mark.parametrize("argv_log_mode", ["unset", "empty"])
+@pytest.mark.parametrize("submit_rc_mode", ["unset", "empty"])
+def test_recording_stub_env_unset_and_empty(tmp_path, argv_log_mode, submit_rc_mode):
+    """LCTL_ARGV_LOG and LCTL_SUBMIT_RC: unset and empty both mean no log, rc 0.
+
+    An empty LCTL_SUBMIT_RC must never reach int(""), which raises ValueError, and an
+    empty LCTL_ARGV_LOG must never be opened as a path.
+    """
+    stub = tmp_path / "launchctl"
+    stub.write_text(ppn_launch.RECORDING_LAUNCHCTL)
+    stub.chmod(0o755)
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("LCTL_ARGV_LOG", "LCTL_SUBMIT_RC")}
+    if argv_log_mode == "empty":
+        env["LCTL_ARGV_LOG"] = ""
+    if submit_rc_mode == "empty":
+        env["LCTL_SUBMIT_RC"] = ""
+    r = subprocess.run([str(stub), "submit", "-l", "com.ibl5.x"], cwd=tmp_path,
+                       env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["launchctl"]

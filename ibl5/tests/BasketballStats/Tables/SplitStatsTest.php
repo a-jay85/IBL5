@@ -223,11 +223,11 @@ final class SplitStatsTest extends TestCase
         ));
 
         $this->assertSame(
-            ['mapRows', 'renderHeader', 'renderPlayerRow'],
+            ['mapRows', 'renderPlayerRow'],
             array_map(static fn (\ReflectionMethod $m): string => $m->getName(), $helpers)
         );
 
-        $expectedReturnTypes = ['mapRows' => 'array', 'renderHeader' => 'string', 'renderPlayerRow' => 'string'];
+        $expectedReturnTypes = ['mapRows' => 'array', 'renderPlayerRow' => 'string'];
         foreach ($helpers as $helper) {
             $this->assertTrue($helper->isPrivate(), $helper->getName());
             $this->assertTrue($helper->isStatic(), $helper->getName());

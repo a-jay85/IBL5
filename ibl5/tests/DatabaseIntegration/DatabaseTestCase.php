@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
-use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,9 +12,10 @@ use PHPUnit\Framework\TestCase;
  * - Connects via env vars: DB_HOST, DB_USER, DB_PASS, DB_NAME
  * - Sets MYSQLI_OPT_INT_AND_FLOAT_NATIVE to match production
  * - Wraps each test in begin_transaction() / rollback() for isolation
- * - Excluded from default PHPUnit suite via #[Group('database')]
+ * - Each concrete subclass declares its own #[Group('database')], which
+ *   phpunit.xml excludes from the default suite. This abstract base carries
+ *   no #[Group]: PHPUnit ignores one here and would inherit it in PHPUnit 14.
  */
-#[Group('database')]
 abstract class DatabaseTestCase extends TestCase
 {
     protected \mysqli $db;

@@ -12,9 +12,10 @@ use Team\Team;
 use UI\TeamCellHelper;
 
 /**
- * TeamStatsRowHelper - the HTML fragments shared byte-for-byte by SeasonAverages,
- * SeasonTotals and Per36Minutes: the head prefix, the player-row prefix and the
- * footer label cells.
+ * TeamStatsRowHelper - the HTML fragments shared byte-for-byte across the team stats
+ * tables. SeasonAverages, SeasonTotals and Per36Minutes share the head prefix, the
+ * player-row prefix and the footer label cells. SplitStats and PeriodAverages share
+ * the whole per-game averages <thead> block.
  *
  * Holds no state and never receives a database handle or a logged-in identity;
  * TeamStatsRowHelperTest pins that structurally. Every HTML-escape call sits
@@ -74,5 +75,38 @@ final class TeamStatsRowHelper
             . '            <td>' . $games . "</td>\n"
             . '            <td>' . $games . "</td>\n"
             . "            <td class=\"sep-r-team\"></td>\n";
+    }
+
+    /**
+     * The per-game averages `<thead>` block (21 header cells) shared by SplitStats and
+     * PeriodAverages, byte-for-byte the former inline template.
+     */
+    public static function perGameAveragesHead(): string
+    {
+        return "    <thead>\n"
+            . "        <tr>\n"
+            . "            <th>Pos</th>\n"
+            . '            <th class="sticky-col">Player</th>' . "\n"
+            . "            <th>g</th>\n"
+            . '            <th class="sep-r-team">min</th>' . "\n"
+            . "            <th>fgm</th>\n"
+            . "            <th>fga</th>\n"
+            . "            <th>fgp</th>\n"
+            . "            <th>ftm</th>\n"
+            . "            <th>fta</th>\n"
+            . "            <th>ftp</th>\n"
+            . "            <th>3gm</th>\n"
+            . "            <th>3ga</th>\n"
+            . '            <th class="sep-r-team">3gp</th>' . "\n"
+            . "            <th>orb</th>\n"
+            . "            <th>reb</th>\n"
+            . "            <th>ast</th>\n"
+            . "            <th>stl</th>\n"
+            . "            <th>to</th>\n"
+            . "            <th>blk</th>\n"
+            . "            <th>pf</th>\n"
+            . "            <th>pts</th>\n"
+            . "        </tr>\n"
+            . "    </thead>\n";
     }
 }

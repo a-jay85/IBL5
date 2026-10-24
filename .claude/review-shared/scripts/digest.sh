@@ -19,8 +19,8 @@
 # defeating the purpose of the skip.
 #
 # Label list note: skip-review.sh carries a duplicate of the five LABELS below. The two
-# must remain byte-identical; bin/test-pr-ready-now asserts this. A label change here
-# requires the same change in skip-review.sh.
+# must remain byte-identical; bin/test-post-plan-fleet row 24e asserts both carry the
+# same label set. A label change here requires the same change in skip-review.sh.
 
 set -euo pipefail
 

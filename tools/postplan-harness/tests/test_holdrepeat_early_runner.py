@@ -200,6 +200,38 @@ def test_force_env_zero_still_declines(tmp_path, dm, monkeypatch):
     assert _calls(ledger) == 0
 
 
+def test_state_changed_env_proceeds(tmp_path, dm, monkeypatch):
+    _first_hold(tmp_path)
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    monkeypatch.setenv("POSTPLAN_STATE_CHANGED", "1")
+    res, ledger, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal != TerminalState.HOLD_REPEAT_DECLINED
+    assert _calls(ledger) > 0
+    assert any("phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)" in line
+               for line in res.audit)
+    assert not any("skipped (POSTPLAN_FORCE=1)" in line for line in res.audit)
+
+
+def test_state_changed_env_unset_still_declines(tmp_path, dm, monkeypatch):
+    _first_hold(tmp_path)
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    monkeypatch.delenv("POSTPLAN_STATE_CHANGED", raising=False)
+    res, ledger, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert _calls(ledger) == 0
+
+
+@pytest.mark.parametrize("value", ["", "0", "true", "yes", " 1"])
+def test_state_changed_env_other_values_still_decline(tmp_path, dm, monkeypatch, value):
+    _first_hold(tmp_path)
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    monkeypatch.setenv("POSTPLAN_STATE_CHANGED", value)
+    res, ledger, _ = _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert res.terminal == TerminalState.HOLD_REPEAT_DECLINED
+    assert _calls(ledger) == 0
+    assert not any("POSTPLAN_STATE_CHANGED" in line for line in res.audit)
+
+
 def test_early_decline_dm_once(tmp_path, dm):
     res1 = _first_hold(tmp_path)
     assert _record(tmp_path)["repeat_count"] == 1
@@ -417,6 +449,15 @@ def test_force_writes_no_marker(tmp_path, dm, plan_file, monkeypatch):
     monkeypatch.setenv("POSTPLAN_FORCE", "1")
     _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
     assert not _marker_file(tmp_path).exists()
+
+
+def test_state_changed_writes_no_marker(tmp_path, dm, plan_file, monkeypatch):
+    _first_hold(tmp_path)
+    monkeypatch.delenv("POSTPLAN_FORCE", raising=False)
+    monkeypatch.setenv("POSTPLAN_STATE_CHANGED", "1")
+    _run(tmp_path, 2, fixture=_fixture(diff=DIFF_XY))
+    assert not _marker_file(tmp_path).exists()
+    assert "Marker:" not in dm.log.read_text()
 
 
 def test_proceed_writes_no_marker(tmp_path, dm, plan_file):

@@ -56,8 +56,7 @@ export default [
       'playwright/expect-expect': 'warn',
       // TODO: tighten playwright/prefer-web-first-assertions to error after burn-down (41 violations)
       'playwright/prefer-web-first-assertions': 'warn',
-      // TODO: tighten playwright/no-networkidle to error after burn-down (3 violations)
-      'playwright/no-networkidle': 'warn',
+      'playwright/no-networkidle': 'error',
 
       // Force every test/expect import inside tests/e2e/** to go through
       // fixtures/base.ts, which overrides the `page` fixture to attach the

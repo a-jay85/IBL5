@@ -1,5 +1,5 @@
 name: All checks settled
-# Event-driven replacement for the polling `All checks green` waiter (ADR-0149 addendum).
+# Event-driven required aggregator (ADR-0149 addendum); it replaced the retired polling `All checks green` waiter.
 # workflow_run events run master's copy of this file, for seconds, once per sibling
 # completion, and write the `All checks settled` commit status on the PR head SHA.
 # workflow_dispatch runs the copy on the dispatched ref, so dispatch from master only.
@@ -13,7 +13,6 @@ on:
     # Every PR-triggered workflow name; bin/check-composite-contracts A6 pins this list
     # to the set of workflows with a pull_request/pull_request_target trigger.
     workflows:
-      - All checks green
       - Auto-mergeable Label
       - bun audit — tracking issue
       - Dependabot Auto-Merge
@@ -82,5 +81,4 @@ jobs:
             --context='All checks settled' --target-url="$RUN_URL" \
             --self='Aggregate check status,All checks settled' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
-            --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure,All checks green' \
-            --ignore-workflows='All checks green'
+            --ignore='human-signoff,needs-a-human label,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure'

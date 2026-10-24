@@ -470,7 +470,7 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
         // CI seed has modern games (dates >> 2007-02-04), so passing the real DB
         // always makes the gate pass. Inject a Season stub that returns '' instead,
         // so the gate fires correctly regardless of seed state.
-        $stubSeason = $this->createMock(\Season\Season::class);
+        $stubSeason = self::createStub(\Season\Season::class);
         $stubSeason->method('getLastBoxScoreDate')->willReturn('');
         $processor = new BoxscoreProcessor($this->db, season: $stubSeason);
 

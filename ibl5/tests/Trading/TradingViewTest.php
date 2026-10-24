@@ -338,7 +338,8 @@ class TradingViewTest extends TestCase
 
         $this->assertStringContainsString('West', $html);
         $this->assertStringContainsString('East', $html);
-        $this->assertStringContainsString('Miami Heat', $html);
+        $this->assertStringContainsString('<span class="ibl-team-cell__text"><span class="ibl-team-cell__city">Miami </span>Heat</span>', $html);
+        $this->assertStringNotContainsString('aria-label', $html);
     }
 
     public function testRenderTradeReviewEscapesTeamNames(): void
@@ -517,8 +518,9 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTeamSelectionLinks($teams);
 
-        $this->assertStringContainsString('Los Angeles Lakers', $html);
-        $this->assertStringContainsString('Boston Celtics', $html);
+        $this->assertStringContainsString('<span class="ibl-team-cell__text"><span class="ibl-team-cell__city">Los Angeles </span>Lakers</span>', $html);
+        $this->assertStringContainsString('<span class="ibl-team-cell__text"><span class="ibl-team-cell__city">Boston </span>Celtics</span>', $html);
+        $this->assertStringNotContainsString('aria-label', $html);
         $this->assertStringContainsString('partner=Lakers', $html);
         $this->assertStringContainsString('partner=Celtics', $html);
     }

@@ -1,5 +1,6 @@
 """Unit tests for harness/merge_danger.py — the PR body's Merge danger field."""
 import os
+import re
 import sys
 
 import pytest
@@ -52,6 +53,65 @@ def test_destructive_text_outside_a_migration_is_ignored():
     diff = (_migration_diff(MIG, "ALTER TABLE t ADD COLUMN c INT;")
             + _migration_diff("docs/x.md", "DROP TABLE example in prose"))
     assert _derive([("A", MIG), ("A", "docs/x.md")], diff).door == "two-way"
+
+
+@pytest.mark.parametrize("stmt", [
+    "ALTER TABLE t DROP COLUMN c;",
+    "DROP TABLE t;",
+    "TRUNCATE t;",
+    "ALTER TABLE t RENAME COLUMN a TO b;",
+    "ALTER TABLE t RENAME TO u;",
+])
+def test_each_destructive_statement_still_forces_one_way(stmt):
+    d = _derive([("A", MIG)], _migration_diff(MIG, stmt))
+    assert d.door == "one-way"
+    assert f"destructive-migration:{MIG}" in d.triggers
+
+
+def test_comment_only_destructive_text_in_migration_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "-- Rollback: ALTER TABLE t DROP COLUMN c;",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+    assert d.triggers == ()
+
+
+def test_hash_comment_destructive_text_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "# TRUNCATE t before rerun",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+
+
+def test_block_comment_destructive_text_in_migration_is_two_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/*", "DROP TABLE t", "*/",
+                                              "ALTER TABLE t ADD COLUMN c INT;"))
+    assert d.door == "two-way"
+
+
+def test_destructive_statement_with_trailing_comment_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "ALTER TABLE t DROP COLUMN c; -- bye"))
+    assert d.door == "one-way"
+    assert f"destructive-migration:{MIG}" in d.triggers
+
+
+def test_destructive_after_closed_block_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/* note */ ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_destructive_inside_unterminated_block_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/* start", "ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_dash_dash_inside_string_does_not_hide_statement():
+    d = _derive([("A", MIG)], _migration_diff(
+        MIG, "INSERT INTO t VALUES ('x -- y'); ALTER TABLE t DROP COLUMN c;"))
+    assert d.door == "one-way"
+
+
+def test_executable_comment_drop_is_one_way():
+    d = _derive([("A", MIG)], _migration_diff(MIG, "/*!40000 DROP TABLE t */"))
+    assert d.door == "one-way"
 
 
 def test_db_sync_prod_is_external_one_way():
@@ -177,6 +237,163 @@ def test_llm_why_is_sanitized_and_clamped():
     out = md.merge_verdicts(TWO, None, None, "line one | pipe\nline two " + "x" * 400)
     assert "\n" not in out.why and "|" not in out.why
     assert len(out.why) <= md.WHY_MAX
+
+
+def test_reapplying_merge_verdicts_does_not_duplicate_the_prefix():
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, "drops the trade_mode column data for every team")
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    third = md.merge_verdicts(ONE, second.door, second.blast, second.why)
+    assert second.why == first.why == third.why
+    assert first.why.count("mechanical:") == 1
+    assert first.why.endswith("for every team")
+
+
+def test_reapplication_is_a_fixed_point_after_truncation():
+    llm = "this sentence is exactly forty chars ok " + "y" * 300
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    assert len(first.why) <= md.WHY_MAX
+    assert second.why == first.why
+    assert second.why.count("mechanical:") == 1
+
+
+def test_reapplication_is_a_fixed_point_with_a_long_prefix():
+    long_mech = md.MergeDanger("one-way", ONE.blast, "m" * 185)
+    first = md.merge_verdicts(long_mech, "one-way", ONE.blast, "z" * 300)
+    second = md.merge_verdicts(long_mech, first.door, first.blast, first.why)
+    assert first.why == long_mech.why
+    assert second.why == first.why
+
+
+def test_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    pad = md.WHY_MAX - len(ONE.why) - 2
+    llm = "a" * (pad - 1) + " tail words past the cut"
+    first = md.merge_verdicts(ONE, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(ONE, first.door, first.blast, first.why)
+    assert not first.why.endswith(" ")
+    assert second.why == first.why
+
+
+def test_two_way_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    llm = "b" * (md.WHY_MAX - 1) + " tail words past the cut"
+    first = md.merge_verdicts(TWO, None, None, llm)
+    second = md.merge_verdicts(TWO, first.door, first.blast, first.why)
+    assert not first.why.endswith(" ")
+    assert second.why == first.why
+
+
+def test_long_prefix_reapplication_is_a_fixed_point_when_the_cut_lands_after_a_space():
+    long_mech = md.MergeDanger("one-way", ONE.blast, "mechanical: " + "m" * 158)
+    llm = "c" * (md.WHY_MAX - len(long_mech.why) - 3) + " " + "d" * 50
+    first = md.merge_verdicts(long_mech, "one-way", ONE.blast, llm)
+    second = md.merge_verdicts(long_mech, first.door, first.blast, first.why)
+    third = md.merge_verdicts(long_mech, second.door, second.blast, second.why)
+    assert first.why != long_mech.why
+    assert not first.why.endswith(" ")
+    assert first.why == second.why == third.why
+
+
+def test_doubled_prefix_from_an_older_harness_collapses_to_one():
+    doubled = f"{ONE.why}. {ONE.why}. Harness code, tests and skill docs only"
+    assert md._llm_core(doubled) == "Harness code, tests and skill docs only"
+    out = md.merge_verdicts(ONE, "one-way", ONE.blast, doubled)
+    assert out.why.count("mechanical:") == 1
+
+
+def test_prefixed_prior_with_short_core_falls_back_to_mechanical():
+    assert md.merge_verdicts(ONE, "one-way", ONE.blast, f"{ONE.why}. tiny").why == ONE.why
+
+
+def test_stale_prefix_is_dropped_when_floor_is_two_way():
+    out = md.merge_verdicts(TWO, None, None,
+                            "mechanical: arming-path:x/y.py. edits the arming predicate library itself")
+    assert out.why == "edits the arming predicate library itself"
+
+
+def test_llm_core_strips_only_the_leading_prefix():
+    assert md._llm_core("mechanical: a:b/c.sql. keep this. and this") == "keep this. and this"
+    assert md._llm_core("mechanical: no one-way trigger in the realized diff") == ""
+    assert md._llm_core("plain words only here") == "plain words only here"
+
+
+@pytest.mark.parametrize("why", [
+    "drops the trade_mode column data for every team",
+    "dropping the legacy column data for every team",
+])
+def test_llm_one_way_naming_an_irreversible_effect_still_raises_under_the_bar(why):
+    out = md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True)
+    assert out.door == "one-way"
+    assert out.why.endswith("for every team")
+
+
+def test_row22_whys_need_the_drop_stem():
+    # Plan row 22: the row-22 Whys go red if `drop(s|ped)?` (now `drop(s|ped|ping)?`) is
+    # removed from _IRREVERSIBLE_RE. Prove that against a mutant regex with the stem cut.
+    stem = "drop(s|ped|ping)?|"
+    assert stem in md._IRREVERSIBLE_RE.pattern
+    mutant = re.compile(md._IRREVERSIBLE_RE.pattern.replace(stem, ""), re.IGNORECASE)
+    for why in ("drops the trade_mode column data for every team",
+                "dropping the trade_mode column data for every team"):
+        assert md._IRREVERSIBLE_RE.search(why)
+        assert not mutant.search(why)
+
+
+def test_llm_one_way_without_a_concrete_effect_is_kept_at_the_floor():
+    why = "the migration widens an ENUM and adds a table for the pipeline"
+    out = md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True)
+    assert out.door == "two-way"
+    assert out.blast == "site-wide"
+    assert out.why == why
+
+
+def test_pr3472_style_why_is_kept_at_the_floor():
+    why = "widens the bug status ENUM, adds the operator context table and backfills rows"
+    assert md.merge_verdicts(TWO, "one-way", "site-wide", why, llm_raise_bar=True).door == "two-way"
+
+
+def test_bar_never_lowers_a_mechanical_one_way():
+    out = md.merge_verdicts(ONE, "two-way", "localized", "nothing risky here at all really", llm_raise_bar=True)
+    assert out.door == "one-way"
+
+
+def test_bar_is_off_by_default_so_a_human_raise_survives():
+    out = md.merge_verdicts(TWO, "one-way", "localized", "a human marked this as needing careful review")
+    assert out.door == "one-way"
+
+
+def test_bar_does_not_touch_blast_radius():
+    out = md.merge_verdicts(TWO, "one-way", "external", "a vague worry about this change overall",
+                            llm_raise_bar=True)
+    assert out.blast == "external"
+    assert out.door == "two-way"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("sends a Discord DM that cannot be recalled", True),
+    ("truncates ibl_hist before the rerun", True),
+    ("overwrites prod rows in place", True),
+    ("renames a column other code reads", True),
+    ("data loss for every team on revert", True),
+    ("dropping the trade_mode column", True),
+    ("deleting old rows from ibl_hist", True),
+    ("truncating the snapshot table", True),
+    ("renaming a column other code reads", True),
+    ("overwriting the stored value", True),
+    ("wiping the cache table", True),
+    ("purging old records", True),
+    ("destroying the backup", True),
+    ("notifying every GM by DM", True),
+    ("emailing the commissioner", True),
+    ("recalling the DM is impossible", True),
+    ("losing the old snapshot rows", True),
+    ("prod syncing the league tables", True),
+    ("production synced over the schedule", True),
+    ("adds a table and widens an ENUM", False),
+    ("edits docs and tests under the harness", False),
+    ("a lossless additive change", False),
+])
+def test_irreversible_lexicon(text, expected):
+    assert bool(md._IRREVERSIBLE_RE.search(text)) == expected
 
 
 # --- render / parse / classify / validate / inject --------------------------------------------

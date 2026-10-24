@@ -1,0 +1,46 @@
+diff --git a/ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql b/ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql
+new file mode 100644
+index 0000000000..32e0a2f30f
+--- /dev/null
++++ b/ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql
+@@ -0,0 +1,40 @@
++-- Migration 198 — bug-pipeline operator-mention wake.
++-- rollback-incompatible: production's BugPipelineSchemaTest pins the exact ibl_bug_reports.status enum set, so the appended 'dormant' value fails it; pre-PR PHP never reads or writes 'dormant', and on rollback the backfilled dormant rows just wait unclaimed
++-- Adds the 'dormant' status (a GM post waits there until the operator @mentions the
++-- bot in its thread), the operator-context log table the wake endpoint appends to,
++-- and a one-time backfill that parks never-picked-up rows.
++-- Forward-only, additive. Re-runnable: MODIFY COLUMN restates the full ENUM, the table
++-- is CREATE IF NOT EXISTS, and the UPDATE matches nothing after its first run.
++
++-- Forward-only, additive: MODIFY COLUMN appends 'dormant'. Re-runnable.
++-- DEFAULT stays 'queued'; the enqueue writer sets 'dormant' explicitly.
++ALTER TABLE `ibl_bug_reports`
++    MODIFY COLUMN `status` ENUM(
++        'queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human',
++        'parked_idle','gathering','awaiting_ajay','planned','dropped','filed','dormant'
++    ) NOT NULL DEFAULT 'queued';
++
++-- One row per operator mention. uq_operator_message makes a replayed wake call a
++-- no-op (INSERT IGNORE). No FOREIGN KEY, matching ibl_bug_reports and the copied-
++-- subset scratch schema the E2E builds. content is truncated to 4000 chars in PHP.
++CREATE TABLE IF NOT EXISTS `ibl_bug_report_operator_context` (
++    `id`                 INT UNSIGNED     NOT NULL AUTO_INCREMENT,
++    `bug_report_id`      INT UNSIGNED     NOT NULL,
++    `discord_message_id` BIGINT UNSIGNED  NOT NULL,
++    `discord_author_id`  BIGINT UNSIGNED  NOT NULL,
++    `content`            TEXT             NOT NULL,
++    `created_at`         DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    PRIMARY KEY (`id`),
++    UNIQUE KEY `uq_operator_message` (`discord_message_id`),
++    INDEX `idx_report` (`bug_report_id`, `created_at`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++-- Rows queued with no classification and no thread were never picked up; they
++-- go dormant and wait for an operator mention. In-flight rows (any other status,
++-- or queued with a thread_id) keep running. Idempotent: after the first run
++-- no row matches.
++UPDATE `ibl_bug_reports`
++   SET `status` = 'dormant'
++ WHERE `status` = 'queued'
++   AND `class` IS NULL
++   AND `thread_id` IS NULL;

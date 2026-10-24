@@ -257,6 +257,11 @@ class RecordingGh:
     def pr_comments_text(self, pr: int) -> str:
         return "\n".join(self.fixture.get("pr_comments") or [])
 
+    def pr_issue_comments(self, pr: int) -> list[dict]:
+        if self.fixture.get("pr_issue_comments_error"):
+            raise HarnessError("gh", "replay: issue comment read failed")
+        return list(self.fixture.get("pr_issue_comments") or [])
+
     def pr_label_remove(self, pr: int, label: str) -> bool:
         self.record("label_remove", pr=pr, label=label)
         return True
@@ -733,6 +738,19 @@ class LiveGh(RecordingGh):
     def pr_comments_text(self, pr: int) -> str:
         return self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
                         "--jq", ".[].body")
+
+    def pr_issue_comments(self, pr: int) -> list[dict]:
+        out = self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
+                       "--jq", ".[] | {id, body, login: .user.login, type: .user.type}")
+        rows: list[dict] = []
+        for line in out.splitlines():
+            if not line.strip():
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                raise HarnessError("gh", "issue comments: unparsable line") from None
+        return rows
 
     def pr_label_remove(self, pr: int, label: str) -> bool:
         try:

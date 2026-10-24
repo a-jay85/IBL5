@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Post (or update) an owner-approved deviation record on a PR.
+# Logic and tests live in tools/postplan-harness/harness/approve_deviation.py.
+# ADR: ibl5/docs/decisions/0215-owner-approved-deviation-records.md
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec python3 -I "$ROOT/tools/postplan-harness/approve_deviation_main.py" "$@"

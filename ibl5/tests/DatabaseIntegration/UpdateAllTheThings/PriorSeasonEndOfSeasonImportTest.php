@@ -65,18 +65,24 @@ class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
         self::assertSame(1, $this->fetchRetiredFlag(self::JSB_PID));
     }
 
-    public function testSecondRunSkipsOnceRetireesExistForPriorYear(): void
+    /**
+     * The archive only holds .ret, so later runs keep retrying the other files
+     * but never re-import the retirees.
+     */
+    public function testSecondRunDoesNotReimportRetireesButRetriesMissingFiles(): void
     {
         $this->insertTestPlayer(self::JSB_PID, 'Prior Ret');
         $this->insertChampion(self::PRIOR_YEAR);
 
         $first = $this->buildStep($this->archiveResolver())->execute();
-        self::assertFalse($first->skipped);
+        self::assertCount(1, self::retMessages($first->messages));
 
         $second = $this->buildStep($this->archiveResolver())->execute();
 
-        self::assertTrue($second->skipped);
-        self::assertSame('Prior-season imports already ran for 2095', $second->detail);
+        self::assertFalse($second->skipped);
+        self::assertSame([], self::retMessages($second->messages));
+        self::assertContains('AWA: not found in the 2095 archive, will retry next run', $second->messages);
+        self::assertSame(1, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
     }
 
     public function testRealResolverDiskFallbackWritesNothing(): void
@@ -98,6 +104,18 @@ class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
 
         self::assertSame(0, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
         self::assertSame(0, $this->fetchRetiredFlag(self::JSB_PID));
+    }
+
+    /**
+     * @param list<string> $messages
+     * @return list<string>
+     */
+    private static function retMessages(array $messages): array
+    {
+        return array_values(array_filter(
+            $messages,
+            static fn (string $message): bool => str_starts_with($message, 'RET:'),
+        ));
     }
 
     private function buildStep(JsbSourceResolverInterface $resolver): PriorSeasonEndOfSeasonImportStep

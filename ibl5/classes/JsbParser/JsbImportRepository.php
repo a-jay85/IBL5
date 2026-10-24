@@ -128,4 +128,28 @@ class JsbImportRepository extends \Database\BaseMysqliRepository implements JsbI
     {
         return $this->ret->hasRetiredPlayersForYear($retirementYear);
     }
+
+    /**
+     * @see JsbImportRepositoryInterface::hasDraftResultsForYear()
+     */
+    public function hasDraftResultsForYear(int $draftYear): bool
+    {
+        return $this->dra->hasDraftResultsForYear($draftYear);
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::hasHofInducteesForYear()
+     */
+    public function hasHofInducteesForYear(int $inductionYear): bool
+    {
+        return $this->hof->hasHofInducteesForYear($inductionYear);
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::hasStatLeaderAwardsForYear()
+     */
+    public function hasStatLeaderAwardsForYear(int $year): bool
+    {
+        return $this->awa->hasStatLeaderAwardsForYear($year);
+    }
 }

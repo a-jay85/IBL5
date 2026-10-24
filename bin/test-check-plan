@@ -3705,14 +3705,16 @@ _corpus_guard_ok() {
     # exit, and only when the failure is provably all-downgradeable. Read ONLY
     # the violations block: [W] advisories and the [N] coverage line print on a
     # clean run too, so a bare '^\[' match would flag passing plans.
+    # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
+    # the plans it flags carry genuine plan-only negated greps (true positives).
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -4813,5 +4815,146 @@ for L_CASE in overflow verbatim; do
         FAILED=1
     fi
 done
+
+# ---------------------------------------------------------------------------
+# Gate [AB] fixtures (32 assert_viol cases + 1 deny-message case)
+# A post-impl CLI-executable row with a negated grep must name a durable
+# in-repo check that contains the grepped token, or carry
+# (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
+# fenced example never trips the gate. The cases run a copy of bin/ inside a
+# scratch repo, so which named checks exist and what they hold is fixed here.
+# ---------------------------------------------------------------------------
+AB_REPO="$(mktemp -d)"
+: > "$AB_REPO/.git"
+trap 'rm -rf "$AB_REPO"; rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
+mkdir -p "$AB_REPO/bin"
+cp "$SCRIPT_DIR/check-plan" "$SCRIPT_DIR/check-prose" "$AB_REPO/bin/"
+cp -R "$SCRIPT_DIR/lib" "$AB_REPO/bin/lib"
+mkdir -p "$AB_REPO/vendor/bin" "$AB_REPO/ibl5/tests/Ab" "$AB_REPO/.github/workflows"
+# Gate [G] wants every named bin/test-* wired in a workflow.
+printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bin/test-ab-other && ./bin/test-ab-dot' \
+    > "$AB_REPO/.github/workflows/ab.yml"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-dot"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-unwired"
+# Gate [BX] wants every named bin/ script to exist; the (one-shot) cases name this one.
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/check-foo"
+# A prefix of a wired script: a substring match would count it as wired.
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-hol"
+printf '%s\n' '#!/bin/sh' 'echo bgcolor2' > "$AB_REPO/vendor/bin/test-ab-holds"
+printf '%s\n' '<?php // asserts no reader of bgcolor2' > "$AB_REPO/ibl5/tests/Ab/NoBgcolor2Test.php"
+AB_GUARD_SAVED="$GUARD"
+GUARD="$AB_REPO/bin/check-plan"
+AB_BASE="$FM$YHDR"'
+'"$YROW"
+AB_NOTE='<!-- no-test-methods: fixture rows are gate AB props -->'
+AB_CANARY=$(cat <<'AB_CANARY_EOF'
+| 7 | `grep -cE` for `bgcolor=`, `cellspacing=` and `cellpadding=` in `ibl5/themes/IBL/theme.php` prints 0, and no PHP file reads `bgcolor2`. Catches: restoring the `bgcolor=` echo in `OpenTable()` ⇒ count 1 | CLI-executable | post-impl (Phase 2) | ! grep -q -e 'bgcolor=' -e 'cellspacing=' -e 'cellpadding=' ibl5/themes/IBL/theme.php && ! grep -rq --include='*.php' 'bgcolor2' ibl5/themes ibl5/classes ibl5/modules ibl5/index.php ibl5/modules.php |
+AB_CANARY_EOF
+)
+AB_WHAT='no PHP file reads bgcolor2; the harness holds the assertion'
+# ab_row <name> <want> <location cell> — one-row [AB] fixture.
+ab_row() {
+    assert_viol "$1" "$2" '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `'"$3"'` |
+'"$AB_NOTE"
+}
+
+# A bin/test-* harness that holds the grepped token: durable.
+ab_row "AB-pass-bin" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A harness that exists but never mentions the token is not durable.
+ab_row "AB-fail-bin-unrelated" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-other'
+# A named harness that does not exist is not durable.
+ab_row "AB-fail-bin-missing" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-nope'
+# vendor/bin/test-* is not bin/test-*, even when it holds the token.
+ab_row "AB-fail-vendor-bin" 1 '! grep -rq bgcolor2 ibl5/modules && vendor/bin/test-ab-holds'
+# A bare runner names no file that could hold the assertion.
+ab_row "AB-fail-runner-bare" 1 'vendor/bin/phpunit --filter testNoBgcolor2Reader && ! grep -rq bgcolor2 ibl5/modules'
+# A runner given a test file that holds the token: durable (cd ibl5 path).
+ab_row "AB-pass-runner-path" 0 'cd ibl5 && vendor/bin/phpunit tests/Ab/NoBgcolor2Test.php && ! grep -rq bgcolor2 modules'
+# A bare vitest / go test word anywhere in the cell is not durable.
+ab_row "AB-fail-vitest-word" 1 '! grep -rq bgcolor2 ibl5/modules && echo vitest go test-free'
+ab_row "AB-fail-runner-anchored" 1 '! grep -rq bgcolor2 ibl5/modules; npx vitest run; go test ./...'
+# A test path that is only the grep target is not durable.
+ab_row "AB-fail-grep-target" 1 '! grep -rq bgcolor2 ibl5/tests/Ab/NoBgcolor2Test.php'
+# The motivating css-legacy-markup-styles.md row 7: plan-only negated grep.
+assert_viol "AB-fail-canary" 1 '[AB]' "$AB_BASE"'
+'"$AB_CANARY"'
+'"$AB_NOTE"
+# The (one-shot) annotation voids the token it annotates.
+ab_row "AB-fail-one-shot" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds # (one-shot)'
+# A (one-shot) note on one token does not void a different durable token.
+ab_row "AB-pass-one-shot-other-token" 0 'bin/test-ab-holds && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# The token comes from the -e pattern, not from a path or flag value.
+ab_row "AB-pass-e-pattern" 0 "! grep -rq --include='*.php' -e 'bgcolor2' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-fail-path-word" 1 '! grep -rq nosuchtoken ibl5/bgcolor2 && bin/test-ab-holds'
+# Each | alternative of a quoted pattern is its own token.
+ab_row "AB-pass-alternation" 0 "! grep -rqE 'getStyles\\|bgcolor2' ibl5/modules && bin/test-ab-holds"
+# Opt-out tag at the trailing end of the What cell.
+assert_viol "AB-optout" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/ count 1 | CLI-executable/ count 1 (one-time-check: ran once at plan time and printed nothing) | CLI-executable}"'
+'"$AB_NOTE"
+# pre-impl rows are characterization runs, not regression claims.
+assert_viol "AB-pre-impl-ignored" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/pre-impl (characterization)}"'
+'"$AB_NOTE"
+# Escaped pipe inside the location cell: the detector reads the whole cell.
+ab_row "AB-escaped-pipe-fail" 1 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures'
+ab_row "AB-escaped-pipe-pass" 0 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-ab-holds'
+# Phase 5.0 runs any Timing cell matching post-impl in any case, so [AB] does too.
+assert_viol "AB-fail-timing-case" 1 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/Post-impl (Phase 2)}"'
+'"$AB_NOTE"
+# A harness the PR itself adds is listed in ## Critical Files: durable.
+assert_viol "AB-pass-critical-files" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-ab-new # (wired in this PR)` |
+'"$AB_NOTE"'
+
+## Critical Files
+
+- `bin/test-ab-new`
+'
+# An unwired harness is not durable, even when a (one-shot) note makes [G] skip the cell.
+ab_row "AB-fail-unwired-one-shot" 1 'bin/test-ab-unwired && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# A path that only prefixes a wired script is not wired.
+ab_row "AB-fail-wired-prefix" 1 'bin/test-ab-hol && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# A workflow that runs the script as ./bin/... wires it.
+ab_row "AB-pass-wired-dot-slash" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-dot'
+# A clustered flag ending in e takes the next word as its pattern.
+ab_row "AB-pass-clustered-e" 0 "! grep -rqe 'bgcolor2' -e 'zzzz' ibl5/modules && bin/test-ab-holds"
+# Regex escapes and anchors do not stick to the token.
+ab_row "AB-pass-word-boundary" 0 "! grep -rqE '\\bbgcolor2\\b' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-pass-end-anchor" 0 "! grep -rqE 'bgcolor2\$' ibl5/modules && bin/test-ab-holds"
+# A subshell paren is not the pattern.
+ab_row "AB-pass-subshell" 0 '( ! grep -rq bgcolor2 ibl5/modules ) && bin/test-ab-holds'
+# A flag value is not the pattern.
+ab_row "AB-pass-flag-value" 0 '! grep -rq -d skip bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A path that is only echoed or sits in a comment is not run.
+ab_row "AB-fail-echo-mention" 1 '! grep -rq bgcolor2 ibl5/modules && echo see bin/test-ab-holds'
+ab_row "AB-fail-comment-mention" 1 '! grep -rq bgcolor2 ibl5/modules && true # covered by bin/test-ab-holds'
+# A matrix header plus the canary inside a fence: invisible to the
+# fence-aware row source.
+assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'
+'"$AB_NOTE"'
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$AB_CANARY"'
+```
+'
+
+# Deny message names the durable path and the opt-out tag.
+f="$TMP/AB-deny-message.md"; printf '%s\n' "$AB_BASE" "$AB_CANARY" "$AB_NOTE" > "$f"
+out="$("$GUARD" "$f" 2>&1)"; got=$?
+if [ "$got" -eq 1 ] \
+   && grep -qF 'Point the Test file / location cell at a durable in-repo check' <<< "$out" \
+   && grep -qF '(one-time-check: <reason>)' <<< "$out"; then
+    h_pass "AB-deny-message (exit $got)"
+else
+    h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
+fi
+GUARD="$AB_GUARD_SAVED"
 
 h_done

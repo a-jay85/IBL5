@@ -561,8 +561,11 @@ LAST line of the final message."
         12) _hr_reject recheck "$(tr '\n' ' ' <<< "$HR_RECHECK_OUT" | cut -c1-200)" ;;
         *) _hr_reject recheck-error "fix-recheck exited $HR_RECHECK_RC" ;;
     esac
-    # 6. empty: nothing changed, nothing to ship.
-    if [ ! -s "$HR_TMP/cached.diff" ] && [ "$HR_PLAN_CHANGED" = 0 ]; then
+    # 6. empty: nothing changed, nothing to ship. The staged tree is compared with HEAD, not
+    # origin/master: a PR branch is always ahead of master, so that diff is never empty.
+    HR_TREE_CHANGED=0
+    git -C "$WT" diff --cached --quiet HEAD || HR_TREE_CHANGED=1
+    if [ "$HR_TREE_CHANGED" = 0 ] && [ "$HR_PLAN_CHANGED" = 0 ]; then
         _hr_revert
         _hr_dm "session found nothing to fix"
         _hr_record nothing-to-fix
@@ -572,7 +575,7 @@ LAST line of the final message."
     # 4c. Ship. All guards passed.
     # 2. Commit, when the tree changed.
     HR_COMMITTED=0
-    if [ -s "$HR_TMP/cached.diff" ]; then
+    if [ "$HR_TREE_CHANGED" = 1 ]; then
         if ! git -C "$WT" commit -q -m "chore(postplan-fix): resolve repeat-hold items ($HR_FP)" >/dev/null 2>"$HR_TMP/commit.err"; then
             _hr_reject commit "$(tr '\n' ' ' < "$HR_TMP/commit.err" | cut -c1-200)"
         fi
@@ -619,6 +622,8 @@ LAST line of the final message."
             if [ "$HR_COMMITTED" = 0 ]; then
                 _hr_reject plan-comment "$HR_COMMENT_BAD"
             fi
+            # The plan lives outside the repo and has no public comment, so put it back.
+            cp "$HR_TMP/plan.before" "$HR_PLAN" || true
             _hr_dm "plan comment failed after the push: $HR_COMMENT_BAD"
             _hr_record rejected-plan-comment
             _hr_finish "$HR_RC_GAVEUP" gave-up-plan-comment

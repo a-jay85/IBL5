@@ -565,6 +565,11 @@ export HOME="$TMP/hrhome"; mkdir -p "$HOME/.claude/hooks"   # no real user hooks
 WTH="$TMP/wt-$B_HR"
 HR_STATE="$TMP/hrstate"; HR_PLANS="$TMP/plans"; mkdir -p "$HR_PLANS"
 git -C "$MAIN" worktree add -q -b "$B_HR" "$WTH" master
+# The branch sits one commit ahead of master, like a real PR branch. A zero-ahead fixture hides
+# any check that diffs the staged tree against origin/master instead of HEAD.
+printf 'fixture\n' > "$WTH/hr-branch-work.txt"
+git -C "$WTH" add hr-branch-work.txt
+git -C "$WTH" commit -q -m "branch work ahead of master"
 git -C "$WTH" push -q origin "$B_HR"
 git -C "$WTH" fetch -q origin "$B_HR"
 HR_TIP=$(git -C "$WTH" rev-parse HEAD)
@@ -1025,7 +1030,25 @@ need "rc 21" test "$RC" = 21
 need "final line" final_is "$STDOUT" gave-up-plan-comment
 need "owner DM sent" test "$(dm_count)" -ge 1
 need "no post-plan call" no_ppn
+need "plan restored (no comment, so no edit)" plan_is_orig
 case_end holdrepeat-plan-comment-fails-no-refire
+
+# 52 (a plan-only fix on a branch ahead of master commits nothing, pushes nothing, comments and re-fires)
+hr_reset
+{ printf 'NOTE=$(sed -nE %s "%s")\n' "'$HR_NOTE_SED'" "$TMP/claude.prompt"
+  printf 'printf -- "- bin/test-widget, bin/widget-tool and The widget renders widgetmark: the work never needed them\\n" > "$NOTE"\n'
+  printf 'printf "# Widget plan\\n" > "%s"\n' "$HR_PLAN_FILE"
+} > "$TMP/effects/hr-planonly.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planonly.sh"
+hr_run
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+need "plan comment posted" gh_has "pr comment"
+need "post-plan re-fired" test "$(ppn_count)" = 1
+need "HEAD unchanged" head_is_tip
+need "origin unchanged" origin_is_tip
+need "plan edit kept" test ! "$(cmp -s "$TMP/plan.orig" "$HR_PLAN_FILE" && echo same)" = same
+case_end holdrepeat-plan-only-fix-ships
 hr_reset
 
 h_done

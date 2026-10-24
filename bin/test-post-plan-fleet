@@ -3320,8 +3320,10 @@ grep -qF 'plist-present=yes' "$_HR_FIXREC" 2>/dev/null \
 [[ "$(_outcome_of)" == declined ]] || fail "holdrepeat-decline-fires-fix: outcome '$(_outcome_of)'"
 grep -qF 'post-plan-fleet: holdrepeat-fix=gave-up-repeat' "$_DM_LOG" 2>/dev/null \
     || fail "holdrepeat-decline-fires-fix: log lacks holdrepeat-fix=gave-up-repeat"
-grep -qF 'autofix: gave-up-repeat' "$_DM_CAPTURE" 2>/dev/null \
-    || fail "holdrepeat-decline-fires-fix: DM lacks 'autofix: gave-up-repeat' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+# postplan-fix sent its own owner DM for a gave-up-*, so the fleet stays quiet.
+if grep -q . "$_DM_CAPTURE" 2>/dev/null; then
+    fail "holdrepeat-decline-fires-fix: fleet sent a DM after gave-up ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+fi
 end_case holdrepeat-decline-fires-fix
 
 # --- case: holdrepeat-fix-replaces-log --------------------------------------------------

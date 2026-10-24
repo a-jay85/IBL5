@@ -37,6 +37,43 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         self::assertNull($row);
     }
 
+    /**
+     * ibl_franchise_seasons carries an FK to ibl_team_info; the CI seed stops at team 28.
+     * Runs inside the rolled-back test transaction, so no cleanup is needed.
+     */
+    private function ensureTeamInfoRow(int $teamId): void
+    {
+        $result = $this->db->query("SELECT 1 FROM ibl_team_info WHERE teamid = $teamId");
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $exists = $result->num_rows > 0;
+        $result->free();
+        if ($exists) {
+            return;
+        }
+
+        $this->insertRow('ibl_team_info', [
+            'teamid' => $teamId,
+            'team_city' => 'Test City',
+            'team_name' => 'TestTeam' . $teamId,
+        ]);
+    }
+
+    public function testFindFranchiseTeamNameReturnsNameForSeason(): void
+    {
+        $this->ensureTeamInfoRow(31);
+        $this->insertFranchiseSeasonRow(31, 1950, 'TestVis');
+
+        self::assertSame('TestVis', $this->repo->findFranchiseTeamName(31, 1950));
+    }
+
+    public function testFindFranchiseTeamNameReturnsNullWhenNoRow(): void
+    {
+        $this->ensureTeamInfoRow(31);
+        $this->insertFranchiseSeasonRow(31, 1950, 'TestVis');
+
+        self::assertNull($this->repo->findFranchiseTeamName(31, 1951));
+    }
+
     public function testInsertTeamBoxscoreCreatesRow(): void
     {
         $row = [

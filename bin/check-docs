@@ -1778,7 +1778,7 @@ const REQUIRED_CLAIMS_DOCS = [
 const REQUIRED_CLAIMS_READBACK = "gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'";
 // Required contexts the aggregator never lists as anchors: itself, and the
 // human-signoff context it ignores.
-const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks settled', 'All checks green', 'human-signoff'];
+const REQUIRED_CLAIMS_EXTRA_CONTEXTS = ['All checks settled', 'human-signoff'];
 
 /** @return array{anchor: list<string>, ignore: list<string>}|null */
 function parseAggregatorCsvs(string $yaml): ?array
@@ -2235,7 +2235,7 @@ if ($enginePinIssues !== []) {
 }
 
 // Corpus-wide like the lint-pin check: the drift lands as an edit to
-// all-checks-green.yml or engine.yml that touches no doc.
+// all-checks-settled.yml or engine.yml that touches no doc.
 $requiredClaimIssues = checkRequiredClaims($root);
 if ($requiredClaimIssues !== []) {
     echo "FAIL required-status claims drift\n";

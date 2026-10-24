@@ -38,8 +38,8 @@
 #                   cancel-in-progress keyed on the PR, exact job if:); A4 only
 #                   statuses: write, no ${{ }} inside run:, a master checkout
 #                   without persisted credentials, event fields only via env; A5 the
-#                   four ADR-0149 anchors and the legacy-waiter ignore shim exactly
-#                   while all-checks-green.yml exists; A6 workflow_run.workflows
+#                   four ADR-0149 anchors, and no leftover `All checks green`
+#                   ignore token now that all-checks-green.yml is retired; A6 workflow_run.workflows
 #                   equals every PR-triggered workflow name; A7 the schedule-only
 #                   sweep workflow (all-checks-settled-sweep.yml) has only schedule +
 #                   workflow_dispatch triggers, actions as its only write scope, no
@@ -391,7 +391,7 @@ fi  # end pp_file present
 # tests.yml and e2e-tests.yml scope master pushes that way. A file with no
 # block-style pull_request key also fails, so a flow-style rewrite cannot turn
 # this check into a vacuous pass.
-for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml all-checks-green.yml; do
+for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
   wf_file="$WORKFLOWS/$wf_name"
   if [ ! -f "$wf_file" ]; then
     echo "composite-contracts: $wf_name absent — R1 skipped"
@@ -737,8 +737,9 @@ else
     echo "composite-contracts: all-checks-settled holds only statuses: write, keeps expressions out of run:, and checks out master without credentials (A4)"
   fi
 
-  # A5: verdict inputs. The anchors are the four ADR-0149 contexts; the legacy
-  # waiter is ignored exactly while its workflow file exists.
+  # A5: verdict inputs. The anchors are the four ADR-0149 contexts. The legacy
+  # waiter is ignored exactly while its workflow file exists; once the file is
+  # gone (the retired state) no ignore token may name it.
   _a5_bad=""
   _a5_want_anchor="$(printf '%s\n' 'Tests and Analysis' 'E2E Tests' 'Meta checks' 'Infection PHP (per-PR diff)' | sort)"
   _a5_anchor="$(_agg_flag anchor | tr ',' '\n' | sort)"
@@ -757,7 +758,7 @@ else
     echo "composite-contracts: all-checks-settled (A5) — $_a5_bad ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-settled anchors are the four ADR-0149 contexts and the legacy-waiter shim matches the tree (A5)"
+    echo "composite-contracts: all-checks-settled anchors are the four ADR-0149 contexts and no ignore token names the retired legacy waiter (A5)"
   fi
 
   # A6: coverage. workflow_run.workflows equals the names of every other workflow

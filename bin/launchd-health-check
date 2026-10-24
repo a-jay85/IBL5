@@ -210,6 +210,16 @@ check_oneshots() {
             fi
         done
     done <<< "$LEJ_TRANSIENT_PREFIXES"
+    local lpid llabel
+    while IFS=$'\t' read -r lpid _ llabel; do
+        [ -n "$llabel" ] && [ "$lpid" = "-" ] || continue
+        while read -r prefix; do
+            [ -n "$prefix" ] || continue
+            case "$llabel" in
+                "$prefix"*) add_info "idle-oneshot:$llabel (loaded but not running; launchctl remove $llabel once no run is active)" ;;
+            esac
+        done <<< "$LEJ_SUBMITTED_PREFIXES"
+    done <<< "$LAUNCHCTL_LIST"
 }
 
 check_docker() {

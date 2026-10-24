@@ -251,15 +251,11 @@ pcw_live_out_dir_fresh() {
     [[ -n "$(find "$newest" -mmin "-$PCW_STALE_LABEL_MIN" -print 2>/dev/null)" ]]
 }
 
-# pcw_last_block <branch> <out-dir>...: for the newest harness run dir for this branch
-# across the out dirs, prints "<run-dir>\t<why>". <why> is the "Why:" line of that run's
-# blocked-ship.txt, capped at 200 chars, or empty when the run left no such file. Prints
-# nothing when no run dir exists. Only the newest run counts, so an older block never
-# stands in for a later failure of another kind.
-pcw_last_block() {
-    local safe d run newest="" why=""
-    safe="$(ljob_safe_slug "$1")"; shift
-    [[ -n "$safe" ]] || return 0
+# _pcw_newest_run <safe-slug> <out-dir>...: prints the newest live-<slug>-<8 digits>-* run dir
+# across the out dirs, by directory-name sort, or nothing when none exists.
+_pcw_newest_run() {
+    local safe="$1" d run newest=""
+    shift
     for d in "$@"; do
         [[ -d "$d" ]] || continue
         while IFS= read -r run; do
@@ -267,6 +263,20 @@ pcw_last_block() {
         done < <(find "$d" -mindepth 1 -maxdepth 1 -type d \
             -name "live-$safe-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*" 2>/dev/null)
     done
+    [[ -z "$newest" ]] || printf '%s\n' "$newest"
+    return 0
+}
+
+# pcw_last_block <branch> <out-dir>...: for the newest harness run dir for this branch
+# across the out dirs, prints "<run-dir>\t<why>". <why> is the "Why:" line of that run's
+# blocked-ship.txt, capped at 200 chars, or empty when the run left no such file. Prints
+# nothing when no run dir exists. Only the newest run counts, so an older block never
+# stands in for a later failure of another kind.
+pcw_last_block() {
+    local safe newest="" why=""
+    safe="$(ljob_safe_slug "$1")"; shift
+    [[ -n "$safe" ]] || return 0
+    newest="$(_pcw_newest_run "$safe" "$@")"
     [[ -n "$newest" ]] || return 0
     # sed quits on the first match itself; a `| head -1` would SIGPIPE under pipefail.
     if [[ -f "$newest/blocked-ship.txt" ]]; then
@@ -274,6 +284,71 @@ pcw_last_block() {
             | tr -d '\t\r' | cut -c1-200)"
     fi
     printf '%s\t%s\n' "$newest" "$why"
+}
+
+# pcw_last_result <branch> <out-dir>...: for the newest harness run dir for this branch, prints
+# "<terminal>\t<reason>" from its result.json. <reason> is error_kind folded to one lowercase
+# word ([a-z0-9-], at most 40 chars), or the terminal when error_kind is empty. Prints nothing
+# when no run dir exists, the newest run has no result.json, or jq cannot read a non-empty
+# terminal from it. Only the newest run counts, the same rule as pcw_last_block.
+pcw_last_result() {
+    local safe newest row terminal kind
+    safe="$(ljob_safe_slug "$1")"; shift
+    [[ -n "$safe" ]] || return 0
+    newest="$(_pcw_newest_run "$safe" "$@")"
+    [[ -n "$newest" && -f "$newest/result.json" ]] || return 0
+    row="$(jq -r 'if type == "object"
+        then [(.terminal // "" | tostring), (.error_kind // "" | tostring)] | @tsv
+        else empty end' "$newest/result.json" 2>/dev/null)" || return 0
+    terminal="${row%%$'\t'*}"
+    kind="${row#*$'\t'}"
+    [[ -n "$terminal" && "$row" == *$'\t'* ]] || return 0
+    kind="$(printf '%s' "${kind:-$terminal}" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9-' '-' | cut -c1-40)"
+    kind="${kind#-}"; kind="${kind%-}"
+    printf '%s\t%s\n' "$terminal" "${kind:-$terminal}"
+}
+
+# pcw_stuck_reason <state-dir> <pr> <branch> <out-dir>...: prints the one-word reason a PR is
+# stuck, or nothing. Stuck means the newest post-plan run's terminal is failed or conflict
+# (reason = pcw_last_result's reason), or else the PR sits in conflict-hold/ (reason
+# "conflict"). A holdrepeat decline already reached the user as "your turn" (DECLINED_MSG),
+# so declined/<pr> hides the PR until a run finishes after the decline. The caller filters
+# drafts and armed PRs.
+pcw_stuck_reason() {
+    local dir="$1" pr="$2" branch="$3" safe run="" row="" terminal=""
+    shift 3
+    safe="$(ljob_safe_slug "$branch")"
+    [[ -z "$safe" ]] || run="$(_pcw_newest_run "$safe" "$@")"
+    row="$(pcw_last_result "$branch" "$@")"
+    if [[ -f "$dir/declined/$pr" ]]; then
+        [[ -n "$row" && "$run/result.json" -nt "$dir/declined/$pr" ]] || return 0
+    fi
+    terminal="${row%%$'\t'*}"
+    case "$terminal" in
+        failed|conflict) printf '%s\n' "${row#*$'\t'}"; return 0 ;;
+    esac
+    [[ ! -f "$dir/conflict-hold/$pr" ]] || printf 'conflict\n'
+    return 0
+}
+
+_PCW_PR_URL='https://github.com/a-jay85/IBL5/pull'
+PCW_STUCK_MAX_LINES=15
+# pcw_stuck_block: reads "<pr>\t<sha>\t<reason>" rows on stdin and prints the "Stuck (N)" DM
+# block: a header, then one linked line per PR (at most PCW_STUCK_MAX_LINES), then
+# "- and K more" past the cap. Prints nothing for empty input. The cap keeps the DM under
+# Discord's 2000 characters (a line runs up to about 110).
+pcw_stuck_block() {
+    awk -F'\t' -v url="$_PCW_PR_URL" -v max="$PCW_STUCK_MAX_LINES" '
+        $1 ~ /^[0-9]+$/ {
+            n++
+            if (n <= max) line[n] = sprintf("- [#%s](%s/%s) %s (head %s)", $1, url, $1, $3, substr($2, 1, 7))
+        }
+        END {
+            if (n == 0) exit
+            printf "**Stuck (%d)**\n", n
+            for (i = 1; i <= n && i <= max; i++) print line[i]
+            if (n > max) printf "- and %d more\n", n - max
+        }'
 }
 
 # Retry cap, keyed by (PR, retry key). The key is the PR's patch-id (pcw_patch_id), which a
@@ -324,8 +399,9 @@ pcw_add_gate_rerun() {  # <dir> <pr> <sha>: writes "<sha> <count+1>", prints the
     _pcw_write "$1/gate-reruns/$2" "$3 $n" && printf '%s\n' "$n"
 }
 # Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the key last DM'd about.
-# Kinds: declined, strikes, patchid. The patchid ledger stores the head SHA, because it
-# fires exactly when there is no patch-id.
+# Kinds: declined, strikes, patchid, stuck. The patchid ledger stores the head SHA, because it
+# fires exactly when there is no patch-id. The stuck ledger stores "<reason>@<head-sha>", so a
+# new head or a new reason re-DMs and a repeat of both stays quiet.
 pcw_kind_dm_due()    { ! _pcw_holds "$1/dm-$2/$3" "$4" "${5:-}"; }
 pcw_kind_mark_dm()   { _pcw_write "$1/dm-$2/$3" "$4"; }
 # pcw_pending_has <state-dir> <pr>: 0 when a launched, not yet settled rescue lists the PR.
@@ -513,6 +589,7 @@ pcw_prune() {
     local dir="$1" open="$2" f
     for f in "$dir"/attempts/* "$dir"/dm-sent/* "$dir"/declined/* "$dir"/strikes/* \
              "$dir"/dm-declined/* "$dir"/dm-strikes/* "$dir"/dm-patchid/* "$dir"/dm-probe/* \
+             "$dir"/dm-stuck/* \
              "$dir"/conflict-hold/* "$dir"/retries/* "$dir"/gate-reruns/*; do
         [[ -f "$f" ]] || continue
         grep -qxF "$(basename "$f")" <<< "$open" || rm -f "$f"

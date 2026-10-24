@@ -13,9 +13,13 @@ from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification, HarnessError, UsageLedger
+from harness.fidelity import GATE_EDIT_DENY_TEXT, GATE_OWNING_PREFIXES
 from harness.thread_ingestion import (
     _is_trusted,
+    GATE_HOLD_MARKER,
+    disposition_thread,
     fetch_trusted_threads,
+    gate_hold_body,
     thread_prompt,
     run_thread_ingestion,
     PURPOSE,
@@ -998,3 +1002,254 @@ def test_posting_procedure_parity_names_both_origins():
         skill_text = open(skill).read()
         assert ti.ORIGIN_PRE_EXISTING in skill_text
         assert ti.ORIGIN_SAME_RUN in skill_text
+
+
+# ---------------------------------------------------------------------------
+# reply_review_thread adapter (gate-hold marker post)
+# ---------------------------------------------------------------------------
+
+def test_recording_gh_reply_review_thread_records_action(tmp_path):
+    """RecordingGh.reply_review_thread records a reply and never a resolve."""
+    gh = _gh(tmp_path)
+    gh.reply_review_thread(7, 111, "x")
+    actions = gh.actions()
+    replies = [a for a in actions if a.get("action") == "pr_reply_thread"]
+    assert len(replies) == 1
+    assert replies[0]["comment_id"] == 111
+    assert [a for a in actions if a.get("action") == "pr_resolve_thread"] == []
+
+
+def test_live_gh_reply_review_thread_shells_reply_helper(tmp_path, monkeypatch):
+    """LiveGh.reply_review_thread shells the reply helper, never the resolve helper.
+
+    Mutation caught: shelling resolve_review_finding instead of reply_review_thread.
+    """
+    argvs = []
+
+    def _spy(argv, *a, **k):
+        argvs.append(argv)
+        return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr("harness.adapters.llm._run_reaped", _spy)
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.reply_review_thread(PR, 111, "marker body")
+    script = argvs[0][2]
+    assert "reply_review_thread" in script
+    assert "resolve_review_finding" not in script
+    replies = [a for a in gh.actions() if a.get("action") == "pr_reply_thread"]
+    assert len(replies) == 1
+    assert replies[0]["comment_id"] == 111
+
+
+def test_live_gh_reply_review_thread_failure_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "harness.adapters.llm._run_reaped",
+        lambda argv, *a, **k: subprocess.CompletedProcess(args=argv, returncode=1, stdout="",
+                                                          stderr="boom"),
+    )
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    with pytest.raises(HarnessError) as ei:
+        gh.reply_review_thread(PR, 111, "marker body")
+    assert ei.value.kind == "thread-reply-failed"
+    assert [a for a in gh.actions() if a.get("action") == "pr_reply_thread"] == []
+
+
+# ---------------------------------------------------------------------------
+# gate-path DECLINE hold
+# ---------------------------------------------------------------------------
+
+GATE_DECLINE = '{"verdict": "DECLINE", "reason": "fix needs .github/workflows/ci.yml", "category": "gate-path"}'
+
+
+def _resolves(gh):
+    return [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+
+
+def _replies(gh):
+    return [a for a in gh.actions() if a.get("action") == "pr_reply_thread"]
+
+
+def _disposition(tmp_path, answer, info):
+    """One disposition_thread call; returns (outcome, gh, commits)."""
+    gh = _gh(tmp_path)
+    commits: list[str] = []
+
+    def _commit(msg):
+        commits.append(msg)
+        return "abc123"
+
+    outcome = disposition_thread(THREAD_2340, _llm({PURPOSE: answer}), ReplayGit({}), str(tmp_path),
+                                 PR, gh, lambda m: None, commit=_commit, push=lambda: "def456",
+                                 info=info)
+    return outcome, gh, commits
+
+
+def test_thread_prompt_lists_gate_paths_and_decline_instruction():
+    prompt = thread_prompt(THREAD_2340, "")
+    for prefix in GATE_OWNING_PREFIXES:
+        assert prefix in prompt
+    assert GATE_EDIT_DENY_TEXT in prompt
+    assert 'category "gate-path"' in prompt
+
+
+def test_gate_path_decline_holds_thread_unresolved(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(tmp_path, GATE_DECLINE, info)
+    assert outcome == "skipped"
+    assert info["gate_hold"] is True
+    assert commits == []
+    assert _resolves(gh) == []
+
+
+def test_non_gate_decline_still_resolves(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(
+        tmp_path, '{"verdict": "DECLINE", "reason": "not a defect", "category": "wrong"}', info)
+    assert outcome == "declined"
+    resolves = _resolves(gh)
+    assert len(resolves) == 1
+    assert resolves[0]["body"].startswith("Declined:")
+    assert "gate_hold" not in info
+    assert commits == []
+
+
+def test_gate_hold_thread_keeps_condition_11(tmp_path):
+    threads = [THREAD_2340]
+    gh = _gh(tmp_path, {"trusted_threads": threads, "pr_number": PR})
+    run_thread_ingestion(
+        gh, _llm({PURPOSE: GATE_DECLINE}), ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids={THREAD_2340["commentId"]}, **_run_kwargs(tmp_path))
+
+    resolved = {a["comment_id"] for a in _resolves(gh)}
+    unresolved = [f"thread:{t['commentId']}" for t in threads if t["commentId"] not in resolved]
+    assert unresolved == [f"thread:{THREAD_2340['commentId']}"]
+
+    d = evaluate(_arm_inputs(unresolved))
+    assert 11 in {c.number for c in d.holds}
+    assert d.armed is False
+    # Control: with nothing unresolved, condition (11) does not hold.
+    assert 11 not in {c.number for c in evaluate(_arm_inputs([])).holds}
+
+
+def test_wrapped_gate_decline_envelope_degrades_to_skip(tmp_path):
+    info: dict = {}
+    outcome, gh, commits = _disposition(
+        tmp_path,
+        '{"result": {"verdict": "DECLINE", "reason": "fix needs .github/workflows/ci.yml", '
+        '"category": "gate-path"}}',
+        info)
+    assert outcome == "skipped"
+    assert commits == []
+    assert _resolves(gh) == []
+    assert _replies(gh) == []
+    assert "gate_hold" not in info
+
+
+# ---------------------------------------------------------------------------
+# gate-hold marker reply and trusted-marker skip
+# ---------------------------------------------------------------------------
+
+MARKED = {**THREAD_2340, "lastBody": gate_hold_body("x"), "lastAuthorLogin": "a-jay85",
+          "lastAuthorType": "User"}
+
+
+def _ingest(tmp_path, thread, llm, gh=None, log=None, commit=None):
+    """One run_thread_ingestion pass over a single thread; returns (result, gh)."""
+    gh = gh or _gh(tmp_path, {"trusted_threads": [thread], "pr_number": PR})
+    result = run_thread_ingestion(
+        gh, llm, ReplayGit({}), str(tmp_path), PR,
+        pre_posting_ids={THREAD_2340["commentId"]}, out_dir=str(tmp_path),
+        log=log or (lambda m: None), commit=commit or (lambda m: "abc123"),
+        push=lambda: "def456")
+    return result, gh
+
+
+def test_gate_hold_posts_one_marker_reply(tmp_path):
+    commits: list[str] = []
+
+    def _commit(msg):
+        commits.append(msg)
+        return "abc123"
+
+    _, gh = _ingest(tmp_path, THREAD_2340, _llm({PURPOSE: GATE_DECLINE}), commit=_commit)
+    replies = _replies(gh)
+    assert len(replies) == 1
+    assert replies[0]["comment_id"] == THREAD_2340["commentId"]
+    assert replies[0]["body"].startswith(GATE_HOLD_MARKER)
+    assert _resolves(gh) == []
+    assert commits == []
+
+
+def test_marked_thread_skipped_without_fixer_call(tmp_path):
+    llm = _llm({PURPOSE: GATE_DECLINE})
+    result, gh = _ingest(tmp_path, MARKED, llm)
+    assert len(llm.tooled_argvs) == 0
+    assert result["skipped"] == 1
+    assert _replies(gh) == []
+
+
+def test_two_runs_post_one_marker(tmp_path):
+    run1, run2 = tmp_path / "run1", tmp_path / "run2"
+    run1.mkdir()
+    run2.mkdir()
+    llm = _llm({PURPOSE: GATE_DECLINE})
+    _, gh1 = _ingest(run1, THREAD_2340, llm)
+    calls_after_run1 = len(llm.tooled_argvs)
+    marker = _replies(gh1)[0]["body"]
+
+    # Run 2 sees the marker run 1 posted as the thread's latest comment.
+    run2_thread = {**THREAD_2340, "lastBody": marker, "lastAuthorLogin": "a-jay85",
+                   "lastAuthorType": "User"}
+    _, gh2 = _ingest(run2, run2_thread, llm)
+    assert len(llm.tooled_argvs) == calls_after_run1
+    assert len(_replies(gh1)) + len(_replies(gh2)) == 1
+
+
+def test_human_comment_after_marker_reenables_thread(tmp_path):
+    thread = {**THREAD_2340, "lastBody": "please retry, gate file was updated",
+              "lastAuthorLogin": "a-jay85", "lastAuthorType": "User"}
+    llm = _llm({PURPOSE: GATE_DECLINE})
+    _ingest(tmp_path, thread, llm)
+    assert len(llm.tooled_argvs) == 1
+
+
+def test_untrusted_marker_does_not_suppress(tmp_path):
+    thread = {**MARKED, "lastAuthorLogin": "stranger", "lastAuthorType": "User"}
+    llm = _llm({PURPOSE: GATE_DECLINE})
+    _ingest(tmp_path, thread, llm)
+    assert len(llm.tooled_argvs) == 1
+
+
+def test_dropped_thread_posts_one_marker(tmp_path, monkeypatch):
+    def _stub(*a, info=None, **kw):
+        info["dropped"] = True
+        return "skipped"
+
+    monkeypatch.setattr("harness.thread_ingestion.disposition_thread", _stub)
+    _, gh = _ingest(tmp_path, THREAD_2340, _llm())
+    replies = _replies(gh)
+    assert len(replies) == 1
+    assert replies[0]["body"].startswith(GATE_HOLD_MARKER)
+    assert "was dropped" in replies[0]["body"]
+    assert _resolves(gh) == []
+
+
+class _ReplyFailsGh(RecordingGh):
+    def reply_review_thread(self, pr, comment_id, body):
+        raise HarnessError("thread-reply-failed", "boom")
+
+
+def test_marker_post_failure_is_swallowed(tmp_path):
+    logs: list[str] = []
+    gh = _ReplyFailsGh(str(tmp_path), {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    result, _ = _ingest(tmp_path, THREAD_2340, _llm({PURPOSE: GATE_DECLINE}), gh=gh, log=logs.append)
+    assert result["skipped"] == 1
+    assert _resolves(gh) == []
+    assert any("marker post failed" in m for m in logs)
+
+
+def test_non_hold_decline_posts_no_marker(tmp_path):
+    _, gh = _ingest(tmp_path, THREAD_2340,
+                    _llm({PURPOSE: '{"verdict": "DECLINE", "reason": "not a defect", "category": "wrong"}'}))
+    assert _replies(gh) == []
+    assert len(_resolves(gh)) == 1

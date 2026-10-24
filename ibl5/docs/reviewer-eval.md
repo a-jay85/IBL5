@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, and the before/after rule for review-surface PRs.
-last_verified: 2026-10-21
+last_verified: 2026-10-24
 ---
 
 # Reviewer eval
@@ -72,7 +72,7 @@ Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or mor
 
 The check binds a claimed score to the exact surface and corpus content. It cannot prove the run happened.
 
-One run is a sample. LLM output varies between runs. Rerun a borderline comparison with `--no-cache` before you trust a one-case difference.
+One run is a sample. LLM output varies between runs. Pass `--runs N` to `run` or `compare` to review each case N times. A bug case then counts as a hit only when every run hits, and a clean case keeps the run with the most findings. Each case line gains `runs_hit=<h>/<N>` or `runs_flagged=<f>/<N>`, plus `FLAKY` when the runs disagree. A `runs=<N> flaky=<k>` line prints before `llm_calls`. The score line keeps its shape, so `bin/check-reviewer-eval` reads it unchanged. Run 1 uses the same cache entry as a plain run, and runs 2 to N get their own `-r<k>` entries. `compare --runs` needs a base that already has the flag.
 
 ## Baseline
 

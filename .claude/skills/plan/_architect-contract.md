@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 ## Read budget: read this once, read nothing else
@@ -126,7 +126,7 @@ Apply this guidance verbatim when tiering phases:
 >
 > **Bulk-sweep pattern.**
 > - Migration authoring, PHPStan rules, ADRs → Opus (self).
-> - Per-module PHP call-site sweeps that require judgment → Sonnet.
+> - Per-module PHP call-site sweeps that require judgment (e.g., distinguishing column refs from table refs in backtick-quoted SQL) → Sonnet.
 > - Per-module sweeps with an explicit old→new mapping and no ambiguity → Haiku.
 > - Running tests, migrations, schema verification → direct Bash (short output); Haiku only if multi-step or output is unpredictably large.
 > - Interpreting failing tests, deciding when to update baselines → Opus (self).

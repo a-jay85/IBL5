@@ -198,8 +198,8 @@ for lineno, e in entries:
         if k not in e:
             fail("line %d: missing key '%s'" % (lineno, k.decode()))
     row = e[b"row"].decode("utf-8", "surrogateescape")
-    if not re.fullmatch(r"[0-9]+", row):
-        fail("line %d: row '%s' is not an integer" % (lineno, row))
+    if not re.fullmatch(r"[0-9]+(-[A-Za-z0-9]+)*", row):
+        fail("line %d: row '%s' is not a matrix row id (digits, optional -suffix)" % (lineno, row))
     if row in seen:
         fail("line %d: duplicate mutation block for row %s" % (lineno, row))
     seen.add(row)
@@ -288,9 +288,13 @@ with open(path, "r+b") as fh:
 PY
 }
 
+CHECK_STATUS=0
+
 # status_diff — prints nothing when the porcelain snapshot matches status.pre,
 # else the first differing entry. Returns 1 on a difference.
 status_diff() {
+    # Only a run that took its own snapshot may compare; recover sees a stale one.
+    [ "$CHECK_STATUS" = 1 ] || return 0
     [ -f "$JDIR/status.pre" ] || return 0
     _now=$(mktemp "${TMPDIR:-/tmp}/pem-status.XXXXXX")
     git status --porcelain=v1 -z > "$_now" 2>/dev/null
@@ -388,6 +392,7 @@ fi
 
 mkdir -p "$JDIR" || exit 3
 git status --porcelain=v1 -z > "$JDIR/status.pre" 2>/dev/null
+CHECK_STATUS=1
 
 CHILD=""
 FINAL=0

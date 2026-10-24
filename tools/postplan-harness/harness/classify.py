@@ -518,6 +518,7 @@ def upsert_exec_mutations(body: str, report) -> str:
         return block
     return body.rstrip() + "\n\n" + block + "\n"
 
+
 def _neutralize_headings(text: str) -> list[str]:
     """Blockquote every line so no line of plan prose can present as a heading.
 

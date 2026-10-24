@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-21
+last_verified: 2026-10-22
 ---
 
 # Post-Plan Orchestrator
@@ -579,7 +579,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
 12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
-14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks.
+14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks. Step 7.5 re-spawns the reviewer once when no readable verdict was written; a second miss still blocks and the hold line says so.
 15. **No already-red CI check.** It is a warning when the aggregator is required. No check on the PR's current head sits in `gh`'s `fail` bucket, excluding `human-signoff` (red by design on every `feat:` PR, and already covered by condition (8)). This closes the gap that merged #2304: a check outside master's required-status-checks list can be red without blocking the queued merge, so nothing downstream of arming would have caught it. Blocks only while master's protection lacks the `All checks settled` context (ADR-0149); once that context is required, a red check is reported as a WARNING and arming proceeds, because the required context makes GitHub hold the merge itself. The aggregator is a commit status. `gh pr checks` lists statuses next to check-runs, a `failure` or `error` status lands in its fail bucket and a `pending` one in pending. A stuck status is re-settled with `gh workflow run all-checks-settled.yml -f pr_number=<N>` (a dispatch, no rerun). Fail-closed on unreadable protection (keeps blocking). Fail-OPEN on pending checks, unlike its fail-closed neighbours: an empty probe result means "no failure proven at arm time", never "all checks are green", so a check that has not yet reported clears this condition.
 16. **Meta checks.** The local meta checks passed pre-push and post-PR.
 17. **Gate backtest.** A changed ship-pipeline gate flags fewer than 2 clean merged PRs in the Gate backtest block; HELD or UNKNOWN holds.
@@ -619,12 +619,12 @@ To post it:
    body template in the appendix of `.claude/skills/post-plan/_phase-2-conflict-resolution.md`
    into `/tmp/post-plan-conflict-comment-<KEY>.md`, substituting the manifest's paths and
    descriptions and any `COLLAPSE-GUARD: WARN` line.
-3. Post it sticky, reusing the `STICKY_MARKER` + `post_sticky()` **shape** in `bin/pr-canary-check`
-   (grep for them; never trust a line number): find an existing comment id via
+3. Post it sticky, reusing the `pr_sticky_upsert` **shape** in `bin/lib/pr-sticky.sh`
+   (grep for it; never trust a line number): find an existing comment id via
    `gh api "repos/{owner}/{repo}/issues/<PR>/comments" --paginate --jq` selecting on the marker,
    PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
-   The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
-   `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
+   The marker is `<!-- post-plan-conflict-hold -->` and **never**
+   `<!-- pr-ready-verdict -->`. Copy the shape and keep your own marker string, or the conflict hold
    overwrites an unrelated verdict on the same PR.
 
 The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that

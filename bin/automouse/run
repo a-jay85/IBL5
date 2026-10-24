@@ -1869,10 +1869,17 @@ run_between_plans_canary() {
     # (.github/workflows/update-behind-prs.yml) fails on transient GitHub API
     # errors, and GitHub drops its next cron run for hours, so its red sticks.
     # Only a completed non-passing run is ignored; a pending one still reads
-    # "checks still running". Exact names. Canary only: PR merge gating and
-    # bin/merge-master-to-prod never set it.
-    ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production" \
-        IGNORE_FAILED_CHECKS="Keep the merge-line head current" \
+    # "checks still running". Exact names. PR merge gating never sets it.
+    # bin/merge-master-to-prod sets it to "Aggregate check status" only.
+    # "Aggregate check status" (the settle job of
+    # .github/workflows/all-checks-settled.yml) is in BOTH lists. It summarizes
+    # other check-runs and tests no code; its concurrency group cancels a
+    # superseded run, so master HEAD often shows it completed/cancelled, which
+    # used to park the queue. bin/promote-master-to-production,
+    # bin/merge-master-to-prod and promote-to-production.yml already ignore
+    # the same exact name in both lists. Every real test job still parks.
+    ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production,Aggregate check status" \
+        IGNORE_FAILED_CHECKS="Keep the merge-line head current,Aggregate check status" \
         "$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
     CANARY_DETAIL="$ci_out"
     printf '%s\n' "$ci_out" >> "$LOG"
@@ -2275,6 +2282,7 @@ while true; do
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
@@ -2306,6 +2314,7 @@ while true; do
         echo "Plan $PLAN_NAME declares an unusable impl_model — $BASE_MODEL — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"

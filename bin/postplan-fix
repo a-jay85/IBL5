@@ -179,7 +179,14 @@ if [ "$HEADLESS" = 1 ]; then
     fi
     HEAD0="$(git -C "$WT" rev-parse HEAD)"
     git -C "$WT" fetch -q origin master
-    REFS0="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/remotes)"
+    # Refs live in the shared common dir, so every checkout sees every other
+    # checkout's pull, fetch and branch create/delete. A whole-repo snapshot
+    # reads those as session moves and rolls them back. Guard only the
+    # session branch's own two refs; a missing ref is a real state.
+    OWN_REFS=("refs/heads/$branch" "refs/remotes/origin/$branch")
+    ZERO_OID="${HEAD0//?/0}"
+    RESTORE_MSG="postplan-fix: restore after session moved refs"
+    REFS0="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")"
     if git -C "$WT" merge --no-edit origin/master; then
         echo "postplan-fix: origin/master merges cleanly; nothing for a session. Ship: cd $WT && bin/post-plan-now"
         exit 0
@@ -206,20 +213,31 @@ if [ "$HEADLESS" = 1 ]; then
             || git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         exit 1
     }
-    REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/remotes)"
+    REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" \
+        || fix_abort "own-ref snapshot failed"
     if [ "$REFS1" != "$REFS0" ]; then
-        while IFS=' ' read -r r sha; do
-            [ -n "$r" ] || continue
-            git -C "$WT" update-ref "$r" "$sha" 2>/dev/null || true
-        done <<< "$REFS0"
-        while IFS=' ' read -r r _; do
-            [ -n "$r" ] || continue
-            case $'\n'"$REFS0"$'\n' in
-                *$'\n'"$r "*) ;;
-                *) git -C "$WT" update-ref -d "$r" 2>/dev/null || true ;;
-            esac
-        done <<< "$REFS1"
-        fix_abort "session moved refs"
+        MOVED=0
+        for r in "${OWN_REFS[@]}"; do
+            s0="" s1=""
+            while IFS=' ' read -r n s; do
+                if [ "$n" = "$r" ]; then s0="$s"; fi
+            done <<< "$REFS0"
+            while IFS=' ' read -r n s; do
+                if [ "$n" = "$r" ]; then s1="$s"; fi
+            done <<< "$REFS1"
+            [ "$s0" != "$s1" ] || continue
+            MOVED=1
+            # Old value = what REFS1 observed, so a ref that moved again
+            # after the read is never clobbered (compare-and-swap).
+            if [ -n "$s0" ]; then
+                git -C "$WT" update-ref -m "$RESTORE_MSG" "$r" "$s0" "${s1:-$ZERO_OID}" 2>/dev/null \
+                    || echo "postplan-fix: $r moved again after the session; left as is" >&2
+            else
+                git -C "$WT" update-ref -m "$RESTORE_MSG" -d "$r" "$s1" 2>/dev/null \
+                    || echo "postplan-fix: $r moved again after the session; left as is" >&2
+            fi
+        done
+        [ "$MOVED" = 0 ] || fix_abort "session moved refs"
     fi
     [ "$(git -C "$WT" rev-parse HEAD)" = "$HEAD0" ] || fix_abort "session moved HEAD"
     [ "$LAST" = "RESOLVED" ] || fix_abort "session ended ${LAST:-without verdict}"

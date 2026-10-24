@@ -1,0 +1,12 @@
+shape: F1 linear replay stops twice (3 linear commits: c1, c2, one unrelated)
+path: .claude/skills/post-plan/SKILL.md  (first hit of the plan's intersection rule: in 5e05c984e3~2..5e05c984e3^, 5e05c984e3^..5e05c984e3 and 5e05c984e3~2..master)
+branch tip: ed376596ac7cd0dd07e5add98a7812e8e33b092c  (git rev-parse 'postplan-skill-shrink@{2026-10-22 08:32:00}'; reflog entry present, contains 5e05c984e3; no fallback used)
+master: 440daf063a7381ba0ea656e41ebe8e01797e5a10  (git rev-list -1 --before='2026-10-22 08:32:00' origin/master)
+base.txt: git show ce17a85c88fb70099ddb7567566f581f11be36d1:.claude/skills/post-plan/SKILL.md   (5e05c984e3~2)
+c1.txt: git show 15b65c593eec1000c1f1eb112646dd8b88ac963d:.claude/skills/post-plan/SKILL.md   (5e05c984e3^)
+c2.txt: git show 5e05c984e3a22f5b20867dbc79f04b80e01bf849:.claude/skills/post-plan/SKILL.md   (5e05c984e3)
+master.txt: git show 440daf063a7381ba0ea656e41ebe8e01797e5a10:.claude/skills/post-plan/SKILL.md
+master_unedited.txt: git show <master>:<path> byte-exact; master.txt is this file plus the one forced edit below
+FORCED OVERLAP: no real overlap exists. The only candidate in A, B and C (the plan's three-way intersection) is SKILL.md, and a replay of c2 onto the stop-1 result applies cleanly. So master.txt is master_unedited.txt with one inserted line, `harness_owner: post-plan-maintainers`, right after line 3 (the `description:` line that c1 -> c2 rewrites). Adjacent edits conflict, so the replay stops at commit 2 of 3.
+stop1.txt: git merge-file -p --ours c1.txt base.txt master.txt, then the forced line inserted after line 3 (what a resolver that kept master's edit writes at stop 1)
+resolved.txt: git merge-file -p --ours c2.txt base.txt master.txt, then the forced line inserted after line 3. The Phase 6.5 section stays deleted (the branch moved it to _phase-6.5-arm-auto-merge.md); every c2 + line is kept. The real lostwork.sh accepts it (test_fixture_resolved_passes_real_proof).

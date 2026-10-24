@@ -106,9 +106,12 @@ final class ShadowProcessLauncherTest extends TestCase
     #[Test]
     public function launchReturnsImmediatelyWhileChildRunsDetached(): void
     {
-        if (!is_file('/usr/bin/setsid') || !is_file('/usr/local/bin/php')) {
-            // phpunit-hygiene-allow: integration-availability skip — real setsid+php-cli exist only in the Linux container/CI, not the macOS host; runs for real in CI
-            self::markTestSkipped('Real-spawn detachment proof requires Linux setsid + php-cli (CI/container only).');
+        if (!is_file('/usr/bin/setsid')) {
+            if (getenv('GITHUB_ACTIONS') === 'true') {
+                self::fail('/usr/bin/setsid is missing on the CI runner; the detach proof must run in CI, not skip.');
+            }
+            // phpunit-hygiene-allow: integration-availability skip; setsid is absent only on macOS hosts, and this test runs for real on the Linux CI runner and in the php container
+            self::markTestSkipped('Real-spawn detachment proof requires Linux setsid (macOS host has none).');
         }
 
         $sentinel = $this->tempPath('sentinel');
@@ -119,7 +122,7 @@ final class ShadowProcessLauncherTest extends TestCase
         );
         $logPath = $this->tempPath('log');
 
-        $launcher = new ShadowProcessLauncher($script, $logPath);
+        $launcher = new ShadowProcessLauncher($script, $logPath, PHP_BINARY);
 
         $t0 = microtime(true);
         $launcher->launch();

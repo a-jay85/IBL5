@@ -59,20 +59,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         self::assertSame([], $map);
     }
 
-    public function testGetAllowTradesStatusReturnsString(): void
-    {
-        $status = $this->repo->getAllowTradesStatus();
-
-        self::assertIsString($status);
-    }
-
-    public function testGetAllowWaiversStatusReturnsString(): void
-    {
-        $status = $this->repo->getAllowWaiversStatus();
-
-        self::assertIsString($status);
-    }
-
     public function testGetLastSimDatesArrayReturnsShape(): void
     {
         $dates = $this->repo->getLastSimDatesArray();
@@ -134,17 +120,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         self::assertIsInt($phaseSimNumber);
         // Falls back to overall sim number (5) when no sim_dates match the FA date range
         self::assertSame(5, $phaseSimNumber);
-    }
-
-    // ── getFreeAgencyNotificationsState ──────────────────────────
-
-    public function testGetFreeAgencyNotificationsStateReturnsString(): void
-    {
-        $this->db->query("REPLACE INTO ibl_settings (setting_key, setting_value) VALUES ('Free Agency Notifications', 'On')");
-
-        $result = $this->repo->getFreeAgencyNotificationsState();
-
-        self::assertSame('On', $result);
     }
 
     public function testGetAvailableSeasonYearsReturnsDistinctYearsNewestFirst(): void

@@ -20,6 +20,16 @@ bpt_expect_eq "empty tick exits 0" 0 "$BPT_RC"
 bpt_log_has "$STUB" tick.out "no actionable rows — exiting cheap" "empty tick logs cheap-exit"
 bpt_file_absent "$STUB/claude.sentinel" "empty tick spawns zero claude"
 
+# ── ★ DORMANT-only list spawns ZERO claude (the tick's own guard, beside the enumerator's) ──
+# A dormant row waits for an operator mention. If one leaks through the enumerator, the
+# tick filters it out BEFORE the empty-tick check, so the cheap exit still fires.
+bpt_reset
+bpt_set_actionable '[{"id":1,"status":"dormant","class":null,"thread_id":null}]'
+bpt_run
+bpt_expect_eq "dormant-only tick exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" tick.out "no actionable rows — exiting cheap" "dormant-only tick logs cheap-exit"
+bpt_file_absent "$STUB/claude.sentinel" "dormant-only tick spawns zero claude"
+
 # ── Whitespace-wrapped [] still treated as empty ──────────────────────────────
 bpt_reset
 bpt_set_actionable '  []

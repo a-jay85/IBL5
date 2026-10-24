@@ -115,6 +115,17 @@ bpt_expect_contains "4d: control run redirects attachment cache" 'BUG_PIPELINE_A
 bpt_expect_eq "5a: no worktree-rooted IBLbot path" 0 "$(grep -cF '$REPO_ROOT/ibl5/IBLbot' "$TARGET")"
 bpt_expect_eq "5b: single IBLBOT assignment" 1 "$(grep -cE '^[[:space:]]*IBLBOT=' "$TARGET")"
 
+# ── Case 7: scratch-DB copy list carries the dormant/operator-context migration ─
+# A renumber of that migration must update the copy list too, or the scratch DB
+# lacks the 'dormant' ENUM value and every E2E enqueue fails.
+bpt_expect_eq "7: copy list carries the dormant migration" 1 \
+    "$(grep -cF 'migrations/198_bug_pipeline_dormant_and_operator_context.sql' "$TARGET")"
+if [ -f "$SCRIPT_DIR/../ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql" ]; then
+    bpt_ok "7b: copied migration exists"
+else
+    bpt_fail "7b: copied migration exists"
+fi
+
 # ── Case 6: no side effects ───────────────────────────────────────────────────
 bpt_expect_eq "6: no docker/pm2/mariadb call" "" "$(cat "$CALLS" 2>/dev/null)"
 

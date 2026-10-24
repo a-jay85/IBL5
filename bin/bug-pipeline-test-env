@@ -87,6 +87,16 @@ if [ "$MODE" = "up" ]; then
     [ -n "${APPROVER:-}" ] || { echo "BUG_PIPELINE_APPROVER_ID unset or empty in $SECRETS" >&2; exit 1; }
     case "${APPROVER}" in REPLACE_WITH_*) echo "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
 
+    # The test bot reads BUG_OPERATOR_DISCORD_ID straight from this file. A placeholder or
+    # empty value aborts here, because it could never route a wake. The E2E wake cases also need the
+    # app base URL and API key, so read all three here and export them below.
+    env_val() { grep -E "^$1=" "$SECRETS" | tail -1 | cut -d= -f2- | sed -E 's/^["'"'"']//; s/["'"'"']$//'; }
+    OPERATOR="$(env_val BUG_OPERATOR_DISCORD_ID)"
+    [ -n "${OPERATOR:-}" ] || { echo "BUG_OPERATOR_DISCORD_ID unset or empty in $SECRETS" >&2; exit 1; }
+    case "${OPERATOR}" in REPLACE_WITH_*) echo "BUG_OPERATOR_DISCORD_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
+    API_BASE="$(env_val BUG_PIPELINE_API_BASE_URL)"
+    API_KEY_VAL="$(env_val API_KEY)"
+
     # Step 2.3 — Create scratch DB and load the bug-pipeline migrations via bin/db-migrate.
     # db-migrate globs every *.sql in a dir, so we point it at a staging dir holding
     # only these — that gives us schema_migrations tracking + skip-if-applied.
@@ -96,6 +106,8 @@ if [ "$MODE" = "up" ]; then
     # schema than production and the E2E silently tests the wrong thing. 177 widens the
     # status enum with 'filed'; 178 widens the class enum with 'roster_error'. Without
     # them a transition to either value is rejected (strict mode) or truncated to ''.
+    # 198 adds the 'dormant' status and the ibl_bug_report_operator_context table the
+    # wake endpoint writes; without it every enqueue fails on the ENUM.
     db_exec "$DB_CONTAINER" mariadb -u root -proot -e \
         "CREATE DATABASE IF NOT EXISTS \`$SCRATCH_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
@@ -103,7 +115,8 @@ if [ "$MODE" = "up" ]; then
     cp "$REPO_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql" \
        "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql" \
        "$REPO_ROOT/ibl5/migrations/177_add_filed_status_to_bug_reports.sql" \
-       "$REPO_ROOT/ibl5/migrations/178_add_roster_error_class_to_bug_reports.sql" "$STAGE/"
+       "$REPO_ROOT/ibl5/migrations/178_add_roster_error_class_to_bug_reports.sql" \
+       "$REPO_ROOT/ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql" "$STAGE/"
     "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$STAGE" "$SCRATCH_DB"
 
     # Step 2.4 — Write claude / gh / wt-new / post-plan-now stubs.
@@ -174,6 +187,8 @@ SH
     # Covers every production-defaulted seam in bin/bug-pipeline-tick:28-73 (original
     # set) and lines 40, 84, 93-106 (CI-autofix + DM + heartbeat seams added later).
     mkdir -p "$WT_BASE" "$PLANS"
+    # The file carries the real API_KEY: create it owner-only before anything is written.
+    install -m 600 /dev/null "$ENV_FILE"
     cat > "$ENV_FILE" <<EOF
 export DB_HOST="127.0.0.1" DB_USER="root" DB_PASS="root" DB_NAME="${SCRATCH_DB}"
 export BOT_BASE_URL="${BOT_URL}"
@@ -190,6 +205,9 @@ export BUG_PIPELINE_SCRIPTS_DIR="${REPO_ROOT}/ibl5/scripts/bug-pipeline"
 export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="/tmp/bug-pipeline-test-attachments"
 export BUG_PIPELINE_HUNT_LOG="/tmp/bug-pipeline-test-hunt.log"
 export BUG_PIPELINE_APPROVER_ID="${APPROVER}"
+export BUG_OPERATOR_DISCORD_ID="${OPERATOR}"
+export BUG_PIPELINE_API_BASE_URL="${API_BASE}"
+export API_KEY="${API_KEY_VAL}"
 export BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bug-pipeline-test-tick-heartbeat"
 export BUG_PIPELINE_CI_AUTOFIX_ENABLED="0"
 export BUG_PIPELINE_CI_AUTOFIX_LEDGER="/tmp/bug-pipeline-test-ci-autofix-ledger.json"

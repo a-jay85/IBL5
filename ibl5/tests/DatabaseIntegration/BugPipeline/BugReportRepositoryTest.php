@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\BugPipeline;
 
 use BugPipeline\BugReportRepository;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
@@ -76,16 +77,230 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertSame(self::MSG_ID, $row['original_message_id']);
     }
 
-    // ── insertQueuedReport ─────────────────────────────────────────────────────
+    // ── insertDormantReport ────────────────────────────────────────────────────
 
-    public function testInsertQueuedReportReturnsNewId(): void
+    public function testEnqueueWritesDormant(): void
     {
-        $id = $this->repo->insertQueuedReport(self::AUTHOR, self::CHANNEL, self::MSG_ID, 'app crashes');
+        $id = $this->repo->insertDormantReport(self::AUTHOR, self::CHANNEL, self::MSG_ID, 'app crashes');
         self::assertGreaterThan(0, $id);
         $row = $this->repo->findById($id);
         self::assertNotNull($row);
-        self::assertSame('queued', $row['status']);
+        self::assertSame('dormant', $row['status']);
         self::assertSame('app crashes', $row['original_text']);
+    }
+
+    // ── dormant exclusion (enumerator + claim) ─────────────────────────────────
+
+    public function testListActiveConversationsExcludesDormant(): void
+    {
+        // dormant + class NULL + thread NULL: would match the (queued, class NULL) arm if widened.
+        $dormant = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => 'dormant']);
+        $queued = $this->insertBugReport(['original_message_id' => self::REPLY_ID, 'status' => 'queued']);
+
+        $ids = array_map(static fn (array $r): int => $r['id'], $this->repo->listActiveConversations());
+        self::assertNotContains($dormant, $ids);
+        self::assertContains($queued, $ids);
+    }
+
+    public function testClaimNextHuntableSkipsDormant(): void
+    {
+        $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => 'dormant', 'class' => 'bug']);
+        self::assertNull($this->repo->claimNextHuntable('worker-1', '2099-01-01 00:00:00'));
+    }
+
+    // ── wakeByOperator ─────────────────────────────────────────────────────────
+
+    private const OP_MSG    = '800000000000000001';
+    private const OP_AUTHOR = '900000000000000001';
+
+    public function testWakeDormantBecomesQueuedWithThreadId(): void
+    {
+        $id = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => 'dormant']);
+
+        $result = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'please look');
+
+        self::assertSame(['outcome' => 'woke', 'status' => 'queued'], $result);
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame('queued', $row['status']);
+        self::assertSame(self::THREAD, $row['thread_id']);
+        self::assertSame('please look', $this->repo->findOperatorContextByReportId($id)[0]['content']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function inFlightStatusProvider(): array
+    {
+        return [
+            'queued'        => ['queued'],
+            'awaiting_info' => ['awaiting_info'],
+            'gathering'     => ['gathering'],
+            'awaiting_ajay' => ['awaiting_ajay'],
+            'hunting'       => ['hunting'],
+            'blocked'       => ['blocked'],
+        ];
+    }
+
+    #[DataProvider('inFlightStatusProvider')]
+    public function testWakeAppendsOnInFlightRowWithoutStatusChange(string $status): void
+    {
+        $id = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => $status]);
+
+        $result = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'note');
+
+        self::assertSame(['outcome' => 'appended', 'status' => $status], $result);
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame($status, $row['status']);
+        self::assertSame(self::THREAD, $row['thread_id'], 'a row with no thread adopts the wake thread');
+        self::assertCount(1, $this->repo->findOperatorContextByReportId($id));
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function replyTriggerProvider(): array
+    {
+        return [
+            'awaiting_info re-runs on a stamp' => ['awaiting_info', true],
+            'gathering re-runs on a stamp'     => ['gathering', true],
+            'queued needs no stamp'            => ['queued', false],
+            'hunting needs no stamp'           => ['hunting', false],
+        ];
+    }
+
+    #[DataProvider('replyTriggerProvider')]
+    public function testWakeAppendStampsLastGmReplyOnlyWhereTickRerunsOnIt(string $status, bool $expectStamp): void
+    {
+        $id = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => $status]);
+
+        $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'guidance');
+
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        if ($expectStamp) {
+            self::assertNotNull($row['last_gm_reply_at']);
+        } else {
+            self::assertNull($row['last_gm_reply_at']);
+        }
+    }
+
+    public function testWakeAppendKeepsExistingThreadId(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'gathering',
+            'thread_id'           => self::THREAD,
+        ]);
+
+        $this->repo->wakeByOperator($id, '410000000000000004', self::OP_MSG, self::OP_AUTHOR, 'note');
+
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame(self::THREAD, $row['thread_id']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function stoppedStatusProvider(): array
+    {
+        return [
+            'needs_human' => ['needs_human'],
+            'parked_idle' => ['parked_idle'],
+            'dropped'     => ['dropped'],
+        ];
+    }
+
+    #[DataProvider('stoppedStatusProvider')]
+    public function testWakeRestartsStoppedRow(string $status): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => $status,
+            'class'               => 'bug',
+            'lease_owner'         => 'worker-1',
+            'lease_expires'       => '2099-01-01 00:00:00',
+            'blocked_until'       => '2099-01-01 00:00:00',
+            'hunt_attempts'       => 3,
+            'approval_message_id' => self::APPROVAL,
+        ]);
+
+        $result = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'retry');
+
+        self::assertSame(['outcome' => 'restarted', 'status' => 'queued'], $result);
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame('queued', $row['status']);
+        self::assertNull($row['lease_owner']);
+        self::assertNull($row['lease_expires']);
+        self::assertNull($row['blocked_until']);
+        self::assertSame(0, $row['hunt_attempts']);
+        self::assertNull($row['class']);
+        self::assertNull($row['approval_message_id']);
+        self::assertSame(self::THREAD, $row['thread_id']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function terminalStatusProvider(): array
+    {
+        return [
+            'fixed'   => ['fixed'],
+            'pr_open' => ['pr_open'],
+            'filed'   => ['filed'],
+        ];
+    }
+
+    #[DataProvider('terminalStatusProvider')]
+    public function testWakeTerminalRowAppendsOnly(string $status): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => $status,
+            'class'               => 'bug',
+        ]);
+
+        $result = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'late note');
+
+        self::assertSame(['outcome' => 'appended', 'status' => $status], $result);
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame($status, $row['status']);
+        self::assertSame('bug', $row['class']);
+        self::assertCount(1, $this->repo->findOperatorContextByReportId($id));
+    }
+
+    public function testWakeDuplicateMessageIsNoOp(): void
+    {
+        $id = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => 'needs_human']);
+
+        $first = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'again');
+        self::assertSame('restarted', $first['outcome']);
+        self::assertTrue($this->repo->transition($id, 'hunting'));
+
+        $second = $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'again');
+
+        self::assertSame(['outcome' => 'duplicate', 'status' => 'hunting'], $second);
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame('hunting', $row['status']);
+        self::assertCount(1, $this->repo->findOperatorContextByReportId($id));
+    }
+
+    public function testWakeUnknownReportIdWritesNothing(): void
+    {
+        $result = $this->repo->wakeByOperator(999999, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'ghost');
+
+        self::assertSame(['outcome' => 'unknown', 'status' => null], $result);
+        $res = $this->db->query('SELECT COUNT(*) AS cnt FROM `ibl_bug_report_operator_context`');
+        self::assertNotFalse($res);
+        /** @var array{cnt: int|string}|null $row */
+        $row = $res->fetch_assoc();
+        self::assertNotNull($row);
+        self::assertSame(0, (int) $row['cnt']);
     }
 
     // ── upsertReporterProfile / getReporterTechLevel ───────────────────────────

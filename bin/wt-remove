@@ -70,6 +70,8 @@ fi
 # of the same name checked out (bin/wt-new's abort trap passes the path).
 case "$NAME" in
     /*)
+        # A trailing slash would make the last "*" in the nested check match empty.
+        NAME="${NAME%/}"
         case "$NAME" in
             */..|*/../*|*/.|*/./*) echo "Error: '$NAME' is outside $WT_PARENT (dot segments are not resolved)" >&2; exit 1 ;;
             "$WT_PARENT"/*/*) echo "Error: '$NAME' is nested below $WT_PARENT; name one worktree directory" >&2; exit 1 ;;

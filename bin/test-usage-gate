@@ -2972,6 +2972,193 @@ test_prestart_blind_pass_keeps_open() {
     if [ "$(log_count blind-trust)" -ge 1 ]; then pass prestart_blind:blind-ran; else fail prestart_blind:blind-ran "no blind-trust line"; fi
 }
 
+# ------------------------------------------- post-plan-now kill evidence beats a marker
+
+PP_KILLED=$'RESULT: post-plan KILLED (signal 15) at phase2\n'
+PP_PAUSED_LINE='post-plan-now: RESULT paused (usage gate); auto-resumes after reset.'
+PP_KILLED_LINE='post-plan-now: RESULT killed (harness rc=143); no skill fallback and no usage-gate pause.'
+
+pp_seed_marker() {
+    in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''"
+}
+
+test_postplan_pause_kill_beats_marker_3352() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf '%s' "$PP_KILLED" > "$T/log"
+    pp_seed_marker
+    local out rc
+    out=$(in_env "postplan_postrun_pause $SID_A $PPN_BIN 143 1 $T/log")
+    rc=$?
+    assert_eq pp_kill_3352:rc 1 "$rc"
+    assert_eq pp_kill_3352:stdout "" "$out"
+    assert_file pp_kill_3352:marker-kept "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+    assert_contains pp_kill_3352:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" \
+        "postrun-kill-beats-marker runner=post-plan-now sid=$SID_A rc=143"
+}
+
+test_postplan_pause_killed_line_rc0() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf '%s' "$PP_KILLED" > "$T/log"
+    pp_seed_marker
+    local out rc
+    out=$(in_env "postplan_postrun_pause $SID_A $PPN_BIN 0 0 $T/log")
+    rc=$?
+    assert_eq pp_killed_line_rc0:rc 1 "$rc"
+    assert_eq pp_killed_line_rc0:stdout "" "$out"
+}
+
+test_postplan_pause_sigterm_flag_only() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    : > "$T/log"
+    pp_seed_marker
+    in_env "postplan_postrun_pause $SID_A $PPN_BIN 0 1 $T/log" >/dev/null
+    assert_eq pp_sigterm_only:rc 1 "$?"
+}
+
+test_postplan_pause_rc124_and_rc137() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    : > "$T/log"
+    pp_seed_marker
+    in_env "postplan_postrun_pause $SID_A $PPN_BIN 124 0 $T/log" >/dev/null
+    assert_eq pp_rc124:rc 1 "$?"
+    in_env "postplan_postrun_pause $SID_A $PPN_BIN 137 0 $T/log" >/dev/null
+    assert_eq pp_rc137:rc 1 "$?"
+}
+
+test_postplan_pause_real_pause_control() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf 'RESULT: post-plan PAUSED (usage gate)\n' > "$T/log"
+    pp_seed_marker
+    local out rc
+    out=$(in_env "postplan_postrun_pause $SID_A $PPN_BIN 75 0 $T/log")
+    rc=$?
+    assert_eq pp_real_pause:rc 0 "$rc"
+    assert_eq pp_real_pause:stdout "$PP_PAUSED_LINE" "$out"
+}
+
+test_postplan_pause_no_marker_rc0() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    : > "$T/log"
+    local out rc
+    out=$(in_env "postplan_postrun_pause $SID_A $PPN_BIN 0 0 $T/log")
+    rc=$?
+    assert_eq pp_no_marker:rc 1 "$rc"
+    assert_eq pp_no_marker:stdout "" "$out"
+    assert_no_file pp_no_marker:no-marker "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json"
+}
+
+test_postplan_killed_no_evidence() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf 'some ordinary failure\n' > "$T/log"
+    in_env "postplan_killed 1 0 $T/log"
+    assert_eq pp_killed_rc1:rc 1 "$?"
+    in_env "postplan_killed 3 0 $T/log"
+    assert_eq pp_killed_rc3:rc 1 "$?"
+    local err
+    err=$(in_env "postplan_killed 1 0 $T/missing.log" 2>&1)
+    assert_eq pp_killed_missing:rc 1 "$?"
+    assert_eq pp_killed_missing:stderr "" "$err"
+    in_env "postplan_killed 1 0 ''"
+    assert_eq pp_killed_empty:rc 1 "$?"
+}
+
+# ppn_seg_file <rc> <sigterm>: $T/seg.sh built from the REAL bin/post-plan-now
+# GATE_OPEN / GATE_CLOSE / PAUSE_SEG text, with `echo FALLBACK-RAN` as the fallback body.
+ppn_seg_file() {
+    local seg_rc="$1" seg_term="$2"
+    (
+        eval "$(grep -E '^shq\(\) ' "$REPO_ROOT/bin/lib/launchd-job.sh")"
+        # shellcheck disable=SC2034  # read by the eval'd segment assignments
+        SESSION_ID=$SID_A ROOT=$REPO_ROOT LOG=$T/log REBASE_ONLY=0 \
+            HARNESS_RUN_DIR=$T/run SLUG=t SAFE_SLUG=t FIX_ROOT=$T
+        eval "$(grep -E '^ *GATE_OPEN="if ' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^ *LOG_Q="' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^ *GATE_CLOSE="; elif ' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^PAUSE_SEG="' "$REPO_ROOT/bin/post-plan-now")"
+        {
+            printf '. %s\n' "$(shq "$REPO_ROOT/bin/lib/usage-gate.sh")"
+            grep -E '^should_fallback\(\) \{' "$REPO_ROOT/bin/post-plan-now"
+            printf 'rc=%s\n_sigterm_received=%s\npp_rc=0\n' "$seg_rc" "$seg_term"
+            printf '%s\n' "${GATE_OPEN}echo FALLBACK-RAN${GATE_CLOSE}"
+            printf 'pp_rc=$?\n'
+            printf '%s\n' "${PAUSE_SEG}"
+            printf 'echo "final=$pp_rc"\n'
+        } > "$T/seg.sh"
+    )
+}
+
+ppn_seg_run() {
+    ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; mkdir -p "$HOME"; bash "$T/seg.sh" 2>&1 )
+}
+
+test_ppn_seg_harness_kill_blocks_fallback() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf '%s' "$PP_KILLED" > "$T/log"
+    ppn_seg_file 143 0
+    local out
+    out=$(ppn_seg_run)
+    case "$out" in *FALLBACK-RAN*) fail ppn_seg_kill:no-fallback "$out" ;; *) pass ppn_seg_kill:no-fallback ;; esac
+    assert_contains ppn_seg_kill:killed-line "$out" "$PP_KILLED_LINE"
+    assert_contains ppn_seg_kill:final "$out" "final=143"
+}
+
+test_ppn_seg_3352_marker_and_kill_not_paused() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf '%s' "$PP_KILLED" > "$T/log"
+    pp_seed_marker
+    ppn_seg_file 0 0
+    local out
+    out=$(ppn_seg_run)
+    case "$out" in *FALLBACK-RAN*) fail ppn_seg_3352:no-fallback "$out" ;; *) pass ppn_seg_3352:no-fallback ;; esac
+    assert_contains ppn_seg_3352:final "$out" "final=143"
+    case "$out" in *"RESULT paused"*) fail ppn_seg_3352:not-paused "$out" ;; *) pass ppn_seg_3352:not-paused ;; esac
+}
+
+test_ppn_seg_sigterm_with_marker_not_paused() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    : > "$T/log"
+    pp_seed_marker
+    ppn_seg_file 143 1
+    local out
+    out=$(ppn_seg_run)
+    assert_contains ppn_seg_term:final "$out" "final=143"
+    case "$out" in *"RESULT paused"*) fail ppn_seg_term:not-paused "$out" ;; *) pass ppn_seg_term:not-paused ;; esac
+}
+
+test_ppn_seg_real_pause_control() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf 'RESULT: post-plan PAUSED (usage gate)\n' > "$T/log"
+    pp_seed_marker
+    ppn_seg_file 75 0
+    local out
+    out=$(ppn_seg_run)
+    case "$out" in *FALLBACK-RAN*) fail ppn_seg_pause:no-fallback "$out" ;; *) pass ppn_seg_pause:no-fallback ;; esac
+    assert_contains ppn_seg_pause:final "$out" "final=75"
+    assert_contains ppn_seg_pause:paused-line "$out" "$PP_PAUSED_LINE"
+}
+
+test_ppn_seg_plain_failure_still_falls_back() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf 'plain harness failure\n' > "$T/log"
+    ppn_seg_file 1 0
+    local out
+    out=$(ppn_seg_run)
+    assert_contains ppn_seg_plain:fallback "$out" "FALLBACK-RAN"
+    assert_contains ppn_seg_plain:final "$out" "final=0"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

@@ -140,7 +140,8 @@ if [ "\$1 \$2 \$3" = "pr view 77" ]; then
         *title,labels*)
             if [ -e "$TMP/claude.args" ] && [ -f "$TMP/gh.snap.after" ]; then cat "$TMP/gh.snap.after"; else cat "$TMP/gh.snap.before"; fi
             exit 0 ;;
-        *comments*) cat "$TMP/gh.lastcomment" 2>/dev/null; exit 0 ;;
+        # gh.paged: the first page of a long thread, which never holds the newest comment.
+        *comments*) if [ -e "$TMP/gh.paged" ]; then echo "an old comment"; else cat "$TMP/gh.lastcomment" 2>/dev/null; fi; exit 0 ;;
     esac
 fi
 if [ "\$1 \$2" = "pr comment" ]; then
@@ -149,8 +150,10 @@ if [ "\$1 \$2" = "pr comment" ]; then
         if [ "\$1" = "--body-file" ]; then cp "\$2" "$TMP/gh.lastcomment"; cp "\$2" "$TMP/gh.comment"; fi
         shift
     done
+    echo "https://github.com/a-jay85/IBL5/pull/77#issuecomment-555"
     exit 0
 fi
+if [ "\$1 \$2" = "api repos/a-jay85/IBL5/issues/comments/555" ]; then cat "$TMP/gh.lastcomment" 2>/dev/null; exit 0; fi
 if [ "\$1 \$2" = "pr edit" ] || [ "\$1 \$2" = "pr merge" ]; then exit 0; fi
 exit 1
 STUBEOF
@@ -631,7 +634,7 @@ hr_reset() {
     rm -rf "$HR_STATE"; mkdir -p "$HR_STATE"
     hr_seed "$HR_STATE" "$HR_REASON"
     cp "$TMP/plan.orig" "$HR_PLANS/$B_HR.md"
-    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.lastcomment" "$TMP/gh.comment" "$TMP/gh.commentfail"
+    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.lastcomment" "$TMP/gh.comment" "$TMP/gh.commentfail" "$TMP/gh.paged"
     printf 'Fix widget\tbug\tno\n' > "$TMP/gh.snap.before"
     unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR CLAUDE_HEADLESS PPN_STUB_RC
     hr_env
@@ -715,9 +718,10 @@ need "final line" final_is "$STDOUT" skip-live-postplan-now
 need "no claude call" no_args
 need "no ledger file" no_ledger
 printf '124\t0\tcom.ibl5.post-plan-fleet-77\n' > "$TMP/launchctl.list"
-run_fix "$SUT" --holdrepeat --dry-run 77
-need "lone fleet label: rc 0" test "$RC" = 0
-need "lone fleet label: dry-run" final_is "$STDOUT" dry-run
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-nothing"
+hr_run
+need "lone fleet label: session ran" test -e "$TMP/claude.args"
+need "lone fleet label: not skipped as live" final_is "$STDOUT" gave-up-nothing-to-fix
 case_end holdrepeat-live-label
 
 # 28
@@ -1049,6 +1053,114 @@ need "HEAD unchanged" head_is_tip
 need "origin unchanged" origin_is_tip
 need "plan edit kept" test ! "$(cmp -s "$TMP/plan.orig" "$HR_PLAN_FILE" && echo same)" = same
 case_end holdrepeat-plan-only-fix-ships
+
+# 53 (the default STATE_DIR sits under the gitignored out/ dir: the launcher's own "started"
+# ledger write and a concurrent harness run writing to out/ are not tamper)
+hr_reset
+HR_EXCL="$MAIN/.git/info/exclude"
+cp "$HR_EXCL" "$TMP/exclude.orig"
+printf 'tools/postplan-harness/out/\n' >> "$HR_EXCL"
+HR_DEF_STATE="$MAIN/tools/postplan-harness/out/state"
+mkdir -p "$HR_DEF_STATE"
+hr_seed "$HR_DEF_STATE" "$HR_REASON"
+export POSTPLAN_FIX_STATE_DIR=""
+# The stub session ends within a second, and bash 3.2's -nt compares whole seconds, so the
+# effects date their writes 5 s ahead, as a real session minutes long would.
+HR_LATER='python3 -c "import os,sys,time; t=time.time()+5; [os.utime(p,(t,t)) for p in sys.argv[1:]]"'
+{ cat "$TMP/effects/hr-fix.sh"
+  printf 'printf "{}\\n" > "%s/concurrent-run.json"\n' "$MAIN/tools/postplan-harness/out"
+  printf '%s "%s/concurrent-run.json" "%s"/*.json\n' "$HR_LATER" "$MAIN/tools/postplan-harness/out" "$HR_DEF_STATE"
+} > "$TMP/effects/hr-outdir.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-outdir.sh"
+hr_run
+cp "$TMP/exclude.orig" "$HR_EXCL"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+need "no gate-path DM" test "$(dm_has 'gate-path' && echo yes || echo no)" = no
+need "ledger in the default state dir" grep -qF "fixed-refire-rc=0" "$HR_DEF_STATE/$B_HR.holdrepeat-fix.json"
+rm -rf "$HR_DEF_STATE" "$MAIN/tools/postplan-harness/out/concurrent-run.json"
+case_end holdrepeat-state-dir-not-tamper
+
+# 54 (a session that runs pytest leaves gitignored harness .pyc files in the worktree: not
+# tamper, and the session env sets PYTHONDONTWRITEBYTECODE so it should write none)
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"
+printf '__pycache__/\n*.pyc\n' >> "$HR_EXCL"
+{ cat "$TMP/effects/hr-fix.sh"
+  printf 'printf "%%s" "${PYTHONDONTWRITEBYTECODE-unset}" > "%s"\n' "$TMP/pydwb"
+  printf 'mkdir -p tools/postplan-harness/harness/__pycache__\n'
+  printf 'printf "x" > tools/postplan-harness/harness/__pycache__/holdrepeat.cpython-312.pyc\n'
+  printf '%s tools/postplan-harness/harness/__pycache__/holdrepeat.cpython-312.pyc\n' "$HR_LATER"
+} > "$TMP/effects/hr-pyc.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-pyc.sh"
+rm -f "$TMP/pydwb"
+( unset PYTHONDONTWRITEBYTECODE; hr_run; printf '%s\n%s\n' "$RC" "$STDOUT" > "$TMP/pyc.out" )
+cp "$TMP/exclude.orig" "$HR_EXCL"
+HR_PYC_RC=$(sed -n 1p "$TMP/pyc.out"); HR_PYC_OUT=$(sed -n '2,$p' "$TMP/pyc.out")
+need "rc 0" test "$HR_PYC_RC" = 0
+need "final line" final_is "$HR_PYC_OUT" fixed
+need "session env sets PYTHONDONTWRITEBYTECODE=1" test "$(cat "$TMP/pydwb" 2>/dev/null)" = 1
+need "worktree pyc purged" test ! -e "$WTH/tools/postplan-harness/harness/__pycache__/holdrepeat.cpython-312.pyc"
+case_end holdrepeat-pycache-not-tamper
+
+# 55 (the plan comment is verified by the URL gh pr comment printed, so a first page of
+# comments that misses the new one does not count as "did not land")
+hr_reset
+: > "$TMP/gh.paged"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planedit.sh"
+hr_run
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+need "comment read back by its id" gh_has "api repos/a-jay85/IBL5/issues/comments/555"
+need "one post-plan call" test "$(ppn_count)" = 1
+case_end holdrepeat-comment-verified-by-url
+
+# 56 (someone else pushes the PR branch during the session: the revert leaves that push alone
+# and the DM says so)
+hr_reset
+cat > "$TMP/effects/hr-ownerpush.sh" <<EFFEOF
+sha=\$(git commit-tree "HEAD^{tree}" -p HEAD -m owner-push)
+git push -q origin "\$sha:refs/heads/$B_HR"
+printf '%s\n' "\$sha" > "$TMP/owner.sha"
+EFFEOF
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-ownerpush.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-refs
+need "owner's push kept on origin" test "$(origin_hr)" = "$(cat "$TMP/owner.sha" 2>/dev/null)"
+need "DM says the remote was left as is" dm_has "left as is"
+need "worktree back at HEAD0" head_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-owner-push-kept
+
+# 57 (the session's own commit pushed to origin is still rewritten back to HEAD0)
+hr_reset
+{ cat "$TMP/effects/hr-commit.sh"; printf 'git push -q origin "HEAD:refs/heads/%s"\n' "$B_HR"; } > "$TMP/effects/hr-sessionpush.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-sessionpush.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-refs
+need "origin rewritten to HEAD0" origin_is_tip
+need "HEAD restored" head_is_tip
+case_end holdrepeat-session-push-reverted
+
+# 58 (--holdrepeat --dry-run is inert: no fetch, so an unreachable origin and a dirty tree
+# do not change the result, and no temp dir is made)
+hr_reset
+printf 'x\n' > "$WTH/untracked.txt"
+HR_URL=$(git -C "$MAIN" remote get-url origin)
+git -C "$MAIN" remote set-url origin "$TMP/no-such-origin.git"
+mkdir -p "$TMP/dryrun-tmp"
+( export TMPDIR="$TMP/dryrun-tmp"; run_fix "$SUT" --holdrepeat --dry-run 77; printf '%s\n%s\n' "$RC" "$STDOUT" > "$TMP/dry.out" )
+git -C "$MAIN" remote set-url origin "$HR_URL"
+rm -f "$WTH/untracked.txt"
+HR_DRY_RC=$(sed -n 1p "$TMP/dry.out"); HR_DRY_OUT=$(sed -n '2,$p' "$TMP/dry.out")
+need "rc 0" test "$HR_DRY_RC" = 0
+need "final line" final_is "$HR_DRY_OUT" dry-run
+need "prompt printed" has_s "$HR_DRY_OUT" "HOLDREPEAT_FIX: fixed"
+need "no temp dir made" test -z "$(ls -A "$TMP/dryrun-tmp")"
+need "no claude call" no_args
+case_end holdrepeat-dry-run-inert
 hr_reset
 
 h_done

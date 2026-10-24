@@ -18,7 +18,9 @@
 # launcher owns every guard, the commit, the push and the post-plan re-fire. One attempt
 # per item set and two per PR. Exit codes: 0 fixed, 20 skipped (no attempt recorded),
 # 21 gave up (owner DM sent), 75 usage gate closed, 1 error. The last stdout line is
-# always "postplan-fix: holdrepeat result=<word>". --dry-run prints the argv and prompt.
+# always "postplan-fix: holdrepeat result=<word>". --dry-run reads the hold record and the
+# plan, prints the argv and prompt, then exits before any fetch, temp dir, ledger write or
+# claude call.
 # Env seams: POSTPLAN_FIX_STATE_DIR, POSTPLAN_FIX_DISCORD_DM, POSTPLAN_FIX_USAGE_JSON,
 # POSTPLAN_FIX_POST_PLAN_NOW. Unset and empty each mean the default.
 set -euo pipefail
@@ -76,7 +78,7 @@ MAIN_ROOT="$(resolve_canonical_root "$SELF_ROOT")"
 # restricted fix sessions; returns 1 when it cannot be read.
 _pf_denied_tools() {
     local d
-    d="$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness.conflict_fix import FIX_DENIED; print(",".join(FIX_DENIED))' "$MAIN_ROOT/tools/postplan-harness" 2>/dev/null)" || return 1
+    d="$(python3 -I -B -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness.conflict_fix import FIX_DENIED; print(",".join(FIX_DENIED))' "$MAIN_ROOT/tools/postplan-harness" 2>/dev/null)" || return 1
     [ -n "$d" ] || return 1
     printf '%s\n' "$d"
 }
@@ -210,6 +212,7 @@ if [ "$HOLDREPEAT" = 1 ]; then
     readonly HR_TIMEOUT_SECS=1500    # wall clock; mirrors harness conflict_fix FIX_TIMEOUT
     STATE_DIR="${POSTPLAN_FIX_STATE_DIR:-$MAIN_ROOT/tools/postplan-harness/out/state}"
     HR_FP="" HR_PARTS="" HR_PLAN="" HR_TMP="" HR_NOTE="" HEAD0="" REFS0="" REFS1=""
+    HR_SESSION_TIPS="" HR_REMOTE_FOREIGN=""
     PF_MOVED=0
 
     _hr_py() {  # harness.holdrepeat needs the package on the path; -I would drop PYTHONPATH
@@ -227,7 +230,11 @@ if [ "$HOLDREPEAT" = 1 ]; then
     _hr_dm() {  # <reason>
         local text line n=0
         HR_DM_STATE=sent
-        text="postplan-fix: PR #$PR repeat hold needs you ($1). fingerprint=$HR_FP. Items:"
+        text="postplan-fix: PR #$PR repeat hold needs you ($1). fingerprint=$HR_FP."
+        if [ -n "$HR_REMOTE_FOREIGN" ]; then
+            text+=" origin/$branch moved to $HR_REMOTE_FOREIGN , which is not provably this session's commit; left as is."
+        fi
+        text+=" Items:"
         while IFS= read -r line; do
             [ -n "$line" ] || continue
             n=$((n + 1))
@@ -244,12 +251,17 @@ if [ "$HOLDREPEAT" = 1 ]; then
     # Back to the clean entry state: the worktree was clean and synced on entry, so a hard
     # reset loses nothing the owner made. The plan lives outside the repo, so restore it too.
     _hr_revert() {
-        # A session may have pushed. Put origin back with a lease on the value just read, so
-        # every reject path repairs the remote, not only the refs guard.
+        # A session may have pushed. Put origin back, with a lease on the value just read, only
+        # when its tip is the session's own commit (HR_SESSION_TIPS, read before any restore).
+        # Any other tip is a push by the owner or another process: keep it and name it in the DM.
         local remote_now
         if remote_now="$(git -C "$WT" ls-remote origin "refs/heads/$branch" 2>/dev/null | cut -f1)" \
             && [ -n "$remote_now" ] && [ "$remote_now" != "$HEAD0" ]; then
-            git -C "$WT" push -q --force-with-lease="refs/heads/$branch:$remote_now" origin "$HEAD0:refs/heads/$branch" >/dev/null 2>&1 || true
+            case " $HR_SESSION_TIPS " in
+                *" $remote_now "*)
+                    git -C "$WT" push -q --force-with-lease="refs/heads/$branch:$remote_now" origin "$HEAD0:refs/heads/$branch" >/dev/null 2>&1 || true ;;
+                *) HR_REMOTE_FOREIGN="$remote_now" ;;
+            esac
         fi
         git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         git -C "$WT" clean -fdq >/dev/null 2>&1 || true
@@ -323,37 +335,8 @@ if [ "$HOLDREPEAT" = 1 ]; then
             HR_PARTS="$(sed -n 's/^part: //p' <<< "$HR_ELIG")" ;;
         *) echo "postplan-fix: fix-eligible failed (rc $HR_ELIG_RC)" >&2; _hr_finish "$HR_RC_ERROR" error ;;
     esac
-    # 3. A live post-plan-now run in this worktree. postplan_fleet_slot_label is not used:
-    # a fleet runner calling this mode holds its own slot, and counting it would refuse every time.
-    # shellcheck source=bin/post-plan-now
-    . "$SELF_ROOT/bin/post-plan-now"
-    HR_LIVE="$(postplan_inflight_label "$safe")"
-    if [ -n "$HR_LIVE" ]; then _hr_finish "$HR_RC_SKIP" skip-live-postplan-now; fi
-    # 4. Clean tree, synced with its remote. The push guard compares against this HEAD.
-    if [ -n "$(git -C "$WT" status --porcelain)" ]; then _hr_finish "$HR_RC_SKIP" skip-dirty-worktree; fi
-    git -C "$WT" fetch -q origin "$branch" master >/dev/null 2>&1 || _hr_finish "$HR_RC_SKIP" skip-not-synced
-    HEAD0="$(git -C "$WT" rev-parse HEAD)"
-    if [ "$HEAD0" != "$(git -C "$WT" rev-parse "origin/$branch" 2>/dev/null || true)" ]; then
-        _hr_finish "$HR_RC_SKIP" skip-not-synced
-    fi
-    # 5. Usage gate. Same posture as usage_prestart_gate without its resume marker: an unknown
-    # reading proceeds, and nothing was recorded, so the next decline simply re-evaluates.
-    HR_USAGE=""
-    if [ -n "${POSTPLAN_FIX_USAGE_JSON:-}" ]; then
-        HR_USAGE="$(cat "$POSTPLAN_FIX_USAGE_JSON" 2>/dev/null)" || HR_USAGE=""
-    else
-        HR_USAGE="$(usage_fetch 45 2>/dev/null)" || HR_USAGE=""
-    fi
-    if [ -z "$HR_USAGE" ]; then
-        echo "postplan-fix: usage unknown; proceeding" >&2
-    else
-        HR_ZONE="$(usage_zone "$HR_USAGE" 2>/dev/null)" || HR_ZONE=""
-        if [ -n "$HR_ZONE" ] && [ "$HR_ZONE" != normal ]; then
-            _hr_finish "$HR_RC_USAGE" "skip-usage-$HR_ZONE"
-        fi
-    fi
-    # 3a. The plan file, before any attempt is recorded.
-    HR_PLAN="$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness.planfile import locate_plan; print(locate_plan(sys.argv[2]).path or "")' "$MAIN_ROOT/tools/postplan-harness" "$branch" 2>/dev/null)" || HR_PLAN=""
+    # 3a. The plan file, before any attempt is recorded. Read-only, so --dry-run runs it too.
+    HR_PLAN="$(python3 -I -B -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness.planfile import locate_plan; print(locate_plan(sys.argv[2]).path or "")' "$MAIN_ROOT/tools/postplan-harness" "$branch" 2>/dev/null)" || HR_PLAN=""
     if [ -z "$HR_PLAN" ] || [ ! -f "$HR_PLAN" ]; then _hr_finish "$HR_RC_SKIP" skip-no-plan; fi
 
     ALLOWED="Read,Write,Edit,Glob,Grep,Bash"
@@ -362,8 +345,12 @@ if [ "$HOLDREPEAT" = 1 ]; then
         echo "postplan-fix: denied-tool list unavailable from $MAIN_ROOT/tools/postplan-harness" >&2
         _hr_finish "$HR_RC_ERROR" error
     fi
-    HR_TMP="$(mktemp -d "${TMPDIR:-/tmp}/postplan-fix-hr.XXXXXX")"
-    trap 'rm -rf "$HR_TMP"' EXIT
+    # --dry-run makes no temp dir; its prompt names the note path a real run would get.
+    HR_TMP="${TMPDIR:-/tmp}/postplan-fix-hr.XXXXXX"
+    if [ "$DRY_RUN" != 1 ]; then
+        HR_TMP="$(mktemp -d "$HR_TMP")"
+        trap 'rm -rf "$HR_TMP"' EXIT
+    fi
     HR_NOTE="$HR_TMP/plan-change-note.md"
 
     HR_PROMPT="PR #$PR (branch $branch) is held because post-plan saw the same missing plan item(s) twice.
@@ -421,6 +408,35 @@ LAST line of the final message."
         printf '%s\n' "$HR_PROMPT"
         _hr_finish "$HR_RC_FIXED" dry-run
     fi
+    # 3. A live post-plan-now run in this worktree. postplan_fleet_slot_label is not used:
+    # a fleet runner calling this mode holds its own slot, and counting it would refuse every time.
+    # shellcheck source=bin/post-plan-now
+    . "$SELF_ROOT/bin/post-plan-now"
+    HR_LIVE="$(postplan_inflight_label "$safe")"
+    if [ -n "$HR_LIVE" ]; then _hr_finish "$HR_RC_SKIP" skip-live-postplan-now; fi
+    # 4. Clean tree, synced with its remote. The push guard compares against this HEAD.
+    if [ -n "$(git -C "$WT" status --porcelain)" ]; then _hr_finish "$HR_RC_SKIP" skip-dirty-worktree; fi
+    git -C "$WT" fetch -q origin "$branch" master >/dev/null 2>&1 || _hr_finish "$HR_RC_SKIP" skip-not-synced
+    HEAD0="$(git -C "$WT" rev-parse HEAD)"
+    if [ "$HEAD0" != "$(git -C "$WT" rev-parse "origin/$branch" 2>/dev/null || true)" ]; then
+        _hr_finish "$HR_RC_SKIP" skip-not-synced
+    fi
+    # 5. Usage gate. Same posture as usage_prestart_gate without its resume marker: an unknown
+    # reading proceeds, and nothing was recorded, so the next decline simply re-evaluates.
+    HR_USAGE=""
+    if [ -n "${POSTPLAN_FIX_USAGE_JSON:-}" ]; then
+        HR_USAGE="$(cat "$POSTPLAN_FIX_USAGE_JSON" 2>/dev/null)" || HR_USAGE=""
+    else
+        HR_USAGE="$(usage_fetch 45 2>/dev/null)" || HR_USAGE=""
+    fi
+    if [ -z "$HR_USAGE" ]; then
+        echo "postplan-fix: usage unknown; proceeding" >&2
+    else
+        HR_ZONE="$(usage_zone "$HR_USAGE" 2>/dev/null)" || HR_ZONE=""
+        if [ -n "$HR_ZONE" ] && [ "$HR_ZONE" != normal ]; then
+            _hr_finish "$HR_RC_USAGE" "skip-usage-$HR_ZONE"
+        fi
+    fi
     command -v claude >/dev/null 2>&1 || { echo "postplan-fix: claude not found on PATH" >&2; _hr_finish "$HR_RC_ERROR" error; }
 
     # 3c. Pre-session snapshots, all taken before the attempt is recorded so a failed
@@ -434,8 +450,13 @@ LAST line of the final message."
         echo "postplan-fix: could not read PR #$PR state before the session" >&2
         _hr_finish "$HR_RC_ERROR" error
     fi
-    git -C "$MAIN_ROOT" status --porcelain > "$HR_TMP/main.before"
-    touch "$HR_TMP/t0"
+    # The harness out/ dir and STATE_DIR take the ledger writes and every concurrent harness
+    # run's output, so the main-checkout tamper scans leave them out.
+    HR_MAIN_EXCL=(":(exclude)tools/postplan-harness/out")
+    case "$STATE_DIR" in
+        "$MAIN_ROOT"/*) HR_MAIN_EXCL+=(":(exclude)${STATE_DIR#"$MAIN_ROOT"/}") ;;
+    esac
+    git -C "$MAIN_ROOT" status --porcelain -- . "${HR_MAIN_EXCL[@]}" > "$HR_TMP/main.before"
 
     # 6. Record the attempt before launch. Without this write the cap cannot hold.
     if ! _hr_py fix-record --state-dir "$STATE_DIR" --slug "$branch" --fingerprint "$HR_FP" \
@@ -443,11 +464,17 @@ LAST line of the final message."
         echo "postplan-fix: could not record the attempt; no session started" >&2
         _hr_finish "$HR_RC_ERROR" error
     fi
+    # t0 comes after the launcher's own ledger write, so only the session's writes are newer.
+    touch "$HR_TMP/t0"
 
     # 3e. The prompt goes on stdin: the tool flags are variadic, so a trailing positional
     # prompt could be read as one more tool name.
     cd "$WT"
-    REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
+    # PYTHONDONTWRITEBYTECODE: a session that runs pytest writes no harness .pyc files.
+    REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
+    # The commits the session made, read before any restore: _hr_revert rewrites origin only
+    # when its tip is one of these.
+    HR_SESSION_TIPS="$(git -C "$WT" rev-parse HEAD "refs/heads/$branch" 2>/dev/null | tr '\n' ' ')" || true
 
     # 3f. Marker parse: tolerant on decoration, strict on value. Text mode keeps only the
     # final message, so the marker is read from its last non-blank line.
@@ -494,7 +521,7 @@ LAST line of the final message."
     # The main checkout and ~/.claude/hooks sit outside the revert, so the DM is the owner's
     # only signal. Collect them here, before any guard exits, so they always reach the DM.
     HR_EXTBAD=""
-    git -C "$MAIN_ROOT" status --porcelain > "$HR_TMP/main.after"
+    git -C "$MAIN_ROOT" status --porcelain -- . "${HR_MAIN_EXCL[@]}" > "$HR_TMP/main.after"
     if ! cmp -s "$HR_TMP/main.before" "$HR_TMP/main.after"; then
         HR_EXTBAD+="main checkout changed; "
     fi
@@ -507,7 +534,7 @@ LAST line of the final message."
             HR_EXTBAD+="main checkout ignored file written ($p); "
             break
         fi
-    done < <(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness)
+    done < <(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}")
     if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
         HR_EXTBAD+="a file under ~/.claude/hooks changed; "
     fi
@@ -517,16 +544,13 @@ LAST line of the final message."
     # 2. refs: the session was told never to commit, so any own-ref move is out of bounds.
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
     # The remote branch is checked too: a session that pushed moved it past anything the local
-    # restore can undo. Put it back with a lease on the value just read, then reject. An
-    # unreadable remote cannot be proven unmoved, so it rejects as well.
+    # restore can undo. The reject's _hr_revert puts back a session push and keeps any other.
+    # An unreadable remote cannot be proven unmoved, so it rejects as well.
     if ! HR_REMOTE_NOW="$(git -C "$WT" ls-remote origin "refs/heads/$branch" 2>/dev/null | cut -f1)"; then
         _pf_restore_own_refs
         _hr_reject refs "could not read origin/$branch after the session"
     fi
     if [ "$HR_REMOTE_NOW" != "$HEAD0" ]; then
-        if [ -n "$HR_REMOTE_NOW" ]; then
-            git -C "$WT" push -q --force-with-lease="refs/heads/$branch:$HR_REMOTE_NOW" origin "$HEAD0:refs/heads/$branch" >/dev/null 2>&1 || true
-        fi
         _pf_restore_own_refs
         _hr_reject refs "origin/$branch moved during the session"
     fi
@@ -542,12 +566,19 @@ LAST line of the final message."
         [ -n "$p" ] || continue
         if _hr_is_gate_path "$p"; then _hr_reject gate-path "$p"; fi
     done <<< "$HR_PATHS"
-    # Ignored files that already existed stay legal; only one written since t0 counts.
+    # Ignored files that already existed stay legal; only one written since t0 counts. Worktree
+    # bytecode is skipped: pytest writes it, and the recheck imports the main checkout's harness.
     HR_IGN="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py)"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
+        case "$p" in */__pycache__/*|*.pyc) continue ;; esac
         if _hr_is_gate_path "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then _hr_reject gate-path "$p (ignored file written)"; fi
     done <<< "$HR_IGN"
+    # Python still loads a .pyc it did not write, so drop the skipped bytecode before anything
+    # runs from the worktree. It is gitignored, so the staged tree is the same either way.
+    if [ -d "$WT/tools/postplan-harness" ]; then
+        find "$WT/tools/postplan-harness" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+    fi
     # Marker outcomes other than "fixed" end here, after the guards above.
     case "$HR_KIND" in
         needs-gate-edit)
@@ -648,10 +679,14 @@ LAST line of the final message."
             printf '%s\n' "$HR_FENCE"
         } > "$HR_TMP/comment.md"
         HR_COMMENT_BAD=""
-        if ! gh pr comment "$PR" --repo a-jay85/IBL5 --body-file "$HR_TMP/comment.md" >/dev/null 2>&1; then
+        # Read the comment back by the id in the URL gh prints: a PR's comment list pages, so
+        # its last entry need not be the newest comment.
+        if ! HR_COMMENT_URL="$(gh pr comment "$PR" --repo a-jay85/IBL5 --body-file "$HR_TMP/comment.md" 2>/dev/null)"; then
             HR_COMMENT_BAD="gh pr comment error"
+        elif ! [[ "$HR_COMMENT_URL" =~ \#issuecomment-([0-9]+) ]]; then
+            HR_COMMENT_BAD="gh pr comment printed no comment URL"
         else
-            HR_LAST_COMMENT="$(gh pr view "$PR" --repo a-jay85/IBL5 --json comments --jq '.comments[-1].body' 2>/dev/null)" || HR_LAST_COMMENT=""
+            HR_LAST_COMMENT="$(gh api "repos/a-jay85/IBL5/issues/comments/${BASH_REMATCH[1]}" --jq .body 2>/dev/null)" || HR_LAST_COMMENT=""
             if [[ "$HR_LAST_COMMENT" != *"fingerprint $HR_FP"* ]]; then
                 HR_COMMENT_BAD="comment did not land"
             fi

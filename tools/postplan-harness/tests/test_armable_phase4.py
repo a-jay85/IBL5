@@ -279,3 +279,21 @@ def test_condition_14_is_additive():
     # a fresh NOT READY still blocks on (12) even with the flag clear
     d = evaluate(inputs(conflict_resolved=False, fidelity_verdict="NOT READY"))
     assert not d.armed and 12 in _held(d)
+
+
+def test_preexisting_finding_in_memory_and_clean_threads_arms():
+    """Mutation: revert the condition-(2) label filter => held on 2, fails."""
+    from harness.state import Finding
+    f = Finding("code-review", "A", "f.php", 1, "x", 85, label="pre-existing")
+    d = evaluate(inputs(findings=[f], unresolved_findings=[]))
+    assert d.armed
+    assert 11 not in _held(d)
+
+
+def test_condition_11_still_holds_on_label_token_from_shell():
+    """The (11) grader never parses labels: any shell token still holds."""
+    from harness.state import Finding
+    f = Finding("code-review", "A", "f.php", 1, "x", 85, label="pre-existing")
+    d = evaluate(inputs(findings=[f], unresolved_findings=["unresolved-finding:85"]))
+    assert 11 in _held(d)
+    assert not d.armed

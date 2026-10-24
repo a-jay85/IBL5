@@ -13,9 +13,13 @@ from harness.state import Finding
 
 SHIM = """#!/usr/bin/env bash
 args="$*"
+case "$args" in
+  *"--input -"*) cat > "${GH_SHIM_LOG}.input" ;;
+esac
 echo "${args//$'\\n'/\\\\n}" >> "$GH_SHIM_LOG"
 case "$1 $2" in
   "pr create") echo "https://github.com/o/r/pull/123" ;;
+  "pr diff") [ -n "${GH_SHIM_DIFF:-}" ] && cat "$GH_SHIM_DIFF"; exit 0 ;;
   "issue create") echo "https://github.com/a-jay85/IBL5-backlog/issues/456" ;;
   "issue list") echo '[{"title":"existing issue"}]' ;;
   "pr view")
@@ -29,6 +33,10 @@ case "$1 $2" in
   "repo view") echo "o/r" ;;
   "api "*)
     [ "${GH_SHIM_API_FAIL:-}" = "1" ] && { echo "422" >&2; exit 1; }
+    if [ -n "${GH_SHIM_API_FAIL_ON_LINE:-}" ] && [ -f "${GH_SHIM_LOG}.input" ] \
+       && grep -q "\"line\": ${GH_SHIM_API_FAIL_ON_LINE}[,}]" "${GH_SHIM_LOG}.input"; then
+      echo "422" >&2; exit 1
+    fi
     case "$args" in
       *"issues/123/comments"*)
         sleep "${GH_SHIM_SLEEP:-0}"
@@ -85,7 +93,7 @@ def test_every_mutation_is_allowlisted(shim, tmp_path):
     gh.label_add(123, "human-approved")
     gh.pr_sticky_verdict(123, "body\n<!-- pr-ready-verdict -->\n")
     allowed = ("pr create", "pr edit", "pr comment", "pr merge", "pr view",
-               "pr list", "repo view", "api repos/o/r/pulls/123/reviews",
+               "pr list", "pr diff", "repo view", "api repos/o/r/pulls/123/reviews",
                "api repos/{owner}/{repo}/issues/123/comments",
                "api --method PATCH repos/{owner}/{repo}/issues/comments/")
     for c in calls(shim):
@@ -102,6 +110,110 @@ def test_review_findings_degrade_to_comment_on_api_422(shim, tmp_path, monkeypat
                             [Finding("code-review", "A", "a.php", 3, "x", 85)])
     assert any(c.startswith("pr comment 123") for c in calls(shim))
     assert gh.actions()[-1]["action"] == "pr_review_findings"
+
+
+DIFF_FIXTURE = """diff --git a/a.php b/a.php
+--- a/a.php
++++ b/a.php
+@@ -1,5 +1,6 @@
+ l1
+ l2
++l3
+ l4
+ l5
+ l6
+"""
+
+
+@pytest.fixture()
+def diff_file(tmp_path, monkeypatch):
+    path = tmp_path / "pr.diff"
+    path.write_text(DIFF_FIXTURE)
+    monkeypatch.setenv("GH_SHIM_DIFF", str(path))
+    return path
+
+
+def _three_findings():
+    return [
+        Finding("code-review", "A", "a.php", 3, "important body", 90, label="important"),
+        Finding("code-review", "A", "a.php", 5, "context body", 85, label="pre-existing"),
+        Finding("code-review", "A", "a.php", 999, "offdiff body", 85, label="pre-existing"),
+    ]
+
+
+def _review_payload(log):
+    return json.loads(open(str(log) + ".input").read())
+
+
+def _pr_comments(log):
+    return [c for c in calls(log) if c.startswith("pr comment 123")]
+
+
+# LiveGh.post_review_findings: visible-diff findings go inline, off-diff pre-existing to one summary.
+def test_review_findings_partition_inline_vs_summary_by_visibility(shim, tmp_path, diff_file):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.post_review_findings(123, "abc", "Code review", _three_findings())
+    comments = _review_payload(shim)["comments"]
+    assert [c["line"] for c in comments] == [3, 5]
+    assert all(c["body"].startswith("<!-- label: ") for c in comments)
+    prc = _pr_comments(shim)
+    assert len(prc) == 1
+    assert "a.php:999" in prc[0] and "**Pre-existing**" in prc[0]
+    assert not any("a.php:3" in c for c in prc)
+
+
+def test_review_findings_important_inline_survives_offdiff_preexisting(
+        shim, tmp_path, diff_file, monkeypatch):
+    monkeypatch.setenv("GH_SHIM_API_FAIL_ON_LINE", "999")
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.post_review_findings(123, "abc", "Code review", _three_findings())
+    assert any(c.startswith("api repos/o/r/pulls/123/reviews") for c in calls(shim))
+    assert [c["line"] for c in _review_payload(shim)["comments"]] == [3, 5]
+    # the Important thread was created; the only comment is the off-diff summary
+    prc = _pr_comments(shim)
+    assert len(prc) == 1 and "a.php:999" in prc[0] and "a.php:3" not in prc[0]
+
+
+def test_review_findings_marker_is_first_line_after_truncation(shim, tmp_path, diff_file):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.post_review_findings(123, "abc", "Code review", [
+        Finding("code-review", "A", "a.php", 3, "x" * 3000, 90, label="important")])
+    body = _review_payload(shim)["comments"][0]["body"]
+    lines = body.split("\n")
+    assert len(body) <= 1000
+    assert lines[0] == "<!-- label: important -->"
+    assert lines[1] == "<!-- score: 90 -->"
+
+
+def test_review_findings_without_diff_use_single_review_like_today(shim, tmp_path, monkeypatch):
+    monkeypatch.delenv("GH_SHIM_DIFF", raising=False)
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.post_review_findings(123, "abc", "Code review", _three_findings())
+    assert [c["line"] for c in _review_payload(shim)["comments"]] == [3, 5, 999]
+    assert _pr_comments(shim) == []
+
+
+def test_summary_comment_renders_label_bug_class_and_instances(shim, tmp_path, diff_file):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    gh.post_review_findings(123, "abc", "Code review", [
+        Finding("code-review", "A", "a.php", 999, "offdiff body", 85,
+                bug_class="unbounded-fetch", other_instances=["b.php:7"],
+                label="pre-existing")])
+    prc = _pr_comments(shim)
+    assert len(prc) == 1
+    assert "bug class: `unbounded-fetch`" in prc[0]
+    assert "`b.php:7`" in prc[0]
+    assert "**Pre-existing**" in prc[0]
+
+
+def test_recording_gh_records_label_and_rendered_body(tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    gh = RecordingGh(str(tmp_path / "out"), {})
+    gh.post_review_findings(123, "abc", "Code review", [
+        Finding("code-review", "A", "a.php", 3, "body", 90, label="nit")])
+    rec = [a for a in gh.actions() if a["action"] == "pr_review_findings"][0]["findings"][0]
+    assert rec["label"] == "nit"
+    assert rec["body"].startswith("<!-- label: nit -->")
 
 
 def test_live_reads_and_dep_state(shim, tmp_path):

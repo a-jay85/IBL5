@@ -203,6 +203,12 @@ class Finding:
     line: int
     body: str
     score: Optional[int] = None
+    severity_hint: str = "important"        # reviewer hint: "important" | "nit"; anything else => "important"
+    preexisting_hint: bool = False          # reviewer says the defect predates the PR
+    bug_class: str = ""                     # reviewer-named class, kebab-case
+    other_instances: list = field(default_factory=list)   # ["path:line", ...]
+    scorer_preexisting: bool = False        # scorer independently says pre-existing
+    label: Optional[str] = None             # "important" | "nit" | "pre-existing"; set only by labels.classify
 
 
 @dataclass

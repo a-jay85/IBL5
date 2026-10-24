@@ -18,11 +18,13 @@ import re
 
 from . import reviewcache
 from . import thread_ingestion
+from .labels import render_body
 from .state import HarnessError
 
 MAX_SAME_RUN_ROUNDS = 1          # asserted by test; the pass has no loop
 ORIGIN = thread_ingestion.ORIGIN_SAME_RUN
 KEY_LEN = 160                    # matches review.py body_head and the per-thread body_head
+POSTED_BODY_LIMIT = 1000         # the limit ghad passes to render_body when it posts
 _PROPAGATE_KINDS = ("gate-path-edit", "push-failed")
 
 # Local copy of runner._redact's token rules: this module cannot import runner.
@@ -96,11 +98,19 @@ def prune_findings(findings, scored, keys) -> tuple[list, list]:
 
     Arming condition (2) reads ``res.findings`` from memory, so this is what releases it
     for a finding this run fixed or declined. Everything else is kept unchanged.
+    A thread key comes from the posted body, which ``render_body`` prefixes with the label
+    and score header, so a finding matches on its rendered body. Scored rows keep the raw
+    body head and are dropped by the raw key of a dropped finding.
     """
     keys = set(keys or ())
-    kept = [f for f in findings or () if _key(f.path, f.body) not in keys]
+    kept, dropped_raw = [], set()
+    for f in findings or ():
+        if _key(f.path, render_body(f, POSTED_BODY_LIMIT)) in keys:
+            dropped_raw.add(_key(f.path, f.body))
+        else:
+            kept.append(f)
     kept_scored = [r for r in scored or ()
-                   if _key(r.get("path"), r.get("body_head")) not in keys]
+                   if _key(r.get("path"), r.get("body_head")) not in dropped_raw]
     return kept, kept_scored
 
 

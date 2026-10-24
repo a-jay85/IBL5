@@ -1592,10 +1592,11 @@ done < "$MATRIX_FILE"
 #      is rejected unless git grep over the whole repo finds it in tracked text, which
 #      is where the helper's tree arm would find it.
 # Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
-# skipped, as the helper skips it. Text before the first `Mutation:` label is scanned
-# whole. From that label on, _mt_blank_clauses blanks each Mutation clause up to its
-# first arrow or sentence end, as the helper does, and the text after the closer is
-# scanned too. A `name=value` token is
+# skipped, as the helper skips it. The whole cell goes through _mt_blank_clauses,
+# which picks Mutation labels with the helper's own regex (`Mutation:` or `mutation:`
+# after a non-letter, optional bold) and blanks each clause up to its first arrow or
+# sentence end. Text before the first label and after each closer is scanned. A
+# `name=value` token is
 # cut at `=`, as the helper cuts it. CHECK_PLAN_MT_GIT_ROOT is a test seam naming the
 # repo whose snapshots and tracked text rule (2) reads; unset or empty means $REPO_ROOT.
 # Outside a git repo the snapshot list is empty and rule (2) is skipped; rule (1) needs
@@ -1637,14 +1638,9 @@ while IFS= read -r row; do
     [ "$MC_NUM" != "#" ] || continue
     _mt_what="${MC_WHAT//$MSEN/|}"
     grep -qE "$_y_shape" <<< "$_mt_what" && continue
-    # Head: text before the first Mutation: label, scanned whole as before. Tail: from
-    # that label on, each clause blanked as the helper blanks it; what survives (the
-    # consequence after each closer) is scanned too. A newline keeps head and tail
-    # tokens from pairing across the seam.
-    _mt_head="${_mt_what%%Mutation:*}"
-    _mt_tail="${_mt_what:${#_mt_head}}"
-    [ -z "$_mt_tail" ] || _mt_tail="$(_mt_blank_clauses <<< "$_mt_tail")"
-    _mt_what="$_mt_head"$'\n'"$_mt_tail"
+    # One pass of the helper's own blanker over the whole cell: the awk picks every
+    # Mutation label, so no second label rule lives here to disagree with it.
+    _mt_what="$(_mt_blank_clauses <<< "$_mt_what")"
     while IFS= read -r _mt_tok; do
         _mt_tok="${_mt_tok#\`}"; _mt_tok="${_mt_tok%\`}"; _mt_tok="${_mt_tok%%=*}"
         [ -n "$_mt_tok" ] || continue
@@ -1678,12 +1674,17 @@ done < "$GATEP_MATRIX"
 #  (b) a directory token (trailing slash) with no tracked file beneath it: arm 2c
 #      matches files only and arm 2b needs a deletion, so a new directory is realised
 #      only when a tracked or added line names it literally.
-#  (c) a scratch-file token under the system temp directory: no tracked file holds it,
-#      and only a diff that commits a script writing that exact path would realise it,
-#      so the row should cite that script or command instead.
+#  (c) a scratch-file token under a system temp directory: the tmp directory at the
+#      root, the macOS per-user temp tree under var/folders, or either one under the
+#      private prefix macOS resolves them to. No tracked file holds it, and only a
+#      diff that commits a script writing that exact path would realise it, so the
+#      row should cite that script or command instead.
 #  (d) a token holding a brace placeholder (an identifier, optionally plus a number,
 #      in braces, with no dollar sign right before the opening brace): a diff carries
 #      the expanded name, never the template. Shell and PHP interpolation stay silent.
+#      A token that also sits inside a fenced code block of the plan stays silent too:
+#      the phases show the diff carrying the template literally (a route pattern, a
+#      docblock path, a format string), so the helper would find it on an added line.
 # The tokens come from the helper itself: it runs on the plan with an EMPTY diff and
 # MATRIX_ASSERT_ROOT set to the toplevel, so fence skipping, duplicate-id skipping,
 # the one-time-check tag, Mutation-clause blanking and the name=value cut are the
@@ -1701,9 +1702,9 @@ _mu_id_re="^(${_mu_cats})\.[a-z][A-Za-z]*(\.[a-z][A-Za-z]*)*\$"
 # a common extension, or the extension of any tracked file.
 _mu_ext_re='\.(php|phtml|ts|tsx|js|jsx|mjs|cjs|json|jsonl|md|txt|yml|yaml|sh|py|css|scss|html|neon|xml|sql|lock|toml|ini|csv|tsv|go|rb|svg|png|log|env|dist)$'
 _mu_dir_re='^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*/$'
-_mu_tmp_re='^/tmp/.'
+_mu_tmp_re='^/(private/)?(tmp|var/folders)/.'
 _mu_tmpl_re='(^|[^$])[{][A-Za-z_][A-Za-z0-9_]*([+][0-9]+)?[}]'
-_mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/|/tmp/[^`[:space:]]+|[^`[:space:]]*[{][A-Za-z_][A-Za-z0-9_]*([+][0-9]+)?[}][^`[:space:]]*)`'
+_mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/|/(private/)?(tmp|var/folders)/[^`[:space:]]+|[^`[:space:]]*[{][A-Za-z_][A-Za-z0-9_]*([+][0-9]+)?[}][^`[:space:]]*)`'
 _mu_helper="$SCRIPT_DIR/lib/plan-matrix-assertions"
 _mu_root="$(git -C "${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}" rev-parse --show-toplevel 2>/dev/null)" || _mu_root=""
 if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_FILE"; then
@@ -1711,6 +1712,9 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_
     _mu_out="$(MATRIX_ASSERT_ROOT="$_mu_root" "$_mu_helper" "$PLAN_FILE" "$_mu_empty" 2>&1)" || true
     rm -f "$_mu_empty"
     _mu_files="$(git -C "$_mu_root" ls-files 2>/dev/null || true)"
+    # Text inside the plan's fenced code blocks (backtick or tilde fences), for the
+    # brace-template exemption.
+    _mu_fenced="$(awk '/^[[:space:]]*(```|~~~)/ { f = !f; next } f' "$PLAN_FILE")"
     _mu_exts="|$(sed -n 's/.*\.\([A-Za-z][A-Za-z]*\)$/\1/p' <<< "$_mu_files" | sort -u | tr '\n' '|')"
     _mu_is_file_name() {
         [[ "$1" =~ $_mu_ext_re ]] && return 0
@@ -1756,10 +1760,10 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_
                 continue
             fi
             if [[ "$_mu_tok" =~ $_mu_tmp_re ]]; then
-                viol "[MU] matrix token \`${_mu_tok}\` names a scratch file under /tmp: no tracked file holds it, and bin/lib/plan-matrix-assertions realises it only when a committed line writes that exact path, so the row stays UNREALISED and Step 6.7 stops. Write the scratch name outside backticks and backtick the command, test or file the diff carries instead: ${row}"
+                viol "[MU] matrix token \`${_mu_tok}\` names a scratch file under a system temp directory: no tracked file holds it, and bin/lib/plan-matrix-assertions realises it only when a committed line writes that exact path, so the row stays UNREALISED and Step 6.7 stops. Write the scratch name outside backticks and backtick the command, test or file the diff carries instead: ${row}"
                 continue
             fi
-            if [[ "$_mu_tok" =~ $_mu_tmpl_re ]]; then
+            if [[ "$_mu_tok" =~ $_mu_tmpl_re ]] && ! grep -qF -- "$_mu_tok" <<< "$_mu_fenced"; then
                 viol "[MU] matrix token \`${_mu_tok}\` holds a brace template placeholder: the diff carries the expanded names, never the template, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Write the template outside backticks and backtick each expanded name the diff carries instead: ${row}"
                 continue
             fi

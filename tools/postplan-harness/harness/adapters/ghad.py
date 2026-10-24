@@ -88,7 +88,7 @@ class RecordingGh:
                  "pr_sticky_verdict", "issue_create", "followup_create",
                  "pr_disable_auto_merge",
                  "pr_checks_json", "run_log_failed", "run_rerun_failed",
-                 "pr_resolve_thread", "label_remove")
+                 "pr_resolve_thread", "pr_reply_thread", "label_remove")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -129,6 +129,9 @@ class RecordingGh:
 
     def resolve_review_thread(self, pr: int, comment_id: int, body: str) -> None:
         self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
+
+    def reply_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        self.record("pr_reply_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_sticky_body(self, pr: int) -> str | None:
         """Prior Phase 5.5 sticky body from the replay fixture, or None.
@@ -500,6 +503,21 @@ class LiveGh(RecordingGh):
         if proc.returncode != 0:
             raise HarnessError("thread-resolve-failed", proc.stderr.strip()[-400:])
         self.record("pr_resolve_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
+
+    def reply_review_thread(self, pr: int, comment_id: int, body: str) -> None:
+        from .llm import _run_reaped
+        if not PRF_LIB.exists():
+            raise HarnessError("thread-reply-failed", "PRF_LIB missing")
+        argv = ["bash", "-c", 'source "$1"; reply_review_thread "$2" "$3" "$4"', "_",
+                str(PRF_LIB), str(pr), str(comment_id), body[:2000]]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
+        try:
+            proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+        except Exception as e:
+            raise HarnessError("thread-reply-failed", str(e))
+        if proc.returncode != 0:
+            raise HarnessError("thread-reply-failed", proc.stderr.strip()[-400:])
+        self.record("pr_reply_thread", pr=pr, comment_id=int(comment_id), body=body[:2000])
 
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._gh("pr", "edit", str(pr), "--body", body)

@@ -3182,7 +3182,7 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MT]/[MU] unrealisable-token fixtures (15 cases)
+# Gate [MT]/[MU] unrealisable-token fixtures (22 cases)
 # ---------------------------------------------------------------------------
 # A throwaway repo whose tracked text holds one bare :LINE literal and one scratch
 # path, for the tracked-token cases. Rejected-shape literals in the rows below are
@@ -3277,6 +3277,49 @@ assert_msg "gateMU-tmp-message-says-outside-backticks" 1 'Write the scratch name
 assert_msg "gateMU-template-message-says-outside-backticks" 1 'Write the template outside backticks' '[Z]' "$FM$YHDR"'
 | 1 | the engine reads `salary_yr'"$NT_OB"'nt}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
 '"$YROW"'
+'
+# [MT] a lowercase-only mutation: label blanks its clause, as the helper does: silent.
+assert_viol "gateMT-lowercase-mutation-label-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds; mutation: delete the branch at `x.php:12` ⇒ the case fails | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a word ending in Mutation: is no label, so the helper scans the token: fires.
+assert_viol "gateMT-word-ending-in-mutation-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. PreMutation: run `NtWideTest.php'"$NT_CO"'277` ⇒ the case fails | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] macOS temp paths count as scratch too: the per-user tree and both private forms.
+assert_viol "gateMU-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'T'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-tmp-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a template the plan's own code block adds literally (a route pattern): silent.
+assert_viol "gateMU-template-in-phase-code-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}'"'"', TeamController::class);
+```
+'
+# [MU] a code block that lacks the template does not exempt it: fires.
+assert_viol "gateMU-template-not-in-phase-code-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL"'7'"'"', TeamController::class);
+```
 '
 unset CHECK_PLAN_MT_GIT_ROOT
 

@@ -213,7 +213,7 @@ if [ "$HOLDREPEAT" = 1 ]; then
     PF_MOVED=0
 
     _hr_py() {  # harness.holdrepeat needs the package on the path; -I would drop PYTHONPATH
-        PYTHONPATH="$MAIN_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" \
+        PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$MAIN_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" \
             python3 -m harness.holdrepeat "$@"
     }
     # Final stdout line for every --holdrepeat exit; callers parse it with the exit code.
@@ -498,6 +498,16 @@ LAST line of the final message."
     if ! cmp -s "$HR_TMP/main.before" "$HR_TMP/main.after"; then
         HR_EXTBAD+="main checkout changed; "
     fi
+    # Status never lists ignored files, yet the recheck imports code from the main checkout's
+    # harness. An ignored file (.pyc, .pth, sitecustomize) written since t0 counts as tamper.
+    # _hr_py sets PYTHONDONTWRITEBYTECODE, so the launcher's own runs write none.
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ]; then
+            HR_EXTBAD+="main checkout ignored file written ($p); "
+            break
+        fi
+    done < <(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness)
     if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
         HR_EXTBAD+="a file under ~/.claude/hooks changed; "
     fi

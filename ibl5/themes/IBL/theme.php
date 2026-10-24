@@ -11,7 +11,7 @@ $textcolor1 = "#000000";
 $textcolor2 = "#000000";
 
 /**
- * @deprecated Use CSS classes directly: <div class="ibl-card">
+ * @deprecated Use CSS classes directly: <div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
  * Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
  * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */
@@ -27,7 +27,7 @@ function OpenTable(): void
 }
 
 /**
- * @deprecated Use CSS classes directly: </div> (closing .ibl-card)
+ * @deprecated Use CSS classes directly: </div> (closing .d-card)
  * Legacy PHP-Nuke table closer. Prefer modern CSS components.
  * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */

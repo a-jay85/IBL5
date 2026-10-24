@@ -73,12 +73,13 @@ final class LastSimRecapViewGoldenMasterTest extends TestCase
         $this->assertSnapshotMatches($html, 'render-no-margins.html');
     }
 
-    public function testSnapshotsCarryIblCardMarkup(): void
+    public function testSnapshotsCarryDaisyUiCardMarkup(): void
     {
         $html = (new LastSimRecapView())->render($this->makeSlate(games: []));
 
-        $this->assertStringContainsString('ibl-card last-sim-recap', $html);
-        $this->assertStringContainsString('ibl-card__header last-sim-recap__head', $html);
+        $this->assertStringContainsString('d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden last-sim-recap', $html);
+        $this->assertStringContainsString('<header class="last-sim-recap__head">', $html);
+        $this->assertStringNotContainsString('ibl-card', $html);
     }
 
     private function assertSnapshotMatches(string $actual, string $snapshotFilename): void

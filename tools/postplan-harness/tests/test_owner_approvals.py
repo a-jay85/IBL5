@@ -112,6 +112,8 @@ def test_owner_login_matches_trusted_login():
 
 
 def test_live_gh_pr_issue_comments_parses_ndjson(tmp_path, monkeypatch):
+    """LiveGh.pr_issue_comments keeps login and type per row; a `--jq .[].body`
+    projection drops them and fails the args check below."""
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
     lines = "\n".join([
         json.dumps({"id": 1, "body": "a", "login": "a-jay85", "type": "User"}),

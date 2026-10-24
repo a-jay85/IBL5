@@ -372,11 +372,10 @@ OUT="$RUNLOG_DIR/plan-now-$TS.out"   # claude's own transcript, kept separate fr
                                 # it duplicates $LOG's transcript, but /tmp is the right
                                 # place for a per-run debugging artifact and macOS clears
                                 # it. Delete it in the runner if that ever becomes a cost.
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 # The session uuid this run's `claude -p` is pinned to, plus the sidecar that lets
 # bin/fleet-status find the transcript mid-run. Minted HERE and not in the runner:
-# the sidecar has to be on disk before launchctl bootstrap returns, or fleet-status
+# the sidecar has to be on disk before ljob_submit returns, or fleet-status
 # can see a live label with no sidecar. Derived from $LOG (launchd's StandardOutPath),
 # never $OUT — fleet-status resolves the row's log from the label, so only
 # ${LOG%.log}.session is findable.
@@ -507,7 +506,6 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'RUN_TIMEOUT=%q\n' "$RUN_TIMEOUT"
     printf 'MODEL=%q\n'      "$MODEL"
     printf 'LABEL=%q\n'      "$LABEL"
-    printf 'PLIST=%q\n'      "$PLIST"
     printf 'SESSION_ID=%q\n' "$SESSION_ID"
     printf 'TS=%q\n'           "$TS"
     printf 'RESUME_FROM=%q\n'  "$RESUME_ID"
@@ -550,7 +548,7 @@ cd "$ROOT" || exit 1
 # shellcheck source=/dev/null
 . "$LOGIN_PREFLIGHT_LIB"
 # A coordinator-granted drain token names the launcher's pid, which exited after the
-# bootstrap. Re-record this runner's pid so usage_token_reclaim_dead keeps the token.
+# submit. Re-record this runner's pid so usage_token_reclaim_dead keeps the token.
 if [ "$(usage_token_holder)" = "$SESSION_ID" ]; then
     usage_token_acquire "$SESSION_ID" $$ 2>/dev/null || true
 fi
@@ -1043,9 +1041,10 @@ fi
 # earlier moment worth watching — which is what made `tail -f` the only way to
 # find out, and why every outcome notifies, not just the failures.
 #
-# BEFORE the teardown below, and that ordering is load-bearing: `launchctl bootout`
-# terminates this job, and discord-dm retries across a window longer than a pm2
-# restart (~5min15s). Sending after the bootout would race the send against its
+# BEFORE the teardown, and that ordering is load-bearing: the ljob_submit wrapper
+# runs `launchctl remove` once this runner exits, which terminates the job, and
+# discord-dm retries across a window longer than a pm2 restart (~5min15s).
+# Sending after the remove would race the send against its
 # own termination and lose exactly the messages that matter — the ones sent while
 # prod is bouncing.
 notify() {
@@ -1117,30 +1116,28 @@ log: $LOG"
     ljob_dm_send plan-now "$msg"
 }
 notify
-
-rm -f "$PLIST"
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+# Teardown (launchctl remove + once-marker cleanup) belongs to the ljob_submit
+# wrapper in bin/lib/launchd-job.sh and runs after this script exits.
 RUNNER_EOF
 } > "$RUNNER"
 chmod +x "$RUNNER"
 
-# ~/Library/LaunchAgents always exists on the Mac this job runs on; the mkdir is for
-# the Linux CI box, where bin/test-plan-now drives this script under PLAN_NOW_DRY_RUN
-# and `set -e` would otherwise abort here before the runner path is printed.
-mkdir -p "$(dirname "$PLIST")"
-ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
+# The exact launch argv, computed once. A usage error aborts here under set -e.
+SUBMIT_LINE=$(ljob_submit_print "$LABEL" "$LOG" "$RUNNER")
 
 if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
-    echo "plan-now: DRY RUN — plist and runner written, not bootstrapped."
+    echo "plan-now: DRY RUN — runner written, nothing submitted to launchd."
     echo "  runner: $RUNNER"
-    echo "  plist:  $PLIST"
+    echo "  submit: $SUBMIT_LINE"
     echo "  prompt: $PROMPT"
     if [ -n "$RESUME_ID" ]; then echo "  resume: $RESUME_ID"; fi
     exit 0
 fi
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+if ! ljob_submit "$LABEL" "$LOG" "$RUNNER"; then
+    echo "plan-now: launchctl submit failed for $LABEL; nothing launched. Log: $LOG" >&2
+    exit 1
+fi
 
 echo "plan-now: fired a detached headless /plan run."
 echo "  model:       $MODEL   (orchestrator; the Step-3 architect tier is set by the prompt)"

@@ -1,5 +1,5 @@
 ---
-description: The front controller publishes one request-scoped Module\ModuleServices, and every module index.php resolves its object graph through a per-module factory instead of building it with new.
+description: The front controller publishes one request-scoped Module\ModuleServices, and each module index.php outside the ratchet allowlist resolves its object graph through a per-module factory instead of building it with new.
 last_verified: 2026-10-23
 ---
 

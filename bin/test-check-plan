@@ -3173,8 +3173,6 @@ assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
-# Seam unset: real repo, a valid plan with corrected forms passes.
-unset CHECK_PLAN_MT_GIT_ROOT
 # Drift guard: _mt_blank_clauses in bin/check-plan is a hand copy of the Mutation-clause
 # loop in bin/lib/plan-matrix-assertions. Compare the two loops line by line, leading
 # whitespace ignored, from the label match through the cut that advances `rest`.
@@ -3188,6 +3186,8 @@ elif [ "$MT_LOOP_CP" != "$MT_LOOP_HELPER" ]; then
 else
     h_pass "gateMT-blanker-loop-parity"
 fi
+# Seam unset: real repo, a valid plan with corrected forms passes.
+unset CHECK_PLAN_MT_GIT_ROOT
 assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 | 1 | `mt-orphan-stem` absent and `ibl5/tests/e2e/auth-pages-extended.spec.ts` green | PHPUnit | post-impl | `tests/XTest.php` |
 '"$YROW"'

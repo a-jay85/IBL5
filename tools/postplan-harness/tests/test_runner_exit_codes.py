@@ -496,3 +496,64 @@ def test_blocked_ship_log_line_when_env_unset_or_empty(monkeypatch, tmp_path):
 def test_blocked_ship_write_error_keeps_exit_code(tmp_path):
     res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
     runner.write_blocked_ship(str(tmp_path / "missing"), res, 3, "/wt")  # must not raise
+
+
+def test_sigterm_handler_reaps_live_bounded_child_before_emergency_abort(tmp_path):
+    import signal
+    import subprocess
+    import time
+    harness_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pidfile = tmp_path / "child.pid"
+    alive = tmp_path / "alive.txt"
+    child = tmp_path / "child.sh"
+    child.write_text(f"echo $$ > {pidfile}\nsleep 300\n")
+    driver = tmp_path / "driver.py"
+    driver.write_text(f"""
+import os, sys, time
+sys.path.insert(0, {harness_dir!r})
+import runner
+from harness.adapters.llm import run_bounded
+
+class FakeGit:
+    def emergency_abort(self):
+        # The child is this driver's own child, so a killed one lingers as a zombie
+        # and os.kill(pid, 0) still succeeds. waitpid tells dead from alive.
+        pid = int(open({str(pidfile)!r}).read().strip())
+        state = "1"
+        deadline = time.monotonic() + 1
+        while time.monotonic() < deadline:
+            try:
+                if os.waitpid(pid, os.WNOHANG)[0] == pid:
+                    state = "0"
+                    break
+            except ChildProcessError:
+                state = "0"
+                break
+            time.sleep(0.02)
+        open({str(alive)!r}, "w").write(state)
+
+runner._active_git = FakeGit()
+runner._install_sigterm_handler()
+run_bounded(["bash", {str(child)!r}], step="probe", timeout=120)
+""")
+    proc = subprocess.Popen([sys.executable, str(driver)], cwd=str(tmp_path))
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if pidfile.exists() and pidfile.read_text().strip():
+                break
+            time.sleep(0.05)
+        pid = int(pidfile.read_text().strip())
+        proc.send_signal(signal.SIGTERM)
+        rc = proc.wait(timeout=15)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+    assert rc == 143
+    assert alive.read_text() == "0"
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+def test_precommit_hang_exits_3():
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "precommit-hang")) == 3

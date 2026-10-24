@@ -73,6 +73,11 @@
 @media (max-width: 768px) {
     .projected-draft-order-table td:nth-child(3) .ibl-team-cell__text {
         display: inline;
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip-path: none;
     }
 
     .projected-draft-order-table td:nth-child(3).ibl-team-cell--colored {

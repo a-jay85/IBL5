@@ -214,7 +214,7 @@ pr_merge_danger_hold() {
 #   Phase 6.5 condition (19). Mirrors harness/removed_guards.py classify_body.
 #   <flagged_keys> is the newline-separated run-local detector key list; bin/pr-triage omits it.
 #   1. Counts the whole-line '<!-- removed-guards:begin -->' / '<!-- removed-guards:end -->' markers.
-#   2. No begin marker: prints nothing without keys; with keys, 'removed-guards:UNLISTED:<key>' per key.
+#   2. No begin and no end marker: prints nothing without keys; with keys, 'removed-guards:UNLISTED:<key>' per key.
 #   3. Begin or end count != 1, end before begin, no '- ' bullet, or a bad bullet -> 'removed-guards:MALFORMED' (fail-closed).
 #   4. Each bullet whose trimmed reason is <15 chars, a none/n/a/tbd/todo word, or '<...>' -> 'removed-guards:UNJUSTIFIED:<key>'.
 #   5. Each flagged key with no bullet -> 'removed-guards:UNLISTED:<key>', after every UNJUSTIFIED line.
@@ -250,7 +250,7 @@ pr_removed_guards_hold() {
     done <<EOF
 $body
 EOF
-    if [ "$nb" = 0 ]; then
+    if [ "$nb" = 0 ] && [ "$ne" = 0 ]; then
         while IFS= read -r k; do
             [ -n "$k" ] && echo "removed-guards:UNLISTED:$k"
         done <<EOF

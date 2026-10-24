@@ -44,9 +44,10 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table sim-stats-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=16 class="player-table-header">Sim Averages</td>
+        <td colspan=16 class="player-view-table__title">Sim Averages</td>
     </tr>
     <tr class="font-bold">
         <th>sim</th>
@@ -64,6 +65,8 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($simDates as $simDate) {
             /** @var array{sim: int, start_date: string, end_date: string} $simDate */
@@ -101,6 +104,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             <?php
         }
         ?>
+</tbody>
 </table>
         <?php
         return (string) ob_get_clean();

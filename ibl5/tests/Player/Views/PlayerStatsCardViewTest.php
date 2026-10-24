@@ -40,57 +40,74 @@ class PlayerStatsCardViewTest extends TestCase
         $this->assertStringContainsString('Averages', $result);
     }
 
-    public function testStyleTableReplacesPlayerTableClasses(): void
+    public function testStyleTableMapsPlayerViewTableClassToStatsCardHook(): void
     {
-        $tableHtml = '<table class="sortable player-table"><tr><td>Test</td></tr></table>';
-        
+        $tableHtml = '<table class="sortable ibl-data-table player-view-table"><tr><td>Test</td></tr></table>';
+
         $result = PlayerStatsCardView::styleTable($tableHtml);
-        
-        $this->assertStringContainsString('class="stats-table sortable"', $result);
-        $this->assertStringNotContainsString('player-table"', $result);
+
+        $this->assertStringContainsString('class="sortable ibl-data-table stats-table"', $result);
+        $this->assertStringNotContainsString('player-view-table', $result);
     }
 
-    public function testStyleTableReplacesPlayerTableHeader(): void
+    public function testStyleTableMapsTitleCellToStatsTableHeader(): void
     {
-        $tableHtml = '<td class="player-table-header">Regular Season</td>';
-        
+        $tableHtml = '<td class="player-view-table__title">Regular Season</td>';
+
         $result = PlayerStatsCardView::styleTable($tableHtml);
-        
+
         $this->assertStringContainsString('class="stats-table-header"', $result);
-        $this->assertStringNotContainsString('player-table-header', $result);
+        $this->assertStringNotContainsString('player-view-table__title', $result);
     }
 
-    public function testStyleTableAddsCareerRowClass(): void
+    public function testStyleTablePassesCareerRowThrough(): void
     {
-        $tableHtml = '<tr class="player-table-row-bold"><td>Career</td></tr>';
-        
+        $tableHtml = '<tfoot><tr class="career-row"><td>Career</td></tr></tfoot>';
+
         $result = PlayerStatsCardView::styleTable($tableHtml);
-        
-        $this->assertStringContainsString('class="player-table-row-bold career-row"', $result);
+
+        $this->assertSame($tableHtml, $result);
     }
 
-    public function testStyleTableHandlesSimStatsTableVariant(): void
+    public function testStyleTableLeavesPlainDataTableUntouched(): void
     {
-        $tableHtml = '<table class="sortable player-table sim-stats-table"><tr><td>Test</td></tr></table>';
-        
+        $tableHtml = '<table class="sortable ibl-data-table"><tr><td>X</td></tr></table>';
+
         $result = PlayerStatsCardView::styleTable($tableHtml);
-        
-        $this->assertStringContainsString('class="stats-table sortable sim-stats-table"', $result);
+
+        $this->assertSame($tableHtml, $result);
+    }
+
+    /** Characterization: stays green across the Phase 2/3 lockstep rename. */
+    public function testStyleTableMapsRealRendererSnapshotsToCardHooks(): void
+    {
+        $snapshotDir = dirname(__DIR__) . '/Stats/Views/__snapshots__/';
+
+        foreach (['PlayerSimStatsView.html', 'PlayerRegularSeasonAveragesView.html'] as $snapshotFile) {
+            $tableHtml = file_get_contents($snapshotDir . $snapshotFile);
+            $this->assertIsString($tableHtml, "Snapshot {$snapshotFile} must be readable");
+
+            $result = PlayerStatsCardView::styleTable($tableHtml);
+
+            $this->assertMatchesRegularExpression('/<table class="[^"]*\bstats-table\b/', $result, $snapshotFile);
+            $this->assertStringContainsString('class="stats-table-header"', $result, $snapshotFile);
+            $this->assertStringNotContainsString('class="player-view-table__title"', $result, $snapshotFile);
+        }
     }
 
     public function testRenderCombinesStyleAndWrap(): void
     {
-        $tableHtml = '<table class="sortable player-table"><tr><td>Test</td></tr></table>';
+        $tableHtml = '<table class="sortable ibl-data-table player-view-table"><tr><td>Test</td></tr></table>';
         
         $result = PlayerStatsCardView::render($tableHtml);
         
         $this->assertStringContainsString('class="player-stats-card"', $result);
-        $this->assertStringContainsString('class="stats-table sortable"', $result);
+        $this->assertStringContainsString('class="sortable ibl-data-table stats-table"', $result);
     }
 
     public function testRenderWithStatsType(): void
     {
-        $tableHtml = '<table class="sortable player-table"><tr><td>Test</td></tr></table>';
+        $tableHtml = '<table class="sortable ibl-data-table player-view-table"><tr><td>Test</td></tr></table>';
         
         $result = PlayerStatsCardView::render($tableHtml, 'Totals');
         
@@ -126,8 +143,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderCreatesFlipContainer(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, 'Regular Season');
         
@@ -139,8 +156,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderIncludesFlipToggle(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml);
         
@@ -150,8 +167,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderIncludesToggleLabelText(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
 
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, 'Playoffs');
 
@@ -161,8 +178,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderShowsAveragesFirstByDefault(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">AVG_CONTENT</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">TOT_CONTENT</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">AVG_CONTENT</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">TOT_CONTENT</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml);
         
@@ -182,8 +199,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderCanShowTotalsFirst(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">AVG_CONTENT</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">TOT_CONTENT</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">AVG_CONTENT</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">TOT_CONTENT</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, '', false);
         
@@ -203,8 +220,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderSetsDataCategoryAttribute(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, 'Olympics');
         
@@ -213,8 +230,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderEscapesCategoryForXss(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $maliciousCategory = '<script>alert("xss")</script>';
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, $maliciousCategory);
@@ -225,20 +242,20 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderAppliesStatsCardStylingToTables(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><tr class="player-table-row-bold"><td>Career</td></tr></table>';
-        $totalsHtml = '<table class="sortable player-table"><tr class="player-table-row-bold"><td>Career</td></tr></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><tr class="career-row"><td>Career</td></tr></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><tr class="career-row"><td>Career</td></tr></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml);
         
         // Check that table classes were transformed
-        $this->assertStringContainsString('class="stats-table sortable"', $result);
+        $this->assertStringContainsString('class="sortable ibl-data-table stats-table"', $result);
         $this->assertStringContainsString('career-row', $result);
     }
 
     public function testRenderIncludesPlayerStatsCardWrapper(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml);
         
@@ -249,8 +266,8 @@ class PlayerStatsCardViewTest extends TestCase
 
     public function testRenderIncludesFlipIconSvg(): void
     {
-        $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
-        $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
+        $averagesHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Averages</td></table>';
+        $totalsHtml = '<table class="sortable ibl-data-table player-view-table"><td class="player-view-table__title">Totals</td></table>';
         
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml);
         

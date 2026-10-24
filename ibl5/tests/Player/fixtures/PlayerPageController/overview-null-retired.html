@@ -379,7 +379,8 @@
         <!-- Front (Averages by default) -->
         <div class="stats-front">
             <div class="player-stats-card">
-                <table class="stats-table sortable">
+                <table class="sortable ibl-data-table stats-table">
+<thead>
     <tr>
         <td colspan=21 class="stats-table-header">Regular Season Averages</td>
     </tr>
@@ -406,6 +407,8 @@
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
             <tr>
         <td>2020</td>
         <td><a href="modules.php?name=Team&op=team&teamid=5&yr=2020">Heat</a></td>
@@ -429,7 +432,9 @@
         <td>2.4</td>
         <td>20.0</td>
     </tr>
-                <tr class="player-table-row-bold career-row">
+            </tbody>
+        <tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td>55</td>
         <td>1,500.0</td>
@@ -451,6 +456,7 @@
         <td>130.0</td>
         <td>1,100.0</td>
     </tr>
+</tfoot>
             </table>
                     </div>
         </div>
@@ -458,7 +464,8 @@
         <!-- Back (Totals by default) -->
         <div class="stats-back">
             <div class="player-stats-card">
-                <table class="stats-table sortable">
+                <table class="sortable ibl-data-table stats-table">
+<thead>
     <tr>
         <td colspan=15 class="stats-table-header">Regular Season Totals</td>
     </tr>
@@ -479,14 +486,16 @@
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
             <tr>
         <td>2020</td>
         <td><a href="modules.php?name=Team&op=team&teamid=5&yr=2020">Heat</a></td>
         <td>55</td>
         <td>1500</td>
-        <td>400-800</td>
-        <td>200-250</td>
-        <td>100-280</td>
+        <td sorttable_customkey="400">400-800</td>
+        <td sorttable_customkey="200">200-250</td>
+        <td sorttable_customkey="100">100-280</td>
         <td>50</td>
         <td>200</td>
         <td>300</td>
@@ -496,7 +505,9 @@
         <td>130</td>
         <td>1100</td>
     </tr>
-                <tr class="player-table-row-bold career-row">
+            </tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td>55</td>
         <td>1500</td>
@@ -512,6 +523,7 @@
         <td>130</td>
         <td>1100</td>
     </tr>
+</tfoot>
 </table>
                     </div>
         </div>

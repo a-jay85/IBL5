@@ -46,9 +46,10 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=21 class="player-table-header">Regular Season Averages</td>
+        <td colspan=21 class="player-view-table__title">Regular Season Averages</td>
     </tr>
     <tr>
         <th>year</th>
@@ -73,6 +74,8 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($historicalStats as $row) {
             $gm = $row['games'];
@@ -109,11 +112,15 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
     </tr>
             <?php
         }
+        ?>
+</tbody>
+        <?php
 
         // Career averages row
         if ($careerAverages !== null) {
             ?>
-    <tr class="player-table-row-bold">
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td><?= (int)$careerAverages['games'] ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></td>
@@ -135,6 +142,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pf'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pts'], 1) ?></td>
     </tr>
+</tfoot>
             <?php
         }
         ?>

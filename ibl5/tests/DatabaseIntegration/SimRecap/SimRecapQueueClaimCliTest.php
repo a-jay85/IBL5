@@ -48,11 +48,15 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
         self::assertNotFalse($path, 'simRecapQueue.php must exist at the expected path');
         $this->scriptPath = $path;
 
-        // claim-next takes the lowest pending sim, so clear only the pending
-        // rows below this test's range; rows other tests seeded stay put.
-        $this->db->query(
-            "DELETE FROM `ibl_sim_summaries` WHERE `status` = 'pending' AND `sim` < " . self::SIM_PENDING
-        );
+        // claim-next takes the lowest pending sim, so set aside the pending rows
+        // below this test's range. A session temp table holds them, and
+        // tearDown puts them back, so no real pending row is lost.
+        $belowRange = "`status` = 'pending' AND `sim` < " . self::SIM_PENDING;
+        $this->db->query('DROP TEMPORARY TABLE IF EXISTS `sim_recap_claim_cli_saved`');
+        self::assertTrue($this->db->query(
+            'CREATE TEMPORARY TABLE `sim_recap_claim_cli_saved` AS SELECT * FROM `ibl_sim_summaries` WHERE ' . $belowRange
+        ));
+        $this->db->query('DELETE FROM `ibl_sim_summaries` WHERE ' . $belowRange);
 
         // The child reads the phase on its own connection, so the phase is
         // committed here and restored in tearDown. Default to a recaps-on phase.
@@ -75,6 +79,8 @@ final class SimRecapQueueClaimCliTest extends DatabaseTestCase
                     . self::SIM_FIRST_CLAIM . ', ' . self::SIM_AFTER_PARK . ', ' . self::SIM_CLAIM_BY_SIM . ', '
                     . self::SIM_PHASE_OFF_NEXT . ', ' . self::SIM_PHASE_OFF_BY_SIM . ')'
                 );
+                $this->db->query('INSERT INTO `ibl_sim_summaries` SELECT * FROM `sim_recap_claim_cli_saved`');
+                $this->db->query('DROP TEMPORARY TABLE IF EXISTS `sim_recap_claim_cli_saved`');
                 if ($this->originalPhase !== null) {
                     $this->setSeasonPhase($this->originalPhase);
                 }

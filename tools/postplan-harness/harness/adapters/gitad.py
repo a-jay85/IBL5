@@ -607,7 +607,7 @@ class LiveGit:
         predict_rebase_conflict() call predicted, or None when it might resolve it.
 
         Decidable before the rebase only through conflict.classify (migration .sql,
-        lockfile, stages != {1, 2, 3}); binary files, LLM decline, marker survival, and the
+        unregistered lockfile, stages != {1, 2, 3}); binary files, LLM decline, marker survival, and the
         lost-work / tree-equivalence proofs are post-LLM and never predicted here. Returns
         None unless the probe was exact (no branch commits past the fork point and no
         iblBase), because only then does the probe's net merge equal the rebase that the
@@ -615,7 +615,8 @@ class LiveGit:
         if not self.last_probe_exact:
             return None
         for path in sorted(self.last_conflict_stages):
-            reason = classify(path, set(self.last_conflict_stages[path]))
+            reason = classify(path, set(self.last_conflict_stages[path]),
+                              regen_lockfiles=True)
             if reason is not None:
                 return reason
         return None

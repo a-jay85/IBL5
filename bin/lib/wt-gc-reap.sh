@@ -468,6 +468,28 @@ reap_stale_refs() {
             return 1
         fi
     done <<< "$doomed"
+    # One compare-and-delete transaction for the whole set (thousands of refs
+    # under a dead remote). If it fails nothing was deleted, so the per-ref
+    # loop below retries one at a time and isolates the bad ref.
+    if [ "${DRY_RUN:-0}" != 1 ]; then
+        local batch="" batch_ok=0
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] || continue
+            batch="${batch}delete ${ref} ${sha}"$'\n'
+        done <<< "$doomed"
+        if git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "$batch" 2>/dev/null; then
+            batch_ok=1
+        else
+            log "batch ref delete failed — retrying one by one"
+        fi
+        if [ "$batch_ok" = 1 ]; then
+            while IFS=' ' read -r sha ref; do
+                [ -n "$ref" ] || continue
+                log "ref deleted $ref $sha"
+            done <<< "$doomed"
+            return "$rc"
+        fi
+    fi
     while IFS=' ' read -r sha ref <&3; do
         [ -n "$ref" ] || continue
         if _gc_do git -C "$WT_GC_REPO_ROOT" update-ref -d "$ref" "$sha"; then

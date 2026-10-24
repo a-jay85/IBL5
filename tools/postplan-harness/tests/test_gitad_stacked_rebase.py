@@ -182,12 +182,36 @@ def test_carried_conflict_flag_is_rebound_to_the_rewritten_head(squash_repo):
     try:
         result = g.autoresolve_stacked_rebase()
         assert result.resolved is True
-        assert g.last_conflict_flag_note.startswith("conflict flag carried")
+        assert g.last_conflict_flag_state == "carried"
         recorded = open(flag).read().split()
         assert recorded == [old_head, g.head()]
         assert _sh(d, "merge-base", "--is-ancestor", old_head, "HEAD", check=False).returncode != 0
         g._reconcile_conflict_flag(branch, key, "origin/master")
         assert os.path.exists(flag)
+    finally:
+        if os.path.exists(flag):
+            os.unlink(flag)
+
+
+def test_rebind_keys_on_flag_state_not_the_log_note(squash_repo, monkeypatch):
+    """The note is log text only. Rewording it must not stop the re-bind, or the hold drops."""
+    from harness.armable import conflict_flag_path, record_conflict_resolution
+    d, parent_tip, master_sha, key, branch = squash_repo
+    g = LiveGit(d)
+    flag = conflict_flag_path(branch)
+    old_head = g.head()
+    record_conflict_resolution(branch, old_head)
+    real_reconcile = g._reconcile_conflict_flag
+
+    def reworded(*args, **kwargs):
+        real_reconcile(*args, **kwargs)
+        g.last_conflict_flag_note = "reworded log line"
+
+    monkeypatch.setattr(g, "_reconcile_conflict_flag", reworded)
+    try:
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is True
+        assert open(flag).read().split() == [old_head, g.head()]
     finally:
         if os.path.exists(flag):
             os.unlink(flag)

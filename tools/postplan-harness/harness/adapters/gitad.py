@@ -165,7 +165,9 @@ class LiveGit:
         # audit log so a fail-closed exit 3 names the files that conflicted.
         self.last_conflict_files: tuple[str, ...] = ()
         # Set by _reconcile_conflict_flag at each rebase start; "" when the marker is absent.
+        # The note is for logging only; control flow keys on the FLAG_* state.
         self.last_conflict_flag_note: str = ""
+        self.last_conflict_flag_state: str = ""
         self.conflict_review_retries: dict[str, int] = {}   # review_resolution retries_out; runner copies into RunResult.retries
         # Probe-only state (set by predict_rebase_conflict, read by resolver_refusal_reason).
         # Stage sets per conflicted path from the merge-tree probe, and whether the probe's
@@ -930,6 +932,7 @@ class LiveGit:
             state, detail = classify_conflict_flag(flag, notes, is_ancestor, legacy_rewritten)
         except (_GitError, OSError) as exc:
             state, detail = FLAG_UNKNOWN, f"git error while classifying: {exc}"
+        self.last_conflict_flag_state = state
         if state == FLAG_ABSENT:
             self.last_conflict_flag_note = ""
             return
@@ -1544,9 +1547,8 @@ class LiveGit:
         # new HEAD. (_record_resolution already did so when a model resolved files.) Only a
         # SHA-bound "carried" marker is re-bound; an unknown one (malformed, legacy empty,
         # git error) stays untouched so appending a SHA cannot turn it into a droppable one.
-        if not auto_resolved_files and self.last_conflict_flag_note.startswith(
-                "conflict flag carried"):
-            from ..armable import record_conflict_resolution
+        from ..armable import FLAG_CARRIED, record_conflict_resolution
+        if not auto_resolved_files and self.last_conflict_flag_state == FLAG_CARRIED:
             record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
 
         return StackedRebaseResult(

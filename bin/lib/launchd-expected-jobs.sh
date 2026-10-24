@@ -38,13 +38,20 @@ com.ibl5.wt-sync standard'
 
 # One-shot runner label prefixes (bin/plan-now, bin/pr-review-now,
 # bin/docfix-run, bin/post-plan-now, bin/finding-class-scan --verify-schedule).
-# Never alerted on; a leftover plist is
-# reported as stale only.
+# Never alerted on; a leftover plist is reported as stale only. bin/plan-now and
+# bin/post-plan-now launch through ljob_submit and write no plist, so a hit under
+# their prefixes is a leak.
 LEJ_TRANSIENT_PREFIXES='com.ibl5.plan-now-
 com.ibl5.pr-review-now-
 com.ibl5.docfix-run-
 com.ibl5.postplan-now-
 com.ibl5.finding-class-scan-verify-'
+
+# Prefixes launched through ljob_submit (no plist). A loaded label under one of
+# these whose PID column is "-" is reported as idle-oneshot. Units that convert
+# another launcher append its prefix here.
+LEJ_SUBMITTED_PREFIXES='com.ibl5.plan-now-
+com.ibl5.postplan-now-'
 
 # Labels a setup script installs that the health check deliberately does NOT
 # expect. One record per line: "<label> <reason>". bin/test-launchd-sched

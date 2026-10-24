@@ -2348,7 +2348,8 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
     with any line already in the body, which may only raise Door / Blast radius.
 
-    Phase 2 writes the line. Any later phase (6, 5.5, 7) only re-applies the floor to a
+    Phase 2 writes the line. In Phase 2 an LLM one-way above the floor survives only when its
+    Why names an irreversible effect; later phases apply no bar, so a human raise is kept. Any later phase (6, 5.5, 7) only re-applies the floor to a
     body that already carries one well-formed line, so a raised Door cannot be lowered. A
     missing or malformed line is left alone there and condition (18) holds it until a human
     adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
@@ -2368,7 +2369,11 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
         prior = None
     final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
                                         prior.blast if prior else None,
-                                        prior.why if prior else None)
+                                        prior.why if prior else None,
+                                        llm_raise_bar=(phase == "phase2"))
+    if prior and prior.door == "one-way" and final.door == "two-way":
+        log(f"{phase}: LLM one-way kept at the mechanical two-way floor; the Why names no "
+            f"irreversible effect ({prior.why[:80]!r})")
     log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
         f"triggers={list(final.triggers)}")
     return merge_danger.inject_merge_danger(body, final)

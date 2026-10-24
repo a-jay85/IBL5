@@ -14,6 +14,7 @@ import types
 
 import pytest
 
+import ppn_launch
 from test_post_plan_now_fallback import (  # noqa: F401  (_private_log_dir is autouse from conftest.py)
     PPN, REPO, _fixture_repo, _generate_cmd, _run_gate, _run_ppn,
 )
@@ -267,8 +268,8 @@ def test_resume_replays_marker_argv_and_clears_marker(tmp_path):
     """The marker's own resume_argv reruns the harness under the same S and clears the marker.
 
     The saved argv drops --foreground (bin/post-plan-now: a resume always goes through the
-    launchd job), so the replay writes a plist instead of running in-process. The test then
-    runs that plist's command the way launchd would. No double fire: the fallback never runs.
+    launchd job), so the replay writes a per-run script instead of running in-process. The test then
+    runs that script's command the way launchd would. No double fire: the fallback never runs.
     """
     extra = {"RUN_LOG": str(tmp_path / "run-log.txt"),
              "ENV_DUMP": str(tmp_path / "env-dump.txt"),
@@ -290,11 +291,7 @@ def test_resume_replays_marker_argv_and_clears_marker(tmp_path):
     assert resume.returncode == 0, f"stdout={resume.stdout!r} stderr={resume.stderr!r}"
     assert not marker_file.exists(), "the resume must clear the pause marker"
 
-    plists = list((tmp_path / "home" / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, plists
-    body = plists[0].read_text()
-    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
-    cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    cmd = ppn_launch.launched_cmd(resume.stdout, tmp_path / "home")
     launched = subprocess.run(["/bin/bash", "-lc", cmd], cwd=marker["resume_cwd"], env=run.env,
                               capture_output=True, text=True)
     assert launched.returncode == 0, f"stdout={launched.stdout!r} stderr={launched.stderr!r}"

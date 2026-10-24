@@ -268,13 +268,15 @@ reset() {
     "$SCRATCH/pad40" e0001 > "$SCRATCH/master-tip"
 }
 
-# set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>]" ...
+# set_prs "<num>|<branch>|<sha>|<mergeStateStatus>|<isDraft>[|<baseRefName>[|<armed>]]" ...
 set_prs() {
-    local e out="[]" n b s m d base
+    local e out="[]" n b s m d base armed
     for e in "$@"; do
-        IFS='|' read -r n b s m d base <<< "$e"
+        IFS='|' read -r n b s m d base armed <<< "$e"
         out="$(jq -c --argjson n "$n" --arg b "$b" --arg s "$s" --arg m "$m" --argjson d "$d" --arg base "${base:-master}" \
-            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:$base}]' <<< "$out")"
+            --argjson a "${armed:-false}" \
+            '. + [{number:$n, headRefName:$b, headRefOid:$s, mergeStateStatus:$m, isDraft:$d, baseRefName:$base,
+                   autoMergeRequest:(if $a then {enabledAt:"2026-10-18T00:00:00Z"} else null end)}]' <<< "$out")"
     done
     printf '%s\n' "$out" > "$SCRATCH/prs.json"
 }
@@ -2406,6 +2408,300 @@ out_has 'the conflict probe could not run' || fail "conflict-probe-fallback-dry-
 [[ "$(probe_dm_count)" == "0" ]] || fail "conflict-probe-fallback-dry-run: dry run sent a probe DM"
 no_file "$STATE_DIR/dm-probe/101" || fail "conflict-probe-fallback-dry-run: dry run wrote dm-probe/101"
 end_case conflict-probe-fallback-dry-run
+
+# --- stuck lookup (lib) --------------------------------------------------------------------
+PCW_LIB="$(dirname "$TICK")/lib/pr-cycle-watch.sh"
+_lr()    ( source "$PCW_LIB"; pcw_last_result "$@" )
+_prune() ( source "$PCW_LIB"; pcw_prune "$@" )
+_mkrun() {   # <out-dir> <branch> <stamp> <json-or-empty>: one run dir, result.json when given
+    mkdir -p "$1/live-$2-$3-1"
+    [[ -z "$4" ]] || printf '%s\n' "$4" > "$1/live-$2-$3-1/result.json"
+}
+OUT_REPO="$REPO/tools/postplan-harness/out"
+OUT_WT="$WT/tools/postplan-harness/out"
+
+# last-result-failed: the newest run's terminal and error_kind come back as one TSV row.
+reset; begin_case
+_mkrun "$OUT_REPO" branch-one 20261018-000000 '{"terminal":"failed","error_kind":"gate-path-edit"}'
+got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")"
+[[ "$got" == "$(printf 'failed\tgate-path-edit')" ]] || fail "last-result-failed: got '$got'"
+end_case last-result-failed
+
+# last-result-newest-wins: only the newest run dir counts.
+reset; begin_case
+_mkrun "$OUT_REPO" branch-one 20261017-000000 '{"terminal":"failed","error_kind":"gate-path-edit"}'
+_mkrun "$OUT_REPO" branch-one 20261018-000000 '{"terminal":"merged"}'
+got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")"
+[[ "$got" == merged* ]] || fail "last-result-newest-wins: got '$got'"
+end_case last-result-newest-wins
+
+# last-result-worktree-dir: a run that lives only under the worktree out dir is found.
+reset; begin_case
+_mkrun "$OUT_WT" branch-one 20261018-000000 '{"terminal":"failed","error_kind":"gate-path-edit"}'
+got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")"
+[[ "$got" == failed* ]] || fail "last-result-worktree-dir: got '$got'"
+end_case last-result-worktree-dir
+
+# last-result-missing: a run dir with no result.json prints nothing and exits 0.
+reset; begin_case
+_mkrun "$OUT_REPO" branch-one 20261018-000000 ""
+rc=0; got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")" || rc=$?
+[[ -z "$got" && "$rc" == 0 ]] || fail "last-result-missing: got '$got' rc=$rc"
+end_case last-result-missing
+
+# last-result-unparseable: junk, a non-object and a terminal-less object all print nothing.
+for body in '{not json' '[]' '{"error_kind":"x"}'; do
+    reset; begin_case
+    _mkrun "$OUT_REPO" branch-one 20261018-000000 "$body"
+    rc=0; got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")" || rc=$?
+    [[ -z "$got" && "$rc" == 0 ]] || fail "last-result-unparseable($body): got '$got' rc=$rc"
+    end_case last-result-unparseable
+done
+
+# last-result-reason-fold: empty error_kind falls back to the terminal; odd chars fold.
+reset; begin_case
+_mkrun "$OUT_REPO" branch-one 20261018-000000 '{"terminal":"failed"}'
+got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")"
+[[ "$got" == "$(printf 'failed\tfailed')" ]] || fail "last-result-reason-fold: empty kind got '$got'"
+_mkrun "$OUT_REPO" branch-one 20261019-000000 '{"terminal":"failed","error_kind":"Gate Path/Edit!"}'
+got="$(_lr branch-one "$OUT_REPO" "$OUT_WT")"
+[[ "$got" == "$(printf 'failed\tgate-path-edit')" ]] || fail "last-result-reason-fold: folded got '$got'"
+end_case last-result-reason-fold
+
+# prune-dm-stuck: the stuck ledger prunes with the PR, the way the other dm-* ledgers do.
+reset; begin_case
+mkdir -p "$STATE_DIR/dm-stuck"
+echo 'gate-path-edit@aaa1111' > "$STATE_DIR/dm-stuck/101"
+echo 'gate-path-edit@aaa1111' > "$STATE_DIR/dm-stuck/202"
+_prune "$STATE_DIR" "101"
+[[ -f "$STATE_DIR/dm-stuck/101" ]] || fail "prune-dm-stuck: open PR's ledger was removed"
+[[ ! -e "$STATE_DIR/dm-stuck/202" ]] || fail "prune-dm-stuck: closed PR's ledger survived"
+end_case prune-dm-stuck
+
+# --- stuck pass (tick) ---------------------------------------------------------------------
+_stuck_run() {   # <base> <branch> <json> <minutes-ago>: back-dated run dir holding result.json
+    local run="$1/tools/postplan-harness/out/live-$2-20261018-000000" st
+    mkdir -p "$run"; printf '%s\n' "$3" > "$run/result.json"
+    st="$(_stamp_at $(( $(date +%s) - $4 * 60 )))"
+    touch -t "$st" "$run/result.json" "$run"
+}
+FAILED_JSON='{"terminal":"failed","error_kind":"gate-path-edit","pr_number":101}'
+UNARMED101='101|branch-one|aaa1111|CLEAN|false|master|false'
+
+# stuck-failed-unarmed: a green, unarmed PR whose last run failed is named in the log.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick --dry-run
+out_has 'stuck PR 101: gate-path-edit (head aaa1111)' || fail "stuck-failed-unarmed: no stuck line: $OUT"
+[[ "$RC" == 0 ]] || fail "stuck-failed-unarmed: rc=$RC"
+end_case stuck-failed-unarmed
+
+# stuck-failed-armed (negative): the same PR with auto-merge armed is not stuck.
+reset; begin_case; set_out_root
+set_prs '101|branch-one|aaa1111|CLEAN|false|master|true'; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-failed-armed: armed PR listed: $OUT"
+end_case stuck-failed-armed
+
+# stuck-draft (negative): a draft PR is not stuck.
+reset; begin_case; set_out_root
+set_prs '101|branch-one|aaa1111|CLEAN|true|master|false'; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-draft: draft PR listed: $OUT"
+end_case stuck-draft
+
+# stuck-worktree-run: the failed run lives under the branch's worktree out dir.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$WT" branch-one "$FAILED_JSON" 60
+run_tick --dry-run
+out_has 'stuck PR 101: gate-path-edit' || fail "stuck-worktree-run: no stuck line: $OUT"
+end_case stuck-worktree-run
+
+# stuck-holdrepeat-declined (negative): a decline newer than the failed result hides the PR.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+mkdir -p "$STATE_DIR/declined"; echo k > "$STATE_DIR/declined/101"
+touch -t "$(_stamp_at $(( $(date +%s) - 30 * 60 )))" "$STATE_DIR/declined/101"
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-holdrepeat-declined: declined PR listed: $OUT"
+end_case stuck-holdrepeat-declined
+
+# stuck-failed-after-decline (boundary): a failed result newer than the decline is listed.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+mkdir -p "$STATE_DIR/declined"; echo k > "$STATE_DIR/declined/101"
+touch -t "$(_stamp_at $(( $(date +%s) - 120 * 60 )))" "$STATE_DIR/declined/101"
+run_tick --dry-run
+out_has 'stuck PR 101: gate-path-edit' || fail "stuck-failed-after-decline: no stuck line: $OUT"
+end_case stuck-failed-after-decline
+
+# stuck-conflict-hold: a conflict-held PR with no run dir is listed with reason conflict.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+mkdir -p "$STATE_DIR/conflict-hold"; echo unknown > "$STATE_DIR/conflict-hold/101"
+run_tick --dry-run
+out_has 'stuck PR 101: conflict' || fail "stuck-conflict-hold: no stuck line: $OUT"
+end_case stuck-conflict-hold
+
+# stuck-result-unparseable (negative): junk result.json lists nothing and the tick finishes.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one '{not json' 60
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-result-unparseable: listed: $OUT"
+[[ "$RC" == 0 ]] || fail "stuck-result-unparseable: rc=$RC"
+out_has 'idle: nothing qualifies' || fail "stuck-result-unparseable: tick did not reach idle: $OUT"
+end_case stuck-result-unparseable
+
+# stuck-result-missing (negative): a run dir without result.json lists nothing.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+set_live_dir branch-one 60
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-result-missing: listed: $OUT"
+[[ "$RC" == 0 ]] || fail "stuck-result-missing: rc=$RC"
+end_case stuck-result-missing
+
+# stuck-ledger-quiet: a ledger holding reason@sha silences the row; a new head brings it back.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+mkdir -p "$STATE_DIR/dm-stuck"; echo 'gate-path-edit@aaa1111' > "$STATE_DIR/dm-stuck/101"
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-ledger-quiet: ledgered row listed: $OUT"
+set_prs '101|branch-one|bbb2222|CLEAN|false|master|false'; set_checks bbb2222 green
+run_tick --dry-run
+out_has 'stuck PR 101: gate-path-edit (head bbb2222)' || fail "stuck-ledger-quiet: new head not listed: $OUT"
+end_case stuck-ledger-quiet
+
+# --- stuck block + idle DM -----------------------------------------------------------------
+_blk() ( source "$PCW_LIB"; pcw_stuck_block )
+
+# stuck-block-format: header, linked lines, and a 7-char head.
+reset; begin_case
+got="$(printf '101\taaa1111bbbb\tgate-path-edit\n102\tccc2222dddd\tconflict\n' | _blk)"
+[[ "$(sed -n 1p <<< "$got")" == '**Stuck (2)**' ]] || fail "stuck-block-format: header: $got"
+[[ "$(sed -n 2p <<< "$got")" == '- [#101](https://github.com/a-jay85/IBL5/pull/101) gate-path-edit (head aaa1111)' ]] \
+    || fail "stuck-block-format: line 1: $got"
+[[ "$(sed -n 3p <<< "$got")" == *'conflict (head ccc2222)' ]] || fail "stuck-block-format: line 2: $got"
+end_case stuck-block-format
+
+# stuck-block-empty (negative): empty and non-numeric input render nothing.
+reset; begin_case
+rc=0; got="$(: | _blk)" || rc=$?
+[[ -z "$got" && "$rc" == 0 ]] || fail "stuck-block-empty: empty input gave '$got' rc=$rc"
+got="$(printf '**Stuck (9)**\nheader\tx\ty\n' | _blk)"
+[[ -z "$got" ]] || fail "stuck-block-empty: non-numeric rows rendered '$got'"
+end_case stuck-block-empty
+
+# stuck-block-cap (boundary): 22 rows print 15 lines and an "and 7 more" tail.
+reset; begin_case
+got="$(for i in $(seq 101 122); do printf '%s\tabcdef1234\tgate-path-edit\n' "$i"; done | _blk)"
+[[ "$(sed -n 1p <<< "$got")" == '**Stuck (22)**' ]] || fail "stuck-block-cap: header: $got"
+[[ "$(grep -c '^- \[#' <<< "$got")" == 15 ]] || fail "stuck-block-cap: line count: $got"
+[[ "$(tail -n 1 <<< "$got")" == '- and 7 more' ]] || fail "stuck-block-cap: tail: $got"
+end_case stuck-block-cap
+
+# stuck-idle-dm-once: an idle tick DMs the block once, marks the ledger, and stays quiet after.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick
+[[ "$(dm_count)" == 1 ]] || fail "stuck-idle-dm-once: dm_count $(dm_count) after tick 1"
+grep -qF 'Stuck (1)' "$SCRATCH/dm.log" || fail "stuck-idle-dm-once: no block in the DM"
+grep -qF 'gate-path-edit' "$SCRATCH/dm.log" || fail "stuck-idle-dm-once: no reason in the DM"
+[[ "$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)" == 'gate-path-edit@aaa1111' ]] \
+    || fail "stuck-idle-dm-once: ledger is '$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)'"
+run_tick
+[[ "$(dm_count)" == 1 ]] || fail "stuck-idle-dm-once: tick 2 re-DM'd (count $(dm_count))"
+end_case stuck-idle-dm-once
+
+# stuck-new-head-redm: a new head re-DMs and moves the ledger.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick
+run_tick
+set_prs '101|branch-one|bbb2222|CLEAN|false|master|false'; set_checks bbb2222 green
+run_tick
+[[ "$(dm_count)" == 2 ]] || fail "stuck-new-head-redm: dm_count $(dm_count)"
+[[ "$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)" == 'gate-path-edit@bbb2222' ]] \
+    || fail "stuck-new-head-redm: ledger is '$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)'"
+end_case stuck-new-head-redm
+
+# stuck-armed-no-dm (negative): an armed PR gets no DM and no ledger file.
+reset; begin_case; set_out_root
+set_prs '101|branch-one|aaa1111|CLEAN|false|master|true'; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick
+[[ "$(dm_count)" == 0 ]] || fail "stuck-armed-no-dm: dm_count $(dm_count)"
+no_file "$STATE_DIR/dm-stuck/101" || fail "stuck-armed-no-dm: ledger written"
+end_case stuck-armed-no-dm
+
+# stuck-dm-fail-unmarked (failure path): a failing DM leaves no ledger; the next tick retries.
+reset; begin_case; set_out_root
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/dm-fail"; chmod +x "$SCRATCH/dm-fail"
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+E_DMCMD="$SCRATCH/dm-fail"
+run_tick
+no_file "$STATE_DIR/dm-stuck/101" || fail "stuck-dm-fail-unmarked: ledger written after a failed DM"
+out_has 'stuck DM failed' || fail "stuck-dm-fail-unmarked: no failure line: $OUT"
+E_DMCMD="$SCRATCH/dm-stub"
+run_tick
+[[ "$(dm_count)" == 1 ]] || fail "stuck-dm-fail-unmarked: retry dm_count $(dm_count)"
+end_case stuck-dm-fail-unmarked
+
+# stuck-dry-run-no-write (negative): --dry-run names the DM and writes and sends nothing.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick --dry-run
+out_has 'would DM:' || fail "stuck-dry-run-no-write: no would-DM line: $OUT"
+[[ "$(dm_count)" == 0 ]] || fail "stuck-dry-run-no-write: sent a DM"
+no_file "$STATE_DIR/dm-stuck" || fail "stuck-dry-run-no-write: wrote the ledger dir"
+end_case stuck-dry-run-no-write
+
+# stuck-prune-closed: the ledger goes when the PR leaves the open list.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101"; set_checks aaa1111 green
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick
+[[ -f "$STATE_DIR/dm-stuck/101" ]] || fail "stuck-prune-closed: ledger was not written"
+set_prs '102|branch-two|ccc2222|CLEAN|false'
+run_tick
+no_file "$STATE_DIR/dm-stuck/101" || fail "stuck-prune-closed: ledger survived the PR closing"
+end_case stuck-prune-closed
+
+# stuck-launch-sends: a launching tick still DMs the stuck block itself and marks the ledger.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101" '102|branch-two|ccc2222|BLOCKED|false'
+set_checks aaa1111 green; set_checks ccc2222 red
+_stuck_run "$REPO" branch-one "$FAILED_JSON" 60
+run_tick
+[[ "$(launch_count)" == 1 ]] || fail "stuck-launch-sends: launch_count $(launch_count)"
+[[ "$(dm_count)" == 1 ]] || fail "stuck-launch-sends: dm_count $(dm_count)"
+grep -qF '[#101]' "$SCRATCH/dm.log" || fail "stuck-launch-sends: block lacks #101"
+! grep -qF '[#102]' "$SCRATCH/dm.log" || fail "stuck-launch-sends: block lists the launching PR"
+[[ "$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)" == 'gate-path-edit@aaa1111' ]] \
+    || fail "stuck-launch-sends: ledger is '$(cat "$STATE_DIR/dm-stuck/101" 2>/dev/null)'"
+end_case stuck-launch-sends
+
+# stuck-launch-none (negative): no stuck rows, so a launching tick sends no stuck DM.
+reset; begin_case; set_out_root
+set_prs "$UNARMED101" '102|branch-two|ccc2222|BLOCKED|false'
+set_checks aaa1111 green; set_checks ccc2222 red
+run_tick
+[[ "$(launch_count)" == 1 ]] || fail "stuck-launch-none: launch_count $(launch_count)"
+[[ "$(dm_count)" == 0 ]] || fail "stuck-launch-none: dm_count $(dm_count)"
+no_file "$STATE_DIR/dm-stuck/101" || fail "stuck-launch-none: ledger written"
+end_case stuck-launch-none
 
 # --- summary -------------------------------------------------------------------------------
 h_done

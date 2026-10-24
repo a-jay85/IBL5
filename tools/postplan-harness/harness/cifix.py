@@ -19,10 +19,9 @@ ROLLUP_CHECKS = frozenset({"Tests and Analysis"})
 STATUS_ROLLUP_CHECKS = frozenset({"All checks settled"})
 # Phase 7 Meta-checks skip (see _ci_fix_loop). "All checks settled" is the aggregate
 # status from .github/workflows/all-checks-settled.yml; it is non-actionable for this
-# predicate only. The legacy waiter's name stays until the ADR-0149 addendum's cutover
-# retires all-checks-green.yml, since it still goes red with Meta checks. ROLLUP_CHECKS and triage() keep their meaning for every caller.
+# predicate only. ROLLUP_CHECKS and triage() keep their meaning for every caller.
 META_CHECK_NAME = "Meta checks"
-META_SKIP_AGGREGATES = frozenset({"All checks settled", "All checks green"})
+META_SKIP_AGGREGATES = frozenset({"All checks settled"})
 _STEP_BIN = re.compile(r"\bbin/([A-Za-z0-9_-]+)")
 CI_FIX_ALLOWED_TOOLS = REMEDIATION_ALLOWED_TOOLS
 # Ci-fix only: the harness judges and applies a proposed PR body. Phase 5.5's fixer

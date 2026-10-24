@@ -187,7 +187,7 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
 # Both edges are observed only where a sim is CLAIMED, so an empty queue neither
 # alerts nor recovers: if the outage ends while nothing is pending, the RECOVERED
 # ping waits for the first sim after it. That is the right trade — the alert is
-# about recaps shipping roster-blind, and no recap is shipping.
+# about recaps parked for want of the fact sheet, and no recap is pending.
 ops_post() { # message — fault-tolerant by contract; never fails the tick
     if [ -n "$SIM_RECAP_OPS_WEBHOOK_URL" ]; then
         local url="$SIM_RECAP_OPS_WEBHOOK_URL" sep='?'
@@ -263,11 +263,11 @@ roster_health_transition() { # sim  ok|degraded
         # than re-alert on every subsequent sim, which is the bug being fixed.
         since="$(date '+%Y-%m-%dT%H:%M:%S')"
         ops_state_write "$since" 1
-        ops_post "WARNING: sim $sim recap proceeding roster-blind — simRecapContext.php fetch failed. Further roster-blind sims will NOT re-alert; expect a single RECOVERED message when it comes back."
+        ops_post "WARNING: sim $sim recap parked: simRecapContext.php fact-sheet fetch failed or returned no usable games. Further parked sims will NOT re-alert; expect a single RECOVERED message when it comes back."
     else
         [ -z "$since" ] && return 0   # healthy, and it was healthy — say nothing
         rm -f "$SIM_RECAP_OPS_ALERT_STATE" 2>/dev/null
-        ops_post "RECOVERED: simRecapContext.php is answering again (sim $sim). $count sim recap(s) ran roster-blind since $since."
+        ops_post "RECOVERED: simRecapContext.php fact sheet is answering again (sim $sim). $count sim recap(s) parked waiting for it since $since."
     fi
     return 0
 }
@@ -361,14 +361,14 @@ q() {
 # ── One seam for the prod-side context precompute ────────────────────────────
 # qctx <sim> -> JSON object on stdout; exit status of the call.
 # A dead ssh, an undeployed simRecapContext.php, or a PHP fatal yields EMPTY
-# stdout plus non-zero exit. Fault-tolerant: caller falls back to '{}' on failure.
+# stdout plus non-zero exit. The caller (fetch_agent_inputs) parks the sim on failure.
 qctx() {
     local sim="$1" rc
     "$SIM_RECAP_SSH_BIN" "$SIM_RECAP_SSH_HOST" \
         "php $SIM_RECAP_REMOTE_ROOT/ibl5/scripts/simRecapContext.php --sim=$sim"
     rc=$?
     if [ "$rc" -ne 0 ]; then
-        log "WARNING: roster-context fetch (sim $sim) failed (exit $rc) — proceeding without roster context"
+        log "WARNING: roster-context fetch (sim $sim) failed (exit $rc)"
     fi
     return "$rc"
 }
@@ -505,7 +505,7 @@ admin_status_done() { # sim
 
 # ── Fetch the two DB-derived inputs the agent gets, into the workdir ──────────
 # Returns non-zero if either fetch is unusable, so the caller can park.
-fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WORKDIR)
+fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json + roster-context.json into WORKDIR)
     local sim="$1" mm rt
     mm="$(q mention-map)"
     if ! jq_ok "$mm" '.ok == true'; then
@@ -522,17 +522,25 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WO
     # .themes is a flat JSON array of strings — string-safe by construction.
     printf '%s' "$rt" | "$SIM_RECAP_JQ_BIN" '.themes' > "$WORKDIR/themes-ledger.json" 2>/dev/null
 
-    # Fetch precomputed roster context (fault-tolerant — failure does NOT park).
+    # Fetch the fact-sheet context. Mandatory: the prompt and assemble_payload
+    # both read it, so a sim without it parks (transport) before any agent spend.
     local ctx ctx_rc
     ctx="$(qctx "$sim")"; ctx_rc=$?
-    if [ "$ctx_rc" -eq 0 ] && jq_ok "$ctx" '.sim != null'; then
-        printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
-        roster_health_transition "$sim" ok
-    else
-        log "sim $sim: roster-context unavailable — writing empty context"
+    if [ "$ctx_rc" -ne 0 ] || ! jq_ok "$ctx" '(.sim != null) and (.games | type == "array")'; then
+        log "sim $sim: fact-sheet context unavailable or malformed (rc=$ctx_rc) — parking"
         roster_health_transition "$sim" degraded
-        printf '{}' > "$WORKDIR/roster-context.json"
+        return 1
     fi
+    # The endpoint answered, so ops health is fine. No games yet, or a game
+    # whose box row is not imported (null game_of_that_day), is a timing state:
+    # park without alerting so real outages are not buried in harmless delays.
+    roster_health_transition "$sim" ok
+    if ! jq_ok "$ctx" '(.games | length > 0)
+            and all(.games[]; (.game_of_that_day | type == "number") and .game_of_that_day >= 1)'; then
+        log "sim $sim: fact-sheet context has no games or a game missing its game_of_that_day — parking until ready"
+        return 1
+    fi
+    printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
     return 0
 }
 
@@ -557,7 +565,53 @@ ensure_tunnel() {
     return 1
 }
 
-# ── Run the generation agent in the temp dir; leaves payload.json on success ──
+# ── Assemble payload.json from model prose + script-owned game rows ──────────
+# The agent writes prose.json only. Structural fields (ids, scores, order) come
+# from roster-context.json, the mention line from mentions.json. Any
+# model-written payload.json is deleted first and never ships.
+assemble_payload() { # sim -> 0 ok | 1 prose missing/invalid | 2 game-key mismatch
+    local p="$WORKDIR/prose.json" c="$WORKDIR/roster-context.json" m="$WORKDIR/mentions.json"
+    ASSEMBLE_DETAIL=""
+    rm -f "$WORKDIR/payload.json" "$WORKDIR/payload.json.tmp"
+    if [ ! -f "$p" ] || ! "$SIM_RECAP_JQ_BIN" -e '
+          ([.intro_text, .outro_text, .recap_text] | all(type == "string" and length > 0))
+          and (.themes | type == "array")
+          and (.games | type == "object")
+          and ([.games[]] | all(type == "string" and length > 0))' "$p" >/dev/null 2>&1; then
+        ASSEMBLE_DETAIL="prose.json missing or malformed"
+        return 1
+    fi
+    ASSEMBLE_DETAIL="$("$SIM_RECAP_JQ_BIN" -r --slurpfile ctx "$c" '
+          ([$ctx[0].games[].key]) as $want | (.games | keys) as $got
+          | ($want - $got) as $miss | ($got - $want) as $extra
+          | if ($miss | length) == 0 and ($extra | length) == 0 then ""
+            else "missing=\($miss | join(",")) extra=\($extra | join(","))" end' "$p")" || return 1
+    [ -z "$ASSEMBLE_DETAIL" ] || return 2
+    "$SIM_RECAP_JQ_BIN" --slurpfile ctx "$c" --slurpfile mm "$m" '
+        def nm($n; $id): $n // ("team " + ($id | tostring));
+        def mention($n): (($mm[0] // {})[$n // ""]) as $s
+            | if ($s | type) == "string" and $s != "" then "<@" + $s + ">" else empty end;
+        . as $pr
+        | {intro_text, outro_text, recap_text, themes,
+           games: [$ctx[0].games | to_entries[] | .key as $i | .value as $g
+             | ([mention($g.visitor_name), mention($g.home_name)]) as $ml
+             | {season_year: $g.season_year, game_date: $g.game_date,
+                visitor_teamid: $g.visitor_teamid, home_teamid: $g.home_teamid,
+                game_of_that_day: $g.game_of_that_day, box_id: $g.box_id,
+                sort_order: ($i + 1),
+                recap_text: ("**\(nm($g.visitor_name; $g.visitor_teamid)) \($g.visitor_score) @ \(nm($g.home_name; $g.home_teamid)) \($g.home_score)**\n"
+                    + (if ($ml | length) > 0 then ($ml | join(" · ")) + "\n\n" else "\n" end)
+                    + $pr.games[$g.key])}]}' "$p" > "$WORKDIR/payload.json.tmp" \
+        || { ASSEMBLE_DETAIL="jq assembly failed"; return 1; }
+    mv "$WORKDIR/payload.json.tmp" "$WORKDIR/payload.json"
+    "$SIM_RECAP_JQ_BIN" -r --slurpfile mm "$m" '
+        $mm[0] as $mm | .games[] | select(.recap_text | split("\n")[1] == "")
+        | "sim recap: game sort_order \(.sort_order) has no Discord mention for either team"' \
+        "$WORKDIR/payload.json" 2>/dev/null | while IFS= read -r w; do log "WARNING: $w"; done
+    return 0
+}
+
+# ── Run the generation agent in the temp dir; leaves prose.json on success ──
 run_agent() { # sim prompt
     local sim="$1" prompt="$2"
     # --allowedTools narrows what runs WITHOUT a prompt; it is NOT a sandbox, and
@@ -679,11 +733,15 @@ generate() { # sim
         park "$sim" usage_limit "$(claude_reset_epoch "$(cat "$WORKDIR/agent.json" 2>/dev/null)")"; return 0
     fi
 
-    if [ ! -f "$WORKDIR/payload.json" ] || \
-       ! "$SIM_RECAP_JQ_BIN" -e '(.games | type == "array") and (.games | length > 0)' \
-            "$WORKDIR/payload.json" >/dev/null 2>&1; then
+    local asm_rc
+    assemble_payload "$sim"; asm_rc=$?
+    if [ "$asm_rc" -ne 0 ]; then
         # A claude timeout (rc 124) lands here too and counts as flaky.
-        log "sim $sim: agent produced no valid payload.json (rc=$agent_rc) — parking"
+        if [ "$asm_rc" -eq 2 ]; then
+            log "sim $sim: prose.json game keys do not match the fact sheet ($ASSEMBLE_DETAIL) — parking"
+        else
+            log "sim $sim: agent produced no valid prose.json (rc=$agent_rc; $ASSEMBLE_DETAIL) — parking"
+        fi
         log_permission_denials "$sim"
         park "$sim" flaky; return 0
     fi
@@ -763,7 +821,10 @@ dry_run() {
     fetch_agent_inputs "$sim" || true
     [ -f "$WORKDIR/mentions.json" ] || printf '{}' > "$WORKDIR/mentions.json"
     [ -f "$WORKDIR/themes-ledger.json" ] || printf '[]' > "$WORKDIR/themes-ledger.json"
-    [ -f "$WORKDIR/roster-context.json" ] || printf '{}' > "$WORKDIR/roster-context.json"
+    if [ ! -f "$WORKDIR/roster-context.json" ]; then
+        log "dry-run sim $sim: fact-sheet context unavailable — not spawning the agent"
+        exit 1
+    fi
 
     local prompt
     if ! prompt="$("$SIM_RECAP_PROMPT_BIN" --sim="$sim" \
@@ -780,8 +841,8 @@ dry_run() {
 
     run_agent "$sim" "$prompt"
 
-    if [ ! -f "$WORKDIR/payload.json" ]; then
-        log "dry-run sim $sim: agent produced no payload.json"
+    if ! assemble_payload "$sim"; then
+        log "dry-run sim $sim: could not assemble payload.json ($ASSEMBLE_DETAIL)"
         exit 1
     fi
     # stdout carries the complete generated document, pretty-printed: a human

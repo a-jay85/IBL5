@@ -167,7 +167,7 @@ def _inputs(**overrides):
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY", owner_approval_state="CLEAR")
     base.update(overrides)
     return ArmInputs(**base)
 

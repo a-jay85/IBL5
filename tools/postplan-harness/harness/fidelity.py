@@ -9,6 +9,7 @@ with prose.
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
 import posixpath
@@ -17,13 +18,14 @@ import subprocess
 import time
 
 from .state import HarnessError
-from .owner_approvals import FIXER_DENIED_TOOLS
+from .owner_approvals import FIXER_DENIED_TOOLS, normalize_anchor, review_context
 from . import llm_calls
 from . import fidelity_filefix
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
 VERDICT_RE = re.compile(r"^(READY WITH NOTES|NOT READY|READY)[ \t]*$", re.M)
+APPROVED_BY_RE = re.compile(r"^\s*approved-by-owner:\s*(oad-[0-9a-f]{8,16})\s*$", re.M)
 DIGEST_CUT = "## DIGEST"
 # Output contract item 2a (.claude/agents/pr-ready-phase6.md) puts every real finding
 # under this exact heading; per-check disposition lines sit above it. Case-sensitive on
@@ -418,6 +420,176 @@ def verdict_path(pr_number: int | str) -> str:
     return f"/tmp/post-plan-fidelity-verdict-{pr_number}.md"
 
 
+_BULLET_PREFIX_RE = re.compile(r"^(\s*(?:[-*]|\d+[.)])\s+)")
+
+
+def _apply_and_collect(path: str, approvals, downgrades: list | None, log) -> None:
+    out = apply_owner_approvals(path, approvals, log)
+    if downgrades is not None and (out["downgraded"] or out["kept"]):
+        downgrades.append(out)
+
+
+def _trusted_record(snap, rid: str):
+    for rec in snap.records:
+        if rec.id == rid:
+            return rec
+    return None
+
+
+def _scope_with_index(lines: list[str]) -> list[tuple[int, str]]:
+    """`_findings_section`'s scope (or every line when no heading), with line indexes."""
+    if not any(ln.rstrip() == FINDINGS_HEADING for ln in lines):
+        return list(enumerate(lines))
+    out: list[tuple[int, str]] = []
+    inside = False
+    for i, ln in enumerate(lines):
+        if ln.rstrip() == FINDINGS_HEADING:
+            inside = True
+            continue
+        if ln.startswith("## "):
+            inside = False
+            continue
+        if inside:
+            out.append((i, ln))
+    return out
+
+
+def _anchors_at_head(rec, gitad) -> bool:
+    """True when every `keep` line is present and every `gone` line absent at HEAD for
+    each file of `rec`. A read error propagates: the caller fails closed."""
+    for f in rec.files:
+        text = gitad.file_at("HEAD", f.path)
+        if text is None:
+            if f.keep:
+                return False
+            continue
+        counts = collections.Counter(normalize_anchor(ln) for ln in text.splitlines())
+        if any(counts[a] == 0 for a in f.keep):
+            return False
+        if any(counts[a] > 0 for a in f.gone):
+            return False
+    return True
+
+
+def apply_owner_approvals(verdict_path: str, approvals: tuple | None, log=None) -> dict:
+    """Downgrade `[BLOCKING]` items that cite a trusted owner-approval record.
+
+    `approvals` is `(snapshot, gitad)` or None. This is the only place a blocking item
+    becomes a note; the reviewer never does it. An item qualifies only when it cites
+    `approved-by-owner: <id>`, `<id>` is in the run-start snapshot, the item names one of
+    the record's paths, and every `keep` line is present and every `gone` line absent at
+    HEAD. A NOT READY word becomes READY WITH NOTES only when no blocking item remains.
+    Nothing below the digest cut is read or changed.
+    """
+    log = log or _noop_log
+    word = parse_verdict(verdict_path)
+    result = {"downgraded": [], "kept": [], "verdict_before": word, "verdict_after": word}
+    if approvals is None or word != "NOT READY":
+        return result
+    snap, gitad = approvals
+    if not getattr(snap, "records", None):
+        return result
+    try:
+        with open(verdict_path) as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return result
+    all_lines = text.splitlines(keepends=True)
+    cut = len(all_lines)
+    for i, line in enumerate(all_lines):
+        if line.strip() == DIGEST_CUT:
+            cut = i
+            break
+    head_lines = all_lines[:cut]
+    tail = "".join(all_lines[cut:])
+    plain = [ln.rstrip("\r\n") for ln in head_lines]
+
+    scope = _scope_with_index(plain)
+    items = _group_findings([ln for _, ln in scope])
+    bullet_idx = [i for i, ln in scope if _FINDING_BULLET_RE.match(ln)]
+    starts: list[int] = []
+    pos = 0
+    for _marker, item_text in items:
+        starts.append(bullet_idx[pos])
+        pos += len(item_text.split("\n"))
+
+    def span_end(n: int) -> int:
+        stop = starts[n + 1] if n + 1 < len(starts) else len(plain)
+        for j in range(starts[n] + 1, stop):
+            if plain[j].startswith("## ") or VERDICT_RE.match(plain[j]):
+                return j
+        return stop
+
+    verified: dict[str, bool] = {}
+    rewrites: dict[int, str] = {}
+    blocking_left = 0
+    for n, (marker, _item_text) in enumerate(items):
+        if marker == "NOTE":
+            continue
+        span = "\n".join(plain[starts[n]:span_end(n)])
+        cited = APPROVED_BY_RE.search(span)
+        if not cited:
+            blocking_left += 1
+            continue
+        rid = cited.group(1)
+        rec = _trusted_record(snap, rid)
+        if rec is None:
+            result["kept"].append((rid, "untrusted-id"))
+            blocking_left += 1
+            continue
+        if not any(f.path in span for f in rec.files):
+            result["kept"].append((rid, "path-mismatch"))
+            blocking_left += 1
+            continue
+        if rid not in verified:
+            try:
+                verified[rid] = _anchors_at_head(rec, gitad)
+            except (HarnessError, OSError, UnicodeDecodeError) as exc:
+                log(f"phase5.5 owner-approval downgrade: unreadable HEAD file ({exc}); "
+                    "verdict left untouched")
+                result["kept"].append((rid, "unreadable"))
+                result["downgraded"] = []
+                return result
+        if not verified[rid]:
+            result["kept"].append((rid, "anchors-not-at-head"))
+            blocking_left += 1
+            continue
+        line = head_lines[starts[n]]
+        eol = line[len(line.rstrip("\r\n")):]
+        body = line[:len(line) - len(eol)]
+        if marker == "BLOCKING":
+            body = body.replace("[BLOCKING]", "[NOTE]", 1)
+        else:
+            body = _BULLET_PREFIX_RE.sub(lambda m: m.group(1) + "[NOTE] ", body, count=1)
+        rewrites[starts[n]] = f"{body} (owner-approved {rid}, downgraded by the harness){eol}"
+        result["downgraded"].append(rid)
+
+    if not rewrites:
+        return result
+    new_lines = list(head_lines)
+    for idx, new in rewrites.items():
+        new_lines[idx] = new
+    if blocking_left == 0:
+        for j in range(len(plain) - 1, -1, -1):
+            if VERDICT_RE.match(plain[j]):
+                eol = new_lines[j][len(new_lines[j].rstrip("\r\n")):]
+                new_lines[j] = "READY WITH NOTES" + eol
+                break
+    try:
+        with open(verdict_path + ".pre-approval", "w") as fh:
+            fh.write(text)
+        with open(verdict_path, "w") as fh:
+            fh.write("".join(new_lines) + tail)
+    except OSError as exc:
+        log(f"phase5.5 owner-approval downgrade: write failed ({exc}); verdict left as is")
+        result["downgraded"] = []
+        return result
+    result["verdict_after"] = parse_verdict(verdict_path)
+    log(f"phase5.5 owner-approval downgrade: {result['downgraded']} "
+        f"verdict {word} -> {result['verdict_after']}")
+    return result
+
+
 def parse_verdict(path: str) -> str | None:
     """Last verdict word ABOVE the digest cut, or None when indeterminate."""
     try:
@@ -694,7 +866,8 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
 
 
 def review(llm, out_dir: str, worktree: str, packet_dir: str,
-           pr_number: int | str, reviewed_tree: str | None = None) -> tuple[str | None, str]:
+           pr_number: int | str, reviewed_tree: str | None = None, *,
+           approvals=None, downgrades: list | None = None, log=None) -> tuple[str | None, str]:
     """Run the review. Returns (verdict_word_or_None, error_kind_or_'').
 
     A `HarnessError` from the adapter is an *indeterminate* verdict: condition (12)
@@ -717,6 +890,7 @@ def review(llm, out_dir: str, worktree: str, packet_dir: str,
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
         return None, "fidelity-verdict-unwritable"
+    _apply_and_collect(path, approvals, downgrades, log)
     if reviewed_tree:
         record_reviewed_tree(path, reviewed_tree)
     return parse_verdict(path), ""
@@ -884,7 +1058,8 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
               verdict1_path: str, phase4b_ran: bool = False, *,
               round_num: int = 1,
-              log=None) -> tuple[str | None, str | None, str | None]:
+              log=None, approvals=None, downgrades: list | None = None
+              ) -> tuple[str | None, str | None, str | None]:
     """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
     A failure here is "no re-review happened" for this round: the prior verdict stands
@@ -905,6 +1080,10 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         "A last_verified date bump in a touched doc is the harness clearing the\n"
         "doc-staleness commit hook, not a new finding.\n"
     )
+    if approvals is not None:
+        ctx = review_context(approvals[0])
+        if ctx:
+            extra += "\n" + ctx + "\n"
     try:
         packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
@@ -927,6 +1106,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
         return None, None, None
+    _apply_and_collect(path2, approvals, downgrades, log)
     # the tree is read after the push, so the recorded tree is the one the reviewer saw
     record_reviewed_tree(path2, gitad.head_tree())
     # read back from the file, never the in-memory value: a reviewer-written line with
@@ -983,7 +1163,8 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                  pr_body: str, prior_body: str, pr_number: int | str,
                  prior_verdict_path: str, name_status: str,
                  plan_hash_at_review: str | None, plan_hash_now: str, *,
-                 round_num: int = 1, log=None
+                 round_num: int = 1, log=None, approvals=None,
+                 downgrades: list | None = None
                  ) -> tuple[str | None, str | None, str | None, str | None]:
     """(verdict, reviewed_tree, verdict_path, decline_reason).
 
@@ -1052,6 +1233,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
             fh.write(text)
     except OSError:
         return _decline("recheck-harness-error")
+    _apply_and_collect(path2, approvals, downgrades, log)
     record_reviewed_tree(path2, current_tree)
     return parse_verdict(path2), read_reviewed_tree(path2), path2, None
 

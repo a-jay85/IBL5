@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-23
+last_verified: 2026-10-24
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -135,6 +135,8 @@ rm -f "$FIDELITY_VERDICT_FILE"
 **Bounded-re-spawn rule:** at most two `Agent` spawns per `/post-plan` run, and never more. Spawn the first reviewer now. **Exactly one re-spawn** is permitted, in step 4b, and only when **both** hold: (a) step 4's remediation addressed **every** `Mode: in-PR` finding, and (b) the plan does **not** declare `auto_merge: false`.
 
 **The first verdict is never replaced.** The re-review writes a **separate file** (`/tmp/post-plan-fidelity-verdict-<N>-2.md`); verdict 1's word, findings and digest stay exactly as the reviewer wrote them. The record grows, it never gets rewritten. Never hand-edit or regenerate verdict 1 to flip its word.
+
+**Owner-approved deviations.** When the packet carries a `## Owner-approved deviations (trusted, ...)` list and a finding is a deviation one of its records covers, the reviewer still writes the item `[BLOCKING]`. It puts `approved-by-owner: <id>` on the next line and names the file path in the item. Only the harness downgrades such an item to `[NOTE]`, after it checks the record against `HEAD`; a reviewer-written downgrade, or an id that is not in the list, changes nothing. The skill fallback has no downgrade path, so a `NOT READY` verdict stays `NOT READY` there.
 
 If anything was left unfixed, do **not** re-spawn — a reviewer looking at a tree that still carries a known finding buys nothing and costs an Opus turn.
 

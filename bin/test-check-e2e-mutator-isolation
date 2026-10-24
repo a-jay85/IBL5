@@ -94,4 +94,35 @@ put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
 run_check "$TMP/nonexistent-config.ts" "$dir"
 expect "missing allowlist config errors" 1 "$RC"
 
+# Cases 7-8: the real config puts one regex per line. The check must read the
+# whole multi-line testMatch array, not just the line holding updater-awards.
+CFG_ML="$TMP/playwright.multiline.config.ts"
+cat > "$CFG_ML" <<'EOF'
+  projects: [
+    {
+      name: 'chromium',
+      testIgnore: [
+        /updater-awards\.spec\.ts$/,
+        /admin-pages\.spec\.ts$/,
+      ],
+    },
+    {
+      name: 'mutators',
+      testMatch: [
+        /updater-awards\.spec\.ts$/,
+        /admin-pages\.spec\.ts$/,
+      ],
+    },
+  ],
+EOF
+dir=$(fresh_specs)
+put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
+run_check "$CFG_ML" "$dir"
+expect "multi-line allowlist: listed firing spec passes" 0 "$RC"
+
+dir=$(fresh_specs)
+put_spec "$dir" 'schedule-leaker.spec.ts' "await runUpdater(page);"
+run_check "$CFG_ML" "$dir"
+expect "multi-line allowlist: unlisted firing spec fails" 1 "$RC"
+
 h_done

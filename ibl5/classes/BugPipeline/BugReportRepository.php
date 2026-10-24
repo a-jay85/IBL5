@@ -257,6 +257,11 @@ class BugReportRepository extends \Database\BaseMysqliRepository
             if ($row['thread_id'] === null) {
                 $this->claims->transition($id, $row['status'], ['thread_id' => $threadId]);
             }
+            // The operator's mention used to arrive as a thread-reply. awaiting_info and
+            // gathering rows re-run only on that stamp, so keep it for them.
+            if (in_array($row['status'], ['awaiting_info', 'gathering'], true)) {
+                $this->claims->stampThreadReply($threadId);
+            }
             return ['outcome' => 'appended', 'status' => $row['status']];
         });
         return $result;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\BugReportRepository;
 use Discord\Discord;
@@ -20,12 +21,33 @@ class WakeController implements ControllerInterface
 {
     private BugReportRepository $bugRepo;
 
+    private ApiKeyRepository $apiKeys;
+
     private string $operatorId;
 
-    public function __construct(BugReportRepository $bugRepo, ?string $operatorId = null)
+    public function __construct(BugReportRepository $bugRepo, ApiKeyRepository $apiKeys, ?string $operatorId = null)
     {
         $this->bugRepo = $bugRepo;
+        $this->apiKeys = $apiKeys;
         $this->operatorId = $operatorId ?? Discord::getBugPipelineApproverDiscordId();
+    }
+
+    /**
+     * True only for a service key. A GM can mint a key for themselves on the API Keys page,
+     * and those are always the 'standard' rate-limit tier. The bot's key must be elevated or
+     * unlimited (README.bugbot.md), so a self-issued key can never reach this route.
+     */
+    private function callerIsServiceKey(): bool
+    {
+        $raw = $_SERVER['HTTP_X_API_KEY'] ?? '';
+        if (!is_string($raw) || $raw === '') {
+            $raw = $_GET['key'] ?? '';
+        }
+        if (!is_string($raw) || $raw === '') {
+            return false;
+        }
+        $key = $this->apiKeys->findByHash(hash('sha256', $raw));
+        return $key !== null && $key['rate_limit_tier'] !== 'standard';
     }
 
     /**
@@ -50,6 +72,11 @@ class WakeController implements ControllerInterface
 
         // Runs before any repository call, so a rejected request reads and writes nothing.
         // An empty operator (unconfigured) is rejected outright => fail-closed.
+        // author_id is body data and Discord ids are public, so the caller must also be the bot's key.
+        if (!$this->callerIsServiceKey()) {
+            $responder->error(403, 'forbidden', 'Only the pipeline bot can wake a report.');
+            return;
+        }
         if ($this->operatorId === '' || $authorId !== $this->operatorId) {
             $responder->error(403, 'forbidden', 'Only the pipeline operator can wake a report.');
             return;

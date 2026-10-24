@@ -157,6 +157,35 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $this->repo->findOperatorContextByReportId($id));
     }
 
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function replyTriggerProvider(): array
+    {
+        return [
+            'awaiting_info re-runs on a stamp' => ['awaiting_info', true],
+            'gathering re-runs on a stamp'     => ['gathering', true],
+            'queued needs no stamp'            => ['queued', false],
+            'hunting needs no stamp'           => ['hunting', false],
+        ];
+    }
+
+    #[DataProvider('replyTriggerProvider')]
+    public function testWakeAppendStampsLastGmReplyOnlyWhereTickRerunsOnIt(string $status, bool $expectStamp): void
+    {
+        $id = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => $status]);
+
+        $this->repo->wakeByOperator($id, self::THREAD, self::OP_MSG, self::OP_AUTHOR, 'guidance');
+
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        if ($expectStamp) {
+            self::assertNotNull($row['last_gm_reply_at']);
+        } else {
+            self::assertNull($row['last_gm_reply_at']);
+        }
+    }
+
     public function testWakeAppendKeepsExistingThreadId(): void
     {
         $id = $this->insertBugReport([

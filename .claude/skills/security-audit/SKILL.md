@@ -5,7 +5,7 @@ name: security-audit
 description: Token-efficient security audit for pull requests
 disable-model-invocation: true
 model: claude-sonnet-5-5
-last_verified: 2026-10-19
+last_verified: 2026-10-23
 ---
 
 Perform a security audit on the given pull request. This command optimizes token usage by fetching the diff once and passing it to a single merged security agent.
@@ -50,7 +50,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Pattern detection and agent launch
 
-**Read** `.claude/review-shared/_security-agents.md` for the canonical pattern-detection bash block and agent definition.
+**Read** `.claude/review-shared/_security-agents.md` for the canonical pattern-detection bash block and agent definition. Findings close with the metadata line from `.claude/review-shared/_review-agents.md` § Per-finding fields (pre-existing, bug class, other instances; severity is always important for security).
 
 Run the pattern-detection block from that file to get SQL and Forms category counts. Build the `CATEGORIES:` line (always include Auth/Authz; add SQL Injection if SQL > 0; add CSRF Protection if Forms > 0). Launch a **single Sonnet 5.5 agent** (`subagent_type: "sonnet-5-5"`, omit `model`) with the categories line and the PHP-only diff from Step 2c. Do not forward CLAUDE.md content (auto-loaded).
 
@@ -64,11 +64,13 @@ Run the pattern-detection block from that file to get SQL and Forms category cou
 
 Collect all findings from Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the findings plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 
+Shape: `[{"n": 1, "score": 75, "preexisting": false}]`.
+
 Parse the JSON response and assign scores back to each finding.
 
 ## Step 5: Filter
 
-Apply the **Security audit** threshold from `_review-rubric.md` (currently `< 75` dropped). If no findings remain, skip to Step 7 with "no issues found".
+Classify per `_review-rubric.md` § Pre-existing defects and labels (Important at `>= 75`; Pre-existing only when reviewer, scorer, and a context-line anchor all agree; security findings are Important or Pre-existing, never Nit). If nothing remains, skip to Step 7 with "no issues found".
 
 ## Step 6: Re-check eligibility
 
@@ -87,12 +89,13 @@ source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 { "path": "repo/relative/path.php",
   "line": 17,
   "body": "**[SEVERITY]** Vulnerability type in `Class::method()` — description\n\n<full-SHA range link>",
-  "score": 88 }
+  "score": 88, "label": "important", "bug_class": "...", "other_instances": [] }
 ```
 - `path` is the repo-relative file path.
 - `line` is a single anchor line on the new-file (right) side.
 - `body` is the finding description in the format below, followed by the full-SHA link. Do NOT add the footer — the helper adds it.
 - `score` is the Haiku score from Step 4.
+- `label`, `bug_class`, `other_instances` come from Step 4 classification and the agent's metadata line; a missing label posts as Important.
 
 Then call:
 ```bash

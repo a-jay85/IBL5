@@ -1253,3 +1253,22 @@ def test_non_hold_decline_posts_no_marker(tmp_path):
                     _llm({PURPOSE: '{"verdict": "DECLINE", "reason": "not a defect", "category": "wrong"}'}))
     assert _replies(gh) == []
     assert len(_resolves(gh)) == 1
+
+
+def test_fetch_trusted_threads_skips_nit_and_preexisting_labeled_bodies(tmp_path):
+    """Mutation: delete the label `continue` in fetch_trusted_threads => 3 returned."""
+    nit = dict(THREAD_2340, commentId=1, body="<!-- label: nit -->\n<!-- score: 70 -->\n**Nit** x")
+    pre = dict(THREAD_2340, commentId=2, body="<!-- label: pre-existing -->\n**Pre-existing** y")
+    plain = dict(THREAD_2340, commentId=3, body="plain finding <!-- score: 85 -->")
+    gh = _gh(tmp_path, {"trusted_threads": [nit, pre, plain]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids={1, 2, 3})
+    assert [t["commentId"] for t in result] == [3]
+
+
+def test_fetch_trusted_threads_keeps_important_marker_and_late_marker(tmp_path):
+    """Mutation: use re.search in parse_label => the line-2 marker drops, fails."""
+    imp = dict(THREAD_2340, commentId=4, body="<!-- label: important -->\n**Important** z")
+    late = dict(THREAD_2340, commentId=5, body="text\n<!-- label: nit -->")
+    gh = _gh(tmp_path, {"trusted_threads": [imp, late]})
+    result = fetch_trusted_threads(gh, PR, pre_posting_ids={4, 5})
+    assert sorted(t["commentId"] for t in result) == [4, 5]

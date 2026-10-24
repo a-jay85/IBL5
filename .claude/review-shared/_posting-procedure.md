@@ -32,6 +32,8 @@ reports "structured code review never ran" and recommends a redundant re-review,
 can never be dispositioned. Observed on PRs #1956 and #2001. If neither helper call fits the
 situation, stop and say so — do not improvise a comment.
 
+`post_review_findings` renders the label itself: line 1 `<!-- label: X -->`, line 2 `<!-- score: N -->`, then a bold `Important` / `Nit` / `Pre-existing` line with the bug class and other instances. It sorts findings Important, Nit, Pre-existing and keeps at most `PRF_NIT_CAP` (5) nits. Pass `label`, `bug_class`, `other_instances` on each finding; a missing or unknown label posts as Important.
+
 ## Dispositioning open threads
 
 A finding posted as an inline thread stays open until something replies *in-thread* and resolves it. Never use `gh pr comment` to announce that a finding is fixed or to close a thread — a top-level comment cannot associate with a review thread. To disposition a finding:
@@ -44,11 +46,15 @@ resolve_review_finding "$PR_NUMBER" <COMMENT_ID> "Fixed in <sha> — <what chang
 
 The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
 
+Threads whose first comment carries `<!-- label: nit -->` or `<!-- label: pre-existing -->` never hold condition (11) and are left open; do not resolve them to clear a hold, since there is none.
+
 ## Remediating trusted threads
 
 A run that posts findings also inherits the threads already open on the PR. `list_trusted_open_threads "$PR_NUMBER"` lists the subset a run may act on: still open, still anchored to a live diff hunk, root comment authored by `a-jay85`, a GitHub `Bot`, or a `[bot]` login. Snapshot `prf_review_threads` ids before posting. Ids in the snapshot are pre-existing threads. The compiled harness also dispositions this run's own findings in a later pass (Phase 4.5b), with one round only: after a fix commit the review runs once more over the fix delta, any new finding is posted and left open, and no second disposition pass runs. The skill path acts on the snapshot ids only. Each candidate is fixed (commit, push, then `resolve_review_finding` with `Fixed in <sha> — <what changed>`) or declined (`resolve_review_finding` with `Declined: <reason>`). A decline with no reason leaves the thread open. Threads outside the trusted subset are never touched; the Phase 6.5 unresolved-thread hold keeps them for a human. The runnable blocks live in `.claude/skills/post-plan/_phase-4-review-audit.md` § 4.5.
 
 Each verdict line also carries a `category` for a DECLINE: `wrong`, `intentional`, `already-fixed` or `not-worth-it`. A FIX ignores it. Each resolved thread's outcome is appended to the main checkout's `tools/postplan-harness/out/state/review-outcomes.jsonl`. A deterministic sweep also logs findings that went outdated or were resolved without a reply. A logging failure never fails the run. Each event also records `origin`, `pre-existing` or `same-run`. `bin/review-outcomes report` does not group by it yet.
+
+"Pre-existing" in this heading means a thread posted before the current run. It is unrelated to the `Pre-existing` severity label; labeled Nit and Pre-existing threads are excluded from remediation (`fetch_trusted_threads` in the harness and the 4.5 work list in the skill skip them).
 
 ## Link format rules
 

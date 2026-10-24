@@ -22,7 +22,7 @@ TEXTS = ["procedure one", "procedure two"]
 
 def _valid_record(**over):
     doc = {
-        "schema_version": 1, "slug": "s", "pr_number": 2345, "run_id": "r1",
+        "schema_version": 2, "slug": "s", "pr_number": 2345, "run_id": "r1",
         "key": {"diff_id": "a", "plan_hash": "b", "version": "c",
                 "pr_title": "t", "file_list": ["x.py"]},
         "per_file_ids": {"x.py": "d"},
@@ -52,7 +52,7 @@ def test_load_record_tolerates_legacy_body_check_arm(tmp_path):
     fresh = rc.build_record(slug="s", pr_number=2345, run_id="r2", key=legacy["key"],
                             per_file_ids={"x.py": "d"}, review=None, fidelity=None)
     assert "body_check" not in fresh
-    assert fresh["schema_version"] == doc["schema_version"] == 1
+    assert fresh["schema_version"] == doc["schema_version"] == rc.SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -88,6 +88,22 @@ def test_load_record_bad_json_returns_none(tmp_path):
 def test_load_record_schema_mismatch_returns_none(tmp_path):
     _write_raw(tmp_path, json.dumps(_valid_record(schema_version=0)))
     assert rc.load_record(str(tmp_path), SLUG) is None
+
+
+def test_load_record_schema_version_1_is_a_miss(tmp_path):
+    """Mutation: accept `in (1, 2)` => fails."""
+    _write_raw(tmp_path, json.dumps(_valid_record(schema_version=1)))
+    assert rc.load_record(str(tmp_path), SLUG) is None
+
+
+def test_restore_finding_without_label_key_is_a_miss():
+    """Mutation: delete the `"label" not in d` guard => fails."""
+    old_shape = {"source": "code-review", "agent": "A", "path": "x.py", "line": 3,
+                 "body": "b", "score": 85}
+    arm = {"degraded_agents": [], "gates": {}, "findings": [old_shape], "scored_findings": []}
+    assert rc.restore_review(arm, {}) is None
+    arm["findings"] = [dict(old_shape, label="important")]
+    assert rc.restore_review(arm, {}) is not None
 
 
 def test_load_record_missing_required_key_returns_none(tmp_path):

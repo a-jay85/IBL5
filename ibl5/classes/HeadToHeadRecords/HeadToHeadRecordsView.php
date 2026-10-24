@@ -278,7 +278,6 @@ final class HeadToHeadRecordsView
         $safeSub   = HtmlSanitizer::e($entry['sublabel']);
         $logoFile  = $entry['logo'] !== '' ? $entry['logo'] : 'new' . $entry['franchise_id'] . '.png';
         $safeLogo  = HtmlSanitizer::e('images/logo/' . $logoFile);
-        $title     = $safeLabel . ($safeSub !== '' ? ' (' . $safeSub . ')' : '');
 
         $classes   = 'sticky-col h2h-row-label';
         $styleAttr = '';
@@ -298,7 +297,7 @@ final class HeadToHeadRecordsView
 
         if ($entry['link_franchise_id'] > 0) {
             $inner = '<a href="' . TeamCellHelper::teamPageUrl($entry['link_franchise_id']) . '"'
-                . ' class="ibl-team-cell__name" aria-label="' . $title . '">' . $inner . '</a>';
+                . ' class="ibl-team-cell__name">' . $inner . '</a>';
         } else {
             $inner = '<span class="ibl-team-cell__name">' . $inner . '</span>';
         }

@@ -433,7 +433,7 @@ reconcile_pending
 TODAY="$(pcw_today)"   # local calendar day for the retries/ ledger, fixed for this tick
 # ── (d) Qualifying set ───────────────────────────────────────────────────────
 if ! PRS_JSON="$(gh pr list --state open --author @me --limit 200 \
-        --json number,headRefName,headRefOid,mergeStateStatus,isDraft,baseRefName 2>/dev/null)"; then
+        --json number,headRefName,headRefOid,mergeStateStatus,autoMergeRequest,isDraft,baseRefName 2>/dev/null)"; then
     log "gh pr list failed"; exit 0
 fi
 if [[ "$DRY_RUN" -eq 0 ]]; then
@@ -618,8 +618,56 @@ while IFS=$'\t' read -r pr branch sha mstate base; do
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
                 | [.number, .headRefName, .headRefOid, .mergeStateStatus, .baseRefName] | @tsv' <<< "$PRS_JSON")
 
+# ── (d2) Stuck set ───────────────────────────────────────────────────────────
+# Open, non-draft, unarmed PRs whose newest post-plan run failed or that sit in conflict-hold.
+# A green one is skipped as "checks green" every tick and nothing else names it.
+# STUCK_ROWS: "<pr>\t<sha>\t<reason>" for each PR whose dm-stuck ledger is due.
+STUCK_ROWS=()
+while IFS=$'\t' read -r pr branch sha; do
+    [[ -n "$pr" ]] || continue
+    [[ " ${QUALIFY[*]-} " != *" $pr|"* ]] || continue   # a rescue launches this tick
+    ! pcw_inflight "$pr" "$branch" "$SNAP" || continue
+    out_dirs=("$ROOT/tools/postplan-harness/out")
+    wt_out="$(worktree_out_dir "$branch")"
+    [[ -n "$wt_out" ]] && out_dirs+=("$wt_out")
+    reason="$(pcw_stuck_reason "$STATE" "$pr" "$branch" "${out_dirs[@]}")"
+    [[ -n "$reason" ]] || continue
+    pcw_kind_dm_due "$STATE" stuck "$pr" "$reason@$sha" || continue
+    log "stuck PR $pr: $reason (head ${sha:0:7})"
+    STUCK_ROWS+=("$pr"$'\t'"$sha"$'\t'"$reason")
+done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not) | select(.autoMergeRequest == null)
+                | [.number, .headRefName, .headRefOid] | @tsv' <<< "$PRS_JSON")
+
+# mark_stuck_rows: record the STUCK_ROWS entries the DM listed in dm-stuck/ as DM'd for their
+# reason and head. Rows past the block's line cap stay unmarked and go out on a later tick.
+mark_stuck_rows() {
+    local row pr sha reason n=0
+    for row in "${STUCK_ROWS[@]}"; do
+        n=$((n + 1))
+        [[ "$n" -le "$PCW_STUCK_MAX_LINES" ]] || break
+        IFS=$'\t' read -r pr sha reason <<< "$row"
+        pcw_kind_mark_dm "$STATE" stuck "$pr" "$reason@$sha"
+    done
+}
+
+# send_stuck_dm: DM the stuck block on its own, then mark each row in dm-stuck/. Marks only
+# after dm_ping succeeds, so a failed send re-tries next tick.
+send_stuck_dm() {
+    local block
+    [[ ${#STUCK_ROWS[@]} -gt 0 ]] || return 0
+    block="$(printf '%s\n' "${STUCK_ROWS[@]}" | pcw_stuck_block)"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        log "would DM: $DM_CMD --ping $block"; return 0
+    fi
+    if ! dm_ping "pr-cycle-watch: these unarmed PRs are stuck and need you."$'\n'"$block"; then
+        log "stuck DM failed; retrying next tick"; return 0
+    fi
+    mark_stuck_rows
+}
+
 if [[ ${#QUALIFY[@]} -eq 0 ]]; then
     rm -f "$SKIP_NOTES"
+    send_stuck_dm
     log "idle: nothing qualifies"; exit 0
 fi
 
@@ -656,4 +704,6 @@ else
     rm -f "$STATE/pending/$id"
     log "pr-cycle exited non-zero; no attempt recorded"
 fi
+# pr-cycle --go returns once launchd starts the worker, so the tick sends the stuck DM itself.
+send_stuck_dm
 exit 0

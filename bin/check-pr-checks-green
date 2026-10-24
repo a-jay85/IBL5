@@ -3,9 +3,7 @@
 # Decides whether every non-ignored check-run on a PR head SHA has settled green,
 # optionally polling until it has. Read by bin/settle-pr-status, which
 # .github/workflows/all-checks-settled.yml runs once per sibling completion and turns the
-# exit code into the `All checks settled` commit status (ADR-0149 addendum). The legacy
-# waiter .github/workflows/all-checks-green.yml still calls it with --wait until the
-# cutover retires it.
+# exit code into the `All checks settled` commit status (ADR-0149 addendum).
 #
 # Verdict logic is shared with bin/check-master-ci-green via bin/lib/ci-checks-green.sh.
 # Legacy commit statuses are deliberately NOT read. Every check on this repo is a
@@ -23,7 +21,7 @@ Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
 
   --self=<csv>             Exact check-run names of the caller (job name and status context); always ignored.
   --ignore=<csv>           Extra exact check-run names to ignore (advisory-by-design).
-  --ignore-workflows=<csv>  Workflow display names whose ACTIVE runs never hold V4 (the legacy All checks green waiter during cutover).
+  --ignore-workflows=<csv>  Workflow display names whose ACTIVE runs never hold V4 (a generic option; no workflow passes it now).
   --ghost-grace-seconds=<n>  A run the runs API still calls active is treated as settled
                            only when every job of its latest attempt completed in
                            {success, skipped, neutral} AND its updated_at is older than

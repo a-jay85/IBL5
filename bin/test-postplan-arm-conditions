@@ -1661,6 +1661,7 @@ mk_cN_repo() { # dir  remove|keep  [stub-exit-code]
     mkdir -p "$d/bin/lib" "$d/ibl5/classes/Season" "$d/home"
     git -C "$d" init -q
     ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$d/bin/lib/pr-armable.sh"
+    ln -s "$REPO_ROOT/bin/lib/plan-resolve.sh" "$d/bin/lib/plan-resolve.sh"
     if [ -n "${3:-}" ]; then
         printf '#!/bin/sh\nexit %s\n' "$3" > "$d/bin/lib/deleted-guards"
         chmod +x "$d/bin/lib/deleted-guards"
@@ -1688,8 +1689,9 @@ run_condN() { # dir  body|__fail__
     else
         jq -n --arg b "$2" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
     fi
-    ( cd "$1" && HOME="$1/home" PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        GH_PR_FAIL="$fail" bash -c "$BN" 2>&1 )
+    # Clear the plan-resolve seams so a caller's PLAN_* env cannot pick a plan.
+    ( cd "$1" && unset PLAN_FILE PLAN_SLUG PLAN_DIR && HOME="$1/home" PATH="$SHIMD:$PATH" \
+        GH_PR_FIXTURE="$BASE_TMP/fixture.json" GH_PR_FAIL="$fail" bash -c "$BN" 2>&1 )
 }
 cN_body() { # dir  reason  ->  a Removed guards block for every flagged key
     local keys

@@ -19,6 +19,7 @@ PPN = os.path.join(REPO, "bin", "post-plan-now")
 
 sys.path.insert(0, os.path.join(REPO, "tools", "postplan-harness"))
 
+import ppn_launch
 from harness.adapters.ghad import RecordingGh
 
 
@@ -139,11 +140,7 @@ def _generate_cmd(tmp_path, extra_env=None):
     assert len(logs) == 1, f"expected one log in {log_dir}, got {logs}"
     assert "post-plan-now: started " in logs[0].read_text(), logs[0].read_text()
 
-    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
-    assert len(plists) == 1, f"expected one generated plist, got {plists}"
-    body = plists[0].read_text()
-    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
-    return cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    return ppn_launch.launched_cmd(r.stdout, home)
 
 
 
@@ -398,7 +395,7 @@ def test_log_dir_default_expands_to_tmp(log_dir):
 # ---------------------------------------------------------------------------
 
 def test_generated_plist_wiring(tmp_path, _private_log_dir):
-    """The generated plist CMD carries all required badge env vars and control flow.
+    """The generated script CMD carries all required badge env vars and control flow.
 
     Counterfactual production edits that turn this test red (apply, run, revert):
       bin/post-plan-now:878  POSTPLAN_LOG_FILE=$(shq "$LOG") -> $(shq "/tmp/x.log")  (private-dir assertion)

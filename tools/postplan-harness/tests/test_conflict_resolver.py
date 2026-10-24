@@ -853,7 +853,7 @@ def test_behind_retry_keeps_first_pass_autoresolved_files(tmp_path):
     key = f"test-{uuid.uuid4().hex[:8]}"
     autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
     git = LiveGit(str(tmp_path))
-    git._run = lambda *a, **k: "changed.php\n"
+    git._run = lambda *a, **k: ("a" * 40 + "\n") if a[:1] == ("rev-parse",) else "changed.php\n"
     try:
         purge_autoresolved_list(key)  # run start
         git._record_resolution(key, key, "m1", ("a.php",))

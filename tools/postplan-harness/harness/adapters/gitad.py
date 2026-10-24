@@ -164,6 +164,8 @@ class LiveGit:
         # the index. Reset at the start of each rebase method; read by runner.py for the
         # audit log so a fail-closed exit 3 names the files that conflicted.
         self.last_conflict_files: tuple[str, ...] = ()
+        # Set by _reconcile_conflict_flag at each rebase start; "" when the marker is absent.
+        self.last_conflict_flag_note: str = ""
         self.conflict_review_retries: dict[str, int] = {}   # review_resolution retries_out; runner copies into RunResult.retries
         # Probe-only state (set by predict_rebase_conflict, read by resolver_refusal_reason).
         # Stage sets per conflicted path from the merge-tree probe, and whether the probe's
@@ -797,7 +799,7 @@ class LiveGit:
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
-        from ..armable import conflict_flag_path
+        from ..armable import record_conflict_resolution
         from ..conflict import review_resolution
 
         manifest_content = self._run("diff", "--name-only", f"{master_sha}...HEAD")
@@ -854,8 +856,10 @@ class LiveGit:
         # Write condition-(14) flag only when a model actually touched files.
         # The mechanical --onto replay (resolved_files=()) proves TREE-EQUIVALENT without
         # any model work, so no review is needed and the hold should not fire.
+        # The marker records the resolving HEAD so a later run can tell a resolution that
+        # is still in history (hold) from one a squash or rebase dropped (stale).
         if resolved_files:
-            Path(conflict_flag_path(branch)).touch()
+            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
 
         if self.llm is not None and resolved_files:
             review_resolution(
@@ -867,6 +871,83 @@ class LiveGit:
             )
 
         return manifest_path, notes_path
+
+    def _reconcile_conflict_flag(self, branch: str, key: str, base: str) -> None:
+        """Drop a condition-(14) marker whose resolution is no longer in HEAD's history.
+
+        Runs at the start of every rebase, before purge_verdict_artifacts, so the marker
+        Phase 6.5 reads describes THIS branch history. Fail closed: a git error, an odd
+        marker, or a legacy empty marker without rewrite proof keeps the file and the hold.
+        """
+        import sys as _sys
+        from ..armable import (FLAG_ABSENT, FLAG_STALE, FLAG_UNKNOWN,
+                               classify_conflict_flag, conflict_flag_path)
+
+        flag = conflict_flag_path(branch)
+        notes = f"/tmp/postplan-conflict-resolution-{key}.md"
+
+        def _git(*args: str) -> tuple[int, str]:
+            proc = subprocess.run(["git", "-C", self.worktree, *args],
+                                  capture_output=True, text=True, errors="replace")
+            return proc.returncode, proc.stdout
+
+        class _GitError(Exception):
+            pass
+
+        def is_ancestor(sha: str) -> bool:
+            rc = _git("merge-base", "--is-ancestor", sha, "HEAD")[0]
+            if rc in (0, 1):
+                return rc == 0
+            # Any other exit is a git error, or the recorded object is gone. cat-file -e
+            # exits 1 only for a missing object, so a pruned commit still counts as not an
+            # ancestor while a broken repo (128) stays unknown and keeps the hold. No
+            # ^{commit} peel: a peel of a missing object exits 128, which would never clear.
+            if _git("cat-file", "-e", sha)[0] == 1:
+                return False
+            raise _GitError(f"git merge-base --is-ancestor exited {rc}")
+
+        def legacy_rewritten(floor: float) -> bool:
+            # Two independent witnesses must agree before an empty marker is called stale:
+            # (1) no merge commit in base..HEAD -- the harness merge path and the skill both
+            #     resolve into a merge commit, and the skill touches its flag BEFORE that
+            #     commit exists, so mtime alone would wrongly call it rewritten;
+            # (2) every commit in base..HEAD has a committer time strictly newer than the
+            #     marker -- squash and rebase re-stamp %ct; the stacked --onto path touches
+            #     the marker AFTER its resolution commit, so that commit is never newer.
+            # An empty range passes both (nothing on the branch can carry a resolution).
+            rc, merges = _git("rev-list", "--merges", "--count", f"{base}..HEAD")
+            if rc != 0 or merges.strip() != "0":
+                return False
+            rc, stamps = _git("log", "--format=%ct", f"{base}..HEAD")
+            if rc != 0:
+                return False
+            try:
+                return all(int(s) > floor for s in stamps.split())
+            except ValueError:
+                return False
+
+        try:
+            state, detail = classify_conflict_flag(flag, notes, is_ancestor, legacy_rewritten)
+        except (_GitError, OSError) as exc:
+            state, detail = FLAG_UNKNOWN, f"git error while classifying: {exc}"
+        if state == FLAG_ABSENT:
+            self.last_conflict_flag_note = ""
+            return
+        if state == FLAG_STALE:
+            try:
+                os.unlink(flag)
+            except OSError as exc:
+                note = (f"conflict flag stale but could not be removed: {flag} "
+                        f"({exc.__class__.__name__}); hold (14) stays")
+            else:
+                note = f"conflict flag dropped as stale: {flag} ({detail})"
+        elif state == FLAG_UNKNOWN:
+            note = f"conflict flag kept (unknown): {flag} ({detail}); hold (14) stays"
+        else:
+            note = f"conflict flag carried: {flag} ({detail}); hold (14) stays until reviewed"
+        self.last_conflict_flag_note = note
+        _sys.stderr.write(f"postplan: {note}\n")
+        _sys.stderr.flush()
 
     def rebase_onto(self, base: str = "origin/master") -> None:
         # Every exit (return or raise) disarms the SIGTERM restore point.
@@ -904,6 +985,7 @@ class LiveGit:
         if pre_patch.strip():
             Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
+        self._reconcile_conflict_flag(branch, key, base)
         purge_verdict_artifacts(key)
 
         proc = subprocess.run(
@@ -1273,6 +1355,7 @@ class LiveGit:
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
+        self._reconcile_conflict_flag(branch, key, pre_base)
         purge_verdict_artifacts(key)
 
         # Step 6.5: collapse a merge-carrying range into one tree-identical commit, so the
@@ -1454,6 +1537,15 @@ class LiveGit:
                                   pre_rebase_sha=pre_rebase_sha,
                                   reason=str(exc))
             raise HarnessError("rebase-conflict", str(exc))
+
+        # A marker that survived the reconcile above describes content this run's own collapse
+        # and replay just rewrote. Its recorded SHA is gone from history now, so the next
+        # run would drop the hold with no CONFLICT-REVIEW=CLEAN verdict. Re-bind it to the
+        # new HEAD. (_record_resolution already did so when a model resolved files.)
+        if not auto_resolved_files and self.last_conflict_flag_note.startswith(
+                ("conflict flag carried", "conflict flag kept")):
+            from ..armable import record_conflict_resolution
+            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
 
         return StackedRebaseResult(
             resolved=True,

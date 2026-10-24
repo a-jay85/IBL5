@@ -709,6 +709,40 @@ run_act 200 true false "$TMP/act-big.txt"
 [ "$(act_body 1 | jq -r '.content | endswith("(truncated)")')" = true ] \
     && ok "A11: capped content ends with the marker" || fail "A11: no truncation marker"
 
+# A12/A13: the real digest builder piped through the real send.sh. PR text never pings or
+# mentions anyone; a manual After-merge row pings the owner and nobody else.
+OWNER_ID=283183467804491776
+bash "$ROOT/bin/digest-dm-build" --pr-number 7 --title "x <@$OWNER_ID> @everyone" \
+    --url https://github.com/a-jay85/IBL5/pull/7 --ping-out "$TMP/a12.ping" \
+    --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --job-result checklist=success < /dev/null > "$TMP/a12.txt" 2>/dev/null
+run_act 200 true "$(cat "$TMP/a12.ping")" "$TMP/a12.txt"
+[ "$(cat "$TMP/a12.ping")" = false ] && ok "A12: no rows and green jobs do not ping" || fail "A12: ping file is not false"
+[ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = '[]' ] \
+    && ok "A12: allowed_mentions.parse is empty" || fail "A12: allowed_mentions.parse is not []"
+[ "$(act_body 1 | jq -r ".content | contains(\"<@$OWNER_ID>\")")" = false ] \
+    && ok "A12: a title mention is neutralized" || fail "A12: title carries a live user mention"
+[ "$(act_body 1 | jq -r '.content | contains("@everyone")')" = false ] \
+    && ok "A12: a title @everyone is neutralized" || fail "A12: title carries a live @everyone"
+
+bash "$ROOT/bin/digest-dm-build" --pr-number 7 --title "x <@$OWNER_ID> @everyone" \
+    --url https://github.com/a-jay85/IBL5/pull/7 --ping-out "$TMP/a13.ping" \
+    --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+    --comment-url https://github.com/a-jay85/IBL5/pull/7#issuecomment-111 \
+    --job-result checklist=success < /dev/null > "$TMP/a13.txt" 2>/dev/null
+run_act 200 true "$(cat "$TMP/a13.ping")" "$TMP/a13.txt"
+[ "$(cat "$TMP/a13.ping")" = true ] && ok "A13: a manual row pings" || fail "A13: ping file is not true"
+[ "$(act_body 1 | jq -r ".content | startswith(\"<@$OWNER_ID> \")")" = true ] \
+    && ok "A13: the owner mention leads the message" || fail "A13: owner mention is not first"
+[ "$(act_body 1 | jq -r "[.content | scan(\"<@$OWNER_ID>\")] | length")" = 1 ] \
+    && ok "A13: exactly one owner mention" || fail "A13: more than one owner mention"
+[ "$(act_body 1 | jq -c '.allowed_mentions.users')" = "[\"$OWNER_ID\"]" ] \
+    && ok "A13: allowed_mentions.users is the owner only" || fail "A13: allowed_mentions.users differs"
+[ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = null ] \
+    && ok "A13: allowed_mentions.parse is absent" || fail "A13: allowed_mentions.parse is set"
+[ "$(act_body 1 | jq -r '.content | contains("Directions: <https://github.com/a-jay85/IBL5/pull/7#issuecomment-111>")')" = true ] \
+    && ok "A13: the directions link is in the message" || fail "A13: no directions link"
+
 # -- notify-discord call sites: webhook-url everywhere, ping only where chosen -
 # Scans every `uses: ./.github/actions/notify-discord` step in <wf-dir>/*.yml
 # until the next step or a line indented 4 or fewer spaces. mode=sites prints one
@@ -752,8 +786,7 @@ docs-refreshed-notify.yml#1 webhook=dev ping=-
 flake-report.yml#1 webhook=reviews ping=-
 log-review.yml#1 webhook=reviews ping=-
 main.yml#1 webhook=dev ping=-
-merge-digest-notify.yml#1 webhook=merged ping='false'   # #merged posts never @mention the owner
-merge-digest-notify.yml#2 webhook=merged ping='false'   # #merged posts never @mention the owner
+merge-digest-notify.yml#1 webhook=merged ping=${{ steps.build.outputs.ping != 'false' }}
 mutation.yml#1 webhook=dev ping=-
 promote-to-production.yml#1 webhook=dev ping=${{ job.status == 'failure' }}
 promote-to-production.yml#2 webhook=dev ping=-
@@ -767,7 +800,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 17 sites pass the expected webhook-url; ping only on the chosen sites"
+    ok "G1: 16 sites pass the expected webhook-url; ping only on the chosen sites"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'
@@ -830,7 +863,8 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
 
 # G6: --ping (the @-mention), directly or through dm_ping, is allowed only in the six PING host callers and bin/lib/dm.sh. Tests, the
 # README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
-G6_GOT=$(grep -rlE -- '--ping|dm_ping' "$ROOT/bin" 2>/dev/null \
+# `--ping-out` (bin/digest-dm-build's ping-decision file) is a different flag and does not match.
+G6_GOT=$(grep -rlE -- '--ping($|[^-[:alnum:]_])|dm_ping' "$ROOT/bin" 2>/dev/null \
     | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' -e '/bin/lib/README.md$' \
     | sed "s|^$ROOT/||" | sort || true)
 G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/main-checkout-guard bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)

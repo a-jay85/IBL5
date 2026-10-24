@@ -949,6 +949,7 @@ jobs:
             bin/test-review-shared-skip \
             bin/test-pr-cycle \
             bin/test-pr-cycle-tick \
+            bin/test-post-merge-rows \
             bin/test-digest-dm-build \
             bin/test-after-merge-checklist \
             bin/test-pr-review-now \

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\Boxscore;
+use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use Boxscore\GameLineWriter;
 use Boxscore\GameUpsertResolver;
 use Boxscore\RegularSeasonGameProcessor;
@@ -30,8 +31,10 @@ class RegularSeasonGameProcessorTest extends TestCase
         $resolver->method('resolve')->willReturn('skip');
         $writer = self::createMock(GameLineWriter::class);
         $writer->expects(self::never())->method('write');
+        $repository = self::createMock(BoxscoreRepositoryInterface::class);
+        $repository->expects(self::never())->method('findFranchiseTeamName');
 
-        $processor = new RegularSeasonGameProcessor($resolver, $writer);
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, $repository);
         $result = $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
 
         self::assertSame(['action' => 'skip', 'linesProcessed' => 0, 'messages' => []], $result);
@@ -60,7 +63,7 @@ class RegularSeasonGameProcessorTest extends TestCase
             ->with(self::identicalTo($line), self::isInstanceOf(Boxscore::class))
             ->willReturn($lines);
 
-        $processor = new RegularSeasonGameProcessor($resolver, $writer);
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, self::createStub(BoxscoreRepositoryInterface::class));
         $result = $processor->process($line, 2026, 'Regular Season/Playoffs', 'ibl');
 
         self::assertSame(['action' => $action, 'linesProcessed' => $lines, 'messages' => []], $result);
@@ -93,7 +96,7 @@ class RegularSeasonGameProcessorTest extends TestCase
             });
         $writer = self::createStub(GameLineWriter::class);
 
-        $processor = new RegularSeasonGameProcessor($resolver, $writer);
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, self::createStub(BoxscoreRepositoryInterface::class));
         $processor->process($this->makeLine(), 2026, $phase, $league);
 
         self::assertInstanceOf(Boxscore::class, $captured);
@@ -114,7 +117,7 @@ class RegularSeasonGameProcessorTest extends TestCase
             });
         $writer = self::createStub(GameLineWriter::class);
 
-        $processor = new RegularSeasonGameProcessor($resolver, $writer);
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, self::createStub(BoxscoreRepositoryInterface::class));
         $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
 
         self::assertInstanceOf(Boxscore::class, $captured);
@@ -122,5 +125,61 @@ class RegularSeasonGameProcessorTest extends TestCase
         self::assertSame(6, $captured->visitor_teamid);
         self::assertSame(8, $captured->home_teamid);
         self::assertSame('05', $captured->gameDay);
+    }
+
+    public function testPassesFranchiseNamesToWriter(): void
+    {
+        $resolver = self::createStub(GameUpsertResolver::class);
+        $resolver->method('resolve')->willReturn('insert');
+        $repository = self::createStub(BoxscoreRepositoryInterface::class);
+        $repository->method('findFranchiseTeamName')->willReturnMap([
+            [6, 2026, 'Spurs'],
+            [8, 2026, 'Thunder'],
+        ]);
+        $writer = self::createMock(GameLineWriter::class);
+        $writer->expects(self::once())
+            ->method('write')
+            ->with(self::anything(), self::anything(), 'Spurs', 'Thunder')
+            ->willReturn(26);
+
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, $repository);
+        $result = $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
+
+        self::assertSame(['action' => 'insert', 'linesProcessed' => 26, 'messages' => []], $result);
+    }
+
+    public function testPassesNullNameWhenFranchiseNameExceedsColumn(): void
+    {
+        $resolver = self::createStub(GameUpsertResolver::class);
+        $resolver->method('resolve')->willReturn('insert');
+        $repository = self::createStub(BoxscoreRepositoryInterface::class);
+        $repository->method('findFranchiseTeamName')->willReturnMap([
+            [6, 2026, 'SeventeenCharName'],
+            [8, 2026, 'Thunder'],
+        ]);
+        $writer = self::createMock(GameLineWriter::class);
+        $writer->expects(self::once())
+            ->method('write')
+            ->with(self::anything(), self::anything(), null, 'Thunder')
+            ->willReturn(26);
+
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, $repository);
+        $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
+    }
+
+    public function testPassesNullNamesWhenFranchiseRowMissing(): void
+    {
+        $resolver = self::createStub(GameUpsertResolver::class);
+        $resolver->method('resolve')->willReturn('insert');
+        $repository = self::createStub(BoxscoreRepositoryInterface::class);
+        $repository->method('findFranchiseTeamName')->willReturn(null);
+        $writer = self::createMock(GameLineWriter::class);
+        $writer->expects(self::once())
+            ->method('write')
+            ->with(self::anything(), self::anything(), null, null)
+            ->willReturn(26);
+
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, $repository);
+        $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
     }
 }

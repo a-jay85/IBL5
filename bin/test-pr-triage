@@ -154,6 +154,7 @@ pr_json 2 UNKNOWN "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 run_triage "$FIX" --arm
 assert_match  "C2 bucket=NOT-MERGEABLE"   "NOT-MERGEABLE"               "$(row_bucket "$OUT" 2)"
 assert_match  "C2 action=re-check"        "re-check \\(state unknown\\)" "$(row_action "$OUT" 2)"
+assert_match  "C2 action exact (pr-cycle contract)" '^re-check \(state unknown\)[[:space:]]*$' "$(row_action "$OUT" 2)"
 assert_absent "C2 no pr merge"            "pr merge"                    "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_absent "C15 UNKNOWN no update-branch" "update-branch"            "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C2 exit 0"                 0                             "$ST"

@@ -39,6 +39,24 @@ fail() { h_fail "$@"; }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-plan-now.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
+# Sandbox HOME so no case can write into the real ~/Library/LaunchAgents.
+# REAL_HOME is kept only for the leak guard at the end of the file.
+REAL_HOME="$HOME"
+REAL_AGENTS="$REAL_HOME/Library/LaunchAgents"
+real_agents_sig() {
+    # Byte-level signature of every per-run plan/post-plan plist plus a
+    # count of any agents-dir file that mentions this test's tmpdir.
+    {
+        find "$REAL_AGENTS" -maxdepth 1 -type f \
+            \( -name 'com.ibl5.plan-now-*' -o -name 'com.ibl5.postplan-now-*' \) \
+            -exec shasum {} + 2>/dev/null | sort
+        grep -rlF "$TMP" "$REAL_AGENTS" 2>/dev/null | wc -l | tr -d ' '
+    } | shasum | cut -d' ' -f1
+}
+REAL_AGENTS_SIG_BEFORE=$(real_agents_sig)
+export HOME="$TMP/home"
+mkdir -p "$HOME/Library/LaunchAgents"
+
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
 
@@ -298,11 +316,10 @@ run_case_recovery() {
 
 # Remove any plist/runner that PLAN_NOW_DRY_RUN=1 wrote but the test did not
 # execute (e.g., the dup gate declined before the runner was launched). Without
-# this, declined pre-flight cases leave RunAtLoad plists in ~/Library/LaunchAgents
+# this, declined pre-flight cases leave runner files in the sandbox $TMP.
 # pointing at deleted /tmp runners. $1 is the captured stdout from plan-now.
 preflight_cleanup() {
-    rm -f "$(printf '%s\n' "$1" | sed -n 's/^  plist:  //p')" \
-          "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p')" \
+    rm -f "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p')" \
           "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p' | sed 's/\.sh$/.session/')"
 }
 
@@ -837,13 +854,11 @@ echo "── two back-to-back invocations get unique artifact paths ──"
 dry1=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
-rm -f "$(printf '%s\n' "$dry1" | sed -n 's/^  plist:  //p')"
 prompt1=$(printf '%s\n' "$dry1" | sed -n 's/^  prompt: //p')
 
 dry2=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
-rm -f "$(printf '%s\n' "$dry2" | sed -n 's/^  plist:  //p')"
 prompt2=$(printf '%s\n' "$dry2" | sed -n 's/^  prompt: //p')
 
 [ -n "$prompt1" ] || fail "first DRY_RUN produced no prompt: line — extraction failed"
@@ -1328,79 +1343,100 @@ echo "── the coda still tells the model where to put it ──"
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
           "$PLAN_NOW" --implement "$PROMPT" 2>&1)
 coda=$(cat "$(printf '%s\n' "$dry" | sed -n 's/^  prompt: //p')" 2>/dev/null)
-echo "── the generated plist (ljob_write_runner_plist layout) ──"
+echo "── the generated submit argv (ljob_submit) ──"
 
-gen_plist=$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')
+gen_submit=$(printf '%s\n' "$dry" | sed -n 's/^  submit: //p')
 gen_runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
-plist_report=$(python3 -I - "$gen_plist" "$gen_runner" "$HOME" <<'PLIST_PY'
-import os
-import plistlib
+[ -n "$gen_submit" ] && ok "dry run prints a submit line" || fail "dry run prints a submit line (got none)"
+[ -n "$gen_runner" ] && ok "dry run prints a runner line" || fail "dry run prints a runner line (got none)"
+if grep -q '^  plist:' <<< "$dry"; then
+    fail "dry run prints no plist line"
+else
+    ok "dry run prints no plist line"
+fi
+submit_report=$(printf '%s\n%s\n%s\n%s\n' "$gen_submit" "$gen_runner" "$HOME" "$PLAN_NOW_LOG_DIR" \
+    | python3 -I -c '
 import re
+import shlex
 import sys
 
-plist_path, runner, home = sys.argv[1:4]
-with open(plist_path, "rb") as fh:
-    d = plistlib.load(fh)
-
-
-def strings(v):
-    if isinstance(v, str):
-        yield v
-    elif isinstance(v, list):
-        for x in v:
-            yield from strings(x)
-    elif isinstance(v, dict):
-        for x in v.values():
-            yield from strings(x)
+lines = sys.stdin.read().split("\n")
+submit_line, runner, home, log_dir = lines[0], lines[1], lines[2], lines[3]
 
 
 def check(label, cond):
     print(("ok   " if cond else "FAIL ") + label)
 
 
-path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
-vals = list(strings(d))
-check("exec form is the helper's unquoted 'exec <runner>'",
-      d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner])
-check("KeepAlive is False and RunAtLoad is True",
-      d.get("KeepAlive") is False and d.get("RunAtLoad") is True)
-check("EnvironmentVariables.PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
+try:
+    argv = shlex.split(submit_line)
+except ValueError:
+    argv = []
+    check("generated submit argv parses with shlex", False)
+
+
+def after(flag):
+    return argv[argv.index(flag) + 1] if flag in argv[:-1] else None
+
+
+label = after("-l") or ""
+prefix = "com.ibl5.plan-now-"
+suffix = label[len(prefix):] if label.startswith(prefix) else ""
+check("generated submit argv: submit verb and plan-now label shape",
+      len(argv) > 1 and argv[1] == "submit"
+      and re.match(r"^com\.ibl5\.plan-now-[0-9]{8}-[0-9]{6}-[0-9]+$", label) is not None)
+check("generated submit argv: -o and -e are equal and equal the log path",
+      after("-o") is not None and after("-o") == after("-e")
+      and after("-o") == log_dir + "/plan-now-" + suffix + ".log")
+tail = argv[argv.index("--") + 1:] if "--" in argv else []
+check("generated submit argv: after -- is env HOME PATH bash -lc <wrapper> and nothing else",
+      len(tail) == 6 and tail[0] == "/usr/bin/env" and tail[1] == "HOME=" + home
+      and tail[2].startswith("PATH=") and tail[3] == "/bin/bash" and tail[4] == "-lc")
+path_val = tail[2][len("PATH="):] if len(tail) > 2 and tail[2].startswith("PATH=") else ""
+path_dirs = path_val.split(":")
+check("generated submit argv: PATH holds /usr/bin, /bin, /opt/homebrew/bin and ~/.local/bin",
       all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin", home + "/.local/bin")))
-check("no string value contains an unexpanded $", not any("$" in v for v in vals))
-check("no string value is empty", all(v != "" for v in vals))
-check("Label matches the plist filename",
-      d.get("Label", "") + ".plist" == os.path.basename(plist_path))
-check("stdout and stderr share the log path",
-      d.get("StandardOutPath") and d.get("StandardOutPath") == d.get("StandardErrorPath"))
-check("WorkingDirectory is an existing directory",
-      os.path.isdir(d.get("WorkingDirectory", "")))
-check("runner path is $PLAN_NOW_LOG_DIR/plan-now-<ts>.sh with no whitespace (unquoted exec depends on it)",
-      re.match("^" + re.escape(os.environ["PLAN_NOW_LOG_DIR"]) + r"/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None
+check("generated submit argv: no element is empty",
+      len(argv) > 0 and all(a != "" for a in argv))
+check("generated submit argv: no element holds an unexpanded $HOME, $PATH or ${",
+      not any(t in a for a in argv for t in ("$HOME", "$PATH", "${")))
+wrapper = tail[5] if len(tail) > 5 else ""
+check("generated submit argv: wrapper names the runner, its .once marker, remove and the label",
+      runner in wrapper and runner + ".once" in wrapper and " remove " in wrapper
+      and label != "" and label in wrapper)
+check("generated submit argv: runner path is $PLAN_NOW_LOG_DIR/plan-now-<ts>.sh with no whitespace",
+      re.match("^" + re.escape(log_dir) + r"/plan-now-[0-9A-Za-z._-]+\.sh$", runner) is not None
       and not any(c.isspace() for c in runner))
-PLIST_PY
-)
+')
 while IFS= read -r line; do
     case "$line" in
         "ok   "*) ok "${line#ok   }" ;;
         *) fail "${line#FAIL }" ;;
     esac
-done <<< "$plist_report"
-if [ "$(grep -c '<string></string>' "$gen_plist")" = "0" ]; then
-    ok "raw plist has no empty <string></string>"
+done <<< "$submit_report"
+
+# Teardown belongs to the ljob_submit wrapper; the runner must hold none of it.
+# Comment lines are dropped first: the runner's own tail comment names the wrapper's work.
+runner_code=$(grep -v '^[[:space:]]*#' "$gen_runner" 2>/dev/null)
+want_no "runner has no plist or launchctl teardown (PLIST)" "$runner_code" "PLIST"
+want_no "runner has no plist or launchctl teardown (bootout)" "$runner_code" "bootout"
+want_no "runner has no plist or launchctl teardown (launchctl remove)" "$runner_code" "launchctl remove"
+runner_last=$(grep -v '^[[:space:]]*#' "$gen_runner" 2>/dev/null | grep -v '^[[:space:]]*$' | tail -1)
+[ "$runner_last" = "notify" ] && ok "runner ends with notify" \
+    || fail "runner ends with notify (last code line: $runner_last)"
+cd_ln=$(grep -nF 'cd "$ROOT" || exit 1' "$gen_runner" | head -1 | cut -d: -f1)
+path_ln=$(grep -n 'export PATH=' "$gen_runner" | head -1 | cut -d: -f1)
+run_ln=$(grep -nF 'timeout "$RUN_TIMEOUT"' "$gen_runner" | head -1 | cut -d: -f1)
+if [ -n "$cd_ln" ] && [ -n "$path_ln" ] && [ -n "$run_ln" ] \
+    && [ "$cd_ln" -gt "$path_ln" ] && [ "$cd_ln" -lt "$run_ln" ]; then
+    ok "cd ROOT precedes the first repo command"
 else
-    fail "raw plist has an empty <string></string>"
+    fail "cd ROOT precedes the first repo command (path=$path_ln cd=$cd_ln run=$run_ln)"
 fi
-if command -v plutil >/dev/null 2>&1; then
-    if plutil -lint "$gen_plist" >/dev/null 2>&1; then
-        ok "plutil -lint accepts the generated plist"
-    else
-        fail "plutil -lint rejects the generated plist"
-    fi
-fi
-# This dry-run's runner is never executed, and the runner is what deletes the plist.
-# Without this, every test run leaves a RunAtLoad plist in ~/Library/LaunchAgents
-# pointing at a /tmp runner that no longer exists.
-rm -f "$(printf '%s\n' "$dry" | sed -n 's/^  plist:  //p')"
+
+agents_files=$(find "$HOME/Library/LaunchAgents" -type f 2>/dev/null | wc -l | tr -d ' ')
+[ "$agents_files" = 0 ] && ok "dry run writes no LaunchAgents file" \
+    || fail "dry run writes no LaunchAgents file (found $agents_files)"
 want "coda demands the FINAL message" "$coda" "FINAL message"
 want "coda demands the last line" "$coda" "last line"
 # Tolerant parsing is a backstop for prose drift, not a licence to move the
@@ -1565,7 +1601,7 @@ want    "R-10 -p still offers the NO_PLAN: ending" "$R10_P_LINE" "exactly: NO_PL
 # runner stdout confirms session/run identity
 want    "R-10 runner out: resuming session" "$R10_OUT" "resuming session $RES_UUID from run $RES_TS"
 rm -f "$RES_RUNNER" "$TMP/r10_argv.txt" "$TMP/r10.out"
-# also remove the plist and sidecar the dry-run wrote
+# also remove the runner and sidecar the dry-run wrote
 preflight_cleanup "$RES_OUT"
 
 # R-11 fresh runner argv unchanged + R-15 fresh fire prints no resume line.
@@ -1852,6 +1888,21 @@ if [ -n "$l7_probe" ] && [ -n "$l7_spawn" ] && [ "$l7_probe" -lt "$l7_spawn" ]; 
     ok "L-7 probe precedes the spawn"
 else
     fail "L-7 probe precedes the spawn (probe=$l7_probe spawn=$l7_spawn)"
+fi
+
+# Whole-run check: the sandbox agents dir stayed empty across every dry-run call site.
+sandbox_agents_files=$(find "$HOME/Library/LaunchAgents" -type f 2>/dev/null)
+if [ -z "$sandbox_agents_files" ]; then
+    ok "no case wrote a LaunchAgents file (sandbox)"
+else
+    fail "no case wrote a LaunchAgents file (sandbox): $(ls -la "$HOME/Library/LaunchAgents")"
+fi
+
+# Leak guard: the run must leave the real agents dir exactly as it found it.
+if [ "$(real_agents_sig)" = "$REAL_AGENTS_SIG_BEFORE" ]; then
+    ok "real ~/Library/LaunchAgents unchanged by the test run"
+else
+    fail "real ~/Library/LaunchAgents unchanged by the test run (plan-now wrote into $REAL_AGENTS)"
 fi
 
 h_done

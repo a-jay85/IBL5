@@ -1,6 +1,6 @@
 ---
 description: The front controller publishes one request-scoped Module\ModuleServices, and every module index.php resolves its object graph through a per-module factory instead of building it with new.
-last_verified: 2026-10-04
+last_verified: 2026-10-23
 ---
 
 # ADR-0171: Module services composition root
@@ -28,7 +28,7 @@ Guards stay in `index.php`: the file guard, auth, admin, `loginbox` and CSRF che
 
 ## Enforcement
 
-- `ibl5/tests/Module/ModuleCompositionRootRatchetTest.php` flags any `new` or `$mysqli_db` token in a module `index.php`. Its allowlist is empty.
+- `ibl5/tests/Module/ModuleCompositionRootRatchetTest.php` flags any `new` or `$mysqli_db` token in a module `index.php`. Its allowlist still lists eight modules not yet converted (AllStarAppearances, Contracts, DraftInfo, FranchiseRecordBook, Leaderboards, RecordHolders, Records, SeasonHighs). The list can only shrink, and a follow-up converts them.
 - `ibl5/tests/Security/ModuleFactorySecuritySurfaceTest.php` keeps factories free of auth and request state and checks that each guard precedes the wiring call.
 
 ## Consequences

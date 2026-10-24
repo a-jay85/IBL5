@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-23
+last_verified: 2026-10-24
 ---
 
 # /pr-burndown

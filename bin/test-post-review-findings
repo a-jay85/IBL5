@@ -41,6 +41,7 @@ cat > "$SHIMD/gh" <<'SHIM'
 # shim for: gh pr diff N  |  gh api --method POST .../reviews --input F
 #           gh pr comment N --body-file F
 if [ "$1" = "pr" ] && [ "$2" = "diff" ]; then
+    [ -n "${GH_DIFF_FAIL:-}" ] && exit 1
     cat "$GH_DIFF_FIXTURE"
     exit 0
 fi
@@ -767,6 +768,16 @@ printf '[{"path":"classes/Foo.php","line":12,"body":"Imp","score":90,"label":"im
 post_review_findings 42 deadbeefcafe "Code review" "$f39"
 assert_jq "case39: important stays inline" '.comments | length == 1' "$REVIEW_OUT"
 assert_contains "case39: pre-existing in fallback" "$COMMENT_OUT" "Found 1 issue(s) that could not be anchored"
+
+# case 40: gh pr diff fails -> pre-existing relabeled important, fallback comment still posts
+reset_outputs
+f40="$BASE_TMP/f40.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Old bug","score":85,"label":"pre-existing"}]' > "$f40"
+GH_DIFF_FAIL=1 post_review_findings 42 deadbeefcafe "Code review" "$f40"
+assert_contains "case40: finding still posted" "$COMMENT_OUT" "classes/Foo.php:12"
+assert_contains "case40: relabeled important" "$COMMENT_OUT" "<!-- label: important -->"
+assert_not_contains "case40: no pre-existing marker" "$COMMENT_OUT" "<!-- label: pre-existing -->"
+assert_absent   "case40: no review POST" "$REVIEW_OUT"
 
 # case 39b: PRF_NIT_CAP env seam
 reset_outputs

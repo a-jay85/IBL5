@@ -119,32 +119,37 @@ post_review_findings() {
     # before anything else reads it.  A context line, an off-diff line, and a
     # line 0 / missing line on an existing file keep the label (case 38 pins the
     # off-diff case); those cannot be proven added, so they post as Pre-existing.
-    # The diff is fetched once and fails closed: an empty added set from a failed
-    # fetch would skip every demotion and post a self-introduced bug as trusted
-    # pre-existing.  Both line sets below are built from this one file.
+    # The diff is fetched once.  When the fetch fails or returns nothing (a 406
+    # "diff too large", an empty diff), no line can be proven context, so every
+    # pre-existing label is forced to important and posting continues down the
+    # existing fallback path (all findings off-diff).  Both line sets below are
+    # built from this one file.
     local diff_file="$tmp/pr.diff"
-    if ! "$GH_CMD" pr diff "$pr" > "$diff_file" || [ ! -s "$diff_file" ]; then
-        printf 'ERROR: could not fetch diff for PR %s; not posting findings.\n' "$pr" >&2
-        return 1
-    fi
     local added_file="$tmp/added.json" demoted_file="$tmp/demoted.json"
-    prf_diff_right_lines "$pr" added "$diff_file" \
-        | jq -R 'split("\t") | .[0]+":"+.[1]' \
-        | jq -s '.' > "$added_file"
-    # A file this PR adds has no pre-existing content, so any pre-existing label
-    # on it is demoted, including a whole-file (line 0 / missing line) finding
-    # that never matches an added path:line.
-    local newfiles_file="$tmp/newfiles.json"
-    awk '
-        /^diff --git / { is_new = 0 }
-        /^--- \/dev\/null/ { is_new = 1 }
-        is_new && /^\+\+\+ b\// { sub(/^\+\+\+ b\//, ""); print }
-    ' "$diff_file" | jq -R '.' | jq -s '.' > "$newfiles_file"
-    jq --slurpfile added "$added_file" --slurpfile newfiles "$newfiles_file" '
-        map(if .label == "pre-existing"
-               and ((((.path // "") + ":" + (.line | tostring)) as $k | $added[0] | index($k) != null)
-                    or ((.path // "") as $p | $newfiles[0] | index($p) != null))
-            then .label = "important" else . end)' "$findings_file" > "$demoted_file"
+    if ! "$GH_CMD" pr diff "$pr" > "$diff_file" 2>/dev/null || [ ! -s "$diff_file" ]; then
+        printf 'WARN: could not fetch diff for PR %s; labeling pre-existing findings as important.\n' "$pr" >&2
+        : > "$diff_file"
+        jq 'map(if .label == "pre-existing" then .label = "important" else . end)' \
+            "$findings_file" > "$demoted_file"
+    else
+        prf_diff_right_lines "$pr" added "$diff_file" \
+            | jq -R 'split("\t") | .[0]+":"+.[1]' \
+            | jq -s '.' > "$added_file"
+        # A file this PR adds has no pre-existing content, so any pre-existing label
+        # on it is demoted, including a whole-file (line 0 / missing line) finding
+        # that never matches an added path:line.
+        local newfiles_file="$tmp/newfiles.json"
+        awk '
+            /^diff --git / { is_new = 0 }
+            /^--- \/dev\/null/ { is_new = 1 }
+            is_new && /^\+\+\+ b\// { sub(/^\+\+\+ b\//, ""); print }
+        ' "$diff_file" | jq -R '.' | jq -s '.' > "$newfiles_file"
+        jq --slurpfile added "$added_file" --slurpfile newfiles "$newfiles_file" '
+            map(if .label == "pre-existing"
+                   and ((((.path // "") + ":" + (.line | tostring)) as $k | $added[0] | index($k) != null)
+                        or ((.path // "") as $p | $newfiles[0] | index($p) != null))
+                then .label = "important" else . end)' "$findings_file" > "$demoted_file"
+    fi
     findings_file="$demoted_file"
 
     local norm_file="$tmp/normalized.json"

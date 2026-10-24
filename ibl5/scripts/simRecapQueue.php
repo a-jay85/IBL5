@@ -257,18 +257,15 @@ $seasonQuery = new \Season\SeasonQueryRepository($db);
 switch ($verb) {
     case 'claim-next':
         $phase = $seasonQuery->getSeasonPhase();
-        $recapsEnabled = \SimRecap\RecapPhasePolicy::isEnabled($phase);
         /** @var string $host */
         $claimedSim = $repo->claimNextPending($host);
-        // A recaps-disabled phase still drains a leftover pending sim, but the
-        // start line is posted only while the phase has recaps on.
         $out = [
             'ok' => true,
             'cmd' => 'claim-next',
             'sim' => $claimedSim,
             'phase' => $phase,
-            'recaps_enabled' => $recapsEnabled,
-            'notified' => $claimedSim !== null && $recapsEnabled ? announceStart($repo, $claimedSim, $host) : 'skipped',
+            'recaps_enabled' => \SimRecap\RecapPhasePolicy::isEnabled($phase),
+            'notified' => $claimedSim !== null ? announceStart($repo, $claimedSim, $host) : 'skipped',
         ];
         break;
 
@@ -278,14 +275,12 @@ switch ($verb) {
         }
         /** @var string $host */
         $claimed = $repo->claimPending($sim, $host);
-        // Same start-line phase gate as claim-next.
-        $recapsEnabled = \SimRecap\RecapPhasePolicy::isEnabled($seasonQuery->getSeasonPhase());
         $out = [
             'ok' => true,
             'cmd' => 'claim',
             'sim' => $sim,
             'claimed' => $claimed,
-            'notified' => $claimed && $recapsEnabled ? announceStart($repo, $sim, $host) : 'skipped',
+            'notified' => $claimed ? announceStart($repo, $sim, $host) : 'skipped',
         ];
         break;
 

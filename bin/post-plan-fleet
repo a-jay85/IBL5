@@ -702,9 +702,16 @@ if [ -n "$HOLDREPEAT_FIX_ARG" ] || case "$_hr_first" in "RESULT: post-plan DECLI
         cp "$LOG" "$LOG.declined" 2>/dev/null || true
         cp "$_hr_log" "$LOG"
     elif [ -n "$HOLDREPEAT_FIX_ARG" ]; then
-        # pr-cycle skipped this PR before the autofix existed: keep it a quiet decline.
-        echo "RESULT: post-plan DECLINED (holdrepeat autofix $_hr_word)" >> "$LOG"
-        _hr_quiet=1
+        # pr-cycle skipped this PR before the autofix existed: skip-* and gave-up-* stay a quiet
+        # decline (postplan-fix DMs its own gave-up). A timeout, an error or a missing result
+        # word falls through to the normal DM.
+        case "$_hr_word" in
+            skip-*|gave-up-*)
+                echo "RESULT: post-plan DECLINED (holdrepeat autofix $_hr_word)" >> "$LOG"
+                _hr_quiet=1 ;;
+            *)
+                echo "STOP: holdrepeat autofix $_hr_word" >> "$LOG" ;;
+        esac
     fi
     [ "$_hr_rc" = 124 ] && RC=124
     echo "post-plan-fleet: holdrepeat-fix=$_hr_word" >> "$LOG"

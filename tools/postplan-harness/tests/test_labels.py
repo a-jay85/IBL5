@@ -44,6 +44,15 @@ def test_classify_line_zero_never_preexisting():
     assert labels.classify(f, TH, {"a.py": {5}}) == "important"
 
 
+def test_classify_new_file_never_preexisting():
+    """Mutation: drop the `--- /dev/null` tracking => an anchor past the hunk reads pre-existing."""
+    diff = ("diff --git a/a.py b/a.py\nnew file mode 100644\n--- /dev/null\n+++ b/a.py\n"
+            "@@ -0,0 +1,2 @@\n+x\n+y\n")
+    changed = labels.changed_right_lines(diff)
+    f = _f(line=55, preexisting_hint=True, scorer_preexisting=True)
+    assert labels.classify(f, TH, changed) == "important"
+
+
 def test_classify_security_never_nit():
     """Mutation: delete the source check => fails."""
     f = _f(source="security-audit", score=70, severity_hint="nit")

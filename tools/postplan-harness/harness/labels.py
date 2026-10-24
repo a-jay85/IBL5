@@ -25,18 +25,30 @@ _LABEL_TITLES = {LABEL_IMPORTANT: "Important", LABEL_NIT: "Nit",
                  LABEL_PREEXISTING: "Pre-existing"}
 
 
+class _AllLines(set):
+    """Right-side lines of a file this PR adds: every line counts as changed."""
+
+    def __contains__(self, item):
+        return True
+
+
 def _walk_right_lines(diff_text, include_context):
     out: dict = {}
     path = None
     right = 0
+    from_null = False
     for line in (diff_text or "").splitlines():
         if line.startswith("diff --git"):
             path = None
+            from_null = False
+            continue
+        if line.startswith("--- "):
+            from_null = line.startswith("--- /dev/null")
             continue
         m = _FILE_RE.match(line)
         if m:
             path = m.group(1)
-            out.setdefault(path, set())
+            out.setdefault(path, _AllLines() if (from_null and not include_context) else set())
             continue
         m = _HUNK_RE.match(line)
         if m:

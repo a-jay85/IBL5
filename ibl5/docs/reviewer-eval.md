@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, and the before/after rule for review-surface PRs.
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 ---
 
 # Reviewer eval
@@ -18,7 +18,9 @@ The corpus lives in `tools/postplan-harness/fixtures/reviewer-eval/corpus.json`.
 
 The run prints a `  raw <agent> <path>:<line> score=<n>` line for every finding before the vote, and the cache keeps them under `scored`. Read those lines to judge a miss by hand.
 
-A bug case counts as a hit when one surviving finding names an expected file and a line within `LINE_WINDOW` (5) lines of an expected range, inclusive. A finding at line 0 never counts as a hit. Every surviving finding on a clean case is a false alarm.
+A bug case counts as a hit when one surviving finding names an accepted file and a line within `LINE_WINDOW` (5) lines of an accepted range, inclusive. The accepted ranges are the case's `expected` ranges plus its optional `also_accept` ranges. A finding at line 0 never counts as a hit. Every surviving finding on a clean case is a false alarm.
+
+`expected` holds the lines the fix changed. `also_accept` holds other lines the introducing PR added where the same defect shows, for example the loop that an unbounded parameter drives. The rule still matches by position only. When two defects share one statement, a range cannot tell a finding about one from a finding about the other.
 
 ## Score line
 
@@ -43,7 +45,8 @@ Each run ends with one line of this shape: `reviewer-eval v=<12 hex> c=<12 hex> 
    - The lines the fix removed or changed are lines the introducing PR added, and they are the defect.
    - The defect is visible in the introducing diff alone.
    A pair that fails one test goes in as `unconfirmed`, with the failed test named in its description.
-3. Strip every `_*` key, write a one-sentence description with no names or emails, and run `bin/reviewer-eval validate`. Validate checks that blame on the fix's removed lines lands inside the expected range. CI runs it on every PR.
+3. When the defect also shows on added lines more than 5 lines from the fix, add an `also_accept` list with those ranges, in the same `{path, start, end}` shape as `expected`. Each range must lie inside lines the introducing commit added. Blame corroboration runs on `expected` only. Leave the key out when there is no second site, since validate rejects an empty list.
+4. Strip every `_*` key, write a one-sentence description with no names or emails, and run `bin/reviewer-eval validate`. Validate checks that blame on the fix's removed lines lands inside an expected range, and that every expected and also_accept range lies inside lines the introducing commit added. CI runs it on every PR.
 
 ## The review surface
 
@@ -76,7 +79,7 @@ One run is a sample. LLM output varies between runs. Rerun a borderline comparis
 
 ## Baseline
 
-Recorded 2026-10-21 on review surface `v=2f6c48d10056`, after the Phase 4D verifier replaced the Haiku scorer. The recall is above 0, so `bin/check-reviewer-eval` blocks.
+Recorded 2026-10-21 on review surface `v=2f6c48d10056`, after the Phase 4D verifier replaced the Haiku scorer. The recall is above 0, so `bin/check-reviewer-eval` blocks. Rescored offline on 2026-10-23 after case `trade-preview-unbounded-cash-years` gained an `also_accept` range at line 63. The reviewer did not run again, so every findings count below is the 2026-10-21 count.
 
 ```
 case depth-chart-log-after-commit bug MISS findings=0 file_only=0
@@ -84,7 +87,7 @@ case playoff-series-invalid-group-by bug MISS findings=3 file_only=1
 case saved-dc-sum-is-int bug HIT findings=2 file_only=0
 case table-dropdown-unencoded-param bug HIT findings=12 file_only=0
 case team-page-missing-pick-team bug MISS findings=2 file_only=0
-case trade-preview-unbounded-cash-years bug MISS findings=1 file_only=0
+case trade-preview-unbounded-cash-years bug HIT findings=1 file_only=0
 case clean-navigation-voting-link clean flagged=1
 case clean-perf-logger-injectable clean flagged=4
 case clean-quad-double-cte clean flagged=0
@@ -95,14 +98,14 @@ case clean-standings-pythagorean clean flagged=3
 case clean-standings-updater-constant clean flagged=0
 case clean-topics-service clean flagged=0
 excluded_unconfirmed=1
-reviewer-eval v=2f6c48d10056 c=89cdd47be2df recall=2/6 false_alarms=11 clean_flagged=5/9 degraded=0
+reviewer-eval v=2f6c48d10056 c=98210c961f08 recall=3/6 false_alarms=11 clean_flagged=5/9 degraded=0
 ```
 
-A hand check of the raw findings shows the position rule both overcounts and undercounts.
+A hand check of the raw findings puts the true recall at 2 of 6. The scored 3/6 is two true hits, `saved-dc-sum-is-int` and `trade-preview-unbounded-cash-years`, plus the dropdown case credited by position alone.
 
 - `saved-dc-sum-is-int` is a true hit. Agents A and B both name the `is_int` defect at line 312.
-- `table-dropdown-unencoded-param` hits on position alone. The finding at line 66 is a nearby injection in the HTML-escaped base URL. It does not name the missing `encodeURIComponent` on the selected value at line 68.
-- `trade-preview-unbounded-cash-years` names the real defect at line 63, the loop, and scores a miss. The fix bounded the GET parameters at lines 39 to 40, outside the window.
+- `table-dropdown-unencoded-param` hits on position alone. The finding at line 66 is a nearby injection in the HTML-escaped base URL. It does not name the missing `encodeURIComponent` on the selected value at line 68. An accepted range cannot correct this over-credit. Both readings point at the same statement, lines 66 to 69, and telling them apart needs a judged text match.
+- `trade-preview-unbounded-cash-years` is a true hit. Its one finding names the real defect at line 63, the loop. The fix bounded the GET parameters at lines 39 to 40, outside the window, so the case scored a miss until its `also_accept` range at line 63 was added.
 - `depth-chart-log-after-commit` is a real miss. The live post-plan run on PR #3288 also got no finding from agents A, B and security.
 
-The first baseline, on surface `v=16345a91e105` with the Haiku scorer, read `recall=0/6` with no surviving finding on any case. The matching rule did not cause that zero, because no finding reached it. The scorer dropped the agents' findings, including the two line-312 findings that the verifier now keeps.
+The first baseline, on surface `v=16345a91e105` with the Haiku scorer, read a recall of 0 of 6 with no surviving finding on any case. The matching rule did not cause that zero, because no finding reached it. The scorer dropped the agents' findings, including the two line-312 findings that the verifier now keeps.

@@ -740,6 +740,25 @@ class LiveGit:
         self._run("add", "-A", "--", *exempt)
         return exempt
 
+    def _regen_lockfiles(self, paths, *, master_sha, pre_rebase_sha):
+        """Rebuild each set-aside lockfile from master's copy plus the resolved manifest
+        and stage it. Returns the paths, which the proof then treats as derived. A failure
+        restores the tree with the module's `lockfile: <path> (...)` reason."""
+        from .. import lockfile_regen
+        from ..conflict import abort_and_restore
+        done = []
+        for path in paths:
+            entry = lockfile_regen.regenerable(path)
+            try:
+                cmd = lockfile_regen.regen_lockfile(
+                    entry, run=self._run, worktree=self.worktree, master_sha=master_sha)
+            except lockfile_regen.LockfileRegenError as exc:
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha, reason=str(exc))
+            self.last_lockfile_regens += ((path, cmd),)
+            done.append(path)
+        return tuple(done)
+
     def _rewrite_pre_patch_for_regen(self, key, *, master_sha, pre_rebase_sha, exempt):
         """Rewrite lostwork_pre_path(key) so each exempt path's section is the
         master-to-merged diff of the regenerated file. Every other file's section stays
@@ -980,6 +999,7 @@ class LiveGit:
         self.last_conflict_resolution = None
         self.last_conflict_rung = ""
         self.last_conflict_fix_summary = ""
+        self.last_lockfile_regens: tuple[tuple[str, str], ...] = ()
         self.conflict_review_retries = {}
         master_sha = self._run("rev-parse", base).strip()
 
@@ -1011,7 +1031,7 @@ class LiveGit:
 
             try:
                 self._snapshot_conflicted_paths()
-                inventory = inventory_conflicts(self._run)
+                inventory = inventory_conflicts(self._run, regen_lockfiles=True)
                 if inventory.unresolvable_reason:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -1035,6 +1055,10 @@ class LiveGit:
                 if regen_targets:
                     regen_exempt = self._regen_generated(
                         regen_targets, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha)
+                if inventory.lockfiles:
+                    regen_exempt = tuple(sorted({*regen_exempt, *self._regen_lockfiles(
+                        inventory.lockfiles, master_sha=master_sha,
+                        pre_rebase_sha=pre_rebase_sha)}))
 
                 # The merge commit runs bin/pre-commit-hook; a hook denial lands here
                 # and restores the tree with the hook's own text in the reason.
@@ -1068,7 +1092,9 @@ class LiveGit:
                 # LLM-resolved and generator-regenerated path is still checked.
                 binary_exempt = {t.path for t in regen_targets if t.command is None}
                 text_reason = assert_text_only(
-                    self.worktree, [p for p in inventory.files if p not in binary_exempt])
+                    self.worktree,
+                    [*(p for p in inventory.files if p not in binary_exempt),
+                     *inventory.lockfiles])
                 if text_reason:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,

@@ -14,6 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness import conflict_ladder, lockfile_regen
 from harness.armable import conflict_flag_path
 from test_conflict_ladder_live import (  # noqa: F401  (make_repo is a pytest fixture)
     _drive_runner,
@@ -93,7 +94,6 @@ def _other_lock_repo(make_repo, path):
 
 
 def _fake_regen(monkeypatch, argv=("bash", "../gen/fake-lock.sh", "package.json", "bun.lock")):
-    from harness import lockfile_regen
     monkeypatch.setattr(lockfile_regen, "REGENERABLE_LOCKFILES", (
         lockfile_regen.RegenLockfile(_LOCK, _MANIFEST, argv, "ibl5"),))
 
@@ -152,3 +152,67 @@ def test_live_bun_lock_conflict_regenerated_and_proof_passes(make_repo, monkeypa
     assert ("phase2: lockfile regenerated: ibl5/bun.lock via "
             "bash ../gen/fake-lock.sh package.json bun.lock") in _audit(fx)
     assert os.path.exists(conflict_flag_path(fx.key))
+
+
+def test_live_lockfile_only_conflict_sets_conflict_flag(make_repo, monkeypatch, tmp_path):
+    fx = _lockfile_repo(make_repo, manifest_conflict=False)
+    _fake_regen(monkeypatch)
+    llm = _ScriptedLlm({})
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "test-stop", res.error
+    assert llm.first_pass_calls == []
+    assert _result_json(fx)["conflict_rung"] == "regen"
+    assert os.path.exists(conflict_flag_path(fx.key))
+    assert [p for p, _m, _pr in llm.calls] == ["conflict-review"]
+    assert _show(fx.d, f"HEAD:{_LOCK}") == fx.expected_lock
+
+
+def _assert_restored(fx):
+    assert _git(fx.d, "rev-parse", "HEAD").stdout.strip() == fx.pre
+    assert _git(fx.d, "ls-files", "--unmerged").stdout.strip() == ""
+
+
+def test_live_bun_lock_regen_failure_names_command(make_repo, monkeypatch, tmp_path):
+    fx = _lockfile_repo(make_repo)
+    _fake_regen(monkeypatch, ("bash", "-c", "exit 7"))
+    llm = _ScriptedLlm({
+        f"conflict-resolve:{_MANIFEST}": _writer(_MANIFEST, fx.merged_manifest),
+    })
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "lockfile: ibl5/bun.lock (regen failed: bash -c 'exit 7' exit 7" in res.error
+    _assert_restored(fx)
+    assert "lockfile regenerated" not in _audit(fx)
+
+
+def test_live_bun_lock_regen_timeout_names_command(make_repo, monkeypatch, tmp_path):
+    fx = _lockfile_repo(make_repo)
+    _fake_regen(monkeypatch, ("bash", "-c", "sleep 5"))
+    monkeypatch.setattr(lockfile_regen, "LOCKFILE_REGEN_TIMEOUT", 1)
+    llm = _ScriptedLlm({
+        f"conflict-resolve:{_MANIFEST}": _writer(_MANIFEST, fx.merged_manifest),
+    })
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "lockfile: ibl5/bun.lock (regen timed out after 1s: bash -c 'sleep 5')" in res.error
+    _assert_restored(fx)
+
+
+def test_live_bun_lock_with_declined_manifest_still_fails(make_repo, monkeypatch, tmp_path):
+    fx = _lockfile_repo(make_repo)
+    _fake_regen(monkeypatch)
+    monkeypatch.setattr(conflict_ladder, "default_rungs", lambda branch: ())
+    llm = _ScriptedLlm({f"conflict-resolve:{_MANIFEST}": lambda cwd, prompt: "FAILED"})
+
+    res = _drive_runner(fx, llm, monkeypatch, tmp_path)
+
+    assert res.error_kind == "rebase-conflict", res.error
+    assert "regen failed" not in res.error
+    _assert_restored(fx)
+    assert "lockfile regenerated" not in _audit(fx)

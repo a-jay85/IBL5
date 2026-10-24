@@ -890,7 +890,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-dropdown__card {
-    background: rgba(30, 41, 59, 0.95);
+    background: color-mix(in srgb, var(--navy-800) 95%, transparent);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border-bottom-left-radius: 0.5rem;
@@ -986,7 +986,7 @@ span.nav-dropdown-item a:hover {
 
 /* Section label in nav dropdown footers (league switcher, username).
    Replaces the utility string: block text-base font-semibold
-   tracking-widest uppercase text-gray-500 mb-2. */
+   tracking-widest uppercase text-gray-400 mb-2. */
 .nav-section-label {
     display: block;
     margin-bottom: 0.5rem;
@@ -995,7 +995,7 @@ span.nav-dropdown-item a:hover {
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--color-gray-500);
+    color: var(--gray-400);
 }
 
 .nav-login-input {
@@ -1010,7 +1010,7 @@ span.nav-dropdown-item a:hover {
 }
 
 .nav-login-input::placeholder {
-    color: var(--gray-500);
+    color: var(--gray-400);
 }
 
 .nav-login-input:focus {

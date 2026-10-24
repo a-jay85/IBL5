@@ -46,6 +46,16 @@ interface BoxscoreRepositoryInterface
     public function deleteRegularSeasonAndPlayoffsBoxScores(int $seasonStartingYear): bool;
 
     /**
+     * Franchise name for a team in a season, or null when ibl_franchise_seasons has no row;
+     * callers fall back to the parsed .sco name
+     *
+     * @param int $franchiseId Franchise (team) ID
+     * @param int $seasonEndingYear Season ending year
+     * @return string|null Team name that season, or null if no row exists
+     */
+    public function findFranchiseTeamName(int $franchiseId, int $seasonEndingYear): ?string;
+
+    /**
      * Find a team boxscore by game identifiers
      *
      * @param string $date Game date in Y-m-d format

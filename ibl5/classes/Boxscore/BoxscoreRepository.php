@@ -98,6 +98,24 @@ class BoxscoreRepository extends \Database\BaseMysqliRepository implements Boxsc
     }
 
     /**
+     * @see BoxscoreRepositoryInterface::findFranchiseTeamName()
+     */
+    public function findFranchiseTeamName(int $franchiseId, int $seasonEndingYear): ?string
+    {
+        $row = $this->fetchOne(
+            "SELECT team_name FROM `ibl_franchise_seasons` WHERE franchise_id = ? AND season_ending_year = ?",
+            "ii",
+            $franchiseId,
+            $seasonEndingYear
+        );
+        if ($row === null || !is_string($row['team_name'])) {
+            return null;
+        }
+
+        return $row['team_name'];
+    }
+
+    /**
      * @see BoxscoreRepositoryInterface::findTeamBoxscore()
      */
     public function findTeamBoxscore(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): ?array

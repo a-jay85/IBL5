@@ -49,9 +49,12 @@ interface TradeOfferRepositoryInterface
     /**
      * Get trade items by offer ID with exclusive row-level lock
      *
-     * Identical to getTradesByOfferId() but appends FOR UPDATE to acquire
-     * an exclusive lock within the current transaction. Used by TradeProcessor
-     * to prevent double-processing of trades via TOCTOU race conditions.
+     * Like getTradesByOfferId(), but returns only rows whose approval is not
+     * 'completed', and acquires an exclusive row lock (FOR UPDATE) within the
+     * current transaction. Used by TradeProcessor to prevent double-processing:
+     * an empty result means no pending rows remain (the offer was already
+     * processed, declined, or withdrawn, or never existed), and the caller
+     * must roll back.
      *
      * Must be called within an active transaction (BEGIN ... COMMIT/ROLLBACK).
      *

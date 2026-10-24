@@ -10,7 +10,7 @@ inputs:
     description: 'The channel webhook URL. Pass secrets.DISCORD_DEV_WEBHOOK_URL (#dev), secrets.DISCORD_MERGED_WEBHOOK_URL (#merged, merge notices only) or secrets.DISCORD_REVIEWS_WEBHOOK_URL (#reviews, weekly review reports only).'
     required: true
   ping:
-    description: '"true" @mentions the owner on this message. Failure notices only.'
+    description: '"true" @mentions the owner on this message. Use it for failure notices, and on #merged only when merge-digest-notify.yml finds a post-merge step that needs the owner.'
     required: false
     default: 'false'
   fail-on-delivery:

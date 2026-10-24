@@ -1,0 +1,406 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-remove — scratch-repo harness for worktree abort cleanup
+# (bin/wt-remove --if-empty and its callers) and backup-branch naming
+# (wt_backup_branch_name in bin/lib/git-helpers.sh).
+#
+# --if-empty is the one place every worktree-creating flow asks "is this
+# aborted worktree empty, so it is safe to remove?". Each case builds a real
+# worktree in a throwaway origin/master pair under mktemp and runs the real
+# bin/wt-remove (copied with bin/lib/ and bin/wt-down; no stubs) against it.
+#
+# The test never sets or reads HOME, so the empty-environment run
+# (env -i PATH=/usr/bin:/bin /bin/bash bin/test-wt-remove) exercises
+# bin/wt-remove's own set -u handling and its PATH floor for lsof.
+#
+# Run: bin/test-wt-remove  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REAL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# pwd -P: lsof reports the resolved cwd (/private/var on macOS), and the in-use
+# case only matches when the worktree path git records is the resolved one too.
+TMP="$(cd "$(mktemp -d)" && pwd -P)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+# Keep has_live_postplan_run off the real launchd job list.
+export LAUNCHCTL_CMD=true
+
+git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
+
+MAIN="$TMP/IBL5"
+WTS="$TMP/IBL5-worktrees"
+
+git_q init -q --bare "$TMP/origin.git" >/dev/null 2>&1
+git_q clone -q "$TMP/origin.git" "$MAIN" >/dev/null 2>&1
+mkdir -p "$MAIN/bin/lib" "$MAIN/ibl5" "$WTS"
+cp "$SCRIPT_DIR/wt-remove" "$SCRIPT_DIR/wt-down" "$MAIN/bin/"
+cp "$SCRIPT_DIR"/lib/*.sh "$MAIN/bin/lib/"
+# The real ignore files, so case 5 pins live coverage of the wt_link_shared links.
+cp "$REAL_ROOT/.gitignore" "$MAIN/.gitignore"
+cp "$REAL_ROOT/ibl5/.gitignore" "$MAIN/ibl5/.gitignore"
+echo tracked > "$MAIN/tracked.txt"
+chmod +x "$MAIN/bin/wt-remove" "$MAIN/bin/wt-down"
+git_q -C "$MAIN" add -A >/dev/null 2>&1
+git_q -C "$MAIN" commit -qm C1 >/dev/null 2>&1
+git_q -C "$MAIN" push -q -u origin master >/dev/null 2>&1
+
+# mkwt <dir> <branch> — fresh worktree on a new branch at origin/master.
+mkwt() {
+    git_q -C "$MAIN" worktree add -q -b "$2" "$WTS/$1" origin/master >/dev/null 2>&1 \
+        || h_fail "setup: worktree add $1 ($2)"
+}
+
+# run_rm <args...> — run the fixture's wt-remove from the main checkout.
+# Sets OUT (stdout+stderr) and RC.
+run_rm() {
+    OUT="$(cd "$MAIN" && "$MAIN/bin/wt-remove" "$@" 2>&1)" && RC=0 || RC=$?
+}
+
+ref_exists() { git -C "$MAIN" show-ref --verify --quiet "refs/heads/$1"; }
+
+echo "== case 1: fresh worktree is removed and its unpushed branch deleted"
+mkwt empty-1 empty-1
+run_rm empty-1 --if-empty
+h_eq "case 1: rc 0" 0 "$RC"
+h_contains "case 1: Done line" "$OUT" "Done. Worktree"
+h_contains "case 1: branch delete line" "$OUT" "Deleted local branch"
+h_absent "case 1: dir gone" "$WTS/empty-1"
+if ref_exists empty-1; then h_fail "case 1: refs/heads/empty-1 gone"; else h_pass "case 1: refs/heads/empty-1 gone"; fi
+
+echo "== case 2: one commit ahead keeps"
+mkwt ahead-1 ahead-1
+echo work > "$WTS/ahead-1/work.txt"
+git_q -C "$WTS/ahead-1" add -A >/dev/null 2>&1
+git_q -C "$WTS/ahead-1" commit -qm work >/dev/null 2>&1
+run_rm ahead-1 --if-empty
+h_eq "case 2: rc 0" 0 "$RC"
+h_contains "case 2: kept with commit count" "$OUT" "kept 'ahead-1': 1 commit(s) ahead"
+h_exists "case 2: dir present" "$WTS/ahead-1"
+if ref_exists ahead-1; then h_pass "case 2: branch present"; else h_fail "case 2: branch present"; fi
+
+echo "== case 3: tracked dirty file keeps"
+mkwt dirty-1 dirty-1
+echo changed >> "$WTS/dirty-1/tracked.txt"
+run_rm dirty-1 --if-empty
+h_eq "case 3: rc 0" 0 "$RC"
+h_contains "case 3: kept" "$OUT" "kept 'dirty-1'"
+h_contains "case 3: reason" "$OUT" "uncommitted changes"
+h_exists "case 3: dir present" "$WTS/dirty-1"
+if ref_exists dirty-1; then h_pass "case 3: branch present"; else h_fail "case 3: branch present"; fi
+
+echo "== case 4: untracked non-ignored file keeps"
+mkwt untracked-1 untracked-1
+echo notes > "$WTS/untracked-1/notes.txt"
+run_rm untracked-1 --if-empty
+h_eq "case 4: rc 0" 0 "$RC"
+h_contains "case 4: kept" "$OUT" "kept 'untracked-1'"
+h_contains "case 4: reason" "$OUT" "untracked files"
+h_exists "case 4: dir present" "$WTS/untracked-1"
+if ref_exists untracked-1; then h_pass "case 4: branch present"; else h_fail "case 4: branch present"; fi
+
+echo "== case 4a: a staged-only change keeps"
+mkwt staged-1 staged-1
+echo staged > "$WTS/staged-1/staged.txt"
+git_q -C "$WTS/staged-1" add staged.txt >/dev/null 2>&1
+run_rm staged-1 --if-empty
+h_eq "case 4a: rc 0" 0 "$RC"
+h_contains "case 4a: kept" "$OUT" "kept 'staged-1'"
+h_contains "case 4a: reason" "$OUT" "uncommitted changes"
+h_exists "case 4a: dir present" "$WTS/staged-1"
+if ref_exists staged-1; then h_pass "case 4a: branch present"; else h_fail "case 4a: branch present"; fi
+
+echo "== case 4b: a tracked edit git cannot read keeps (fail-closed)"
+mkwt unreadable-1 unreadable-1
+echo changed >> "$WTS/unreadable-1/tracked.txt"
+chmod 000 "$WTS/unreadable-1/tracked.txt"
+run_rm unreadable-1 --if-empty
+chmod u+rw "$WTS/unreadable-1/tracked.txt" 2>/dev/null
+h_eq "case 4b: rc 0" 0 "$RC"
+h_contains "case 4b: kept" "$OUT" "kept 'unreadable-1'"
+h_exists "case 4b: dir present" "$WTS/unreadable-1"
+
+echo "== case 5: gitignored wt_link_shared symlinks are not work"
+mkwt links-1 links-1
+mkdir -p "$TMP/shared/vendor" "$TMP/shared/node_modules"
+ln -s "$TMP/shared/vendor" "$WTS/links-1/ibl5/vendor"
+ln -s "$TMP/shared/node_modules" "$WTS/links-1/node_modules"
+echo X=1 > "$WTS/links-1/ibl5/.env.test"
+run_rm links-1 --if-empty
+h_eq "case 5: rc 0" 0 "$RC"
+h_contains "case 5: removed" "$OUT" "Done. Worktree"
+h_absent "case 5: dir gone" "$WTS/links-1"
+
+echo "== case 6: _pool-* named slot is untouched"
+mkwt _pool-1 _pool-1
+run_rm _pool-1 --if-empty
+h_eq "case 6: rc 0" 0 "$RC"
+h_contains "case 6: pool slot" "$OUT" "kept '_pool-1': pool slot"
+h_exists "case 6: dir present" "$WTS/_pool-1"
+
+echo "== case 7: _pool-* directory under another branch name is untouched"
+mkwt _pool-2 slot-two
+run_rm slot-two --if-empty
+h_eq "case 7: rc 0" 0 "$RC"
+h_contains "case 7: pool slot" "$OUT" "pool slot"
+h_exists "case 7: dir present" "$WTS/_pool-2"
+
+echo "== case 8: in-use worktree keeps"
+mkwt busy-1 busy-1
+(cd "$WTS/busy-1" && exec sleep 30) &
+SLEEPER=$!
+# Wait (bounded) until lsof can see the sleeper's cwd.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if PATH="$PATH:/usr/sbin:/sbin" lsof -d cwd -Fn 2>/dev/null | grep -qF "n$WTS/busy-1"; then break; fi
+    sleep 0.2
+done
+run_rm busy-1 --if-empty
+kill "$SLEEPER" 2>/dev/null
+wait "$SLEEPER" 2>/dev/null
+h_eq "case 8: rc 0" 0 "$RC"
+h_contains "case 8: kept" "$OUT" "kept 'busy-1'"
+h_contains "case 8: reason" "$OUT" "in use"
+h_exists "case 8: dir present" "$WTS/busy-1"
+
+echo "== case 9: unresolvable origin/master keeps (fail-closed)"
+mkwt noorigin-1 noorigin-1
+ORIGIN_TIP="$(git -C "$MAIN" rev-parse refs/remotes/origin/master)"
+git -C "$MAIN" update-ref -d refs/remotes/origin/master
+run_rm noorigin-1 --if-empty
+git -C "$MAIN" update-ref refs/remotes/origin/master "$ORIGIN_TIP"
+h_eq "case 9: rc 0" 0 "$RC"
+h_contains "case 9: reason" "$OUT" "cannot verify emptiness"
+h_exists "case 9: dir present" "$WTS/noorigin-1"
+
+echo "== case 10: --if-empty --force is rejected"
+run_rm noorigin-1 --if-empty --force
+h_eq "case 10: rc 1" 1 "$RC"
+h_contains "case 10: message" "$OUT" "cannot be combined"
+h_exists "case 10: dir present" "$WTS/noorigin-1"
+
+echo "== case 11: --if-empty on a missing worktree exits 0"
+run_rm no-such-worktree --if-empty
+h_eq "case 11: rc 0" 0 "$RC"
+h_contains "case 11: message" "$OUT" "nothing to remove"
+
+echo "== case 12: pushed branch survives an empty removal"
+mkwt pushed-1 pushed-1
+git_q -C "$WTS/pushed-1" push -q origin pushed-1 >/dev/null 2>&1
+git -C "$MAIN" fetch -q origin >/dev/null 2>&1
+run_rm pushed-1 --if-empty
+h_eq "case 12: rc 0" 0 "$RC"
+h_absent "case 12: dir gone" "$WTS/pushed-1"
+if ref_exists pushed-1; then h_pass "case 12: refs/heads/pushed-1 present"; else h_fail "case 12: refs/heads/pushed-1 present"; fi
+h_not_contains "case 12: no branch delete" "$OUT" "Deleted local branch"
+
+echo "== case 13: plain call (no flag) still removes a dirty worktree"
+mkwt plain-1 plain-1
+echo changed >> "$WTS/plain-1/tracked.txt"
+echo notes > "$WTS/plain-1/notes.txt"
+run_rm plain-1
+h_eq "case 13: rc 0" 0 "$RC"
+h_absent "case 13: dir gone" "$WTS/plain-1"
+
+echo "== case 14: automouse reap_empty_worktree removes only an empty worktree"
+REAP_SRC="$(awk '/^reap_empty_worktree\(\) \{/,/^\}/' "$SCRIPT_DIR/automouse/run")"
+if [ -z "$REAP_SRC" ]; then
+    h_fail "case 14: reap_empty_worktree found in bin/automouse/run"
+else
+    eval "$REAP_SRC"
+    # shellcheck disable=SC2034  # read by the eval'd reap_empty_worktree
+    REPO="$MAIN"
+    LOG="$TMP/am.log"
+    : > "$LOG"
+    mkwt reap-empty reap-empty
+    mkwt reap-commit reap-commit
+    git_q -C "$WTS/reap-commit" commit -q --allow-empty -m work >/dev/null 2>&1
+    mkwt reap-untracked reap-untracked
+    echo stray > "$WTS/reap-untracked/stray.txt"
+    mkwt _pool-3 _pool-3
+    reap_empty_worktree reap-empty; R14a=$?
+    reap_empty_worktree reap-commit; R14b=$?
+    reap_empty_worktree reap-untracked; R14c=$?
+    reap_empty_worktree _pool-3; R14d=$?
+    h_eq "case 14: rc 0 on every call" "0 0 0 0" "$R14a $R14b $R14c $R14d"
+    h_absent "case 14: empty worktree removed" "$WTS/reap-empty"
+    if ref_exists reap-empty; then h_fail "case 14: empty worktree's branch deleted"; else h_pass "case 14: empty worktree's branch deleted"; fi
+    h_exists "case 14: commit worktree kept" "$WTS/reap-commit"
+    h_exists "case 14: untracked worktree kept" "$WTS/reap-untracked"
+    h_exists "case 14: _pool-3 kept" "$WTS/_pool-3"
+    h_eq "case 14: three kept lines in the log" 3 "$(grep -c 'kept' "$LOG")"
+fi
+
+echo "== case 15: every skipped/ disposal in bin/automouse/run reaps"
+R15="$(awk '
+    { line[NR] = $0 }
+    END {
+        n = 0; miss = 0
+        for (i = 1; i <= NR; i++) {
+            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"/) {
+                n++; hit = 0
+                for (j = i + 1; j <= i + 15 && j <= NR; j++)
+                    if (index(line[j], "reap_empty_worktree ") || index(line[j], "reap-exempt:")) hit = 1
+                if (!hit) { miss++; printf "MISS line %d\n", i }
+            }
+        }
+        printf "sites=%d missing=%d\n", n, miss
+    }' "$SCRIPT_DIR/automouse/run")"
+h_contains "case 15: 5 sites, 0 missing" "$R15" "sites=5 missing=0"
+h_eq "case 15: only the pre-attempt impl_model skip is reap-exempt" 1 "$(grep -c 'reap-exempt:' "$SCRIPT_DIR/automouse/run")"
+
+echo "== case 15b: the impl-agent-moved-it-to-skipped branch reaps"
+R15B="$(awk '
+    { line[NR] = $0 }
+    END {
+        res = "no-site"
+        for (i = 1; i <= NR; i++) {
+            if (index(line[i], "[ -e \"$NIGHTLY_DIR/skipped/$PLAN_NAME\" ]; then")) {
+                res = "misses"
+                for (j = i + 1; j <= i + 3 && j <= NR; j++)
+                    if (index(line[j], "reap_empty_worktree ")) res = "reaps"
+                break
+            }
+        }
+        print res
+    }' "$SCRIPT_DIR/automouse/run")"
+h_eq "case 15b: reap_empty_worktree within 3 lines of the skipped/ check" "reaps" "$R15B"
+
+echo "== case 16: burndown's failed-item block names the reap"
+BD="$REAL_ROOT/.claude/skills/burndown/SKILL.md"
+h_eq "case 16: reap command present" 1 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5 && bin/wt-remove <slug> --if-empty' "$BD")"
+h_eq "case 16: stays-dirty sentence gone" 0 \
+    "$(grep -cF 'Its worktree stays dirty and keeps the issue in flight' "$BD")"
+
+echo "== case 17: fix-and-prevent Step 0 names the reap on the /plan hand-off line"
+FP="$REAL_ROOT/.claude/skills/fix-and-prevent/SKILL.md"
+h_eq "case 17: reap command present once" 1 \
+    "$(grep -cF 'bin/wt-remove <slug> --if-empty' "$FP")"
+h_contains "case 17: same line as the /plan hand-off" \
+    "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
+
+echo "== case 18: an absolute path resolves by directory, not by branch name"
+mkwt swap-a swap-b
+mkwt swap-b swap-a
+run_rm "$WTS/swap-a" --if-empty
+h_eq "case 18: rc 0" 0 "$RC"
+h_absent "case 18: named directory gone" "$WTS/swap-a"
+h_exists "case 18: same-named branch's directory kept" "$WTS/swap-b"
+run_rm /tmp --if-empty
+h_eq "case 18: path outside the parent rc 1" 1 "$RC"
+h_contains "case 18: path outside the parent message" "$OUT" "is outside"
+run_rm "$WTS/../IBL5" --if-empty
+h_eq "case 18: dot segments rc 1" 1 "$RC"
+h_contains "case 18: dot segments message" "$OUT" "dot segments"
+h_exists "case 18: dot segments left swap-b alone" "$WTS/swap-b"
+
+echo "== case 19: bin/wt-new removes only a worktree it created"
+WN="$SCRIPT_DIR/wt-new"
+h_eq "case 19: WT_OWNED=1 set at two sites" 2 "$(grep -cF 'WT_OWNED=1' "$WN")"
+h_contains "case 19: trap gates on ownership" \
+    "$(grep -F '"$WT_OWNED" = 1' "$WN")" '"$WT_OWNED" = 1'
+h_contains "case 19: trap calls wt-remove --if-empty" \
+    "$(grep -F 'bin/wt-remove' "$WN")" '"$WT_ROOT" --if-empty'
+
+# backup-name helper (bin/lib/git-helpers.sh wt_backup_branch_name)
+# shellcheck disable=SC1091  # the fixture copy of the real lib
+. "$MAIN/bin/lib/git-helpers.sh"
+# The date shim pins the clock and nothing else.
+mkdir -p "$TMP/dateshim"
+printf '%s\n' '#!/bin/sh' \
+    'if [ "$1" = "+%Y%m%d-%H%M%S" ]; then echo 20261022-120000; exit 0; fi' \
+    'exec /bin/date "$@"' > "$TMP/dateshim/date"
+chmod +x "$TMP/dateshim/date"
+
+# bk <repo> <slug> <reason> — run the helper from <repo>. Sets BK_OUT, BK_ERR, BK_RC.
+bk() {
+    BK_OUT="$(cd "$1" && PATH="$TMP/dateshim:$PATH" wt_backup_branch_name "$2" "$3" 2>"$TMP/bk.err")" \
+        && BK_RC=0 || BK_RC=$?
+    BK_ERR="$(cat "$TMP/bk.err")"
+}
+
+echo "== case B1: slug-first dated shape, and git can create it"
+bk "$MAIN" my-slug pre-rebase
+h_eq "case B1: rc 0" 0 "$BK_RC"
+h_eq "case B1: name" "backup/my-slug/20261022-120000-pre-rebase" "$BK_OUT"
+if git -C "$MAIN" branch "$BK_OUT" HEAD >/dev/null 2>&1; then
+    h_pass "case B1: git branch succeeds"
+else
+    h_fail "case B1: git branch succeeds"
+fi
+
+echo "== case B2: a slash in the slug flattens to a dash"
+bk "$MAIN" feat/x local
+h_eq "case B2: name" "backup/feat-x/20261022-120000-local" "$BK_OUT"
+
+echo "== case B3: a flat legacy backup/<slug> branch blocks"
+git -C "$MAIN" branch backup/flat-slug HEAD >/dev/null 2>&1
+bk "$MAIN" flat-slug presquash
+h_eq "case B3: rc 1" 1 "$BK_RC"
+h_eq "case B3: stdout empty" "" "$BK_OUT"
+h_contains "case B3: stderr names the blocker" "$BK_ERR" \
+    "branch 'backup/flat-slug' exists and blocks 'backup/flat-slug/20261022-120000-presquash'"
+
+echo "== case B4: a bare 'backup' branch blocks"
+git_q init -q "$TMP/bk2" >/dev/null 2>&1
+git_q -C "$TMP/bk2" commit -q --allow-empty -m C1 >/dev/null 2>&1
+git -C "$TMP/bk2" branch backup HEAD >/dev/null 2>&1
+bk "$TMP/bk2" any-slug local
+h_eq "case B4: rc 1" 1 "$BK_RC"
+h_contains "case B4: stderr names the blocker" "$BK_ERR" "branch 'backup' exists"
+
+echo "== case B5: a same-second duplicate fails"
+git -C "$MAIN" branch backup/dup/20261022-120000-local HEAD >/dev/null 2>&1
+bk "$MAIN" dup local
+h_eq "case B5: rc 1" 1 "$BK_RC"
+h_contains "case B5: already exists" "$BK_ERR" "already exists"
+
+echo "== case B6: bad input fails with nothing on stdout"
+bk "$MAIN" s "Pre Rebase"
+h_eq "case B6: non-kebab reason rc 1" 1 "$BK_RC"
+h_eq "case B6: non-kebab reason stdout empty" "" "$BK_OUT"
+bk "$MAIN" "" x
+h_eq "case B6: empty slug rc 1" 1 "$BK_RC"
+h_eq "case B6: empty slug stdout empty" "" "$BK_OUT"
+
+echo "== case B7: legacy reason shapes still mint slug-first, date-first"
+for B7_REASON in pre-rebase presquash local local-1729600000; do
+    bk "$MAIN" s "$B7_REASON"
+    case "$BK_OUT" in
+        "backup/s/20261022-120000-$B7_REASON") h_pass "case B7: $B7_REASON" ;;
+        *) h_fail "case B7: $B7_REASON (got '$BK_OUT')" ;;
+    esac
+done
+
+echo "== case B8: the rule's fenced backup example works as written"
+B8_RULE="$REAL_ROOT/.claude/rules/linear-history-squash-merge.md"
+B8_BLOCK="$(awk '
+    /If you keep a backup branch/ { seen = 1; next }
+    seen && !inb && /^```bash$/ { inb = 1; next }
+    inb && /^```$/ { exit }
+    inb { print }
+' "$B8_RULE")"
+if [ -z "$B8_BLOCK" ]; then
+    h_fail "case B8: fenced bash block found after 'If you keep a backup branch'"
+else
+    h_pass "case B8: fenced bash block found after 'If you keep a backup branch'"
+    h_not_contains "case B8: no hand-typed backup branch" "$B8_BLOCK" "git branch backup/"
+    git -C "$MAIN" branch b8-branch HEAD >/dev/null 2>&1
+    B8_RUN="${B8_BLOCK//<your-branch>/b8-branch}"
+    (cd "$MAIN" && bash -c "$B8_RUN") >/dev/null 2>&1 && B8_RC=0 || B8_RC=$?
+    h_eq "case B8: example exits 0" 0 "$B8_RC"
+    B8_REFS="$(git -C "$MAIN" for-each-ref --format='%(refname)' refs/heads/backup/b8-branch/)"
+    if [[ "$B8_REFS" =~ ^refs/heads/backup/b8-branch/[0-9]{8}-[0-9]{6}-pre-rebase$ ]]; then
+        h_pass "case B8: minted ref has the dated shape"
+    else
+        h_fail "case B8: minted ref has the dated shape (got '$B8_REFS')"
+    fi
+fi
+
+echo "----"
+h_done

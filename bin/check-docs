@@ -118,6 +118,18 @@ const RETIRED_FIGURES = [
         'why'     => 'the spawn cost was re-measured at ~17–23K tokens (agent-tiering-detail.md § Skip the Agent, corrected 2026-08-14); the ~3–5K figure understates it and made delegation look cheaper than a direct Read/Grep',
         'use'     => '~17–23K tokens, see .claude/rules/agent-tiering-detail.md § Skip the Agent',
     ],
+    [
+        'pattern' => '~(?<![\w-])backup/[^\s/`\'"]+-(?:pre-rebase|presquash|local)(?:-\d+)?(?![\w/-]|\.\w)~',
+        'label'   => 'flat backup-branch shape backup/<slug>-<reason>',
+        'why'     => 'backup branches moved to one dated namespace; a flat backup/<slug> branch also blocks every backup/<slug>/... name, since git cannot store a ref and a ref directory at one path',
+        'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
+    ],
+    [
+        'pattern' => '~(?:git (?:branch(?: -[fcmM])?|checkout -[bB]|switch -[cC]) |refs/heads/)\S*-(?:backup|local)-[0-9]{8}\b~',
+        'label'   => 'undated-namespace backup branch <slug>-backup-<YYYYMMDD>',
+        'why'     => 'backup branches moved to backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>; a <slug>-backup-<date> or <slug>-local-<date> branch is invisible to a backup/* sweep',
+        'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
+    ],
 ];
 
 // A retired figure may be quoted legitimately inside its own correction. Any of
@@ -1411,6 +1423,23 @@ function selfTestRetiredFigures(): int
         ['spawn-cost figure inside CORRECTED line exempts', "# Doc\n\nSpawn costs ~17–23K [CORRECTED 2026-08-14 — was \"~3–5K-token spawn\"].\n", 0],
         ['unrelated nearby figure does not flag', "# Doc\n\nSeed SD 0.0125pp and 0.021pp are fine.\n", 0],
         ['warning glyph alone does not exempt', "# Doc\n\n⚠ heads up\n\nSeed SD 0.012pp across 8 seeds.\n", 1],
+        ['flat backup shape flags', "# Doc\n\ngit branch backup/my-slug-pre-rebase HEAD\n", 1],
+        ['flat presquash shape flags', "# Doc\n\nKeep backup/3267-presquash around.\n", 1],
+        ['flat local-epoch shape flags', "# Doc\n\nbackup/foo-local-1729600000\n", 1],
+        ['fenced flat shape flags', "# Doc\n\n```bash\ngit branch backup/foo-pre-rebase\n```\n", 1],
+        ['dated-suffix branch flags', "# Doc\n\ngit branch my-slug-backup-20261022 HEAD\n", 1],
+        ['local-date branch flags', "# Doc\n\ngit checkout -b xm-local-20261022\n", 1],
+        ['branch -f dated name flags', "# Doc\n\ngit branch -f xm-backup-20261022 HEAD\n", 1],
+        ['checkout -B local-date flags', "# Doc\n\ngit checkout -B xm-local-20261022\n", 1],
+        ['switch -C local-date flags', "# Doc\n\ngit switch -C xm-local-20261022\n", 1],
+        ['new namespace with local in slug does not flag', "# Doc\n\ngit branch backup/fix-local-dev/20261022-120000-pre-rebase HEAD\n", 0],
+        ['source file named backup/x-local.go does not flag', "# Doc\n\nSee engine/internal/backup/data-local.go for the writer.\n", 0],
+        ['flat shape before a sentence-ending dot flags', "# Doc\n\nThe old name was backup/foo-pre-rebase.\n", 1],
+        ['new namespace does not flag',"# Doc\n\ngit branch backup/my-slug/20261022-120000-pre-rebase HEAD\n", 0],
+        ['dated backup directory does not flag', "# Doc\n\nSee ~/decom-backup-20260727/ for the crontab.\n", 0],
+        ['wt-sync ref does not flag', "# Doc\n\nrefs/wt-sync-backup/my-branch holds the pre-reset tip.\n", 0],
+        ['wt-sync ref with reason suffix does not flag', "# Doc\n\nrefs/wt-sync-backup/x-local holds the pre-reset tip.\n", 0],
+        ['RETIRED-OK exempts a backup shape', "# Doc\n\nbackup/foo-pre-rebase <!-- RETIRED-OK: legacy name quoted -->\n", 0],
         // Regression guard: \R would split inside `✅` (E2 9C 85) and shift the
         // line number, so this asserts the reported line, not just the count.
         ['multi-byte glyphs do not shift line numbers', "# Doc\n\n✅ done ✅\n\nSeed SD 0.012pp.\n", 1, 5],

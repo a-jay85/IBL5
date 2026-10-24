@@ -90,7 +90,7 @@ if [ "$MODE" = "up" ]; then
     # The test bot reads BUG_OPERATOR_DISCORD_ID straight from this file. A placeholder or
     # empty value aborts here, because it could never route a wake. The E2E wake cases also need the
     # app base URL and API key, so read all three here and export them below.
-    env_val() { grep -E "^$1=" "$SECRETS" | tail -1 | cut -d= -f2- | tr -d '"'"'"' '; }
+    env_val() { grep -E "^$1=" "$SECRETS" | tail -1 | cut -d= -f2- | sed -E 's/^["'"'"']//; s/["'"'"']$//'; }
     OPERATOR="$(env_val BUG_OPERATOR_DISCORD_ID)"
     [ -n "${OPERATOR:-}" ] || { echo "BUG_OPERATOR_DISCORD_ID unset or empty in $SECRETS" >&2; exit 1; }
     case "${OPERATOR}" in REPLACE_WITH_*) echo "BUG_OPERATOR_DISCORD_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac

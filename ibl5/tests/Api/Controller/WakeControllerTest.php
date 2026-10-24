@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\WakeController;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\BugReportRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -13,6 +14,46 @@ use PHPUnit\Framework\TestCase;
 class WakeControllerTest extends TestCase
 {
     private const OPERATOR_ID = '100000000000000001';
+
+    protected function setUp(): void
+    {
+        $_SERVER['HTTP_X_API_KEY'] = 'test-bot-key';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+    }
+
+    /**
+     * Key lookup stub: a service key (unlimited tier) or a self-issued one (standard tier).
+     */
+    private static function keys(bool $serviceKey): ApiKeyRepository
+    {
+        $keys = self::createStub(ApiKeyRepository::class);
+        $keys->method('findByHash')->willReturn([
+            'key_hash'         => hash('sha256', 'test-bot-key'),
+            'key_prefix'       => 'test-bot',
+            'owner_name'       => 'x',
+            'permission_level' => 'public',
+            'rate_limit_tier'  => $serviceKey ? 'unlimited' : 'standard',
+        ]);
+        return $keys;
+    }
+
+    public function testSelfIssuedKeyWithOperatorAuthorIdRejected403AndNoRepositoryCall(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->never())->method('findByOriginalMessageId');
+        $bugRepo->expects($this->never())->method('wakeByOperator');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', self::anything());
+
+        (new WakeController($bugRepo, self::keys(false), self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
+    }
 
     /**
      * @return array{source_message_id: string, thread_id: string, message_id: string, author_id: string, content: string}
@@ -49,7 +90,7 @@ class WakeControllerTest extends TestCase
                 return true;
             }));
 
-        (new WakeController($bugRepo, self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
+        (new WakeController($bugRepo, self::keys(true), self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
     }
 
     public function testNonOperatorAuthorRejected403AndNoRepositoryCall(): void
@@ -66,7 +107,7 @@ class WakeControllerTest extends TestCase
         $body = self::validBody();
         $body['author_id'] = '999999999999999999';
 
-        (new WakeController($bugRepo, self::OPERATOR_ID))->handle([], [], $responder, $body);
+        (new WakeController($bugRepo, self::keys(true), self::OPERATOR_ID))->handle([], [], $responder, $body);
     }
 
     public function testEmptyConfiguredOperatorRejects403(): void
@@ -83,7 +124,7 @@ class WakeControllerTest extends TestCase
         $body = self::validBody();
         $body['author_id'] = '0';
 
-        (new WakeController($bugRepo, ''))->handle([], [], $responder, $body);
+        (new WakeController($bugRepo, self::keys(true), ''))->handle([], [], $responder, $body);
     }
 
     public function testUnknownSourceReturns404AndNoWrite(): void
@@ -100,7 +141,7 @@ class WakeControllerTest extends TestCase
             ->method('error')
             ->with(404, 'not_found', self::anything());
 
-        (new WakeController($bugRepo, self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
+        (new WakeController($bugRepo, self::keys(true), self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
     }
 
     /**
@@ -132,6 +173,6 @@ class WakeControllerTest extends TestCase
         $body = self::validBody();
         unset($body[$missingField]);
 
-        (new WakeController($bugRepo, self::OPERATOR_ID))->handle([], [], $responder, $body);
+        (new WakeController($bugRepo, self::keys(true), self::OPERATOR_ID))->handle([], [], $responder, $body);
     }
 }

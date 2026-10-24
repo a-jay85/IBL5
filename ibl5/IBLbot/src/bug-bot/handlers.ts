@@ -128,7 +128,17 @@ export async function handleWake(msg: Message): Promise<void> {
             // No report row for the thread starter (never enqueued, e.g. posted while the
             // bot was down): enqueue it now, then wake exactly once more.
             await handleEnqueue(starter);
-            result = await phpClient.wake(body);
+            try {
+                result = await phpClient.wake(body);
+            } catch (retryErr) {
+                // EnqueueController may have refused the starter (e.g. an unknown author), so the
+                // retry can 404 again. That is a settled "no report", not a failure to rethrow.
+                if (retryErr instanceof phpClient.ApiError && (retryErr.statusCode === 404 || retryErr.statusCode === 403)) {
+                    console.error(`handleWake: wake rejected after enqueue (${retryErr.statusCode}):`, retryErr.message);
+                    return;
+                }
+                throw retryErr;
+            }
         } else if (err instanceof phpClient.ApiError && (err.statusCode === 404 || err.statusCode === 403)) {
             console.error(`handleWake: wake rejected (${err.statusCode}):`, err.message);
             return;

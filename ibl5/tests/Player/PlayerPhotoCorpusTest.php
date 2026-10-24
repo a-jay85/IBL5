@@ -9,13 +9,17 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Guards the player photo corpus: PlayerImageHelper::getImageUrl() only serves
- * <pid>.jpg, so a photo in any other format with no .jpg twin is unreachable.
+ * <pid>.jpg or <pid>.png, so a photo in any other format with no .jpg/.png twin
+ * is unreachable.
  *
  * Regression: pid 1742 shipped as 1742.jpeg and rendered broken (backlog#1317).
  * The golden .jpg URL assertions stay in ibl5/tests/Player/PlayerImageHelperTest.php.
  */
 final class PlayerPhotoCorpusTest extends TestCase
 {
+    /** Extensions PlayerImageHelper::getImageUrl() can serve. */
+    private const SERVED_EXTENSIONS = ['jpg', 'png'];
+
     private string $tmpDir;
 
     protected function setUp(): void
@@ -44,9 +48,9 @@ final class PlayerPhotoCorpusTest extends TestCase
     }
 
     /**
-     * @return list<string> sorted basenames of non-.jpg files lacking a .jpg twin
+     * @return list<string> sorted basenames of non-.jpg/.png files lacking a .jpg or .png twin
      */
-    private static function findOrphanedNonJpgPhotos(string $dir): array
+    private static function findUnservablePhotos(string $dir): array
     {
         $entries = scandir($dir);
         if ($entries === false) {
@@ -58,12 +62,13 @@ final class PlayerPhotoCorpusTest extends TestCase
             if ($name === '.' || $name === '..' || !is_file($dir . '/' . $name)) {
                 continue;
             }
-            if (pathinfo($name, PATHINFO_EXTENSION) === 'jpg') {
+            if (in_array(pathinfo($name, PATHINFO_EXTENSION), self::SERVED_EXTENSIONS, true)) {
                 continue;
             }
             // is_file(), not a listing lookup: the corpus tracks both 86.JPG and
             // 86.jpg, and only one lands on a case-insensitive checkout.
-            if (!is_file($dir . '/' . pathinfo($name, PATHINFO_FILENAME) . '.jpg')) {
+            $base = $dir . '/' . pathinfo($name, PATHINFO_FILENAME);
+            if (!is_file($base . '.jpg') && !is_file($base . '.png')) {
                 $orphans[] = $name;
             }
         }
@@ -73,7 +78,7 @@ final class PlayerPhotoCorpusTest extends TestCase
         return $orphans;
     }
 
-    public function testEveryNonJpgPlayerPhotoHasJpgTwin(): void
+    public function testEveryPlayerPhotoIsServable(): void
     {
         $dir = dirname(__DIR__, 2) . '/images/player';
         self::assertDirectoryExists($dir);
@@ -88,11 +93,11 @@ final class PlayerPhotoCorpusTest extends TestCase
         }
         self::assertGreaterThan(1000, $jpgCount, 'Photo corpus looks empty or the path is wrong: ' . $dir);
 
-        $orphans = self::findOrphanedNonJpgPhotos($dir);
+        $orphans = self::findUnservablePhotos($dir);
         self::assertSame(
             [],
             $orphans,
-            'Player photos with no .jpg twin (PlayerImageHelper::getImageUrl() only serves <pid>.jpg): ' . implode(', ', $orphans)
+            'Player photos with no .jpg/.png twin (PlayerImageHelper::getImageUrl() only serves <pid>.jpg or <pid>.png): ' . implode(', ', $orphans)
         );
     }
 
@@ -103,26 +108,29 @@ final class PlayerPhotoCorpusTest extends TestCase
         self::assertFileExists(dirname(__DIR__, 2) . '/' . substr($url, 2));
     }
 
-    public function testOrphanDetectorFlagsNonJpgPhotoWithoutJpgTwin(): void
+    public function testOrphanDetectorFlagsPhotoWithoutJpgOrPngTwin(): void
     {
         touch($this->tmpDir . '/10.png');
         touch($this->tmpDir . '/10.jpg');
         touch($this->tmpDir . '/20.jpeg');
         touch($this->tmpDir . '/30.jpg');
         touch($this->tmpDir . '/40.bmp');
-        mkdir($this->tmpDir . '/50.png');
+        touch($this->tmpDir . '/60.png');
+        mkdir($this->tmpDir . '/50.jpeg');
 
-        self::assertSame(['20.jpeg', '40.bmp'], self::findOrphanedNonJpgPhotos($this->tmpDir));
+        self::assertSame(['20.jpeg', '40.bmp'], self::findUnservablePhotos($this->tmpDir));
     }
 
-    public function testOrphanDetectorReturnsEmptyWhenEveryNonJpgHasTwin(): void
+    public function testOrphanDetectorReturnsEmptyWhenEveryPhotoHasServableTwin(): void
     {
         touch($this->tmpDir . '/10.png');
         touch($this->tmpDir . '/10.jpg');
         touch($this->tmpDir . '/20.jpeg');
         touch($this->tmpDir . '/20.jpg');
         touch($this->tmpDir . '/30.jpg');
+        touch($this->tmpDir . '/40.bmp');
+        touch($this->tmpDir . '/40.png');
 
-        self::assertSame([], self::findOrphanedNonJpgPhotos($this->tmpDir));
+        self::assertSame([], self::findUnservablePhotos($this->tmpDir));
     }
 }

@@ -11,11 +11,12 @@ use Player\Stats\PlayerStatsRepository;
 use Player\Views\PlayerOverviewView;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerOverviewView */
 class PlayerOverviewViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * @param list<array<string, int|string>> $boxScores

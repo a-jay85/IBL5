@@ -538,6 +538,11 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     `(run-only)`) is skipped only when it names a tracked file or directory; otherwise
     MISSING is kept and a `RUN-ONLY-REFUSED:` note records why.
 
+    A planned token in `plan.reference_only_test_paths` (the plan's own Critical Files
+    reference marker or Out of Scope no-edit line names it, no veto fired) is skipped
+    under the same trackedness rule, with a `REFERENCE-ONLY:` note; a vetoed or
+    untracked token keeps MISSING and gets a `REFERENCE-ONLY-REFUSED:` note.
+
     `UNMET-CONTRACT:` items are produced even when the plan has no Verification
     Matrix — a matrix-less doc/tooling plan is exactly what `evidence-present`
     exists for.
@@ -573,7 +578,7 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     items.extend(phase_omission_items(plan, changed_files, tracked_files, notes))
     if not plan.has_matrix:
         return items
-    _tracked: set[str] | None = None  # lazy; only a (run-only) miss pays for git ls-files
+    _tracked: set[str] | None = None  # lazy; only a (run-only) or reference-only miss pays for git ls-files
     for t in plan.planned_test_paths:
         if t in plan.no_change_test_paths:
             # Every row planning this token is a Visual-regression row marked
@@ -596,6 +601,24 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
                     _note(notes, f"RUN-ONLY: {t} — every planning row marked (run-only) and the file is tracked; MISSING skipped")
                     continue
                 _note(notes, f"RUN-ONLY-REFUSED: {t} — marked (run-only) but not a tracked file; MISSING kept")
+            if t in plan.reference_only_test_paths:
+                # The plan itself declares this token reference-only: a Critical Files
+                # reference marker and/or an Out of Scope no-edit line on the same path,
+                # with no creation cue on any planning row and no edit-verb citation in
+                # any phase body (planfile.parse_reference_only_test_paths). PR #3511:
+                # `.github/workflows/e2e-tests.yml` named as the CI env of an E2E row
+                # held arming condition (3) for a file the plan never edits. Same
+                # trackedness rule as (run-only): an untracked path or git unavailable
+                # keeps MISSING (fail closed).
+                if _tracked is None:
+                    _tr = tracked_files if tracked_files is not None else _tracked_files()
+                    _tracked = set(_tr) if _tr is not None else set()
+                if _run_only_tracked(t, _tracked):
+                    _note(notes, f"REFERENCE-ONLY: {t} — {plan.reference_only_test_paths[t]}; tracked file; MISSING skipped")
+                    continue
+                _note(notes, f"REFERENCE-ONLY-REFUSED: {t} — {plan.reference_only_test_paths[t]} but not a tracked file; MISSING kept")
+            elif t in plan.reference_only_refusals:
+                _note(notes, f"REFERENCE-ONLY-REFUSED: {t} — {plan.reference_only_refusals[t]}; MISSING kept")
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")
         elif resolutions is not None and hit != t:
             resolutions[t] = hit

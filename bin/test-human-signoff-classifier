@@ -43,6 +43,256 @@ run_pr "fix: a bug" "";                          expect "fix: -> PASS" 0 "$?"
 run_pr "ci: plumb merge queue" "";               expect "ci: -> PASS" 0 "$?"
 run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label -> FAIL" 1 "$?"
 
+# ---- diff-pinned approval (ADR-0062 Update) ----
+# want <name> <haystack> <needle> — substring assertion.
+want() { if [[ "$2" == *"$3"* ]]; then h_pass "$1"; else h_fail "$1" "missing [$3] in: $2"; fi; }
+# same / differ <name> <a> <b>
+same()   { if [ -n "$2" ] && [ "$2" = "$3" ]; then h_pass "$1"; else h_fail "$1" "[$2] != [$3]"; fi; }
+differ() { if [ -n "$2" ] && [ -n "$3" ] && [ "$2" != "$3" ]; then h_pass "$1"; else h_fail "$1" "[$2] vs [$3]"; fi; }
+# fp_of <base> <head> — real hs_diff_fingerprint inside the fixture repo $R.
+fp_of() { LAST_OUT=$(cd "$R" && bash -c "set -euo pipefail; source '$LIB'; hs_diff_fingerprint \"\$1\" \"\$2\"" _ "$1" "$2" 2>&1); }
+# run_approval <action> <event_label> <title> <labels> <fp> <comments_file>
+# prints VERDICT=<v> REASON=<r> after the gate output; rc is hs_eval_approval's.
+run_approval() {
+    # shellcheck disable=SC2016  # $0/$@ expand inside the child bash, not here
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; rc=0; hs_eval_approval "$@" || rc=$?; echo "VERDICT=$HS_VERDICT REASON=$HS_DROP_REASON"; exit "$rc"' "$LIB" "$@" 2>&1)
+}
+# comment_json <login> <type> <created_at> <body> — one REST-shaped comment.
+comment_json() { jq -n --arg l "$1" --arg t "$2" --arg c "$3" --arg b "$4" '{user:{login:$l,type:$t},created_at:$c,body:$b}'; }
+# record_body <fp> — the real hs_record_comment_body output.
+record_body() { bash -c "set -euo pipefail; source '$LIB'; hs_record_comment_body \"\$1\" deadbeef" _ "$1"; }
+# drop_body <reason> — the real hs_drop_comment_body output.
+drop_body() { bash -c "set -euo pipefail; source '$LIB'; hs_drop_comment_body \"\$1\" x" _ "$1"; }
+# write_a <l2> <l5> <l8> — write the ten-line a.txt with three overridable lines.
+write_a() {
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        case "$i" in
+            2) printf '%s\n' "$1" ;;
+            5) printf '%s\n' "$2" ;;
+            8) printf '%s\n' "$3" ;;
+            *) printf 'l%s\n' "$i" ;;
+        esac
+    done > "$R/a.txt"
+}
+# gcommit <msg> — commit everything in $R.
+gcommit() { git -C "$R" add -A && git -C "$R" commit -q -m "$1"; }
+
+h_tmp T
+R="$T/r"
+h_git_repo "$R"
+write_a l2 l5 l8
+printf 'x\n' > "$R/c.txt"
+printf '\x00\x01\x02' > "$R/b.bin"
+gcommit base
+git -C "$R" checkout -q -b feat
+write_a "l2 changed" l5 l8
+gcommit "feat change"
+
+# G1: the approved diff
+fp_of master feat; rc=$?
+expect "fp: feat diff -> rc 0" 0 "$rc"
+A="$LAST_OUT"
+if [[ "$A" =~ ^[0-9a-f]{40}$ ]]; then h_pass "fp: feat diff is 40 lowercase hex"; else h_fail "fp: feat diff is 40 lowercase hex" "got [$A]"; fi
+
+# Copy branches cut from the approved diff before master moves.
+git -C "$R" branch rb feat
+git -C "$R" branch ctx feat
+
+# G2: clean rebase over a distant upstream edit
+git -C "$R" checkout -q master
+printf 'y\n' > "$R/c.txt"
+gcommit "upstream c.txt"
+git -C "$R" checkout -q rb
+git -C "$R" rebase -q master
+# master moves again after the rebase, so only the three-dot diff stays equal
+git -C "$R" checkout -q master
+printf 'd\n' > "$R/d.txt"
+gcommit "upstream d.txt"
+fp_of master rb
+FP_RB="$LAST_OUT"
+same "fp: clean rebase keeps the fingerprint" "$A" "$FP_RB"
+
+# G3: the recorded approval survives the clean rebase (real record_body round-trip)
+REC="$T/rec.json"
+comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")" | jq -s . > "$REC"
+run_approval synchronize "" "feat: x" human-approved "$FP_RB" "$REC"; rc=$?
+expect "approval: clean rebase -> rc 0" 0 "$rc"
+want "approval: clean rebase -> keep" "$LAST_OUT" "VERDICT=keep"
+
+# G4: a real content change
+git -C "$R" checkout -q -b chg feat
+write_a "l2 changed" l5 "l8 changed"
+gcommit "chg"
+fp_of master chg
+B="$LAST_OUT"
+differ "fp: real diff change alters the fingerprint" "$A" "$B"
+
+# G5: the changed diff drops the approval
+run_approval synchronize "" "feat: x" human-approved "$B" "$REC"; rc=$?
+expect "approval: changed diff -> rc 1" 1 "$rc"
+want "approval: changed diff -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+
+# G6: whitespace-only edit
+git -C "$R" checkout -q -b ws feat
+write_a "l2 changed " l5 l8
+gcommit "ws"
+fp_of master ws
+differ "fp: whitespace-only edit alters the fingerprint (--verbatim)" "$A" "$LAST_OUT"
+
+# G7: same-path binary content change
+git -C "$R" checkout -q -b bin feat
+printf '\x00\x09\x09' > "$R/b.bin"
+gcommit "bin"
+fp_of master bin
+FP_BIN="$LAST_OUT"
+git -C "$R" checkout -q -b bin2 feat
+printf '\x00\x07\x07' > "$R/b.bin"
+gcommit "bin2"
+fp_of master bin2
+differ "fp: same-path binary content change alters the fingerprint" "$FP_BIN" "$LAST_OUT"
+
+# G8: an upstream edit inside the hunk's context (l5 sits in the 3 lines after l2)
+git -C "$R" checkout -q master
+write_a l2 "l5 upstream" l8
+gcommit "upstream l5"
+git -C "$R" checkout -q ctx
+git -C "$R" rebase -q master
+fp_of master ctx
+differ "fp: upstream edit inside hunk context alters the fingerprint (conservative drop)" "$A" "$LAST_OUT"
+
+# G9: empty diff fails closed
+fp_of master master; rc=$?
+expect "fp: empty diff -> rc 1" 1 "$rc"
+if [ -z "$LAST_OUT" ]; then h_pass "fp: empty diff prints nothing"; else h_fail "fp: empty diff prints nothing" "got [$LAST_OUT]"; fi
+
+# G10: unknown ref fails closed
+fp_of master no-such-ref; rc=$?
+expect "fp: unknown ref -> rc 1" 1 "$rc"
+
+# invocation-2-only: hand-built comment state
+EMPTY="$T/empty.json"
+printf '[]\n' > "$EMPTY"
+
+# E1, E2: the approving labeled event
+run_approval labeled human-approved "feat: x" human-approved "$A" /nonexistent; rc=$?
+expect "approval: label applied -> rc 0" 0 "$rc"
+want "approval: label applied -> record" "$LAST_OUT" "VERDICT=record"
+run_approval labeled human-approved "feat: x" human-approved "" /nonexistent; rc=$?
+expect "approval: label applied, no fingerprint -> rc 1" 1 "$rc"
+want "approval: label applied, no fingerprint -> drop error" "$LAST_OUT" "REASON=error"
+
+# E3: no record
+run_approval synchronize "" "feat: x" human-approved "$A" "$EMPTY"; rc=$?
+expect "approval: no record -> rc 1" 1 "$rc"
+want "approval: no record -> drop missing" "$LAST_OUT" "REASON=missing"
+
+# E4: a marker forged by a non-bot user
+FORGED="$T/forged.json"
+comment_json mallory User "2026-10-18T00:00:01Z" "$(record_body "$A")" | jq -s . > "$FORGED"
+run_approval synchronize "" "feat: x" human-approved "$A" "$FORGED"; rc=$?
+expect "approval: forged non-bot marker -> rc 1" 1 "$rc"
+want "approval: forged non-bot marker -> drop missing" "$LAST_OUT" "REASON=missing"
+
+# E5: a newer revoked marker overrides the older fingerprint
+REVOKED="$T/revoked.json"
+{
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")"
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(drop_body mismatch)"
+} | jq -s . > "$REVOKED"
+run_approval synchronize "" "feat: x" human-approved "$A" "$REVOKED"; rc=$?
+expect "approval: revoked is newest -> rc 1" 1 "$rc"
+want "approval: revoked is newest -> drop missing" "$LAST_OUT" "REASON=missing"
+
+# E6: a fingerprint recorded after a revoke re-validates the label
+REREC="$T/rerec.json"
+{
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(drop_body mismatch)"
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(record_body "$A")"
+} | jq -s . > "$REREC"
+run_approval synchronize "" "feat: x" human-approved "$A" "$REREC"; rc=$?
+expect "approval: re-recorded after revoke -> rc 0" 0 "$rc"
+want "approval: re-recorded after revoke -> keep" "$LAST_OUT" "VERDICT=keep"
+
+# E7: newest by created_at, never by array order
+ORDER="$T/order.json"
+{
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(record_body "$B")"
+    comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")"
+} | jq -s . > "$ORDER"
+run_approval synchronize "" "feat: x" human-approved "$A" "$ORDER"; rc=$?
+expect "approval: newest by created_at wins over array order -> rc 1" 1 "$rc"
+want "approval: newest by created_at wins over array order -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+
+# E8, E9: malformed and unreadable comments fail closed
+BAD="$T/bad.json"
+printf 'not json\n' > "$BAD"
+run_approval synchronize "" "feat: x" human-approved "$A" "$BAD"; rc=$?
+expect "approval: malformed comments -> rc 1" 1 "$rc"
+want "approval: malformed comments -> drop error" "$LAST_OUT" "REASON=error"
+run_approval synchronize "" "feat: x" human-approved "$A" /nonexistent/c.json; rc=$?
+expect "approval: unreadable comments -> rc 1" 1 "$rc"
+want "approval: unreadable comments -> drop error" "$LAST_OUT" "REASON=error"
+
+# E10: any other label event compares instead of recording
+run_approval labeled needs-a-human "feat: x" human-approved "$A" "$EMPTY"; rc=$?
+expect "approval: other label event compares -> rc 1" 1 "$rc"
+want "approval: other label event compares -> drop missing" "$LAST_OUT" "REASON=missing"
+
+# E11: a non-feat PR skips the fingerprint entirely
+run_approval synchronize "" "fix: y" human-approved "" /nonexistent; rc=$?
+expect "approval: non-feat skips fingerprint -> rc 0" 0 "$rc"
+want "approval: non-feat skips fingerprint -> pass" "$LAST_OUT" "VERDICT=pass"
+
+# E12: the event names the label but the csv lacks it
+run_approval labeled human-approved "feat: x" "" "$A" "$REC"; rc=$?
+expect "approval: no label in csv never passes -> rc 1" 1 "$rc"
+want "approval: no label in csv never passes -> hold" "$LAST_OUT" "VERDICT=hold"
+
+# E13: uppercase hex is malformed, so it never matches
+UPPER="ABCDEF0123456789ABCDEF0123456789ABCDEF01"
+bash -c "set -euo pipefail; source '$LIB'; hs_fingerprint_matches \"\$1\" \"\$1\"" _ "$UPPER"; rc=$?
+expect "match: uppercase hex never matches -> rc 1" 1 "$rc"
+
+# E14: tightening only — every Phase 1 FAIL input still fails with a matching record
+run_approval synchronize "" "feat: shiny new page" "" "$A" "$REC"; rc=$?
+expect "tightening: feat: shiny new page -> still rc 1" 1 "$rc"
+run_approval synchronize "" "feat(ui): scoped" "" "$A" "$REC"; rc=$?
+expect "tightening: feat(ui): scoped -> still rc 1" 1 "$rc"
+run_approval synchronize "" "feat!: breaking" "" "$A" "$REC"; rc=$?
+expect "tightening: feat!: breaking -> still rc 1" 1 "$rc"
+run_approval synchronize "" "feat: x" "not-human-approved-yet" "$A" "$REC"; rc=$?
+expect "tightening: feat: x -> still rc 1" 1 "$rc"
+
+# B1-B3: comment-body builders
+bash -c "set -euo pipefail; source '$LIB'; hs_record_comment_body not-a-fingerprint x" >/dev/null 2>&1; rc=$?
+expect "body: record rejects malformed fingerprint -> rc 1" 1 "$rc"
+bash -c "set -euo pipefail; source '$LIB'; hs_drop_comment_body bogus x" >/dev/null 2>&1; rc=$?
+expect "body: drop rejects unknown reason -> rc 1" 1 "$rc"
+DROP_OUT=$(drop_body mismatch)
+same "body: drop starts with the revoked marker" "<!-- hs-approved-diff: revoked -->" "${DROP_OUT%%$'\n'*}"
+want "body: drop names the diff change" "$DROP_OUT" "the PR diff changed after the label was applied"
+
+# real captured gh api response (PR 3339 fixture)
+FIX="$REPO_ROOT/bin/fixtures/human-signoff/pr3339-comments.json"
+# recorded_of <comments_file> — real hs_recorded_fingerprint; rc is its rc.
+recorded_of() { LAST_OUT=$(bash -c "set -euo pipefail; source '$LIB'; hs_recorded_fingerprint \"\$1\"" _ "$1" 2>&1); }
+recorded_of "$FIX"; rc=$?
+expect "real comments: no marker -> rc 1" 1 "$rc"
+FIX_BOT="$T/fix-bot.json"
+jq --arg b "$(record_body "$A")" \
+    '. + [([.[] | select(.user.login == "github-actions[bot]")] | last | .body = $b | .created_at = "2026-10-19T05:00:00Z")]' \
+    "$FIX" > "$FIX_BOT"
+recorded_of "$FIX_BOT"; rc=$?
+expect "real comments: bot marker -> rc 0" 0 "$rc"
+same "real comments: bot marker -> prints A" "$A" "$LAST_OUT"
+FIX_USER="$T/fix-user.json"
+jq --arg b "$(record_body "$A")" \
+    '. + [([.[] | select(.user.login == "a-jay85")] | first | .body = $b | .created_at = "2026-10-19T05:00:00Z")]' \
+    "$FIX" > "$FIX_USER"
+recorded_of "$FIX_USER"; rc=$?
+expect "real comments: user-authored marker -> rc 1" 1 "$rc"
+
 # ---- workflow job `if:` characterization (event-payload fixtures) ----
 # These rows pin the invariant any label/event filter on the signoff workflows
 # must respect: a job runs on every event where the classifier would FAIL, and
@@ -452,8 +702,8 @@ wf_job_block() {
         s { print }
     ' "$1"
 }
-# EXEMPT_HS: dependent jobs that already exclude `skipped` (PR #3346 has not landed).
-EXEMPT_HS=(needs-a-human-label)
+# EXEMPT_HS: dependent jobs that already exclude `skipped`.
+EXEMPT_HS=(needs-a-human-label human-approved-fingerprint)
 # hs_job_ok <workflow-file> <job-id> — 0 when the job is guarded or exempt. Silent.
 hs_job_ok() {
     local ex id ifx blk

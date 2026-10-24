@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # bin/test-launchd-health-check — stubbed regression harness for bin/launchd-health-check.
 #
-# Stubs out launchctl, docker, db-query, discord-dm, and sleep through a temp
-# PATH dir + env overrides. Runs on Linux CI (ubuntu-latest) — no real launchd.
+# Stubs out launchctl, docker, db-query, discord-dm, bug-pipeline-check, and sleep
+# through a temp PATH dir + env overrides. Runs on Linux CI (ubuntu-latest) — no real launchd.
 #
 # Run: bin/test-launchd-health-check  (exit 0 = all pass, 1 = a case failed)
 set -u
@@ -78,6 +78,18 @@ STUB
     chmod +x "$CASE/bin/fake-dm"
     printf '0\n' > "$CASE/dm-rc"
 
+    # bug-pipeline-check stub: record each run, cat bpc.out, exit bpc-rc (default healthy, 0)
+    cat > "$CASE/bin/bug-pipeline-check" <<'STUB'
+#!/bin/sh
+CASE_DIR="$(dirname "$0")/.."
+echo ran >> "$CASE_DIR/bpc-ran"
+cat "$CASE_DIR/bpc.out"
+exit "$(cat "$CASE_DIR/bpc-rc" 2>/dev/null || echo 0)"
+STUB
+    chmod +x "$CASE/bin/bug-pipeline-check"
+    printf 'VERDICT: healthy\n' > "$CASE/bpc.out"
+    printf '0\n' > "$CASE/bpc-rc"
+
     # Export all test seams so run_checker and direct invocations pick them up
     export HOME="$CASE/home"
     export PATH="$CASE/bin:$BASE_PATH"
@@ -86,6 +98,7 @@ STUB
     export DISCORD_DM_BIN="$CASE/bin/fake-dm"
     export LAUNCHD_HEALTH_LOG_DIR="$CASE/logs"
     export LAUNCHD_HEALTH_TODAY=2026-09-28
+    export BUG_PIPELINE_CHECK_BIN="$CASE/bin/bug-pipeline-check"
     unset LAUNCHD_HEALTH_JOBS_LIB
 
     # Hermeticity abort: stubs must shadow the real binaries
@@ -95,6 +108,10 @@ STUB
     }
     [ "$(command -v sleep)" = "$CASE/bin/sleep" ] || {
         printf 'HARNESS NOT HERMETIC: sleep resolves to %s\n' "$(command -v sleep)"
+        exit 3
+    }
+    [ "$BUG_PIPELINE_CHECK_BIN" = "$CASE/bin/bug-pipeline-check" ] || {
+        printf 'HARNESS NOT HERMETIC: BUG_PIPELINE_CHECK_BIN is %s\n' "$BUG_PIPELINE_CHECK_BIN"
         exit 3
     }
 }
@@ -906,6 +923,344 @@ if [ "$_RC" -eq 2 ] && [ ! -f "$CASE/sleep.log" ]; then
 else
     fail H5c "rc=$_RC sleep=$([ -f "$CASE/sleep.log" ] && echo present || echo absent)"
 fi
+
+# ---------------------------------------------------------------------------
+# B-series: bin/bug-pipeline-check verdicts routed through check_bug_pipeline
+# ---------------------------------------------------------------------------
+
+# bpc_set <rc> <line>... — script the stub checker's stdout and exit code
+bpc_set() {
+    local rc="$1"; shift
+    printf '%s\n' "$@" > "$CASE/bpc.out"
+    printf '%s\n' "$rc" > "$CASE/bpc-rc"
+}
+# count_fail <key> — FAIL lines for exactly <key> in $OUT
+count_fail() { grep -cF -- "FAIL: $1: " <<< "$OUT"; }
+# dm_blocks — DMs the fake-dm stub received
+dm_blocks() { if [ -f "$CASE/dm.log" ]; then grep -c '^---$' "$CASE/dm.log"; else echo 0; fi; }
+# eq <label> <want> <got> / has <label> <haystack> <needle> / lacks (same shape)
+eq() { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "want [$2] got [$3]"; fi; }
+has() { if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1" "missing [$3] in [$(head -c 300 <<< "$2")]"; fi; }
+lacks() { if grep -qF -- "$3" <<< "$2"; then fail "$1" "unexpected [$3] in [$(head -c 300 <<< "$2")]"; else ok "$1"; fi; }
+
+# B0: healthy stub is invoked and adds nothing
+healthy_fixture B0
+run_checker
+eq "B0 stub invoked" yes "$([ -f "$CASE/bpc-ran" ] && echo yes || echo no)"
+eq "B0 rc 0" 0 "$RC"
+eq "B0 no bug-pipeline lines" 0 "$(grep -c 'bug-pipeline:' <<< "$OUT")"
+
+# B1: degraded botkey:missing keys, DMs, and stamps per signal
+healthy_fixture B1
+bpc_set 1 'SIGNAL: botkey:missing — no active ibl_api_keys row' 'VERDICT: degraded [botkey:missing]'
+run_checker
+eq "B1 rc 1" 1 "$RC"
+eq "B1 one botkey:missing FAIL line" 1 "$(count_fail bug-pipeline:botkey:missing)"
+has "B1 dm argv" "$(cat "$CASE/dm.argv" 2>/dev/null)" "--ping --chunk -"
+has "B1 dm body" "$(cat "$CASE/dm.log" 2>/dev/null)" "bug pipeline botkey:missing — no active ibl_api_keys row"
+eq "B1 stamp holds today" 2026-09-28 "$(head -1 "$CASE/logs/stamps/bug-pipeline_botkey_missing" 2>/dev/null)"
+
+# B2: several signals; a repeated signal collapses to one problem
+healthy_fixture B2
+bpc_set 1 'SIGNAL: stale:db-unavailable — a' 'SIGNAL: stale:db-unavailable — b' \
+    'SIGNAL: botkey:missing — c' 'UNKNOWN: [stale:db-unavailable]' 'VERDICT: degraded [botkey:missing]'
+run_checker
+eq "B2 stale:db-unavailable once" 1 "$(count_fail bug-pipeline:stale:db-unavailable)"
+eq "B2 botkey:missing once" 1 "$(count_fail bug-pipeline:botkey:missing)"
+eq "B2 one DM" 1 "$(dm_blocks)"
+
+# B3: rc 2 (unknown) keys its signal and is not check-failed
+healthy_fixture B3
+bpc_set 2 'SIGNAL: botkey:db-unavailable — db-query exited 1' 'VERDICT: unknown [botkey:db-unavailable]'
+run_checker
+eq "B3 signal keyed" 1 "$(count_fail bug-pipeline:botkey:db-unavailable)"
+eq "B3 no check-failed" 0 "$(count_fail bug-pipeline:check-failed)"
+
+# B4: rc outside 0-2 fails loud
+healthy_fixture B4
+bpc_set 64 'usage: bug-pipeline-check'
+run_checker
+eq "B4 one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B4 names the rc" "$OUT" "exited 64 —"
+
+# B5: missing binary (127) and signal death (143) fail loud
+healthy_fixture B5a
+export BUG_PIPELINE_CHECK_BIN="$CASE/no-such-checker"
+run_checker
+eq "B5a one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B5a names rc 127" "$OUT" "exited 127 —"
+healthy_fixture B5b
+printf '#!/bin/sh\nkill -TERM $$\n' > "$CASE/bin/bug-pipeline-check"
+run_checker
+eq "B5b one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B5b names rc 143" "$OUT" "exited 143 —"
+
+# B5c: a checker that never returns is killed; the verdict and DM still go out
+healthy_fixture B5c
+printf '#!/bin/sh\nexec /bin/sleep 300\n' > "$CASE/bin/bug-pipeline-check"
+BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
+eq "B5c one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B5c says it timed out" "$OUT" "did not finish in 1s"
+eq "B5c one DM" 1 "$(dm_blocks)"
+
+# B5d: a timeout kills the checker's children too, not just its top pid
+healthy_fixture B5d
+cat > "$CASE/bin/bug-pipeline-check" <<'STUB'
+#!/bin/sh
+/bin/sleep 300 &
+echo $! > "$(dirname "$0")/../child.pid"
+/bin/sleep 300
+STUB
+BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
+eq "B5d timed out" 1 "$(count_fail bug-pipeline:check-failed)"
+_B5D_CHILD="$(cat "$CASE/child.pid" 2>/dev/null)"
+if [ -z "$_B5D_CHILD" ]; then
+    fail "B5d child pid recorded" "stub never wrote child.pid"
+elif kill -0 "$_B5D_CHILD" 2>/dev/null; then
+    kill "$_B5D_CHILD" 2>/dev/null
+    fail "B5d no orphan child" "checker child $_B5D_CHILD outlived the timeout"
+else
+    ok "B5d no orphan child"
+fi
+
+# B5e: a healthy run leaves no watchdog sleep behind
+healthy_fixture B5e
+BUG_PIPELINE_CHECK_TIMEOUT=4271 run_checker
+eq "B5e rc 0" 0 "$RC"
+_B5E_LEFT="$(pgrep -f '^/bin/sleep 4271$')"
+if [ -n "$_B5E_LEFT" ]; then
+    pkill -f '^/bin/sleep 4271$'
+    fail "B5e no watchdog sleep survives" "leftover sleep pid(s): $_B5E_LEFT"
+else
+    ok "B5e no watchdog sleep survives"
+fi
+
+# B5f: a checker that ignores TERM (its children inherit that) is still KILLed
+healthy_fixture B5f
+cat > "$CASE/bin/bug-pipeline-check" <<'STUB'
+#!/bin/sh
+trap '' TERM
+/bin/sleep 300 &
+echo $! > "$(dirname "$0")/../child.pid"
+/bin/sleep 300
+STUB
+BUG_PIPELINE_CHECK_TIMEOUT=1 run_checker
+eq "B5f timed out" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B5f says it timed out" "$OUT" "did not finish in 1s"
+_B5F_CHILD="$(cat "$CASE/child.pid" 2>/dev/null)"
+if [ -z "$_B5F_CHILD" ]; then
+    fail "B5f child pid recorded" "stub never wrote child.pid"
+elif kill -0 "$_B5F_CHILD" 2>/dev/null; then
+    kill -KILL "$_B5F_CHILD" 2>/dev/null
+    fail "B5f no orphan child" "TERM-ignoring child $_B5F_CHILD outlived the timeout"
+else
+    ok "B5f no orphan child"
+fi
+
+# B6: rc 1 with no SIGNAL line fails loud
+healthy_fixture B6
+bpc_set 1 'VERDICT: degraded []'
+run_checker
+eq "B6 one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+has "B6 says no SIGNAL line" "$OUT" "printed no SIGNAL line"
+
+# B7: dedup is per key; a new signal still DMs
+healthy_fixture B7
+bpc_set 1 'SIGNAL: botkey:missing — no active ibl_api_keys row'
+run_checker
+eq "B7 run 1 DMs" 1 "$(dm_blocks)"
+run_checker
+eq "B7 run 2 sends no second DM" 1 "$(dm_blocks)"
+has "B7 run 2 suppressed" "$OUT" "dm=suppressed"
+bpc_set 1 'SIGNAL: botkey:missing — no active ibl_api_keys row' 'SIGNAL: bot:unreachable — no HTTP response'
+run_checker
+eq "B7 run 3 DMs the new signal" 2 "$(dm_blocks)"
+_B7_LAST="$(awk 'BEGIN{RS="---\n"} {b=$0} END{print b}' "$CASE/dm.log")"
+has "B7 last block has the new signal" "$_B7_LAST" "bot:unreachable"
+lacks "B7 last block omits the old signal" "$_B7_LAST" "- bug pipeline botkey:missing"
+has "B7 last block counts the suppressed one" "$_B7_LAST" "(1 more already reported today)"
+
+# B8: covered signals are dropped only when the covering key is present
+healthy_fixture B8a
+grep -vF 'com.ibl5.bug-pipeline-cron' "$CASE/launchctl.out" > "$CASE/lc.tmp"; mv "$CASE/lc.tmp" "$CASE/launchctl.out"
+bpc_set 1 'SIGNAL: process:unloaded — x'
+run_checker
+eq "B8a covering key present" 1 "$(count_fail missing:com.ibl5.bug-pipeline-cron)"
+eq "B8a process:unloaded dropped" 0 "$(count_fail bug-pipeline:process:unloaded)"
+eq "B8a no check-failed" 0 "$(count_fail bug-pipeline:check-failed)"
+healthy_fixture B8b
+grep -vF 'com.ibl5.bug-bot' "$CASE/launchctl.out" > "$CASE/lc.tmp"; mv "$CASE/lc.tmp" "$CASE/launchctl.out"
+bpc_set 1 'SIGNAL: bot:unloaded — x'
+run_checker
+eq "B8b covering key present" 1 "$(count_fail missing:com.ibl5.bug-bot)"
+eq "B8b bot:unloaded dropped" 0 "$(count_fail bug-pipeline:bot:unloaded)"
+eq "B8b no check-failed" 0 "$(count_fail bug-pipeline:check-failed)"
+healthy_fixture B8c
+printf '1\n' > "$CASE/docker-info-rc"
+bpc_set 2 'SIGNAL: botkey:db-unavailable — x' 'SIGNAL: stale:db-unavailable — y'
+run_checker
+eq "B8c covering key present" 1 "$(count_fail docker:daemon-down)"
+eq "B8c db-unavailable dropped" 0 "$(grep -c 'bug-pipeline:' <<< "$OUT")"
+healthy_fixture B8d
+printf '%s\n' ibl5-php ibl5-traefik > "$CASE/docker-ps.txt"
+bpc_set 2 'SIGNAL: botkey:db-unavailable — x' 'SIGNAL: stale:db-unavailable — y'
+run_checker
+eq "B8d covering key present" 1 "$(count_fail container:ibl5-mariadb)"
+eq "B8d db-unavailable dropped" 0 "$(grep -c 'bug-pipeline:' <<< "$OUT")"
+
+# B8n: skips stay conditional
+healthy_fixture B8n1
+bpc_set 1 'SIGNAL: process:unloaded — x'
+run_checker
+eq "B8n(a) process:unloaded reported without a covering key" 1 "$(count_fail bug-pipeline:process:unloaded)"
+healthy_fixture B8n2
+printf '%s\n' ibl5-mariadb ibl5-traefik > "$CASE/docker-ps.txt"
+bpc_set 2 'SIGNAL: stale:db-unavailable — y'
+run_checker
+eq "B8n(b) missing ibl5-php does not hide stale:db-unavailable" 1 "$(count_fail bug-pipeline:stale:db-unavailable)"
+
+# B9: a SIGNAL line the check cannot key is reported, not dropped
+healthy_fixture B9a
+bpc_set 1 'SIGNAL: Botkey:Missing — x'
+run_checker
+eq "B9a one unparsed-signal" 1 "$(count_fail bug-pipeline:unparsed-signal)"
+eq "B9a no key for the bad line" 0 "$(grep -c 'bug-pipeline:Botkey' <<< "$OUT")"
+eq "B9a rc 1" 1 "$RC"
+eq "B9a one DM" 1 "$(dm_blocks)"
+healthy_fixture B9b
+bpc_set 1 'SIGNAL: botkey:missing - ascii hyphen'
+run_checker
+eq "B9b one unparsed-signal" 1 "$(count_fail bug-pipeline:unparsed-signal)"
+eq "B9b no key for the bad line" 0 "$(grep -c 'bug-pipeline:botkey:missing' <<< "$OUT")"
+eq "B9b rc 1" 1 "$RC"
+eq "B9b one DM" 1 "$(dm_blocks)"
+
+# B10: drift guard — every signal the real checker can emit keys cleanly
+CHK="$SCRIPT_DIR/bug-pipeline-check"
+eq "B10 every emit site names a literal signal" \
+    "$(grep -cE 'emit (DEGRADED|UNKNOWN) ' "$CHK")" \
+    "$(grep -cE 'emit (DEGRADED|UNKNOWN) [a-z]+:[a-z-]+ ' "$CHK")"
+eq "B10 both emit arms print the SIGNAL shape" 2 "$(grep -c "printf 'SIGNAL: %s — %s" "$CHK")"
+grep -oE 'emit (DEGRADED|UNKNOWN) [a-z]+:[a-z-]+' "$CHK" | awk '{print $3}' | sort -u > "$TMP/corpus.txt"
+if [ "$(wc -l < "$TMP/corpus.txt")" -ge 20 ]; then ok "B10 corpus has at least 20 names"; else fail "B10 corpus size" "$(wc -l < "$TMP/corpus.txt") names"; fi
+_B10_I=0
+while read -r _name; do
+    [ -n "$_name" ] || continue
+    _B10_I=$((_B10_I+1))
+    healthy_fixture "B10_$_B10_I"
+    bpc_set 1 "SIGNAL: $_name — drift probe"
+    run_checker
+    eq "B10 $_name keys" 1 "$(count_fail "bug-pipeline:$_name")"
+done < "$TMP/corpus.txt"
+
+# B11/B12: unset and empty BUG_PIPELINE_CHECK_BIN both select the sibling checker
+healthy_fixture B11
+mkdir -p "$CASE/lhc"
+cp "$SCRIPT_DIR/launchd-health-check" "$CASE/lhc/launchd-health-check"
+ln -s "$SCRIPT_DIR/lib" "$CASE/lhc/lib"
+printf '#!/bin/sh\nprintf "SIGNAL: stale:rows-stuck — sibling default\\n"\nexit 1\n' > "$CASE/lhc/bug-pipeline-check"
+chmod +x "$CASE/lhc/bug-pipeline-check"
+OUT="$(env -u BUG_PIPELINE_CHECK_BIN bash "$CASE/lhc/launchd-health-check" 2>/dev/null)"
+RC=$?
+teardown_case
+eq "B11 unset seam runs the sibling checker" 1 "$(count_fail bug-pipeline:stale:rows-stuck)"
+eq "B11 no check-failed" 0 "$(count_fail bug-pipeline:check-failed)"
+healthy_fixture B12
+mkdir -p "$CASE/lhc"
+cp "$SCRIPT_DIR/launchd-health-check" "$CASE/lhc/launchd-health-check"
+ln -s "$SCRIPT_DIR/lib" "$CASE/lhc/lib"
+printf '#!/bin/sh\nprintf "SIGNAL: stale:rows-stuck — sibling default\\n"\nexit 1\n' > "$CASE/lhc/bug-pipeline-check"
+chmod +x "$CASE/lhc/bug-pipeline-check"
+OUT="$(BUG_PIPELINE_CHECK_BIN='' bash "$CASE/lhc/launchd-health-check" 2>/dev/null)"
+RC=$?
+teardown_case
+eq "B12 empty seam runs the sibling checker" 1 "$(count_fail bug-pipeline:stale:rows-stuck)"
+eq "B12 no check-failed" 0 "$(count_fail bug-pipeline:check-failed)"
+
+# B13: launchd-like empty environment under pipefail, set -u stays quiet
+healthy_fixture B13
+bpc_set 1 'SIGNAL: botkey:missing — no active ibl_api_keys row' 'VERDICT: degraded [botkey:missing]'
+OUT="$(env -i HOME="$CASE/home" PATH="$CASE/bin:/usr/bin:/bin" \
+    DOCKER_BIN="$DOCKER_BIN" DB_QUERY_BIN="$DB_QUERY_BIN" DISCORD_DM_BIN="$DISCORD_DM_BIN" \
+    LAUNCHD_HEALTH_LOG_DIR="$LAUNCHD_HEALTH_LOG_DIR" LAUNCHD_HEALTH_TODAY="$LAUNCHD_HEALTH_TODAY" \
+    BUG_PIPELINE_CHECK_BIN="$BUG_PIPELINE_CHECK_BIN" \
+    IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" \
+    IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
+    "$BASH" -o pipefail "$SCRIPT_DIR/launchd-health-check" 2>"$CASE/b13.err")"
+RC=$?
+teardown_case
+eq "B13 rc 1" 1 "$RC"
+eq "B13 one botkey:missing" 1 "$(count_fail bug-pipeline:botkey:missing)"
+lacks "B13 no unbound variable" "$(cat "$CASE/b13.err")" "unbound variable"
+
+# B13b: same environment with no SIGNAL line, so the final "$n" test reads the counter
+healthy_fixture B13b
+bpc_set 1 'VERDICT: degraded []'
+OUT="$(env -i HOME="$CASE/home" PATH="$CASE/bin:/usr/bin:/bin" \
+    DOCKER_BIN="$DOCKER_BIN" DB_QUERY_BIN="$DB_QUERY_BIN" DISCORD_DM_BIN="$DISCORD_DM_BIN" \
+    LAUNCHD_HEALTH_LOG_DIR="$LAUNCHD_HEALTH_LOG_DIR" LAUNCHD_HEALTH_TODAY="$LAUNCHD_HEALTH_TODAY" \
+    BUG_PIPELINE_CHECK_BIN="$BUG_PIPELINE_CHECK_BIN" \
+    IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" \
+    IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
+    "$BASH" -o pipefail "$SCRIPT_DIR/launchd-health-check" 2>"$CASE/b13.err")"
+RC=$?
+teardown_case
+eq "B13b one check-failed" 1 "$(count_fail bug-pipeline:check-failed)"
+lacks "B13b no unbound variable" "$(cat "$CASE/b13.err")" "unbound variable"
+
+# B14/B14b: the real bin/bug-pipeline-check, driven through its own seams
+b14_run() {
+    healthy_fixture "$1"
+    R="$CASE/bpc-real"
+    mkdir -p "$R"
+    cat > "$R/launchctl" <<'STUB'
+#!/bin/sh
+case "$1" in
+    list)  exit 0 ;;
+    print) printf 'last exit code = 0\nruns = 1\n'; exit 0 ;;
+    *)     exit 1 ;;
+esac
+STUB
+    cat > "$R/db-query" <<'STUB'
+#!/bin/sh
+D="$(dirname "$0")"
+printf '%s\n' "${DB_QUERY_TARGET:-}" >> "$D/db-target"
+case "$*" in
+    *ibl_api_keys*) printf '| n |\n|---|\n| %s |\n' "$(cat "$D/botkey-count")" ;;
+    *)              printf '| n |\n|---|\n| 0 |\n' ;;
+esac
+exit 0
+STUB
+    cat > "$R/curl" <<'STUB'
+#!/bin/sh
+printf '200'
+exit 0
+STUB
+    chmod +x "$R/launchctl" "$R/db-query" "$R/curl"
+    printf '%s\n' "$(date +%s)" > "$R/heartbeat"
+    printf '%s\n' "$2" > "$R/botkey-count"
+    export BUG_PIPELINE_CHECK_BIN="$SCRIPT_DIR/bug-pipeline-check"
+    export BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$R/launchctl"
+    export BUG_PIPELINE_CHECK_DB_QUERY_BIN="$R/db-query"
+    export BUG_PIPELINE_CHECK_CURL_BIN="$R/curl"
+    export BUG_PIPELINE_TICK_HEARTBEAT="$R/heartbeat"
+    run_checker
+    unset BUG_PIPELINE_CHECK_LAUNCHCTL_BIN BUG_PIPELINE_CHECK_DB_QUERY_BIN \
+          BUG_PIPELINE_CHECK_CURL_BIN BUG_PIPELINE_TICK_HEARTBEAT
+}
+
+b14_run B14 0
+eq "B14 rc 1" 1 "$RC"
+eq "B14 one botkey:missing" 1 "$(count_fail bug-pipeline:botkey:missing)"
+eq "B14 exactly one bug-pipeline problem" 1 "$(grep -c 'FAIL: bug-pipeline:' <<< "$OUT")"
+has "B14 dm body" "$(cat "$CASE/dm.log" 2>/dev/null)" "botkey:missing"
+eq "B14 db-query ran" yes "$([ -s "$R/db-target" ] && echo yes || echo no)"
+eq "B14 every db-query call targets main" 0 "$(grep -cvx main "$R/db-target")"
+
+b14_run B14b 1
+eq "B14b rc 0" 0 "$RC"
+eq "B14b no bug-pipeline lines" 0 "$(grep -c 'bug-pipeline:' <<< "$OUT")"
+eq "B14b no DM" 0 "$(dm_blocks)"
 
 # ---------------------------------------------------------------------------
 echo ""

@@ -26,6 +26,40 @@ final class AdminChatStatusTest extends TestCase
         self::assertStringContainsString("at {$time}.", $message);
     }
 
+    public function testStartedMessageNamesGitHubActionsHost(): void
+    {
+        self::assertSame(
+            'Sim 740 recap started on GitHub Actions.',
+            AdminChatStatus::message('started', 740, [], 'actions')
+        );
+    }
+
+    public function testStartedMessageNamesTheMacHost(): void
+    {
+        self::assertSame(
+            'Sim 740 recap started on the Mac.',
+            AdminChatStatus::message('started', 740, [], 'mac')
+        );
+    }
+
+    /** The start line is a bare announcement: the cause words never leak into it. */
+    public function testStartedMessageIgnoresTheCause(): void
+    {
+        self::assertSame(
+            'Sim 740 recap started on GitHub Actions.',
+            AdminChatStatus::message('started', 740, ['last_cause' => 'flaky'], 'actions')
+        );
+    }
+
+    /** The start line carries neither cause words nor the viewer link, even when both are supplied. */
+    public function testStartedMessageNeverCarriesTheViewerLink(): void
+    {
+        self::assertSame(
+            'Sim 740 recap started on GitHub Actions.',
+            AdminChatStatus::message('started', 740, ['last_cause' => 'flaky'], 'actions', 'https://example.test/x')
+        );
+    }
+
     public function testHandedMessageNamesBothHosts(): void
     {
         $toMac = AdminChatStatus::message('handed_mac', 812, ['last_cause' => 'auth'], 'actions');

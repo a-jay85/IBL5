@@ -102,6 +102,8 @@ srt_expect_eq "store passes stdin through" '{"x":1}' "$(cat "$STUB/php.stdin" 2>
 
 # ── 4. denies wrong root ──────────────────────────────────────────────────────
 gate_expect_denied "php /tmp/evil/ibl5/scripts/simRecapQueue.php claim-next --host=mac"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim-next --host=actions --event=started"
+gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php claim --sim=12 --host=mac --event=started"
 gate_expect_denied "php /srv/ibl/../evil/ibl5/scripts/simRecapQueue.php claim-next --host=mac"
 gate_expect_denied "php /srv/ibl/ibl5/scripts/simRecapQueue.php x /srv/ibl/ibl5/scripts/storeSimRecap.php claim-next"
 gate_denied_report "denies wrong root"

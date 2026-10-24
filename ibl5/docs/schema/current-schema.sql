@@ -3539,7 +3539,7 @@ CREATE TABLE `ibl_sim_summaries` (
   `transport_failures` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Parks with cause transport (ssh, tunnel, input fetch, store transport).',
   `usage_waits` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Usage-limit waits. Informational; never terminal on its own.',
   `auth_failed_hosts` set('mac','actions') NOT NULL DEFAULT '' COMMENT 'Hosts whose Claude login failed for this sim. Both set = terminal.',
-  `notified_state` enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable') DEFAULT NULL COMMENT 'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
+  `notified_state` enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable','started') DEFAULT NULL COMMENT 'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
   `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
   PRIMARY KEY (`sim`),
   KEY `idx_claim` (`status`,`blocked_until`,`sim`) COMMENT 'The composite index the oldest-pending-first selection scans.'

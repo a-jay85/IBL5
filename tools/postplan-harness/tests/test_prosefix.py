@@ -584,7 +584,8 @@ def test_run_passes_llm_to_meta_checks(monkeypatch):
     out = tempfile.mkdtemp(prefix="postplan-test-prosefix-")
     llm = FixtureLlm(UsageLedger(), canned)
     runner.run(fx, out, llm, mode="replay", headless=True)
-    assert recorded.get("llm") is llm
+    # run() hands every site the OwnerGuardLlm proxy around the adapter it was given.
+    assert recorded.get("llm")._inner is llm
 
 
 def test_runner_usage_limit_propagates(prose_repo):

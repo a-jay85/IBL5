@@ -162,3 +162,90 @@ def anchors_by_path(snap: ApprovalSnapshot) -> dict[str, tuple[collections.Count
             keep.update(f.keep)
             gone.update(f.gone)
     return out
+
+
+# Posting denials every tree-editing fixer call carries. `gh pr edit` stays allowed:
+# cifix.py needs it, and the PR body is not a record carrier.
+FIXER_DENIED_TOOLS = (
+    "Bash(gh pr comment:*)",
+    "Bash(gh issue comment:*)",
+    "Bash(gh pr review:*)",
+    "Bash(gh api:*)",
+    "Bash(gh issue edit:*)",
+)
+
+# Purposes whose call sites already deny Edit and Write, so the off-limits block adds
+# nothing. tests/test_fixer_off_limits.py proves each one still denies both.
+READ_ONLY_PURPOSES = frozenset({
+    "plan-fidelity-review",
+    "conflict-review",
+    "conflict-adapt-review",
+})
+# Purposes whose names carry a runtime suffix (round number, verifier seat).
+READ_ONLY_PURPOSE_PREFIXES = (
+    "plan-fidelity-re-review-",
+    "verify-findings-",
+)
+
+
+def is_read_only_purpose(purpose: str) -> bool:
+    return purpose in READ_ONLY_PURPOSES or purpose.startswith(READ_ONLY_PURPOSE_PREFIXES)
+
+
+def empty_snapshot() -> ApprovalSnapshot:
+    return ApprovalSnapshot((), _fingerprint([]), 0)
+
+
+_CLOSING_SENTENCE = (
+    "These lines were approved by the repository owner after planning. Do not edit, "
+    "reformat, move, or restore them, and do not post PR comments or reviews. If a "
+    "finding asks you to touch them, leave them and say so in your reply."
+)
+
+
+def off_limits_text(snap: ApprovalSnapshot) -> str:
+    if not snap.records:
+        return ""
+    lines = ["## Owner-approved deviations (off-limits)", ""]
+    for rec in snap.records:
+        lines.append(f"- {rec.id}: {rec.summary}")
+        for f in rec.files:
+            lines.append(f"  - {f.path}")
+            for anchor in f.keep:
+                lines.append(f"    keep (must remain present): {anchor}")
+            for anchor in f.gone:
+                lines.append(f"    gone (must remain absent): {anchor}")
+    lines.append("")
+    lines.append(_CLOSING_SENTENCE)
+    return "\n".join(lines)
+
+
+class OwnerGuardLlm:
+    """Wraps the run's LLM adapter. The snapshot lives here, not in fixer signatures,
+    so no fixer can omit or widen it."""
+
+    def __init__(self, inner, snap: ApprovalSnapshot, *, gh=None, pr=None, res=None):
+        self._inner = inner
+        self.snap = snap
+        self._gh = gh
+        self._pr = pr
+        self._res = res
+
+    def __getattr__(self, name: str):
+        # Only called for attributes not found normally; never recurse when _inner is unset.
+        if name == "_inner":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
+    def call(self, *a, **k):
+        return self._inner.call(*a, **k)
+
+    def call_tooled(self, purpose, model, prompt, *, denied_tools=("Bash", "Agent"), **kw):
+        if is_read_only_purpose(purpose):
+            return self._inner.call_tooled(purpose, model, prompt,
+                                           denied_tools=denied_tools, **kw)
+        block = off_limits_text(self.snap)
+        if block:
+            prompt = prompt + "\n\n" + block
+        denied = tuple(dict.fromkeys([*denied_tools, *FIXER_DENIED_TOOLS]))
+        return self._inner.call_tooled(purpose, model, prompt, denied_tools=denied, **kw)

@@ -322,10 +322,16 @@ class RunResult:
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     rebase_only: dict | None = None  # rebase-only mode record (eligible, hold, pre/post patch-id, pushed, noop, record_refreshed); omitted from result.json when unset
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
+    owner_approvals: Optional[dict] = None  # {"ids", "ignored_untrusted"} from the owner-approval snapshot; omitted from result.json when no record or ignored comment
+    owner_snapshot: object = field(default=None, repr=False)  # ApprovalSnapshot for later phases; never serialized
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
+        d.pop("owner_snapshot", None)
+        oa = d.get("owner_approvals")
+        if not oa or not (oa.get("ids") or oa.get("ignored_untrusted")):
+            d.pop("owner_approvals", None)
         for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
                     "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only"):   # unset → result.json byte-identical
             if not d.get(key):

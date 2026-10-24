@@ -17,6 +17,7 @@ import subprocess
 import time
 
 from .state import HarnessError
+from .owner_approvals import FIXER_DENIED_TOOLS
 from . import llm_calls
 from . import fidelity_filefix
 
@@ -68,8 +69,7 @@ REMEDIATION_DENIED_TOOLS = (
     "Bash(git push:*)",
     "Bash(git commit:*)",
     "Bash(gh pr merge:*)",
-    "Bash(gh pr review:*)",
-    "Bash(gh api:*)",
+    *FIXER_DENIED_TOOLS,
 )
 
 # Inline diff budget for the remediation prompt. 40 KB is ~10K tokens: large enough

@@ -41,6 +41,7 @@ HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
+from harness import owner_approvals
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
@@ -345,6 +346,19 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         f"predicted by merge-tree probe vs origin/master: "
                         f"{', '.join(conflict_files)}; resolver would refuse: {refusal}")
                 log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
+
+        # Owner-approved deviations (ADR pending): one snapshot per run, read before any
+        # fixer can spawn. The wrapper owns it, so no fixer signature carries it. A PR that
+        # does not exist yet cannot hold an owner record. Fail closed: a HarnessError from
+        # the read propagates to the outer handler and nothing is pushed.
+        snap_pr = gh.pr_number() if gh.pr_exists() else None
+        snap = owner_approvals.snapshot(gh, snap_pr) if snap_pr else owner_approvals.empty_snapshot()
+        llm = owner_approvals.OwnerGuardLlm(llm, snap, gh=gh, pr=snap_pr, res=res)
+        if getattr(git, "llm", None) is not None:
+            git.llm = llm      # conflict resolvers reach the LLM through the git adapter
+        res.owner_approvals = {"ids": [r.id for r in snap.records],
+                               "ignored_untrusted": snap.ignored_untrusted}
+        res.owner_snapshot = snap
 
         if rebase_only:
             ok, why, ro_pr, ro_hold = _rebase_only_gate(

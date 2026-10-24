@@ -131,6 +131,24 @@ intent log — without touching GitHub.
   - **Failure.** A rejected, empty or timed-out attempt is reverted and the run fails closed with the original denial (exit 3). A retry that is still denied raises the ORIGINAL error and leaves the fixer's edits in the tree.
   - **Record.** `result.json` carries `gate_fix` (status, model, cost, files, gate class, phase, retry) and `audit.log` carries a `gatefix:` line. A fix whose retry passed adds a `gate-fix` marker block to the PR body. `actions.jsonl` gets no row, because the fixer issues no `gh` mutation and the PR body edit goes through the existing body-edit intent.
 
+## Owner-approved deviations
+
+An owner who approves a change the plan did not ask for records it with `bin/approve-deviation --pr N --commit SHA --summary "..."` (or `--diff FILE`). The command posts a PR issue comment that carries a hidden `<!-- postplan-owner-approval -->` marker and a JSON record. The record has an `oad-` id, a summary, and per path a `keep` list (normalized added lines that must stay present) and a `gone` list (normalized removed lines that must stay absent). The writer derives both lists from `git show --unified=0`, drops trivial lines such as a lone `}`, and refuses a change with no non-trivial line. Re-running it on the same change is idempotent. Decision: `ibl5/docs/decisions/0215-owner-approved-deviation-records.md`.
+
+Only a comment whose GitHub `user.login` is `a-jay85` and whose `user.type` is `User` counts. Bot authors, `[bot]` logins, and record-shaped blocks in the PR body have no effect.
+
+`run()` reads the record set once at run start, before any fixer spawns, through `harness/owner_approvals.py`. A fixer runs with the owner's `gh` token, so a record it posted mid-run would look like the owner's. Taking the snapshot first keeps every fixer working against the owner's set. An unreadable or malformed owner record stops the run before any fixer.
+
+The snapshot lives in `OwnerGuardLlm`, which wraps the LLM adapter. Every tree-editing `call_tooled` prompt gets an `## Owner-approved deviations (off-limits)` block, and every call's `denied_tools` gains the PR and issue posting commands. After each editing call the guard re-lists the records and holds on any change.
+
+Every fixer commit passes through `_commit_with_gate_fix`. A commit that drops a `keep` line or brings back a `gone` line is undone locally, nothing is pushed, and arming condition (20) holds the PR with a notice naming the line.
+
+Fidelity review sees the same records in its packet. A reviewer finding that the owner approved cites `approved-by-owner: <id>`. Only the harness downgrades that finding, and only when the id is in the snapshot and its anchors are still at `HEAD`. An uncited finding keeps its `NOT READY`.
+
+These exit-3 kinds come from this path: `owner-approval-revert`, `owner-approval-undo-failed`, `owner-approval-check`, `owner-approval-drift`, `owner-approval-record`.
+
+The skill fallback engine gets condition (20) in its conservative form only: it holds whenever the PR carries an owner-approval record, because it cannot run the Python revert check. The harness engine, which bin/post-plan-now pins by default, runs the full check. A shell revert check for the fallback is deferred (see Out of Scope).
+
 ## Installation (executed 2026-07-16 with explicit approval)
 
 1. ✅ `LiveGh` (`harness/adapters/ghad.py`) executes the seven allowlisted

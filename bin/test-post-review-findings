@@ -15,6 +15,7 @@
 #   • list_open_review_findings lists only UNRESOLVED threads, with score/line
 #   • resolve_review_finding replies in-thread AND resolves the owning thread
 #   • resolve_review_finding refuses an unknown / malformed comment id
+#   • reply_review_thread replies in-thread WITHOUT resolving
 #   • all 3 callers document the disposition step (structural)
 #   • sourcing under zsh installs a working cleanup trap and leaks no temp dir
 #   • 4b-probe.sh's helper-envelope regex still matches what this lib actually emits
@@ -130,10 +131,12 @@ cat > "$GH_THREADS_FIXTURE" <<'THREADS'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
   {"id":"PRRT_open85","isResolved":false,"isOutdated":false,
    "path":"classes/Foo.php","line":12,
-   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->","author":{"login":"a-jay85","__typename":"User"}}]}},
+   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->","author":{"login":"a-jay85","__typename":"User"}}]},
+   "lastComment":{"nodes":[{"body":"<!-- postplan-gate-hold --> later reply","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
   {"id":"PRRT_done90","isResolved":true,"isOutdated":false,
    "path":"classes/Foo.php","line":13,
-   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
+   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->","author":{"login":"claude[bot]","__typename":"Bot"}}]},
+   "lastComment":{"nodes":[{"body":"a later reply from a deleted account","author":null}]}},
   {"id":"PRRT_human","isResolved":false,"isOutdated":true,
    "path":"classes/Bar.php","line":null,
    "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question","author":null}]}},
@@ -379,6 +382,43 @@ resolve_review_finding 42 "abc" 'Fixed.' >/dev/null 2>&1 || rc=$?
 if [ "$rc" -eq 2 ]; then ok "case12: non-numeric comment id → exit 2"; else fail "case12: exit $rc, expected 2"; fi
 assert_absent "case12: no reply posted"  "$REPLY_OUT"
 assert_absent "case12: nothing resolved" "$RESOLVE_OUT"
+
+# ── reply-1..4: reply_review_thread replies WITHOUT resolving ────────────────
+reset_outputs
+rc=0
+reply_review_thread 42 111 'gate hold body' >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 0 ]; then ok "reply-1: reply exits 0"; else fail "reply-1: exit $rc, expected 0"; fi
+assert_contains "reply-1: endpoint" "$REPLY_OUT" "repos/a-jay85/IBL5/pulls/42/comments/111/replies"
+assert_contains "reply-1: body"     "$REPLY_OUT" "gate hold body"
+assert_absent   "reply-1: no resolve mutation" "$RESOLVE_OUT"
+
+reset_outputs
+rc=0
+reply_review_thread 42 "abc" 'x' >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 2 ]; then ok "reply-2: non-numeric comment id → exit 2"; else fail "reply-2: exit $rc, expected 2"; fi
+assert_absent "reply-2: no reply posted" "$REPLY_OUT"
+
+reset_outputs
+rc=0
+# The thread lookup must succeed so only the POST fails; a bare GH_CMD=false
+# would fail the lookup first and never reach the POST's `|| return 1`.
+cat > "$SHIMD/gh-postfail" <<'POSTFAIL'
+#!/usr/bin/env bash
+if [ "$1" = "api" ] && [ "$2" = "--method" ] && [ "$3" = "POST" ]; then exit 1; fi
+exec "$(dirname "$0")/gh" "$@"
+POSTFAIL
+chmod +x "$SHIMD/gh-postfail"
+SAVED_GH_CMD="$GH_CMD"
+GH_CMD="$SHIMD/gh-postfail"
+reply_review_thread 42 111 'x' >/dev/null 2>&1 || rc=$?
+GH_CMD="$SAVED_GH_CMD"
+if [ "$rc" -eq 1 ]; then ok "reply-3: failing POST → exit 1"; else fail "reply-3: exit $rc, expected 1"; fi
+
+reset_outputs
+rc=0
+reply_review_thread 42 999 'x' >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 1 ]; then ok "reply-4: unknown comment id → exit 1"; else fail "reply-4: exit $rc, expected 1"; fi
+assert_absent "reply-4: no reply posted" "$REPLY_OUT"
 
 # ── structural case 7: all 3 callers reference the helper ────────────────────
 for f in \
@@ -730,8 +770,9 @@ else
 fi
 
 # ── pin-A: prf_review_threads emits one object per thread with the 8 base keys ─
-# Characterization: Phase 2 ADDS authorLogin/authorType; every key here must
-# survive that edit unchanged (superset assertion, so the pin stays green-green).
+# Characterization: the object also carries authorLogin/authorType (pin-D) and
+# lastBody/lastAuthorLogin/lastAuthorType (pin-F); every key here must survive
+# those additions unchanged (superset assertion, so the pin stays green-green).
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 PIN_A="$BASE_TMP/pin-a.jsonl"
 prf_review_threads 42 > "$PIN_A"
@@ -752,6 +793,12 @@ if jq -s -e '.[0].score == 85 and .[2].score == null and .[3].commentId == null
     ok "pin-A: score parse, null score, ghost commentId, isOutdated preserved"
 else
     fail "pin-A: per-thread derived fields drifted"
+fi
+if jq -e 'has("lastBody") and has("lastAuthorLogin") and has("lastAuthorType")' \
+      "$PIN_A" >/dev/null 2>&1; then
+    ok "pin-A: every object carries the 3 latest-comment keys"
+else
+    fail "pin-A: a thread object lacks a latest-comment key"
 fi
 
 # ── pin-B: list_open_review_findings TSV is exactly 4 tab-separated columns ───
@@ -791,6 +838,41 @@ if grep -qE 'comments\(first:1\) \{ nodes \{ databaseId body author \{ login __t
     ok "pin-E: prf_review_threads query selects author.login and author.__typename"
 else
     fail "pin-E: author selection missing from prf_review_threads GraphQL query"
+fi
+
+# ── pin-F: lastBody / lastAuthor* come from the LATEST comment, null-safe ──────
+PIN_F="$BASE_TMP/pin-f.jsonl"
+prf_review_threads 42 > "$PIN_F"
+if jq -s -e '(.[0].lastBody | contains("postplan-gate-hold"))
+             and .[0].lastAuthorLogin == "claude[bot]" and .[0].lastAuthorType == "Bot"' \
+      "$PIN_F" >/dev/null 2>&1; then
+    ok "pin-F: latest comment body and author projected"
+else
+    fail "pin-F: latest-comment projection wrong: $(jq -c '{lastBody,lastAuthorLogin,lastAuthorType}' "$PIN_F" | tr '\n' ' ')"
+fi
+if jq -s -e '.[1].lastAuthorLogin == "" and .[1].lastAuthorType == ""' \
+      "$PIN_F" >/dev/null 2>&1; then
+    ok "pin-F: null latest author yields empty strings"
+else
+    fail "pin-F: null latest-author guard missing"
+fi
+if jq -s -e '.[2].lastBody == "" and .[3].lastBody == ""' "$PIN_F" >/dev/null 2>&1 \
+   && [ "$(wc -l < "$PIN_F")" -eq 4 ]; then
+    ok "pin-F: absent latest comment yields \"\" and the ghost thread did not abort"
+else
+    fail "pin-F: lastBody guard missing or ghost thread aborted ($(wc -l < "$PIN_F") objects)"
+fi
+if jq -s -e '.[0].authorLogin == "a-jay85"' "$PIN_F" >/dev/null 2>&1; then
+    ok "pin-F: root authorLogin unchanged by the latest-comment alias"
+else
+    fail "pin-F: root authorLogin now reads the latest comment"
+fi
+
+# ── pin-G: the GraphQL selection requests the latest comment ──────────────────
+if grep -qF 'lastComment: comments(last:1) { nodes { body author { login __typename } } }' "$LIB"; then
+    ok "pin-G: prf_review_threads query selects the latest comment"
+else
+    fail "pin-G: lastComment alias missing from prf_review_threads GraphQL query"
 fi
 
 # ── trust-1..: list_trusted_open_threads ──────────────────────────────────────

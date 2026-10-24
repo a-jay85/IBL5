@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from typing import Callable, Optional, Sequence, TypeVar
 
-from .state import HarnessError
+from .state import PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -33,7 +33,9 @@ TRANSIENT_MARKERS: tuple[str, ...] = (
 # A bare "EOF" never matches; the quoted URL and the ": EOF" suffix are required.
 HTTP_EOF_RE = re.compile(r'\b[A-Z][a-z]+ "https?://[^"\s]+": EOF\b')
 _HARNESS_TIMEOUT_RE = re.compile(r"exceeded \d+(?:\.\d+)?s\b")  # LiveGh._gh timeout text
-_NEVER_RETRY_KINDS = frozenset({"local-gate"})
+# A harness timeout already spent its whole budget, and retrying it multiplies wall time
+# past the fleet's 90 min (4 attempts plus 85 s of sleeps, per push-lease attempt).
+_NEVER_RETRY_KINDS = frozenset({"local-gate", SUBPROCESS_TIMEOUT, PRECOMMIT_HANG})
 # GitHub primary rate limit, GraphQL or REST shape. The secondary (abuse) limit
 # reads "exceeded a secondary rate limit" and is deliberately not matched.
 RATE_LIMIT_RE = re.compile(r"\bAPI rate limit (?:already )?exceeded\b")

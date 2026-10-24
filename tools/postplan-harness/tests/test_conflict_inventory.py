@@ -64,6 +64,28 @@ def test_lockfile_unresolvable():
     assert inv.files == ()
 
 
+def _three_stage(path: str) -> str:
+    return (
+        f"100644 aabbcc 1\t{path}\n"
+        f"100644 aabbcd 2\t{path}\n"
+        f"100644 aabbce 3\t{path}\n"
+    )
+
+
+def test_iblbot_package_lock_still_unresolvable():
+    path = "ibl5/IBLbot/package-lock.json"
+    inv = inventory_conflicts(_run_with(_three_stage(path)))
+    assert inv.unresolvable_reason == f"lockfile: {path}"
+    assert inv.files == ()
+
+
+def test_unregistered_dot_lock_still_unresolvable():
+    path = "ibl5/other.lock"
+    inv = inventory_conflicts(_run_with(_three_stage(path)))
+    assert inv.unresolvable_reason == f"lockfile: {path}"
+    assert inv.files == ()
+
+
 def test_delete_vs_modify():
     # stages 1 and 2 only — modify/delete: resolvable, the resolver settles it
     text = (

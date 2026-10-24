@@ -30,7 +30,7 @@ final class ParkPolicy
 
     public const HOSTS = ['mac', 'actions'];
 
-    public const NOTIFY_STATES = ['retrying', 'waiting', 'handed_mac', 'handed_actions', 'posted', 'recovered', 'unavailable'];
+    public const NOTIFY_STATES = ['retrying', 'waiting', 'handed_mac', 'handed_actions', 'posted', 'recovered', 'unavailable', 'started'];
 
     /** A recap for tonight's sim stops being useful by the next sim. */
     public const WINDOW_HOURS = 24;

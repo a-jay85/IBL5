@@ -646,6 +646,21 @@ cd "$ROOT" || exit 1
 RC=0
 timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
+# A timed-out run's last step: the last "starting" line of the harness audit.log, found
+# through post-plan-now's harness-run-dir= line. Empty (and no line written) when either
+# is missing, so the timeout wording stays as it was.
+TIMEOUT_STEP=""
+if [ "$RC" = 124 ]; then
+    _to_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
+        | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
+    if [ -n "$_to_dir" ] && [ "$_to_dir" != none ] && [ -f "$_to_dir/audit.log" ]; then
+        TIMEOUT_STEP=$(grep -E '^\[[0-9:]+\] [A-Za-z0-9._-]+: starting ' "$_to_dir/audit.log" 2>/dev/null \
+            | tail -n 1 | sed -E 's/^\[[0-9:]+\] //' | cut -c1-160 || true)
+    fi
+    if [ -n "$TIMEOUT_STEP" ]; then
+        echo "post-plan-now: timed-out run's last step: $TIMEOUT_STEP" >> "$LOG"
+    fi
+fi
 notify() {
     ljob_dm_ready post-plan-fleet || return 0
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
@@ -656,6 +671,10 @@ notify() {
     if [ -n "$stop_line" ]; then
         stop_text=$(printf '%s' "$stop_line" | sed 's/.*STOP:[[:space:]]*//' | cut -c1-120)
     fi
+    # First RESULT: line, the same one the fleet-outcome block reads further down. A hold-repeat
+    # decline is recognised from it before the RC check, so rc=0 (harness) and rc=8 (post-plan-now) agree.
+    local first_result="" decl_text=""
+    first_result=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
     if [ "$RC" = 124 ]; then
         verdict="TIMED OUT"
     elif grep -q 'postplan-rc=75' "$LOG" 2>/dev/null \
@@ -664,6 +683,12 @@ notify() {
         verdict="PAUSED"
     elif [ -n "$stop_line" ]; then
         verdict="STOPPED"
+    elif [[ "$first_result" == "RESULT: post-plan DECLINED"* ]]; then
+        verdict="DECLINED"
+        decl_text="${first_result#RESULT: post-plan DECLINED}"
+        decl_text="${decl_text# — }"
+        decl_text="${decl_text#terminal=hold-repeat-declined; }"
+        decl_text=$(printf '%s' "$decl_text" | cut -c1-200)
     else
         # Primary: find harness-run-dir from log and read result.json
         local run_dir=""
@@ -766,7 +791,12 @@ for c in (d.get("arm") or {}).get("conditions") or []:
                             DM_NEXT="nothing to fix — it resumes on its own after the usage reset" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"
-                            DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`" ;;
+                            DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`"
+                            if [ -n "$TIMEOUT_STEP" ]; then
+                                DM_NEXT="last step reached: ${TIMEOUT_STEP}"$'\n'"${DM_NEXT}"
+                            fi ;;
+        DECLINED)           DM_ICON="🚫"; DM_VERDICT="DECLINED (same hold as last run)"
+                            DM_NEXT="$decl_text" ;;
         *)
             if [ "$RC" != 0 ]; then
                 DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="$bail_lines"

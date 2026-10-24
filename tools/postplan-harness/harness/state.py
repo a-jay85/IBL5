@@ -31,6 +31,7 @@ class TerminalState(str, Enum):
 
 OUTPUT_KEEP = 4000   # HarnessError.output keeps this many trailing characters
 SUBPROCESS_TIMEOUT = "subprocess-timeout"   # HarnessError.kind for a bounded subprocess that hung
+PRECOMMIT_HANG = "precommit-hang"   # HarnessError.kind: git commit's pre-commit hook outlived COMMIT_HOOK_TIMEOUT
 
 
 class HarnessError(Exception):
@@ -145,6 +146,8 @@ class PlanInfo:
     planned_test_paths: list[str] = field(default_factory=list)
     no_change_test_paths: list[str] = field(default_factory=list)  # planned tokens every VR row marked `(no-change)`; conformance skips these
     run_only_test_paths: list[str] = field(default_factory=list)  # planned tokens every row marked `(run-only)`; conformance skips MISSING for these when the file is tracked
+    reference_only_test_paths: dict[str, str] = field(default_factory=dict)  # planned token -> reason the plan declares it reference-only (planfile.parse_reference_only_test_paths); conformance skips MISSING when the file is tracked
+    reference_only_refusals: dict[str, str] = field(default_factory=dict)  # planned token -> why a reference-only signal was vetoed; conformance records a REFERENCE-ONLY-REFUSED: note and keeps MISSING
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
     backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
@@ -316,6 +319,7 @@ class RunResult:
     manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
     run_id: str = ""                          # basename(out_dir); popped when empty
     reused_from: dict = field(default_factory=dict)  # arm -> producing run id; popped when empty
+    retries: dict[str, int] = field(default_factory=dict)  # stage -> extra attempts this run ("conflict-review", "merge-danger"); popped when empty
     review_delta: list[str] = field(default_factory=list)  # interdiff-reviewed paths; popped when empty
     rearm: dict | None = None  # RunResult.rearm: Phase 7 re-arm outcome after the fix loop; None = never ran
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
@@ -350,7 +354,7 @@ class RunResult:
                 d["plan"].pop("plan_source", None)
         if not self.manual_testing:
             d.pop("manual_testing", None)   # keep existing replay goldens byte-identical
-        for key in ("run_id", "reused_from", "review_delta"):   # review cache; unset → byte-identical
+        for key in ("run_id", "reused_from", "review_delta", "retries"):   # review cache; unset → byte-identical
             if not d.get(key):
                 d.pop(key, None)
         return json.dumps(d, indent=1, default=str)

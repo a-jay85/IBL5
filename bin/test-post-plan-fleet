@@ -702,7 +702,7 @@ end_case wait-dry-run-inert
 # --- case 20: wait-drains ----------------------------------------------------------------
 # Sub-case A (fast): empty label list → reap_stale reaps all plists in the first
 # iteration → live_slots=0 → break without printing "waiting for".
-# Sub-case B (~20s): a plist for a PR that is NOT a selection candidate, whose label IS
+# Sub-case B (~4s at WAIT_POLL=1): a plist for a PR that is NOT a selection candidate, whose label IS
 # live, survives the first reap → "waiting for 1 session(s)…" printed → a background job
 # clears the label list → the second iteration reaps it → live_slots hits 0 → exit 0.
 #
@@ -727,7 +727,7 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 ( sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
 _wd_bg=$!
-out_b="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
+out_b="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
          run_driver --go --wait 2>&1)"; rc_b=$?
 wait "$_wd_bg" 2>/dev/null
 [[ $rc_b -eq 0 ]] || fail "wait-drains/B: exit $rc_b (out: $out_b)"
@@ -902,18 +902,19 @@ end_case seam-wtl-unset-vs-empty
 # --- case 32: reap-respects-live-process -------------------------------------------------
 # 32a: a plist whose process is ALIVE survives the first reap → the wait block actually waits.
 # 32b: once that process exits, the next iteration DOES reap it → live_slots reaches 0.
-# The 12s stub straddles the wait block's `sleep 20`: iteration 1 (t≈0) preserves, iteration 2
-# (t≈20) reaps. A longer stub would loop to CEILING_SECS=7200 and hang the harness.
+# The 6s stub straddles the wait block's poll (WAIT_POLL=1 below): iteration 1 (t≈0) preserves the
+# slot, a later iteration (t≈6) reaps it. Never go below 6: a slow driver start would reap on
+# iteration 1 and fail 32a. A longer stub would loop to CEILING_SECS=7200 and hang the harness.
 begin_case
 clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist"
 clear_live_labels
-( SLEEP_SECS=12 "$SLEEPER" post-plan-now --pr 9001 --foreground >/dev/null 2>&1 & )
+( SLEEP_SECS=6 "$SLEEPER" post-plan-now --pr 9001 --foreground >/dev/null 2>&1 & )
 sleep 0.5
 pgrep -f "post-plan-now --pr 9001( |$)" >/dev/null 2>&1 \
     || fail "reap-respects-live-process: sleeper fixture never started"
-out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait 2>&1)"; rc=$?
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 run_driver --go --wait 2>&1)"; rc=$?
 pkill -f "post-plan-now --pr 9001( |$)" 2>/dev/null || true
 [[ $rc -eq 0 ]] || fail "reap-respects-live-process: exit $rc (out: $out)"
 grep -qE 'waiting for [0-9]+ session' <<< "$out" \
@@ -928,7 +929,8 @@ end_case reap-respects-live-process
 # A pgrep that ERRORS (exit 2 — how procps rejects a BSD-only flag) must read as ALIVE.
 # Reading an error as "dead" is exactly how a portability slip would silently restore L34.
 # Because failing closed means the wait block never drains, the driver is bounded and killed
-# rather than waited on; the assertion is on the surviving plist, not on the exit code.
+# rather than waited on; the 8s window is about 8 polls at WAIT_POLL=1. The assertion is on the
+# surviving plist, not on the exit code.
 begin_case
 clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"
@@ -936,9 +938,9 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 clear_live_labels
 printf '#!/usr/bin/env bash\necho "pgrep: invalid option" >&2\nexit 2\n' > "$SCRATCH/.local/bin/pgrep"
 chmod +x "$SCRATCH/.local/bin/pgrep"
-POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait >/dev/null 2>&1 &
+POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 run_driver --go --wait >/dev/null 2>&1 &
 _p=$!
-sleep 25
+sleep 8
 kill "$_p" 2>/dev/null || true
 wait "$_p" 2>/dev/null || true
 rm -f "$SCRATCH/.local/bin/pgrep"
@@ -2910,7 +2912,74 @@ else
     [[ ! -f "$_HOLD_PLIST" ]] || fail "runner-real-timeout: plist not removed (slot leaked)"
     (( _T_ELAPSED <= 10 )) \
         || fail "runner-real-timeout: runner took ${_T_ELAPSED}s; the 1 s timeout never fired"
+    # No run dir in this arm, so the timeout wording must stay as it was.
+    ! grep -qF "timed-out run's last step" "$_DM_LOG" 2>/dev/null \
+        || fail "runner-real-timeout: log names a last step with no run dir"
+    ! grep -qF 'last step reached' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-real-timeout: DM names a last step with no run dir"
     end_case runner-real-timeout
+
+    # A timed-out run with a run dir and audit.log: the last "starting" line is named in the
+    # log (after the unchanged TIMED OUT line) and in the DM above the re-run hint. The stub
+    # runs with HOME=$SCRATCH, so it builds its run dir under $HOME.
+    _STEP_BODY='d="$HOME/run65s"; mkdir -p "$d"; printf "[11:30:01] phase2: starting scope check\n[11:30:05] phase2: starting commit (pre-commit hook)\n[11:30:06] phase2: hook output follows\n" > "$d/audit.log"; echo "post-plan-now: postplan-rc=143 harness-rc=0 harness-run-dir=$d"; '
+    begin_case
+    _dm_timeout_arm 65s "${_STEP_BODY}exec sleep 30"
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks the TIMED OUT rc=124 line ($(cat "$_DM_LOG" 2>/dev/null))"
+    grep -qxF "post-plan-now: timed-out run's last step: phase2: starting commit (pre-commit hook)" "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks the last-step line ($(cat "$_DM_LOG" 2>/dev/null))"
+    _to_ln=$(grep -nxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null | head -n 1 | cut -d: -f1 || true)
+    _st_ln=$(grep -nxF "post-plan-now: timed-out run's last step: phase2: starting commit (pre-commit hook)" "$_DM_LOG" 2>/dev/null | head -n 1 | cut -d: -f1 || true)
+    { [[ -n "$_to_ln" && -n "$_st_ln" ]] && (( _st_ln > _to_ln )); } \
+        || fail "runner-timeout-names-last-step: step line (${_st_ln:-none}) not after TIMED OUT line (${_to_ln:-none})"
+    grep -qxF 'post-plan-fleet: outcome=timed-out' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: log lacks 'post-plan-fleet: outcome=timed-out'"
+    _s_dms=$(grep -c '^@@DM@@$' "$_DM_CAPTURE" 2>/dev/null || true)
+    [[ "$_s_dms" == 1 ]] || fail "runner-timeout-names-last-step: want exactly one DM, got '${_s_dms:-0}'"
+    grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks TIMED OUT"
+    grep -qF 'last step reached: phase2: starting commit (pre-commit hook)' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks the last-step line ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    grep -qF 're-run with' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-names-last-step: DM lacks the re-run hint"
+    end_case runner-timeout-names-last-step
+
+    # Run dir exists but has no audit.log: wording unchanged.
+    begin_case
+    _dm_timeout_arm 65n 'd="$HOME/run65n"; mkdir -p "$d"; echo "post-plan-now: postplan-rc=143 harness-rc=0 harness-run-dir=$d"; exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: log lacks the TIMED OUT rc=124 line"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-no-audit-log-unchanged: DM names a last step"
+    end_case runner-timeout-no-audit-log-unchanged
+
+    # Run dir reported as 'none': wording unchanged.
+    begin_case
+    _dm_timeout_arm 65z 'echo "post-plan-now: postplan-rc=143 harness-rc=none harness-run-dir=none"; exec sleep 30'
+    grep -qxF 'post-plan-now: TIMED OUT after 90m (rc=124)' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: log lacks the TIMED OUT rc=124 line"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-timeout-run-dir-none-unchanged: DM names a last step"
+    end_case runner-timeout-run-dir-none-unchanged
+
+    # Negative control: the same audit.log as 65s, but the stub exits 1 at once, so there is no
+    # timeout and no step line. The step is named only on rc 124.
+    begin_case
+    _dm_timeout_arm 65g "${_STEP_BODY}exit 1"
+    ! grep -qF 'last step' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: log names a last step ($(cat "$_DM_LOG" 2>/dev/null))"
+    ! grep -qF 'last step' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: DM names a last step"
+    ! grep -qF 'TIMED OUT' "$_DM_LOG" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: log says TIMED OUT for a fast stub"
+    ! grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "runner-fast-fail-with-audit-no-step: DM says TIMED OUT for a fast stub"
+    end_case runner-fast-fail-with-audit-no-step
 
     # Negative control: same sed rewrite, stub exits 0 at once -> no timeout path at all.
     begin_case
@@ -3116,6 +3185,51 @@ _dm_result_case 106 'RESULT: post-plan REBASED — terminal=rebased-held PR #280
 grep -qF 'REBASED (still held)' "$_DM_CAPTURE" 2>/dev/null \
     || fail "fleet-outcome-line: RESULT-only rebased-held DM lacks REBASED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 end_case fleet-outcome-line
+
+# --- case: declined-dm ------------------------------------------------------------------
+# A hold-repeat decline reads DECLINED in the DM, whether it arrives as rc=0 (harness) or
+# rc=8 (bin/post-plan-now). It never reads "unconfirmed" and never offers bin/postplan-fix.
+# The outcome=/reason= log lines stay what bin/pr-cycle counts.
+begin_case
+_declined_dm_ok() {  # $1 = label
+    [[ -f "$_DM_CAPTURE" ]] || fail "declined-dm/$1: no DM sent"
+    grep -qF 'DECLINED' "$_DM_CAPTURE" 2>/dev/null \
+        || fail "declined-dm/$1: DM lacks DECLINED ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+    ! grep -qF 'unconfirmed' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/$1: DM still says unconfirmed"
+    ! grep -qF 'runner exited' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/$1: DM says runner exited"
+    ! grep -qF 'postplan-fix' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/$1: DM offers postplan-fix"
+    [[ "$(_outcome_of)" == declined ]] || fail "declined-dm/$1: outcome '$(_outcome_of)'"
+    [[ "$(_reason_of)" == holdrepeat ]] || fail "declined-dm/$1: reason '$(_reason_of)'"
+    [[ "$(grep -c '^post-plan-fleet: outcome=' "$_DM_LOG")" == 1 ]] \
+        || fail "declined-dm/$1: want exactly one outcome= line"
+}
+# 107: harness wording, rc=0 (the "unconfirmed" DM seen in #dev). The terminal= prefix is stripped.
+_dm_result_case 107 'RESULT: post-plan DECLINED — terminal=hold-repeat-declined; declined: same hold as last run (missing files: a.md), no tokens spent. Fix the missing files or re-run bin/post-plan-now --force.' <<< '{}'
+_declined_dm_ok 107
+grep -qF 'same hold as last run (missing files: a.md)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "declined-dm/107: DM lacks the reason from the RESULT line"
+grep -qF -- '--force' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/107: DM lacks the --force hint"
+! grep -qF 'terminal=hold-repeat-declined' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "declined-dm/107: DM kept the terminal= prefix"
+# 108: bin/post-plan-now wording, stub exits 8 (post-plan-now's own decline exit code).
+_dm_result_case 108 'RESULT: post-plan DECLINED — held twice on the same reason and nothing changed since; no tokens spent, no PR change. Override: bin/post-plan-now --force' 8 <<< '{}'
+_declined_dm_ok 108
+grep -qF -- '--force' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/108: rc=8 DM lacks the --force hint"
+# 109: a >200-char reason is cut. After the prefix strips, 33 chars of reason text precede the
+# x run, so at most 167 x survive a 200-char cut, and the trailing hint is gone.
+_xs="$(printf 'x%.0s' {1..300})"
+_dm_result_case 109 "RESULT: post-plan DECLINED — terminal=hold-repeat-declined; declined: same hold as last run (${_xs}), no tokens spent. Fix the missing files or re-run bin/post-plan-now --force." <<< '{}'
+_declined_dm_ok 109
+grep -qE 'x{100}' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/109: long reason was dropped, not cut"
+! grep -qE 'x{168}' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/109: reason not cut at 200 chars"
+! grep -qF 'Fix the missing files' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/109: tail past 200 chars survived"
+# 110: a STOP: line keeps priority over a decline.
+_dm_result_case 110 $'STOP: need a human decision on the schema\nRESULT: post-plan DECLINED — held twice on the same reason and nothing changed since; no tokens spent, no PR change. Override: bin/post-plan-now --force' <<< '{}'
+grep -qF 'STOPPED' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "declined-dm/110: STOP: line did not win ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -qF 'DECLINED (same hold' "$_DM_CAPTURE" 2>/dev/null || fail "declined-dm/110: decline overrode STOP:"
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
+end_case declined-dm
 
 # --- case 23: usage-gate-paused ----------------------------------------------------------
 # ADR-0143: a worktree holding a post-plan run paused by the usage gate is skipped (no

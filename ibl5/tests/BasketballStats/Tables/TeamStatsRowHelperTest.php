@@ -153,4 +153,38 @@ final class TeamStatsRowHelperTest extends TestCase
         $this->assertStringStartsWith("        <tr>\n            <td colspan=\"3\">", TeamStatsRowHelper::footerLabelCells($team, 'Defense', 0, 'LeagueStarters'));
         $this->assertStringContainsString(' Defense</td>', TeamStatsRowHelper::footerLabelCells($team, 'Defense', 0, 'LeagueStarters'));
     }
+
+    public function testPerGameAveragesHeadEmitsExactTheadBytes(): void
+    {
+        $expected = <<<'HTML'
+    <thead>
+        <tr>
+            <th>Pos</th>
+            <th class="sticky-col">Player</th>
+            <th>g</th>
+            <th class="sep-r-team">min</th>
+            <th>fgm</th>
+            <th>fga</th>
+            <th>fgp</th>
+            <th>ftm</th>
+            <th>fta</th>
+            <th>ftp</th>
+            <th>3gm</th>
+            <th>3ga</th>
+            <th class="sep-r-team">3gp</th>
+            <th>orb</th>
+            <th>reb</th>
+            <th>ast</th>
+            <th>stl</th>
+            <th>to</th>
+            <th>blk</th>
+            <th>pf</th>
+            <th>pts</th>
+        </tr>
+    </thead>
+
+HTML;
+
+        self::assertSame($expected, TeamStatsRowHelper::perGameAveragesHead());
+    }
 }

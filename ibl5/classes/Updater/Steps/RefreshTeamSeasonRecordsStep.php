@@ -95,10 +95,8 @@ WITH canonical_games AS (
 unique_games AS (
     SELECT
         b.game_date, b.visitor_teamid, b.home_teamid,
-        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
-         + COALESCE(b.visitor_ot_points, 0)) AS visitor_total,
-        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
-         + COALESCE(b.home_ot_points, 0)) AS home_total
+        MIN(b.id) AS visitor_row_id,
+        MAX(b.id) AS home_row_id
     FROM `ibl_box_scores_teams` b
     JOIN canonical_games c
       ON c.game_date = b.game_date
@@ -108,16 +106,31 @@ unique_games AS (
     WHERE b.game_type = 1
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
+scored_games AS (
+    -- Quarter columns are identical on both rows of a game, so they read from the
+    -- visitor row. A NULL quarter (the restored 2004 Suns@Heat game) falls back to
+    -- each side's own calc_points: v.calc_points for the visitor, h.calc_points for
+    -- the home team. Same shape in FranchiseHistoryRepository and the ibl_team_win_loss view.
+    SELECT
+        u.game_date, u.visitor_teamid, u.home_teamid,
+        COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points
+                 + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS visitor_total,
+        COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points
+                 + COALESCE(v.home_ot_points, 0), h.calc_points) AS home_total
+    FROM unique_games u
+    JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
+    JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
+),
 team_games AS (
     SELECT visitor_teamid AS team_id, game_date,
            IF(visitor_total > home_total, 1, 0) AS win,
            IF(visitor_total < home_total, 1, 0) AS loss
-    FROM unique_games
+    FROM scored_games
     UNION ALL
     SELECT home_teamid AS team_id, game_date,
            IF(home_total > visitor_total, 1, 0) AS win,
            IF(home_total < visitor_total, 1, 0) AS loss
-    FROM unique_games
+    FROM scored_games
 )
 SELECT
     tg.team_id,
@@ -162,10 +175,8 @@ WITH canonical_games AS (
 unique_games AS (
     SELECT
         b.game_date, b.visitor_teamid, b.home_teamid,
-        (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
-         + COALESCE(b.visitor_ot_points, 0)) AS visitor_total,
-        (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
-         + COALESCE(b.home_ot_points, 0)) AS home_total
+        MIN(b.id) AS visitor_row_id,
+        MAX(b.id) AS home_row_id
     FROM `ibl_box_scores_teams` b
     JOIN canonical_games c
       ON c.game_date = b.game_date
@@ -176,16 +187,31 @@ unique_games AS (
       AND YEAR(b.game_date) < 9000
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 ),
+scored_games AS (
+    -- Quarter columns are identical on both rows of a game, so they read from the
+    -- visitor row. A NULL quarter (the restored 2004 Suns@Heat game) falls back to
+    -- each side's own calc_points: v.calc_points for the visitor, h.calc_points for
+    -- the home team. Same shape in FranchiseHistoryRepository and the ibl_team_win_loss view.
+    SELECT
+        u.game_date, u.visitor_teamid, u.home_teamid,
+        COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points
+                 + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS visitor_total,
+        COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points
+                 + COALESCE(v.home_ot_points, 0), h.calc_points) AS home_total
+    FROM unique_games u
+    JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
+    JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
+),
 team_games AS (
     SELECT visitor_teamid AS team_id, game_date,
            IF(visitor_total > home_total, 1, 0) AS win,
            IF(visitor_total < home_total, 1, 0) AS loss
-    FROM unique_games
+    FROM scored_games
     UNION ALL
     SELECT home_teamid AS team_id, game_date,
            IF(home_total > visitor_total, 1, 0) AS win,
            IF(home_total < visitor_total, 1, 0) AS loss
-    FROM unique_games
+    FROM scored_games
 )
 SELECT
     tg.team_id,

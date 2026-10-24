@@ -275,7 +275,7 @@ GROUP BY self_gm, opp_gm';
 
         return sprintf(
             'WITH unique_games AS (
-    SELECT MIN(id) AS id
+    SELECT MIN(b.id) AS visitor_row_id, MAX(b.id) AS home_row_id
     FROM `ibl_box_scores_teams` b
     WHERE b.game_type %s
       AND b.visitor_teamid BETWEEN 1 AND %d
@@ -285,12 +285,13 @@ GROUP BY self_gm, opp_gm';
 ),
 games AS (
     SELECT b.season_year, b.visitor_teamid, b.home_teamid,
-           (b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
-            + COALESCE(b.visitor_ot_points, 0)) AS visitor_pts,
-           (b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
-            + COALESCE(b.home_ot_points, 0)) AS home_pts
-    FROM `ibl_box_scores_teams` b
-    JOIN unique_games u ON u.id = b.id
+           COALESCE(b.visitor_q1_points + b.visitor_q2_points + b.visitor_q3_points + b.visitor_q4_points
+                    + COALESCE(b.visitor_ot_points, 0), b.calc_points) AS visitor_pts,
+           COALESCE(b.home_q1_points + b.home_q2_points + b.home_q3_points + b.home_q4_points
+                    + COALESCE(b.home_ot_points, 0), h.calc_points) AS home_pts
+    FROM unique_games u
+    JOIN `ibl_box_scores_teams` b ON b.id = u.visitor_row_id
+    JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
 ),
 perspectives AS (
     SELECT season_year, visitor_teamid AS self_id, home_teamid AS opp_id,

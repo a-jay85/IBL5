@@ -114,16 +114,29 @@ async function captureSnapshot(
   const title = filename.replace(/\.png$/, '');
   const anchor = page.locator(row.anchor).first();
 
-  // Re-establish the same visual state after a (re)load: settle the network,
-  // wait for the anchor, and re-trigger the HTMX tab swap if any. Runs after
-  // both the initial navigation and the render-B reload.
+  // Re-establish the same visual state after a (re)load: wait for the anchor,
+  // and re-trigger the HTMX tab swap if any. Runs after both the initial
+  // navigation and the render-B reload. Late image/font loads settle inside
+  // captureStable() (re-samples until two consecutive shots differ by at most
+  // STABLE_MAX_DIFF_RATIO) and the toHaveScreenshot() gate.
   async function settle(): Promise<void> {
-    await page.waitForLoadState('networkidle');
     await anchor.waitFor({ state: 'visible' });
     if (tab) {
-      await page.locator(tab.trigger).first().click();
+      // The swap target already exists before the click, so waiting on its
+      // visibility alone can pass against the old tab. Start the response wait
+      // before the click so the HTMX GET is confirmed to have landed. The
+      // module name keeps an unrelated API fetch from satisfying the wait.
+      await Promise.all([
+        page.waitForResponse(
+          (r) =>
+            r.url().includes('name=LeagueStarters') &&
+            r.url().includes('op=api') &&
+            r.request().method() === 'GET' &&
+            r.status() === 200,
+        ),
+        page.locator(tab.trigger).first().click(),
+      ]);
       await page.locator(tab.swapTarget).first().waitFor({ state: 'visible' });
-      await page.waitForLoadState('networkidle');
     }
   }
 

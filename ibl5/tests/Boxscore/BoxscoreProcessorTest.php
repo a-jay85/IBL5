@@ -1675,6 +1675,7 @@ class BoxscoreProcessorTest extends TestCase
         ]);
         $mockDb1->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []); // new game → insert
         $mockDb1->onQuery('ibl_schedule', []); // empty schedule → guard fails open (branch added the guard after this test was written)
+        $mockDb1->onQuery('ibl_franchise_seasons', []); // no franchise row → parsed .sco name kept (shared pool would answer with an unrelated row)
         $processor1 = new BoxscoreProcessor($mockDb1);
         $result1 = $processor1->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
         self::assertTrue($result1['success']);

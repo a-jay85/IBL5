@@ -7,6 +7,7 @@ namespace SeasonArchive;
 use Database\BaseMysqliRepository;
 use League\League;
 use League\LeagueContext;
+use Repositories\TeamAwardSql;
 use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
 
 /**
@@ -130,12 +131,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
                     psr.winner AS name,
                     CONCAT(lc.conference, ' Conference Champions') AS award,
                     COUNT(*) OVER (PARTITION BY psr.year, lc.conference) AS series_in_conf
-                FROM vw_playoff_series_results psr
-                LEFT JOIN `ibl_franchise_seasons` fs
-                    ON fs.franchise_id = psr.winner_tid AND fs.season_ending_year = psr.year
-                JOIN `ibl_league_config` lc
-                    ON lc.season_ending_year = psr.year
-                   AND lc.team_name = COALESCE(fs.team_name, psr.winner)
+                " . TeamAwardSql::CONFERENCE_CHAMPION_JOIN . "
                 WHERE psr.round = 3
                   AND psr.year = ?
                   AND psr.winner_games >= NULLIF(CAST(SUBSTRING_INDEX(lc.playoff_round3_format, ' ', 1) AS UNSIGNED), 0)
@@ -146,49 +142,13 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
 
             SELECT hc.year, ti.team_name AS name, 'IBL HEAT Champions' AS award, 0 AS id
             FROM (
-                SELECT
-                    YEAR(bst.game_date) AS year,
-                    CASE
-                        WHEN (bst.home_q1_points + bst.home_q2_points + bst.home_q3_points + bst.home_q4_points
-                              + COALESCE(bst.home_ot_points, 0))
-                           > (bst.visitor_q1_points + bst.visitor_q2_points + bst.visitor_q3_points + bst.visitor_q4_points
-                              + COALESCE(bst.visitor_ot_points, 0))
-                        THEN bst.home_teamid
-                        ELSE bst.visitor_teamid
-                    END AS winner_tid,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY YEAR(bst.game_date)
-                        ORDER BY bst.game_date DESC, bst.game_of_that_day ASC, bst.id ASC
-                    ) AS rn
-                FROM `ibl_box_scores_teams` bst
-                WHERE bst.game_type = 3 AND YEAR(bst.game_date) = ?
+                " . TeamAwardSql::HEAT_WINNER_SUBSELECT . " AND YEAR(bst.game_date) = ?
             ) hc
             JOIN `ibl_team_info` ti ON ti.teamid = hc.winner_tid
             WHERE hc.rn = 1
 
-            ORDER BY " . self::AWARD_HIERARCHY_CASE . ", award ASC, name ASC, id ASC";
+            ORDER BY " . TeamAwardSql::AWARD_HIERARCHY_CASE . ", award ASC, name ASC, id ASC";
     }
-
-    /**
-     * Hierarchical award ordering used by team-award queries.
-     *
-     * Orders awards from hardest to easiest to win so season-archive displays are
-     * deterministic (avoids flaky e2e tests when a year has multiple awards):
-     * IBL Champions → IBL HEAT Champions → Conference Champions (alpha) →
-     * Division Champions (alpha) → IBL Draft Lottery Winners → everything else.
-     */
-    private const AWARD_HIERARCHY_CASE = "CASE award
-                WHEN 'IBL Champions' THEN 1
-                WHEN 'IBL HEAT Champions' THEN 2
-                WHEN 'Eastern Conference Champions' THEN 3
-                WHEN 'Western Conference Champions' THEN 4
-                WHEN 'Atlantic Division Champions' THEN 5
-                WHEN 'Central Division Champions' THEN 6
-                WHEN 'Midwest Division Champions' THEN 7
-                WHEN 'Pacific Division Champions' THEN 8
-                WHEN 'IBL Draft Lottery Winners' THEN 9
-                ELSE 10
-            END";
 
     /**
      * @see SeasonArchiveRepositoryInterface::getAllGmAwardsWithTeams()

@@ -713,7 +713,11 @@ def review_case(root: Path, commit: str, llm: object, meta: dict,
 
 def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
              llm_factory: Callable[[str], object], cache_dir: Optional[Path],
-             dry_run: bool, out: TextIO) -> int:
+             dry_run: bool, out: TextIO, runs: int = 1) -> int:
+    """Review each case `runs` times. A bug case hits only when every run hits, and a
+    clean case keeps its worst run, so one lucky sample cannot raise the score."""
+    if runs < 1:
+        raise EvalUsageError("--runs must be at least 1")
     known = {c["id"] for c in corpus["cases"]} | {c["id"] for c in corpus["clean"]}
     if case_ids is not None:
         unknown = sorted(case_ids - known)
@@ -739,7 +743,7 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
             _meta, cls = case_input(root, case["commit"])
             gates = ReviewPhase(None, NullGh()).gates(cls)
             on = [k for k in _AGENT_GATES if gates[k]]
-            est = len(on) + VERIFIER_COUNT    # one verifier chunk; more findings add chunks
+            est = (len(on) + VERIFIER_COUNT) * runs    # one verifier chunk; more findings add chunks
             total += est
             print(f"case {case['id']} {kind} dry gates={','.join(on)} "
                   f"diff_bytes={len(cls.filtered_diff.encode())} est_calls={est}", file=out)
@@ -750,36 +754,57 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
     bug_out: list[CaseOutcome] = []
     clean_out: list[CaseOutcome] = []
     llm_calls = 0
+    flaky = 0
     for case, kind in selected:
         cid = case["id"]
-        cache_path = (cache_dir / v / f"{cid}-{case_digest(case, kind)}.json"
-                      if cache_dir is not None else None)
-        cached = _load_cached(cache_path) if cache_path is not None else None
-        if cached is not None:
-            findings, scored, degraded = cached
-        else:
-            meta, cls = case_input(root, case["commit"])
-            llm = _CountingLlm(llm_factory(cid))
-            findings, scored, degraded = review_case(root, case["commit"], llm, meta, cls)
-            llm_calls += llm.calls
-            if cache_path is not None and not degraded:
-                _write_cache(cache_path, findings, scored)
-        for s in scored:
-            print(f"  raw {s['agent']} {s['path']}:{s['line']} score={s['score']} "
-                  f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
-        suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
+        expected: list[ExpectedRange] = []
         if kind == "bug":
             expected = accepted_ranges(case)
-            hit = case_hit(findings, expected)
-            bug_out.append(CaseOutcome(cid, "bug", tuple(findings), tuple(degraded), hit))
-            print(f"case {cid} bug {'HIT' if hit else 'MISS'} findings={len(findings)} "
-                  f"file_only={file_only_count(findings, expected)}{suffix}", file=out)
+        per_run: list[list[Finding]] = []
+        run_hits: list[bool] = []
+        degraded: list[str] = []
+        for k in range(1, runs + 1):
+            # Run 1 keeps the old cache name, so a --runs 1 cache stays valid.
+            tag = "" if k == 1 else f"-r{k}"
+            cache_path = (cache_dir / v / f"{cid}-{case_digest(case, kind)}{tag}.json"
+                          if cache_dir is not None else None)
+            cached = _load_cached(cache_path) if cache_path is not None else None
+            if cached is not None:
+                findings, scored, run_degraded = cached
+            else:
+                meta, cls = case_input(root, case["commit"])
+                llm = _CountingLlm(llm_factory(cid))
+                findings, scored, run_degraded = review_case(root, case["commit"], llm, meta, cls)
+                llm_calls += llm.calls
+                if cache_path is not None and not run_degraded:
+                    _write_cache(cache_path, findings, scored)
+            for s in scored:
+                print(f"  raw {s['agent']} {s['path']}:{s['line']} score={s['score']} "
+                      f"{' '.join((s.get('body_head') or '').split())[:120]}", file=out)
+            per_run.append(findings)
+            run_hits.append(case_hit(findings, expected) if kind == "bug" else bool(findings))
+            degraded += [d for d in run_degraded if d not in degraded]
+        worst = max(per_run, key=len)
+        suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
+        if runs > 1:
+            n = sum(run_hits)
+            suffix = f" runs_{'hit' if kind == 'bug' else 'flagged'}={n}/{runs}{suffix}"
+            if 0 < n < runs:
+                flaky += 1
+                suffix += " FLAKY"
+        if kind == "bug":
+            hit = all(run_hits)
+            bug_out.append(CaseOutcome(cid, "bug", tuple(worst), tuple(degraded), hit))
+            print(f"case {cid} bug {'HIT' if hit else 'MISS'} findings={len(worst)} "
+                  f"file_only={file_only_count(worst, expected)}{suffix}", file=out)
         else:
-            clean_out.append(CaseOutcome(cid, "clean", tuple(findings), tuple(degraded), None))
-            print(f"case {cid} clean flagged={len(findings)}{suffix}", file=out)
+            clean_out.append(CaseOutcome(cid, "clean", tuple(worst), tuple(degraded), None))
+            print(f"case {cid} clean flagged={len(worst)}{suffix}", file=out)
 
     score = compute_score(bug_out, clean_out, v=v, c=c_digest)
     print(f"excluded_unconfirmed={excluded}", file=out)
+    if runs > 1:
+        print(f"runs={runs} flaky={flaky}", file=out)
     print(f"llm_calls={llm_calls}", file=out)
     print(format_score_line(score), file=out)
     return 3 if score.degraded > 0 else 0
@@ -846,7 +871,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         out: TextIO = _Tee(sys.stdout, out_fh) if out_fh else sys.stdout  # type: ignore[assignment]
         return run_eval(root, corpus, kinds=args.kinds, case_ids=case_ids,
                         llm_factory=factory, cache_dir=cache_dir,
-                        dry_run=args.dry_run, out=out)
+                        dry_run=args.dry_run, out=out, runs=args.runs)
     finally:
         if out_fh:
             out_fh.close()
@@ -878,8 +903,11 @@ def _last_line(text: str) -> str:
 
 def compare(root: Path, base: str, corpus_path: Path, *, runner: Runner,
             make_tree: Callable, out: TextIO, cache_dir: Optional[Path] = None,
-            err: Optional[TextIO] = None) -> int:
+            err: Optional[TextIO] = None, runs: int = 1) -> int:
     err = err if err is not None else sys.stderr
+    if runs < 1:
+        print("error: --runs must be at least 1", file=err)
+        return 2
     rv = _gitt(root, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
     if rv.returncode != 0 or not rv.stdout.strip():
         print(f"error: cannot resolve base ref {base}", file=err)
@@ -891,6 +919,12 @@ def compare(root: Path, base: str, corpus_path: Path, *, runner: Runner,
         return 2
     cache = cache_dir if cache_dir is not None else root / DEFAULT_CACHE_REL
     args = ["run", "--corpus", str(corpus_path.resolve()), "--cache-dir", str(Path(cache).resolve())]
+    if runs > 1:
+        base_src = _gitt(root, "show", f"{base_sha}:tools/postplan-harness/harness/reviewer_eval.py")
+        if '"--runs"' not in base_src.stdout:
+            print(f"error: base {base} predates --runs; compare with --runs 1", file=err)
+            return 2
+        args += ["--runs", str(runs)]
     with make_tree(root, base_sha) as tree:
         base_rc, base_out = runner(Path(tree) / "bin/reviewer-eval", args)
     head_rc, head_out = runner(root / "bin/reviewer-eval", args)
@@ -925,7 +959,8 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     corpus_path = Path(args.corpus) if args.corpus else root / DEFAULT_CORPUS
     cache_dir = Path(args.cache_dir) if args.cache_dir else None
     return compare(root, args.base, corpus_path, runner=_default_runner,
-                   make_tree=_default_make_tree, out=sys.stdout, cache_dir=cache_dir)
+                   make_tree=_default_make_tree, out=sys.stdout, cache_dir=cache_dir,
+                   runs=args.runs)
 
 
 def _cmd_mine(args: argparse.Namespace) -> int:
@@ -1142,6 +1177,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("--canned", metavar="FILE", default=None)
     r.add_argument("--dry-run", action="store_true")
     r.add_argument("--out", metavar="FILE", default=None)
+    r.add_argument("--runs", type=int, default=1, metavar="N",
+                   help="review each case N times; a bug hits only when every run hits")
     r.set_defaults(func=_cmd_run)
     sm = sub.add_parser("smoke", help="one live review-agent call proving the claude -p boundary")
     sm.set_defaults(func=_cmd_smoke)
@@ -1150,6 +1187,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     c.add_argument("--corpus", metavar="PATH", default=None)
     c.add_argument("--repo", metavar="DIR", default=None)
     c.add_argument("--cache-dir", metavar="DIR", default=None)
+    c.add_argument("--runs", type=int, default=1, metavar="N")
     c.set_defaults(func=_cmd_compare)
     mn = sub.add_parser("mine", help="print corpus candidates from history (writes nothing)")
     msub = mn.add_subparsers(dest="mine_cmd", required=True)

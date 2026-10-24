@@ -93,7 +93,7 @@ class TradeProcessor implements TradeProcessorInterface
                 $this->db->rollback();
                 return [
                     'success' => false,
-                    'error' => 'No trade data found for this offer ID'
+                    'error' => self::NO_TRADE_DATA_ERROR
                 ];
             }
 

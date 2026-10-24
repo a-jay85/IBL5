@@ -720,6 +720,78 @@ def test_run_cache_reuse(tmp_path):
     assert stub.calls
 
 
+def _seq_factory(*canneds):
+    """One stub per run, in order, so each run can return a different review."""
+    stubs = [_StubLlm(c) for c in canneds]
+    it = iter(stubs)
+    return (lambda cid: next(it)), stubs
+
+
+def test_run_repeats_bug_hits_only_when_every_run_hits(tmp_path):
+    r = _eval_repo(tmp_path)
+    factory, _ = _seq_factory(_canned(FOO, 12, "real"), _canned(FOO, 90, "real"))
+    rc, text = _run(r, _vcorpus([_bug(r)]), factory, runs=2)
+    assert rc == 0
+    assert "case b1 bug MISS findings=1 file_only=0 runs_hit=1/2 FLAKY" in text
+    assert "runs=2 flaky=1" in text
+    assert _last(text).endswith("recall=0/1 false_alarms=0 clean_flagged=0/0 degraded=0")
+    factory, _ = _seq_factory(_canned(FOO, 12, "real"), _canned(FOO, 12, "real"))
+    rc, text = _run(r, _vcorpus([_bug(r)]), factory, runs=2)
+    assert "case b1 bug HIT findings=1 file_only=0 runs_hit=2/2\n" in text
+    assert "runs=2 flaky=0" in text and "recall=1/1" in _last(text)
+
+
+def test_run_repeats_clean_keeps_worst_run(tmp_path):
+    r = _eval_repo(tmp_path)
+    corpus = _vcorpus([_bug(r)], [_clean("c1", 13, r["fix2"])])
+    quiet = _canned(FOO, 3, "not-real")
+    factory, _ = _seq_factory(_canned(FOO, 12, "real"), _canned(FOO, 12, "real"),
+                              quiet, _canned(FOO, 3, "real"))
+    rc, text = _run(r, corpus, factory, runs=2)
+    assert rc == 0
+    assert "case c1 clean flagged=1 runs_flagged=1/2 FLAKY" in text
+    assert _last(text).endswith("recall=1/1 false_alarms=1 clean_flagged=1/1 degraded=0")
+
+
+def test_run_repeats_degraded_in_any_run_is_degraded(tmp_path):
+    r = _eval_repo(tmp_path)
+    stubs = [_StubLlm(_canned(FOO, 12, "real")),
+             _StubLlm(_canned(FOO, 12, "real"), raises={"review-agent-a"})]
+    it = iter(stubs)
+    rc, text = _run(r, _vcorpus([_bug(r)]), lambda cid: next(it), runs=2)
+    assert rc == 3
+    assert "DEGRADED=review-agent-a" in text and _last(text).endswith("degraded=1")
+
+
+def test_run_repeats_cache_one_entry_per_run(tmp_path):
+    r = _eval_repo(tmp_path)
+    corpus = _vcorpus([_bug(r)])
+    cache = tmp_path / "cache"
+    stub = _StubLlm(_canned(FOO, 12, "real"))
+    _run(r, corpus, lambda cid: stub, cache_dir=cache)
+    (first,) = list(cache.rglob("*.json"))
+    calls_one = len(stub.calls)
+    stub.calls.clear()
+    _run(r, corpus, lambda cid: stub, cache_dir=cache, runs=3)
+    assert len(stub.calls) == 2 * calls_one
+    names = sorted(p.name for p in cache.rglob("*.json"))
+    assert len(names) == 3 and first.name in names
+    assert sum(n.endswith(("-r2.json", "-r3.json")) for n in names) == 2
+    stub.calls.clear()
+    _run(r, corpus, lambda cid: stub, cache_dir=cache, runs=3)
+    assert stub.calls == []
+
+
+def test_run_repeats_rejects_zero_and_dry_run_scales(tmp_path):
+    r = _eval_repo(tmp_path)
+    with pytest.raises(re_.EvalUsageError):
+        _run(r, _vcorpus([_bug(r)]), lambda cid: None, runs=0)
+    _rc, one = _run(r, _vcorpus([_bug(r)]), lambda cid: None, dry_run=True)
+    _rc, two = _run(r, _vcorpus([_bug(r)]), lambda cid: None, dry_run=True, runs=2)
+    est = int(_last(one).split("=")[-1])
+    assert _last(two) == f"dry-run total est_calls={2 * est}"
+
+
 def test_run_canned_never_writes_cache(tmp_path, capsys):
     r = _eval_repo(tmp_path)
     corpus = _eval_corpus(r)
@@ -996,6 +1068,24 @@ def test_compare_base_predates_tool(tmp_path):
     rc = re_.compare(r["root"], "no-such-ref", r["root"] / "corpus.json",
                      runner=runner, make_tree=trees, out=out, err=err)
     assert rc == 2 and trees.entered == []
+
+
+def test_compare_passes_runs_only_when_base_supports_it(tmp_path):
+    r = _compare_repo(tmp_path)
+    line = re_.format_score_line(_s(5, 1))
+    runner = _Runner([])
+    rc, out, err, trees = _compare(r, runner, runs=3)
+    assert rc == 2 and "predates --runs" in err
+    assert runner.calls == [] and trees.entered == []
+    r["tool"] = _commit(r["root"], "chore: runs flag (#31)", NOW - DAY + 60,
+                        {"tools/postplan-harness/harness/reviewer_eval.py": 'add("--runs")\n'})
+    runner = _Runner([(0, line), (0, line)])
+    rc, _out, _err, _t = _compare(r, runner, runs=3)
+    assert rc == 0
+    (_, base_args), (_, head_args) = runner.calls
+    assert base_args == head_args and base_args[-2:] == ["--runs", "3"]
+    rc, _out, err, _t = _compare(r, _Runner([]), runs=0)
+    assert rc == 2 and "--runs must be at least 1" in err
 
 
 def test_compare_propagates_degraded_and_usage(tmp_path):

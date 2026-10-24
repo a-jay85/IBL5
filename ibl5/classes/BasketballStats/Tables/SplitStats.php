@@ -77,7 +77,7 @@ class SplitStats
         // "\n" restores the template line break: PHP swallows the newline right after the closing PHP tag.
         // @phpstan-ignore ibl.trustedVariable (openTag() escapes the aria-label and sanitizes the colors)
         echo HtmlSanitizer::trusted(TeamStatsTableContext::openTag($team)), "\n";
-        echo self::renderHeader();
+        echo TeamStatsRowHelper::perGameAveragesHead();
         ?>
     <tbody>
 <?php if ($playerRows === []): ?>
@@ -90,38 +90,6 @@ endforeach; ?>
 </table>
         <?php
         return (string) ob_get_clean();
-    }
-
-    /**
-     * The `<thead>` block, byte-for-byte the former inline template.
-     */
-    private static function renderHeader(): string
-    {
-        return "    <thead>\n"
-            . "        <tr>\n"
-            . "            <th>Pos</th>\n"
-            . '            <th class="sticky-col">Player</th>' . "\n"
-            . "            <th>g</th>\n"
-            . '            <th class="sep-r-team">min</th>' . "\n"
-            . "            <th>fgm</th>\n"
-            . "            <th>fga</th>\n"
-            . "            <th>fgp</th>\n"
-            . "            <th>ftm</th>\n"
-            . "            <th>fta</th>\n"
-            . "            <th>ftp</th>\n"
-            . "            <th>3gm</th>\n"
-            . "            <th>3ga</th>\n"
-            . '            <th class="sep-r-team">3gp</th>' . "\n"
-            . "            <th>orb</th>\n"
-            . "            <th>reb</th>\n"
-            . "            <th>ast</th>\n"
-            . "            <th>stl</th>\n"
-            . "            <th>to</th>\n"
-            . "            <th>blk</th>\n"
-            . "            <th>pf</th>\n"
-            . "            <th>pts</th>\n"
-            . "        </tr>\n"
-            . "    </thead>\n";
     }
 
     /**

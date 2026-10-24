@@ -39,7 +39,7 @@ final class SimRecapContextCliTest extends DatabaseTestCase
      * all six expected keys.  This exercises the fault-tolerance path of
      * buildContext() (unknown sim → empty context, no throw).
      */
-    public function testUnknownSimExitsZeroWithWellFormedSixKeyJson(): void
+    public function testUnknownSimExitsZeroWithWellFormedEightKeyJson(): void
     {
         $result = $this->runScript(['--sim=999999']);
 
@@ -50,7 +50,7 @@ final class SimRecapContextCliTest extends DatabaseTestCase
         self::assertIsArray($json,
             'stdout must be valid JSON; got: ' . $result['stdout']);
 
-        foreach (['sim', 'start_date', 'end_date', 'roster', 'active_injuries', 'sim_trades'] as $key) {
+        foreach (['sim', 'start_date', 'end_date', 'roster', 'active_injuries', 'sim_trades', 'games', 'standings'] as $key) {
             self::assertArrayHasKey($key, $json,
                 "JSON must contain key: {$key}");
         }

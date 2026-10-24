@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-21
+last_verified: 2026-10-24
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -11,8 +11,8 @@ no-adr: lazy-load companion relocating existing guidance out of workflow-continu
 # Workflow Continuity — Post-Plan Detail
 
 Companion to `.claude/rules/workflow-continuity.md` § Post-Plan. That rule carries the
-triggers (never inline; auto-fire when verified clean; don't commit first). This file
-carries the internals — read it before debugging or changing a post-plan run.
+triggers. This file carries the internals. Read it before debugging or changing a
+post-plan run.
 
 ## Engine
 
@@ -29,17 +29,24 @@ branch; it survives you closing Claude Code. Engine selection:
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Five kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
-  rewritten on GitHub with different content), a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget), a
-  **usage limit** (`llm-usage-limit`: a model call returned a session, rate, or API limit
-  message), and an **expired login** (`llm-auth-expired`: the Claude CLI login expired).
-  A skill re-run would hit the same wall on each one, so the run stops for a human.
-  For a usage limit, re-run `bin/post-plan-now` after the limit resets. For an expired
-  login, run `claude`, complete `/login`, then re-run it.
+  These reach it: a rebase conflict, a **diverged remote head** (the PR branch was rewritten
+  on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
+  refusal), a **usage limit** (`llm-usage-limit`),
+  an **expired login** (`llm-auth-expired`), and a **hung step**: `subprocess-timeout` (a
+  bounded step, including every harness `git` call, past its timeout) or `precommit-hang`
+  (`bin/pre-commit-hook` past 300 s). The `RESULT:` line names the step. When
+  `bin/post-plan-fleet`'s 90-minute timeout fires, its DM names the last step started.
+  A skill re-run would hit the same wall, so the run stops for a human. After a usage limit,
+  re-run `bin/post-plan-now` once it resets. After an expired login, run `claude`, `/login`,
+  then re-run it.
   A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
-  registry skips the LLM resolver. Today only `ibl5/phpstan-baseline.neon` carries the flag.
-  Once every other conflicted file resolves, the harness takes master's copy, runs
+  registry skips the LLM resolver. Two entries carry the flag: `ibl5/phpstan-baseline.neon` and
+  the glob `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/*.png` (that one directory
+  only). For a VR PNG both sides modified, the harness takes master's copy with no generator run;
+  a modify/delete conflict still goes to the resolver. The branch's screenshot is dropped on
+  purpose. Visual Regression stays red until a human applies the `update-baselines` label, which
+  regenerates it in CI. The harness never adds that label. For the baseline,
+  once every other conflicted file resolves, the harness takes master's copy, runs
   `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
   rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
   proof checks every other file unchanged. A generator that fails, times out or writes a file
@@ -60,8 +67,7 @@ branch; it survives you closing Claude Code. Engine selection:
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
 `bin/post-plan-now` additionally exits **6** from its own in-flight duplicate-run guard.
-That code is caller-side and has no harness meaning: it refuses to start a second
-supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
+It is caller-side: it refuses to start a second supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
 It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired and the
 skill fallback is suppressed. `cd` into the target worktree and re-run.
 It exits **8** when it declines a repeat hold: the last run for this slug held on the same
@@ -85,6 +91,7 @@ uncommitted edit or a master merge can realise a row. A hold that mixes MISSING 
 UNREALISED rows keeps the MISSING rule above.
 `bin/post-plan-now --force` passes `POSTPLAN_FORCE=1` to the harness and skips this check
 too; every other launch passes `POSTPLAN_FORCE=0`.
+`bin/post-plan-now --state-changed` (and `--rebase-only`, which implies it) passes `POSTPLAN_STATE_CHANGED=1` the same way, so the harness logs `phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)` and proceeds without writing the marker; every other launch passes `POSTPLAN_STATE_CHANGED=0`, and only the exact value `1` skips.
 The in-run decline also writes a held-unfixable marker through `harness/heldmarker.py`:
 `tools/postplan-harness/out/state/<slug>.held-unfixable.json` in the main checkout, which
 `.gitignore` already covers. It stores a hash of condition (3)'s MISSING items and

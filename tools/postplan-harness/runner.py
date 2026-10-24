@@ -75,13 +75,13 @@ from harness.adaptations import audit_lines_for_adaptations
 from harness.review import ReviewPhase
 from harness import review_depth
 from harness import baseline_guard
-from harness.state import (SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
+from harness.state import (PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError, RunResult, TerminalState,
                            UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
                                     is_stale_base, is_stale_lease)
-from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT
+from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT, reap_live_groups
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate, fail_log_lines, timing_log_line, tracks_log_line
 
@@ -123,6 +123,12 @@ def _install_sigterm_handler() -> None:
     import signal
 
     def _sigterm_handler(signum: int, frame: object) -> None:  # type: ignore[type-arg]
+        # Kill bounded children (git, hooks, claude -p) first: they run in their own
+        # sessions, and emergency_abort's git calls would race a live child's index.lock.
+        try:
+            reap_live_groups()
+        except Exception:
+            pass
         git = _active_git
         if git is not None:
             try:
@@ -357,6 +363,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                               diff_body=diff, worktree=worktree):
             return _finish(res, out_dir)
 
+        phase2_merge_danger = None   # MergeDanger this run's Phase 2 injected; None on the clean-tree rerun
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
@@ -375,6 +382,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         if _inject_merge_danger(copy, worktree, diff, log):
             merge_danger_degraded = True
+        phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
         _inject_how_to_revert(copy, diff, log)
         log("phase2: starting commit ADR gate")
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
@@ -755,6 +763,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
         _arm_body = gh.pr_body() or body
+        if live and pr:
+            _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
+                                            git.diff_vs_base(), log, res)
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -787,6 +798,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gate_backtest_status=_gb.status,
             gate_backtest_reason=_gb.reason,
             merge_danger_state=merge_danger.classify_body(_arm_body),
+            retried_stages=sorted(res.retries),
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -1346,7 +1358,7 @@ def _commit_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res)
                                   plan_path=plan_path, check_mode="commit",
                                   commit=False)
     except HarnessError as e2:
-        if e2.kind == SUBPROCESS_TIMEOUT:
+        if e2.kind in (SUBPROCESS_TIMEOUT, PRECOMMIT_HANG):
             log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
             raise
         if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
@@ -1389,7 +1401,7 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res,
             drafted = adr_draft.draft(llm, git, worktree, out_dir, log,
                                       phase=phase, plan_path=plan_path)
         except HarnessError as e2:
-            if e2.kind == SUBPROCESS_TIMEOUT:
+            if e2.kind in (SUBPROCESS_TIMEOUT, PRECOMMIT_HANG):
                 log(f"{phase}: ADR draft step timed out: {(e2.detail or '')[:300]}")
                 raise
             if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
@@ -2290,6 +2302,41 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     return findings
 
 
+def _phase2_merge_danger_of(summary_md: str):
+    """The MergeDanger line Phase 2 injected into `summary_md`, or None when there is none
+    (clean-tree rerun: empty summary) or the line is malformed (a real condition (18)
+    verdict, never refilled)."""
+    try:
+        return merge_danger.parse_merge_danger(summary_md) if summary_md else None
+    except merge_danger.MalformedMergeDanger:
+        return None
+
+
+def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, log, res) -> str:
+    """Phase 6.5: one bounded refill of the Merge danger line this run's Phase 2 wrote.
+
+    Retries only when Phase 2 computed a line this run (phase2_md) and the live body
+    classifies MISSING. ONE-WAY, MALFORMED and UNREADABLE are real verdicts and are never
+    touched; a run whose Phase 2 wrote nothing (clean-tree rerun) never refills. The line
+    re-applied is phase2_md itself, then the raise-only later-phase floor, so the Door can
+    only go up. Returns the body condition (18) should classify. Fail closed: any error
+    leaves the body as is, and the retry is still recorded so the hold says so."""
+    if phase2_md is None or merge_danger.classify_body(body) != "MISSING":
+        return body
+    res.retries["merge-danger"] = 1
+    try:
+        refilled = merge_danger.inject_merge_danger(body, phase2_md)
+        refilled = _merge_danger_body(refilled, worktree, diff_body, log, "phase6.5")
+        gh.pr_edit_body(pr, refilled)
+        fresh = gh.pr_body_fresh() or ""   # what GitHub holds now, never our own last write
+        log("phase6.5: merge-danger line missing from the live body; re-applied the Phase 2 "
+            f"line once -> state={merge_danger.classify_body(fresh)}")
+        return fresh
+    except (HarnessError, OSError, subprocess.SubprocessError, ValueError) as exc:
+        log(f"phase6.5: merge-danger refill failed ({exc}); condition (18) holds")
+        return body
+
+
 def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
     """Phase 2: advisory How to revert line, placed after Merge danger. Log-only: no finding,
     no degraded body check. An empty summary_md is the clean-tree rerun and is left as is."""
@@ -2307,7 +2354,8 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
     with any line already in the body, which may only raise Door / Blast radius.
 
-    Phase 2 writes the line. Any later phase (6, 5.5, 7) only re-applies the floor to a
+    Phase 2 writes the line. In Phase 2 an LLM one-way above the floor survives only when its
+    Why names an irreversible effect; later phases apply no bar, so a human raise is kept. Any later phase (6, 5.5, 7) only re-applies the floor to a
     body that already carries one well-formed line, so a raised Door cannot be lowered. A
     missing or malformed line is left alone there and condition (18) holds it until a human
     adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
@@ -2327,7 +2375,11 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
         prior = None
     final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
                                         prior.blast if prior else None,
-                                        prior.why if prior else None)
+                                        prior.why if prior else None,
+                                        llm_raise_bar=(phase == "phase2"))
+    if prior and prior.door == "one-way" and final.door == "two-way":
+        log(f"{phase}: LLM one-way kept at the mechanical two-way floor; the Why names no "
+            f"irreversible effect ({prior.why[:80]!r})")
     log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
         f"triggers={list(final.triggers)}")
     return merge_danger.inject_merge_danger(body, final)
@@ -3264,7 +3316,7 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "llm-usage-limit", "llm-auth-expired",
                       "usage-pause-unconfirmed", "usage-pause-dirty",
-                      SUBPROCESS_TIMEOUT)
+                      SUBPROCESS_TIMEOUT, PRECOMMIT_HANG)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
@@ -3624,6 +3676,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     except HarnessError as e:
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
@@ -3636,6 +3691,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         # and merely confirms it in step 7.
         log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
             "-- attempting stacked --onto auto-resolution")
+        log(f"phase2: plain-path decline -- {(e.detail or '')[:600]}")
         plain_conflicted = getattr(git, "last_conflict_files", ())
         log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
         conflict_resolved = git.autoresolve_stacked_rebase()
@@ -3663,6 +3719,9 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         if conflict_resolved.collapse_warn:
             log(f"phase2: {conflict_resolved.collapse_warn}")
+        res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
+        if res.retries.get("conflict-review"):
+            log("phase2: conflict-review re-asked once (first reply carried no verdict token)")
     sha = git.head()
     if conflict_resolved is not None:
         auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"
@@ -3750,11 +3809,14 @@ def _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, lo
     """Decline before any LLM call when condition 3's MISSING set or an UNREALISED-ASSERTION-only set repeats the prior hold.
 
     True means `res` now carries the HOLD_REPEAT_DECLINED terminal and the caller
-    returns. Fail-open: any exception, POSTPLAN_FORCE=1, no plan, or no matching
+    returns. Fail-open: any exception, POSTPLAN_FORCE=1, POSTPLAN_STATE_CHANGED=1, no plan, or no matching
     record returns False and the run proceeds. Never touches res.pr_number or res.arm.
     """
     if os.environ.get("POSTPLAN_FORCE") == "1":
         log("phase2 early hold-repeat: skipped (POSTPLAN_FORCE=1)")
+        return False
+    if os.environ.get("POSTPLAN_STATE_CHANGED") == "1":
+        log("phase2 early hold-repeat: skipped (POSTPLAN_STATE_CHANGED=1)")
         return False
     if not (live or state_dir is not None) or not (plan and plan.found):
         return False
@@ -3955,6 +4017,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             return ("RESULT: post-plan BLOCKED — rebase conflict, "
                     "human required; ERROR terminal=failed, no PR opened."
                     f"{detail}{cause} Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == PRECOMMIT_HANG:
+            m = re.search(r"hung past (\d+)s", res.error or "")
+            secs = f"{m.group(1)}s" if m else "its timeout"
+            return ("RESULT: post-plan BLOCKED — the pre-commit hook hung past "
+                    f"{secs} and was killed; ERROR terminal=failed kind=precommit-hang. "
+                    "Step: commit (pre-commit hook). That commit did not land. Run "
+                    "bin/pre-commit-hook by hand in the worktree to find the hanging "
+                    "check, then re-run bin/post-plan-now.")
         if res.error_kind == SUBPROCESS_TIMEOUT:
             detail = _flat(res.error) or "a phase-2 subprocess timed out"
             cmd = _cmd_text(res.error_cmd)

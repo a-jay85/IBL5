@@ -971,8 +971,16 @@ td.ibl-team-cell--colored {
 }
 
 @media (max-width: 768px) {
+    /* Visually hidden but still the link's accessible name (no aria-label on
+       the link: name-abbreviation.js shortens this text, and a mismatched
+       aria-label fails axe's label-content-name-mismatch). */
     .ibl-team-cell__text {
-        display: none;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
 
     /* Center the logo when text is hidden */

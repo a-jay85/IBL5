@@ -52,12 +52,25 @@ E2E="${E2E_MUTATOR_SPECS_DIR:-$ROOT/ibl5/tests/e2e}"
 FIRE_PATTERN='(triggerUpdater|runUpdater)\(|\.post\([^)]*updateAllTheThings'
 
 # Allowlist: spec basenames named in the mutators project's testMatch array. That
-# array is the single `testMatch:` line that lists updater-awards. Strip the
-# regex backslashes (\.spec\.ts) before extracting basenames.
-allowlist_line=$(grep -E 'testMatch:.*updater-awards' "$CONFIG" || true)
+# array is the `testMatch:` array that lists updater-awards. It may sit on one
+# line or span several (one regex per line, closed by `]`). Strip the regex
+# backslashes (\.spec\.ts) before extracting basenames.
+if [ ! -r "$CONFIG" ]; then
+  echo "ERROR: could not find the mutators testMatch allowlist in $CONFIG" >&2
+  echo "  (config file is missing or unreadable)" >&2
+  exit 1
+fi
+allowlist_line=$(awk '
+  /testMatch:/ { block = ""; collecting = 1 }
+  collecting   { block = block $0 "\n" }
+  collecting && /\]/ {
+    collecting = 0
+    if (block ~ /updater-awards/ && !found) { printf "%s", block; found = 1 }
+  }
+' "$CONFIG")
 if [ -z "$allowlist_line" ]; then
   echo "ERROR: could not find the mutators testMatch allowlist in $CONFIG" >&2
-  echo "  (expected a 'testMatch:' line naming updater-awards.spec.ts)" >&2
+  echo "  (expected a 'testMatch:' array naming updater-awards.spec.ts)" >&2
   exit 1
 fi
 # shellcheck disable=SC1003  # '\\' is a literal backslash for tr — strips the

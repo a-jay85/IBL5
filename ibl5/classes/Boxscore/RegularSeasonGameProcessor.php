@@ -15,6 +15,8 @@ use JsbParser\ScoFileParser;
  */
 class RegularSeasonGameProcessor implements GameTypeProcessorInterface
 {
+    private const TEAM_NAME_MAX_LENGTH = 16;
+
     /** @var array<string, string|null> */
     private array $franchiseNameCache = [];
 
@@ -53,7 +55,9 @@ class RegularSeasonGameProcessor implements GameTypeProcessorInterface
     {
         $key = $seasonEndingYear . ':' . $franchiseId;
         if (!array_key_exists($key, $this->franchiseNameCache)) {
-            $this->franchiseNameCache[$key] = $this->repository->findFranchiseTeamName($franchiseId, $seasonEndingYear);
+            $name = $this->repository->findFranchiseTeamName($franchiseId, $seasonEndingYear);
+            // ibl_box_scores_teams.name is VARCHAR(16); a longer name falls back to the parsed .sco name
+            $this->franchiseNameCache[$key] = $name !== null && mb_strlen($name) > self::TEAM_NAME_MAX_LENGTH ? null : $name;
         }
 
         return $this->franchiseNameCache[$key];

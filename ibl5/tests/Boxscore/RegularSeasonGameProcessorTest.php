@@ -148,6 +148,25 @@ class RegularSeasonGameProcessorTest extends TestCase
         self::assertSame(['action' => 'insert', 'linesProcessed' => 26, 'messages' => []], $result);
     }
 
+    public function testPassesNullNameWhenFranchiseNameExceedsColumn(): void
+    {
+        $resolver = self::createStub(GameUpsertResolver::class);
+        $resolver->method('resolve')->willReturn('insert');
+        $repository = self::createStub(BoxscoreRepositoryInterface::class);
+        $repository->method('findFranchiseTeamName')->willReturnMap([
+            [6, 2026, 'SeventeenCharName'],
+            [8, 2026, 'Thunder'],
+        ]);
+        $writer = self::createMock(GameLineWriter::class);
+        $writer->expects(self::once())
+            ->method('write')
+            ->with(self::anything(), self::anything(), null, 'Thunder')
+            ->willReturn(26);
+
+        $processor = new RegularSeasonGameProcessor($resolver, $writer, $repository);
+        $processor->process($this->makeLine(), 2026, 'Regular Season/Playoffs', 'ibl');
+    }
+
     public function testPassesNullNamesWhenFranchiseRowMissing(): void
     {
         $resolver = self::createStub(GameUpsertResolver::class);

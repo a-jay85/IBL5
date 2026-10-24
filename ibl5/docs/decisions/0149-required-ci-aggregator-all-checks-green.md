@@ -20,7 +20,7 @@ Requiring every check name was rejected. Path-filtered workflows do not run on e
 
 ## Decision
 
-1. One aggregator workflow, `.github/workflows/all-checks-green.yml`, with one job named `All checks green`. It triggers on `pull_request` types `opened`, `reopened`, `synchronize`, `ready_for_review`, `edited`, `labeled`, and `unlabeled`. It has no `paths` or `branches` filter and no job-level `if:`. The label and edit types matter because sibling workflows start jobs on those events, and the aggregator must re-settle after them.
+1. One aggregator workflow, `.github/workflows/all-checks-green.yml` (example), with one job named `All checks green`. It triggers on `pull_request` types `opened`, `reopened`, `synchronize`, `ready_for_review`, `edited`, `labeled`, and `unlabeled`. It has no `paths` or `branches` filter and no job-level `if:`. The label and edit types matter because sibling workflows start jobs on those events, and the aggregator must re-settle after them.
 2. The job runs `bin/check-pr-checks-green --wait` against the PR head SHA. It passes when every check run on the head concludes `success`, `skipped`, or `neutral`. It fails at once on any other conclusion. The verdict logic is shared with `bin/check-master-ci-green` through `bin/lib/ci-checks-green.sh`.
 3. It waits on anchors so it cannot pass before siblings register. The four other required contexts (`Tests and Analysis`, `E2E Tests`, `Meta checks`, `Infection PHP (per-PR diff)`) must be reported and completed. Every workflow run on the head SHA other than this one must be completed too.
 4. It fails closed. The script gives up at `--timeout-seconds=2400` and exits 1. The job carries `timeout-minutes: 45`, and a killed job concludes `cancelled`, which the required context reads as red. An API error while waiting counts as pending and ends in the same timeout.
@@ -204,6 +204,8 @@ satisfied by a status, so the two aggregators coexist until the runbook below co
 **Escape hatch.** If `All checks settled` stops settling repo-wide, undo steps 5 and 4.
 A POST re-adds `All checks green` as an any-source entry, which the legacy check-run
 satisfies. A DELETE then removes `All checks settled`. Both are single API calls.
+
+**Retired 2026-10-22.** Cutover runbook steps 1 to 5 are done and the retirement PR deleted the legacy waiter. `.github/workflows/all-checks-green.yml` (example) no longer exists, and nothing ignores `All checks green`. The escape hatch above no longer applies. The step 4 POST pinned the new entry to the GitHub Actions app (`app_id` 15368). The workflow posts its status as `github-actions[bot]`, so the pinned entry is satisfied.
 
 **Interim window.** Condition (15) reads `All checks settled` from live protection. From
 this merge until runbook step 4 adds that entry, condition (15) blocks arming on any red

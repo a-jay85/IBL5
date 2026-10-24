@@ -2,11 +2,12 @@
 # bin/sim-recap-prompt
 #
 # Prints the assembled sim-recap Claude prompt to stdout.
-# Performs NO database access of any kind — the agent that receives this prompt
-# queries live game data itself via mysql.
+# Performs NO database access of any kind — the prompt carries a prefetched fact
+# sheet (from --roster) and the agent writes prose from it. The agent may run
+# mysql only for extra color the sheet lacks (a bench line, quarter scores).
 #
 # Usage:
-#   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path> [--roster=<path>]
+#   bin/sim-recap-prompt --sim=N --mentions=<path> --themes=<path> --roster=<path>
 #
 # --mentions JSON shape: {"Team Name": "snowflake-string-or-null", ...}
 #   Keys are teams that played in the sim. Values are Discord snowflakes as
@@ -15,12 +16,13 @@
 #
 # --themes JSON shape: ["narrative angle used", ...] or [] for empty ledger
 #
-# --roster JSON shape: precomputed roster context from simRecapContext.php.
+# --roster JSON shape: precomputed context from simRecapContext.php.
 #   {"sim":N,"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD",
 #    "roster":{"<teamid>":[{"pid":N,"name":"...","pos":"...","current_teamid":N}],...},
-#    "active_injuries":[...],"sim_trades":[...]}
-#   When provided, injected as Block 8 (after the exemplar) so it outranks it.
-#   When absent, Block 8 is omitted entirely (roster-blind mode).
+#    "active_injuries":[...],"sim_trades":[...],"games":[...],"standings":[...]}
+#   Required. Must hold a non-empty "games" array (the fact sheet); exits 2 otherwise.
+#   games and standings render as Block 3b (the fact sheet); roster and
+#   active_injuries are injected as Block 8 (after the exemplar) so it outranks it.
 #
 # Env seams (SIM_RECAP_* convention):
 #   SIM_RECAP_EXEMPLAR  Path to the pinned exemplar txt file.
@@ -76,6 +78,13 @@ for arg in "$@"; do
         --roster=*)   roster_path="${arg#--roster=}" ;;
     esac
 done
+
+if [[ -z "$roster_path" || ! -f "$roster_path" ]] \
+    || ! jq -e '(.games | type == "array") and (.games | length > 0)' \
+        "$roster_path" >/dev/null 2>&1; then
+    echo "sim-recap-prompt: --roster context missing or has no games; refusing to build a fact-sheet-less prompt" >&2
+    exit 2
+fi
 
 # --- Fail closed: exemplar must exist ---
 # Emitting a prompt without the anchor would silently produce off-format output —
@@ -133,8 +142,12 @@ cat <<DATA_EOF
 
 Sim number: ${sim}
 
-Query live game data with this EXACT command. Copy the path verbatim, start the
-command with it, and pass the SQL with -e:
+The FACT SHEET below is complete and authoritative for this sim: every game, final
+score, game order, top performers, game-day injuries, trades, standings, and streaks.
+Write the recap from it. Do not re-query any of that.
+
+Query the database only for extra color the sheet lacks (a bench player's line,
+quarter scores). Use this EXACT command, binary path and flag verbatim:
 
   ${SIM_RECAP_MYSQL_WRAPPER} -e "SELECT ..."
 
@@ -148,21 +161,41 @@ Do not run "mysql" or any other client directly; only the command above is
 permitted. Do not prefix it with environment variables or chain other commands
 onto it.
 
-Relevant tables:
-
-  ibl_sim_dates         — sim, start_date, end_date (identifies which dates are in this sim)
-  ibl_box_scores        — raw box score data per game
-  ibl_box_scores_teams  — per-team box score lines (scores, player stats)
-  ibl_schedule          — league schedule
-  ibl_standings         — current standings: wins, losses, pct, conference, division,
-                          leagueRecord, confRecord, divRecord, homeRecord, awayRecord,
-                          gamesUnplayed, confMagicNumber, divMagicNumber
-  ibl_jsb_transactions  — injuries and transactions during the sim: injury_games_missed,
-                          injury_description, transaction_type, player_name, from_teamid, to_teamid
-  ibl_power             — post-sim power rankings: ranking, streak_type (W/L), streak length,
-                          sos, remaining_sos
+Useful tables: ibl_box_scores (player lines), ibl_box_scores_teams (quarter scores),
+ibl_jsb_transactions.
 
 DATA_EOF
+
+# =============================================================================
+# Block 3b: Fact sheet (games, top performers, injuries, standings, trades),
+# rendered from the precomputed context file. Terse text, not JSON: roughly a
+# third of the tokens. Team names resolve through the standings rows.
+# =============================================================================
+echo "== FACT SHEET (complete and authoritative) =="
+echo ""
+echo "Each game carries a key (g1, g2, ...). Your prose.json games object is keyed by these."
+echo ""
+jq -r '
+  def tn($nm; $id; $n): $n // $nm[$id | tostring] // ("team " + ($id | tostring));
+  def pl($s): "  \($s) \(.name) \(.min)m \(.pts)p \(.reb)r \(.ast)a \(.stl)s \(.blk)b \(.fgm)-\(.fga) \(.tpm)-\(.tpa)";
+  (reduce .standings[] as $s ({}; .[$s.teamid | tostring] = $s.name)) as $nm
+  | "Sim \(.sim): \(.start_date) to \(.end_date)",
+    "",
+    "GAMES (key date Visitor score @ Home score; V/H lines: min pts reb ast stl blk FGM-FGA 3PM-3PA)",
+    (.games[]
+      | "\(.key) \(.game_date) \(tn($nm; .visitor_teamid; .visitor_name)) \(.visitor_score) @ \(tn($nm; .home_teamid; .home_name)) \(.home_score)",
+        (.visitor_top[] | pl("V")),
+        (.home_top[] | pl("H")),
+        (.injuries[] | "  INJ \(.name): \(.injuryDescription) (\(.injuryGamesMissed) games)")),
+    "",
+    "STANDINGS (team W-L conference/division confGB streak last10)",
+    (.standings[] | "\(.name) \(.wins)-\(.losses) \(.conference // "-")/\(.division // "-") \(.conf_gb // "-") \(if .streak == "" then "-" else .streak end) \(if .last10 == "" then "-" else .last10 end)"),
+    "",
+    "TRADES",
+    (if (.sim_trades | length) == 0 then "(none)"
+     else (.sim_trades[] | "\(.player_name // ("pid " + (.pid | tostring))): \(tn($nm; .from_teamid; null)) to \(tn($nm; .to_teamid; null)) on \(.trade_date)")
+     end)
+' "$roster_path"
 
 # =============================================================================
 # Block 4: Discord mention map
@@ -173,8 +206,7 @@ DATA_EOF
 echo ""
 echo "== DISCORD MENTION MAP =="
 echo ""
-echo "Use these @mentions when writing each game recap."
-echo "Format: away-team-mention · home-team-mention (middle-dot separated, on one line below the score header). The prose paragraph follows after a blank line."
+echo "The caller writes each game's score header and mention line from this map. Never write them yourself."
 echo ""
 
 if [[ -n "$mentions_path" && -f "$mentions_path" ]]; then
@@ -213,7 +245,7 @@ echo ""
 
 # =============================================================================
 # Block 6: Output contract
-# Write exactly ONE file to cwd: payload.json satisfying SimRecapPayload::fromJson()
+# Write exactly ONE file to cwd: prose.json; bin/sim-recap-tick assembles payload.json
 # =============================================================================
 cat <<'CONTRACT_EOF'
 
@@ -221,61 +253,34 @@ cat <<'CONTRACT_EOF'
 
 Write exactly ONE file to your current working directory using the Write tool:
 
-  payload.json
+  prose.json
 
-This must be a valid JSON document satisfying SimRecapPayload::fromJson(). Required shape:
+Shape:
 
 {
   "intro_text": "…",
   "outro_text": "…",
   "recap_text": "…",
   "themes": ["…"],
-  "games": [
-    {
-      "season_year": N,
-      "game_date": "YYYY-MM-DD",
-      "visitor_teamid": N,
-      "home_teamid": N,
-      "game_of_that_day": N,
-      "box_id": N_or_null,
-      "sort_order": N,
-      "recap_text": "…"
-    }
-  ]
+  "games": { "g1": "…", "g2": "…" }
 }
 
-Strict field types:
-  - season_year, visitor_teamid, home_teamid, game_of_that_day, sort_order: JSON integers
-  - game_date: non-empty string, format YYYY-MM-DD
-  - recap_text (per game and top-level): non-empty strings
-  - box_id: integer or null
-  - game_of_that_day: READ this value from the database. Do NOT infer it, do NOT count
-    it yourself, and do NOT default it to 1. It is the 1-based index of the game within
-    its DATE across the entire league, assigned by the sim engine: on a seven-game night
-    the seven games carry 1, 2, 3, 4, 5, 6 and 7. It is NOT a doubleheader counter and it
-    is NOT per-matchup. Look it up once for the whole sim window:
-
-      SELECT DISTINCT game_date, visitor_teamid, home_teamid, game_of_that_day
-        FROM ibl_box_scores_teams
-       WHERE game_date BETWEEN '<start_date>' AND '<end_date>'
-       ORDER BY game_date, game_of_that_day;
-
-    (start_date and end_date come from ibl_sim_dates for this sim. ibl_box_scores_teams
-    stores one row per team side, so DISTINCT collapses it to one row per game.)
-
-    Copy the value verbatim into each game object. A wrong value silently drops that
-    recap from the rendered output: sim 725 wrote 1 for all 49 games and only 7 of them
-    ever rendered. Never use 0.
-  - themes: array of strings — narrative angles you used this run (for the next ledger)
+  - games: an object with exactly one entry per FACT SHEET key, every key, no others.
+    Each value is that game's prose paragraph only. The caller adds the bold score
+    header and the mention line above it, so never start a paragraph with a score,
+    a team-mention line, or a blank line.
+  - recap_text (top level): a teaser of about 220 characters for the whole sim.
+  - intro_text, outro_text, every games value: non-empty strings.
+  - themes: array of strings, the narrative angles you used this run (for the next ledger).
 
 == HOW TO PRODUCE IT ==
 
-Write payload.json DIRECTLY with the Write tool, as literal JSON.
+Write prose.json DIRECTLY with the Write tool, as literal JSON.
 
 Do NOT write a Python (or any other) script that generates, assembles, templates,
-or emits payload.json. No gen.py, no build_payload.py, no heredoc'd generator. You
-are the generator. Every recap_text is prose you write; every field around it is a
-value you already looked up. Putting those same literals into a script that then
+or emits prose.json. No gen.py, no build_payload.py, no heredoc'd generator. You
+are the generator. Every recap_text is prose you write; the caller supplies every
+field around the prose. Putting those same literals into a script that then
 prints them adds a step and buys nothing — the caller already validates the result.
 
 Scratch files, when you genuinely need one (a query dump, notes):
@@ -334,30 +339,27 @@ EXEMPLAR_FOOTER_EOF
 
 # =============================================================================
 # Block 8: Authoritative roster context (injected AFTER the exemplar so it
-# outranks the exemplar on player attribution). Only emitted when --roster=<path>
-# provides a valid JSON file.
+# outranks the exemplar on player attribution). Always emitted: --roster is
+# required and validated above. Games, standings, and trades are in the fact sheet.
 # =============================================================================
-if [[ -n "$roster_path" && -f "$roster_path" ]] && jq -e '.sim != null' "$roster_path" >/dev/null 2>&1; then
-    cat <<'ROSTER_HEADER_EOF'
+cat <<'ROSTER_HEADER_EOF'
 
 == CURRENT ROSTER CONTEXT (authoritative — outranks the exemplar) ==
 
 The following precomputed context reflects the current state of the league as
 of this sim. Use it to attribute players correctly in your recap:
 
-- roster: each team's current player list (current_teamid is authoritative;
+- roster: played, injured, or traded players by current team (current_teamid is authoritative;
   never use ibl_jsb_transactions.from_teamid — it is a frozen historical marker)
 - active_injuries: players currently on the injury list as of the sim window end.
   Each row carries current_teamid (from ibl_plr.teamid) — attribute an injured
   player to THAT team, never to ibl_jsb_transactions.from_teamid, which records
   where he was when he got hurt and is wrong for anyone traded since.
-- sim_trades: trades that occurred during this sim window
 
 ROSTER_HEADER_EOF
-    cat "$roster_path"
-    cat <<'ROSTER_FOOTER_EOF'
+jq -c '{roster, active_injuries}' "$roster_path"
+cat <<'ROSTER_FOOTER_EOF'
 
-(End of roster context — write the recap using the live database data above,
+(End of roster context. Write the recap from the fact sheet above,
  informed by this roster context for current team attribution.)
 ROSTER_FOOTER_EOF
-fi

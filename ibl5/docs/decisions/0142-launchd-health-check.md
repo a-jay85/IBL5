@@ -1,6 +1,6 @@
 ---
 description: Daily and at-login health check for the nine com.ibl5 launchd UserAgents, with once-per-day Discord alerting.
-last_verified: 2026-09-28
+last_verified: 2026-10-23
 ---
 
 # ADR-0142: Daily and At-Login Health Check for the com.ibl5 launchd Jobs
@@ -36,3 +36,13 @@ Nine long-lived `com.ibl5.*` jobs run the league's unattended plumbing: `automou
 - `bin/test-launchd-health-check` (stubbed harness)
 - `bin/test-launchd-health-cron-setup` (plist-generation harness)
 - `.github/workflows/tests.yml` (CI wiring)
+
+## Addendum (2026-10-23): bug-pipeline verdicts route through this check
+
+`bin/bug-pipeline-check` had no alert route, so a degraded verdict reached nobody unless someone ran it by hand (a-jay85/IBL5-backlog#1573). `bin/launchd-health-check` now runs it after `check_docker` in a `check_bug_pipeline` step.
+
+- Exit 0 adds nothing. Exit 1 or 2 adds one problem per `SIGNAL:` line, keyed `bug-pipeline:<signal>`. Each key goes through the existing stamp dedup, so a new signal still DMs on a day an older one was already reported.
+- Any other exit code, a missing binary, or exit 1 or 2 with no `SIGNAL:` line adds `bug-pipeline:check-failed`. A `SIGNAL:` line the parser cannot key adds `bug-pipeline:unparsed-signal`.
+- A signal is dropped only when an earlier check already reports the same fault. `process:unloaded` is dropped when `missing:com.ibl5.bug-pipeline-cron` is present. `bot:unloaded` is dropped when `missing:com.ibl5.bug-bot` is present. Any `*:db-unavailable` signal is dropped when a `docker:*` or `container:ibl5-mariadb` problem is present, which covers the at-login run firing before Docker is up.
+- The test seam `BUG_PIPELINE_CHECK_BIN` selects the checker. Unset or empty means the sibling `bin/bug-pipeline-check`. `bin/test-launchd-health-check` cases B0 to B14b cover the step, including a drift guard over the checker's emit sites and two cases that run the real checker.
+- The step has a timeout. This reverses plan decision 11 ("No timeout wrapper"). Review thread 4362888859 showed that a hung curl or db-query inside the checker would block the verdict, stamps, and DM for every other check. The owner's approval of the watchdog is not recorded on the PR. The checker runs in its own process group via `perl setpgrp`, because macOS has no `setsid`. After `BUG_PIPELINE_CHECK_TIMEOUT` seconds (default 60) the watchdog sends TERM to the group, waits 2 seconds, then sends KILL. The step then reports `bug-pipeline:check-failed`. Cases B5c to B5f cover a hung checker, an orphaned child, a leftover watchdog sleep, and a checker that ignores TERM.

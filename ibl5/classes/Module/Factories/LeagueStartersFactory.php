@@ -17,9 +17,24 @@ final class LeagueStartersFactory implements \Module\Contracts\ModuleFactoryInte
     {
     }
 
-    public function db(): \mysqli
+    public function team(string $teamName): \Team\Team
     {
-        return $this->services->db();
+        return \Team\Team::initialize($this->services->db(), $teamName);
+    }
+
+    /**
+     * The view's table renderers need the connection, which index.php never holds.
+     *
+     * @param array<string, array<int, \Player\Player>> $startersByPosition
+     */
+    public function renderPage(
+        LeagueStartersView $view,
+        \Season\Season $season,
+        array $startersByPosition,
+        \Team\Team $highlightedTeam,
+        string $display
+    ): string {
+        return $view->render($this->services->db(), $season, $startersByPosition, $highlightedTeam, $display);
     }
 
     public function teamIdentity(): \Repositories\TeamIdentityRepository

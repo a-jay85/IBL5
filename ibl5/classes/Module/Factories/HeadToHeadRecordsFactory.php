@@ -25,7 +25,7 @@ final class HeadToHeadRecordsFactory implements ModuleFactoryInterface
     public function controller(string $imageRoot): \HeadToHeadRecords\HeadToHeadRecordsController
     {
         $db = $this->services->db();
-        $season = new \Season\Season($db, $this->services->leagueContext());
+        $season = \Season\SharedSeason::get($db, $this->services->leagueContext());
         $logoResolver = new \HeadToHeadRecords\LogoResolver();
 
         $innerRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(

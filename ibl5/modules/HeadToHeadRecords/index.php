@@ -32,18 +32,10 @@ $gmTeamId = null;
 if ($nukeCompat->isUser($user)) {
     $decoded  = $nukeCompat->cookieDecode($user);
     $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
-    $stmt = $username !== ''
-        ? $services->db()->prepare('SELECT teamid FROM `ibl_team_info` WHERE gm_username = ? LIMIT 1')
-        : false;
-    if ($stmt !== false) {
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $stmt->bind_result($fetchedTeamId);
-        $fetched = $stmt->fetch();
-        $stmt->close();
-        if ($fetched === true && is_numeric($fetchedTeamId)) {
-            $gmTeamId = (int) $fetchedTeamId;
-        }
+    if ($username !== '') {
+        $teamIdentity = $services->teamIdentity();
+        $gmTeamName = $teamIdentity->getTeamnameFromUsername($username);
+        $gmTeamId = $gmTeamName !== null ? $teamIdentity->getTidFromTeamname($gmTeamName) : null;
     }
 }
 

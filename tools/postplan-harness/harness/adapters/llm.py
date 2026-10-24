@@ -94,17 +94,36 @@ def _extractor_for(purpose: str):
     return extract_json
 
 
-def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None):
+# Process groups of in-flight _run_reaped children. Each child runs in its own session,
+# so a SIGTERM aimed at the harness's group never reaches it. runner's SIGTERM handler
+# calls reap_live_groups() before os._exit, which skips the finally below.
+_LIVE_PGIDS: set[int] = set()
+
+
+def reap_live_groups() -> None:
+    """SIGKILL every in-flight bounded child group. Safe in a signal handler: no lock,
+    and set.copy() runs as one C call under the GIL, so a worker thread adding or
+    discarding a pgid cannot break the iteration."""
+    for pgid in _LIVE_PGIDS.copy():
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None, text=True):
     """Run argv with its own process group, always reaping the group on exit.
 
     `claude -p` spawns children that a plain subprocess timeout never touches, so the
     killpg lives in `finally` and fires on the success path too. TimeoutExpired is
     re-raised so callers keep today's exception contract.
+    text=False returns bytes unchanged, for callers that write output back verbatim.
     """
     proc = subprocess.Popen(
         argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, cwd=cwd, env=env, start_new_session=True, errors=errors,
+        text=text, cwd=cwd, env=env, start_new_session=True, errors=errors if text else None,
     )
+    _LIVE_PGIDS.add(proc.pid)
     try:
         out, err = proc.communicate(stdin_text, timeout=timeout)
         return subprocess.CompletedProcess(argv, proc.returncode, out, err)
@@ -112,12 +131,14 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env, errors=None):
         raise
     finally:
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            os.killpg(proc.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+        _LIVE_PGIDS.discard(proc.pid)
 
 
-def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, errors=None):
+def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, errors=None,
+                text=True):
     """_run_reaped plus the typed timeout contract for deterministic phase-2 steps.
 
     Returns the CompletedProcess unchanged (a nonzero rc is the caller's business).
@@ -126,9 +147,11 @@ def run_bounded(argv, *, step, timeout, cwd=None, stdin_text=None, env=None, err
     OSError (missing binary) propagates unchanged; callers keep their own handling.
     """
     try:
-        return _run_reaped(list(argv), stdin_text, timeout, cwd, env, errors)
+        return _run_reaped(list(argv), stdin_text, timeout, cwd, env, errors, text)
     except subprocess.TimeoutExpired as e:
-        partial = e.output if isinstance(e.output, str) else ""
+        out = e.output
+        partial = (out.decode("utf-8", errors="replace") if isinstance(out, bytes)
+                   else out if isinstance(out, str) else "")
         raise HarnessError(
             SUBPROCESS_TIMEOUT,
             f"step '{step}' timed out after {timeout}s",

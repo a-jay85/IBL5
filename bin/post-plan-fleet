@@ -714,17 +714,25 @@ if [ "$_hr_run" = 1 ]; then
         cp "$LOG" "$LOG.declined" 2>/dev/null || true
         cp "$_hr_log" "$LOG"
         # RC still holds the first pass's decline exit (8). notify() must judge the re-fire.
-        RC=0
+        # RC takes the re-fire's own exit. A missing line (older fix, stub) reads as 0.
+        _hr_refire_rc=$(grep '^postplan-fix: holdrepeat refire rc=' "$_hr_log" 2>/dev/null | tail -n 1 | sed 's/.*rc=//')
+        case "$_hr_refire_rc" in
+            ''|*[!0-9]*) RC=0 ;;
+            *) RC="$_hr_refire_rc" ;;
+        esac
     else
-        # gave-up-* is quiet on both paths: postplan-fix sent its own owner DM, so a second
-        # decline DM would duplicate it. skip-* is quiet only when pr-cycle routed the PR here
+        # gave-up-* is quiet only when postplan-fix printed "holdrepeat dm=sent", meaning it
+        # already DMed the owner. When it sent none (a repeat decline with dm=no), the normal
+        # decline DM goes out carrying the autofix word. skip-* is quiet only when pr-cycle routed the PR here
         # (no first pass ran, so no decline DM exists yet); after a first-pass decline the
         # normal DM goes out with the autofix word appended. A timeout, an error or a missing
         # result word falls through to the normal DM.
         case "$_hr_word" in
             gave-up-*)
                 echo "RESULT: post-plan DECLINED (holdrepeat autofix $_hr_word)" >> "$LOG"
-                _hr_quiet=1 ;;
+                if grep -qF 'postplan-fix: holdrepeat dm=sent' "$_hr_log" 2>/dev/null; then
+                    _hr_quiet=1
+                fi ;;
             skip-*)
                 if [ -n "$HOLDREPEAT_FIX_ARG" ]; then
                     echo "RESULT: post-plan DECLINED (holdrepeat autofix $_hr_word)" >> "$LOG"

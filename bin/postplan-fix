@@ -218,12 +218,15 @@ if [ "$HOLDREPEAT" = 1 ]; then
     }
     # Final stdout line for every --holdrepeat exit; callers parse it with the exit code.
     _hr_finish() {  # <rc> <result word>
+        printf 'postplan-fix: holdrepeat dm=%s\n' "$HR_DM_STATE"
         printf 'postplan-fix: holdrepeat result=%s\n' "$2"
         exit "$1"
     }
     # Owner DM: the fleet's call shape (message on stdin, "-" as the argument).
+    HR_DM_STATE=none   # "sent" once the owner DM went out; the fleet reads it to avoid a second DM
     _hr_dm() {  # <reason>
         local text line n=0
+        HR_DM_STATE=sent
         text="postplan-fix: PR #$PR repeat hold needs you ($1). fingerprint=$HR_FP. Items:"
         while IFS= read -r line; do
             [ -n "$line" ] || continue
@@ -496,17 +499,38 @@ LAST line of the final message."
     if [ -n "$HR_EXTBAD" ]; then _hr_reject gate-path "$HR_EXTBAD"; fi
     # 2. refs: the session was told never to commit, so any own-ref move is out of bounds.
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" || REFS1="unreadable"
+    # The remote branch is checked too: a session that pushed moved it past anything the local
+    # restore can undo. Put it back with a lease on the value just read, then reject. An
+    # unreadable remote cannot be proven unmoved, so it rejects as well.
+    if ! HR_REMOTE_NOW="$(git -C "$WT" ls-remote origin "refs/heads/$branch" 2>/dev/null | cut -f1)"; then
+        _pf_restore_own_refs
+        _hr_reject refs "could not read origin/$branch after the session"
+    fi
+    if [ "$HR_REMOTE_NOW" != "$HEAD0" ]; then
+        if [ -n "$HR_REMOTE_NOW" ]; then
+            git -C "$WT" push -q --force-with-lease="refs/heads/$branch:$HR_REMOTE_NOW" origin "$HEAD0:refs/heads/$branch" >/dev/null 2>&1 || true
+        fi
+        _pf_restore_own_refs
+        _hr_reject refs "origin/$branch moved during the session"
+    fi
     if [ "$(git -C "$WT" rev-parse HEAD)" != "$HEAD0" ] || [ "$REFS1" != "$REFS0" ]; then
         _pf_restore_own_refs
         _hr_reject refs "HEAD or the branch refs moved during the session"
     fi
     # 3. gate-path: gate scripts in the worktree stay untouched (the main checkout and
-    # ~/.claude/hooks were checked above).
+    # ~/.claude/hooks were checked above). Gitignored files under the gate roots count too:
+    # .claude/settings.local.json and similar never show in diff or plain ls-files.
     HR_PATHS="$(git -C "$WT" -c core.quotepath=off diff --no-renames --name-only HEAD; git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         if _hr_is_gate_path "$p"; then _hr_reject gate-path "$p"; fi
     done <<< "$HR_PATHS"
+    # Ignored files that already existed stay legal; only one written since t0 counts.
+    HR_IGN="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py)"
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if _hr_is_gate_path "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then _hr_reject gate-path "$p (ignored file written)"; fi
+    done <<< "$HR_IGN"
     # Marker outcomes other than "fixed" end here, after the guards above.
     case "$HR_KIND" in
         needs-gate-edit)

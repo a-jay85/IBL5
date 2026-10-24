@@ -3311,7 +3311,7 @@ _hr_decline_line='RESULT: post-plan DECLINED — terminal=hold-repeat-declined; 
 
 # --- case: holdrepeat-decline-fires-fix -------------------------------------------------
 begin_case
-_hr_run "$_hr_decline_line" 'postplan-fix: holdrepeat result=gave-up-repeat'
+_hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat dm=sent\npostplan-fix: holdrepeat result=gave-up-repeat'
 [[ "$(_hr_calls "$_HR_FIXREC")" == 1 ]] \
     || fail "holdrepeat-decline-fires-fix: want exactly one fix call, got $(_hr_calls "$_HR_FIXREC")"
 grep -qF -- "argv=--holdrepeat ${_DM_PR} " "$_HR_FIXREC" 2>/dev/null \
@@ -3321,11 +3321,27 @@ grep -qF 'plist-present=yes' "$_HR_FIXREC" 2>/dev/null \
 [[ "$(_outcome_of)" == declined ]] || fail "holdrepeat-decline-fires-fix: outcome '$(_outcome_of)'"
 grep -qF 'post-plan-fleet: holdrepeat-fix=gave-up-repeat' "$_DM_LOG" 2>/dev/null \
     || fail "holdrepeat-decline-fires-fix: log lacks holdrepeat-fix=gave-up-repeat"
-# postplan-fix sent its own owner DM for a gave-up-*, so the fleet stays quiet.
+# postplan-fix reported dm=sent, so the fleet stays quiet.
 if grep -q . "$_DM_CAPTURE" 2>/dev/null; then
     fail "holdrepeat-decline-fires-fix: fleet sent a DM after gave-up ($(cat "$_DM_CAPTURE" 2>/dev/null))"
 fi
 end_case holdrepeat-decline-fires-fix
+
+# --- case: holdrepeat-gaveup-no-dm-sends-autofix-dm ------------------------------------
+# postplan-fix sent no owner DM (dm=none, e.g. a repeat decline), so the fleet DM goes out and
+# carries the autofix word.
+begin_case
+_hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat dm=none\npostplan-fix: holdrepeat result=gave-up-repeat'
+grep -qF 'autofix: gave-up-repeat' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-gaveup-no-dm: fleet DM lacks 'autofix: gave-up-repeat' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+end_case holdrepeat-gaveup-no-dm-sends-autofix-dm
+
+# --- case: holdrepeat-skip-after-decline-sends-autofix-dm -------------------------------
+begin_case
+_hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat dm=none\npostplan-fix: holdrepeat result=skip-dirty-worktree'
+grep -qF 'autofix: skip-dirty-worktree' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "holdrepeat-skip-after-decline: fleet DM lacks 'autofix: skip-dirty-worktree' ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+end_case holdrepeat-skip-after-decline-sends-autofix-dm
 
 # --- case: holdrepeat-fix-replaces-log --------------------------------------------------
 begin_case

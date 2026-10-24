@@ -336,6 +336,11 @@
     /* Show team name in team-cell (override global hide) but hide city */
     .trading-team-select .ibl-team-cell__text {
         display: inline;
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip-path: none;
     }
 
     .trading-team-select .ibl-team-cell__city {

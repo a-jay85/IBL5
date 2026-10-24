@@ -359,7 +359,7 @@ def test_repin_updates_verdict_2_and_tree_with_round_past_max(monkeypatch):
     seen = {}
 
     def fake(llm, git, out_dir, worktree, plan, master_sha, pr_body, pr, remediation_sha,
-             verdict1_path, *, round_num, log=None):
+             verdict1_path, *, round_num, log=None, approvals=None):
         seen.update(round_num=round_num, pr_body=pr_body, remediation_sha=remediation_sha,
                     verdict1_path=verdict1_path)
         return "READY", "newtree", "/p"

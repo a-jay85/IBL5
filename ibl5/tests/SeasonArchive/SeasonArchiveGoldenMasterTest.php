@@ -7,6 +7,7 @@ namespace Tests\SeasonArchive;
 use PHPUnit\Framework\TestCase;
 use SeasonArchive\SeasonArchiveIndexView;
 use SeasonArchive\SeasonDetailView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * Golden-master snapshot tests pinned against the split view classes.
@@ -22,7 +23,7 @@ use SeasonArchive\SeasonDetailView;
  */
 class SeasonArchiveGoldenMasterTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     private SeasonArchiveIndexView $indexView;
     private SeasonDetailView $detailView;

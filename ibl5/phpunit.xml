@@ -308,6 +308,9 @@
         <testsuite name="DataRetention Module Tests">
             <directory>tests/DataRetention</directory>
         </testsuite>
+        <testsuite name="Support Tests">
+            <directory>tests/Support</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

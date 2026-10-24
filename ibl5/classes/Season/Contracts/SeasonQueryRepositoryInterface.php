@@ -74,27 +74,6 @@ interface SeasonQueryRepositoryInterface
     public function getLastRegularSeasonGameDate(int $endingYear): ?string;
 
     /**
-     * Get allow trades status
-     *
-     * @return string Status of allowing trades ('Yes' or 'No')
-     */
-    public function getAllowTradesStatus(): string;
-
-    /**
-     * Get allow waivers status
-     *
-     * @return string Status of allowing waivers ('Yes' or 'No')
-     */
-    public function getAllowWaiversStatus(): string;
-
-    /**
-     * Get free agency notifications state
-     *
-     * @return string State of free agency notifications ('On' or 'Off')
-     */
-    public function getFreeAgencyNotificationsState(): string;
-
-    /**
      * Calculate phase-specific sim number for any sim/phase/season combination
      *
      * @param int $overallSimNumber The overall sim number to calculate for

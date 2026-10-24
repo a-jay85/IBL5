@@ -131,47 +131,6 @@ class SeasonQueryRepositoryTest extends TestCase
     }
 
     // ============================================
-    // GET ALLOW TRADES/WAIVERS STATUS TESTS
-    // ============================================
-
-    public function testGetAllowTradesStatusReturnsYes(): void
-    {
-        $this->mockDb->setMockData([
-            ['setting_value' => 'Yes'],
-        ]);
-
-        $result = $this->repository->getAllowTradesStatus();
-
-        $this->assertSame('Yes', $result);
-    }
-
-    public function testGetAllowWaiversStatusReturnsNo(): void
-    {
-        $this->mockDb->setMockData([
-            ['setting_value' => 'No'],
-        ]);
-
-        $result = $this->repository->getAllowWaiversStatus();
-
-        $this->assertSame('No', $result);
-    }
-
-    // ============================================
-    // GET FREE AGENCY NOTIFICATIONS STATE TESTS
-    // ============================================
-
-    public function testGetFreeAgencyNotificationsStateReturnsOn(): void
-    {
-        $this->mockDb->setMockData([
-            ['setting_value' => 'On'],
-        ]);
-
-        $result = $this->repository->getFreeAgencyNotificationsState();
-
-        $this->assertSame('On', $result);
-    }
-
-    // ============================================
     // GET LAST REGULAR SEASON GAME DATE TESTS
     // ============================================
 

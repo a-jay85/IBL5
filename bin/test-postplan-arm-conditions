@@ -2846,6 +2846,220 @@ else
 fi
 fi
 
+# --- Phase 5.5 stale-verdict clear (verdict 1 and -2): structural + behavioural cases
+# PR 999999 keeps the default /tmp path clear of any live PR's verdict file.
+SV_PR=999999
+SV_FIX="$BASE_TMP/sv-fixture.json"
+printf '{"number":%s}' "$SV_PR" > "$SV_FIX"
+SV_STALE="$(printf 'READY WITH NOTES\n\n## DIGEST\n**Why:** stale prior run\n')"
+SV_VF1="$BASE_TMP/sv-vf1.md"
+SV_VF2="$BASE_TMP/sv-vf2.md"
+SV_DEF1="/tmp/post-plan-fidelity-verdict-$SV_PR.md"
+SV_DEF2="/tmp/post-plan-fidelity-verdict-$SV_PR-2.md"
+
+# sv_run <block> [vf1] [vf2] — run a clear block under the gh shim. An empty vf
+# argument leaves that override unset so the block's PR-keyed default applies.
+sv_run() {
+    local blk="$1" vf1="${2:-}" vf2="${3:-}"
+    (
+        unset FIDELITY_VERDICT_FILE FIDELITY_VERDICT_FILE_2
+        [ -n "$vf1" ] && export FIDELITY_VERDICT_FILE="$vf1"
+        [ -n "$vf2" ] && export FIDELITY_VERDICT_FILE_2="$vf2"
+        PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$SV_FIX" bash -c "$blk" 2>&1
+    )
+}
+
+# sv1-stale-parses-without-clear (characterization): the stale fixture is a
+# verdict the real Step 3 parse block accepts. This is the bug: without a clear,
+# a prior run's file passes as this run's word. It also proves the later
+# "missing" assertion is earned by the clear block and not by a broken fixture.
+printf '%s\n' "$SV_STALE" > "$SV_VF1"
+expect_fidelity "sv1-stale-parses-without-clear: stale file parses as READY WITH NOTES" "READY WITH NOTES" \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$SV_FIX" FIDELITY_VERDICT_FILE="$SV_VF1" bash -c "$B55" 2>&1)"
+rm -f "$SV_VF1"
+
+# sv1_struct <skill-file> — prints "ok" when the verdict-1 clear marker is a unique
+# whole line, sits below the "## Step 2 " heading and above the first reviewer
+# spawn after that heading, and no rm -f command line naming a verdict path sits
+# above Step 2 (Steps 1, 1b, 1c must keep the carried verdict). Else prints why.
+sv1_struct() {
+    local f="$1" n s2 fence spawn early
+    n="$(grep -cxF '# phase 5.5 clear stale verdict 1' "$f")"
+    [ "$n" = 1 ] || { echo "verdict-1 marker count is $n, want 1"; return; }
+    s2="$(grep -n '^## Step 2 ' "$f" | head -1 | cut -d: -f1)"
+    fence="$(grep -nxF '# phase 5.5 clear stale verdict 1' "$f" | cut -d: -f1)"
+    spawn="$(awk -v s="${s2:-0}" 'NR>s && /subagent_type: "pr-ready-phase6"/ && !p {print NR; p=1}' "$f")"
+    early="$(awk -v s="${s2:-0}" 'NR<s && /^[[:space:]]*rm -f/ && /(FIDELITY_VERDICT_FILE|fidelity-verdict)/ {c++} END {print c+0}' "$f")"
+    if [ -z "$s2" ] || [ -z "$spawn" ]; then echo "anchor missing (step2=$s2 spawn=$spawn)"
+    elif [ "$fence" -le "$s2" ] || [ "$fence" -ge "$spawn" ]; then echo "fence $fence not between step2 $s2 and spawn $spawn"
+    elif [ "$early" != 0 ]; then echo "$early verdict rm -f line(s) above ## Step 2"
+    else echo ok; fi
+}
+
+SV1S="$(sv1_struct "$P55_SKILL")"
+if [ "$SV1S" = ok ]; then echo "ok: sv1-struct"; else echo "FAIL: sv1-struct — $SV1S"; FAILED=1; fi
+
+BSV1="$(extract_block '# phase 5.5 clear stale verdict 1' "$P55_SKILL")"
+if [ -n "$BSV1" ] && [ "$(grep -c '^rm -f' <<< "$BSV1")" = 1 ]; then echo "ok: sv1-extract"
+else echo "FAIL: sv1-extract — clear block missing or not exactly one rm -f line"; FAILED=1; fi
+
+# sv1-clears-stale: stale non-empty verdict 1 is gone after the block, and the
+# real Step 3 parse block then reports missing.
+printf '%s\n' "$SV_STALE" > "$SV_VF1"
+sv_run "$BSV1" "$SV_VF1" "$SV_VF2" >/dev/null
+if [ ! -e "$SV_VF1" ]; then echo "ok: sv1-clears-stale"
+else echo "FAIL: sv1-clears-stale — stale verdict 1 survived the clear block"; FAILED=1; fi
+expect_fidelity "sv1-clears-stale: parse after clear reads missing" "missing" \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$SV_FIX" FIDELITY_VERDICT_FILE="$SV_VF1" bash -c "$B55" 2>&1)"
+
+# sv1-absent-ok: the block exits 0 when there is nothing to clear.
+rm -f "$SV_VF1"
+sv_run "$BSV1" "$SV_VF1" "$SV_VF2" >/dev/null; SV_RC=$?
+if [ "$SV_RC" = 0 ]; then echo "ok: sv1-absent-ok"
+else echo "FAIL: sv1-absent-ok — exit $SV_RC on an absent verdict file"; FAILED=1; fi
+
+# sv1-default-path-pr-keyed: with no override the block removes the PR-keyed
+# /tmp path, which is the path Step 2's reviewer writes and Step 3 reads.
+printf '%s\n' "$SV_STALE" > "$SV_DEF1"
+sv_run "$BSV1" "" "" >/dev/null
+if [ ! -e "$SV_DEF1" ]; then echo "ok: sv1-default-path-pr-keyed"
+else echo "FAIL: sv1-default-path-pr-keyed — $SV_DEF1 survived"; FAILED=1; fi
+rm -f "$SV_DEF1"
+
+# --- sv1 mutations: each must turn its target case red. An unchanged copy is inert.
+SV_M="$BASE_TMP/sv-mut.md"
+
+# rm line deleted from the include copy: the stale file must survive.
+sed '/^rm -f "\$FIDELITY_VERDICT_FILE"$/d' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv1-mutation-rm-deleted — mutation inert: sed did not apply"; FAILED=1
+else
+    printf '%s\n' "$SV_STALE" > "$SV_VF1"
+    sv_run "$(extract_block '# phase 5.5 clear stale verdict 1' "$SV_M")" "$SV_VF1" "$SV_VF2" >/dev/null
+    if [ -e "$SV_VF1" ]; then echo "ok: sv1-mutation-rm-deleted"
+    else echo "FAIL: sv1-mutation-rm-deleted — verdict 1 vanished with the rm line gone"; FAILED=1; fi
+    rm -f "$SV_VF1"
+fi
+
+# PID-keyed path: the PR-keyed default file must survive.
+SV_MB="$(sed 's/post-plan-fidelity-verdict-\$PR_NUM\.md/post-plan-fidelity-verdict-$$.md/' <<< "$BSV1")"
+if [ "$SV_MB" = "$BSV1" ]; then echo "FAIL: sv1-mutation-pid-keyed — mutation inert: sed did not apply"; FAILED=1
+else
+    printf '%s\n' "$SV_STALE" > "$SV_DEF1"
+    sv_run "$SV_MB" "" "" >/dev/null
+    if [ -e "$SV_DEF1" ]; then echo "ok: sv1-mutation-pid-keyed"
+    else echo "FAIL: sv1-mutation-pid-keyed — PR-keyed file removed by a PID-keyed block"; FAILED=1; fi
+    rm -f "$SV_DEF1"
+fi
+
+# rm injected into Step 1c's carry-forward block: sv1_struct must reject it.
+awk '{print} /^# phase 5\.5 carry-forward materialise$/ {print "rm -f \"$FIDELITY_VERDICT_FILE\""}' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv1-mutation-rm-in-step1c — mutation inert: awk did not apply"; FAILED=1
+elif [ "$(sv1_struct "$SV_M")" != ok ]; then echo "ok: sv1-mutation-rm-in-step1c"
+else echo "FAIL: sv1-mutation-rm-in-step1c — sv1_struct accepted an rm above Step 2"; FAILED=1; fi
+
+# spawn sentence moved above the fence: sv1_struct must reject it.
+awk '{print} /^## Step 2 / {print "Spawn with `subagent_type: \"pr-ready-phase6\"` now."}' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv1-mutation-spawn-above-fence — mutation inert: awk did not apply"; FAILED=1
+elif [ "$(sv1_struct "$SV_M")" != ok ]; then echo "ok: sv1-mutation-spawn-above-fence"
+else echo "FAIL: sv1-mutation-spawn-above-fence — sv1_struct accepted a spawn above the fence"; FAILED=1; fi
+
+# sv2_struct <skill-file> — prints "ok" when the verdict-2 clear marker is a unique
+# whole line inside Step 4b, below the skip-gate echo, below the RE_REVIEW=skip
+# paragraph, below the first RE_REVIEW=spawn line after the Step 4b heading, and
+# above the re-review spawn sentence, which itself sits above ## Step 5. Else why.
+sv2_struct() {
+    local f="$1" n s4b s5 fence echo_l skip_l rr spawn2
+    n="$(grep -cxF '# phase 5.5 clear stale verdict 2' "$f")"
+    [ "$n" = 1 ] || { echo "verdict-2 marker count is $n, want 1"; return; }
+    s4b="$(grep -n '^## Step 4b ' "$f" | head -1 | cut -d: -f1)"
+    s5="$(grep -n '^## Step 5 ' "$f" | head -1 | cut -d: -f1)"
+    fence="$(grep -nxF '# phase 5.5 clear stale verdict 2' "$f" | cut -d: -f1)"
+    echo_l="$(awk -v s="${s4b:-0}" 'NR>s && index($0, "echo \"RE_REVIEW=") && !p {print NR; p=1}' "$f")"
+    skip_l="$(awk -v s="${s4b:-0}" 'NR>s && index($0, "On `RE_REVIEW=skip`") && !p {print NR; p=1}' "$f")"
+    rr="$(awk -v s="${s4b:-0}" 'NR>s && index($0, "RE_REVIEW=spawn") && !index($0, "echo ") && !p {print NR; p=1}' "$f")"
+    spawn2="$(awk -v s="${s4b:-0}" 'NR>s && /subagent_type: "pr-ready-phase6"/ && !p {print NR; p=1}' "$f")"
+    if [ -z "$s4b" ] || [ -z "$s5" ] || [ -z "$echo_l" ] || [ -z "$skip_l" ] || [ -z "$rr" ] || [ -z "$spawn2" ]; then
+        echo "anchor missing (4b=$s4b s5=$s5 echo=$echo_l skip=$skip_l rr=$rr spawn2=$spawn2)"
+    elif [ "$fence" -le "$echo_l" ] || [ "$fence" -le "$skip_l" ] || [ "$fence" -le "$rr" ]; then
+        echo "fence $fence not below echo $echo_l, skip $skip_l and spawn-branch line $rr"
+    elif [ "$fence" -ge "$spawn2" ] || [ "$spawn2" -ge "$s5" ]; then
+        echo "fence $fence not above re-review spawn $spawn2 inside Step 4b (step5=$s5)"
+    else echo ok; fi
+}
+
+SV2S="$(sv2_struct "$P55_SKILL")"
+if [ "$SV2S" = ok ]; then echo "ok: sv2-struct"; else echo "FAIL: sv2-struct — $SV2S"; FAILED=1; fi
+
+BSV2="$(extract_block '# phase 5.5 clear stale verdict 2' "$P55_SKILL")"
+if [ -n "$BSV2" ] && [ "$(grep -c '^rm -f' <<< "$BSV2")" = 1 ] \
+        && ! grep -qF 'clear stale verdict 1' <<< "$BSV2"; then echo "ok: sv2-extract"
+else echo "FAIL: sv2-extract — clear block missing, not one rm -f line, or merged with the verdict-1 fence"; FAILED=1; fi
+
+# sv2-clears-stale-keeps-verdict-1: the -2 block removes a stale -2 file and
+# leaves a present verdict-1 file in place.
+printf '%s\n' "$SV_STALE" > "$SV_VF1"
+printf '%s\n' "$SV_STALE" > "$SV_VF2"
+sv_run "$BSV2" "$SV_VF1" "$SV_VF2" >/dev/null
+if [ ! -e "$SV_VF2" ]; then echo "ok: sv2-clears-stale"
+else echo "FAIL: sv2-clears-stale — stale verdict 2 survived the clear block"; FAILED=1; fi
+if [ -s "$SV_VF1" ]; then echo "ok: sv2-keeps-verdict-1"
+else echo "FAIL: sv2-keeps-verdict-1 — the -2 clear block removed verdict 1"; FAILED=1; fi
+rm -f "$SV_VF1" "$SV_VF2"
+
+# sv2-absent-ok: the block exits 0 when there is nothing to clear.
+sv_run "$BSV2" "$SV_VF1" "$SV_VF2" >/dev/null; SV_RC=$?
+if [ "$SV_RC" = 0 ]; then echo "ok: sv2-absent-ok"
+else echo "FAIL: sv2-absent-ok — exit $SV_RC on an absent verdict file"; FAILED=1; fi
+
+# sv2-default-path-pr-keyed: with no overrides the block removes the PR-keyed -2
+# path and leaves the PR-keyed verdict-1 path alone.
+printf '%s\n' "$SV_STALE" > "$SV_DEF1"
+printf '%s\n' "$SV_STALE" > "$SV_DEF2"
+sv_run "$BSV2" "" "" >/dev/null
+if [ ! -e "$SV_DEF2" ] && [ -s "$SV_DEF1" ]; then echo "ok: sv2-default-path-pr-keyed"
+else echo "FAIL: sv2-default-path-pr-keyed — def2-exists=$([ -e "$SV_DEF2" ] && echo yes || echo no) def1-exists=$([ -e "$SV_DEF1" ] && echo yes || echo no)"; FAILED=1; fi
+rm -f "$SV_DEF1" "$SV_DEF2"
+
+# --- sv2 mutations: each must turn its target case red. An unchanged copy is inert.
+
+# rm line deleted from the include copy: the stale -2 file must survive.
+sed '/^rm -f "\$FIDELITY_VERDICT_FILE_2"$/d' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv2-mutation-rm-deleted — mutation inert: sed did not apply"; FAILED=1
+else
+    printf '%s\n' "$SV_STALE" > "$SV_VF2"
+    sv_run "$(extract_block '# phase 5.5 clear stale verdict 2' "$SV_M")" "$SV_VF1" "$SV_VF2" >/dev/null
+    if [ -e "$SV_VF2" ]; then echo "ok: sv2-mutation-rm-deleted"
+    else echo "FAIL: sv2-mutation-rm-deleted — verdict 2 vanished with the rm line gone"; FAILED=1; fi
+    rm -f "$SV_VF2"
+fi
+
+# default path collapsed onto verdict 1: the PR-keyed verdict-1 file must be removed,
+# which sv2-default-path-pr-keyed would report as a failure.
+SV_MB="$(sed 's/-\$PR_NUM-2\.md/-$PR_NUM.md/' <<< "$BSV2")"
+if [ "$SV_MB" = "$BSV2" ]; then echo "FAIL: sv2-mutation-path-collapsed — mutation inert: sed did not apply"; FAILED=1
+else
+    printf '%s\n' "$SV_STALE" > "$SV_DEF1"
+    sv_run "$SV_MB" "" "" >/dev/null
+    if [ ! -e "$SV_DEF1" ]; then echo "ok: sv2-mutation-path-collapsed"
+    else echo "FAIL: sv2-mutation-path-collapsed — collapsed block left verdict 1, so the keep-verdict-1 check is not live"; FAILED=1; fi
+    rm -f "$SV_DEF1"
+fi
+
+# fence hoisted to the top of Step 4b, above the skip gate: sv2_struct must reject it.
+awk '/^# phase 5\.5 clear stale verdict 2$/ {next} {print} /^## Step 4b / {print "# phase 5.5 clear stale verdict 2"}' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv2-mutation-fence-above-skip-gate — mutation inert: awk did not apply"; FAILED=1
+elif [ "$(sv2_struct "$SV_M")" != ok ]; then echo "ok: sv2-mutation-fence-above-skip-gate"
+else echo "FAIL: sv2-mutation-fence-above-skip-gate — sv2_struct accepted a fence above the skip gate"; FAILED=1; fi
+
+# re-review spawn sentence moved above the fence: sv2_struct must reject it.
+awk '{print} /^## Step 4b / {print "Spawn `subagent_type: \"pr-ready-phase6\"` now."}' "$P55_SKILL" > "$SV_M"
+if cmp -s "$SV_M" "$P55_SKILL"; then echo "FAIL: sv2-mutation-spawn-above-fence — mutation inert: awk did not apply"; FAILED=1
+elif [ "$(sv2_struct "$SV_M")" != ok ]; then echo "ok: sv2-mutation-spawn-above-fence"
+else echo "FAIL: sv2-mutation-spawn-above-fence — sv2_struct accepted a spawn above the fence"; FAILED=1; fi
+rm -f "$SV_M"
+
+# --- end stale-verdict clear cases
+
 # --- §5.8c findings render: extraction + composition cases ----------------
 
 # Extract _digest_labels from bin/digest-dm-build (the expect_mss idiom: anchor on

@@ -31,6 +31,13 @@
 # longer parks. Case 12 pins that exact list too; cases 16-18 drive the real
 # script for helper-red (green), helper-red plus real-red (parks), and
 # helper-pending (proceeds with a warning, as before).
+# Both lists also carry `Aggregate check status`, the settle job of
+# .github/workflows/all-checks-settled.yml. It summarizes other checks and
+# tests no code; its concurrency group cancels superseded runs, so master
+# HEAD often shows it as cancelled. The three promote callers already ignore
+# the same name. Case 12 pins it in both lists; cases 19-21 drive the real
+# script for Aggregate-cancelled (green), Aggregate-cancelled plus real-red
+# (parks on the real one), and Aggregate-pending (green, not 4).
 #
 # Cases 8 and 9 run the REAL bin/check-master-ci-green against fixture JSON via
 # its documented GH_API_CMD stub, so the two stderr strings the proceed/park
@@ -395,8 +402,8 @@ fi
 setup_case "PASS: 3 check-run(s) all green" 0 0
 RC=0; run_between_plans_canary || RC=$?
 expect "ignore-list-stub-rc"         0 "$RC"
-same   "canary-passes-exact-ignore-list" "deploy,Promote master to production" "$(cat "$SANDBOX/ci-env")"
-same   "canary-passes-exact-failed-ignore-list" "Keep the merge-line head current" "$(cat "$SANDBOX/ci-env-failed")"
+same   "canary-passes-exact-ignore-list" "deploy,Promote master to production,Aggregate check status" "$(cat "$SANDBOX/ci-env")"
+same   "canary-passes-exact-failed-ignore-list" "Keep the merge-line head current,Aggregate check status" "$(cat "$SANDBOX/ci-env-failed")"
 
 # --- Cases 13-15: real script THROUGH the extracted canary function ----------
 # setup_case's stub is replaced by a wrapper that execs the real script against
@@ -458,5 +465,35 @@ real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclus
 RC=0; run_between_plans_canary || RC=$?
 expect "real-helper-pending-proceeds"       4 "$RC"
 want   "real-helper-pending-detail"         "$CANARY_DETAIL" "checks still running: Keep the merge-line head current"
+
+# --- Cases 19-21: `Aggregate check status` (settle job) in both lists --------
+# The settle workflow's concurrency group cancels a superseded run, so master
+# HEAD routinely carries a completed/cancelled `Aggregate check status`. It
+# tests no code. These cases pin that it never parks on its own (19), that a
+# real red check still parks beside it (20), and that a pending one no longer
+# turns the verdict into "checks still running" (21).
+
+# 19. Aggregate cancelled, real tests green -> green (rc 0), smoke runs
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Aggregate check status","status":"completed","conclusion":"cancelled","completed_at":"2026-09-06T10:04:00Z","started_at":"2026-09-06T10:02:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-aggregate-cancelled-is-green"     0 "$RC"
+want   "real-aggregate-cancelled-logs-ignore"  "$(cat "$LOG")" "IGNORE_FAILED_CHECKS active — ignoring failed: Aggregate check status (cancelled)"
+want   "real-aggregate-cancelled-logs-pass"    "$(cat "$LOG")" "PASS: 1 check-run(s) all green"
+
+# 20. Aggregate cancelled AND phpunit failure -> the real one still parks (rc 1)
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Aggregate check status","status":"completed","conclusion":"cancelled","completed_at":"2026-09-06T10:04:00Z","started_at":"2026-09-06T10:02:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-aggregate-plus-real-red-parks"    1 "$RC"
+want   "real-aggregate-plus-real-red-detail"   "$CANARY_DETAIL" "checks failed: phpunit (failure)"
+
+# 21. Aggregate pending (newest run), real tests green -> green (rc 0), not 4
+setup_case "unused" 0 0
+real_canary_case '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"},{"name":"Aggregate check status","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T10:02:00Z"}]}'
+RC=0; run_between_plans_canary || RC=$?
+expect "real-aggregate-pending-is-green"       0 "$RC"
+want   "real-aggregate-pending-logs-ignore"    "$(cat "$LOG")" "IGNORE_PENDING_CHECKS active — ignoring while pending: Aggregate check status"
+want   "real-aggregate-pending-logs-pass"      "$(cat "$LOG")" "PASS: 1 check-run(s) all green"
 
 h_done

@@ -3,9 +3,7 @@
 # Decides whether every non-ignored check-run on a PR head SHA has settled green,
 # optionally polling until it has. Read by bin/settle-pr-status, which
 # .github/workflows/all-checks-settled.yml runs once per sibling completion and turns the
-# exit code into the `All checks settled` commit status (ADR-0149 addendum). The legacy
-# waiter .github/workflows/all-checks-green.yml still calls it with --wait until the
-# cutover retires it.
+# exit code into the `All checks settled` commit status (ADR-0149 addendum).
 #
 # Verdict logic is shared with bin/check-master-ci-green via bin/lib/ci-checks-green.sh.
 # Legacy commit statuses are deliberately NOT read. Every check on this repo is a
@@ -23,7 +21,12 @@ Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
 
   --self=<csv>             Exact check-run names of the caller (job name and status context); always ignored.
   --ignore=<csv>           Extra exact check-run names to ignore (advisory-by-design).
-  --ignore-workflows=<csv>  Workflow display names whose ACTIVE runs never hold V4 (the legacy All checks green waiter during cutover).
+  --ignore-workflows=<csv>  Workflow display names whose ACTIVE runs never hold V4 (a generic option; no workflow passes it now).
+  --ghost-grace-seconds=<n>  A run the runs API still calls active is treated as settled
+                           only when every job of its latest attempt completed in
+                           {success, skipped, neutral} AND its updated_at is older than
+                           this many seconds (default 600). Zero jobs, a pending job, a
+                           red job, a jobs read error or a younger run all hold.
   --anchor=<csv>           Exact names that MUST exist and be completed before any
                            PASS verdict (the other required contexts).
   --wait                   Poll until settled or deadline. Without it: one shot.
@@ -42,7 +45,7 @@ Verdict order per poll (first match wins):
   V1 a completed check-run concluded outside {success, skipped, neutral} -> FAIL now
   V2 an --anchor name is absent or not completed                          -> WAIT
   V3 a non-ignored check-run is not completed                              -> WAIT
-  V4 a workflow run on the SHA (other than $GITHUB_WORKFLOW) is active     -> WAIT
+  V4 a workflow run on the SHA (other than $GITHUB_WORKFLOW) is active and not a settled ghost (see --ghost-grace-seconds) -> WAIT
   V5 otherwise                                                             -> PASS
 
 An API error or unparseable response is a WAIT under --wait (so the deadline fails
@@ -55,6 +58,8 @@ Environment:
   GITHUB_WORKFLOW  Display name of the calling workflow. Its own active run is
                    excluded from V4 so the aggregator never waits on itself.
                    Unset or empty means no self-exclusion.
+  CCG_NOW_EPOCH    Test seam: epoch seconds used as "now" for the ghost age. Unset or
+                   empty means the wall clock. Anything else is a usage error (exit 2).
 
 Exit codes: 0 = every non-ignored check settled in {success, skipped, neutral};
             1 = a check failed, the base is stacked (--base-ref), or the deadline
@@ -76,6 +81,9 @@ TIMEOUT=2400
 BASE_REF=""
 BASE_REF_SET=0
 GRACE=0
+# Ghost grace in seconds. bin/check-composite-contracts A7 reads this line and requires
+# the sweep workflow's --sweep-stale-minutes to be at least this long.
+GHOST_GRACE=600
 # Bases whose PRs run the full CI suite. Mirrors `branches: [ master, develop ]`
 # in .github/workflows/tests.yml and .github/workflows/pr-meta-checks.yml. A PR on
 # any other base never receives the Tests and Analysis / E2E Tests / Meta checks
@@ -96,6 +104,7 @@ for arg in "$@"; do
         --timeout-seconds=*)  TIMEOUT="${arg#--timeout-seconds=}" ;;
         --base-ref=*)         BASE_REF="${arg#--base-ref=}"; BASE_REF_SET=1 ;;
         --startup-grace-seconds=*) GRACE="${arg#--startup-grace-seconds=}" ;;
+        --ghost-grace-seconds=*) GHOST_GRACE="${arg#--ghost-grace-seconds=}" ;;
         --*)
             echo "unknown flag: $arg" >&2
             usage >&2
@@ -123,6 +132,14 @@ if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || ! [[ "$TIMEOUT" =~ ^[0-9]+$ ]]; then
 fi
 if ! [[ "$GRACE" =~ ^[0-9]+$ ]]; then
     echo "invalid --startup-grace-seconds: must be a non-negative integer" >&2
+    exit 2
+fi
+if ! [[ "$GHOST_GRACE" =~ ^[0-9]+$ ]]; then
+    echo "invalid --ghost-grace-seconds: must be a non-negative integer" >&2
+    exit 2
+fi
+if [ -n "${CCG_NOW_EPOCH:-}" ] && ! [[ "$CCG_NOW_EPOCH" =~ ^[0-9]+$ ]]; then
+    echo "invalid CCG_NOW_EPOCH: '$CCG_NOW_EPOCH' (want epoch seconds, or unset)" >&2
     exit 2
 fi
 if [ "$BASE_REF_SET" -eq 1 ]; then
@@ -162,14 +179,15 @@ ANCHOR_LIST="$(printf '%s' "$ANCHOR_JSON" | jq -r 'join(", ")')"
 
 # poll_once — one verdict. Sets VERDICT (fail|wait|pass|apierr) and LINE.
 poll_once() {
-    local raw runs_raw checks failed missing pending active total
+    local raw runs_raw candidates checks failed missing pending active ghosts total now run id name jobs_raw jobs reason
     if ! raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/commits/$SHA/check-runs?per_page=100\"" 2>/dev/null)" \
         || ! checks="$(printf '%s' "$raw" | jq -e '{check_runs: [.[].check_runs[]]}' 2>/dev/null)"; then
         VERDICT=apierr; LINE="check-runs read failed"; return 0
     fi
     if ! runs_raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs?head_sha=$SHA&per_page=100\"" 2>/dev/null)" \
-        || ! active="$(printf '%s' "$runs_raw" | jq -er --arg self_wf "$SELF_WORKFLOW" --argjson skipwf "$IGNORE_WF_JSON" \
-            '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf) | select(.name as $n | $skipwf | index($n) | not)] | map(.name) | join(", ")' 2>/dev/null)"; then
+        || ! candidates="$(printf '%s' "$runs_raw" | jq -ec --arg self_wf "$SELF_WORKFLOW" --argjson skipwf "$IGNORE_WF_JSON" \
+            '[.[].workflow_runs[] | select(.status != "completed") | select(.name != $self_wf) | select(.name as $n | $skipwf | index($n) | not)
+              | {id, name, status, run_attempt, updated_at}]' 2>/dev/null)"; then
         VERDICT=apierr; LINE="workflow-runs read failed"; return 0
     fi
     checks="$(printf '%s' "$checks" | ccg_dedupe "$SKIP_JSON")"
@@ -188,12 +206,41 @@ poll_once() {
     if [ -n "$pending" ]; then
         VERDICT="wait"; LINE="WAIT: checks still running: $pending"; return 0
     fi
+    # V4 with the ghost check (ADR-0149 addendum 2026-10-22). A run the runs API still
+    # calls active holds unless every job of its latest attempt completed green and its
+    # updated_at has sat unchanged for more than GHOST_GRACE seconds. Jobs are read only
+    # here, after V1-V3, so a red or pending check-run never costs a jobs call. A run
+    # without a numeric id gets an empty jobs list and holds (no-run-id).
+    now="${CCG_NOW_EPOCH:-$(date +%s)}"
+    active=""; ghosts=""
+    while IFS= read -r run; do
+        [ -n "$run" ] || continue
+        id="$(jq -r 'if (.id | type) == "number" then .id else "" end' <<< "$run")"
+        name="$(jq -r '.name // "?"' <<< "$run")"
+        jobs='[]'
+        if [ -n "$id" ]; then
+            if ! jobs_raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs/$id/jobs?filter=latest&per_page=100\"" 2>/dev/null)" \
+                || ! jobs="$(printf '%s' "$jobs_raw" | jq -ec '[.[].jobs[]]' 2>/dev/null)"; then
+                VERDICT=apierr; LINE="jobs read failed for run $id ($name)"; return 0
+            fi
+        fi
+        reason="$(jq -nc --argjson r "$run" --argjson j "$jobs" '{run: $r, jobs: $j}' | ccg_ghost_reason "$now" "$GHOST_GRACE")"
+        if [ "$reason" = "settled" ]; then
+            jq -r --argjson now "$now" --argjson grace "$GHOST_GRACE" \
+                '"GHOST: run \(.id) (\(.name)) status=\(.status) run_attempt=\(.run_attempt) updated_at=\(.updated_at) age=\($now - (.updated_at | fromdateiso8601))s > grace \($grace)s: every latest-attempt job completed green; treating as settled"' \
+                <<< "$run" >&2
+            ghosts="${ghosts:+$ghosts, }$name#$id"
+        else
+            echo "ghost-check: run ${id:-?} ($name): $reason; still holding" >&2
+            active="${active:+$active, }$name"
+        fi
+    done < <(jq -c '.[]' <<< "$candidates")
     if [ -n "$active" ]; then
         VERDICT="wait"; LINE="WAIT: workflow runs still active: $active"; return 0
     fi
     total="$(printf '%s' "$checks" | jq '.check_runs | length')"
     VERDICT=pass
-    LINE="PASS: $total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
+    LINE="PASS: ${ghosts:+ghost-settled by jobs: $ghosts; }$total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
 }
 
 # Startup grace: give sibling workflows time to register their check-runs before

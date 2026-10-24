@@ -103,9 +103,9 @@ if printf '%s' "$cmd" | grep -q 'simRecapContext\.php'; then
     if [ -f "$STUB/resp.simRecapContext" ]; then
         cat "$STUB/resp.simRecapContext"
     elif [ "${STUB_SENTINEL:-0}" = 1 ]; then
-        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{"ROSTER-SENTINEL":[]},"active_injuries":[],"sim_trades":[]}\n'
+        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{"ROSTER-SENTINEL":[]},"active_injuries":[],"sim_trades":[],"games":[{"key":"g1","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":1,"visitor_teamid":1,"visitor_name":"Team A","visitor_score":101,"home_teamid":2,"home_name":"Team B","home_score":99,"visitor_top":[],"home_top":[],"injuries":[]}],"standings":[]}\n'
     else
-        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}\n'
+        printf '{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[],"games":[{"key":"g1","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":1,"visitor_teamid":1,"visitor_name":"Team A","visitor_score":101,"home_teamid":2,"home_name":"Team B","home_score":99,"visitor_top":[],"home_top":[],"injuries":[]}],"standings":[]}\n'
     fi
     exit 0
 fi
@@ -138,7 +138,7 @@ else
                 printf '{"ok":true,"cmd":"claim-next","sim":null}\n'
             fi ;;
         claim)         printf '{"ok":true,"cmd":"claim","sim":null}\n' ;;
-        mention-map)   printf '{"ok":true,"cmd":"mention-map","teams":{}}\n' ;;
+        mention-map)   printf '{"ok":true,"cmd":"mention-map","teams":{"Team A":"111111111111111111","Team B":"222222222222222222"}}\n' ;;
         recent-themes) printf '{"ok":true,"cmd":"recent-themes","themes":[]}\n' ;;
         park)          printf '{"ok":true,"cmd":"park","sim":42,"outcome":"backoff","route":"any","blocked_until":"2026-10-15 03:00:00","notified":"unchanged"}\n' ;;
         notify)        printf '{"ok":true,"cmd":"notify","sim":42,"notified":"posted"}\n' ;;
@@ -147,10 +147,10 @@ else
 fi
 SH
 
-    # claude stub: touch sentinel, log call; write valid payload.json unless
+    # claude stub: touch sentinel, log call; write valid prose.json unless
     # agent-fails is set; emit usage-limit line when agent-usage-limit is set.
-    # resp.payload (if present): cat its content into payload.json instead of the
-    # built-in default — lets length-specific tests control recap_text size without
+    # resp.prose (if present): cat its content into prose.json instead of the
+    # built-in default — lets length-specific tests control the paragraph size without
     # overriding the whole stub. srt_reset wipes resp.* so cleanup is automatic.
     cat > "$STUB/claude" <<'SH'
 #!/usr/bin/env bash
@@ -179,25 +179,23 @@ if [ -f "$STUB/agent-fails-once" ]; then
     rm -f "$STUB/agent-fails-once"
     exit 0
 fi
+# write-garbage-payload: also drop a model-written payload.json the tick must ignore.
+[ -f "$STUB/write-garbage-payload" ] && printf 'GARBAGE-NOT-JSON' > payload.json
 if [ ! -f "$STUB/agent-fails" ]; then
-    if [ -f "$STUB/resp.payload" ]; then
-        cat "$STUB/resp.payload" > payload.json
+    if [ -f "$STUB/resp.prose" ]; then
+        cat "$STUB/resp.prose" > prose.json
     elif [ "${STUB_SENTINEL:-0}" = 1 ]; then
         printf '%s\n' \
             '{"intro_text":"intro","outro_text":"outro","recap_text":"recap PAYLOAD-SENTINEL",' \
             '"themes":["theme1"],' \
-            '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
-            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,' \
-            '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
-            | tr -d '\n' > payload.json
+            '"games":{"g1":"game recap"}}' \
+            | tr -d '\n' > prose.json
     else
         printf '%s\n' \
             '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
             '"themes":["theme1"],' \
-            '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
-            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,' \
-            '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
-            | tr -d '\n' > payload.json
+            '"games":{"g1":"game recap"}}' \
+            | tr -d '\n' > prose.json
     fi
 fi
 exit 0
@@ -285,6 +283,7 @@ srt_reset() {
           "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* "$STUB"/curl.stdin \
           "$STUB_CALLS" \
           "$STUB"/prompt-fails "$STUB"/agent-output "$STUB"/agent-fails-once \
+          "$STUB"/write-garbage-payload \
           "$STUB"/store-unreachable "$STUB"/gh-output "$STUB"/ops-alert.json.park-unreachable \
           2>/dev/null
     rm -rf "$STUB"/seq.* 2>/dev/null
@@ -429,6 +428,47 @@ printf '{"ok":true,"cmd":"park","sim":42,"outcome":"failed"}' > "$STUB/resp.park
 srt_run
 srt_expect_eq "park_failed_is_terminal — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" tick.out "TERMINAL — no route left" "park_failed_is_terminal — terminal log line"
+
+# ── claim_notified_key_is_inert ───────────────────────────────────────────────
+# Prod adds "notified" (started|unchanged|failed|skipped) to the claim reply
+# (sim-recap-started-status). The tick must not read it: same exit, same ssh
+# call sequence, and a "failed" value fires no ops-thread fallback.
+srt_claim_trace() {
+    grep -oE 'simRecapQueue\.php [a-z-]+|storeSimRecap|simRecapContext' \
+        "$STUB/ssh.log" 2>/dev/null | tr '\n' ' '
+}
+# srt_ops_posts is defined further down (after this block runs), so count the
+# curl stub's ops-thread posts directly.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+srt_run
+cni_base_rc=$SRT_RC
+cni_base_trace="$(srt_claim_trace)"
+cni_base_ops="$(srt_matches curl.log '/post-to-thread')"
+srt_log_has "$STUB" tick.out "claimed sim 42" "claim_notified_key_is_inert — baseline claims 42"
+
+for cni_value in started failed; do
+    srt_reset
+    printf '{"ok":true,"cmd":"claim-next","sim":"42","notified":"%s"}' "$cni_value" \
+        > "$STUB/resp.claim-next"
+    srt_run
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: same exit" \
+        "$cni_base_rc" "$SRT_RC"
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: same ssh calls" \
+        "$cni_base_trace" "$(srt_claim_trace)"
+    srt_log_has "$STUB" tick.out "claimed sim 42" \
+        "claim_notified_key_is_inert — notified=$cni_value: claims 42"
+    srt_expect_eq "claim_notified_key_is_inert — notified=$cni_value: no ops post" \
+        "$cni_base_ops" "$(srt_matches curl.log '/post-to-thread')"
+done
+
+# ── no_host_side_status_text ──────────────────────────────────────────────────
+# Prod writes every #admin-chat line (ADR-0154). The tick never posts to
+# Discord itself and never carries the start-line wording.
+srt_expect_eq "no_host_side_status_text — tick never calls postToChannel" \
+    0 "$(grep -c postToChannel "$SRT_DRIVER" || true)"
+srt_expect_eq "no_host_side_status_text — tick has no start-line wording" \
+    0 "$(grep -c 'recap started' "$SRT_DRIVER" || true)"
 
 # ── missing_payload_parks_not_stores ─────────────────────────────────────────
 srt_reset
@@ -1146,12 +1186,11 @@ srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 {
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
-    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
-    printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%s' '"games":{"g1":"'
     # shellcheck disable=SC2183  # intentional: printf '%280s' pads with spaces (no args = empty string pads to width)
     printf '%280s' | tr ' ' 'x'
-    printf '%s' '"}]}'
-} > "$STUB/resp.payload"
+    printf '%s' '"}}'
+} > "$STUB/resp.prose"
 srt_run
 srt_expect_eq "length_warn_fires_below_band — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" tick.out "stored"              "length_warn_fires_below_band — stored logged"
@@ -1164,12 +1203,11 @@ srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 {
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
-    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
-    printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%s' '"games":{"g1":"'
     # shellcheck disable=SC2183  # intentional: printf '%570s' pads with spaces (no args = empty string pads to width)
     printf '%570s' | tr ' ' 'x'
-    printf '%s' '"}]}'
-} > "$STUB/resp.payload"
+    printf '%s' '"}}'
+} > "$STUB/resp.prose"
 srt_run
 srt_expect_eq "length_warn_silent_inside_band — exit 0" 0 "$SRT_RC"
 srt_log_lacks "$STUB" tick.out "below the exemplar band" "length_warn_silent_inside_band — no warning"
@@ -1181,15 +1219,139 @@ srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 {
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
-    printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
-    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%s' '"games":{"g1":"'
     # shellcheck disable=SC2183  # intentional: printf '%280s' pads with spaces (no args = empty string pads to width)
     printf '%280s' | tr ' ' 'x'
-    printf '%s' '"}]}'
-} > "$STUB/resp.payload"
+    printf '%s' '"}}'
+} > "$STUB/resp.prose"
 srt_run
 srt_expect_eq "length_warn_does_not_change_store_outcome — exit 0" 0 "$SRT_RC"
 srt_log_lacks "$STUB" tick.out "parked" "length_warn_does_not_change_store_outcome — no park"
+
+# ══ ASSEMBLY CASES — payload.json is built by the tick from prose.json ═══════
+# Each case emits exactly ONE ok/FAIL line carrying its name; the sub-checks
+# accumulate into _SRT_BAD and srt_case_done reports them together.
+
+_SRT_BAD=""
+# srt_ck <label> <want> <got> — record a mismatch.
+srt_ck() { [ "$2" = "$3" ] || _SRT_BAD="$_SRT_BAD; $1: want [$2] got [$3]"; }
+# srt_ck_has / srt_ck_lacks <file-in-STUB> <pattern> <label>
+srt_ck_has()   { grep -qF -- "$2" "$STUB/$1" 2>/dev/null || _SRT_BAD="$_SRT_BAD; $3: '$2' absent from $1"; }
+srt_ck_lacks() { ! grep -qF -- "$2" "$STUB/$1" 2>/dev/null || _SRT_BAD="$_SRT_BAD; $3: '$2' unexpectedly in $1"; }
+# srt_case_done <name> — one ok/FAIL line, then reset.
+srt_case_done() {
+    if [ -z "$_SRT_BAD" ]; then srt_ok "$1"; else srt_fail "$1 —$_SRT_BAD"; fi
+    _SRT_BAD=""
+}
+# srt_stored_line <n> — line n of the first stored game's recap_text.
+srt_stored_line() {
+    jq -r '.games[0].recap_text' "$STUB/store.stdin" 2>/dev/null | sed -n "${1}p"
+}
+_SRT_TWO_GAMES='{"sim":42,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[],"games":[{"key":"g1","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":1,"visitor_teamid":1,"visitor_name":"Team A","visitor_score":101,"home_teamid":2,"home_name":"Team B","home_score":99},{"key":"g2","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":2,"visitor_teamid":3,"visitor_name":"Team C","visitor_score":90,"home_teamid":4,"home_name":"Team D","home_score":88}],"standings":[]}'
+
+# ── assemble_builds_score_header_and_mention_line ─────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+srt_run
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck "line 1 is the score header" "**Team A 101 @ Team B 99**" "$(srt_stored_line 1)"
+if ! srt_stored_line 2 | grep -qE '^<@[0-9]+> · <@[0-9]+>$'; then
+    _SRT_BAD="$_SRT_BAD; line 2 not a two-mention line: [$(srt_stored_line 2)]"
+fi
+srt_ck "line 3 is empty" "" "$(srt_stored_line 3)"
+srt_ck "line 4 is the paragraph" "game recap" "$(srt_stored_line 4)"
+srt_case_done "assemble_builds_score_header_and_mention_line"
+
+# ── assemble_structural_fields_come_from_context ──────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],"game_of_that_day":7,"games":{"g1":"game recap"}}' \
+    > "$STUB/resp.prose"
+srt_run
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck "game_of_that_day from context" "1" "$(jq -r '.games[0].game_of_that_day' "$STUB/store.stdin" 2>/dev/null)"
+srt_ck "sort_order" "1" "$(jq -r '.games[0].sort_order' "$STUB/store.stdin" 2>/dev/null)"
+srt_ck "box_id" "null" "$(jq -r '.games[0].box_id' "$STUB/store.stdin" 2>/dev/null)"
+srt_ck "visitor_teamid type" "number" "$(jq -r '.games[0].visitor_teamid | type' "$STUB/store.stdin" 2>/dev/null)"
+srt_case_done "assemble_structural_fields_come_from_context"
+
+# ── assemble_missing_game_key_parks_flaky ─────────────────────────────────────
+srt_reset; srt_claim42
+printf '%s\n' "$_SRT_TWO_GAMES" > "$STUB/resp.simRecapContext"
+srt_run
+srt_ck_has   ssh.log "park --sim=42 --host=mac --cause=flaky" "parks flaky"
+srt_ck_lacks ssh.log "storeSimRecap" "no store"
+srt_ck_has   tick.out "missing=g2" "log names the missing key"
+srt_case_done "assemble_missing_game_key_parks_flaky"
+
+# ── assemble_extra_game_key_parks_flaky ───────────────────────────────────────
+srt_reset; srt_claim42
+printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],"games":{"g1":"game recap","g9":"stray"}}' \
+    > "$STUB/resp.prose"
+srt_run
+srt_ck_has   ssh.log "park --sim=42 --host=mac --cause=flaky" "parks flaky"
+srt_ck_lacks ssh.log "storeSimRecap" "no store"
+srt_ck_has   tick.out "extra=g9" "log names the extra key"
+srt_case_done "assemble_extra_game_key_parks_flaky"
+
+# ── assemble_missing_prose_parks_flaky ────────────────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/agent-fails"
+srt_run
+srt_ck_has   ssh.log "park --sim=42 --host=mac --cause=flaky" "parks flaky"
+srt_ck_lacks ssh.log "storeSimRecap" "no store"
+srt_ck_has   tick.out "no valid prose.json" "log says no valid prose.json"
+srt_case_done "assemble_missing_prose_parks_flaky"
+
+# ── assemble_ignores_model_written_payload_json ───────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin" "$STUB/write-garbage-payload"
+srt_run
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck_lacks store.stdin "GARBAGE-NOT-JSON" "garbage never stored"
+srt_ck "stored payload is the assembled one" "1" "$(jq -r '.games[0].sort_order' "$STUB/store.stdin" 2>/dev/null)"
+srt_case_done "assemble_ignores_model_written_payload_json"
+
+# ── assemble_single_missing_mention_keeps_one_id_line ─────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+printf '{"ok":true,"cmd":"mention-map","teams":{"Team A":"111111111111111111"}}\n' > "$STUB/resp.mention-map"
+srt_run
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck "line 2 is exactly one id" "<@111111111111111111>" "$(srt_stored_line 2)"
+srt_case_done "assemble_single_missing_mention_keeps_one_id_line"
+
+# ── assemble_both_mentions_missing_warns_and_stores ───────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+printf '{"ok":true,"cmd":"mention-map","teams":{}}\n' > "$STUB/resp.mention-map"
+srt_run
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck_has ssh.log "storeSimRecap" "store called"
+srt_ck "line 2 is empty" "" "$(srt_stored_line 2)"
+srt_ck_has tick.out "WARNING:" "WARNING logged"
+srt_ck_has tick.out "no Discord mention" "names the missing mention"
+srt_case_done "assemble_both_mentions_missing_warns_and_stores"
+
+# ── assemble_keeps_snowflake_above_2_53_verbatim ──────────────────────────────
+srt_reset; srt_claim42
+touch "$STUB/record-stdin"
+printf '{"ok":true,"cmd":"mention-map","teams":{"Team A":"9007199254740993","Team B":"9007199254740995"}}\n' \
+    > "$STUB/resp.mention-map"
+srt_run
+srt_ck "line 2 byte-for-byte" "<@9007199254740993> · <@9007199254740995>" "$(srt_stored_line 2)"
+srt_case_done "assemble_keeps_snowflake_above_2_53_verbatim"
+
+# ── dry_run_prints_assembled_payload ──────────────────────────────────────────
+srt_reset
+"$SRT_DRIVER" --dry-run --sim=42 > "$STUB/tick.stdout" 2> "$STUB/tick.stderr"
+SRT_RC=$?
+srt_ck "exit" 0 "$SRT_RC"
+srt_ck "stdout games[0].sort_order" "1" "$(jq -r '.games[0].sort_order' "$STUB/tick.stdout" 2>/dev/null)"
+srt_ck_lacks ssh.log "storeSimRecap" "no store call"
+srt_ck_lacks ssh.log "claim-next" "no queue claim"
+srt_ck_lacks ssh.log "simRecapQueue.php park" "no park call"
+srt_case_done "dry_run_prints_assembled_payload"
 
 # ══ PROMPT GROUP — real bin/sim-recap-prompt ══════════════════════════════════
 
@@ -1201,8 +1363,26 @@ printf '["past theme one", "past theme two"]'    > "$_FIX/themes.json"
 printf '{"Known Team": "123456789012345678", "Unknown Team": null}' \
     > "$_FIX/mentions-unmapped.json"
 printf '[]' > "$_FIX/themes-empty.json"
-printf '{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[]}' \
-    > "$_FIX/roster-context.json"
+cat > "$_FIX/roster-context.json" <<'ROSTER_FIX_EOF'
+{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07",
+ "roster":{"1":[{"pid":11,"name":"Ann Alpha","pos":"PG","current_teamid":1}],"2":[]},
+ "active_injuries":[{"pid":22,"name":"Bob Beta","current_teamid":2}],
+ "sim_trades":[{"pid":33,"player_name":"Cal Gamma","from_teamid":1,"to_teamid":2,"trade_date":"2026-01-03"}],
+ "games":[
+  {"key":"g1","game_date":"2026-01-02","visitor_teamid":1,"home_teamid":2,"visitor_score":101,"home_score":99,
+   "visitor_top":[{"name":"Ann Alpha","min":34,"pts":28,"reb":5,"ast":7,"stl":2,"blk":0,"fgm":10,"fga":19,"tpm":3,"tpa":7}],
+   "home_top":[{"name":"Bob Beta","min":36,"pts":22,"reb":9,"ast":3,"stl":1,"blk":2,"fgm":8,"fga":17,"tpm":1,"tpa":4}],
+   "injuries":[{"name":"Bob Beta","injuryDescription":"sprained ankle","injuryGamesMissed":4}]},
+  {"key":"g2","game_date":"2026-01-03","visitor_teamid":2,"home_teamid":1,"visitor_score":90,"home_score":95,
+   "visitor_top":[{"name":"Bob Beta","min":30,"pts":15,"reb":6,"ast":2,"stl":0,"blk":1,"fgm":6,"fga":14,"tpm":0,"tpa":2}],
+   "home_top":[{"name":"Ann Alpha","min":35,"pts":31,"reb":4,"ast":8,"stl":3,"blk":0,"fgm":12,"fga":20,"tpm":4,"tpa":8}],
+   "injuries":[]}
+ ],
+ "standings":[
+  {"teamid":1,"name":"Team Alpha","wins":10,"losses":4,"conference":"East","division":"Atlantic","conf_gb":"0","streak":"W3","last10":"7-3"},
+  {"teamid":2,"name":"Team Beta","wins":6,"losses":8,"conference":"West","division":"Pacific","conf_gb":"2","streak":"","last10":""}
+ ]}
+ROSTER_FIX_EOF
 
 # Run the real builder; output → prompt.out, errors → prompt.err.
 run_prompt() {
@@ -1212,7 +1392,8 @@ run_prompt() {
 }
 
 # ── exemplar_embedded ─────────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "WHERE THINGS STAND" "exemplar_embedded — WHERE THINGS STAND"
 srt_log_has "$STUB" prompt.out "===== "             "exemplar_embedded — date separator"
 
@@ -1230,18 +1411,21 @@ srt_log_lacks "$STUB" prompt.out "paragraph at the end" \
 
 # ── mentions_render_as_strings ────────────────────────────────────────────────
 # Snowflake digit-for-digit in output (same run, but rerun for clarity).
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "123456789012345678" \
     "mentions_render_as_strings — snowflake digit-for-digit"
 
 # ── negative_unmapped_team ────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions-unmapped.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions-unmapped.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has  "$STUB" prompt.out "Unknown Team" "negative_unmapped_team — plain name present"
 srt_log_lacks "$STUB" prompt.out "<@>"          "negative_unmapped_team — no empty mention tag"
 srt_log_lacks "$STUB" prompt.out "<@null>"      "negative_unmapped_team — no null mention tag"
 
 # ── negative_empty_ledger ─────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes-empty.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_has "$STUB" prompt.out "(none recorded yet)" \
     "negative_empty_ledger — none-recorded-yet for empty themes"
 
@@ -1273,7 +1457,8 @@ else
 fi
 
 # ── voice_spec_corrected ──────────────────────────────────────────────────────
-run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
 srt_log_lacks "$STUB" prompt.out "injuries during the sim" \
     "voice_spec_corrected — old injury-only note absent"
 srt_log_has "$STUB" prompt.out "frozen historical marker" \
@@ -1284,12 +1469,10 @@ srt_log_lacks "$STUB" prompt.out "integer zero, not null" \
     "game_of_that_day_contract — old 'integer zero' instruction absent"
 srt_log_lacks "$STUB" prompt.out "first game of a doubleheader" \
     "game_of_that_day_contract — retired doubleheader semantics absent"
-srt_log_has "$STUB" prompt.out "READ this value from the database" \
-    "game_of_that_day_contract — read-not-infer directive present"
-srt_log_has "$STUB" prompt.out "index of the game within" \
-    "game_of_that_day_contract — within-date semantics present"
-srt_log_has "$STUB" prompt.out "FROM ibl_box_scores_teams" \
-    "game_of_that_day_contract — lookup query present"
+srt_log_lacks "$STUB" prompt.out "READ this value from the database" \
+    "game_of_that_day_contract — lookup directive gone (the caller assembles the structure)"
+srt_log_lacks "$STUB" prompt.out "FROM ibl_box_scores_teams" \
+    "game_of_that_day_contract — lookup query gone"
 
 # ── prose_length_band_present ─────────────────────────────────────────────────
 srt_log_has "$STUB" prompt.out "504 and 639 characters" \
@@ -1326,24 +1509,90 @@ else
     srt_fail "length_band_matches_exemplar — exemplar measures '$_band' (n min max avg), prompt claims 504..639 averaging '$_stated_avg'"
 fi
 
-# ── negative_roster_absent ────────────────────────────────────────────────────
-# Without --roster, Block 8 must not appear.
+# ── prompt_rejects_missing_roster_context ─────────────────────────────────────
+# --roster is required: without it there is no fact sheet, so the builder refuses.
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json"
-srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
-    "negative_roster_absent — roster block absent when --roster not provided"
+if [ "$SRT_PROMPT_RC" = 2 ] && grep -qF -- "no games" "$STUB/prompt.err" \
+    && ! grep -qF -- "CURRENT ROSTER CONTEXT" "$STUB/prompt.out"; then
+    srt_ok "prompt_rejects_missing_roster_context — exit 2, stderr names the missing games, no roster block"
+else
+    srt_fail "prompt_rejects_missing_roster_context — rc=$SRT_PROMPT_RC err=$(cat "$STUB/prompt.err")"
+fi
+
+# ── prompt_rejects_empty_games_array ──────────────────────────────────────────
+printf '{"sim":1,"start_date":"2026-01-01","end_date":"2026-01-07","roster":{},"active_injuries":[],"sim_trades":[],"games":[],"standings":[]}' \
+    > "$_FIX/roster-nogames.json"
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-nogames.json"
+srt_expect_eq "prompt_rejects_empty_games_array — exit 2" 2 "$SRT_PROMPT_RC"
 
 # ── negative_roster_empty_object ──────────────────────────────────────────────
-# An empty-object roster ({}) must NOT trigger Block 8 — no .sim key (Block 8 fix).
+# An empty-object roster ({}) has no games, so it is refused too.
 printf '{}' > "$_FIX/roster-empty.json"
 run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
     --roster="$_FIX/roster-empty.json"
+srt_expect_eq "negative_roster_empty_object — exit 2" 2 "$SRT_PROMPT_RC"
 srt_log_lacks "$STUB" prompt.out "CURRENT ROSTER CONTEXT" \
-    "negative_roster_empty_object — block absent for empty-object roster (Block 8 fix)"
+    "negative_roster_empty_object — block absent for empty-object roster"
+
+# ── fact sheet cases ──────────────────────────────────────────────────────────
+run_prompt --sim=1 --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json"
+srt_expect_eq "fact_sheet_fixture_builds — exit 0" 0 "$SRT_PROMPT_RC"
+
+# ── prompt_fact_sheet_renders_game_and_player_lines ──────────────────────────
+if grep -qF -- "g1 2026-01-02 Team Alpha 101 @ Team Beta 99" "$STUB/prompt.out" \
+    && grep -qF -- "  V Ann Alpha 34m 28p 5r 7a 2s 0b 10-19 3-7" "$STUB/prompt.out"; then
+    srt_ok "prompt_fact_sheet_renders_game_and_player_lines — g1 header and V player line"
+else
+    srt_fail "prompt_fact_sheet_renders_game_and_player_lines — g1 header or V line absent"
+fi
+
+# ── prompt_fact_sheet_renders_injury_and_trade ───────────────────────────────
+if grep -qF -- "  INJ Bob Beta: sprained ankle (4 games)" "$STUB/prompt.out" \
+    && grep -qF -- "Cal Gamma: Team Alpha to Team Beta on 2026-01-03" "$STUB/prompt.out"; then
+    srt_ok "prompt_fact_sheet_renders_injury_and_trade — INJ line and trade with names from standings"
+else
+    srt_fail "prompt_fact_sheet_renders_injury_and_trade — INJ or trade line absent"
+fi
+
+# ── prompt_roster_block_is_minified_and_omits_games ──────────────────────────
+_rb_line=$(awk '/wrong for anyone traded since/ {n=NR+2} n && NR==n {print; exit}' "$STUB/prompt.out")
+if [ -n "$_rb_line" ] \
+    && jq -e 'has("roster") and has("active_injuries") and (has("games") | not)' \
+        >/dev/null 2>&1 <<< "$_rb_line" \
+    && [ "$(printf '%s' "$_rb_line" | wc -l | tr -d ' ')" = "0" ]; then
+    srt_ok "prompt_roster_block_is_minified_and_omits_games"
+else
+    srt_fail "prompt_roster_block_is_minified_and_omits_games — got: ${_rb_line:-<none>}"
+fi
+
+# ── prompt_contract_requests_prose_json_only ─────────────────────────────────
+if grep -qF -- "prose.json" "$STUB/prompt.out" \
+    && ! grep -qF -- "Write payload.json" "$STUB/prompt.out"; then
+    srt_ok "prompt_contract_requests_prose_json_only — prose.json named, payload.json not requested"
+else
+    srt_fail "prompt_contract_requests_prose_json_only — prose.json absent or payload.json still requested"
+fi
+
+# ── prompt_data_access_declares_fact_sheet_authoritative ─────────────────────
+if grep -qF -- "complete and authoritative" "$STUB/prompt.out" \
+    && grep -qE -- 'sim-recap-mysql -e "SELECT' "$STUB/prompt.out"; then
+    srt_ok "prompt_data_access_declares_fact_sheet_authoritative — sheet authoritative, mysql command kept"
+else
+    srt_fail "prompt_data_access_declares_fact_sheet_authoritative — declaration or mysql command absent"
+fi
+
+# ── prompt_never_expands_mysql_pwd ───────────────────────────────────────────
+MYSQL_PWD="sekrit-canary" run_prompt --sim=1 --mentions="$_FIX/mentions.json" \
+    --themes="$_FIX/themes.json" --roster="$_FIX/roster-context.json"
+srt_log_lacks "$STUB" prompt.out "sekrit-canary" "prompt_never_expands_mysql_pwd"
 
 # ── negative_missing_exemplar ─────────────────────────────────────────────────
 SIM_RECAP_EXEMPLAR="/nonexistent/exemplar.txt" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 SRT_PROMPT_RC=$?
 srt_expect_eq "negative_missing_exemplar — exit 1" 1 "$SRT_PROMPT_RC"
@@ -1355,6 +1604,7 @@ srt_expect_eq "negative_missing_exemplar — empty stdout" "0" "$_stdout_size"
 MYSQL_PWD="s3cr3t_pw_xyz" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 srt_log_lacks "$STUB" prompt.out "s3cr3t_pw_xyz" "negative_no_credential_leak"
 srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \
@@ -1366,6 +1616,7 @@ srt_log_lacks "$STUB" prompt.out "SIM_RECAP_DB_PASSWORD" \
 SIM_RECAP_MYSQL_BIN="/raw/client/mysql" SIM_RECAP_EXEMPLAR="$SRT_EXEMPLAR" \
     "$SRT_PROMPT_BIN" --sim=1 \
     --mentions="$_FIX/mentions.json" --themes="$_FIX/themes.json" \
+    --roster="$_FIX/roster-context.json" \
     > "$STUB/prompt.out" 2>"$STUB/prompt.err"
 srt_log_has "$STUB" prompt.out "$SCRIPT_DIR/sim-recap-mysql -e" "prompt_names_wrapper_only"
 srt_log_lacks "$STUB" prompt.out "/raw/client/mysql" "prompt_names_wrapper_only — raw client path absent"
@@ -1395,31 +1646,81 @@ else
 fi
 unset SIM_RECAP_KEEP_WORKDIR
 
-# ── negative_roster_fetch_failure_does_not_park ──────────────────────────────
-# If simRecapContext.php fails (exit 255), the tick continues and writes {}.
+# ── context_fetch_failure_parks_transport ────────────────────────────────────
+# The fact-sheet context is mandatory: if simRecapContext.php fails (exit 255),
+# the sim parks transport before the prompt is built and before any agent spend.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
-export SIM_RECAP_KEEP_WORKDIR=1
 srt_run
-srt_expect_eq "negative_roster_fetch_failure_does_not_park — exit 0" 0 "$SRT_RC"
+srt_expect_eq "context fetch failure — exit 0" 0 "$SRT_RC"
 srt_log_has "$STUB" curl.log "/post-to-thread" \
     "degraded_path_discord_alert — alert fires on qctx failure"
-srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
-    "negative_roster_fetch_failure_does_not_park — tick did not park on roster failure"
-WORKDIR_PATH=$(sed -n 's/.*\] workdir \(\/[^ ]*\) .*/\1/p' "$STUB/tick.out" | head -1)
-if [ -n "$WORKDIR_PATH" ] && [ -f "$WORKDIR_PATH/roster-context.json" ]; then
-    _fallback=$(cat "$WORKDIR_PATH/roster-context.json")
-    if [ "$_fallback" = '{}' ]; then
-        srt_ok "negative_roster_fetch_failure_does_not_park — fallback {} written"
-    else
-        srt_fail "negative_roster_fetch_failure_does_not_park — expected {}, got: $_fallback"
-    fi
-    rm -rf "$WORKDIR_PATH"
-else
-    srt_fail "negative_roster_fetch_failure_does_not_park — workdir not found or roster-context.json missing (KEEP_WORKDIR=1 set)"
-fi
-unset SIM_RECAP_KEEP_WORKDIR
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_fetch_failure_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context fetch failure — claude never spawned"
+srt_log_lacks "$STUB" ssh.log "storeSimRecap.php" \
+    "context fetch failure — no storeSimRecap.php call"
+
+# ── context_empty_games_parks_transport ──────────────────────────────────────
+# Schedule scores not posted yet: a context with no games cannot carry a recap.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"sim":42,"roster":{},"active_injuries":[],"sim_trades":[],"games":[],"standings":[]}\n' \
+    > "$STUB/resp.simRecapContext"
+srt_run
+srt_expect_eq "context empty games — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_empty_games_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context empty games — claude never spawned"
+srt_log_lacks "$STUB" curl.log "/post-to-thread" \
+    "context_empty_games_parks_transport — no ops alert for a timing state"
+
+# ── context_null_ordinal_parks_transport ─────────────────────────────────────
+# A game whose team box row is not imported yet has a null game_of_that_day;
+# the tick never infers it, so it parks until the ordinal exists.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"sim":42,"roster":{},"active_injuries":[],"sim_trades":[],"games":[{"key":"g1","season_year":2008,"game_date":"2026-07-23","box_id":null,"game_of_that_day":null,"visitor_teamid":1,"visitor_name":"Team A","visitor_score":101,"home_teamid":2,"home_name":"Team B","home_score":99,"visitor_top":[],"home_top":[],"injuries":[]}],"standings":[]}\n' \
+    > "$STUB/resp.simRecapContext"
+srt_run
+srt_expect_eq "context null ordinal — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "context_null_ordinal_parks_transport — parks transport"
+srt_file_absent "$STUB/claude.sentinel" \
+    "context null ordinal — claude never spawned"
+srt_log_lacks "$STUB" curl.log "/post-to-thread" \
+    "context_null_ordinal_parks_transport — no ops alert for a timing state"
+
+# ── onset_alert_full_wording ─────────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_log_has "$STUB" curl.log \
+    "WARNING: sim 42 recap parked: simRecapContext.php fact-sheet fetch failed or returned no usable games. Further parked sims will NOT re-alert; expect a single RECOVERED message when it comes back." \
+    "onset_alert_full_wording — exact onset string"
+
+# ── recovery_alert_full_wording ──────────────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+printf '{"degraded_since":"2026-08-14T00:00:00","degraded_count":2}\n' > "$STUB/ops-alert.json"
+srt_run
+srt_log_has "$STUB" curl.log \
+    "RECOVERED: simRecapContext.php fact sheet is answering again (sim 42). 2 sim recap(s) parked waiting for it since 2026-08-14T00:00:00" \
+    "recovery_alert_full_wording — exact recovery string with seeded count and timestamp"
+
+# ── dry_run_without_context_exits_1_without_agent ────────────────────────────
+srt_reset
+touch "$STUB/fail.simRecapContext"
+srt_run --dry-run --sim=42
+srt_expect_eq "dry_run_without_context_exits_1_without_agent — exit 1" 1 "$SRT_RC"
+srt_log_has "$STUB" tick.out "fact-sheet context unavailable" \
+    "dry run without context — logs the refusal"
+srt_file_absent "$STUB/claude.sentinel" \
+    "dry run without context — claude never spawned"
 
 # ── phase_gate_stays_armed_when_recaps_disabled ───────────────────────────────
 # When claim-next reports recaps_enabled:false and sim is null (nothing left to
@@ -1519,7 +1820,7 @@ srt_log_lacks "$STUB" curl.log "/post-to-thread" \
     "degraded_path_alert_noop_when_no_thread_id — no curl call when thread ID empty"
 
 # ── degraded_path_alert_fault_tolerant ────────────────────────────────────────
-# Tick must succeed (exit 0, no park) even when curl fails.
+# Tick must succeed (exit 0) even when curl fails.
 srt_reset
 printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
@@ -1532,8 +1833,10 @@ SH
 chmod +x "$STUB/curl"
 srt_run
 srt_expect_eq "degraded_path_alert_fault_tolerant — exit 0" 0 "$SRT_RC"
-srt_log_lacks "$STUB" ssh.log "simRecapQueue.php park" \
-    "degraded_path_alert_fault_tolerant — no park when curl fails"
+# A missing fact sheet parks transport; the point of this case (a failing curl
+# never fails the tick) is the exit 0 above.
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "degraded_path_alert_fault_tolerant — tick completes and parks when curl fails"
 # Restore working curl stub for any tests that follow.
 cat > "$STUB/curl" <<'SH'
 #!/usr/bin/env bash
@@ -1558,7 +1861,7 @@ srt_run
 srt_run
 srt_expect_eq "ops_alert_second_degraded_sim_is_silent — one post across two degraded ticks" \
     1 "$(srt_matches curl.log '/post-to-thread')"
-srt_log_has "$STUB" curl.log "roster-blind" \
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" \
     "ops_alert_second_degraded_sim_is_silent — the single post is the onset warning"
 
 # ── ops_alert_recovery_ping_on_healthy_after_degraded ─────────────────────────
@@ -1631,8 +1934,8 @@ touch "$STUB/fail.simRecapContext"
 printf '{"degraded_since":"2026-08-14T00:00:00","degraded_count":"lots"}\n' > "$STUB/ops-alert.json"
 srt_run
 srt_expect_eq "ops_alert_corrupt_count_does_not_kill_the_tick — exit 0" 0 "$SRT_RC"
-srt_count "ops_alert_corrupt_count_does_not_kill_the_tick — the recap still ran" \
-    1 "$STUB/claude.log"
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" \
+    "ops_alert_corrupt_count_does_not_kill_the_tick — the tick still reached its park"
 
 # ══ DB-SYNC HOOK CASES ═══════════════════════════════════════════════════════
 
@@ -1792,10 +2095,10 @@ cat "$STUB/tick.out" >> "$STUB/wh.out1"
 srt_count "webhook: exactly two pings across onset and recovery" 2 "$STUB/curl.log"
 srt_expect_eq "webhook: exactly two pings — two url lines on stdin" \
     2 "$(srt_matches curl.stdin '^url = ')"
-srt_log_has "$STUB" curl.log "roster-blind" "webhook: onset body is roster-blind"
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" "webhook: onset body is the fact-sheet warning"
 srt_log_has "$STUB" curl.log "RECOVERED" "webhook: recovery body is RECOVERED"
 srt_expect_eq "webhook: first ping is the onset" 1 \
-    "$(sed -n 1p "$STUB/curl.log" | grep -c 'roster-blind')"
+    "$(sed -n 1p "$STUB/curl.log" | grep -c 'fact-sheet fetch failed')"
 srt_expect_eq "webhook: second ping is the recovery" 1 \
     "$(sed -n 2p "$STUB/curl.log" | grep -c 'RECOVERED')"
 
@@ -1828,7 +2131,9 @@ printf '%s\n' "$WH_CLAIM" > "$STUB/resp.claim-next"
 touch "$STUB/fail.simRecapContext"
 STUB_CURL_FAIL=1 srt_run
 srt_expect_eq "webhook curl failure never fails the tick — exit 0" 0 "$SRT_RC"
-srt_log_has "$STUB" tick.out "stored" "webhook curl failure never fails the tick"
+# A missing fact sheet parks transport instead of storing; exit 0 above is the
+# property under test.
+srt_log_has "$STUB" ssh.log "park --sim=42 --host=mac --cause=transport" "webhook curl failure never fails the tick — tick completes and parks"
 
 # 7. unset and empty both use the bot path
 srt_reset
@@ -1855,7 +2160,7 @@ touch "$STUB/fail.simRecapContext"
 srt_run
 srt_expect_eq "webhook without thread id — exit 0" 0 "$SRT_RC"
 srt_count "webhook without thread id still pings once" 1 "$STUB/curl.log"
-srt_log_has "$STUB" curl.log "roster-blind" "webhook without thread id sends the onset body"
+srt_log_has "$STUB" curl.log "fact-sheet fetch failed" "webhook without thread id sends the onset body"
 srt_log_has "$STUB" curl.stdin "url = \"$WH_URL\"" \
     "webhook without thread id posts to the bare webhook URL"
 srt_log_lacks "$STUB" curl.stdin "thread_id" "webhook without thread id adds no thread_id"

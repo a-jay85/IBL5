@@ -592,7 +592,7 @@ LAST line of the final message."
         fi
     fi
     # 4. The plan comment goes after the push, so a failed commit or push never leaves a comment
-    # for reverted edits. The commit is already public here, so a comment failure only DMs.
+    # for reverted edits. A comment failure stops the re-fire (see below).
     if [ "$HR_PLAN_CHANGED" = 1 ]; then
         HR_FENCE='```'
         HR_PLAN_DIFF="$(diff -u "$HR_TMP/plan.before" "$HR_PLAN" || true)"
@@ -603,12 +603,25 @@ LAST line of the final message."
             sed -n '1,200p' <<< "$HR_PLAN_DIFF"
             printf '%s\n' "$HR_FENCE"
         } > "$HR_TMP/comment.md"
+        HR_COMMENT_BAD=""
         if ! gh pr comment "$PR" --repo a-jay85/IBL5 --body-file "$HR_TMP/comment.md" >/dev/null 2>&1; then
-            _hr_dm "plan comment failed: gh pr comment error"
+            HR_COMMENT_BAD="gh pr comment error"
+        else
+            HR_LAST_COMMENT="$(gh pr view "$PR" --repo a-jay85/IBL5 --json comments --jq '.comments[-1].body' 2>/dev/null)" || HR_LAST_COMMENT=""
+            if [[ "$HR_LAST_COMMENT" != *"fingerprint $HR_FP"* ]]; then
+                HR_COMMENT_BAD="comment did not land"
+            fi
         fi
-        HR_LAST_COMMENT="$(gh pr view "$PR" --repo a-jay85/IBL5 --json comments --jq '.comments[-1].body' 2>/dev/null)" || HR_LAST_COMMENT=""
-        if [[ "$HR_LAST_COMMENT" != *"fingerprint $HR_FP"* ]]; then
-            _hr_dm "plan comment did not land"
+        # The comment is the only public record of a model-written plan edit, so a failed or
+        # unverified one never re-fires. Nothing was pushed on a plan-only fix: reject reverts it.
+        # A pushed commit stays public, so there it DMs, records and gives up without reverting.
+        if [ -n "$HR_COMMENT_BAD" ]; then
+            if [ "$HR_COMMITTED" = 0 ]; then
+                _hr_reject plan-comment "$HR_COMMENT_BAD"
+            fi
+            _hr_dm "plan comment failed after the push: $HR_COMMENT_BAD"
+            _hr_record rejected-plan-comment
+            _hr_finish "$HR_RC_GAVEUP" gave-up-plan-comment
         fi
     fi
     # 5. Re-fire post-plan. env -u is required: a caller may have exported CLAUDE_HEADLESS=1,

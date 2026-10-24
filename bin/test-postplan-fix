@@ -144,6 +144,7 @@ if [ "\$1 \$2 \$3" = "pr view 77" ]; then
     esac
 fi
 if [ "\$1 \$2" = "pr comment" ]; then
+    if [ -e "$TMP/gh.commentfail" ]; then exit 1; fi
     while [ \$# -gt 0 ]; do
         if [ "\$1" = "--body-file" ]; then cp "\$2" "$TMP/gh.lastcomment"; cp "\$2" "$TMP/gh.comment"; fi
         shift
@@ -625,7 +626,7 @@ hr_reset() {
     rm -rf "$HR_STATE"; mkdir -p "$HR_STATE"
     hr_seed "$HR_STATE" "$HR_REASON"
     cp "$TMP/plan.orig" "$HR_PLANS/$B_HR.md"
-    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.lastcomment" "$TMP/gh.comment"
+    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.lastcomment" "$TMP/gh.comment" "$TMP/gh.commentfail"
     printf 'Fix widget\tbug\tno\n' > "$TMP/gh.snap.before"
     unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR CLAUDE_HEADLESS PPN_STUB_RC
     hr_env
@@ -1014,6 +1015,17 @@ need "plan restored" plan_is_orig
 need "origin unchanged" origin_is_tip
 need "no post-plan call" no_ppn
 case_end holdrepeat-push-fails-no-comment
+
+# 51 (the plan comment fails after the push: DM, record, give up, no re-fire)
+hr_reset
+: > "$TMP/gh.commentfail"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planedit.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-plan-comment
+need "owner DM sent" test "$(dm_count)" -ge 1
+need "no post-plan call" no_ppn
+case_end holdrepeat-plan-comment-fails-no-refire
 hr_reset
 
 h_done

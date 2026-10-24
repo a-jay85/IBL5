@@ -12,6 +12,8 @@ use Waivers\WaiversSubmissionService;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Season\Season;
+use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Waivers\Contracts\WaiversRosterSlotCounterInterface;
 
 /**
  * Security deliverable for backlog 6.22 (Waivers half).
@@ -27,7 +29,9 @@ class WaiversSubmissionServiceTest extends TestCase
 {
     public function testSubmitRefusesNullTeamWithoutProcessingAdd(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(slotCounter: $slotCounter);
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
@@ -41,7 +45,9 @@ class WaiversSubmissionServiceTest extends TestCase
 
     public function testSubmitRefusesEmptyTeamWithoutProcessingDrop(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(slotCounter: $slotCounter);
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
@@ -55,7 +61,9 @@ class WaiversSubmissionServiceTest extends TestCase
 
     public function testSubmitRefusesFreeAgentsPseudoTeamCollapsedToNull(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(slotCounter: $slotCounter);
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
@@ -104,7 +112,9 @@ class WaiversSubmissionServiceTest extends TestCase
 
     public function testSubmitForwardsAuthorizedAddToProcessor(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(0, 12)
+        );
         $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->never())->method('processDrop');
@@ -122,12 +132,14 @@ class WaiversSubmissionServiceTest extends TestCase
     }
 
     /**
-     * A team at 15 with two injured players posts rosterslots=0 and healthyrosterslots=2.
+     * A team at 15 with two injured players: the counter reports open 0, healthy 2.
      * The add path forwards both counts, open first.
      */
     public function testSubmitForwardsHealthyRosterSlotsToProcessAdd(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(0, 2)
+        );
         $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->once())->method('processAdd')
@@ -144,7 +156,9 @@ class WaiversSubmissionServiceTest extends TestCase
 
     public function testSubmitForwardsAuthorizedWaiveToProcessor(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(14, 14)
+        );
         $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')
             ->with('Chicago Bulls')->willReturn(75000000);
         $processor->expects($this->never())->method('processAdd');
@@ -172,7 +186,10 @@ class WaiversSubmissionServiceTest extends TestCase
         string $unusedMethod,
         int $expectedSalary
     ): void {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks($advancesContractYears);
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            $advancesContractYears,
+            $this->counterReporting(12, 12)
+        );
 
         $salaryCapRepo->expects($this->once())
             ->method($expectedMethod)
@@ -210,16 +227,129 @@ class WaiversSubmissionServiceTest extends TestCase
     }
 
     /**
-     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub}
+     * backlog#1538 — the posted rosterslots / healthyrosterslots are tamperable; an add must
+     * forward the counter's numbers, not the posted ones.
      */
-    private function buildServiceWithMocks(bool $advancesContractYears = false): array
+    public function testSubmitAddUsesServerCountsNotPostedRosterSlots(): void
     {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(0, 0)
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturn(75000000);
+        $processor->expects($this->once())->method('processAdd')
+            ->with(42, 'Chicago Bulls', 0, 0, self::anything())
+            ->willReturn(['success' => false, 'error' => 'No roster spot']);
+
+        $service->submit(
+            ['Action' => 'add', 'Player_ID' => 42, 'rosterslots' => 5, 'healthyrosterslots' => 5],
+            'Chicago Bulls'
+        );
+    }
+
+    public function testSubmitDropUsesServerCountNotPostedRosterSlots(): void
+    {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(5, 5)
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturn(75000000);
+        $processor->expects($this->once())->method('processDrop')
+            ->with(42, 'Chicago Bulls', 5, self::anything())
+            ->willReturn(['success' => true]);
+
+        $service->submit(
+            ['Action' => 'waive', 'Player_ID' => 42, 'rosterslots' => 0],
+            'Chicago Bulls'
+        );
+    }
+
+    public function testSubmitAddWithoutPostedSlotFieldsStillPassesServerCounts(): void
+    {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $this->counterReporting(3, 2)
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturn(75000000);
+        $processor->expects($this->once())->method('processAdd')
+            ->with(42, 'Chicago Bulls', 3, 2, self::anything())
+            ->willReturn(['success' => true]);
+
+        $service->submit(['Action' => 'add', 'Player_ID' => 42], 'Chicago Bulls');
+    }
+
+    public function testSubmitRefusesUnknownTeamIdWithoutCountingOrProcessing(): void
+    {
+        $teamIdentityRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->expects($this->once())->method('getTidFromTeamname')
+            ->with('Chicago Bulls')->willReturn(null);
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $slotCounter,
+            teamIdentityRepo: $teamIdentityRepo
+        );
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->never())->method('processDrop');
+        $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => 42], 'Chicago Bulls');
+
+        $this->assertSame(['success' => false, 'error' => 'Unable to determine your team.'], $result);
+    }
+
+    public function testSubmitForwardsVerifiedTeamIdAndInjectedSeasonToCounter(): void
+    {
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTidFromTeamname')->willReturn(7);
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+
+        [$service, $processor, $salaryCapRepo, $season] = $this->buildServiceWithMocks(
+            slotCounter: $slotCounter,
+            teamIdentityRepo: $teamIdentityRepo
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturn(75000000);
+        $slotCounter->expects($this->once())->method('countOpenSlots')
+            ->with(7, self::identicalTo($season))
+            ->willReturn(['open' => 5, 'healthy' => 5]);
+        $processor->expects($this->once())->method('processAdd')->willReturn(['success' => true]);
+
+        $service->submit(
+            ['Action' => 'add', 'Player_ID' => 42, 'Team_Name' => 'Some Other Team'],
+            'Chicago Bulls'
+        );
+    }
+
+    private function counterReporting(int $open, int $healthy): WaiversRosterSlotCounterInterface
+    {
+        $counter = self::createStub(WaiversRosterSlotCounterInterface::class);
+        $counter->method('countOpenSlots')->willReturn(['open' => $open, 'healthy' => $healthy]);
+
+        return $counter;
+    }
+
+    /**
+     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub, 4: WaiversRosterSlotCounterInterface, 5: TeamIdentityRepositoryInterface}
+     */
+    private function buildServiceWithMocks(
+        bool $advancesContractYears = false,
+        ?WaiversRosterSlotCounterInterface $slotCounter = null,
+        ?TeamIdentityRepositoryInterface $teamIdentityRepo = null
+    ): array {
         $processor = $this->createMock(WaiversProcessorInterface::class);
         $salaryCapRepo = $this->createMock(SalaryCapRepositoryInterface::class);
         $season = self::createStub(Season::class);
         $season->method('advancesContractYears')->willReturn($advancesContractYears);
-        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season);
 
-        return [$service, $processor, $salaryCapRepo, $season];
+        if ($slotCounter === null) {
+            $slotCounter = $this->counterReporting(5, 5);
+        }
+        if ($teamIdentityRepo === null) {
+            $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+            $teamIdentityRepo->method('getTidFromTeamname')->willReturn(7);
+        }
+
+        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo);
+
+        return [$service, $processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo];
     }
 }

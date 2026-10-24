@@ -1,6 +1,6 @@
 ---
 description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 ---
 
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
@@ -364,9 +364,11 @@ ROOTN="$(git rev-parse --show-toplevel)"
 source "$ROOTN/bin/lib/pr-armable.sh"
 RG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 RG_BASE="$(git config "branch.$RG_BRANCH.iblBase" || echo master)"
-RG_PLAN="${PLAN_FILE:-$HOME/claude-plans/$RG_BRANCH.md}"
+source "$ROOTN/bin/lib/plan-resolve.sh"
+PLAN_SLUG_DRIFT=""
+resolve_plan_file
 RG_PLAN_ARG=()
-[ -f "$RG_PLAN" ] && RG_PLAN_ARG=(--plan "$RG_PLAN")
+[ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ] && RG_PLAN_ARG=(--plan "$PLAN_FILE")
 RG_DIFF="$(mktemp)"
 if ! git diff "origin/$RG_BASE...HEAD" > "$RG_DIFF"; then
   echo "BLOCKED: removed guards: cannot compute the realized diff against origin/$RG_BASE (fail-closed)"

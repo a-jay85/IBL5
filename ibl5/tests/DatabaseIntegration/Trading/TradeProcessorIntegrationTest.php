@@ -6,6 +6,7 @@ namespace Tests\DatabaseIntegration\Trading;
 
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
+use Trading\Contracts\TradeProcessorInterface;
 use Trading\TradeItemType;
 use Trading\TradeProcessor;
 
@@ -211,6 +212,34 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         self::assertArrayHasKey('error', $result);
     }
 
+    public function testReprocessingCompletedTradeIsRejectedWithoutSecondNewsStory(): void
+    {
+        $pidA = 200040091;
+        $pidB = 200040092;
+        $this->seedPlayer($pidA, 'Reaccept Test A', 1, 'PG');
+        $this->seedPlayer($pidB, 'Reaccept Test B', 2, 'SF');
+
+        $offerId = $this->seedPendingTrade([
+            ['id' => $pidA, 'type' => TradeItemType::Player->value, 'from' => 'Metros', 'to' => 'Stars'],
+            ['id' => $pidB, 'type' => TradeItemType::Player->value, 'from' => 'Stars', 'to' => 'Metros'],
+        ]);
+
+        $storiesBefore = $this->countNewsStories();
+        $first = $this->processor->processTrade($offerId);
+
+        self::assertTrue($first['success']);
+        self::assertSame($storiesBefore + 1, $this->countNewsStories());
+
+        $storiesAfterFirst = $this->countNewsStories();
+        $second = $this->processor->processTrade($offerId);
+
+        self::assertFalse($second['success']);
+        self::assertSame(TradeProcessorInterface::NO_TRADE_DATA_ERROR, $second['error'] ?? null);
+        self::assertSame($storiesAfterFirst, $this->countNewsStories());
+        self::assertSame(2, $this->getPlayerTeamId($pidA));
+        self::assertSame(1, $this->getPlayerTeamId($pidB));
+    }
+
     // ── Scenario 5: Multi-asset trade ──────────────────────────
 
     public function testMultiAssetTradeTransfersAllAssets(): void
@@ -376,6 +405,14 @@ class TradeProcessorIntegrationTest extends DatabaseTestCase
         }
 
         return $offerId;
+    }
+
+    private function countNewsStories(): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) FROM nuke_stories');
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_row();
+        return (int) ($row[0] ?? 0);
     }
 
     private function getPlayerTeamId(int $pid): int

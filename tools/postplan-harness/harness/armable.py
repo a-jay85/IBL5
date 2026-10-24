@@ -20,9 +20,11 @@ from __future__ import annotations
 import os
 
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
+from . import labels
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
 
@@ -266,6 +268,74 @@ def conflict_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:
                         "postplan-conflict-resolved-" + branch.translate(str.maketrans("/:", "--")))
 
 
+_SHA_LINE = re.compile(r"^[0-9a-f]{40}$")
+
+FLAG_ABSENT = "absent"
+FLAG_CARRIED = "carried"    # at least one recorded SHA is an ancestor of HEAD -> hold stays
+FLAG_STALE = "stale"        # every recorded SHA (or the legacy witnesses) prove a rewrite
+FLAG_UNKNOWN = "unknown"    # unreadable, malformed, or legacy with no rewrite proof -> hold stays
+
+
+def record_conflict_resolution(branch: str, sha: str, tmp_dir: str = "/tmp") -> str:
+    """Append the resolving HEAD SHA (one per line) to the condition-(14) marker.
+    Returns the marker path. A malformed SHA raises so a bad caller cannot write a
+    marker the classifier would later treat as unknown."""
+    sha = sha.strip()
+    if not _SHA_LINE.match(sha):
+        raise ValueError(f"record_conflict_resolution: not a full SHA: {sha!r}")
+    path = conflict_flag_path(branch, tmp_dir)
+    with open(path, "a") as fh:
+        fh.write(sha + "\n")
+    return path
+
+
+def classify_conflict_flag(
+    flag_path: str,
+    notes_path: str,
+    is_ancestor: Callable[[str], bool],
+    legacy_rewritten: Callable[[float], bool],
+) -> tuple[str, str]:
+    """Decide what the condition-(14) marker at flag_path describes.
+
+    Returns (state, detail). States: FLAG_ABSENT, FLAG_CARRIED, FLAG_STALE, FLAG_UNKNOWN.
+    - SHA lines (written by record_conflict_resolution): CARRIED when any SHA is an
+      ancestor of HEAD, STALE when none is.
+    - Legacy empty marker (skill or pre-change harness): STALE only when
+      legacy_rewritten(floor) says so, where floor is the newest mtime among the flag
+      and the notes file. Anything else is UNKNOWN (fail closed).
+    - Any read error or a non-SHA non-blank line is UNKNOWN (fail closed).
+    """
+    if not os.path.lexists(flag_path):
+        return FLAG_ABSENT, ""
+    try:
+        with open(flag_path, encoding="utf-8") as fh:
+            raw = fh.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        return FLAG_UNKNOWN, f"unreadable marker: {exc.__class__.__name__}"
+    lines = [l.strip() for l in raw.splitlines() if l.strip()]
+    bad = [l for l in lines if not _SHA_LINE.match(l)]
+    if bad:
+        return FLAG_UNKNOWN, f"malformed marker line: {bad[0][:60]!r}"
+    if lines:
+        for sha in lines:
+            if is_ancestor(sha):
+                return FLAG_CARRIED, f"recorded resolution {sha} is in HEAD history"
+        return FLAG_STALE, ("recorded resolution(s) " + ", ".join(s[:12] for s in lines)
+                            + " absent from HEAD history (history rewritten)")
+    try:
+        floor = os.path.getmtime(flag_path)
+        if os.path.exists(notes_path):
+            floor = max(floor, os.path.getmtime(notes_path))
+    except OSError as exc:
+        return FLAG_UNKNOWN, f"legacy marker mtime unreadable: {exc.__class__.__name__}"
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(floor))
+    if legacy_rewritten(floor):
+        return FLAG_STALE, (f"legacy empty marker from {stamp}: no merge commit in range and "
+                            "every branch commit is newer than the marker")
+    return FLAG_UNKNOWN, (f"legacy empty marker from {stamp}: a merge commit or an older "
+                          "commit is still in range; keeping the hold")
+
+
 def conflict_verdict_for(branch: str, tmp_dir: str = "/tmp") -> Optional[str]:
     """Read the SHA sidecar then the verdict file; return line 1 stripped, or None on any failure."""
     key = branch.translate(str.maketrans("/:", "--"))
@@ -292,7 +362,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(1, "manual-testing-clearance", cond1_held,
                               f"state={clearance}" if cond1_held else ""))
 
-    high = [f for f in inp.findings if (f.score or 0) >= 80]
+    # Only labels.NON_HOLDING_LABELS (nit, pre-existing) clear. A missing, empty or unknown
+    # label such as "blocker" or "Nit" holds as Important (fail-closed), like prf_label.
+    high = [f for f in inp.findings
+            if (f.score or 0) >= 80
+            and getattr(f, "label", None) not in labels.NON_HOLDING_LABELS]
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 
@@ -379,6 +453,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # holds; the split below is for the reason text only. Trust and authorship are
     # never consulted here: thread_ingestion.py decides what a run may ACT on,
     # this decides whether the PR may merge. None / api-error / cap stay fail-closed.
+    # Threads whose first comment carries a trusted <!-- label: nit --> or
+    # <!-- label: pre-existing --> marker are dropped by pr_unresolved_findings_hold
+    # before this list is built; this grader never parses labels and still holds on
+    # any non-empty list.
     uf = inp.unresolved_findings
     if uf is None:
         r = "unresolved review-thread state not consulted — fail-closed"

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 import pytest
@@ -17,7 +18,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness.adapters.gitad import LiveGit
+from harness.armable import conflict_flag_path, conflict_verdict_for, evaluate
 from harness.state import HarnessError
+from test_armable_phase4 import _held, inputs
 from test_gitad_stacked_rebase import (
     _LOSTWORK_EQUIV,
     _WritingLlm,
@@ -127,6 +130,7 @@ def test_rebase_onto_conflict_resolved_lands_merge_commit():
         assert g.last_conflict_resolution.auto_resolved is True
         assert g.last_conflict_resolution.manifest_path
         assert os.path.exists(conflict_flag_path(branch))
+        assert open(conflict_flag_path(branch)).read() == _rev(d, "HEAD") + "\n"
         assert _parents(d) == [pre, master_sha]
         assert _merge_head(d) == ""
         assert open(os.path.join(d, "feature.txt")).read() == "merged content\n"
@@ -206,3 +210,152 @@ def test_resolve_all_orientation_per_path(monkeypatch):
     assert seen[-1]["branch_stage"] == 3
     assert seen[-1]["master_sha"] == master_sha
     assert len(seen) == 2
+
+
+# ── Condition (14) marker reconcile at rebase start ───────────────────────────
+
+def _legacy_marker(branch, mtime):
+    """An empty marker (skill or pre-SHA harness shape) stamped at mtime."""
+    p = conflict_flag_path(branch)
+    open(p, "w").close()
+    os.utime(p, (mtime, mtime))
+    return p
+
+
+def _held_14(branch):
+    """Condition 14 as the runner's read site sees it: flag existence plus the verdict file."""
+    dec = evaluate(inputs(conflict_resolved=os.path.exists(conflict_flag_path(branch)),
+                          conflict_verdict=conflict_verdict_for(branch)))
+    return 14 in _held(dec)
+
+
+def test_rebase_onto_drops_legacy_marker_after_history_rewrite(capsys):
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        flag = _legacy_marker(branch, time.time() - 86400)
+        _sh(d, "reset", "--soft", "origin/master")      # squash the branch ...
+        _sh(d, "commit", "-m", "squashed onto master")  # ... onto master (fresh %ct)
+        g = LiveGit(d)
+        g.rebase_onto()
+        assert not os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag dropped as stale: " + flag)
+        assert f"postplan: conflict flag dropped as stale: {flag}" in capsys.readouterr().err
+        assert not _held_14(branch)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_keeps_recorded_marker_still_in_history():
+    d, _base, _master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        LiveGit(d, llm=llm).rebase_onto()
+        flag = conflict_flag_path(branch)
+        assert os.path.exists(flag)
+        open(os.path.join(d, "extra.txt"), "w").write("later\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "feat: later work")
+        g = LiveGit(d)
+        g.rebase_onto()
+        assert os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag carried")
+        assert conflict_verdict_for(branch) is None
+        assert _held_14(branch)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_fresh_resolution_holds_until_reviewed():
+    d, _base, _master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        LiveGit(d, llm=llm).rebase_onto()
+        flag = conflict_flag_path(branch)
+        assert open(flag).read().split() == [_rev(d, "HEAD")]
+        dec = evaluate(inputs(conflict_resolved=os.path.exists(flag), conflict_verdict=None))
+        assert 14 in _held(dec)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_keeps_legacy_marker_with_merge_commit():
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        flag = _legacy_marker(branch, time.time() - 86400)
+        _sh(d, "merge", "--no-edit", "origin/master")
+        g = LiveGit(d)
+        g.rebase_onto()
+        assert os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag kept (unknown)")
+        assert _held_14(branch)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_keeps_legacy_marker_not_newer_than_branch_commit():
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        ct = int(_sh(d, "log", "-1", "--format=%ct").stdout)
+        flag = _legacy_marker(branch, ct)
+        g = LiveGit(d)
+        g.rebase_onto()
+        assert os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag kept (unknown)")
+        assert _held_14(branch)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_keeps_malformed_marker():
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        flag = conflict_flag_path(branch)
+        open(flag, "w").write("hello\n")
+        g = LiveGit(d)
+        g.rebase_onto()
+        assert os.path.exists(flag)
+        assert "malformed marker line" in g.last_conflict_flag_note
+        assert _held_14(branch)
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_reconcile_keeps_legacy_marker_when_base_ref_missing():
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        flag = _legacy_marker(branch, time.time() - 86400)
+        g = LiveGit(d)
+        g._reconcile_conflict_flag(branch, key, "refs/remotes/origin/does-not-exist")
+        assert os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag kept (unknown)")
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_reconcile_drops_sha_marker_whose_object_is_gone():
+    d, key, branch, _shas, _master = _make_clean_repo()
+    try:
+        flag = conflict_flag_path(branch)
+        open(flag, "w").write("a" * 40 + "\n")  # well-formed SHA, no such object
+        g = LiveGit(d)
+        g._reconcile_conflict_flag(branch, key, "origin/master")
+        assert not os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag dropped as stale")
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_reconcile_keeps_sha_marker_when_git_fails(tmp_path):
+    branch = "feature-broken-worktree"
+    flag = conflict_flag_path(branch)
+    open(flag, "w").write("a" * 40 + "\n")
+    try:
+        g = LiveGit(str(tmp_path / "no-such-worktree"))
+        g._reconcile_conflict_flag(branch, "broken-key", "origin/master")
+        assert os.path.exists(flag)
+        assert g.last_conflict_flag_note.startswith("conflict flag kept (unknown)")
+    finally:
+        if os.path.exists(flag):
+            os.unlink(flag)

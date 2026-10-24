@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # Post-Plan Orchestrator
@@ -567,7 +567,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 **All eighteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing is cleared. The PR body carries the `No manual testing needed` sentinel. The skill writes it in Phase 6 step 4; the compiled harness writes `MANUAL_TESTING_SENTINEL_TICKED` in Phase 6.7 once every row it ticked is confirmed on a fresh read. A `## After merge` section, written for plan rows tagged `post-merge:`, sits outside the window `pr_manual_testing_clearance` scans; it neither holds nor clears this condition, and an unchecked row inside `## Manual Testing` still holds it.
-2. No review/audit finding scored `>= 80` (scored in Phase 4).
+2. No `Important` review/audit finding scored `>= 80` (scored and labeled in Phase 4). Findings labeled `Nit` or `Pre-existing` never hold this condition.
 3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path, `UNREALISED-ASSERTION:` assertion-footprint **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
@@ -576,7 +576,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 8. Commit-type floor — the PR title is not a conventional-commit `feat:` (unless `human-approved`-labeled).
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
-11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
+11. Unresolved review thread. Every unresolved GitHub review thread holds, scored at any value or unscored, with one exception: a thread whose first comment starts with `<!-- label: nit -->` or `<!-- label: pre-existing -->` and whose author is trusted (`a-jay85`, a GitHub Bot, or a `[bot]` login). Live-state counterpart to (2), which is run-local.
 12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks. Step 7.5 re-spawns the reviewer once when no readable verdict was written; a second miss still blocks and the hold line says so.

@@ -90,6 +90,23 @@ def test_findings_below_80_do_not_block():
     assert d.armed
 
 
+def _labeled(label):
+    f = Finding("code-review", "A", "f.php", 1, "bug", 85)
+    f.label = label
+    return f
+
+
+@pytest.mark.parametrize("label", ["blocker", "Nit", "PRE-EXISTING", "", None])
+def test_unknown_label_holds_condition_2(label):
+    d = evaluate(inputs(findings=[_labeled(label)]))
+    assert not d.armed and any(c.number == 2 for c in d.holds)
+
+
+@pytest.mark.parametrize("label", ["nit", "pre-existing"])
+def test_nit_and_preexisting_labels_do_not_hold_condition_2(label):
+    assert evaluate(inputs(findings=[_labeled(label)])).armed
+
+
 def test_phase5_skipped_does_not_block():
     assert evaluate(inputs(phase5_status="skipped")).armed
 
@@ -616,3 +633,49 @@ def test_condition_9_still_holds_on_destructive_text_outside_migrations():
     cls = Classification(has_migration=True, filtered_diff="+DROP TABLE t\n")
     assert deterministic_safety_holds(cls, "chore: x") == [
         "destructive/schema-tightening migration in realized diff"]
+
+# --- condition (2): only Important findings hold ---------------------------------
+
+def test_preexisting_labeled_90_does_not_block_condition_2():
+    """Mutation: delete the label conjunct in condition (2) => this holds and fails."""
+    f = Finding("code-review", "A", "f.php", 1, "x", 90, label="pre-existing")
+    assert evaluate(inputs(findings=[f])).armed
+
+
+def test_nit_labeled_finding_does_not_block_condition_2():
+    """Mutation: lower the floor to score >= 60 => the nit holds and this fails."""
+    f = Finding("code-review", "A", "f.php", 1, "x", 79, label="nit")
+    d = evaluate(inputs(findings=[f]))
+    c2 = [c for c in d.conditions if c.number == 2][0]
+    assert d.armed
+    assert not c2.blocked
+    assert c2.reason == ""
+
+
+def test_important_labeled_90_blocks_condition_2():
+    """Mutation: compare the label to "nit" instead of "important" => armed, fails."""
+    f = Finding("code-review", "A", "f.php", 1, "x", 90, label="important")
+    assert not evaluate(inputs(findings=[f])).armed
+
+
+def test_unlabeled_90_still_blocks_condition_2():
+    """Fail-closed pin. Mutation: `(f.label or "nit")` => armed, fails."""
+    f = Finding("code-review", "A", "f.php", 1, "x", 90, label=None)
+    d = evaluate(inputs(findings=[f]))
+    c2 = [c for c in d.conditions if c.number == 2][0]
+    assert not d.armed
+    assert c2.blocked
+    assert "f.php:1 score=90" in c2.reason
+
+
+def test_finding_without_label_attribute_still_blocks_condition_2():
+    """A stub with no `label` attribute reads as Important via getattr's default."""
+    class _Stub:
+        source, agent, path, line, body, score = "code-review", "A", "f.php", 1, "x", 90
+    assert not evaluate(inputs(findings=[_Stub()])).armed
+
+
+def test_security_76_important_does_not_block_condition_2():
+    """Characterization of the >= 80 floor. Mutation: lower it to 75 => fails."""
+    f = Finding("security-audit", "security", "f.php", 1, "x", 76, label="important")
+    assert evaluate(inputs(findings=[f])).armed

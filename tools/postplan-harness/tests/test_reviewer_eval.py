@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -229,6 +230,108 @@ def test_corpus_digest_scope():
     assert re_.corpus_digest(c) != base
 
 
+def test_corpus_digest_pinned_without_also_accept():
+    assert re_.corpus_digest(_corpus()) == "9e2372cc67c5"
+
+
+def test_case_digest_pinned():
+    assert re_.case_digest(_corpus()["cases"][0], "bug") == "6f88e391853a"
+
+
+def test_corpus_digest_also_accept():
+    base = re_.corpus_digest(_corpus())
+    c = _corpus()
+    c["cases"][0]["also_accept"] = [{"path": "a.php", "start": 30, "end": 30}]
+    first = re_.corpus_digest(c)
+    assert first != base
+    c["cases"][0]["also_accept"][0]["end"] = 31
+    assert re_.corpus_digest(c) != first
+    c = _corpus()
+    c["cases"].append({**c["cases"][0], "id": "b2", "status": "unconfirmed",
+                       "also_accept": [{"path": "a.php", "start": 30, "end": 30}]})
+    assert re_.corpus_digest(c) == base
+
+
+def test_case_digest_ignores_also_accept():
+    case = _corpus()["cases"][0]
+    with_key = {**case, "also_accept": [{"path": "a.php", "start": 30, "end": 30}]}
+    assert re_.case_digest(with_key, "bug") == re_.case_digest(case, "bug")
+
+
+def test_accepted_ranges_and_file_only():
+    case = {"expected": [{"path": "a.php", "start": 10, "end": 14}],
+            "also_accept": [{"path": "b.php", "start": 40, "end": 40}]}
+    assert re_.accepted_ranges(case) == [R("a.php", 10, 14), R("b.php", 40, 40)]
+    assert re_.file_only_count([_f("b.php", 0)], re_.accepted_ranges(case)) == 1
+    assert not re_.case_hit([_f("b.php", 0)], re_.accepted_ranges(case))
+    assert re_.accepted_ranges({"expected": case["expected"]}) == [R("a.php", 10, 14)]
+
+
+REPO_ROOT =Path(__file__).resolve().parents[3]
+TRADE_CASE = "trade-preview-unbounded-cash-years"
+TRADE_PATH = "ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php"
+
+
+def _real_corpus():
+    return re_.load_corpus(REPO_ROOT / re_.DEFAULT_CORPUS)
+
+
+def _real_case(cid):
+    return next(c for c in _real_corpus()["cases"] if c["id"] == cid)
+
+
+PINNED_EXPECTED = {
+    "depth-chart-log-after-commit": [
+        ("ibl5/classes/DepthChartSnapshot/DepthChartSnapshotService.php", 148, 154)],
+    "playoff-series-invalid-group-by": [
+        ("ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", 78, 78)],
+    "saved-dc-sum-is-int": [
+        ("ibl5/classes/SavedDepthChart/SavedDepthChartRepository.php", 312, 313)],
+    "table-dropdown-unencoded-param": [
+        ("ibl5/classes/UI/Components/TableViewDropdown.php", 68, 68)],
+    "team-page-missing-pick-team": [
+        ("ibl5/classes/Team/TeamPageDataPreparer.php", 370, 371)],
+    TRADE_CASE: [(TRADE_PATH, 39, 40)],
+}
+
+
+def test_real_corpus_expected_ranges_pinned():
+    confirmed = [c for c in _real_corpus()["cases"] if c["status"] == "confirmed"]
+    assert len(confirmed) == 6
+    got = {c["id"]: [(e["path"], e["start"], e["end"]) for e in c["expected"]]
+           for c in confirmed}
+    assert got == PINNED_EXPECTED
+
+
+def test_real_corpus_trade_line_63_misses_expected_only():
+    expected = [R(e["path"], e["start"], e["end"]) for e in _real_case(TRADE_CASE)["expected"]]
+    assert not re_.case_hit([_f(TRADE_PATH, 63)], expected)
+    assert re_.case_hit([_f(TRADE_PATH, 45)], expected)
+    assert not re_.case_hit([_f(TRADE_PATH, 46)], expected)
+
+
+def test_real_corpus_trade_line_63_hits_via_also_accept():
+    ranges = re_.accepted_ranges(_real_case(TRADE_CASE))
+    assert re_.case_hit([_f(TRADE_PATH, 63)], ranges)
+    for line in (58, 68):
+        assert re_.case_hit([_f(TRADE_PATH, line)], ranges), line
+    for line in (57, 69):
+        assert not re_.case_hit([_f(TRADE_PATH, line)], ranges), line
+    other = "ibl5/classes/Trading/TradeRosterPreviewView.php"
+    assert not re_.case_hit([_f(other, 63)], ranges)
+
+
+def test_real_corpus_only_trade_case_has_also_accept():
+    cases = _real_corpus()["cases"]
+    assert [c["id"] for c in cases if "also_accept" in c] == [TRADE_CASE]
+    trade = _real_case(TRADE_CASE)
+    assert [(e["path"], e["start"], e["end"]) for e in trade["also_accept"]] == [(TRADE_PATH, 63, 63)]
+
+
+def test_real_corpus_schema_valid():
+    assert re_.validate_schema(_real_corpus()) == []
+
+
 # ---------------------------------------------------------------------------
 # Phase 3: corpus validate
 # ---------------------------------------------------------------------------
@@ -311,6 +414,24 @@ def test_validate_schema_rejects_bad_fields(tmp_path):
     assert len(errs) == 1 and "duplicate" in errs[0]
 
 
+FOO_PATH = "ibl5/classes/Foo.php"
+
+
+def test_validate_schema_also_accept(tmp_path):
+    r = {"intro": "a" * 40, "fix": "b" * 40}
+    good = [{"path": "x.php", "start": 3, "end": 4}]
+    assert re_.validate_schema(_vcorpus([_bug(r, also_accept=good)])) == []
+    cases = [
+        (_bug(r, also_accept=[]), "also_accept must be a non-empty list"),
+        (_bug(r, also_accept=[{"path": "x.php", "start": 5, "end": 4}]), "also_accept[0]"),
+        (_bug(r, also_accept=[{"path": "x.php", "start": 5}]), "missing=['end']"),
+        (_bug(r, also_accept=good, extra="x"), "unknown=['extra']"),
+    ]
+    for case, needle in cases:
+        errs = re_.validate_schema(_vcorpus([case]))
+        assert len(errs) == 1 and needle in errs[0], (needle, errs)
+
+
 def test_validate_git_confirmed_case_passes(tmp_path):
     r = _mk_repo(tmp_path)
     assert _vg(r, _vcorpus([_bug(r)])) == []
@@ -321,6 +442,29 @@ def test_validate_range_outside_added_lines(tmp_path):
     c = _bug(r, expected=[{"path": "ibl5/classes/Foo.php", "start": 20, "end": 22}])
     errs = _vg(r, _vcorpus([c]))
     assert any("b1" in e and "outside the lines added" in e for e in errs), errs
+
+
+def test_validate_also_accept_outside_added_lines(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, also_accept=[{"path": FOO_PATH, "start": 20, "end": 22}])
+    errs = _vg(r, _vcorpus([c]))
+    assert len(errs) == 1, errs
+    assert "also_accept range" in errs[0] and "outside the lines added" in errs[0]
+
+
+def test_validate_also_accept_needs_no_blame(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, expected=[{"path": FOO_PATH, "start": 12, "end": 12}],
+             also_accept=[{"path": FOO_PATH, "start": 14, "end": 14}])
+    assert _vg(r, _vcorpus([c])) == []
+
+
+def test_validate_blame_ignores_also_accept(tmp_path):
+    r = _mk_repo(tmp_path)
+    c = _bug(r, expected=[{"path": FOO_PATH, "start": 14, "end": 14}],
+             also_accept=[{"path": FOO_PATH, "start": 12, "end": 12}])
+    errs = _vg(r, _vcorpus([c]))
+    assert len(errs) == 1 and "does not corroborate" in errs[0], errs
 
 
 def test_validate_fix_not_touching_range(tmp_path):
@@ -476,6 +620,23 @@ def test_run_canned_hit_and_miss(tmp_path):
     assert rc == 0
     assert _last(text).endswith("recall=1/2 false_alarms=1 clean_flagged=1/1 degraded=0")
     assert "case b1 bug HIT" in text and "case b2 bug MISS" in text
+
+
+def test_run_hit_via_also_accept(tmp_path):
+    r = _eval_repo(tmp_path)
+    canned = _canned_by_case()
+    corpus = _eval_corpus(r)
+    corpus["cases"][1]["also_accept"] = [{"path": FOO, "start": 48, "end": 48}]
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(canned[cid]))
+    assert rc == 0
+    assert "case b2 bug HIT" in text
+    assert _last(text).endswith("recall=2/2 false_alarms=1 clean_flagged=1/1 degraded=0")
+    corpus = _eval_corpus(r)
+    corpus["cases"][1]["also_accept"] = [{"path": FOO, "start": 56, "end": 56}]
+    rc, text = _run(r, corpus, lambda cid: _StubLlm(canned[cid]))
+    assert rc == 0
+    assert "case b2 bug MISS" in text
+    assert _last(text).endswith("recall=1/2 false_alarms=1 clean_flagged=1/1 degraded=0")
 
 
 def test_run_all_verifiers_reject_not_counted(tmp_path):

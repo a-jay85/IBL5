@@ -193,6 +193,7 @@ PIPELINE_HOLD=$(pr_pipeline_authored_hold \
 
 **(11) Unresolved review thread.** Any review thread that is still unresolved holds
 the merge: scored at any value, unscored (a human question, a bot note), or outdated.
+The one exception is a thread whose first comment begins with a trusted-author `<!-- label: nit -->` or `<!-- label: pre-existing -->` marker, written only by the posting helper; `pr_unresolved_findings_hold` skips it and logs the skip to stderr. An untrusted author, a marker below line 1, or any other label word holds as before.
 This is the live-state counterpart to condition (2): (2) only sees findings scored by
 *this* run, so a thread posted by an earlier post-plan run, by a standalone
 `/pr-review` / `/security-audit`, or by a human would otherwise sail through. Resolved

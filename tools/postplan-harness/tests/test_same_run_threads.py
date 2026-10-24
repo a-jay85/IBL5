@@ -12,6 +12,7 @@ from harness import reviewcache, same_run_threads
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
+from harness.labels import LABEL_NIT, LABEL_PREEXISTING, render_body
 from harness.same_run_threads import (
     MAX_SAME_RUN_ROUNDS,
     candidate_ids,
@@ -31,6 +32,9 @@ DECLINE = ('{"verdict":"DECLINE","reason":"guard already present",'
 
 
 def _thread(cid, *, path=PATH, body=BODY, login="a-jay85", typ="User"):
+    # GitHub shows the body the recorder rendered: label and score markers included.
+    body = render_body(Finding(source="code-review", agent="A", path=path, line=41, body=body,
+                               score=85), 1000)
     return {
         "id": f"PRRT_{cid}", "commentId": cid, "isResolved": False, "isOutdated": False,
         "path": path, "line": 41, "score": 85, "body": body, "agent": "A",
@@ -299,15 +303,20 @@ def test_prune_findings_drops_fixed_and_declined_keeps_skipped():
 
     fixed, declined, skipped = f("a.php", "fixed body"), f("b.php", "declined body"), \
         f("c.php", "skipped body")
-    scored = [{"path": x.path, "body_head": x.body[:160], "score": 85}
-              for x in (fixed, declined, skipped)]
+    nit, pre = f("d.php", "nit body"), f("e.php", "pre-existing body")
+    nit.label, pre.label = LABEL_NIT, LABEL_PREEXISTING
+    findings = [fixed, declined, skipped, nit, pre]
+    # review.py scored rows keep the raw body head.
+    scored = [{"path": x.path, "body_head": x.body[:160], "score": 85} for x in findings]
+    # Thread rows carry the posted body head, which render_body prefixes with the header.
+    outcomes = ("fixed", "declined", "skipped", "declined", "fixed")
     result = {"threads": [
-        {"commentId": 1, "outcome": "fixed", "path": "a.php", "body_head": "fixed body"},
-        {"commentId": 2, "outcome": "declined", "path": "b.php", "body_head": "declined body"},
-        {"commentId": 3, "outcome": "skipped", "path": "c.php", "body_head": "skipped body"},
+        {"commentId": i, "outcome": o, "path": x.path,
+         "body_head": render_body(x, 1000)[:160]}
+        for i, (x, o) in enumerate(zip(findings, outcomes), 1)
     ]}
     keys = same_run_threads.dispositioned_keys(result)
-    kept, kept_scored = prune_findings([fixed, declined, skipped], scored, keys)
+    kept, kept_scored = prune_findings(findings, scored, keys)
 
     assert kept == [skipped]
     assert [r["path"] for r in kept_scored] == ["c.php"]

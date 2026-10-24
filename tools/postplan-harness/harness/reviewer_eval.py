@@ -70,6 +70,12 @@ def file_only_count(findings: Sequence[Finding], expected: Sequence[ExpectedRang
     return sum(1 for f in findings if f.line <= 0 and normalize_path(f.path) in paths)
 
 
+def accepted_ranges(case: dict) -> list[ExpectedRange]:
+    """Ranges a finding may land near to score a hit: `expected` plus optional `also_accept`."""
+    return [ExpectedRange(e["path"], e["start"], e["end"])
+            for e in [*case["expected"], *case.get("also_accept", [])]]
+
+
 @dataclass(frozen=True)
 class Score:
     v: str
@@ -207,12 +213,18 @@ def surface_hash_ref(root: Path, ref: str) -> str:
     return surface_hash(lambda r: read_git_ref(root, ref, r))
 
 
+def _digest_case(c: dict) -> dict:
+    d = {"id": c["id"], "commit": c["commit"],
+         "expected": sorted([[e["path"], e["start"], e["end"]] for e in c["expected"]])}
+    if "also_accept" in c:
+        d["also_accept"] = sorted([[e["path"], e["start"], e["end"]] for e in c["also_accept"]])
+    return d
+
+
 def corpus_digest(corpus: dict) -> str:
     proj = {
         "bugs": sorted(
-            [{"id": c["id"], "commit": c["commit"],
-              "expected": sorted([[e["path"], e["start"], e["end"]] for e in c["expected"]])}
-             for c in corpus["cases"] if c["status"] == "confirmed"],
+            [_digest_case(c) for c in corpus["cases"] if c["status"] == "confirmed"],
             key=lambda d: d["id"]),
         "clean": sorted([{"id": c["id"], "commit": c["commit"]} for c in corpus["clean"]],
                         key=lambda d: d["id"]),
@@ -231,6 +243,7 @@ DEFAULT_CORPUS = "tools/postplan-harness/fixtures/reviewer-eval/corpus.json"
 _TOP_KEYS = {"schema_version", "window_days", "cases", "clean"}
 _BUG_KEYS = {"id", "kind", "status", "pr", "commit", "fix_pr", "fix_commit",
              "expected", "description"}
+_BUG_OPTIONAL_KEYS = frozenset({"also_accept"})
 _RANGE_KEYS = {"path", "start", "end"}
 _CLEAN_KEYS = {"id", "pr", "commit", "checked_through"}
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -254,20 +267,23 @@ def _is_pos_int(v: object) -> bool:
     return _is_int(v) and v >= 1  # type: ignore[operator]
 
 
-def _key_error(label: str, obj: dict, keys: set) -> Optional[str]:
-    if set(obj) == keys:
+def _key_error(label: str, obj: dict, keys: set,
+               optional: frozenset = frozenset()) -> Optional[str]:
+    present = set(obj)
+    missing = sorted(keys - present)
+    extra = sorted(present - keys - optional)
+    if not missing and not extra:
         return None
-    missing = sorted(keys - set(obj))
-    extra = sorted(set(obj) - keys)
     return f"{label}: bad keys (missing={missing}, unknown={extra})"
 
 
-def _check_expected(label: str, expected: object, errors: list[str]) -> None:
+def _check_expected(label: str, expected: object, errors: list[str],
+                    field: str = "expected") -> None:
     if not isinstance(expected, list) or not expected:
-        errors.append(f"{label}: expected must be a non-empty list")
+        errors.append(f"{label}: {field} must be a non-empty list")
         return
     for i, r in enumerate(expected):
-        rl = f"{label}: expected[{i}]"
+        rl = f"{label}: {field}[{i}]"
         if not isinstance(r, dict):
             errors.append(f"{rl} must be an object")
             continue
@@ -322,7 +338,7 @@ def validate_schema(corpus: dict) -> list[str]:
         if not isinstance(c, dict):
             errors.append(f"{label}: case must be an object")
             continue
-        ke = _key_error(label, c, _BUG_KEYS)
+        ke = _key_error(label, c, _BUG_KEYS, _BUG_OPTIONAL_KEYS)
         if ke:
             errors.append(ke)
             continue
@@ -338,6 +354,8 @@ def validate_schema(corpus: dict) -> list[str]:
             if not isinstance(c[k], str) or not _SHA_RE.match(c[k]):
                 errors.append(f"{label}: {k} must be 40 lowercase hex chars")
         _check_expected(label, c["expected"], errors)
+        if "also_accept" in c:
+            _check_expected(label, c["also_accept"], errors, field="also_accept")
         d = c["description"]
         if not isinstance(d, str) or not d or len(d) > 300:
             errors.append(f"{label}: description must be a non-empty str of at most 300 chars")
@@ -521,12 +539,13 @@ def validate_git(root: Path, corpus: dict, *, ref: str = "HEAD", now: float) -> 
         if commit == fix or not is_ancestor(root, commit, fix):
             errors.append(f"{cid}: fix_commit must be later than commit")
         added_cache: dict[str, set[int]] = {}
-        for r in c["expected"]:
-            if r["path"] not in added_cache:
-                added_cache[r["path"]] = diff_line_sets(root, commit, r["path"])[1]
-            if not set(range(r["start"], r["end"] + 1)) <= added_cache[r["path"]]:
-                errors.append(f"{cid}: expected range {r['path']}:{r['start']}-{r['end']} "
-                              f"is outside the lines added by commit")
+        for field in ("expected", "also_accept"):
+            for r in c.get(field, []):
+                if r["path"] not in added_cache:
+                    added_cache[r["path"]] = diff_line_sets(root, commit, r["path"])[1]
+                if not set(range(r["start"], r["end"] + 1)) <= added_cache[r["path"]]:
+                    errors.append(f"{cid}: {field} range {r['path']}:{r['start']}-{r['end']} "
+                                  f"is outside the lines added by commit")
         corroborated = False
         for path in sorted({r["path"] for r in c["expected"]}):
             removed, _ = diff_line_sets(root, fix, path)
@@ -617,6 +636,8 @@ def case_input(root: Path, commit: str) -> tuple[dict, Classification]:
     return meta, cls
 
 
+# The cache key covers what review_case reads. Accepted ranges (`also_accept`) only
+# affect scoring after the fact, so editing them must reuse cached findings.
 def case_digest(case: dict, kind: str) -> str:
     blob = json.dumps({"kind": kind, "commit": case["commit"],
                        "expected": case.get("expected", [])}, sort_keys=True)
@@ -736,8 +757,9 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
     flaky = 0
     for case, kind in selected:
         cid = case["id"]
-        expected = ([ExpectedRange(e["path"], e["start"], e["end"]) for e in case["expected"]]
-                    if kind == "bug" else [])
+        expected: list[ExpectedRange] = []
+        if kind == "bug":
+            expected = accepted_ranges(case)
         per_run: list[list[Finding]] = []
         run_hits: list[bool] = []
         degraded: list[str] = []

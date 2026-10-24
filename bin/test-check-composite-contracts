@@ -638,7 +638,7 @@ agg_edit "$d_wf/all-checks-settled.yml" "s/--context='All checks settled'/--cont
 run_agg_mut "A2 rejects a drifted --context literal" "(A2)" "$d_wf"
 
 d_wf="$(agg_copy)"
-agg_edit "$d_wf/all-checks-settled.yml" 's/--ignore-workflows=/--wait --ignore-workflows=/'
+agg_edit "$d_wf/all-checks-settled.yml" 's/--self=/--wait --self=/'
 run_agg_mut "A3 rejects a --wait token" "(A3)" "$d_wf"
 
 d_wf="$(agg_copy)"
@@ -655,8 +655,8 @@ agg_edit "$d_wf/all-checks-settled.yml" 's/^  contents: read$/  contents: write/
 run_agg_mut "A4 rejects contents write" "(A4)" "$d_wf"
 
 d_wf="$(agg_copy)"
-agg_edit "$d_wf/all-checks-settled.yml" "s/,All checks green' \\\\\$/' \\\\/m"
-run_agg_mut "A5 rejects a missing All checks green ignore while the legacy file exists" "(A5)" "$d_wf"
+printf 'name: All checks green\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/all-checks-green.yml"
+run_agg_mut "A5 rejects a missing All checks green ignore while a legacy file exists" "(A5)" "$d_wf"
 
 d_wf="$(agg_copy)"
 printf 'name: Unlisted PR Gate\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/unlisted-pr-gate.yml"
@@ -674,10 +674,9 @@ d_wf="$(agg_copy)"
 agg_edit "$d_wf/all-checks-settled.yml" 's/^      - VR Refresh$/      - VR Refresh\n      - Phantom Workflow/m'
 run_agg_mut "A6 rejects a listed name without a PR trigger" "(A6)" "$d_wf"
 
-# A5 flips once the legacy waiter is retired: the shim must go with it.
+# A5 other direction: the legacy waiter is retired, so a leftover ignore token must fail.
 d_wf="$(agg_copy)"
-rm "$d_wf/all-checks-green.yml"
-agg_edit "$d_wf/all-checks-settled.yml" 's/^      - All checks green\n//m'
+agg_edit "$d_wf/all-checks-settled.yml" "s/,Notify Mutation Failure'/,Notify Mutation Failure,All checks green'/"
 run_agg_mut "A5 rejects a leftover All checks green ignore after the legacy file is gone" "(A5)" "$d_wf"
 
 # A7: the schedule-only stale-pending sweep workflow.

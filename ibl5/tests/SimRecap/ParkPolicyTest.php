@@ -81,7 +81,7 @@ final class ParkPolicyTest extends TestCase
         self::assertSame(['flaky', 'usage_limit', 'auth', 'transport', 'prompt'], $strings(ParkPolicy::CAUSES));
         self::assertSame(['mac', 'actions'], $strings(ParkPolicy::HOSTS));
         self::assertSame(
-            ['retrying', 'waiting', 'handed_mac', 'handed_actions', 'posted', 'recovered', 'unavailable'],
+            ['retrying', 'waiting', 'handed_mac', 'handed_actions', 'posted', 'recovered', 'unavailable', 'started'],
             $strings(ParkPolicy::NOTIFY_STATES),
         );
     }
@@ -625,6 +625,7 @@ final class ParkPolicyTest extends TestCase
             'done after handed_mac recovers' => ['done', 'mac', 'handed_mac', 'recovered'],
             'done after handed_actions recovers' => ['done', 'mac', 'handed_actions', 'recovered'],
             'done after unavailable recovers' => ['done', 'mac', 'unavailable', 'recovered'],
+            'done after started is posted' => ['done', 'mac', 'started', 'posted'],
         ];
     }
 

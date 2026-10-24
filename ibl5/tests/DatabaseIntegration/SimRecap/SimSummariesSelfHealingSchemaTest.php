@@ -26,7 +26,7 @@ final class SimSummariesSelfHealingSchemaTest extends DatabaseTestCase
             'transport_failures' => ['tinyint(3) unsigned', '0'],
             'usage_waits' => ['tinyint(3) unsigned', '0'],
             'auth_failed_hosts' => ["set('mac','actions')", "''"],
-            'notified_state' => ["enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable')", 'NULL'],
+            'notified_state' => ["enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable','started')", 'NULL'],
         ];
 
         $result = $this->db->query(
@@ -45,6 +45,22 @@ final class SimSummariesSelfHealingSchemaTest extends DatabaseTestCase
             self::assertArrayHasKey($column, $actual, "Column {$column} must exist");
             self::assertSame($shape, $actual[$column], "Column {$column} type/default");
         }
+    }
+
+    public function testNotifiedStateCommentSurvivesStartedMigration(): void
+    {
+        $result = $this->db->query(
+            "SELECT `COLUMN_COMMENT` AS `comment` FROM information_schema.COLUMNS"
+            . " WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = 'ibl_sim_summaries'"
+            . " AND `COLUMN_NAME` = 'notified_state'"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertSame(
+            'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
+            $row['comment']
+        );
     }
 
     public function testLegacyPendingRowReadsDefaultRoute(): void

@@ -26,6 +26,12 @@ final class AdminChatStatus
         'prompt' => "couldn't build the prompt",
     ];
 
+    /** The start line names the runner, so GitHub reads as "GitHub Actions" there. */
+    private const STARTED_HOST_WORDS = [
+        'actions' => 'GitHub Actions',
+        'mac' => 'the Mac',
+    ];
+
     private const FIX_WORDS = [
         'prompt' => 'The recap prompt or exemplar file is broken and needs a developer.',
         'auth' => 'Claude login failed on both GitHub and the Mac. Renew CLAUDE_CODE_OAUTH_TOKEN.',
@@ -45,6 +51,7 @@ final class AdminChatStatus
         $link = $viewerUrl === '' ? '' : " Review them: {$viewerUrl}";
 
         return match ($state) {
+            'started' => "Sim {$sim} recap started on " . self::STARTED_HOST_WORDS[$host] . '.',
             'posted' => "Sim {$sim} recaps are posted.{$link}",
             'recovered' => "Sim {$sim} recaps are posted. The earlier problem ({$causeWords}) was worked around.{$link}",
             'retrying' => "Sim {$sim} recap hit a glitch on " . self::HOST_WORDS[$host] . '. '

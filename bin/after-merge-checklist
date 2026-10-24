@@ -1,56 +1,46 @@
 #!/usr/bin/env bash
-# Usage: bin/after-merge-checklist --pr-number N --pr-url URL --title TITLE --pr-body-file FILE [--comment-out FILE] [--dm-out FILE] [--dry-run]
+# Usage: bin/after-merge-checklist --pr-number N --pr-url URL --pr-body-file FILE [--comment-out FILE] [--dry-run]
 #   Reads the `## After merge` section of a merged PR's body and, when it carries
-#   `- **Row N** — text` bullets, posts them as ONE checkbox comment on the PR and writes
-#   a Discord-sized DM. The section ends at `<!-- after-merge:end -->`, the next `## `
-#   heading, or EOF; only lines matching `^- (\[ \] )?\*\*Row` are forwarded.
-#   --comment-out defaults to /tmp/after-merge-comment.md, --dm-out to /tmp/discord-msg.txt.
-#   Prints one `status=<value>` line on stdout, and appends the same line to the file
-#   named by $GITHUB_OUTPUT when that variable is set and non-empty:
-#     posted    the comment was posted; both files are written
-#     skipped   the PR already carries an after-merge-checklist comment (redelivered
-#               event); the DM file is removed, nothing is posted
-#     absent    no `## After merge` rows; nothing is written or posted
-#     dry-run   both files are written, no gh call is made
-#   An unknown flag, a missing required flag, or an unreadable body file exits 2 with a
-#   message on stderr. A failing gh call exits 1.
+#   `- **Row N** [<tag>] — text` bullets, posts them as ONE comment on the PR. The tag is
+#   `manual`, `auto:ci <name>` or `auto:mac <name>`; an untagged row is manual. The row
+#   grammar lives in bin/lib/post-merge-rows.sh. The section ends at
+#   `<!-- after-merge:end -->`, the next `## ` heading, or EOF.
+#   Manual rows get a checkbox. Auto rows say they run automatically, but only when
+#   their executor is on this checkout (pmr_executor_ready). An auto row with no
+#   executor yet is a manual row: it gets a checkbox and counts in manual_count.
+#   --comment-out defaults to /tmp/after-merge-comment.md.
+#   Prints `key=value` lines on stdout, and appends the same lines to the file named by
+#   $GITHUB_OUTPUT when that variable is set and non-empty. Keys:
+#     manual_count    rows a person must do, including rows with an unrecognised tag
+#                     and auto rows whose executor is not on this checkout yet
+#     auto_ci_count   rows tagged auto:ci that post-merge-ci-run (unit 2) will run
+#     auto_mac_count  rows tagged auto:mac that post-merge-run (unit 3) will run
+#     comment_url     the checklist comment URL, or the PR URL when none can be read,
+#                     or empty when there are no rows
+#     status          always the last key printed:
+#       posted    the comment was posted
+#       skipped   the PR already carries an after-merge-checklist comment (redelivered
+#                 event); its URL is reported, nothing is posted
+#       absent    no `## After merge` rows; nothing is written or posted
+#       dry-run   the comment file is written, no gh call is made
+#   The counts are printed before any gh call, so a failing gh call still leaves them in
+#   $GITHUB_OUTPUT. An unknown flag, a missing required flag, or an unreadable body file
+#   exits 2 with a message on stderr. A failing gh call exits 1.
 #
-# Consumed by .github/workflows/merge-digest-notify.yml. Contract and rationale: the
-# post-merge-rows plan and its ADR. The flag parser, UTF-8 locale pick and character-wise
-# truncation are copied from bin/digest-dm-build.
+# Consumed by .github/workflows/merge-digest-notify.yml. Contract and rationale: ADR-0198
+# and ADR-0208. This script sends no Discord message; bin/digest-dm-build builds the
+# digest from the keys above.
 
 set -euo pipefail
+# shellcheck source=bin/lib/post-merge-rows.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/post-merge-rows.sh"
 
 MARKER='<!-- after-merge-checklist -->'
-END_ANCHOR='<!-- after-merge:end -->'
-TITLE_MAX=80
-ROW_DM_MAX=200
-DM_BODY_MAX=1800   # stop adding rows past this; .github/actions/notify-discord truncates at 1900
-DM_HARD_MAX=1900
-
-# Character-wise truncation needs a UTF-8 locale; the name differs by platform. See the
-# note above _pick_utf8_locale in bin/digest-dm-build. A herestring, not a pipe, so an
-# early `return` cannot take SIGPIPE under pipefail (.claude/rules/shell-pipefail-grep.md).
-_pick_utf8_locale() {
-    local _l
-    while IFS= read -r _l; do
-        case "$_l" in
-            C.UTF-8|C.utf8|en_US.UTF-8|en_US.utf8) printf '%s' "$_l"; return 0 ;;
-        esac
-    done <<< "$(locale -a 2>/dev/null || true)"
-    return 1
-}
-_LOC="$(_pick_utf8_locale || true)"
-if [ -n "$_LOC" ]; then
-    export LC_ALL="$_LOC"
-fi
 
 PR_NUMBER=""
 PR_URL=""
-TITLE=""
 PR_BODY_FILE=""
 COMMENT_OUT="/tmp/after-merge-comment.md"
-DM_OUT="/tmp/discord-msg.txt"
 DRY_RUN=0
 
 _need_value() {
@@ -63,10 +53,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --pr-number)    _need_value "$1" $#; PR_NUMBER="$2";    shift 2 ;;
         --pr-url)       _need_value "$1" $#; PR_URL="$2";       shift 2 ;;
-        --title)        _need_value "$1" $#; TITLE="$2";        shift 2 ;;
         --pr-body-file) _need_value "$1" $#; PR_BODY_FILE="$2"; shift 2 ;;
         --comment-out)  _need_value "$1" $#; COMMENT_OUT="$2";  shift 2 ;;
-        --dm-out)       _need_value "$1" $#; DM_OUT="$2";       shift 2 ;;
         --dry-run)      DRY_RUN=1; shift ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -76,8 +64,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if [ -z "$PR_NUMBER" ] || [ -z "$PR_URL" ] || [ -z "$TITLE" ] || [ -z "$PR_BODY_FILE" ]; then
-    printf 'after-merge-checklist: --pr-number, --pr-url, --title and --pr-body-file are all required\n' >&2
+if [ -z "$PR_NUMBER" ] || [ -z "$PR_URL" ] || [ -z "$PR_BODY_FILE" ]; then
+    printf 'after-merge-checklist: --pr-number, --pr-url and --pr-body-file are all required\n' >&2
     exit 2
 fi
 case "$PR_NUMBER" in
@@ -90,105 +78,123 @@ if [ ! -r "$PR_BODY_FILE" ] || [ -d "$PR_BODY_FILE" ]; then
     exit 2
 fi
 
-# _emit_status VALUE -- stdout always; $GITHUB_OUTPUT too when set and non-empty.
-_emit_status() {
-    printf 'status=%s\n' "$1"
+# _emit KEY VALUE -- stdout always; $GITHUB_OUTPUT too when set and non-empty.
+_emit() {
+    printf '%s=%s\n' "$1" "$2"
     if [ -n "${GITHUB_OUTPUT:-}" ]; then
-        printf 'status=%s\n' "$1" >> "$GITHUB_OUTPUT"
+        printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
     fi
 }
 
-# _trunc MAX VALUE -- character-wise; U+2026 replaces the last kept character on a cut.
-_trunc() {
-    local _m="$1" _v="$2"
-    if [ "${#_v}" -le "$_m" ]; then
-        printf '%s' "$_v"
-        return 0
-    fi
-    printf '%s…' "${_v:0:$((_m - 1))}"
+# _is_url VALUE -- 0 iff VALUE is a single https URL with no whitespace.
+_is_url() {
+    local _re='^https://[^[:space:]]+$'
+    [[ "$1" =~ $_re ]]
 }
 
-# Section: from `## After merge` to the next `## ` heading, then cut at the end anchor.
-# Each stage is a variable assignment fed by a herestring, so no producer can take SIGPIPE.
-SECTION="$(sed -n '/^## After merge/,/^## /p' "$PR_BODY_FILE")"
-SECTION="$(awk -v a="$END_ANCHOR" 'index($0, a) { exit } { print }' <<< "$SECTION")"
-ROWS_RAW="$(grep -E '^- (\[ \] )?\*\*Row' <<< "$SECTION" || true)"
+ROWS_RAW="$(pmr_rows "$PR_BODY_FILE")"
 
 if [ -z "$ROWS_RAW" ]; then
-    _emit_status absent
+    _emit manual_count 0
+    _emit auto_ci_count 0
+    _emit auto_mac_count 0
+    _emit comment_url ''
+    _emit status absent
     exit 0
 fi
 
 # A zero-width space after each `@`: the text renders but never notifies anyone.
 ZWSP="$(printf '\342\200\213')"
 
-ROWS=()
+MANUAL=0
+AUTO_CI=0
+AUTO_MAC=0
+LINES=()
 while IFS= read -r line; do
     line="${line%$'\r'}"
     line="${line//@/@$ZWSP}"
-    row="${line#- }"
-    row="${row#\[ \] }"
-    ROWS+=("$row")
+    pmr_parse_row "$line"
+    case "$PMR_KIND" in
+        manual)
+            MANUAL=$((MANUAL + 1))
+            if [ "$PMR_VALID" = 1 ]; then
+                LINES+=("- [ ] $PMR_LABEL $PMR_TEXT")
+            else
+                LINES+=("- [ ] $PMR_LABEL $PMR_TEXT _(unrecognised tag, treated as a manual step)_")
+            fi ;;
+        auto:ci|auto:mac)
+            # An auto row counts as automatic only once its executor is on this checkout.
+            # Until then nothing runs it, so it is a manual step and the digest pings.
+            if ! pmr_executor_ready "$PMR_KIND"; then
+                MANUAL=$((MANUAL + 1))
+                LINES+=("- [ ] $PMR_LABEL $PMR_TEXT _(tagged \`$PMR_KIND $PMR_NAME\`, but nothing runs $PMR_KIND rows yet, so a person must do it)_")
+            elif [ "$PMR_KIND" = auto:ci ]; then
+                AUTO_CI=$((AUTO_CI + 1))
+                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically in CI: \`$PMR_NAME\`)_")
+            else
+                AUTO_MAC=$((AUTO_MAC + 1))
+                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically on the owner's Mac: \`$PMR_NAME\`; a failure pings in #dev)_")
+            fi ;;
+    esac
 done <<< "$ROWS_RAW"
 
+# Counts go out before any gh call, so a gh failure still leaves them in $GITHUB_OUTPUT.
+_emit manual_count "$MANUAL"
+_emit auto_ci_count "$AUTO_CI"
+_emit auto_mac_count "$AUTO_MAC"
+
 PR_NUMBER_REF="#$PR_NUMBER"
-TITLE_SAFE="${TITLE//@/@$ZWSP}"
 
 # Comment file.
 {
     printf '%s\n' "$MARKER"
     printf '## After merge checklist for %s\n\n' "$PR_NUMBER_REF"
-    printf 'These steps need a person after the merge of %s.\n\n' "$PR_NUMBER_REF"
-    for row in "${ROWS[@]}"; do
-        printf -- '- [ ] %s\n' "$row"
+    if [ "$MANUAL" -gt 0 ]; then
+        printf 'These steps need a person after the merge of %s.\n\n' "$PR_NUMBER_REF"
+    else
+        printf 'Every step below runs automatically. Nothing needs a person.\n\n'
+    fi
+    for line in "${LINES[@]}"; do
+        printf '%s\n' "$line"
     done
-    printf '\nTick each box as you complete it.\n'
+    if [ "$MANUAL" -gt 0 ]; then
+        printf '\nTick each box as you complete it.\n'
+    fi
 } > "$COMMENT_OUT"
 
-# DM file. Rows stop being added once the body would pass DM_BODY_MAX characters.
-DM="After merge: $PR_NUMBER_REF $(_trunc "$TITLE_MAX" "$TITLE_SAFE")"$'\n'"$PR_URL"
-TOTAL="${#ROWS[@]}"
-ADDED=0
-for row in "${ROWS[@]}"; do
-    plain="${row//\*\*/}"
-    dm_line="• $(_trunc "$ROW_DM_MAX" "$plain")"
-    if [ $(( ${#DM} + 1 + ${#dm_line} )) -gt "$DM_BODY_MAX" ]; then
-        break
-    fi
-    DM="$DM"$'\n'"$dm_line"
-    ADDED=$((ADDED + 1))
-done
-if [ "$ADDED" -lt "$TOTAL" ]; then
-    DM="$DM"$'\n'"…(+$((TOTAL - ADDED)) more rows in the PR comment)"
-fi
-# Backstop for an absurdly long URL: never above what notify-discord would cut anyway.
-DM="$(_trunc "$DM_HARD_MAX" "$DM")"
-printf '%s\n' "$DM" > "$DM_OUT"
-
 if [ "$DRY_RUN" = 1 ]; then
-    _emit_status dry-run
+    _emit comment_url ''
+    _emit status dry-run
     exit 0
 fi
 
-# Idempotency: a redelivered merge event must not post twice.
-if ! EXISTING="$(gh pr view "$PR_NUMBER" --json comments \
-        --jq '[.comments[].body | select(contains("<!-- after-merge-checklist -->"))] | length')"; then
+# Idempotency: a redelivered merge event must not post twice. The query returns the URL of
+# the last marker comment ("-" when that comment carries no url), or an empty string when
+# there is no marker comment.
+if ! EXISTING_URL="$(gh pr view "$PR_NUMBER" --json comments \
+        --jq '[.comments[] | select(.body | contains("<!-- after-merge-checklist -->"))] | if length == 0 then "" else (last | .url // "-") end')"; then
     printf 'after-merge-checklist: gh pr view failed for #%s\n' "$PR_NUMBER" >&2
     exit 1
 fi
-case "$EXISTING" in
-    ''|*[!0-9]*)
-        printf 'after-merge-checklist: unexpected gh pr view output: %s\n' "$EXISTING" >&2
-        exit 1 ;;
-esac
-if [ "$EXISTING" -gt 0 ]; then
-    rm -f "$DM_OUT"
-    _emit_status skipped
+if [ -n "$EXISTING_URL" ]; then
+    if _is_url "$EXISTING_URL"; then
+        _emit comment_url "$EXISTING_URL"
+    else
+        _emit comment_url "$PR_URL"
+    fi
+    _emit status skipped
     exit 0
 fi
 
-if ! gh pr comment "$PR_NUMBER" --body-file "$COMMENT_OUT"; then
+if ! POSTED="$(gh pr comment "$PR_NUMBER" --body-file "$COMMENT_OUT")"; then
     printf 'after-merge-checklist: gh pr comment failed for #%s\n' "$PR_NUMBER" >&2
     exit 1
 fi
-_emit_status posted
+# gh prints the new comment URL; take the last https line, else fall back to the PR URL.
+URL_LINES="$(grep -E '^https://[^[:space:]]+$' <<< "$POSTED" || true)"
+COMMENT_URL="${URL_LINES##*$'\n'}"
+if [ -z "$COMMENT_URL" ]; then
+    COMMENT_URL="$PR_URL"
+fi
+_emit comment_url "$COMMENT_URL"
+_emit status posted

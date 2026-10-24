@@ -1,7 +1,7 @@
 name: Deploy VR gallery to Pages
 
 # Fired by `gh workflow run` from the jobs that actually push to gh-pages (e2e-tests.yml:
-# the `e2e` job after a successful gallery push, and `vr-pages-cleanup` after a prune push),
+# the `e2e` job after a successful gallery push, and `vr-pages-cleanup` after a prune, blob GC, or migration push),
 # so a deploy happens once per real gh-pages content change instead of once per E2E run.
 # `workflow_dispatch` is deliberately UNGUARDED: it doubles as the manual recovery path when
 # the site is left half-published.
@@ -31,11 +31,42 @@ jobs:
         with:
           ref: gh-pages
           fetch-depth: 0
+          path: pages
+
+      # master's bin/ lands BESIDE pages/, never inside it, so no script ships in the
+      # Pages artifact (the upload below takes path: pages only).
+      - name: Checkout bin/ from master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /bin/
+          path: master-scripts
+
+      # Fail before uploading a tree with a gallery image ref that resolves to no file
+      # (for example a _vr-blobs/ blob GC'd under a racing publish). Recovery: let the
+      # next cleanup or publish push land, or republish the PR's gallery with
+      # `gh workflow run vr-refresh.yml -f pr=<N>`, which re-adds every blob it uses.
+      - name: Check gallery image references
+        run: master-scripts/bin/check-vr-gallery-refs --root pages
+
+      # Shadow-mode telemetry: report only. upload-pages-artifact tars the tree minus
+      # .git and .github, so measure the same set.
+      - name: Measure Pages artifact size
+        id: size
+        run: |
+          bytes=$(du -sb --exclude=.git --exclude=.github pages | cut -f1)
+          echo "bytes=${bytes}" >> "$GITHUB_OUTPUT"
+          echo "Pages tree: ${bytes} bytes"
+          if [ "$bytes" -gt 1073741824 ]; then
+            echo "::warning::Pages tree is ${bytes} bytes, over 1 GiB."
+          fi
 
       - name: Upload the whole gh-pages tree as the Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: .
+          path: pages
 
       - name: Deploy to GitHub Pages
         id: deployment
@@ -43,6 +74,9 @@ jobs:
 
       - name: Assert a per-SHA gallery serves HTTP 200
         shell: bash
+        working-directory: pages
+        env:
+          ARTIFACT_BYTES: ${{ steps.size.outputs.bytes }}
         run: |
           set -euo pipefail
           base="${{ steps.deployment.outputs.page_url }}"
@@ -69,8 +103,12 @@ jobs:
           for i in $(seq 1 20); do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
             echo "attempt ${i}: HTTP ${code}"
-            [ "$code" = "200" ] && exit 0
+            if [ "$code" = "200" ]; then
+              printf '| artifact_bytes | attempts_to_200 |\n|---|---|\n| %s | %s |\n' "${ARTIFACT_BYTES:-unknown}" "$i" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             [ "$i" -lt 20 ] && sleep 30
           done
+          printf '| artifact_bytes | attempts_to_200 |\n|---|---|\n| %s | none in 20 |\n' "${ARTIFACT_BYTES:-unknown}" >> "$GITHUB_STEP_SUMMARY"
           echo "::error::VR gallery did not serve HTTP 200 at ${url} after retries"
           exit 1

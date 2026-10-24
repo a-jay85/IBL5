@@ -1538,6 +1538,15 @@ class LiveGit:
                                   reason=str(exc))
             raise HarnessError("rebase-conflict", str(exc))
 
+        # A marker that survived the reconcile above describes content this run's own collapse
+        # and replay just rewrote. Its recorded SHA is gone from history now, so the next
+        # run would drop the hold with no CONFLICT-REVIEW=CLEAN verdict. Re-bind it to the
+        # new HEAD. (_record_resolution already did so when a model resolved files.)
+        if not auto_resolved_files and self.last_conflict_flag_note.startswith(
+                ("conflict flag carried", "conflict flag kept")):
+            from ..armable import record_conflict_resolution
+            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+
         return StackedRebaseResult(
             resolved=True,
             reason="",

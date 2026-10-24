@@ -60,6 +60,23 @@ AUTOMATIC_ZERO_NOTE = (
     "Pre-existing note instead of being dropped."
 )
 
+# Every finding this reviewer posts holds auto-merge as Important, so the bar is a concrete
+# failure, not a quality opinion. Agents apply it before emitting; verifiers apply it as a
+# rejection rule even when the claim is true.
+REPORTABLE_BAR = (
+    "REPORTABLE BAR: report a finding ONLY when you can name (1) a concrete input, request, "
+    "row or call sequence that is possible today, (2) the changed or cited lines it runs "
+    "through, and (3) the wrong result it causes in shipped code: a crash, a wrong value "
+    "shown or stored, lost data, or an exploitable hole. If you cannot name all three, do "
+    "not report it. An unguarded state that can happen today DOES meet the bar: a missing "
+    "row or array key, a null, a collaborator or logger that can throw, a failing call, or "
+    "request input with no bound. These never meet the bar on their own: stale line numbers or wording in "
+    "docs and comments; test strength (a test that is weak, cannot fail, or assumes an "
+    "unset environment value); naming, injectability, duplication or layering opinions; a "
+    "hypothetical future caller, future enum value or future edit that would misuse the "
+    "code when no current caller does; PR scope or title/description mismatch."
+)
+
 OUTPUT_CONTRACT_EXAMPLE = (
     '[{"path": "ibl5/classes/TeamRepository.php", "line": 88, '
     '"body": "fetchAll() on ibl_box_scores is unbounded and this table grows every sim; '
@@ -73,7 +90,8 @@ _CONTRACT_BODY = (
     '[{"path": "repo/relative/file.php", "line": 123, "body": "what and why"}]. '
     'Every finding carries the three required lowercase keys "path", "line", "body", '
     "plus four OPTIONAL lowercase keys and nothing else: "
-    '"severity" ("important" or "nit"; a nit is a real but low-impact issue), '
+    '"severity" ("important" or "nit"; a nit is a real but low-impact issue; a finding '
+    "below this prompt's REPORTABLE BAR is not a nit, leave it out), "
     '"preexisting" (JSON true only when the defect existed before this PR and the '
     'anchor line is unchanged context), '
     '"bug_class" (a short kebab-case name for the defect class, e.g. unbounded-fetch, '
@@ -85,8 +103,14 @@ _CONTRACT_BODY = (
     "Give bug_class and other_instances for every finding so one round fixes all copies. "
     "Do NOT wrap the array in an object and do NOT group findings under per-topic keys; "
     "one flat array covers the whole review. "
-    "line is a single anchor line on the new-file side of the diff; use 0 when the "
-    "finding is about the file as a whole and has no single anchor line. "
+    "line is a single anchor line on the new-file side of the diff: the statement a fix "
+    "would change, meaning where the missing check belongs or where the bad value is made, "
+    "not where the damage shows up later; list those later use sites in other_instances. "
+    "For example, an unbounded or unchecked input anchors on the line that reads it or on "
+    "the existing check that should reject it, not on the loop or query that later uses it. "
+    "Count the line from the hunk's @@ +start header, adding one per context or + line, "
+    "and quote that exact statement in body. "
+    "Use 0 only when no single statement is at fault. "
     "Return [] if no issues survive scrutiny. No prose outside the JSON, no markdown "
     "headings, no explanation before or after.\n"
     "A complete valid reply with one finding looks exactly like this:\n"
@@ -124,7 +148,7 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
         OUTPUT_CONTRACT_HEAD
         + "You are a Senior PHP Architect and Staff Engineer reviewing a PR for "
         "architectural fitness, correctness bugs, and database performance.\n\n"
-        + AUTOMATIC_ZERO_NOTE + "\n\n" + "\n\n".join(sections) + reuse
+        + AUTOMATIC_ZERO_NOTE + "\n\n" + REPORTABLE_BAR + "\n\n" + "\n\n".join(sections) + reuse
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + f"Files changed:\n" + "\n".join(cls.files)
         + "\n\nDIFF:\n" + cls.filtered_diff + OUTPUT_CONTRACT
@@ -147,7 +171,8 @@ def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comme
     return (
         OUTPUT_CONTRACT_HEAD
         + "You are a Senior Software Engineer reviewing regression risk and in-code "
-        "guidance compliance.\n\n" + AUTOMATIC_ZERO_NOTE + "\n\n" + "\n\n".join(parts)
+        "guidance compliance.\n\n" + AUTOMATIC_ZERO_NOTE + "\n\n" + REPORTABLE_BAR + "\n\n"
+        + "\n\n".join(parts)
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + "\n\nDIFF:\n" + cls.filtered_diff + OUTPUT_CONTRACT
     )
@@ -170,6 +195,8 @@ def agent_d_prompt(meta: dict, cls: Classification) -> str:
         "test block (prod overlap present: " + str(cls.has_e2e_prod_overlap) + ").\n"
         "Smoke tests (tests/e2e/smoke/) legitimately assert page-load via generic "
         "selectors — exempt. Error-path tests intentionally verify absence of effect — exempt.\n"
+        "Each finding must name which of the three patterns it is. Any other test-strength "
+        "concern (a test that cannot fail for another reason, a weak fixture) is out of scope.\n"
         + f"\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + "\nSPEC DIFF:\n" + spec_diff + "\n\nPRODUCTION DIFF (overlapping modules):\n"
         + (prod_diff or "(none)") + OUTPUT_CONTRACT
@@ -213,7 +240,8 @@ def security_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
         "generateToken(). GET-only reads and ApiKeyAuthenticator endpoints are exempt.\n"
         "Auth/Authz: flag state-changing endpoints without is_user()/isAuthenticated(); "
         "admin operations without is_admin(); open redirects from user input; missing "
-        "session_regenerate_id() after auth changes. Read-only public pages are exempt."
+        "session_regenerate_id() after auth changes. Read-only public pages are exempt.\n\n"
+        + REPORTABLE_BAR
         + plan_block
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + "\nPHP DIFF (filtered):\n" + cls.filtered_diff + OUTPUT_CONTRACT
@@ -267,9 +295,16 @@ def verifier_prompt(chunk: list[Finding], hunks: dict[str, str]) -> str:
         "to judge the claim, compare with the diff hunk, and vote.\n"
         "Vote not-real ONLY when you verified in the code that the claim is wrong, already "
         "mitigated, or matches a rejection rule below. "
+        "Vote not-real even when the claim is TRUE if it fails the reportable bar below: "
+        "the finding must name a concrete input or state, possible today, that drives the "
+        "cited code to a crash, wrong shown or stored value, lost data, or exploitable hole. "
+        "A review-agent-d finding is exempt from the bar only when it names one of its three "
+        "E2E anti-patterns (same-page-success-only, generic-fallback assertion, new UI branch "
+        "without a spec). "
         "When you cannot open the file, cannot find the line, or cannot decide, vote real: "
         "the pipeline keeps a finding unless every verifier rejects it.\n\n"
-        "REJECTION RULES:\n" + AUTOMATIC_ZERO_NOTE + "\n" + VERIFIER_FALSE_POSITIVES + "\n\n"
+        "REJECTION RULES:\n" + AUTOMATIC_ZERO_NOTE + "\n" + VERIFIER_FALSE_POSITIVES + "\n"
+        + REPORTABLE_BAR + "\n\n"
         "FINDINGS:\n" + numbered + "\n\nDIFF HUNKS FOR THE CITED FILES:\n" + diff_text
         + "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _VERDICT_CONTRACT
     )

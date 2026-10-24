@@ -137,6 +137,32 @@ class TradingRepositoryTest extends DatabaseTestCase
         self::assertSame($offerId, $trades[0]['tradeofferid']);
     }
 
+    public function testGetTradesByOfferIdForUpdateExcludesCompletedRows(): void
+    {
+        $offerId = $this->insertTradeOfferRow();
+        $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks');
+        $this->offerRepo->markTradeInfoCompleted($offerId);
+
+        self::assertSame([], $this->offerRepo->getTradesByOfferIdForUpdate($offerId));
+
+        $all = $this->offerRepo->getTradesByOfferId($offerId);
+        self::assertCount(1, $all);
+        self::assertSame('completed', $all[0]['approval']);
+    }
+
+    public function testGetTradesByOfferIdForUpdateKeepsPendingRowsOfMixedOffer(): void
+    {
+        $offerId = $this->insertTradeOfferRow();
+        $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks', 'completed');
+        $this->insertTradeInfoRow($offerId, 2, '1', 'Sharks', 'Metros');
+
+        $locked = $this->offerRepo->getTradesByOfferIdForUpdate($offerId);
+
+        self::assertCount(1, $locked);
+        self::assertSame(2, $locked[0]['itemid']);
+        self::assertCount(2, $this->offerRepo->getTradesByOfferId($offerId));
+    }
+
     // ── Mark completed / delete info ────────────────────────────
 
     public function testMarkTradeInfoCompletedSetsApproval(): void

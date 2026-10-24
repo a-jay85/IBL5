@@ -138,7 +138,20 @@ if [ "\$1 \$2 \$3" = "pr view 77" ]; then
     case "\$*" in
         *headRefName*) printf '%s\n' "$B_HR"; exit 0 ;;
         *title,labels*)
-            if [ -e "$TMP/claude.args" ] && [ -f "$TMP/gh.snap.after" ]; then cat "$TMP/gh.snap.after"; else cat "$TMP/gh.snap.before"; fi
+            s="$TMP/gh.snap.before"
+            if [ -e "$TMP/claude.args" ] && { [ -f "$TMP/gh.snap.after" ] || [ -f "$TMP/gh.snap.after.json" ]; }; then s="$TMP/gh.snap.after"; fi
+            # A .json fixture goes through the launcher's real --json field list and --jq
+            # expression, so a field the launcher never asks for reads as null on both sides.
+            if [ -f "\$s.json" ]; then
+                fields="" expr=""
+                while [ \$# -gt 0 ]; do
+                    case "\$1" in --json) fields="\$2"; shift ;; --jq) expr="\$2"; shift ;; esac
+                    shift
+                done
+                jq --arg f "\$fields" '. as \$o | reduce (\$f | split(","))[] as \$k ({}; .[\$k] = \$o[\$k])' "\$s.json" | jq -r "\$expr"
+            else
+                cat "\$s"
+            fi
             exit 0 ;;
         # gh.paged: the first page of a long thread, which never holds the newest comment.
         *comments*) if [ -e "$TMP/gh.paged" ]; then echo "an old comment"; else cat "$TMP/gh.lastcomment" 2>/dev/null; fi; exit 0 ;;
@@ -634,7 +647,7 @@ hr_reset() {
     rm -rf "$HR_STATE"; mkdir -p "$HR_STATE"
     hr_seed "$HR_STATE" "$HR_REASON"
     cp "$TMP/plan.orig" "$HR_PLANS/$B_HR.md"
-    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.lastcomment" "$TMP/gh.comment" "$TMP/gh.commentfail" "$TMP/gh.paged"
+    rm -f "$TMP/dm.log" "$TMP/ppn.calls" "$TMP/launchctl.list" "$TMP/gh.snap.after" "$TMP/gh.snap.before.json" "$TMP/gh.snap.after.json" "$TMP/gh.lastcomment" "$TMP/gh.comment" "$TMP/gh.commentfail" "$TMP/gh.paged"
     printf 'Fix widget\tbug\tno\n' > "$TMP/gh.snap.before"
     unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR CLAUDE_HEADLESS PPN_STUB_RC
     hr_env
@@ -972,6 +985,80 @@ need "HEAD restored" head_is_tip
 need "origin unchanged" origin_is_tip
 case_end holdrepeat-refs-and-pr-state
 
+# 47b (a session that merges, closes or gets the PR reviewed is caught: the snapshot reads
+# state, reviewDecision and mergedAt. JSON fixtures run the launcher's real --json/--jq.)
+HR_PRJSON='{"title":"Fix widget","labels":[{"name":"bug"}],"autoMergeRequest":null,"baseRefName":"master","isDraft":false,"state":"OPEN","reviewDecision":"REVIEW_REQUIRED","mergedAt":null,"body":"x"}'
+jq -c '.state = "MERGED"' <<< "$HR_PRJSON" > "$TMP/snap-merged.json"
+jq -c '.state = "CLOSED"' <<< "$HR_PRJSON" > "$TMP/snap-closed.json"
+jq -c '.reviewDecision = "APPROVED"' <<< "$HR_PRJSON" > "$TMP/snap-approved.json"
+jq -c '.mergedAt = "2026-10-24T12:00:00Z"' <<< "$HR_PRJSON" > "$TMP/snap-mergedat.json"
+for HR_SNAP in merged closed approved mergedat; do
+    hr_reset
+    printf '%s\n' "$HR_PRJSON" > "$TMP/gh.snap.before.json"
+    { cat "$TMP/effects/hr-fix.sh"; printf 'cp "%s" "%s"\n' "$TMP/snap-$HR_SNAP.json" "$TMP/gh.snap.after.json"; } > "$TMP/effects/hr-snap.sh"
+    export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-snap.sh"
+    hr_run
+    need "$HR_SNAP: rc 21" test "$RC" = 21
+    need "$HR_SNAP: final line" final_is "$STDOUT" gave-up-pr-state
+    need "$HR_SNAP: DM names the field group" dm_has "base, draft, state, review, merge or body changed"
+    need "$HR_SNAP: origin unchanged" origin_is_tip
+    need "$HR_SNAP: no post-plan call" no_ppn
+done
+# Control: an unchanged JSON snapshot still lets a real fix through.
+hr_reset
+printf '%s\n' "$HR_PRJSON" > "$TMP/gh.snap.before.json"
+{ cat "$TMP/effects/hr-fix.sh"; printf 'printf "%%s\\n" %q > "%s"\n' "$HR_PRJSON" "$TMP/gh.snap.after.json"; } > "$TMP/effects/hr-snap.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-snap.sh"
+hr_run
+need "unchanged: rc 0 (stderr: $ERR)" test "$RC" = 0
+need "unchanged: final line" final_is "$STDOUT" fixed
+case_end holdrepeat-pr-state-merge-review
+
+# 47c (any label change rejects; a removed hold label goes back, an added arming label comes off)
+hr_reset
+printf 'Fix widget\tbug,pipeline-authored\tno\n' > "$TMP/gh.snap.before"
+{ cat "$TMP/effects/hr-fix.sh"; printf 'printf "Fix widget\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-unlabel.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-unlabel.sh"
+hr_run
+need "removed hold: rc 21" test "$RC" = 21
+need "removed hold: final line" final_is "$STDOUT" gave-up-pr-state
+need "removed hold: label put back" gh_has "--add-label pipeline-authored"
+need "removed hold: DM names labels" dm_has "labels changed"
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; printf 'printf "Fix widget\\tauto-mergeable,bug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-amlabel.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-amlabel.sh"
+hr_run
+need "auto-mergeable: rc 21" test "$RC" = 21
+need "auto-mergeable: final line" final_is "$STDOUT" gave-up-pr-state
+need "auto-mergeable: label removed" gh_has "--remove-label auto-mergeable"
+case_end holdrepeat-pr-state-any-label
+
+# 47d (a session that pushes straight to origin master is caught; a GitHub-committed master
+# move during the session is a normal merge and passes)
+HR_MASTER_ORIG=$(git --git-dir="$TMP/origin.git" rev-parse refs/heads/master)
+cat > "$TMP/effects/hr-masterpush.sh" <<'EFFEOF'
+git fetch -q origin master
+sha=$(git commit-tree "origin/master^{tree}" -p origin/master -m direct)
+git push -q origin "$sha:refs/heads/master"
+EFFEOF
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; cat "$TMP/effects/hr-masterpush.sh"; } > "$TMP/effects/hr-master.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-master.sh"
+hr_run
+git --git-dir="$TMP/origin.git" update-ref refs/heads/master "$HR_MASTER_ORIG"
+need "direct push: rc 21" test "$RC" = 21
+need "direct push: final line" final_is "$STDOUT" gave-up-master-push
+need "direct push: DM names it" dm_has "origin/master got a direct push"
+need "direct push: no post-plan call" no_ppn
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; printf 'export GIT_COMMITTER_EMAIL=noreply@github.com\n'; cat "$TMP/effects/hr-masterpush.sh"; } > "$TMP/effects/hr-master.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-master.sh"
+hr_run
+git --git-dir="$TMP/origin.git" update-ref refs/heads/master "$HR_MASTER_ORIG"
+need "github merge: rc 0 (stderr: $ERR)" test "$RC" = 0
+need "github merge: final line" final_is "$STDOUT" fixed
+case_end holdrepeat-master-direct-push
+
 # 48 (a ~/.claude/hooks edit behind a "blocked" ending is caught)
 hr_reset
 { cat "$TMP/effects/hr-fix.sh"; printf 'printf "x\\n" > "%s/.claude/hooks/sneaky.sh"\n' "$HOME"; } > "$TMP/effects/hr-hook.sh"
@@ -1143,6 +1230,26 @@ need "worktree clean" wt_clean
 need "HEAD restored" head_is_tip
 need "planted module never imported" test ! -e "$TMP/planted.hit"
 case_end holdrepeat-planted-module-blocks-push
+
+# 54c (a new test file in a new nested directory is a real fix and ships; a .pth at any depth
+# is an import hook and is rejected)
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; printf 'mkdir -p tools/postplan-harness/tests/newpkg\nprintf "def test_x():\\n    pass\\n" > tools/postplan-harness/tests/newpkg/test_x.py\n'; } > "$TMP/effects/hr-newpkg.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-newpkg.sh"
+hr_run
+need "nested test: rc 0 (stderr: $ERR)" test "$RC" = 0
+need "nested test: final line" final_is "$STDOUT" fixed
+need "nested test: file shipped" git --git-dir="$TMP/origin.git" cat-file -e "refs/heads/$B_HR:tools/postplan-harness/tests/newpkg/test_x.py"
+hr_reset
+{ cat "$TMP/effects/hr-fix.sh"; printf 'mkdir -p a/b\nprintf "import os\\n" > a/b/x.pth\n'; } > "$TMP/effects/hr-nestedpth.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-nestedpth.sh"
+hr_run
+need "nested pth: rc 21" test "$RC" = 21
+need "nested pth: final line" final_is "$STDOUT" gave-up-planted-python
+need "nested pth: DM names it" dm_has "planted-python: a/b/x.pth"
+need "nested pth: removed" test ! -e "$WTH/a/b/x.pth"
+need "nested pth: origin unchanged" origin_is_tip
+case_end holdrepeat-planted-nested-scope
 
 # 55 (the plan comment is verified by the URL gh pr comment printed, so a first page of
 # comments that misses the new one does not count as "did not land")

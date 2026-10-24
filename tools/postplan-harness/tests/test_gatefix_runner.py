@@ -216,7 +216,8 @@ def _span(name):
 
 
 def test_commit_sites_use_gate_fix_wrapper():
-    s0, s1 = _span("_commit_with_gate_fix")
+    s0 = _span("_commit_with_gate_fix")[0]
+    s1 = _span("_commit_with_gate_fix_inner")[1]    # wrapper + inner are one unit
     remediation = [p for p in _call_sites("_commit_with_gate_remediation")
                    if not s0 <= p < s1]
     assert len(remediation) == 1       # run_meta_checks_local, deliberately unwired

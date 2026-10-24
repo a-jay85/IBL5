@@ -16,7 +16,7 @@ from harness.state import UsageLedger
 
 from test_fidelity_rounds import (NOT_READY, TREE_1, TREE_2, _ScriptedLlm,  # noqa: F401
                                    _cleanup, _counting_git, _plan, _Res,
-                                   git_shim)
+                                   _owner_snapshot_on_fixture_llm, git_shim)
 
 
 # ---------------------------------------------------------------------------

@@ -196,6 +196,70 @@ def empty_snapshot() -> ApprovalSnapshot:
     return ApprovalSnapshot((), _fingerprint([]), 0)
 
 
+EMPTY_SNAPSHOT = empty_snapshot()
+
+
+@dataclass(frozen=True)
+class RevertHit:
+    record_id: str
+    path: str
+    kind: str   # "keep-lost" | "gone-restored" | "file-gone"
+    line: str
+
+
+def _norm_counter(text: str | None) -> collections.Counter:
+    if text is None:
+        return collections.Counter()
+    return collections.Counter(normalize_anchor(l) for l in text.splitlines())
+
+
+def revert_hits(snap: ApprovalSnapshot, path: str,
+                pre_text: str | None, post_text: str | None) -> list[RevertHit]:
+    """Anchors a commit reverted. `pre_text` is the file at the commit's parent, `post_text`
+    at the commit; None = absent. Compared on normalized text, so a pure indent or spacing
+    change passes and any token change counts as a revert."""
+    pre = _norm_counter(pre_text)
+    post = _norm_counter(post_text)
+    hits: list[RevertHit] = []
+    for rec in snap.records:
+        for f in rec.files:
+            if f.path != path:
+                continue
+            for a in f.keep:
+                k = pre[a]
+                if k == 0:
+                    continue    # stale: the fixer did not remove what was already gone
+                if post_text is None:
+                    hits.append(RevertHit(rec.id, path, "file-gone", a))
+                elif post[a] < k:
+                    hits.append(RevertHit(rec.id, path, "keep-lost", a))
+            for g in f.gone:
+                if post[g] > pre[g]:
+                    hits.append(RevertHit(rec.id, path, "gone-restored", g))
+    return hits
+
+
+def check_commit(git, snap: ApprovalSnapshot, sha: str) -> list[RevertHit]:
+    by_path = anchors_by_path(snap)
+    if not by_path:
+        return []
+    hits: list[RevertHit] = []
+    try:
+        changed = set(git.changed_files(f"{sha}^"))
+        for path in sorted(by_path.keys() & changed):
+            try:
+                pre_text = git.file_at(f"{sha}^", path)
+                post_text = git.file_at(sha, path)
+            except (HarnessError, OSError, UnicodeDecodeError) as exc:
+                raise HarnessError("owner-approval-check", f"{path}: {exc}") from exc
+            hits.extend(revert_hits(snap, path, pre_text, post_text))
+    except HarnessError as exc:
+        if exc.kind == "owner-approval-check":
+            raise
+        raise HarnessError("owner-approval-check", f"{sha[:12]}: {exc}") from exc
+    return hits
+
+
 _CLOSING_SENTENCE = (
     "These lines were approved by the repository owner after planning. Do not edit, "
     "reformat, move, or restore them, and do not post PR comments or reviews. If a "
@@ -217,6 +281,37 @@ def off_limits_text(snap: ApprovalSnapshot) -> str:
                 lines.append(f"    gone (must remain absent): {anchor}")
     lines.append("")
     lines.append(_CLOSING_SENTENCE)
+    return "\n".join(lines)
+
+
+_REVIEW_INSTRUCTION = (
+    "A plan deviation that one of these records covers is still a [BLOCKING] finding. "
+    "Put the line approved-by-owner: <id> directly under its bullet and name the file "
+    "path. The harness downgrades it to a note after checking the record against HEAD; "
+    "you never downgrade it yourself. A deviation with no record here is BLOCKING as before."
+)
+
+
+def _record_listing(snap: ApprovalSnapshot) -> list[str]:
+    lines: list[str] = []
+    for rec in snap.records:
+        lines.append(f"- {rec.id}: {rec.summary}")
+        for f in rec.files:
+            lines.append(f"  - {f.path}")
+            for anchor in f.keep:
+                lines.append(f"    keep (must remain present): {anchor}")
+            for anchor in f.gone:
+                lines.append(f"    gone (must remain absent): {anchor}")
+    return lines
+
+
+def review_context(snap: ApprovalSnapshot | None) -> str:
+    if snap is None or not snap.records:
+        return ""
+    lines = ["## Owner-approved deviations (trusted, read from the PR by the harness)", ""]
+    lines.extend(_record_listing(snap))
+    lines.append("")
+    lines.append(_REVIEW_INSTRUCTION)
     return "\n".join(lines)
 
 
@@ -248,4 +343,9 @@ class OwnerGuardLlm:
         if block:
             prompt = prompt + "\n\n" + block
         denied = tuple(dict.fromkeys([*denied_tools, *FIXER_DENIED_TOOLS]))
-        return self._inner.call_tooled(purpose, model, prompt, denied_tools=denied, **kw)
+        out = self._inner.call_tooled(purpose, model, prompt, denied_tools=denied, **kw)
+        # A fixer that posts a record mid-call must not get it into the snapshot or its
+        # commit pushed: any drift fails the run before a commit is attempted.
+        if self._gh is not None and self._pr is not None:
+            verify_unchanged(self._gh, self._pr, self.snap)
+        return out

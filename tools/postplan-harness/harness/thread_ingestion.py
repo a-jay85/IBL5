@@ -167,6 +167,8 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
             denied_tools=REMEDIATION_DENIED_TOOLS,
         )
     except HarnessError as e:
+        if e.kind.startswith("owner-approval"):
+            raise
         log(f"thread {cid}: LLM error {e}")
         return "skipped"
 

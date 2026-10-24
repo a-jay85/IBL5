@@ -408,7 +408,8 @@ def _arm_inputs(unresolved_findings):
                      plan_auto_merge_false=False, headless=True,
                      dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                      unresolved_findings=unresolved_findings, conflict_resolved=False,
-                     current_tree="a" * 40, merge_danger_state="TWO-WAY")
+                     current_tree="a" * 40, merge_danger_state="TWO-WAY",
+                     owner_approval_state="CLEAR")
 
 
 def test_dropped_gate_thread_stays_unresolved_and_holds_condition_11(tmp_path):

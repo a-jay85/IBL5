@@ -429,6 +429,18 @@ class LiveGit:
     def head(self) -> str:
         return self._run("rev-parse", "HEAD").strip()
 
+    def file_at(self, ref: str, path: str) -> str | None:
+        """File content at `ref` (strict utf-8), or None when the path is absent there."""
+        proc = subprocess.run(["git", "-C", self.worktree, "show", f"{ref}:{path}"],
+                              capture_output=True)
+        if proc.returncode == 0:
+            return proc.stdout.decode("utf-8")
+        stderr = proc.stderr.decode("utf-8", errors="replace")
+        if proc.returncode == 128 and ("does not exist in" in stderr
+                                       or "exists on disk, but not in" in stderr):
+            return None
+        raise HarnessError("git", stderr.strip())
+
     def head_tree(self) -> str:
         # a TREE sha, not a commit sha: condition (12) compares trees so a no-op
         # commit (rebase, empty amend) does not invalidate a still-valid review
@@ -1599,6 +1611,11 @@ class ReplayGit:
         """Record the undo; replay has no tree to move. Returns "" like a successful reset."""
         self.drops.append(pre)
         return ""
+
+    def file_at(self, ref, path):
+        if self.fx.get("files_at_error"):
+            raise HarnessError("git", "replay: file read failed")
+        return (self.fx.get("files_at") or {}).get(f"{ref}:{path}")
 
     def head(self) -> str:
         return self.fx.get("head_sha") or ""

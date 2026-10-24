@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
+from harness.owner_approvals import EMPTY_SNAPSHOT
 from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
 from harness import cifix, ciwatch, schemas
@@ -2190,6 +2191,7 @@ def test_phase7_watch_timeout_uses_fresh_remaining(monkeypatch, tmp_path):
     git = _TwoShaLiveGit(_INLINE_FIXTURE)
     gh = RecordingGh(out)
     llm = FixtureLlm(UsageLedger(), dict(CANNED, **{"ci-fix": ["edits made"]}))
+    llm.snap = EMPTY_SNAPSHOT   # commit-site owner-approval check fails closed without one
     res = types.SimpleNamespace(ci_head=None)
 
     runner._ci_fix_loop(

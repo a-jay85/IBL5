@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
 from harness import adr_draft, fidelity
+from harness.owner_approvals import EMPTY_SNAPSHOT
 from harness.adapters import gitad
 from harness.adapters.gitad import (
     LiveGit,
@@ -1206,6 +1207,7 @@ def test_phase55_push_site_calls_adr_wrapper(tmp_path, monkeypatch):
         "plan-fidelity-re-review-2": "checks\n\nREADY\n",
     }
     llm = FixtureLlm(UsageLedger(), canned)
+    llm.snap = EMPTY_SNAPSHOT   # commit-site owner-approval check fails closed without one
     git = _StaleBaseGit({
         "slug": "demo",
         "worktree_diff": "",

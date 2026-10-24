@@ -291,6 +291,7 @@ def test_revert_restores_out_of_repo_bytes(repo, home):
 
 from harness import classify, state, usage_pause  # noqa: E402
 from harness.state import HarnessError, LlmCallRecord, UsageLedger  # noqa: E402
+from harness.owner_approvals import EMPTY_SNAPSHOT  # noqa: E402
 
 EXAMPLE_GATE_TEXT = (
     "git commit: bin/check-rules-byte-budget: path-unscoped rules exceed the budget\n"
@@ -305,6 +306,7 @@ class WritingLlm:
         self.edit, self.raises, self.cost = edit, raises, cost
         self.calls = []
         self.ledger = UsageLedger()
+        self.snap = EMPTY_SNAPSHOT   # commit-site owner-approval check needs a snapshot
 
     def call_tooled(self, purpose, model, prompt, **kwargs):
         self.calls.append((purpose, model, prompt, kwargs))

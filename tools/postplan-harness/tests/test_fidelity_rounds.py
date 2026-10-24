@@ -22,6 +22,14 @@ from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
 
 import runner
+from harness.owner_approvals import EMPTY_SNAPSHOT
+
+
+@pytest.fixture(autouse=True)
+def _owner_snapshot_on_fixture_llm(monkeypatch):
+    # The commit-site owner-approval check fails closed without a snapshot; run() wraps
+    # the real llm in OwnerGuardLlm, so a bare FixtureLlm here stands in for that.
+    monkeypatch.setattr(FixtureLlm, "snap", EMPTY_SNAPSHOT, raising=False)
 
 TREE_1 = "a" * 40
 TREE_2 = "b" * 40

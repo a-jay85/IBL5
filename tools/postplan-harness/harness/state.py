@@ -324,16 +324,21 @@ class RunResult:
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     owner_approvals: Optional[dict] = None  # {"ids", "ignored_untrusted"} from the owner-approval snapshot; omitted from result.json when no record or ignored comment
     owner_snapshot: object = field(default=None, repr=False)  # ApprovalSnapshot for later phases; never serialized
+    owner_approval_hold: Optional[dict] = None  # {"phase", "sha", "hits"} when a fixer commit reverted an owner-approved deviation and was dropped; omitted from result.json when unset
+    owner_approval_state: str = "UNKNOWN"  # CLEAR | REVERT | UNDO-FAILED | DRIFT | UNREADABLE | UNKNOWN; arming condition (20) clears only on CLEAR; serialized only when a hold state
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
         d.pop("owner_snapshot", None)
+        if d.get("owner_approval_state") in ("UNKNOWN", "CLEAR"):
+            d.pop("owner_approval_state", None)   # no hold → result.json byte-identical
         oa = d.get("owner_approvals")
         if not oa or not (oa.get("ids") or oa.get("ignored_untrusted")):
             d.pop("owner_approvals", None)
         for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
-                    "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only"):   # unset → result.json byte-identical
+                    "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only",
+                    "owner_approval_hold"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

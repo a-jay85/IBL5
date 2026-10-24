@@ -352,7 +352,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # does not exist yet cannot hold an owner record. Fail closed: a HarnessError from
         # the read propagates to the outer handler and nothing is pushed.
         snap_pr = gh.pr_number() if gh.pr_exists() else None
-        snap = owner_approvals.snapshot(gh, snap_pr) if snap_pr else owner_approvals.empty_snapshot()
+        try:
+            snap = owner_approvals.snapshot(gh, snap_pr) if snap_pr else owner_approvals.empty_snapshot()
+        except HarnessError:
+            res.owner_approval_state = "UNREADABLE"    # condition (20) holds; the raise holds the run
+            raise
+        res.owner_approval_state = "CLEAR"
         llm = owner_approvals.OwnerGuardLlm(llm, snap, gh=gh, pr=snap_pr, res=res)
         if getattr(git, "llm", None) is not None:
             git.llm = llm      # conflict resolvers reach the LLM through the git adapter
@@ -789,6 +794,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # is what combines the two, and it tree-gates verdict 2. Passing the collapsed
             # value here would let an untethered verdict 2 satisfy condition (12) on its own.
             fidelity_verdict=res.fidelity.get("verdict_1"),
+            owner_approval_state=res.owner_approval_state,
+            owner_approval_reason=((res.owner_approval_hold or {}).get("sha") or "")[:12],
             fidelity_verdict_2=res.fidelity.get("verdict_2"),
             fidelity_tree_2=res.fidelity.get("reviewed_tree_2"),
             current_tree=git.head_tree(),   # read here, after every commit this run makes
@@ -1027,6 +1034,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.block_cause = getattr(e, "block_cause", None)
             _record_failure_context(res, e)
             log(f"FAILED: {res.error}")
+            if e.kind.startswith("owner-approval"):
+                _hold_on_owner_approval(res, e, gh, log)
     except usage_pause.UsagePause as p:
         res.terminal = TerminalState.FAILED
         res.error_kind = _classify_pause(p, llm, res, log)
@@ -1883,7 +1892,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7",
                     llm=llm, res=res)
         except HarnessError as e:
-            if e.kind == "remote-head-diverged":
+            if e.kind == "remote-head-diverged" or e.kind.startswith("owner-approval"):
                 raise
             last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
@@ -2600,7 +2609,32 @@ def _attempt_gate_fix(e, *, llm, worktree, res, log, phase):
 
 def _commit_with_gate_fix(git, worktree, message, log, phase="phase2", *, llm=None,
                           res=None) -> str:
-    """Commit-site gate fixer, outermost: same-commit fix, then ONE plain retry."""
+    """Owner-approval revert check, outermost: wraps the gate-fix commit path."""
+    pre = git.head()
+    sha = _commit_with_gate_fix_inner(git, worktree, message, log, phase, llm=llm, res=res)
+    if not sha:
+        return sha                                   # nothing was committed
+    snap = getattr(llm, "snap", None)
+    if snap is None:
+        raise HarnessError("owner-approval-check", f"{phase}: no owner-approval snapshot at commit site")
+    hits = owner_approvals.check_commit(git, snap, sha)   # raises owner-approval-check on any read failure
+    if not hits:
+        return sha
+    git.drop_commit(pre)
+    if git.head() != pre:
+        raise HarnessError("owner-approval-undo-failed",
+                           f"{phase}: could not drop {sha[:12]}; HEAD={git.head()[:12]} expected {pre[:12]}")
+    if res is not None:
+        res.owner_approval_hold = {"phase": phase, "sha": sha,
+                                   "hits": [h.__dict__ for h in hits]}
+    log(f"{phase}: dropped {sha[:12]}: fixer reverted owner-approved deviation "
+        + ", ".join(f"{h.record_id} {h.path} {h.kind}" for h in hits))
+    raise HarnessError("owner-approval-revert", "; ".join(f"{h.record_id}:{h.path}:{h.kind}" for h in hits))
+
+
+def _commit_with_gate_fix_inner(git, worktree, message, log, phase="phase2", *, llm=None,
+                                res=None) -> str:
+    """Commit-site gate fixer: same-commit fix, then ONE plain retry."""
     try:
         # Same call shape the unwrapped sites used: phase is passed only when non-default.
         return (_commit_with_gate_remediation(git, worktree, message, log)
@@ -2825,7 +2859,8 @@ def _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master
     v, tree, path = fidelity.re_review(
         llm, git, out_dir, worktree or ".", plan, master_sha, gh.pr_body_fresh() or body, pr,
         fix_sha, res.fidelity.get("verdict_path") or fidelity.verdict_path(pr),
-        round_num=fidelity.MAX_FIDELITY_ROUNDS + 1, log=log)
+        round_num=fidelity.MAX_FIDELITY_ROUNDS + 1, log=log,
+        approvals=(getattr(res, "owner_snapshot", None), git))
     if v is None:
         log("phase4.5b: fidelity re-pin indeterminate; condition (12) falls back to verdict 1")
         return
@@ -2992,11 +3027,15 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     if _reviewed_head:
         _lines.insert(0, f"reviewed_head: {_reviewed_head}")
     review_findings = "\n".join(_lines)
+    _owner_ctx = owner_approvals.review_context(getattr(res, "owner_snapshot", None))
+    if _owner_ctx:
+        _owner_ctx = "\n\n" + _owner_ctx
     try:
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
-            review_findings=review_findings)
+            review_findings=review_findings,
+            extra_context=_owner_ctx)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
@@ -3009,8 +3048,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
+    _owner_dg: list = []
     verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
-                                   reviewed_tree=reviewed_tree)
+                                   reviewed_tree=reviewed_tree,
+                                   approvals=(getattr(res, "owner_snapshot", None), git),
+                                   downgrades=_owner_dg, log=log)
     log(f"phase5.5 fidelity: verdict={verdict or 'INDETERMINATE'}"
         + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}")
     res.fidelity = {"verdict_1": verdict, "error_kind": err or None,
@@ -3030,6 +3072,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         "phase4b_ran": bool(phase4b_ran),
         "seen": (seen(pr) if (callable(seen) and live and pr) else None),
     }
+    if _owner_dg:
+        res.fidelity["owner_downgrades"] = list(_owner_dg)
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     # Verdict 1's file: the round loop advances current_verdict_path, so this is the only
@@ -3195,7 +3239,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
                     pr, current_verdict_path, name_status_text(git.diff_vs_base()),
                     res.fidelity.get("plan_hash"), _plan_hash(plan),
-                    round_num=round_num, log=log)
+                    round_num=round_num, log=log,
+                    approvals=(getattr(res, "owner_snapshot", None), git), downgrades=_owner_dg)
                 if v_n is not None:
                     review_kind = "body-recheck"
             if v_n is None:
@@ -3204,7 +3249,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-                current_verdict_path, round_num=round_num, log=log)
+                current_verdict_path, round_num=round_num, log=log,
+                approvals=(getattr(res, "owner_snapshot", None), git), downgrades=_owner_dg)
             if v_n is not None:
                 break
             # Count the extra attempt, never the first one, so retries stays the
@@ -3225,6 +3271,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["remediation_sha"] = str(sha)
         res.fidelity["verdict_2"] = v_n
         res.fidelity["reviewed_tree_2"] = tree_n
+        if _owner_dg:
+            res.fidelity["owner_downgrades"] = list(_owner_dg)
         log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
             f"outcome={rec['outcome']} sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'}")
@@ -3324,6 +3372,9 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "llm-usage-limit", "llm-auth-expired",
                       "usage-pause-unconfirmed", "usage-pause-dirty",
+                      "owner-approval-revert", "owner-approval-undo-failed",
+                      "owner-approval-check", "owner-approval-drift",
+                      "owner-approval-record",
                       SUBPROCESS_TIMEOUT)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
@@ -3360,6 +3411,41 @@ def _reported_gate_class(res: RunResult) -> str:
     if head == "unknown" and classify_local_gate_denial(res.error_output_tail or "") == "byte-budget":
         return "byte-budget"
     return head
+
+
+_OWNER_APPROVAL_STATE_BY_KIND = {
+    "owner-approval-revert": "REVERT",
+    "owner-approval-undo-failed": "UNDO-FAILED",
+    "owner-approval-drift": "DRIFT",
+}
+
+
+def _owner_hold_body(e: HarnessError) -> str:
+    """PR notice for an owner-approval hold. Carries no APPROVAL_MARKER, so it can never be
+    read back as a record. A revert detail is `id:path:kind[; ...]`."""
+    tail = "Nothing was pushed. Re-run after deciding whether the approval or the fix stands."
+    if e.kind == "owner-approval-revert":
+        hits = []
+        for part in (e.detail or "").split("; "):
+            rid, _, rest = part.partition(":")
+            path, _, kind = rest.rpartition(":")
+            hits.append(f"{rid} ({path}, {kind})")
+        return ("Post-plan held: a fixer commit was dropped because it reverted "
+                f"owner-approved deviation {', '.join(hits)}. {tail}")
+    return (f"Post-plan held: the owner-approved deviation check stopped this run "
+            f"({e.kind}: {(e.detail or '')[:300]}). {tail}")
+
+
+def _hold_on_owner_approval(res: RunResult, e: HarnessError, gh, log) -> None:
+    """Pin the arming state for an owner-approval stop and tell the PR why. Posting is
+    best-effort: the exit code already holds, so a failed post is logged and swallowed."""
+    res.owner_approval_state = _OWNER_APPROVAL_STATE_BY_KIND.get(e.kind, "UNREADABLE")
+    try:
+        pr = res.pr_number or gh.pr_number()
+        if pr:
+            gh.post_review_summary(pr, "Owner approval hold", _owner_hold_body(e))
+    except Exception as exc:  # noqa: BLE001 - the held exit stands without the notice
+        log(f"owner-approval hold notice not posted ({exc!r})")
 
 
 def exit_code_for(res: RunResult) -> int:

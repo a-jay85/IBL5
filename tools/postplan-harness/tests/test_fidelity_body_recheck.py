@@ -19,7 +19,7 @@ from harness.state import PlanInfo, UsageLedger
 from test_fidelity_body_only_round import _BodySeqGh
 from test_fidelity_rounds import (TREE_1, TREE_2, _cleanup, _counting_git,  # noqa: F401
                                    _CountingGit, _drive, _plan, _Res, _ScriptedLlm,
-                                   git_shim)
+                                   _owner_snapshot_on_fixture_llm, git_shim)
 
 
 VERDICT1_PURE_BODY = """REVIEW-COVERAGE: CURRENT

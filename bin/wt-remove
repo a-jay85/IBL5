@@ -134,7 +134,12 @@ fi
 echo "Removing worktree '$NAME'..."
 # Docker on macOS sets deny-delete ACLs on bind-mount dirs (e.g. ibl5/backups)
 chmod -R -N "$WT_PATH" 2>/dev/null || true
-git worktree remove --force "$WT_PATH"
+if ! git worktree remove --force "$WT_PATH"; then
+    # An untracked directory (e.g. a half-finished wt-new abort) fails here;
+    # --if-empty callers must still get a kept line and exit 0.
+    [ "$IF_EMPTY" = true ] && keep "git could not remove it (not a tracked worktree?)"
+    exit 1
+fi
 # An empty, never-pushed branch would block a same-slug retry (wt-new's
 # existing-branch guard) and docfix-run's per-day branch dedupe. -D is safe:
 # the ancestor test proves the tip is already on origin/master.

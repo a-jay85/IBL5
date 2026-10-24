@@ -3481,6 +3481,71 @@ assert_viol "gateBX-new-script-in-critical-files-ok" 0 '[BX]' "$FM"'
 | 1 | tool runs | CLI-executable | post-impl | `bin/brand-new-tool --help` |
 '
 
+# Whole-token match: a Critical Files entry bin/foo-bar must not excuse a missing bin/foo.
+assert_viol "gateBX-prefix-sibling-in-critical-files-flags" 1 '[BX]' "$FM"'
+## Critical Files
+
+- `bin/foo-bar` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
+# The exact path listed (with a trailing annotation) still excuses it.
+assert_viol "gateBX-exact-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
+# An ibl5/-prefixed Critical Files entry still excuses the missing bin/foo.
+assert_viol "gateBX-ibl5-prefixed-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `ibl5/bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
+# A variable prefix and a ./ prefix in Critical Files still excuse bin/foo.
+# (An absolute path would also excuse bin/foo here, but gate [F] flags it separately.)
+assert_viol "gateBX-var-prefix-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `$REPO_ROOT/bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
+assert_viol "gateBX-dot-slash-path-in-critical-files-ok" 0 '[BX]' "$FM"'
+## Critical Files
+
+- `./bin/foo` (NEW)
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | tool runs | CLI-executable | post-impl | `bin/foo --help` |
+'
+
 # Legacy annotation form: a note after the closing backtick leaves a stray
 # backtick after Phase 5.0's strip, so gate [V] must reject it (Option A).
 assert_viol "gateG-legacy-oneshot-suffix-fails-V" 1 '[V]' "$FM"'

@@ -392,6 +392,47 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T12b: running submitted plan-now label, no plist → quiet
+# ---------------------------------------------------------------------------
+healthy_fixture T12b
+printf '4242\t0\tcom.ibl5.plan-now-20261021-120000-77\n' >> "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && ! grep -q 'stale-oneshot' <<< "$OUT" \
+    && ! grep -q 'idle-oneshot' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok T12b
+else
+    fail T12b "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# T12c: idle submitted postplan-now label, no plist → INFO idle-oneshot, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture T12c
+printf -- '-\t0\tcom.ibl5.postplan-now-x-20261021-120000-77\n' >> "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.postplan-now-x-20261021-120000-77' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok T12c
+else
+    fail T12c "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# T12d: idle pr-review-now label → not reported (submitted prefixes only)
+# ---------------------------------------------------------------------------
+healthy_fixture T12d
+printf -- '-\t0\tcom.ibl5.pr-review-now-42\n' >> "$CASE/launchctl.out"
+run_checker
+if ! grep -q 'idle-oneshot' <<< "$OUT"; then
+    ok T12d
+else
+    fail T12d "expected no idle-oneshot for a non-submitted prefix, out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
 # T13: docker info fails → PROBLEM docker:daemon-down, no container: lines
 # ---------------------------------------------------------------------------
 healthy_fixture T13

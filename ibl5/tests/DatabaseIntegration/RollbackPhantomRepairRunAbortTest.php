@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
@@ -147,6 +148,112 @@ final class RollbackPhantomRepairRunAbortTest extends TestCase
         self::assertSame(1, $calls);
     }
 
+    public function testProbeScriptPathNeverContainsDbPhpWhenHexEndsInDb(): void
+    {
+        $hex = '00112233445566db';
+        $legacy = '/rollback-probe-' . $hex . '.php';
+        self::assertNotFalse(stripos($legacy, 'db.php'), 'fixture hex must reproduce the guard collision on the legacy shape');
+
+        $path = self::probeScriptPath($hex);
+
+        self::assertSame(0, preg_match('/db\.php$/i', $path), 'new name must not end in db.php');
+        self::assertFalse(stripos($path, 'db.php'), 'new name must not contain db.php anywhere');
+    }
+
+    #[DataProvider('probeHexProvider')]
+    public function testProbeScriptPathHasExactShapeForAnyHex(string $hex): void
+    {
+        $path = self::probeScriptPath($hex);
+
+        self::assertSame(sys_get_temp_dir() . '/rollback-probe-' . $hex . '-probe.php', $path);
+        self::assertSame(0, preg_match('/db\.php$/i', $path));
+        self::assertFalse(stripos($path, 'db.php'));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function probeHexProvider(): array
+    {
+        return [
+            'ends in db' => ['00112233445566db'],
+            'ends in d' => ['00112233445566ad'],
+            'ends in b' => ['00112233445566eb'],
+            'all db pairs' => ['dbdbdbdbdbdbdbdb'],
+            'starts with db' => ['db00112233445566'],
+        ];
+    }
+
+    public function testRunProbeScriptWithRetryUsesFreshFileNamePerAttempt(): void
+    {
+        $allZero = array_fill_keys([...self::BACKUP_TABLES, ...self::LIVE_TABLES], 0);
+        $queue = [
+            ['exit' => 0, 'stdout' => '', 'stderr' => ''],
+            ['exit' => 1, 'stdout' => '', 'stderr' => 'boom'],
+            self::okRun($allZero),
+        ];
+        $seen = [];
+        $code = "<?php echo 'x';";
+        $exec = static function (string $file) use (&$queue, &$seen, $code): array {
+            self::assertFileExists($file);
+            self::assertSame(strlen($code), filesize($file));
+            $seen[] = $file;
+
+            return array_shift($queue);
+        };
+
+        $result = self::runProbeScriptWithRetry($code, $exec, 0);
+
+        self::assertSame(3, $result['attempts']);
+        self::assertSame($allZero, $result['counts']);
+        self::assertCount(3, $seen);
+        self::assertCount(3, array_unique($seen), 'every attempt must use a fresh file name');
+    }
+
+    public function testRunProbeScriptWithRetryRemovesEveryAttemptFile(): void
+    {
+        $seen = [];
+        $exec = static function (string $file) use (&$seen): array {
+            $seen[] = $file;
+
+            return ['exit' => 0, 'stdout' => '', 'stderr' => ''];
+        };
+
+        $result = self::runProbeScriptWithRetry('<?php echo 1;', $exec, 0);
+
+        self::assertNull($result['counts']);
+        self::assertSame(3, $result['attempts']);
+        self::assertCount(3, array_unique($seen));
+        foreach ($seen as $file) {
+            self::assertFileDoesNotExist($file);
+        }
+    }
+
+    public function testRunProbeScriptWithRetryRemovesFileAndPropagatesWhenExecutorThrows(): void
+    {
+        $seen = [];
+        $calls = 0;
+        $exec = static function (string $file) use (&$seen, &$calls): array {
+            $seen[] = $file;
+            $calls++;
+
+            throw new \RuntimeException('exec exploded');
+        };
+
+        $caught = null;
+        try {
+            self::runProbeScriptWithRetry('<?php echo 1;', $exec, 0);
+        } catch (\RuntimeException $e) {
+            $caught = $e;
+        }
+
+        self::assertNotNull($caught);
+        self::assertSame('exec exploded', $caught->getMessage());
+        self::assertSame(1, $calls, 'a thrown executor is not retried');
+        self::assertCount(1, $seen);
+        self::assertFileDoesNotExist($seen[0], 'unlink must run in finally');
+    }
+
     public function testEmptyBackupsAbortWithExitOneAndWriteNothing(): void
     {
         $before = $this->probe();
@@ -223,16 +330,11 @@ foreach (\$tables as \$table) {
 echo json_encode(\$out);
 PHP;
 
-        $file = sys_get_temp_dir() . '/rollback-probe-' . bin2hex(random_bytes(8)) . '.php';
-        file_put_contents($file, $code);
-        try {
-            $result = self::probeWithRetry(
-                fn (): array => $this->runCommand([PHP_BINARY, $file]),
-                self::PROBE_RETRY_SLEEP_MICROS
-            );
-        } finally {
-            unlink($file);
-        }
+        $result = self::runProbeScriptWithRetry(
+            $code,
+            fn (string $file): array => $this->runCommand([PHP_BINARY, $file]),
+            self::PROBE_RETRY_SLEEP_MICROS
+        );
 
         $stderr = trim($result['stderr']);
         $stdout = mb_substr(trim($result['stdout']), 0, self::PROBE_STDOUT_SNIPPET_CHARS);
@@ -245,6 +347,40 @@ PHP;
         );
 
         return $result['counts'];
+    }
+
+    /**
+     * Pure name builder. The `-probe` tail keeps the file name from ever ending in
+     * `db.php`: ibl5/db/db.php dies silently (exit 0, no output) when PHP_SELF
+     * contains `db.php`, and a random hex ending in `db` used to trip it.
+     */
+    private static function probeScriptPath(string $hex): string
+    {
+        return sys_get_temp_dir() . '/rollback-probe-' . $hex . '-probe.php';
+    }
+
+    /**
+     * Writes $code to a freshly named temp script, runs it through $exec, and removes
+     * the file, once per attempt. Every retry gets a new random name so a bad name
+     * cannot poison the remaining attempts.
+     *
+     * @param callable(string): array{exit: int, stdout: string, stderr: string} $exec receives the script path
+     * @return array{counts: array<string, int>|null, attempts: int, exit: int, stdout: string, stderr: string}
+     */
+    private static function runProbeScriptWithRetry(string $code, callable $exec, int $sleepMicros): array
+    {
+        return self::probeWithRetry(
+            static function () use ($code, $exec): array {
+                $file = self::probeScriptPath(bin2hex(random_bytes(8)));
+                file_put_contents($file, $code);
+                try {
+                    return $exec($file);
+                } finally {
+                    unlink($file);
+                }
+            },
+            $sleepMicros
+        );
     }
 
     /**

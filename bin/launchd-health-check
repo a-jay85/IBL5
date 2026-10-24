@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # bin/launchd-health-check — daily and at-login check for com.ibl5.* launchd jobs.
+# Also runs bin/bug-pipeline-check and reports each degraded or unknown signal.
 #
 # Test seams (env overrides; production never sets these):
 #   DOCKER_BIN                override the docker binary
 #   DB_QUERY_BIN              override bin/db-query for the phase lookup
+#   BUG_PIPELINE_CHECK_BIN    override bin/bug-pipeline-check (unset or empty = sibling script)
+#   BUG_PIPELINE_CHECK_TIMEOUT  seconds before bin/bug-pipeline-check is killed (default 60)
 #   DISCORD_DM_BIN            override bin/discord-dm for DM sends
 #   LAUNCHD_HEALTH_JOBS_LIB   override bin/lib/launchd-expected-jobs.sh
 #   LAUNCHD_HEALTH_LOG_DIR    override the log/stamp directory root
@@ -30,6 +33,8 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin"
 DOCKER_BIN="${DOCKER_BIN:-docker}"
 DB_QUERY_BIN="${DB_QUERY_BIN:-$ROOT/bin/db-query}"
+BUG_PIPELINE_CHECK_BIN="${BUG_PIPELINE_CHECK_BIN:-$SCRIPT_DIR/bug-pipeline-check}"
+BUG_PIPELINE_CHECK_TIMEOUT="${BUG_PIPELINE_CHECK_TIMEOUT:-60}"
 
 STARTUP_DELAY=0
 PROBLEM_KEYS=()
@@ -210,6 +215,16 @@ check_oneshots() {
             fi
         done
     done <<< "$LEJ_TRANSIENT_PREFIXES"
+    local lpid llabel
+    while IFS=$'\t' read -r lpid _ llabel; do
+        [ -n "$llabel" ] && [ "$lpid" = "-" ] || continue
+        while read -r prefix; do
+            [ -n "$prefix" ] || continue
+            case "$llabel" in
+                "$prefix"*) add_info "idle-oneshot:$llabel (loaded but not running; launchctl remove $llabel once no run is active)" ;;
+            esac
+        done <<< "$LEJ_SUBMITTED_PREFIXES"
+    done <<< "$LAUNCHCTL_LIST"
 }
 
 check_docker() {
@@ -229,6 +244,119 @@ check_docker() {
             add_problem "container:$c" "container $c is not running"
         fi
     done <<< "$LEJ_REQUIRED_CONTAINERS"
+}
+
+# has_problem <key> — 0 when an earlier check already added exactly <key>.
+has_problem() {
+    local i
+    for ((i=0; i<${#PROBLEM_KEYS[@]}; i++)); do
+        [ "${PROBLEM_KEYS[$i]}" = "$1" ] && return 0
+    done
+    return 1
+}
+
+# db_problem_reported — 0 when check_docker already reported the DB as down.
+db_problem_reported() {
+    local i
+    for ((i=0; i<${#PROBLEM_KEYS[@]}; i++)); do
+        case "${PROBLEM_KEYS[$i]}" in
+            docker:*|container:ibl5-mariadb) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# bpc_label <name> — print the expected launchd label ending in .<name>.
+# Labels come from the shared jobs lib (H4 forbids literals here). A label the
+# lib no longer lists prints nothing, so its covered-signal skip stops applying.
+bpc_label() {
+    local l
+    while read -r l; do
+        case "$l" in *".$1") printf '%s\n' "$l"; return 0 ;; esac
+    done <<< "$(lej_expected_labels)"
+    return 0
+}
+
+# bpc_covered <signal> — 0 when an earlier check reports the same fault.
+# Each skip is conditional on the covering key, so a skip never goes silent.
+bpc_covered() {
+    case "$1" in
+        process:unloaded) has_problem "missing:$(bpc_label bug-pipeline-cron)" ;;
+        bot:unloaded)     has_problem "missing:$(bpc_label bug-bot)" ;;
+        *:db-unavailable) db_problem_reported ;;
+        *)                return 1 ;;
+    esac
+}
+
+# check_bug_pipeline — run bin/bug-pipeline-check; one problem per SIGNAL line.
+# rc 0 = healthy, 1 = degraded, 2 = unknown; any other rc fails loud.
+check_bug_pipeline() {
+    local out rc line sig key n=0 tmp pid wd
+    # Background job + watchdog: macOS has no GNU timeout, and a hung curl or
+    # db-query must not block the verdict, stamps, and DM for every other check.
+    tmp="$(mktemp)"
+    # perl setpgrp gives the checker its own process group (pgid = pid), so a
+    # timeout can kill its curl/db-query children too. macOS has no setsid(1).
+    DB_QUERY_TARGET=main perl -e 'setpgrp(0, 0); exec { $ARGV[0] } @ARGV or exit 127' \
+        "$BUG_PIPELINE_CHECK_BIN" >"$tmp" 2>/dev/null &
+    pid=$!
+    # The watchdog's sleeps run as their own children so the TERM trap can kill
+    # them; a healthy run must not leave a sleep behind for the full timeout.
+    # On timeout it sends TERM, waits a short grace, then KILLs the group, so a
+    # checker that traps or ignores TERM still cannot hang this check.
+    (
+        s=
+        trap 'kill "$s" 2>/dev/null; exit 0' TERM
+        /bin/sleep "$BUG_PIPELINE_CHECK_TIMEOUT" &
+        s=$!
+        wait "$s" || exit 0
+        : > "$tmp.timeout"
+        kill -TERM -- "-$pid" 2>/dev/null
+        /bin/sleep 2 &
+        s=$!
+        wait "$s"
+        kill -KILL -- "-$pid" 2>/dev/null
+    ) >/dev/null 2>&1 &
+    wd=$!
+    wait "$pid"
+    rc=$?
+    kill "$wd" 2>/dev/null
+    wait "$wd" 2>/dev/null
+    if [ -e "$tmp.timeout" ]; then
+        # The leader may die on TERM while children that ignore it live on.
+        kill -KILL -- "-$pid" 2>/dev/null
+    fi
+    out="$(<"$tmp")"
+    if [ -e "$tmp.timeout" ]; then rc=timeout; fi
+    rm -f "$tmp" "$tmp.timeout"
+    case "$rc" in
+        0) return ;;
+        1|2) ;;
+        timeout)
+            add_problem "bug-pipeline:check-failed" \
+                "bin/bug-pipeline-check did not finish in ${BUG_PIPELINE_CHECK_TIMEOUT}s and was killed — bug pipeline state unknown; run it by hand"
+            return ;;
+        *)
+            add_problem "bug-pipeline:check-failed" \
+                "bin/bug-pipeline-check exited $rc — bug pipeline state unknown; run it by hand"
+            return ;;
+    esac
+    while IFS= read -r line; do
+        case "$line" in "SIGNAL: "*) ;; *) continue ;; esac
+        n=$((n+1))
+        sig="${line#SIGNAL: }"; sig="${sig%% *}"
+        if ! [[ "$sig" =~ ^[a-z]+:[a-z-]+$ ]] || [ "${line#SIGNAL: $sig — }" = "$line" ]; then
+            has_problem "bug-pipeline:unparsed-signal" || add_problem "bug-pipeline:unparsed-signal" \
+                "bin/bug-pipeline-check printed a SIGNAL line this check cannot key: ${line:0:160}"
+            continue
+        fi
+        bpc_covered "$sig" && continue
+        key="bug-pipeline:$sig"
+        has_problem "$key" && continue
+        add_problem "$key" "bug pipeline $sig — ${line#SIGNAL: $sig — }"
+    done <<< "$out"
+    [ "$n" -gt 0 ] || add_problem "bug-pipeline:check-failed" \
+        "bin/bug-pipeline-check exited $rc but printed no SIGNAL line"
 }
 
 print_verdict() {
@@ -256,6 +384,7 @@ main() {
     check_launchd
     check_oneshots
     check_docker
+    check_bug_pipeline
     mkdir -p "$STAMP_DIR" 2>/dev/null || printf 'WARN: stamp dir unavailable: %s\n' "$STAMP_DIR" >&2
     rotate_stamps
     NEW_KEYS=(); NEW_MSGS=(); SUPPRESSED=0; DM_STATUS=none

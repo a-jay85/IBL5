@@ -1,6 +1,6 @@
 ---
 description: Scheduled pr-cycle watcher tick, its retry and in-flight guards, the post-plan race fix in both directions, and the gate-timeout rerun.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # ADR-0167: Schedule bin/pr-cycle on a launchd tick
@@ -98,7 +98,7 @@ Non-conflict holds keep the until-the-diff-changes rule. That covers red CI, fai
 
 ## Addendum 2026-10-21: gate-timeout reruns
 
-The `All checks green` gate (`.github/workflows/all-checks-green.yml`) fails closed when an anchor check has not reported within its 2400 s wait. On 2026-10-21 runner queueing pushed anchors past that deadline on PRs 3404, 3403, 3399, 3390, 3335, 3353 and 3004. Each gate went red, and its anchors finished green later. The tick read each one as a red PR and launched a Claude rescue, which cannot fix a timeout. A manual `gh run rerun <id> --failed` cleared each one.
+The `All checks green` gate (`.github/workflows/all-checks-green.yml` (example)) fails closed when an anchor check has not reported within its 2400 s wait. On 2026-10-21 runner queueing pushed anchors past that deadline on PRs 3404, 3403, 3399, 3390, 3335, 3353 and 3004. Each gate went red, and its anchors finished green later. The tick read each one as a red PR and launched a Claude rescue, which cannot fix a timeout. A manual `gh run rerun <id> --failed` cleared each one.
 
 The tick now reruns the gate's failed job in place of a rescue when all of these hold for the PR's head SHA:
 
@@ -120,3 +120,7 @@ The tick now runs `git merge-tree --write-tree --name-only <tip> <head>` when it
 A probe that cannot decide falls back to the 2026-10-19 rule and re-fires on the new tip. That covers a missing object, unrecognised merge-tree output, a legacy one-line hold, and an `unknown` tip. Each fallback logs a `WARN` line. The first fallback per (PR, head) also sends a Discord DM through the `dm-probe/<pr>` ledger, which `pcw_prune` sweeps for closed PRs. The daily cap of two launches stays as the backstop.
 
 Record time and compare time use the same instrument. The harness audit's plain-rebase path list was rejected as the record source: a rebase replays commits one at a time and can list different paths than one three-way merge, so the two sets would not be comparable.
+
+## Addendum 2026-10-23: gate retired
+
+The `All checks green` gate is deleted, so the 2026-10-21 rerun path above has nothing left to match. `bin/lib/pr-cycle-watch.sh` still sets `PCW_GATE_WORKFLOW` to the old workflow file name. `All checks settled` never waits, so it has no anchor timeout to rerun. Removing the dead rerun code is follow-up work.

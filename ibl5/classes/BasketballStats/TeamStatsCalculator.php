@@ -19,7 +19,7 @@ use League\LeagueContext;
  * @phpstan-type NormalizedGame array{awayTeam: int, awayScore: int, homeTeam: int, homeScore: int}
  * @phpstan-type TeamStats array{wins: int, losses: int, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int, winPoints: int, lossPoints: int, winsInLast10Games: int, lossesInLast10Games: int, streak: int, streakType: string}
  */
-class TeamStatsCalculator
+class TeamStatsCalculator extends \Database\BaseMysqliRepository
 {
     /** Standings table per league; values pinned to LeagueContext::TABLE_MAP by TeamStatsCalculatorTest. */
     private const STANDINGS_TABLES = [
@@ -27,7 +27,6 @@ class TeamStatsCalculator
         'olympics' => 'ibl_olympics_standings',
     ];
 
-    private \mysqli $db;
     private bool $isOlympics;
 
     /** @var array<int, array{win: int, loss: int}>|null */
@@ -35,7 +34,7 @@ class TeamStatsCalculator
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        $this->db = $db;
+        parent::__construct($db, $leagueContext);
         $this->isOlympics = $leagueContext !== null && $leagueContext->isOlympics();
     }
 
@@ -57,19 +56,17 @@ class TeamStatsCalculator
 
         $this->teamRecordsCache = [];
 
-        if (method_exists($this->db, 'fetchAll')) {
-            /** @var list<array{teamid: int, win: int, loss: int}> $rows */
-            $rows = $this->db->fetchAll(
-                "SELECT teamid AS teamid, wins AS win, losses AS loss FROM " . $this->standingsTable(),
-                ""
-            );
+        /** @var list<array{teamid: int, win: int, loss: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT teamid AS teamid, wins AS win, losses AS loss FROM " . $this->standingsTable(),
+            ""
+        );
 
-            foreach ($rows as $row) {
-                $this->teamRecordsCache[$row['teamid']] = [
-                    'win' => $row['win'],
-                    'loss' => $row['loss'],
-                ];
-            }
+        foreach ($rows as $row) {
+            $this->teamRecordsCache[$row['teamid']] = [
+                'win' => $row['win'],
+                'loss' => $row['loss'],
+            ];
         }
     }
 
@@ -198,18 +195,14 @@ class TeamStatsCalculator
             return $this->teamRecordsCache[$teamId] ?? ['win' => 0, 'loss' => 0];
         }
 
-        // Fallback to per-query lookup for duck-typing compatibility with MockDatabase
-        if (method_exists($this->db, 'fetchOne')) {
-            /** @var array{win: int, loss: int}|null $result */
-            $result = $this->db->fetchOne(
-                "SELECT wins AS win, losses AS loss FROM " . $this->standingsTable() . " WHERE teamid = ?",
-                "i",
-                $teamId
-            );
-            return $result ?? ['win' => 0, 'loss' => 0];
-        }
-
-        return ['win' => 0, 'loss' => 0];
+        // No preload: fall back to a per-team lookup.
+        /** @var array{win: int, loss: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT wins AS win, losses AS loss FROM " . $this->standingsTable() . " WHERE teamid = ?",
+            "i",
+            $teamId
+        );
+        return $result ?? ['win' => 0, 'loss' => 0];
     }
 
     /**

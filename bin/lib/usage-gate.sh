@@ -672,6 +672,32 @@ usage_postrun_pause() {
     return 0
 }
 
+# postplan_killed <rc> <sigterm_received> <log>: rc 0 when the run shows kill evidence
+# (rc 124/137/143, the CMD's TERM trap fired, or the harness's KILLED line is in <log>).
+postplan_killed() {
+    case "${1:-}" in 124|137|143) return 0 ;; esac
+    [ "${2:-0}" = 1 ] && return 0
+    [ -n "${3:-}" ] && grep -q '^RESULT: post-plan KILLED' "$3" 2>/dev/null && return 0
+    return 1
+}
+
+# postplan_postrun_pause <sid> <resume_bin> <rc> <sigterm_received> <log>
+# post-plan-now's post-run pause check. Kill evidence beats a pause marker: a killed run
+# is never reported as a pause (the marker is left for the coordinator, and logged).
+# Otherwise defers to usage_postrun_pause. rc 0 + the paused line when paused; rc 1 if not.
+postplan_postrun_pause() {
+    local sid="${1:-}" rbin="${2:-}" rc="${3:-0}" sigterm="${4:-0}" log="${5:-}"
+    if postplan_killed "$rc" "$sigterm" "$log"; then
+        if usage_marker_exists "$sid"; then
+            usage_log "postrun-kill-beats-marker runner=post-plan-now sid=$sid rc=$rc"
+        fi
+        return 1
+    fi
+    usage_postrun_pause post-plan-now "$sid" "$rbin" "$rc" "$log" || return 1
+    echo 'post-plan-now: RESULT paused (usage gate); auto-resumes after reset.'
+    return 0
+}
+
 # usage_resume_paused_args <runner> <sid>: saved argv NUL-separated; rc 2 + stderr
 # reason for an invalid sid, no marker, a runner mismatch, or a missing argv file.
 usage_resume_paused_args() {

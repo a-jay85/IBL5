@@ -666,3 +666,24 @@ def test_rc3_result_line_stays_one_line(case_id, kind, error, extra, expected):
     line = runner.verdict_line(_rc3_res(kind, error, extra), 3, "")
     assert "\n" not in line
     assert line.startswith("RESULT: post-plan BLOCKED")
+
+
+_PRECOMMIT_HANG_LINE = (
+    "RESULT: post-plan BLOCKED — the pre-commit hook hung past 300s and was killed; "
+    "ERROR terminal=failed kind=precommit-hang. Step: commit (pre-commit hook). That "
+    "commit did not land. Run bin/pre-commit-hook by hand in the worktree to find the "
+    "hanging check, then re-run bin/post-plan-now.")
+
+
+def test_precommit_hang_verdict_full_wording():
+    r = _res(TerminalState.FAILED, error_kind="precommit-hang",
+             error="precommit-hang: pre-commit hook hung past 300s and was killed "
+                   "(step 'commit (pre-commit hook)')",
+             error_cmd="git commit")
+    assert runner.verdict_line(r, 3) == _PRECOMMIT_HANG_LINE
+
+
+def test_precommit_hang_verdict_without_seconds_says_its_timeout():
+    r = _res(TerminalState.FAILED, error_kind="precommit-hang", error="precommit-hang",
+             error_cmd="git commit")
+    assert "hung past its timeout" in runner.verdict_line(r, 3)

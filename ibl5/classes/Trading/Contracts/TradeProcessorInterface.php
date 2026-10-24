@@ -15,6 +15,13 @@ namespace Trading\Contracts;
 interface TradeProcessorInterface
 {
     /**
+     * Error returned by processTrade() (and TradeExecutionService::validateAndExecute())
+     * when no pending ibl_trade_info rows exist for the offer: the offer is unknown,
+     * already completed, declined, or withdrawn.
+     */
+    public const NO_TRADE_DATA_ERROR = 'No trade data found for this offer ID';
+
+    /**
      * Process a complete trade acceptance
      *
      * Executes all trade items (players, picks, cash), creates a news story,

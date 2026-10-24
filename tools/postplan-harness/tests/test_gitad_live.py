@@ -225,7 +225,7 @@ def _fake_proc(returncode, stdout="", stderr=""):
 def test_push_gate_denial_is_kind_local_gate(monkeypatch):
     """pre-push-adr-hook denial must not be a generic 'git' failure: the kind is what
     drives the fail-closed exit 3 that skips the ~1M-token skill fallback."""
-    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+    monkeypatch.setattr(gitad, "run_bounded", lambda *a, **k: _fake_proc(
         1, stderr="pre-push-adr-hook: a decision-trigger surface is being pushed without an ADR."))
     with pytest.raises(HarnessError) as e:
         LiveGit("/tmp", push_remote="origin").push()
@@ -235,7 +235,7 @@ def test_push_gate_denial_is_kind_local_gate(monkeypatch):
 def test_commit_gate_denial_on_stdout_is_detected(monkeypatch):
     """bin/pre-commit-hook runs its checks with 2>&1 and echoes to STDOUT, so
     stderr-only detection would miss every commit-path denial."""
-    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+    monkeypatch.setattr(gitad, "run_bounded", lambda *a, **k: _fake_proc(
         1, stdout="FAIL  .claude/rules/x.md  16374 bytes  cap 16000\nOne or more checks failed:\n"))
     with pytest.raises(HarnessError) as e:
         LiveGit("/tmp")._run("commit", "-m", "x")
@@ -245,7 +245,7 @@ def test_commit_gate_denial_on_stdout_is_detected(monkeypatch):
 
 def test_ordinary_git_failure_stays_kind_git(monkeypatch):
     """Negative path: transient/real git errors must still fall back to the skill."""
-    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+    monkeypatch.setattr(gitad, "run_bounded", lambda *a, **k: _fake_proc(
         1, stderr="fatal: could not read from remote repository"))
     with pytest.raises(HarnessError) as e:
         LiveGit("/tmp")._run("fetch", "origin")
@@ -419,8 +419,8 @@ def test_drop_commit_returns_error_text_on_bad_target(repo):
     assert g.head() != ""            # HEAD untouched, repo still usable
 
 
-def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, monkeypatch):
-    """A pre-commit hook that hangs is bounded: typed subprocess-timeout (not local-gate),
+def test_commit_all_timeout_raises_precommit_hang_and_reaps(repo, tmp_path, monkeypatch):
+    """A pre-commit hook that hangs is bounded: typed precommit-hang (not local-gate),
     the hook's process group is reaped, and the index.lock git left behind is cleared.
 
     Mutation caught: drop _clear_stale_index_lock() and the lock assertion fails; drop
@@ -435,7 +435,7 @@ def test_commit_all_timeout_raises_subprocess_timeout_and_reaps(repo, tmp_path, 
     with pytest.raises(HarnessError) as ei:
         g.commit_all("chore: hook hangs")
     assert time.monotonic() - start < 15
-    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert ei.value.kind == "precommit-hang", f"kind was {ei.value.kind!r}"
     assert "commit" in ei.value.detail
     grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
     deadline = time.monotonic() + 5
@@ -614,3 +614,113 @@ def test_prove_lostwork_conjunctive_gate(repo, script, expected_ok):
     assert ok is expected_ok, evidence
     if script is None:
         assert "lostwork.sh not found" in evidence
+
+
+def _install_slow_clean_filter(repo, tmp_path):
+    script = tmp_path / "slow-clean.sh"
+    script.write_text(f"#!/bin/bash\necho $$ > {tmp_path}/filter.pid\nsleep 30\ncat\n")
+    script.chmod(0o755)
+    with open(os.path.join(repo, ".gitattributes"), "w") as fh:
+        fh.write("*.slow filter=slow\n")
+    subprocess.run(["git", "-C", repo, "config", "filter.slow.clean", str(script)],
+                   check=True, capture_output=True)
+
+
+def _assert_pid_gone(pidfile):
+    pid = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+            time.sleep(0.1)
+        except ProcessLookupError:
+            return
+    pytest.fail("filter process survived the process-group reap")
+
+
+def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monkeypatch):
+    """A hang in commit_all's `git add -A` leg is bounded and named, and it stays
+    subprocess-timeout: only the commit leg (the hook) is precommit-hang.
+
+    Mutation caught: revert _run to a bare subprocess.run and git add finishes after
+    30s, the commit lands, so the raise and HEAD assertions fail.
+    """
+    _install_slow_clean_filter(repo, tmp_path)
+    subprocess.run(["git", "-C", repo, "add", ".gitattributes"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", repo, "commit", "-m", "attrs"], check=True, capture_output=True)
+    with open(os.path.join(repo, "x.slow"), "w") as fh:
+        fh.write("slow\n")
+    pre = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                         capture_output=True, text=True).stdout.strip()
+    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 1)
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).commit_all("m")
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+    assert ei.value.kind != "precommit-hang"
+    assert "step 'git add'" in ei.value.detail
+    post = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+    assert post == pre
+    _assert_pid_gone(tmp_path / "filter.pid")
+    assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))
+
+
+def test_run_out_and_run_bytes_are_bounded(repo, tmp_path, monkeypatch):
+    """Mutation caught: revert _run_out (returns (0, sha)) or _run_bytes (returns bytes)
+    to a bare subprocess.run, and its raise assertion fails."""
+    _install_slow_clean_filter(repo, tmp_path)
+    with open(os.path.join(repo, "x.slow"), "w") as fh:
+        fh.write("slow\n")
+    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 1)
+    g = LiveGit(repo)
+    for call in (g._run_out, g._run_bytes):
+        start = time.monotonic()
+        with pytest.raises(HarnessError) as ei:
+            call("hash-object", "x.slow")
+        assert time.monotonic() - start < 15
+        assert ei.value.kind == "subprocess-timeout"
+        assert "step 'git hash-object'" in ei.value.detail
+
+
+def test_network_subcommands_use_git_net_timeout(repo, monkeypatch):
+    """Mutation caught: make _git_timeout always return GIT_OP_TIMEOUT and the list is
+    [3, 3, 3, 3]."""
+    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 3)
+    monkeypatch.setattr(gitad, "GIT_NET_TIMEOUT", 7)
+    recorded = []
+
+    def fake_run_bounded(argv, **kwargs):
+        recorded.append(kwargs["timeout"])
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(gitad, "run_bounded", fake_run_bounded)
+    g = LiveGit(repo)
+    g._run("fetch", "origin", "master")
+    g._run_out("push", "origin", "HEAD:refs/heads/x")
+    g._run_out("ls-remote", "origin")
+    g._run("status")
+    assert recorded == [7,7,7,3]  # fetch, push, ls-remote, then a local call
+
+
+def test_precommit_hang_makes_no_commit(repo, tmp_path, monkeypatch):
+    """Mutation caught: pass timeout=None on the commit leg and the hook exits 0 after
+    30s, the commit lands, so the raise and HEAD assertions fail."""
+    _install_reject_hook(repo, "#!/bin/bash\nsleep 30\nexit 0\n")
+    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 1)
+    with open(os.path.join(repo, "slow.txt"), "w") as fh:
+        fh.write("slow\n")
+    pre = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                         capture_output=True, text=True).stdout.strip()
+    start = time.monotonic()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).commit_all("m")
+    assert time.monotonic() - start < 15
+    assert ei.value.kind == "precommit-hang", f"kind was {ei.value.kind!r}"
+    assert "hung past 1s" in ei.value.detail
+    assert "commit (pre-commit hook)" in ei.value.detail
+    post = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+    assert post == pre
+    assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))

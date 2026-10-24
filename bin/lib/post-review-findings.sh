@@ -193,11 +193,15 @@ post_review_summary() {
 # prf_review_threads PR_NUMBER
 #   Emits one JSON object per review thread:
 #     {id, isResolved, isOutdated, path, line, commentId, score, agent, body,
-#      authorLogin, authorType}
+#      authorLogin, authorType, lastBody, lastAuthorLogin, lastAuthorType}
 #   `authorLogin` / `authorType` describe the FIRST comment's author (the thread
 #   root): GraphQL `author.login` and `author.__typename` (`User`, `Bot`, ...).
 #   Both are "" when the root comment or its author is gone. list_trusted_open_threads
 #   is the only consumer that keys on them; the trust rule lives there, not here.
+#   `lastBody` / `lastAuthorLogin` / `lastAuthorType` describe the thread's LATEST
+#   comment (GraphQL `comments(last:1)`), which is the root on a single-comment
+#   thread. All three are "" when absent. The post-plan harness reads them to
+#   detect its own gate-hold marker reply.
 #   `commentId` is the REST databaseId of the thread's FIRST comment — the id the
 #   replies endpoint keys on.  `score` is parsed from the `<!-- score: N -->`
 #   marker post_review_findings embeds, or null for a human-authored thread.
@@ -220,6 +224,7 @@ prf_review_threads() {
                 nodes {
                   id isResolved isOutdated path line
                   comments(first:1) { nodes { databaseId body author { login __typename } } }
+                  lastComment: comments(last:1) { nodes { body author { login __typename } } }
                 }
               }
             }
@@ -236,7 +241,10 @@ prf_review_threads() {
                          | if . == null then null else .a end),
                  body: (.comments.nodes[0].body // ""),
                  authorLogin: (.comments.nodes[0].author.login // ""),
-                 authorType: (.comments.nodes[0].author.__typename // "")}'
+                 authorType: (.comments.nodes[0].author.__typename // ""),
+                 lastBody: (.lastComment.nodes[0].body // ""),
+                 lastAuthorLogin: (.lastComment.nodes[0].author.login // ""),
+                 lastAuthorType: (.lastComment.nodes[0].author.__typename // "")}'
 }
 
 # list_open_review_findings PR_NUMBER
@@ -292,6 +300,29 @@ list_trusted_open_threads() {
                  | select(.authorLogin == "a-jay85"
                           or .authorType == "Bot"
                           or (.authorLogin | endswith("[bot]")))'
+}
+
+# reply_review_thread PR_NUMBER COMMENT_ID BODY
+#   Posts BODY as a threaded REPLY to COMMENT_ID and leaves the thread OPEN.
+#   The post-plan harness uses it to mark a thread it will not fix (gate-path
+#   hold) without resolving it, so the thread keeps holding arming condition (11).
+#   Returns 2 on a malformed COMMENT_ID, 1 when COMMENT_ID owns no thread on the
+#   PR or the POST fails. Prints nothing.
+reply_review_thread() {
+    local pr="$1" cid="$2" body="$3"
+    case "$cid" in
+        ''|*[!0-9]*) echo "reply_review_thread: COMMENT_ID must be numeric, got '$cid'" >&2; return 2 ;;
+    esac
+    local tid
+    tid=$(prf_review_threads "$pr" | jq -r --argjson cid "$cid" \
+        'select(.commentId == $cid) | .id' | head -1)
+    if [ -z "$tid" ]; then
+        echo "reply_review_thread: comment ${cid} owns no review thread in the first 100 on PR #${pr}" >&2
+        return 1
+    fi
+    "$GH_CMD" api --method POST \
+        "repos/${REPO_SLUG}/pulls/${pr}/comments/${cid}/replies" \
+        -f body="$body" >/dev/null || return 1
 }
 
 # resolve_review_finding PR_NUMBER COMMENT_ID BODY

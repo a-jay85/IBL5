@@ -2389,3 +2389,42 @@ def test_replay_phase2_logs_how_to_revert_once(tmp_path):
     assert md_idx and adr_idx, lines
     assert md_idx[0] < htr_idx[0] < adr_idx[0], (md_idx, htr_idx, adr_idx)
     assert not any("phase2 finding: how-to-revert" in ln for ln in lines), lines
+
+
+def test_precommit_hang_fails_run_closed_no_push_no_gatefix(tmp_path, monkeypatch):
+    """A pre-commit hook hang fails the run closed (exit 3) before push and arming, and
+    neither the gate fixer nor doc remediation runs on it.
+
+    Mutation caught: drop PRECOMMIT_HANG from _FAIL_CLOSED_KINDS (exit 1); admit it in
+    _attempt_gate_fix (the recorder fires); swallow it in _commit_with_gate_fix (the run
+    reaches `phase2: PR #`).
+    """
+    from harness.adapters import gitad
+
+    def _hang(*a, **kw):
+        raise HarnessError(runner.PRECOMMIT_HANG,
+                           "pre-commit hook hung past 300s and was killed "
+                           "(step 'commit (pre-commit hook)')",
+                           cmd="git commit")
+
+    gatefix_calls: list = []
+    remediate_calls: list = []
+    monkeypatch.setattr(gitad.ReplayGit, "commit_all", _hang)
+    monkeypatch.setattr(runner.gatefix, "attempt_gate_fix",
+                        lambda *a, **k: gatefix_calls.append(a))
+    monkeypatch.setattr(runner, "_remediate_doc_staleness",
+                        lambda *a, **k: remediate_calls.append(a))
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "precommit-hang"
+    assert runner.exit_code_for(res) == 3
+    assert "kind=precommit-hang" in runner.verdict_line(res, 3)
+    assert gatefix_calls == []
+    assert remediate_calls == []
+    audit = _audit(out)
+    assert "phase2: PR #" not in audit
+    assert "REBASE=" not in audit
+    assert "phase6.5" not in audit

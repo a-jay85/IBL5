@@ -701,6 +701,8 @@ if [ -n "$HOLDREPEAT_FIX_ARG" ] || case "$_hr_first" in "RESULT: post-plan DECLI
         # The re-fire's post-plan output becomes this run's record; the decline is kept beside it.
         cp "$LOG" "$LOG.declined" 2>/dev/null || true
         cp "$_hr_log" "$LOG"
+        # RC still holds the first pass's decline exit (8). notify() must judge the re-fire.
+        RC=0
     elif [ -n "$HOLDREPEAT_FIX_ARG" ]; then
         # pr-cycle skipped this PR before the autofix existed: skip-* and gave-up-* stay a quiet
         # decline (postplan-fix DMs its own gave-up). A timeout, an error or a missing result
@@ -715,6 +717,21 @@ if [ -n "$HOLDREPEAT_FIX_ARG" ] || case "$_hr_first" in "RESULT: post-plan DECLI
     fi
     [ "$_hr_rc" = 124 ] && RC=124
     echo "post-plan-fleet: holdrepeat-fix=$_hr_word" >> "$LOG"
+fi
+# A timed-out run's last step: the last "starting" line of the harness audit.log, found
+# through post-plan-now's harness-run-dir= line. Empty (and no line written) when either
+# is missing, so the timeout wording stays as it was.
+TIMEOUT_STEP=""
+if [ "$RC" = 124 ]; then
+    _to_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
+        | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
+    if [ -n "$_to_dir" ] && [ "$_to_dir" != none ] && [ -f "$_to_dir/audit.log" ]; then
+        TIMEOUT_STEP=$(grep -E '^\[[0-9:]+\] [A-Za-z0-9._-]+: starting ' "$_to_dir/audit.log" 2>/dev/null \
+            | tail -n 1 | sed -E 's/^\[[0-9:]+\] //' | cut -c1-160 || true)
+    fi
+    if [ -n "$TIMEOUT_STEP" ]; then
+        echo "post-plan-now: timed-out run's last step: $TIMEOUT_STEP" >> "$LOG"
+    fi
 fi
 notify() {
     [ "$_hr_quiet" = 1 ] && return 0
@@ -847,7 +864,10 @@ for c in (d.get("arm") or {}).get("conditions") or []:
                             DM_NEXT="nothing to fix — it resumes on its own after the usage reset" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="$stop_text" ;;
         "TIMED OUT")        DM_ICON="⏱";  DM_VERDICT="TIMED OUT"
-                            DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`" ;;
+                            DM_NEXT="re-run with \`bin/post-plan-fleet --pr ${PR} --go\`"
+                            if [ -n "$TIMEOUT_STEP" ]; then
+                                DM_NEXT="last step reached: ${TIMEOUT_STEP}"$'\n'"${DM_NEXT}"
+                            fi ;;
         DECLINED)           DM_ICON="🚫"; DM_VERDICT="DECLINED (same hold as last run)"
                             DM_NEXT="$decl_text"
                             _hr_dm_word=$(grep -m1 '^post-plan-fleet: holdrepeat-fix=' "$LOG" 2>/dev/null | sed 's/.*holdrepeat-fix=//' || true)

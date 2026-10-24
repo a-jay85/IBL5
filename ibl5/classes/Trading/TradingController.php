@@ -11,6 +11,7 @@ use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
 use Trading\Contracts\TradeDecisionServiceInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
+use Trading\Contracts\TradeProcessorInterface;
 use Auth\Contracts\AuthServiceInterface;
 use EventLog\EventLogger;
 
@@ -318,16 +319,33 @@ class TradingController implements TradingControllerInterface
                 EventLogger::setAction('trade_offer_accepted');
                 \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
             } else {
-                $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
-                $errorMsg = is_string($result['error'] ?? null)
-                    ? ($result['error'] ?? '')
-                    : ($errors !== [] ? implode('; ', $errors) : 'Unknown error');
-                \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($errorMsg));
+                \Utilities\HtmxHelper::redirect(self::acceptFailureRedirectUrl($result));
             }
         } catch (\Exception $e) {
             $this->tradeLogger->error('Failed to process trade', ['error' => $e->getMessage()]);
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
         }
+    }
+
+    /**
+     * Redirect URL for a failed accept. The empty-pending-rows error (the trade was
+     * already processed, declined, or withdrawn) maps to the already_processed
+     * alert; every other failure keeps the generic accept_error alert plus message.
+     *
+     * @param array{success: bool, error?: string, errors?: list<string>, storytext?: string, storytitle?: string} $result
+     */
+    public static function acceptFailureRedirectUrl(array $result): string
+    {
+        if (($result['error'] ?? null) === TradeProcessorInterface::NO_TRADE_DATA_ERROR) {
+            return '/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed';
+        }
+
+        $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
+        $errorMsg = is_string($result['error'] ?? null)
+            ? ($result['error'] ?? '')
+            : ($errors !== [] ? implode('; ', $errors) : 'Unknown error');
+
+        return '/ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($errorMsg);
     }
 
     /**

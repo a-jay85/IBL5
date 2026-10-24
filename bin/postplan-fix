@@ -244,6 +244,13 @@ if [ "$HOLDREPEAT" = 1 ]; then
     # Back to the clean entry state: the worktree was clean and synced on entry, so a hard
     # reset loses nothing the owner made. The plan lives outside the repo, so restore it too.
     _hr_revert() {
+        # A session may have pushed. Put origin back with a lease on the value just read, so
+        # every reject path repairs the remote, not only the refs guard.
+        local remote_now
+        if remote_now="$(git -C "$WT" ls-remote origin "refs/heads/$branch" 2>/dev/null | cut -f1)" \
+            && [ -n "$remote_now" ] && [ "$remote_now" != "$HEAD0" ]; then
+            git -C "$WT" push -q --force-with-lease="refs/heads/$branch:$remote_now" origin "$HEAD0:refs/heads/$branch" >/dev/null 2>&1 || true
+        fi
         git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         git -C "$WT" clean -fdq >/dev/null 2>&1 || true
         REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}" 2>/dev/null)" || REFS1="$REFS0"

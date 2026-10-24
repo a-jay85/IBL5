@@ -1,6 +1,6 @@
 ---
 description: Shared E2E spec reviewer agent used by /post-plan Phase 4B Agent D.
-last_verified: 2026-09-28
+last_verified: 2026-10-19
 ---
 
 # Agent D: E2E Spec Reviewer (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
@@ -80,11 +80,11 @@ When `ibl5/tests/e2e/vr-manifest.ts` exists, also confirm manifest rows were add
 
 **Do not flag:**
 - Branches that are pure refactors (logic moved, no new user-visible state)
-- Pre-existing branches that the diff did not introduce
+- Pre-existing untested branches ARE reportable when the missing test would catch a real defect; mark them `pre-existing: yes` (they post as a non-holding note). Skip them when the branch is merely old and harmless.
 - Branches gated by configuration the test suite cannot reach
 
 ---
 
 ## Output format
 
-Return one entry per issue: `file:line`, the anti-pattern matched (Section/Pattern name), and the concrete regression the test would let through. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked (e.g., "Scanned 3 *-submission.spec.ts files; all happy-path tests use cross-page navigation + destination assertion.").
+Return one entry per issue: `file:line`, the anti-pattern matched (Section/Pattern name), and the concrete regression the test would let through. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked (e.g., "Scanned 3 *-submission.spec.ts files; all happy-path tests use cross-page navigation + destination assertion."). Close each finding with the metadata line from `.claude/review-shared/_review-agents.md` § Per-finding fields.

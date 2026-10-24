@@ -345,6 +345,11 @@ pr_pipeline_authored_hold() {
 #   scored unresolved thread, `unresolved-finding:-` per unscored one, or one of
 #   `unresolved-findings-cap` / `-api-error`, or nothing.
 #   History: until 2026-09 only N >= 80 held; the widening is additive.
+#   Exception (2026-10): a thread whose FIRST comment begins with
+#   `<!-- label: nit -->` or `<!-- label: pre-existing -->` AND whose first-comment
+#   author is trusted (a-jay85, a GitHub Bot, or a `[bot]` login) never holds. The
+#   marker is written only by the posting code; an untrusted author, a marker not on
+#   line 1, or any other label word holds as before. Skipped threads go to stderr.
 pr_unresolved_findings_hold() {
     local pr="$1"
     local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
@@ -358,7 +363,7 @@ pr_unresolved_findings_hold() {
               reviewThreads(first:100) {
                 nodes {
                   isResolved
-                  comments(first:1) { nodes { databaseId body } }
+                  comments(first:1) { nodes { databaseId body author { login __typename } } }
                 }
               }
             }
@@ -381,15 +386,34 @@ pr_unresolved_findings_hold() {
         || { echo "unresolved-findings-api-error"; return 0; }
     # first:100 is unpaginated: a full page means threads 101+ are invisible, so hold.
     [ "$count" -eq 100 ] && { echo "unresolved-findings-cap"; return 0; }
+    # A trusted first comment that opens with a nit / pre-existing label marker is
+    # non-holding (see header Exception). Shared by the stdout and stderr passes.
+    local nonholding_def='
+        def nonholding:
+            ((.comments.nodes[0].body // "") | test("^<!-- label: (nit|pre-existing) -->")) and
+            (((.comments.nodes[0].author.login // "") == "a-jay85")
+             or ((.comments.nodes[0].author.__typename // "") == "Bot")
+             or ((.comments.nodes[0].author.login // "") | endswith("[bot]")));'
     local findings
-    findings=$(printf '%s' "$raw" | jq -r '
+    findings=$(printf '%s' "$raw" | jq -r "$nonholding_def"'
         .data.repository.pullRequest.reviewThreads.nodes[]
         | select(.isResolved == false)
+        | select(nonholding | not)
         | "unresolved-finding:" +
           (((.comments.nodes[0].body // "")
             | capture("<!-- score: (?<s>[0-9]+) -->") // null)
            | if . == null then "-" else .s end)
     ' 2>/dev/null) || { echo "unresolved-findings-api-error"; return 0; }
+    # Skipped threads are logged to stderr only: any stdout line holds.
+    printf '%s' "$raw" | jq -r "$nonholding_def"'
+        .data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved == false)
+        | select(nonholding)
+        | "pr_unresolved_findings_hold: non-holding thread "
+          + ((.comments.nodes[0].databaseId // "-") | tostring) + " ("
+          + ((.comments.nodes[0].body // "") | capture("^<!-- label: (?<l>[a-z-]+) -->").l)
+          + ")"
+    ' >&2 2>/dev/null || true
     [ -n "$findings" ] && printf '%s\n' "$findings"
     # REQUIRED: without it the clear path returns 1 and aborts bin/pr-triage
     # (set -euo pipefail) on the first clear PR. Every predicate in this file must

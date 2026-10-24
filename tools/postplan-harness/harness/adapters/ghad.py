@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 from .. import followcap, netretry
+from ..labels import render_body, visible_right_lines
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -63,6 +64,22 @@ def _last_code_review(data) -> dict:
     except (AttributeError, TypeError):
         found = None
     return {"scanned": True, "comment": found}
+
+
+_LABEL_WORDS = {"important": "Important", "nit": "Nit", "pre-existing": "Pre-existing"}
+
+
+def _summary_lines(fs: list) -> list[str]:
+    """One summary-comment line per finding; an unset label renders as Important."""
+    out = []
+    for f in fs:
+        line = f"- **{_LABEL_WORDS.get(f.label, 'Important')}** `{f.path}:{f.line}`"
+        if f.bug_class:
+            line += f" (bug class: `{f.bug_class}`)"
+        if f.other_instances:
+            line += " other instances: " + ", ".join(f"`{x}`" for x in f.other_instances)
+        out.append(line + f" — {f.body}\n\n<!-- score: {f.score} -->")
+    return out
 
 
 class RecordingGh:
@@ -140,8 +157,8 @@ class RecordingGh:
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
-                    findings=[{"path": f.path, "line": f.line, "body": f.body[:1000],
-                               "score": f.score} for f in findings])
+                    findings=[{"path": f.path, "line": f.line, "body": render_body(f, 1000),
+                               "score": f.score, "label": f.label} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
@@ -601,29 +618,49 @@ class LiveGh(RecordingGh):
                 raise HarnessError("gh", f"issue list failed: {exc}") from exc
             return []
 
-    def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
-        payload = {"commit_id": head_sha, "event": "COMMENT", "body": title,
-                   "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
-                                 "body": f.body[:1000]} for f in findings]}
+    def _visible_right_lines(self, pr: int):
+        """{path: visible right-side lines} for the PR diff, or None when unknown."""
         try:
-            self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
-                             "--method", "POST", "--input", "-"),
-                            label="gh api reviews POST",
-                            landed=self._count_increase_landed(
-                                lambda: self._matching_count(pr, "reviews", title)),
-                            input_text=json.dumps(payload))
+            parsed = visible_right_lines(self._gh("pr", "diff", str(pr)))
         except HarnessError:
-            # one out-of-diff line anchor 422s the whole review — degrade to a
-            # summary comment; findings still hold arming from memory regardless
-            body = "\n".join(f"- `{f.path}:{f.line}` — {f.body}" for f in findings)
-            comment = f"## {title}\n\n{body}"
-            self._gh_landed(("pr", "comment", str(pr), "--body", comment),
-                            label="gh pr comment",
-                            landed=self._count_increase_landed(
-                                lambda: self._matching_count(pr, "comments", comment)))
+            return None
+        return parsed or None
+
+    def _post_summary_comment(self, pr: int, comment: str) -> None:
+        self._gh_landed(("pr", "comment", str(pr), "--body", comment),
+                        label="gh pr comment",
+                        landed=self._count_increase_landed(
+                            lambda: self._matching_count(pr, "comments", comment)))
+
+    def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
+        visible = self._visible_right_lines(pr)
+        inline = [f for f in findings
+                  if visible is None or (f.line > 0 and f.line in visible.get(f.path, set()))]
+        inline_ids = {id(f) for f in inline}
+        summary = [f for f in findings if id(f) not in inline_ids]
+        if inline:
+            payload = {"commit_id": head_sha, "event": "COMMENT", "body": title,
+                       "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
+                                     "body": render_body(f, 1000)} for f in inline]}
+            try:
+                self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
+                                 "--method", "POST", "--input", "-"),
+                                label="gh api reviews POST",
+                                landed=self._count_increase_landed(
+                                    lambda: self._matching_count(pr, "reviews", title)),
+                                input_text=json.dumps(payload))
+            except HarnessError:
+                # an out-of-diff line anchor 422s the whole review — degrade to a
+                # summary comment; findings still hold arming from memory regardless
+                self._post_summary_comment(
+                    pr, f"## {title}\n\n" + "\n".join(_summary_lines(inline)))
+        if summary:
+            self._post_summary_comment(
+                pr, f"## {title}\n\nFound {len(summary)} issue(s) that could not be "
+                    "anchored to a diff line:\n\n" + "\n".join(_summary_lines(summary)))
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
-                    findings=[{"path": f.path, "line": f.line, "body": f.body[:1000],
-                               "score": f.score} for f in findings])
+                    findings=[{"path": f.path, "line": f.line, "body": render_body(f, 1000),
+                               "score": f.score, "label": f.label} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         comment = f"## {title}\n\n{body}"

@@ -88,4 +88,4 @@ Check EACH pattern in the vulnerable and secure lists below against the diff. Fo
 
 ### Output format
 
-For each audited section: return findings with a `file:line` citation, what is wrong, and the concrete input that exploits it (what an attacker sends and what it reaches). If you cannot name one, say so in the finding. With no findings, return a 1-2 sentence evidence summary citing the specific secure patterns observed. Do not return a bare "no issues."
+For each audited section: return findings with a `file:line` citation, what is wrong, and the concrete input that exploits it (what an attacker sends and what it reaches). If you cannot name one, say so in the finding. With no findings, return a 1-2 sentence evidence summary citing the specific secure patterns observed. Do not return a bare "no issues." Close each finding with the metadata line from `.claude/review-shared/_review-agents.md` § Per-finding fields, with `severity` always `important`: a security finding is never a nit; only `pre-existing: yes` changes how it posts.

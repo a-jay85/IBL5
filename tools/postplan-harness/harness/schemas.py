@@ -14,6 +14,8 @@ from .state import Classification, HarnessError
 PR_COPY_PURPOSE = "pr-copy"
 
 FINDING_KEYS = {"path", "line", "body"}
+FINDING_OPTIONAL_KEYS = {"severity", "preexisting", "bug_class", "other_instances"}
+SEVERITY_HINTS = {"important", "nit"}
 FINDING_ALIASES = (
     ("path", ("file",)),
     ("body", ("detail", "description", "message")),
@@ -43,6 +45,17 @@ def _normalize_finding(item):
         out["line"] = item["line"]
     elif out:
         out["line"] = 0
+    sev = item.get("severity")
+    if isinstance(sev, str) and sev.lower() in SEVERITY_HINTS:
+        out["severity"] = sev.lower()
+    if isinstance(item.get("preexisting"), bool):
+        out["preexisting"] = item["preexisting"]
+    bug_class = item.get("bug_class")
+    if isinstance(bug_class, str) and bug_class.strip():
+        out["bug_class"] = bug_class.strip()[:60]
+    others = item.get("other_instances")
+    if isinstance(others, list):
+        out["other_instances"] = [o for o in others if isinstance(o, str)][:20]
     return out
 
 
@@ -54,8 +67,9 @@ def unwrap_findings_envelope(data):
       2. a dict with TWO OR MORE keys whose values are ALL lists -> the concatenation of
          those lists, in key order. This is the sectioned reply an agent emits when it
          echoes the prompt's section headers as JSON keys.
-      3. every item of the resulting list -> exactly {path, line, body}, resolving the
-         aliases in FINDING_ALIASES and dropping every other key. A finding with no `line`
+      3. every item of the resulting list -> {path, line, body} plus any well-formed
+         FINDING_OPTIONAL_KEYS (malformed optional keys are dropped, never rejected),
+         resolving the aliases in FINDING_ALIASES and dropping every other key. A finding with no `line`
          gets the int sentinel 0, which passes validate_findings and routes to a file-level
          PR comment in bin/lib/post-review-findings.sh.
 
@@ -96,6 +110,15 @@ def validate_findings(data) -> None:
             raise HarnessError("schema", f"finding[{i}] path/body must be strings")
 
 
+def unwrap_scores_envelope(data):
+    """{"scores": [...]} or {"findings": [...]} -> the inner list; anything else passes through."""
+    if isinstance(data, dict) and len(data) == 1:
+        (key, inner), = data.items()
+        if key in ("scores", "findings") and isinstance(inner, list):
+            return inner
+    return data
+
+
 def validate_scores(data) -> None:
     """[{n, score}] — the rubric scoring call (0-100)."""
     if not isinstance(data, list):
@@ -105,6 +128,8 @@ def validate_scores(data) -> None:
             raise HarnessError("schema", f"score[{i}] needs n and score")
         if not isinstance(s["score"], int) or not 0 <= s["score"] <= 100:
             raise HarnessError("schema", f"score[{i}].score must be int 0-100")
+        if "preexisting" in s and not isinstance(s["preexisting"], bool):
+            s["preexisting"] = False
 
 
 VERDICT_VALUES = {"real", "not-real"}

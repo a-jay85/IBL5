@@ -2917,7 +2917,9 @@ reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 hm_fixture 101 first-slug
-PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+# The seeded hold is a fix-eligible MISSING hold, so the auto-fix route would take the PR;
+# 0 keeps this case on the plain skip it tests.
+PR_CYCLE_HOLDREPEAT_AUTOFIX=0 PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
 [[ $RC -eq 0 ]] || fail "marker M-A: exit $RC, want 0"
 [[ "$(calls ready)" == "0" ]] || fail "marker M-A: fleet ran $(calls ready) time(s), want 0"
 grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "marker M-A: 101 is in stage1.txt"
@@ -2991,7 +2993,31 @@ PLANS_DIR="" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
 hm_fires "M-G empty PLANS_DIR"
 hm_cleanup
 
-# M-H: the suppressed PR frees its --max-ready slot for the next ordered PR.
+# M-H: the suppressed PR frees its --max-ready slot for the next ordered PR. The autofix
+# stays on: a seeded "started" attempt makes 101 fix-ineligible, so it takes the plain skip.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+jq '. + [{"number":102,"headRefName":"second-slug","autoMergeRequest":null,"mergeStateStatus":"CLEAN"}]' \
+    "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+_mh_fp="$(env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 -c \
+    'import sys; from harness.holdrepeat import hold_fingerprint; print(hold_fingerprint(sys.argv[1]))' "$HM_MISSING_A")"
+[[ -n "$_mh_fp" ]] || fail "marker M-H: fingerprint helper printed nothing"
+env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 -m harness.holdrepeat fix-record \
+    --state-dir "$HMSTATE" --slug first-slug --fingerprint "$_mh_fp" --pr 101 --outcome started \
+    > /dev/null 2>&1
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
+[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "marker M-H: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
+grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
+grep -qF -- '--holdrepeat-fix-prs' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
+    && fail "marker M-H: the fix-ineligible PR was routed: $(sed -n 1p "$SCRATCH/ready.argv")"
+hm_cleanup
+
+# M-H1: with the autofix on, the marked PR is routed to the fix, and a routed PR counts against
+# --max-ready like any other: it keeps its ordered slot and the next PR is capped out.
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
@@ -3000,9 +3026,33 @@ jq '. + [{"number":102,"headRefName":"second-slug","autoMergeRequest":null,"merg
     "$SCRATCH/armed-state.json" > "$SCRATCH/armed-state.tmp" \
     && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
 PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
-[[ "$(cat "$(rundir)/stage1.txt")" == "102" ]] || fail "marker M-H: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 102"
-grep -qF '#101 — held-unfixable marker active' <<< "$OUT" || fail "marker M-H: 101 skip line missing"
-grep -qF '#102 — over --max-ready cap' <<< "$OUT" && fail "marker M-H: 102 was capped out"
+[[ "$(cat "$(rundir)/stage1.txt")" == "101" ]] || fail "marker M-H1: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 101"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" || fail "marker M-H1: 102 was not capped out (out: $OUT)"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
+    || fail "marker M-H1: argv lacks --holdrepeat-fix-prs=101: $(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF -- '--pr-list 101 ' <<< "$(sed -n 1p "$SCRATCH/ready.argv") " \
+    || fail "marker M-H1: --pr-list is not just 101: $(sed -n 1p "$SCRATCH/ready.argv")"
+hm_cleanup
+
+# M-H2: two routed PRs and --max-ready 1. Only the first ordered PR reaches the fleet, and
+# the capped one is never handed to --holdrepeat-fix-prs, so no second paid session starts.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 102 second-slug
+cp "$SCRATCH/armed-state.json" "$SCRATCH/armed-state.102"
+hm_fixture 101 first-slug
+jq -s '.[0] + .[1]' "$SCRATCH/armed-state.json" "$SCRATCH/armed-state.102" > "$SCRATCH/armed-state.tmp" \
+    && mv "$SCRATCH/armed-state.tmp" "$SCRATCH/armed-state.json"
+rm -f "$SCRATCH/armed-state.102"
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker --max-ready 1
+grep -qxF 102 "$(rundir)/stage1-holdrepeat-fix.txt" 2>/dev/null \
+    || fail "marker M-H2: precondition: 102 was not routed, the case proves nothing"
+[[ "$(cat "$(rundir)/stage1.txt")" == "101" ]] || fail "marker M-H2: stage1.txt is '$(cat "$(rundir)/stage1.txt")', want just 101"
+grep -qF '#102 — over --max-ready cap' <<< "$OUT" || fail "marker M-H2: 102 was not capped out (out: $OUT)"
+_mh2_argv="$(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$_mh2_argv" || fail "marker M-H2: argv lacks --holdrepeat-fix-prs=101: $_mh2_argv"
+grep -qE -- '--holdrepeat-fix-prs=[0-9,]*102' <<< "$_mh2_argv" && fail "marker M-H2: capped 102 reached --holdrepeat-fix-prs: $_mh2_argv"
 hm_cleanup
 # M-I: an UNREALISED-ASSERTION marker written at another head never suppresses the PR, and an
 # empty headRefOid means the head is unknown, so the PR fires too.
@@ -3031,6 +3081,149 @@ PY
 done
 echo "PASS: heldmarker unrealised head mismatch proceeds"
 end_case "case held-unfixable marker pre-fire skip"
+
+# ==========================================================================================
+# Holdrepeat auto-fix route: a skip that is fix-eligible joins the fleet call instead
+# ==========================================================================================
+# hf_seed <branch> <conds> <pr> — replace hr_fixture's hand-built hold record with one written
+# through harness.holdrepeat.observe, so `fix-eligible` reads a real hold_set and structural
+# list. The fingerprint is carried over from hr_fixture and the DM is marked sent, so
+# `check` still declines. <conds> is a csv: 3 -> {3 MISSING-FILE}, 3,14 adds condition 14.
+hf_seed() {
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$SCRATCH/hrstate" "$1" "$2" "$3" <<'PY'
+import sys
+from types import SimpleNamespace
+from harness import holdrepeat as hr
+sd, slug, conds, pr = sys.argv[1:5]
+fp = hr.load_record(sd, slug)["fingerprint"]
+hr.clear_record(sd, slug)
+conditions = [SimpleNamespace(number=int(c), name="c" + c, blocked=True,
+                              reason="MISSING-FILE: bin/foo" if c == "3" else "other")
+              for c in conds.split(",")]
+obs = hr.observe(sd, slug, armed=False, conditions=conditions, fingerprint=fp, pr=int(pr),
+                 now="2026-10-23T12:00:00Z")
+hr.mark_dm_sent(sd, slug, obs.key)
+PY
+}
+
+# hf_setup <conds> — one NEEDS-WORK PR 101 on first-slug, held and DM'd on <conds>.
+hf_setup() {
+    hr_cleanup
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    hr_fixture 101 first-slug "3"
+    hf_seed first-slug "$1" 101
+}
+hf_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
+
+begin_case
+hf_setup "3"
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "holdrepeat-skip-routes-fix: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "holdrepeat-skip-routes-fix: ready calls $(calls ready), want 1"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(hf_argv)" || fail "holdrepeat-skip-routes-fix: argv lacks --holdrepeat-fix-prs=101: $(hf_argv)"
+grep -qF -- '--pr-list 101' <<< "$(hf_argv)" || fail "holdrepeat-skip-routes-fix: --pr-list lacks 101: $(hf_argv)"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat.txt" 2>/dev/null && fail "holdrepeat-skip-routes-fix: 101 is in stage1-holdrepeat.txt"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat-fix.txt" 2>/dev/null || fail "holdrepeat-skip-routes-fix: 101 missing from stage1-holdrepeat-fix.txt"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" && fail "holdrepeat-skip-routes-fix: the plain skip line still printed"
+hr_cleanup
+end_case "holdrepeat-skip-routes-fix"
+
+begin_case
+hf_setup "3,14"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat-skip-other-condition-stays: fleet ran $(calls ready) time(s), want 0"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat.txt" 2>/dev/null || fail "holdrepeat-skip-other-condition-stays: 101 missing from stage1-holdrepeat.txt"
+grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "holdrepeat-skip-other-condition-stays: 101 is in stage1.txt"
+grep -qF -- '--holdrepeat-fix-prs' <<< "$(hf_argv)" && fail "holdrepeat-skip-other-condition-stays: argv carries --holdrepeat-fix-prs"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat-skip-other-condition-stays: skip line missing (out: $OUT)"
+hr_cleanup
+end_case "holdrepeat-skip-other-condition-stays"
+
+# The ledger already holds this fingerprint, so fix-eligible answers give-up (rc 11) and the
+# PR stays skipped. --no-mark must leave giveup_dm empty: the DM belongs to bin/postplan-fix.
+begin_case
+hf_setup "3"
+_hf_fp="$(env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 -c \
+    'from harness.holdrepeat import hold_fingerprint; print(hold_fingerprint("MISSING-FILE: bin/foo"))')"
+[[ -n "$_hf_fp" ]] || fail "holdrepeat-skip-attempted-stays: fingerprint helper printed nothing"
+env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 -m harness.holdrepeat fix-record \
+    --state-dir "$SCRATCH/hrstate" --slug first-slug --fingerprint "$_hf_fp" --pr 101 --outcome started \
+    > /dev/null 2>&1
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat-skip-attempted-stays: fleet ran $(calls ready) time(s), want 0"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat.txt" 2>/dev/null || fail "holdrepeat-skip-attempted-stays: 101 missing from stage1-holdrepeat.txt"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat-skip-attempted-stays: skip line missing (out: $OUT)"
+jq -e '(.attempts | length) == 1' "$SCRATCH/hrstate/first-slug.holdrepeat-fix.json" > /dev/null 2>&1 \
+    || fail "holdrepeat-skip-attempted-stays: ledger lacks the seeded attempt"
+jq -e '.giveup_dm == []' "$SCRATCH/hrstate/first-slug.holdrepeat-fix.json" > /dev/null 2>&1 \
+    || fail "holdrepeat-skip-attempted-stays: giveup_dm is not empty (--no-mark not honoured)"
+hr_cleanup
+end_case "holdrepeat-skip-attempted-stays"
+
+# The same route through the held-unfixable marker branch. The record has no dm_sent_key, so
+# the older holdrepeat skip fails open and only the marker skip is under test.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+hm_fixture 101 first-slug
+PLANS_DIR="$HMPLANS" HRHARNESS="$HRH" HRSTATE="$HMSTATE" run --worker
+[[ $RC -eq 0 ]] || fail "heldmarker-skip-routes-fix: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "heldmarker-skip-routes-fix: ready calls $(calls ready), want 1"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(hf_argv)" || fail "heldmarker-skip-routes-fix: argv lacks --holdrepeat-fix-prs=101: $(hf_argv)"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat.txt" 2>/dev/null && fail "heldmarker-skip-routes-fix: 101 is in stage1-holdrepeat.txt"
+grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "heldmarker-skip-routes-fix: the plain marker skip line still printed"
+grep -qF 'holdrepeat would decline' <<< "$OUT" && fail "heldmarker-skip-routes-fix: the older holdrepeat skip fired; the case proves nothing"
+hm_cleanup
+end_case "heldmarker-skip-routes-fix"
+
+# Kill switch: 0 keeps the plain skip; empty means the default (1) and routes.
+begin_case
+hf_setup "3"
+PR_CYCLE_HOLDREPEAT_AUTOFIX=0 HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "holdrepeat-autofix-kill-switch: 0 still fired the fleet ($(calls ready) calls)"
+grep -qxF 101 "$(rundir)/stage1-holdrepeat.txt" 2>/dev/null || fail "holdrepeat-autofix-kill-switch: 0 did not keep the plain skip"
+grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat-autofix-kill-switch: 0 run lacks the skip line (out: $OUT)"
+hf_setup "3"
+PR_CYCLE_HOLDREPEAT_AUTOFIX="" HRHARNESS="$HRH" run --worker
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(hf_argv)" || fail "holdrepeat-autofix-kill-switch: empty did not route: $(hf_argv)"
+hr_cleanup
+end_case "holdrepeat-autofix-kill-switch"
+
+# A stub harness: `check` answers DECLINE and, as the PR was already in the state-changed and
+# rebase-only lists, seeds both lists with 101; `fix-eligible` and `rebase-eligible` answer 10.
+# A DIRTY PR never reaches the skip branches in the live flow, so this seeds the overlap
+# directly and runs the real routing helper over it.
+HF_STUB="$SCRATCH/hf-stub"
+mkdir -p "$HF_STUB/harness"
+: > "$HF_STUB/harness/__init__.py"
+cat > "$HF_STUB/harness/holdrepeat.py" <<'PY'
+import os
+import sys
+cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+if cmd == "check":
+    for name in ("stage1-state-changed.txt", "stage1-rebase-only.txt"):
+        with open(os.path.join(os.environ["HF_STUB_RUNDIR"], name), "a") as fh:
+            fh.write("101\n")
+    sys.exit(10)
+if cmd in ("fix-eligible", "rebase-eligible"):
+    sys.exit(10)
+sys.exit(0)
+PY
+
+begin_case
+hf_setup "3"
+HF_STUB_RUNDIR="$(rundir)" HRHARNESS="$HF_STUB" run --worker
+[[ $RC -eq 0 ]] || fail "holdrepeat-route-no-overlap: exit $RC, want 0"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(hf_argv)" || fail "holdrepeat-route-no-overlap: argv lacks --holdrepeat-fix-prs=101: $(hf_argv)"
+grep -qF -- '--rebase-only-prs' <<< "$(hf_argv)" && fail "holdrepeat-route-no-overlap: argv still carries --rebase-only-prs: $(hf_argv)"
+grep -qF -- '--state-changed-prs' <<< "$(hf_argv)" && fail "holdrepeat-route-no-overlap: argv still carries --state-changed-prs: $(hf_argv)"
+grep -qxF 101 "$(rundir)/stage1-state-changed.txt" 2>/dev/null && fail "holdrepeat-route-no-overlap: 101 left in stage1-state-changed.txt"
+grep -qxF 101 "$(rundir)/stage1-rebase-only.txt" 2>/dev/null && fail "holdrepeat-route-no-overlap: 101 left in stage1-rebase-only.txt"
+hr_cleanup
+end_case "holdrepeat-route-no-overlap"
 
 # ==========================================================================================
 # State-change exemption (DIRTY / BLOCKED-CHECK) and stacked-PR skip

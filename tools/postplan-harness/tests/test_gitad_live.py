@@ -664,6 +664,7 @@ def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monk
                           capture_output=True, text=True).stdout.strip()
     assert post == pre
     _assert_pid_gone(tmp_path / "filter.pid")
+    assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))
 
 
 def test_run_out_and_run_bytes_are_bounded(repo, tmp_path, monkeypatch):

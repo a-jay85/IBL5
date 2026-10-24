@@ -243,9 +243,20 @@ class LiveGit:
                     f"reset --keep {pre[:12]} exited {proc.returncode}")[:300]
         return ""
 
+    def _bounded(self, args: tuple[str, ...], **kw):
+        """run_bounded for a git call. A killed git leaves .git/index.lock behind, which
+        would fail emergency_abort and the human re-run, so clear it on a timeout.
+        Network ops (fetch, push, ls-remote) never hold the index lock."""
+        try:
+            return run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
+                               timeout=_git_timeout(args), **kw)
+        except HarnessError as e:
+            if e.kind == SUBPROCESS_TIMEOUT and args and args[0] not in ("fetch", "push", "ls-remote"):
+                self._clear_stale_index_lock()
+            raise
+
     def _run(self, *args: str, check: bool = True) -> str:
-        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
-                           timeout=_git_timeout(args), errors="replace")
+        proc = self._bounded(args, errors="replace")
         if check and proc.returncode != 0:
             # Scan BOTH streams: bin/pre-commit-hook runs its checks with `2>&1` and
             # echoes guidance to stdout, so stderr-only detection misses every
@@ -262,8 +273,7 @@ class LiveGit:
 
     def _run_out(self, *args: str) -> tuple[int, str]:
         """Raises HarnessError(subprocess-timeout) on a hang. Only a completed git returns an rc."""
-        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
-                           timeout=_git_timeout(args), errors="replace")
+        proc = self._bounded(args, errors="replace")
         return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
 
     def _run_bytes(self, *args: str, check: bool = True) -> bytes:
@@ -272,8 +282,7 @@ class LiveGit:
         the CR from CRLF files and replaces non-UTF-8 bytes with U+FFFD, which
         makes lostwork.sh report every CRLF line as LOST (13 blocked runs,
         2026-10-09/10)."""
-        proc = run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
-                           timeout=_git_timeout(args), text=False)
+        proc = self._bounded(args, text=False)
         if check and proc.returncode != 0:
             stdout = proc.stdout.decode("utf-8", errors="replace")
             stderr = proc.stderr.decode("utf-8", errors="replace")
@@ -441,8 +450,13 @@ class LiveGit:
     def _clear_stale_index_lock(self) -> None:
         """After a reaped commit timeout no git process holds the lock; drop it."""
         try:
-            rel = self._run("rev-parse", "--git-path", "index.lock").strip()
+            # run_bounded directly: going through self._run would recurse on a timeout.
+            rel = run_bounded(["git", "-C", self.worktree, "rev-parse", "--git-path", "index.lock"],
+                              step="rev-parse index.lock", timeout=30,
+                              errors="replace").stdout.strip()
         except HarnessError:
+            return
+        if not rel:
             return
         lock = rel if os.path.isabs(rel) else os.path.join(self.worktree, rel)
         try:

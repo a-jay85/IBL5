@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-10-05
+last_verified: 2026-10-19
 ---
 
 # Code Review Agents (shared definitions)
@@ -24,6 +24,17 @@ Each agent receives: filtered PR diff, file list, and PR metadata from the paren
 **Playwright `.spec.ts` files are lint-enforced by `bun run lint:e2e` (CI job `ESLint (e2e specs)`).** Reviewers should not duplicate `playwright/*` or `@typescript-eslint/*` rule checks — the preset already covers missing `await`, `{ force: true }`, `waitForTimeout`, `networkidle`, web-first assertions, etc. Semantic E2E spec review (POST-effect verification, assertion discrimination, coverage-branch check) is handled by **Agent D**, defined in `.claude/review-shared/_test-spec-agent.md` and launched from `/post-plan` Phase 4B. Do not duplicate its checks here.
 
 ---
+
+## Per-finding fields (every review agent)
+
+End every finding with one metadata line, exactly this shape:
+
+`severity: important|nit · pre-existing: yes|no · bug class: <kebab-case> · other instances: <path:line, path:line> | none`
+
+- `severity`: `nit` only for a real but low-impact issue (naming, a comment, a micro-clarity fix). The scorer decides the final label; a `nit` hint can never demote a finding the scorer rates at or above threshold.
+- `pre-existing: yes` when the defect was already on the line before this PR (the line is unchanged context in the diff and the diff did not introduce the bug). Report such defects; do not drop them. They post as a non-holding `Pre-existing` note so the author is not blamed and the bug is not lost.
+- `bug class`: a short name for the defect class (`unbounded-fetch`, `missing-null-guard`, `unescaped-output`). Reuse a class name from `ibl5/docs/retrospective-class-registry.md` when one fits.
+- `other instances`: every other place in the diff with the same bug class, plus any you can see in the diff's context windows of the touched files. One review round should fix all copies. Write `none` when there are none.
 
 ## Agent A: Architecture + Bug Detection + DB Performance (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
 
@@ -78,7 +89,7 @@ Only flag issues where the performance impact is measurable — not micro-optimi
 
 ### Output format
 
-Return one entry per issue: `file:line`, what is wrong, and a concrete input or state that makes it fail. For a rule violation, quote the rule and name its `.claude/rules/*.md` file (or the anti-pattern matched). If you cannot name a failing input or state, say so in the entry. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked.
+Return one entry per issue: `file:line`, what is wrong, and a concrete input or state that makes it fail. For a rule violation, quote the rule and name its `.claude/rules/*.md` file (or the anti-pattern matched). If you cannot name a failing input or state, say so in the entry. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked. Close each entry with the metadata line from § Per-finding fields.
 
 ---
 
@@ -100,7 +111,7 @@ Check whether the PR changes comply with guidance in code comments visible in th
 
 ### Output format
 
-Return findings per section, each with `file:line`, what is wrong, the commit or code comment it conflicts with, and a concrete input or state that makes it fail. If you cannot name a failing input or state, say so in the finding. If a section has no concerns, return a 1-sentence evidence summary for it.
+Return findings per section, each with `file:line`, what is wrong, the commit or code comment it conflicts with, and a concrete input or state that makes it fail. If you cannot name a failing input or state, say so in the finding. If a section has no concerns, return a 1-sentence evidence summary for it. Close each entry with the metadata line from § Per-finding fields.
 
 ---
 

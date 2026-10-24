@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.llm import extract_json
-from harness.state import Classification, HarnessError, PlanInfo
+from harness.state import Classification, Finding, HarnessError, PlanInfo
 from harness import review, schemas
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
@@ -145,6 +145,20 @@ def test_no_section_label_survives(builder):
         assert f"Section {n} —" not in prompt
 
 
+@pytest.mark.parametrize("builder", ["a", "b", "security"])
+def test_reportable_bar_reaches_every_holding_agent(builder):
+    """Mutation: drop REPORTABLE_BAR from an agent prompt => quality opinions post as Important."""
+    assert review.REPORTABLE_BAR in _prompts()[builder]
+
+
+def test_verifier_rejects_true_claims_below_the_bar():
+    """Mutation: drop the bar from the verifier => a true but harmless claim survives."""
+    f = Finding(source="code-review", agent="A", path="ibl5/classes/A.php", line=1, body="b")
+    prompt = review.verifier_prompt([f], {})
+    assert review.REPORTABLE_BAR in prompt
+    assert "Vote not-real even when the claim is TRUE" in prompt
+
+
 def test_contract_example_validates():
     example = json.loads(review.OUTPUT_CONTRACT_EXAMPLE)
     schemas.validate_findings(example)
@@ -155,3 +169,46 @@ def test_contract_forbids_the_observed_wrong_keys():
     for key in ("category", "severity", "symbol", "detail"):
         assert f'"{key}"' in review.OUTPUT_CONTRACT_HEAD
     assert "one flat array" in review.OUTPUT_CONTRACT_HEAD
+
+
+def test_optional_finding_keys_survive_normalize_and_validate():
+    """Mutation: drop a key from FINDING_OPTIONAL_KEYS (or from normalize) => fails."""
+    item = {"path": "a.py", "line": 3, "body": "b", "severity": "Nit", "preexisting": True,
+            "bug_class": " unquoted-glob ", "other_instances": ["b.py:1", 7, "c.py:2"]}
+    data = schemas.unwrap_findings_envelope([item])
+    schemas.validate_findings(data)
+    assert data[0]["severity"] == "nit"
+    assert data[0]["preexisting"] is True
+    assert data[0]["bug_class"] == "unquoted-glob"
+    assert data[0]["other_instances"] == ["b.py:1", "c.py:2"]
+    assert schemas.FINDING_KEYS == {"path", "line", "body"}
+    assert set(item) - schemas.FINDING_KEYS == schemas.FINDING_OPTIONAL_KEYS
+
+
+def test_malformed_optional_keys_are_dropped_not_rejected():
+    """Mutation: raise on a bad optional key => fails."""
+    data = schemas.unwrap_findings_envelope([
+        {"path": "a.py", "line": 3, "body": "b", "severity": "blocker",
+         "preexisting": "yes", "other_instances": "a:1"}])
+    schemas.validate_findings(data)
+    assert data == [{"path": "a.py", "line": 3, "body": "b"}]
+
+
+def test_findings_envelope_with_optional_keys_unwraps_to_nonempty():
+    """Mutation: make unwrap_findings_envelope return [] for a dict => fails."""
+    data = schemas.unwrap_findings_envelope(
+        {"findings": [{"path": "a.py", "line": 3, "body": "b",
+                       "severity": "nit", "preexisting": False}]})
+    schemas.validate_findings(data)
+    assert len(data) == 1
+    assert data[0]["severity"] == "nit"
+
+
+def test_validate_scores_coerces_non_bool_preexisting_to_false():
+    """Mutation: delete the coercion => fails."""
+    scores = [{"n": 1, "score": 90, "preexisting": "true"},
+              {"n": 2, "score": 90, "preexisting": 1},
+              {"n": 3, "score": 90, "preexisting": True},
+              {"n": 4, "score": 90}]
+    schemas.validate_scores(scores)
+    assert [s.get("preexisting") for s in scores] == [False, False, True, None]

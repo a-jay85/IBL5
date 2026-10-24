@@ -204,13 +204,19 @@ Combine ALL issues from 4B and 4C into one numbered list.
 
 **Skip the scoring agent if the combined list is empty** — jump straight to the `post_review_summary` no-issues path below.
 
-Otherwise launch **three verifier agents in one message** (`subagent_type: "sonnet-5-5"`, omit `model`; tools `Read`, `Grep`, `Glob` only; cwd = this worktree). Each gets the same packet: the numbered issue list; for every cited path the hunk from `git diff origin/master...HEAD -- <path>` (cap each hunk at 20 KB); and the **Automatic Zero** and **IBL5-specific false positives** sections of `_review-rubric.md` as rejection rules. Tell each agent to judge only the numbered issues, to open the cited file and line before voting, to never report a new issue, to vote `not-real` only when the code shows the claim is wrong or matches a rejection rule, and to vote `real` whenever it cannot open the file or cannot decide. Each returns `[{"n": 1, "verdict": "real", "reason": "..."}]` with `verdict` one of `real` / `not-real`.
+Otherwise launch **three verifier agents in one message** (`subagent_type: "sonnet-5-5"`, omit `model`; tools `Read`, `Grep`, `Glob` only; cwd = this worktree). Each gets the same packet: the numbered issue list; for every cited path the hunk from `git diff origin/master...HEAD -- <path>` (cap each hunk at 20 KB); and the **Automatic Zero** and **IBL5-specific false positives** sections of `_review-rubric.md` as rejection rules. Tell each agent to judge only the numbered issues, to open the cited file and line before voting, to never report a new issue, to vote `not-real` only when the code shows the claim is wrong or matches a rejection rule, and to vote `real` whenever it cannot open the file or cannot decide. Each returns `[{"n": 1, "verdict": "real", "reason": "...", "preexisting": false}]` with `verdict` one of `real` / `not-real`. `preexisting` is `true` only when the defect clearly existed before the PR (unchanged line, bug not introduced by the diff). A missing or non-boolean value reads as `false`.
 
 **Aggregate per issue.** A seat whose reply is missing, unparseable, timed out, or omits the issue's `n` is an abstention. Drop an issue only when all three seats returned a valid `not-real`. Any other tally keeps it. Score a kept issue `base + round((100 - base) * real_votes / 3)`, where `base` is 80 for code review and 75 for security (100 / 93 / 87 / 80 for code, 100 / 92 / 83 / 75 for security); a dropped issue scores 0. Write the tallies to `/tmp/post-plan-verifier-votes-$PPID.json` and print one line per issue in the run output: `phase4d verifier: kept|DROPPED [source/agent] path:line score=N real=a not-real=b abstain=c`. A dropped **security** issue always prints `phase4d verifier: DROPPED security finding path:line` followed by every rejecting reason, so the run log keeps it even though it is never posted.
 
 This step only removes issues. It never adds one and never lifts a score above what the votes give. Phase 6.5 conditions (2) and (11) therefore see more held findings than before: the old text-only scorer dropped findings without reading code, and an issue now drops only when three code-reading verifiers all reject it. An issue any verifier kept holds arming exactly as it did.
 
-**Filter** per the thresholds in `_review-rubric.md`. A kept issue always clears its threshold; the filter stays so the Thresholds table remains the single statement of the posting rule.
+Each kept issue then carries its score into the label step below.
+
+The scorer's `preexisting` flag (`_review-rubric.md` § Pre-existing defects and labels) comes from the verifiers here. It is `true` only when every `real` voter returned `preexisting: true`; keep it beside each score as `[{"n": 1, "score": 75, "preexisting": false}]`. Verifier votes never produce a score below the threshold, so Phase 4D never posts a `Nit`. Nit is reachable only through `/pr-review`.
+
+**Classify and filter** per `_review-rubric.md` § Pre-existing defects and labels. For a candidate `Pre-existing` finding, confirm in the diff that the anchor line starts with a space (context line); a leading `+` means an added line. On any doubt label it `Important`. Every kept issue already clears its threshold, so a reviewer `nit` hint is ignored here and the finding posts as `Important`.
+
+A kept issue always clears its threshold; the filter stays so the Thresholds table remains the single statement of the posting rule.
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 
@@ -240,11 +246,12 @@ source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 # One object per surviving issue. path = repo-relative file (matches `+++ b/<path>`);
 # line = single anchor line on the new-file (RIGHT) side; body = <description>
 # (<rule file> says "<rule>") followed by the full-SHA range link; score = Haiku score.
+# label = important | nit | pre-existing (missing => important); bug_class and other_instances come from the agent's metadata line.
 # Do NOT add the heading or footer — the helper emits both.
 cat > /tmp/post-plan-cr-findings-$PPID.json <<'JSON'
 [ { "path": "ibl5/classes/Example.php", "line": 17,
     "body": "<description> (<rule file> says \"<rule>\")\n\n<full-SHA range link>",
-    "score": 85 } ]
+    "score": 85, "label": "important", "bug_class": "unbounded-fetch", "other_instances": ["ibl5/classes/Other.php:40"] } ]
 JSON
 post_review_findings "$PR" "$FULL_SHA" "Code review" "/tmp/post-plan-cr-findings-$PPID.json"
 ```
@@ -263,7 +270,7 @@ non-critical endpoints, LOW = best practice):
 cat > /tmp/post-plan-sa-findings-$PPID.json <<'JSON'
 [ { "path": "ibl5/classes/Example.php", "line": 17,
     "body": "**[SEVERITY]** Type in `Class::method()` — description\n\n<full-SHA range link>",
-    "score": 85 } ]
+    "score": 85, "label": "important" } ]
 JSON
 post_review_findings "$PR" "$FULL_SHA" "Security audit" "/tmp/post-plan-sa-findings-$PPID.json"
 ```
@@ -320,7 +327,7 @@ resolve_review_finding "$PR" <COMMENT_ID> "Fixed in $FULL_SHA — <what changed>
 
 ### 4.5: Remediate pre-existing trusted threads
 
-Runs after 4D has posted, before Phase 5. Canonical prose: `.claude/review-shared/_posting-procedure.md` § Remediating trusted threads. Only threads that are (a) in the 4D snapshot, (b) unresolved and not outdated, and (c) rooted by a trusted author (`a-jay85`, a GitHub `Bot`, or a `[bot]` login) are candidates, and each is tagged origin pre-existing. This skill path keeps no ledger of what its own 4D posted, so it does not remediate same-run threads. The compiled harness does (Phase 4.5b); here they stay open and condition (11) holds them. The trust filter is `list_trusted_open_threads`; do not widen it inline.
+Runs after 4D has posted, before Phase 5. Canonical prose: `.claude/review-shared/_posting-procedure.md` § Remediating trusted threads. Only threads that are (a) in the 4D snapshot, (b) unresolved and not outdated, and (c) rooted by a trusted author (`a-jay85`, a GitHub `Bot`, or a `[bot]` login) are candidates, and each is tagged origin pre-existing. Threads whose first comment carries a `nit` or `pre-existing` label marker are not candidates (they never hold; see `_posting-procedure.md` § Remediating trusted threads). "Pre-existing" in this section's title means "posted before this run" and is unrelated to that label. This skill path keeps no ledger of what its own 4D posted, so it does not remediate same-run threads. The compiled harness does (Phase 4.5b); here they stay open and condition (11) holds them. The trust filter is `list_trusted_open_threads`; do not widen it inline.
 
 ```bash
 # phase 4.5 remediate
@@ -333,7 +340,8 @@ if [ -s "$PRE4D_IDS" ]; then
   rc=0; list_trusted_open_threads "$PR" > "$P45_ALL" || rc=$?
   if [ "$rc" -eq 0 ]; then
     jq -c --rawfile ids "$PRE4D_IDS" \
-       '. as $t | select((($ids | split("\n")) | index($t.commentId|tostring)) != null) | . + {origin: "pre-existing"}' \
+       '. as $t | select((($ids | split("\n")) | index($t.commentId|tostring)) != null) | . + {origin: "pre-existing"}
+        | select((.body // "") | test("^<!-- label: (nit|pre-existing) -->") | not)' \
        "$P45_ALL" > "$P45_WORK"
   else
     echo "phase 4.5: list_trusted_open_threads rc=$rc; skipping remediation (condition (11) keeps the hold)"

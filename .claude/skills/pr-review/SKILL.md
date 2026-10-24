@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-5-5
-last_verified: 2026-09-28
+last_verified: 2026-10-19
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -61,7 +61,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Launch parallel agents (merged by tier)
 
-**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs). For a PR touching shell, workflow, or `.claude/` prose files, also **Read** `.claude/review-shared/_shell-workflow-agent.md` (Agent E) — it gets `$DIFF` from Step 2c and the file list from Step 2b like every other agent, and the **CRITICAL: No agent should call `gh pr diff`** rule below applies to it unchanged. No awk pre-slice here: `/pr-review` has no `$DIFF_FILE` temp file, and its 100KB fallback path already handles oversized diffs.
+**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs). For a PR touching shell, workflow, or `.claude/` prose files, also **Read** `.claude/review-shared/_shell-workflow-agent.md` (Agent E). It gets `$DIFF` from Step 2c and the file list from Step 2b like every other agent, and the **CRITICAL: No agent should call `gh pr diff`** rule below applies to it unchanged. No awk pre-slice here: `/pr-review` has no `$DIFF_FILE` temp file, and its 100KB fallback path already handles oversized diffs. Every agent closes each finding with the § Per-finding fields metadata line (severity, pre-existing, bug class, other instances); carry those fields into Step 4 and Step 6.
 
 Launch applicable agents in parallel. Each agent receives:
 - The filtered diff from Step 2c
@@ -82,11 +82,13 @@ Launch applicable agents in parallel. Each agent receives:
 
 Collect all issues found in Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 
+Shape: `[{"n": 1, "score": 75, "preexisting": false}]`.
+
 Parse the JSON response and assign scores back to each issue.
 
 ## Step 5: Filter
 
-Apply the **Code review** threshold from `_review-rubric.md` (currently `< 80` dropped). If no issues remain, skip to Step 7 with "no issues found".
+Classify per `_review-rubric.md` § Pre-existing defects and labels (Important at `>= 80`; Pre-existing only when reviewer, scorer, and a context-line anchor all agree; Nit when 60 <= score < 80 with a `nit` hint). If nothing remains, skip to Step 7 with "no issues found".
 
 ## Step 6: Re-check eligibility
 
@@ -105,12 +107,13 @@ source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 { "path": "repo/relative/path.php",
   "line": 17,
   "body": "<description> (<rule file> says \"<rule>\")\n\n<full-SHA range link>",
-  "score": 85 }
+  "score": 85, "label": "important", "bug_class": "unbounded-fetch", "other_instances": [] }
 ```
 - `path` is the repo-relative file path (matching `+++ b/<path>` in the diff).
 - `line` is a single anchor line on the new-file (right) side.
 - `body` is the description in the format below, followed by the full-SHA link. Do NOT add the footer — the helper adds it.
 - `score` is the Haiku score from Step 4.
+- `label`, `bug_class`, `other_instances` come from Step 4 classification and the agent's metadata line; a missing label posts as Important.
 
 Then call:
 ```bash

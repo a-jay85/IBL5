@@ -8,6 +8,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'tools/postplan-harness/**'
+      - 'bin/lib/pr-armable.sh'
+      - 'bin/lib/post-review-findings.sh'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
       - 'bin/lib/usage-gate.sh'
@@ -21,6 +23,8 @@ on:
     branches: [master]
     paths:
       - 'tools/postplan-harness/**'
+      - 'bin/lib/pr-armable.sh'
+      - 'bin/lib/post-review-findings.sh'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
       - 'bin/lib/usage-gate.sh'

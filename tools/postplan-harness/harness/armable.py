@@ -24,6 +24,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Sequence
 
+from . import labels
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
 
@@ -361,7 +362,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(1, "manual-testing-clearance", cond1_held,
                               f"state={clearance}" if cond1_held else ""))
 
-    high = [f for f in inp.findings if (f.score or 0) >= 80]
+    # Only labels.NON_HOLDING_LABELS (nit, pre-existing) clear. A missing, empty or unknown
+    # label such as "blocker" or "Nit" holds as Important (fail-closed), like prf_label.
+    high = [f for f in inp.findings
+            if (f.score or 0) >= 80
+            and getattr(f, "label", None) not in labels.NON_HOLDING_LABELS]
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 
@@ -448,6 +453,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # holds; the split below is for the reason text only. Trust and authorship are
     # never consulted here: thread_ingestion.py decides what a run may ACT on,
     # this decides whether the PR may merge. None / api-error / cap stay fail-closed.
+    # Threads whose first comment carries a trusted <!-- label: nit --> or
+    # <!-- label: pre-existing --> marker are dropped by pr_unresolved_findings_hold
+    # before this list is built; this grader never parses labels and still holds on
+    # any non-empty list.
     uf = inp.unresolved_findings
     if uf is None:
         r = "unresolved review-thread state not consulted — fail-closed"

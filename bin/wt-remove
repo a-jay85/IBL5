@@ -9,7 +9,8 @@
 set -euo pipefail
 # lsof lives in /usr/sbin on macOS. Without it is_worktree_in_use reads "not in
 # use" (empty pipe), which is fail-open for a destructive call. Append the
-# system sbin dirs so a stripped PATH (launchd, env -i) still finds it.
+# system sbin dirs so a stripped PATH (launchd, env -i) still finds it. If it is
+# still missing, the --if-empty and non---force paths below refuse to remove.
 PATH="$PATH:/usr/sbin:/sbin"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -117,6 +118,11 @@ if [ "$IF_EMPTY" = true ]; then
 fi
 
 # Safety: refuse to remove a worktree that is actively in use
+if [ "$FORCE" != true ] && ! command -v lsof >/dev/null 2>&1; then
+    echo "Error: cannot check whether '$NAME' is in use (lsof not on PATH)" >&2
+    echo "Use --force to remove anyway." >&2
+    exit 1
+fi
 if [ "$FORCE" != true ] && is_worktree_in_use "$WT_PATH"; then
     echo "Error: worktree '$NAME' is in active use (processes detected in directory)" >&2
     echo "Use --force to remove anyway." >&2

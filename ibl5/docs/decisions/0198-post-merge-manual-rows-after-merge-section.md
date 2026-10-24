@@ -1,6 +1,6 @@
 ---
 description: Truly-manual matrix rows tagged post-merge render under a separate ## After merge PR-body section outside the Phase 6.5 condition (1) window, and a merge workflow job posts them as a checklist comment.
-last_verified: 2026-10-15
+last_verified: 2026-10-21
 ---
 
 # ADR-0198: Post-merge manual rows move to an After merge section
@@ -34,3 +34,7 @@ A tagged row still forces `impl_model: opus` and `/plan` gate 14(a), so the huma
 - A PR whose only manual rows are post-merge now arms on condition (1) when every other condition clears. The merge hold moves to gate 14(a) and `auto_merge: false`, which the plan author still sets.
 - The owed checks arrive as a PR comment plus a DM instead of a stuck PR.
 - CI gains one more write-scoped job. Its input is the PR body, which it handles as a file and never interpolates into `run:`.
+
+## Addendum: one #merged message per merge (2026-10-21)
+
+The Decision above says the checklist job "sends one #merged Discord message". ADR-0208 retires that message. The job now only posts the sticky PR comment and emits counts. The single #merged digest carries the directions link and @mentions the owner when a person is needed.

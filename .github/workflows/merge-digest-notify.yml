@@ -41,6 +41,15 @@ name: Merge digest notify
 # workflow runs on its own PR's `closed` event, so the PR that adds that job is the first
 # live exercise of it. The first checklist comment on that PR, or its absence, is the
 # verification step.
+#
+# One #merged message per merge. `notify-merge-digest` needs `after-merge-checklist`, runs
+# under `always()` (still behind the merged + same-repo guard), and sends even when the
+# checklist job failed. The owner is @mentioned only when the pipeline says a person is
+# needed: a manual After-merge row, a failed auto row, a non-numeric count, or a needed
+# job whose result is not `success`. The decision lives in bin/lib/post-merge-rows.sh
+# (pmr_ping_decision) and is computed by bin/digest-dm-build from job OUTPUTS, never from
+# PR text. The `ping:` input below compares against 'false', so an empty or garbled output
+# pings. Rationale: ADR-0198 and ADR-0208.
 
 on:
   pull_request:
@@ -59,8 +68,11 @@ jobs:
     # `merged == true` filters plain closes. The head-repo equality test filters FORK PRs:
     # a fork's `pull_request` event gets no secrets, so `webhook-url` arrives empty and
     # `send.sh` exits 1 under `fail-on-delivery: 'true'`; the guard keeps every fork
-    # merge from going red.
+    # merge from going red. `always()` lets the digest post when the checklist job failed
+    # or was cancelled, so that failure pings instead of silencing the merge notice.
+    needs: [after-merge-checklist]
     if: >-
+      always() &&
       github.event.pull_request.merged == true &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -77,6 +89,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
 
       - name: Build merge-digest DM
+        id: build
         env:
           # Every event-controlled value travels as an environment variable and is consumed
           # only as a quoted shell variable or a `jq --arg`. A PR title is attacker-supplied
@@ -87,6 +100,14 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_BRANCH: ${{ github.event.pull_request.head.ref }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pipeline-written values only. The checklist's outputs are produced by committed
+          # code on the default branch; bin/digest-dm-build re-validates every count.
+          AM_RESULT: ${{ needs.after-merge-checklist.result }}
+          AM_MANUAL: ${{ needs.after-merge-checklist.outputs.manual_count }}
+          AM_AUTO_CI: ${{ needs.after-merge-checklist.outputs.auto_ci_count }}
+          AM_AUTO_MAC: ${{ needs.after-merge-checklist.outputs.auto_mac_count }}
+          AM_COMMENT_URL: ${{ needs.after-merge-checklist.outputs.comment_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
 
@@ -108,14 +129,26 @@ jobs:
           # `bash bin/...` rather than `bin/...`: the exec bit on a brand-new script is one
           # `git update-index` mistake away from missing, and that failure would surface only
           # here, on master, after merge.
+          # Unit 1 has no auto executor, so no auto row can fail yet: the literal 0 is
+          # replaced by the CI executor job's output when that job lands.
           bash bin/digest-dm-build \
             --pr-number "$PR_NUMBER" \
             --title "$PR_TITLE" \
             --url "$PR_URL" \
             --branch "$PR_BRANCH" \
             --pr-body-file /tmp/pr-body.md \
+            --ping-out "$RUNNER_TEMP/ping" \
+            --manual-count "$AM_MANUAL" \
+            --auto-ci-count "$AM_AUTO_CI" \
+            --auto-mac-count "$AM_AUTO_MAC" \
+            --auto-failed-count 0 \
+            --comment-url "$AM_COMMENT_URL" \
+            --run-url "$RUN_URL" \
+            --job-result "after-merge-checklist=$AM_RESULT" \
             < /tmp/verdict-body.md \
             > /tmp/discord-msg.txt
+
+          printf 'ping=%s\n' "$(cat "$RUNNER_TEMP/ping")" >> "$GITHUB_OUTPUT"
 
           # Visible in the run log, and a cheap tripwire if the 2000-char budget ever slips.
           printf 'message bytes: %s\n' "$(wc -c < /tmp/discord-msg.txt)"
@@ -126,7 +159,9 @@ jobs:
           # message-file defaults to /tmp/discord-msg.txt -- the path written above.
           # Merge notices go to #merged, not #dev (DISCORD_MERGED_WEBHOOK_URL).
           webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
-          ping: 'false'   # #merged posts never @mention the owner
+          # Mention the owner only when a person is needed after the merge (see header).
+          # `!= 'false'` fails closed: an empty or garbled build output pings.
+          ping: ${{ steps.build.outputs.ping != 'false' }}
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.
           fail-on-delivery: 'true'
@@ -144,6 +179,14 @@ jobs:
     permissions:
       contents: read
       pull-requests: write   # gh pr comment; the ONLY write scope in this workflow
+    # Structured result for the digest job. No Discord send here: the digest is the one
+    # #merged message, and it carries the ping and the directions link.
+    outputs:
+      status: ${{ steps.checklist.outputs.status }}
+      manual_count: ${{ steps.checklist.outputs.manual_count }}
+      auto_ci_count: ${{ steps.checklist.outputs.auto_ci_count }}
+      auto_mac_count: ${{ steps.checklist.outputs.auto_mac_count }}
+      comment_url: ${{ steps.checklist.outputs.comment_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,7 +199,6 @@ jobs:
         id: checklist
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -167,17 +209,6 @@ jobs:
 
           bash bin/after-merge-checklist \
             --pr-number "$PR_NUMBER" \
-            --title "$PR_TITLE" \
             --pr-url "$PR_URL" \
             --pr-body-file "$RUNNER_TEMP/pr-body.md" \
-            --comment-out "$RUNNER_TEMP/after-merge-comment.md" \
-            --dm-out "$RUNNER_TEMP/discord-msg.txt"
-
-      - name: Send Discord message
-        if: steps.checklist.outputs.status == 'posted'
-        uses: ./.github/actions/notify-discord
-        with:
-          message-file: ${{ runner.temp }}/discord-msg.txt
-          webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
-          ping: 'false'   # #merged posts never @mention the owner
-          fail-on-delivery: 'true'
+            --comment-out "$RUNNER_TEMP/after-merge-comment.md"

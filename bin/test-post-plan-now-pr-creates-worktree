@@ -273,36 +273,28 @@ fi
 [ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new --existing with no value exits with usage"
 
 # ==========================================================================
-# Case 6 — loaded-idle phantom is reaped before the inflight check
+# Case 6 — an orphaned per-run script is reaped before the launch
 # ==========================================================================
-# A previous run left a loaded-idle plist for feat-x.  Without the reaper it
-# would make postplan_inflight_label report an in-flight run → exit 6.  The
-# reaper fires here because POST_PLAN_MAIN_ROOT and POST_PLAN_SELF_BIN are
-# NOT set, and HOME=$TMP keeps the LaunchAgents dir under $TMP (not real ~/Library).
-# The stateful launchctl stub clears the loaded-idle row when bootout is called,
-# so the inflight check finds nothing and post-plan-now proceeds (exit != 6).
+# A SIGKILLed run leaves post-plan-now-<slug>-<ts>-<pid>.sh (and its .once marker) in the
+# log dir. The reaper fires here because POST_PLAN_MAIN_ROOT and POST_PLAN_SELF_BIN are
+# NOT set; POSTPLAN_LOG_DIR is a private dir so the real /tmp is never touched. The orphan
+# is old and its label is absent from the (non-empty) launchctl list, so it is removed.
 WT6="$WT_PARENT/feat-x"
 [ -d "$WT6" ] || git -C "$MAIN" worktree add "$WT6" feat-x >/dev/null 2>&1
 
-PHANTOM_LABEL="com.ibl5.postplan-now-feat-x-20260101-000000-12345"
-PHANTOM_PLIST="$TMP/Library/LaunchAgents/${PHANTOM_LABEL}.plist"
-LAUNCHCTL_LIST_STATE="$TMP/launchctl_list_state"
-export LAUNCHCTL_LIST_STATE
+ORPHAN_STEM="post-plan-now-feat-x-20260101-000000-12345"
+PPLOGS="$TMP/pplogs"
+mkdir -p "$PPLOGS"
+ORPHAN_SCRIPT="$PPLOGS/${ORPHAN_STEM}.sh"
+touch "$ORPHAN_SCRIPT"; touch -t 202601010000 "$ORPHAN_SCRIPT"
+mkdir -p "${ORPHAN_SCRIPT}.once"
 
-# Old phantom plist (will be reaped)
-touch "$PHANTOM_PLIST"
-touch -t 202601010000 "$PHANTOM_PLIST"
-
-# Loaded-idle row for the phantom label
-printf '%s\t%s\t%s\n' '-' '78' "$PHANTOM_LABEL" > "$LAUNCHCTL_LIST_STATE"
-
-# Stateful launchctl stub: list returns the state file; bootout clears it
+# `list` prints one unrelated row, so the snapshot is non-empty and the orphan is not loaded
 cat > "$SHIMS/launchctl" << 'SHIM_EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
 case "${1:-}" in
-    list)    [ -f "${LAUNCHCTL_LIST_STATE:-}" ] && cat "${LAUNCHCTL_LIST_STATE}" ;;
-    bootout) rm -f "${LAUNCHCTL_LIST_STATE:-}" ;;
+    list) printf '%s\t%s\t%s\n' 1 0 com.ibl5.unrelated ;;
 esac
 exit 0
 SHIM_EOF
@@ -311,22 +303,48 @@ chmod +x "$SHIMS/launchctl"
 RC6=0
 set +e
 # Run from within the feat-x worktree without the test-only overrides
-ERR6="$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
+ERR6="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
 RC6=$?
 set -e
 
 FAIL_BEFORE=$H_FAIL
 if [ "$RC6" -eq 6 ]; then
-    fail "loaded-idle-reap-before-inflight: exited 6 (phantom in-flight not reaped)"
+    fail "orphan-script-reaped-before-launch: exited 6 (orphan counted as in flight)"
 fi
-if [ -e "$PHANTOM_PLIST" ]; then
-    fail "loaded-idle-reap-before-inflight: phantom plist still exists ($PHANTOM_PLIST)"
+if [ -e "$ORPHAN_SCRIPT" ]; then
+    fail "orphan-script-reaped-before-launch: orphan script still exists ($ORPHAN_SCRIPT)"
 fi
-# LAUNCHCTL_LOG may hold lines from earlier cases; match the phantom label.
-if ! grep -Eq "^bootout gui/[0-9]+/${PHANTOM_LABEL}\$" "$LAUNCHCTL_LOG" 2>/dev/null; then
-    fail "loaded-idle-reap-before-inflight: no 'bootout gui/<uid>/$PHANTOM_LABEL' in launchctl log"
+if [ -e "${ORPHAN_SCRIPT}.once" ]; then
+    fail "orphan-script-reaped-before-launch: orphan marker still exists (${ORPHAN_SCRIPT}.once)"
 fi
-[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "loaded-idle-reap-before-inflight"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "orphan-script-reaped-before-launch"
+rm -f "$PPLOGS"/post-plan-now-feat-x-*
+
+# A legacy loaded-idle label (from before per-run scripts) now blocks a duplicate run
+# instead of being reaped: postplan_inflight_label sees the listed label.
+LEGACY_LABEL="com.ibl5.postplan-now-feat-x-20260101-000000-12345"
+cat > "$SHIMS/launchctl" << SHIM_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "\${LAUNCHCTL_LOG:-/dev/null}"
+case "\${1:-}" in
+    list) printf '%s\t%s\t%s\n' '-' '78' '$LEGACY_LABEL' ;;
+esac
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
+
+RC6B=0
+set +e
+ERR6B="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
+RC6B=$?
+set -e
+
+FAIL_BEFORE=$H_FAIL
+if [ "$RC6B" -ne 6 ]; then
+    fail "legacy-idle-label-blocks-dup: expected exit 6, got $RC6B (out: $ERR6B)"
+fi
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "legacy-idle-label-blocks-dup"
+rm -f "$PPLOGS"/post-plan-now-feat-x-*
 
 # Restore simple launchctl stub for any future tests
 cat > "$SHIMS/launchctl" << 'SHIM_EOF'
@@ -339,7 +357,7 @@ chmod +x "$SHIMS/launchctl"
 # ==========================================================================
 # Case 7 — a paused or limit-hit skill run is RESULT paused, never a FAIL-DM
 # ==========================================================================
-# Runs the far-side $CMD that post-plan-now writes into its plist, with a fake claude
+# Runs the far-side script that post-plan-now writes (the `  script:` stdout line), with a fake claude
 # behind a caffeinate shim. POST_PLAN_SKILL=1 selects the skill-only engine, so the
 # harness (which lives in the main checkout) never runs.
 unset GH_PR_JSON
@@ -395,23 +413,22 @@ chmod +x "$FAKE_CLAUDE"
 
 # run_far_side <mode> → P7_OUT (the log the run wrote), P7_MARKERS (marker count)
 run_far_side() {
-    local mode="$1" plist log cmd
-    rm -f "$HOME7"/Library/LaunchAgents/*.plist "$FAILDM_LOG"
+    local mode="$1" script log ppn_out
+    rm -f "$FAILDM_LOG"
     rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
     set +e
-    (cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" >/dev/null 2>&1)
+    ppn_out=$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" 2>/dev/null)
     set -e
-    plist=$(ls "$HOME7"/Library/LaunchAgents/com.ibl5.postplan-now-feat-x-*.plist 2>/dev/null | head -1)
-    P7_OUT="no plist written"; P7_MARKERS=0
-    [ -n "$plist" ] || return 0
-    cmd=$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb"))["ProgramArguments"][2])' "$plist")
-    log=$(python3 -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb"))["StandardOutPath"])' "$plist")
+    script=$(sed -n 's/^  script: \([^ ]*\).*/\1/p' <<< "$ppn_out")
+    log=$(sed -n 's/^  log:    \([^ ]*\).*/\1/p' <<< "$ppn_out")
+    P7_OUT="no script written"; P7_MARKERS=0
+    [ -n "$script" ] || return 0
     set +e
-    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" /bin/bash -c "$cmd" > "$log" 2>&1
+    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" /bin/bash "$script" > "$log" 2>&1
     set -e
     P7_OUT=$(cat "$log")
     P7_MARKERS=$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
-    rm -f "$log" "${log%.log}.session"
+    rm -f "$log" "${log%.log}.session" "$script"
 }
 
 FAIL_BEFORE=$H_FAIL
@@ -496,11 +513,11 @@ unset GH_NO_FORK_FIELD
 # ==========================================================================
 # Cases 11-14 — --auto headless guard + IBL5_BURNDOWN_LOOP opt-in
 # ==========================================================================
-# run_auto_headless <opt-in-state> → G_OUT (stdout+stderr), G_RC, G_PLIST (0/1)
+# run_auto_headless <opt-in-state> → G_OUT (stdout+stderr), G_RC, G_PLIST (0/1: a per-run script was written)
 # opt-in-state: "unset" | "empty" | any literal value
 run_auto_headless() {
     local state="$1"
-    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+    rm -f "$POSTPLAN_LOG_DIR"/post-plan-now-feat-x-*
     set +e
     if [ "$state" = "unset" ]; then
         G_OUT=$(cd "$WT6" && env -u IBL5_BURNDOWN_LOOP CLAUDE_HEADLESS=1 \
@@ -515,15 +532,15 @@ run_auto_headless() {
     G_RC=$?
     set -e
     G_PLIST=0
-    ls "$HOME7"/Library/LaunchAgents/com.ibl5.postplan-now-feat-x-*.plist >/dev/null 2>&1 && G_PLIST=1
-    rm -f "$HOME7"/Library/LaunchAgents/*.plist
+    ls "$POSTPLAN_LOG_DIR"/post-plan-now-feat-x-*.sh >/dev/null 2>&1 && G_PLIST=1
+    rm -f "$POSTPLAN_LOG_DIR"/post-plan-now-feat-x-*
 }
 
 # assert_skips <label> — the last run_auto_headless must have skipped
 assert_skips() {
     [ "$G_RC" = 0 ] || fail "$1: expected RC=0, got $G_RC"
     grep -qF -- "skipping auto-fire" <<< "$G_OUT" || fail "$1: no 'skipping auto-fire' (got: $G_OUT)"
-    [ "$G_PLIST" = 0 ] || fail "$1: a plist was written"
+    [ "$G_PLIST" = 0 ] || fail "$1: a script was written"
 }
 
 FAIL_BEFORE=$H_FAIL
@@ -545,7 +562,7 @@ FAIL_BEFORE=$H_FAIL
 run_auto_headless 1
 if grep -qF -- "skipping auto-fire" <<< "$G_OUT"; then fail "opt-in=1: still skipped (got: $G_OUT)"; fi
 grep -qF -- "IBL5_BURNDOWN_LOOP=1" <<< "$G_OUT" || fail "opt-in=1: no opt-in message (got: $G_OUT)"
-[ "$G_PLIST" = 1 ] || fail "opt-in=1: no plist written (got: $G_OUT)"
+[ "$G_PLIST" = 1 ] || fail "opt-in=1: no script written (got: $G_OUT)"
 [ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
 
 # Case 14 — the launchd path never inherits the caller's env, so only --foreground

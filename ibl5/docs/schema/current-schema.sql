@@ -761,6 +761,15 @@ CREATE TABLE `ibl_box_scores_teams` (
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_box_scores_teams_franchise_names_backup`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_box_scores_teams_franchise_names_backup` (
+  `id` int(11) NOT NULL DEFAULT 0,
+  `name` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Denormalized team label snapshot (e.g. Team Home/Team Away); no FK by design',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_box_scores_teams_phantom_backup`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -3539,7 +3548,7 @@ CREATE TABLE `ibl_sim_summaries` (
   `transport_failures` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Parks with cause transport (ssh, tunnel, input fetch, store transport).',
   `usage_waits` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Usage-limit waits. Informational; never terminal on its own.',
   `auth_failed_hosts` set('mac','actions') NOT NULL DEFAULT '' COMMENT 'Hosts whose Claude login failed for this sim. Both set = terminal.',
-  `notified_state` enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable') DEFAULT NULL COMMENT 'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
+  `notified_state` enum('retrying','waiting','handed_mac','handed_actions','posted','recovered','unavailable','started') DEFAULT NULL COMMENT 'Last #admin-chat status posted for this sim; compare-and-set de-dup key.',
   `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
   PRIMARY KEY (`sim`),
   KEY `idx_claim` (`status`,`blocked_until`,`sim`) COMMENT 'The composite index the oldest-pending-first selection scans.'

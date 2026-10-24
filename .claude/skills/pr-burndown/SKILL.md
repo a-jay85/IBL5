@@ -1,6 +1,6 @@
 ---
 name: pr-burndown
-description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, pr-ready verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
+description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
 last_verified: 2026-10-23
 ---
 
@@ -76,7 +76,7 @@ Re-fetch the PR right before you show it. Then collect:
   ```bash
   gh api graphql -f query='query{repository(owner:"a-jay85",name:"IBL5"){pullRequest(number:N){reviewThreads(first:50){nodes{isResolved isOutdated path line comments(first:3){nodes{author{login} body}}}}}}}'
   ```
-- **pr-ready verdict:** the last comment holding `<!-- pr-ready-verdict -->`. Check
+- **post-plan verdict:** the last comment holding `<!-- pr-ready-verdict -->`. Check
   whether it reviewed the current head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
 - **Visual links:** the "Visual review" comment's `a-jay85.github.io/IBL5/...` URLs.
@@ -96,25 +96,32 @@ Write the card in this shape:
 - Size: F files, +A/−D. Type is `<type>`.
 
 **State**
-- **CI:** <green / which real check failed>, on head `<sha>`.
-- **Review comments:** <open count; what each said; which commit fixed it>.
-- **pr-ready verdict:** <verdict>. <Current or stale>. <Its notes, short>.
-- **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-- **Conflicts:** <none / which files clash and with which PR>.
-- **Why it's held:** <each reason by number; mark stale ones as stale>.
+- <✅/⚠️/❌/⏳> **CI:** <green / which real check failed>, on head `<sha>`.
+- <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
+- <✅/⚠️/❌/⏳> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
+- <✅/⚠️/❌/🚨> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
+- <✅/⚠️/❌> **Conflicts:** <none / which files clash and with which PR>.
+- <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 
-**What's left for you:** <the one decision>.
+👉 **What's left for you:** <the one decision>.
 
 **Options**
 1. **<Ship it / Approve>.** <what you'll do>
 2. **<Fix X first>.** <what you'll do; comes back to you>
 3. **Hold.**
 
-I'd go with **<n>**. <One or two lines of why.>
+💡 I'd go with **<n>**. <One or two lines of why.>
 ```
 
+Legend for the emoji: ✅ fine, nothing to read. ⚠️ worth a look but does not block. ❌ blocks the
+merge or is a real problem. ⏳ still running or waiting. Pick the emoji from the live state
+you fetched. Do not guess. A line with no evidence gets ⚠️. Use 🚨 only for a
+line the owner must not miss: a one-way door, a data or prod risk, a stale verdict that
+hides a change. Keep ✅ lines to a few words so the eye skips them. Spend words only on
+⚠️, ❌, and 🚨 lines.
+
 Start every reply with a one-line status of each background job that has moved since the
-last card.
+last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked.
 
 ## Step 4: Help the owner look
 

@@ -59,6 +59,10 @@ def _rev(d, ref):
 def _write(d, rel, text):
     path = os.path.join(str(d), rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if isinstance(text, bytes):
+        with open(path, "wb") as fh:
+            fh.write(text)
+        return
     with open(path, "w") as fh:
         fh.write(text)
 
@@ -174,7 +178,10 @@ def make_repo(request, tmp_path):
         pre = _rev(wt, "HEAD")
         _git(wt, "checkout", "-q", "master")
         for rel, text in master.items():
-            _write(wt, rel, text)
+            if text is None:  # None deletes the path on master
+                os.remove(os.path.join(str(wt), rel))
+            else:
+                _write(wt, rel, text)
         _commit_all(wt, "master moves")
         _git(wt, "push", "-q", "origin", "master")
         master_sha = _rev(wt, "origin/master")
@@ -436,6 +443,109 @@ def test_live_regen_does_not_exempt_other_files_from_proof(make_repo, monkeypatc
     assert "id-stale" not in res.error
     assert _result_json(fx)["conflict_rung"] == "exhausted"
     assert _git(fx.d, "rev-parse", "HEAD").stdout.strip() == fx.pre
+
+
+# VR PNG master-copy shape: the real GENERATED_FILES glob entry, no monkeypatching.
+
+_SNAP_DIR = "ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+_VR_PNG = f"{_SNAP_DIR}/player-mobile.png"
+_PNG_BASE, _PNG_BRANCH, _PNG_MASTER = (
+    b"\x89PNG\r\n\x1a\n" + s for s in (b"base", b"branch", b"master"))
+
+
+def _png_repo(make_repo, *, path=_VR_PNG, master_png=_PNG_MASTER, with_doc=False):
+    """Both sides modify the PNG. `notes.txt` changes only on the branch so the branch diff
+    stays non-empty once the PNG is dropped (the pre-patch must not be empty)."""
+    base = {path: _PNG_BASE, "notes.txt": "a\n"}
+    branch = {path: _PNG_BRANCH, "notes.txt": "a\nbranch\n"}
+    master = {path: master_png}
+    if with_doc:
+        base["doc.txt"] = "a\nb\n"
+        branch["doc.txt"] = "a\nbranch-keep-me\nb\n"
+        master["doc.txt"] = "a\nmaster-line\nb\n"
+    return make_repo(base, branch, master)
+
+
+def _show_bytes(d, ref_path):
+    return subprocess.run(["git", "-C", str(d), "show", ref_path], check=True,
+                          capture_output=True, env=_ENV).stdout
+
+
+def _failed(path):
+    return {f"conflict-resolve:{path}": lambda cwd, prompt: "FAILED"}
+
+
+def test_live_vr_png_conflict_takes_master_copy_without_llm(make_repo):
+    fx = _png_repo(make_repo)
+    llm = _ScriptedLlm({})
+    git = LiveGit(fx.d, llm=llm)
+
+    git.rebase_onto()
+
+    # `conflict-review` runs after any success; no resolver call may have been made.
+    assert llm.first_pass_calls == []
+    assert llm.ladder_calls == []
+    assert len(_parents(fx.d)) == 2
+    assert _show_bytes(fx.d, f"HEAD:{_VR_PNG}") == _PNG_MASTER
+    assert _show(fx.d, "HEAD:notes.txt") == "a\nbranch\n"
+    assert git.last_conflict_rung == "regen"
+
+
+def test_live_vr_png_copy_passes_text_guard(make_repo):
+    """The PNG is not UTF-8; the post-commit text guard must not reject master's copy."""
+    fx = _png_repo(make_repo, master_png=b"\x89PNG\r\n\x1a\n\xff\xfe\x00master")
+    git = LiveGit(fx.d, llm=_ScriptedLlm({}))
+
+    try:
+        git.rebase_onto()
+    except HarnessError as exc:
+        assert "non-UTF-8 content after resolution" not in str(exc)
+        raise
+
+    assert _show_bytes(fx.d, f"HEAD:{_VR_PNG}").endswith(b"\xff\xfe\x00master")
+
+
+def test_live_png_outside_snapshot_dir_still_goes_to_resolver(make_repo):
+    path = "ibl5/images/logo.png"
+    fx = _png_repo(make_repo, path=path)
+    llm = _ScriptedLlm(_failed(path))
+
+    with pytest.raises(HarnessError) as exc:
+        LiveGit(fx.d, llm=llm).rebase_onto()
+
+    assert f"resolver declined: {path}" in str(exc.value)
+    assert [p for p, _m, _pr in llm.first_pass_calls] == [f"conflict-resolve:{path}"]
+    assert _rev(fx.d, "HEAD") == fx.pre
+
+
+def test_live_vr_png_modify_delete_goes_to_resolver(make_repo):
+    fx = _png_repo(make_repo, master_png=None)
+    llm = _ScriptedLlm(_failed(_VR_PNG))
+
+    with pytest.raises(HarnessError) as exc:
+        LiveGit(fx.d, llm=llm).rebase_onto()
+
+    assert f"resolver declined: {_VR_PNG}" in str(exc.value)
+    assert [p for p, _m, _pr in llm.first_pass_calls] == [f"conflict-resolve:{_VR_PNG}"]
+    assert _rev(fx.d, "HEAD") == fx.pre
+
+
+def test_live_vr_png_copy_does_not_exempt_other_files_from_proof(make_repo):
+    """The copy-only exemption covers the PNG alone: a line the resolver drops from
+    doc.txt still fails the proof."""
+    fx = _png_repo(make_repo, with_doc=True)
+    llm = _ScriptedLlm({"conflict-resolve:doc.txt": _writer("doc.txt", "a\nmaster-line\nb\n")})
+    git = LiveGit(fx.d, llm=llm)
+
+    with pytest.raises(HarnessError) as exc:
+        git.rebase_onto()
+
+    assert "tree proof failed" in str(exc.value)
+    assert "doc.txt" in str(exc.value)
+    assert _VR_PNG not in str(exc.value)
+    assert [p for p, _m, _pr in llm.first_pass_calls] == ["conflict-resolve:doc.txt"]
+    assert git.last_conflict_rung == "exhausted"
+    assert _rev(fx.d, "HEAD") == fx.pre
 
 
 def test_live_mixed_conflict_routes_only_non_generated_to_resolver(

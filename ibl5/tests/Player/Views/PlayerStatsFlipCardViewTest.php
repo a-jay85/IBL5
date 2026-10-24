@@ -6,11 +6,12 @@ namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
 use Player\Views\PlayerStatsFlipCardView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerStatsFlipCardView */
 class PlayerStatsFlipCardViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testGetFlipStylesWithNullColorSchemeReturnsNonEmptyString(): void
     {

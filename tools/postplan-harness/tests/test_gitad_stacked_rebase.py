@@ -621,6 +621,10 @@ def test_autoresolve_llm_happy_path():
         assert result.post_resolution_sha != pre_head
         from harness.armable import conflict_flag_path, conflict_verdict_for
         assert os.path.exists(conflict_flag_path(branch))
+        recorded = open(conflict_flag_path(branch)).read().split()
+        assert len(recorded) == 1 and len(recorded[0]) == 40
+        assert _sh(d, "merge-base", "--is-ancestor", recorded[0], "HEAD",
+                   check=False).returncode == 0
         assert conflict_verdict_for(branch) == "CONFLICT-REVIEW=CLEAN"
         sidecar = f"/tmp/postplan-conflict-sha-{key}.txt"
         assert open(sidecar).read().strip() == result.post_resolution_sha

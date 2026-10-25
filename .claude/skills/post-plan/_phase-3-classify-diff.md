@@ -114,11 +114,11 @@ if [ "$(wc -c < "$DIFF_FILE")" -gt 102400 ] && $HAS_PR; then
     > "$DIFF_FILE"
 fi
 
-# Code-comment detection on added lines only (gates Phase 4B Agent B)
+# Code-comment detection on added lines only (gates Phase 4B Agent A Section 5)
 COMMENT_COUNT=$(grep -cE '^\+[[:space:]]*(//|#|/\*|\*)' "$DIFF_FILE" || true)
 HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 
-# PHP lines changed (gates Phase 4B Agents B-C size threshold)
+# PHP lines changed (gates Phase 4B Agent A Section 4 and Agent C size threshold)
 LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
 # Shell-arm lines only (bin/ + .sh). Agent E slicer is a superset — it also covers
 # .github/workflows/ and .claude/ arms — so the two share the shell-arm predicate.

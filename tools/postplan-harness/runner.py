@@ -524,10 +524,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
-            code_review_purposes = {"review-agent-a", "review-agent-b", "review-agent-d"}
-            expected_code = [p for p in ("review-agent-a", "review-agent-b", "review-agent-d")
-                             if gates.get({"review-agent-a": "A", "review-agent-b": "B",
-                                           "review-agent-d": "D"}[p])]
+            code_review_purposes = {"review-agent-a", "review-agent-d"}
+            expected_code = [p for p in ("review-agent-a", "review-agent-d")
+                             if gates.get({"review-agent-a": "A", "review-agent-d": "D"}[p])]
             code_degraded = [p for p in degraded_agents if p in code_review_purposes]
             res.phase4b_code_ran = bool(expected_code) and len(code_degraded) < len(expected_code)
             res.phase4b_reviewed_head = meta.get("headRefOid") or ""

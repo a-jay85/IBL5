@@ -57,6 +57,23 @@ class TeamNeedsScorerTest extends TestCase
         self::assertSame(['big' => 1], $rebuild->positionHoles);
     }
 
+    public function testInjuredTopPlayerFillsNoValueSlot(): void
+    {
+        $healthy = [];
+        foreach (['PG', 'SG', 'SF', 'GF', 'PF', 'C'] as $i => $pos) {
+            $healthy[] = self::player($i + 1, $pos, 55);
+        }
+        $injuredStar = new SuggestionPlayer(99, 'Star', 'SF', 27, 75, true, 1000, 3, 2000);
+        $healthyStar = new SuggestionPlayer(99, 'Star', 'SF', 27, 75, false, 1000, 3, 2000);
+
+        $injured = $this->scorer->score(new TeamAssets(1, [...$healthy, $injuredStar], []), TeamMode::WinNow);
+        $fit = $this->scorer->score(new TeamAssets(1, [...$healthy, $healthyStar], []), TeamMode::WinNow);
+
+        // Six 55s fill slots 1-6 either way; the healthy 75 takes slot 1 and pushes a 55 to slot 7.
+        self::assertEqualsWithDelta(10 * (5 + 0.6), $injured->total, 1e-9);
+        self::assertEqualsWithDelta(90 + 10 * (4 + 0.6 + 0.6), $fit->total, 1e-9);
+    }
+
     public function testPicksAddTheirModeValue(): void
     {
         $pick = new SuggestionPick(100, 1, 2027, 1, 10.0);

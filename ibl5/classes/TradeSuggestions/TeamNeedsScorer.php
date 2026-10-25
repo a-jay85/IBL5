@@ -35,7 +35,9 @@ final class TeamNeedsScorer
 
     public function score(TeamAssets $assets, TeamMode $mode): TeamScore
     {
-        $values = array_map(fn (SuggestionPlayer $p): float => $this->valuer->playerValue($p, $mode), $assets->players);
+        // An injured player fills no slot, so an injury gap lowers the score directly.
+        $healthy = array_filter($assets->players, static fn (SuggestionPlayer $p): bool => !$p->injured);
+        $values = array_values(array_map(fn (SuggestionPlayer $p): float => $this->valuer->playerValue($p, $mode), $healthy));
         rsort($values);
 
         $total = 0.0;

@@ -12,6 +12,7 @@ use TradeSuggestions\LeagueStarterRanks;
 use TradeSuggestions\Need;
 use TradeSuggestions\NeedJudge;
 use TradeSuggestions\NeedKind;
+use TradeSuggestions\NeedPairMatcher;
 use TradeSuggestions\NeedsCard;
 use TradeSuggestions\PairedCandidate;
 use TradeSuggestions\Pairing;
@@ -90,6 +91,68 @@ final class NeedJudgeTest extends TestCase
 
         $veteran = RosterFactory::player(3, 'C', age: 25);
         self::assertSame(0, $judge->paidTier([$veteran], [], RosterFactory::emptyRanks()));
+    }
+
+    public function testYoungPlayerDumpedByOverCapSideIsNotPayment(): void
+    {
+        // Team 1 is 1100 over. The matcher picks bench pid 10 (age 23, 1200
+        // owed) as the dump, which owes a tier 1 sweetener. Team 1 has no
+        // picks and no other young bench player, so nothing pays for it.
+        $starter = RosterFactory::player(11, 'C', salary: 300, dcMinutes: 30);
+        $user = new TeamAssets(1, [RosterFactory::player(10, 'C', age: 23, salary: 1200), $starter], [], null, League::HARD_CAP_MAX - 8100);
+        $userCard = new NeedsCard(1, [new Need(NeedKind::OverHardCap, 1100)], 8100, [], TeamMode::Rebuild, 0.5);
+        $partner = RosterFactory::team(2, [RosterFactory::player(20, 'PG', dcMinutes: 30)], 4000);
+        $partnerCard = new NeedsCard(2, [new Need(NeedKind::RoomToAbsorb, 3000)], 4000, [], TeamMode::Rebuild, 0.5);
+        $ranks = RosterFactory::emptyRanks();
+
+        $candidates = array_values(iterator_to_array((new NeedPairMatcher())->generate(
+            $userCard,
+            $user,
+            [2 => $partnerCard],
+            [2 => $partner],
+            RosterFactory::depth(['C' => $starter]),
+            [2 => RosterFactory::depth([])],
+            $ranks,
+        ), false));
+
+        self::assertCount(1, $candidates);
+        self::assertSame([10], $candidates[0]->candidate->userPids);
+        self::assertSame([10], $candidates[0]->dumpPids);
+        self::assertSame(
+            RejectReason::PaymentShort,
+            (new NeedJudge())->judge($candidates[0], $userCard, $partnerCard, $user, $partner, $ranks),
+        );
+    }
+
+    public function testYoungLongContractSentForExpiringIsNotPayment(): void
+    {
+        // Team 1 is capped out and swaps pid 10 (age 23, 3000 owed) for an
+        // expiring 1000. Team 2 takes on 2000 more and is owed a tier 1
+        // sweetener; the long contract itself does not pay it.
+        $starter = RosterFactory::player(11, 'C', salary: 300, dcMinutes: 30);
+        $user = RosterFactory::team(1, [RosterFactory::player(10, 'C', age: 23, salary: 1000, years: 3, laterSalaries: [1000, 1000]), $starter], 6000);
+        $userCard = new NeedsCard(1, [new Need(NeedKind::CappedOut, 2000)], 6000, [], TeamMode::Rebuild, 0.5);
+        $partner = RosterFactory::team(2, [RosterFactory::player(20, 'C', salary: 1000), RosterFactory::player(21, 'PG', dcMinutes: 30)], 4000);
+        $partnerCard = new NeedsCard(2, [new Need(NeedKind::RoomToAbsorb, 3000)], 4000, [], TeamMode::Rebuild, 0.5);
+        $ranks = RosterFactory::emptyRanks();
+
+        $candidates = array_values(iterator_to_array((new NeedPairMatcher())->generate(
+            $userCard,
+            $user,
+            [2 => $partnerCard],
+            [2 => $partner],
+            RosterFactory::depth(['C' => $starter]),
+            [2 => RosterFactory::depth([])],
+            $ranks,
+        ), false));
+
+        self::assertCount(1, $candidates);
+        self::assertSame(Pairing::LengthForExpiring, $candidates[0]->pairing);
+        self::assertSame([10], $candidates[0]->dumpPids);
+        self::assertSame(
+            RejectReason::PaymentShort,
+            (new NeedJudge())->judge($candidates[0], $userCard, $partnerCard, $user, $partner, $ranks),
+        );
     }
 
     public function testExtraIncomingPlayerCostsRosterSpot(): void

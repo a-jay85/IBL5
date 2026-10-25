@@ -50,9 +50,8 @@ final class NeedJudge
             return RejectReason::ImportantWorsened;
         }
 
-        $needPids = array_merge($userCard->topNeed()->pids ?? [], $partnerCard->topNeed()->pids ?? []);
-        $userPaid = $this->paidTier($partnerOut, $partnerPicksOut, $ranks, $needPids);
-        $partnerPaid = $this->paidTier($userOut, $userPicksOut, $ranks, $needPids);
+        $userPaid = $this->paidTier($partnerOut, $partnerPicksOut, $ranks, $p->dumpPids);
+        $partnerPaid = $this->paidTier($userOut, $userPicksOut, $ranks, $p->dumpPids);
         $requiredTier = 0;
         $paidTier = 0;
         if ($dumpShape) {
@@ -93,7 +92,7 @@ final class NeedJudge
      *
      * @param list<SuggestionPlayer> $playersIn
      * @param list<SuggestionPick> $picksIn
-     * @param list<int> $excludePids Players a need names (the ones being dumped); they are never payment
+     * @param list<int> $excludePids The deal's dumped players; they are never payment
      */
     public function paidTier(array $playersIn, array $picksIn, LeagueStarterRanks $ranks, array $excludePids = []): int
     {

@@ -91,6 +91,7 @@ final class NeedPairMatcher
                                 $pairing,
                                 $userIsA ? $aNeed : $bNeed,
                                 $userIsA ? $bNeed : $aNeed,
+                                $deal['dump'] ?? [],
                             );
                             $emitted++;
                             if ($emitted >= $this->maxPerPartner) {
@@ -118,7 +119,7 @@ final class NeedPairMatcher
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private function deals(Pairing $pairing, MatchSide $a, MatchSide $b, Need $aNeed, Need $bNeed, LeagueStarterRanks $ranks): array
     {
@@ -132,7 +133,7 @@ final class NeedPairMatcher
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private static function salaryDump(MatchSide $a, Need $aNeed): array
     {
@@ -163,14 +164,14 @@ final class NeedPairMatcher
             if (array_intersect($pay['pids'], $dump) !== []) {
                 continue;
             }
-            $deals[] = ['aPids' => [...$dump, ...$pay['pids']], 'aPicks' => $pay['picks'], 'bPids' => [], 'bPicks' => []];
+            $deals[] = ['aPids' => [...$dump, ...$pay['pids']], 'aPicks' => $pay['picks'], 'bPids' => [], 'bPicks' => [], 'dump' => $dump];
         }
 
         return $deals;
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private static function veteranForFuture(MatchSide $a, MatchSide $b, Need $bNeed, LeagueStarterRanks $ranks): array
     {
@@ -219,7 +220,7 @@ final class NeedPairMatcher
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private static function surplusForHole(MatchSide $a, MatchSide $b, Need $aNeed): array
     {
@@ -248,7 +249,7 @@ final class NeedPairMatcher
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private static function consolidation(MatchSide $a, MatchSide $b, LeagueStarterRanks $ranks): array
     {
@@ -279,7 +280,7 @@ final class NeedPairMatcher
     }
 
     /**
-     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>}>
+     * @return list<array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>}>
      */
     private static function lengthForExpiring(MatchSide $a, MatchSide $b, LeagueStarterRanks $ranks): array
     {
@@ -314,7 +315,7 @@ final class NeedPairMatcher
                 continue;
             }
             foreach ($sweeteners as $pickIds) {
-                $deals[] = ['aPids' => [$long->pid], 'aPicks' => $pickIds, 'bPids' => [$player->pid], 'bPicks' => []];
+                $deals[] = ['aPids' => [$long->pid], 'aPicks' => $pickIds, 'bPids' => [$player->pid], 'bPicks' => [], 'dump' => [$long->pid]];
             }
         }
 
@@ -324,7 +325,7 @@ final class NeedPairMatcher
     /**
      * Cheap prefilters. The Trading validator still decides legality.
      *
-     * @param array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>} $deal
+     * @param array{aPids: list<int>, aPicks: list<int>, bPids: list<int>, bPicks: list<int>, dump?: list<int>} $deal
      */
     private static function passesGuards(MatchSide $a, MatchSide $b, array $deal): bool
     {

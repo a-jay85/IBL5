@@ -1453,6 +1453,7 @@ class LiveGit:
 
             try:
                 self._snapshot_conflicted_paths()
+                # regen_lockfiles stays off: this path has no derived-file pre-patch rewrite (extend_pre_patch=None).
                 inventory = inventory_conflicts(self._run)
                 if inventory.unresolvable_reason:
                     abort_and_restore(self._run, worktree=self.worktree,

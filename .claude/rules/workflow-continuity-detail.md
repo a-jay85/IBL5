@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-24
+last_verified: 2026-10-25
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -52,6 +52,14 @@ branch; it survives you closing Claude Code. Engine selection:
   proof checks every other file unchanged. A generator that fails, times out or writes a file
   outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
   as before. `conflict_rung` reads `regen` when no file needed the resolver.
+  `ibl5/bun.lock` and `ibl5/composer.lock` are rebuilt when both sides changed them
+  (`tools/postplan-harness/harness/lockfile_regen.py`). The resolver takes the manifest first.
+  The harness then checks out master's lockfile, runs the registered bun or composer command
+  with scripts off under a 600-second bound, stages the result, and logs
+  `phase2: lockfile regenerated: <path> via <cmd>`. The proof treats the lockfile like the
+  baseline. A failed regen exits 3 with `lockfile: <path> (regen failed: <cmd> ...)`. Other
+  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`. Condition (14)
+  still needs `CONFLICT-REVIEW=CLEAN`.
   Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
   goes through the four-rung conflict ladder: `tools/postplan-harness/README.md` § Conflict ladder.
   The arming hold for an auto-resolved conflict, condition (14), reads a marker file the

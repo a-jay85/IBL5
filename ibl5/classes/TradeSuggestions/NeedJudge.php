@@ -44,8 +44,8 @@ final class NeedJudge
 
         $dumpShape = $p->pairing === Pairing::SalaryDump || $p->pairing === Pairing::LengthForExpiring;
         if (
-            $this->worsened($user, $userAfter, $userCard, $userOut, $partnerOut, $dumpShape)
-            || $this->worsened($partner, $partnerAfter, $partnerCard, $partnerOut, $userOut, $dumpShape)
+            $this->worsened($user, $userAfter, $userCard, $userOut, $partnerOut, $dumpShape, $ranks)
+            || $this->worsened($partner, $partnerAfter, $partnerCard, $partnerOut, $userOut, $dumpShape, $ranks)
         ) {
             return RejectReason::ImportantWorsened;
         }
@@ -120,6 +120,7 @@ final class NeedJudge
         array $out,
         array $in,
         bool $dumpShape,
+        LeagueStarterRanks $ranks,
     ): bool {
         $depth = SlotMapper::depthFor($before->players);
         foreach ($out as $player) {
@@ -127,7 +128,7 @@ final class NeedJudge
             if ($slot === null) {
                 continue;
             }
-            if ($card->mode === TeamMode::WinNow) {
+            if ($card->mode === TeamMode::WinNow && !self::covers($in, $player, $slot, $ranks)) {
                 return true;
             }
         }
@@ -269,6 +270,31 @@ final class NeedJudge
         }
 
         return (int) round($total);
+    }
+
+    /**
+     * True when an incoming player holds the slot at an equal or better rank
+     * than the outgoing starter. An unranked outgoing starter is never covered.
+     *
+     * @param list<SuggestionPlayer> $in
+     */
+    private static function covers(array $in, SuggestionPlayer $out, string $slot, LeagueStarterRanks $ranks): bool
+    {
+        $outRank = $ranks->rankIfStarting($out, $slot);
+        if ($outRank === null) {
+            return false;
+        }
+        foreach ($in as $player) {
+            if (!SlotMapper::eligible($player, $slot)) {
+                continue;
+            }
+            $inRank = $ranks->rankIfStarting($player, $slot);
+            if ($inRank !== null && $inRank <= $outRank) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

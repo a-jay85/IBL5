@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the 9998/9999 preseason sentinel year and using real season years instead, with a cleanup pipeline step for the Preseason→Regular Season transition.
-last_verified: 2026-08-25
+last_verified: 2026-10-24
 ---
 
 # ADR-0011: Remove Preseason Sentinel Year (9998/9999)

@@ -67,7 +67,8 @@ class PausingLlm:
     def call_tooled(self, purpose, model, prompt, *, cwd=None, agent=None,
                     allowed_tools=(), denied_tools=("Bash", "Agent"), add_dirs=(),
                     append_system_prompt=None, setting_sources="user,project",
-                    timeout=0, max_turns=0, max_retries=1):
+                    timeout=0, max_turns=0, max_retries=1,
+                    max_budget_usd=None, advisor=True):
         return self._answer(purpose)
 
 

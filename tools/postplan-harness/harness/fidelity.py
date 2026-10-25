@@ -707,6 +707,7 @@ def review(llm, out_dir: str, worktree: str, packet_dir: str,
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet_dir,), append_system_prompt=OVERRIDE,
+            advisor=False,
         )
     except HarnessError as e:
         return None, e.kind

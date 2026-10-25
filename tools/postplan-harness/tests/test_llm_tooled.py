@@ -460,6 +460,18 @@ def test_tooled_argv_unchanged_without_budget():
     assert len(_bounded_argv(max_budget_usd=5.0)) == len(argv) + 2
 
 
+def test_tooled_argv_keeps_advisor_by_default():
+    argv = _bounded_argv()
+    assert "--settings" not in argv
+    assert "advisorModel" not in " ".join(argv)
+
+
+def test_tooled_argv_drops_advisor_when_asked():
+    argv = _bounded_argv(advisor=False)
+    assert json.loads(argv[argv.index("--settings") + 1]) == {"advisorModel": ""}
+    assert len(argv) == len(_bounded_argv()) + 2
+
+
 def test_session_budget_reaches_cli_subprocess(shim, tmp_path):
     cli = _cli(tmp_path)
     cli.call_tooled("conflict-ladder-session", "opus", "p", cwd=str(tmp_path),

@@ -1442,6 +1442,7 @@ class LiveGit:
                                             key=key, inventory=inventory,
                                             branch_stage=3, master_sha=master_sha,
                                             pre_sha=pre_rebase_sha,
+                                            replay_base=pre_base if pre_base != master_sha else "",
                                             decline_retry_model=DECLINE_RETRY_MODEL,
                                             max_decline_retries=MAX_DECLINE_RETRIES - self._decline_retries_used)
                 self._decline_retries_used += resolve_result.decline_retries

@@ -212,6 +212,54 @@ def test_resolve_all_orientation_per_path(monkeypatch):
     assert len(seen) == 2
 
 
+def test_stacked_resolve_all_scopes_decline_retry_to_the_branch_own_commits(monkeypatch):
+    """Stacked parent tip not on master: replay_base is the parent tip, so the decline-retry
+    prompt omits the parent's lines. An iblBase already on master passes no replay_base."""
+    import harness.conflict as conflict
+
+    seen = []
+
+    def recording_resolve_all(llm, run, **kwargs):
+        seen.append(kwargs)
+        return conflict.ConflictResolutionResult(False, "stub: stop after recording")
+
+    monkeypatch.setattr(conflict, "resolve_all", recording_resolve_all)
+
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    try:
+        g = LiveGit(d, llm=_WritingLlm(d, "feature.txt"))
+        pre_sha = _rev(d, "HEAD")
+        with pytest.raises(HarnessError):
+            g.autoresolve_stacked_rebase()
+        assert seen[-1]["replay_base"] == parent_tip
+
+        prompt = conflict.decline_retry_context(
+            g._run, path="parent.txt", pre_sha=pre_sha, master_sha=master_sha,
+            prior_reason="resolver declined: x", replay_base=seen[-1]["replay_base"])
+        unscoped = conflict.decline_retry_context(
+            g._run, path="parent.txt", pre_sha=pre_sha, master_sha=master_sha,
+            prior_reason="resolver declined: x")
+        # Master's own section carries the squashed parent; only the branch section is scoped.
+        branch_side = lambda text: text.split("Master's whole change")[0]
+        assert "+step2" not in branch_side(prompt)
+        assert "+step2" in branch_side(unscoped)
+    finally:
+        _cleanup_full(key, branch, d)
+
+    d, _tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    try:
+        on_master = _sh(d, "merge-base", branch, master_sha).stdout.strip()
+        _sh(d, "config", f"branch.{branch}.iblBase", on_master)
+        with pytest.raises(HarnessError):
+            LiveGit(d, llm=_WritingLlm(d, "feature.txt")).autoresolve_stacked_rebase()
+    finally:
+        _cleanup_full(key, branch, d)
+    assert seen[-1]["replay_base"] == ""
+    assert len(seen) == 2
+
+
 # ── Condition (14) marker reconcile at rebase start ───────────────────────────
 
 def _legacy_marker(branch, mtime):

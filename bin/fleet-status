@@ -1361,7 +1361,7 @@ paused_resume_text() {
 }
 
 render_paused() {
-    local count=0 now rows sid runner cwd reason window resets paused_at stuck rpid label age
+    local count=0 bad=0 f out now rows sid runner cwd reason window resets paused_at stuck rpid label age
 
     section "PAUSED JOBS  (usage gate; the coordinator resumes them)"
 
@@ -1375,14 +1375,26 @@ render_paused() {
         return 0
     fi
     now="$(date +%s)"
-    # One jq pass over every marker, in the coordinator's own resume order.
-    rows="$("$JQ_BIN" -rs '
-        [.[] | select(type == "object" and (.session_id // "") != "")]
-        | sort_by(.priority // 9, .paused_at // 0) | .[]
-        | [.session_id, (.runner // "?"), (.resume_cwd // ""), (.reason // ""),
-           (.window // ""), (.resets_at // "" | tostring), (.paused_at // "" | tostring),
-           (.stuck // false | tostring), (.resuming_pid // "" | tostring)]
-        | join("\u001f")' "$@" 2>/dev/null)"
+    # One jq call per marker, so a truncated file drops only its own row.
+    # Each row leads with priority and paused_at, then is sorted into the
+    # coordinator's resume order and the sort keys are cut off.
+    rows=''
+    for f in "$@"; do
+        if out="$("$JQ_BIN" -r '
+            select(type == "object" and (.session_id // "") != "")
+            | [(.priority // 9 | tostring), (.paused_at // 0 | tostring),
+               .session_id, (.runner // "?"), (.resume_cwd // ""), (.reason // ""),
+               (.window // ""), (.resets_at // "" | tostring), (.paused_at // "" | tostring),
+               (.stuck // false | tostring), (.resuming_pid // "" | tostring)]
+            | join("\u001f")' "$f" 2>/dev/null)"; then
+            [ -n "$out" ] && rows="${rows:+$rows$'\n'}$out"
+        else
+            bad=$(( bad + 1 ))
+        fi
+    done
+    if [ -n "$rows" ]; then
+        rows="$(LC_ALL=C sort -t $'\037' -k1,1n -k2,2n <<< "$rows" | cut -d $'\037' -f3-)"
+    fi
 
     while IFS=$'\037' read -r sid runner cwd reason window resets paused_at stuck rpid; do
         [ -z "$sid" ] && continue
@@ -1401,7 +1413,8 @@ render_paused() {
 $rows
 EOF
 
-    [ "$count" -eq 0 ] && note "none"
+    [ "$bad" -gt 0 ] && note "$bad marker file(s) unreadable (bad JSON), skipped"
+    [ "$count" -eq 0 ] && [ "$bad" -eq 0 ] && note "none"
     return 0
 }
 

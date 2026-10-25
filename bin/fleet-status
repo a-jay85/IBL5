@@ -26,7 +26,7 @@
 #
 # THE OTHER WAY TO OVERCOUNT: DOUBLE-COUNTING ONE JOB. Every job above spawns its
 # own `claude -p` children, so a flat `pgrep` lists work the page already showed —
-# 5 real jobs once rendered as 12 rows. The last section walks each candidate's
+# 5 real jobs once rendered as 12 rows. The unaccounted section walks each candidate's
 # ancestry and drops anything descending from a PID already printed, which leaves
 # it empty on a healthy fleet and turns it into an orphan detector.
 #
@@ -1298,11 +1298,132 @@ EOF
     return 0
 }
 
+# ── section 4: paused jobs ─────────────────────────────────────────────────────
+#
+# Runs the usage gate stopped at the usage limit. A paused run has no process, so
+# no section above lists it (an automouse plan's queue row only says "paused").
+# Each pause leaves markers/<sid>.json, and bin/usage-gate-coordinator resumes the
+# run from that file.
+#
+# THE RESUME TIME IS AN ESTIMATE. The coordinator ticks every 60s. It resumes a
+# marker once the usage zone is back to normal, or once the marker's window reset
+# is 60s past. A limit-hit pause also sits out 600s first. The page shows the
+# later of those two times. A reset already past reads "due".
+
+# "Sun 2026-10-25 16:00" for an epoch. BSD first, GNU (CI) second.
+epoch_clock() {
+    date -r "$1" +'%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || date -d "@$1" +'%a %Y-%m-%d %H:%M' 2>/dev/null \
+        || printf '?'
+}
+
+# The queue plan whose lock names <sid> in paused-held, or nothing.
+paused_plan_for() {
+    local held
+    for held in "$AUTOMOUSE_DIR"/queue/*.lock/paused-held; do
+        [ -f "$held" ] || continue
+        [ "$(tr -dc '0-9a-f-' < "$held" 2>/dev/null)" = "$1" ] || continue
+        held="${held%/paused-held}"; held="${held##*/}"
+        printf '%s' "${held%.lock}"
+        return 0
+    done
+    return 1
+}
+
+# When a paused marker resumes, as one line. Arguments are the marker's fields.
+paused_resume_text() {
+    local reason="$1" window="$2" resets="$3" paused_at="$4" stuck="$5" rpid="$6" now est='' when
+    now="$(date +%s)"
+    if [ "$stuck" = true ]; then
+        printf '%sstuck — paused 5 times, resume by hand%s' "$YEL" "$R"; return 0
+    fi
+    if [ -n "$rpid" ] && kill -0 "$rpid" 2>/dev/null; then
+        printf '%sresuming now (pid %s)%s' "$GRN" "$rpid" "$R"; return 0
+    fi
+    case "$resets" in ''|*[!0-9]*) ;; *) est=$(( resets + 60 )) ;; esac
+    case "$window" in
+        five_hour) when='5h reset' ;;
+        seven_day) when='weekly reset' ;;
+        *)         when='reset' ;;
+    esac
+    if [ "$reason" = limit-hit ] && [ -n "$est" ]; then
+        case "$paused_at" in ''|*[!0-9]*) ;; *)
+            [ $(( paused_at + 600 )) -gt "$est" ] && est=$(( paused_at + 600 )) ;;
+        esac
+    fi
+    if [ -z "$est" ]; then
+        printf 'resumes when usage is back to normal (reset time unknown)'
+    elif [ "$est" -gt "$now" ]; then
+        printf 'resumes ~%s (%s)' "$(epoch_clock "$est")" "$when"
+    else
+        printf 'resume due (next coordinator tick)'
+    fi
+}
+
+render_paused() {
+    local count=0 bad=0 f out now rows sid runner cwd reason window resets paused_at stuck rpid label age
+
+    section "PAUSED JOBS  (usage gate; the coordinator resumes them)"
+
+    set -- "$USAGE_STATE_DIR"/markers/*.json
+    if [ ! -e "$1" ]; then
+        note "none"
+        return 0
+    fi
+    if ! have_jq; then
+        note "$# paused — install jq to list them"
+        return 0
+    fi
+    now="$(date +%s)"
+    # One jq call per marker, so a truncated file drops only its own row.
+    # Each row leads with priority and paused_at, then is sorted into the
+    # coordinator's resume order and the sort keys are cut off.
+    rows=''
+    for f in "$@"; do
+        if out="$("$JQ_BIN" -r '
+            select(type == "object" and (.session_id // "") != "")
+            | [(.priority // 9 | tostring), (.paused_at // 0 | tostring),
+               .session_id, (.runner // "?"), (.resume_cwd // ""), (.reason // ""),
+               (.window // ""), (.resets_at // "" | tostring), (.paused_at // "" | tostring),
+               (.stuck // false | tostring), (.resuming_pid // "" | tostring)]
+            | join("\u001f")' "$f" 2>/dev/null)"; then
+            [ -n "$out" ] && rows="${rows:+$rows$'\n'}$out"
+        else
+            bad=$(( bad + 1 ))
+        fi
+    done
+    if [ -n "$rows" ]; then
+        rows="$(LC_ALL=C sort -t $'\037' -k1,1n -k2,2n <<< "$rows" | cut -d $'\037' -f3-)"
+    fi
+
+    while IFS=$'\037' read -r sid runner cwd reason window resets paused_at stuck rpid; do
+        [ -z "$sid" ] && continue
+        label=''
+        [ "$runner" = automouse ] && label="$(paused_plan_for "$sid")"
+        [ -z "$label" ] && [ -n "$cwd" ] && label="$(basename "$cwd")"
+        [ -z "$label" ] && label="${sid%%-*}"
+        age='?'
+        case "$paused_at" in ''|*[!0-9]*) ;; *) age="$(human_age $(( now - paused_at )))" ;; esac
+        count=$(( count + 1 ))
+        printf '  %s‖%s %-14s %-40s paused %s ago%s\n' \
+            "$DIM" "$R" "$runner" "$(clip_field "$label" 40)" "$age" \
+            "${reason:+  $DIM($reason)$R}"
+        printf '      %s\n' "$(paused_resume_text "$reason" "$window" "$resets" "$paused_at" "$stuck" "$rpid")"
+    done <<EOF
+$rows
+EOF
+
+    [ "$bad" -gt 0 ] && note "$bad marker file(s) unreadable (bad JSON), skipped"
+    [ "$count" -eq 0 ] && [ "$bad" -eq 0 ] && note "none"
+    return 0
+}
+
 render_all() {
     printf '%sFLEET STATUS%s  %s%s%s\n' "$B" "$R" "$DIM" "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$R"
     render_launchd
     render_queue
     render_loose
+    render_paused
     printf '\n'
 }
 

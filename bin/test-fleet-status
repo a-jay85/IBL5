@@ -306,7 +306,24 @@ for p in paused-plan resumed-plan resumed-gone-plan stale-lock-plan merged-plan;
     printf '%s\n' "$DEAD_PID" > "$AM/queue/$p.md.lock/pid"
 done
 printf '%s\n' "$PAUSED_SID" > "$AM/queue/paused-plan.md.lock/paused-held"
-printf '{"session_id":"%s"}\n' "$PAUSED_SID" > "$USAGE_DIR/markers/$PAUSED_SID.json"
+# Pause markers for the PAUSED JOBS section, one per resume-time branch. The
+# automouse one belongs to paused-plan above, so its row names the plan.
+PM_NOW="$(date +%s)"
+printf '{"session_id":"%s","runner":"automouse","priority":2,"resume_cwd":"/x/IBL5","reason":"limit-hit","window":"five_hour","resets_at":%s,"paused_at":%s}\n' \
+    "$PAUSED_SID" $(( PM_NOW + 7200 )) $(( PM_NOW - 120 )) > "$USAGE_DIR/markers/$PAUSED_SID.json"
+PM_DUE='cccccccc-1111-2222-3333-444444444444'
+printf '{"session_id":"%s","runner":"post-plan-now","priority":1,"resume_cwd":"/x/IBL5-worktrees/due-slug","reason":"zone","window":"seven_day","resets_at":%s,"paused_at":%s}\n' \
+    "$PM_DUE" $(( PM_NOW - 600 )) $(( PM_NOW - 3700 )) > "$USAGE_DIR/markers/$PM_DUE.json"
+PM_STUCK='dddddddd-1111-2222-3333-444444444444'
+printf '{"session_id":"%s","runner":"burndown-loop","priority":4,"resume_cwd":"/x/stuck-tree","reason":"zone","resets_at":%s,"paused_at":%s,"stuck":true}\n' \
+    "$PM_STUCK" $(( PM_NOW + 60 )) $(( PM_NOW - 60 )) > "$USAGE_DIR/markers/$PM_STUCK.json"
+PM_NORESET='eeeeeeee-1111-2222-3333-444444444444'
+printf '{"session_id":"%s","runner":"plan-now","priority":3,"resume_cwd":"/x/noreset-tree","reason":"zone","resets_at":null,"paused_at":%s}\n' \
+    "$PM_NORESET" $(( PM_NOW - 30 )) > "$USAGE_DIR/markers/$PM_NORESET.json"
+# A limit-hit pause whose window already reset still sits out its 600s hold.
+PM_HOLD='ffffffff-1111-2222-3333-444444444444'
+printf '{"session_id":"%s","runner":"plan-now","priority":3,"resume_cwd":"/x/hold-tree","reason":"limit-hit","window":"five_hour","resets_at":%s,"paused_at":%s}\n' \
+    "$PM_HOLD" $(( PM_NOW - 300 )) $(( PM_NOW - 10 )) > "$USAGE_DIR/markers/$PM_HOLD.json"
 printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-plan.md.lock/paused-held"
 printf '%s\n' "$RESUMED_SID" > "$AM/queue/resumed-gone-plan.md.lock/paused-held"
 # resumed-plan's post-plan run is alive. Its handoff names a branch that differs
@@ -1465,6 +1482,31 @@ elif [ "$PTY_OK" -eq 1 ]; then
 else
     printf '  skip  %s\n' "watch tty: alt-screen/clip/restore (no python3 or no pty available)"
 fi
+
+# ── paused jobs section ────────────────────────────────────────────────────────
+PAUSED_BLOCK="$(sed -n '/PAUSED JOBS/,$p' <<< "$OUTPUT")"
+assert_has "paused: section renders below unaccounted" \
+    "$(sed -n '/UNACCOUNTED HEADLESS SESSIONS/,$p' <<< "$OUTPUT")" 'PAUSED JOBS'
+assert_has "paused: automouse row names its queued plan" \
+    "$PAUSED_BLOCK" '‖ automouse +paused-plan\.md +paused 2m +ago +\(limit-hit\)'
+assert_has "paused: future reset shows the resume clock and window" \
+    "$PAUSED_BLOCK" 'resumes ~[A-Z][a-z]{2} [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} \(5h reset\)'
+assert_has "paused: post-plan row labelled by its worktree" \
+    "$PAUSED_BLOCK" '‖ post-plan-now +due-slug'
+assert_has "paused: past reset reads due" \
+    "$PAUSED_BLOCK" 'resume due \(next coordinator tick\)'
+assert_has "paused: stuck marker says resume by hand" \
+    "$PAUSED_BLOCK" 'stuck — paused 5 times, resume by hand'
+assert_has "paused: missing reset time says so" \
+    "$PAUSED_BLOCK" 'reset time unknown'
+HOLD_ROW="$(grep -A1 'hold-tree' <<< "$PAUSED_BLOCK")"
+assert_has "paused: limit-hit hold outlasts a past reset" \
+    "$HOLD_ROW" 'resumes ~.*\(5h reset\)'
+assert_has "paused: coordinator priority order (post-plan-now first)" \
+    "$(grep -m1 '‖' <<< "$PAUSED_BLOCK")" 'post-plan-now'
+mkdir -p "$TMP/usage-empty/markers"
+assert_has "paused: no markers reads none" \
+    "$(run_fleet IBL5_USAGE_GATE_STATE_DIR="$TMP/usage-empty" | sed -n '/PAUSED JOBS/,$p')" '^  none$'
 
 printf '\n'
 h_done

@@ -18,6 +18,7 @@ from .llm import run_bounded
 COMMIT_HOOK_TIMEOUT = 300   # seconds for `git commit` incl. bin/pre-commit-hook
 GIT_OP_TIMEOUT = 300    # seconds; every other local git call routed through _run/_run_out/_run_bytes
 GIT_NET_TIMEOUT = 600   # seconds; fetch, push (runs bin/pre-push-adr-hook), ls-remote, pull
+EMERGENCY_GIT_TIMEOUT = 30   # seconds per git call in emergency_abort (SIGTERM cleanup path)
 # A hang in any git call fails closed with subprocess-timeout naming `git <subcommand>`.
 # Added after the 2026-10-23 run (PR 3352) sat 90 min after "starting commit (pre-commit
 # hook)" with no FAILED line: the bounded commit leg was ruled out, which left the then
@@ -31,7 +32,11 @@ def _git_timeout(args: tuple[str, ...]) -> int:
 
 
 def _git_step(args: tuple[str, ...]) -> str:
-    return f"git {args[0]}" if args else "git"
+    """`git <subcommand>`, skipping leading `-c key=val` pairs (e.g. _NO_RERERE)."""
+    rest = list(args)
+    while len(rest) >= 2 and rest[0] == "-c":
+        rest = rest[2:]
+    return f"git {rest[0]}" if rest else "git"
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
 
@@ -196,15 +201,11 @@ class LiveGit:
         # --git-path can print a path relative to the worktree, so join it (a no-op
         # when git already printed an absolute one).
         def _git_path(name: str) -> str:
-            out = subprocess.run(
-                ["git", "-C", self.worktree, "rev-parse", "--git-path", name],
-                capture_output=True, text=True,
-            ).stdout.strip()
+            proc = self._emergency_git("rev-parse", "--git-path", name)
+            out = proc.stdout.strip() if proc else ""
             return os.path.join(self.worktree, out) if out else ""
-        merging = subprocess.run(
-            ["git", "-C", self.worktree, "rev-parse", "-q", "--verify", "MERGE_HEAD"],
-            capture_output=True, text=True,
-        ).stdout.strip()
+        merge_proc = self._emergency_git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+        merging = merge_proc.stdout.strip() if merge_proc else ""
         if not merging and not any(
                 p and os.path.exists(p)
                 for p in (_git_path("rebase-merge"), _git_path("rebase-apply"))):
@@ -214,18 +215,34 @@ class LiveGit:
                 except Exception:  # signal handler: never raise
                     pass
             return
-        subprocess.run(["git", "-C", self.worktree, "merge", "--abort"],
-                       capture_output=True)
-        subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
-                       capture_output=True)
-        subprocess.run(["git", "-C", self.worktree, "reset", "--hard", pre],
-                       capture_output=True)
+        # Each step is best-effort: a hang or failure in one must not skip the next.
+        timed_out = [
+            args[0] for args in (("merge", "--abort"), ("rebase", "--abort"),
+                                 ("reset", "--hard", pre))
+            if self._emergency_git(*args) is None
+        ]
         import sys as _sys
         _sys.stderr.write(
             f"post-plan harness: SIGTERM — aborted merge/rebase in {self.worktree},"
-            f" restored to {pre[:12]}\n"
+            f" restored to {pre[:12]}"
+            + (f" (timed out or failed to run: {', '.join(timed_out)})" if timed_out else "")
+            + "\n"
         )
         _sys.stderr.flush()
+
+    def _emergency_git(self, *args: str):
+        """Bounded git call for the SIGTERM cleanup path. Never raises: returns the
+        CompletedProcess, or None when git hung (reaped, stale index.lock dropped) or
+        could not run. A nonzero rc still returns the process, as the old bare run did."""
+        try:
+            return run_bounded(["git", "-C", self.worktree, *args], step=_git_step(args),
+                               timeout=EMERGENCY_GIT_TIMEOUT, errors="replace")
+        except HarnessError as e:
+            if e.kind == SUBPROCESS_TIMEOUT:
+                self._clear_stale_index_lock()
+            return None
+        except Exception:  # signal handler: never raise (e.g. OSError)
+            return None
 
     def drop_commit(self, pre: str) -> str:
         """Move HEAD back to `pre`, dropping commits made after it.
@@ -991,9 +1008,7 @@ class LiveGit:
         self._reconcile_conflict_flag(branch, key, base)
         purge_verdict_artifacts(key)
 
-        proc = subprocess.run(
-            ["git", "-C", self.worktree, *_NO_RERERE, "merge", "--no-edit", base],
-            capture_output=True, text=True, errors="replace")
+        proc = self._bounded((*_NO_RERERE, "merge", "--no-edit", base), errors="replace")
         if proc.returncode != 0:
             conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
 
@@ -1001,8 +1016,7 @@ class LiveGit:
                 # No LLM or no pre-patch: immediate abort-and-restore. Snapshot the
                 # unmerged set FIRST; the abort clears it.
                 files = self._snapshot_conflicted_paths()
-                subprocess.run(["git", "-C", self.worktree, "merge", "--abort"],
-                               capture_output=True, text=True, errors="replace")
+                self._bounded(("merge", "--abort"), errors="replace")
                 raise HarnessError(
                     "rebase-conflict",
                     f"{conflict_detail} | conflicted: {', '.join(files) or '?'}",
@@ -1349,7 +1363,7 @@ class LiveGit:
                 f"collapse guard record failed: {(record_proc.stderr or record_proc.stdout).strip()[:400]}",
             )
 
-        # Step 7: the --onto rebase (direct subprocess, same shape as rebase_onto)
+        # Step 7: the --onto rebase (bounded via _bounded, same shape as rebase_onto)
         from ..conflict import (
             DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES,
             abort_and_restore, assert_text_only, inventory_conflicts,
@@ -1375,19 +1389,15 @@ class LiveGit:
         if squash_fatal:
             return StackedRebaseResult(False, squash_note)
 
-        rebase_proc = subprocess.run(
-            ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, pre_base, branch],
-            capture_output=True, text=True, errors="replace",
-        )
+        rebase_proc = self._bounded(
+            (*_NO_RERERE, "rebase", "--onto", master_sha, pre_base, branch),
+            errors="replace")
         # Step 7.5: a linear multi-commit range whose replay conflicts is squashed and
         # replayed once, so the resolver sees one stop against the branch's final content.
         if (rebase_proc.returncode != 0 and not squashed_head and self.llm is not None
                 and int(self._run("rev-list", "--count",
                                   f"{pre_base}..{pre_rebase_sha}").strip() or "0") >= 2):
-            abort_proc = subprocess.run(
-                ["git", "-C", self.worktree, "rebase", "--abort"],
-                capture_output=True, text=True, errors="replace",
-            )
+            abort_proc = self._bounded(("rebase", "--abort"), errors="replace")
             if (abort_proc.returncode != 0
                     or self._run("rev-parse", "HEAD").strip() != pre_rebase_sha):
                 abort_and_restore(self._run, worktree=self.worktree,
@@ -1403,10 +1413,9 @@ class LiveGit:
                 self._squashed_from = None
             if squash_fatal:
                 return StackedRebaseResult(False, squash_note)
-            rebase_proc = subprocess.run(
-                ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--onto", master_sha, pre_base, branch],
-                capture_output=True, text=True, errors="replace",
-            )
+            rebase_proc = self._bounded(
+                (*_NO_RERERE, "rebase", "--onto", master_sha, pre_base, branch),
+                errors="replace")
         auto_resolved_files: tuple = ()
         adaptations: tuple = ()
         if rebase_proc.returncode != 0:
@@ -1414,10 +1423,7 @@ class LiveGit:
                 # No LLM: immediate decline. Snapshot the unmerged set FIRST; the abort
                 # clears it.
                 files = self._snapshot_conflicted_paths()
-                subprocess.run(
-                    ["git", "-C", self.worktree, "rebase", "--abort"],
-                    capture_output=True, text=True, errors="replace",
-                )
+                self._bounded(("rebase", "--abort"), errors="replace")
                 return StackedRebaseResult(
                     False,
                     f"--onto rebase still conflicts: {(rebase_proc.stderr or rebase_proc.stdout).strip()[:400]}"
@@ -1446,10 +1452,8 @@ class LiveGit:
                                       reason=resolve_result.reason)
 
                 env = {**os.environ, "GIT_EDITOR": "true"}
-                cont_proc = subprocess.run(
-                    ["git", "-C", self.worktree, *_NO_RERERE, "rebase", "--continue"],
-                    capture_output=True, text=True, errors="replace", env=env,
-                )
+                cont_proc = self._bounded((*_NO_RERERE, "rebase", "--continue"),
+                                          errors="replace", env=env)
                 if cont_proc.returncode != 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,

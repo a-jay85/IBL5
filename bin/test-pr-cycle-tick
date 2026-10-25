@@ -2386,6 +2386,45 @@ out_has "WARN PR 101: conflict probe unavailable (merge-tree output unrecognised
     || fail "conflict-probe-error-fallback-fired: dm-probe/101 is '$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)'"
 end_case conflict-probe-error-fallback-fired
 
+# conflict-cquoted-path-fallback-fired: a path with a double quote stays C-quoted even under
+# core.quotePath=false, so the probe cannot name it and answers rc 2. The hold is recorded at a
+# tip where only a.txt and b.txt conflict (the quoted path merges clean there); on the next tip
+# the quoted path conflicts too, so the re-fire rule falls back: re-fire, WARN, one DM.
+P_QP='q"uote.txt'
+P_QBASE="$(_pc_commit - a.txt=base b.txt=base "$P_QP=base")"
+P_QM1="$(_pc_commit "$P_QBASE" a.txt=master b.txt=master "$P_QP=base")"
+P_QM2="$(_pc_commit "$P_QM1" a.txt=master b.txt=master "$P_QP=master")"
+P_QBR="$(_pc_commit "$P_QBASE" a.txt=branch b.txt=branch "$P_QP=branch")"
+for v in P_QBASE P_QM1 P_QM2 P_QBR; do
+    [[ "${!v}" =~ ^[0-9a-f]{40}$ ]] || fail "cquoted-fixture: $v is not a commit: '${!v}'"
+done
+reset; begin_case
+pc_probe "$REPO" 101 "$P_QM1" "$P_QBR"
+[[ "$PC_RC" == 1 && "$PC_OUT" == $'a.txt\nb.txt' ]] \
+    || fail "conflict-cquoted-path-fallback-fired: QM1 probe rc $PC_RC paths '$PC_OUT'"
+pc_probe "$REPO" 101 "$P_QM2" "$P_QBR"
+[[ "$PC_RC" == 2 ]] || fail "conflict-cquoted-path-fallback-fired: QM2 want rc 2 got $PC_RC ($PC_OUT)"
+[[ "$PC_OUT" == "conflicted path is C-quoted" ]] \
+    || fail "conflict-cquoted-path-fallback-fired: QM2 reason '$PC_OUT'"
+end_case conflict-cquoted-path-fallback-fired
+
+reset; begin_case
+set_prs "101|branch-one|$P_QBR|DIRTY|false"; set_result "101\tfired\tconflict\trebase-conflict"
+set_tip_raw "$P_QM1"
+run_tick; run_tick
+[[ "$(conflict_hold 101)" == "$P_QM1"$'\n'"head $P_QBR"$'\npaths 2\na.txt\nb.txt' ]] \
+    || fail "conflict-cquoted-path-fallback-fired: hold is '$(conflict_hold 101)'"
+set_tip_raw "$P_QM2"; run_tick
+[[ "$(launch_count)" == "2" ]] || fail "conflict-cquoted-path-fallback-fired: want 2 launches got $(launch_count)"
+out_has "WARN PR 101: conflict probe unavailable (conflicted path is C-quoted); re-firing on the new master tip as before" \
+    || fail "conflict-cquoted-path-fallback-fired: no WARN line: $OUT"
+[[ "$(probe_dm_count)" == "1" ]] || fail "conflict-cquoted-path-fallback-fired: probe DMs $(probe_dm_count), want 1"
+grep -qF 'could not run (conflicted path is C-quoted)' "$SCRATCH/dm.log" \
+    || fail "conflict-cquoted-path-fallback-fired: DM text lacks the C-quoted reason"
+[[ "$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)" == "$P_QBR" ]] \
+    || fail "conflict-cquoted-path-fallback-fired: dm-probe/101 is '$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)'"
+end_case conflict-cquoted-path-fallback-fired
+
 reset; begin_case
 set_prs "$DIRTY101"; set_result "101\tfired\tconflict\trebase-conflict"
 set_tip e0001

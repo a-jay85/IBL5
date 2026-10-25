@@ -60,8 +60,15 @@ def test_registry_bun_argv_ignores_scripts():
 
 def test_registry_composer_argv_disables_scripts_and_plugins():
     argv = regenerable("ibl5/composer.lock").argv
-    for flag in ("--no-scripts", "--no-plugins", "--no-install", "--minimal-changes"):
+    for flag in ("--no-scripts", "--no-plugins", "--no-install"):
         assert flag in argv
+
+
+def test_registry_composer_argv_is_a_partial_update():
+    # A bare `composer update` upgrades every package. A named package makes it partial.
+    argv = regenerable("ibl5/composer.lock").argv
+    assert argv[:3] == ("composer", "update", "nothing")
+    assert "--minimal-changes" not in argv
 
 
 def test_regenerable_rejects_unregistered_locks():

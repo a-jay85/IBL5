@@ -30,7 +30,9 @@ REGENERABLE_LOCKFILES: tuple[RegenLockfile, ...] = (
     RegenLockfile("ibl5/bun.lock", "ibl5/package.json",
                   ("bun", "install", "--lockfile-only", "--ignore-scripts"), "ibl5"),
     RegenLockfile("ibl5/composer.lock", "ibl5/composer.json",
-                  ("composer", "update", "--minimal-changes", "--no-install",
+                  # "nothing" names no real package, so this is a partial update: every
+                  # locked version stays put and only new manifest constraints resolve.
+                  ("composer", "update", "nothing", "--no-install",
                    "--no-scripts", "--no-plugins", "--no-interaction"), "ibl5"),
 )
 

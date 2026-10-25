@@ -61,6 +61,7 @@ _GATE_TABLE = [
 
 @pytest.mark.parametrize("row,flags,expected", _GATE_TABLE, ids=[r[0] for r in _GATE_TABLE])
 def test_agent_a_gate_is_union_of_old_a_and_b(row, flags, expected):
+    """gates()["A"] is true whenever the old A gate, b_hist or b_comm was true; no B key remains."""
     non_code_only, engine_only, has_php, lines, comments, depth = flags
     g = ReviewPhase(None, None, depth=depth).gates(Classification(
         non_code_only=non_code_only, engine_only=engine_only, has_php=has_php,

@@ -97,13 +97,14 @@ final class TeamModeGuesser
     }
 
     /**
-     * Top ROTATION_SIZE players by ovr, ties by lower pid.
+     * Top ROTATION_SIZE healthy players by ovr, ties by lower pid.
      *
      * @param list<SuggestionPlayer> $players
      * @return list<SuggestionPlayer>
      */
     public static function rotation(array $players): array
     {
+        $players = array_values(array_filter($players, static fn (SuggestionPlayer $p): bool => !$p->injured));
         usort($players, static fn (SuggestionPlayer $a, SuggestionPlayer $b): int => [$b->ovr, $a->pid] <=> [$a->ovr, $b->pid]);
 
         return array_slice($players, 0, self::ROTATION_SIZE);

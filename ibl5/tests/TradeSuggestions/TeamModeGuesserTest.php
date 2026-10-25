@@ -140,6 +140,16 @@ class TeamModeGuesserTest extends TestCase
         self::assertSame(2, $inputs->teamCount);
     }
 
+    public function testRotationSkipsInjuredPlayers(): void
+    {
+        $healthy = self::player(1, 60, 25, 2);
+        $hurtStar = new SuggestionPlayer(2, 'Player 2', 'SF', 25, 80, true, 1000, 2, 1000);
+
+        $rotation = TeamModeGuesser::rotation([$hurtStar, $healthy]);
+
+        self::assertSame([1], array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rotation));
+    }
+
     private static function inputs(int $wins, int $losses, int $priorWins, int $priorLosses, int $rank, float $age = 26.5): ModeInputs
     {
         return new ModeInputs($wins, $losses, $priorWins, $priorLosses, 55.0, $rank, 28, $age, 0.5);

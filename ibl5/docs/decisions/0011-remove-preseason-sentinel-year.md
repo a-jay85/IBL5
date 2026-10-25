@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the 9998/9999 preseason sentinel year and using real season years instead, with a cleanup pipeline step for the Preseason→Regular Season transition.
-last_verified: 2026-08-25
+last_verified: 2026-10-25
 ---
 
 # ADR-0011: Remove Preseason Sentinel Year (9998/9999)
@@ -42,3 +42,11 @@ The update pipeline (`updateAllTheThings.php`) shares a single `Season` object a
 
 - Destructive migration (`122`) triggers this ADR requirement.
 - New pipeline step (`CleanupPreseasonDataStep`) is covered by unit tests.
+
+## Addendum — preseason cleanup drift (2026-10-25) <!-- slop-ok -->
+
+The Decision above is unchanged. Three of its figures no longer match the code.
+
+- **Decision item 2.** The original says cleanup runs "on the first Regular Season sim". `ibl5/classes/Updater/Steps/CleanupPreseasonDataStep.php` now skips unless the phase is `'HEAT'`, so it runs on the first HEAT sim.
+- **Decision item 3.** The original says the delete covers "November through December". `BoxscoreRepository::deletePreseasonBoxScores()` in `ibl5/classes/Boxscore/BoxscoreRepository.php` now deletes `-09-01` to `-09-30` of the season's beginning year.
+- **Decision item 4.** The original says to add `'sch'` to `ExtractFromBackupStep::EXTENSIONS`. In `ibl5/classes/Updater/Steps/ExtractFromBackupStep.php` that constant is now `[]`. Every file type is read straight from the archive by `JsbSourceResolver`, so no extension list is needed.

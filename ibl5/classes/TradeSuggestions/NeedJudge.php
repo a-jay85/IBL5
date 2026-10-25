@@ -169,7 +169,8 @@ final class NeedJudge
             NeedKind::CappedOut => min(100, intdiv(max(0, self::later($out) - self::later($in)), 20)),
             NeedKind::WeakStarter => $this->slotGain($before, $in, $need->slot, $ranks),
             NeedKind::WinNow => $this->slotGain($before, $in, null, $ranks),
-            NeedKind::Logjam => 40 + $this->weakStarterGain($card, $before, $in, $ranks),
+            NeedKind::Logjam => ($need->slot !== null && self::anyEligible($out, $need->slot) ? 40 : 0)
+                + $this->weakStarterGain($card, $before, $in, $ranks),
             NeedKind::Consolidate => $this->consolidateGain($in, $ranks),
             NeedKind::RoomToAbsorb, NeedKind::Rebuild, NeedKind::ExpiringStarOnLoser => min(100, 25 * $paidTier),
             NeedKind::FutureCapStrain => min(100, intdiv(max(0, self::futureOverage($before) - self::futureOverage($after)), 20)),

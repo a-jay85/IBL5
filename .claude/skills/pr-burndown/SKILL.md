@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-24
+last_verified: 2026-10-25
 ---
 
 # /pr-burndown
@@ -149,6 +149,7 @@ before you write it, because nothing expands them for the child session:
 Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it covers.>
 1. Get the PR worktree (bin/pr-wt-resolve N prints its path; bin/wt-new if none). Work only there.
    First check for a live post-plan run: launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-N$)'.
+   Use the flattened branch slug for <branch> (post-plan-now flattens it): `printf '%s' "<branch>" | tr -cs 'A-Za-z0-9._-' '-'`. A branch with `/` never matches raw.
    If one is listed, do not touch the worktree. Write "blocked: post-plan run live" to $D/jobs/pN.result and stop.
 2. Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
@@ -186,6 +187,7 @@ Then:
   below first.
 - Before any git operation in a PR's worktree, or before re-firing post-plan, check for a
   live run: `launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-<N>$)'`.
+  Use the flattened branch slug for `<branch>` (post-plan-now flattens it): `printf '%s' "<branch>" | tr -cs 'A-Za-z0-9._-' '-'`. A branch with `/` never matches raw.
   If one is listed, don't touch the worktree. Wait for it to end.
 
 When a `.result` lands, read it and report it in one line at the top of the next reply. If

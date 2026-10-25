@@ -34,7 +34,7 @@ from test_review_cache_hit import ALPHA, BETA, CANNED_FINDINGS, FIXTURE, SLUG, S
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
 FIDELITY_PURPOSE = "plan-fidelity-review"
-PURPOSES = {FIDELITY_PURPOSE, "review-agent-a", "review-agent-b", "review-agent-d",
+PURPOSES = {FIDELITY_PURPOSE, "review-agent-a", "review-agent-d",
             "security-audit", *VERIFIER_PURPOSES}
 SAMPLE_LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                              "fixtures", "reviewcache", "sample-ledger.json")
@@ -204,9 +204,9 @@ def test_one_changed_line_reviews_that_file_only(h, monkeypatch):
     seen = []
     real_prompt = review.agent_a_prompt
 
-    def spy(meta, cls, plan):
+    def spy(meta, cls, plan, **sections):
         seen.append(cls.filtered_diff)
-        return real_prompt(meta, cls, plan)
+        return real_prompt(meta, cls, plan, **sections)
 
     monkeypatch.setattr(runner, "ReplayGit", OneLineGit)
     monkeypatch.setattr(review, "agent_a_prompt", spy)

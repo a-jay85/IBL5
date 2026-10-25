@@ -259,8 +259,13 @@ class ReasonBuilderTest extends TestCase
     private static function logjam(): ?string
     {
         return self::reason(
-            new NeedsCard(1, [new Need(NeedKind::Logjam, 3, 'SF', [10])], 6000, [], TeamMode::Rebuild, 0.5),
-            RosterFactory::team(1, [RosterFactory::player(10, 'SF', dcMinutes: 20)]),
+            // NeedsCardBuilder sets Logjam severity to rotation count - 2 (3 SFs -> 1).
+            new NeedsCard(1, [new Need(NeedKind::Logjam, 1, 'SF', [10])], 6000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [
+                RosterFactory::player(10, 'SF', dcMinutes: 20),
+                RosterFactory::player(11, 'SF', dcMinutes: 20),
+                RosterFactory::player(12, 'SF', dcMinutes: 20),
+            ]),
             RosterFactory::team(2, [RosterFactory::player(20, 'C')]),
             self::paired([10], [], [20]),
             RosterFactory::emptyRanks(),

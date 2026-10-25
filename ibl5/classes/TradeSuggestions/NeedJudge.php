@@ -50,8 +50,9 @@ final class NeedJudge
             return RejectReason::ImportantWorsened;
         }
 
-        $userPaid = $this->paidTier($partnerOut, $partnerPicksOut, $ranks);
-        $partnerPaid = $this->paidTier($userOut, $userPicksOut, $ranks);
+        $needPids = array_merge($userCard->topNeed()->pids ?? [], $partnerCard->topNeed()->pids ?? []);
+        $userPaid = $this->paidTier($partnerOut, $partnerPicksOut, $ranks, $needPids);
+        $partnerPaid = $this->paidTier($userOut, $userPicksOut, $ranks, $needPids);
         $requiredTier = 0;
         $paidTier = 0;
         if ($dumpShape) {
@@ -92,15 +93,16 @@ final class NeedJudge
      *
      * @param list<SuggestionPlayer> $playersIn
      * @param list<SuggestionPick> $picksIn
+     * @param list<int> $excludePids Players a need names (the ones being dumped); they are never payment
      */
-    public function paidTier(array $playersIn, array $picksIn, LeagueStarterRanks $ranks): int
+    public function paidTier(array $playersIn, array $picksIn, LeagueStarterRanks $ranks, array $excludePids = []): int
     {
         $paid = 0;
         foreach ($picksIn as $pick) {
             $paid += ($pick->tier ?? PickTier::Second)->value;
         }
         foreach ($playersIn as $player) {
-            if ($player->age > NeedThresholds::YOUNG_MAX_AGE) {
+            if ($player->age > NeedThresholds::YOUNG_MAX_AGE || in_array($player->pid, $excludePids, true)) {
                 continue;
             }
             $paid += self::inTopHalf($player, $ranks) ? 2 : 1;

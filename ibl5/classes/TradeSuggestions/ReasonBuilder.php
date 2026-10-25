@@ -65,7 +65,7 @@ final class ReasonBuilder
             NeedKind::CappedOut => $named === null ? null
                 : $v['Were'] . ' ' . (League::HARD_CAP_MAX - $card->payrollNow) . ' under the hard cap. This swaps '
                     . count($named->laterSalaries) . ' years of ' . $named->name . "'s salary for an expiring deal.",
-            NeedKind::Logjam => $this->logjam($v, $need, $named, $in, $payment),
+            NeedKind::Logjam => $this->logjam($v, $need, $named, $in, $payment, $self),
             NeedKind::Consolidate => $this->consolidate($v, $in, $ranks),
             NeedKind::RoomToAbsorb => $payment === null || $in === [] ? null
                 : $v['We'] . ' have ' . (League::HARD_CAP_MAX - $card->payrollNow) . ' of room under the hard cap. Taking on '
@@ -127,12 +127,12 @@ final class ReasonBuilder
      * @param array<string, string> $v
      * @param list<SuggestionPlayer> $in
      */
-    private function logjam(array $v, Need $need, ?SuggestionPlayer $named, array $in, ?string $payment): ?string
+    private function logjam(array $v, Need $need, ?SuggestionPlayer $named, array $in, ?string $payment, TeamAssets $self): ?string
     {
         if ($named === null || $need->slot === null) {
             return null;
         }
-        $head = $v['We'] . ' have ' . $need->severity . ' ' . $need->slot . 's getting minutes. This turns ' . $named->name . ' into ';
+        $head = $v['We'] . ' have ' . count(SlotMapper::rotationAt($self->players, $need->slot)) . ' ' . $need->slot . 's getting minutes. This turns ' . $named->name . ' into ';
         foreach ($in as $player) {
             foreach (SlotMapper::slotsForPos($player->pos) as $slot) {
                 if ($slot !== $need->slot) {

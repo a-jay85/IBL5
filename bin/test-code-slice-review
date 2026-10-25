@@ -425,7 +425,7 @@ case_prompt_includes_anchored_sections() {
     csr --print-prompt --slice=Alpha
     local want
     for want in "### Section 1: Architectural fitness" "### Section 2: Bug detection" \
-        "### Section 3: Database performance" "### Section 2: Code comments" \
+        "### Section 3: Database performance" "### Section 5: Code comments" \
         "### Section 1: SQL Injection" "### Section 2: CSRF Protection" "### Section 3: Authentication" \
         "## Thresholds" "## Scoring scale" "## Automatic Zero" "## IBL5-specific false positives"; do
         expect_has "prompt has $want" "$OUT" "$want"

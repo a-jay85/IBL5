@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-28
+last_verified: 2026-10-25
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -123,7 +123,7 @@ fences) only in the draft-only case where you do print it.
 3. **Scope** — numbered parts, plus an explicit **out of scope** list.
 
 4. **Hard constraints** — ADR references, invariants and orderings to preserve, PII
-   boundaries, `auto_merge: false` when the change wants human signoff, whether
+   boundaries, `auto_merge: false` only when a `/plan` Step 4 gate 14 trigger (a) to (g) applies, whether
    a resolved GitHub Issue should be closed in this PR (via a `## Backlog issues` section in the
    plan, which post-plan turns into `Closes a-jay85/IBL5-backlog#N` in the PR body).
 
@@ -194,8 +194,8 @@ Do not ask conventional or irreducible forks (`/plan` Step 3.5 rule) — asking 
 things with an obvious answer is the failure mode on the other side.
 
 `bin/plan-now` appends a coda telling the run to never ask, and to record + hold
-(`auto_merge: false`) any fork that survives anyway. That coda is the backstop, not
-the plan: a fork you could have resolved here costs a held PR. And a fork you *did*
+(`auto_merge: false`, gate 14g) any fork that survives anyway. That coda is the backstop.
+Resolve forks here instead: a fork you could have resolved here costs a held PR. And a fork you *did*
 resolve, but with low confidence, means you have not finished this step. Reopen it
 with `AskUserQuestion` now, while the human is still in the room to answer.
 

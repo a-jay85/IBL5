@@ -1,4 +1,5 @@
 """Phase 2 — the Phase 5.5 fidelity reviewer module."""
+import json
 import os
 import stat
 import sys
@@ -350,6 +351,14 @@ def test_reviewer_tool_budget_is_narrowed(tmp_path):
         assert t in denied
     assert argv[argv.index("--agent") + 1] == "pr-ready-phase6"
     assert "--model" not in argv
+
+
+def test_review_runs_without_the_advisor(tmp_path):
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-review": "READY\n"})
+    fidelity.review(llm, str(tmp_path), str(tmp_path), str(tmp_path), "advisor-test")
+    os.unlink(fidelity.verdict_path("advisor-test"))
+    _, argv = llm.tooled_argvs[0]
+    assert json.loads(argv[argv.index("--settings") + 1]) == {"advisorModel": ""}
 
 
 # --- phase4b_ran propagation from res.phase4b_code_ran -------------------------

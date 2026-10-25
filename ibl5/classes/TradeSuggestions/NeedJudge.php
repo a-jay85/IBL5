@@ -172,7 +172,7 @@ final class NeedJudge
             NeedKind::Logjam => 40 + $this->weakStarterGain($card, $before, $in, $ranks),
             NeedKind::Consolidate => $this->consolidateGain($in, $ranks),
             NeedKind::RoomToAbsorb, NeedKind::Rebuild, NeedKind::ExpiringStarOnLoser => min(100, 25 * $paidTier),
-            NeedKind::FutureCapStrain => 0,
+            NeedKind::FutureCapStrain => min(100, intdiv(max(0, self::futureOverage($before) - self::futureOverage($after)), 20)),
         };
 
         $netIncoming = max(0, count($in) - count($out));

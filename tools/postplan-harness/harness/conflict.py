@@ -40,6 +40,7 @@ class ConflictInventory:
     files: tuple[str, ...] = ()
     unresolvable_reason: Optional[str] = None
     stage_sets: dict[str, frozenset[int]] = field(default_factory=dict)
+    lockfiles: tuple[str, ...] = ()  # registered lockfiles set aside for regen (lockfile_regen.py)
 
 
 @dataclass(frozen=True)
@@ -68,10 +69,19 @@ def parse_unmerged(text: str) -> dict[str, set[int]]:
     return result
 
 
-def classify(path: str, stages: set[int]) -> Optional[str]:
+def _regen_lockfile_ok(path: str, stages: set[int]) -> bool:
+    """A registered lockfile both sides modified. Lazy import: lockfile_regen imports
+    this module at load time."""
+    from .lockfile_regen import regenerable
+    return stages == {1, 2, 3} and regenerable(path) is not None
+
+
+def classify(path: str, stages: set[int], *, regen_lockfiles: bool = False) -> Optional[str]:
     """Return None when resolvable; reason string when not. Checked in fixed order."""
     if path.startswith("ibl5/migrations/") and path.endswith(".sql"):
         return f"{UNRESOLVABLE_MIGRATION}: {path}"
+    if regen_lockfiles and _regen_lockfile_ok(path, stages):
+        return None
     if (os.path.basename(path) in {"composer.lock", "package-lock.json"}
             or path.endswith(".lock")):
         return f"{UNRESOLVABLE_LOCKFILE}: {path}"
@@ -80,20 +90,29 @@ def classify(path: str, stages: set[int]) -> Optional[str]:
     return None
 
 
-def inventory_conflicts(run: Callable[..., str]) -> ConflictInventory:
-    """Build a ConflictInventory from `git ls-files --unmerged`."""
+def inventory_conflicts(
+    run: Callable[..., str], *, regen_lockfiles: bool = False,
+) -> ConflictInventory:
+    """Build a ConflictInventory from `git ls-files --unmerged`. With `regen_lockfiles`,
+    a registered lockfile both sides modified goes to `lockfiles` instead of bailing."""
     text = run("ls-files", "--unmerged")
     stages = parse_unmerged(text)
     if not stages:
         return ConflictInventory(unresolvable_reason=UNRESOLVABLE_EMPTY)
+    lockfiles: list[str] = []
     for path in sorted(stages):
+        if regen_lockfiles and _regen_lockfile_ok(path, stages[path]):
+            lockfiles.append(path)
+            continue
         reason = classify(path, stages[path])
         if reason:
             return ConflictInventory(files=(), unresolvable_reason=reason)
+    files = tuple(p for p in sorted(stages) if p not in lockfiles)
     return ConflictInventory(
-        files=tuple(sorted(stages)),
+        files=files,
         unresolvable_reason=None,
-        stage_sets={p: frozenset(s) for p, s in stages.items()},
+        stage_sets={p: frozenset(stages[p]) for p in files},
+        lockfiles=tuple(lockfiles),
     )
 
 

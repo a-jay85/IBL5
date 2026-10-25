@@ -256,6 +256,17 @@ def test_refusal_reason_lockfile(tmp_path):
     assert g.resolver_refusal_reason().startswith(conflict.UNRESOLVABLE_LOCKFILE)
 
 
+def test_refusal_reason_none_for_bun_lock(tmp_path):
+    _, g, _ = _probed(tmp_path, conflict=True, dirty=True, path="ibl5/bun.lock")
+    assert g.resolver_refusal_reason() is None
+
+
+def test_refusal_reason_iblbot_package_lock(tmp_path):
+    _, g, _ = _probed(tmp_path, conflict=True, dirty=True,
+                      path="ibl5/IBLbot/package-lock.json")
+    assert g.resolver_refusal_reason() == "lockfile: ibl5/IBLbot/package-lock.json"
+
+
 def test_refusal_reason_delete_modify(tmp_path):
     # A modify/delete conflict is resolvable now; the probe predicts no refusal.
     _, g, _ = _probed(tmp_path, conflict=True, dirty=True, path="c.txt", master_deletes=True)

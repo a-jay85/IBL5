@@ -3674,6 +3674,8 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         for line in audit_lines_for_adaptations(
                 getattr(plain_resolution, "adapted_lines", ())):
             log(f"phase2: {line}")
+        for path, cmd in getattr(git, "last_lockfile_regens", ()):
+            log(f"phase2: lockfile regenerated: {path} via {cmd}")
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         res.retries.update(getattr(git, "conflict_review_retries", {}) or {})

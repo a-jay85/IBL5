@@ -64,6 +64,81 @@ def test_lockfile_unresolvable():
     assert inv.files == ()
 
 
+def _three_stage(path: str) -> str:
+    return (
+        f"100644 aabbcc 1\t{path}\n"
+        f"100644 aabbcd 2\t{path}\n"
+        f"100644 aabbce 3\t{path}\n"
+    )
+
+
+def test_iblbot_package_lock_still_unresolvable():
+    path = "ibl5/IBLbot/package-lock.json"
+    inv = inventory_conflicts(_run_with(_three_stage(path)))
+    assert inv.unresolvable_reason == f"lockfile: {path}"
+    assert inv.files == ()
+
+
+def test_unregistered_dot_lock_still_unresolvable():
+    path = "ibl5/other.lock"
+    inv = inventory_conflicts(_run_with(_three_stage(path)))
+    assert inv.unresolvable_reason == f"lockfile: {path}"
+    assert inv.files == ()
+
+
+def test_bun_lock_set_aside_when_regen_enabled():
+    text = _three_stage("ibl5/bun.lock") + _three_stage("ibl5/package.json")
+    inv = inventory_conflicts(_run_with(text), regen_lockfiles=True)
+    assert inv.unresolvable_reason is None
+    assert inv.files == ("ibl5/package.json",)
+    assert inv.lockfiles == ("ibl5/bun.lock",)
+    assert "ibl5/bun.lock" not in inv.stage_sets
+
+
+def test_composer_lock_set_aside_when_regen_enabled():
+    text = _three_stage("ibl5/composer.lock") + _three_stage("ibl5/composer.json")
+    inv = inventory_conflicts(_run_with(text), regen_lockfiles=True)
+    assert inv.unresolvable_reason is None
+    assert inv.files == ("ibl5/composer.json",)
+    assert inv.lockfiles == ("ibl5/composer.lock",)
+    assert "ibl5/composer.lock" not in inv.stage_sets
+
+
+def test_lockfile_only_conflict_set_aside():
+    inv = inventory_conflicts(_run_with(_three_stage("ibl5/bun.lock")), regen_lockfiles=True)
+    assert inv.unresolvable_reason is None
+    assert inv.files == ()
+    assert inv.lockfiles == ("ibl5/bun.lock",)
+
+
+def test_bun_lock_bails_without_regen_flag():
+    inv = inventory_conflicts(_run_with(_three_stage("ibl5/bun.lock")))
+    assert inv.unresolvable_reason == "lockfile: ibl5/bun.lock"
+    assert inv.lockfiles == ()
+
+
+def test_regen_lockfile_with_migration_still_bails():
+    text = _three_stage("ibl5/bun.lock") + _three_stage("ibl5/migrations/001_x.sql")
+    inv = inventory_conflicts(_run_with(text), regen_lockfiles=True)
+    assert inv.unresolvable_reason is not None
+    assert inv.unresolvable_reason.startswith(UNRESOLVABLE_MIGRATION + ":")
+
+
+def test_regen_lockfile_add_add_still_bails():
+    text = (
+        "100644 aabbcd 2\tibl5/bun.lock\n"
+        "100644 aabbce 3\tibl5/bun.lock\n"
+    )
+    inv = inventory_conflicts(_run_with(text), regen_lockfiles=True)
+    assert inv.unresolvable_reason == "lockfile: ibl5/bun.lock"
+
+
+def test_iblbot_package_lock_bails_with_regen_flag():
+    path = "ibl5/IBLbot/package-lock.json"
+    inv = inventory_conflicts(_run_with(_three_stage(path)), regen_lockfiles=True)
+    assert inv.unresolvable_reason == f"lockfile: {path}"
+
+
 def test_delete_vs_modify():
     # stages 1 and 2 only — modify/delete: resolvable, the resolver settles it
     text = (

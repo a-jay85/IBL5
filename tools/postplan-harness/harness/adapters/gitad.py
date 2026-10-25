@@ -751,7 +751,8 @@ class LiveGit:
             entry = lockfile_regen.regenerable(path)
             try:
                 cmd = lockfile_regen.regen_lockfile(
-                    entry, run=self._run, worktree=self.worktree, master_sha=master_sha)
+                    entry, run=self._run, worktree=self.worktree, master_sha=master_sha,
+                    other_locks=tuple(p for p in paths if p != path))
             except lockfile_regen.LockfileRegenError as exc:
                 abort_and_restore(self._run, worktree=self.worktree,
                                   pre_rebase_sha=pre_rebase_sha, reason=str(exc))

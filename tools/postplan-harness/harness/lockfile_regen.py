@@ -55,9 +55,12 @@ def regen_lockfile(
     master_sha: str,
     timeout: Optional[int] = None,
     runner: Callable[..., "subprocess.CompletedProcess[str]"] = subprocess.run,
+    other_locks: tuple[str, ...] = (),
 ) -> str:
     """Rebuild `entry.lock` from master's copy plus the resolved manifest and stage it.
-    Returns the command text. Every failure raises LockfileRegenError."""
+    `other_locks` are sibling lockfiles still unmerged in this rebase; they show up in
+    `git diff --name-only` but are not stray writes. Returns the command text. Every
+    failure raises LockfileRegenError."""
     if timeout is None:
         timeout = LOCKFILE_REGEN_TIMEOUT
     cmd = command_text(entry)
@@ -92,7 +95,7 @@ def regen_lockfile(
     changed = (set(run("diff", "--name-only").split())
                | (set(run("ls-files", "--others", "--exclude-standard").split())
                   - untracked_before))
-    stray = sorted(changed - {entry.lock})
+    stray = sorted(changed - {entry.lock, *other_locks})
     if stray:
         raise LockfileRegenError(
             f"{prefix}regen touched unexpected paths: {', '.join(stray)[:300]})")

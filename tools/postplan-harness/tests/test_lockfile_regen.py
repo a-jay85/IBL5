@@ -102,6 +102,28 @@ def test_regen_stray_write_rejected(repo):
     assert "regen touched unexpected paths: ibl5/stray.txt" in str(exc.value)
 
 
+def test_regen_ignores_other_unmerged_lockfile(repo):
+    d, _ = repo
+    other = "ibl5/composer.lock"
+    (d / other).write_text("master other\n")
+    _git(d, "add", "-A")
+    _git(d, "commit", "-qm", "other lock")
+    sha = _git(d, "rev-parse", "HEAD").strip()
+    (d / other).write_text("dirty, still unmerged\n")
+    argv = ("bash", "-c", "echo regenerated > bun.lock")
+
+    def run(*args, **_kw):
+        return _git(d, *args)
+
+    with pytest.raises(LockfileRegenError) as exc:
+        regen_lockfile(_entry(argv), run=run, worktree=str(d), master_sha=sha)
+    assert f"unexpected paths: {other}" in str(exc.value)
+
+    (d / _LOCK).write_text("master lock\n")
+    assert regen_lockfile(_entry(argv), run=run, worktree=str(d), master_sha=sha,
+                          other_locks=(other,)) == command_text(_entry(argv))
+
+
 def test_regen_env_inherits_path(repo):
     d, _ = repo
     seen = {}

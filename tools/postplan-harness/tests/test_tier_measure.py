@@ -317,6 +317,30 @@ def test_dry_run_never_invokes_runner(tmp_path, capsys):
     assert "ceiling=25.00 per_call_cap=1.50" in text
 
 
+def test_dry_run_builds_every_prompt_and_fails_at_zero_cost(tmp_path, monkeypatch):
+    built = []
+
+    def good(case):
+        built.append(case["id"])
+        return "p"
+
+    code = tm.run(Path("."), _corpus(), tmp_path / "o.jsonl", cells=tm.CELLS,
+                  runner=None, max_calls=None, already_spent=0.0, dry_run=True,
+                  prompt_for=good)
+    assert code == 0
+    assert sorted(built) == sorted(tm.BUG_CASES + tm.CLEAN_CASES)
+
+    def bad(case):
+        raise RuntimeError("no such commit")
+
+    monkeypatch.setattr(tm.re_, "load_corpus", lambda _p: _corpus())
+    monkeypatch.setattr(tm, "default_prompt_for", lambda _root: bad)
+    out = tmp_path / "o2.jsonl"
+    assert tm.main(["run", "--repo-root", str(tmp_path), "--out", str(out),
+                    "--dry-run"]) == 2
+    assert not out.exists()
+
+
 def test_report_concatenated_records(tmp_path):
     src = tmp_path / "in.jsonl"
     rows = [_rec(1, cid, hit=True, n=0, cost=2.0) for cid in tm.BUG_CASES]

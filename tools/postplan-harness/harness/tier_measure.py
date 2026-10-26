@@ -253,20 +253,26 @@ def run(root: Path, corpus: dict, out_jsonl: Path, *, cells: Sequence[tuple],
         build_argv(model, effort, mechanism)          # ValueError before any call
     plan = plan_calls(cells)
     by_cell = {name: (model, effort) for name, model, effort in cells}
-    if dry_run:
-        for run_idx, case_id, cell in plan:
-            model, effort = by_cell[cell]
-            print(f"call run={run_idx} case={case_id} cell={cell} model={model} effort={effort}")
-        print(f"planned_calls={len(plan)}")
-        print(f"ceiling={BUDGET_CEILING_USD:.2f} per_call_cap={PER_CALL_CAP_USD:.2f}")
-        return EXIT_OK
-
     cases = {c["id"]: c for c in [*corpus["cases"], *corpus["clean"]]}
     missing = sorted({cid for _r, cid, _c in plan if cid not in cases})
     if missing:
         raise re_.EvalUsageError(f"corpus lacks case id(s): {', '.join(missing)}")
     if prompt_for is None:
         prompt_for = default_prompt_for(root)
+
+    if dry_run:
+        # Build every prompt now so a bad case commit fails at $0.
+        for case_id in dict.fromkeys(cid for _r, cid, _c in plan):
+            try:
+                prompt_for(cases[case_id])
+            except Exception as e:
+                raise re_.EvalUsageError(f"cannot build prompt for case {case_id}: {e}") from e
+        for run_idx, case_id, cell in plan:
+            model, effort = by_cell[cell]
+            print(f"call run={run_idx} case={case_id} cell={cell} model={model} effort={effort}")
+        print(f"planned_calls={len(plan)}")
+        print(f"ceiling={BUDGET_CEILING_USD:.2f} per_call_cap={PER_CALL_CAP_USD:.2f}")
+        return EXIT_OK
 
     out_jsonl = Path(out_jsonl)
     existing = _read_records(out_jsonl)

@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -58,11 +58,10 @@ branch; it survives you closing Claude Code. Engine selection:
   with scripts off under a 600-second bound, stages the result, and logs
   `phase2: lockfile regenerated: <path> via <cmd>`. The proof treats the lockfile like the
   baseline. A failed regen exits 3 with `lockfile: <path> (regen failed: <cmd> ...)`. Other
-  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`. Condition (14)
-  still needs `CONFLICT-REVIEW=CLEAN`.
-  Rung 1 regenerates a both-modified golden snapshot (`ibl5/tests/**/__snapshots__/*` or `**/fixtures/*.golden.html`; `harness/snapshot_regen.py`). It deletes the file, reruns its owning PHPUnit test with `UPDATE_SNAPSHOTS=1` and `IBL_GOLDEN_CAPTURE=1`, restores any other file it changed, then reruns it with neither variable set. Only a passing second run lets the proof check the file against HEAD. Each file logs `phase2: snapshot regenerated: <path> via <test>` to `audit.log`. It declines on no single owning test, a failing or zero-test run, missing php or `ibl5/vendor`, or no capture path. Condition (14) still holds the merge until `CONFLICT-REVIEW=CLEAN`.
+  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`.
   Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
-  goes through the four-rung conflict ladder: `tools/postplan-harness/README.md` § Conflict ladder.
+  goes through the four-rung conflict ladder (rung 1 also rebuilds conflicted golden snapshots):
+  `tools/postplan-harness/README.md` § Conflict ladder.
   The arming hold for an auto-resolved conflict, condition (14), reads a marker file the
   harness binds to the resolving commit. At each rebase start the harness drops the marker
   when that commit has left the branch history (a squash or rebase) and logs

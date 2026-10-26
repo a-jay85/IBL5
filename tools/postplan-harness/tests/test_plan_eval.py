@@ -121,6 +121,22 @@ def test_validate_schema_rejects_prompt_naming_expected_path(tmp_path):
     assert any("prompt names expected path bin/plan-now" in e for e in errors)
 
 
+def test_validate_schema_longer_path_does_not_name_its_prefix(tmp_path):
+    corpus = _corpus4(tmp_path)
+    corpus["cases"][0]["expected_files"] = ["bin/check-plan", "b.txt"]
+    (tmp_path / corpus["cases"][0]["prompt"]).write_text("Fix bin/check-plan-staleness.\n")
+    errors = pe.validate_schema(corpus, tmp_path)
+    assert not any("prompt names expected path" in e for e in errors)
+
+
+def test_names_path_matches_whole_paths_only():
+    assert pe._names_path("Then edit bin/check-plan.", "bin/check-plan")
+    assert pe._names_path("(`bin/check-plan`)", "bin/check-plan")
+    assert not pe._names_path("bin/check-plan-staleness", "bin/check-plan")
+    assert not pe._names_path("bin/check-plan.sh", "bin/check-plan")
+    assert not pe._names_path("ibl5/bin/check-plan", "bin/check-plan")
+
+
 def test_validate_schema_core_must_cover_tiers(tmp_path):
     corpus = _corpus4(tmp_path)
     for c in corpus["cases"]:
@@ -287,6 +303,17 @@ def test_select_cases_skips_missing_pr(tmp_path):
     cases = pe.select_cases(rows, lookup.get, repo, 14, out=out)
     assert f"skip {spec[0][0]}: no merged PR" in out.getvalue()
     assert spec[0][0] not in {c["id"] for c in cases}
+
+
+def test_select_cases_keeps_file_whose_name_prefixes_a_prompt_path(tmp_path):
+    spec = _spec(6, 2, 3)
+    slug = spec[0][0]
+    named = f"See {slug}/x.txt.bak for context. " + "p" * 50
+    spec[0] = (slug, spec[0][1], spec[0][2], named)
+    repo, rows, lookup = _mine_repo(tmp_path, spec)
+    cases = pe.select_cases(rows, lookup.get, repo, 14, out=io.StringIO())
+    by_id = {c["id"]: c for c in cases}
+    assert by_id[slug]["expected_files"] == [f"{slug}/x.txt", f"{slug}/y.txt"]
 
 
 # ---------------------------------------------------------------------------

@@ -87,6 +87,11 @@ def _bad_rel_path(p: object) -> bool:
             or ".." in p.split("/"))
 
 
+def _names_path(text: str, path: str) -> bool:
+    """True when text names path as a whole path, so bin/check-plan-staleness does not name bin/check-plan."""
+    return re.search(r"(?<![\w./-])" + re.escape(path) + r"(?![\w/-]|\.[\w/-])", text) is not None
+
+
 def _check_case(case: object, i: int, corpus_dir: Path, seen: set,
                 errors: list[str]) -> None:
     label = f"cases[{i}]"
@@ -140,7 +145,7 @@ def _check_case(case: object, i: int, corpus_dir: Path, seen: set,
     if not text.strip():
         errors.append(f"{label}: prompt file is empty: {prompt}")
     for f in files:
-        if isinstance(f, str) and f and f in text:
+        if isinstance(f, str) and f and _names_path(text, f):
             errors.append(f"{label}: prompt names expected path {f}")
 
 
@@ -370,7 +375,7 @@ def select_cases(rows: list[dict], lookup: Callable[[str], Optional[tuple]],
         # Files the prompt already names are the human's input, not something the plan
         # found, so recall is scored only on the rest.
         files = [f for f in expected_files_for(repo, base_sha, merge_sha)
-                 if f not in row["prompt"]]
+                 if not _names_path(row["prompt"], f)]
         if not (MIN_EXPECTED <= len(files) <= MAX_EXPECTED):
             print(f"skip {slug}: {len(files)} expected files", file=out)
             continue

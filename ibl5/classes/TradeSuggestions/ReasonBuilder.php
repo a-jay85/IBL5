@@ -46,7 +46,7 @@ final class ReasonBuilder
         $v = $userSide
             ? ['We' => 'You', 'Were' => "You're", 'our' => 'your', 'us' => 'you', 'we' => 'you', 'They' => 'They']
             : ['We' => 'They', 'Were' => "They're", 'our' => 'their', 'us' => 'them', 'we' => 'they', 'They' => 'You'];
-        $payment = self::payment($in, $inPicks);
+        $payment = self::payment($in, $inPicks, $p->dumpPids);
         $named = self::named($out, $need) ?? ($out[0] ?? null);
         $payrollAfter = $userSide ? $j->userPayrollAfter : $j->partnerPayrollAfter;
         $under = League::HARD_CAP_MAX - $payrollAfter;
@@ -217,14 +217,17 @@ final class ReasonBuilder
     }
 
     /**
+     * Dumped players are salary the side takes on, so they never read as payment.
+     *
      * @param list<SuggestionPlayer> $in
      * @param list<SuggestionPick> $inPicks
+     * @param list<int> $dumpPids
      */
-    private static function payment(array $in, array $inPicks): ?string
+    private static function payment(array $in, array $inPicks, array $dumpPids): ?string
     {
         $parts = array_map(self::pickLabel(...), $inPicks);
         foreach ($in as $player) {
-            if ($player->age <= NeedThresholds::YOUNG_MAX_AGE) {
+            if ($player->age <= NeedThresholds::YOUNG_MAX_AGE && !in_array($player->pid, $dumpPids, true)) {
                 $parts[] = $player->name . ' (age ' . $player->age . ')';
             }
         }

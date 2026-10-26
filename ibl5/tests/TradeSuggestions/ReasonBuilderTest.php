@@ -132,6 +132,28 @@ class ReasonBuilderTest extends TestCase
         );
     }
 
+    public function testDumpedYoungPlayerIsNotNamedAsPayment(): void
+    {
+        $reason = self::reason(
+            new NeedsCard(1, [new Need(NeedKind::RoomToAbsorb, 2000)], 5000, [], TeamMode::Rebuild, 0.5),
+            RosterFactory::team(1, [], 5000),
+            self::withPick(RosterFactory::team(2, [RosterFactory::player(20, 'C', age: 23)]), new SuggestionPick(200, 2, 2027, 1, 0.0)),
+            new PairedCandidate(
+                new TradeCandidate(1, 2, [], [], [20], [200]),
+                Pairing::SalaryDump,
+                new Need(NeedKind::RoomToAbsorb, 1),
+                new Need(NeedKind::DeadWeight, 1),
+                [20],
+            ),
+            RosterFactory::emptyRanks(),
+        );
+
+        self::assertSame(
+            'You have 2000 of room under the hard cap. Taking on Player 20 earns you the 2027 Round 1 pick.',
+            $reason,
+        );
+    }
+
     public function testRebuildReasonGolden(): void
     {
         self::assertSame('Player 20 (age 22) for Player 10, age 31, fits your rebuild.', self::rebuild());

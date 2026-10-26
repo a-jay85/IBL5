@@ -214,6 +214,7 @@ class ArmInputs:
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
+    conformance_fix_note: str = ""   # Phase 5.0-pre fixer summary appended to the condition-(3) hold line; "" = fixer did not run
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -376,7 +377,9 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 
     cs.append(ConditionResult(3, "unresolved-MISSING-items", bool(inp.unresolved_conformance),
-                              "; ".join(inp.unresolved_conformance)))
+                              "; ".join(inp.unresolved_conformance)
+                              + (f" [conformance-fix: {inp.conformance_fix_note}]"
+                                 if inp.conformance_fix_note and inp.unresolved_conformance else "")))
 
     p5 = inp.phase5_status
     # Three-state on the value, fail-closed (backlog #654): only "pass" and "skipped"

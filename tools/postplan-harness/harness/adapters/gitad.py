@@ -4,6 +4,7 @@ mode). ReplayGit serves recorded point-in-time state."""
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass, field, replace as _dc_replace
@@ -351,6 +352,31 @@ class LiveGit:
             raise HarnessError(MUTATION_JOURNAL_PENDING,
                                "exec-mutation journal pending — tree may be mutated; "
                                "refusing to stage/commit")
+
+    def dirty_paths(self) -> list[str]:
+        """Every path `git status` reports, one entry per file (untracked dirs expanded).
+
+        `--untracked-files=all` so a new test in a new directory is listed as its file,
+        not as `dir/`; `--no-renames` so each record is one path (the conformance fixer
+        compares these against exact allowed paths)."""
+        out = self._run("status", "--porcelain", "-z", "--untracked-files=all",
+                        "--no-renames")
+        return [ent[3:] for ent in out.split("\0") if len(ent) > 3]
+
+    def restore_paths(self, paths) -> None:
+        """Put `paths` back to HEAD: tracked files are checked out, untracked removed."""
+        paths = [p for p in (paths or []) if p]
+        if not paths:
+            return
+        tracked = set(self._run("ls-files", "-z", "--", *paths).split("\0")) - {""}
+        if tracked:
+            self._run("checkout", "HEAD", "--", *sorted(tracked))
+        for p in paths:
+            if p not in tracked:
+                try:
+                    os.remove(os.path.join(self.worktree, p))
+                except OSError:
+                    pass
 
     def stage_all(self) -> None:
         """post-plan-now fires on a DIRTY worktree by design — stage everything
@@ -1722,6 +1748,8 @@ class ReplayGit:
         self.ff_pushes = 0
         self.meta_checks_calls: list[tuple[str, int]] = []
         self.drops: list[str] = []
+        self.extra_dirty: list[str] = []      # paths a test wrote on disk (conformance fixer)
+        self.restored: list[list[str]] = []   # restore_paths() calls, in order
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
@@ -1731,7 +1759,25 @@ class ReplayGit:
 
     def is_dirty(self) -> bool:
         # the Phase 2 commit leaves the replay tree clean, as it does live
-        return bool(self.fx.get("worktree_diff")) and not self.commit_messages
+        return (bool(self.fx.get("worktree_diff")) and not self.commit_messages) \
+            or bool(self.extra_dirty)
+
+    def dirty_paths(self) -> list[str]:
+        """The fixture's uncommitted paths (until a commit cleans them, as is_dirty() does)
+        plus whatever a test appended to `extra_dirty`."""
+        out: list[str] = []
+        if not self.commit_messages:
+            for m in re.finditer(r"^diff --git a/\S+ b/(\S+)$",
+                                 self.fx.get("worktree_diff") or "", re.MULTILINE):
+                if m.group(1) not in out:
+                    out.append(m.group(1))
+        for p in self.extra_dirty:
+            if p not in out:
+                out.append(p)
+        return out
+
+    def restore_paths(self, paths) -> None:
+        self.restored.append(list(paths))
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""
@@ -1777,6 +1823,7 @@ class ReplayGit:
 
     def commit_all(self, message: str) -> str:
         self.commit_messages.append(message)
+        self.extra_dirty = []   # a commit sweeps the test-written paths, as `git add -A` does live
         return "replay-sha-" + self.fx.get("slug", "x")[:12]
 
     def drop_commit(self, pre: str) -> str:

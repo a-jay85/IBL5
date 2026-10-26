@@ -399,10 +399,11 @@ def test_summarize_strips_and_caps():
 def test_fix_prompt_names_remit_and_tests(tmp_path, key):
     d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, _edit_keepme)
     prompt = _fix_prompt(ctx, _KEEPME_PROOF, ["a.txt"])
+    base = _git(d, "merge-base", pre, master).stdout.strip()
     for needle in (
         pre, master, "a.txt", "LOST: a.txt: +keep-me",
         "ibl5/tests/", "bin/test-", "tools/postplan-harness/tests/",
-        f"git show {pre}:<path>", f"git show {master}:<path>",
+        f"git diff {base} {pre} -- <path>", f"git diff {base} {master} -- <path>",
         "python3 -m pytest -q tests", "vendor/bin/phpunit --no-progress",
         "PHPUNIT: unavailable", "ibl5/tests/DatabaseIntegration is out of remit",
         "only those count", "untrusted program output",
@@ -412,6 +413,15 @@ def test_fix_prompt_names_remit_and_tests(tmp_path, key):
     assert "[proof output truncated]" not in prompt
     big = _fix_prompt(ctx, "LOST: a.txt: +" + "x" * (SESSION_PROOF_CAP + 100), ["a.txt"])
     assert "[proof output truncated]" in big
+
+
+def test_fix_prompt_prefers_side_diffs(tmp_path, key):
+    d, pre, master, merge, llm, ctx, _ = _fix_ladder(tmp_path, key, _OK_REPLY, _edit_keepme)
+    prompt = _fix_prompt(ctx, _KEEPME_PROOF, ["a.txt"])
+    base = _git(d, "merge-base", pre, master).stdout.strip()
+    assert f"git diff {base} {pre} -- <path>" in prompt
+    assert "never re-read a file you already read" in prompt
+    assert "Read the three sides with" not in prompt
 
 
 # --- Phase 2: LiveGit seams ----------------------------------------------------------

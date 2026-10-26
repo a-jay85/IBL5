@@ -263,3 +263,65 @@ def test_resolver_hunk_artifact_from_stage_revs(tmp_path, stage_key):
     text = artifact.read_text()
     assert "OURS 20" in text
     assert "THEIRS 100" in text
+
+
+# ── large-file byte bound and degrade paths ────────────────────────────────────
+
+def _big_lines(n: int = 1100) -> list[str]:
+    return [f"value_{i:05d} = compute({i})  # padding to make this line long\n"
+            for i in range(n)]
+
+
+def _run_big(tmp_path, key, base, ours, theirs):
+    worktree = str(tmp_path / "wt")
+    _write_worktree_file(worktree, "app/foo.py", "clean merged\n")
+    llm = _StubLlm(["RESOLVED"])
+    run = _StagedRun(worktree, {1: "".join(base), 2: "".join(ours), 3: "".join(theirs)})
+    resolve_one(llm, run, worktree=worktree, key=key, path="app/foo.py")
+    return llm.calls[0]["prompt"]
+
+
+def test_large_file_prompt_and_artifact_under_byte_bound(tmp_path, stage_key):
+    base = _big_lines()
+    ours, theirs = list(base), list(base)
+    for i in (200, 600, 1000):
+        ours[i], theirs[i] = f"OURS {i}\n", f"THEIRS {i}\n"
+    base_bytes = len("".join(base).encode())
+    assert base_bytes >= 30_000
+    prompt = _run_big(tmp_path, stage_key, base, ours, theirs)
+    stage_dir = f"/tmp/postplan-conflict-stages-{stage_key}"
+    line = next(l for l in prompt.splitlines() if l.startswith("  hunk context: "))
+    artifact = Path(line.split("hunk context: ", 1)[1].split(" (", 1)[0])
+    total = len(prompt.encode()) + artifact.stat().st_size
+    assert total <= 8_000
+    assert total <= base_bytes * 0.15
+    assert "Read all three before deciding" not in prompt
+    assert f"{stage_dir}/base/app__foo.py" not in prompt
+
+
+def test_many_hunks_degrade_to_whole_file(tmp_path, stage_key):
+    base = _big_lines(20 * (HUNK_MAX_COUNT + 2))
+    ours, theirs = list(base), list(base)
+    for n in range(HUNK_MAX_COUNT + 1):
+        i = 20 * n + 10
+        ours[i], theirs[i] = f"OURS {i}\n", f"THEIRS {i}\n"
+    prompt = _run_big(tmp_path, stage_key, base, ours, theirs)
+    assert "Read all three before deciding" in prompt
+    assert not list(Path(f"/tmp/postplan-conflict-stages-{stage_key}").glob("hunks/*"))
+
+
+def test_oversized_hunk_degrades_to_whole_file(tmp_path, stage_key):
+    base = _big_lines()
+    ours, theirs = list(base), list(base)
+    ours[500], theirs[500] = "x" * 20_000 + "\n", "y\n"
+    prompt = _run_big(tmp_path, stage_key, base, ours, theirs)
+    assert "Read all three before deciding" in prompt
+    assert not list(Path(f"/tmp/postplan-conflict-stages-{stage_key}").glob("hunks/*"))
+
+
+def test_binary_like_stage_degrades_to_whole_file(tmp_path, stage_key):
+    base = _big_lines()
+    ours, theirs = list(base), list(base)
+    ours[300], theirs[300] = "OURS\x00\n", "THEIRS\n"
+    prompt = _run_big(tmp_path, stage_key, base, ours, theirs)
+    assert "Read all three before deciding" in prompt

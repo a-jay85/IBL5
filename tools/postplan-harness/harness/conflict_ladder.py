@@ -474,7 +474,8 @@ def _opus_context(ctx: LadderContext, path: str, lines) -> str:
     return (
         "ESCALATION. An earlier resolution of this file failed the lost-work proof.\n"
         f"The file currently at {ctx.worktree}/{path} is that failed resolution. "
-        "Read it as well as the three stages.\n"
+        "Read it once. Take the three sides from the hunk context file named above, "
+        "or from the stage files when the prompt lists them.\n"
         "The proof reported these lines from the branch's own change as LOST:\n"
         f"{lost_block}\n"
         "Requirements:\n"

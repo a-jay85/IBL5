@@ -671,6 +671,18 @@ def test_opus_rung_citation_reaches_trail(tmp_path, key):
     assert _head(d) == merge
 
 
+def test_opus_context_reads_failed_resolution_once(tmp_path, key):
+    from harness.conflict_ladder import _opus_context
+
+    d, pre, master, _ = _a_repo(tmp_path)
+    ctx = _ctx(d, key, pre, master, ("a.txt",), lambda: (False, ""))
+    text = _opus_context(ctx, "a.txt", ["+keep-me"])
+    assert "Read it once." in text
+    assert "hunk context file" in text
+    assert "as well as the three stages" not in text
+    assert "citations.txt" in text
+
+
 def test_opus_rung_caps_file_count(tmp_path, key):
     n = OPUS_MAX_FILES + 1
     files = {f"src/f{i}.txt": f"content {i}\n" for i in range(n)}

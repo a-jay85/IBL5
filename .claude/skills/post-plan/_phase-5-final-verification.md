@@ -1,6 +1,6 @@
 ---
 description: Full Phase 5 how-to for plan-to-test, plan-to-file, diff-to-plan and plan-gap scope, and assertion-footprint conformance checks run during post-plan.
-last_verified: 2026-10-11
+last_verified: 2026-10-22
 ---
 
 # Phase 5 — Final Verification (post-plan reference)
@@ -14,6 +14,7 @@ At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker
 ```bash
 : > /tmp/post-plan-missing-tests-$PPID
 rm -f /tmp/post-plan-conformance-done-$PPID
+rm -f /tmp/post-plan-exec-mutations-done-$PPID
 ```
 
 Read the Verification Matrix from `$PLAN_FILE`. Collect the test-file path from the "Test file / location" column of every row whose Test type is PHPUnit, API-test, E2E, or Visual-regression. **Skip every row inside a fenced code block** — a plan that documents the matrix format carries scaffold rows (`| 1 | thing works | PHPUnit | post-impl | \`tests/X.php\` |`) inside a ```` ```bash ```` fixture block, and those are illustration, not declarations. Reading one produces a phantom path no diff can ever contain, so the resulting `MISSING:` is unresolvable and condition (3) holds the PR forever (observed on plan `critical-files-parser-unification`). Fence tracking is **width-aware**, same rule as `## Critical Files` below: this repo wraps 3-backtick blocks in 4-backtick outer ones, and per CommonMark a closing fence must be at least as long as its opener — a width-blind toggle closes on the inner fence and swallows the real matrix underneath. The same skip applies to Truly-manual rows (condition (1) reads those). Then confirm the PR diff actually wrote each collected path:
@@ -62,6 +63,24 @@ done
 > A failing row follows the same **resolution** discipline as every other `MISSING:` item: resolved when the underlying defect is fixed and the command re-runs exit 0, or when the failure is environmental / the row was cut and a PR comment says so. Only items still **unresolved** at Phase 5.0 END reach `/tmp/post-plan-missing-tests-$PPID` via the existing append step. Writing to the bridge file *inline* here would be wrong — a row you then fix would still block auto-merge at Phase 6.5 condition (3).
 >
 > Scope: skill path only. As `:54` already states, `tools/postplan-harness` computes conformance in-process and never touches these `/tmp` files; do not port this executor to the harness.
+
+> **Run the executable mutations.** Runs whenever `PLAN_FOUND != none`, even when `! $HAS_MATRIX`: it is not a matrix-derived sub-check, and it is the only writer of the done-marker on that path, so skipping it holds condition (19) forever. Runs after the CLI-row executor above and before any later stage or commit in this skill (Phase 5 fix commits, checkpoints). Later blocks (Shellcheck verify, the critical-files check, scope conformance, 5.0d, 5.0e) read the tree after it, which the byte-identical revert makes safe. The lib applies each `## Executable Mutations` entry, requires its check to exit non-zero, reverts, and verifies the tree byte-identical; a plan with no section is a silent no-op.
+
+```bash
+# Reuses $PLAN_FILE. Worktree root, same as the CLI-row block above.
+cd "$(git rev-parse --show-toplevel)"
+: > "/tmp/post-plan-exec-mutations-$PPID"
+XM_OUT=$(bin/lib/plan-exec-mutations run --root "$PWD" --timeout 30 "$PLAN_FILE"); XM_RC=$?
+printf '%s\n' "$XM_OUT" | grep -E '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED|NO-TIMEOUT|PARSE-FAILED)' \
+  | sed 's/^/EXEC-MUTATION: /' >> "/tmp/post-plan-exec-mutations-$PPID"
+[ "$XM_RC" -eq 3 ] && echo "EXEC-MUTATION: tree not verified clean — run 'bin/lib/plan-exec-mutations recover' and inspect before any commit" >> "/tmp/post-plan-exec-mutations-$PPID"
+# Fail closed: a usage error (2), missing lib (127) or failed cd leaves nothing bridged above.
+case "$XM_RC" in 0|1|3) ;; *) [ -s "/tmp/post-plan-exec-mutations-$PPID" ] || echo "EXEC-MUTATION: executor exited $XM_RC" >> "/tmp/post-plan-exec-mutations-$PPID" ;; esac
+touch "/tmp/post-plan-exec-mutations-done-$PPID"
+bin/lib/plan-exec-mutations pending --root "$PWD" && echo "STOP: exec-mutation journal pending — do not stage or commit"
+```
+
+> Exit 0 means every entry printed `TRIPPED`. Exit 1 means at least one held result. Exit 3 means the revert was not verified. None of these fails the run. Phase 6.5 condition (19) reads the bridge file `/tmp/post-plan-exec-mutations-$PPID`. Unlike `MISSING:` items there is no resolution path. A `HELD` row means the plan's mutation claim was false, so the hold stands until a human reads the PR-body block. The `STOP` line is a hard precondition for every later `git add` or `git commit` in this skill. When `pending` exits 0, run `recover`, re-check, and never stage a tree while it still exits 0.
 
 **Shellcheck verify.** Runs when shell scripts changed (mirrors CI job flags exactly). Skip if `! $HAS_SHELL`:
 

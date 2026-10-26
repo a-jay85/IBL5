@@ -6,11 +6,12 @@ namespace Tests\Player\Views;
 
 use PHPUnit\Framework\TestCase;
 use Player\Views\PlayerButtonsView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerButtonsView */
 class PlayerButtonsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testRookieOptionUsedMessageSnapshot(): void
     {

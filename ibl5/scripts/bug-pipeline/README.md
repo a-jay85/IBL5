@@ -1,6 +1,6 @@
 ---
-description: Bug-pipeline PHP CLI layer — how to exercise it end-to-end against a scratch DB, and the behavioural gotchas (UTC skew, claim-loser semantics, tick sequencing) the shell harnesses cannot prove.
-last_verified: 2026-10-05
+description: Bug-pipeline PHP CLI layer. How to exercise it end-to-end against a scratch DB, the operator_context row field, and the behavioural gotchas (UTC skew, claim-loser semantics, tick sequencing) the shell harnesses cannot prove.
+last_verified: 2026-10-22
 ---
 
 # Bug Pipeline CLI
@@ -31,6 +31,23 @@ the shape of the main checkout's untracked file that `bin/wt-new` copies into ea
 shape the CLI scripts write into whatever database `config.local.php` names. The
 three-barrier isolation design is
 `ibl5/docs/decisions/0111-bug-pipeline-test-isolation.md`.
+
+It also loads `ibl5/migrations/198_bug_pipeline_dormant_and_operator_context.sql`, which adds
+the `dormant` status and the operator-context table, and it exports `BUG_OPERATOR_DISCORD_ID`.
+The test bot reads that variable from `.env.bugbot.test` and refuses to start without it.
+
+## Operator context in the row JSON
+
+`list-active-conversations.php` and `claim-next.php` add an `operator_context` array to each
+row. Each entry carries `message_id` (a string), `created_at` and `content`. The tick renders
+the entries into the trusted `<operator>` prompt block and drops those message ids from the
+transcript. Dormant rows never appear in either script's output (ADR-0213).
+
+`bin/bug-pipeline-e2e` Phase 8 covers the wake path. Case 8.1 checks that enqueue lands in
+`dormant` and stays out of the enumerator. Cases 8.2 to 8.6 call the real wake endpoint: a
+non-operator is rejected, a wake moves `dormant` to `queued`, a re-mention appends, a replayed
+message id is a no-op, one real tick classifies the woken row, and a stopped row restarts. They
+print `SKIP` unless `BUG_PIPELINE_API_BASE_URL` and `API_KEY` are exported.
 
 This is the layer worth running before merging a bug-pipeline PR. The shell harnesses
 (`bin/test-bug-pipeline-classify` and siblings) stub the PHP layer, so they **cannot** prove

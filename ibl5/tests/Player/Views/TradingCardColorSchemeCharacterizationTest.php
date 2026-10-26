@@ -12,6 +12,7 @@ use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
 use Player\Views\PlayerTradingCardFrontView;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * Pins the team-colored, teamid-0, and missing-row card renders so the color
@@ -23,7 +24,7 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  */
 final class TradingCardColorSchemeCharacterizationTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * @return Player&\PHPUnit\Framework\MockObject\Stub

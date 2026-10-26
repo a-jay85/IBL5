@@ -34,6 +34,7 @@ import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -64,14 +65,16 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
-                              upsert_gate_fix,
+                              upsert_exec_mutations, upsert_gate_fix,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
+from harness import snapshot_regen
 from harness.review import ReviewPhase
 from harness import review_depth
 from harness import baseline_guard
@@ -217,6 +220,43 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     classifiers; _finish redacts it when writing result.json."""
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
+
+
+
+def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
+    """Executable mutation claims (ADR-0199), run after verify and before arming.
+
+    Replay reads the report from the fixture (default: an empty, passing report). A run
+    with no plan has no `## Executable Mutations` section, so it gets the same empty
+    report. A live run with a plan but no worktree returns None, which condition (19)
+    holds on. A crash never aborts the run: it becomes a holding report with
+    tree_suspect=True, because the journal may hold an unreverted edit.
+    """
+    if not live:
+        fx = fixture or {}
+        return MutationReport(ran=True, results=(),
+                              holding=tuple(fx.get("exec_mutations_holding") or ()),
+                              tree_suspect=bool(fx.get("exec_mutations_tree_suspect", False)))
+    if plan is None or not getattr(plan, "found", False) or not getattr(plan, "path", None):
+        log("exec-mutations: no plan — nothing to run")
+        return MutationReport(ran=True, results=(), holding=(), tree_suspect=False)
+    if not (worktree and os.path.isdir(worktree)):
+        log("exec-mutations: skipped (no worktree) — condition (19) holds")
+        return None
+    try:
+        report = run_executable_mutations(Path(plan.path), Path(worktree))
+    except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
+        report = MutationReport(ran=False, results=(),
+                                holding=(f"executor-crashed: {e}",), tree_suspect=True)
+    for r in report.results:
+        log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
+    for h in report.holding:
+        log(f"exec-mutations HOLD: {h}")
+    if report.tree_suspect:
+        log("exec-mutations: tree suspect — journal may hold an unreverted edit")
+    if not report.results and not report.holding:
+        log("exec-mutations: no executable mutations in plan")
+    return report
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
@@ -761,6 +801,21 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
+        if live and pr and mutation_report is not None:
+            # A second body edit: the Phase 6 body write above runs before this step.
+            # Log-and-continue like the merge-digest write: a failed or empty read must never
+            # blank the body, and a failed edit must never abort the run.
+            try:
+                _xm_cur = gh.pr_body_fresh() or ""
+                if not _xm_cur:
+                    log("phase6.5: exec-mutations body write skipped (PR body read empty)")
+                else:
+                    _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
+                    if _xm_new != _xm_cur:
+                        gh.pr_edit_body(pr, _xm_new)
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
         _arm_body = gh.pr_body() or body
         if live and pr:
             _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
@@ -769,6 +824,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
+            exec_mutations_holding=(mutation_report.holding
+                                    if mutation_report is not None else None),
+            exec_mutations_tree_suspect=(mutation_report.tree_suspect
+                                         if mutation_report is not None else True),
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
             branch=git.branch(),
@@ -3680,6 +3739,13 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _log_snapshot_regens(git, log) -> None:
+    worktree = getattr(git, "worktree", "") or ""
+    if worktree:
+        for line in snapshot_regen.pop_audit_lines(worktree):
+            log(f"phase2: {line}")
+
+
 def _phase2_rebase(git, res, log) -> tuple[str, str]:
     """Phase 2 merge of origin/master, shared by the full path and rebase-only mode.
 
@@ -3690,6 +3756,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
     pre_rebase = git.head()
     conflict_resolved = None
     try:
+        snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
         git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
         # A plain merge the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
@@ -3698,6 +3765,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         for path, cmd in getattr(git, "last_lockfile_regens", ()):
             log(f"phase2: lockfile regenerated: {path} via {cmd}")
+        _log_snapshot_regens(git, log)
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
@@ -3738,6 +3806,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             f"manifest={conflict_resolved.manifest_path} "
             f"notes={conflict_resolved.notes_path} "
             f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+        _log_snapshot_regens(git, log)
         for line in audit_lines_for_adaptations(
                 getattr(conflict_resolved, "adapted_lines", ())):
             log(f"phase2: {line}")

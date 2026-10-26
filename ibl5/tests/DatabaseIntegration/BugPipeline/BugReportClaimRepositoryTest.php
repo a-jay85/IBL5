@@ -122,7 +122,6 @@ class BugReportClaimRepositoryTest extends DatabaseTestCase
         self::assertSame('2099-01-01 00:00:00', $before['blocked_until']);
 
         // A key present with a null value is "set to NULL", not "leave alone".
-        // @phpstan-ignore argument.type (the null is the behavior under test)
         self::assertTrue($this->repo->transition($id, 'needs_human', ['thread_id' => null, 'blocked_until' => null]));
 
         $row = $this->fetchBugReport($id);

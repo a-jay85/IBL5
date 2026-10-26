@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Optional
 
 from .state import HarnessError
+from . import snapshot_regen
 
 RUNG_REGEN = "regen"          # Phase 3
 RUNG_OPUS = "opus-retry"      # Phase 4
@@ -431,7 +432,8 @@ def command_outputs(targets, *, registry=None) -> frozenset[str]:
     return frozenset(g.path for g in registry if g.command in commands)
 
 
-def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> Rung:
+def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT,
+                    snapshot_runner=None) -> Rung:
     def fn(ctx: LadderContext, proof_out: str) -> RungAttempt:
         lost, structural = parse_lost_lines(proof_out)
         involved = (set(ctx.conflicted_files) | set(lost)
@@ -442,13 +444,33 @@ def make_regen_rung(registry=GENERATED_FILES, timeout: int = REGEN_TIMEOUT) -> R
         candidates = [g for g in match_generated(involved, registry=registry)
                       if not _is_glob_match(g.path)
                       or frozenset(ctx.stage_sets.get(g.path, ())) == BOTH_MODIFIED]
-        if not candidates:
-            return RungAttempt(False, (), "no generated file involved")
-        notes = regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,
-                           master_sha=ctx.master_sha, candidates=candidates,
-                           timeout=timeout)
+        # Golden snapshots regenerate by rerunning their owning PHPUnit test
+        # (harness/snapshot_regen.py). Runs first, while the tree is still clean.
+        # A LOST renderer/source file means the first-pass tree is broken. A snapshot
+        # rebuilt from it would pass its own verify run and ship a stale golden once a
+        # later rung restores that file, so decline snapshot regen in that case.
+        code_lost = sorted(p for p in lost
+                           if not snapshot_regen.is_snapshot_path(p)
+                           and not match_generated([p], registry=registry))
+        if code_lost and any(snapshot_regen.is_snapshot_path(p)
+                             for p in ctx.conflicted_files):
+            snap = snapshot_regen.SnapshotRegen(
+                decline="snapshot regen declined: non-snapshot files lost work: "
+                        + ", ".join(code_lost))
+        else:
+            snap = snapshot_regen.regenerate_conflicted(ctx, frozenset(lost),
+                                                        runner=snapshot_runner)
+        if not candidates and not snap.paths:
+            return RungAttempt(False, (), snap.decline or "no generated file involved")
+        notes = list(snap.notes)
+        if snap.decline:
+            notes.append(snap.decline)
+        if candidates:
+            notes.extend(regenerate(ctx.run, ctx.run_out, worktree=ctx.worktree,
+                                    master_sha=ctx.master_sha, candidates=candidates,
+                                    timeout=timeout))
         touched = tuple(ctx.run("diff", "--name-only", "HEAD").split())
-        return RungAttempt(True, touched, "; ".join(notes))
+        return RungAttempt(True, touched, "; ".join(notes), after_amend=snap.after_amend)
     return (RUNG_REGEN, fn)
 
 

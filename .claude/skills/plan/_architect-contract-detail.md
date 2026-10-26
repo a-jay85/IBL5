@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-19
+last_verified: 2026-10-22
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -35,9 +35,34 @@ Write the mutation into the row's **How** cell as a clause on the command, so an
 
 **Compliant exemplar (extract and run).** `bin/test-automouse-postplan-engine` (lines 71 to 74) awk-extracts the real runner span and `eval`s it, so the test executes production text. Its row 12-neg is the mutation control.
 
-**Rejected executable gates (measured 2026-10-02 for backlog#922).** A comment regex over test code (`to simulate`, `simulate the X logic`) hit 13 of 1603 test files, with 2 real instances. A PHP heuristic that flags test methods whose body references no production class flagged 238 of 9031 methods. Sampled hits such as `ibl5/tests/Bootstrap/FilterFunctionTest.php` and `ibl5/tests/YourAccount/BuildRedirectUrlTest.php` call production global functions and are false positives, and the heuristic sees only PHP while the plan-originated cases are TypeScript and bash. The fix therefore lives in plan guidance. A plan-time mutation-presence check would need `bin/check-plan`, which backlog#947 owns. <!-- slop-ok -->
+**Example mutation clause.** "delete the `--model` arm ⇒ this assertion fails" is the shape a **How** cell carries. <!-- slop-ok -->
+
+**Restating shapes that satisfy nothing.** A test seeds a state file instead of driving the loop N times, cancels before time advances, or asserts behind an `if` that can be false. Each passes with production reverted.
+
+**Rejected executable gates (measured 2026-10-02 for backlog#922).** A comment regex over test code (`to simulate`, `simulate the X logic`) hit 13 of 1603 test files, with 2 real instances. A PHP heuristic that flags test methods whose body references no production class flagged 238 of 9031 methods. Sampled hits such as `ibl5/tests/Bootstrap/FilterFunctionTest.php` and `ibl5/tests/YourAccount/BuildRedirectUrlTest.php` call production global functions and are false positives, and the heuristic sees only PHP while the plan-originated cases are TypeScript and bash. The fix therefore lives in plan guidance. A plan-time mutation-presence check would need `bin/check-plan`, which backlog#947 owns. Superseded 2026-10: the keyed-section form made the plan-time gate buildable; see § Executable mutations. <!-- slop-ok -->
+
+### Executable mutations
+
+A plan states each catching mutation as data in a `## Executable Mutations` section. One entry per post-impl CLI-executable row:
+
+````text
+```mutation
+row: 20
+file: .github/workflows/merge-digest-notify.yml
+match: <one line copied verbatim from the file>
+replace: <the same line with the mutation applied>
+```
+````
+
+- **Keys.** `row:` names a post-impl CLI-executable matrix row. `file:` is a repo-relative path. `match:` is a single-line literal that must occur exactly once in the file. `replace:` is a literal; an empty value deletes the match. `check:` is optional and defaults to the row's location cell after gate `[V]` strips its backticks. An override must itself pass gate `[V]`'s runnable test.
+- **Literals.** Both values are single lines, compared byte for byte. No regex and no escapes.
+- **Paths.** A leading `/`, a `..` segment, a `.git/` prefix, or a symlink is rejected. The file must exist in the tree or be named in `## Critical Files`.
+- **When prose stays.** A row whose mutation needs a DB, a browser, GitHub Actions, or a multi-line edit ends its "What to verify" cell with `(mutation-prose: <reason>)`. The reason is 15 or more characters. A `(one-time-check:)` row needs neither.
+- **Who runs it.** `bin/check-plan` gate `[XM]` checks the grammar and coverage at plan time. `/post-plan` Phase 5.0 runs `bin/lib/plan-exec-mutations`, which applies each entry, requires the check to exit non-zero, reverts, and verifies the tree byte-identical. Arming condition (19) holds on any result other than `TRIPPED`.
 
 ### Critical Files parsing — counter-examples
+
+Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`. All tokens match as **whole words**.
 
 The `(conditional)` marker exempts an entry from the MISSING-FILE check, but only when `conditional` *opens* the parenthesized group immediately followed by `)` or a separator (`—`/`–`/`-`/`:`/`;`/`,`):
 
@@ -232,6 +257,8 @@ A **path-scoped** rule belongs in the field when the delegate depends on it but 
 Omit the field entirely when the phase needs nothing beyond the always-on set. An empty `Rules:` line is worse than no line: it reads as "I considered this and found nothing", which is indistinguishable from "I did not consider it".
 
 ## One-time-check tag shape
+
+Typical single plan-time runs: a corpus diff over local transcripts, a counterfactual working-tree mutation, or one command's printed output.
 
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
 

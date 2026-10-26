@@ -360,3 +360,37 @@ else
   esac
 fi
 ```
+
+**(19) exec-mutations.** Phase 5.0's executable-mutation step writes one `EXEC-MUTATION:` line per held result to the bridge file `/tmp/post-plan-exec-mutations-$PPID`. Any line holds. A missing done-marker also holds, because then the step did not run. A pending mutation journal also holds, because a hard-killed Phase 5 run can leave the tree carrying a mutation. The block also upserts the `<!-- exec-mutations:begin -->` PR-body block with the same markers the harness writes, so either path replaces the other's block. Each line is prefixed `> ` so plan text cannot forge a heading. It only adds a hold and never clears another condition.
+
+```bash
+# condition (19): block unless every executable mutation tripped and the tree verified clean
+XMF="/tmp/post-plan-exec-mutations-$PPID"
+if [ ! -e "/tmp/post-plan-exec-mutations-done-$PPID" ]; then
+  echo "BLOCKED: exec-mutations: the executable-mutation step did not run"
+elif [ -s "$XMF" ]; then
+  echo "BLOCKED: exec-mutations: $(head -c 300 "$XMF" | tr '\n' ';')"
+fi
+if "$(git rev-parse --show-toplevel)/bin/lib/plan-exec-mutations" pending --root "$(git rev-parse --show-toplevel)" >/dev/null 2>&1; then
+  echo "BLOCKED: exec-mutations: journal pending, the tree may still carry a mutation"
+fi
+if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+  # Drop the old block, so a clean rerun clears a stale HELD block. Strip only when
+  # the first begin marker and the first end marker are present and in order, the same pairing
+  # as classify.upsert_exec_mutations. Delete by line number, so a stray later begin marker
+  # cannot widen the range to EOF.
+  XM_NEW="$XM_BODY"
+  XM_B=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:begin -->' | cut -d: -f1)
+  XM_E=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:end -->' | cut -d: -f1)
+  if [ -n "$XM_B" ] && [ -n "$XM_E" ] && [ "$XM_B" -lt "$XM_E" ]; then
+    XM_NEW=$(printf '%s\n' "$XM_BODY" | sed "${XM_B},${XM_E}d")
+  fi
+  if [ -s "$XMF" ]; then
+    XM_BLOCK=$(printf '<!-- exec-mutations:begin -->\n### Executable mutations\n\n'
+               sed 's/^/> /' "$XMF"
+               printf '<!-- exec-mutations:end -->')
+    XM_NEW=$(printf '%s\n\n%s\n' "$XM_NEW" "$XM_BLOCK")
+  fi
+  [ "$XM_NEW" = "$XM_BODY" ] || printf '%s\n' "$XM_NEW" | gh pr edit --body-file - >/dev/null
+fi
+```

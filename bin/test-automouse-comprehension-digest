@@ -178,7 +178,11 @@ case_success_path() {
   assert_exists "success: report" "$T/reports/2026-10-03-comprehension-digest.md"
   local dm argv
   dm=$(cat "$T/dm.out")
-  assert_contains "success: DM facts" "Comprehension digest: week ending 2026-10-03" "$dm"
+  assert_contains "success: DM facts" "Comprehension digest: week ending Sat Oct 3, 2026 (merged Sat Sep 26, 2026 to Fri Oct 2, 2026, UTC)" "$dm"
+  assert_contains "success: DM merge stats" "Merged: 6." "$dm"
+  assert_not_contains "success: DM omits PR lists" "Touched the live site" "$dm"
+  assert_not_contains "success: DM omits governance" "Governance surfaces" "$dm"
+  assert_contains "success: model still gets PR lists" "Touched the live site" "$(cat "$T/claude.stdin")"
   assert_contains "success: DM narrative" "### What changed conceptually" "$dm"
   argv=$(cat "$T/claude.argv")
   assert_contains "success: pinned model" "--model claude-sonnet-5-5" "$argv"

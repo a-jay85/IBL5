@@ -714,6 +714,8 @@ class ReplayClone:
             if packed.exists():
                 packed.unlink()
             _git_check(self.root, "reflog", "expire", "--expire=now", "--all")
+            # --local hardlinks every object, so the merged answer stays readable until pruned.
+            _git_check(self.root, "gc", "-q", "--prune=now")
             (self.plans_dir / ".drafts").mkdir(parents=True)
             self.stub_bin.mkdir()
             ok = True

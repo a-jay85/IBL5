@@ -475,6 +475,16 @@ def test_replay_clone_hides_future_history(tmp_path):
         assert (rc.plans_dir / ".drafts").is_dir()
 
 
+def test_replay_clone_prunes_future_objects(tmp_path):
+    repo, a, b, c = _abc_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "gc", "-q"], check=True)
+    with pe.ReplayClone(repo, b) as rc:
+        gone = subprocess.run(["git", "-C", str(rc.root), "cat-file", "-e", c])
+        assert gone.returncode != 0
+        assert subprocess.run(["git", "-C", str(rc.root), "cat-file", "-e", b]).returncode == 0
+    assert subprocess.run(["git", "-C", str(repo), "cat-file", "-e", c]).returncode == 0
+
+
 def test_replay_clone_removed_on_exit(tmp_path):
     repo, a, b, c = _abc_repo(tmp_path)
     with pe.ReplayClone(repo, b) as rc:

@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, and the before/after rule for review-surface PRs.
-last_verified: 2026-10-24
+last_verified: 2026-10-25
 ---
 
 # Reviewer eval
@@ -76,6 +76,21 @@ Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or mor
 The check binds a claimed score to the exact surface and corpus content. It cannot prove the run happened.
 
 One run is a sample. LLM output varies between runs. Pass `--runs N` to `run` or `compare` to review each case N times. A bug case then counts as a hit only when every run hits, and a clean case keeps the run with the most findings. Each case line gains `runs_hit=<h>/<N>` or `runs_flagged=<f>/<N>`, plus `FLAKY` when the runs disagree. A `runs=<N> flaky=<k>` line prints before `llm_calls`. The score line keeps its shape, so `bin/check-reviewer-eval` reads it unchanged. Run 1 uses the same cache entry as a plain run, and runs 2 to N get their own `-r<k>` entries. `compare --runs` needs a base that already has the flag.
+
+## Fold B into A trial (2026-10-25)
+
+Agent B (git history and code comments) was folded into Agent A as Sections 4 and 5, each behind B's old sub-gate. Each side was scored three times. A bug case counted as a hit only when all three runs hit it, and `false_alarms` took the worst run. The fold scored no worse under the `is_worse` rule, so it shipped.
+
+aggregate before: hits=2/6 false_alarms=0 clean_flagged=0/9
+aggregate after: hits=2/6 false_alarms=0 clean_flagged=0/9
+
+Flipped cases: none. `saved-dc-sum-is-int` stayed a hit (HIT -> HIT). Unstable cases: `team-page-missing-pick-team` before (2 of 3 runs hit), `depth-chart-log-after-commit` after (1 of 3 runs hit).
+
+```
+run 1
+Reviewer eval before: reviewer-eval v=c2c7dbf3da13 c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+Reviewer eval after: reviewer-eval v=f44dd1a41403 c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+```
 
 ## Baseline
 

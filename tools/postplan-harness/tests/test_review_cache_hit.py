@@ -19,12 +19,12 @@ from harness.adapters.llm import FixtureLlm
 from harness.classify import classify, files_from_diff
 from harness.review import VERIFIER_PURPOSES, ReviewPhase
 from harness.state import Finding, TerminalState, UsageLedger
-from test_runner_replay import CANNED, _actions
+from test_runner_replay import CANNED, DegradingLlm, _actions
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
-REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
+REVIEW_PURPOSES = ("review-agent-a", "review-agent-d",
                    "security-audit") + VERIFIER_PURPOSES
 
 
@@ -58,8 +58,8 @@ def _ts_section(path):
             f"--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,2 @@\n+test('x', () => {{}});\n+// spec\n")
 
 
-# Alpha has >50 added php lines (agent B on) and a spec file is present (agent D on), so a
-# full review runs all five review purposes.
+# Alpha has >50 added php lines (Agent A's history section on) and a spec file is present
+# (agent D on), so a full review runs all four review purposes.
 ALPHA, BETA, SPEC = "ibl5/classes/Alpha.php", "ibl5/classes/Beta.php", "ibl5/tests/e2e/hit.spec.ts"
 DIFF = _php_section(ALPHA, 60) + _php_section(BETA, 3) + _ts_section(SPEC)
 FILES = reviewcache.per_file_patch_ids(DIFF)
@@ -112,12 +112,12 @@ def test_restore_review_returns_tuple_in_run_order():
 
 
 def test_restore_review_rejects_degraded_arm():
-    assert reviewcache.restore_review(_arm(degraded_agents=["review-agent-b"]), dict(GATES)) is None
+    assert reviewcache.restore_review(_arm(degraded_agents=["review-agent-a"]), dict(GATES)) is None
 
 
 def test_restore_review_rejects_gate_mismatch():
-    stored = dict(GATES, B=False)
-    current = dict(GATES, B=True)
+    stored = dict(GATES, A_history=False)
+    current = dict(GATES, A_history=True)
     assert reviewcache.restore_review(_arm(gates=stored), current) is None
     assert reviewcache.restore_review(_arm(gates=stored), dict(stored)) is not None
 
@@ -232,7 +232,7 @@ def test_review_hit_not_marked_degraded(monkeypatch, tmp_path):
 
     # A record whose arm holds a degraded agent is never restored: the hit falls to a full review.
     bad = _seed_from(fresh)
-    bad["review"]["degraded_agents"] = ["review-agent-b"]
+    bad["review"]["degraded_agents"] = ["review-agent-a"]
     miss, _ = _drive(monkeypatch, tmp_path, name="miss", canned=CANNED_FINDINGS, record=bad)
     assert miss.reused_from == {}
     assert set(REVIEW_PURPOSES) <= set(_purposes(miss))
@@ -251,3 +251,39 @@ def test_review_hit_arm_conditions_equal_fresh_run(monkeypatch, tmp_path):
     assert hit.arm.armed == fresh.arm.armed
     # Condition 2 counts the >=80 findings, so the comparison is not vacuous.
     assert any(c.number == 2 and c.blocked for c in fresh.arm.conditions)
+
+
+# An engine-only diff that adds a code comment: Agent A runs its comments section alone, so
+# Phase 4B code review counts as ran exactly when Agent A succeeds.
+ENGINE_DIFF = ("diff --git a/engine/x.go b/engine/x.go\nindex 1111111..2222222 100644\n"
+               "--- a/engine/x.go\n+++ b/engine/x.go\n@@ -1 +1,2 @@\n package x\n"
+               "+// explains the rounding below\n")
+
+
+def _drive_engine(monkeypatch, tmp_path, *, name, llm):
+    state = str(tmp_path / f"state-{name}")
+    out = str(tmp_path / f"out-{name}")
+    files = reviewcache.per_file_patch_ids(ENGINE_DIFF)
+    monkeypatch.setattr(runner, "_review_cache_context", lambda *a, **k: (KEY, dict(files)))
+    fixture = dict(FIXTURE, diff=ENGINE_DIFF)
+    res = runner.run(fixture, out, llm, mode="replay", headless=True, state_dir=state)
+    assert res.terminal != TerminalState.FAILED, res.error
+    return res
+
+
+def test_phase4b_code_ran_true_for_engine_only_comments_diff(monkeypatch, tmp_path):
+    cls = classify(files_from_diff(ENGINE_DIFF), ENGINE_DIFF)
+    assert cls.engine_only and cls.has_comments_in_diff and not cls.non_code_only
+    gates = ReviewPhase(None, None).gates(cls)
+    assert (gates["A"], gates["A_core"], gates["A_comments"], gates["D"]) == (True, False, True, False)
+
+    canned = dict(CANNED, **{"review-agent-a": []})
+    ran = _drive_engine(monkeypatch, tmp_path, name="ran", llm=FixtureLlm(UsageLedger(), canned))
+    assert "review-agent-a" in _purposes(ran)
+    assert ran.degraded_agents == []
+    assert ran.phase4b_code_ran is True
+
+    degraded = _drive_engine(monkeypatch, tmp_path, name="degraded",
+                             llm=DegradingLlm(UsageLedger(), canned, ["review-agent-a"]))
+    assert "review-agent-a" in degraded.degraded_agents
+    assert degraded.phase4b_code_ran is False

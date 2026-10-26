@@ -27,7 +27,7 @@ from test_runner_replay import DegradingLlm, ScriptedToolLlm, _verdict_doc
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show", "standard_review_depth")
 
-REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
+REVIEW_PURPOSES = ("review-agent-a", "review-agent-d",
                    "security-audit")
 RUN = "run-write"
 
@@ -68,7 +68,7 @@ def test_vet_review_rejects_each_degraded_purpose(purpose):
     assert reviewcache.vet_review(findings, _scored(findings), [], dict(GATES), RUN) is not None
 
 
-def test_vet_review_purpose_set_is_the_four_agent_purposes():
+def test_vet_review_purpose_set_is_the_three_agent_purposes():
     assert set(reviewcache.REVIEW_PURPOSES) == set(REVIEW_PURPOSES)
 
 
@@ -171,9 +171,9 @@ def test_clean_run_writes_both_arms(monkeypatch, tmp_path):
 def test_degraded_review_agent_writes_null_review_arm(monkeypatch, tmp_path):
     # A deleted canned reply is `llm-fixture-missing`, which fails the whole run; the
     # degraded shape (llm-invalid-output on one agent) is what DegradingLlm raises.
-    llm = DegradingLlm(UsageLedger(), CANNED_FINDINGS, {"review-agent-b"})
+    llm = DegradingLlm(UsageLedger(), CANNED_FINDINGS, {"review-agent-a"})
     res, _ = _drive(monkeypatch, tmp_path, name="degraded", canned=None, llm=llm)
-    assert "review-agent-b" in res.degraded_agents, (res.terminal, res.error)
+    assert "review-agent-a" in res.degraded_agents, (res.terminal, res.error)
     rec = _load(tmp_path, "degraded")
     assert rec is not None
     assert rec["review"] is None

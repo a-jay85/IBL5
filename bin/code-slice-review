@@ -458,7 +458,7 @@ extract_section() {
     printf '%s' "$out"
 }
 
-# Heading prefixes, not full headings: the Agent A and B headings embed model
+# Heading prefixes, not full headings: the Agent A heading embeds model
 # strings that sibling PRs edit. Diff-only sections are left out on purpose:
 # the common preamble, git history, previous PRs, pattern detection, E2E patterns.
 # shellcheck disable=SC2034  # read through eval in extract_all
@@ -466,7 +466,7 @@ CODE_ANCHORS=(
     "_review-agents.md|### Section 1: Architectural fitness"
     "_review-agents.md|### Section 2: Bug detection"
     "_review-agents.md|### Section 3: Database performance"
-    "_review-agents.md|### Section 2: Code comments"
+    "_review-agents.md|### Section 5: Code comments"
 )
 # shellcheck disable=SC2034
 SECURITY_ANCHORS=(

@@ -101,12 +101,12 @@ class _NullGh:
 
 
 def _php_cls(**kwargs) -> Classification:
-    """Classification with PHP enabled (triggers agents A, B, security)."""
+    """Classification with PHP enabled (triggers agent A with all five sections, and security)."""
     c = Classification()
     c.has_php = True
     c.has_modified = True
-    c.lines_php_changed = 100    # triggers B_history
-    c.has_comments_in_diff = True  # triggers B_comments
+    c.lines_php_changed = 100    # triggers A_history
+    c.has_comments_in_diff = True  # triggers A_comments
     c.non_code_only = False
     c.engine_only = False
     c.has_e2e_specs = False      # skip agent D
@@ -123,7 +123,6 @@ def _make_canned(findings_by_agent=None):
     verdicts = {p: _all_real(total) for p in VERIFIER_PURPOSES}
     return {**verdicts,
         "review-agent-a": findings_by_agent.get("A", []),
-        "review-agent-b": findings_by_agent.get("B", []),
         "review-agent-d": findings_by_agent.get("D", []),
         "security-audit": findings_by_agent.get("security", []),
     }
@@ -143,10 +142,10 @@ def test_agents_overlap_in_time(tmp_path):
 
     ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
-    # Three agents ran (A, B, security); D gate is off.
+    # Two agents ran (A, security); D gate is off.
     review_calls = [entry for entry in llm.log if entry[0] in
-                    ("review-agent-a", "review-agent-b", "security-audit")]
-    assert len(review_calls) == 3, f"expected 3 review agent calls, got {review_calls}"
+                    ("review-agent-a", "security-audit")]
+    assert len(review_calls) == 2, f"expected 2 review agent calls, got {review_calls}"
 
     # Assert overlap directly from recorded (start, end) pairs — not from total elapsed
     # time, which is fragile on a contended CI runner where thread-startup jitter can
@@ -172,7 +171,7 @@ def test_agents_run_in_distinct_threads(tmp_path):
     ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
     review_calls = [entry for entry in llm.log if entry[0] in
-                    ("review-agent-a", "review-agent-b", "security-audit")]
+                    ("review-agent-a", "security-audit")]
     tids = {entry[1] for entry in review_calls}
     assert len(tids) > 1, (
         f"all {len(review_calls)} agents ran in the same thread — "
@@ -190,8 +189,9 @@ def test_ledger_has_entry_for_every_agent(tmp_path):
     ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
 
     purposes = {r.purpose for r in ledger.calls}
-    for expected in ("review-agent-a", "review-agent-b", "security-audit"):
+    for expected in ("review-agent-a", "security-audit"):
         assert expected in purposes, f"{expected!r} missing from ledger — {purposes}"
+    assert "review-agent-b" not in purposes
 
 
 def test_security_audit_and_verifiers_are_sonnet(tmp_path):
@@ -213,11 +213,11 @@ def test_security_audit_and_verifiers_are_sonnet(tmp_path):
 
 
 def test_findings_from_all_agents_are_returned(tmp_path):
-    """Findings from each concurrent agent must appear in the result, in A→B→security order."""
+    """Findings from each concurrent agent must appear in the result, in A→D→security order."""
     ledger = UsageLedger()
     findings_by_agent = {
         "A": [{"path": "ibl5/a.php", "line": 1, "body": "agent-a issue"}],
-        "B": [{"path": "ibl5/b.php", "line": 2, "body": "agent-b issue"}],
+        "D": [{"path": "ibl5/d.php", "line": 2, "body": "agent-d issue"}],
         "security": [{"path": "ibl5/s.php", "line": 3, "body": "security issue"}],
     }
     canned = _make_canned(findings_by_agent)
@@ -225,19 +225,19 @@ def test_findings_from_all_agents_are_returned(tmp_path):
     gh = _NullGh()
 
     surviving, gates, scored, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
-        {"number": 1, "headRefOid": "abc"}, _php_cls(), PlanInfo()
+        {"number": 1, "headRefOid": "abc"}, _php_cls(has_e2e_specs=True), PlanInfo()
     )
 
     paths = {f.path for f in surviving}
     assert "ibl5/a.php" in paths, f"agent-A finding missing; surviving={surviving}"
-    assert "ibl5/b.php" in paths, f"agent-B finding missing; surviving={surviving}"
+    assert "ibl5/d.php" in paths, f"agent-D finding missing; surviving={surviving}"
     assert "ibl5/s.php" in paths, f"security finding missing; surviving={surviving}"
 
-    # Order: A then B then security (A,B are code-review; security is security-audit).
+    # Order: A then D then security (A,D are code-review; security is security-audit).
     # The Finding objects appear in submission order regardless of which thread finished first.
     agents_in_order = [f.agent for f in surviving]
-    assert agents_in_order.index("A") < agents_in_order.index("B"), \
-        f"A must precede B in finding order; got {agents_in_order}"
+    assert agents_in_order.index("A") < agents_in_order.index("D"), \
+        f"A must precede D in finding order; got {agents_in_order}"
 
 
 def test_raw_files_written_for_every_agent(tmp_path):
@@ -253,16 +253,16 @@ def test_raw_files_written_for_every_agent(tmp_path):
     # _persist_raw is a best-effort dump — call it directly for three distinct purposes.
     ledger = UsageLedger()
     cli = ClaudeCli(ledger, out_dir=out_dir)
-    for purpose in ("review-agent-a", "review-agent-b", "security-audit"):
+    for purpose in ("review-agent-a", "review-agent-d", "security-audit"):
         cli._persist_raw(purpose, 0, f"reply from {purpose}")
 
     files = os.listdir(out_dir)
     assert len(files) == 3, f"expected 3 raw files, got {files}"
-    for purpose in ("review-agent-a", "review-agent-b", "security-audit"):
+    for purpose in ("review-agent-a", "review-agent-d", "security-audit"):
         expected = f"raw-{purpose}-attempt0.txt"
         assert expected in files, f"{expected} missing from {files}"
     # Verify content
-    for purpose in ("review-agent-a", "review-agent-b", "security-audit"):
+    for purpose in ("review-agent-a", "review-agent-d", "security-audit"):
         p = os.path.join(out_dir, f"raw-{purpose}-attempt0.txt")
         assert open(p).read() == f"reply from {purpose}"
 
@@ -288,19 +288,19 @@ def test_degraded_agent_does_not_block_others(tmp_path):
             return data
 
     llm = _OneFailLlm()
-    _, gates, scored, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run({}, _php_cls(), PlanInfo())
+    _, gates, scored, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(
+        {}, _php_cls(has_e2e_specs=True), PlanInfo())
     assert "review-agent-a" in degraded
-    # B and security must still have been called
-    assert "review-agent-b" in llm.calls
+    # D and security must still have been called
+    assert "review-agent-d" in llm.calls
     assert "security-audit" in llm.calls
 
 
-def test_all_four_agents_preserve_submission_order(tmp_path):
-    """With agent D enabled, findings appear in A → B → D → security order."""
+def test_all_three_agents_preserve_submission_order(tmp_path):
+    """With every gated agent enabled, findings appear in A → D → security order."""
     ledger = UsageLedger()
     findings_by_agent = {
         "A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}],
-        "B": [{"path": "ibl5/b.php", "line": 2, "body": "b"}],
         "D": [{"path": "ibl5/d.php", "line": 3, "body": "d"}],
         "security": [{"path": "ibl5/s.php", "line": 4, "body": "s"}],
     }
@@ -313,9 +313,9 @@ def test_all_four_agents_preserve_submission_order(tmp_path):
     )
 
     agents = [f.agent for f in surviving]
-    assert agents.index("A") < agents.index("B"), f"A before B; got {agents}"
-    assert agents.index("B") < agents.index("D"), f"B before D; got {agents}"
-    assert agents.index("D") < agents.index("security"), f"D before security; got {agents}"
+    assert agents == ["A", "D", "security"], f"submission order; got {agents}"
+    assert agents.index("A") < agents.index("D"), f"A before D; got {agents}"
+    assert "review-agent-b" not in {p for p, *_ in llm.log}
 
 
 def test_terminal_error_propagates(tmp_path):
@@ -338,9 +338,8 @@ def test_terminal_error_propagates(tmp_path):
 # Verifier fan-out (Phase 4D)
 # ---------------------------------------------------------------------------
 
-_FOUR_FINDINGS = {
+_THREE_FINDINGS = {
     "A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}],
-    "B": [{"path": "ibl5/b.php", "line": 2, "body": "b"}],
     "D": [{"path": "ibl5/d.php", "line": 3, "body": "d"}],
     "security": [{"path": "ibl5/s.php", "line": 4, "body": "s"}],
 }
@@ -362,20 +361,19 @@ def test_verifiers_overlap_in_time(tmp_path):
                 f"verifier seats did not overlap - {[(p, f'{s:.3f}-{e:.3f}') for p, _, s, e in seats]}")
 
 
-def test_all_four_agents_then_verifiers_preserve_submission_order(tmp_path):
-    """Agents finish in reverse order, findings still aggregate A, B, D, security, then verifiers run."""
-    canned = _make_canned(_FOUR_FINDINGS)
-    # security finishes first, A last: only possible if all four calls are in flight together
-    finish_after = {"review-agent-d": "security-audit", "review-agent-b": "review-agent-d",
-                    "review-agent-a": "review-agent-b"}
+def test_all_three_agents_then_verifiers_preserve_submission_order(tmp_path):
+    """Agents finish in reverse order, findings still aggregate A, D, security, then verifiers run."""
+    canned = _make_canned(_THREE_FINDINGS)
+    # security finishes first, A last: only possible if all three calls are in flight together
+    finish_after = {"review-agent-d": "security-audit", "review-agent-a": "review-agent-d"}
     llm = _SleepingLlm(UsageLedger(), canned, sleep=0.02, finish_after=finish_after)
 
     surviving, _, _, _ = ReviewPhase(llm, _NullGh(), worktree=str(tmp_path)).run(
         {"number": 1, "headRefOid": "abc"}, _php_cls(has_e2e_specs=True), PlanInfo())
 
     assert [p for p, *_ in llm.log] == [
-        "security-audit", "review-agent-d", "review-agent-b", "review-agent-a"]
-    assert [f.agent for f in surviving] == ["A", "B", "D", "security"]
+        "security-audit", "review-agent-d", "review-agent-a"]
+    assert [f.agent for f in surviving] == ["A", "D", "security"]
     assert {p for p, *_ in llm.tooled_log} == set(VERIFIER_PURPOSES)
     last_agent_end = max(end for *_, end in llm.log)
     assert all(start >= last_agent_end for _, _, start, _ in llm.tooled_log), \

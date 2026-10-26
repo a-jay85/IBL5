@@ -1,6 +1,6 @@
 ---
 description: When a change adds or alters concurrency in the post-plan harness, the PR body names the fail-fast change and the tests cover every enabled agent path in submission order.
-last_verified: 2026-10-01
+last_verified: 2026-10-25
 paths: "tools/postplan-harness/**"
 ---
 
@@ -18,9 +18,9 @@ Write that consequence in plain words. For example: "A terminal error in one rev
 
 ## Cover every enabled agent path in tests
 
-Tests for a concurrent block exercise every enabled agent path. That includes the gated agents A, B, D, and security. Assert that the aggregate order equals the submission order.
+Tests for a concurrent block exercise every enabled agent path. That includes the gated agents A, D, and security. Assert that the aggregate order equals the submission order.
 
-Copy the pattern in `tools/postplan-harness/tests/test_review_parallel.py`. The test `test_all_four_agents_preserve_submission_order` enables all four agents and checks their order. The test `test_agents_overlap_in_time` proves the agents run concurrently.
+Copy the pattern in `tools/postplan-harness/tests/test_review_parallel.py`. The test `test_all_three_agents_preserve_submission_order` enables all three agents and checks their order. The test `test_agents_overlap_in_time` proves the agents run concurrently.
 
 Delete a test class scaffolded for an approach you abandoned. A leftover class tests code that no longer ships.
 

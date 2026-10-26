@@ -50,7 +50,7 @@ When the inputs do switch:
   existing `^diff --git` keys unchanged, because the delta artifact is emitted with
   `--unified=100000`, which preserves those headers.
 - Delta mode does not change model tiers. They come from the review depth below: the standard
-  tier keeps Agents A/B/D on `subagent_type: "sonnet-5-5"` with `model` omitted and Agent C on Haiku.
+  tier keeps Agents A and D on `subagent_type: "sonnet-5-5"` with `model` omitted and Agent C on Haiku.
 
 **Flag resolution for the launch gates.** The launch gates below name `$DELTA_*` flags. In delta
 mode, read each one literally from the command's stdout. **In full mode — the default — read each
@@ -71,7 +71,7 @@ tree, naming the `DELTA-BASE` SHA, and recording zero findings.
 cosmetic. Phase 4D then scores it as an ordinary zero-finding review: `post_review_findings` 0,
 `post_review_summary` naming the empty delta, and the `prf_envelope_count` envelope still lands.
 
-**Read** `.claude/review-shared/_review-agents.md` (Agents A/B/C) and `.claude/review-shared/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
+**Read** `.claude/review-shared/_review-agents.md` (Agents A and C) and `.claude/review-shared/_test-spec-agent.md` (Agent D, E2E specs). The canonical agent definitions.
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
@@ -120,22 +120,20 @@ review depth. Deep only adds review. It never skips an agent the standard tier l
 
 **Model tiers:**
 
-- Agent A (Architecture + Bug detection + DB performance): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
-- Agent B (Git history + Code comments): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
+- Agent A (Architecture + Bug detection + DB performance + Git history + Code comments): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
 - Agent C (Previous PRs): **Haiku**
 - Agent D (E2E specs: POST-effect + assertion discrimination + coverage-branch): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`)
-- Deep tier (`$REVIEW_DEPTH` is `deep`): launch Agent A with `subagent_type: "sonnet-5-5"` and `model: "opus"`. An explicit `model` overrides the def's Sonnet pin, so Agent A runs on Opus. Agents B, C, D and E keep the tiers above.
+- Deep tier (`$REVIEW_DEPTH` is `deep`): launch Agent A with `subagent_type: "sonnet-5-5"` and `model: "opus"`. An explicit `model` overrides the def's Sonnet pin, so Agent A runs on Opus. Agents C, D and E keep the tiers above. Agent A's Sections 4 and 5 run inside Agent A, so they run on Opus in the deep tier as well.
 
 **Deep-tier gate overrides** (only when `$REVIEW_DEPTH` is `deep`; the standard tier reads every gate below as written):
 
-- Agent B: the history sub-gate passes whenever `! $DELTA_NON_CODE_ONLY`, ignoring `$DELTA_HAS_PHP` and the 50-line test. Tell the agent to cover the files with the most changed lines, of any language.
+- Agent A Section 4 (git history): the history sub-gate passes whenever `! $DELTA_NON_CODE_ONLY`, ignoring `$DELTA_HAS_PHP` and the 50-line test. Tell Agent A to cover the files with the most changed lines, of any language.
 - Agent C: drop the `$DELTA_LINES_PHP_CHANGED <= 50` clause. Still skip on `$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_MODIFIED`.
-- Agents A, D and E: gates unchanged.
+- Agents D and E, and Agent A's Core and Comments gates: unchanged.
 
 **Launch gates** (resolve each `$DELTA_*` name per the flag-resolution rule above — skip the launch entirely, don't let the agent exit early):
 
-- Agent A: skip if `$DELTA_NON_CODE_ONLY` or `$DELTA_ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $DELTA_HAS_PHP`, instruct agent to skip Section 3 (DB performance).
-- Agent B: skip if BOTH sub-gates fail: (`! $DELTA_HAS_PHP` or `$DELTA_LINES_PHP_CHANGED <= 50`) AND (`$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
+- Agent A: evaluate three section gates. **Core** (Sections 1 to 3) passes unless `$DELTA_NON_CODE_ONLY` or `$DELTA_ENGINE_ONLY`. **History** (Section 4) passes when `$DELTA_HAS_PHP` and `$DELTA_LINES_PHP_CHANGED > 50` (deep tier: see the override above). **Comments** (Section 5) passes when `! $DELTA_NON_CODE_ONLY` and `$DELTA_HAS_COMMENTS_IN_DIFF`. Skip the launch only when all three fail, and instruct the agent to skip each section whose gate failed. When Core passes: if `$MIGRATION_ONLY`, instruct the agent to skip Section 2 (bug detection), and if `! $DELTA_HAS_PHP`, to skip Section 3 (DB performance). Core fails on a pure-Go engine diff, because Agent A's PHP rubric has nothing to review there. A **mixed** PR (`HAS_PHP=true`, `ENGINE_ONLY=false`) still runs Core on the PHP portion. An engine-only diff with code comments launches Agent A with Section 5 only, plus Section 4 in the deep tier.
 - Agent C: skip if `$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_MODIFIED` or `$DELTA_LINES_PHP_CHANGED <= 50`
 - Agent E (Shell / Workflow / Agent-prose): **Sonnet 5.5** (`subagent_type: "sonnet-5-5"`, omit `model`). Launch when `$DELTA_HAS_SHELL || $DELTA_HAS_WORKFLOW || $DELTA_HAS_SKILL_PROSE`; skip when all three are false. No line-count threshold.
 - Agent D: skip if `! $DELTA_HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:

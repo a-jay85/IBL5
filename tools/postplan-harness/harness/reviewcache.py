@@ -32,7 +32,7 @@ PROMPT_SOURCE_FILES = (
 # Literal pins the hash also covers. test_model_pins_match_source greps review.py
 # and runner.py so these cannot drift silently.
 MODEL_PINS = (
-    "review-agent-a:sonnet", "review-agent-b:sonnet", "review-agent-d:sonnet",
+    "review-agent-a:sonnet", "review-agent-d:sonnet",
     "security-audit:sonnet", "verify-findings:sonnet",
 )
 REQUIRED_KEYS = ("schema_version", "slug", "pr_number", "run_id", "key", "per_file_ids")
@@ -299,7 +299,7 @@ def conflict_only_delta(record, key, current_files, pre_patch_id, manifest_paths
                                  manifest_paths, verdict_ok) == ""
 
 
-REVIEW_PURPOSES = ("review-agent-a", "review-agent-b", "review-agent-d",
+REVIEW_PURPOSES = ("review-agent-a", "review-agent-d",
                    "security-audit")
 
 

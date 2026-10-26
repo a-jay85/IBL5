@@ -607,7 +607,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 DEFAULT_CACHE_REL = "tools/postplan-harness/out/reviewer-eval/cache"
 _TRAILING_PR_RE = re.compile(r"\s*\(#(\d+)\)\s*$")
-_AGENT_GATES = ("A", "B", "D", "security")
+_AGENT_GATES = ("A", "D", "security")
 
 
 class NullGh:

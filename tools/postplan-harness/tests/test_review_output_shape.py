@@ -114,13 +114,17 @@ def _prompts():
     meta, plan = {"number": 1, "title": "t"}, PlanInfo()
     return {
         "a": review.agent_a_prompt(meta, cls, plan),
-        "b": review.agent_b_prompt(meta, cls, True, True),
+        # Agent A carrying the history and comments sections Agent B used to run, with and
+        # without its core sections (the engine-only-with-comments call).
+        "a_folded": review.agent_a_prompt(meta, cls, plan, run_history=True, run_comments=True),
+        "a_folded_only": review.agent_a_prompt(meta, cls, plan, run_core=False,
+                                               run_history=True, run_comments=True),
         "d": review.agent_d_prompt(meta, cls),
         "security": review.security_prompt(meta, cls, plan),
     }
 
 
-BUILDERS = ["a", "b", "d", "security"]
+BUILDERS = ["a", "a_folded", "a_folded_only", "d", "security"]
 
 
 @pytest.mark.parametrize("builder", BUILDERS)
@@ -145,7 +149,7 @@ def test_no_section_label_survives(builder):
         assert f"Section {n} —" not in prompt
 
 
-@pytest.mark.parametrize("builder", ["a", "b", "security"])
+@pytest.mark.parametrize("builder", ["a", "a_folded", "a_folded_only", "security"])
 def test_reportable_bar_reaches_every_holding_agent(builder):
     """Mutation: drop REPORTABLE_BAR from an agent prompt => quality opinions post as Important."""
     assert review.REPORTABLE_BAR in _prompts()[builder]

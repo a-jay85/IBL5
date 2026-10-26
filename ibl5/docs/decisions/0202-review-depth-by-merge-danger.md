@@ -1,6 +1,6 @@
 ---
 description: Phase 4 review depth is standard or deep, picked from the PR body's Merge danger line. One-way doors, site-wide or external blast radius, and a missing line select deep, which raises agent tiers and never skips an agent.
-last_verified: 2026-10-19
+last_verified: 2026-10-25
 ---
 
 # ADR-0202: Phase 4 review depth follows the Merge danger line
@@ -40,3 +40,7 @@ The harness reads the deeper of the Phase-2 body and the live PR body (`tools/po
 - `tools/postplan-harness/harness/review_depth.py`: the Python classifier.
 - `tools/postplan-harness/tests/test_review_depth_parity.py`: the parity test over the shared case table.
 - `.claude/skills/post-plan/_phase-4-review-audit.md`: the skill prose that selects the depth.
+
+## Addendum (2026-10): Agent B folded into Agent A
+
+Agent B no longer exists. Its git-history and code-comment checks now run as Agent A Sections 4 and 5, gated by the same sub-gates as before. The deep tier still forces the history check on any code PR. That check now runs inside Agent A, so in the deep tier it runs on Opus instead of Sonnet. Agent A also launches on an engine-only diff that has code comments, running only the comments section (plus history in the deep tier), so no diff lost a check in the fold. The standard and deep tiers otherwise keep the rules above. The reviewer eval scores for the fold are in `ibl5/docs/reviewer-eval.md`.

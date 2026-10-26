@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-plan-exec-mutations — tests for bin/lib/plan-exec-mutations (ADR-0199).
+# Prints one `PASS <case>` or `FAIL <case> — <why>` line per case; the
+# Verification Matrix greps the PASS lines. Exits 1 when any case fails.
+#
+# Usage: bin/test-plan-exec-mutations
+
+set -u
+export LC_ALL=C
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LIB="$REPO_ROOT/bin/lib/plan-exec-mutations"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILS=0
+F='```'
+
+# Case bookkeeping: start_case <name>; chk <description> <command...>; end_case.
+CASE=""; CASE_ERR=""
+start_case() { CASE="$1"; CASE_ERR=""; }
+chk() {
+    _d="$1"; shift
+    if ! "$@"; then
+        [ -n "$CASE_ERR" ] || CASE_ERR="$_d"
+    fi
+}
+end_case() {
+    if [ -z "$CASE_ERR" ]; then
+        echo "PASS $CASE"
+    else
+        echo "FAIL $CASE — $CASE_ERR"
+        FAILS=$((FAILS + 1))
+    fi
+}
+eq() { [ "$1" = "$2" ]; }
+has() { grep -qF -- "$2" <<< "$1"; }
+
+MATRIX='## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | target flips | CLI-executable | post-impl | `bash check.sh` |
+| 2 | override row | CLI-executable | post-impl | `bin/broad-runner` |
+| 3 | unit row | PHPUnit | post-impl | `vendor/bin/phpunit` |
+| 4 | pin row | CLI-executable | pre-impl | `bin/broad-runner` |
+
+## Critical Files
+
+- `new/file.txt` — NEW
+'
+
+# mkplan <path> <section-body> — matrix + critical files + the given tail.
+mkplan() {
+    printf '# Fixture plan\n\n%s\n%s\n' "$MATRIX" "$2" > "$1"
+}
+
+# block <row> <file> <match> <replace> [check]
+block() {
+    printf '%smutation\nrow: %s\nfile: %s\n' "$F" "$1" "$2"
+    [ -z "${5:-}" ] || printf 'check: %s\n' "$5"
+    printf 'match: %s\nreplace: %s\n%s\n' "$3" "$4" "$F"
+}
+
+parse() { "$LIB" parse "$@" 2>&1 | tr '\0' '\t'; return "${PIPESTATUS[0]}"; }
+
+# --- parse cases -----------------------------------------------------------
+
+start_case parse_wellformed
+P="$TMP/wf.md"
+mkplan "$P" "## Executable Mutations
+
+$(block 1 target.txt ALPHA BETA)
+
+$(block 2 bin/broad-runner 'x=1' 'x=2' 'bin/sharp-check')
+"
+OUT=$(parse "$P"); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "default check is the row cell" eq "$(sed -n 1p <<< "$OUT")" "$(printf '1\ttarget.txt\tbash check.sh\tALPHA\tBETA')"
+chk "override check honoured" eq "$(sed -n 2p <<< "$OUT")" "$(printf '2\tbin/broad-runner\tbin/sharp-check\tx=1\tx=2')"
+end_case
+
+start_case parse_legacy_silent
+P="$TMP/legacy.md"
+printf '# Legacy\n\n%s\n' "$(sed 's/| target flips |/| target flips. Mutation: drop the guard ⇒ fails |/' <<< "$MATRIX")" > "$P"
+OUT=$(parse "$P"); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "empty stdout" eq "$OUT" ""
+end_case
+
+start_case parse_path_rejects
+for bad in ../etc/passwd /abs/file .git/config sub/../x; do
+    P="$TMP/path.md"
+    mkplan "$P" "## Executable Mutations
+
+$(block 1 "$bad" ALPHA BETA)
+"
+    OUT=$(parse "$P"); RC=$?
+    chk "$bad exits 1" eq "$RC" 1
+done
+end_case
+
+start_case parse_row_kind
+for r in 3 4; do
+    P="$TMP/kind.md"
+    mkplan "$P" "## Executable Mutations
+
+$(block "$r" target.txt ALPHA BETA)
+"
+    OUT=$(parse "$P"); RC=$?
+    chk "row $r exits 1" eq "$RC" 1
+    chk "row $r names the kind" has "$OUT" "not a post-impl CLI-executable row"
+done
+end_case
+
+# Matrix row ids are not always integers (e.g. `12-neg`); a suffixed id must parse.
+start_case parse_suffixed_row_id
+P="$TMP/suffix.md"
+printf '# Fixture plan\n\n%s\n%s\n' "$(sed 's/^| 1 | target flips |/| 12-neg | target flips |/' <<< "$MATRIX")" "## Executable Mutations
+
+$(block 12-neg target.txt ALPHA BETA)
+" > "$P"
+OUT=$(parse "$P"); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "row id kept" eq "$OUT" "$(printf '12-neg\ttarget.txt\tbash check.sh\tALPHA\tBETA')"
+end_case
+
+start_case parse_shape_rejects
+P="$TMP/dup.md"
+mkplan "$P" "## Executable Mutations
+
+$(block 1 target.txt ALPHA BETA)
+
+$(block 1 target.txt GAMMA DELTA)
+"
+OUT=$(parse "$P"); RC=$?
+chk "duplicate row exits 1" eq "$RC" 1
+chk "duplicate row named" has "$OUT" "duplicate mutation block"
+P="$TMP/same.md"
+mkplan "$P" "## Executable Mutations
+
+$(block 1 target.txt ALPHA ALPHA)
+"
+OUT=$(parse "$P"); RC=$?
+chk "match=replace exits 1" eq "$RC" 1
+P="$TMP/missing.md"
+mkplan "$P" "## Executable Mutations
+
+${F}mutation
+row: 1
+file: target.txt
+replace: BETA
+${F}
+"
+OUT=$(parse "$P"); RC=$?
+chk "missing match exits 1" eq "$RC" 1
+chk "missing key named" has "$OUT" "missing key"
+P="$TMP/unknown.md"
+mkplan "$P" "## Executable Mutations
+
+${F}mutation
+row: 1
+file: target.txt
+match: ALPHA
+replace: BETA
+mode: regex
+${F}
+"
+OUT=$(parse "$P"); RC=$?
+chk "unknown key exits 1" eq "$RC" 1
+chk "unknown key named" has "$OUT" "unknown key"
+end_case
+
+start_case parse_fence_aware
+P="$TMP/quoted.md"
+mkplan "$P" "## Notes
+
+${F}\`
+${F}
+${F}mutation
+row: 1
+file: target.txt
+match: ALPHA
+replace: BETA
+${F}
+${F}\`
+"
+OUT=$(parse "$P"); RC=$?
+chk "quoted fence exits 0" eq "$RC" 0
+chk "quoted fence yields no records" eq "$OUT" ""
+P="$TMP/outside.md"
+mkplan "$P" "## Notes
+
+$(block 1 target.txt ALPHA BETA)
+"
+OUT=$(parse "$P"); RC=$?
+chk "fence outside section exits 1" eq "$RC" 1
+chk "outside named" has "$OUT" "outside the ## Executable Mutations section"
+end_case
+
+# --- fixture repo for --root and run cases ---------------------------------
+
+# mkrepo <dir> <check.sh body> [target body] — committed git repo, plan beside it.
+mkrepo() {
+    rm -rf "$1"; mkdir -p "$1"
+    git -C "$1" init -q
+    printf '%s\n' "${3:-ALPHA}" > "$1/target.txt"
+    printf '%s\n' "$2" > "$1/check.sh"
+    git -C "$1" add -A
+    git -C "$1" -c user.email=t@t -c user.name=t commit -qm fixture
+    mkplan "$1.plan.md" "## Executable Mutations
+
+$(block 1 target.txt ALPHA BETA)
+"
+}
+jdir() { printf '%s/exec-mutations' "$(git -C "$1" rev-parse --absolute-git-dir)"; }
+journal_clear() { [ -z "$(ls -A "$(jdir "$1")" 2>/dev/null)" ]; }
+porcelain_clean() { [ -z "$(git -C "$1" status --porcelain)" ]; }
+sha() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
+
+start_case parse_root_checks
+R="$TMP/rootrepo"
+mkrepo "$R" 'true'
+ln -s /etc/hosts "$R/link.txt"
+for spec in "link.txt:1" "new/other.txt:1" "new/file.txt:0" "target.txt:0" \
+            "./.git/config:1" "sub/../.git/config:1" "./target.txt:0"; do
+    P="$TMP/root.md"
+    mkplan "$P" "## Executable Mutations
+
+$(block 1 "${spec%%:*}" ALPHA BETA)
+"
+    OUT=$(parse --root "$R" "$P"); RC=$?
+    chk "${spec%%:*} exits ${spec##*:}" eq "$RC" "${spec##*:}"
+done
+end_case
+
+start_case run_tripped_clean
+R="$TMP/r1"
+mkrepo "$R" 'grep -q ALPHA target.txt'
+BEFORE=$(sha "$R/target.txt")
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "TRIPPED reported" has "$OUT" "TRIPPED row 1"
+chk "porcelain empty" porcelain_clean "$R"
+chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "journal empty" journal_clear "$R"
+# A relative --root resolves against the caller's cwd, not the cwd after the lib's own cd.
+OUT=$(cd "$TMP" && "$LIB" run --root "r1" "$R.plan.md" 2>&1); RC=$?
+chk "relative root exits 0" eq "$RC" 0
+chk "relative root TRIPPED" has "$OUT" "TRIPPED row 1"
+end_case
+
+start_case run_held
+R="$TMP/r2"
+mkrepo "$R" 'true'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "HELD reported" has "$OUT" "HELD row 1"
+chk "TRIPPED not reported" eval '! grep -q TRIPPED <<< "$OUT"'
+chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_baseline_failed
+R="$TMP/r3"
+mkrepo "$R" 'false'
+BEFORE=$(sha "$R/target.txt")
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "BASELINE-FAILED reported" has "$OUT" "BASELINE-FAILED row 1"
+chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "journal empty" journal_clear "$R"
+end_case
+
+start_case run_not_applied
+R="$TMP/r4"
+mkrepo "$R" 'true' "$(printf 'ALPHA\nALPHA')"
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "twice exits 1" eq "$RC" 1
+chk "twice reported" has "$OUT" "NOT-APPLIED row 1 — match occurs 2 times"
+mkrepo "$R" 'true' 'GAMMA'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "zero exits 1" eq "$RC" 1
+chk "zero reported" has "$OUT" "match occurs 0 times"
+chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_stray_untracked
+R="$TMP/r5"
+mkrepo "$R" 'grep -q ALPHA target.txt || { touch stray; exit 1; }'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 3" eq "$RC" 3
+chk "REVERT-FAILED status changed" has "$OUT" "REVERT-FAILED row 1 — status changed"
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending exits 0" eq "$PRC" 0
+"$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?
+chk "recover with the stray still present exits 3" eq "$RRC" 3
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending still exits 0 with the stray present" eq "$PRC" 0
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "run with the stray present exits 3" eq "$RC" 3
+"$LIB" pending --root "$R"; PRC=$?
+chk "run did not clear the journal" eq "$PRC" 0
+rm -f "$R/stray"
+"$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?
+chk "recover exits 0" eq "$RRC" 0
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending exits 1 after recover" eq "$PRC" 1
+chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_baseline_artifact
+R="$TMP/r5b"
+mkrepo "$R" 'touch artifact.out; grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 0 (tripped, artifact is not a mutation side effect)" eq "$RC" 0
+chk "TRIPPED reported" has "$OUT" "TRIPPED row 1"
+chk "no REVERT-FAILED" eq "$(grep -c REVERT-FAILED <<< "$OUT")" 0
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending exits 1" eq "$PRC" 1
+chk "target restored" eq "$(cat "$R/target.txt")" ALPHA
+end_case
+
+start_case run_signals
+R="$TMP/r6"
+mkrepo "$R" 'grep -q ALPHA target.txt || sleep 30'
+BEFORE=$(sha "$R/target.txt")
+"$LIB" run --root "$R" "$R.plan.md" >/dev/null 2>&1 &
+PID=$!
+J="$(jdir "$R")/1.meta"
+i=0
+while [ ! -e "$J" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+chk "journal entry appeared before the kill" test -e "$J"
+# The meta file lands before the mutation is applied. Wait for the edit itself, so the
+# kill hits a mutated tree and the restore checks below cannot pass on an untouched file.
+i=0
+while [ "$(sha "$R/target.txt")" = "$BEFORE" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+chk "mutation applied before the kill" eval '[ "$(sha "$R/target.txt")" != "$BEFORE" ]'
+kill -TERM "$PID" 2>/dev/null
+wait "$PID" 2>/dev/null
+chk "SIGTERM: porcelain empty" porcelain_clean "$R"
+chk "SIGTERM: sha restored" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "SIGTERM: journal empty" journal_clear "$R"
+mkrepo "$R" 'grep -q ALPHA target.txt || sleep 5'
+OUT=$("$LIB" run --root "$R" --timeout 1 "$R.plan.md" 2>&1); RC=$?
+chk "timeout exits 1" eq "$RC" 1
+chk "UNDECIDED (124) reported" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124)"
+chk "timeout: porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_literals_verbatim
+R="$TMP/r7"
+mkrepo "$R" "grep -q '^X=' target.txt"
+# shellcheck disable=SC2016
+LIT='X=$(touch pwned) `touch pwned2` "dq" '"'"'sq'"'"
+# shellcheck disable=SC2016
+REP='Y=$(touch pwned3) `touch pwned4`'
+printf '%s\n' "$LIT" > "$R/target.txt"
+git -C "$R" add -A; git -C "$R" -c user.email=t@t -c user.name=t commit -qm lit
+mkplan "$R.plan.md" "## Executable Mutations
+
+$(block 1 target.txt "$LIT" "$REP")
+"
+BEFORE=$(sha "$R/target.txt")
+OUT=$(cd "$TMP" && "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "TRIPPED reported" has "$OUT" "TRIPPED row 1"
+chk "no pwned file" eval '[ -z "$(find "$TMP" -name "pwned*")" ]'
+chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
+end_case
+
+start_case recover_cases
+R="$TMP/r8"
+mkrepo "$R" 'true'
+J="$(jdir "$R")"; mkdir -p "$J"
+BEFORE=$(sha "$R/target.txt")
+cp -p "$R/target.txt" "$J/1.orig"
+printf 'path=target.txt\nsha256-before=%s\n' "$BEFORE" > "$J/1.meta"
+printf 'BETA\n' > "$R/target.txt"
+OUT=$("$LIB" recover --root "$R" 2>&1); RC=$?
+chk "recover exits 0" eq "$RC" 0
+chk "RECOVERED reported" has "$OUT" "RECOVERED target.txt"
+chk "sha restored" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "journal empty" journal_clear "$R"
+cp -p "$R/target.txt" "$J/1.orig"
+printf 'path=target.txt\nsha256-before=%s\n' deadbeef > "$J/1.meta"
+OUT=$("$LIB" recover --root "$R" 2>&1); RC=$?
+chk "wrong sha exits 3" eq "$RC" 3
+chk "wrong sha keeps the entry" test -e "$J/1.meta"
+rm -f "$J/1.meta" "$J/1.orig"
+mkrepo "$R" 'true'
+BEFORE=$(sha "$R/target.txt")
+# A PATH that carries every tool the lib needs except gtimeout/timeout. An empty PATH
+# would hide git too, and the lib would exit 2 on its git check before reaching NO-TIMEOUT.
+NT="$TMP/no-timeout-bin"
+mkdir -p "$NT"
+for t in git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut dirname basename cp mv date env readlink realpath cmp diff touch sha256sum shasum uname; do
+    p=$(command -v "$t" 2>/dev/null) || continue
+    case "$p" in /*) ln -sf "$p" "$NT/$t" ;; esac
+done
+OUT=$(PATH="$NT" /bin/bash "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "NO-TIMEOUT exits 1" eq "$RC" 1
+chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
+chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"
+end_case
+
+# row20_e2e: the PR #3264 row 20 false claim, replayed on a detached worktree copy of
+# HEAD so no write touches this checkout. The mutation adds a second checkout `ref:`
+# naming the PR head to the after-merge-checklist job. bin/check-workflow-checkout
+# never reads `ref:` (HELD); bin/test-after-merge-checklist pins exactly one
+# default-branch ref (TRIPPED). Slow: one `git worktree add` plus two runs.
+start_case row20_e2e
+WT="$TMP/row20-wt"
+WF=".github/workflows/merge-digest-notify.yml"
+XM_MATCH='          # bin/after-merge-checklist must run, not the copy inside the PR being announced.'
+XM_REPLACE='          ref: ${{ github.event.pull_request.head.sha }}'
+if git -C "$REPO_ROOT" worktree add --detach "$WT" HEAD >/dev/null 2>&1; then
+    trap 'git -C "$REPO_ROOT" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMP"' EXIT
+    WF_BEFORE=$(sha "$WT/$WF")
+    for which in a b; do
+        if [ "$which" = a ]; then CHECK='bin/check-workflow-checkout'; else CHECK='bin/test-after-merge-checklist'; fi
+        P="$TMP/plan-$which.md"
+        printf '# Row 20 fixture\n\n## Verification Matrix\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 20 | checkout ref is the default branch | CLI-executable | post-impl | `%s` |\n\n## Executable Mutations\n\n%smutation\nrow: 20\nfile: %s\nmatch: %s\nreplace: %s\n%s\n' \
+            "$CHECK" "$F" "$WF" "$XM_MATCH" "$XM_REPLACE" "$F" > "$P"
+        OUT=$("$LIB" run --root "$WT" --timeout 60 "$P" 2>&1); RC=$?
+        if [ "$which" = a ]; then
+            chk "plan A exits 1" eq "$RC" 1
+            chk "plan A HELD" eval 'grep -qE "^HELD row 20 — bin/check-workflow-checkout still exited 0 under mutation" <<< "$OUT"'
+        else
+            chk "plan B exits 0" eq "$RC" 0
+            chk "plan B TRIPPED" eval 'grep -qE "^TRIPPED row 20 — bin/test-after-merge-checklist exited [1-9]" <<< "$OUT"'
+        fi
+        chk "plan $which porcelain empty" porcelain_clean "$WT"
+        chk "plan $which sha unchanged" eq "$(sha "$WT/$WF")" "$WF_BEFORE"
+        chk "plan $which .git is a worktree pointer" test -f "$WT/.git"
+        chk "plan $which journal empty" eval '[ -z "$(ls "$(git -C "$WT" rev-parse --absolute-git-dir)/exec-mutations/"*.meta 2>/dev/null)" ]'
+    done
+else
+    CASE_ERR="git worktree add failed"
+fi
+end_case
+
+# matrix_assertions_silent: bin/lib/plan-matrix-assertions must not report anything for a
+# plan that carries a `## Executable Mutations` section (fixture plan, empty diff).
+start_case matrix_assertions_silent
+MA_PLAN="$TMP/ma-plan.md"
+printf '# MA fixture\n\n## Verification Matrix\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 1 | target flips | CLI-executable | post-impl | `bash check.sh` |\n\n## Executable Mutations\n\n%smutation\nrow: 1\nfile: check.sh\nmatch: exit 0\nreplace: exit 1\n%s\n' "$F" "$F" > "$MA_PLAN"
+: > "$TMP/ma-empty.diff"
+MA_OUT=$(MATRIX_ASSERT_ROOT="" "$REPO_ROOT/bin/lib/plan-matrix-assertions" "$MA_PLAN" "$TMP/ma-empty.diff" 2>&1); MA_RC=$?
+chk "helper exits 0" eq "$MA_RC" 0
+chk "no UNREALISED-ASSERTION token" eval '! grep -q "UNREALISED-ASSERTION" <<< "$MA_OUT"'
+chk "no output at all" eq "$MA_OUT" ""
+end_case
+
+if [ "$FAILS" -gt 0 ]; then
+    echo "test-plan-exec-mutations: $FAILS case(s) failed"
+    exit 1
+fi
+echo "test-plan-exec-mutations: all cases passed"

@@ -194,6 +194,13 @@ run_approval synchronize "" "feat: x" human-approved "$A" "$FORGED"; rc=$?
 expect "approval: forged non-bot marker -> rc 1" 1 "$rc"
 want "approval: forged non-bot marker -> drop missing" "$LAST_OUT" "REASON=missing"
 
+# E15: a bot comment that carries the marker below line 1 is ignored
+ECHOED="$T/echoed.json"
+comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(printf 'Test report\n%s' "$(record_body "$A")")" | jq -s . > "$ECHOED"
+run_approval synchronize "" "feat: x" human-approved "$A" "$ECHOED"; rc=$?
+expect "approval: bot marker on line 2 -> rc 1" 1 "$rc"
+want "approval: bot marker on line 2 -> drop missing" "$LAST_OUT" "REASON=missing"
+
 # E5: a newer revoked marker overrides the older fingerprint
 REVOKED="$T/revoked.json"
 {

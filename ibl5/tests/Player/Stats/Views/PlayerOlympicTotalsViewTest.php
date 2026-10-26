@@ -8,13 +8,14 @@ use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerOlympicTotalsView;
 use Player\Stats\Views\PlayerSeasonTableRenderer;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * @covers \Player\Stats\Views\PlayerOlympicTotalsView
  */
 class PlayerOlympicTotalsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testRenderTotalsMatchesSnapshot(): void
     {

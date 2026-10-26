@@ -3173,6 +3173,19 @@ assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
+# Drift guard: _mt_blank_clauses in bin/check-plan is a hand copy of the Mutation-clause
+# loop in bin/lib/plan-matrix-assertions. Compare the two loops line by line, leading
+# whitespace ignored, from the label match through the cut that advances `rest`.
+MT_LOOP_AWK='on && !/^[ \t]*chk = ""; rest/ { sub(/^[ \t]+/, ""); print } /chk = ""; rest = / { on = 1 } on && /rest = substr\(body, stop \+ 1\)/ { exit }'
+MT_LOOP_CP="$(awk "$MT_LOOP_AWK" "$GUARD")"
+MT_LOOP_HELPER="$(awk "$MT_LOOP_AWK" "$SCRIPT_DIR/lib/plan-matrix-assertions")"
+if [ -z "$MT_LOOP_CP" ] || [ -z "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "could not extract the Mutation-clause loop from both files"
+elif [ "$MT_LOOP_CP" != "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "_mt_blank_clauses in bin/check-plan differs from the loop in bin/lib/plan-matrix-assertions"
+else
+    h_pass "gateMT-blanker-loop-parity"
+fi
 # Seam unset: real repo, a valid plan with corrected forms passes.
 unset CHECK_PLAN_MT_GIT_ROOT
 assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
@@ -3180,6 +3193,148 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
+
+# ---------------------------------------------------------------------------
+# Gate [MT]/[MU] unrealisable-token fixtures (22 cases)
+# ---------------------------------------------------------------------------
+# A throwaway repo whose tracked text holds one bare :LINE literal and one scratch
+# path, for the tracked-token cases. Rejected-shape literals in the rows below are
+# spliced from variables so no contiguous copy of them sits in this tracked file.
+NT_REPO="$TMP/nt-repo"
+mkdir -p "$NT_REPO/e2e"
+git -C "$NT_REPO" init -q
+printf "test('x', async () => {});\n" > "$NT_REPO/e2e/vr.spec.ts"
+printf 'See line :7070 and the log at /tmp/nt-tracked.log here.\n' > "$NT_REPO/README.md"
+git -C "$NT_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$NT_REPO"
+NT_CO=':'
+NT_SL='/'
+NT_OB='{'
+# [MT] a bare :LINE after the Mutation arrow (the worktree-abort-cleanup shape).
+assert_viol "gateMT-bare-line-after-arrow-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a bare :LINE outside any Mutation clause.
+assert_viol "gateMT-bare-line-outside-mutation-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a path-prefixed :LINE after the arrow (the trade-lock-skip-completed shape).
+assert_viol "gateMT-path-line-after-arrow-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ `NtWideTest.php'"$NT_CO"'277` goes red | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a :LINE inside the clause, before the arrow, is blanked: silent.
+assert_viol "gateMT-line-in-clause-before-arrow-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: delete the branch at `x.php:12` ⇒ the case fails | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a bare :LINE that tracked text holds is pre-existing to the helper: silent.
+assert_viol "gateMT-bare-line-tracked-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: drop the guard ⇒ the case fails at `:7070` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a host:port token after the arrow keeps its exemption: silent.
+assert_viol "gateMT-host-port-after-arrow-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: stop the stack ⇒ `wt-x.localhost:8080` refuses | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] the bare-token message says where the line number goes.
+assert_msg "gateMT-bare-line-message-says-prose" 1 'Write the line number in prose outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a scratch file under /tmp (the phpunit-group-attribute-deprecation shape).
+assert_viol "gateMU-tmp-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a scratch path that tracked text holds is pre-existing to the helper: silent.
+assert_viol "gateMU-tmp-tracked-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | the run writes `/tmp/nt-tracked.log` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] a brace placeholder (the trade-suggestions-needs-engine shape).
+assert_viol "gateMU-template-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a brace placeholder with a +N offset.
+assert_viol "gateMU-template-offset-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt+1}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a dollar-brace shell expansion is no template: silent. The tracked e2e/
+# token makes the pre-filter match, so the helper runs.
+assert_viol "gateMU-shell-expansion-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `${NT_VAR}` expands under `e2e/` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] a PHP brace-dollar interpolation is no template: silent.
+assert_viol "gateMU-php-interpolation-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `salary_yr{$nt}` resolves under `e2e/` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] both new messages tell the author to move the token out of backticks.
+assert_msg "gateMU-tmp-message-says-outside-backticks" 1 'Write the scratch name outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_msg "gateMU-template-message-says-outside-backticks" 1 'Write the template outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a lowercase-only mutation: label blanks its clause, as the helper does: silent.
+assert_viol "gateMT-lowercase-mutation-label-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds; mutation: delete the branch at `x.php:12` ⇒ the case fails | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a word ending in Mutation: is no label, so the helper scans the token: fires.
+assert_viol "gateMT-word-ending-in-mutation-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. PreMutation: run `NtWideTest.php'"$NT_CO"'277` ⇒ the case fails | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] macOS temp paths count as scratch too: the per-user tree and both private forms.
+assert_viol "gateMU-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'T'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-tmp-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a template the plan's own code block adds literally (a route pattern): silent.
+assert_viol "gateMU-template-in-phase-code-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}'"'"', TeamController::class);
+```
+'
+# [MU] a code block that lacks the template does not exempt it: fires.
+assert_viol "gateMU-template-not-in-phase-code-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL"'7'"'"', TeamController::class);
+```
+'
+unset CHECK_PLAN_MT_GIT_ROOT
 
 # ---------------------------------------------------------------------------
 # Gate [MU] fixtures (22 cases)

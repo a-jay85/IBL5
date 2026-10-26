@@ -8,13 +8,14 @@ use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerHeatTotalsView;
 use Player\Stats\Views\PlayerSeasonTableRenderer;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * @covers \Player\Stats\Views\PlayerHeatTotalsView
  */
 class PlayerHeatTotalsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testRenderTotalsMatchesSnapshot(): void
     {

@@ -7,11 +7,12 @@ namespace Tests\Player\Stats\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerRegularSeasonAveragesView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Stats\Views\PlayerRegularSeasonAveragesView */
 class PlayerRegularSeasonAveragesViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * @param list<array<string, int|string>> $history

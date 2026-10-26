@@ -250,7 +250,7 @@ def plan_surface_hash(paths: list[str], reader: Callable[[str], Optional[bytes]]
 
 def worktree_lister(root: Path) -> Callable[[str], list[str]]:
     def lister(d: str) -> list[str]:
-        r = _git(root, "ls-files", "--", d)
+        r = _git(root, "ls-files", "--cached", "--others", "--exclude-standard", "--", d)
         return r.stdout.splitlines()
     return lister
 

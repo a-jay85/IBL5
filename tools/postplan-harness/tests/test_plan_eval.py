@@ -137,6 +137,17 @@ def test_names_path_matches_whole_paths_only():
     assert not pe._names_path("ibl5/bin/check-plan", "bin/check-plan")
 
 
+def test_wrapper_loads_harness_from_its_own_tree(tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    r = subprocess.run([str(REPO_ROOT / "bin" / "plan-eval"), "compare", "--bogus"],
+                       cwd=other, env=env, capture_output=True, text=True)
+    assert "No module named" not in r.stderr
+    assert r.returncode == 2
+
+
 def test_validate_schema_core_must_cover_tiers(tmp_path):
     corpus = _corpus4(tmp_path)
     for c in corpus["cases"]:

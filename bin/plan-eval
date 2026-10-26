@@ -12,7 +12,8 @@ case "${1:-}" in
         sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'
         exit 0 ;;
 esac
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
+# The harness comes from this script's own tree; the default --repo still comes from cwd.
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHONPATH="$HERE/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONPATH
 exec python3 -m harness.plan_eval "$@"

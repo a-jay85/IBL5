@@ -199,6 +199,18 @@ case_staged_subset_ok() {
   case "$OUT" in *"1 staged path(s) within target list") ;; *) bad "listed-only stdout: $OUT"; return 1 ;; esac
 }
 
+# The label must come off before the bot push. A push while the label is still
+# on fires a synchronize run whose payload still carries it, so regen runs twice.
+WORKFLOW="${VR_WORKFLOW_FILE:-$REPO_ROOT/.github/workflows/e2e-tests.yml}"
+case_label_removed_before_push() {
+  local remove commit
+  remove="$(grep -n -- '- name: Remove update-baselines label' "$WORKFLOW" | head -n 1 | cut -d: -f1)"
+  commit="$(grep -n -- '- name: Commit and push updated baselines' "$WORKFLOW" | head -n 1 | cut -d: -f1)"
+  [ -n "$remove" ] || bad "no Remove update-baselines label step in $WORKFLOW" || return 1
+  [ -n "$commit" ] || bad "no Commit and push updated baselines step in $WORKFLOW" || return 1
+  [ "$remove" -lt "$commit" ] || bad "label removal (line $remove) runs after the push step (line $commit)" || return 1
+}
+
 FAILED=0
 run_case() {
   REASON=""
@@ -216,5 +228,6 @@ run_case case_empty_env
 run_case case_mutation_wrong_title
 run_case case_staged_outside_list
 run_case case_staged_subset_ok
+run_case case_label_removed_before_push
 
 exit "$FAILED"

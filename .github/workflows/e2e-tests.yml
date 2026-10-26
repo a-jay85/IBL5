@@ -603,6 +603,16 @@ jobs:
             --snapshot-dir=ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots \
             --list-out="$RUNNER_TEMP/vr-baseline-targets.txt"
 
+      # Must run BEFORE the bot push. The push's synchronize event snapshots the
+      # PR labels when it fires; if the label is still on, that run regenerates
+      # again (the regen step runs on a green VR step too) and pushes a second
+      # bot commit.
+      - name: Remove update-baselines label
+        if: always() && steps.regen-baselines.outcome != 'skipped' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
+
       - name: Commit and push updated baselines
         if: always() && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.regen-baselines.outcome != 'skipped'
         run: |
@@ -632,12 +642,6 @@ jobs:
           git commit -m "test: update visual regression baselines [auto]"
           git push
           echo "update-baselines: ${committed} PNG(s) committed" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remove update-baselines label
-        if: always() && steps.regen-baselines.outcome != 'skipped' && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
-        env:
-          GH_TOKEN: ${{ secrets.CI_PAT }}
-        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
 
       - name: Upload visual regression report
         if: always() && env.VRCTX_REFRESH != 'true'

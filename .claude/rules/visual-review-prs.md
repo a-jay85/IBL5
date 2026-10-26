@@ -15,7 +15,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-23
+last_verified: 2026-10-26
 ---
 
 # Visual-review PRs
@@ -113,7 +113,7 @@ Apply the **`update-baselines`** label. The label run reruns the strict pass aga
 own baselines (`bin/vr-build-gallery --base-sha=HEAD`), then `bin/vr-apply-baselines` copies the
 changed and new cells' `.a.png` over their baselines and commits only those. Flake, infra, and
 unflagged cells stay byte-identical. That commit is the approval record; no flagged view, no
-commit. The label is removed once the VR step ran. A leftover flake cell keeps VR red: re-run the
+commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
 VR job (ADR-0214).
 
 ## When the comment is missing

@@ -18,7 +18,7 @@ import os
 import re
 
 from .state import Classification, Finding, HarnessError, PlanInfo
-from . import labels, schemas
+from . import labels, schemas, verdictcache
 from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
@@ -409,12 +409,31 @@ class ReviewPhase:
             return aggregate_votes(findings, seat_votes)
         hunks = _diff_by_path(filtered_diff or "")
         chunks = chunk_findings(findings, hunks)
-        jobs = [(seat, ci) for ci in range(len(chunks)) for seat in range(VERIFIER_COUNT)]
+        tree = verdictcache.tree_state(self.worktree) if verdictcache.enabled() else None
+        cdir = verdictcache.cache_dir(self.worktree) if tree else None
+        prompts = [verifier_prompt([findings[i] for i in idxs], hunks) for idxs in chunks]
+        keys: dict[int, str] = {}
+        reused: set[int] = set()
+        if cdir:
+            for ci in range(len(chunks)):
+                keys[ci] = verdictcache.key(prompt=prompts[ci], tree=tree, model=VERIFIER_MODEL,
+                                            purposes=VERIFIER_PURPOSES, tools=VERIFIER_ALLOWED_TOOLS)
+                hit = verdictcache.load(cdir, keys[ci], len(chunks[ci]), VERIFIER_COUNT)
+                if hit is None:
+                    continue
+                for s, entry in enumerate(hit):
+                    for p, idx in enumerate(chunks[ci], start=1):
+                        verdict, reason, preexisting = entry[str(p)]
+                        seat_votes[s]["votes"][idx] = (verdict, reason, preexisting)
+                reused.add(ci)
+                self._log(f"phase4d verifier: chunk {ci + 1}/{len(chunks)} reused cached verdicts "
+                          f"({len(chunks[ci])} finding(s), 0 spawns)")
+        jobs = [(seat, ci) for ci in range(len(chunks)) if ci not in reused for seat in range(VERIFIER_COUNT)]
 
         def _one(job):
             seat, ci = job
             idxs = chunks[ci]
-            prompt = verifier_prompt([findings[i] for i in idxs], hunks)
+            prompt = prompts[ci]
             try:
                 raw = self.llm.call_tooled(
                     VERIFIER_PURPOSES[seat], VERIFIER_MODEL, prompt, cwd=self.worktree,
@@ -437,13 +456,30 @@ class ReviewPhase:
                                                 v.get("preexisting", False) is True)
             return seat, idxs, votes, None
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(jobs)) as ex:
-            results = [fut.result() for fut in [ex.submit(_one, j) for j in jobs]]
+        results = []
+        if jobs:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(jobs)) as ex:
+                results = [fut.result() for fut in [ex.submit(_one, j) for j in jobs]]
         for seat, idxs, votes, err in results:
             seat_votes[seat]["votes"].update(votes)
             for i in idxs:
                 if i not in votes:
                     seat_votes[seat]["errors"][i] = err or "missing-vote"
+        if cdir and results and verdictcache.tree_state(self.worktree) == tree:
+            for ci in range(len(chunks)):
+                if ci in reused:
+                    continue
+                chunk_results = [r for (_seat, jci), r in zip(jobs, results) if jci == ci]
+                if len(chunk_results) != VERIFIER_COUNT:
+                    continue
+                if any(err is not None or any(i not in votes for i in chunks[ci])
+                       for _seat, _idxs, votes, err in chunk_results):
+                    continue
+                by_seat = {seat: votes for seat, _idxs, votes, _err in chunk_results}
+                verdictcache.store(cdir, keys[ci], [
+                    {str(p): [by_seat[s][idx][0], by_seat[s][idx][1], by_seat[s][idx][2]]
+                     for p, idx in enumerate(chunks[ci], start=1)}
+                    for s in range(VERIFIER_COUNT)])
         return aggregate_votes(findings, seat_votes)
 
     def _audit_votes(self, records: list[dict]) -> None:

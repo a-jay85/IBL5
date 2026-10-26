@@ -824,4 +824,169 @@ else
          "exit 0, count 0, listed old dir kept"
 fi
 
+# ---------------------------------------------------------------------------
+# Blob GC cases (pass 3). A fixture repo gets a committed _vr-blobs/<hash>.png
+# at a chosen age plus per-SHA dirs whose index.html may reference it.
+# ---------------------------------------------------------------------------
+GC_HASH="c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0"
+GC_BLOB="_vr-blobs/$GC_HASH.png"
+GC_A="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+
+# mk_gc_repo <dir> <blob_age_days> [<sha>:<age_days>:<ref|none> …]
+mk_gc_repo() {
+    local d="$1" bage="$2" pair sha rest age ref
+    shift 2
+    git_init "$d"
+    mkdir -p "$d/_vr-blobs"
+    printf 'blob-bytes' > "$d/$GC_BLOB"
+    git -C "$d" add .
+    git_commit_at "$d" $(( NOW - bage*86400 )) "blob"
+    for pair in "$@"; do
+        sha="${pair%%:*}"; rest="${pair#*:}"
+        age="${rest%%:*}"; ref="${rest#*:}"
+        mkdir -p "$d/$sha/visual-review"
+        if [ "$ref" = "ref" ]; then
+            printf '<img src="../../_vr-blobs/%s.png">\n' "$GC_HASH" > "$d/$sha/visual-review/index.html"
+        else
+            printf '<html></html>\n' > "$d/$sha/visual-review/index.html"
+        fi
+        git -C "$d" add .
+        git_commit_at "$d" $(( NOW - age*86400 )) "$sha"
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Case: gc-unreferenced-old-blob-collected
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-old"
+mk_gc_repo "$REPO" 10 "$GC_A:1:none"
+run_prune "$REPO" --cutoff-days 7
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "0" ] || CASE_PASS=0
+[ "$(git -C "$REPO" diff --cached --name-only)" = "$GC_BLOB" ] || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-unreferenced-old-blob-collected"
+else
+    fail "gc-unreferenced-old-blob-collected" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+         "exit 0, stdout 0, only the blob staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-young-unreferenced-blob-survives
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-young"
+mk_gc_repo "$REPO" 1 "$GC_A:1:none"
+run_prune "$REPO" --cutoff-days 7
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "0" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-young-unreferenced-blob-survives"
+else
+    fail "gc-young-unreferenced-blob-survives" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+         "exit 0, stdout 0, nothing staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-keep-file-dir-ref-survives
+# An old dir exempted by --keep-file still counts as a referrer.
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-keep"
+mk_gc_repo "$REPO" 10 "$GC_A:10:ref"
+printf '%s\n' "$GC_A" > "$TMP/gc-keep.txt"
+run_prune "$REPO" --cutoff-days 7 --keep-file "$TMP/gc-keep.txt"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "0" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-keep-file-dir-ref-survives"
+else
+    fail "gc-keep-file-dir-ref-survives" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+         "exit 0, stdout 0, neither dir nor blob staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-same-run-pruned-ref-collected
+# The only referrer is pruned in this run, so the blob goes with it.
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-same-run"
+mk_gc_repo "$REPO" 10 "$GC_A:10:ref"
+run_prune "$REPO" --cutoff-days 7
+GC_STAGED="$(git -C "$REPO" diff --cached --name-only)"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "1" ] || CASE_PASS=0
+case "$GC_STAGED" in (*"$GC_A/visual-review/index.html"*) ;; (*) CASE_PASS=0 ;; esac
+case "$GC_STAGED" in (*"$GC_BLOB"*) ;; (*) CASE_PASS=0 ;; esac
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-same-run-pruned-ref-collected"
+else
+    fail "gc-same-run-pruned-ref-collected" "RC=$RC OUT='$OUT' staged='$GC_STAGED'" \
+         "stdout 1, dir index and blob both staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-survivor-ref-keeps-old-blob
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-survivor"
+mk_gc_repo "$REPO" 30 "$GC_A:2:ref"
+run_prune "$REPO" --cutoff-days 7
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+[ "$OUT" = "0" ] || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-survivor-ref-keeps-old-blob"
+else
+    fail "gc-survivor-ref-keeps-old-blob" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+         "exit 0, stdout 0, old blob not staged"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-dry-run-simulates
+# ---------------------------------------------------------------------------
+REPO="$TMP/case-gc-dry"
+mk_gc_repo "$REPO" 10 "$GC_A:10:ref"
+run_prune "$REPO" --dry-run --cutoff-days 7
+GC_LAST="$(tail -n 1 <<< "$OUT")"
+GC_WOULD_PRUNE="$(grep -cF "WOULD PRUNE" <<< "$OUT" || true)"
+CASE_PASS=1
+[ "$RC" -eq 0 ] || CASE_PASS=0
+grep -qF -- "WOULD GC: $GC_BLOB" <<< "$OUT" || CASE_PASS=0
+git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+[ "$GC_LAST" = "$GC_WOULD_PRUNE" ] || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "gc-dry-run-simulates"
+else
+    fail "gc-dry-run-simulates" "RC=$RC last='$GC_LAST' would_prune='$GC_WOULD_PRUNE' OUT='$OUT'" \
+         "WOULD GC line, nothing staged, trailing integer equals WOULD PRUNE count"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: gc-scan-fails-closed
+# An unreadable surviving index aborts the run before any blob is deleted.
+# ---------------------------------------------------------------------------
+if [ "$(id -u)" -eq 0 ]; then
+    echo "SKIP: gc-scan-fails-closed (running as root, chmod 000 cannot block reads)" >&2
+    h_skip "gc-scan-fails-closed"
+else
+    REPO="$TMP/case-gc-failclosed"
+    mk_gc_repo "$REPO" 10 "$GC_A:1:none"
+    chmod 000 "$REPO/$GC_A/visual-review/index.html"
+    run_prune "$REPO" --cutoff-days 7
+    chmod 644 "$REPO/$GC_A/visual-review/index.html"
+    CASE_PASS=1
+    [ "$RC" -eq 1 ] || CASE_PASS=0
+    git -C "$REPO" diff --cached --quiet || CASE_PASS=0
+    if [ "$CASE_PASS" -eq 1 ]; then
+        pass "gc-scan-fails-closed"
+    else
+        fail "gc-scan-fails-closed" "RC=$RC OUT='$OUT' ERR='$ERR'" \
+             "exit 1, no blob deletion staged"
+    fi
+fi
+
 h_done

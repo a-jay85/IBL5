@@ -120,8 +120,12 @@ def plan_critical_paths(plan) -> list[str]:
 
 
 def classify(items: list[str], plan_test_paths: list[str],
-             plan_critical_paths: list[str]) -> Classification:
-    """Split conformance items into fixer targets and refusals (item -> reason). Pure."""
+             plan_critical_paths: list[str], exists=None) -> Classification:
+    """Split conformance items into fixer targets and refusals (item -> reason). Pure.
+
+    `exists(path)` reports whether a repo path is already on disk. A non-test Critical File
+    that exists is refused: the plan wants it changed, and a trivial append would clear the gate.
+    """
     del plan_critical_paths  # MISSING-FILE carries its own path; kept for the call shape
     out = Classification()
     test_targets = [p for p in plan_test_paths if not _denied(p)]
@@ -132,6 +136,8 @@ def classify(items: list[str], plan_test_paths: list[str],
             path = _item_subject(item, "MISSING-FILE:")
             if _denied(path):
                 out.unfixable[item] = "denied-path"
+            elif exists is not None and not TEST_PATH_RE.search(path) and exists(path):
+                out.unfixable[item] = "existing-non-test-file"
             else:
                 out.fixable.append(Target(item, "promised-file", [path]))
         elif item.startswith("MISSING-METHOD:"):
@@ -288,7 +294,8 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
         return _done("disabled")
     if not items:
         return _done("no-items")
-    cls = classify(items, plan_test_paths(plan), plan_critical_paths(plan))
+    cls = classify(items, plan_test_paths(plan), plan_critical_paths(plan),
+                   exists=lambda p: bool(worktree) and os.path.exists(os.path.join(worktree, p)))
     rec["fixable"] = [t.item for t in cls.fixable]
     rec["unfixable"] = dict(cls.unfixable)
     if not cls.fixable:

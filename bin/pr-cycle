@@ -19,8 +19,10 @@
 #                   file is never removed by this script; clearing it is the human's
 #                   explicit re-enable.
 #   --no-dm         Suppress the single end-of-run Discord DM.
-#   --max-ready N   Cap on PRs handed to post-plan-fleet in Stage 1 (default 10). Ordered
-#                   PRs fill the cap first, then DIRTY rescues. Arming is never capped.
+#   --max-ready N   Cap on PRs handed to post-plan-fleet in Stage 1 (default 10). Up to
+#                   PR_CYCLE_DIRTY_RESERVE slots (default 3, never more than N) are held
+#                   for DIRTY rescues; ordered PRs fill the rest, and a held slot with no
+#                   DIRTY PR to fill it goes back to ordered PRs. Arming is never capped.
 #   --jobs N        Concurrent readying sessions in Stage 1 (default 3).
 #   --only LIST     Work ONLY these PRs. Comma-separated; a leading # is optional, so
 #                   `--only 2101,2108` and `--only '#2101,#2108'` name the same set.
@@ -49,6 +51,9 @@
 #   PR_CYCLE_UNKNOWN_SLEEP   Seconds between warm-up rounds.  Default: 20
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
+#   PR_CYCLE_DIRTY_RESERVE   --max-ready slots held for DIRTY rescues, clamped to N.
+#                            0 = ordered PRs fill the cap first. Unset or empty = 3.
+#                            Anything but 0-999999 exits 2. Default: 3
 #   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
 #                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
 #                            bucket AND a /pr-ready READY verdict over the head's current
@@ -172,6 +177,7 @@ PR_CYCLE_DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_DM_CMD)"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
+PR_CYCLE_DIRTY_RESERVE="${PR_CYCLE_DIRTY_RESERVE:-3}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 # Machine-readable per-PR result file written by the worker. Unset or empty writes nothing.
@@ -294,6 +300,17 @@ if [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] \
     echo "pr-cycle: UNKNOWN warm-up would wait over 120s (PR_CYCLE_UNKNOWN_POLLS x PR_CYCLE_UNKNOWN_SLEEP)" >&2
     exit 2
 fi
+# DIRTY-rescue reserve: a non-negative integer of at most 6 digits. Unset and empty already
+# became 3 above; 0 is legal and restores the ordered-first fill. Same `case` glob reason as
+# --max-ready (an arithmetic test errors on abc under set -e). 10# keeps bash 3.2 from reading
+# 08 as octal. Sits after --stop so a bad value cannot block a stop, and before every
+# dry-run/--go/--worker branch so all three reject it.
+case "$PR_CYCLE_DIRTY_RESERVE" in
+    *[!0-9]*|???????*)
+        echo "pr-cycle: PR_CYCLE_DIRTY_RESERVE must be an integer from 0 to 999999, got '$PR_CYCLE_DIRTY_RESERVE'" >&2
+        exit 2 ;;
+esac
+PR_CYCLE_DIRTY_RESERVE=$((10#$PR_CYCLE_DIRTY_RESERVE))
 
 # --- refusal guards ----------------------------------------------------------------------
 # Guard (a) applies to --go, --dry-run and --worker alike; never to --stop or --help.
@@ -1000,6 +1017,8 @@ _stage1_list() {
     : > "$RUNDIR/stage1-holdrepeat-fix.txt"
     : > "$RUNDIR/stage1-state-changed.txt"
     : > "$RUNDIR/stage1-rebase-only.txt"
+    : > "$RUNDIR/stage1-rescue.txt"
+    : > "$RUNDIR/stage1-split.txt"
     while IFS=$'\t' read -r _sl_n _sl_needs; do
         [ -n "$_sl_n" ] || continue
         if ! _pr_allowed "$_sl_n"; then continue; fi
@@ -1098,32 +1117,49 @@ EOF
             fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1.txt" 2>/dev/null; then continue; fi
             if grep -qxF "$_sl_dn" "$RUNDIR/stage1-holdrepeat.txt" 2>/dev/null; then continue; fi
+            # Rescues collect separately so the cap below can reserve slots for them.
+            if grep -qxF "$_sl_dn" "$RUNDIR/stage1-rescue.txt" 2>/dev/null; then continue; fi
             _sl_dbk="$(_precheck_bucket "$_sl_dn")"
             case "$_sl_dbk" in
                 DIRTY|BLOCKED-CHECK) _stage1_state_change "$_sl_dn" "$_sl_dbk" ;;
             esac
-            echo "$_sl_dn" >> "$RUNDIR/stage1.txt"
+            echo "$_sl_dn" >> "$RUNDIR/stage1-rescue.txt"
         done <<EOF
 $(_excluded_dirty_rows)
 EOF
     fi
 
-    # Apply the cap: keep first MAX_READY lines.
-    if [ -s "$RUNDIR/stage1.txt" ]; then
-        local _total
-        _total="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
-        if [ "$_total" -gt "$MAX_READY" ]; then
-            local _overflow
-            _overflow="$(tail -n +"$((MAX_READY + 1))" "$RUNDIR/stage1.txt")"
-            head -n "$MAX_READY" "$RUNDIR/stage1.txt" > "$RUNDIR/stage1.tmp" && mv "$RUNDIR/stage1.tmp" "$RUNDIR/stage1.txt"
-            while IFS= read -r _ov_n; do
-                [ -n "$_ov_n" ] || continue
-                echo "#$_ov_n — over --max-ready cap" >> "$RUNDIR/stage1-skipped.txt"
-            done <<EOF
-$_overflow
-EOF
-        fi
-    fi
+    # Apply the cap with a DIRTY-rescue reserve. Rescue rows (the ## Excluded loop above;
+    # an ordered-list PR that is DIRTY stays ordered) get up to
+    # min(PR_CYCLE_DIRTY_RESERVE, MAX_READY) slots first. Ordered rows take what is left.
+    # Slots the ordered rows cannot fill go back to further rescues, so a short ordered list
+    # keeps every rescue. Reserve 0 reproduces the old "first MAX_READY lines" fill exactly.
+    # awk, not head: `head -n 0` errors on macOS and a take of 0 is legal here.
+    local _n_ord _n_res _res_eff _res_take0 _ord_take _res_take _ov_n
+    _n_ord="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
+    _n_res="$(wc -l < "$RUNDIR/stage1-rescue.txt" | tr -d ' ')"
+    _res_eff="$PR_CYCLE_DIRTY_RESERVE"
+    if [ "$_res_eff" -gt "$MAX_READY" ]; then _res_eff="$MAX_READY"; fi
+    _res_take0="$_n_res"
+    if [ "$_res_take0" -gt "$_res_eff" ]; then _res_take0="$_res_eff"; fi
+    _ord_take=$((MAX_READY - _res_take0))
+    if [ "$_ord_take" -gt "$_n_ord" ]; then _ord_take="$_n_ord"; fi
+    _res_take=$((MAX_READY - _ord_take))
+    if [ "$_res_take" -gt "$_n_res" ]; then _res_take="$_n_res"; fi
+    {
+        awk -v n="$_ord_take" 'NR > n' "$RUNDIR/stage1.txt"
+        awk -v n="$_res_take" 'NR > n' "$RUNDIR/stage1-rescue.txt"
+    } > "$RUNDIR/stage1-overflow.txt"
+    {
+        awk -v n="$_ord_take" 'NR <= n' "$RUNDIR/stage1.txt"
+        awk -v n="$_res_take" 'NR <= n' "$RUNDIR/stage1-rescue.txt"
+    } > "$RUNDIR/stage1.tmp" && mv "$RUNDIR/stage1.tmp" "$RUNDIR/stage1.txt"
+    while IFS= read -r _ov_n; do
+        [ -n "$_ov_n" ] || continue
+        echo "#$_ov_n — over --max-ready cap" >> "$RUNDIR/stage1-skipped.txt"
+    done < "$RUNDIR/stage1-overflow.txt"
+    # One line, read by the dry run: ordered-taken rescue-taken effective-reserve.
+    printf '%s %s %s\n' "$_ord_take" "$_res_take" "$_res_eff" > "$RUNDIR/stage1-split.txt"
 }
 
 # _fleet_outcome N — print "<outcome><TAB><reason>" for PR N from its post-plan-fleet log.
@@ -1550,7 +1586,9 @@ _worker() {
     : > "$RUNDIR/armed.txt"
     : > "$RUNDIR/your-turn.txt"
 
-    echo "pr-cycle worker starting — max-ready $MAX_READY, jobs $JOBS, rundir $RUNDIR"
+    _wk_reff="$PR_CYCLE_DIRTY_RESERVE"
+    if [ "$_wk_reff" -gt "$MAX_READY" ]; then _wk_reff="$MAX_READY"; fi
+    echo "pr-cycle worker starting — max-ready $MAX_READY (DIRTY reserve $_wk_reff), jobs $JOBS, rundir $RUNDIR"
     if [ -n "$ONLY" ]; then echo "pr-cycle scope: --only $ONLY"; fi
     if [ -n "$SKIP" ]; then echo "pr-cycle scope: --skip $SKIP"; fi
 
@@ -1637,10 +1675,11 @@ _report_dry_run() {
 
     _stage1_list
     _s1_cnt="$(wc -l < "$RUNDIR/stage1.txt" | tr -d ' ')"
+    read -r _s1_ord _s1_res _s1_reff < "$RUNDIR/stage1-split.txt"
     if [ "$_s1_cnt" -eq 0 ]; then
         echo "stage 1 would ready: none"
     else
-        echo "stage 1 would ready ($_s1_cnt): $(awk '{printf "#%s ", $0}' "$RUNDIR/stage1.txt")"
+        echo "stage 1 would ready ($_s1_cnt): $(awk '{printf "#%s ", $0}' "$RUNDIR/stage1.txt")[$_s1_ord ordered + $_s1_res DIRTY rescue]"
     fi
     if [ -s "$RUNDIR/stage1-skipped.txt" ]; then
         while IFS= read -r _sk; do
@@ -1666,7 +1705,7 @@ _report_dry_run() {
     if [ -n "$ONLY" ]; then      echo "would use scope:      --only $ONLY"
     elif [ -n "$SKIP" ]; then    echo "would use scope:      --skip $SKIP"
     else                         echo "would use scope:      every orderable PR"; fi
-    echo "would use max-ready:  $MAX_READY"
+    echo "would use max-ready:  $MAX_READY (DIRTY reserve $_s1_reff; this run: $_s1_ord ordered + $_s1_res DIRTY rescue)"
     echo "would use jobs:       $JOBS"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
     echo "would use rundir:     $RUNDIR"
@@ -1716,7 +1755,7 @@ _launch() {
         printf 'export PR_CYCLE_LOG=%q\n'  "$LOG"
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
-                  PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
+                  PR_CYCLE_RESCUE PR_CYCLE_DIRTY_RESERVE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_REBASE_ONLY_HELD PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR PR_CYCLE_HOLDREPEAT_AUTOFIX PLANS_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \

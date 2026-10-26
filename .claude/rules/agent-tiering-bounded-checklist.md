@@ -1,10 +1,10 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — explains why /post-plan Phase 6.5 condition (9) may run on Sonnet rather than Opus: it is bounded hold-enumeration against a named trigger list, not open-ended diff-triage. Includes the tripwire for when to revisit. The always-loaded agent-tiering.md names this file in the Opus row, so it stays one Read away from every session.
-last_verified: 2026-10-08
+description: Read-on-demand only (no auto-attach trigger). Explains why the harness arming check (tools/postplan-harness/harness/armable.py, formerly /post-plan Phase 6.5 condition (9)) may run on Sonnet rather than Opus. It is bounded hold-enumeration against a named trigger list, not open-ended diff-triage. Includes the tripwire for when to revisit. The always-loaded agent-tiering.md names this file in the Opus row, so it stays one Read away from every session.
+last_verified: 2026-10-23
 paths: ".claude/rules/agent-tiering-bounded-checklist.md"
 ---
 
-Read-on-demand companion to `agent-tiering.md` § Tiers (Opus row, "open-ended diff-triage"). Nothing here auto-attaches, and nothing needs to: the always-loaded `agent-tiering.md` names this file directly in the Opus row, so the payload is one Read away from every session. That includes `/post-plan` reading `_phase-6.5-arm-auto-merge.md`, where this rationale is needed. It used to arrive via `agent-tiering-detail.md`, whose `.claude/skills/**/*.md` glob was removed 2026-09-17 on measured attach cost; the resident pointer is the reachability guarantee now, and `bin/check-rules-byte-budget` Check 4 enforces it.
+Read-on-demand companion to `agent-tiering.md` § Tiers (Opus row, "open-ended diff-triage"). Nothing here auto-attaches, and nothing needs to: the always-loaded `agent-tiering.md` names this file directly in the Opus row, so the payload is one Read away from every session. The harness owns arming (`tools/postplan-harness/harness/armable.py`); the `/post-plan` skill never arms and carries no Phase 6.5. This file used to arrive via `agent-tiering-detail.md`, whose `.claude/skills/**/*.md` glob was removed 2026-09-17 on measured attach cost; the resident pointer is the reachability guarantee now, and `bin/check-rules-byte-budget` Check 4 enforces it.
 
 ## Bounded-checklist diff-triage (post-plan exception)
 
@@ -34,7 +34,6 @@ triage and run on Sonnet 5.5 by deliberate def/frontmatter pin (`agent-tiering.m
 
 **Tripwire to revisit:** a *measured* miss where a shipped diff was unsafe for a reason
 **not** on condition (9)'s trigger list (a listed trigger that a run simply failed to spot is
-a prompt bug, not a tier bug). Escalating then means copying Phase 7's pattern in
-`.claude/skills/post-plan/_phase-7-ci-monitoring.md` and adding an `opus` key to `MODEL_MAP`
+a prompt bug and leaves the tier alone). Escalating then means adding an `opus` key to `MODEL_MAP`
 in `tools/postplan-harness/harness/adapters/llm.py`, which has none today.
 

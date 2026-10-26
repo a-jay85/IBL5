@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-10-17
+last_verified: 2026-10-25
 ---
 
 # Plan Verification Matrix
@@ -156,7 +156,7 @@ Phrase the Truly-manual row as a question of taste — never with an automatable
 | N | Does the new notification bell + inbox look right, and does the mark-read flow feel right? | Truly-manual | post-impl | manual (reviewer walkthrough) |
 ```
 
-A plan that trips this trigger therefore **cannot** carry the "All verification is automated — no manual testing needed" line, and per `/plan` Step 4 gate 14 must set `auto_merge: false`.
+A plan that trips this trigger therefore **cannot** carry the "All verification is automated — no manual testing needed" line, and per `/plan` Step 4 gate 14(d) must set `auto_merge: false`.
 
 ## Forced integration-verification trigger
 

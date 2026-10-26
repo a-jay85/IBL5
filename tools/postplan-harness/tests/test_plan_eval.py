@@ -287,3 +287,119 @@ def test_select_cases_skips_missing_pr(tmp_path):
     cases = pe.select_cases(rows, lookup.get, repo, 14, out=out)
     assert f"skip {spec[0][0]}: no merged PR" in out.getvalue()
     assert spec[0][0] not in {c["id"] for c in cases}
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: scorer
+# ---------------------------------------------------------------------------
+
+PLAN_GOOD = """---
+impl_model: sonnet
+---
+
+# Plan: canned
+
+## Phase 1: Do it
+
+Edit things.
+
+## Phase 2: Test it
+
+Test things.
+
+## Critical Files
+
+- `bin/plan-now` Modify: the wrapper.
+- `bin/test-plan-now` Modify: its tests.
+
+## Verification Matrix
+
+| # | What | Type | Timing | Where |
+|---|------|------|--------|-------|
+| 1 | it works | CLI-executable | post-impl | `bin/test-plan-now` |
+"""
+
+PLAN_NO_MATRIX = PLAN_GOOD.split("## Verification Matrix")[0]
+PLAN_EMPTY = ""
+SCASE = {"id": "c1", "tier": "plan-architect",
+         "expected_files": ["bin/plan-now", "bin/test-plan-now"]}
+
+
+def _rec(**kw):
+    r = {"id": "c1", "run": 1, "status": "ok", "plan_text": PLAN_GOOD, "check_plan_rc": 0,
+         "staleness_rc": 0, "critical_files": ["bin/plan-now", "bin/test-plan-now"],
+         "tier_chosen": "plan-architect", "output_tokens": 1, "cache_read_tokens": 1,
+         "cache_write_tokens": 1, "cost_usd": 1.5, "wall_s": 1, "detail": ""}
+    r.update(kw)
+    return r
+
+
+def test_score_run_good_plan_full_marks():
+    s = pe.score_run(_rec(), SCASE)
+    assert s == pe.RunScore(mech=True, file_hits=2, file_total=2, tier_ok=True, scored=True)
+
+
+def test_score_run_missing_matrix_fails_mech():
+    assert pe.score_run(_rec(plan_text=PLAN_NO_MATRIX), SCASE).mech is False
+
+
+def test_score_run_check_plan_failure_fails_mech():
+    assert pe.score_run(_rec(check_plan_rc=1), SCASE).mech is False
+
+
+def test_score_run_staleness_failure_fails_mech():
+    assert pe.score_run(_rec(staleness_rc=1), SCASE).mech is False
+
+
+def test_score_run_no_plan_counts_as_zero():
+    s = pe.score_run(_rec(status="no_plan", plan_text=PLAN_EMPTY), SCASE)
+    assert s.scored is True and s.file_hits == 0 and s.mech is False and s.file_total == 2
+
+
+def test_score_run_degraded_unscored():
+    for status in ("degraded", "leaked"):
+        assert pe.score_run(_rec(status=status), SCASE).scored is False
+    recs = [_rec(), _rec(status="degraded"), _rec(status="leaked")]
+    score = pe.compute_score([pe.score_run(r, SCASE) for r in recs], recs,
+                             v="a" * 12, c="b" * 12)
+    assert (score.runs, score.files_total, score.degraded, score.leaked) == (1, 2, 1, 1)
+    assert score.cost_usd == 4.5
+
+
+def test_score_run_path_normalization():
+    assert pe.score_run(_rec(critical_files=["./bin/plan-now"]), SCASE).file_hits == 1
+
+
+def test_compute_score_all_degraded_raises():
+    recs = [_rec(status="degraded"), _rec(status="degraded")]
+    with pytest.raises(pe.EvalUsageError):
+        pe.compute_score([pe.score_run(r, SCASE) for r in recs], recs, v="a" * 12, c="b" * 12)
+
+
+def _score(**kw):
+    base = dict(v="a" * 12, c="b" * 12, runs=4, mech=3, files=9, files_total=12, tier=3,
+                no_plan=0, degraded=0, leaked=0, cost_usd=12.5)
+    base.update(kw)
+    return pe.PlanScore(**base)
+
+
+def test_score_line_round_trip():
+    s = _score()
+    assert pe.parse_score_line(pe.format_score_line(s)) == s
+    bad = pe.format_score_line(s).replace("mech=3/4", "mech=5/4")
+    with pytest.raises(pe.EvalUsageError):
+        pe.parse_score_line(bad)
+
+
+def test_is_worse_detects_tier_drop():
+    assert pe.is_worse(_score(), _score(tier=2)) is True
+    assert pe.is_worse(_score(), _score()) is False
+    with pytest.raises(pe.EvalUsageError):
+        pe.is_worse(_score(), _score(runs=3, mech=3, tier=3))
+
+
+def test_critical_files_from_real_check_plan(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text(PLAN_GOOD)
+    got = pe.critical_files_of(plan, REPO_ROOT / "bin" / "check-plan")
+    assert got == ["bin/plan-now", "bin/test-plan-now"]

@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, TextIO
 
@@ -458,6 +459,124 @@ def _cmd_mine(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
     for e in errors:
         print(f"ERROR {e}", file=out)
     return 1 if errors else 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: scorer
+# ---------------------------------------------------------------------------
+
+SCORE_LINE_PREFIX = "plan-eval"
+STATUSES = ("ok", "no_plan", "degraded", "leaked")
+_PHASE_HEADING_RE = re.compile(r"^## (Phase|Step) \d+", re.M)
+
+
+@dataclass(frozen=True)
+class RunScore:
+    mech: bool
+    file_hits: int
+    file_total: int
+    tier_ok: bool
+    scored: bool
+
+
+@dataclass(frozen=True)
+class PlanScore:
+    v: str
+    c: str
+    runs: int
+    mech: int
+    files: int
+    files_total: int
+    tier: int
+    no_plan: int
+    degraded: int
+    leaked: int
+    cost_usd: float
+
+
+def has_required_sections(plan_text: str) -> bool:
+    return (re.search(r"^## Verification Matrix\b", plan_text, re.M) is not None
+            and re.search(r"^## Critical Files\b", plan_text, re.M) is not None
+            and _PHASE_HEADING_RE.search(plan_text) is not None)
+
+
+def score_run(record: dict, case: dict) -> RunScore:
+    status = record.get("status")
+    total = len(case["expected_files"])
+    if status in ("degraded", "leaked"):
+        return RunScore(mech=False, file_hits=0, file_total=total, tier_ok=False, scored=False)
+    ok = status == "ok"
+    mech = (ok and record.get("check_plan_rc") == 0 and record.get("staleness_rc") == 0
+            and has_required_sections(record.get("plan_text") or ""))
+    hits = 0
+    if ok:
+        expected = {normalize_path(p) for p in case["expected_files"]}
+        got = {normalize_path(p) for p in record.get("critical_files") or []}
+        hits = len(expected & got)
+    tier_ok = bool(record.get("tier_chosen")) and record.get("tier_chosen") == case["tier"]
+    return RunScore(mech=mech, file_hits=hits, file_total=total, tier_ok=tier_ok, scored=True)
+
+
+def critical_files_of(plan_path: Path, check_plan_bin: Path) -> list[str]:
+    r = subprocess.run([str(check_plan_bin), "--print-critical-files", str(plan_path)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return []
+    # Lines are `MUST_APPEAR:<path>` or `EXEMPT:<path>` (reference or conditional rows);
+    # both name a file the plan identified.
+    out: list[str] = []
+    for ln in r.stdout.splitlines():
+        kind, sep, path = ln.strip().partition(":")
+        if sep and kind in ("MUST_APPEAR", "EXEMPT") and path:
+            out.append(path)
+    return out
+
+
+def compute_score(scores: list[RunScore], records: list[dict], *, v: str, c: str) -> PlanScore:
+    scored = [s for s in scores if s.scored]
+    if not scored:
+        raise EvalUsageError("no scored runs")
+    return PlanScore(
+        v=v, c=c, runs=len(scored),
+        mech=sum(1 for s in scored if s.mech),
+        files=sum(s.file_hits for s in scored),
+        files_total=sum(s.file_total for s in scored),
+        tier=sum(1 for s in scored if s.tier_ok),
+        no_plan=sum(1 for r in records if r.get("status") == "no_plan"),
+        degraded=sum(1 for r in records if r.get("status") == "degraded"),
+        leaked=sum(1 for r in records if r.get("status") == "leaked"),
+        cost_usd=round(sum(float(r.get("cost_usd") or 0.0) for r in records), 2),
+    )
+
+
+def format_score_line(s: PlanScore) -> str:
+    return (f"{SCORE_LINE_PREFIX} v={s.v} c={s.c} runs={s.runs} mech={s.mech}/{s.runs} "
+            f"files={s.files}/{s.files_total} tier={s.tier}/{s.runs} no_plan={s.no_plan} "
+            f"degraded={s.degraded} leaked={s.leaked} cost_usd={s.cost_usd:.2f}")
+
+
+SCORE_LINE_RE = re.compile(
+    r"^plan-eval v=([0-9a-f]{12}) c=([0-9a-f]{12}) runs=(\d+) mech=(\d+)/(\d+) "
+    r"files=(\d+)/(\d+) tier=(\d+)/(\d+) no_plan=(\d+) degraded=(\d+) leaked=(\d+) "
+    r"cost_usd=(\d+\.\d{2})$")
+
+
+def parse_score_line(text: str) -> PlanScore:
+    m = SCORE_LINE_RE.fullmatch(text.strip())
+    if not m:
+        raise EvalUsageError(f"malformed score line: {text!r}")
+    n, a, an, h, e, t, tn, x, d, lk = (int(m.group(i)) for i in range(3, 13))
+    if n == 0 or an != n or tn != n or a > n or h > e or t > n:
+        raise EvalUsageError(f"malformed score line: {text!r}")
+    return PlanScore(v=m.group(1), c=m.group(2), runs=n, mech=a, files=h, files_total=e,
+                     tier=t, no_plan=x, degraded=d, leaked=lk, cost_usd=float(m.group(13)))
+
+
+def is_worse(before: PlanScore, after: PlanScore) -> bool:
+    if before.runs != after.runs or before.files_total != after.files_total:
+        raise EvalUsageError("scores not comparable: denominators differ")
+    return (after.mech < before.mech or after.files < before.files
+            or after.tier < before.tier)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -47,7 +47,8 @@ CONFIX_DENIED_SUBSTRINGS = ("-snapshots/",)
 # Vacuous-test scan, per language, over the ADDED lines of a test path only.
 # (test-declaration regex, assertion regex, forbidden-marker regex)
 _VACUOUS_RULES = {
-    ".php": (re.compile(r"(public\s+)?function\s+test\w*\s*\(|#\[Test\]"),
+    ".php": (re.compile(r"#\[Test\]\s*(?:public\s+)?function\s+\w+\s*\("
+                        r"|(?:public\s+)?function\s+test\w*\s*\(|#\[Test\]"),
              re.compile(r"(->|::)assert\w+\(|expectException\w*\("),
              re.compile(r"markTestSkipped|markTestIncomplete"
                         r"|assertTrue\(\s*true\s*\)|assertFalse\(\s*false\s*\)")),
@@ -213,7 +214,11 @@ def _vacuous(path: str, added_text: str) -> bool:
         if path.endswith(suffix):
             if forbidden.search(added_text):
                 return True
-            return len(decl.findall(added_text)) > len(asserts.findall(added_text))
+            # Each test body (declaration to the next declaration) needs its own assertion.
+            starts = [m.start() for m in decl.finditer(added_text)]
+            bounds = starts[1:] + [len(added_text)]
+            return any(not asserts.search(added_text[s:e])
+                       for s, e in zip(starts, bounds))
     return False
 
 

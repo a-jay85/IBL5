@@ -323,6 +323,18 @@ def test_rejects_vacuous_test_with_skip_marker_or_no_assertion(tmp_path, lang):
         assert git.commit_messages == []
 
 
+def test_vacuous_checks_each_test_body():
+    php = ("    public function testFoo(): void\n    {\n        $x = 1;\n    }\n"
+           "    public function testBar(): void\n    {\n"
+           "        $this->assertSame(1, 1);\n        $this->assertSame(2, 2);\n    }\n")
+    assert conformance_fix._vacuous("ibl5/tests/A/FooTest.php", php)
+    attr = ("    #[Test]\n    public function foo(): void\n    {\n"
+            "        $this->assertSame(1, 1);\n    }\n")
+    assert not conformance_fix._vacuous("ibl5/tests/A/FooTest.php", attr)
+    py = "def test_a():\n    x = 1\ndef test_b():\n    assert 1\n    assert 2\n"
+    assert conformance_fix._vacuous("tools/x/tests/test_a.py", py)
+
+
 def test_rejects_missing_method_not_written(tmp_path):
     wrong = GOOD_PHP.replace("testFoo", "testBar")
     wt, git, llm = _setup(tmp_path, writes={PROMISED: wrong})

@@ -37,18 +37,25 @@
     margin: 0 auto;
 }
 
-.auth-card .ibl-card__header {
+.auth-card__header {
     text-align: center;
     padding: var(--space-6) var(--space-6) var(--space-4);
 }
 
-.auth-card .ibl-card__body {
-    padding: var(--space-4) var(--space-6) var(--space-6);
-}
-
-.auth-card .ibl-card__footer {
+.auth-card__footer {
     text-align: center;
     padding: var(--space-4) var(--space-6);
+}
+
+.auth-card__subtitle {
+    font-size: var(--text-base);
+    color: var(--gray-600);
+    margin-top: var(--space-1);
+}
+
+.auth-label--required::after {
+    content: ' *';
+    color: var(--error-600);
 }
 
 /* ==========================================================================
@@ -69,6 +76,9 @@
     width: 20px;
     height: 20px;
     pointer-events: none;
+    /* .d-input is position:relative with an opaque background and comes after
+       the icon, so it would paint over the icon without this. */
+    z-index: var(--z-raised);
 }
 
 .auth-input--with-icon {
@@ -201,15 +211,11 @@
         max-width: 100%;
     }
 
-    .auth-card .ibl-card__header {
+    .auth-card__header {
         padding: var(--space-4) var(--space-4) var(--space-3);
     }
 
-    .auth-card .ibl-card__body {
-        padding: var(--space-3) var(--space-4) var(--space-4);
-    }
-
-    .auth-card .ibl-card__footer {
+    .auth-card__footer {
         padding: var(--space-3) var(--space-4);
     }
 

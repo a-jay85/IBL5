@@ -1244,6 +1244,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
             outcome_log_path=outcome_log_path,
+            include_outdated=True,   # Phase 4.5 re-runs drain outdated trusted threads left by earlier runs
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,

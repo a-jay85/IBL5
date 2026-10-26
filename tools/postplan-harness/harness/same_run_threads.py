@@ -133,6 +133,9 @@ def run_same_run_pass(gh, llm, git, worktree, pr, pre_posting_ids, out_dir, log,
         return empty_result("nothing-posted")
     before = reviewcache.per_file_patch_ids(git.diff_vs_base())
     try:
+        # include_outdated stays at its False default here: this pass handles only the
+        # threads this run just posted, which cannot be outdated yet. Only Phase 4.5
+        # (runner._run_thread_ingestion_phase) opts in.
         out = thread_ingestion.run_thread_ingestion(
             gh, llm, git, worktree, pr, cands, out_dir, log,
             commit=commit, push=push, outcome_log_path=outcome_log_path,

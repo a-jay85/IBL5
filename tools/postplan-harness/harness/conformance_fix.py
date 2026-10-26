@@ -101,12 +101,13 @@ def _denied(path: str) -> bool:
             or bool(fidelity.denied_local_gate_edits([path])))
 
 
-_NON_LITERAL_RE = re.compile(r"[*?\[]|:\d|/$|(?:^|/)NNN+[_-]")
+_NON_LITERAL_RE = re.compile(r"[*?\[<>]|:\d|/$|(?:^|/)(?:NNN+|XXX+)[_-]")
 
 
 def _non_literal(path: str) -> bool:
-    """True for a plan token that is not one writable file: glob, `:NNN` suffix, directory
-    or `NNN_`/`NNNN-` number placeholder. The fixer cannot name the real file for these."""
+    """True for a plan token that is not one writable file: glob, `:NNN` suffix, directory,
+    `<name>` placeholder or `NNN_`/`NNNN-`/`XXXX-` number placeholder. The fixer cannot name
+    the real file for these."""
     return bool(_NON_LITERAL_RE.search(path)) or ".../" in path
 
 

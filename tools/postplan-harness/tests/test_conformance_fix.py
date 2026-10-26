@@ -171,6 +171,9 @@ def test_classify_rejects_non_test_matrix_path_and_denied_prefixes():
 
 @pytest.mark.parametrize("path", [
     "ibl5/docs/decisions/NNNN-some-slug.md",
+    "ibl5/docs/decisions/XXXX-some-slug.md",
+    "ibl5/docs/decisions/<next>-some-slug.md",
+    "ibl5/classes/<Module>/Thing.php",
     "ibl5/classes/Fixer/*.php",
     "ibl5/classes/Fixer/Thing.php:41",
     "ibl5/classes/Fixer/",

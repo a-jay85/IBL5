@@ -5303,7 +5303,7 @@ ab_row "AB-pass-wired-dotdot-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/
 # repo file read upstream, so it needs a durable check like any other row.
 ab_row "AB-fail-herestring" 1 "out=\$(awk '/^## Step 4\\.5:/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md); grep -qF 'Second challenge.' <<< \"\$out\" && ! grep -qF 'EXCESS_LINE=' <<< \"\$out\""
 ab_row "AB-fail-pipe" 1 "awk '/^## Drift/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md \\| ! grep -qF 'bgcolor2'"
-# A here-string negation does not excuse a second negated grep on a repo file.
+# A here-string negation next to a negated grep on a repo file also fails.
 ab_row "AB-fail-herestring-plus-file" 1 "out=\$(cat ibl5/x.md); ! grep -qF 'bgcolor2' <<< \"\$out\" && ! grep -qF 'bgcolor2' ibl5/modules/x.md"
 # A clustered flag ending in e takes the next word as its pattern.
 ab_row "AB-pass-clustered-e" 0 "! grep -rqe 'bgcolor2' -e 'zzzz' ibl5/modules && bin/test-ab-holds"

@@ -5,6 +5,7 @@
 # ---
 # Default `run` replays the 4 core cases once each with detached workers.
 # Repeat `bin/plan-eval run` until it prints the score line; start with --dry-run.
+#
 set -eu
 case "${1:-}" in
     ""|-h|--help)

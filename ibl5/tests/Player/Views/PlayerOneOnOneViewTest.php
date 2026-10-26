@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Player\Contracts\PlayerRepositoryInterface;
 use Player\PlayerRepository;
 use Player\Views\PlayerOneOnOneView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * @covers \Player\Views\PlayerOneOnOneView
@@ -17,7 +18,7 @@ use Player\Views\PlayerOneOnOneView;
  */
 class PlayerOneOnOneViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * @param list<OneOnOneWinRow> $wins

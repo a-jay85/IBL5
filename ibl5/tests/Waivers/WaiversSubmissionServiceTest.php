@@ -79,7 +79,9 @@ class WaiversSubmissionServiceTest extends TestCase
 
     public function testSubmitRefusesUnknownActionWithoutProcessing(): void
     {
-        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks();
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(slotCounter: $slotCounter);
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         // The in_array($action, ['add','waive']) check sits above the salary read, so a

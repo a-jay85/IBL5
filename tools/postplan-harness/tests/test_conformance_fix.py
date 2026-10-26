@@ -343,6 +343,17 @@ def test_vacuous_checks_each_test_body():
     assert conformance_fix._vacuous("tools/x/tests/test_a.py", py)
 
 
+def test_rejects_test_path_with_no_test_declaration(tmp_path):
+    helper_only = ("<?php\nfinal class PromisedTest extends TestCase\n{\n"
+                   "    private function helper(): int\n    {\n        return 1;\n    }\n}\n")
+    wt, git, llm = _setup(tmp_path, writes={PROMISED: helper_only})
+    rec = _remediate(tmp_path, [ITEM_PATH], wt, git, llm)
+    assert rec["reason"] == "rejected" and rec["detail"] == "vacuous-test"
+    assert not (wt / PROMISED).exists()
+    assert git.commit_messages == []
+    assert conformance_fix._vacuous("tools/x/tests/test_a.py", "import os\n")
+
+
 def test_rejects_missing_method_not_written(tmp_path):
     wrong = GOOD_PHP.replace("testFoo", "testBar")
     wt, git, llm = _setup(tmp_path, writes={PROMISED: wrong})

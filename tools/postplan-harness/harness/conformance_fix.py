@@ -220,6 +220,8 @@ def _vacuous(path: str, added_text: str) -> bool:
                 return True
             # Each test body (declaration to the next declaration) needs its own assertion.
             starts = [m.start() for m in decl.finditer(added_text)]
+            if not starts:
+                return True  # a test path with no test in it proves nothing
             bounds = starts[1:] + [len(added_text)]
             return any(not asserts.search(added_text[s:e])
                        for s, e in zip(starts, bounds))

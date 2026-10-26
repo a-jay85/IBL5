@@ -18,6 +18,8 @@
 # A PR is GM-visible when it touches product code: any ibl5/ path outside ibl5/tests/,
 # ibl5/docs/, ibl5/bin/ and *.md. Those PRs go first in the model data (feat PRs too),
 # so the 100000-byte cap trims the tooling PRs first.
+# The posted brief shows only the week (human-readable dates) and the merge counts. The PR
+# lists (GM-visible, by type, governance surfaces) go to the model and --dry-run, never the post.
 # The brief leads with "What a GM would notice", grouped by area, and flags any PR that
 # looks like it changes a rule in ibl5/docs/LEAGUE_RULES.md (read from this checkout).
 # One tool-less headless Sonnet call writes the conceptual brief from the facts and the
@@ -174,7 +176,16 @@ fi
 
 # --- Facts block (deterministic) ----------------------------------------------
 
-FACTS="Comprehension digest: week ending ${D} (merged ${START}T00:00Z to ${END}T00:00Z)"
+# human_date <YYYY-MM-DD>: "Sat Oct 3, 2026". BSD date first, then GNU; falls back to the input.
+human_date() {
+  date -j -f %F "$1" "+%a %b %-d, %Y" 2>/dev/null \
+    || date -d "$1" "+%a %b %-d, %Y" 2>/dev/null \
+    || printf '%s\n' "$1"
+}
+
+# FACTS is what the reader sees. FACTS_DETAIL (PR lists) feeds the model and --dry-run only.
+FACTS="Comprehension digest: week ending $(human_date "$D") (merged $(human_date "$START") to $(human_date "$LAST"), UTC)"
+FACTS_DETAIL=""
 if [ "$RAW_COUNT" -ge "$LIMIT" ]; then
   FACTS+=$'\n'"WARNING: fetch hit the ${LIMIT}-PR limit; counts below are truncated."
 fi
@@ -182,6 +193,12 @@ if [ "$N" -eq 0 ]; then
   FACTS+=$'\n'"Merged: 0. No PRs merged this week."
 else
   FACTS+=$'\n'"$(jq -r "$JQ_DEFS"'
+    (map(select(cdd_bucket == "auto-armed")) | length) as $a
+    | (map(select(cdd_bucket == "direct-merge")) | length) as $r
+    | (map(select(cdd_bucket == "human-signoff")) | length) as $h
+    | "Merged: \(length). Without a recorded human gate: \($a + $r) (auto-armed \($a), direct-merge \($r)). Human signoff (feat): \($h)."
+  ' <<<"$WINDOWED")"
+  FACTS_DETAIL="$(jq -r "$JQ_DEFS"'
     def entry: "#\(.number) \(.title | gsub("[\\r\\n]+"; " "))";
     def cap($a):
       if ($a | length) == 0 then "none"
@@ -194,23 +211,20 @@ else
         | entry ];
     def ptype:
       .title | if test("^[A-Za-z]+(\\([^)]*\\))?!?:") then (sub("[(!:].*$"; "") | ascii_downcase) else "other" end;
-    (map(select(cdd_bucket == "auto-armed")) | length) as $a
-    | (map(select(cdd_bucket == "direct-merge")) | length) as $r
-    | (map(select(cdd_bucket == "human-signoff")) | length) as $h
-    | "Merged: \(length). Without a recorded human gate: \($a + $r) (auto-armed \($a), direct-merge \($r)). Human signoff (feat): \($h).",
-      "Touched the live site (GM-visible candidates): " + cap([sort_by(.number)[] | select(gm_visible) | entry]),
-      "By type: " + (map(ptype) | group_by(.) | map({t: .[0], n: length}) | sort_by(-.n, .t) | map("\(.t) \(.n)") | join(", ")),
-      "Governance surfaces changed without a human gate:",
-      "  ADRs: " + cap(gov(["ibl5/docs/decisions/"])),
-      "  Agent rules and skills: " + cap(gov([".claude/rules/", ".claude/skills/"])),
-      "  CI workflows: " + cap(gov([".github/workflows/"])),
-      "  Migrations: " + cap(gov(["ibl5/migrations/"])),
-      "  bin tooling: " + cap(gov(["bin/"]))
+    "Touched the live site (GM-visible candidates): " + cap([sort_by(.number)[] | select(gm_visible) | entry]),
+    "By type: " + (map(ptype) | group_by(.) | map({t: .[0], n: length}) | sort_by(-.n, .t) | map("\(.t) \(.n)") | join(", ")),
+    "Governance surfaces changed without a human gate:",
+    "  ADRs: " + cap(gov(["ibl5/docs/decisions/"])),
+    "  Agent rules and skills: " + cap(gov([".claude/rules/", ".claude/skills/"])),
+    "  CI workflows: " + cap(gov([".github/workflows/"])),
+    "  Migrations: " + cap(gov(["ibl5/migrations/"])),
+    "  bin tooling: " + cap(gov(["bin/"]))
   ' <<<"$WINDOWED")"
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '%s\n' "$FACTS"
+  [ -z "$FACTS_DETAIL" ] || printf '%s\n' "$FACTS_DETAIL"
   exit 0
 fi
 
@@ -298,6 +312,7 @@ rebuild a mental model fast and pick the few PRs worth a real read.
 
 Trusted facts, computed by script:
 ${FACTS}
+${FACTS_DETAIL}
 
 Trusted league rules, written by the owner. These are the rules the site must enforce:
 ${RULES_TEXT}

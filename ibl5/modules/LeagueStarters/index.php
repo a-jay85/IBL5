@@ -55,8 +55,8 @@ $username = $authService->getUsername() ?? '';
 // TypeError under strict_types. Fall back to the same value a logged-out visitor
 // already gets, keeping this read-only page rendering for everyone.
 $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? \League\League::FREE_AGENTS_TEAM_NAME;
-$userTeam = $factory->team($userTeamName);
+$userTeam = \Team\Team::initialize(\Module\ModuleServices::current()->db(), $userTeamName);
 
-echo $factory->renderPage($view, $season, $startersByPosition, $userTeam, $display);
+echo $view->render(\Module\ModuleServices::current()->db(), $season, $startersByPosition, $userTeam, $display);
 
 PageLayout\PageLayout::footer();

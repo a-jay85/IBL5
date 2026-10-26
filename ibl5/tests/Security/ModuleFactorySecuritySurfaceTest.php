@@ -27,7 +27,7 @@ use Tests\Security\Fixtures\IdentityLeakingFactory;
 final class ModuleFactorySecuritySurfaceTest extends TestCase
 {
     private const WIRING_TOKEN = 'ModuleServices::current(';
-    private const IDENTITY_PARAMETER_PATTERN = '/(loggedin|currentuser|username|userteam|ownteam|highlightteam|session|cookie|actor)/i';
+    private const IDENTITY_PARAMETER_PATTERN = '/(loggedin|currentuser|username|userteam|ownteam|highlight\w*team|session|cookie|actor)/i';
     private const GATE_TOKEN_PATTERN = '/is_admin\(|->isAdmin\(|->isAuthenticated\(|\bloginbox\(|->loginBox\(|CsrfGuard::/';
 
     /** Request and auth state a factory must never read. */

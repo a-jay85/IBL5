@@ -78,11 +78,12 @@ test.describe('Player stat view mobile smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, `${PLAYER_BASE_URL}&pageView=3`);
     await assertNoPhpErrors(page, 'on player RS Totals (mobile)');
-    // Player stats tables use .player-stats-card (overflow-x: auto), not .table-scroll-container
-    await expect(page.locator('.player-stats-card').first()).toBeVisible();
+    // Player stats tables scroll inside .player-stats-card__scroll, which sits under the card's title
+    const scroller = page.locator('.player-stats-card .player-stats-card__scroll').first();
+    await expect(scroller).toBeVisible();
     await assertScrollContainerIsScrollable(
       page,
-      page.locator('.player-stats-card').first(),
+      scroller,
       'on player RS Totals',
     );
   });

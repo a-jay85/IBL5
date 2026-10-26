@@ -279,6 +279,7 @@ test.describe('player view tables (post-conversion)', () => {
         const box = await titleEl.boundingBox();
         expect(box, `${name}: title has a box`).not.toBeNull();
         const viewportWidth = page.viewportSize()?.width ?? 0;
+        // e2e-hygiene-allow: a title that scrolls away has a negative x, so >= 0 is the real bound
         expect(box!.x, `${name}: title left edge in viewport`).toBeGreaterThanOrEqual(0);
         expect(box!.x + box!.width, `${name}: title right edge in viewport`).toBeLessThanOrEqual(viewportWidth);
       });

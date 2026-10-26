@@ -1193,6 +1193,7 @@ if [ "$got" = "601 602 603 605 " ]; then
 else
     fail "trust-outdated: expected '601 602 603 605 ', got '$got'"
 fi
+# 605 must keep the shape fix-or-decline reads: isOutdated:true and line:null.
 if jq -e 'select(.commentId == 605) | .isOutdated == true and .line == null' "$TO_OUT" >/dev/null 2>&1; then
     ok "trust-outdated: 605 carries isOutdated true and line null"
 else

@@ -1501,6 +1501,7 @@ def _pr3458_rows():
 
 
 def test_backtest_pr3458_every_open_thread_is_taken_with_the_flag():
+    """fetch_trusted_threads(include_outdated=True) plus cap_outdated keep every #3458 thread."""
     rows = _pr3458_rows()
     assert rows and all(r["isOutdated"] and r["line"] is None for r in rows)
     gh = _FlagGh(rows)

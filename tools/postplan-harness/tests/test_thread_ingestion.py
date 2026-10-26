@@ -15,6 +15,7 @@ from harness.armable import ArmInputs, evaluate
 from harness.state import Classification, HarnessError, UsageLedger
 from harness.fidelity import GATE_EDIT_DENY_TEXT, GATE_OWNING_PREFIXES
 from harness.thread_ingestion import (
+    _is_gate_held,
     _is_trusted,
     GATE_HOLD_MARKER,
     disposition_thread,
@@ -1374,3 +1375,152 @@ def test_live_gh_passes_include_outdated_flag_to_prf(monkeypatch):
     assert seen[0][-1] == "42" and "--include-outdated" not in seen[0]
     assert seen[1][-2:] == ["42", "--include-outdated"]
     assert seen[1][2] == 'source "$1"; "$2" "$3" "${@:4}"'
+
+
+# ── Phase 4.5 dispositions outdated trusted threads (include_outdated=True) ──
+import harness.thread_ingestion as ti
+
+OUTDATED_THREAD = dict(THREAD_2340, id="PRRT_old", commentId=4074926170, isOutdated=True, line=None,
+                       body="Guard the empty-roster case before dividing.")
+HUMAN_OUTDATED_THREAD = dict(OUTDATED_THREAD, id="PRRT_human", commentId=4074926169,
+                             authorLogin="stranger", authorType="User")
+
+
+def _run(tmp_path, threads, canned, *, include_outdated, commit=lambda m: "abc123", push=lambda: "def456",
+         worktree=None, ids=None):
+    gh = _gh(tmp_path, {"trusted_threads": threads, "pr_number": PR})
+    llm = _llm({PURPOSE: canned})
+    result = run_thread_ingestion(
+        gh, llm, ReplayGit({}), worktree or str(tmp_path), PR,
+        pre_posting_ids=ids if ids is not None else {t["commentId"] for t in (threads or [])},
+        out_dir=str(tmp_path), log=lambda msg: None, commit=commit, push=push,
+        include_outdated=include_outdated)
+    return gh, llm, result
+
+
+def _resolves(gh):
+    return [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+
+
+def test_run_include_outdated_fixes_and_resolves_prior_run_thread(tmp_path):
+    gh, llm, result = _run(tmp_path, [OUTDATED_THREAD], '{"verdict":"FIX","reason":"Added the guard"}',
+                           include_outdated=True)
+    assert result["fixed"] == 1 and result["found"] == 1
+    assert result["outdated_found"] == 1 and result["deferred_outdated"] == 0
+    assert result["threads"][0]["outdated"] is True
+    assert [r["comment_id"] for r in _resolves(gh)] == [4074926170]
+    assert _resolves(gh)[0]["body"].startswith("Fixed in def456")
+    on_disk = json.load(open(os.path.join(str(tmp_path), "thread-ingestion.json")))
+    assert on_disk["outdated_found"] == 1 and on_disk["threads"][0]["outdated"] is True
+
+
+def test_run_include_outdated_declines_with_reply_naming_reason(tmp_path):
+    def _no_commit(msg):
+        raise AssertionError("commit must not run for a DECLINE")
+    gh, llm, result = _run(tmp_path, [OUTDATED_THREAD],
+                           '{"verdict":"DECLINE","reason":"The guard landed in commit 1a2b3c","category":"already-fixed"}',
+                           include_outdated=True, commit=_no_commit, push=lambda: "")
+    assert result["declined"] == 1
+    body = _resolves(gh)[0]["body"]
+    assert body.startswith("Declined: ")
+    assert "The guard landed in commit 1a2b3c" in body
+
+
+def test_run_include_outdated_skips_excerpt_for_outdated_thread(tmp_path, monkeypatch):
+    wt = str(tmp_path / "wt")
+    os.makedirs(os.path.join(wt, os.path.dirname(THREAD_2340["path"])))
+    open(os.path.join(wt, THREAD_2340["path"]), "w").write("".join(f"line {i}\n" for i in range(50)))
+    seen = []
+    real = ti.thread_prompt
+
+    def spy(thread, file_excerpt):
+        seen.append((thread["commentId"], file_excerpt))
+        return real(thread, file_excerpt)
+
+    monkeypatch.setattr(ti, "thread_prompt", spy)
+    _run(tmp_path, [THREAD_2340, OUTDATED_THREAD], '{"verdict":"DECLINE","reason":"x","category":"wrong"}',
+         include_outdated=True, worktree=wt)
+    excerpts = dict(seen)
+    assert excerpts[THREAD_2340["commentId"]] != ""      # current thread: excerpt built as before
+    assert excerpts[OUTDATED_THREAD["commentId"]] == ""  # outdated thread: no excerpt
+
+
+def test_prompt_outdated_thread_names_search_and_already_fixed():
+    p = thread_prompt(dict(OUTDATED_THREAD, outdated=True), "")
+    assert "=== OUTDATED THREAD ===" in p
+    assert "answer DECLINE with category already-fixed" in p
+    assert "line: unknown (outdated thread" in p
+    assert "=== FILE EXCERPT ===" not in p
+    assert "=== OUTDATED THREAD ===" not in thread_prompt(THREAD_2340, "x = 1\n")
+
+
+def test_run_include_outdated_leaves_human_outdated_thread_open_and_holding(tmp_path):
+    gh, llm, result = _run(tmp_path, [HUMAN_OUTDATED_THREAD], '{"verdict":"DECLINE","reason":"x","category":"wrong"}',
+                           include_outdated=True)
+    assert result["found"] == 0 and result["outdated_found"] == 0
+    assert _resolves(gh) == []
+    assert llm.tooled_argvs == []
+    d = evaluate(_arm_inputs(["unresolved-finding:-"]))
+    assert d.armed is False and {c.number for c in d.holds} == {11}
+
+
+def test_run_include_outdated_gh_failure_resolves_nothing(tmp_path):
+    gh, llm, result = _run(tmp_path, None, '{"verdict":"DECLINE","reason":"x","category":"wrong"}',
+                           include_outdated=True, ids={OUTDATED_THREAD["commentId"]})
+    assert result["reason"] == "cap-or-api-error"
+    assert result["outdated_found"] == 0 and result["deferred_outdated"] == 0
+    assert _resolves(gh) == [] and llm.tooled_argvs == []
+
+
+def test_run_include_outdated_caps_at_twelve_and_defers_the_rest(tmp_path):
+    ids = [4074926100 + i for i in range(13)]
+    shuffled = [ids[i] for i in (12, 3, 7, 0, 11, 5, 9, 1, 10, 4, 8, 2, 6)]
+    threads = [dict(OUTDATED_THREAD, id=f"PRRT_{c}", commentId=c) for c in shuffled]
+    gh, llm, result = _run(tmp_path, threads, '{"verdict":"DECLINE","reason":"gone","category":"already-fixed"}',
+                           include_outdated=True)
+    assert result["outdated_found"] == 13 and result["deferred_outdated"] == 1
+    assert result["declined"] == 12 and result["found"] == 12
+    resolved = sorted(r["comment_id"] for r in _resolves(gh))
+    assert resolved == ids[:12]
+    assert ids[12] not in resolved
+
+
+def test_run_default_still_drops_outdated_threads(tmp_path):
+    gh, llm, result = _run(tmp_path, [OUTDATED_THREAD], '{"verdict":"FIX","reason":"x"}', include_outdated=False)
+    assert result["found"] == 0 and result["outdated_found"] == 0
+    assert llm.tooled_argvs == [] and _resolves(gh) == []
+
+
+# ── Back-test: PR #3458's open threads (fixture captured 2026-10-25) ──────────
+FIXTURE_3458 = os.path.join(os.path.dirname(__file__), "fixtures", "pr3458_open_threads.jsonl")
+
+
+def _pr3458_rows():
+    with open(FIXTURE_3458) as fh:
+        return [json.loads(l) for l in fh if l.strip()]
+
+
+def test_backtest_pr3458_every_open_thread_is_taken_with_the_flag():
+    rows = _pr3458_rows()
+    assert rows and all(r["isOutdated"] and r["line"] is None for r in rows)
+    gh = _FlagGh(rows)
+    kept = fetch_trusted_threads(gh, 3458, {r["commentId"] for r in rows}, include_outdated=True)
+    kept, deferred = cap_outdated(kept)
+    assert sorted(r["commentId"] for r in kept) == sorted(r["commentId"] for r in rows)
+    assert deferred == 0
+    assert all(r["outdated"] for r in kept)
+    assert not any(_is_gate_held(r) for r in rows)
+
+
+def test_backtest_pr3458_default_still_drops_every_open_thread():
+    rows = _pr3458_rows()
+    assert fetch_trusted_threads(_FlagGh(rows), 3458, {r["commentId"] for r in rows}) == []
+
+
+def test_readme_and_posting_procedure_name_the_outdated_cap():
+    root = os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    readme = open(os.path.join(root, "tools", "postplan-harness", "README.md")).read()
+    proc = open(os.path.join(root, ".claude", "review-shared", "_posting-procedure.md")).read()
+    assert f"`MAX_OUTDATED_PER_PASS` ({MAX_OUTDATED_PER_PASS})" in readme
+    assert f"at most {MAX_OUTDATED_PER_PASS} of them per run" in proc
+    assert "--include-outdated" in readme and "--include-outdated" in proc

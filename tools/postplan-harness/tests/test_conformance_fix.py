@@ -86,6 +86,10 @@ class RealRestoreGit(ReplayGit):
         super().__init__(fixture)
         self.root = root
 
+    def changed_files(self, base="origin/master"):
+        # A `<sha>^` base asks for the files of the just-made commit: the fixer's own writes.
+        return list(self.extra_dirty) if base.endswith("^") else super().changed_files(base)
+
     def restore_paths(self, paths):
         super().restore_paths(paths)
         for p in paths:
@@ -453,6 +457,24 @@ def test_post_commit_gate_path_hit_raises_gate_path_edit(tmp_path):
     assert exc.value.kind == "gate-path-edit"
     assert git.pushes == 0
     assert git.commit_messages == [conformance_fix.COMMIT_MSG]
+
+
+class _ExtraFileGit(RealRestoreGit):
+    def changed_files(self, base="origin/master"):
+        if base.endswith("^"):
+            return [*super().changed_files(base), "ibl5/classes/Foo/Foo.php"]
+        return super().changed_files(base)
+
+
+def test_post_commit_unscoped_file_raises_gate_path_edit(tmp_path):
+    wt = tmp_path / "wt"
+    wt.mkdir()
+    git = _ExtraFileGit(_fixture(), str(wt))
+    llm = WritingLlm(UsageLedger(), {"conformance-fix": "done"}, writes={PROMISED: GOOD_PHP}, git=git)
+    with pytest.raises(HarnessError) as exc:
+        _remediate(tmp_path, [ITEM_PATH], wt, git, llm)
+    assert exc.value.kind == "gate-path-edit"
+    assert git.pushes == 0
 
 
 # --- hold note + CLI ------------------------------------------------------------------

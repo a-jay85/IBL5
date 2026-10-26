@@ -428,7 +428,11 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
     if not sha:
         _revert_staged()
         return _done("no-edits")
-    hits = fidelity.denied_local_gate_edits(gitad.changed_files(f"{sha}^"))
+    committed = gitad.changed_files(f"{sha}^")
+    # The commit callback can run the gate fixer, which may fold extra edits into this
+    # commit after the pre-commit scope checks. Hold any path the fixer was not scoped to.
+    hits = sorted(set(fidelity.denied_local_gate_edits(committed))
+                  | {p for p in committed if p not in changed or _denied(p)})
     if hits:
         log(f"phase5.0-fix: fix commit touched gate paths ({', '.join(hits)}) "
             "- commit left local, run ends")

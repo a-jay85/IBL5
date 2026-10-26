@@ -1,0 +1,150 @@
+import { test, expect } from '../fixtures/auth-regular';
+import type { APIRequestContext } from '@playwright/test';
+
+/**
+ * Google Sheets card on the ApiKeys page, driven by seeded connection rows for
+ * the E2E regular user (test-state.php seed/get/delete-google-sheet-connection).
+ * The seeded refresh token is a fixed fake. PHP makes every Google call
+ * server-side, so these tests assert on the rendered card and the stored row.
+ *
+ * Runs in the `mutators` project: it rewrites the regular user's connection row,
+ * which security/google-sheets-oauth.spec.ts also reads.
+ */
+
+const API_KEYS = 'modules.php?name=ApiKeys';
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e2e-sheet-id/edit';
+// The PHP container has no IBL_TEST_USER_REGULAR, so name the user per request.
+const USER = `username=${encodeURIComponent(process.env.IBL_TEST_USER_REGULAR ?? '')}`;
+
+async function seed(request: APIRequestContext, status: 'active' | 'broken', reason = ''): Promise<void> {
+  const response = await request.post(
+    `test-state.php?action=seed-google-sheet-connection&${USER}&status=${status}&reason=${encodeURIComponent(reason)}`,
+    { data: {} },
+  );
+  if (!response.ok()) {
+    throw new Error(`seed-google-sheet-connection failed: ${response.status()} ${await response.text()}`);
+  }
+}
+
+async function clear(request: APIRequestContext): Promise<void> {
+  await request.delete(`test-state.php?action=delete-google-sheet-connection&${USER}`);
+}
+
+async function connection(request: APIRequestContext): Promise<{ status: number; body: { status?: string } }> {
+  const response = await request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
+  return { status: response.status(), body: response.ok() ? await response.json() : {} };
+}
+
+/** The `_csrf_token` inside the form posting to `op`, read from a fresh render. */
+async function tokenFor(request: APIRequestContext, op: string): Promise<string> {
+  const html = await (await request.get(API_KEYS)).text();
+  const formIdx = html.indexOf(`op=${op}"`);
+  if (formIdx === -1) {
+    throw new Error(`no form for op=${op} on the ApiKeys page`);
+  }
+  const match = html.slice(formIdx).match(/name="_csrf_token" value="([0-9a-f]+)"/);
+  if (match === null) {
+    throw new Error(`no _csrf_token in the op=${op} form`);
+  }
+  return match[1];
+}
+
+async function post(request: APIRequestContext, op: string, withToken: boolean): Promise<void> {
+  const form: Record<string, string> = withToken ? { _csrf_token: await tokenFor(request, op) } : {};
+  const response = await request.post(`${API_KEYS}&op=${op}`, { form, maxRedirects: 0 });
+  expect(response.status()).toBe(302);
+}
+
+test.describe('Google Sheets card', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  // e2e-hygiene-allow: CI-config env gating — auth-regular.setup.ts also skips when IBL_TEST_USER_REGULAR is unset, so regular.json is absent or stale and these assertions would run against an unauthenticated session
+  test.skip(
+    !process.env.IBL_TEST_USER_REGULAR || !process.env.IBL_TEST_PASS_REGULAR,
+    'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',
+  );
+
+  test.beforeEach(async ({ page }) => {
+    const html = await (await page.request.get(API_KEYS)).text();
+    expect(html, 'set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_TOKEN_KEY for the PHP server').not.toContain('sync is not configured');
+    await clear(page.request);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await clear(page.request);
+  });
+
+  test('no connection shows the sign-in button only', async ({ page }) => {
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#google-sheet-connect')).toBeVisible();
+    await expect(page.locator('#google-sheet-open')).toHaveCount(0);
+  });
+
+  test('active connection shows open, refresh, and disconnect', async ({ page }) => {
+    await seed(page.request, 'active');
+    await page.goto(API_KEYS);
+
+    await expect(page.locator(`#google-sheet-open[href="${SHEET_URL}"]`)).toBeVisible();
+    await expect(page.locator('#google-sheet-refresh')).toBeVisible();
+    await expect(page.locator('#google-sheet-disconnect')).toBeVisible();
+    await expect(page.locator('#google-sheet-connect')).toHaveCount(0);
+  });
+
+  test('broken connection explains the revoke and offers reconnect', async ({ page }) => {
+    await seed(page.request, 'broken', 'invalid_grant');
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#google-sheet-card .ibl-alert--warning')).toContainText('revoked or expired');
+    await expect(page.locator('#google-sheet-reconnect')).toBeVisible();
+    await expect(page.locator('#google-sheet-refresh')).toHaveCount(0);
+  });
+
+  test('refresh without a token is rejected and leaves the row active', async ({ page }) => {
+    await seed(page.request, 'active');
+
+    await post(page.request, 'google_refresh', false);
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Invalid or expired form submission');
+    expect((await connection(page.request)).body.status).toBe('active');
+  });
+
+  test('refresh on a broken row asks to reconnect without calling Google', async ({ page }) => {
+    // The broken card has no refresh form, so take the token while the row is
+    // active, then break it.
+    await seed(page.request, 'active');
+    const token = await tokenFor(page.request, 'google_refresh');
+    await seed(page.request, 'broken', 'invalid_grant');
+
+    const response = await page.request.post(`${API_KEYS}&op=google_refresh`, {
+      form: { _csrf_token: token },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(302);
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Reconnect Google');
+  });
+
+  test('disconnect on a broken row deletes it without calling Google', async ({ page }) => {
+    await seed(page.request, 'broken', 'invalid_grant');
+
+    await post(page.request, 'google_disconnect', true);
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#apikeys-flash.ibl-alert--success')).toContainText('stays in your Drive');
+    expect((await connection(page.request)).status).toBe(404);
+    await expect(page.locator('#google-sheet-connect')).toBeVisible();
+  });
+
+  test('disconnect without a token is rejected and keeps the row', async ({ page }) => {
+    await seed(page.request, 'active');
+
+    await post(page.request, 'google_disconnect', false);
+    await page.goto(API_KEYS);
+
+    await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Invalid or expired form submission');
+    expect((await connection(page.request)).status).toBe(200);
+  });
+});

@@ -58,22 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [
-        /auth\.setup\.ts/,
-        /auth-regular\.setup\.ts/,
-        /visual-regression/,
-        /updater-awards\.spec\.ts$/,
-        /league-control-panel\.spec\.ts$/,
-        /engine-shadow-spawn-on-update\.spec\.ts$/,
-        /admin-pages\.spec\.ts$/,
-        /olympics-admin\.spec\.ts$/,
-        /contract-extension-submission\.spec\.ts$/,
-        /api-v1-rest\.spec\.ts$/,
-        /depth-chart-entry-mobile\.spec\.ts$/,
-        /depth-chart-entry-submission\.spec\.ts$/,
-        /faprep-xss-escape\.spec\.ts$/,
-        /projected-draft-order-submission\.spec\.ts$/,
-      ],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /projected-draft-order-submission\.spec\.ts$/, /google-sheet-card\.spec\.ts$/, /google-sheets-oauth\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -131,25 +116,15 @@ export default defineConfig({
       // [1..12] lottery save also puts any posted team projected at pick 13+ in
       // round 1 twice, which doubled the Metros notes toggle that
       // projected-draft-order.spec's notes test counts.
+      // google-sheet-card and google-sheets-oauth both rewrite the E2E regular
+      // user's ibl_google_sheet_connections row and assert which card state renders.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [
-        /updater-awards\.spec\.ts$/,
-        /league-control-panel\.spec\.ts$/,
-        /engine-shadow-spawn-on-update\.spec\.ts$/,
-        /admin-pages\.spec\.ts$/,
-        /olympics-admin\.spec\.ts$/,
-        /contract-extension-submission\.spec\.ts$/,
-        /api-v1-rest\.spec\.ts$/,
-        /depth-chart-entry-mobile\.spec\.ts$/,
-        /depth-chart-entry-submission\.spec\.ts$/,
-        /faprep-xss-escape\.spec\.ts$/,
-        /projected-draft-order-submission\.spec\.ts$/,
-      ],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/, /depth-chart-entry-submission\.spec\.ts$/, /faprep-xss-escape\.spec\.ts$/, /projected-draft-order-submission\.spec\.ts$/, /google-sheet-card\.spec\.ts$/, /google-sheets-oauth\.spec\.ts$/],
     },
   ],
 });

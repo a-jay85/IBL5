@@ -182,7 +182,8 @@ def _tooled_env(allowed_tools, denied_tools) -> dict:
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
                  append_system_prompt, setting_sources, max_turns,
                  max_budget_usd: float | None = None,
-                 advisor: bool = True) -> list[str]:
+                 advisor: bool = True,
+                 minimal_context: bool = False) -> list[str]:
     """Pure argv builder so replay can record a live run's exact command line."""
     argv = ["claude", "-p", "--output-format", "json",
             "--max-turns", str(max_turns),
@@ -211,6 +212,9 @@ def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
         # verdict and none changed it. The reviewer is already Opus, and so is the advisor.
         # (--disallowedTools advisor does not remove it; an empty advisorModel does.)
         argv += ["--settings", json.dumps({"advisorModel": ""})]
+    if minimal_context:
+        # Verifier-only: no MCP servers, no skills listing. Hooks stay (setting sources unchanged).
+        argv += ["--strict-mcp-config", "--disable-slash-commands"]
     return argv
 
 
@@ -384,7 +388,8 @@ class ClaudeCli:
                     max_turns: int = TOOLED_MAX_TURNS,
                     max_retries: int = 1,
                     max_budget_usd: float | None = None,
-                    advisor: bool = True) -> str:
+                    advisor: bool = True,
+                    minimal_context: bool = False) -> str:
         """Bounded, tool-enabled call. Returns the envelope's RAW `result` text.
 
         The verdict this exists to fetch is a prose document, so parsing belongs to the
@@ -403,7 +408,8 @@ class ClaudeCli:
                             denied_tools=denied_tools, add_dirs=add_dirs,
                             append_system_prompt=append_system_prompt,
                             setting_sources=setting_sources, max_turns=max_turns,
-                            max_budget_usd=max_budget_usd, advisor=advisor)
+                            max_budget_usd=max_budget_usd, advisor=advisor,
+                            minimal_context=minimal_context)
         rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
         # A read-only call cannot edit the worktree, so its pause is never dirty.
         can_write = usage_pause.tools_can_write(allowed_tools, denied_tools)
@@ -557,14 +563,16 @@ class FixtureLlm:
                     max_turns: int = TOOLED_MAX_TURNS,
                     max_retries: int = 1,
                     max_budget_usd: float | None = None,
-                    advisor: bool = True) -> str:
+                    advisor: bool = True,
+                    minimal_context: bool = False) -> str:
         if not allowed_tools:
             raise HarnessError("llm-tooled-no-tools", purpose)
         self.tooled_argvs.append((purpose, _tooled_argv(
             model, agent=agent, allowed_tools=allowed_tools, denied_tools=denied_tools,
             add_dirs=add_dirs, append_system_prompt=append_system_prompt,
             setting_sources=setting_sources, max_turns=max_turns,
-            max_budget_usd=max_budget_usd, advisor=advisor)))
+            max_budget_usd=max_budget_usd, advisor=advisor,
+            minimal_context=minimal_context)))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]

@@ -478,3 +478,22 @@ def test_session_budget_reaches_cli_subprocess(shim, tmp_path):
                     allowed_tools=("Read", "Write"), max_budget_usd=5.0, max_retries=0)
     logged = shim.read_text()
     assert "--max-budget-usd 5.00" in logged
+
+
+# --- verifier-only minimal context -------------------------------------------
+
+def test_tooled_argv_minimal_context_appends_exactly_two_flags():
+    base = _bounded_argv()
+    lean = _bounded_argv(minimal_context=True)
+    assert lean == base + ["--strict-mcp-config", "--disable-slash-commands"]
+    assert lean[lean.index("--tools") + 1] == base[base.index("--tools") + 1]
+    assert lean[lean.index("--setting-sources") + 1] == "user,project"
+
+
+def test_call_tooled_forwards_minimal_context(shim, tmp_path):
+    cli = _cli(tmp_path)
+    cli.call_tooled("verify-findings-1", "sonnet", "p", cwd=str(tmp_path),
+                    allowed_tools=("Read", "Grep", "Glob"), minimal_context=True, max_retries=0)
+    logged = shim.read_text()
+    assert "--strict-mcp-config" in logged
+    assert "--disable-slash-commands" in logged

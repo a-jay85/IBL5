@@ -439,7 +439,7 @@ class ReviewPhase:
                     VERIFIER_PURPOSES[seat], VERIFIER_MODEL, prompt, cwd=self.worktree,
                     allowed_tools=VERIFIER_ALLOWED_TOOLS, denied_tools=VERIFIER_DENIED_TOOLS,
                     max_turns=VERIFIER_MAX_TURNS, timeout=VERIFIER_TIMEOUT,
-                    max_budget_usd=VERIFIER_MAX_BUDGET_USD)
+                    max_budget_usd=VERIFIER_MAX_BUDGET_USD, minimal_context=True)
                 data = schemas.unwrap_verdicts_envelope(extract_json(raw))
                 schemas.validate_verdicts(data)
             except HarnessError as e:

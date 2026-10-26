@@ -85,6 +85,50 @@ class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
         self::assertSame(1, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
     }
 
+    /**
+     * The draft, Hall of Fame and award rows are already stored, so the first
+     * run imports only the retirees. The second run finds all four files done
+     * through the real per-table checks and skips.
+     */
+    public function testSecondRunSkipsOnceRetireesExistForPriorYear(): void
+    {
+        $this->insertTestPlayer(self::JSB_PID, 'Prior Ret');
+        $this->insertChampion(self::PRIOR_YEAR);
+        $this->repo->upsertDraftResult([
+            'draft_year' => 2094,
+            'round' => 1,
+            'pick' => 1,
+            'team_name' => 'Prior Team',
+            'pos' => 'PG',
+            'player_name' => 'Prior Pick',
+            'pid' => null,
+        ]);
+        $this->repo->upsertHofInductee([
+            'jsb_pid' => 200000302,
+            'player_name' => 'Prior Inductee',
+            'pos' => 'C',
+            'induction_year' => 2094,
+            'pid' => null,
+        ]);
+        $this->repo->upsertAward(self::PRIOR_YEAR, 'Scoring Leader (1st)', 'Prior Scorer');
+
+        $resolver = $this->archiveResolver([
+            'ret' => self::RET_DATA,
+            'dra' => "***** 2094 rookie draft *****\nRound 1 Pick 1\nPrior Team: PG Prior Pick\n",
+            'hof' => str_pad(" C Prior Inductee 327 2094 \r\n", 7000),
+        ]);
+
+        $first = $this->buildStep($resolver)->execute();
+        self::assertFalse($first->skipped);
+        self::assertCount(1, self::retMessages($first->messages));
+
+        $second = $this->buildStep($resolver)->execute();
+
+        self::assertTrue($second->skipped);
+        self::assertSame('Prior-season imports already ran for 2095', $second->detail);
+        self::assertSame(1, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
+    }
+
     public function testRealResolverDiskFallbackWritesNothing(): void
     {
         $this->insertTestPlayer(self::JSB_PID, 'Prior Ret');
@@ -123,11 +167,17 @@ class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
         return new PriorSeasonEndOfSeasonImportStep($this->repo, $this->service, self::PRIOR_YEAR, $resolver);
     }
 
-    private function archiveResolver(): JsbSourceResolverInterface
+    /**
+     * Archive resolver that serves each extension's contents; a missing key
+     * means the file is not in the archive.
+     *
+     * @param array<string, string> $files
+     */
+    private function archiveResolver(array $files = ['ret' => self::RET_DATA]): JsbSourceResolverInterface
     {
         $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')->willReturnCallback(
-            static fn (string $extension): ?string => $extension === 'ret' ? self::RET_DATA : null
+            static fn (string $extension): ?string => $files[$extension] ?? null
         );
         $resolver->method('describeLastSource')->willReturn(new SourceProvenance(
             kind: SourceProvenance::KIND_ARCHIVE,

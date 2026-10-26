@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-10-25
+description: Read-on-demand detail for work-triage (no auto-attach; its `paths:` entries are all out-of-repo and never match). Read it when work-triage.md cites it. Covers the inline-Opus leak, ADR-0067 gateway, the hard-trigger rule and gate properties, /plan-verdict routing, the straddle gate's remedy ladder, inline-vs-delegated criteria with the inline-edit trial to 2026-11-23 and its measurement limits, safety-mirror backstop, and repeat-polling.
+last_verified: 2026-10-26
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/skill-gate.sh"
@@ -24,24 +24,24 @@ The user should never have to ask "is this big enough for a `/plan`?" — that j
 
 ### Why a numeric rule
 
-The prose routing guidance in `work-triage.md` is a judgment call, and judgment loses to batch momentum — measured 2026-07-21: a 30-reference / 18-file rename was swept inline on Opus *after* the ≥125K dumb-zone `systemMessage` had already fired and been ignored. A warning you can read past is not a control.
+The prose routing guidance in `work-triage.md` is a judgment call, and judgment loses to batch momentum. Measured 2026-07-21: an 18-file rename was swept inline on Opus after the ≥125K dumb-zone `systemMessage` had fired and been ignored. A warning you can read past is not a control.
 
 ### Gate properties
 
 `~/.claude/hooks/plan-gate-edit.sh` § Check 1 enforces the ≥5-distinct-files rule by **denying** the Edit/Write tool call. The threshold is the hook's `SWEEP_LIMIT` constant — raised from 3 to 5 on 2026-07-22, once repo-scoping had removed the scratch-file false positives and 3 proved to bind on ordinary multi-file changes rather than on sweeps. The self-test reads `SWEEP_LIMIT` from the hook, so retuning it needs no test edit. Properties worth knowing:
 
-- **Sub-agent edits are exempt** (`agent_id` present in the PreToolUse payload). The delegate you spawn in response is never blocked — otherwise the gate would brick the delegation it exists to force. Note sub-agents share the parent's `session_id` *and* `transcript_path`, so `agent_id` is the only usable discriminator.
+- **Sub-agent edits are exempt** (`agent_id` present in the PreToolUse payload). The delegate you spawn in response is never blocked. Sub-agents share the parent's `session_id` and `transcript_path`, so `agent_id` is the only usable discriminator.
 - **Per user turn, not per session** (keyed on `prompt_id`). A handful of unrelated one-file edits spread across a long session is not a sweep and doesn't trip it.
 - **Distinct files, not calls** — editing one file ten times counts once.
-- **Repo files only** — a path counts only when it resolves inside a git working tree; `/tmp` scratch and `~/.claude` hook/settings edits never accrue, so they can't push a later repo file over the line. A new file in a not-yet-created repo subdirectory still counts, because the check walks up to the nearest existing ancestor directory.
+- **Repo files only.** A path counts only when it resolves inside a git working tree, so `/tmp` scratch and `~/.claude` edits never accrue. A new file in a not-yet-created repo subdirectory still counts, because the check walks up to the nearest existing ancestor.
 - **Fails open** on a malformed payload; never blocks editing because a field was missing.
-- **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design — for example authoring a rule doc, its detail companion, and the ADR recording the decision together. Using it silently defeats the gate: **say out loud that you're overriding and why**, in the same turn.
+- **Escape hatch, deliberately loud:** `touch /tmp/claude-sweep-override-<prompt_id>` (example) releases it for that turn. Legitimate when the edits are genuinely *entangled* with the design, such as authoring a rule doc, its detail companion, and its ADR together. **Say out loud that you're overriding and why**, in the same turn.
 
 Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
 
 ### Other checks in the same hook
 
-`plan-gate-edit.sh` is one file registered on `Read|Edit|Write`, but only Check 1 implements the sweep trigger. Don't read a deny from it as "I hit the ≥5-file limit" without reading the message — the **cross-worktree straddle gate** (Check 3) denies a **Read** whose target resolves inside a *different* worktree of this same repo than the session cwd, because touching it loads that tree's `.claude/rules/*.md` on top of the byte-identical set already resident, re-sent every turn for the rest of the session (ADR-0046). Reading back into the tree whose rules are already loaded stays allowed.
+`plan-gate-edit.sh` is registered on `Read|Edit|Write`, but only Check 1 implements the sweep trigger. Read the deny message before assuming you hit the ≥5-file limit. The **cross-worktree straddle gate** (Check 3) denies a **Read** whose target sits in a *different* worktree of this repo than the session cwd, because that loads the tree's `.claude/rules/*.md` on top of the identical set already resident (ADR-0046). Reading back into the cwd's own tree stays allowed.
 
 **Its remedy is not one thing — the deny message prints a four-rung ladder, and the right rung depends on the direction.** Take the first that fits; don't skip to the override:
 
@@ -50,7 +50,7 @@ Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
 3. **Relocate or hand off**, direction-dependent: `EnterWorktree` when the session is in the **main checkout** and the target is a worktree; a **fresh session** rooted in the target when the session is already in a worktree (`ExitWorktree` no-ops for a session *launched* in a worktree, and a direct worktree→worktree `EnterWorktree` is rejected — leave the tree dirty and hand off in prose). Never relocate INTO the main checkout: it is read-only reference (ADR-0062).
 4. **The escape hatch** — `touch /tmp/claude-tree-override-<session_id>` (example), keyed per **session**, not per turn like Check 1's — for the genuine both-trees-at-once case (diffing two worktrees).
 
-Why the ladder replaced a bare "use `EnterWorktree`": in the gate's first 27h, all 8 override releases came from sessions already inside a worktree, where re-rooting is exactly the rung that does not work. Prescribing it there taught callers the remedy was broken and sent them to the override.
+The ladder replaced a bare "use `EnterWorktree`" because all 8 override releases in the gate's first 27h came from sessions already inside a worktree, where re-rooting does not work.
 
 ## Repeat-polling
 
@@ -62,25 +62,27 @@ A poll loop re-reads the full context every call (~81K tokens); eight 60s checks
 
 ### The readiness predicate
 
-Moving the poll off the main thread fixes *where* it runs, not whether it is asking the right question. A watcher with a wrong readiness predicate is worse than no watcher: it returns a confident verdict on an unfinished artifact, and the caller has no reason to doubt it.
+Moving the poll off the main thread fixes *where* it runs. A watcher with a wrong readiness predicate is worse than none: it returns a confident verdict on an unfinished artifact.
 
 **Valid completion signals:** the process exiting; its launchd/job label disappearing from `launchctl list`; a runner's own verdict line in its log; a sentinel the producer writes **last** (including a scratch/draft file it deletes on completion). **Not a completion signal:** mtime, size, or existence of a file the producer appends to incrementally — those all go true mid-write.
 
-**Prefer the producer's verdict over your own.** If the producing process already runs the check you were going to run, wait for it and read its answer. Recomputing invites the two to disagree, and yours is the one running against a partial artifact.
+**Prefer the producer's verdict over your own.** If the producing process already runs the check you were going to run, wait for it and read its answer. Yours would run against a partial artifact.
 
-Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now`) used "final plan is newer than its draft" as the done-test. `/plan` appends the final plan section-by-section, so the predicate went true while the file was still truncated, `bin/check-plan` failed on the partial text, and a passing plan was reported as `CHECK-PLAN FAILED`. Three valid signals were available and unused: the launchd label vanishing, `bin/plan-now`'s own `RESULT ok — check-plan PASSED` log line, and the draft file being deleted. This is the same family as the ADR-0096 identity bug — a verdict trusted from a heuristic instead of from the run's own self-report.
+Observed 2026-07-27: a watcher for detached `/plan` runs (`bin/plan-now`) used "final plan is newer than its draft" as the done-test. `/plan` appends the plan section by section, so the test went true on a truncated file and a passing plan was reported as `CHECK-PLAN FAILED`. The launchd label vanishing, the `RESULT ok — check-plan PASSED` log line, and the draft's deletion were all unused valid signals (same family as the ADR-0096 identity bug).
 
 ## Safety mirror backstop
 
 **What counts as a gate removal/weakening** (the resident bullet carries the trigger; these are the examples): deleting, relaxing, or disabling an enforcement mechanism — a hook deny, a `bin/check-plan` gate condition, a `plan-gate-edit` check, a `/post-plan` Phase 6.5 arming condition. **Bootstrap hazard** means the change rewrites the arming, escalation, or auto-merge rules that govern its own merge. Same trigger as `/plan` Step 3's `plan-architect-xhigh` escalation — full clause in `.claude/skills/plan/SKILL.md` Step 3 check 1.
 
-**Why these five bullets.** The trigger list mirrors the surfaces `/plan` Step 4 gate 14 (the auto-merge hold criterion) holds the merge for: a subjective/`Truly-manual` row (14a), a touched security surface (14b), a destructive or schema-tightening migration (14c), new or redesigned user-visible UI/UX (14d), and gate weakening or a bootstrap hazard (14e, the same clause as the `plan-architect-xhigh` escalation). Gate 14 also holds a golden-snapshot change (14f) and a recorded-and-unresolved fork (14g); neither is a triage trigger, because both are plan-time outcomes with no surface to spot before planning. A change that would be held at merge is routed into `/plan` at the start instead, so the defense and its verification get designed up front.
+**Why these five bullets.** The trigger list mirrors the surfaces `/plan` Step 4 gate 14 (the auto-merge hold criterion) holds the merge for: a subjective/`Truly-manual` row (14a), a security surface (14b), a destructive or schema-tightening migration (14c), new user-visible UI/UX (14d), and gate weakening or a bootstrap hazard (14e). Gate 14 also holds a golden-snapshot change (14f) and an unresolved fork (14g); neither is a triage trigger, because both are plan-time outcomes. A change that would be held at merge goes to `/plan` first, so its defense and verification are designed up front.
 
 Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.
 
 ## Inline vs. delegated
 
-Stay inline (Opus edits directly) only when:
+**Inline-edit trial to 2026-11-23.** A design-resolved, machine-verifiable chunk under 5 distinct files is edited inline by Opus (`work-triage.md` § Execution routing). The recipe writer makes the edits, can revise mid-turn, and skips the 17-23K token spawn and the lossy handoff summary. The cost is review independence, partly restored because the Sonnet review agents are a different model from the editor.
+
+For a chunk of 5 or more files, Opus stays inline only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
 - the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~17–23K tokens [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
@@ -88,7 +90,18 @@ Either way the routing decision is **stated, not silent** — one line, like the
 
 **One delegate is the default floor.** When the chunk splits cleanly into parts that do not depend on each other (separate modules, separate test files, a doc sweep beside an unrelated script fix), issue the `Agent` calls in a single message so they run **concurrently**. Chaining one delegate through them serially wastes wall-clock. Each spawn adds roughly 20K tokens of overhead, small next to the session it sits in. Measured 2026-09-23 by `bin/measure-delegate-cost` over 205 Sonnet and 88 Opus automouse impl sessions, with Opus re-priced at opus-5-5 rates: a Sonnet session costs $2.65 at p50 against $4.33 for Opus, and $3.26 against $5.23 per completed plan, and redo rates of 14.7% and 13.3%. Opus plans skew harder, so read this as observational evidence. [CORRECTED 2026-09-23: was "we sit ~2.5× below delegation break-even", a 2026-08-25 spawn-count figure from Opus 5 sessions in `agent-tiering-detail.md` § Fan out by independence.] Wall-clock is what the split buys.
 
-The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, and that is deliberate rather than a leftover: a file sweep is one coherent change whose edits must stay consistent with each other, so its parts are *dependent* and splitting them buys no wall-clock while risking divergence. Fan out across **independent** chunks, not within a single sweep.
+The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, by design: a file sweep is one coherent change whose parts are *dependent*, so splitting it buys no wall-clock and risks divergence. Fan out across **independent** chunks, not within a single sweep.
+
+### Inline-edit trial measurement
+
+`bin/lib/opus-trial-cost.jq` sums the `cost` field of `bin/lib/automouse-pricer --index` per worktree transcript dir and reports `n`, median, mean, and p90 for a half-open window `[from, to)`. Under 20 tasks it sets `note: "insufficient-sample"`, the floor in `bin/measure-delegate-cost`. `cost` is recomputed from transcripts and includes subagents, unlike `logged_cost` (`bin/automouse/backfill-costs`). Transcripts age out after 30 days, so the before-window stats were saved to `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. The review compares that file with a fresh run. The command is in `work-triage.md` § Execution routing.
+
+Known limits:
+
+- **Headless dilution.** Automouse, `/post-plan`, and `bin/plan-now` sessions share the worktree dirs and no index field separates them. They dilute both windows about equally.
+- **The headless ledgers cannot see the trial.** `work-triage.md` § Calibration makes this rule a no-op under headless/automouse, so the sidecar `*.costs.jsonl` files price only sessions the trial never changes.
+- **Boundary tasks.** A worktree that spans `from` is priced only for sessions on or after it.
+- **Observational evidence.** Task mix differs between windows. Treat a median shift as one signal next to redo rate and review findings.
 
 ## /plan verdict routing
 

@@ -48,8 +48,8 @@ CONFIX_DENIED_SUBSTRINGS = ("-snapshots/",)
 # Vacuous-test scan, per language, over the ADDED lines of a test path only.
 # (test-declaration regex, assertion regex, forbidden-marker regex)
 _VACUOUS_RULES = {
-    ".php": (re.compile(r"#\[Test\]\s*(?:public\s+)?function\s+\w+\s*\("
-                        r"|(?:public\s+)?function\s+test\w*\s*\(|#\[Test\]"),
+    ".php": (re.compile(r"#\[Test\](?:\s*#\[[^\n]*\])*\s*(?:public\s+)?function\s+\w+\s*\("
+                        r"|(?:public\s+)?function\s+test\w*\s*\("),
              re.compile(r"(->|::)assert\w+\(|expectException\w*\("),
              re.compile(r"markTestSkipped|markTestIncomplete"
                         r"|assertTrue\(\s*true\s*\)|assertFalse\(\s*false\s*\)")),

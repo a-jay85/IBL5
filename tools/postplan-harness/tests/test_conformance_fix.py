@@ -169,6 +169,19 @@ def test_classify_rejects_non_test_matrix_path_and_denied_prefixes():
     assert cls.unfixable[c] == "denied-path"
 
 
+@pytest.mark.parametrize("path", [
+    "ibl5/docs/decisions/NNNN-some-slug.md",
+    "ibl5/classes/Fixer/*.php",
+    "ibl5/classes/Fixer/Thing.php:41",
+    "ibl5/classes/Fixer/",
+])
+def test_classify_refuses_non_literal_missing_file_tokens(path):
+    item = f"MISSING-FILE: {path} (plan Critical File never appeared in the diff)"
+    cls = conformance_fix.classify([item], [], [])
+    assert cls.fixable == []
+    assert cls.unfixable == {item: "non-literal-path"}
+
+
 def test_classify_method_items_target_plan_cited_test_paths():
     plan = _plan()
     assert conformance_fix.plan_test_paths(plan) == [PROMISED]

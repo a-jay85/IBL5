@@ -101,6 +101,15 @@ def _denied(path: str) -> bool:
             or bool(fidelity.denied_local_gate_edits([path])))
 
 
+_NON_LITERAL_RE = re.compile(r"[*?\[]|:\d|/$|(?:^|/)NNN+[_-]")
+
+
+def _non_literal(path: str) -> bool:
+    """True for a plan token that is not one writable file: glob, `:NNN` suffix, directory
+    or `NNN_`/`NNNN-` number placeholder. The fixer cannot name the real file for these."""
+    return bool(_NON_LITERAL_RE.search(path)) or ".../" in path
+
+
 def _item_subject(item: str, prefix: str) -> str:
     """The path or name an item carries: the text after `prefix` up to ` (`."""
     rest = item[len(prefix):].strip()
@@ -130,7 +139,7 @@ def classify(items: list[str], plan_test_paths: list[str],
     """
     del plan_critical_paths  # MISSING-FILE carries its own path; kept for the call shape
     out = Classification()
-    test_targets = [p for p in plan_test_paths if not _denied(p)]
+    test_targets = [p for p in plan_test_paths if not _denied(p) and not _non_literal(p)]
     for item in items:
         if item.startswith(NEVER_FIXABLE_PREFIXES):
             out.unfixable[item] = "never-fixable"
@@ -138,6 +147,8 @@ def classify(items: list[str], plan_test_paths: list[str],
             path = _item_subject(item, "MISSING-FILE:")
             if _denied(path):
                 out.unfixable[item] = "denied-path"
+            elif _non_literal(path):
+                out.unfixable[item] = "non-literal-path"
             elif exists is not None and not TEST_PATH_RE.search(path) and exists(path):
                 out.unfixable[item] = "existing-non-test-file"
             else:
@@ -161,6 +172,8 @@ def classify(items: list[str], plan_test_paths: list[str],
                 out.unfixable[item] = "denied-path"
             elif not TEST_PATH_RE.search(path):
                 out.unfixable[item] = "non-test-path"
+            elif _non_literal(path):
+                out.unfixable[item] = "non-literal-path"
             else:
                 out.fixable.append(Target(item, "test-path", [path]))
         else:

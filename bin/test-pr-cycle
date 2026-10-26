@@ -427,6 +427,7 @@ run_in() {
     [[ -n "${SKIPHELD+x}" ]]  && extra+=("PR_CYCLE_SKIP_HELD_UNCHANGED=$SKIPHELD")
     [[ -n "${UPOLLS+x}" ]]    && extra+=("PR_CYCLE_UNKNOWN_POLLS=$UPOLLS")
     [[ -n "${USLEEP+x}" ]]    && extra+=("PR_CYCLE_UNKNOWN_SLEEP=$USLEEP")
+    [[ -n "${DIRTYRES+x}" ]]  && extra+=("PR_CYCLE_DIRTY_RESERVE=$DIRTYRES")
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
@@ -459,6 +460,25 @@ arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
 # Path to the per-run scratch directory. Mirrors the driver: PR_CYCLE_TS resolves to
 # ${TSPIN:-$TSBASE}, so cases that set TSPIN (e.g. case 21/22/23) use their own subdir.
 rundir() { echo "/tmp/pr-cycle-${TSPIN:-$TSBASE}"; }
+# gen_attack N_ORDERED N_DIRTY: a plan of attack with N_ORDERED table rows (#7001, #7002, ...)
+# and N_DIRTY `## Excluded` DIRTY bullets (#7901, #7902, ...), in the bullet shape bin/pr-attack
+# emits (copied from ATTACK_EXCLUDED). Rescue slugs are dirty-<i> so ro_setup can name the branch.
+gen_attack() {
+    local _no="$1" _nd="$2" _i
+    printf '# Plan of attack\n\n| # | PR | Constraint | Needs you? |\n|---|----|-----------|------------|\n'
+    for ((_i = 1; _i <= _no; _i++)); do
+        printf '| %d | #%d ord-%d | none | no |\n' "$_i" "$((7000 + _i))" "$_i"
+    done
+    if [ "$_nd" -gt 0 ]; then
+        printf '\n## Excluded\n\n'
+        for ((_i = 1; _i <= _nd; _i++)); do
+            printf -- '- #%d dirty-%d — DIRTY (merge conflict; rebase before it can be ordered)\n' \
+                "$((7900 + _i))" "$_i"
+        done
+    fi
+}
+# prlist: the --pr-list csv of the first post-plan-fleet call the worker made.
+prlist() { sed -nE '1s/.*--pr-list ([0-9,]+).*/\1/p' "$SCRATCH/ready.argv"; }
 # ==========================================================================================
 # 1 — flag validation
 # ==========================================================================================
@@ -3756,6 +3776,19 @@ reset_state
 run --dry-run --only 101,abc --max-ready 2
 [[ $RC -eq 2 ]] || fail "tick argv contract: '--only 101,abc' exit $RC, want 2"
 end_case "tick-argv-contract"
+
+# ==========================================================================================
+# 42 — DIRTY rescues get reserved --max-ready slots (PR_CYCLE_DIRTY_RESERVE)
+# ==========================================================================================
+begin_case
+reset_state
+gen_attack 34 3 > "$SCRATCH/attack-out"
+triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 10
+[[ $RC -eq 0 ]] || fail "case 42 34+3: exit $RC, want 0"
+[[ "$(prlist)" == "7001,7002,7003,7004,7005,7006,7007,7901,7902,7903" ]] \
+    || fail "case 42 34+3 cap 10: want 7 ordered + 3 DIRTY, got $(prlist)"
+end_case "case 42 dirty reserve"
 
 # --- summary --------------------------------------------------------------------------------
 h_done

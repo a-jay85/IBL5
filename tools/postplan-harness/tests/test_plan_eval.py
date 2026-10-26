@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
@@ -136,12 +137,22 @@ def test_find_followups_window_and_subject(tmp_path):
     r = _mk_repo(tmp_path)
     root = r["root"]
     merged_at = NOW - 60 * DAY
-    _commit(root, "feat: later feature", merged_at + 1 * DAY, {"a.txt": "feat\n"})
+    _commit(root, "feat: later feature", merged_at + 1 * DAY, {"unrelated.txt": "feat\n"})
     near = _commit(root, "fix: quick fix", merged_at + 3 * DAY, {"a.txt": "fix1\n"})
     _commit(root, "fix: much later", merged_at + 20 * DAY, {"b.txt": "fix2\n"})
     case = _mk_case(base_sha=r["base"], merge_sha=r["merge"])
     found = pe.find_followups(root, case, 14)
     assert found == [f"c1: follow-up {near[:12]} fix: quick fix"]
+
+
+def test_find_followups_ignores_fix_not_blaming_pr_lines(tmp_path):
+    r = _mk_repo(tmp_path)
+    root = r["root"]
+    merged_at = NOW - 60 * DAY
+    # Appends to a.txt without changing the PR's line, so it does not blame the PR.
+    _commit(root, "fix: append only", merged_at + 2 * DAY, {"a.txt": "a2\nextra\n"})
+    case = _mk_case(base_sha=r["base"], merge_sha=r["merge"])
+    assert pe.find_followups(root, case, 14) == []
 
 
 def test_validate_git_checks_parent_and_files(tmp_path):
@@ -167,3 +178,112 @@ def test_plan_surface_hash_tracks_skill_edit(tmp_path):
 
 def test_validate_cli_rejects_unknown_flag():
     assert pe.main(["validate", "--bogus"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: mine
+# ---------------------------------------------------------------------------
+
+def test_parse_tier_prefers_specific_suffix():
+    assert pe.parse_tier("Step 3 MUST route to plan-architect-xhigh.") == "plan-architect-xhigh"
+    assert pe.parse_tier("routes to the default plan-architect") == "plan-architect"
+    assert pe.parse_tier("plan-architect-sonnet (recipe)") == "plan-architect-sonnet"
+    assert pe.parse_tier("no tier named") == "plan-architect"
+
+
+def test_expected_files_drop_last_verified_only(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    base = _commit(repo, "base", NOW, {"a.md": "---\nlast_verified: 2026-01-01\n---\nA\n",
+                                       "b.md": "B\n"})
+    head = _commit(repo, "docs", NOW + DAY, {"a.md": "---\nlast_verified: 2026-02-01\n---\nA\n",
+                                             "b.md": "B2\n"})
+    assert pe.expected_files_for(repo, base, head) == ["b.md"]
+
+
+def _mine_repo(tmp_path, spec):
+    """spec: list of (slug, pr, tier, prompt_text). One merge commit per slug, 2 files each."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    _commit(repo, "base", NOW - 100 * DAY, {"seed.txt": "s\n"})
+    lookup, rows = {}, []
+    for i, (slug, pr, tier, prompt) in enumerate(spec):
+        sha = _commit(repo, f"feat: {slug} (#{pr})", NOW - 90 * DAY + i * 60,
+                      {f"{slug}/x.txt": "x\n", f"{slug}/y.txt": "y\n"})
+        if pr is not None:
+            lookup[slug] = (pr, sha)
+        rows.append({"slug": slug, "tier_line": f"Step 3 MUST route to {tier}.",
+                     "prompt": prompt})
+    return repo, rows, lookup
+
+
+def _spec(n_default, n_sonnet, n_xhigh):
+    spec, pr = [], 100
+    for tier, n in (("plan-architect", n_default), ("plan-architect-sonnet", n_sonnet),
+                    ("plan-architect-xhigh", n_xhigh)):
+        short = {"plan-architect": "d", "plan-architect-sonnet": "s",
+                 "plan-architect-xhigh": "x"}[tier]
+        for i in range(n):
+            # z-prefixed slugs sort opposite to PR order, so a slug sort picks wrong rows
+            spec.append((f"{'z' * (n - i)}{short}{i}", pr, tier, "p" * (50 + pr)))
+            pr += 1
+    return spec
+
+
+def test_select_cases_quota_and_order(tmp_path):
+    repo, rows, lookup = _mine_repo(tmp_path, _spec(8, 3, 4))
+    cases = pe.select_cases(rows, lookup.get, repo, 14, out=io.StringIO())
+    by_tier = {t: sorted(c["pr"] for c in cases if c["tier"] == t) for t in pe.TIERS}
+    assert by_tier["plan-architect"] == [100, 101, 102, 103, 104]
+    assert by_tier["plan-architect-sonnet"] == [108, 109]
+    assert by_tier["plan-architect-xhigh"] == [111, 112, 113]
+
+
+def test_select_cases_shortfall_backfills_default(tmp_path):
+    repo, rows, lookup = _mine_repo(tmp_path, _spec(8, 1, 4))
+    out = io.StringIO()
+    cases = pe.select_cases(rows, lookup.get, repo, 14, out=out)
+    assert len(cases) == 10
+    tiers = [c["tier"] for c in cases]
+    assert tiers.count("plan-architect") == 6
+    assert tiers.count("plan-architect-sonnet") == 1
+    assert "shortfall plan-architect-sonnet 1/2" in out.getvalue()
+
+
+def test_select_cases_zero_tier_exits_1(tmp_path, monkeypatch):
+    repo, rows, lookup = _mine_repo(tmp_path, _spec(6, 2, 0))
+    pdir = tmp_path / "prompts-in"
+    pdir.mkdir()
+    lines = []
+    for r in rows:
+        (pdir / f"{r['slug']}.txt").write_text(r["prompt"])
+        lines.append(f"{r['slug']}\t0\t2026-01-01\t0\t{r['tier_line']}")
+    (pdir / "INDEX.tsv").write_text("\n".join(lines) + "\n")
+    monkeypatch.setattr(pe, "gh_lookup", lookup.get)
+    out_dir = tmp_path / "out"
+    rc = pe.main(["mine", "--prompts-dir", str(pdir), "--repo", str(repo),
+                  "--out-dir", str(out_dir)])
+    assert rc == 1
+    assert not (out_dir / "corpus.json").exists()
+
+
+def test_select_cases_core_is_smallest_prompts(tmp_path):
+    spec = _spec(5, 2, 3)
+    sizes = {"zzzzzd0": 900, "zzzzd1": 300, "zzzd2": 100, "zzd3": 700, "zd4": 500,
+             "zzs0": 400, "zs1": 200, "zzzx0": 800, "zzx1": 150, "zx2": 600}
+    spec = [(slug, pr, tier, "p" * sizes[slug]) for slug, pr, tier, _ in spec]
+    repo, rows, lookup = _mine_repo(tmp_path, spec)
+    cases = pe.select_cases(rows, lookup.get, repo, 14, out=io.StringIO())
+    assert sorted(c["id"] for c in cases if c["core"]) == sorted(["zzzd2", "zzzzd1", "zs1", "zzx1"])
+
+
+def test_select_cases_skips_missing_pr(tmp_path):
+    spec = _spec(6, 2, 3)
+    spec[0] = (spec[0][0], None, spec[0][2], spec[0][3])
+    repo, rows, lookup = _mine_repo(tmp_path, spec)
+    out = io.StringIO()
+    cases = pe.select_cases(rows, lookup.get, repo, 14, out=out)
+    assert f"skip {spec[0][0]}: no merged PR" in out.getvalue()
+    assert spec[0][0] not in {c["id"] for c in cases}

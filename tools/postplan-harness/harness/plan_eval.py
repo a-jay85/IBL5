@@ -19,6 +19,8 @@ from typing import Callable, Optional, TextIO
 from .reviewer_eval import (
     EvalUsageError,
     SurfaceError,
+    blame_origins,
+    diff_line_sets,
     load_corpus,
     normalize_path,
     read_git_ref,
@@ -182,8 +184,15 @@ def find_followups(repo: Path, case: dict, window_days: int) -> list[str]:
         sha, when, subject = parts
         if int(when) - merged_at > window_days * 86400:
             continue
-        if re.match(r"^(fix|Revert)", subject):
-            out.append(f"{case['id']}: follow-up {sha[:12]} {subject}")
+        if not re.match(r"^(fix|Revert)", subject):
+            continue
+        # A follow-up must change a line the PR wrote (reviewer-eval's "blamed" rule);
+        # an unrelated fix that only shares a busy file does not count.
+        for f in case["expected_files"]:
+            removed, _ = diff_line_sets(repo, sha, f)
+            if any(o == case["merge_sha"] for o, _ in blame_origins(repo, f"{sha}^", f, removed)):
+                out.append(f"{case['id']}: follow-up {sha[:12]} {subject}")
+                break
     return out
 
 
@@ -304,6 +313,153 @@ def overlay_probe(root: Path, corpus: dict) -> list[str]:
     return []
 
 
+# ---------------------------------------------------------------------------
+# Phase 2: `mine` (deterministic case selection from the frozen prompt set)
+# ---------------------------------------------------------------------------
+
+QUOTA = (("plan-architect", 5), ("plan-architect-sonnet", 2), ("plan-architect-xhigh", 3))
+CORPUS_SIZE = sum(n for _, n in QUOTA)
+_TIER_RE = re.compile(r"plan-architect(?:-sonnet|-xhigh)?")
+_LAST_VERIFIED_RE = re.compile(r"^[+-]last_verified:")
+
+
+class MineFailure(RuntimeError):
+    """The prompt set cannot fill a corpus; CLI exit 1."""
+
+
+def parse_tier(first_line: str) -> str:
+    m = _TIER_RE.search(first_line)
+    return m.group(0) if m else "plan-architect"
+
+
+def expected_files_for(repo: Path, base_sha: str, merge_sha: str) -> list[str]:
+    names = _git(repo, "diff", "--name-only", base_sha, merge_sha).stdout.splitlines()
+    out: list[str] = []
+    for name in names:
+        diff = _git(repo, "diff", "-U0", base_sha, merge_sha, "--", name).stdout
+        changed = [ln for ln in diff.splitlines()
+                   if ln[:1] in ("+", "-") and not ln.startswith(("+++", "---"))]
+        if changed and all(_LAST_VERIFIED_RE.match(ln) for ln in changed):
+            continue
+        out.append(name)
+    return out
+
+
+def select_cases(rows: list[dict], lookup: Callable[[str], Optional[tuple]],
+                 repo: Path, window_days: int, out: TextIO = sys.stdout) -> list[dict]:
+    """Rows carry slug, tier_line, prompt (text). Returns cases with prompt_text attached."""
+    eligible: list[dict] = []
+    for row in rows:
+        slug = row["slug"]
+        if not _ID_RE.match(slug):
+            print(f"skip {slug}: bad slug", file=out)
+            continue
+        found = lookup(slug)
+        if found is None:
+            print(f"skip {slug}: no merged PR", file=out)
+            continue
+        pr, merge_sha = found
+        parent = _git(repo, "rev-parse", f"{merge_sha}^1")
+        if parent.returncode != 0:
+            print(f"skip {slug}: merge {merge_sha[:12]} not in local history", file=out)
+            continue
+        base_sha = parent.stdout.strip()
+        # Files the prompt already names are the human's input, not something the plan
+        # found, so recall is scored only on the rest.
+        files = [f for f in expected_files_for(repo, base_sha, merge_sha)
+                 if f not in row["prompt"]]
+        if not (MIN_EXPECTED <= len(files) <= MAX_EXPECTED):
+            print(f"skip {slug}: {len(files)} expected files", file=out)
+            continue
+        case = {"id": slug, "pr": pr, "base_sha": base_sha, "merge_sha": merge_sha,
+                "tier": parse_tier(row["tier_line"]), "core": False,
+                "prompt": f"prompts/{slug}.txt", "expected_files": sorted(files)}
+        if find_followups(repo, case, window_days):
+            print(f"skip {slug}: has a follow-up fix", file=out)
+            continue
+        eligible.append({**case, "prompt_text": row["prompt"]})
+    eligible.sort(key=lambda c: c["pr"])
+    by_tier = {t: [c for c in eligible if c["tier"] == t] for t, _ in QUOTA}
+    chosen: list[dict] = []
+    for tier, want in QUOTA:
+        have = by_tier[tier]
+        if not have:
+            raise MineFailure(f"no eligible {tier} case")
+        if len(have) < want:
+            print(f"shortfall {tier} {len(have)}/{want}", file=out)
+        chosen.extend(have[:want])
+    spare = [c for c in by_tier["plan-architect"] if c not in chosen]
+    while len(chosen) < CORPUS_SIZE and spare:
+        chosen.append(spare.pop(0))
+    _mark_core(chosen)
+    return sorted(chosen, key=lambda c: c["id"])
+
+
+def _mark_core(cases: list[dict]) -> None:
+    def size_key(c: dict) -> tuple:
+        return (len(c["prompt_text"].encode("utf-8")), c["pr"])
+    for tier in TIERS:
+        ranked = sorted((c for c in cases if c["tier"] == tier), key=size_key)
+        take = 2 if tier == "plan-architect" else 1
+        for c in ranked[:take]:
+            c["core"] = True
+
+
+def read_index(prompts_dir: Path) -> list[dict]:
+    rows: list[dict] = []
+    for line in (prompts_dir / "INDEX.tsv").read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t")
+        if len(parts) < 5:
+            continue
+        slug = parts[0]
+        try:
+            prompt = (prompts_dir / f"{slug}.txt").read_text(encoding="utf-8")
+        except OSError:
+            continue
+        rows.append({"slug": slug, "tier_line": parts[4], "prompt": prompt})
+    return rows
+
+
+def gh_lookup(slug: str) -> Optional[tuple]:
+    r = subprocess.run(["gh", "pr", "list", "-R", "a-jay85/IBL5", "--state", "merged",
+                        "--head", slug, "--json", "number,mergeCommit", "--limit", "1"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise EvalUsageError(f"gh pr list failed for {slug}: {r.stderr.strip()}")
+    items = json.loads(r.stdout or "[]")
+    if not items or not items[0].get("mergeCommit"):
+        return None
+    return int(items[0]["number"]), items[0]["mergeCommit"]["oid"]
+
+
+def _cmd_mine(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
+    root = _repo_root(args.repo)
+    prompts_dir = Path(args.prompts_dir)
+    out_dir = Path(args.out_dir) if args.out_dir else root / Path(DEFAULT_CORPUS).parent
+    window_days = 14
+    try:
+        cases = select_cases(read_index(prompts_dir), gh_lookup, root, window_days, out)
+    except MineFailure as e:
+        print(f"ERROR {e}", file=out)
+        return 1
+    for c in cases:
+        print(f"{c['id']} {c['pr']} {c['tier']} {'core' if c['core'] else '-'} "
+              f"{len(c['expected_files'])} {len(c['prompt_text'].encode('utf-8'))}", file=out)
+    if args.dry_run:
+        return 0
+    (out_dir / "prompts").mkdir(parents=True, exist_ok=True)
+    for c in cases:
+        (out_dir / c["prompt"]).write_bytes(c["prompt_text"].encode("utf-8"))
+    corpus = {"schema_version": SCHEMA_VERSION, "window_days": window_days,
+              "cases": [{k: v for k, v in c.items() if k != "prompt_text"} for c in cases]}
+    (out_dir / "corpus.json").write_text(
+        json.dumps(corpus, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    errors = validate_schema(corpus, out_dir)
+    for e in errors:
+        print(f"ERROR {e}", file=out)
+    return 1 if errors else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="plan_eval")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -311,6 +467,12 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--corpus", metavar="PATH", default=None)
     v.add_argument("--repo", metavar="DIR", default=None)
     v.set_defaults(func=_cmd_validate)
+    mn = sub.add_parser("mine", help="select the corpus from the frozen prompt set")
+    mn.add_argument("--prompts-dir", metavar="DIR", required=True)
+    mn.add_argument("--out-dir", metavar="DIR", default=None)
+    mn.add_argument("--repo", metavar="DIR", default=None)
+    mn.add_argument("--dry-run", action="store_true")
+    mn.set_defaults(func=_cmd_mine)
     return parser
 
 

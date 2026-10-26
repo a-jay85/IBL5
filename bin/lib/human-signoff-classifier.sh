@@ -1,5 +1,6 @@
 # shellcheck shell=bash
 #
+# Row 32 live test: this line changes the PR diff and is reverted next.
 # bin/lib/human-signoff-classifier.sh — single source of truth for the
 # .github/workflows/human-signoff.yml feature-PR sign-off classifier (ADR-0062),
 # sourced by BOTH the workflow and the regression harness

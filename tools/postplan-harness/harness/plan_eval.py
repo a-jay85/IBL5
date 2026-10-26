@@ -693,6 +693,7 @@ class ReplayClone:
 
     def __enter__(self) -> "ReplayClone":
         self.tmp = Path(tempfile.mkdtemp(prefix="plan-eval-")).resolve()
+        ok = False
         try:
             r = subprocess.run(["git", "clone", "-q", "--local", "--no-checkout",
                                 str(self.repo), str(self.root)],
@@ -710,9 +711,10 @@ class ReplayClone:
             _git_check(self.root, "reflog", "expire", "--expire=now", "--all")
             (self.plans_dir / ".drafts").mkdir(parents=True)
             self.stub_bin.mkdir()
-        except BaseException:
-            self._cleanup()
-            raise
+            ok = True
+        finally:
+            if not ok:
+                self._cleanup()
         return self
 
     def _cleanup(self) -> None:

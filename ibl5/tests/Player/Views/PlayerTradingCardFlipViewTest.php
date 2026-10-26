@@ -8,11 +8,12 @@ use PHPUnit\Framework\TestCase;
 use Player\Player;
 use Player\Stats\PlayerStats;
 use Player\Views\PlayerTradingCardFlipView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerTradingCardFlipView */
 class PlayerTradingCardFlipViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * Build a Player stub with every getter called by both sub-views (FrontView + BackView)

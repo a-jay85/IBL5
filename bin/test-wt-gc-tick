@@ -387,7 +387,7 @@ bd_commit() {
 # mk_wt <name> <branch> [ahead=N] [age_days=N] [dirt=KIND] — a worktree off
 # origin/master under <env>/IBL5-worktrees/<name>. Own commits and the dir
 # mtime are backdated N days. KIND: none|match|diff|untracked-match|
-# untracked-diff|deleted|symlink.
+# untracked-diff|staged-diff|deleted|symlink.
 mk_wt() {
     local name="$1" br="$2" ahead=0 age=0 dirt=none kv i=1 ep wt
     shift 2
@@ -419,6 +419,10 @@ mk_wt() {
             bd_commit "$wt" "$ep" "drop readme"
             git -C "$wt" show origin/master:README.md > "$wt/README.md" ;;
         untracked-diff) printf 'new\n' > "$wt/new.txt" ;;
+        staged-diff)
+            printf 'staged\n' > "$wt/README.md"
+            git -C "$wt" add README.md
+            git -C "$wt" show origin/master:README.md > "$wt/README.md" ;;
         deleted) rm -f "$wt/README.md" ;;
         symlink) rm -f "$wt/README.md"; ln -s /etc/hosts "$wt/README.md" ;;
     esac
@@ -1176,6 +1180,18 @@ d_wt d5 symlink
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep d5: path README.md' || note_err "symlink not kept"
 [ -d "$(wt_dir d5)" ] || note_err "removed"
+finish_case
+
+# D5b — MM: the index holds an edit, the working copy matches master. The
+# staged blob is never in the tips file, so reaping would lose it.
+fx D5b-staged-diff-kept
+d_wt d5b staged-diff
+rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc D5b 0
+log_has 'dirty keep d5b: path README.md status MM' || note_err "MM not kept"
+[ -d "$(wt_dir d5b)" ] || note_err "removed"
+[ "$(git -C "$(wt_dir d5b)" show :README.md 2>/dev/null)" = staged ] || note_err "staged content lost"
+has_branch d5b || note_err "branch deleted"
 finish_case
 
 fx D6-merge-unproven-kept

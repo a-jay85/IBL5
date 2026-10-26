@@ -1620,6 +1620,148 @@ if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate AB: a post-impl CLI-executable row that asserts an absence with a negated
+# grep (`! grep`, `! rg`, `! git grep`) must name a durable in-repo check in its
+# location cell, or end its What-to-verify cell with (one-time-check: <reason>).
+# Post-plan Phase 5.0 runs the cell once and CI never re-runs it, so a later
+# master merge can reintroduce the deleted symbol with no signal (PR #2515:
+# $bgcolor2 was deleted, master grew a reader in News, CI stayed green).
+# Rows come from $GATEP_MATRIX (fence-aware) so a documented example never
+# trips it. Additive by construction: the gate only appends viol lines, shares
+# no state with any other gate, and reads _y_shape from gate Y above.
+# Detector is the narrow negated-grep form only. `grep -c ... = 0` and
+# `test -z "$(grep ...)"` are left alone: the 2026-10-20 corpus sample showed
+# them dominated by diff-hygiene counts and presence-and-absence mixes.
+# Durable means: a command segment outside the negated greps runs a file
+# (bin/test-*, bin/check-*, a test under ibl5/tests/, or a *_test.go) as its
+# command word or as an argument of a test runner. Either the file exists
+# under $REPO_ROOT and contains the longest literal run of one grepped
+# pattern, or ## Critical Files lists it as a change target (the PR writes
+# it, so the file cannot be read at plan time). A bin/ file must also be
+# named in a workflow, or its segment must carry `# (wired in this PR)`.
+# That shows the check plausibly carries the assertion; it cannot show the
+# check asserts absence. A bare runner (`vendor/bin/phpunit --filter X`,
+# `vitest`, `go test`) names no file, so it never counts. A path in an echo
+# or a shell comment does not count. A segment carrying `(one-shot)` is
+# dropped on its own; the rest still count.
+# ---------------------------------------------------------------------------
+_ab_neg='(^|[;(&|])[[:space:]]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_seg_neg='^[[:space:](]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_durable='^(\./)?(bin/(test|check)-[A-Za-z0-9_.-]+|(ibl5/)?tests/[A-Za-z0-9_./-]+\.(php|ts)|[A-Za-z0-9_./-]*_test\.go)$'
+_ab_runner='^(\./)?(vendor/bin/phpunit|npx|bash|sh|php|go)$'
+_ab_cf="$(cf_parse_section "$PLAN_FILE" 2>/dev/null | sed -n 's/^MUST_APPEAR://p')"
+# _ab_split <cell> — one command segment per line, split on ; & | outside quotes.
+_ab_split() {
+    awk '{
+        n = length($0); seg = ""; q = ""
+        for (i = 1; i <= n; i++) {
+            c = substr($0, i, 1)
+            if (q != "") { seg = seg c; if (c == q) q = ""; continue }
+            if (c == "\047" || c == "\"") { q = c; seg = seg c; continue }
+            if (c == ";" || c == "&" || c == "|") { print seg; seg = ""; continue }
+            seg = seg c
+        }
+        print seg
+    }' <<< "$1"
+}
+# _ab_cores <negated-grep segment> — print the longest identifier-like run
+# (3+ chars) of each `|` alternative of each pattern the grep searches for.
+# Patterns are the -e / --regexp values, else the first non-option word.
+# Regex escapes (`\b`, `\(`) split runs, and a trailing `$` anchor is dropped.
+# xargs does the shell-style unquoting; an unbalanced quote prints nothing,
+# so the row stays undurable (fail-closed).
+_ab_cores() {
+    _abc_words="$(printf '%s\n' "$1" | xargs -n1 printf '%s\n' 2>/dev/null)" || return 0
+    _abc_pats=""; _abc_first=""; _abc_take=0; _abc_skip=0; _abc_e=0
+    while IFS= read -r _abc_w; do
+        if [ "$_abc_take" = 1 ]; then _abc_pats+="$_abc_w"$'\n'; _abc_take=0; continue; fi
+        if [ "$_abc_skip" = 1 ]; then _abc_skip=0; continue; fi
+        case "$_abc_w" in
+            '!'|'('|'(!'|grep|rg|git) : ;;
+            -e|--regexp) _abc_take=1; _abc_e=1 ;;
+            --regexp=*) _abc_pats+="${_abc_w#--regexp=}"$'\n'; _abc_e=1 ;;
+            -f|-m|-A|-B|-C|-d|-D|-g|-t|-T|-j|-M|--include|--exclude|--exclude-dir|--exclude-from|--glob|--type|--type-not|--max-count|--max-depth|--context|--replace) _abc_skip=1 ;;
+            -[A-Za-z]*e) _abc_take=1; _abc_e=1 ;;
+            -[A-Za-z]*[fmABCdDgtTjM]) _abc_skip=1 ;;
+            -*) : ;;
+            *) [ -n "$_abc_first" ] || _abc_first="$_abc_w" ;;
+        esac
+    done <<< "$_abc_words"
+    [ "$_abc_e" = 1 ] || _abc_pats="$_abc_first"
+    while IFS= read -r _abc_p; do
+        [ -n "$_abc_p" ] || continue
+        _abc_p="${_abc_p//\\|/|}"
+        _abc_p="$(sed -E 's/\\./ /g' <<< "$_abc_p")"
+        while IFS= read -r _abc_alt; do
+            grep -oE '[A-Za-z0-9_$][A-Za-z0-9_$-]{2,}' <<< "$_abc_alt" | sed 's/\$$//' \
+                | awk '{ if (length($0) > length(b)) b = $0 } END { if (length(b) > 2) print b }'
+        done <<< "${_abc_p//|/$'\n'}"
+    done <<< "$_abc_pats"
+}
+# _ab_path_ok <path> <segment> <cores> — 0 when the named file can carry the
+# assertion: listed as a Critical Files change target, or on disk holding a
+# core. A bin/ file must also be wired in a workflow or noted wired in this PR.
+_ab_path_ok() {
+    _abp_p="${1#./}"; _abp_f="$REPO_ROOT/$_abp_p"
+    case "$_abp_p" in
+        tests/*) [ -f "$_abp_f" ] || { _abp_f="$REPO_ROOT/ibl5/$_abp_p"; _abp_p="ibl5/$_abp_p"; } ;;
+        bin/*)
+            case "$2" in
+                *'(wired in this PR)'*) : ;;
+                *) _abp_re="$(sed 's/[.]/\\./g' <<< "$_abp_p")"
+                   grep -rqE -- "(^|[^A-Za-z0-9_./-]|[^A-Za-z0-9_./-]\./|\}/)${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
+            esac ;;
+    esac
+    grep -qxF -- "$_abp_p" <<< "$_ab_cf" && return 0
+    [ -f "$_abp_f" ] || return 1
+    while IFS= read -r _abp_c; do
+        [ -n "$_abp_c" ] || continue
+        grep -qF -- "$_abp_c" "$_abp_f" && return 0
+    done <<< "$3"
+    return 1
+}
+# _ab_is_durable <cell> — 0 when a segment outside the negated greps runs a
+# file that passes _ab_path_ok.
+_ab_is_durable() {
+    _abd_cores=""; _abd_rest=""
+    while IFS= read -r _abd_seg; do
+        case "$_abd_seg" in *'(one-shot)'*) continue ;; esac
+        if grep -qE "$_ab_seg_neg" <<< "$_abd_seg"; then
+            _abd_cores+="$(_ab_cores "$_abd_seg")"$'\n'
+        else
+            _abd_rest+="$_abd_seg"$'\n'
+        fi
+    done < <(_ab_split "$1")
+    [ -n "${_abd_cores//[[:space:]]/}" ] || return 1
+    while IFS= read -r _abd_seg; do
+        _abd_cmd="${_abd_seg%%#*}"
+        _abd_cmd="${_abd_cmd//[\`()]/ }"
+        read -ra _abd_w <<< "$_abd_cmd"
+        [ "${#_abd_w[@]}" -gt 0 ] || continue
+        if grep -qE "$_ab_durable" <<< "${_abd_w[0]}"; then
+            _ab_path_ok "${_abd_w[0]}" "$_abd_seg" "$_abd_cores" && return 0
+        elif grep -qE "$_ab_runner" <<< "${_abd_w[0]}"; then
+            for _abd_a in "${_abd_w[@]:1}"; do
+                grep -qE "$_ab_durable" <<< "$_abd_a" || continue
+                _ab_path_ok "$_abd_a" "$_abd_seg" "$_abd_cores" && return 0
+            done
+        fi
+    done <<< "$_abd_rest"
+    return 1
+}
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    # The same Timing test post-plan Phase 5.0 uses to pick the rows it runs.
+    grep -qiE 'post-impl' <<< "$MC_TIME" || continue
+    grep -qE "$_ab_neg" <<< "$MC_LOC" || continue
+    grep -qE "$_y_shape" <<< "${MC_WHAT//$MSEN/|}" && continue
+    _ab_is_durable "$MC_LOC" && continue
+    viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script, named by path in its own command and containing the grepped token), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate Z: an untagged CLI-executable row whose command runs only outside the repo
 # or against a post-PR CI run. Two arms, checked in order:
 #  (1) ~/, $HOME, /tmp, or gh run|pr|api. A row that also runs a repo path or a

@@ -403,3 +403,97 @@ def test_critical_files_from_real_check_plan(tmp_path):
     plan.write_text(PLAN_GOOD)
     got = pe.critical_files_of(plan, REPO_ROOT / "bin" / "check-plan")
     assert got == ["bin/plan-now", "bin/test-plan-now"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: replay clone, overlay, stub gh, prompt
+# ---------------------------------------------------------------------------
+
+def _git_out(repo, *args):
+    return subprocess.run(["git", "-C", str(repo), *args], check=True,
+                          capture_output=True, text=True).stdout
+
+
+def _abc_repo(tmp_path):
+    repo = tmp_path / "abc"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    a = _commit(repo, "A", NOW, {"f.txt": "a\n"})
+    b = _commit(repo, "B", NOW + 1, {"f.txt": "b\n"})
+    c = _commit(repo, "C", NOW + 2, {"f.txt": "c\n"})
+    subprocess.run(["git", "-C", str(repo), "branch", "feat", c], check=True)
+    subprocess.run(["git", "-C", str(repo), "tag", "v1", c], check=True)
+    return repo, a, b, c
+
+
+def test_replay_clone_hides_future_history(tmp_path):
+    repo, a, b, c = _abc_repo(tmp_path)
+    with pe.ReplayClone(repo, b) as rc:
+        assert _git_out(rc.root, "log", "--all", "--format=%H").split() == [b, a]
+        assert _git_out(rc.root, "tag").strip() == ""
+        assert _git_out(rc.root, "remote").strip() == ""
+        assert (rc.root / "f.txt").read_text() == "b\n"
+        assert (rc.plans_dir / ".drafts").is_dir()
+
+
+def test_replay_clone_removed_on_exit(tmp_path):
+    repo, a, b, c = _abc_repo(tmp_path)
+    with pe.ReplayClone(repo, b) as rc:
+        tmp = rc.tmp
+        assert tmp.is_dir()
+    assert not tmp.exists()
+    with pe.ReplayClone(repo, b, keep=True) as rc:
+        kept = rc.tmp
+    assert kept.is_dir()
+    import shutil
+    shutil.rmtree(kept)
+
+
+def test_replay_clone_bad_sha_raises(tmp_path):
+    repo, a, b, c = _abc_repo(tmp_path)
+    with pytest.raises(pe.SurfaceError):
+        with pe.ReplayClone(repo, "0" * 40):
+            pass
+
+
+def test_overlay_replaces_and_deletes_stale(tmp_path):
+    src = tmp_path / "src"
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "init", "-q", str(src)], check=True)
+    _commit(src, "src", NOW, {".claude/skills/plan/SKILL.md": "new skill\n",
+                              "bin/check-plan": "#!/bin/sh\nexit 0\n"})
+    (src / "bin/check-plan").chmod(0o755)
+    (clone / ".claude/skills/plan").mkdir(parents=True)
+    (clone / ".claude/skills/plan/old.md").write_text("stale\n")
+    (clone / ".claude/skills/plan/SKILL.md").write_text("old skill\n")
+    (clone / "bin").mkdir()
+    (clone / "bin/check-plan").write_text("old\n")
+    pe.overlay_surface(src, clone)
+    assert not (clone / ".claude/skills/plan/old.md").exists()
+    assert (clone / ".claude/skills/plan/SKILL.md").read_text() == "new skill\n"
+    assert os.stat(clone / "bin/check-plan").st_mode & 0o777 == 0o755
+
+
+def test_stub_gh_silent_success(tmp_path):
+    gh = pe.write_stub_gh(tmp_path / "stubbin")
+    r = subprocess.run([str(gh), "pr", "list", "--state", "merged"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
+
+
+def test_build_prompt_rewrites_slug_and_plans_dir(tmp_path):
+    prompt = "Fix the thing.\n\n- Branch slug: real-slug\n- Base: master\n"
+    out = pe.build_prompt(prompt, "eval-x-r1", tmp_path / "plans", "real-slug")
+    assert out.startswith("/plan ")
+    assert "- Branch slug: eval-x-r1" in out
+    assert "- Branch slug: real-slug" not in out
+    assert f"PLAN_FILE: {tmp_path / 'plans'}/eval-x-r1.md" in out
+    assert "~/claude-plans/<slug>.md" not in out
+
+
+def test_canned_plan_passes_check_plan():
+    plan = REPO_ROOT / pe.CANNED_PLAN
+    for tool in ("bin/check-plan", "bin/check-plan-staleness"):
+        r = subprocess.run([str(REPO_ROOT / tool), str(plan)], cwd=str(REPO_ROOT),
+                           capture_output=True, text=True)
+        assert r.returncode == 0, (tool, r.stdout, r.stderr)

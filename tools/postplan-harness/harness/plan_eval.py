@@ -11,8 +11,10 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, TextIO
@@ -309,11 +311,6 @@ def _cmd_validate(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
     return 0
 
 
-def overlay_probe(root: Path, corpus: dict) -> list[str]:
-    """Phase 4 fills this in: clone at the first core base, overlay, run the gates."""
-    return []
-
-
 # ---------------------------------------------------------------------------
 # Phase 2: `mine` (deterministic case selection from the frozen prompt set)
 # ---------------------------------------------------------------------------
@@ -577,6 +574,206 @@ def is_worse(before: PlanScore, after: PlanScore) -> bool:
         raise EvalUsageError("scores not comparable: denominators differ")
     return (after.mech < before.mech or after.files < before.files
             or after.tier < before.tier)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: replay clone, surface overlay, stub gh, eval coda
+# ---------------------------------------------------------------------------
+
+CANNED_PLAN = "tools/postplan-harness/fixtures/plan-eval/canned-plan.md"
+
+# Copied from bin/plan-now's headless coda (PLAN_FILE/NO_PLAN markers, no human,
+# fork rule, self-check, foreground sub-agents); the queue disposition bullet is dropped.
+EVAL_CODA = """
+
+---
+
+**Headless run constraints (appended by `bin/plan-eval` — these override any
+conflicting default in the skill):**
+
+- **Announce your plan's path — in your FINAL message.** Unless you halt with no
+  plan (next bullet), the **last line** of your final message must be exactly this line, on its own, with nothing after it and no
+  backticks, bullet, bold or fence around it:
+  ```
+  PLAN_FILE: {plans_dir}/{slug}.md
+  ```
+  (absolute path). This job attributes the check-plan verdict to your run by that
+  line. **The final message is the only placement that works**: under
+  `claude -p` only your final message reaches this job, so an earlier print is
+  discarded (printing it earlier as well is harmless; the last one wins). This
+  overrides the skill's Step 5.5 and Step 6: skip the queue step, write the Step 6
+  report, then end with this line.
+- **Halting with no plan is legal — end it with `NO_PLAN:` instead.** If you stop
+  without writing any plan (the skill's Step 2.1 found the work fully done), the
+  last line of your final message must be exactly this, bare, on its own:
+  ```
+  NO_PLAN: <one line: why, with the evidence — PR #, commit SHA or file path>
+  ```
+  Use it only when no plan file was written. A run that wrote a plan always ends
+  with `PLAN_FILE:`. Without either line the run is reported `unconfirmed`.
+- **No human is present.** Never call `AskUserQuestion`, never pause for input,
+  never end a turn waiting for an answer. The forks a human could answer were
+  already resolved by the session that drafted this prompt; they appear above as
+  hard constraints.
+- If you hit a genuine `needs-user-input` fork that the constraints above do not
+  settle: pick the safest option, **record the fork and your choice explicitly in
+  the plan's Approach section**, and set `auto_merge: false` in the line-1
+  frontmatter. `auto_merge: false` requires an `## Automouse Hold Justification`
+  section naming the unresolved fork, or `bin/check-plan` gate [H] fails.
+- Before finishing, run `bin/check-plan {plans_dir}/{slug}.md` and then
+  `bin/check-plan-staleness` on the same file, and fix everything they report.
+  This job re-runs both after you exit and logs the verdict. Step 5 of the skill
+  has the remediation table.
+- **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
+  other `Agent`) with `run_in_background: true`, and never start a long task, end
+  your turn, and expect to collect it afterwards. Under `claude -p` the turn you
+  end is the run, so a background result has no next turn to land on and is
+  discarded. If you have already started one, collect it before you finish.
+- Evaluation run. The branch slug is `{slug}`; it overrides any slug named above for
+  the plan file, the draft and any shared-context file.
+- Plans directory override. Everywhere the skill or a rule says `$HOME/claude-plans`
+  or `~/claude-plans` (plans, `.drafts/`, shared-context files you write), use
+  `{plans_dir}` instead. Write nothing under `~/claude-plans`.
+- Do not read `~/claude-plans/{orig_slug}.md`, any `{orig_slug}-<n>.md` variant, or
+  `.drafts/{orig_slug}.draft.md`. A shared-context file the task text names may be read.
+- Never run `bin/automouse/queue`, `bin/plan-now`, `bin/post-plan-now`, `bin/wt-new`,
+  or `gh`; never push a branch; never edit a tracked file.
+"""
+
+_SLUG_LINE_RE = re.compile(r"^- Branch slug: .*$", re.M)
+
+
+def run_slug(case_id: str, k: int) -> str:
+    return f"eval-{case_id}-r{k}"
+
+
+def build_prompt(case_prompt: str, slug: str, plans_dir: Path, orig_slug: str) -> str:
+    text = _SLUG_LINE_RE.sub(f"- Branch slug: {slug}", case_prompt)
+    if not text.lstrip().startswith("/plan"):
+        text = "/plan " + text.lstrip()
+    return text.rstrip("\n") + EVAL_CODA.format(plans_dir=str(plans_dir), slug=slug,
+                                                orig_slug=orig_slug)
+
+
+def _git_check(repo: Path, *args: str) -> str:
+    r = _git(repo, *args)
+    if r.returncode != 0:
+        raise SurfaceError(f"git {' '.join(args)} failed: {r.stderr.strip()[-300:]}")
+    return r.stdout
+
+
+class ReplayClone:
+    """A history-truncated local clone at base_sha in system temp."""
+
+    def __init__(self, repo: Path, base_sha: str, keep: bool = False) -> None:
+        self.repo = Path(repo)
+        self.base_sha = base_sha
+        self.keep = keep
+        self.tmp: Optional[Path] = None
+
+    @property
+    def root(self) -> Path:
+        assert self.tmp is not None
+        return self.tmp / "repo"
+
+    @property
+    def plans_dir(self) -> Path:
+        assert self.tmp is not None
+        return self.tmp / "plans"
+
+    @property
+    def stub_bin(self) -> Path:
+        assert self.tmp is not None
+        return self.tmp / "stubbin"
+
+    def __enter__(self) -> "ReplayClone":
+        self.tmp = Path(tempfile.mkdtemp(prefix="plan-eval-")).resolve()
+        try:
+            r = subprocess.run(["git", "clone", "-q", "--local", "--no-checkout",
+                                str(self.repo), str(self.root)],
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                raise SurfaceError(f"git clone failed: {r.stderr.strip()[-300:]}")
+            _git_check(self.root, "checkout", "-q", "--detach", self.base_sha)
+            for ref in _git_check(self.root, "for-each-ref", "--format=%(refname)").split():
+                _git_check(self.root, "update-ref", "-d", ref)
+            if _git(self.root, "remote").stdout.strip():
+                _git_check(self.root, "remote", "remove", "origin")
+            packed = self.root / ".git" / "packed-refs"
+            if packed.exists():
+                packed.unlink()
+            _git_check(self.root, "reflog", "expire", "--expire=now", "--all")
+            (self.plans_dir / ".drafts").mkdir(parents=True)
+            self.stub_bin.mkdir()
+        except BaseException:
+            self._cleanup()
+            raise
+        return self
+
+    def _cleanup(self) -> None:
+        if self.tmp is not None and not self.keep:
+            shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def __exit__(self, *exc: object) -> None:
+        self._cleanup()
+
+
+def overlay_surface(source_root: Path, clone_root: Path) -> list[str]:
+    files = expand_surface(worktree_lister(source_root))
+    for entry in PLAN_SURFACE_ENTRIES:
+        if entry.endswith("/") or entry.endswith("-"):
+            d = entry.rstrip("/") if entry.endswith("/") else entry.rsplit("/", 1)[0]
+            base = clone_root / d
+            if base.is_dir():
+                for p in sorted(base.rglob("*")):
+                    rel = p.relative_to(clone_root).as_posix()
+                    if p.is_file() and rel.startswith(entry):
+                        p.unlink()
+        else:
+            target = clone_root / entry
+            if target.is_file():
+                target.unlink()
+    copied: list[str] = []
+    for rel in files:
+        src = Path(source_root) / rel
+        if not src.is_file():
+            continue
+        dst = clone_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        copied.append(rel)
+    return copied
+
+
+def write_stub_gh(stub_bin: Path) -> Path:
+    stub_bin.mkdir(parents=True, exist_ok=True)
+    gh = stub_bin / "gh"
+    gh.write_text("#!/bin/sh\nexit 0\n")
+    gh.chmod(0o755)
+    return gh
+
+
+def _tail(text: str, n: int = 5) -> str:
+    return " | ".join(text.strip().splitlines()[-n:])
+
+
+def overlay_probe(root: Path, corpus: dict) -> list[str]:
+    """Clone at the first case's base, overlay today's surface, run both gates on a canned plan."""
+    if not corpus["cases"]:
+        return []
+    first = sorted(corpus["cases"], key=lambda c: c["id"])[0]
+    errors: list[str] = []
+    with ReplayClone(root, first["base_sha"]) as rc:
+        overlay_surface(root, rc.root)
+        plan = rc.plans_dir / "canned-plan.md"
+        shutil.copy2(root / CANNED_PLAN, plan)
+        for tool in ("bin/check-plan", "bin/check-plan-staleness"):
+            r = subprocess.run([str(rc.root / tool), str(plan)], cwd=str(rc.root),
+                               capture_output=True, text=True)
+            if r.returncode != 0:
+                errors.append(f"overlay probe: {tool} rc={r.returncode}: "
+                              f"{_tail(r.stderr or r.stdout)}")
+    return errors
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1040,22 +1040,22 @@ def _cmd_worker(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
     corpus_path = _corpus_path(root, args.corpus)
     cache_dir = Path(args.cache_dir)
     pending = cache_dir / f"{args.case}-r{args.run}.pending"
+    case = _load_case(corpus_path, args.case)
+    kw = dict(repo=root, corpus_dir=corpus_path.parent, cache_dir=cache_dir,
+              model=args.model, timeout=args.timeout,
+              plans_home=Path(args.plans_home) if args.plans_home else None)
+    if args.source_ref:
+        from .gate_backtest_replay import ScratchTree  # lazy, as above
+        with ScratchTree(str(root), args.source_ref) as st:
+            run_case(case, args.run, source_root=Path(st.dir), **kw)
+    else:
+        run_case(case, args.run, source_root=Path(args.source_root), **kw)
+    # run_case wrote the record. On a crash the .pending stays, so key_state
+    # reports the documented degraded "worker died" record.
     try:
-        case = _load_case(corpus_path, args.case)
-        kw = dict(repo=root, corpus_dir=corpus_path.parent, cache_dir=cache_dir,
-                  model=args.model, timeout=args.timeout,
-                  plans_home=Path(args.plans_home) if args.plans_home else None)
-        if args.source_ref:
-            from .gate_backtest_replay import ScratchTree  # lazy, as above
-            with ScratchTree(str(root), args.source_ref) as st:
-                run_case(case, args.run, source_root=Path(st.dir), **kw)
-        else:
-            run_case(case, args.run, source_root=Path(args.source_root), **kw)
-    finally:
-        try:
-            pending.unlink()
-        except FileNotFoundError:
-            pass
+        pending.unlink()
+    except FileNotFoundError:
+        pass
     return 0
 
 

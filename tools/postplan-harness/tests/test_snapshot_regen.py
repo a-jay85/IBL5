@@ -319,6 +319,35 @@ def test_require_snapshot_only_rejects_other_paths():
     assert snapshot_regen.require_snapshot_only((SNAP,)) == (SNAP,)
 
 
+def test_regenerate_conflicted_keeps_sibling_targets_of_one_owner(tmp_path):
+    # Two conflicted goldens share one owning test. Rebuilding the first must not put the
+    # second back to its stale HEAD bytes, or the verify run fails on the second's case.
+    snap_a = "ibl5/tests/Demo/__snapshots__/shared-a.html"
+    snap_b = "ibl5/tests/Demo/__snapshots__/shared-b.html"
+    subprocess.run(["git", "init", "-b", "master", str(tmp_path)], check=True,
+                   capture_output=True)
+    _write(tmp_path, {snap_a: "stale\n", snap_b: "stale\n",
+                      OWNER: "<?php\n$this->snap('shared-a');\n$this->snap('shared-b');\n"})
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-m", "first pass")
+
+    def fake(ibl5_dir, test_rel, env, timeout):
+        if env.get("UPDATE_SNAPSHOTS") == "1":
+            for p in (snap_a, snap_b):
+                (tmp_path / p).write_text("fresh\n")
+            return RunResult(True, 2, "fake capture")
+        ok = all((tmp_path / p).read_text() == "fresh\n" for p in (snap_a, snap_b))
+        return RunResult(ok, 2, "fake verify")
+
+    ctx = _ctx(tmp_path, "unused", "", "", (snap_a, snap_b), None,
+               stage_sets={snap_a: frozenset({1, 2, 3}), snap_b: frozenset({1, 2, 3})},
+               extend_pre_patch=lambda paths: None)
+    res = snapshot_regen.regenerate_conflicted(ctx, frozenset({snap_a, snap_b}), runner=fake)
+    assert res.decline == ""
+    assert res.paths == (snap_a, snap_b)
+    assert (tmp_path / snap_b).read_text() == "fresh\n"
+
+
 def test_audit_lines_round_trip(tmp_path):
     subprocess.run(["git", "init", "-b", "master", str(tmp_path)], check=True,
                    capture_output=True)

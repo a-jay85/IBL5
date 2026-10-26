@@ -138,14 +138,16 @@ class GoogleSheetExportService
                 return $this->broken($userId, GoogleSheetConnectionRepositoryInterface::REASON_KEY_UNAVAILABLE, $started);
             }
 
+            // Re-encrypt before any Google call, so a Google outage during a rotation
+            // run cannot leave the row under the old key.
+            if ($this->box->needsReencrypt($row['refresh_token_enc'])) {
+                $this->connections->updateRefreshToken($userId, $this->box->encrypt($refreshToken));
+            }
+
             try {
                 $accessToken = $this->oauth->refreshAccessToken($refreshToken);
             } catch (GoogleGrantRevokedException) {
                 return $this->broken($userId, GoogleSheetConnectionRepositoryInterface::REASON_INVALID_GRANT, $started);
-            }
-
-            if ($this->box->needsReencrypt($row['refresh_token_enc'])) {
-                $this->connections->updateRefreshToken($userId, $this->box->encrypt($refreshToken));
             }
 
             $rows ??= $this->buildRows();

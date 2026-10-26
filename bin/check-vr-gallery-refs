@@ -11,18 +11,25 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: check-vr-gallery-refs [--root DIR]
+Usage: check-vr-gallery-refs [--root DIR] [--deleted-list FILE]
 
 Checks every top-level 40-hex dir under ROOT (default: .) that has
 visual-review/index.html. Prints "DANGLING <sha>/visual-review/index.html -> <value>"
 for each relative .png reference whose target file is missing.
 
+--deleted-list FILE narrows the failure to files this run deleted. FILE holds
+ROOT-relative paths, one per line. A missing target listed there is DANGLING;
+any other missing target already dangled before this run, so it prints
+"WARN pre-existing dangling <sha>/visual-review/index.html -> <value>" on
+stderr and does not fail the check.
+
 Exit 0 and "OK dirs=<n> refs=<m>" when clean; exit 1 on any dangling reference;
-exit 2 on a usage error or when a directory or index.html cannot be read.
+exit 2 on a usage error or when a directory, index.html, or FILE cannot be read.
 EOF
 }
 
 root="."
+deleted_list=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,6 +47,16 @@ while [[ $# -gt 0 ]]; do
       root="$1"
       shift
       ;;
+    --deleted-list)
+      shift
+      if [[ $# -eq 0 || -z "${1:-}" ]]; then
+        echo "check-vr-gallery-refs: --deleted-list needs a value" >&2
+        usage
+        exit 2
+      fi
+      deleted_list="$1"
+      shift
+      ;;
     *)
       echo "check-vr-gallery-refs: unknown option: $1" >&2
       usage
@@ -52,6 +69,48 @@ if [[ ! -d "$root" ]]; then
   echo "check-vr-gallery-refs: root not a directory: $root" >&2
   exit 2
 fi
+
+# Fail closed: an unreadable deleted list must never turn every miss into a warning.
+if [[ -n "$deleted_list" && ( ! -f "$deleted_list" || ! -r "$deleted_list" ) ]]; then
+  echo "check-vr-gallery-refs: cannot read deleted list: $deleted_list" >&2
+  exit 2
+fi
+
+# normalize_path <path>  — resolve "." and ".." segments; prints a ROOT-relative path.
+# String-based so it runs under bash 3.2 with set -u (no empty-array expansion).
+normalize_path() {
+  local rest="$1" out="" seg
+  while [[ -n "$rest" ]]; do
+    seg="${rest%%/*}"
+    if [[ "$rest" == */* ]]; then rest="${rest#*/}"; else rest=""; fi
+    case "$seg" in
+      (''|.) ;;
+      (..) if [[ "$out" == */* ]]; then out="${out%/*}"; else out=""; fi ;;
+      (*) if [[ -z "$out" ]]; then out="$seg"; else out="$out/$seg"; fi ;;
+    esac
+  done
+  printf '%s\n' "$out"
+}
+
+# deleted_this_run <dir-basename> <ref-path>…  — true when any form of the ref
+# resolves to a path in the deleted list.
+deleted_this_run() {
+  local b="$1" p target rc
+  shift
+  for p in "$@"; do
+    target="$(normalize_path "$b/visual-review/$p")"
+    rc=0
+    grep -Fxq -- "$target" "$deleted_list" || rc=$?
+    if [[ "$rc" -eq 0 ]]; then
+      return 0
+    fi
+    if [[ "$rc" -ge 2 ]]; then
+      echo "check-vr-gallery-refs: could not read deleted list: $deleted_list" >&2
+      exit 2
+    fi
+  done
+  return 1
+}
 
 # Prints every (src|href)="<value>" value in the file, one per line. The same
 # match() walk is used by bin/vr-dedupe-gallery, keep the two copies in step.
@@ -113,6 +172,10 @@ while IFS= read -r dir; do
           ;;
       esac
       if [[ ! -f "$dir/visual-review/$decoded" ]]; then
+        if [[ -n "$deleted_list" ]] && ! deleted_this_run "$b" "$path" "$decoded"; then
+          echo "WARN pre-existing dangling $b/visual-review/index.html -> $value" >&2
+          continue
+        fi
         echo "DANGLING $b/visual-review/index.html -> $value"
         dangling=$(( dangling + 1 ))
       fi

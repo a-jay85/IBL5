@@ -242,6 +242,36 @@ h_eq "refs-check-detects-dangling: exit 1" "1" "$RC"
 h_contains "refs-check-detects-dangling: names the missing blob" "$OUT" "DANGLING $SHA1/visual-review/index.html -> ../../_vr-blobs/$GONE_HASH.png"
 
 # ---------------------------------------------------------------------------
+# Case: refs-check-deleted-list
+# Cleanup passes --deleted-list so damage already on gh-pages cannot lock every
+# later push. Only a ref to a file this run deleted fails; older misses warn.
+# ---------------------------------------------------------------------------
+ROOT="$TMP/deleted-root"
+build_shared_root "$ROOT"
+OLD_HASH="$(sha_of "$ROOT/$SHA1/visual-review/a.before.png")"
+NEW_HASH="$(sha_of "$ROOT/$SHA2/visual-review/a.before.png")"
+run "$DEDUPE" --migrate --root "$ROOT"
+rm -f "$ROOT/$BLOBS/$OLD_HASH.png"
+DEL="$TMP/deleted-list.txt"
+printf '%s\n' "$BLOBS/unrelated.png" > "$DEL"
+run "$REFS" --root "$ROOT" --deleted-list "$DEL"
+h_eq "refs-check-deleted-list: pre-existing only exit 0" "0" "$RC"
+h_contains "refs-check-deleted-list: pre-existing only OK line" "$OUT" "OK dirs=2"
+h_contains "refs-check-deleted-list: pre-existing ref warns" "$ERR" "WARN pre-existing dangling $SHA1/visual-review/index.html -> ../../_vr-blobs/$OLD_HASH.png"
+rm -f "$ROOT/$BLOBS/$NEW_HASH.png"
+printf '%s\n' "$BLOBS/$NEW_HASH.png" > "$DEL"
+run "$REFS" --root "$ROOT" --deleted-list "$DEL"
+h_eq "refs-check-deleted-list: deleted-this-run exit 1" "1" "$RC"
+h_contains "refs-check-deleted-list: names the deleted blob" "$OUT" "DANGLING $SHA2/visual-review/index.html -> ../../_vr-blobs/$NEW_HASH.png"
+h_contains "refs-check-deleted-list: older ref still warns" "$ERR" "WARN pre-existing dangling $SHA1/visual-review/index.html -> ../../_vr-blobs/$OLD_HASH.png"
+case "$OUT" in
+    (*"DANGLING $SHA1/"*) h_fail "refs-check-deleted-list: older ref not DANGLING" ;;
+    (*) h_pass "refs-check-deleted-list: older ref not DANGLING" ;;
+esac
+run "$REFS" --root "$ROOT" --deleted-list "$TMP/no-such-list.txt"
+h_eq "refs-check-deleted-list: unreadable list exit 2" "2" "$RC"
+
+# ---------------------------------------------------------------------------
 # Case: refs-check-skips-external-and-pr
 # ---------------------------------------------------------------------------
 ROOT="$TMP/skip-root"

@@ -1261,7 +1261,10 @@ jobs:
       # deletions, and only _vr-blobs/ may hold new files. `git add -A .` would also
       # stage master-scripts/ (a nested checkout) as an embedded repo.
       # The refs check runs on the exact tree about to be pushed, after every rebase,
-      # so a PR publish that raced a blob GC can never reach gh-pages dangling.
+      # so a PR publish that raced a blob GC can never reach gh-pages dangling. It fails
+      # only on refs to files this run's commit deleted (--deleted-list). A ref that
+      # already dangled on gh-pages only warns, so old damage cannot lock out every
+      # later prune, GC, and migration.
       - name: Commit and push gh-pages
         id: push
         if: steps.checkout-pages.outcome == 'success'
@@ -1278,16 +1281,25 @@ jobs:
             exit 0
           fi
           git commit -q -m "chore(vr-pages): prune ${REMOVED:-0} dir(s), migrate ${MIGRATED:-0} dir(s), gc blobs (7d age + 150-dir cap)"
+          # The files this commit deletes, computed once: a rebase replays the same
+          # deletions. --no-renames keeps a GC'd blob from pairing with a new migration
+          # blob as a rename, which would drop it from the D filter. -z avoids path
+          # quoting. No pipe, so a git failure fails the step under bash -e.
+          git diff --no-renames --diff-filter=D --name-only -z HEAD~1 HEAD > "$RUNNER_TEMP/vr-deleted.z"
+          tr '\0' '\n' < "$RUNNER_TEMP/vr-deleted.z" > "$RUNNER_TEMP/vr-deleted.txt"
           # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
           # jobs push to gh-pages while we work, so a rejected push is usually
           # contention and a rebase-then-retry resolves it. Migration rewrites index.html
           # in place, so a rebase can also conflict; that fails the step cleanly instead.
           for attempt in 1 2 3; do
-            if ! ./master-scripts/bin/check-vr-gallery-refs --root . > "$RUNNER_TEMP/vr-refs.txt"; then
-              cat "$RUNNER_TEMP/vr-refs.txt"
-              echo "::error::Dangling gallery reference(s) in the tree to push; gh-pages left unchanged. The next master push recomputes."
+            if ! ./master-scripts/bin/check-vr-gallery-refs --root . \
+                --deleted-list "$RUNNER_TEMP/vr-deleted.txt" \
+                > "$RUNNER_TEMP/vr-refs.txt" 2> "$RUNNER_TEMP/vr-refs.err"; then
+              cat "$RUNNER_TEMP/vr-refs.txt" "$RUNNER_TEMP/vr-refs.err"
+              echo "::error::Gallery reference(s) to files this run deleted in the tree to push; gh-pages left unchanged. The next master push recomputes."
               exit 1
             fi
+            sed -n 's/^WARN /::warning::/p' "$RUNNER_TEMP/vr-refs.err"
             if git push origin gh-pages; then
               echo "pushed=true" >> "$GITHUB_OUTPUT"
               exit 0

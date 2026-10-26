@@ -5299,10 +5299,10 @@ ab_row "AB-pass-wired-dot-slash" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test
 # A workflow that runs the script behind any /-ending prefix wires it.
 ab_row "AB-pass-wired-workspace-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-ws'
 ab_row "AB-pass-wired-dotdot-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-up'
-# A negated grep that reads a shell value (here-string or pipe) and names no
-# file operand checks no repo path, so there is no absence to keep durable.
-ab_row "AB-pass-herestring" 0 "out=\$(awk '/^## Step 4\\.5:/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md); grep -qF 'Second challenge.' <<< \"\$out\" && ! grep -qF 'EXCESS_LINE=' <<< \"\$out\""
-ab_row "AB-pass-pipe" 0 "awk '/^## Drift/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md \\| ! grep -qF 'bgcolor2'"
+# A negated grep on a here-string or a pipe is still an absence check on a
+# repo file read upstream, so it needs a durable check like any other row.
+ab_row "AB-fail-herestring" 1 "out=\$(awk '/^## Step 4\\.5:/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md); grep -qF 'Second challenge.' <<< \"\$out\" && ! grep -qF 'EXCESS_LINE=' <<< \"\$out\""
+ab_row "AB-fail-pipe" 1 "awk '/^## Drift/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md \\| ! grep -qF 'bgcolor2'"
 # A here-string negation does not excuse a second negated grep on a repo file.
 ab_row "AB-fail-herestring-plus-file" 1 "out=\$(cat ibl5/x.md); ! grep -qF 'bgcolor2' <<< \"\$out\" && ! grep -qF 'bgcolor2' ibl5/modules/x.md"
 # A clustered flag ending in e takes the next word as its pattern.

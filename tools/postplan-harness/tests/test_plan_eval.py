@@ -497,3 +497,171 @@ def test_canned_plan_passes_check_plan():
         r = subprocess.run([str(REPO_ROOT / tool), str(plan)], cwd=str(REPO_ROOT),
                            capture_output=True, text=True)
         assert r.returncode == 0, (tool, r.stdout, r.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: stream parse, plan resolution, leak sweep, single-case worker
+# ---------------------------------------------------------------------------
+
+FAKE_CLAUDE = REPO_ROOT / "tools/postplan-harness/fixtures/plan-eval/fake-claude.py"
+
+
+def _lines(*events):
+    return [json.dumps(e) for e in events]
+
+
+def _asst(mid, out_tokens, blocks=()):
+    return {"type": "assistant", "message": {
+        "id": mid, "usage": {"output_tokens": out_tokens, "cache_read_input_tokens": 1000,
+                             "cache_creation_input_tokens": 10},
+        "content": list(blocks)}}
+
+
+def _tool(name, inp):
+    return {"type": "tool_use", "name": name, "input": inp}
+
+
+def test_parse_stream_reads_tier_tokens_cost():
+    lines = _lines(
+        _asst("m1", 100, [{"type": "text", "text": "hi"}]),
+        _asst("m1", 100, [_tool("Agent", {"subagent_type": "plan-architect-sonnet"})]),
+        {"type": "assistant", "parent_tool_use_id": "t1", "message": {
+            "id": "sub1", "usage": {"output_tokens": 50}, "content": []}},
+        _asst("m2", 7, [_tool("Agent", {"subagent_type": "plan-architect-xhigh"})]),
+        {"type": "result", "result": "done", "total_cost_usd": 3.5},
+    )
+    f = pe.parse_stream(lines, "orig")
+    assert f.tier_chosen == "plan-architect-sonnet"
+    assert f.output_tokens == 157
+    assert f.cache_read_tokens == 2000
+    assert f.cost_usd == 3.5
+    assert f.has_result and f.final_text == "done"
+
+
+def test_parse_stream_skips_bad_lines_and_flags_no_result(tmp_path):
+    f = pe.parse_stream(["this is not json {"], "orig")
+    assert f.bad_lines == 1
+    assert not f.has_result
+
+
+def test_parse_stream_detects_answer_key_read():
+    bad = pe.parse_stream(_lines(_asst("m1", 1, [
+        _tool("Read", {"file_path": "/Users/x/claude-plans/plan-now-resume-2.md"})])),
+        "plan-now-resume")
+    assert bad.contaminated == "claude-plans/plan-now-resume-2.md"
+    ok = pe.parse_stream(_lines(_asst("m1", 1, [
+        _tool("Read", {"file_path": "/Users/x/claude-plans/plan-now-resume-shared-context.md"})])),
+        "plan-now-resume")
+    assert ok.contaminated == ""
+
+
+def test_marker_outside_plans_dir_rejected(tmp_path):
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    outside = tmp_path / "elsewhere.md"
+    outside.write_text("x\n")
+    status, detail, plan = pe.resolve_plan(f"done\nPLAN_FILE: {outside}", plans, "eval-x-r1")
+    assert status == "no_plan" and plan is None
+    status, _, plan = pe.resolve_plan("done\nPLAN_FILE: /tmp/elsewhere.md", plans, "eval-x-r1")
+    assert status == "no_plan"
+
+
+def test_marker_decorated_accepted(tmp_path):
+    plans = tmp_path / "plans"
+    plans.mkdir()
+    p = plans / "eval-x-r1.md"
+    p.write_text("x\n")
+    status, detail, plan = pe.resolve_plan(f"done\n**PLAN_FILE:** `{p}`", plans, "eval-x-r1")
+    assert status == "ok" and detail == "" and plan == p.resolve()
+    status, detail, _ = pe.resolve_plan("done\nNO_PLAN: already merged in #12", plans, "x")
+    assert status == "no_plan" and "already merged" in detail
+    status, detail, plan = pe.resolve_plan("done, no marker", plans, "eval-x-r1")
+    assert status == "ok" and detail == "marker missing; adopted eval-x-r1.md"
+
+
+def test_sweep_leaks_deletes_only_prefixed_files(tmp_path):
+    home = tmp_path / "claude-plans"
+    (home / ".drafts").mkdir(parents=True)
+    for name in ("eval-a-r1.md", ".drafts/eval-a-r1.draft.md", "eval-a-r10.md",
+                 "evaluation.md", "plan-eval.md"):
+        (home / name).write_text("x\n")
+    (home / "eval-a-r1").mkdir()
+    hits = pe.sweep_leaks(home, "eval-a-r1")
+    assert sorted(hits) == [".drafts/eval-a-r1.draft.md", "eval-a-r1.md"]
+    assert not (home / "eval-a-r1.md").exists()
+    assert not (home / ".drafts/eval-a-r1.draft.md").exists()
+    for name in ("eval-a-r10.md", "evaluation.md", "plan-eval.md", "eval-a-r1"):
+        assert (home / name).exists(), name
+    assert pe.sweep_leaks(home, pattern=pe.LEAK_ANY_RE) == ["eval-a-r10.md"]
+
+
+def test_claude_bin_empty_env_uses_default(monkeypatch):
+    monkeypatch.delenv("PLAN_EVAL_CLAUDE", raising=False)
+    assert pe.claude_bin() == "claude"
+    monkeypatch.setenv("PLAN_EVAL_CLAUDE", "")
+    assert pe.claude_bin() == "claude"
+    monkeypatch.setenv("PLAN_EVAL_CLAUDE", "/x/fake")
+    assert pe.claude_bin() == "/x/fake"
+
+
+def _fake_shim(tmp_path):
+    shim = tmp_path / "fake-claude"
+    shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE_CLAUDE}" "$@"\n')
+    shim.chmod(0o755)
+    return str(shim)
+
+
+def _e2e(tmp_path, monkeypatch, mode="ok", sleep="0", timeout=60):
+    repo = _mk_repo(tmp_path)
+    corpus_dir = tmp_path / "corpus"
+    case = _mk_case(id="x", base_sha=repo["base"], merge_sha=repo["merge"],
+                    prompt="prompts/x.txt")
+    _write_prompts(corpus_dir, [case], text="Do the thing.\n\n- Branch slug: x\n")
+    home = tmp_path / "home-plans"
+    monkeypatch.setenv("FAKE_CLAUDE_MODE", mode)
+    monkeypatch.setenv("FAKE_CLAUDE_SLEEP", sleep)
+    monkeypatch.setenv("FAKE_CLAUDE_LEAK_DIR", str(home))
+    cache = tmp_path / "cache"
+    seen = []
+    real_clone = pe.ReplayClone
+
+    class SpyClone(real_clone):
+        def __enter__(self):
+            r = super().__enter__()
+            seen.append(self.tmp)
+            return r
+
+    monkeypatch.setattr(pe, "ReplayClone", SpyClone)
+    rec = pe.run_case(case, 1, repo=repo["root"], source_root=REPO_ROOT, corpus_dir=corpus_dir,
+                      cache_dir=cache, claude=_fake_shim(tmp_path), timeout=timeout,
+                      plans_home=home)
+    return rec, cache, seen, home
+
+
+def test_run_case_end_to_end_fake_claude(tmp_path, monkeypatch):
+    rec, cache, seen, _ = _e2e(tmp_path, monkeypatch)
+    assert rec["status"] == "ok", rec["detail"]
+    on_disk = json.loads((cache / "x-r1.json").read_text())
+    assert on_disk["status"] == "ok"
+    assert on_disk["critical_files"] == ["bin/check-plan"]
+    assert on_disk["check_plan_rc"] == 0
+    assert on_disk["tier_chosen"] == "plan-architect"
+    assert "## Verification Matrix" in on_disk["plan_text"]
+    assert (cache / "eval-x-r1.stream.jsonl").is_file()
+    assert seen and not seen[0].exists()
+
+
+def test_run_case_timeout_is_degraded(tmp_path, monkeypatch):
+    rec, cache, seen, _ = _e2e(tmp_path, monkeypatch, sleep="5", timeout=1)
+    assert rec["status"] == "degraded"
+    on_disk = json.loads((cache / "x-r1.degraded.json").read_text())
+    assert "timeout" in on_disk["detail"]
+    assert not (cache / "x-r1.json").exists()
+
+
+def test_run_case_leak_marks_leaked(tmp_path, monkeypatch):
+    rec, cache, seen, home = _e2e(tmp_path, monkeypatch, mode="leak")
+    on_disk = json.loads((cache / "x-r1.degraded.json").read_text())
+    assert on_disk["status"] == "leaked"
+    assert "eval-x-r1.md" in on_disk["detail"]
+    assert not (home / "eval-x-r1.md").exists()

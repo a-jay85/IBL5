@@ -10,12 +10,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+import time
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, TextIO
 
@@ -776,6 +781,274 @@ def overlay_probe(root: Path, corpus: dict) -> list[str]:
     return errors
 
 
+# ---------------------------------------------------------------------------
+# Phase 5: single-case worker, stream parse, leak sweep
+# ---------------------------------------------------------------------------
+
+DEFAULT_MODEL = "claude-sonnet-5-5"
+DEFAULT_TIMEOUT = 10800
+GATE_TIMEOUT = 300
+CACHE_ROOT = "tools/postplan-harness/out/plan-eval/cache"
+LEAK_ANY_RE = re.compile(r"^eval-[a-z0-9-]+-r\d+([.-]|$)")
+_MARKER_RE = re.compile(r"^(PLAN_FILE|NO_PLAN):\s*(.*)$")
+
+
+def claude_bin() -> str:
+    """PLAN_EVAL_CLAUDE overrides the binary; unset and empty both mean `claude`."""
+    return os.environ.get("PLAN_EVAL_CLAUDE") or "claude"
+
+
+@dataclass
+class StreamFacts:
+    final_text: str = ""
+    has_result: bool = False
+    cost_usd: float = 0.0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    tier_chosen: str = ""
+    contaminated: str = ""
+    bad_lines: int = 0
+
+
+def _answer_key_re(orig_slug: str) -> "re.Pattern[str]":
+    return re.compile(r"claude-plans/(\.drafts/)?" + re.escape(orig_slug)
+                      + r"(-\d+)?(\.draft)?\.md")
+
+
+def _int(v: object) -> int:
+    return v if isinstance(v, int) and not isinstance(v, bool) else 0
+
+
+def parse_stream(lines: list[str], orig_slug: str) -> StreamFacts:
+    facts = StreamFacts()
+    seen: set = set()
+    key_re = _answer_key_re(orig_slug)
+    for raw in lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            ev = json.loads(raw)
+        except ValueError:
+            facts.bad_lines += 1
+            continue
+        if not isinstance(ev, dict):
+            facts.bad_lines += 1
+            continue
+        if ev.get("type") == "result":
+            facts.has_result = True
+            facts.final_text = str(ev.get("result") or "")
+            try:
+                facts.cost_usd = float(ev.get("total_cost_usd") or 0.0)
+            except (TypeError, ValueError):
+                facts.cost_usd = 0.0
+            continue
+        if ev.get("type") != "assistant":
+            continue
+        msg = ev.get("message")
+        if not isinstance(msg, dict):
+            continue
+        mid = msg.get("id")
+        # The stream repeats one message once per content block; count its usage once.
+        if mid is None or mid not in seen:
+            if mid is not None:
+                seen.add(mid)
+            usage = msg.get("usage") if isinstance(msg.get("usage"), dict) else {}
+            facts.output_tokens += _int(usage.get("output_tokens"))
+            facts.cache_read_tokens += _int(usage.get("cache_read_input_tokens"))
+            facts.cache_write_tokens += _int(usage.get("cache_creation_input_tokens"))
+        content = msg.get("content")
+        for block in content if isinstance(content, list) else []:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            inp = block.get("input")
+            if (not facts.tier_chosen and block.get("name") in ("Agent", "Task")
+                    and isinstance(inp, dict)):
+                st = inp.get("subagent_type")
+                if isinstance(st, str) and st.startswith("plan-architect"):
+                    facts.tier_chosen = st
+            if not facts.contaminated:
+                m = key_re.search(json.dumps(inp))
+                if m:
+                    facts.contaminated = m.group(0)
+    return facts
+
+
+def _strip_decoration(line: str) -> str:
+    s = re.sub(r"^[-*]\s+", "", line.strip())
+    return s.replace("**", "").replace("`", "").strip()
+
+
+def _newest_slug_plan(plans_dir: Path, slug: str) -> Optional[Path]:
+    rx = re.compile("^" + re.escape(slug) + r"(-\d+)?\.md$")
+    found = [p for p in plans_dir.iterdir() if p.is_file() and rx.match(p.name)] \
+        if plans_dir.is_dir() else []
+    return max(found, key=lambda p: p.stat().st_mtime) if found else None
+
+
+def resolve_plan(final_text: str, plans_dir: Path, slug: str) -> tuple:
+    """(status, detail, plan path or None) from the final message's last line."""
+    lines = [ln for ln in final_text.splitlines() if ln.strip()]
+    m = _MARKER_RE.match(_strip_decoration(lines[-1])) if lines else None
+    bad_marker = False
+    if m and m.group(1) == "NO_PLAN":
+        return "no_plan", m.group(2).strip() or "no plan", None
+    if m and m.group(1) == "PLAN_FILE":
+        path = m.group(2).strip()
+        if path:
+            real = Path(os.path.realpath(path))
+            base = Path(os.path.realpath(plans_dir))
+            if real.is_file() and base in real.parents:
+                return "ok", "", real
+        bad_marker = True
+    adopted = _newest_slug_plan(plans_dir, slug)
+    if adopted is not None:
+        return "ok", f"marker missing; adopted {adopted.name}", adopted
+    return "no_plan", "marker outside plans dir" if bad_marker else "no marker", None
+
+
+def sweep_leaks(plans_home: Path, slug: Optional[str] = None,
+                pattern: Optional["re.Pattern[str]"] = None) -> list[str]:
+    """Delete regular files in plans_home and its .drafts/ named for this run; return them."""
+    rx = pattern or re.compile("^" + re.escape(slug or "") + r"([.-]|$)")
+    hits: list[str] = []
+    for d in (plans_home, plans_home / ".drafts"):
+        if not d.is_dir():
+            continue
+        for p in sorted(d.iterdir()):
+            if p.is_file() and not p.is_symlink() and rx.match(p.name):
+                p.unlink()
+                hits.append(p.relative_to(plans_home).as_posix())
+    return hits
+
+
+def record_path(cache_dir: Path, case_id: str, k: int, status: str) -> Path:
+    suffix = ".degraded.json" if status in ("degraded", "leaked") else ".json"
+    return cache_dir / f"{case_id}-r{k}{suffix}"
+
+
+def write_record(cache_dir: Path, record: dict) -> Path:
+    path = record_path(cache_dir, record["case_id"], record["run"], record["status"])
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    os.replace(tmp, path)
+    return path
+
+
+def _gate_rc(argv: list[str], cwd: Path) -> int:
+    try:
+        return subprocess.run(argv, cwd=str(cwd), capture_output=True, text=True,
+                              timeout=GATE_TIMEOUT).returncode
+    except subprocess.TimeoutExpired:
+        return 124
+
+
+def _invoke_claude(argv: list[str], cwd: Path, env: dict, timeout: int) -> tuple:
+    """(stdout, returncode, timed_out) with the whole process group reaped."""
+    from .adapters.llm import _run_reaped  # lazy: keeps `validate` import-light
+    try:
+        proc = _run_reaped(argv, "", timeout, str(cwd), env)
+        return proc.stdout or "", proc.returncode, False
+    except subprocess.TimeoutExpired as e:
+        out = e.output
+        text = out.decode("utf-8", "replace") if isinstance(out, bytes) else (out or "")
+        return text, None, True
+
+
+def run_case(case: dict, k: int, *, repo: Path, source_root: Path, corpus_dir: Path,
+             cache_dir: Path, claude: Optional[str] = None, model: str = DEFAULT_MODEL,
+             timeout: int = DEFAULT_TIMEOUT, plans_home: Optional[Path] = None) -> dict:
+    slug = run_slug(case["id"], k)
+    home = Path(plans_home) if plans_home else Path.home() / "claude-plans"
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    record: dict = {
+        "case_id": case["id"], "run": k, "slug": slug, "model": model,
+        "status": "degraded", "detail": "", "tier_chosen": "", "cost_usd": 0.0,
+        "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "bad_lines": 0, "exit_code": None, "check_plan_rc": None, "staleness_rc": None,
+        "critical_files": [], "plan_text": "", "started": int(time.time()),
+    }
+    try:
+        prompt_text = (Path(corpus_dir) / case["prompt"]).read_text()
+        with ReplayClone(Path(repo), case["base_sha"]) as rc:
+            overlay_surface(Path(source_root), rc.root)
+            write_stub_gh(rc.stub_bin)
+            prompt = build_prompt(prompt_text, slug, rc.plans_dir, case["id"])
+            argv = [claude or claude_bin(), "-p", prompt, "--dangerously-skip-permissions",
+                    "--model", model, "--effort", "high", "--output-format", "stream-json",
+                    "--verbose", "--session-id", str(uuid.uuid4()),
+                    "--name", f"plan-eval {slug}"]
+            env = dict(os.environ)
+            env["CLAUDE_HEADLESS"] = "1"
+            env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"] = "0"
+            env["PATH"] = f"{rc.stub_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+            out, exit_code, timed_out = _invoke_claude(argv, rc.root, env, timeout)
+            (cache_dir / f"{slug}.stream.jsonl").write_text(out)
+            facts = parse_stream(out.splitlines(), case["id"])
+            record.update(tier_chosen=facts.tier_chosen, cost_usd=facts.cost_usd,
+                          output_tokens=facts.output_tokens,
+                          cache_read_tokens=facts.cache_read_tokens,
+                          cache_write_tokens=facts.cache_write_tokens,
+                          bad_lines=facts.bad_lines, exit_code=exit_code)
+            if timed_out:
+                record["detail"] = f"timeout after {timeout}s"
+            elif not facts.has_result:
+                record["detail"] = f"no result event (exit {exit_code})"
+            elif facts.contaminated:
+                record["detail"] = f"contaminated: {facts.contaminated}"
+            else:
+                status, detail, plan = resolve_plan(facts.final_text, rc.plans_dir, slug)
+                record.update(status=status, detail=detail)
+                if plan is not None:
+                    record["check_plan_rc"] = _gate_rc(
+                        [str(rc.root / "bin/check-plan"), str(plan)], rc.root)
+                    record["staleness_rc"] = _gate_rc(
+                        [str(rc.root / "bin/check-plan-staleness"), str(plan)], rc.root)
+                    record["critical_files"] = critical_files_of(plan, rc.root / "bin/check-plan")
+                    record["plan_text"] = plan.read_text(errors="replace")
+    except (SurfaceError, OSError) as e:
+        record.update(status="degraded", detail=f"setup failed: {e}")
+    leaks = sweep_leaks(home, slug)
+    if leaks:
+        record.update(status="leaked", detail="leaked: " + ", ".join(leaks))
+    write_record(cache_dir, record)
+    return record
+
+
+def _load_case(corpus_path: Path, case_id: str) -> dict:
+    corpus = load_corpus(corpus_path)
+    for c in corpus["cases"]:
+        if c["id"] == case_id:
+            return c
+    raise EvalUsageError(f"unknown case: {case_id}")
+
+
+def _cmd_worker(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
+    root = _repo_root(args.repo)
+    corpus_path = _corpus_path(root, args.corpus)
+    cache_dir = Path(args.cache_dir)
+    pending = cache_dir / f"{args.case}-r{args.run}.pending"
+    try:
+        case = _load_case(corpus_path, args.case)
+        kw = dict(repo=root, corpus_dir=corpus_path.parent, cache_dir=cache_dir,
+                  model=args.model, timeout=args.timeout,
+                  plans_home=Path(args.plans_home) if args.plans_home else None)
+        if args.source_ref:
+            from .gate_backtest_replay import ScratchTree  # lazy, as above
+            with ScratchTree(str(root), args.source_ref) as st:
+                run_case(case, args.run, source_root=Path(st.dir), **kw)
+        else:
+            run_case(case, args.run, source_root=Path(args.source_root), **kw)
+    finally:
+        try:
+            pending.unlink()
+        except FileNotFoundError:
+            pass
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="plan_eval")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -789,6 +1062,18 @@ def build_parser() -> argparse.ArgumentParser:
     mn.add_argument("--repo", metavar="DIR", default=None)
     mn.add_argument("--dry-run", action="store_true")
     mn.set_defaults(func=_cmd_mine)
+    w = sub.add_parser("_worker")
+    w.add_argument("--case", required=True)
+    w.add_argument("--run", type=int, required=True)
+    w.add_argument("--source-root", default=None)
+    w.add_argument("--source-ref", default=None)
+    w.add_argument("--cache-dir", required=True)
+    w.add_argument("--corpus", default=None)
+    w.add_argument("--repo", default=None)
+    w.add_argument("--model", default=DEFAULT_MODEL)
+    w.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
+    w.add_argument("--plans-home", default=None)
+    w.set_defaults(func=_cmd_worker)
     return parser
 
 

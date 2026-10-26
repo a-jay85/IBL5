@@ -832,6 +832,21 @@ def test_smoke_inprocess_tmp_repo(tmp_path, capsys):
     assert out.startswith("smoke ok plan-eval ")
 
 
+SYSTEM_PYTHON = "/usr/bin/python3"
+
+
+@pytest.mark.skipif(not os.path.exists(SYSTEM_PYTHON), reason="no system python3")
+def test_module_runs_under_system_python(tmp_path):
+    """The macOS system Python is 3.9: a runtime `X | Y` or a `match` breaks this."""
+    env = {"PATH": "/usr/bin:/bin",
+           "PYTHONPATH": str(REPO_ROOT / "tools/postplan-harness")}
+    r = subprocess.run([SYSTEM_PYTHON, "-m", "harness.plan_eval", "compare",
+                        "--before", "x", "--after", "y"],
+                       capture_output=True, text=True, env=env, cwd=str(tmp_path))
+    assert r.returncode == 2, r.stderr
+    assert "malformed score line" in r.stderr
+
+
 def test_smoke_detached_survives_launcher_kill(tmp_path, capsys):
     root, cpath, _ = _run_env(tmp_path)
     rc = pe.main(["smoke", "--detached", "--repo", str(root), "--corpus", str(cpath),

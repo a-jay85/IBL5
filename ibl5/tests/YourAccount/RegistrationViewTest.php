@@ -49,7 +49,7 @@ final class RegistrationViewTest extends TestCase
 
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
-        self::assertStringContainsString('ibl-alert--error', $html);
+        self::assertStringContainsString('d-alert-error', $html);
     }
 
     public function testRegistrationErrorPageAttributeBreakoutPrevented(): void

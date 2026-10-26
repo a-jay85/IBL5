@@ -1,0 +1,13 @@
+diff --git a/tools/demo/validate.py b/tools/demo/validate.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/validate.py
+@@ -0,0 +1,7 @@
++"""Input validation for the demo CLI."""
++
++
++def reject_empty(value):
++    if not value or not value.strip():
++        raise ValueError("empty value")
++    return value

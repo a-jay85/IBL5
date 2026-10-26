@@ -19,6 +19,7 @@ import time
 from .state import HarnessError
 from . import llm_calls
 from . import fidelity_filefix
+from . import schemas
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -161,8 +162,10 @@ def _findings_section(lines: list[str]) -> list[str] | None:
 
     The heading matches only at column 0, exactly, after a right-strip. A section runs
     to the next line starting `## `; a `### ` subsection stays inside it. Repeated
-    headings each contribute their section.
+    headings each contribute their section. A `## SHADOW-ARMING` section is dropped first,
+    so the shadow block never ends or changes the findings.
     """
+    lines = _strip_shadow_section(lines)
     if not any(ln.rstrip() == FINDINGS_HEADING for ln in lines):
         return None
     section: list[str] = []
@@ -626,8 +629,13 @@ def body_only_findings(verdict_path: str) -> list[str] | None:
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
-                 extra_context: str = "", review_findings: str = "") -> str:
-    """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir."""
+                 extra_context: str = "", review_findings: str = "",
+                 shadow_request: bool = False) -> str:
+    """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir.
+
+    `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
+    the `DIFF_FILES:` summary it needs. Off, `context.md` is byte-identical to before.
+    """
     packet = os.path.join(out_dir, packet_name)
     os.makedirs(packet, exist_ok=True)
 
@@ -674,8 +682,34 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
            f"REVIEWED_TREE: {reviewed_tree}\n"
            f"PR_NUMBER: {pr_number}\n"
            f"VERDICT_OUTPUT_PATH: {verdict_path(pr_number)}\n"
+           + (shadow_context(diff) if shadow_request else "")
            + extra_context)
     return packet
+
+
+SHADOW_REQUEST_LINE = "SHADOW_ARMING: requested"
+DIFF_FILES_CAP = 400
+
+
+def shadow_context(diff: str) -> str:
+    """The `context.md` lines that request the shadow block: the marker plus a capped
+    `DIFF_FILES:` list of `<path> +<added> -<removed>` in diff order."""
+    from .reviewcache import split_diff_by_file   # lazy: reviewcache imports this module
+    rows = []
+    for path, section in split_diff_by_file(diff or "").items():
+        added = removed = 0
+        for ln in section.splitlines():
+            if ln.startswith("+++") or ln.startswith("---"):
+                continue
+            if ln.startswith("+"):
+                added += 1
+            elif ln.startswith("-"):
+                removed += 1
+        rows.append(f"{path} +{added} -{removed}")
+    shown = rows[:DIFF_FILES_CAP]
+    if len(rows) > DIFF_FILES_CAP:
+        shown.append(f"(+{len(rows) - DIFF_FILES_CAP} more files)")
+    return f"{SHADOW_REQUEST_LINE}\nDIFF_FILES:\n" + "".join(f"{r}\n" for r in shown)
 
 
 def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
@@ -884,7 +918,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
 def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
               verdict1_path: str, phase4b_ran: bool = False, *,
-              round_num: int = 1,
+              round_num: int = 1, shadow_request: bool = False,
               log=None) -> tuple[str | None, str | None, str | None]:
     """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
@@ -910,7 +944,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
                               packet_name=f"fidelity-packet-{round_num + 1}",
-                              extra_context=extra)
+                              extra_context=extra, shadow_request=shadow_request)
         text = llm.call_tooled(
             f"plan-fidelity-re-review-{round_num + 1}", "opus",
             _pointer_prompt(packet, pr_number),
@@ -1318,6 +1352,86 @@ def _escape_quoted(line: str) -> str:
     return line.replace(STICKY_MARKER, "<!-- pr-ready-verdict (quoted) -->")
 
 
+# --- Shadow-mode arming record (procedure 6f). Logged beside conditions (3) and (18) in
+# result.json; nothing on the arming, remediation or verdict path reads it.
+
+SHADOW_KEY = "shadow"
+
+
+def shadow_absent(reason: str) -> dict:
+    status = f"absent:{reason}"
+    return {"status": status, "states": schemas.shadow_condition_states({"status": status})}
+
+
+def read_shadow(path: str, *, source: str, reviewed_tree, plan_blind: bool) -> dict:
+    """The shadow record for one verdict file. Unreadable is `absent:verdict-unreadable`."""
+    try:
+        with open(path) as fh:
+            text = fh.read()
+    except OSError:
+        return shadow_absent("verdict-unreadable")
+    rec = schemas.extract_fidelity_shadow(text)
+    rec["source"] = source
+    rec["reviewed_tree"] = reviewed_tree
+    rec["plan_blind"] = bool(plan_blind)
+    rec["states"] = schemas.shadow_condition_states(rec)
+    return rec
+
+
+def shadow_old_outcomes(arm) -> dict:
+    """{"3", "18"} -> "hold" / "clear" from the arm decision, else "not-evaluated"."""
+    by_number = {getattr(c, "number", None): c for c in (getattr(arm, "conditions", None) or [])}
+    out = {}
+    for n in (3, 18):
+        c = by_number.get(n)
+        out[str(n)] = ("not-evaluated" if c is None
+                       else "hold" if getattr(c, "blocked", False) else "clear")
+    return out
+
+
+def finalize_shadow(shadow, arm) -> dict:
+    """A copy of the run's shadow record (or `absent:not-reached`) with the old outcomes."""
+    rec = dict(shadow) if shadow else shadow_absent("not-reached")
+    rec["old"] = shadow_old_outcomes(arm)
+    return rec
+
+
+def shadow_audit_line(shadow: dict) -> str:
+    states = shadow.get("states") or schemas.shadow_condition_states(shadow)
+    old = shadow.get("old") or {}
+    return (f"phase5.5 shadow: status={shadow.get('status')} "
+            f"cond3={states.get('3')}/{old.get('3')} "
+            f"cond18={states.get('18')}/{old.get('18')} "
+            f"body_numbers={states.get('body_numbers')}")
+
+
+def carried_shadow(cached, run_id) -> dict:
+    """A carried verdict's shadow: the cached `present` record, relabelled `carried`."""
+    if not isinstance(cached, dict) or cached.get("status") != "present":
+        return shadow_absent("carried-no-shadow")
+    rec = dict(cached)
+    rec["status"] = "carried"
+    rec["carried_from"] = run_id
+    rec["states"] = schemas.shadow_condition_states(rec)
+    return rec
+
+
+def _strip_shadow_section(lines: list[str]) -> list[str]:
+    """Drop the `## SHADOW-ARMING` section up to the next `## ` heading or bare verdict word.
+    The verdict word itself is kept."""
+    out: list[str] = []
+    skipping = False
+    for ln in lines:
+        if ln.rstrip() == schemas.FIDELITY_SHADOW_HEADING:
+            skipping = True
+            continue
+        if skipping and (ln.startswith("## ") or VERDICT_RE.match(ln)):
+            skipping = False
+        if not skipping:
+            out.append(ln)
+    return out
+
+
 def findings_excerpt(path: str, verdict_present: bool) -> str:
     """The reviewer's findings, quoted safely into the sticky comment.
 
@@ -1340,7 +1454,7 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     if not raw.strip():
         return ""
     out = []
-    for line in raw.splitlines():
+    for line in _strip_shadow_section(raw.splitlines()):
         if line.strip() == DIGEST_CUT:
             break
         if line.startswith("REVIEWED_TREE="):

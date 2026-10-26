@@ -1429,7 +1429,9 @@ def test_audit_log_final_bytes_unchanged_by_the_mirror(tmp_path, sticky_tmp):
                              {"plan-fidelity-review": [_verdict_doc("READY")]})
     with open(os.path.join(out, "audit.log")) as fh:
         on_disk = fh.read()
-    assert on_disk == "\n".join(res.audit) + "\n"
+    # `_finish` appends the shadow line on its stored copy only (the live `res` never changes).
+    shadow = runner.fidelity.finalize_shadow((res.fidelity or {}).get("shadow"), res.arm)
+    assert on_disk == "\n".join(res.audit + [runner.fidelity.shadow_audit_line(shadow)]) + "\n"
 
 
 def test_audit_log_truncated_for_a_reused_out_dir(tmp_path, sticky_tmp):

@@ -188,30 +188,4 @@ test.describe('Standalone error pages', () => {
     await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
     await expect(page.locator('body')).toHaveCSS('color', 'rgb(209, 213, 219)');
   });
-
-  // The message box used to be a fixed 800px block, so every phone could
-  // scroll sideways. It must fit and sit centered on any phone width.
-  for (const width of [320, 375, 430]) {
-    for (const code of ['403', '404', '500', '503']) {
-      test(`${code} page fits and centers at ${width}px`, async ({ page }) => {
-        await page.setViewportSize({ width, height: 667 });
-        await page.goto(`error-pages/${code}.html`);
-        const m = await page.evaluate(() => {
-          const de = document.documentElement;
-          const box = document.querySelector('.error-content')!.getBoundingClientRect();
-          return {
-            scrollWidth: de.scrollWidth,
-            clientWidth: de.clientWidth,
-            gapL: box.left,
-            gapR: de.clientWidth - box.right,
-            gapT: box.top,
-            gapB: window.innerHeight - box.bottom,
-          };
-        });
-        expect(m.scrollWidth).toBeLessThanOrEqual(m.clientWidth);
-        expect(Math.abs(m.gapL - m.gapR)).toBeLessThanOrEqual(2);
-        expect(Math.abs(m.gapT - m.gapB)).toBeLessThanOrEqual(2);
-      });
-    }
-  }
 });

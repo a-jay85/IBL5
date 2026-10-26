@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 ---
 
 # /pr-burndown
@@ -63,6 +63,11 @@ Order the PRs that need the owner:
 2. PRs that unblock the most other work, such as backlog items or stacked PRs.
 3. Dev tooling `chore:` PRs last. Offer to batch these once the GM-facing ones are done.
 
+A merge conflict (`DIRTY`) or an out-of-date branch (`BEHIND`) never drops a PR from
+the list or moves it down. Rank it as if it were clean. Every PR gets rebased onto
+master after the owner picks, so a rebase is one more chore for the Step 5 job. Review
+comes first.
+
 Tell the owner the total count and why the first PR is first.
 
 ## Step 3: Build the card
@@ -100,7 +105,7 @@ Write the card in this shape:
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
 - <✅/⚠️/❌/⏳> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - <✅/⚠️/❌/🚨> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-- <✅/⚠️/❌> **Conflicts:** <none / which files clash and with which PR>.
+- <✅/⚠️> **Conflicts:** <none / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 
 👉 **What's left for you:** <the one decision>.
@@ -119,6 +124,13 @@ you fetched. Do not guess. A line with no evidence gets ⚠️. Use 🚨 only fo
 line the owner must not miss: a one-way door, a data or prod risk, a stale verdict that
 hides a change. Keep ✅ lines to a few words so the eye skips them. Spend words only on
 ⚠️, ❌, and 🚨 lines.
+
+A conflict or a `BEHIND` branch gets ⚠️ on the Conflicts line and on the
+"merge conflict (DIRTY)" hold reason. It never gets ❌. It never makes a "fix conflicts
+first" option or a recommendation to wait. The pick the owner makes (Ship, Fix X)
+already includes the rebase in Step 5. The one exception is a conflict that needs the
+owner's call to resolve, such as two PRs that change the same rule in opposite ways.
+Mark that one 🚨 and put the call in the options.
 
 Start every reply with a one-line status of each background job that has moved since the
 last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked.

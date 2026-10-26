@@ -33,6 +33,13 @@ MAX_DECLINE_RETRIES = 2        # per harness run, shared by the plain and stacke
 DECLINE_REASON_CAP = 300       # chars of model text carried into the decline reason
 DECLINE_CONTEXT_CAP = 20_000   # chars per side of diff context in the retry prompt
 STAGE_NAMES = {1: "base", 2: "ours", 3: "theirs"}
+HUNK_CONTEXT_LINES = 3            # unchanged lines shown before and after each hunk
+HUNK_MAX_COUNT = 20               # more hunks than this -> whole-file fallback
+HUNK_ARTIFACT_MAX_BYTES = 16_000  # rendered artifact larger than this -> whole-file fallback
+HUNK_STAGE_MAX_BYTES = 5_000_000  # any stage larger than this -> skip merge-file entirely
+MERGE_FILE_TIMEOUT_S = 30
+_MF_OPEN, _MF_BASE, _MF_SEP, _MF_CLOSE = (
+    "<<<<<<< ours", "||||||| base", "=======", ">>>>>>> theirs")
 
 
 @dataclass(frozen=True)
@@ -143,6 +150,142 @@ def extract_stages(
         dest.write_text(content)
         result[stage] = dest
     return result
+
+
+@dataclass(frozen=True)
+class HunkContext:
+    path: Path        # the artifact file the resolver Reads
+    hunk_count: int
+    size_bytes: int
+
+
+def _parse_diff3_hunks(lines: list[str]) -> Optional[list[dict]]:
+    """Parse `git merge-file --diff3` output into hunks. None on any out-of-order marker
+    or unclosed hunk (a literal marker line in unchanged text lands here)."""
+    hunks: list[dict] = []
+    state = "text"
+    cur: dict = {}
+    for idx, line in enumerate(lines):
+        if line == _MF_OPEN:
+            if state != "text":
+                return None
+            cur = {"open": idx, "base": [], "ours": [], "theirs": []}
+            state = "ours"
+        elif line == _MF_BASE:
+            if state != "ours":
+                return None
+            state = "base"
+        elif line == _MF_SEP:
+            if state != "base":
+                return None
+            state = "theirs"
+        elif line == _MF_CLOSE:
+            if state != "theirs":
+                return None
+            cur["close"] = idx
+            hunks.append(cur)
+            state = "text"
+        elif state in ("ours", "base", "theirs"):
+            cur[state].append(line)
+    if state != "text":
+        return None
+    return hunks
+
+
+def build_hunk_context(
+    path: str,
+    stage_paths: Mapping[int, Path],
+    *,
+    context_lines: int = HUNK_CONTEXT_LINES,
+    max_hunks: int = HUNK_MAX_COUNT,
+    max_bytes: int = HUNK_ARTIFACT_MAX_BYTES,
+) -> Optional[HunkContext]:
+    """Write a small per-hunk artifact into the stage dir, or return None.
+
+    None means "keep the whole-file prompt": modify/delete, no detected hunks, too many
+    hunks, an oversized artifact, a binary-like or oversized stage, or any merge-file
+    failure. Never raises. A stale artifact from an earlier build is deleted on decline."""
+    artifact = (
+        stage_paths[1].parent.parent / "hunks" / (path.replace("/", "__") + ".md")
+        if 1 in stage_paths else None
+    )
+
+    def decline() -> None:
+        if artifact is not None:
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return None
+
+    try:
+        if set(stage_paths) != {1, 2, 3}:
+            return decline()
+        for stage in (1, 2, 3):
+            data = stage_paths[stage].read_bytes()
+            if len(data) > HUNK_STAGE_MAX_BYTES or b"\x00" in data:
+                return decline()
+        proc = subprocess.run(
+            ["git", "merge-file", "-p", "--diff3",
+             "-L", "ours", "-L", "base", "-L", "theirs",
+             str(stage_paths[2]), str(stage_paths[1]), str(stage_paths[3])],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            stdin=subprocess.DEVNULL, timeout=MERGE_FILE_TIMEOUT_S, check=False,
+        )
+        if proc.returncode == 0 or proc.returncode > 127:
+            return decline()
+        lines = proc.stdout.splitlines()
+        hunks = _parse_diff3_hunks(lines)
+        if hunks is None:
+            return decline()
+        count = len(hunks)
+        if count == 0 or count > max_hunks:
+            return decline()
+        if proc.returncode < 127 and count != proc.returncode:
+            return decline()
+
+        parts = [
+            f"# Hunk context for {path}",
+            f"{count} conflict hunk(s). Each hunk lists up to {context_lines} unchanged "
+            "lines before and after it,",
+            "then the base, ours, and theirs text of the conflicting region.",
+            "Text outside these hunks merged cleanly and needs no decision.",
+            "Line ranges are the approximate position of each conflict block in the "
+            "worktree file",
+            "when that file still holds conflict markers.",
+            "",
+        ]
+        removed = 0
+        for i, hunk in enumerate(hunks, start=1):
+            prev_close = hunks[i - 2]["close"] if i > 1 else -1
+            next_open = hunks[i]["open"] if i < count else len(lines)
+            before = lines[prev_close + 1:hunk["open"]]
+            after = lines[hunk["close"] + 1:next_open]
+            before = before[-context_lines:] if context_lines > 0 else []
+            after = after[:context_lines]
+            start = hunk["open"] + 1 - removed
+            end = start + len(hunk["ours"]) + len(hunk["theirs"]) + 2
+            removed += 1 + len(hunk["base"])
+            parts.append(f"## Hunk {i} of {count} (worktree lines ~{start}-{end})")
+            parts.append("--- context before")
+            parts.extend(before)
+            parts.append("--- base (merge base)")
+            parts.extend(hunk["base"])
+            parts.append("--- ours (stage 2)")
+            parts.extend(hunk["ours"])
+            parts.append("--- theirs (stage 3)")
+            parts.extend(hunk["theirs"])
+            parts.append("--- context after")
+            parts.extend(after)
+            parts.append("")
+        encoded = "\n".join(parts).encode("utf-8")
+        if len(encoded) > max_bytes:
+            return decline()
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_bytes(encoded)
+        return HunkContext(artifact, count, len(encoded))
+    except (OSError, subprocess.SubprocessError, UnicodeError, ValueError):
+        return decline()
 
 
 def master_references(run, *, path, master_sha, merge_base) -> tuple[str, ...]:

@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# Harness for ibl5/bin/check-infection-ran. Each case builds a fresh temp dir
+# holding a hermetic infection.json5, a log, and a changed-list, runs the
+# helper from there, and asserts the exit code plus one substring per token.
+# Prints PASS <case-id> / FAIL <case-id> per assertion; exits 1 on any FAIL.
+set -uo pipefail
+
+ROOT=$(git rev-parse --show-toplevel)
+HELPER="$ROOT/ibl5/bin/check-infection-ran"
+BASE=$(mktemp -d)
+trap 'rm -rf "$BASE"' EXIT
+
+FAILS=0
+PASSES=0
+RC=0
+OUT=""
+ERR=""
+
+pass() { echo "PASS $1"; PASSES=$((PASSES + 1)); }
+fail() { echo "FAIL $1 ($2)"; FAILS=$((FAILS + 1)); }
+
+want_rc() {
+    if [ "$RC" -eq "$2" ]; then pass "$1"; else fail "$1" "rc=$RC, wanted $2"; fi
+}
+want() {
+    if grep -qF -- "$3" <<< "$2"; then pass "$1"; else fail "$1" "missing: $3"; fi
+}
+want_not() {
+    if grep -qF -- "$3" <<< "$2"; then fail "$1" "unexpected: $3"; else pass "$1"; fi
+}
+
+# Run the helper in $1 with the remaining args; sets RC, OUT, ERR.
+run_in() {
+    local dir="$1"
+    shift
+    RC=0
+    (cd "$dir" && "$HELPER" "$@") > "$BASE/stdout" 2> "$BASE/stderr" || RC=$?
+    OUT=$(< "$BASE/stdout")
+    ERR=$(< "$BASE/stderr")
+}
+
+# Fresh case dir with the hermetic config; echoes the path.
+new_case() {
+    local d
+    d=$(mktemp -d "$BASE/case.XXXXXX")
+    cat > "$d/infection.json5" <<'EOF'
+{
+    "source": {
+        "directories": ["classes"],
+        "excludes": [
+            "*/Contracts/*",
+            "Bootstrap",
+            "Boxscore/Legacy",
+            // "Team",
+            "League/JsbConstants.php",
+            // infra-exclude reason
+            "Database/PdoConnection.php"
+        ]
+    }
+}
+EOF
+    echo "$d"
+}
+
+# Real log from PR #3443 (timestamp/job columns dropped; the message wraps).
+write_3443_log() {
+    cat > "$1" <<'EOF'
+ [OK] No source file found for the filter applied to the configured sources. The
+      git filter used was: "AM" with the base "ad8b69e940ef5bef5abac8476a2dd7d3dabcea6d".
+EOF
+}
+
+TEAM="ibl5/classes/Team/TeamView.php"
+
+# c1: the live #3443 scenario, a mutable class with a no-source log.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c1-mutable-3443 5
+want c1-mutable-3443 "$ERR" "classes/Team/TeamView.php"
+
+# c2: excluded directory.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "ibl5/classes/Bootstrap/Kernel.php" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c2-excluded-dir 0
+want c2-excluded-dir "$OUT" "Bootstrap/Kernel.php"
+
+# c3: excluded file.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "ibl5/classes/League/JsbConstants.php" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c3-excluded-file 0
+
+# c4: excluded glob.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "ibl5/classes/Player/Contracts/PlayerRepositoryInterface.php" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c4-excluded-glob 0
+
+# c5: one excluded and one mutable class; only the mutable one is named.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+printf '%s\n' "ibl5/classes/Bootstrap/Kernel.php" "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c5-mixed 5
+want c5-mixed "$ERR" "Team/TeamView.php"
+want_not c5-mixed "$ERR" "Bootstrap/Kernel.php"
+
+# c6: a commented-out exclude must not exclude.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c6-commented-exclude 5
+
+# c7: Infection generated mutants, so the no-op guard stays quiet.
+d=$(new_case)
+echo "12 mutants were generated:" > "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c7-mutants-generated 0
+want c7-mutants-generated "$OUT" "matched source files"
+
+# c8: "modified files" variant of the no-op message.
+d=$(new_case)
+echo 'Could not find any modified files in the configured sources for the git filter "AM" and the base "origin/master".' > "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c8-modified-files 5
+
+# c9: "modified lines" variant of the no-op message.
+d=$(new_case)
+echo 'Could not find any modified lines for the git filter "AM" and the base "origin/master". The diff got was blank.' > "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c9-modified-lines 5
+
+# c10: --log absent.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --changed changed.txt
+want_rc c10-no-log-flag 2
+want c10-no-log-flag "$ERR" "Usage:"
+
+# c11: log path does not exist.
+d=$(new_case)
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log missing.txt --changed changed.txt
+want_rc c11-unreadable-log 2
+want c11-unreadable-log "$ERR" "cannot read"
+
+# c12: empty changed list fails closed.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+: > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c12-empty-changed 2
+want c12-empty-changed "$ERR" "lists no classes/ paths"
+
+# c13: unknown flag.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+run_in "$d" --log log.txt --changed changed.txt --bogus
+want_rc c13-unknown-flag 2
+want c13-unknown-flag "$ERR" "unknown argument"
+
+# c14: cwd without infection.json5.
+d=$(new_case)
+write_3443_log "$d/log.txt"
+echo "$TEAM" > "$d/changed.txt"
+rm "$d/infection.json5"
+run_in "$d" --log log.txt --changed changed.txt
+want_rc c14-no-config 2
+want c14-no-config "$ERR" "run from ibl5/"
+
+# c15: the real ibl5/infection.json5 still parses (catches format drift).
+d=$(mktemp -d "$BASE/case.XXXXXX")
+write_3443_log "$d/log.txt"
+echo "ibl5/classes/Bootstrap/Kernel.php" > "$d/changed.txt"
+run_in "$ROOT/ibl5" --log "$d/log.txt" --changed "$d/changed.txt"
+want_rc c15-real-config 0
+
+echo "passed=$PASSES failed=$FAILS"
+if [ "$FAILS" -ne 0 ]; then
+    exit 1
+fi
+exit 0

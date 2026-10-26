@@ -502,7 +502,7 @@ else
     rm -f "$P7B_LOG" "${P7B_LOG%.log}.session" "$P7B_SCRIPT"
     grep -qF -- "CRASH-TRIAGE: harness-rc=1 pr=42 state=OPEN armed=no" <<< "$P7B_OUT" \
         || fail "harness crash: skill triage block did not report the PR (got: $P7B_OUT)"
-    if grep -qE '^(pr comment|pr merge|api)' "$GH7B_LOG" 2>/dev/null; then
+    if grep -qvE '^pr view( |$)' "$GH7B_LOG" 2>/dev/null; then
         fail "harness crash: skill triage wrote to GitHub ($(cat "$GH7B_LOG"))"
     fi
     P7B_DMS=$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')

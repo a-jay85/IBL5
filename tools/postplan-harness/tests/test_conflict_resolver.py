@@ -217,6 +217,62 @@ def test_resolver_tool_allowlist(tmp_path):
     assert len(llm.calls[0]["add_dirs"]) > 0
 
 
+def test_resolver_add_dirs_is_exactly_stage_dir(tmp_path):
+    """add_dirs stays the stage dir: citations.txt and the whole-file fallback need it."""
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    run = _StubRun(worktree)
+    resolve_one(llm, run, worktree=worktree, key="pin-key", path=path)
+    assert llm.calls[0]["add_dirs"] == ("/tmp/postplan-conflict-stages-pin-key",)
+
+
+def test_resolver_denied_tools_unchanged(tmp_path):
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    run = _StubRun(worktree)
+    resolve_one(llm, run, worktree=worktree, key="pin-key", path=path)
+    assert llm.calls[0]["denied_tools"] == ("Bash", "Agent")
+    assert llm.calls[0]["allowed_tools"] == ("Read", "Write")
+
+
+def test_resolver_modify_delete_keeps_whole_file_prompt(tmp_path):
+    """A modify/delete conflict keeps the whole-file prompt with the stage path."""
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    run = _StubRun(worktree)
+    resolve_one(
+        llm, run, worktree=worktree, key="md-key", path=path,
+        stages=frozenset({1, 2}), branch_stage=2,
+    )
+    prompt = llm.calls[0]["prompt"]
+    assert "Read all three before deciding" in prompt
+    assert "(absent: this side deleted the file)" in prompt
+    assert "/tmp/postplan-conflict-stages-md-key/base/app__foo.py" in prompt
+
+
+def test_resolver_identical_stages_keeps_whole_file_prompt(tmp_path):
+    """Identical stages have no real conflict, so the whole-file prompt stays."""
+    worktree = str(tmp_path)
+    path = "app/foo.py"
+    _make_temp_file(worktree, path, "resolved\n")
+
+    llm = _StubLlm(["RESOLVED"])
+    run = _StubRun(worktree)
+    resolve_one(llm, run, worktree=worktree, key="same-key", path=path)
+    prompt = llm.calls[0]["prompt"]
+    assert "Read all three before deciding" in prompt
+    assert "hunk context" not in prompt
+
+
 # ── Phase 3e: negative-path restore tests (real temp git repo) ──────────────
 
 def _sh(d, *args, check=True):

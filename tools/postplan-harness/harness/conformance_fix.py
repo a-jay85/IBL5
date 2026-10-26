@@ -414,8 +414,19 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
             _revert()
             return _done("rejected", "method-not-written")
 
-    sha = commit(COMMIT_MSG)
+    def _revert_staged() -> None:
+        # A rejected commit leaves `git add -A` staged; unstage before restoring files.
+        gitad.unstage_paths(sorted(set(gitad.dirty_paths()) - pre_dirty))
+        _revert()
+
+    try:
+        sha = commit(COMMIT_MSG)
+    except Exception:
+        _revert_staged()
+        log("phase5.0-fix: commit failed - tree reverted, re-raising")
+        raise
     if not sha:
+        _revert_staged()
         return _done("no-edits")
     hits = fidelity.denied_local_gate_edits(gitad.changed_files(f"{sha}^"))
     if hits:

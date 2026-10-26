@@ -378,6 +378,15 @@ class LiveGit:
                 except OSError:
                     pass
 
+    def unstage_paths(self, paths) -> None:
+        """Drop `paths` from the index (back to HEAD's entry); the working files stay.
+
+        A commit the pre-commit hook rejected leaves `git add -A` staged; a caller
+        that reverts the files must unstage them too or the tree stays dirty."""
+        paths = [p for p in (paths or []) if p]
+        if paths:
+            self._run("reset", "-q", "--", *paths, check=False)
+
     def stage_all(self) -> None:
         """post-plan-now fires on a DIRTY worktree by design — stage everything
         so untracked files land in the shippable diff before classification."""
@@ -1750,6 +1759,7 @@ class ReplayGit:
         self.drops: list[str] = []
         self.extra_dirty: list[str] = []      # paths a test wrote on disk (conformance fixer)
         self.restored: list[list[str]] = []   # restore_paths() calls, in order
+        self.unstaged: list[list[str]] = []   # unstage_paths() calls, in order
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
@@ -1778,6 +1788,9 @@ class ReplayGit:
 
     def restore_paths(self, paths) -> None:
         self.restored.append(list(paths))
+
+    def unstage_paths(self, paths) -> None:
+        self.unstaged.append(list(paths))
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""

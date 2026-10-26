@@ -52,7 +52,7 @@ bin/lib/automouse-pricer --index --since SPLIT |
   jq -s --arg from SPLIT --arg to 2026-11-23 -f bin/lib/opus-trial-cost.jq
 ```
 
-Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label. Limits: `work-triage-detail.md` § Inline vs. delegated.
+Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label. Limits: `work-triage-inline-trial.md`.
 
 ### The hard trigger: ≥5 distinct files in one turn
 

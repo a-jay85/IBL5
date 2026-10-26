@@ -1,5 +1,5 @@
 ---
-description: Read-on-demand detail for work-triage (no auto-attach; its `paths:` entries are all out-of-repo and never match). Read it when work-triage.md cites it. Covers the inline-Opus leak, ADR-0067 gateway, the hard-trigger rule and gate properties, /plan-verdict routing, the straddle gate's remedy ladder, inline-vs-delegated criteria with the inline-edit trial to 2026-11-23 and its measurement limits, safety-mirror backstop, and repeat-polling.
+description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
 last_verified: 2026-10-26
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
@@ -10,7 +10,7 @@ paths:
 
 Read-on-demand companion to `work-triage.md` (always-loaded).
 
-**This file never auto-attaches.** Its `paths:` entries are out-of-repo hooks and never match (`doc-freshness.md` § `paths:` residency semantics). Access is by explicit Read where `work-triage.md` names this file. Do **not** glob `.claude/rules/work-triage.md` to fix it. PR #1730 removed that compaction cascade.
+**This file never auto-attaches.** Its `paths:` entry points at a hook outside the repo, and out-of-repo entries do not match (`doc-freshness.md` § `paths:` residency semantics). The `paths:` key is kept non-empty only so the doc isn't promoted to always-loaded — access is by explicit Read, at the points where `work-triage.md` names this file. Do **not** "fix" it by globbing `.claude/rules/work-triage.md`: that is the compaction cascade PR #1730 removed.
 
 ## Execution routing context
 
@@ -50,6 +50,8 @@ Self-test: `bash ~/.claude/hooks/test-plan-gate-edit.sh`
 3. **Relocate or hand off**, direction-dependent: `EnterWorktree` when the session is in the **main checkout** and the target is a worktree; a **fresh session** rooted in the target when the session is already in a worktree (`ExitWorktree` no-ops for a session *launched* in a worktree, and a direct worktree→worktree `EnterWorktree` is rejected — leave the tree dirty and hand off in prose). Never relocate INTO the main checkout: it is read-only reference (ADR-0062).
 4. **The escape hatch** — `touch /tmp/claude-tree-override-<session_id>` (example), keyed per **session**, not per turn like Check 1's — for the genuine both-trees-at-once case (diffing two worktrees).
 
+Why the ladder replaced a bare "use `EnterWorktree`": in the gate's first 27h, all 8 override releases came from sessions already inside a worktree, where re-rooting is exactly the rung that does not work. Prescribing it there taught callers the remedy was broken and sent them to the override.
+
 ## Repeat-polling
 
 A poll loop re-reads the full context every call (~81K tokens); eight 60s checks burns ~650K tokens vs ~81K for one deferred check. **Never poll on the main thread.**
@@ -60,13 +62,13 @@ A poll loop re-reads the full context every call (~81K tokens); eight 60s checks
 
 ### The readiness predicate
 
-Moving the poll off the main thread fixes *where* it runs. A watcher with a wrong readiness predicate is worse than none: it returns a confident verdict on an unfinished artifact.
+Moving the poll off the main thread fixes *where* it runs, not whether it is asking the right question. A watcher with a wrong readiness predicate is worse than no watcher: it returns a confident verdict on an unfinished artifact, and the caller has no reason to doubt it.
 
 **Valid completion signals:** the process exiting; its launchd/job label disappearing from `launchctl list`; a runner's own verdict line in its log; a sentinel the producer writes **last** (including a scratch/draft file it deletes on completion). **Not a completion signal:** mtime, size, or existence of a file the producer appends to incrementally — those all go true mid-write.
 
-**Prefer the producer's verdict over your own.** If the producing process already runs the check you were going to run, wait for it and read its answer. Yours would run against a partial artifact.
+**Prefer the producer's verdict over your own.** If the producing process already runs the check you were going to run, wait for it and read its answer. Recomputing invites the two to disagree, and yours is the one running against a partial artifact.
 
-Observed 2026-07-27: a `bin/plan-now` watcher used "final plan newer than its draft" as the done-test. `/plan` appends section by section, so the test went true on a truncated file and reported a passing plan as `CHECK-PLAN FAILED`. The launchd label vanishing and the draft's deletion were unused valid signals.
+Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now`) used "final plan is newer than its draft" as the done-test. `/plan` appends the final plan section-by-section, so the predicate went true while the file was still truncated, `bin/check-plan` failed on the partial text, and a passing plan was reported as `CHECK-PLAN FAILED`. Three valid signals were available and unused: the launchd label vanishing, `bin/plan-now`'s own `RESULT ok — check-plan PASSED` log line, and the draft file being deleted. This is the same family as the ADR-0096 identity bug — a verdict trusted from a heuristic instead of from the run's own self-report.
 
 ## Safety mirror backstop
 
@@ -78,11 +80,11 @@ Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condi
 
 ## Inline vs. delegated
 
-**Inline-edit trial to 2026-11-23.** A design-resolved, machine-verifiable chunk under 5 distinct files is edited inline by Opus (`work-triage.md` § Execution routing). The recipe writer makes the edits, can revise mid-turn, and skips the 17-23K token spawn and the lossy handoff summary. The cost is review independence, partly restored because the Sonnet review agents are a different model from the editor.
+Until 2026-11-23, chunks under 5 files follow the inline-edit trial in `work-triage-inline-trial.md`.
 
-For a chunk of 5 or more files, Opus stays inline only when:
+Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
-- the chunk is **trivial**: a one-or-two-edit change where the fixed spawn cost (17K to 23K tokens p50, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
+- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~17–23K tokens [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
 
@@ -90,22 +92,11 @@ Either way the routing decision is **stated, not silent** — one line, like the
 
 The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, and that is deliberate rather than a leftover: a file sweep is one coherent change whose edits must stay consistent with each other, so its parts are *dependent* and splitting them buys no wall-clock while risking divergence. Fan out across **independent** chunks, not within a single sweep.
 
-### Inline-edit trial measurement
-
-`bin/lib/opus-trial-cost.jq` sums the `cost` field of `bin/lib/automouse-pricer --index` per worktree transcript dir and reports `n`, median, mean, and p90 for a half-open window `[from, to)`. Under 20 tasks it sets `note: "insufficient-sample"`, the floor in `bin/measure-delegate-cost`. `cost` is recomputed from transcripts and includes subagents, unlike `logged_cost` (`bin/automouse/backfill-costs`). Transcripts age out after 30 days, so the before-window stats were saved to `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. The review compares that file with a fresh run. The command is in `work-triage.md` § Execution routing.
-
-Known limits:
-
-- **Headless dilution.** Automouse, `/post-plan`, and `bin/plan-now` sessions share the worktree dirs and no index field separates them. They dilute both windows about equally.
-- **The headless ledgers cannot see the trial.** `work-triage.md` § Calibration makes this rule a no-op under headless/automouse, so the sidecar `*.costs.jsonl` files price only sessions the trial never changes.
-- **Boundary tasks.** A worktree that spans `from` is priced only for sessions on or after it.
-- **Observational evidence.** Task mix differs between windows. Treat a median shift as one signal next to redo rate and review findings.
-
 ## /plan verdict routing
 
 **The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)`. It burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 5.5); `~/.claude/hooks/skill-gate.sh` denies it.
 
-Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed.
+Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed. A warning you can read past is not a control.
 
 ### Gate properties — plan skill
 
@@ -114,7 +105,7 @@ Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.m
 - **Denies unconditionally** (not Opus-specific — `/plan-prompt` → `bin/plan-now` is the better path on ANY interactive model).
 - **Exact skill-name match.** `plan` is denied here (`post-plan` has its own override namespace in the same hook, routing to `bin/post-plan-now`). Every other skill, including `plan-prompt`, and namespaced names like `commit-commands:commit`, passes through untouched.
 - **Main thread only** — sub-agent calls (`agent_id` present) pass through; the delegate you spawn is never blocked.
-- **Headless sessions exempt.** When `CLAUDE_HEADLESS=1` is set, the hook allows the call. `bin/plan-now` sets it before its detached `claude -p` run, which keeps `bin/plan-now` and automouse working.
+- **Headless sessions exempt.** When `CLAUDE_HEADLESS=1` is set in the environment, the hook allows the call. `bin/plan-now` sets this env var before its detached `claude -p` invocation; `bash-guard.sh` and `output-guard.sh` both branch on it in production, confirming it reaches hook child processes. This exemption is what keeps `bin/plan-now` and automouse working.
 - **Fails open** on malformed or unrecognised payload — a missing field never blocks a Skill call.
 - **Escape hatch:** `touch /tmp/claude-plan-inline-override-<session_id>` (session-scoped). Legitimate when the session has already paid the context cost or the plan is too entangled with live state to hand off. **Say out loud that you're overriding and why, in the same turn** — using it silently defeats the gate.
 

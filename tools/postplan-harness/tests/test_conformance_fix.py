@@ -289,6 +289,14 @@ def test_rejects_edit_that_removes_existing_test_lines(tmp_path):
     assert git.commit_messages == []
 
 
+def test_added_and_removed_counts_lines_that_look_like_diff_headers():
+    before = b"a\n--$i;\nb\n"
+    after = b"a\nb\n++$i;\n"
+    added, removed = conformance_fix._added_and_removed(before, after)
+    assert added == ["++$i;"]
+    assert removed == 1
+
+
 _VACUOUS = {
     "php": ("ibl5/tests/Fixer/PromisedTest.php",
             ["<?php\nfinal class PromisedTest extends TestCase\n{\n"

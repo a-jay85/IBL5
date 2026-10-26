@@ -18,6 +18,7 @@ Kill switch: `POSTPLAN_CONFORMANCE_FIX`. Unset and empty enable; only the exact 
 from __future__ import annotations
 
 import difflib
+import itertools
 import os
 import re
 import sys
@@ -199,8 +200,11 @@ def _added_and_removed(before: bytes | None, after: bytes | None) -> tuple[list[
         return _lines(after), 0
     added: list[str] = []
     removed = 0
-    for ln in difflib.unified_diff(_lines(before), _lines(after), lineterm="", n=0):
-        if ln.startswith("+++") or ln.startswith("---") or ln.startswith("@@"):
+    diff = difflib.unified_diff(_lines(before), _lines(after), lineterm="", n=0)
+    # Only the first two lines are file headers; a content line like `++$i;` or `--$i;`
+    # comes out as `+++$i;` / `---$i;` and must still count.
+    for ln in itertools.islice(diff, 2, None):
+        if ln.startswith("@@"):
             continue
         if ln.startswith("+"):
             added.append(ln[1:])

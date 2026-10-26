@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: bin/check-infection-ran --log <infection-log> --changed <changed-list>
+# Guards the per-PR mutation job against Infection's silent no-op. When the
+# git filter finds nothing, Infection prints "No source file found" (or "Could
+# not find any modified files/lines"), generates zero mutants, and exits 0, so
+# the MSI gate passes on changed classes that were never mutated.
+# ---
+# --log <file>      Infection's combined stdout/stderr for the run.
+# --changed <file>  One changed path per line; only paths with classes/ count.
+# Run from the ibl5/ directory (reads ./infection.json5 source.excludes).
+# ---
+# Exit 0: Infection matched sources, or every changed class is excluded.
+# Exit 2: bad arguments or unreadable input (fails closed).
+# Exit 5: Infection mutated nothing, yet a changed class is not excluded.
+#
+
+CONFIG="infection.json5"
+NO_SOURCE_RE='No source file found|Could not find any modified (files|lines)'
+
+usage() {
+    sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+log=""
+changed=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --log)
+            if [ $# -lt 2 ]; then
+                echo "ERROR: --log needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            log="$2"
+            shift 2
+            ;;
+        --changed)
+            if [ $# -lt 2 ]; then
+                echo "ERROR: --changed needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            changed="$2"
+            shift 2
+            ;;
+        *)
+            echo "ERROR: unknown argument: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ -z "$log" ] || [ -z "$changed" ]; then
+    echo "ERROR: both --log and --changed are required" >&2
+    usage >&2
+    exit 2
+fi
+
+# --- Input checks (all fail closed) -----------------------------------------
+if [ ! -f "$log" ] || [ ! -r "$log" ]; then
+    echo "ERROR: cannot read $log" >&2
+    exit 2
+fi
+if [ ! -f "$changed" ] || [ ! -r "$changed" ]; then
+    echo "ERROR: cannot read $changed" >&2
+    exit 2
+fi
+if [ ! -f "$CONFIG" ]; then
+    echo "ERROR: $CONFIG not found (run from ibl5/ directory)" >&2
+    exit 2
+fi
+
+# --- Changed class paths, relative to classes/ ------------------------------
+rels=()
+while IFS= read -r p || [ -n "$p" ]; do
+    case "$p" in
+        *classes/*) ;;
+        *) continue ;;
+    esac
+    r="${p#*classes/}"
+    if [ -n "$r" ]; then
+        rels+=("$r")
+    fi
+done < "$changed"
+
+if [ ${#rels[@]} -eq 0 ]; then
+    echo "ERROR: $changed lists no classes/ paths (the changed-file list was not written?)" >&2
+    exit 2
+fi
+
+# --- Did Infection find sources? --------------------------------------------
+rc=0
+grep -qE "$NO_SOURCE_RE" "$log" || rc=$?
+if [ "$rc" -eq 1 ]; then
+    echo 'OK: Infection matched source files (no "no source" message).'
+    exit 0
+fi
+if [ "$rc" -gt 1 ]; then
+    echo "ERROR: grep failed on $log" >&2
+    exit 2
+fi
+
+# --- Parse source.excludes from infection.json5 -----------------------------
+# From the "excludes" key line through the first line holding "]". Whole-line
+# // comments are dropped; a trailing // comment is cut after the closing quote.
+parsed=""
+if ! parsed=$(awk '
+    !on && $0 ~ /"?excludes"?[[:space:]]*:/ {
+        on = 1
+        sub(/"?excludes"?[[:space:]]*:/, "")
+    }
+    !on { next }
+    /^[[:space:]]*\/\// { next }
+    {
+        line = $0
+        if (match(line, /"[[:space:]]*,?[[:space:]]*\/\//)) {
+            line = substr(line, 1, RSTART)
+        }
+        done = index(line, "]") > 0
+        while (match(line, /"[^"]*"/)) {
+            tok = substr(line, RSTART + 1, RLENGTH - 2)
+            print tok
+            line = substr(line, RSTART + RLENGTH)
+        }
+        if (done) { exit }
+    }
+' "$CONFIG"); then
+    echo "ERROR: could not parse excludes from $CONFIG" >&2
+    exit 2
+fi
+
+excl=()
+if [ -n "$parsed" ]; then
+    while IFS= read -r e; do
+        if [ -n "$e" ]; then
+            excl+=("$e")
+        fi
+    done <<< "$parsed"
+fi
+
+# --- Classify each changed class --------------------------------------------
+excluded=()
+mutable=()
+for rel in "${rels[@]}"; do
+    hit=0
+    for e in ${excl[@]+"${excl[@]}"}; do
+        if [[ "$e" == *"*"* ]]; then
+            # shellcheck disable=SC2053
+            if [[ $rel == $e ]]; then hit=1; fi
+        elif [[ "$e" == *.php ]]; then
+            if [[ "$rel" == "$e" ]]; then hit=1; fi
+        else
+            if [[ "$rel" == "$e"/* ]]; then hit=1; fi
+        fi
+        if [ "$hit" -eq 1 ]; then
+            break
+        fi
+    done
+    if [ "$hit" -eq 1 ]; then
+        excluded+=("$rel")
+    else
+        mutable+=("$rel")
+    fi
+done
+
+if [ ${#mutable[@]} -eq 0 ]; then
+    echo "OK: Infection matched no source file, and every changed class is in infection.json5 source.excludes:"
+    for rel in "${excluded[@]}"; do
+        echo "  - $rel"
+    done
+    exit 0
+fi
+
+echo "ERROR: Infection mutated nothing, but ${#mutable[@]} changed class(es) are not in source.excludes:" >&2
+for rel in "${mutable[@]}"; do
+    echo "  - classes/$rel" >&2
+done
+matched=""
+matched=$(grep -E "$NO_SOURCE_RE" "$log") || true
+while IFS= read -r l; do
+    if [ -n "$l" ]; then
+        echo "  infection: $l" >&2
+    fi
+done <<< "$matched"
+echo "Hint: a git config diff.relative=true setting makes git diff print paths relative to the cwd, so Infection's git filter finds no source file; unset it (git -c diff.relative=false) for the diff step." >&2
+exit 5

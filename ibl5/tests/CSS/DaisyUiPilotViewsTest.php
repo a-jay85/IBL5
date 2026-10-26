@@ -48,6 +48,10 @@ class DaisyUiPilotViewsTest extends TestCase
             'PlayerSearchView' => [$classes . '/PlayerSearch/PlayerSearchView.php'],
             'FreeAgencyOfferView' => [$classes . '/FreeAgency/FreeAgencyOfferView.php'],
             'FreeAgencyFormView' => [$classes . '/FreeAgency/FreeAgencyFormView.php'],
+            'LoginView' => [$classes . '/YourAccount/LoginView.php'],
+            'RegistrationView' => [$classes . '/YourAccount/RegistrationView.php'],
+            'PasswordResetView' => [$classes . '/YourAccount/PasswordResetView.php'],
+            'ActivationView' => [$classes . '/YourAccount/ActivationView.php'],
         ];
     }
 

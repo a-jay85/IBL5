@@ -8,13 +8,14 @@ use PHPUnit\Framework\TestCase;
 use Player\Stats\Views\PlayerSeasonTableConfig;
 use Player\Stats\Views\PlayerSeasonTableMode;
 use Player\Stats\Views\PlayerSeasonTableRenderer;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * @covers \Player\Stats\Views\PlayerSeasonTableRenderer
  */
 class PlayerSeasonTableRendererTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     private PlayerSeasonTableRenderer $renderer;
 

@@ -150,6 +150,12 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.search-results', viewports: ['desktop', 'mobile'] },
   { name: 'your-account', auth: 'public', url: 'modules.php?name=YourAccount',
     anchor: '.auth-page', viewports: ['desktop', 'mobile'] },
+  { name: 'your-account-register', auth: 'public', url: 'modules.php?name=YourAccount&op=new_user',
+    anchor: '.auth-page:has(#register-username)', viewports: ['desktop', 'mobile'],
+    notes: 'Registration form (RegistrationView), daisyUI d-card/d-input/d-btn. Logged-out only; a logged-in user is redirected away, so the row is public.' },
+  { name: 'your-account-forgot-password', auth: 'public', url: 'modules.php?name=YourAccount&op=pass_lost',
+    anchor: '.auth-page:has(#reset-email)', viewports: ['desktop', 'mobile'],
+    notes: 'Forgot-password form (PasswordResetView), daisyUI d-card/d-input/d-btn. Logged-out only.' },
 
   // ── Error pages ──────────────────────────────────────────────
   { name: 'error-invalid-module', auth: 'public', url: 'modules.php?name=NonExistentModule',

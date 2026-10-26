@@ -108,7 +108,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
                 . self::esc($t['iblFinalsLoser']) . ' 4-' . $t['iblFinalsLoserGames'];
         }
 
-        $html = '<div class="season-archive-section"><h3>Tournaments</h3>';
+        $html = '<div class="season-archive-section"><h2>Tournaments</h2>';
         $html .= '<p class="season-archive-bracket-hint">Click an event name to view its Challonge bracket.</p>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Event</th><th>Champion</th></tr></thead><tbody>';
 
@@ -145,7 +145,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
             $asw['gameMvps']
         );
 
-        $html = '<div class="season-archive-section"><h3>All-Star Weekend</h3>';
+        $html = '<div class="season-archive-section"><h2>All-Star Weekend</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>';
         $html .= '<tr><td>Three-Point Contest</td><td>' . self::renderPlayerName($asw['threePointWinner'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Slam Dunk Competition</td><td>' . self::renderPlayerName($asw['slamDunkWinner'], $playerIds) . '</td></tr>';
@@ -178,7 +178,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
             }
         }
 
-        $html = '<div class="season-archive-section"><h3>Major Awards</h3>';
+        $html = '<div class="season-archive-section"><h2>Major Awards</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Award</th><th>Winner</th></tr></thead><tbody>';
         $html .= '<tr><td>Most Valuable Player</td><td>' . self::renderPlayerName($awards['mvp'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Defensive Player of the Year</td><td>' . self::renderPlayerName($awards['dpoy'], $playerIds) . '</td></tr>';
@@ -197,7 +197,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
      */
     private function renderStatisticalLeaders(array $leaders, array $playerIds): string
     {
-        $html = '<div class="season-archive-section"><h3>Statistical Leaders</h3>';
+        $html = '<div class="season-archive-section"><h2>Statistical Leaders</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Category</th><th>Leader</th></tr></thead><tbody>';
         $html .= '<tr><td>Scoring</td><td>' . self::renderPlayerName($leaders['scoring'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Rebounds</td><td>' . self::renderPlayerName($leaders['rebounds'], $playerIds) . '</td></tr>';
@@ -215,7 +215,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
      */
     private function renderTeamSelection(array $teams, string $title, array $playerIds): string
     {
-        $html = '<div class="season-archive-section"><h3>' . self::esc($title) . '</h3>';
+        $html = '<div class="season-archive-section"><h2>' . self::esc($title) . '</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>First Team</th><th>Second Team</th><th>Third Team</th></tr></thead><tbody>';
 
         $maxRows = max(count($teams['first']), count($teams['second']), count($teams['third']));
@@ -241,7 +241,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>Playoff Bracket</h3>';
+        $html = '<div class="season-archive-section"><h2>Playoff Bracket</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Round</th><th>Winner</th><th>Loser</th><th>Result</th></tr></thead><tbody>';
 
         $isFirstRound = true;
@@ -276,7 +276,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>H.E.A.T. Standings</h3>';
+        $html = '<div class="season-archive-section"><h2>H.E.A.T. Standings</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Team</th><th>W-L</th></tr></thead><tbody>';
 
         foreach ($standings as $row) {
@@ -302,7 +302,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>Champions &amp; Awards</h3>';
+        $html = '<div class="season-archive-section"><h2>Champions &amp; Awards</h2>';
         $html .= '<table class="ibl-data-table" data-no-responsive><thead><tr><th>Award</th><th>Team</th></tr></thead><tbody>';
 
         foreach ($teamAwards as $awardName => $teamName) {
@@ -345,14 +345,14 @@ class SeasonDetailView implements SeasonDetailViewInterface
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>Rosters</h3>';
+        $html = '<div class="season-archive-section"><h2>Rosters</h2>';
         $html .= '<div class="season-archive-roster-flex">';
 
         // IBL Champions column
         if ($hasIbl) {
             $html .= '<div class="season-archive-roster-col">';
             $html .= $this->renderCoachCaption($iblChampionCoach !== '' ? [$iblChampionCoach] : []);
-            $html .= '<h4>IBL Champions</h4>';
+            $html .= '<h3>IBL Champions</h3>';
             $html .= $this->renderRosterTable($championRosters['ibl'], $playerIds);
             $html .= $this->renderIblChampionLogoImg($iblChampion, $teamColors, $year);
             $html .= '</div>';
@@ -362,7 +362,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
         if ($hasEast) {
             $html .= '<div class="season-archive-roster-col">';
             $html .= $this->renderCoachCaption($allStarCoaches['east']);
-            $html .= '<h4>Eastern Conf. All-Stars</h4>';
+            $html .= '<h3>Eastern Conf. All-Stars</h3>';
             $html .= $this->renderRosterTable($allStarRosters['east'], $playerIds);
             $html .= '</div>';
         }
@@ -371,7 +371,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
         if ($hasWest) {
             $html .= '<div class="season-archive-roster-col">';
             $html .= $this->renderCoachCaption($allStarCoaches['west']);
-            $html .= '<h4>Western Conf. All-Stars</h4>';
+            $html .= '<h3>Western Conf. All-Stars</h3>';
             $html .= $this->renderRosterTable($allStarRosters['west'], $playerIds);
             $html .= '</div>';
         }
@@ -381,7 +381,7 @@ class SeasonDetailView implements SeasonDetailViewInterface
         // H.E.A.T. Champions as a separate roster below
         if ($championRosters['heat'] !== []) {
             $html .= '<div class="season-archive-heat">';
-            $html .= '<h4>H.E.A.T. Champions</h4>';
+            $html .= '<h3>H.E.A.T. Champions</h3>';
             $html .= $this->renderRosterTable($championRosters['heat'], $playerIds);
             $html .= '</div>';
         }

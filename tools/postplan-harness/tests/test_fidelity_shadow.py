@@ -221,6 +221,12 @@ class TestShadowPacket:
         assert len(rows) == 400
         assert "(+1 more files)" in ctx
 
+    def test_diff_files_counts_removed_sql_comment_and_plus_lines(self, tmp_path):
+        diff = ("diff --git a/m.sql b/m.sql\n--- a/m.sql\n+++ b/m.sql\n"
+                "@@ -1,2 +1,2 @@\n-- old comment\n+++ new\n keep\n")
+        ctx = _packet_context(tmp_path, diff=diff, shadow_request=True)
+        assert "m.sql +1 -1" in ctx
+
     def test_packet_never_carries_old_conformance(self, tmp_path):
         ctx = _packet_context(tmp_path, shadow_request=True)
         assert "MISSING" not in ctx

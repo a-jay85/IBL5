@@ -698,8 +698,12 @@ def shadow_context(diff: str) -> str:
     rows = []
     for path, section in split_diff_by_file(diff or "").items():
         added = removed = 0
+        in_hunk = False
         for ln in section.splitlines():
-            if ln.startswith("+++") or ln.startswith("---"):
+            if ln.startswith("@@"):
+                in_hunk = True
+                continue
+            if not in_hunk:   # `---`/`+++` headers sit before the first hunk only
                 continue
             if ln.startswith("+"):
                 added += 1

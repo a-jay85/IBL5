@@ -382,7 +382,8 @@ if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
   XM_NEW="$XM_BODY"
   XM_B=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:begin -->' | cut -d: -f1)
   XM_E=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:end -->' | cut -d: -f1)
-  if [ -n "$XM_B" ] && [ -n "$XM_E" ] && [ "$XM_B" -lt "$XM_E" ]; then
+  # A missing done-marker means the step never ran, so keep the old block untouched.
+  if [ -e "/tmp/post-plan-exec-mutations-done-$PPID" ] && [ -n "$XM_B" ] && [ -n "$XM_E" ] && [ "$XM_B" -lt "$XM_E" ]; then
     XM_NEW=$(printf '%s\n' "$XM_BODY" | sed "${XM_B},${XM_E}d")
   fi
   if [ -s "$XMF" ]; then

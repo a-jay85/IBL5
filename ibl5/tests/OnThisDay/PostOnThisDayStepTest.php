@@ -222,6 +222,28 @@ final class PostOnThisDayStepTest extends TestCase
         self::assertStringContainsString('db gone', $result->detail);
         self::assertSame([], $poster->messages);
     }
+
+    public function testSeasonLookupFailureSkipsWithoutFailingPipeline(): void
+    {
+        $seasonQuery = self::createStub(SeasonQueryRepository::class);
+        $seasonQuery->method('getSeasonPhase')->willThrowException(new \RuntimeException('settings gone'));
+        $claims = $this->makeClaims(true);
+        $poster = new RecordingPoster();
+        $step = new PostOnThisDayStep(
+            $this->makeService($this->makeSelection()),
+            $claims,
+            $seasonQuery,
+            $poster,
+        );
+
+        $result = $step->execute();
+
+        self::assertTrue($result->success);
+        self::assertTrue($result->skipped);
+        self::assertStringContainsString('settings gone', $result->detail);
+        self::assertSame([], $claims->claimed);
+        self::assertSame([], $poster->messages);
+    }
 }
 
 final class RecordingPoster implements MomentPosterInterface

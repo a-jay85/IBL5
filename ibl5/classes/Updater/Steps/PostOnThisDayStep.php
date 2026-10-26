@@ -35,20 +35,20 @@ class PostOnThisDayStep implements PipelineStepInterface
     {
         $label = $this->getLabel();
 
-        $phase = $this->seasonQuery->getSeasonPhase();
-        if (!\OnThisDay\OnThisDayPhasePolicy::isEnabled($phase)) {
-            $reason = $phase !== ''
-                ? "On this day posts are disabled during the {$phase} phase."
-                : 'On this day posts are disabled — no season phase is set.';
-            return StepResult::skipped($label, $reason);
-        }
-
-        $sim = $this->seasonQuery->getLastSimDatesArray()['sim'];
-        if ($sim <= 0) {
-            return StepResult::skipped($label, 'No sim dates recorded — nothing to post.');
-        }
-
         try {
+            $phase = $this->seasonQuery->getSeasonPhase();
+            if (!\OnThisDay\OnThisDayPhasePolicy::isEnabled($phase)) {
+                $reason = $phase !== ''
+                    ? "On this day posts are disabled during the {$phase} phase."
+                    : 'On this day posts are disabled — no season phase is set.';
+                return StepResult::skipped($label, $reason);
+            }
+
+            $sim = $this->seasonQuery->getLastSimDatesArray()['sim'];
+            if ($sim <= 0) {
+                return StepResult::skipped($label, 'No sim dates recorded — nothing to post.');
+            }
+
             $selection = $this->service->getMomentsForSim();
             if ($selection->isEmpty()) {
                 return StepResult::skipped($label, "No notable moment within 7 days of {$selection->centerDate}.");

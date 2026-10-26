@@ -284,6 +284,16 @@ h_eq "case 17: reap command present once" 1 \
 h_contains "case 17: same line as the /plan hand-off" \
     "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
 
+echo "== case 17a: prompt-impl Step 6.5 leaves the worktree by a cd bash-guard allows"
+# Run from inside the worktree under CLAUDE_HEADLESS, so bash-guard Check 15 denies a
+# persisting cd into the main checkout, and a subshell cd keeps the shell in the worktree
+# (wt-remove --if-empty then answers "kept: in use").
+PI="$REAL_ROOT/bin/automouse/prompt-impl"
+h_eq "case 17a: reap cds to the worktrees parent" 1 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5-worktrees && /Users/ajaynicolas/GitHub/IBL5/bin/wt-remove <slug> --if-empty' "$PI")"
+h_eq "case 17a: no cd into the main checkout" 0 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5 &&' "$PI")"
+
 echo "== case 18: an absolute path resolves by directory, not by branch name"
 mkwt swap-a swap-b
 mkwt swap-b swap-a

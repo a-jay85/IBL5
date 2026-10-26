@@ -1,0 +1,9 @@
+diff --git a/ibl5/migrations/902_demo_add.sql b/ibl5/migrations/902_demo_add.sql
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/ibl5/migrations/902_demo_add.sql
+@@ -0,0 +1,3 @@
++-- Add a nullable note column to ibl_demo.
++-- Rollback: ALTER TABLE ibl_demo DROP COLUMN note;
++ALTER TABLE ibl_demo ADD COLUMN note TEXT NULL;

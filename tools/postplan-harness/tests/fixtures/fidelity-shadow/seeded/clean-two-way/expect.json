@@ -1,0 +1,9 @@
+{
+  "case": "clean-two-way",
+  "expect": {
+    "3": "clear",
+    "18": "clear",
+    "body_numbers": "consistent"
+  },
+  "why": "Control: plan fully realised, additive Python change, and the body numbers match the diff."
+}

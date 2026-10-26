@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-24
+last_verified: 2026-10-26
 ---
 
 # IBL5 Architecture Decision Records
@@ -84,6 +84,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0209](0209-launchd-per-run-jobs-write-no-plist.md) | Per-run launchd jobs write no LaunchAgents plist | Accepted | `ljob_submit` replaces per-run plists for plan-now and post-plan-now; tests sandbox HOME and assert the real agents dir stays unchanged. |
 | [0210](0210-required-context-payload-provable-job-skip.md) | Payload-provable job-level skips on PR label and edit events | Accepted | `human-signoff` and `auto-mergeable label` skip label and edit events their verdict cannot read, with the predicate copied into a per-run concurrency group; `Meta checks` stays unfiltered. |
 | [0208](0208-merged-digest-pings-owner-for-post-merge-steps.md) | The merge digest pings the owner when a post-merge step needs them | Accepted | `bin/digest-dm-build` @mentions the owner on the single #merged digest only for a manual row, a failed auto row, or a failed checklist job, decided by `pmr_ping_decision` from job outputs and never from PR text. |
+| [0218](0218-opus-inline-edit-trial-under-five-files.md) | Opus inline-edit trial for chunks under 5 files | Accepted | Until 2026-11-23 Opus edits a design-resolved, machine-verifiable chunk of under 5 files inline; `bin/lib/opus-trial-cost.jq` compares per-task cost against a saved baseline at review. |
 
 ## When an ADR is Required
 

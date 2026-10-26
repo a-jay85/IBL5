@@ -1285,6 +1285,12 @@ def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = s
               f"cost_usd={float(rec.get('cost_usd') or 0.0):.2f}", file=err)
     if extra_leaks:
         print(f"leaked after run: {', '.join(extra_leaks)}", file=err)
+    if not any(s.scored for s in scores):
+        # Every run degraded or leaked: no score line exists, but the documented exit is 3.
+        print(f"no scored runs: degraded={sum(1 for r in records if r.get('status') == 'degraded')} "
+              f"leaked={sum(1 for r in records if r.get('status') == 'leaked') + len(extra_leaks)}",
+              file=err)
+        return 3
     score = compute_score(scores, records, v=v, c=c)
     if extra_leaks:
         from dataclasses import replace

@@ -1101,6 +1101,7 @@ fi
 # t8 author null                   → excluded (deleted account is untrusted)
 # t9 "bot" User                    → excluded (suffix must be literal "[bot]")
 # t10 comments empty (ghost)       → excluded (no commentId), must not abort
+# t11 "stranger", isOutdated true  → excluded in both modes (untrusted)
 fixT="$BASE_TMP/threads-trust.json"
 cat > "$fixT" <<'THREADST'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -1123,7 +1124,9 @@ cat > "$fixT" <<'THREADST'
   {"id":"PRRT_t9","isResolved":false,"isOutdated":false,"path":"classes/I.php","line":12,
    "comments":{"nodes":[{"databaseId":609,"body":"Bare bot","author":{"login":"bot","__typename":"User"}}]}},
   {"id":"PRRT_t10","isResolved":false,"isOutdated":false,"path":null,"line":null,
-   "comments":{"nodes":[]}}
+   "comments":{"nodes":[]}},
+  {"id":"PRRT_t11","isResolved":false,"isOutdated":true,"path":"classes/J.php","line":null,
+   "comments":{"nodes":[{"databaseId":611,"body":"Old from a stranger","author":{"login":"stranger","__typename":"User"}}]}}
 ]}}}}}
 THREADST
 GH_THREADS_FIXTURE="$fixT"
@@ -1143,6 +1146,7 @@ assert_not_contains "trust: login prefix imposter 607 excluded" "$TRUST_OUT" '"c
 assert_not_contains "trust: null author 608 excluded"           "$TRUST_OUT" '"commentId":608'
 assert_not_contains "trust: bare 'bot' login 609 excluded"      "$TRUST_OUT" '"commentId":609'
 assert_not_contains "trust: ghost thread never listed as null"  "$TRUST_OUT" '"commentId":null'
+assert_not_contains "trust: untrusted outdated 611 excluded by default" "$TRUST_OUT" '"commentId":611'
 if jq -e 'has("id") and has("path") and has("line") and has("body") and has("score")' \
       "$TRUST_OUT" >/dev/null 2>&1; then
     ok "trust: full thread objects (id/path/line/body/score) pass through"
@@ -1177,6 +1181,49 @@ if [ "$(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')" = "111 " ]; then
 else
     fail "trust-default: got $(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')"
 fi
+
+# ── trust-outdated: --include-outdated lists trusted outdated threads ──────────
+GH_THREADS_FIXTURE="$fixT"
+TO_OUT="$BASE_TMP/trust-outdated.jsonl"
+list_trusted_open_threads 42 --include-outdated > "$TO_OUT"; rcO=$?
+[ "$rcO" -eq 0 ] && ok "trust-outdated: rc 0 with the flag" || fail "trust-outdated: rc $rcO, expected 0"
+got=$(jq -r '.commentId' "$TO_OUT" | sort | tr '\n' ' ')
+if [ "$got" = "601 602 603 605 " ]; then
+    ok "trust-outdated: 605 joins 601 602 603 (trusted outdated listed)"
+else
+    fail "trust-outdated: expected '601 602 603 605 ', got '$got'"
+fi
+# 605 must keep the shape fix-or-decline reads: isOutdated:true and line:null.
+if jq -e 'select(.commentId == 605) | .isOutdated == true and .line == null' "$TO_OUT" >/dev/null 2>&1; then
+    ok "trust-outdated: 605 carries isOutdated true and line null"
+else
+    fail "trust-outdated: 605 lost isOutdated/line"
+fi
+assert_not_contains "trust-outdated: untrusted outdated 611 still excluded" "$TO_OUT" '"commentId":611'
+assert_not_contains "trust-outdated: resolved 606 still excluded"           "$TO_OUT" '"commentId":606'
+assert_not_contains "trust-outdated: untrusted 604 still excluded"          "$TO_OUT" '"commentId":604'
+assert_not_contains "trust-outdated: null author 608 still excluded"        "$TO_OUT" '"commentId":608'
+
+# ── trust-badflag: an unknown option fails loudly, prints nothing ─────────────
+BF_OUT="$BASE_TMP/trust-badflag.jsonl"
+list_trusted_open_threads 42 --include-outdatedd > "$BF_OUT" 2>"$BASE_TMP/trust-badflag.err"; rcB=$?
+if [ "$rcB" -eq 2 ] && [ ! -s "$BF_OUT" ]; then
+    ok "trust-badflag: --include-outdatedd → rc 2, empty stdout"
+else
+    fail "trust-badflag: rc $rcB, stdout $(wc -l < "$BF_OUT") lines; expected rc 2 and empty"
+fi
+assert_contains "trust-badflag: stderr names the unknown option" "$BASE_TMP/trust-badflag.err" "unknown option '--include-outdatedd'"
+
+# ── trust-cap-flag: the 100-node cap still applies with the flag ──────────────
+GH_THREADS_FIXTURE="$fixTcap"
+CF_OUT="$BASE_TMP/trust-cap-flag.jsonl"
+list_trusted_open_threads 42 --include-outdated > "$CF_OUT" 2>"$BASE_TMP/trust-cap-flag.err"; rcCF=$?
+if [ "$rcCF" -eq 2 ] && [ ! -s "$CF_OUT" ]; then
+    ok "trust-cap-flag: 100 nodes with --include-outdated → empty stdout, rc 2"
+else
+    fail "trust-cap-flag: rc $rcCF, stdout $(wc -l < "$CF_OUT") lines; expected rc 2 and empty"
+fi
+assert_contains "trust-cap-flag: stderr names the cap" "$BASE_TMP/trust-cap-flag.err" "100-thread page cap"
 
 # ── hold-1: score 50 (below the old floor) now holds with its score ───────────
 fixH1="$BASE_TMP/threads-hold1.json"

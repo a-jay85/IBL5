@@ -334,16 +334,19 @@ list_open_review_findings() {
                  | @tsv'
 }
 
-# list_trusted_open_threads PR_NUMBER
+# list_trusted_open_threads PR_NUMBER [--include-outdated]
 #   One compact JSON object per review thread a pipeline run may ACT on
 #   (fix or decline). Same object shape as prf_review_threads. A thread qualifies
 #   only when ALL hold:
 #     isResolved == false          still open
-#     isOutdated == false          the anchored diff hunk still exists; an outdated
-#                                  thread may no longer apply, so it is never
-#                                  actioned (it still holds auto-merge via
-#                                  pr_unresolved_findings_hold)
-#     commentId != null            the root comment exists, so a reply can land
+#     isOutdated == false          the anchored diff hunk still exists. Default:
+#                                  an outdated thread is never actioned (it still
+#                                  holds auto-merge via pr_unresolved_findings_hold).
+#                                  With --include-outdated, outdated threads ARE
+#                                  listed (line is null on them); the post-plan
+#                                  harness Phase 4.5 passes the flag so a re-run can
+#                                  fix or decline threads left open by earlier runs.
+#     commentId != null           the root comment exists, so a reply can land
 #     trusted root author          authorLogin == "a-jay85"
 #                                  OR authorType == "Bot"
 #                                  OR authorLogin ends with "[bot]"
@@ -354,9 +357,20 @@ list_open_review_findings() {
 #   nodes the list is unknowable, so this prints nothing, writes a note to
 #   stderr, and returns 2. Callers treat rc 2 as "skip ingestion"; the hold
 #   predicate independently reports unresolved-findings-cap.
+#   Any other option prints "unknown option" to stderr, prints nothing, returns 2.
 #   Empty output means "nothing to action", never "safe to merge".
 list_trusted_open_threads() {
     local pr="$1"
+    local include_outdated=false
+    local opt
+    for opt in "${@:2}"; do
+        case "$opt" in
+            --include-outdated) include_outdated=true ;;
+            *)
+                echo "list_trusted_open_threads: unknown option '$opt'" >&2
+                return 2 ;;
+        esac
+    done
     local all count
     all=$(prf_review_threads "$pr") || return 1
     count=$(printf '%s\n' "$all" | grep -c '^{')
@@ -365,11 +379,13 @@ list_trusted_open_threads() {
         return 2
     fi
     printf '%s\n' "$all" \
-        | jq -c 'select(.isResolved == false and .isOutdated == false
-                        and .commentId != null)
-                 | select(.authorLogin == "a-jay85"
-                          or .authorType == "Bot"
-                          or (.authorLogin | endswith("[bot]")))'
+        | jq -c --argjson inc "$include_outdated" \
+             'select(.isResolved == false
+                     and ($inc or .isOutdated == false)
+                     and .commentId != null)
+              | select(.authorLogin == "a-jay85"
+                       or .authorType == "Bot"
+                       or (.authorLogin | endswith("[bot]")))'
 }
 
 # reply_review_thread PR_NUMBER COMMENT_ID BODY

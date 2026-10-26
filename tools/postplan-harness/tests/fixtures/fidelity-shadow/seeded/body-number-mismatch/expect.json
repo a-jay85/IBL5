@@ -1,0 +1,8 @@
+{
+  "case": "body-number-mismatch",
+  "expect": {
+    "3": "clear",
+    "body_numbers": "mismatch"
+  },
+  "why": "The PR body says it adds 3 tests; the diff adds 2 test functions."
+}

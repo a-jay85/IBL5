@@ -521,6 +521,129 @@ def validate_safety_verdict(data) -> None:
             raise HarnessError("schema", "each hold must be a string")
 
 
+# Shadow-mode arming block inside the Phase 5.5 plan-fidelity verdict. The reviewer writes
+# this heading, then one fenced json block, above the terminal verdict word. It stands in for
+# conditions (3) and (18) and the body-number checks, and it never controls arming.
+FIDELITY_SHADOW_HEADING = "## SHADOW-ARMING"
+FIDELITY_SHADOW_SCHEMA = "fidelity-shadow/1"
+SHADOW_MISSING_KINDS = {"file", "test", "method", "phase"}
+SHADOW_ENVELOPE_KEYS = ("shadow", "fidelity_shadow", "SHADOW-ARMING")
+_SHADOW_TOP_KEYS = {"schema", "planned_landed", "merge_danger", "body_numbers"}
+_SHADOW_DETAIL_CAP = 300
+# Same literal as fidelity.DIGEST_CUT, restated to keep schemas free of a fidelity import.
+_SHADOW_DIGEST_CUT = "## DIGEST"
+
+
+def unwrap_fidelity_shadow_envelope(data):
+    """A one-key `{"shadow": {...}}`-style wrapper -> the inner dict; anything else unchanged."""
+    if isinstance(data, dict) and len(data) == 1:
+        (key, inner), = data.items()
+        if key in SHADOW_ENVELOPE_KEYS and isinstance(inner, dict):
+            return inner
+    return data
+
+
+def _shadow_keys(obj, want: set, where: str) -> None:
+    if not isinstance(obj, dict):
+        raise HarnessError("schema", f"{where} must be an object")
+    if set(obj) != want:
+        raise HarnessError("schema", f"{where} keys must be {sorted(want)}, got {sorted(obj)}")
+
+
+def _shadow_str(v, where: str) -> None:
+    if not isinstance(v, str):
+        raise HarnessError("schema", f"{where} must be a string")
+
+
+def validate_fidelity_shadow(data) -> None:
+    """The `fidelity-shadow/1` object. Every flag must agree with its list or door."""
+    from .merge_danger import DOORS   # lazy: merge_danger imports armable at module load
+    _shadow_keys(data, _SHADOW_TOP_KEYS, "shadow block")
+    if data["schema"] != FIDELITY_SHADOW_SCHEMA:
+        raise HarnessError("schema", f"schema must be {FIDELITY_SHADOW_SCHEMA!r}")
+    pl = data["planned_landed"]
+    _shadow_keys(pl, {"hold", "missing"}, "planned_landed")
+    if not isinstance(pl["hold"], bool) or not isinstance(pl["missing"], list):
+        raise HarnessError("schema", "planned_landed needs bool hold and list missing")
+    for m in pl["missing"]:
+        _shadow_keys(m, {"kind", "token", "why"}, "planned_landed.missing item")
+        for k in ("kind", "token", "why"):
+            _shadow_str(m[k], f"planned_landed.missing.{k}")
+        if m["kind"] not in SHADOW_MISSING_KINDS:
+            raise HarnessError("schema", f"unknown missing kind {m['kind']!r}")
+    if pl["hold"] != (len(pl["missing"]) > 0):
+        raise HarnessError("schema", "planned_landed.hold contradicts its missing list")
+    md = data["merge_danger"]
+    _shadow_keys(md, {"door", "hold", "why"}, "merge_danger")
+    if not isinstance(md["hold"], bool):
+        raise HarnessError("schema", "merge_danger.hold must be a bool")
+    _shadow_str(md["why"], "merge_danger.why")
+    if md["door"] not in DOORS:
+        raise HarnessError("schema", f"merge_danger.door must be one of {list(DOORS)}")
+    if md["hold"] != (md["door"] == "one-way"):
+        raise HarnessError("schema", "merge_danger.hold contradicts its door")
+    bn = data["body_numbers"]
+    _shadow_keys(bn, {"consistent", "mismatches"}, "body_numbers")
+    if not isinstance(bn["consistent"], bool) or not isinstance(bn["mismatches"], list):
+        raise HarnessError("schema", "body_numbers needs bool consistent and list mismatches")
+    for mm in bn["mismatches"]:
+        _shadow_keys(mm, {"claim", "actual"}, "body_numbers.mismatches item")
+        _shadow_str(mm["claim"], "body_numbers.mismatches.claim")
+        _shadow_str(mm["actual"], "body_numbers.mismatches.actual")
+    if bn["consistent"] != (len(bn["mismatches"]) == 0):
+        raise HarnessError("schema", "body_numbers.consistent contradicts its mismatches list")
+
+
+def extract_fidelity_shadow(text: str) -> dict:
+    """The shadow record for one verdict text. Never raises; bad input is a typed `invalid:*`."""
+    lines = (text or "").splitlines()
+    for i, ln in enumerate(lines):
+        if ln.strip() == _SHADOW_DIGEST_CUT:
+            lines = lines[:i]
+            break
+    heads = [i for i, ln in enumerate(lines) if ln.rstrip() == FIDELITY_SHADOW_HEADING]
+    if not heads:
+        return {"status": "invalid:missing-block"}
+    if len(heads) > 1:
+        return {"status": "invalid:duplicate-block"}
+    body: list[str] | None = None
+    j = heads[0] + 1
+    while j < len(lines) and not lines[j].startswith("## "):
+        if lines[j].startswith("```"):
+            k = j + 1
+            while k < len(lines) and not lines[k].startswith("```"):
+                k += 1
+            if k < len(lines):
+                body = lines[j + 1:k]
+            break
+        j += 1
+    if body is None:
+        return {"status": "invalid:no-fence"}
+    try:
+        data = json.loads("\n".join(body))
+    except ValueError:
+        return {"status": "invalid:bad-json"}
+    data = unwrap_fidelity_shadow_envelope(data)
+    try:
+        validate_fidelity_shadow(data)
+    except HarnessError as e:
+        return {"status": "invalid:schema", "detail": str(e)[:_SHADOW_DETAIL_CAP]}
+    return {"status": "present", "fields": data}
+
+
+def shadow_condition_states(record: dict) -> dict:
+    """{"3", "18", "body_numbers"} states. Any record without present fields is all `unknown`."""
+    fields = record.get("fields") if isinstance(record, dict) else None
+    if not isinstance(record, dict) or record.get("status") not in ("present", "carried") \
+            or not isinstance(fields, dict):
+        return {"3": "unknown", "18": "unknown", "body_numbers": "unknown"}
+    return {
+        "3": "hold" if fields["planned_landed"]["hold"] else "clear",
+        "18": "hold" if fields["merge_danger"]["hold"] else "clear",
+        "body_numbers": "consistent" if fields["body_numbers"]["consistent"] else "mismatch",
+    }
+
+
 def validate_retrospective(data) -> None:
     """{save: bool, name?, body?} — Phase 9 typed output."""
     if not isinstance(data, dict) or not isinstance(data.get("save"), bool):

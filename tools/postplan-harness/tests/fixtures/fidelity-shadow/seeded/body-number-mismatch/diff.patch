@@ -1,0 +1,30 @@
+diff --git a/tools/demo/calc.py b/tools/demo/calc.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/calc.py
+@@ -0,0 +1,9 @@
++"""Arithmetic helpers for the demo CLI."""
++
++
++def add(a, b):
++    return a + b
++
++
++def double(a):
++    return add(a, a)
+diff --git a/tools/demo/tests/test_calc.py b/tools/demo/tests/test_calc.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/tests/test_calc.py
+@@ -0,0 +1,9 @@
++from tools.demo.calc import add, double
++
++
++def test_add():
++    assert add(2, 3) == 5
++
++
++def test_double():
++    assert double(4) == 8

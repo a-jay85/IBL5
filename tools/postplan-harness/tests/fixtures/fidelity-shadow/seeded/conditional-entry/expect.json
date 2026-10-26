@@ -1,0 +1,7 @@
+{
+  "case": "conditional-entry",
+  "expect": {
+    "3": "clear"
+  },
+  "why": "Control: the (conditional) Critical Files entry is absent from the diff and must not count as missing."
+}

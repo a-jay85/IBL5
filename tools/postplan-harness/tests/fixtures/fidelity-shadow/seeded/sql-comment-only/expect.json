@@ -1,0 +1,7 @@
+{
+  "case": "sql-comment-only",
+  "expect": {
+    "18": "clear"
+  },
+  "why": "Control for #3528: the only DROP COLUMN text is inside a -- comment; the statement is an additive ADD COLUMN."
+}

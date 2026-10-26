@@ -1244,6 +1244,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
             outcome_log_path=outcome_log_path,
+            include_outdated=True,   # Phase 4.5 re-runs drain outdated trusted threads left by earlier runs
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
@@ -2902,6 +2903,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
         log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
         res.fidelity = {"verdict_1": "READY", "error_kind": None,
+                        "shadow": fidelity.shadow_absent("replay-synthetic"),
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
@@ -2968,6 +2970,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True,
+                        "shadow": fidelity.carried_shadow(
+                            ((cache_rec or {}).get("fidelity") or {}).get("shadow"), reuse_run),
                         **({"carry_reason": carry_reason} if carry_reason else {})}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
@@ -2987,10 +2991,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
-            review_findings=review_findings)
+            review_findings=review_findings, shadow_request=True)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
+                        "shadow": fidelity.shadow_absent(f"packet-error:{e.kind}"),
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
@@ -3013,6 +3018,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
+    # Shadow-mode arming record (procedure 6f). Set after the wholesale replacement above;
+    # nothing on the verdict, remediation or arming path reads it.
+    res.fidelity["shadow"] = (
+        fidelity.shadow_absent(f"review-error:{err}") if err
+        else fidelity.read_shadow(fidelity.verdict_path(pr), source="verdict-1",
+                                  reviewed_tree=reviewed_tree,
+                                  plan_blind=not getattr(plan, "found", False)))
     # What code review the PR shows. `code_review_seen` reads the cache the one existing
     # comments fetch filled, so this adds no network call. `res.fidelity` was replaced
     # wholesale just above, so the key is set after it.
@@ -3195,7 +3207,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-                current_verdict_path, round_num=round_num, log=log)
+                current_verdict_path, round_num=round_num, shadow_request=True, log=log)
             if v_n is not None:
                 break
             # Count the extra attempt, never the first one, so retries stays the
@@ -3216,6 +3228,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["remediation_sha"] = str(sha)
         res.fidelity["verdict_2"] = v_n
         res.fidelity["reviewed_tree_2"] = tree_n
+        # A body-recheck round never changes the tree, so the prior Opus shadow stands.
+        if review_kind == "full" and path_n:
+            res.fidelity["shadow"] = fidelity.read_shadow(
+                path_n, source=f"round-{round_num}", reviewed_tree=tree_n,
+                plan_blind=not getattr(plan, "found", False))
         log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
             f"outcome={rec['outcome']} sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'}")
@@ -3298,10 +3315,16 @@ def _state_dir(out_dir: str, live: bool, override) -> str:
 def _finish(res: RunResult, out_dir: str) -> RunResult:
     if res.ledger:
         res.ledger.finished_at = time.time()
+    # The shadow record is finalized on a copy, so the live `res` never changes. `_finish`
+    # runs on every exit path, so a run that never reached Phase 5.5 records not-reached.
+    fid = dict(res.fidelity or {})
+    fid[fidelity.SHADOW_KEY] = fidelity.finalize_shadow(fid.get(fidelity.SHADOW_KEY), res.arm)
+    shadow_line = fidelity.shadow_audit_line(fid[fidelity.SHADOW_KEY])
     stored = dataclasses.replace(
         res,
         error=_redact(res.error) if res.error else res.error,
-        audit=[_redact(ln) for ln in res.audit],
+        fidelity=fid,
+        audit=[_redact(ln) for ln in res.audit + [shadow_line]],
     )
     with open(os.path.join(out_dir, "result.json"), "w") as fh:
         fh.write(stored.to_json())

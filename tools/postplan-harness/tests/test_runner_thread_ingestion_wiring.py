@@ -466,3 +466,27 @@ def test_sweep_adapter_failure_keeps_result(tmp_path, monkeypatch):
         outcome_log_path=str(tmp_path / "o.jsonl"))
     assert result["found"] == 0
     assert "error" not in result
+
+
+def test_thread_ingestion_phase_opts_into_outdated_threads(tmp_path, monkeypatch):
+    """Mutation caught: dropping include_outdated=True leaves the spy with None."""
+    seen: dict = {}
+
+    def _spy(*args, **kwargs):
+        seen["flag"] = kwargs.get("include_outdated")
+        return {"found": 0, "fixed": 0, "declined": 0, "skipped": 0, "last_sha": None}
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _spy)
+    runner._run_thread_ingestion_phase(
+        _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res())
+    assert seen["flag"] is True
+
+
+def test_same_run_pass_never_opts_into_outdated_threads():
+    """The same-run pass keeps the default: its candidates are threads this run posted."""
+    import inspect
+    from harness import same_run_threads
+    src = inspect.getsource(same_run_threads)
+    call = src[src.index("out = thread_ingestion.run_thread_ingestion("):src.index("except HarnessError", src.index("out = thread_ingestion.run_thread_ingestion("))]
+    assert "include_outdated" not in call
+    assert "keep=this_run_only(keys)" in call

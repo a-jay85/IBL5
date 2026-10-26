@@ -56,10 +56,11 @@ class PostOnThisDayStep implements PipelineStepInterface
             }
 
             $top = $selection->moments[0];
-            $line = $this->formatter->discordLine(
-                $top,
-                $this->calendar->seasonsAgo($selection->currentSeasonYear, $top->seasonYear) ?? 0,
-            );
+            $seasonsAgo = $this->calendar->seasonsAgo($selection->currentSeasonYear, $top->seasonYear);
+            if ($seasonsAgo === null) {
+                return StepResult::skipped($label, "Top moment is not from a past season (season {$top->seasonYear}).");
+            }
+            $line = $this->formatter->discordLine($top, $seasonsAgo);
 
             $sim = $selection->sim;
             if ($sim <= 0) {

@@ -57,11 +57,15 @@ _COMPACT_TS = re.compile(r"\b\d{8}-\d{6}\b")
 _SHA = re.compile(r"\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b")
 _PR_NUM = re.compile(r"\bPR #?\d+\b")
 _WS = re.compile(r"\s+")
+# armable condition (3) appends ` [conformance-fix: <note>]` to its detail. The note names
+# the fixer's outcome (sha, counts), not a hold item, and its own `;` would split into a
+# fake part, so it is dropped before the parts are compared.
+_CONFIX_NOTE = re.compile(r"\s*\[conformance-fix: [^\]]*\]")
 
 
 def normalize_reason(text: str) -> str:
     """Strip run-to-run volatile tokens so the same hold reason compares equal."""
-    s = text or ""
+    s = _CONFIX_NOTE.sub("", text or "")
     s = _RUN_DIR.sub("<run-dir>", s)
     s = _WT_PATH.sub("<wt>/", s)
     s = _ROOT_PATH.sub("<root>/", s)

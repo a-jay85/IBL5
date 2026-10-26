@@ -2278,9 +2278,12 @@ _PLAN_REQUIRES_METHOD = (
 
 
 def test_runner_conformance_reader_is_worktree_read_at_both_sites(tmp_path, monkeypatch):
-    """Both `conformance.check(` calls get the adapter's bound `read_worktree_file`.
+    """All three `conformance.check(` calls get the adapter's bound `read_worktree_file`.
 
-    Mutation caught: dropping `read_file=` at either call site fails the key lookup;
+    The three sites are the Phase 5.0-pre pre-verify check (`_conformance_items_pre_verify`)
+    and the two Phase 5 checks.
+
+    Mutation caught: dropping `read_file=` at any call site fails the key lookup;
     a lambda wrapper has no `__self__` and fails the bound-method check.
     """
     _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
@@ -2302,12 +2305,12 @@ def test_runner_conformance_reader_is_worktree_read_at_both_sites(tmp_path, monk
     runner.run(_fixture(plan_content=_PLAN_WITH_TEST_FOO), out,
                FixtureLlm(UsageLedger(), CANNED), mode="replay")
 
-    assert len(calls) == 2
+    assert len(calls) == 3
     for kw in calls:
         reader = kw["read_file"]
         assert isinstance(reader.__self__, runner.ReplayGit)
         assert reader.__func__ is runner.ReplayGit.read_worktree_file
-    assert calls[0]["read_file"].__self__ is calls[1]["read_file"].__self__
+    assert len({id(kw["read_file"].__self__) for kw in calls}) == 1
 
 
 def test_replay_runner_missing_method_stays_held(tmp_path):

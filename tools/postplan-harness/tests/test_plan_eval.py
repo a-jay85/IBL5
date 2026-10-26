@@ -538,6 +538,21 @@ def test_parse_stream_reads_tier_tokens_cost():
     assert f.has_result and f.final_text == "done"
 
 
+def test_parse_stream_prefers_result_model_usage():
+    lines = _lines(
+        _asst("m1", 100),
+        {"type": "result", "result": "done", "total_cost_usd": 1.0, "modelUsage": {
+            "claude-sonnet-5-5": {"outputTokens": 19434, "cacheReadInputTokens": 4941568,
+                                  "cacheCreationInputTokens": 135818},
+            "claude-opus-5-5": {"outputTokens": 34013, "cacheReadInputTokens": 2081073,
+                                "cacheCreationInputTokens": 92858}}},
+    )
+    f = pe.parse_stream(lines, "orig")
+    assert f.output_tokens == 53447
+    assert f.cache_read_tokens == 7022641
+    assert f.cache_write_tokens == 228676
+
+
 def test_parse_stream_skips_bad_lines_and_flags_no_result(tmp_path):
     f = pe.parse_stream(["this is not json {"], "orig")
     assert f.bad_lines == 1

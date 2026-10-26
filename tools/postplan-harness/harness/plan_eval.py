@@ -824,6 +824,7 @@ def parse_stream(lines: list[str], orig_slug: str) -> StreamFacts:
     facts = StreamFacts()
     seen: set = set()
     key_re = _answer_key_re(orig_slug)
+    result_usage: list = []
     for raw in lines:
         raw = raw.strip()
         if not raw:
@@ -843,6 +844,9 @@ def parse_stream(lines: list[str], orig_slug: str) -> StreamFacts:
                 facts.cost_usd = float(ev.get("total_cost_usd") or 0.0)
             except (TypeError, ValueError):
                 facts.cost_usd = 0.0
+            model_usage = ev.get("modelUsage")
+            if isinstance(model_usage, dict) and model_usage:
+                result_usage = [u for u in model_usage.values() if isinstance(u, dict)]
             continue
         if ev.get("type") != "assistant":
             continue
@@ -872,6 +876,12 @@ def parse_stream(lines: list[str], orig_slug: str) -> StreamFacts:
                 m = key_re.search(json.dumps(inp))
                 if m:
                     facts.contaminated = m.group(0)
+    if result_usage:
+        # The result event's per-model totals include sub-agent turns the stream omits.
+        facts.output_tokens = sum(_int(u.get("outputTokens")) for u in result_usage)
+        facts.cache_read_tokens = sum(_int(u.get("cacheReadInputTokens")) for u in result_usage)
+        facts.cache_write_tokens = sum(_int(u.get("cacheCreationInputTokens"))
+                                       for u in result_usage)
     return facts
 
 

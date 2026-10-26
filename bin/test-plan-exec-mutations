@@ -114,6 +114,18 @@ $(block "$r" target.txt ALPHA BETA)
 done
 end_case
 
+# Matrix row ids are not always integers (e.g. `12-neg`); a suffixed id must parse.
+start_case parse_suffixed_row_id
+P="$TMP/suffix.md"
+printf '# Fixture plan\n\n%s\n%s\n' "$(sed 's/^| 1 | target flips |/| 12-neg | target flips |/' <<< "$MATRIX")" "## Executable Mutations
+
+$(block 12-neg target.txt ALPHA BETA)
+" > "$P"
+OUT=$(parse "$P"); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "row id kept" eq "$OUT" "$(printf '12-neg\ttarget.txt\tbash check.sh\tALPHA\tBETA')"
+end_case
+
 start_case parse_shape_rejects
 P="$TMP/dup.md"
 mkplan "$P" "## Executable Mutations

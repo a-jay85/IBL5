@@ -12,8 +12,7 @@ from typing import Optional
 
 from .. import netretry
 from ..mutations import JOURNAL_DIRNAME
-from ..state import MUTATION_JOURNAL_PENDING, SUBPROCESS_TIMEOUT, HarnessError
-from ..state import PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError
+from ..state import MUTATION_JOURNAL_PENDING, PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError
 from ..conflict import classify, parse_unmerged
 from .llm import run_bounded
 

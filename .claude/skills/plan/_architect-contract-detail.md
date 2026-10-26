@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-22
+last_verified: 2026-10-26
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -115,6 +115,8 @@ Gates `[13]` (`impl_model` consistency, via `bin/lib/plan-model-consistency`), `
 The prohibition is on *invoking the script*, not on the gates themselves: `[C]` (size budget), `[F]` (list-form `## Critical Files`), `[8]` (creation phrasing), and `[T]` (tier lines) remain **authoring constraints you satisfy while writing** — self-verify them by reading what you wrote.
 
 ### Pre-prod exercise path — slice elaboration
+
+Deploy-dependent behavior includes a file CI ships on merge, an applied migration, a registered daemon/cron, a new `.github/workflows/` job, and a live-service call.
 
 When a behavior looks untestable pre-prod, **split it by slice before conceding**:
 

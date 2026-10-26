@@ -3815,6 +3815,23 @@ assert_viol "xm-coverage-prose-short" 1 'too short' "$FM$XM_TWO| 2 | docs again 
 $(xm_block bin/check-docs)
 "
 
+# The --root is the repo being checked, never the plan's own git toplevel:
+# $HOME/claude-plans/ can sit inside an unrelated repo (a dotfiles repo).
+XM_FOREIGN="$(mktemp -d)"
+git -C "$XM_FOREIGN" init -q
+printf '%s\n' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+" > "$XM_FOREIGN/plan.md"
+XM_FOREIGN_OUT="$("$GUARD" "$XM_FOREIGN/plan.md" 2>&1)"
+if grep -qF '[XM]' <<< "$XM_FOREIGN_OUT"; then
+    h_fail "xm-root-ignores-plan-repo" "plan inside a foreign repo fired [XM]: $XM_FOREIGN_OUT"
+else
+    h_pass "xm-root-ignores-plan-repo"
+fi
+rm -rf "$XM_FOREIGN"
+
 assert_viol "xm-coverage-one-time-exempt" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (one-time-check: corpus diff printed zero) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
 | 3 | docs third (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --no-staleness\` |
 | 4 | docs fourth (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --help\` |

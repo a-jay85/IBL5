@@ -1080,7 +1080,8 @@ EST_CACHE_READ = 7960000
 EST_CACHE_WRITE = 356000
 EST_WALL_MIN = 20.3
 POLL_SECONDS = 15
-DEAD_GRACE = 600
+# Past the claude timeout a worker still clones, gc-prunes and runs two gates.
+DEAD_GRACE = 2 * GATE_TIMEOUT + 1200
 
 
 def select_run_cases(corpus: dict, spec: str) -> list[dict]:
@@ -1130,9 +1131,9 @@ def _terminal(cache_dir: Path, key: str) -> Optional[Path]:
 def _read_pending(path: Path) -> tuple:
     try:
         info = json.loads(path.read_text())
-        return int(info["pid"]), float(info["started"])
-    except (OSError, ValueError, KeyError, TypeError):
-        return 0, 0.0
+        return int(info["pid"]), float(info["started"]), info.get("timeout")
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return 0, 0.0, None
 
 
 def key_state(cache_dir: Path, case_id: str, k: int, timeout: int, now: float,
@@ -1143,7 +1144,10 @@ def key_state(cache_dir: Path, case_id: str, k: int, timeout: int, now: float,
     if _terminal(cache_dir, key):
         return "terminal"
     if pending.exists():
-        pid, started = _read_pending(pending)
+        pid, started, worker_timeout = _read_pending(pending)
+        # Judge the worker by the timeout it was launched with, not this call's.
+        if isinstance(worker_timeout, (int, float)) and worker_timeout > 0:
+            timeout = worker_timeout
         if pid and _pid_alive(pid) and now - started < timeout + DEAD_GRACE:
             return "pending"
         if not mutate:
@@ -1188,9 +1192,12 @@ def worker_argv(spec: dict) -> list[str]:
     return argv
 
 
-def _write_pending(cache_dir: Path, key: str, pid: int) -> None:
+def _write_pending(cache_dir: Path, key: str, pid: int, timeout: Optional[int] = None) -> None:
     tmp = cache_dir / f"{key}.pending.tmp"
-    tmp.write_text(json.dumps({"pid": pid, "started": int(time.time())}) + "\n")
+    info = {"pid": pid, "started": int(time.time())}
+    if timeout:
+        info["timeout"] = timeout
+    tmp.write_text(json.dumps(info) + "\n")
     os.replace(tmp, cache_dir / f"{key}.pending")
 
 
@@ -1272,7 +1279,7 @@ def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = s
                           "timeout": args.timeout, "source_ref": source_ref,
                           "source_root": root, "plans_home": args.plans_home})
             if not _terminal(cache_dir, f"{case['id']}-r{k}"):
-                _write_pending(cache_dir, f"{case['id']}-r{k}", pid)
+                _write_pending(cache_dir, f"{case['id']}-r{k}", pid, args.timeout)
             states[(case["id"], k)] = "pending"
             alive += 1
         waiting = sum(1 for s in states.values() if s != "terminal")

@@ -21,7 +21,7 @@ pass() { h_pass "$1"; }
 fail() { h_fail "$1"; }
 want() {
     local label="$1" text="$2" token="$3"
-    if printf '%s' "$text" | grep -qF -- "$token"; then
+    if grep -qF -- "$token" <<< "$text"; then
         pass "$label"
     else
         fail "$label (token not found: $token)"
@@ -30,7 +30,7 @@ want() {
 }
 absent() {
     local label="$1" text="$2" token="$3"
-    if printf '%s' "$text" | grep -qF -- "$token"; then
+    if grep -qF -- "$token" <<< "$text"; then
         fail "$label (token was present but should be absent: $token)"
         printf '  output: %s\n' "$text"
     else

@@ -30,9 +30,11 @@ class RateLimitRepositoryTest extends DatabaseTestCase
     {
         $keyHash = hash('sha256', 'rate-limit-test-batch7-new');
 
-        $this->repo->increment($keyHash);
+        $count = $this->withinOneDbMinute(function () use ($keyHash): int {
+            $this->repo->increment($keyHash);
 
-        $count = $this->repo->getRequestCount($keyHash);
+            return $this->repo->getRequestCount($keyHash);
+        });
 
         self::assertSame(1, $count);
     }
@@ -109,14 +111,47 @@ class RateLimitRepositoryTest extends DatabaseTestCase
     {
         $keyHash = hash('sha256', 'rate-limit-test-batch7-keep');
 
-        // Increment creates a current-minute entry
-        $this->repo->increment($keyHash);
+        $count = $this->withinOneDbMinute(function () use ($keyHash): int {
+            // Increment creates a current-minute entry
+            $this->repo->increment($keyHash);
 
-        // Prune should not remove current entries
-        $this->repo->pruneOldEntries();
+            // Prune should not remove current entries
+            $this->repo->pruneOldEntries();
 
-        $count = $this->repo->getRequestCount($keyHash);
+            return $this->repo->getRequestCount($keyHash);
+        });
 
         self::assertSame(1, $count);
+    }
+
+    /**
+     * Runs $fn until the DB clock stays in one minute for the whole call.
+     * increment() and getRequestCount() each key on NOW()'s minute, so a
+     * rollover between them reads an empty window and returns 0.
+     *
+     * @param callable(): int $fn
+     */
+    private function withinOneDbMinute(callable $fn): int
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $before = $this->currentDbMinute();
+            $result = $fn();
+            if ($this->currentDbMinute() === $before) {
+                return $result;
+            }
+        }
+
+        self::fail('DB minute rolled over on every attempt');
+    }
+
+    private function currentDbMinute(): string
+    {
+        $result = $this->db->query("SELECT DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i') AS m");
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsString($row['m']);
+
+        return $row['m'];
     }
 }

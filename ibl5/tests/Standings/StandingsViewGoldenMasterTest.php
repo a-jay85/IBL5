@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Standings\StandingsRowView;
 use Standings\StandingsView;
 use Standings\Contracts\StandingsRepositoryInterface;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * Golden-master pin + divergence-guard for StandingsView.
@@ -27,6 +28,8 @@ use Standings\Contracts\StandingsRepositoryInterface;
 #[AllowMockObjectsWithoutExpectations]
 class StandingsViewGoldenMasterTest extends TestCase
 {
+    use GoldenSnapshotTrait;
+
     // -------------------------------------------------------------------------
     // Divergence fixture helpers
     // -------------------------------------------------------------------------
@@ -250,31 +253,6 @@ class StandingsViewGoldenMasterTest extends TestCase
         );
 
         return new StandingsView($repo, 2025);
-    }
-
-    /**
-     * Snapshot helper — writes on first run; compares on subsequent runs.
-     *
-     * On the first run (no snapshot file yet) the snapshot is auto-created from
-     * $actual and the test passes. Commit the generated files before editing
-     * StandingsView.php so that later runs catch any divergence.
-     */
-    private function assertSnapshotMatches(string $actual, string $snapshotFilename): void
-    {
-        $snapshotDir = __DIR__ . '/__snapshots__';
-        $path = $snapshotDir . '/' . $snapshotFilename;
-
-        if (!file_exists($path)) {
-            if (!is_dir($snapshotDir)) {
-                mkdir($snapshotDir, 0755, true);
-            }
-            file_put_contents($path, $actual);
-            $this->assertFileExists($path, "Snapshot $snapshotFilename was not created");
-            return;
-        }
-
-        $expected = file_get_contents($path);
-        $this->assertSame($expected, $actual, "Golden master mismatch for $snapshotFilename");
     }
 
     // -------------------------------------------------------------------------

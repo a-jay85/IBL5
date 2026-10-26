@@ -71,6 +71,29 @@ Open each `## FINDINGS` bullet with `[BLOCKING]` or `[NOTE]` so the bullets agre
 
 A green CI plus a green Phase 5.0 conformance run is **not** sufficient for `READY` on its own — that combination is exactly the state this skill exists to look past.
 
+**6f. Shadow arming block (only when context.md says SHADOW_ARMING: requested).** <!-- slop-ok -->
+
+Skip the block entirely when `context.md` lacks the line `SHADOW_ARMING: requested`. The skill fallback and `/pr-ready` never request it.
+
+Place the block after the `## FINDINGS` section and before the terminal verdict word. Write the heading exactly as `## SHADOW-ARMING`. Follow it with one fenced `json` block and nothing else in the section. The block never changes the verdict word, the findings, or the digest. It is a second, typed answer to three questions.
+
+```json
+{
+  "schema": "fidelity-shadow/1",
+  "planned_landed": {"hold": true,
+                     "missing": [{"kind": "file", "token": "tools/x.py", "why": "planned in Phase 2, absent from diff"}]},
+  "merge_danger":   {"door": "one-way", "hold": true, "why": "drops column ibl_x.y with no backfill"},
+  "body_numbers":   {"consistent": false,
+                     "mismatches": [{"claim": "adds 4 tests", "actual": "diff adds 3 test functions"}]}
+}
+```
+
+- `planned_landed`: for each `## Critical Files` entry without a reference marker (`(reference)`, `(read-only)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`), each test file or test method named in a Verification Matrix location cell (skip `(run-only)` and a Visual-regression `(no-change)` token), and each `## Phase N` heading whose body changes the tree, decide whether the diff realises it. A `NNN` / `NNNN` placeholder is realised by any new file of that shape. A `(conditional)` entry is never missing. A phase carrying `**No diff:**` is never missing. List only the unrealised items. On a plan-blind run, write `"hold": false, "missing": []` and say `plan-blind` in no field; the harness marks plan-blind runs itself. `kind` is one of `file`, `test`, `method`, `phase`. `hold` must equal whether `missing` is non-empty.
+- `merge_danger`: `one-way` when reverting the merge commit would not undo the effect: a migration that drops a table, column or index, or deletes or rewrites rows; a schema tightening on a populated column; a message, email or production sync sent on merge. Text inside SQL comments never counts. Everything else is `two-way`. `why` names the hunk. `hold` must equal `door == "one-way"`.
+- `body_numbers`: compare every count or number the PR body states (files changed, lines, tests added, migration or ADR numbers, file:line citations) against `diff.patch` and the `DIFF_FILES:` block. List each mismatch as `claim` and `actual`. `consistent` must equal whether `mismatches` is empty.
+
+No other top-level keys are allowed. The harness rejects contradictory output as invalid.
+
 **6e(b). Merge digest — always emitted, after the verdict word.** Whatever the verdict, the
 verdict file ends with a `## DIGEST` section: the heading, then exactly five lines, each opening
 with its bold label, in this order — `**What changed:**`, `**Why:**`, `**Watch:**`,

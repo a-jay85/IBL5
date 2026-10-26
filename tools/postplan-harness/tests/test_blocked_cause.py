@@ -3,6 +3,7 @@
 Covers the carried command/output fields (HarnessError, RunResult), the bounded
 redacted tail helper, the verdict arms, and the blocked-ship block.
 """
+import dataclasses
 import json
 import os
 import subprocess
@@ -16,6 +17,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError, RunResult, TerminalState
+
+
+def _clean_stored_json(res):
+    """What `_finish` writes for an unredacted result: the live result plus the shadow
+    record and its audit line, which `_finish` adds on a copy."""
+    fid = dict(res.fidelity or {})
+    fid["shadow"] = runner.fidelity.finalize_shadow(fid.get("shadow"), res.arm)
+    line = runner.fidelity.shadow_audit_line(fid["shadow"])
+    return dataclasses.replace(res, fidelity=fid, audit=res.audit + [line]).to_json()
 
 
 @pytest.fixture()
@@ -140,7 +150,7 @@ def test_finish_clean_error_is_byte_identical(tmp_path):
     res = RunResult(terminal=TerminalState.FAILED,
                     error="rebase-conflict: CONFLICT (content) in foo.py")
     runner._finish(res, str(tmp_path))
-    assert (tmp_path / "result.json").read_text() == res.to_json()
+    assert (tmp_path / "result.json").read_text() == _clean_stored_json(res)
 
     # _finish must guard on res.error: _redact(None) raises TypeError.
     with pytest.raises(TypeError):
@@ -150,7 +160,7 @@ def test_finish_clean_error_is_byte_identical(tmp_path):
     res_none = RunResult(terminal=TerminalState.FAILED, error=None)
     runner._finish(res_none, str(none_dir))
     text = (none_dir / "result.json").read_text()
-    assert text == res_none.to_json()
+    assert text == _clean_stored_json(res_none)
     assert json.loads(text)["error"] is None
 
 

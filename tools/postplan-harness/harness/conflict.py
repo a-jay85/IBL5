@@ -363,6 +363,7 @@ def resolve_one(
     ours_path = stage_paths.get(2, _ABSENT)
     theirs_path = stage_paths.get(3, _ABSENT)
     stage_dir = str(stage_paths[1].parent.parent)
+    hunk_ctx = build_hunk_context(path, stage_paths)
     ours_is, theirs_is = (
         ("the branch", "master") if branch_stage == 2 else ("master", "the branch")
     )
@@ -371,14 +372,34 @@ def resolve_one(
     last_error = ""
 
     for _round in range(max_rounds):
-        prompt = (
-            f"You are resolving exactly ONE conflicted file: `{path}`.\n"
-            f"The three merge stages are already extracted:\n"
-            f"  base:   {base_path}\n"
-            f"  ours:   {ours_path}\n"
-            f"  theirs: {theirs_path}\n"
-            f"Read all three before deciding. Write the merged result to "
-            f"`{worktree}/{path}` with Write.\n"
+        if hunk_ctx is None:
+            head = (
+                f"You are resolving exactly ONE conflicted file: `{path}`.\n"
+                f"The three merge stages are already extracted:\n"
+                f"  base:   {base_path}\n"
+                f"  ours:   {ours_path}\n"
+                f"  theirs: {theirs_path}\n"
+                f"Read all three before deciding. Write the merged result to "
+                f"`{worktree}/{path}` with Write.\n"
+            )
+        else:
+            head = (
+                f"You are resolving exactly ONE conflicted file: `{path}`.\n"
+                f"The conflicting regions are summarized in a hunk context file:\n"
+                f"  hunk context: {hunk_ctx.path} ({hunk_ctx.hunk_count} hunk(s))\n"
+                f"It holds the base, ours, and theirs text of every conflicting hunk "
+                f"with a few unchanged lines around each. Everything outside those "
+                f"hunks already merged cleanly.\n"
+                f"Read the hunk context file once. Then Read `{worktree}/{path}` once: "
+                f"it is the current merged copy you start from. Write the complete "
+                f"merged file to `{worktree}/{path}` with Write, keeping every line "
+                f"outside the hunks as that copy has it.\n"
+                f"Never Read a whole stage file under `{stage_dir}`. If one hunk needs "
+                f"more surrounding text, Read that one stage file with offset and limit "
+                f"(at most 200 lines). Never re-read a file you already read; work from "
+                f"what you have.\n"
+            )
+        prompt = head + (
             f"Stage 2 (ours) is {ours_is}; stage 3 (theirs) is {theirs_is}.\n"
             f"Never wholesale-take one side. Touch no other file.\n"
             f"{RESOLVER_ADAPTATION_INSTRUCTIONS}\n"

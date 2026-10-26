@@ -3,15 +3,18 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
+import uuid
+from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import harness.conflict
-from harness.conflict import HUNK_MAX_COUNT, HunkContext, build_hunk_context
+from harness.conflict import HUNK_MAX_COUNT, HunkContext, build_hunk_context, resolve_one
 
 
 def _lines(n: int = 120) -> list[str]:
@@ -140,3 +143,123 @@ def test_hunk_context_removes_stale_artifact(tmp_path):
     stages[2].write_text(theirs)
     assert build_hunk_context("app/foo.py", stages) is None
     assert not first.path.exists()
+
+
+# ── resolve_one prompt wiring ──────────────────────────────────────────────────
+
+class _StubLlm:
+    """Records call_tooled kwargs; replies are driven by a list."""
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls: list[dict] = []
+
+    def call_tooled(self, purpose, model, prompt, *, cwd, allowed_tools,
+                    denied_tools=(), add_dirs=(), max_turns=None, **_):
+        self.calls.append({
+            "purpose": purpose, "allowed_tools": allowed_tools,
+            "denied_tools": denied_tools, "add_dirs": add_dirs, "prompt": prompt,
+        })
+        return self.replies.pop(0) if self.replies else "FAILED"
+
+
+class _StagedRun:
+    """Git-run stub whose `show` returns per-stage (or per-rev) text."""
+    def __init__(self, worktree: str, texts: dict):
+        self.worktree = worktree
+        self.texts = texts
+
+    def __call__(self, *args, check=True) -> str:
+        first = args[0] if args else ""
+        if first == "show":
+            parts = args[1].split(":")
+            key = int(parts[1]) if parts[0] == "" else parts[0]
+            return self.texts[key]
+        if first == "rev-parse":
+            return "abc1234"
+        return ""
+
+
+def _write_worktree_file(worktree, path: str, content: str) -> None:
+    full = Path(worktree) / path
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_text(content)
+
+
+@pytest.fixture
+def stage_key():
+    key = f"hunk-{uuid.uuid4().hex[:8]}"
+    yield key
+    shutil.rmtree(f"/tmp/postplan-conflict-stages-{key}", ignore_errors=True)
+
+
+def test_resolver_prompt_points_at_hunk_artifact(tmp_path, stage_key):
+    base, ours, theirs = _three_hunk_texts()
+    worktree = str(tmp_path / "wt")
+    _write_worktree_file(worktree, "app/foo.py", "clean merged\n")
+    llm = _StubLlm(["RESOLVED"])
+    run = _StagedRun(worktree, {1: base, 2: ours, 3: theirs})
+    success, _ = resolve_one(llm, run, worktree=worktree, key=stage_key, path="app/foo.py")
+    assert success is True
+    prompt = llm.calls[0]["prompt"]
+    stage_dir = f"/tmp/postplan-conflict-stages-{stage_key}"
+    assert "hunk context:" in prompt
+    assert f"{stage_dir}/hunks/app__foo.py.md" in prompt
+    assert "Never re-read a file you already read" in prompt
+    assert "Never Read a whole stage file" in prompt
+    assert "Read all three before deciding" not in prompt
+    assert f"{stage_dir}/base/app__foo.py" not in prompt
+    assert llm.calls[0]["add_dirs"] == (stage_dir,)
+
+
+def test_resolver_hunk_path_keeps_marker_guard(tmp_path, stage_key):
+    base, ours, theirs = _three_hunk_texts()
+    worktree = str(tmp_path / "wt")
+    _write_worktree_file(
+        worktree, "app/foo.py", "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> b\n")
+    llm = _StubLlm(["RESOLVED"])
+    run = _StagedRun(worktree, {1: base, 2: ours, 3: theirs})
+    success, reason = resolve_one(
+        llm, run, worktree=worktree, key=stage_key, path="app/foo.py", max_rounds=1,
+    )
+    assert success is False
+    assert "hunk context:" in llm.calls[0]["prompt"]
+    assert "round cap exceeded" in reason
+
+
+def test_resolver_builds_hunk_context_once(tmp_path, stage_key, monkeypatch):
+    base, ours, theirs = _three_hunk_texts()
+    worktree = str(tmp_path / "wt")
+    _write_worktree_file(worktree, "app/foo.py", "")
+    real = harness.conflict.build_hunk_context
+    counter = {"n": 0}
+
+    def counting(*a, **k):
+        counter["n"] += 1
+        return real(*a, **k)
+
+    monkeypatch.setattr(harness.conflict, "build_hunk_context", counting)
+    llm = _StubLlm(["RESOLVED"] * 3)
+    run = _StagedRun(worktree, {1: base, 2: ours, 3: theirs})
+    success, _ = resolve_one(
+        llm, run, worktree=worktree, key=stage_key, path="app/foo.py", max_rounds=3,
+    )
+    assert success is False
+    assert counter["n"] == 1
+    assert len(llm.calls) == 3
+
+
+def test_resolver_hunk_artifact_from_stage_revs(tmp_path, stage_key):
+    base, ours, theirs = _three_hunk_texts()
+    worktree = str(tmp_path / "wt")
+    _write_worktree_file(worktree, "app/foo.py", "earlier failed resolution, no markers\n")
+    llm = _StubLlm(["RESOLVED"])
+    run = _StagedRun(worktree, {"mb": base, "pre": ours, "mstr": theirs})
+    resolve_one(
+        llm, run, worktree=worktree, key=stage_key, path="app/foo.py",
+        stage_revs={1: "mb", 2: "pre", 3: "mstr"},
+    )
+    assert "hunk context:" in llm.calls[0]["prompt"]
+    artifact = Path(f"/tmp/postplan-conflict-stages-{stage_key}/hunks/app__foo.py.md")
+    text = artifact.read_text()
+    assert "OURS 20" in text
+    assert "THEIRS 100" in text

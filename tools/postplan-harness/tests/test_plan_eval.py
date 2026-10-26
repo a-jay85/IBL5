@@ -354,6 +354,7 @@ def test_score_run_staleness_failure_fails_mech():
 def test_score_run_no_plan_counts_as_zero():
     s = pe.score_run(_rec(status="no_plan", plan_text=PLAN_EMPTY), SCASE)
     assert s.scored is True and s.file_hits == 0 and s.mech is False and s.file_total == 2
+    assert s.tier_ok is False
 
 
 def test_score_run_degraded_unscored():

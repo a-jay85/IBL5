@@ -515,7 +515,7 @@ def score_run(record: dict, case: dict) -> RunScore:
         expected = {normalize_path(p) for p in case["expected_files"]}
         got = {normalize_path(p) for p in record.get("critical_files") or []}
         hits = len(expected & got)
-    tier_ok = bool(record.get("tier_chosen")) and record.get("tier_chosen") == case["tier"]
+    tier_ok = ok and bool(record.get("tier_chosen")) and record.get("tier_chosen") == case["tier"]
     return RunScore(mech=mech, file_hits=hits, file_total=total, tier_ok=tier_ok, scored=True)
 
 

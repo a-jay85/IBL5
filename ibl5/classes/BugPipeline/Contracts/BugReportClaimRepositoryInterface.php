@@ -46,7 +46,7 @@ interface BugReportClaimRepositoryInterface
 
     /**
      * @see \BugPipeline\BugReportClaimRepository::transition()
-     * @param array<string, int|string> $opts
+     * @param array<string, int|string|null> $opts
      */
     public function transition(int $id, string $status, array $opts = [], bool $releaseLease = false): bool;
 

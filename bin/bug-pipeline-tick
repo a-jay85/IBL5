@@ -365,7 +365,7 @@ att_line() { # attachments_json
 #   prompt_nonce         — 8 hex chars, fresh per render. Every open/close tag carries it as
 #                          an id attribute and the framing text says only a closing tag with
 #                          that id ends the block. The attacker never sees the render.
-#   neutralize_untrusted — backup for a model that ignores the id rule: rewrites the four
+#   neutralize_untrusted — backup for a model that ignores the id rule: rewrites the five
 #                          closing-tag prefixes to a "_"-suffixed form so no well-formed
 #                          closing tag survives in a payload. The text stays readable, since a
 #                          report that mentions </report> must still reach the classifier.
@@ -377,7 +377,7 @@ prompt_nonce() {
 
 neutralize_untrusted() { # payload  → stdout
     local s="$1" tag
-    for tag in report untrusted transcript attachments; do
+    for tag in report untrusted transcript attachments operator; do
         s="${s//<\/$tag/</${tag}_}"
         # Idempotent: a second pass turns "</tag_" into "</tag__"; collapse it back.
         while [[ "$s" == *"</${tag}__"* ]]; do s="${s//<\/${tag}__/</${tag}_}"; done
@@ -389,28 +389,37 @@ neutralize_untrusted() { # payload  → stdout
 # {{nonce}} is substituted FIRST, over the template alone, so a GM who types the literal
 # "{{nonce}}" in a report cannot have it rewritten into the real nonce inside the data block.
 # Every untrusted argument is neutralized before it is spliced in.
-render_prompt() { # template original_text transcript attachments_text
-    local t="$1" nonce o tr at
+render_prompt() { # template original_text transcript attachments_text operator_context
+    local t="$1" nonce o tr at oc
     nonce="$(prompt_nonce)"
     t="${t//\{\{nonce\}\}/$nonce}"
     o="$(neutralize_untrusted "$2")"
     tr="$(neutralize_untrusted "$3")"
     at="$(neutralize_untrusted "$4")"
+    # Operator text is trusted (it reaches the DB only through the author-checked wake
+    # endpoint) but is still defanged, so a typed closing tag closes nothing.
+    oc="$(neutralize_untrusted "${5:-(none)}")"
     t="${t//\{\{original_text\}\}/$o}"
     t="${t//\{\{transcript\}\}/$tr}"
     t="${t//\{\{attachments_text\}\}/$at}"
+    t="${t//\{\{operator_context\}\}/$oc}"
     printf '%s' "$t"
 }
 
 # Fetch the live transcript for a row (or a placeholder when there is no thread yet).
-row_transcript() { # thread_id
+# Optional 2nd arg: a JSON array of message ids to leave out. Callers pass the row's
+# operator mention ids, so the operator's words appear only in the trusted <operator>
+# block. Ids compare as strings; a snowflake never goes through a number.
+row_transcript() { # thread_id [omit_ids_json]
     if [ -n "$1" ] && [ "$1" != "null" ]; then
         local msgs; msgs="$(bot_get_thread_messages "$1")"
         # Transcript attachment names come straight from /get-thread-messages and have NEVER
         # passed AttachmentInputValidator — this jq is the only sanitizer on that path. Strip
         # control chars + cap 120 so an image-only message renders a non-empty, single-line tail.
-        printf '%s' "$msgs" | jq -r '
-            (.messages // []) | map(
+        printf '%s' "$msgs" | jq -r --argjson omit "${2:-[]}" '
+            (.messages // [])
+            | map(select(((.id // "") | tostring) as $m | ($omit | index($m)) == null))
+            | map(
                 "\(.author_id): \(.content // "")"
                 + (if ((.attachments // []) | length) > 0
                    then "\n[attachments: "
@@ -422,6 +431,21 @@ row_transcript() { # thread_id
     else
         printf '(no thread yet)'
     fi
+}
+
+# Operator guidance for a row: one "[created_at] content" line per wake mention, oldest
+# first, or "(none)". The message id is never rendered and never read as a number.
+row_operator_context() { # row_json
+    local out
+    out="$(printf '%s' "$1" | jq -r '(.operator_context // []) | map("[\(.created_at)] \(.content)") | join("\n")' 2>/dev/null)"
+    if [ -n "$out" ]; then printf '%s' "$out"; else printf '(none)'; fi
+}
+
+# JSON array of the row's operator mention ids (strings), for row_transcript's omit list.
+row_operator_ids() { # row_json
+    local ids
+    ids="$(printf '%s' "$1" | jq -c '[(.operator_context // [])[] | .message_id | tostring]' 2>/dev/null)"
+    if [ -n "$ids" ]; then printf '%s' "$ids"; else printf '[]'; fi
 }
 
 # ── Branch: classify a queued/awaiting_info row ───────────────────────────────
@@ -456,9 +480,9 @@ classify_row() { # row_json
     [ -n "$live_text" ] && original_text="$live_text"
 
     local transcript attachments_text prompt
-    transcript="$(row_transcript "$thread_id")"
+    transcript="$(row_transcript "$thread_id" "$(row_operator_ids "$row")")"
     attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
-    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
+    prompt="$(render_prompt "$(cat "$CLASSIFY_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text" "$(row_operator_context "$row")")"
 
     if ! run_structured_call "$prompt" "$CLASSIFY_SCHEMA"; then
         : # rc captured in CJ_RC; handled below
@@ -651,9 +675,9 @@ drive_feature_row() { # row_json
 
     # Case A — gathering with a fresh GM reply.
     local transcript attachments_text prompt
-    transcript="$(row_transcript "$thread_id")"
+    transcript="$(row_transcript "$thread_id" "$(row_operator_ids "$row")")"
     attachments_text="$(att_line "$(printf '%s' "$row" | jq -c '.attachments // []')")"
-    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text")"
+    prompt="$(render_prompt "$(cat "$GATHER_PROMPT_FILE")" "$original_text" "$transcript" "$attachments_text" "$(row_operator_context "$row")")"
 
     run_structured_call "$prompt" "$GATHER_SCHEMA" || true
     if [ "$CJ_RC" -ne 0 ] || [ -z "${CJ_OUT:-}" ] || claude_env_error "${CJ_OUT:-}${CJ_ERR:-}"; then
@@ -1028,13 +1052,14 @@ ci_autofix_giveup() {
 # are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
 # in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
 render_hunter_prompt() { # claimed wt_appdir
-    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t host
+    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t host oc
     id="$(printf '%s' "$claimed" | jq -r '.id')"
     class="$(printf '%s' "$claimed" | jq -r '.class // "bug"')"
     report="$(printf '%s' "$claimed" | jq -r '.original_text // ""')"
     thread_id="$(printf '%s' "$claimed" | jq -r '.thread_id // empty')"
-    transcript="$(row_transcript "$thread_id")"
+    transcript="$(row_transcript "$thread_id" "$(row_operator_ids "$claimed")")"
     att="$(att_line "$(printf '%s' "$claimed" | jq -c '.attachments // []')")"
+    oc="$(row_operator_context "$claimed")"
     t="$(cat "$HUNT_PROMPT_FILE")"
     # Nonce first, template-only — same ordering rationale as render_prompt().
     local nonce; nonce="$(prompt_nonce)"
@@ -1056,9 +1081,14 @@ render_hunter_prompt() { # claimed wt_appdir
     report="$(neutralize_untrusted "$report")"
     transcript="$(neutralize_untrusted "$transcript")"
     att="$(neutralize_untrusted "$att")"
+    # Operator guidance is trusted but defanged the same way (see render_prompt).
+    oc="$(neutralize_untrusted "$oc")"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
     t="${t//\{\{attachments_text\}\}/$att}"
+    # Substituted last, so a placeholder typed in the operator text is never expanded
+    # into GM-authored text inside the trusted block.
+    t="${t//\{\{operator_context\}\}/$oc}"
     printf '%s' "$t"
 }
 
@@ -1690,6 +1720,12 @@ main() {
 
     local actionable normalized
     actionable="$(cli list-active-conversations)" || actionable=''   # empty ⇒ trips the fail-closed array check below
+    # Dormant guard, beside the enumerator's own filter: a dormant row waits for an operator
+    # mention and must never spawn claude. It runs BEFORE the empty-tick check so a
+    # dormant-only list exits cheap. A non-array passes through to the fail-closed check.
+    if printf '%s' "$actionable" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        actionable="$(printf '%s' "$actionable" | jq -c 'map(select(.status != "dormant"))')"
+    fi
     normalized="$(printf '%s' "$actionable" | tr -d '[:space:]')"
 
     # ★ EMPTY-TICK COST GUARD — exit cheap, spawn zero `claude`.

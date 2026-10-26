@@ -26,11 +26,13 @@ $ids = array_map(static fn (array $row): int => (int) $row['id'], $rows);
 // empty $ids short-circuits inside fetchAllInList without touching the DB, so the empty-tick
 // zero-cost guard is preserved: nothing actionable → zero attachment queries.
 $byReport = $repo->findAttachmentsForReportIds($ids);
+$ctxByReport = $repo->findOperatorContextForReportIds($ids);
 
 $out = array_map(
-    static function (array $row) use ($byReport): array {
+    static function (array $row) use ($byReport, $ctxByReport): array {
         $withAtt = $row;
         $withAtt['attachments'] = $byReport[(int) $row['id']] ?? [];
+        $withAtt['operator_context'] = $ctxByReport[(int) $row['id']] ?? [];
         return $withAtt;
     },
     $rows

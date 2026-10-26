@@ -261,6 +261,31 @@ final class PostOnThisDayStepTest extends TestCase
         self::assertSame([], $poster->messages);
     }
 
+    public function testSkipsWhenSelectionHasNoSimWithoutClaiming(): void
+    {
+        $selection = new OnThisDaySelection(
+            moments: [$this->makeMoment()],
+            currentSeasonYear: 2021,
+            centerDate: '2021-02-14',
+            radiusUsed: 0,
+            sim: 0,
+        );
+        $claims = $this->makeClaims(true);
+        $poster = new RecordingPoster();
+        $step = new PostOnThisDayStep(
+            $this->makeService($selection),
+            $claims,
+            $this->makeSeasonQuery('Regular Season', 12),
+            $poster,
+        );
+
+        $result = $step->execute();
+
+        self::assertTrue($result->skipped);
+        self::assertSame([], $claims->claimed);
+        self::assertSame([], $poster->messages);
+    }
+
     public function testSeasonLookupFailureSkipsWithoutFailingPipeline(): void
     {
         $seasonQuery = self::createStub(SeasonQueryRepository::class);

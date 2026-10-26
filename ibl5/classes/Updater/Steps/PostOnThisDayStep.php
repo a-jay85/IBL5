@@ -62,6 +62,9 @@ class PostOnThisDayStep implements PipelineStepInterface
             );
 
             $sim = $selection->sim;
+            if ($sim <= 0) {
+                return StepResult::skipped($label, 'No sim dates recorded — nothing to post.');
+            }
             if ($this->claims->claimSimPost($sim) === false) {
                 return StepResult::skipped($label, "Already posted for sim {$sim}.");
             }

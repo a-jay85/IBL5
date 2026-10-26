@@ -1651,6 +1651,8 @@ _ab_durable='^(\./)?(bin/(test|check)-[A-Za-z0-9_.-]+|(ibl5/)?tests/[A-Za-z0-9_.
 _ab_runner='^(\./)?(vendor/bin/phpunit|npx|bash|sh|php|go)$'
 _ab_cf="$(cf_parse_section "$PLAN_FILE" 2>/dev/null | sed -n 's/^MUST_APPEAR://p')"
 # _ab_split <cell> — one command segment per line, split on ; & | outside quotes.
+# An unquoted `#` at a word start opens a comment: the rest of the cell stays in
+# the current segment unsplit, so a `;` inside a comment starts no new command.
 _ab_split() {
     awk '{
         n = length($0); seg = ""; q = ""
@@ -1658,6 +1660,7 @@ _ab_split() {
             c = substr($0, i, 1)
             if (q != "") { seg = seg c; if (c == q) q = ""; continue }
             if (c == "\047" || c == "\"") { q = c; seg = seg c; continue }
+            if (c == "#" && (i == 1 || substr($0, i - 1, 1) ~ /[ \t;&|()]/)) { seg = seg substr($0, i); break }
             if (c == ";" || c == "&" || c == "|") { print seg; seg = ""; continue }
             seg = seg c
         }

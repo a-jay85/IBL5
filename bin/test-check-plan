@@ -5188,7 +5188,7 @@ for L_CASE in overflow verbatim; do
 done
 
 # ---------------------------------------------------------------------------
-# Gate [AB] fixtures (37 assert_viol cases + 1 deny-message case)
+# Gate [AB] fixtures (40 assert_viol cases + 1 deny-message case)
 # A post-impl CLI-executable row with a negated grep must name a durable
 # in-repo check that contains the grepped token, or carry
 # (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
@@ -5317,6 +5317,10 @@ ab_row "AB-pass-flag-value" 0 '! grep -rq -d skip bgcolor2 ibl5/modules && bin/t
 # A path that is only echoed or sits in a comment is not run.
 ab_row "AB-fail-echo-mention" 1 '! grep -rq bgcolor2 ibl5/modules && echo see bin/test-ab-holds'
 ab_row "AB-fail-comment-mention" 1 '! grep -rq bgcolor2 ibl5/modules && true # covered by bin/test-ab-holds'
+ab_row "AB-fail-comment-separator" 1 '! grep -rq bgcolor2 ibl5/modules # see; bin/test-ab-holds'
+ab_row "AB-fail-comment-after-separator" 1 '! grep -rq bgcolor2 ibl5/modules;# see; bin/test-ab-holds'
+# A quoted # is part of the pattern, so the command after it still runs.
+ab_row "AB-pass-quoted-hash" 0 "! grep -rqF 'see #bgcolor2' ibl5/modules && bin/test-ab-holds"
 # A matrix header plus the canary inside a fence: invisible to the
 # fence-aware row source.
 assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'

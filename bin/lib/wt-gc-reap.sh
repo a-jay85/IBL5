@@ -52,7 +52,8 @@ _gc_epoch_days_ago() {
     printf '%s\n' "$(( $(date +%s) - $1 * 86400 ))"
 }
 
-# _gc_valid_days <VAR> — the named seam holds a non-empty integer. Logs and
+# _gc_valid_days <VAR> — the named seam holds a non-empty integer (rewritten
+# in place without leading zeros, so 010 means 10). Logs and
 # returns 1 otherwise, so the calling step is skipped and the tick exits 1.
 _gc_valid_days() {
     local name="$1" val
@@ -62,6 +63,9 @@ _gc_valid_days() {
             log "invalid $name '$val' — step skipped (fail-closed)"
             return 1 ;;
     esac
+    # Strip leading zeros so bash arithmetic reads 010 as ten, not octal.
+    val="${val#"${val%%[!0]*}"}"
+    eval "$name=\"\${val:-0}\""
     return 0
 }
 

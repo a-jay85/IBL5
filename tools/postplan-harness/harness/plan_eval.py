@@ -520,7 +520,7 @@ def score_run(record: dict, case: dict) -> RunScore:
         expected = {normalize_path(p) for p in case["expected_files"]}
         got = {normalize_path(p) for p in record.get("critical_files") or []}
         hits = len(expected & got)
-    tier_ok = ok and bool(record.get("tier_chosen")) and record.get("tier_chosen") == case["tier"]
+    tier_ok = bool(record.get("tier_chosen")) and record.get("tier_chosen") == case["tier"]
     return RunScore(mech=mech, file_hits=hits, file_total=total, tier_ok=tier_ok, scored=True)
 
 
@@ -1232,7 +1232,10 @@ def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = s
     corpus = load_corpus(corpus_path)
     selected = select_run_cases(corpus, args.cases)
     v, c, source_ref = _cache_key(root, corpus, corpus_path, args.base)
-    cache_dir = root / CACHE_ROOT / f"{v}-{c}"
+    model_tag = ""
+    if args.model != DEFAULT_MODEL:  # default keeps the bare key so old records still hit
+        model_tag = "-" + re.sub(r"[^A-Za-z0-9._]+", "_", args.model)
+    cache_dir = root / CACHE_ROOT / f"{v}-{c}{model_tag}"
     keys = [(case, k) for case in selected for k in range(1, args.runs + 1)]
     plans_home = Path(args.plans_home) if args.plans_home else Path.home() / "claude-plans"
 

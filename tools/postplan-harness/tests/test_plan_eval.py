@@ -392,7 +392,19 @@ def test_score_run_staleness_failure_fails_mech():
 def test_score_run_no_plan_counts_as_zero():
     s = pe.score_run(_rec(status="no_plan", plan_text=PLAN_EMPTY), SCASE)
     assert s.scored is True and s.file_hits == 0 and s.mech is False and s.file_total == 2
+    assert s.tier_ok is True  # tier_chosen matches SCASE; a no_plan run can still match tier
+    s = pe.score_run(_rec(status="no_plan", plan_text=PLAN_EMPTY, tier_chosen=None), SCASE)
     assert s.tier_ok is False
+
+
+def test_run_model_changes_cache_dir(tmp_path):
+    root, cpath, _ = _run_env(tmp_path)
+    default = _Launcher()
+    _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "1", launcher=default)
+    other = _Launcher()
+    _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "1", "--model", "claude-opus-5-5",
+         launcher=other)
+    assert Path(default.calls[0]["cache_dir"]).name != Path(other.calls[0]["cache_dir"]).name
 
 
 def test_score_run_degraded_unscored():

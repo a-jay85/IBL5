@@ -41,7 +41,7 @@ Useful flags: `--cases core|all|ID[,ID...]`, `--runs 1-3`, `--parallel 1-4`, `--
 
 `bin/plan-eval smoke` and `bin/plan-eval smoke --detached` exercise the whole path with a fake model and spend no tokens.
 
-Records live in `tools/postplan-harness/out/plan-eval/cache/<v>-<c>/`, which git ignores. Each run also keeps its raw transcript there as `eval-<id>-r<k>.stream.jsonl`.
+Records live in `tools/postplan-harness/out/plan-eval/cache/<v>-<c>/`, which git ignores. A non-default `--model` adds a `-<model>` suffix to that folder name, so two models never share records. Each run also keeps its raw transcript there as `eval-<id>-r<k>.stream.jsonl`.
 
 ## Cost
 

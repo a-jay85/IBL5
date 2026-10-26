@@ -147,6 +147,20 @@ class Harness:
         def diff_vs_base(git, base="origin/master"):
             return fixed_diff if conformance_fix.COMMIT_MSG in git.commit_messages else base_diff
 
+        orig_commit_all = ReplayGit.commit_all
+        orig_changed_files = ReplayGit.changed_files
+
+        def commit_all(git, message):
+            git.last_commit_paths = list(git.extra_dirty)
+            return orig_commit_all(git, message)
+
+        def changed_files(git, base="origin/master"):
+            # Live `changed_files(f"{sha}^")` lists only that commit's paths; the replay
+            # fake would list the whole branch diff and trip the fixer's scope check.
+            if base.endswith("^"):
+                return list(getattr(git, "last_commit_paths", []))
+            return orig_changed_files(git, base)
+
         def read_worktree_file(git, path):
             try:
                 return (wt / path).read_text()
@@ -157,6 +171,8 @@ class Harness:
         monkeypatch.setattr(adr_draft, "commit_gate", lambda worktree: (0, ""))
         monkeypatch.setattr(ReplayGit, "__init__", init)
         monkeypatch.setattr(ReplayGit, "diff_vs_base", diff_vs_base)
+        monkeypatch.setattr(ReplayGit, "commit_all", commit_all)
+        monkeypatch.setattr(ReplayGit, "changed_files", changed_files)
         monkeypatch.setattr(ReplayGit, "read_worktree_file", read_worktree_file)
 
         orig_run = ReplayVerify.run

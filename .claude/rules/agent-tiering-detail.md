@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
-last_verified: 2026-10-10
+description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, 2026-10 review-seat measurement, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
+last_verified: 2026-10-26
 paths:
   - ".claude/agents/*.md"
 ---
@@ -101,7 +101,6 @@ A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/
 Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it. Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
 
 **Price cliff.** Haiku bills $0.10/$0.50 per MTok up to 100K prompt tokens per request (cache included) and $0.50/$2.50 above, 0.25 of Sonnet's input rate. Send jobs past ~100K tokens to Sonnet.
-
 ## Prompt Style by Tier
 
 **Haiku 5.5** (tips checked against the 2026-10-08 A/B, § Haiku 5.5 measurement): lead with a concrete grep/find command · ask for every match when exhaustiveness matters, and for checklists, check each pattern and cite file:line or state not found · pre-resolve absolute paths · name the output block the caller parses · never ask it to judge relevance, trace multi-hop flows, or relate a past event to the current context.

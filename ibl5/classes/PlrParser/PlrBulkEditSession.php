@@ -95,12 +95,14 @@ final class PlrBulkEditSession
 
     /**
      * @param resource $handle
-     * @throws \RuntimeException when a live write is short
+     * @throws \RuntimeException when a live write is short or a dry-run seek fails
      */
     public function write($handle, string $bytes): void
     {
         if ($this->dryRun) {
-            fseek($handle, strlen($bytes), SEEK_CUR);
+            if (fseek($handle, strlen($bytes), SEEK_CUR) === -1) {
+                throw new \RuntimeException("Dry-run seek failed in PLR file: {$this->plrPath}");
+            }
 
             return;
         }

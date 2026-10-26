@@ -116,6 +116,23 @@ final class PlrBulkEditSessionTest extends TestCase
         self::assertSame($this->corpus, file_get_contents($this->plrPath));
     }
 
+    public function testDryRunWriteThrowsWhenSeekFails(): void
+    {
+        $session = $this->session(['--dry-run']);
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        self::assertIsArray($pair);
+
+        try {
+            $session->write($pair[0], ' 4');
+            self::fail('write() should have thrown');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('Dry-run seek failed', $e->getMessage());
+        } finally {
+            fclose($pair[0]);
+            fclose($pair[1]);
+        }
+    }
+
     public function testLiveOpenCreatesVerifiedBackupBeforeReturningHandle(): void
     {
         $session = $this->session([]);

@@ -346,7 +346,7 @@ _gc_reap_dirty_one() {
             160000*) log "dirty keep $name: path $p is a submodule"; return 0 ;;
         esac
         case "$xy" in
-            '??'|' M'|'M '|'MM'|'A ')
+            '??'|' M'|'M '|'A ')
                 if ! git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
                     log "dirty keep $name: path $p absent on master"; return 0
                 fi
@@ -477,7 +477,7 @@ reap_stale_refs() {
             [ -n "$ref" ] || continue
             batch="${batch}delete ${ref} ${sha}"$'\n'
         done <<< "$doomed"
-        if git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "$batch" 2>/dev/null; then
+        if _gc_do git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "$batch" 2>/dev/null; then
             batch_ok=1
         else
             log "batch ref delete failed — retrying one by one"

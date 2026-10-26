@@ -1049,6 +1049,335 @@ def _cmd_worker(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: detached `run`, cache, estimate, `compare`, `smoke`
+# ---------------------------------------------------------------------------
+
+HARNESS_DIR = Path(__file__).resolve().parents[1]
+FAKE_CLAUDE = HARNESS_DIR / "fixtures" / "plan-eval" / "fake-claude.py"
+# Frozen decision 6: measured per-run medians of past bin/plan-now runs.
+EST_OUTPUT = 73500
+EST_CACHE_READ = 7960000
+EST_CACHE_WRITE = 356000
+EST_WALL_MIN = 20.3
+POLL_SECONDS = 15
+DEAD_GRACE = 600
+
+
+def select_run_cases(corpus: dict, spec: str) -> list[dict]:
+    cases = corpus.get("cases") or []
+    if not cases:
+        raise EvalUsageError("empty corpus")
+    if spec == "core":
+        sel = [c for c in cases if c.get("core")]
+    elif spec == "all":
+        sel = list(cases)
+    else:
+        by_id = {c["id"]: c for c in cases}
+        ids = [s for s in spec.split(",") if s]
+        unknown = [s for s in ids if s not in by_id]
+        if unknown or not ids:
+            raise EvalUsageError(f"unknown case id: {', '.join(unknown) or spec!r}")
+        sel = [by_id[s] for s in ids]
+    return sorted(sel, key=lambda c: c["id"])
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        done, _ = os.waitpid(pid, os.WNOHANG)  # reaps our own exited child
+        if done == pid:
+            return False
+    except ChildProcessError:
+        pass
+    except OSError:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _terminal(cache_dir: Path, key: str) -> Optional[Path]:
+    for suffix in (".json", ".degraded.json"):
+        p = cache_dir / f"{key}{suffix}"
+        if p.exists():
+            return p
+    return None
+
+
+def _read_pending(path: Path) -> tuple:
+    try:
+        info = json.loads(path.read_text())
+        return int(info["pid"]), float(info["started"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0, 0.0
+
+
+def key_state(cache_dir: Path, case_id: str, k: int, timeout: int, now: float,
+              mutate: bool = True) -> str:
+    """terminal | pending | missing. With mutate, a dead worker becomes a degraded record."""
+    key = f"{case_id}-r{k}"
+    pending = cache_dir / f"{key}.pending"
+    if _terminal(cache_dir, key):
+        return "terminal"
+    if pending.exists():
+        pid, started = _read_pending(pending)
+        if pid and _pid_alive(pid) and now - started < timeout + DEAD_GRACE:
+            return "pending"
+        if not mutate:
+            return "missing"
+        if _terminal(cache_dir, key):  # finished between the two checks
+            return "terminal"
+        write_record(cache_dir, {"case_id": case_id, "run": k, "slug": run_slug(case_id, k),
+                                 "status": "degraded", "detail": "worker died",
+                                 "cost_usd": 0.0, "tier_chosen": ""})
+        pending.unlink()
+        return "terminal"
+    return "terminal" if _terminal(cache_dir, key) else "missing"
+
+
+def launch_worker(spec: dict) -> int:
+    """Start a detached `_worker` (own session, so it outlives this process); return its pid."""
+    cache_dir = Path(spec["cache_dir"])
+    key = f"{spec['case_id']}-r{spec['run']}"
+    env = dict(os.environ)
+    prior = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(HARNESS_DIR) + (os.pathsep + prior if prior else "")
+    env.update(spec.get("env") or {})
+    with open(cache_dir / f"{key}.worker.log", "ab") as log:
+        proc = subprocess.Popen(worker_argv(spec), start_new_session=True,
+                                stdin=subprocess.DEVNULL, stdout=log,
+                                stderr=subprocess.STDOUT, cwd=str(spec["repo"]), env=env)
+    return proc.pid
+
+
+def worker_argv(spec: dict) -> list[str]:
+    argv = [sys.executable, "-m", "harness.plan_eval", "_worker",
+            "--case", spec["case_id"], "--run", str(spec["run"]),
+            "--cache-dir", str(spec["cache_dir"]), "--corpus", str(spec["corpus"]),
+            "--repo", str(spec["repo"]), "--model", spec["model"],
+            "--timeout", str(spec["timeout"])]
+    if spec.get("source_ref"):
+        argv += ["--source-ref", spec["source_ref"]]
+    else:
+        argv += ["--source-root", str(spec["source_root"])]
+    if spec.get("plans_home"):
+        argv += ["--plans-home", str(spec["plans_home"])]
+    return argv
+
+
+def _write_pending(cache_dir: Path, key: str, pid: int) -> None:
+    tmp = cache_dir / f"{key}.pending.tmp"
+    tmp.write_text(json.dumps({"pid": pid, "started": int(time.time())}) + "\n")
+    os.replace(tmp, cache_dir / f"{key}.pending")
+
+
+def estimate_line(n: int, parallel: int) -> str:
+    return (f"estimate launch={n} output_tokens={n * EST_OUTPUT} "
+            f"cache_read={n * EST_CACHE_READ} cache_write={n * EST_CACHE_WRITE} "
+            f"wall_serial_min={n * EST_WALL_MIN:.1f} "
+            f"wall_parallel_min={math.ceil(n / parallel) * EST_WALL_MIN:.1f}")
+
+
+def _check_run_args(args: argparse.Namespace) -> None:
+    if not 1 <= args.runs <= 3:
+        raise EvalUsageError("--runs must be 1 to 3")
+    if args.wait < 0:
+        raise EvalUsageError("--wait must be >= 0")
+    if not 1 <= args.parallel <= 4:
+        raise EvalUsageError("--parallel must be 1 to 4")
+    if args.timeout < 1:
+        raise EvalUsageError("--timeout must be >= 1")
+
+
+def _cache_key(root: Path, corpus: dict, corpus_path: Path, base: Optional[str]) -> tuple:
+    c = corpus_digest(corpus, corpus_path.parent)
+    if base:
+        r = _git(root, "rev-parse", "--verify", "-q", base + "^{commit}")
+        sha = r.stdout.strip()
+        if r.returncode != 0 or not sha:
+            raise EvalUsageError(f"unknown --base ref: {base}")
+        return surface_hash_ref(root, sha), c, sha
+    return surface_hash_worktree(root), c, None
+
+
+def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = sys.stderr,
+             launcher: Optional[Callable[[dict], int]] = None,
+             sleep: Callable[[float], None] = time.sleep) -> int:
+    _check_run_args(args)
+    root = _repo_root(args.repo)
+    corpus_path = _corpus_path(root, args.corpus)
+    corpus = load_corpus(corpus_path)
+    selected = select_run_cases(corpus, args.cases)
+    v, c, source_ref = _cache_key(root, corpus, corpus_path, args.base)
+    cache_dir = root / CACHE_ROOT / f"{v}-{c}"
+    keys = [(case, k) for case in selected for k in range(1, args.runs + 1)]
+    plans_home = Path(args.plans_home) if args.plans_home else Path.home() / "claude-plans"
+
+    if args.dry_run:
+        n = 0
+        for case, k in keys:
+            st = (key_state(cache_dir, case["id"], k, args.timeout, time.time(), mutate=False)
+                  if cache_dir.is_dir() else "missing")
+            if args.retry_degraded and (cache_dir / f"{case['id']}-r{k}.degraded.json").exists():
+                st = "missing"
+            word = {"terminal": "cached", "pending": "pending", "missing": "to-launch"}[st]
+            print(f"{word} {case['id']}-r{k}", file=out)
+            n += st == "missing"
+        print(estimate_line(n, args.parallel), file=out)
+        return 0
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if args.retry_degraded:
+        for case, k in keys:
+            p = cache_dir / f"{case['id']}-r{k}.degraded.json"
+            if p.exists():
+                p.unlink()
+    launch = launcher or launch_worker
+    deadline = time.time() + args.wait
+    while True:
+        states = {(case["id"], k): key_state(cache_dir, case["id"], k, args.timeout, time.time())
+                  for case, k in keys}
+        alive = sum(1 for s in states.values() if s == "pending")
+        for case, k in keys:
+            if states[(case["id"], k)] != "missing" or alive >= args.parallel:
+                continue
+            pid = launch({"case_id": case["id"], "run": k, "cache_dir": cache_dir,
+                          "corpus": corpus_path, "repo": root, "model": args.model,
+                          "timeout": args.timeout, "source_ref": source_ref,
+                          "source_root": root, "plans_home": args.plans_home})
+            if not _terminal(cache_dir, f"{case['id']}-r{k}"):
+                _write_pending(cache_dir, f"{case['id']}-r{k}", pid)
+            states[(case["id"], k)] = "pending"
+            alive += 1
+        waiting = sum(1 for s in states.values() if s != "terminal")
+        if not waiting:
+            break
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            print(f"pending={waiting} cache={cache_dir}", file=out)
+            return 4
+        sleep(min(POLL_SECONDS, remaining))
+
+    extra_leaks = sweep_leaks(plans_home, pattern=LEAK_ANY_RE)
+    records, scores = [], []
+    for case, k in keys:
+        rec = json.loads(_terminal(cache_dir, f"{case['id']}-r{k}").read_text())  # type: ignore[union-attr]
+        s = score_run(rec, case)
+        records.append(rec)
+        scores.append(s)
+        print(f"case {case['id']} r{k} {rec.get('status')} mech={int(s.mech)} "
+              f"files={s.file_hits}/{s.file_total} "
+              f"tier={rec.get('tier_chosen') or '-'}/{case['tier']} "
+              f"cost_usd={float(rec.get('cost_usd') or 0.0):.2f}", file=err)
+    if extra_leaks:
+        print(f"leaked after run: {', '.join(extra_leaks)}", file=err)
+    score = compute_score(scores, records, v=v, c=c)
+    if extra_leaks:
+        from dataclasses import replace
+        score = replace(score, leaked=score.leaked + 1)
+    print(format_score_line(score), file=out)
+    return 3 if score.degraded + score.leaked > 0 else 0
+
+
+def _cmd_compare(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
+    worse = is_worse(parse_score_line(args.before), parse_score_line(args.after))
+    print("worse" if worse else "not-worse", file=out)
+    return 1 if worse else 0
+
+
+def _fake_claude_shim(where: Path) -> Path:
+    shim = where / "fake-claude"
+    shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE_CLAUDE}" "$@"\n')
+    shim.chmod(0o755)
+    return shim
+
+
+def _smoke_case(corpus: dict) -> dict:
+    core = sorted((c for c in corpus.get("cases") or [] if c.get("core")), key=lambda c: c["id"])
+    if not core:
+        raise EvalUsageError("smoke needs a core case")
+    return core[0]
+
+
+def _cmd_smoke(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
+    root = _repo_root(args.repo)
+    corpus_path = _corpus_path(root, args.corpus)
+    corpus = load_corpus(corpus_path)
+    case = _smoke_case(corpus)
+    source_root = Path(args.source_root) if args.source_root else root
+    tmp = Path(tempfile.mkdtemp(prefix="plan-eval-smoke-")).resolve()
+    try:
+        shim = _fake_claude_shim(tmp)
+        cache_dir = tmp / "cache"
+        plans_home = tmp / "plans-home"
+        if args.detached:
+            return _smoke_detached(root, corpus_path, case, source_root, cache_dir,
+                                   plans_home, shim, out)
+        rec = run_case(case, 1, repo=root, source_root=source_root,
+                       corpus_dir=corpus_path.parent, cache_dir=cache_dir, claude=str(shim),
+                       timeout=300, plans_home=plans_home)
+        problems = []
+        if rec.get("status") != "ok":
+            problems.append(f"status {rec.get('status')} ({rec.get('detail')})")
+        if not rec.get("critical_files"):
+            problems.append("no critical files")
+        if rec.get("check_plan_rc") != 0:
+            problems.append(f"check_plan_rc={rec.get('check_plan_rc')}")
+        if problems:
+            print("smoke FAIL " + "; ".join(problems), file=out)
+            return 1
+        line = format_score_line(compute_score([score_run(rec, case)], [rec],
+                                               v="0" * 12, c="0" * 12))
+        if format_score_line(parse_score_line(line)) != line:
+            print(f"smoke FAIL score line does not round-trip: {line}", file=out)
+            return 1
+        print(f"smoke ok {line}", file=out)
+        return 0
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _smoke_detached(root: Path, corpus_path: Path, case: dict, source_root: Path,
+                    cache_dir: Path, plans_home: Path, shim: Path, out: TextIO) -> int:
+    cache_dir.mkdir(parents=True)
+    spec = {"case_id": case["id"], "run": 1, "cache_dir": str(cache_dir),
+            "corpus": str(corpus_path), "repo": str(root), "model": DEFAULT_MODEL,
+            "timeout": 300, "source_ref": None, "source_root": str(source_root),
+            "plans_home": str(plans_home),
+            "env": {"PLAN_EVAL_CLAUDE": str(shim), "FAKE_CLAUDE_SLEEP": "3"}}
+    env = dict(os.environ)
+    prior = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(HARNESS_DIR) + (os.pathsep + prior if prior else "")
+    launcher = subprocess.Popen([sys.executable, "-m", "harness.plan_eval", "_smoke_launcher",
+                                 json.dumps(spec)], start_new_session=True,
+                                stdin=subprocess.DEVNULL, env=env, cwd=str(root))
+    launcher.wait()
+    record = cache_dir / f"{case['id']}-r1.json"
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        if record.exists():
+            break
+        time.sleep(0.5)
+    if record.exists() and json.loads(record.read_text()).get("status") == "ok":
+        print("smoke-detached ok", file=out)
+        return 0
+    print("smoke-detached FAIL worker did not survive launcher kill", file=out)
+    return 1
+
+
+def _cmd_smoke_launcher(args: argparse.Namespace, out: TextIO = sys.stdout) -> int:
+    """Start the worker the way `run` does, then SIGKILL our own process group."""
+    spec = json.loads(args.spec)
+    pid = launch_worker(spec)
+    _write_pending(Path(spec["cache_dir"]), f"{spec['case_id']}-r{spec['run']}", pid)
+    os.killpg(os.getpgrp(), signal.SIGKILL)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="plan_eval")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -1074,6 +1403,33 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     w.add_argument("--plans-home", default=None)
     w.set_defaults(func=_cmd_worker)
+    r = sub.add_parser("run", help="run the selected cases (detached) and print the score line")
+    r.add_argument("--corpus", metavar="PATH", default=None)
+    r.add_argument("--repo", metavar="DIR", default=None)
+    r.add_argument("--cases", default="core", help="core | all | ID[,ID...]")
+    r.add_argument("--runs", type=int, default=1)
+    r.add_argument("--base", metavar="REF", default=None)
+    r.add_argument("--wait", type=int, default=540)
+    r.add_argument("--parallel", type=int, default=2)
+    r.add_argument("--model", default=DEFAULT_MODEL)
+    r.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
+    r.add_argument("--dry-run", action="store_true")
+    r.add_argument("--retry-degraded", action="store_true")
+    r.add_argument("--plans-home", metavar="DIR", default=None, help=argparse.SUPPRESS)
+    r.set_defaults(func=_cmd_run)
+    cp = sub.add_parser("compare", help="compare two score lines")
+    cp.add_argument("--before", required=True)
+    cp.add_argument("--after", required=True)
+    cp.set_defaults(func=_cmd_compare)
+    sm = sub.add_parser("smoke", help="end-to-end check with a fake model")
+    sm.add_argument("--detached", action="store_true")
+    sm.add_argument("--corpus", metavar="PATH", default=None)
+    sm.add_argument("--repo", metavar="DIR", default=None)
+    sm.add_argument("--source-root", metavar="DIR", default=None)
+    sm.set_defaults(func=_cmd_smoke)
+    sl = sub.add_parser("_smoke_launcher")
+    sl.add_argument("spec")
+    sl.set_defaults(func=_cmd_smoke_launcher)
     return parser
 
 
@@ -1084,7 +1440,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     except SystemExit as e:
         return e.code if isinstance(e.code, int) else 2
     try:
-        return args.func(args)
+        return args.func(args, sys.stdout)  # late-bound, so a redirected stdout is honoured
     except EvalUsageError as e:
         print(f"usage error: {e}", file=sys.stderr)
         return 2

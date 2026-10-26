@@ -665,3 +665,177 @@ def test_run_case_leak_marks_leaked(tmp_path, monkeypatch):
     assert on_disk["status"] == "leaked"
     assert "eval-x-r1.md" in on_disk["detail"]
     assert not (home / "eval-x-r1.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: run orchestration, cache, estimate, compare, smoke
+# ---------------------------------------------------------------------------
+
+def _run_env(tmp_path):
+    repo = _mk_repo(tmp_path)
+    cdir = tmp_path / "corpus"
+    cdir.mkdir()
+    corpus = _corpus4(cdir, base_sha=repo["base"], merge_sha=repo["merge"])
+    cpath = cdir / "corpus.json"
+    cpath.write_text(json.dumps(corpus))
+    return repo["root"], cpath, corpus
+
+
+def _cache_of(root, cpath, corpus):
+    v = pe.surface_hash_worktree(root)
+    c = pe.corpus_digest(corpus, cpath.parent)
+    return root / pe.CACHE_ROOT / f"{v}-{c}"
+
+
+class _Launcher:
+    def __init__(self, pid=None):
+        self.calls = []
+        self.pid = pid if pid is not None else os.getpid()
+
+    def __call__(self, spec):
+        self.calls.append(spec)
+        return self.pid
+
+
+def _run(tmp_path, root, cpath, *extra, launcher=None):
+    args = pe.build_parser().parse_args(
+        ["run", "--repo", str(root), "--corpus", str(cpath),
+         "--plans-home", str(tmp_path / "plans-home"), *extra])
+    out, err = io.StringIO(), io.StringIO()
+    rc = pe._cmd_run(args, out, err, launcher=launcher or _Launcher(), sleep=lambda s: None)
+    return rc, out.getvalue(), err.getvalue()
+
+
+def _ok_record(case, k=1):
+    return {"case_id": case["id"], "run": k, "status": "ok", "check_plan_rc": 0,
+            "staleness_rc": 0, "plan_text": PLAN_GOOD, "critical_files": ["a.txt", "b.txt"],
+            "tier_chosen": case["tier"], "cost_usd": 1.0, "detail": ""}
+
+
+def test_run_dry_run_estimate_launches_nothing(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    launcher = _Launcher()
+    rc, out, _ = _run(tmp_path, root, cpath, "--dry-run", launcher=launcher)
+    assert rc == 0
+    assert "estimate launch=4 output_tokens=294000 " in out
+    assert out.count("to-launch ") == 4
+    assert launcher.calls == []
+    assert not (root / pe.CACHE_ROOT).exists()
+
+
+def test_run_scores_from_cache_without_launching(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    cache = _cache_of(root, cpath, corpus)
+    cache.mkdir(parents=True)
+    for case in corpus["cases"]:
+        pe.write_record(cache, _ok_record(case))
+    launcher = _Launcher()
+    rc, out, err = _run(tmp_path, root, cpath, launcher=launcher)
+    assert rc == 0, err
+    lines = out.strip().splitlines()
+    assert len(lines) == 1 and pe.SCORE_LINE_RE.match(lines[0])
+    assert "mech=4/4 files=8/8 tier=4/4" in lines[0]
+    assert launcher.calls == []
+    assert err.count("case c") == 4
+
+
+def test_run_parallel_cap(tmp_path):
+    root, cpath, _ = _run_env(tmp_path)
+    launcher = _Launcher()
+    rc, out, _ = _run(tmp_path, root, cpath, "--parallel", "2", "--wait", "0",
+                      launcher=launcher)
+    assert rc == 4
+    assert len(launcher.calls) == 2
+
+
+def test_run_pending_exits_4(tmp_path):
+    root, cpath, _ = _run_env(tmp_path)
+    rc, out, _ = _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "4")
+    assert rc == 4
+    assert out.startswith("pending=4 ")
+
+
+def test_run_never_relaunches_alive_worker(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    first = _Launcher()
+    _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "4", launcher=first)
+    assert len(first.calls) == 4
+    second = _Launcher()
+    rc, _, _ = _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "4", launcher=second)
+    assert rc == 4
+    assert second.calls == []
+
+
+def test_run_dead_worker_becomes_degraded(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    cache = _cache_of(root, cpath, corpus)
+    cache.mkdir(parents=True)
+    for case in corpus["cases"][1:]:
+        pe.write_record(cache, _ok_record(case))
+    child = subprocess.Popen(["true"])
+    child.wait()
+    key = f"{corpus['cases'][0]['id']}-r1"
+    (cache / f"{key}.pending").write_text(json.dumps({"pid": child.pid, "started": NOW}))
+    launcher = _Launcher()
+    rc, out, err = _run(tmp_path, root, cpath, launcher=launcher)
+    assert rc == 3, (out, err)
+    rec = json.loads((cache / f"{key}.degraded.json").read_text())
+    assert rec["detail"] == "worker died"
+    assert not (cache / f"{key}.pending").exists()
+    assert launcher.calls == []
+    assert "degraded=1" in out
+
+
+@pytest.mark.parametrize("bad", [["--runs", "0"], ["--runs", "4"], ["--cases", "nope"],
+                                 ["--wait", "-1"], ["--parallel", "5"], ["--bogus"]])
+def test_run_rejects_bad_flags(tmp_path, bad):
+    root, cpath, _ = _run_env(tmp_path)
+    rc = pe.main(["run", "--repo", str(root), "--corpus", str(cpath), "--dry-run", *bad])
+    assert rc == 2
+
+
+def test_run_base_ref_uses_ref_hash(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    _commit(root, "chore: skill edit", NOW, {".claude/skills/plan/SKILL.md": "skill v2\n"})
+    head1 = _git_out(root, "rev-parse", "HEAD~1").strip()
+    after = _Launcher()
+    _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "1", launcher=after)
+    before = _Launcher()
+    _run(tmp_path, root, cpath, "--wait", "0", "--parallel", "1", "--base", "HEAD~1",
+         launcher=before)
+    assert Path(after.calls[0]["cache_dir"]).name != Path(before.calls[0]["cache_dir"]).name
+    assert before.calls[0]["source_ref"] == head1
+    argv = pe.worker_argv(before.calls[0])
+    assert argv[argv.index("--source-ref") + 1] == head1
+    assert "--source-root" not in argv
+    assert "--source-ref" not in pe.worker_argv(after.calls[0])
+
+
+def test_compare_worse_and_mismatch(capsys):
+    base = "plan-eval v=aaaaaaaaaaaa c=bbbbbbbbbbbb runs=4 mech=4/4 files=8/10 tier=3/4 " \
+           "no_plan=0 degraded=0 leaked=0 cost_usd=10.00"
+    drop = base.replace("tier=3/4", "tier=2/4")
+    assert pe.main(["compare", "--before", base, "--after", drop]) == 1
+    assert capsys.readouterr().out.strip() == "worse"
+    assert pe.main(["compare", "--before", base, "--after", base]) == 0
+    assert capsys.readouterr().out.strip() == "not-worse"
+    other = base.replace("runs=4 mech=4/4", "runs=3 mech=3/3").replace("tier=3/4", "tier=3/3")
+    assert pe.main(["compare", "--before", base, "--after", other]) == 2
+
+
+def test_smoke_inprocess_tmp_repo(tmp_path, capsys):
+    root, cpath, _ = _run_env(tmp_path)
+    rc = pe.main(["smoke", "--repo", str(root), "--corpus", str(cpath),
+                  "--source-root", str(REPO_ROOT)])
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert out.startswith("smoke ok plan-eval ")
+
+
+def test_smoke_detached_survives_launcher_kill(tmp_path, capsys):
+    root, cpath, _ = _run_env(tmp_path)
+    rc = pe.main(["smoke", "--detached", "--repo", str(root), "--corpus", str(cpath),
+                  "--source-root", str(REPO_ROOT)])
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert out.strip() == "smoke-detached ok"

@@ -42,7 +42,7 @@ class LastSimRecapViewTest extends TestCase
         $html = (new LastSimRecapView())->render($this->makeSlate(games: []));
 
         self::assertStringContainsString(
-            '<section class="ibl-card last-sim-recap" data-component="last-sim-recap">',
+            '<section class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden last-sim-recap" data-component="last-sim-recap">',
             $html
         );
     }

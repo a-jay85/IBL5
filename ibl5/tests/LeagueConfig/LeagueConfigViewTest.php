@@ -23,7 +23,7 @@ final class LeagueConfigViewTest extends TestCase
         // Beginning year (2025 - 1) and the two-digit ending year (substr from offset 2).
         $this->assertStringContainsString('2024-25 season', $output);
         $this->assertStringNotContainsString('2024-2025', $output);
-        $this->assertStringContainsString('ibl-alert--info', $output);
+        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-info mb-4">No .lge data found for the 2024-25 season. ', $output);
         $this->assertStringContainsString('Place IBL5.lge in the ibl5/ directory', $output);
     }
 
@@ -36,7 +36,7 @@ final class LeagueConfigViewTest extends TestCase
             'messages' => [],
         ]);
 
-        $this->assertStringContainsString('ibl-alert--success', $output);
+        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-success mb-4">.lge imported: ', $output);
         $this->assertStringContainsString('.lge imported: 2024-25 season, 28 teams stored.', $output);
     }
 
@@ -50,9 +50,9 @@ final class LeagueConfigViewTest extends TestCase
             'error' => 'File not found',
         ]);
 
-        $this->assertStringContainsString('ibl-alert--error', $output);
+        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-error mb-4">.lge import failed: ', $output);
         $this->assertStringContainsString('.lge import failed: File not found', $output);
-        $this->assertStringNotContainsString('ibl-alert--success', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
     }
 
     public function testRenderParseResultFailureWithoutErrorKeyFallsBackToUnknown(): void
@@ -90,7 +90,7 @@ final class LeagueConfigViewTest extends TestCase
     {
         $output = $this->view->renderCrossCheckResults(['Team count mismatch', 'Salary cap differs']);
 
-        $this->assertStringContainsString('ibl-alert--warning', $output);
+        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-warning mb-4"><div><strong>League config cross-check warnings:</strong><ul class="list-disc pl-5">', $output);
         $this->assertStringContainsString('<li>Team count mismatch</li>', $output);
         $this->assertStringContainsString('<li>Salary cap differs</li>', $output);
     }

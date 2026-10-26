@@ -250,22 +250,24 @@ if ($csrfField === '') {
     <h1 class="ibl-title">Upload Draft Class</h1>
 
 <?php if ($errorMessage !== ''): ?>
-    <div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($errorMessage) ?></div>
+    <div role="alert" class="d-alert d-alert-error mb-4"><?= HtmlSanitizer::e($errorMessage) ?></div>
 <?php endif; ?>
 
 <?php if ($errors !== []): ?>
-    <div class="ibl-alert ibl-alert--error">
-        <strong>This file was not imported. Fix the following and upload it again:</strong>
-        <ul>
-        <?php foreach ($errors as $error): ?>
-            <li><?= HtmlSanitizer::e($error) ?></li>
-        <?php endforeach; ?>
-        </ul>
+    <div role="alert" class="d-alert d-alert-error mb-4">
+        <div>
+            <strong>This file was not imported. Fix the following and upload it again:</strong>
+            <ul class="list-disc pl-5">
+            <?php foreach ($errors as $error): ?>
+                <li><?= HtmlSanitizer::e($error) ?></li>
+            <?php endforeach; ?>
+            </ul>
+        </div>
     </div>
 <?php endif; ?>
 
 <?php if ($view === 'imported'): ?>
-    <div class="ibl-alert ibl-alert--success">
+    <div role="alert" class="d-alert d-alert-success mb-4">
         Imported <?= $importedCount ?> player<?= $importedCount === 1 ? '' : 's' ?>.
     </div>
     <p><a href="modules.php?name=Draft">Go to the Draft module</a></p>
@@ -325,8 +327,8 @@ if ($csrfField === '') {
     <form method="post" id="draftClassConfirmForm">
         <?= HtmlSanitizer::trusted($csrfField) ?>
         <?php /* Destructive: commit deletes every existing row before inserting. */ ?>
-        <button type="submit" name="action" value="commit" class="ibl-btn ibl-btn--danger">Import</button>
-        <a href="<?= DRAFT_CLASS_PAGE_URL ?>?action=cancel" class="ibl-btn ibl-btn--ghost">Cancel</a>
+        <button type="submit" name="action" value="commit" class="d-btn d-btn-error">Import</button>
+        <a href="<?= DRAFT_CLASS_PAGE_URL ?>?action=cancel" class="d-btn d-btn-ghost">Cancel</a>
     </form>
 
 <?php else: ?>
@@ -335,17 +337,17 @@ if ($csrfField === '') {
 
     <?php /* The file input wears .sr-only: its native control reads as a text box, not a
              button, but it must stay focusable for keyboard users. The <label> is the
-             .ibl-btn the commissioner sees, and choosing a file submits the form — no
+             .d-btn the commissioner sees, and choosing a file submits the form — no
              second click. `action` rides as a hidden input so the JS submit carries it
              (a submit button's name/value would not). */ ?>
     <form method="post" enctype="multipart/form-data" id="draftClassForm">
         <?= HtmlSanitizer::trusted($csrfField) ?>
         <input type="hidden" name="action" value="upload">
         <input type="file" name="draftClassFile" id="draftClassFile" accept=".csv" class="sr-only" required>
-        <label for="draftClassFile" class="ibl-btn ibl-btn--primary" id="draftClassLabel">Click to choose .csv</label>
-        <noscript><button type="submit" class="ibl-btn ibl-btn--primary">Upload and Preview</button></noscript>
+        <label for="draftClassFile" class="d-btn d-btn-primary" id="draftClassLabel">Click to choose .csv</label>
+        <noscript><button type="submit" class="d-btn d-btn-primary">Upload and Preview</button></noscript>
     </form>
-    <p class="ibl-alert ibl-alert--error" id="draftClassClientError" hidden>That is not a .csv file. Choose the draft-class export again.</p>
+    <p role="alert" class="d-alert d-alert-error mb-4" id="draftClassClientError" hidden>That is not a .csv file. Choose the draft-class export again.</p>
 
     <script>
     (function () {

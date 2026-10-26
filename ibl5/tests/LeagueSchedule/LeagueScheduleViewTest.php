@@ -250,7 +250,7 @@ class LeagueScheduleViewTest extends TestCase
         $regular = $this->view->render($this->createPageData(gamesByMonth: [
             '2025-11' => ['label' => 'November', 'dates' => []],
         ]));
-        $this->assertStringContainsString('class="ibl-card__header schedule-month__header"', $regular);
+        $this->assertStringContainsString('class="schedule-month__header"', $regular);
 
         $playoffs = $this->view->render($this->createPageData(
             gamesByMonth: [
@@ -260,7 +260,7 @@ class LeagueScheduleViewTest extends TestCase
             playoffMonthKey: '2026-06',
         ));
         $this->assertStringContainsString(
-            'class="ibl-card__header schedule-month__header schedule-month__header--playoffs"',
+            'class="schedule-month__header schedule-month__header--playoffs"',
             $playoffs
         );
     }

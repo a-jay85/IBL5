@@ -120,6 +120,7 @@ final class PlrBulkEditSession
         }
 
         if (($this->copier)($this->plrPath, $backupPath) !== true) {
+            @unlink($backupPath);
             throw new \RuntimeException("Could not copy {$this->plrPath} to $backupPath");
         }
 

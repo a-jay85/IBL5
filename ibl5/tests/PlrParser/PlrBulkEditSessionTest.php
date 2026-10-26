@@ -157,6 +157,25 @@ final class PlrBulkEditSessionTest extends TestCase
         }
     }
 
+    public function testRemovesPartialBackupWhenCopierFailsMidCopy(): void
+    {
+        $partial = substr($this->corpus, 0, 100);
+        $session = $this->session([], static function (string $from, string $to) use ($partial): bool {
+            file_put_contents($to, $partial);
+
+            return false;
+        });
+
+        try {
+            $session->open();
+            self::fail('open() should have thrown');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('Could not copy', $e->getMessage());
+            self::assertSame($this->corpus, file_get_contents($this->plrPath));
+            self::assertSame(['IBL5.plr'], $this->plrFiles());
+        }
+    }
+
     public function testAbortsAndRemovesBackupOnSizeMismatch(): void
     {
         $truncated = substr($this->corpus, 0, -1);

@@ -1,0 +1,16 @@
+diff --git a/tools/demo/shout.py b/tools/demo/shout.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/shout.py
+@@ -0,0 +1,10 @@
++"""Shout helper."""
++import sys
++
++
++def shout(text):
++    return text.upper()
++
++
++if __name__ == "__main__":
++    print(shout(sys.argv[1]))

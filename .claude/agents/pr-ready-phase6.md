@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-10-22
+last_verified: 2026-10-26
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -119,6 +119,10 @@ in this review.
    finding's title, so it never reaches a backlog issue title, the terminal line, or
    `## DIGEST`. A reader that meets a top-level finding bullet with no marker treats that
    finding as blocking.
+2b. When `context.md` carries `SHADOW_ARMING: requested`, emit the `## SHADOW-ARMING`
+   section per procedure 6f between `## FINDINGS` and the terminal verdict word. Otherwise
+   emit nothing for it. The terminal verdict word and the `## DIGEST`-last rules are
+   unchanged.
 3. **Append a `## DIGEST` section, and nothing after it.** The terminal verdict word stays
    the last *bare* line of the prose body; `## DIGEST` is a heading that follows it, so the
    Phase 7 composer can find the section with a fixed-string match and the existing

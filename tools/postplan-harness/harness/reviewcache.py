@@ -345,8 +345,13 @@ def vet_fidelity(fid, run_id):
         return None
     if not fid.get("diff_id") or not fid.get("plan_hash"):
         return None
-    return {"run_id": run_id, "verdict": verdict, "diff_id": fid["diff_id"],
-            "plan_hash": fid["plan_hash"], "remediated": False}
+    rec = {"run_id": run_id, "verdict": verdict, "diff_id": fid["diff_id"],
+           "plan_hash": fid["plan_hash"], "remediated": False}
+    # Only a validated shadow is cached; a carried verdict copies it (fidelity.carried_shadow).
+    shadow = fid.get("shadow")
+    if isinstance(shadow, dict) and shadow.get("status") == "present":
+        rec["shadow"] = shadow
+    return rec
 
 
 def avoided_cost(sample_calls, absent_purposes) -> float:

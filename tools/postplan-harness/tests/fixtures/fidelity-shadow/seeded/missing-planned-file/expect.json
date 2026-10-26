@@ -1,0 +1,8 @@
+{
+  "case": "missing-planned-file",
+  "expect": {
+    "3": "hold",
+    "18": "clear"
+  },
+  "why": "Plan creates tools/demo/helper.py in Phase 1 and lists it in Critical Files; the diff never adds it."
+}

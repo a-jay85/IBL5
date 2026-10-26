@@ -1,0 +1,18 @@
+diff --git a/tools/demo/main.py b/tools/demo/main.py
+index 5d6e7f8..9a0b1c2 100644
+--- a/tools/demo/main.py
++++ b/tools/demo/main.py
+@@ -2,8 +2,12 @@
+ import sys
+ 
+ 
++def normalize(name):
++    return name.strip().lower()
++
++
+ def run(argv):
+-    name = argv[0] if argv else "world"
++    name = normalize(argv[0]) if argv else "world"
+     print(f"hello {name}")
+     return 0
+ 

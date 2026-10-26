@@ -4,6 +4,7 @@ CI half: committed error shapes go through the real writer, runner._finish.
 Local half: every out/*/result.json already on disk must be stable under
 runner._redact, so the fix rewrites nothing a clean run stored.
 """
+import dataclasses
 import glob
 import json
 import os
@@ -16,6 +17,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner  # noqa: E402
 from harness.state import RunResult, TerminalState  # noqa: E402
+
+
+def _clean_stored_json(res):
+    """What `_finish` writes for an unredacted result: the live result plus the shadow
+    record and its audit line, which `_finish` adds on a copy."""
+    fid = dict(res.fidelity or {})
+    fid["shadow"] = runner.fidelity.finalize_shadow(fid.get("shadow"), res.arm)
+    line = runner.fidelity.shadow_audit_line(fid["shadow"])
+    return dataclasses.replace(res, fidelity=fid, audit=res.audit + [line]).to_json()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +51,7 @@ DIRTY_ERRORS = [  # (stored error, secret that must not reach disk)
 def test_finish_clean_error_shapes_byte_identical(tmp_path, error):
     res = RunResult(terminal=TerminalState.FAILED, error=error)
     runner._finish(res, str(tmp_path))
-    assert (tmp_path / "result.json").read_text() == res.to_json()
+    assert (tmp_path / "result.json").read_text() == _clean_stored_json(res)
 
 
 @pytest.mark.parametrize("error,secret", DIRTY_ERRORS)

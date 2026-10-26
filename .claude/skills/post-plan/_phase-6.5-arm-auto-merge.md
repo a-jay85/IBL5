@@ -1,6 +1,6 @@
 ---
 description: Per-condition run-and-report blocks for Phase 6.5 auto-merge arming.
-last_verified: 2026-10-21
+last_verified: 2026-10-26
 ---
 
 # Phase 6.5 — Arm Auto-Merge (post-plan reference)
@@ -22,6 +22,8 @@ CLEAR=$(pr_manual_testing_clearance "$_prbody" "$_prfiles")
 A Visual-regression matrix row marked `(no-change)` directly after its backticked test token plans an untouched baseline. `conformance.check` skips that token, so a CSS-only diff can arm without a `MISSING:` for the snapshots directory (backlog#1222). The harness honors the marker only on Visual-regression rows and only when no unmarked row shares the token; the row shape is specified in `.claude/review-shared/_plan-verification.md`.
 
 A test row marked `(run-only)` directly after its backticked token plans a run of a test that already exists on master. `conformance.check` skips that token's `MISSING:` only when the file is tracked in the PR tree and every row naming the token carries `(run-only)` or `(no-change)`; a `RUN-ONLY:` or `RUN-ONLY-REFUSED:` note in the Phase 5.0 log records the decision. `MISSING-FILE:` and `MISSING-METHOD:` are never exempted by it. `bin/check-plan` gate `[RO]` rejects the marker at authoring time on a path absent from the base branch.
+
+The compiled harness also records a shadow answer for this condition at `fidelity.shadow` in `result.json`. It never arms or holds. The skill path records none.
 
 Condition (3) is three-state, and an indeterminate Phase 5.0 BLOCKS. The bridge file `/tmp/post-plan-missing-tests-$PPID` is truncated at 5.0 START and appended to at 5.0 END, so *empty* is ambiguous on its own: it is byte-identical for "5.0 ran and found nothing unresolved" and "5.0 died before it finished". Reading empty as PASS is a fail-OPEN that contradicts the fail-closed default. The disambiguator is the **done-marker** `/tmp/post-plan-conformance-done-$PPID`, written as the last action of Phase 5.0 on **both** the normal path and the skip path (`PLAN_FOUND=none` or `! $HAS_MATRIX`; see `SKILL.md` Phase 5.0). Marker absent ⇒ indeterminate ⇒ **BLOCKED**; marker present + empty bridge ⇒ clean ⇒ pass. The skip-path write is what keeps this from blocking every plan-blind PR (the dominant case), so treat it as load-bearing. The compiled harness computes conformance in-process, then writes the same two signals into its own run dir (`conformance-done` and `missing-tests`, beside `result.json`) as that run's audit trail. So the harness never uses the `/tmp` files, and it no longer drives this block: the rc=4 resume arm that once re-entered the skill here is gone. The defaults below are the production path, read by the skill on its own fallback run. The `$DONE_MARK`/`$BRIDGE` indirection now survives only as a test seam, and `bin/test-postplan-arm-conditions` is its sole caller:
 
@@ -339,6 +341,8 @@ fi
 ```
 
 **(18) Merge danger door.** The block reads the PR body's `**Merge danger:**` line, defined in `_pr-body-claims.md` § Merge danger rule. It holds when the Door is `one-way`, when the line is missing or malformed, and when the body cannot be read. It only adds a hold and never clears another condition.
+
+The compiled harness also records a shadow answer for this condition at `fidelity.shadow` in `result.json`. It never arms or holds. The skill path records none.
 
 ```bash
 # condition (18): block unless the PR body carries exactly one well-formed two-way Merge danger line

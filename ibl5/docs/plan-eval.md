@@ -83,10 +83,16 @@ The selection rule picks 5 default, 2 Sonnet and 3 xhigh cases with 2 to 12 expe
 
 ## Baseline
 
-No live baseline is recorded yet. The first 2-case run (`recordholders-repository-tests`, `harness-slash-branch-result-line`) was launched on 2026-10-26 with this command:
+The first live run covered 2 cases on 2026-10-26 with this command:
 
 ```bash
 bin/plan-eval run --cases recordholders-repository-tests,harness-slash-branch-result-line
 ```
 
-Re-run that command to collect its score line once both workers finish, then record it here.
+```text
+case harness-slash-branch-result-line r1 ok mech=1 files=2/2 tier=plan-architect/plan-architect cost_usd=3.43
+case recordholders-repository-tests r1 ok mech=1 files=3/3 tier=plan-architect/plan-architect-sonnet cost_usd=3.59
+plan-eval v=4e5ce364f1dd c=dfd27bafb9fe runs=2 mech=2/2 files=5/5 tier=1/2 no_plan=0 degraded=0 leaked=0 cost_usd=7.02
+```
+
+Nothing leaked into `~/claude-plans`. These two records hold token counts from before the counter read the result event's per-model totals, so their token fields are low. Score fields and cost are unaffected. The default 4-case core baseline is still to be run.

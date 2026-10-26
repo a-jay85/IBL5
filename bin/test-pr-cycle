@@ -1098,15 +1098,21 @@ grep -qF '2201' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" && fail "case 33 slot
 grep -qF 'slot already live' <<< "$OUT" || fail "case 33 slot: slot skip not logged in worker output"
 clear_live_labels
 
-# With --max-ready 2: 2201 capped out; ordered PRs win.
+# With --max-ready 2: the default DIRTY reserve (3, clamped to 2) holds a slot for 2201,
+# so one ordered PR runs and 2102 waits for the next run.
 reset_state
 printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 2
-_a1cap="$(sed -n '1p' "$SCRATCH/ready.argv")"
-grep -qF '2101' <<< "$_a1cap" || fail "case 33 cap: 2101 missing"
-grep -qF '2102' <<< "$_a1cap" || fail "case 33 cap: 2102 missing"
-grep -qF '2201' <<< "$_a1cap" && fail "case 33 cap: 2201 should be capped out with --max-ready 2"
+[[ "$(prlist)" == "2101,2201" ]] \
+    || fail "case 33 cap: want 2101,2201 (1 ordered + reserved DIRTY), got $(prlist)"
+# The old ordered-first fill is still reachable with the reserve at 0.
+reset_state
+printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+DIRTYRES=0 run --worker --max-ready 2
+[[ "$(prlist)" == "2101,2102" ]] \
+    || fail "case 33 cap reserve-0: want 2101,2102 (ordered-first), got $(prlist)"
 end_case "case 33 DIRTY joins the batch"
 
 # --- 11e: only DIRTY is eligible; unset and empty seam values BOTH mean enabled ---------------
@@ -3791,6 +3797,7 @@ end_case "tick-argv-contract"
 # 42 — DIRTY rescues get reserved --max-ready slots (PR_CYCLE_DIRTY_RESERVE)
 # ==========================================================================================
 begin_case
+unset DIRTYRES RESCUE
 reset_state
 gen_attack 34 3 > "$SCRATCH/attack-out"
 triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
@@ -3798,6 +3805,75 @@ run --worker --max-ready 10
 [[ $RC -eq 0 ]] || fail "case 42 34+3: exit $RC, want 0"
 [[ "$(prlist)" == "7001,7002,7003,7004,7005,7006,7007,7901,7902,7903" ]] \
     || fail "case 42 34+3 cap 10: want 7 ordered + 3 DIRTY, got $(prlist)"
+# res_case LABEL N_ORDERED N_DIRTY CAP WANT_CSV: worker run on a generated attack doc, asserting
+# the fleet --pr-list exactly. DIRTYRES and RESCUE pass through when the caller set them.
+res_case() {
+    reset_state
+    gen_attack "$2" "$3" > "$SCRATCH/attack-out"
+    triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    run --worker --max-ready "$4"
+    [[ $RC -eq 0 ]] || fail "case 42 $1: exit $RC, want 0"
+    [[ "$(prlist)" == "$5" ]] || fail "case 42 $1: --pr-list want $5, got $(prlist)"
+}
+grep -qF 'max-ready 10 (DIRTY reserve 3)' <<< "$OUT" \
+    || fail "case 42 banner: worker banner lacks 'max-ready 10 (DIRTY reserve 3)'"
+res_case "34+0" 34 0 10 "7001,7002,7003,7004,7005,7006,7007,7008,7009,7010"
+res_case "34+1" 34 1 10 "7001,7002,7003,7004,7005,7006,7007,7008,7009,7901"
+res_case "34+5" 34 5 10 "7001,7002,7003,7004,7005,7006,7007,7901,7902,7903"
+run --dry-run --max-ready 10
+grep -qF '#7904 — over --max-ready cap' <<< "$OUT" || fail "case 42 34+5: #7904 not listed over the cap"
+grep -qF '#7905 — over --max-ready cap' <<< "$OUT" || fail "case 42 34+5: #7905 not listed over the cap"
+grep -qF '#7008 — over --max-ready cap' <<< "$OUT" || fail "case 42 34+5: #7008 not listed over the cap"
+grep -qF '#7903 — over --max-ready cap' <<< "$OUT" && fail "case 42 34+5: reserved #7903 listed over the cap"
+RESCUE=0 res_case "rescue-off" 34 3 10 "7001,7002,7003,7004,7005,7006,7007,7008,7009,7010"
+DIRTYRES=50 res_case "clamp" 34 5 4 "7901,7902,7903,7904"
+grep -qF 'max-ready 4 (DIRTY reserve 4)' <<< "$OUT" \
+    || fail "case 42 clamp: worker banner does not show the reserve clamped to 4"
+res_case "short-ordered" 2 5 10 "7001,7002,7901,7902,7903,7904,7905"
+res_case "cap2" 2 1 2 "7001,7901"
+res_case "cap1" 3 1 1 "7901"
+DIRTYRES=0 res_case "reserve-0" 34 3 10 "7001,7002,7003,7004,7005,7006,7007,7008,7009,7010"
+DIRTYRES=0 res_case "reserve-0-short" 2 5 4 "7001,7002,7901,7902"
+DIRTYRES='' res_case "empty" 34 3 10 "7001,7002,7003,7004,7005,7006,7007,7901,7902,7903"
+DIRTYRES=08 res_case "octal" 34 9 10 "7001,7002,7901,7902,7903,7904,7905,7906,7907,7908"
+
+# Scoping runs before the reservation: out-of-scope rescues never claim a reserved slot.
+reset_state
+gen_attack 34 3 > "$SCRATCH/attack-out"
+triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --only 7001,7002,7003,7901 --max-ready 2
+[[ "$(prlist)" == "7001,7901" ]] || fail "case 42 only: want 7001,7901, got $(prlist)"
+reset_state
+gen_attack 34 3 > "$SCRATCH/attack-out"
+triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --skip 7901,7902 --max-ready 10
+[[ "$(prlist)" == "7001,7002,7003,7004,7005,7006,7007,7008,7009,7903" ]] \
+    || fail "case 42 skip: want 9 ordered + 7903, got $(prlist)"
+
+# Dry run shows the split on the stage-1 line and the max-ready line.
+reset_state
+gen_attack 34 3 > "$SCRATCH/attack-out"
+triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --dry-run --max-ready 10
+grep -qF 'stage 1 would ready (10): #7001 ' <<< "$OUT" || fail "case 42 dry-run split: stage-1 line prefix changed"
+grep -qF '[7 ordered + 3 DIRTY rescue]' <<< "$OUT" || fail "case 42 dry-run split: stage-1 line lacks [7 ordered + 3 DIRTY rescue]"
+grep -qF 'would use max-ready:  10 (DIRTY reserve 3; this run: 7 ordered + 3 DIRTY rescue)' <<< "$OUT" \
+    || fail "case 42 dry-run split: max-ready line lacks the split"
+
+# A reserved DIRTY rescue keeps its state-change flag; an over-cap one does not reach the fleet.
+reset_state
+gen_attack 34 4 > "$SCRATCH/attack-out"
+triage_report "7901 DIRTY rebase" "7904 DIRTY rebase" > "$SCRATCH/triage-out"
+run --worker --max-ready 10
+grep -qE -- '--state-changed-prs=7901( |$)' <<< "$(ro_argv)" \
+    || fail "case 42 state-changed: argv lacks --state-changed-prs=7901: $(ro_argv)"
+grep -qF '7904' <<< "$(ro_argv)" && fail "case 42 state-changed: over-cap 7904 reached the fleet argv: $(ro_argv)"
+ro_setup 7901 dirty-1 DIRTY
+gen_attack 34 1 > "$SCRATCH/attack-out"
+RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker --max-ready 10
+grep -qF -- '--rebase-only-prs=7901' <<< "$(ro_argv)" \
+    || fail "case 42 rebase-only: argv lacks --rebase-only-prs=7901: $(ro_argv)"
+unset -f res_case
 end_case "case 42 dirty reserve"
 
 # ==========================================================================================

@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
-last_verified: 2026-10-10
+description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, 2026-10 review-seat measurement, extra Sonnet pins. Attaches only on `.claude/agents/*.md`. Fable test and bounded checklist live in their own files.
+last_verified: 2026-10-26
 paths:
   - ".claude/agents/*.md"
 ---
@@ -65,7 +65,7 @@ Re-validated 2026-06-30 against Sonnet 5. The Opus-only column (final code revie
 
 ## Nested Sub-Agents — One Carve-Out, Otherwise Unused
 
-Sub-agents can spawn sub-agents. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json` (the rule previously claimed 5). We keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates. `Explore` denies `Agent`, adding a depth rather than a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-5-5`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2. Run-wide ceiling: **3**. The orchestrator owns triage: the pipelines keep review/triage **in the orchestrator session** by design, whatever tier it runs at, because a coordinator would blind the orchestrator to the findings it filtered and delegated judgment degrades (see § Boundary keys). `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context.
+Sub-agents can spawn sub-agents. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json`. We keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates. `Explore` denies `Agent`, adding a depth rather than a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-5-5`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2. Run-wide ceiling: **3**. The orchestrator owns triage: the pipelines keep review/triage **in the orchestrator session** by design, whatever tier it runs at, because a coordinator would blind the orchestrator to the findings it filtered and delegated judgment degrades (see § Boundary keys). `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context.
 
 **Depth, not width.** This constrains *nesting*, not how many agents one level runs at once. § Fan out by independence governs width and leaves this untouched. Width is explicitly allowed; the load-bearing reason is orchestrator-owns-triage, which is width-independent.
 
@@ -101,6 +101,10 @@ A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/
 Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it. Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
 
 **Price cliff.** Haiku bills $0.10/$0.50 per MTok up to 100K prompt tokens per request (cache included) and $0.50/$2.50 above, 0.25 of Sonnet's input rate. Send jobs past ~100K tokens to Sonnet.
+
+## Review-seat measurement (2026-10)
+
+Table and scope: `agent-tiering-fable.md` § Review-seat measurement table.
 
 ## Prompt Style by Tier
 

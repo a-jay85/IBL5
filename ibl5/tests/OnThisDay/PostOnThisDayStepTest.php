@@ -223,6 +223,44 @@ final class PostOnThisDayStepTest extends TestCase
         self::assertSame([], $poster->messages);
     }
 
+    public function testFormattingFailureSkipsWithoutClaimingSim(): void
+    {
+        $badDate = new Moment(
+            kind: MomentKind::FiftyPointGame,
+            key: 'fifty_point_game:bad:1',
+            date: 'not-a-date',
+            seasonYear: 2019,
+            pid: 1,
+            playerName: 'Test Player',
+            teamId: 1,
+            teamName: 'Hawks',
+            opponentTeamId: 2,
+            opponentName: 'Celtics',
+            facts: ['points' => 52],
+        );
+        $selection = new OnThisDaySelection(
+            moments: [$badDate],
+            currentSeasonYear: 2021,
+            centerDate: '2021-02-14',
+            radiusUsed: 0,
+            sim: 12,
+        );
+        $claims = $this->makeClaims(true);
+        $poster = new RecordingPoster();
+        $step = new PostOnThisDayStep(
+            $this->makeService($selection),
+            $claims,
+            $this->makeSeasonQuery('Regular Season', 12),
+            $poster,
+        );
+
+        $result = $step->execute();
+
+        self::assertTrue($result->skipped);
+        self::assertSame([], $claims->claimed);
+        self::assertSame([], $poster->messages);
+    }
+
     public function testSeasonLookupFailureSkipsWithoutFailingPipeline(): void
     {
         $seasonQuery = self::createStub(SeasonQueryRepository::class);

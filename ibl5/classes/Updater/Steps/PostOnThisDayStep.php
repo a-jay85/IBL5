@@ -12,7 +12,8 @@ use Updater\StepResult;
  *
  * Never fails the pipeline: a history lookup or cache problem skips the step,
  * and a Discord problem is reported as a successful step with a note. The sim
- * is claimed before posting, so a failed post is not retried on re-run.
+ * is claimed right before posting, after the line is built, so only a failed
+ * Discord call loses the post; it is not retried on re-run.
  */
 class PostOnThisDayStep implements PipelineStepInterface
 {
@@ -54,16 +55,16 @@ class PostOnThisDayStep implements PipelineStepInterface
                 return StepResult::skipped($label, "No notable moment within 7 days of {$selection->centerDate}.");
             }
 
-            $sim = $selection->sim;
-            if ($this->claims->claimSimPost($sim) === false) {
-                return StepResult::skipped($label, "Already posted for sim {$sim}.");
-            }
-
             $top = $selection->moments[0];
             $line = $this->formatter->discordLine(
                 $top,
                 $this->calendar->seasonsAgo($selection->currentSeasonYear, $top->seasonYear) ?? 0,
             );
+
+            $sim = $selection->sim;
+            if ($this->claims->claimSimPost($sim) === false) {
+                return StepResult::skipped($label, "Already posted for sim {$sim}.");
+            }
         } catch (\Throwable $e) {
             return StepResult::skipped($label, 'On this day skipped: ' . $e->getMessage());
         }

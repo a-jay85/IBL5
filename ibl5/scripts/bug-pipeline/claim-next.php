@@ -72,4 +72,5 @@ if ($row === null) {
 // unchanged; a NEW variable avoids PHPStan rejecting the extra key against the row shape).
 $out = $row;
 $out['attachments'] = $repo->findAttachmentsByReportId((int) $row['id']);
+$out['operator_context'] = $repo->findOperatorContextByReportId((int) $row['id']);
 echo json_encode($out), PHP_EOL;

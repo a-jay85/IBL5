@@ -5,6 +5,7 @@ import {
     toRoutable,
     handleEnqueue,
     handleThreadReply,
+    handleWake,
     handleReaction,
     handleSourceUpdate,
     handleSourceDelete,
@@ -60,6 +61,7 @@ client.on(Events.MessageCreate, async (message) => {
         const route = classifyMessage(toRoutable(message), clientUserId);
         if (route === 'enqueue') await handleEnqueue(message);
         else if (route === 'thread-reply') await handleThreadReply(message);
+        else if (route === 'wake') await handleWake(message);
         // 'ignore' → no-op
     } catch (err) {
         console.error('MessageCreate handler error:', err);

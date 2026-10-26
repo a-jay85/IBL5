@@ -254,6 +254,14 @@ class RouterTest extends TestCase
         $this->assertSame([], $deleted['params']);
     }
 
+    public function testWakeRouteResolvesToWakeController(): void
+    {
+        $wake = $this->router->match('bug-pipeline/wake', 'POST');
+        $this->assertNotNull($wake);
+        $this->assertSame('Api\Controller\WakeController', $wake['controller']);
+        $this->assertSame([], $wake['params']);
+    }
+
     public function testReturnsNullForUnknownRoute(): void
     {
         $result = $this->router->match('nonexistent', 'GET');

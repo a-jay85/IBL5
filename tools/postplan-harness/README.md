@@ -32,6 +32,8 @@ Phase 2 rebases the branch onto origin/master, runs the local meta-check gate, t
 
 Before the Phase 2 commit a mechanical body pass (`harness/body_numbers.py`) corrects file, line, migration and ADR numbers in the PR body and annotates test-count mismatches. No model reads the body in Phase 2; the Phase 5.5 fidelity review's check 4 is the body-vs-diff gate. A missing or malformed Merge danger line degrades the run as `merge-danger` and holds arming.
 
+Shadow mode (not yet in control). The Phase 5.5 Opus reviewer also writes a `## SHADOW-ARMING` JSON block with typed answers for condition (3) (planned files and tests landed), condition (18) (merge-danger door) and the PR-body numbers. `harness/schemas.py` validates it. Bad output becomes `invalid:<kind>` and never reads as clear. The harness stores the record at `fidelity.shadow` in `result.json` next to the old outcomes and logs a `phase5.5 shadow:` line in `audit.log`. Arming never reads it. `bench/compare_fidelity_shadow.py` compares the two over `out/live-*` and prints the flip exit criteria (E1 to E7). `conformance.py`, `merge_danger.py` and `body_numbers.py` stay in control until a later flip PR.
+
 Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run. Any path still `MISSING` is also handed to the Phase 5.5 fixer as a tagged work-list item.
 
 Every retained call: single turn, no tools, byte-capped input packet, JSON
@@ -132,6 +134,8 @@ intent log — without touching GitHub.
   - **Rules carve-out.** When `bin/check-rules-byte-budget` already fails and a rules `.md` file is in the diff against `origin/master`, the ADR-0184 rules (shrink only, at most one new `*-detail.md` with `paths:`, then the three post checks) apply to that file. That is the only exception to the guard.
   - **Failure.** A rejected, empty or timed-out attempt is reverted and the run fails closed with the original denial (exit 3). A retry that is still denied raises the ORIGINAL error and leaves the fixer's edits in the tree.
   - **Record.** `result.json` carries `gate_fix` (status, model, cost, files, gate class, phase, retry) and `audit.log` carries a `gatefix:` line. A fix whose retry passed adds a `gate-fix` marker block to the PR body. `actions.jsonl` gets no row, because the fixer issues no `gh` mutation and the PR body edit goes through the existing body-edit intent.
+
+- **Shadow fields never arm.** No `ArmInputs` field carries the shadow record. `tests/test_fidelity_shadow.py` asserts this and that a shadow hold leaves the arm decision unchanged.
 
 ## Installation (executed 2026-07-16 with explicit approval)
 

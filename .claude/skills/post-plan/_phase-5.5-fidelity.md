@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-23
+last_verified: 2026-10-26
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -153,6 +153,8 @@ Provide these seven inputs in the spawn prompt (items 1, 2, 6, 7 are post-plan-s
 7. **`PHASE_4B_RAN`** and the review timestamp from Phase 4B's result earlier in this run.
 
 The def returns a thin pointer only (its output contract item 4). Treat the returned text as a pointer and read the file; never treat captured stdout as the verdict.
+
+The skill does not write `SHADOW_ARMING: requested` into the reviewer's context, so the reviewer emits no `## SHADOW-ARMING` block here. Only the compiled harness requests it (procedure 6f). Step 3's parse is unchanged either way, because the block sits above the terminal verdict word.
 
 ## Step 3 — Read the verdict word
 

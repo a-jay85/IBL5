@@ -341,4 +341,33 @@ test.describe('Login page input icon', () => {
     expect(pad.left).toBeGreaterThan(pad.right);
     await assertNoPhpErrors(page);
   });
+
+  // d-input is position:relative with an opaque background and follows the
+  // icon in the DOM, so without a z-index the input paints over the icon.
+  for (const id of ['login-username', 'login-password']) {
+    test(`${id} icon paints on top, inside the input`, async ({ page }) => {
+      await page.goto('modules.php?name=YourAccount');
+      const input = page.locator(`#${id}`);
+      await expect(input).toBeVisible();
+      const result = await input.evaluate((el) => {
+        const icon = el.parentElement?.querySelector('svg.auth-input__icon');
+        if (!icon) return null;
+        const i = icon.getBoundingClientRect();
+        const f = el.getBoundingClientRect();
+        // The icon is pointer-events:none, which hit-testing skips. Turn it on
+        // so elementFromPoint reports paint order.
+        (icon as SVGElement).style.pointerEvents = 'auto';
+        const hit = document.elementFromPoint(i.left + i.width / 2, i.top + i.height / 2);
+        (icon as SVGElement).style.pointerEvents = '';
+        return {
+          onTop: hit !== null && (hit === icon || icon.contains(hit)),
+          inside: i.left >= f.left && i.right <= f.left + f.width / 2
+            && i.top >= f.top && i.bottom <= f.bottom,
+        };
+      });
+      expect(result).not.toBeNull();
+      expect(result?.onTop).toBe(true);
+      expect(result?.inside).toBe(true);
+    });
+  }
 });

@@ -76,6 +76,9 @@
     width: 20px;
     height: 20px;
     pointer-events: none;
+    /* .d-input is position:relative with an opaque background and comes after
+       the icon, so it would paint over the icon without this. */
+    z-index: var(--z-raised);
 }
 
 .auth-input--with-icon {

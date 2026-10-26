@@ -10,6 +10,7 @@ use Team\TeamService;
 use Team\TeamView;
 use Team\Contracts\TeamRepositoryInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Tests\Support\GoldenSnapshotTrait;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 
@@ -20,11 +21,11 @@ use Tests\WideUnit\Mocks\TestDataFactory;
  * BEFORE any production refactoring. The snapshots serve as the regression guard
  * that proves the refactor produces byte-identical output.
  *
- * Run once to write snapshots, then again to assert they match.
+ * Snapshots are committed. After an intended output change, regenerate them with UPDATE_SNAPSHOTS=1.
  */
 class TeamServiceSnapshotTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /** @return array<string, mixed> */
     private static function bullsTeamRow(): array

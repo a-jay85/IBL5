@@ -19,8 +19,10 @@
 #                   file is never removed by this script; clearing it is the human's
 #                   explicit re-enable.
 #   --no-dm         Suppress the single end-of-run Discord DM.
-#   --max-ready N   Cap on PRs handed to post-plan-fleet in Stage 1 (default 10). Ordered
-#                   PRs fill the cap first, then DIRTY rescues. Arming is never capped.
+#   --max-ready N   Cap on PRs handed to post-plan-fleet in Stage 1 (default 10). Up to
+#                   PR_CYCLE_DIRTY_RESERVE slots (default 3, never more than N) are held
+#                   for DIRTY rescues; ordered PRs fill the rest, and a held slot with no
+#                   DIRTY PR to fill it goes back to ordered PRs. Arming is never capped.
 #   --jobs N        Concurrent readying sessions in Stage 1 (default 3).
 #   --only LIST     Work ONLY these PRs. Comma-separated; a leading # is optional, so
 #                   `--only 2101,2108` and `--only '#2101,#2108'` name the same set.
@@ -49,6 +51,9 @@
 #   PR_CYCLE_UNKNOWN_SLEEP   Seconds between warm-up rounds.  Default: 20
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
+#   PR_CYCLE_DIRTY_RESERVE   --max-ready slots held for DIRTY rescues, clamped to N.
+#                            0 = ordered PRs fill the cap first. Unset or empty = 3.
+#                            Anything but 0-999999 exits 2. Default: 3
 #   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
 #                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
 #                            bucket AND a /pr-ready READY verdict over the head's current
@@ -172,6 +177,7 @@ PR_CYCLE_DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_DM_CMD)"
 PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
+PR_CYCLE_DIRTY_RESERVE="${PR_CYCLE_DIRTY_RESERVE:-3}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 # Machine-readable per-PR result file written by the worker. Unset or empty writes nothing.
@@ -294,6 +300,17 @@ if [ "$PR_CYCLE_UNKNOWN_POLLS" -gt 0 ] \
     echo "pr-cycle: UNKNOWN warm-up would wait over 120s (PR_CYCLE_UNKNOWN_POLLS x PR_CYCLE_UNKNOWN_SLEEP)" >&2
     exit 2
 fi
+# DIRTY-rescue reserve: a non-negative integer of at most 6 digits. Unset and empty already
+# became 3 above; 0 is legal and restores the ordered-first fill. Same `case` glob reason as
+# --max-ready (an arithmetic test errors on abc under set -e). 10# keeps bash 3.2 from reading
+# 08 as octal. Sits after --stop so a bad value cannot block a stop, and before every
+# dry-run/--go/--worker branch so all three reject it.
+case "$PR_CYCLE_DIRTY_RESERVE" in
+    *[!0-9]*|???????*)
+        echo "pr-cycle: PR_CYCLE_DIRTY_RESERVE must be an integer from 0 to 999999, got '$PR_CYCLE_DIRTY_RESERVE'" >&2
+        exit 2 ;;
+esac
+PR_CYCLE_DIRTY_RESERVE=$((10#$PR_CYCLE_DIRTY_RESERVE))
 
 # --- refusal guards ----------------------------------------------------------------------
 # Guard (a) applies to --go, --dry-run and --worker alike; never to --stop or --help.
@@ -1716,7 +1733,7 @@ _launch() {
         printf 'export PR_CYCLE_LOG=%q\n'  "$LOG"
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
-                  PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
+                  PR_CYCLE_RESCUE PR_CYCLE_DIRTY_RESERVE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_REBASE_ONLY_HELD PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
                   PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR PR_CYCLE_HOLDREPEAT_AUTOFIX PLANS_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \

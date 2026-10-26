@@ -492,6 +492,12 @@ for f in -- --go --dry-run --stop --no-dm --max-ready --jobs --only --skip --hel
 done
 grep -qF 'PR_CYCLE_SKIP_READY_WHEN_ARMABLE' <<< "$OUT" \
     || fail "--help omits the PR_CYCLE_SKIP_READY_WHEN_ARMABLE seam"
+grep -qF 'PR_CYCLE_DIRTY_RESERVE' <<< "$OUT" \
+    || fail "--help omits the PR_CYCLE_DIRTY_RESERVE seam"
+grep -qF 'for DIRTY rescues; ordered PRs fill the rest' <<< "$OUT" \
+    || fail "--help --max-ready text lacks the reserved-slot wording"
+grep -qF 'PRs fill the cap first, then DIRTY rescues' <<< "$OUT" \
+    && fail "--help still carries the old ordered-first --max-ready wording"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
 grep -qF 'judged-empty form' <<< "$OUT" \
@@ -1340,6 +1346,10 @@ grep -qE '^export PR_CYCLE_SKIP_HELD_UNCHANGED=' "$RUNNER" \
     || fail "runner does not export the SKIP_HELD_UNCHANGED seam"
 grep -qE '^export PR_CYCLE_REBASE_ONLY_HELD=' "$RUNNER" \
     || fail "rebase-only-env-forwarded: runner does not export the REBASE_ONLY_HELD seam"
+grep -qE '^export PR_CYCLE_DIRTY_RESERVE=' "$RUNNER" \
+    || fail "dirty-reserve-env-forwarded: runner does not export the DIRTY_RESERVE seam"
+_rv_dres="$(bash -c "$(grep -m1 '^export PR_CYCLE_DIRTY_RESERVE=' "$RUNNER"); printf '%s' \"\$PR_CYCLE_DIRTY_RESERVE\"")"
+[[ "$_rv_dres" == "3" ]] || fail "dirty-reserve-env-forwarded: runner PR_CYCLE_DIRTY_RESERVE='$_rv_dres', want 3"
 _rv_maxready="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
 [[ "$_rv_maxready" == "10" ]] || fail "runner MAX_READY='$_rv_maxready', want 10"
 _rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
@@ -3789,6 +3799,30 @@ run --worker --max-ready 10
 [[ "$(prlist)" == "7001,7002,7003,7004,7005,7006,7007,7901,7902,7903" ]] \
     || fail "case 42 34+3 cap 10: want 7 ordered + 3 DIRTY, got $(prlist)"
 end_case "case 42 dirty reserve"
+
+# ==========================================================================================
+# 43 — PR_CYCLE_DIRTY_RESERVE validation
+# ==========================================================================================
+begin_case
+for _bad in abc -1 1234567; do
+    for _mode in --dry-run --worker; do
+        reset_state
+        gen_attack 4 1 > "$SCRATCH/attack-out"
+        triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+        DIRTYRES="$_bad" run "$_mode"
+        [[ $RC -eq 2 ]] || fail "case 43 '$_bad' $_mode: exit $RC, want 2"
+        grep -qF 'PR_CYCLE_DIRTY_RESERVE' "$ERR" \
+            || fail "case 43 '$_bad' $_mode: stderr does not name PR_CYCLE_DIRTY_RESERVE"
+        [[ "$(calls ready)" == "0" ]] || fail "case 43 '$_bad' $_mode: post-plan-fleet ran despite a bad seam"
+    done
+done
+# Boundary: six digits is legal (and clamps to the cap; Phase 4 checks the clamp itself).
+reset_state
+gen_attack 4 1 > "$SCRATCH/attack-out"
+triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+DIRTYRES=999999 run --dry-run --max-ready 4
+[[ $RC -eq 0 ]] || fail "case 43 999999: exit $RC, want 0 (six digits is legal)"
+end_case "case 43 dirty reserve validation"
 
 # --- summary --------------------------------------------------------------------------------
 h_done

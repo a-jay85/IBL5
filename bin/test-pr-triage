@@ -67,9 +67,13 @@ case "$1 $2" in
     case "$*" in
       *update-branch*) rc=0; [ -f "$FIX/update-branch-rc" ] && rc="$(cat "$FIX/update-branch-rc")"
                        [ "$rc" = 0 ] && echo '{"message":"Updating pull request branch."}'; exit "$rc" ;;
-      *protection*)    echo '{"required_status_checks":{"contexts":["Tests and Analysis","E2E Tests","human-signoff"]}}' ;;
+      *protection*)    if [ -f "$FIX/protection.json" ]; then cat "$FIX/protection.json"; else echo '{"required_status_checks":{"contexts":["Tests and Analysis","E2E Tests","human-signoff"]}}'; fi ;;
       *check-runs*)    sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\1#')"
                        if [ -f "$FIX/checks-$sha.json" ]; then cat "$FIX/checks-$sha.json"; else echo '{"check_runs":[]}'; fi ;;
+      *commits/*/status*) sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/status.*#\1#')"
+                       rc=0; [ -f "$FIX/status-rc" ] && rc="$(cat "$FIX/status-rc")"
+                       if [ "$rc" != 0 ]; then echo 'gh: HTTP 502' >&2; exit "$rc"; fi
+                       if [ -f "$FIX/status-$sha.json" ]; then cat "$FIX/status-$sha.json"; else echo '{"state":"pending","statuses":[],"total_count":0}'; fi ;;
       "api user")      if [ -f "$FIX/viewer.json" ]; then cat "$FIX/viewer.json"; else echo '{"login":"fixture-me"}'; fi ;;
       *issues/*/comments*) n="$(printf '%s' "$*" | sed -E 's#.*/issues/([0-9]+)/comments.*#\1#')"
                        if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"; else echo '[]'; fi ;;
@@ -135,6 +139,33 @@ row_bucket() { printf '%s\n' "$1" | awk -F'  +' -v pr="#$2" '$1 == pr { print $2
 row_action()  { printf '%s\n' "$1" | awk -F'  +' -v pr="#$2" '$1 == pr { print $3 }'; }
 # row_mss <output> <pr-number>  — MSS column
 row_mss()     { printf '%s\n' "$1" | awk -F'  +' -v pr="#$2" '$1 == pr { print $4 }'; }
+
+# row_col <output> <pr-number> <header>  — the cell under a check header (e.g. ALLCHECKS).
+# Finds the column by header name so the test does not pin the REQUIRED order.
+row_col() {
+    printf '%s\n' "$1" | awk -F'  +' -v pr="#$2" -v h="$3" '
+        $1 == "PR#" { for (i = 1; i <= NF; i++) if ($i == h) c = i }
+        $1 == pr && c { print $c }'
+}
+
+# protection_json <ctx>... — a branch-protection payload requiring exactly these contexts.
+protection_json() {
+    printf '%s\n' "$@" | jq -R . | jq -s '{required_status_checks: {contexts: .}}'
+}
+PROT_REQ=("Tests and Analysis" "E2E Tests" "human-signoff" "All checks settled")
+
+# status_json <state> [context] [total_count] — one combined-status payload in GitHub's
+# real shape (fields as captured 2026-10-24 from PR #3496's head; repository/creator
+# blocks elided). A status carries created_at/updated_at, never completed_at.
+status_json() {
+    local state="$1" ctx="${2:-All checks settled}" total="${3:-1}"
+    jq -n --arg state "$state" --arg ctx "$ctx" --argjson total "$total" '
+      {sha: "fixture", state: $state, total_count: $total,
+       statuses: [{context: $ctx, state: $state, description: "fixture", id: 1,
+                   target_url: "https://github.com/a-jay85/IBL5-test/actions/runs/77",
+                   created_at: "2026-10-25T02:02:43Z", updated_at: "2026-10-25T02:02:43Z"}]}'
+}
+STATUS_EMPTY_JSON='{"state":"pending","statuses":[],"total_count":0}'
 
 # --- C1: DRAFT + cleared + green under --arm is NOT-MERGEABLE ---
 FIX="$(mktemp -d -p "$TMP")"
@@ -523,5 +554,19 @@ assert_absent "H-E7 no login lists nothing"        '^#40  '                     
 ST=0; OUT="$("$TRIAGE" --help 2>&1)" || ST=$?
 assert_match  "H-E8 --help mentions --held"        '[-][-]held'                                      "$OUT"
 assert_match  "H-E8 --help mentions the exclusion" 'Read-only; cannot be combined' "$OUT"
+
+# --- S1: every check-run green + "All checks settled" success STATUS, under a protection
+# list that requires that context -> ARMABLE with ALLCHECKS=green. RED on master, which
+# reads check-runs only and prints the context as `absent`. ---
+FIX="$(mktemp -d -p "$TMP")"
+protection_json "${PROT_REQ[@]}" > "$FIX/protection.json"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 70).json"
+status_json success > "$FIX/status-$(printf '%040d' 70).json"
+pr_json 70 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX"
+assert_match  "S1 ALLCHECKS=green"        '^green$'   "$(row_col "$OUT" 70 ALLCHECKS)"
+assert_match  "S1 bucket=ARMABLE"         '^ARMABLE$' "$(row_bucket "$OUT" 70)"
+assert_match  "S1 status fetched per_page=100" 'commits/0+70/status\?per_page=100' "$(cat "$FIX/calls.log")"
+assert_status "S1 exit 0"                 0           "$ST"
 
 h_done

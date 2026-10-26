@@ -34,8 +34,9 @@ async function readCardTableMetrics(page: Page): Promise<CardTableMetrics[]> {
     };
     return Array.from(document.querySelectorAll<HTMLTableElement>('.player-stats-card table')).map((table) => {
       const cs = getComputedStyle(table);
-      const firstRow = table.rows[0];
-      const titleCell = firstRow ? firstRow.cells[0] : undefined;
+      // The card title sits above the table's scroller (lifted out of thead)
+      const titleCell = table.closest('.player-stats-card')
+        ?.querySelector('.stats-table-header, .player-view-table__title') ?? undefined;
       const bodyRows = Array.from(table.tBodies).flatMap((tbody) => Array.from(tbody.rows))
         .concat(table.tFoot ? Array.from(table.tFoot.rows) : []);
       const dataRows = bodyRows.filter((tr) => tr.querySelector('th') === null);
@@ -124,8 +125,9 @@ test.describe('player view tables (post-conversion)', () => {
       expect(role, 'thead header cell role').toBe('columnheader');
     }
 
-    const titleRole = await table.locator('td.stats-table-header').getAttribute('role');
-    expect(titleRole, 'title cell role').toBeNull();
+    const titleRole = await page.locator('.stats-front .player-stats-card > .stats-table-header').getAttribute('role');
+    expect(titleRole, 'title role').toBeNull();
+    await expect(table.locator('.stats-table-header')).toHaveCount(0);
   });
 
   // pid=3 averages table: 4 <tr> through </tbody> (2 thead rows + 2 season rows); pid=1 has only one season.
@@ -159,7 +161,7 @@ test.describe('player view tables (post-conversion)', () => {
     await page.waitForLoadState('load');
     await assertNoPhpErrors(page, 'on player ratings page');
 
-    const titles = page.locator('.player-stats-card .player-view-table td.player-view-table__title');
+    const titles = page.locator('.player-stats-card > .player-view-table__title');
     await expect(titles.first()).toBeAttached();
     const styles = await titles.evaluateAll((els) => els.map((el) => {
       const cs = getComputedStyle(el);
@@ -240,10 +242,70 @@ test.describe('player view tables (post-conversion)', () => {
       expect(padding.middle, 'mobile td padding').toBe('4px 4px');
 
       // The gold title bar keeps its card padding (10px --pc-pad-md / 16px --pc-pad-lg)
-      const titlePadding = await page.locator(`${AVERAGES_TABLE} td.stats-table-header`).first().evaluate(
+      const titlePadding = await page.locator('.stats-front .player-stats-card > .stats-table-header').evaluate(
         (el) => getComputedStyle(el).padding,
       );
       expect(titlePadding, 'mobile title padding').toBe('10px 16px');
     });
+
+    // Owner decision on #2897 ("B2-2"): on a phone the title stays in view while
+    // the columns scroll sideways under it.
+    const TITLE_PAGES = [
+      { name: 'averages', url: AVERAGES_URL, title: '.stats-front .player-stats-card .stats-table-header' },
+      { name: 'totals', url: TOTALS_URL, title: '.stats-front .player-stats-card .stats-table-header' },
+      { name: 'ratings', url: RATINGS_URL, title: '.player-stats-card .player-view-table__title' },
+    ] as const;
+
+    for (const { name, url, title } of TITLE_PAGES) {
+      test(`${name} title stays in the viewport when the columns scroll`, async ({ page }) => {
+        await gotoWithRetry(page, url);
+        await page.waitForLoadState('load');
+        await assertNoPhpErrors(page, `on player ${name} page (mobile)`);
+
+        const titleEl = page.locator(title).first();
+        await expect(titleEl).toBeVisible();
+
+        // Scroll every horizontal scroller in the card (or the card itself) to its far end
+        const scrolled = await titleEl.evaluate((el) => {
+          const card = el.closest('.player-stats-card');
+          if (card === null) return 0;
+          const scrollers = [card, ...Array.from(card.querySelectorAll('*'))]
+            .filter((s) => s.scrollWidth > s.clientWidth + 1);
+          for (const s of scrollers) s.scrollLeft = s.scrollWidth;
+          return scrollers.length;
+        });
+        expect(scrolled, `${name}: the wide table scrolls sideways`).toBeGreaterThan(0);
+
+        const box = await titleEl.boundingBox();
+        expect(box, `${name}: title has a box`).not.toBeNull();
+        const viewportWidth = page.viewportSize()?.width ?? 0;
+        expect(box!.x, `${name}: title left edge in viewport`).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width, `${name}: title right edge in viewport`).toBeLessThanOrEqual(viewportWidth);
+      });
+    }
   });
+
+  // Owner decision on #2897 ("B2-2"): the Career row is one even shade under the gold rule.
+  for (const { name, url } of [{ name: 'averages', url: AVERAGES_URL }, { name: 'totals', url: TOTALS_URL }]) {
+    test(`${name} career row has one even background`, async ({ page }) => {
+      await gotoWithRetry(page, url);
+      await page.waitForLoadState('load');
+      await assertNoPhpErrors(page, `on player ${name} page`);
+
+      const cells = await page.locator(`${AVERAGES_TABLE} tfoot tr.career-row td`).evaluateAll(
+        (tds) => tds.map((td) => {
+          const cs = getComputedStyle(td);
+          return { image: cs.backgroundImage, color: cs.backgroundColor, rule: `${cs.borderTopWidth} ${cs.borderTopColor}` };
+        }),
+      );
+      expect(cells.length, `${name}: career cells present`).toBeGreaterThan(2);
+      for (const [i, c] of cells.entries()) {
+        expect(c.image, `${name}: career cell #${i} background-image`).toBe('none');
+        expect(c.color, `${name}: career cell #${i} background-color`).toBe(cells[0].color);
+        expect(c.rule, `${name}: career cell #${i} top rule`).toBe(cells[0].rule);
+      }
+      expect(cells[0].color, `${name}: career row is shaded`).not.toBe('rgba(0, 0, 0, 0)');
+      expect(cells[0].rule, `${name}: gold 2px top rule`).toMatch(/^2px /);
+    });
+  }
 });

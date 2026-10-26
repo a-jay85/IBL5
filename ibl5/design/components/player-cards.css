@@ -530,6 +530,7 @@
 /* Table header - gold gradient */
 .player-stats-card .stats-table-header,
 .player-stats-card .player-view-table td.player-view-table__title,
+.player-stats-card > .player-view-table__title,
 .player-stats-card td.stats-table-header {
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);
     color: var(--card-grad-mid);
@@ -541,6 +542,29 @@
     text-align: center;
     border: none;
     border-radius: var(--pc-radius-lg) var(--pc-radius-lg) 0 0;
+}
+
+/* PlayerStatsCardView::liftTitle() moves the title out of the table, above the
+   scroller, so it stays in view on a phone. The block keeps the look the title
+   cell had inside the table. */
+.player-stats-card__scroll {
+    overflow-x: auto;
+}
+
+.player-stats-card > .stats-table-header,
+.player-stats-card > .player-view-table__title {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+/* The flip-card title cell never showed the gold bar: `.stats-table td` cleared it */
+.player-stats-card > div.stats-table-header {
+    background: transparent;
+    color: var(--card-text-muted);
+    font-size: var(--pc-text-md);
+    padding: var(--pc-pad-md);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Column headers */
@@ -596,7 +620,8 @@
     font-weight: var(--font-weight-bold);
     color: var(--card-text);
     border-top: 2px solid var(--card-border);
-    background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 10%, transparent) 100%);
+    /* One flat shade: a gradient here repaints in every cell and reads as stripes */
+    background: color-mix(in srgb, var(--card-border) 15%, transparent);
 }
 
 /* Team Links */
@@ -654,7 +679,9 @@
     /* vs .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td (0,3,1):
        the title cell keeps the card's title size and padding, as on master */
     .player-stats-card table.ibl-data-table td.stats-table-header,
-    .player-stats-card table.ibl-data-table td.player-view-table__title {
+    .player-stats-card table.ibl-data-table td.player-view-table__title,
+    .player-stats-card > div.stats-table-header,
+    .player-stats-card > .player-view-table__title {
         font-size: var(--pc-text-lg);
         padding: 10px var(--pc-pad-xl);
     }

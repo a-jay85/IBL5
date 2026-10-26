@@ -95,6 +95,57 @@ class PlayerStatsCardViewTest extends TestCase
         }
     }
 
+    // Owner decision on #2897 ("B2-2"): the title sits above the scroller, so it
+    // stays in view on a phone while the columns scroll sideways.
+    private const TITLED_TABLE = '<table class="sortable ibl-data-table player-view-table">' . "\n"
+        . '<thead>' . "\n" . '    <tr>' . "\n"
+        . '        <td colspan=15 class="player-view-table__title">Regular Season Totals</td>' . "\n"
+        . '    </tr>' . "\n" . '    <tr>' . "\n" . '        <th>year</th>' . "\n" . '    </tr>' . "\n"
+        . '</thead>' . "\n" . '<tbody><tr><td>2025</td></tr></tbody>' . "\n" . '</table>';
+
+    public function testStyleTableLiftsTitleAboveTheScroller(): void
+    {
+        $result = PlayerStatsCardView::styleTable(self::TITLED_TABLE);
+
+        $this->assertStringStartsWith(
+            '<div class="stats-table-header">Regular Season Totals</div><div class="player-stats-card__scroll"><table ',
+            $result
+        );
+        $this->assertStringEndsWith('</table></div>', $result);
+        $this->assertStringNotContainsString('<td colspan=15', $result);
+        $this->assertMatchesRegularExpression('#<thead>\s*<tr>\s*<th>year</th>#', $result);
+    }
+
+    public function testWrapLiftsRatingsTitleAboveTheScroller(): void
+    {
+        $result = PlayerStatsCardView::wrap(self::TITLED_TABLE);
+
+        $this->assertStringContainsString(
+            '<div class="player-view-table__title">Regular Season Totals</div><div class="player-stats-card__scroll"><table class="sortable ibl-data-table player-view-table">',
+            $result
+        );
+        $this->assertStringNotContainsString('<td colspan=15', $result);
+    }
+
+    public function testRenderWrapsTheTableInOneScroller(): void
+    {
+        $result = PlayerStatsCardView::render(self::TITLED_TABLE);
+
+        $this->assertSame(1, substr_count($result, 'player-stats-card__scroll'));
+        $this->assertSame(1, substr_count($result, 'Regular Season Totals'));
+    }
+
+    public function testTitleRowsOutsideTheadStayInTheTable(): void
+    {
+        $tableHtml = '<table class="sortable ibl-data-table player-view-table">'
+            . '<tr><td class="player-view-table__title">AWARDS</td></tr></table>';
+
+        $result = PlayerStatsCardView::render($tableHtml);
+
+        $this->assertStringContainsString('<tr><td class="stats-table-header">AWARDS</td></tr>', $result);
+        $this->assertStringNotContainsString('player-stats-card__scroll', $result);
+    }
+
     public function testRenderCombinesStyleAndWrap(): void
     {
         $tableHtml = '<table class="sortable ibl-data-table player-view-table"><tr><td>Test</td></tr></table>';

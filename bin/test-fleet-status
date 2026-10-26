@@ -208,6 +208,17 @@ ORPHAN_PID=$!
 disown "$ORPHAN_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $ORPHAN_PID"
 
+# A second orphan that carries a prompt and runs inside a worktree, so its
+# summary line has a slug and task text to show. The newline in the prompt
+# checks that only the first line prints.
+mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
+(cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
+    && exec "$STUBBIN/claude" -p "Fix the fixture widget
+SECOND PROMPT LINE") >/dev/null 2>&1 &
+PROMPT_ORPHAN_PID=$!
+disown "$PROMPT_ORPHAN_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $PROMPT_ORPHAN_PID"
+
 # Give the runners a moment to fork their children and write their pid files.
 # Wait on the LIVE runner's file specifically, not "any file appeared" — case 10
 # asserts that this child is deduped by ancestry, which only holds for a child
@@ -609,6 +620,11 @@ run_fleet() {
 }
 
 OUTPUT="$(run_fleet)"; RC=$?
+
+# Case 10b's forced-prompt render runs here, next to the main capture. The stub
+# orphans sleep 120s, and later in the suite a slow machine can outlive them.
+LOOSE_PROMPTS="$(run_fleet FLEET_STATUS_FORCE_PROMPTS=1 \
+    | sed -n '/UNACCOUNTED HEADLESS SESSIONS/,/PAUSED JOBS/p')"
 
 # Cases 14 and 15 need their own renders: the plist gate's two negative branches
 # are properties of a whole run, so one capture cannot hold them alongside 13.
@@ -1073,6 +1089,22 @@ else
     fail "loose: child of a listed job is deduped by ancestry (fixture child never started)"
 fi
 assert_has "loose: a true orphan IS shown" "$OUTPUT" "pid $ORPHAN_PID "
+
+# 10b — the summary line under each loose row. Off a terminal it names the
+# worktree and never the prompt; the override shows the prompt's first line.
+LOOSE_PLAIN="$(sed -n '/UNACCOUNTED HEADLESS SESSIONS/,/PAUSED JOBS/p' <<< "$OUTPUT")"
+assert_has "loose summary: prompt orphan is listed" \
+    "$LOOSE_PLAIN" "pid $PROMPT_ORPHAN_PID "
+assert_has "loose summary: worktree slug under the row" \
+    "$LOOSE_PLAIN" '^      fixture-wt-slug$'
+assert_lacks "loose summary: no prompt text off a terminal" \
+    "$LOOSE_PLAIN" 'Fix the fixture widget'
+assert_has "loose summary: forced prompts show the first line" \
+    "$LOOSE_PROMPTS" '^      fixture-wt-slug · Fix the fixture widget$'
+assert_lacks "loose summary: the prompt's second line never prints" \
+    "$LOOSE_PROMPTS" 'SECOND PROMPT LINE'
+assert_lacks "loose summary: a flags-first command shows no prompt" \
+    "$LOOSE_PROMPTS" '· --name'
 
 # 17 — the default capture is not a TTY, so it must be plain. `]8;;` is the OSC 8
 # introducer; matching it needs no ESC byte in the pattern.

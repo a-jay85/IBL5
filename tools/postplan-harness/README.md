@@ -272,7 +272,7 @@ Each row replays the conformance check over a held PR's plan and pipes the items
 
 ```bash
 python3 -m harness.conformance <plan> <worktree> > /tmp/confix-<slug>.items
-python3 -m harness.conformance_fix classify --plan <plan> < /tmp/confix-<slug>.items
+python3 -m harness.conformance_fix classify --plan <plan> --worktree <worktree> < /tmp/confix-<slug>.items
 ```
 
 | PR | head | items | FIXABLE (kind per item) | UNFIXABLE (reason per item) |

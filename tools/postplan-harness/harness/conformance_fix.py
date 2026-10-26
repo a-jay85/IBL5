@@ -444,7 +444,19 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
     return _done("committed", rec["sha"][:12])
 
 
-def _cli_classify(plan_path: str, stdin) -> int:
+def _default_root() -> str:
+    """Git toplevel of the cwd, or the cwd itself outside a repo."""
+    import subprocess
+    try:
+        proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True,
+                              text=True, check=False, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return os.getcwd()
+    root = proc.stdout.strip() if proc.returncode == 0 else ""
+    return root or os.getcwd()
+
+
+def _cli_classify(plan_path: str, stdin, root: str) -> int:
     from .planfile import locate_plan  # local import keeps module-level cycle-free
     if not os.path.isfile(plan_path):
         print(f"conformance_fix: plan not found: {plan_path}", file=sys.stderr)
@@ -454,7 +466,9 @@ def _cli_classify(plan_path: str, stdin) -> int:
         print(f"conformance_fix: plan not readable: {plan_path}", file=sys.stderr)
         return 1
     items = [ln.strip() for ln in stdin.read().splitlines() if ln.strip()]
-    cls = classify(items, plan_test_paths(plan), plan_critical_paths(plan))
+    # Same `exists` as remediate_missing, so the CLI refuses what the runtime refuses.
+    cls = classify(items, plan_test_paths(plan), plan_critical_paths(plan),
+                   exists=lambda p: os.path.exists(os.path.join(root, p)))
     for t in cls.fixable:
         print(f"FIXABLE {t.kind} {t.item}")
     for item, reason in cls.unfixable.items():
@@ -463,7 +477,7 @@ def _cli_classify(plan_path: str, stdin) -> int:
 
 
 def main(argv: list[str] | None = None, stdin=None) -> int:
-    """usage: python3 -m harness.conformance_fix classify --plan <plan.md> < items.txt
+    """usage: python3 -m harness.conformance_fix classify --plan <plan.md> [--worktree <root>] < items.txt
 
     Prints `FIXABLE <kind> <item>` / `UNFIXABLE <reason> <item>`; never touches git or an LLM.
     Exit 0 on success, 1 on a missing plan, 2 on bad usage.
@@ -473,8 +487,11 @@ def main(argv: list[str] | None = None, stdin=None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("classify")
     c.add_argument("--plan", required=True)
+    c.add_argument("--worktree", default="",
+                   help="repo root for on-disk checks (default: git toplevel of cwd, else cwd)")
     args = parser.parse_args(argv)
-    return _cli_classify(args.plan, stdin if stdin is not None else sys.stdin)
+    return _cli_classify(args.plan, stdin if stdin is not None else sys.stdin,
+                         args.worktree or _default_root())
 
 
 if __name__ == "__main__":

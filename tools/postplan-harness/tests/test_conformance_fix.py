@@ -507,3 +507,18 @@ def test_classify_cli_prints_fixable_and_unfixable_lines(tmp_path):
     missing = _cli(["classify", "--plan", str(tmp_path / "absent.md")], ITEM_METHOD + "\n")
     assert missing.returncode == 1
     assert missing.stdout == ""
+
+
+def test_classify_cli_refuses_existing_non_test_critical_file(tmp_path):
+    # The CLI must classify like remediate_missing: an on-disk non-test Critical File is refused.
+    plan_path = tmp_path / "plan.md"
+    plan_path.write_text(PLAN_TEXT)
+    wt = tmp_path / "wt"
+    (wt / "ibl5/classes/Fixer").mkdir(parents=True)
+    (wt / "ibl5/classes/Fixer/Thing.php").write_text("<?php\n")
+    item = "MISSING-FILE: ibl5/classes/Fixer/Thing.php (plan Critical File the diff never touched)"
+    proc = _cli(["classify", "--plan", str(plan_path), "--worktree", str(wt)], item + "\n")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.splitlines() == [f"UNFIXABLE existing-non-test-file {item}"]
+    absent = _cli(["classify", "--plan", str(plan_path), "--worktree", str(tmp_path)], item + "\n")
+    assert absent.stdout.splitlines() == [f"FIXABLE promised-file {item}"]

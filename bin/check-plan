@@ -1752,6 +1752,68 @@ _ab_is_durable() {
     done <<< "$_abd_rest"
     return 1
 }
+# _ab_stream_only <cell> — 0 when every negated grep in the cell reads a
+# stream (a `<<<` here-string, or stdin after a lone `|`) and names no file
+# operand. Such a grep checks a shell value, not a repo path, so there is no
+# absence to keep durable. One negated grep with a file operand or a `<`
+# redirect returns 1 and the row stays flagged. Any leftover word counts as
+# a file operand (fail-closed), and so does an unbalanced quote.
+_ab_stream_only() {
+    _abs_n=0
+    while IFS=$'\t' read -r _abs_sep _abs_seg; do
+        grep -qE "$_ab_seg_neg" <<< "${_abs_seg//\`/ }" || continue
+        _abs_n=$((_abs_n + 1))
+        _abs_words="$(printf '%s\n' "${_abs_seg//[\`()]/ }" | xargs -n1 printf '%s\n' 2>/dev/null)" || return 1
+        _abs_stream=0; [ "$_abs_sep" = P ] && _abs_stream=1
+        _abs_ops=0; _abs_e=0; _abs_skip=0; _abs_take=0; _abs_dd=0
+        while IFS= read -r _abs_w; do
+            [ -n "$_abs_w" ] || continue
+            if [ "$_abs_take" = 1 ]; then _abs_take=0; continue; fi
+            if [ "$_abs_skip" = 1 ]; then _abs_skip=0; continue; fi
+            if [ "$_abs_skip" = 2 ]; then _abs_skip=0; _abs_ops=$((_abs_ops + 1)); continue; fi
+            case "$_abs_w" in
+                '<<<') _abs_stream=1; _abs_skip=1; continue ;;
+                '<<<'*) _abs_stream=1; continue ;;
+                '<') _abs_skip=2; continue ;;
+                '<'*) _abs_ops=$((_abs_ops + 1)); continue ;;
+                '>'|'>>'|[0-9]'>'|[0-9]'>>'|'&>') _abs_skip=1; continue ;;
+                '>'*|[0-9]'>'*|'&>'*) continue ;;
+            esac
+            if [ "$_abs_dd" = 0 ]; then
+                case "$_abs_w" in
+                    '!'|grep|rg|git) continue ;;
+                    --) _abs_dd=1; continue ;;
+                    -e|--regexp) _abs_take=1; _abs_e=1; continue ;;
+                    --regexp=*) _abs_e=1; continue ;;
+                    -f|-m|-A|-B|-C|-d|-D|-g|-t|-T|-j|-M|--include|--exclude|--exclude-dir|--exclude-from|--glob|--type|--type-not|--max-count|--max-depth|--context|--replace) _abs_skip=1; continue ;;
+                    -[A-Za-z]*e) _abs_take=1; _abs_e=1; continue ;;
+                    -[A-Za-z]*[fmABCdDgtTjM]) _abs_skip=1; continue ;;
+                    -*) continue ;;
+                esac
+            fi
+            _abs_ops=$((_abs_ops + 1))
+        done <<< "$_abs_words"
+        # Without -e the first operand is the pattern.
+        [ "$_abs_e" = 1 ] || _abs_ops=$((_abs_ops - 1))
+        [ "$_abs_stream" = 1 ] && [ "$_abs_ops" -le 0 ] || return 1
+    done < <(awk '{
+        n = length($0); seg = ""; q = ""; sep = "-"
+        for (i = 1; i <= n; i++) {
+            c = substr($0, i, 1)
+            if (q != "") { seg = seg c; if (c == q) q = ""; continue }
+            if (c == "\047" || c == "\"") { q = c; seg = seg c; continue }
+            if (c == ";" || c == "&" || c == "|") {
+                print sep "\t" seg; seg = ""
+                lone = (c == "|" && substr($0, i - 1, 1) != "|" && substr($0, i + 1, 1) != "|")
+                sep = lone ? "P" : "-"
+                continue
+            }
+            seg = seg c
+        }
+        print sep "\t" seg
+    }' <<< "$1")
+    [ "$_abs_n" -gt 0 ]
+}
 while IFS= read -r row; do
     matrix_split "$row" || continue
     [ "$MC_NUM" != "#" ] || continue
@@ -1760,6 +1822,7 @@ while IFS= read -r row; do
     grep -qiE 'post-impl' <<< "$MC_TIME" || continue
     grep -qE "$_ab_neg" <<< "$MC_LOC" || continue
     grep -qE "$_y_shape" <<< "${MC_WHAT//$MSEN/|}" && continue
+    _ab_stream_only "$MC_LOC" && continue
     _ab_is_durable "$MC_LOC" && continue
     viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script, named by path in its own command and containing the grepped token), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
 done < "$GATEP_MATRIX"

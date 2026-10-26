@@ -72,6 +72,7 @@ from harness import merge_danger
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
+from harness import snapshot_regen
 from harness.review import ReviewPhase
 from harness import review_depth
 from harness import baseline_guard
@@ -3680,6 +3681,13 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _log_snapshot_regens(git, log) -> None:
+    worktree = getattr(git, "worktree", "") or ""
+    if worktree:
+        for line in snapshot_regen.pop_audit_lines(worktree):
+            log(f"phase2: {line}")
+
+
 def _phase2_rebase(git, res, log) -> tuple[str, str]:
     """Phase 2 merge of origin/master, shared by the full path and rebase-only mode.
 
@@ -3690,6 +3698,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
     pre_rebase = git.head()
     conflict_resolved = None
     try:
+        snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
         git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
         # A plain merge the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
@@ -3698,6 +3707,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         for path, cmd in getattr(git, "last_lockfile_regens", ()):
             log(f"phase2: lockfile regenerated: {path} via {cmd}")
+        _log_snapshot_regens(git, log)
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
@@ -3738,6 +3748,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             f"manifest={conflict_resolved.manifest_path} "
             f"notes={conflict_resolved.notes_path} "
             f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+        _log_snapshot_regens(git, log)
         for line in audit_lines_for_adaptations(
                 getattr(conflict_resolved, "adapted_lines", ())):
             log(f"phase2: {line}")

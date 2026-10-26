@@ -1,6 +1,6 @@
 ---
 description: The per-PR Infection job moves to its own workflow so it reports on every PR and can be a required check; branch protection gains it by a manual append-only POST with a checked read-back.
-last_verified: 2026-09-29
+last_verified: 2026-10-23
 owner: ajaynicolas
 ---
 
@@ -105,3 +105,11 @@ Supersedes the mechanism and the Activation block of ADR-0065. Precedent for the
 ## Addendum: activation body format (2026-09-29)
 
 The Activation and Rollback commands first used `-f 'contexts[]=Infection PHP (per-PR diff)'`. The POST returned an empty HTTP 500 twice and left protection unchanged. The same POST with a bare-array body through `--input -` returned 200, and the read-back printed `protection-readback: OK — 5 contexts`. Both blocks now use the bare-array form. The DELETE form is untested because the rollback was never needed.
+
+## Addendum: no-source guard (2026-10-23)
+
+The workflow set `git config diff.relative true` before running Infection. Infection then resolved the diff's `classes/X.php` paths against the repo root, matched no source file, printed `No source file found`, and exited 0. [#3443](https://github.com/a-jay85/IBL5/pull/3443) changed `ibl5/classes/Team/TeamView.php` and passed this required check with zero mutants.
+
+The workflow no longer sets that option. The Infection step tees its output to a log, returns Infection's own exit code when it is nonzero, and then runs `ibl5/bin/check-infection-ran`. The helper exits 5 when the log reports no source file, or no modified files or lines, for a diff that changes a class outside `source.excludes`. A diff that touches only excluded classes passes, because this context has no waive label. `bin/check-composite-contracts` M5 fails a workflow that sets the option or runs Infection without the helper.
+
+Six recent class-touching PRs replayed through the fixed local runner all reached 100% covered MSI, so `--min-msi=100` stays.

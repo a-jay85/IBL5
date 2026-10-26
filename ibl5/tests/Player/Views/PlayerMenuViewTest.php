@@ -7,11 +7,12 @@ namespace Tests\Player\Views;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageType;
 use Player\Views\PlayerMenuView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerMenuView */
 class PlayerMenuViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testNullCurrentPageTypeDefaultsToOverviewActive(): void
     {

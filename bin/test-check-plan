@@ -5188,7 +5188,7 @@ for L_CASE in overflow verbatim; do
 done
 
 # ---------------------------------------------------------------------------
-# Gate [AB] fixtures (32 assert_viol cases + 1 deny-message case)
+# Gate [AB] fixtures (34 assert_viol cases + 1 deny-message case)
 # A post-impl CLI-executable row with a negated grep must name a durable
 # in-repo check that contains the grepped token, or carry
 # (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
@@ -5204,8 +5204,12 @@ cp -R "$SCRIPT_DIR/lib" "$AB_REPO/bin/lib"
 mkdir -p "$AB_REPO/vendor/bin" "$AB_REPO/ibl5/tests/Ab" "$AB_REPO/.github/workflows"
 # Gate [G] wants every named bin/test-* wired in a workflow.
 printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bin/test-ab-other && ./bin/test-ab-dot' \
+    '      - run: $GITHUB_WORKSPACE/bin/test-ab-ws' \
+    '      - run: cd ibl5 && ../bin/test-ab-up' \
     > "$AB_REPO/.github/workflows/ab.yml"
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-dot"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-ws"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-up"
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
 printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
 printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-unwired"
@@ -5292,6 +5296,9 @@ ab_row "AB-fail-unwired-one-shot" 1 'bin/test-ab-unwired && ! grep -rq bgcolor2 
 ab_row "AB-fail-wired-prefix" 1 'bin/test-ab-hol && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
 # A workflow that runs the script as ./bin/... wires it.
 ab_row "AB-pass-wired-dot-slash" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-dot'
+# A workflow that runs the script behind any /-ending prefix wires it.
+ab_row "AB-pass-wired-workspace-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-ws'
+ab_row "AB-pass-wired-dotdot-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-up'
 # A clustered flag ending in e takes the next word as its pattern.
 ab_row "AB-pass-clustered-e" 0 "! grep -rqe 'bgcolor2' -e 'zzzz' ibl5/modules && bin/test-ab-holds"
 # Regex escapes and anchors do not stick to the token.

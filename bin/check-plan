@@ -1708,8 +1708,11 @@ _ab_path_ok() {
         bin/*)
             case "$2" in
                 *'(wired in this PR)'*) : ;;
+                # Whole-token match with gate [BX]'s left boundary: any path
+                # prefix ending in `/` is allowed (`./`, `../`,
+                # `$GITHUB_WORKSPACE/`), but a longer script name is not.
                 *) _abp_re="$(sed 's/[.]/\\./g' <<< "$_abp_p")"
-                   grep -rqE -- "(^|[^A-Za-z0-9_./-]|[^A-Za-z0-9_./-]\./|\}/)${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
+                   grep -rqE -- "(^|[^A-Za-z0-9_.-])([^[:space:]\`]*/)?${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
             esac ;;
     esac
     grep -qxF -- "$_abp_p" <<< "$_ab_cf" && return 0

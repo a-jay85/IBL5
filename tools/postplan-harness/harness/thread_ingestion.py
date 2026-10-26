@@ -27,6 +27,11 @@ GATE_HOLD_CATEGORY = "gate-path"
 GATE_HOLD_MARKER = "<!-- postplan-gate-hold -->"
 ORIGIN_PRE_EXISTING = "pre-existing"
 ORIGIN_SAME_RUN = "same-run"
+# Phase 4.5 (pre-existing origin) takes at most this many OUTDATED trusted threads
+# per run, oldest commentId first. Current (non-outdated) threads are never capped.
+# Deferred outdated threads stay open and keep holding arming condition (11); the
+# next re-run drains more. 12 covers the largest back-test PR (#3382: 8 outdated).
+MAX_OUTDATED_PER_PASS = 12
 
 
 def _is_trusted(login: str, typename: str) -> bool:
@@ -49,12 +54,14 @@ def _is_gate_held(thread: dict) -> bool:
     return _is_trusted(thread.get("lastAuthorLogin") or "", thread.get("lastAuthorType") or "")
 
 
-def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> list[dict] | None:
+def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None, include_outdated: bool = False) -> list[dict] | None:
     """Open, current, trusted threads whose id is in the candidate id set.
 
     ``pre_posting_ids`` is the candidate id set: the pre-posting snapshot for the
     pre-existing pass, this run's new ids for the same-run pass. ``keep`` is an optional
     per-row predicate applied after the trust check, so it never sees an untrusted row.
+    ``include_outdated`` keeps trusted outdated threads (their ``line`` is null); the
+    default drops them, matching the shell default.
     """
     # None = cap/API failure: caller skips ingestion; condition (11) keeps the hold.
     if not pre_posting_ids:
@@ -62,7 +69,7 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
         # second prf_review_threads query is dead work. Mirrors the skill path's
         # `[ -s "$PRE4D_IDS" ]` skip in _phase-4-review-audit.md section 4.5.
         return []
-    rows = gh.trusted_open_threads(pr)
+    rows = gh.trusted_open_threads(pr, include_outdated=include_outdated)
     if rows is None:
         return None
     kept = []
@@ -70,7 +77,9 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
         cid = t.get("commentId")
         if cid is None or int(cid) not in pre_posting_ids:
             continue
-        if t.get("isResolved") or t.get("isOutdated"):
+        if t.get("isResolved"):
+            continue
+        if t.get("isOutdated") and not include_outdated:
             continue
         if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
             continue
@@ -79,9 +88,24 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None) -> li
             continue
         if keep is not None and not keep(t):
             continue
-        kept.append({k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent",
-                                            "lastBody", "lastAuthorLogin", "lastAuthorType")})
+        row = {k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent",
+                                      "lastBody", "lastAuthorLogin", "lastAuthorType")}
+        row["outdated"] = bool(t.get("isOutdated"))
+        kept.append(row)
     return kept
+
+
+def cap_outdated(rows: list[dict], limit: int = MAX_OUTDATED_PER_PASS) -> tuple[list[dict], int]:
+    """Return (rows to action, deferred_outdated).
+
+    Current rows pass through in their original order and are never capped. Outdated
+    rows are sorted by commentId ascending (oldest first) and only the first ``limit``
+    are kept; the rest are deferred and counted. Current rows come before outdated
+    rows in the result so a cap never starves a thread with a live anchor.
+    """
+    current = [r for r in rows if not r.get("outdated")]
+    outdated = sorted((r for r in rows if r.get("outdated")), key=lambda r: int(r["commentId"]))
+    return current + outdated[:limit], max(0, len(outdated) - limit)
 
 
 def result_basename(origin: str) -> str:

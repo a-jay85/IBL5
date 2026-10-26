@@ -93,9 +93,9 @@ class _CountingGh(RecordingGh):
         super().__init__(out_dir, fixture)
         self.trusted_calls = 0
 
-    def trusted_open_threads(self, pr):
+    def trusted_open_threads(self, pr, include_outdated=False):
         self.trusted_calls += 1
-        return super().trusted_open_threads(pr)
+        return super().trusted_open_threads(pr, include_outdated=include_outdated)
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +128,7 @@ def test_fetch_keeps_only_snapshot_ids(tmp_path):
 
 
 def test_fetch_python_recheck_drops_untrusted_and_outdated(tmp_path):
+    """Pins include_outdated's default (False): outdated rows are dropped unless a caller opts in."""
     untrusted = dict(THREAD_2340, authorLogin="stranger")
     outdated = dict(THREAD_2340, isOutdated=True, commentId=4074926172)
     # Both are in the snapshot but should be dropped by the Python re-checks
@@ -708,7 +709,7 @@ def test_resolve_failure_after_fix_counts_as_skipped_and_loop_continues(tmp_path
     resolve_calls: list[int] = []
 
     class _FailOnceGh:
-        def trusted_open_threads(self, pr):
+        def trusted_open_threads(self, pr, include_outdated=False):
             return [thread_a, thread_b]
 
         def resolve_review_thread(self, pr, cid, body):
@@ -1272,3 +1273,104 @@ def test_fetch_trusted_threads_keeps_important_marker_and_late_marker(tmp_path):
     gh = _gh(tmp_path, {"trusted_threads": [imp, late]})
     result = fetch_trusted_threads(gh, PR, pre_posting_ids={4, 5})
     assert sorted(t["commentId"] for t in result) == [4, 5]
+
+
+# ── include_outdated flag and the outdated cap (postplan-rerun-stale-threads) ──
+from types import SimpleNamespace
+
+from harness.thread_ingestion import MAX_OUTDATED_PER_PASS, cap_outdated, fetch_trusted_threads
+
+
+class _FlagGh:
+    def __init__(self, rows):
+        self.rows = rows
+        self.flags = []
+
+    def trusted_open_threads(self, pr, include_outdated=False):
+        self.flags.append(include_outdated)
+        return self.rows
+
+
+def _row(cid, *, login="a-jay85", typename="User", outdated=True, resolved=False, body="Old finding"):
+    return {"commentId": cid, "path": "bin/automouse/prompt-impl", "line": None if outdated else 5,
+            "body": body, "score": None, "authorLogin": login, "authorType": typename,
+            "isResolved": resolved, "isOutdated": outdated, "agent": None,
+            "lastBody": body, "lastAuthorLogin": login, "lastAuthorType": typename}
+
+
+def test_fetch_include_outdated_keeps_trusted_outdated_rows():
+    gh = _FlagGh([_row(601, outdated=False), _row(605)])
+    kept = fetch_trusted_threads(gh, 42, {601, 605}, include_outdated=True)
+    assert [r["commentId"] for r in kept] == [601, 605]
+    assert [r["outdated"] for r in kept] == [False, True]
+    assert kept[1]["line"] is None
+
+
+def test_fetch_include_outdated_still_drops_untrusted_outdated():
+    gh = _FlagGh([_row(611, login="stranger"), _row(605)])
+    kept = fetch_trusted_threads(gh, 42, {611, 605}, include_outdated=True)
+    assert [r["commentId"] for r in kept] == [605]
+
+
+def test_fetch_default_forwards_include_outdated_false():
+    gh = _FlagGh([_row(605)])
+    assert fetch_trusted_threads(gh, 42, {605}) == []
+    assert gh.flags == [False]
+
+
+def test_fetch_include_outdated_returns_none_on_gh_failure():
+    gh = _FlagGh(None)
+    assert fetch_trusted_threads(gh, 42, {605}, include_outdated=True) is None
+
+
+def test_fetch_include_outdated_still_drops_resolved():
+    gh = _FlagGh([_row(606, resolved=True), _row(605)])
+    kept = fetch_trusted_threads(gh, 42, {606, 605}, include_outdated=True)
+    assert [r["commentId"] for r in kept] == [605]
+
+
+def test_fetch_include_outdated_still_drops_non_holding_labels():
+    gh = _FlagGh([_row(607, body="<!-- label: nit -->\nOld nit"), _row(605)])
+    kept = fetch_trusted_threads(gh, 42, {607, 605}, include_outdated=True)
+    assert [r["commentId"] for r in kept] == [605]
+
+
+def test_cap_outdated_defers_thirteenth():
+    rows = [{"commentId": 700 + i, "outdated": True} for i in range(MAX_OUTDATED_PER_PASS + 1)]
+    kept, deferred = cap_outdated(rows)
+    assert len(kept) == MAX_OUTDATED_PER_PASS
+    assert deferred == 1
+
+
+def test_cap_outdated_keeps_oldest_first():
+    ids = [712, 700, 705, 711, 701, 710, 702, 709, 703, 708, 704, 707, 706]
+    kept, deferred = cap_outdated([{"commentId": i, "outdated": True} for i in ids])
+    assert [r["commentId"] for r in kept] == list(range(700, 712))
+    assert deferred == 1
+
+
+def test_cap_outdated_never_caps_current_rows():
+    current = [{"commentId": 800 + i, "outdated": False} for i in range(15)]
+    outdated = [{"commentId": 650, "outdated": True}]
+    kept, deferred = cap_outdated(outdated + current)
+    assert [r["commentId"] for r in kept] == [800 + i for i in range(15)] + [650]
+    assert deferred == 0
+
+
+def test_live_gh_passes_include_outdated_flag_to_prf(monkeypatch):
+    from harness.adapters import ghad, llm
+    seen = []
+
+    def fake_run(argv, *a, **k):
+        seen.append(list(argv))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(llm, "_run_reaped", fake_run)
+    gh = ghad.LiveGh.__new__(ghad.LiveGh)
+    gh.timeout = 5
+    gh.worktree = None
+    gh.trusted_open_threads(42)
+    gh.trusted_open_threads(42, include_outdated=True)
+    assert seen[0][-1] == "42" and "--include-outdated" not in seen[0]
+    assert seen[1][-2:] == ["42", "--include-outdated"]
+    assert seen[1][2] == 'source "$1"; "$2" "$3" "${@:4}"'

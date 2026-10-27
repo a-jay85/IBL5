@@ -367,6 +367,10 @@ jobs:
       # tree. Only gitignored runtime files (vendor/, generated config) are copied
       # into the base tree. Any failure leaves the row after-only. Keeps the
       # update-baselines guard: a `setup=` mutation must never precede the regen.
+      # ibl5/logs/ is never copied: the after pass's log files land runner-owned and
+      # read-only for www-data, so the base app's first log write (login_success)
+      # threw and every login POST answered 500. A failed run prints an ::error::
+      # and the base container's log so an after-only result is never silent.
       - name: Capture manual-row before screenshots on the base SHA
         if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         continue-on-error: true
@@ -379,17 +383,21 @@ jobs:
           set -euo pipefail
           [ "$(jq '.rows | length' ibl5/vr-manual-rows.json 2>/dev/null || echo 0)" -gt 0 ] || exit 0
           BASE="$RUNNER_TEMP/vr-base"
-          cleanup() { docker rm -f php-base >/dev/null 2>&1 || true; git worktree remove --force "$BASE" || true; }
+          cleanup() {
+            docker exec php-base chown -R "$(id -u):$(id -g)" /var/www/html/ibl5 >/dev/null 2>&1 || true
+            docker rm -f php-base >/dev/null 2>&1 || true
+            git worktree remove --force "$BASE" || true
+          }
           trap cleanup EXIT
           git worktree add --detach "$BASE" "${{ github.event.pull_request.base.sha }}"
           git ls-files -z --others --ignored --exclude-standard --directory -- ibl5 \
-            | grep -zvE '^ibl5/(node_modules|vr-[^/]*|test-results|playwright-report)/?$' \
+            | grep -zvE '^ibl5/((node_modules|vr-[^/]*|test-results|playwright-report)/?$|logs/)' \
             | rsync -a -r --from0 --files-from=- ./ "$BASE/"
           docker run -d --name php-base --network ibl5-e2e --network-alias php-base \
             -e DB_HOST=mariadb -e E2E_TESTING=1 \
             -v "$BASE/ibl5:/var/www/html/ibl5" ghcr.io/a-jay85/ibl5/php-apache:latest
           for i in $(seq 1 30); do docker exec php-base curl -sf http://localhost/ibl5/ >/dev/null && break; sleep 2; done
-          docker run --rm \
+          if ! docker run --rm \
             --network ibl5-e2e \
             --user "$(id -u):$(id -g)" \
             -v "${{ github.workspace }}/ibl5:/ibl5" \
@@ -402,7 +410,11 @@ jobs:
             -e "IBL_TEST_PASS_REGULAR=$IBL_TEST_PASS_REGULAR" \
             -e "HOME=/tmp" \
             "$PW_IMAGE" \
-            npx playwright test --config=playwright.manual-rows.config.ts
+            npx playwright test --config=playwright.manual-rows.config.ts; then
+            docker logs --tail 60 php-base 2>&1 || true
+            echo "::error::Manual-row before pass failed on the base SHA; every row stays after-only. Base container log above."
+            exit 1
+          fi
 
       # --- Visual-review publishing (change-driven, every PR run) ---
       # Fires on pass OR fail (the gallery's "before" is `git show base.sha:<snapshot>`,

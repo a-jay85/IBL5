@@ -127,6 +127,43 @@ function mutateStep(yaml: string, name: string, fn: (block: string) => string): 
   return yaml.slice(0, at) + next + yaml.slice(at + block.length);
 }
 
+const BEFORE_PASS = 'Capture manual-row before screenshots on the base SHA';
+
+// The base-SHA before pass copies gitignored runtime files into the base tree.
+// Copying ibl5/logs/ hands www-data runner-owned log files it cannot append to,
+// so the base app's login_success log write threw and every login answered 500
+// (demo PR #3586). The pass must also fail loudly, never silently after-only.
+function beforePassViolations(yaml: string): string[] {
+  const s = e2eSteps(yaml).find((x) => x.name === BEFORE_PASS);
+  if (!s) return [`missing: ${BEFORE_PASS}`];
+  const out: string[] = [];
+  const filter = /grep -zvE '([^']+)'/.exec(s.body)?.[1];
+  if (filter === undefined) out.push('no-filter');
+  else {
+    const re = new RegExp(filter);
+    if (!re.test('ibl5/logs/ibl5-auth-2026-10-27.log')) out.push('copies-logs');
+    if (re.test('ibl5/config.php') || re.test('ibl5/vendor/')) out.push('drops-runtime');
+  }
+  if (!s.body.includes('::error::')) out.push('silent-failure');
+  return out;
+}
+
+describe('beforePassViolations', () => {
+  it('13a: the real workflow has no violations', () => {
+    expect(beforePassViolations(REAL)).toEqual([]);
+  });
+
+  it('13b: dropping the logs/ exclusion is reported', () => {
+    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace('|logs/)', ')'));
+    expect(beforePassViolations(mutant)).toEqual(['copies-logs']);
+  });
+
+  it('13c: dropping the ::error:: line is reported', () => {
+    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace('::error::', '::notice::'));
+    expect(beforePassViolations(mutant)).toEqual(['silent-failure']);
+  });
+});
+
 describe('publishStepViolations', () => {
   it('12a: the real workflow has no violations', () => {
     expect(publishStepViolations(REAL)).toEqual([]);

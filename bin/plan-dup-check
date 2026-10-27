@@ -62,8 +62,14 @@ decline() {  # $1=label $2=artifact path $3=recovery command
 
 exists() { [ -e "$1" ] || [ -L "$1" ]; }   # -L so a dangling symlink still counts
 
-if exists "$NIGHTLY_DIR/queue/$SLUG.md"; then
-    decline "Queued for automouse" "$NIGHTLY_DIR/queue/$SLUG.md" \
+# A queue entry is NNN-<slug>.md; a bare <slug>.md is a not-yet-normalized
+# legacy entry. Either one means the slug is queued.
+QUEUED=""
+for f in "$NIGHTLY_DIR/queue/$SLUG.md" "$NIGHTLY_DIR"/queue/[0-9][0-9][0-9]-"$SLUG".md; do
+    if exists "$f"; then QUEUED=$f; break; fi
+done
+if [ -n "$QUEUED" ]; then
+    decline "Queued for automouse" "$QUEUED" \
         "bin/automouse/queue remove $SLUG"
     exit 3
 fi

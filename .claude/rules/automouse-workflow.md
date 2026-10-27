@@ -18,6 +18,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Show queue | `bin/automouse/queue` (no args) |
 | Triage skipped/failed/paused/held/forced plans | `bin/automouse/queue status` |
 | Remove a plan from queue | `bin/automouse/queue remove <slug>` |
+| Reorder / dispose | `queue reorder <slug>…` · `queue dispose <slug> <done\|skipped>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
 | Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, or tomorrow if that time has passed; TZ to local) |
@@ -42,18 +43,15 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
-  queue/    symlinks to ~/claude-plans/*.md (oldest mtime runs first; queuing and
-            requeuing stamp the new entry to the BACK — only `queue reorder`
-            changes relative order)
-  done/     symlinks moved here after successful execution, or when the impl agent
-            detects the plan is already merged (its work shipped under a prior PR)
+  queue/    NNN-<slug>.md symlinks to ~/claude-plans/ (run order below)
+  done/     symlinks moved here after success, or when the impl agent finds the plan
+            already merged under a prior PR
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
   reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md
-            and YYYY-MM-DD-canary-park.md — no -<slug> suffix, written at plan boundaries when the
-            master health check fails; there is no current plan at a boundary so no slug applies);
-            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by bin/automouse/run
+            and YYYY-MM-DD-canary-park.md, slug-less, written at a plan boundary when the
+            master health check fails); plus YYYY-MM-DD-costs.md (per-phase cost roll-up)
   logs/     claude -p output logs + launchd stdout/stderr
   force-overrides.log  one line per `queue --force` add
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
@@ -74,9 +72,13 @@ Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.m
 
 At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged by their *own* mtime and still resolve after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
-**Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
-`bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
-move it. `queue`/`queue reorder` stamp the link (`touch -h`).
+Archival mtimes never affect run order.
+
+**Run order is the entry's `NNN-` prefix** (`queue_entries`, `bin/lib/automouse-queue-order.sh`).
+Editing a plan never moves it. Enqueue appends +10; `reorder`/`renumber` rename to 010,
+020, …. `normalize_queue` prefixes legacy bare entries once (old mtime order). Move
+entries only with `queue dispose` (strips the prefix): `done/`, `skipped/`, locks and
+sidecars use `<slug>.md`.
 
 ### Self-heal
 

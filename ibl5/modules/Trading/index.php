@@ -16,36 +16,13 @@ $op      = is_string($_REQUEST['op']      ?? null) ? $_REQUEST['op']      : '';
 $partner = is_string($_REQUEST['partner'] ?? null) ? $_REQUEST['partner'] : null;
 
 $pagetitle = "- Team Pages";
+global $user;
 
-global $mysqli_db, $authService, $user;
-/** @var \mysqli $mysqli_db */
-/** @var \Auth\Contracts\AuthServiceInterface $authService */
-
-$httpRequest = \Http\HttpRequest::fromGlobals();
-$serverNameRaw = $httpRequest->server('SERVER_NAME');
+$services = \Module\ModuleServices::current();
+$serverNameRaw = $services->request()->server('SERVER_NAME');
 $serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
-$teamIdentityRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$offerRepo = new \Trading\TradeOfferRepository($mysqli_db, $serverName);
-$assetRepo = new \Trading\TradeAssetRepository($mysqli_db);
-$formRepo = new \Trading\TradeFormRepository($mysqli_db);
-$cashRepo = new \Trading\TradeCashRepository($mysqli_db);
-$offerGrouper = new \Trading\TradeOfferGrouper($assetRepo, $cashRepo);
-$futureSalaryCalc = new \Trading\FutureSalaryCalculator();
-$service = new \Trading\TradingService($offerRepo, $formRepo, $teamIdentityRepo, $mysqli_db, $offerGrouper, $futureSalaryCalc);
-$processor = new \Trading\TradeProcessor($mysqli_db, $teamIdentityRepo, $serverName, $offerRepo, $assetRepo);
-$tradeOffer = new \Trading\TradeOffer($mysqli_db, $teamIdentityRepo, $serverName);
-$view = new \Trading\TradingView();
-$nukeCompat = new \Utilities\NukeCompat();
-$validator = new \Trading\TradeValidator($mysqli_db);
-$salaryCapRepo = new \Repositories\SalaryCapRepository($mysqli_db);
-$season = \Season\SharedSeason::get($mysqli_db);
-$executionService = new \Trading\TradeExecutionService(
-    $offerRepo, $processor, $validator, $salaryCapRepo, $teamIdentityRepo, $cashRepo, $season
-);
-$controller = new \Trading\TradingController(
-    $service, $offerRepo, $tradeOffer, $view,
-    $teamIdentityRepo, $nukeCompat, $mysqli_db, $executionService, $authService
-);
+$factory = $services->factory(\Module\Factories\TradingFactory::class);
+$controller = $factory->controller($serverName);
 
 switch ($op) {
     case "reviewtrade":

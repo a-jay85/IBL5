@@ -16,9 +16,6 @@
 
 declare(strict_types=1);
 
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
@@ -27,10 +24,11 @@ $module_name = basename(dirname(__FILE__));
 $pagetitle = "- $module_name";
 
 // Initialize components
-$repository = new TeamOffDefStats\TeamOffDefStatsRepository($mysqli_db);
-$service = new TeamOffDefStats\TeamOffDefStatsService();
-$view = new TeamOffDefStats\TeamOffDefStatsView();
-$season = \Season\SharedSeason::get($mysqli_db);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TeamOffDefStatsFactory::class);
+$repository = $factory->repository();
+$service = $factory->service();
+$view = $factory->view();
+$season = $factory->season();
 
 // Fetch and process data
 $gameTypes = TeamOffDefStats\TeamOffDefStatsRepository::gameTypesForPhase($season->phase);

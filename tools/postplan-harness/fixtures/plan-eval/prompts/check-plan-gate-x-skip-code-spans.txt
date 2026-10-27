@@ -1,0 +1,31 @@
+Weaken bin/check-plan gate [X] so (no-change) inside backtick code spans and fenced fixture blocks no longer produces a violation (gate weakening: input the gate previously rejected now passes), closing a-jay85/IBL5-backlog#1233.
+
+## Exploration pointers
+- a-jay85/IBL5-backlog#1233 — the issue body carries the full fix recipe (3 parts) and the two false-positive shapes. Read it first (`gh issue view 1233 -R a-jay85/IBL5-backlog`).
+- bin/check-plan:937-957 (origin/master) — Gate X loop. Line 946 `grep -qiF '(no-change)' <<< "$row"` tests the raw row, so a backticked `(no-change)` in a PHPUnit row description trips it. It reads `$MATRIX_FILE`, which has no fence-delimiter lines.
+- bin/check-plan:210 — gate letter index comment for X.
+- tools/postplan-harness/harness/planfile.py — `parse_no_change_test_paths` is the harness side Gate X mirrors; planfile.py:397-401 is the isolation logic the issue compares against; planfile.py:135 `_is_test_path` drops tokens without a path separator.
+- PR https://github.com/a-jay85/IBL5/pull/2536 — origin; its own plan produced 7 false violations (a ready-made corpus sample).
+
+## Resolved design decisions
+- Liveness confirmed 2026-09-30: origin/master bin/check-plan:946 still greps the raw row. Shape 2 (fenced fixture blocks re-collected into $MATRIX_FILE) is unverified — verify it with a real run before designing that half.
+- Keep the original row for the whole-cell Visual-regression check and the position check (line 952). Strip backtick spans only from the copy used for "has a marker".
+- The "marker after a second backticked token" shape must still emit a violation (fails safe). The fix must not exempt it.
+- Do not change planfile.py semantics; this is the check-plan gate only, unless the premise scan shows the harness parser has the same bug.
+
+## Scope
+1. Gate X ignores `(no-change)` that appears only inside backtick code spans.
+2. Gate X derives its rows from $PLAN_FILE with explicit fence tracking so fenced fixture blocks are excluded.
+3. Test cases in the check-plan test suite for both false-positive shapes plus the still-rejected shapes (non-VR row with a bare marker, marker after a second backticked token).
+Out of scope: the row-19 `x.spec.ts-snapshots` token note in the issue (a separate `_is_test_path` concern); any other gate.
+
+## Hard constraints
+Verify the issue's premise with a real scan or run before designing. Resolve migration numbers at implement time. Base on master. Do not touch these files held by other batch items: `bin/cleanup`, `bin/docfix-poll`, `bin/merge-master-to-prod`, `bin/merge-line-watch`, `.claude/rules/automouse-workflow.md`, `bin/post-plan-now`. Emit `## Backlog issues` with `closes a-jay85/IBL5-backlog#1233`. A parser or gate change carries a corpus diff in its verification.
+
+## Verification
+- Corpus diff: run old vs new bin/check-plan over every `~/claude-plans/*.md` (and `_archive/` if present); every Gate X verdict change must be a removed false positive of shape 1 or 2. Zero new violations, zero removed true positives.
+- The new test cases fail on origin/master's bin/check-plan and pass after the change.
+
+
+## Sequencing
+Slug `check-plan-gate-x-skip-code-spans`, base master.

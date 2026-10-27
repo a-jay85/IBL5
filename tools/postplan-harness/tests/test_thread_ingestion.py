@@ -981,18 +981,6 @@ def _repo_root_for_parity():
     return os.path.dirname(os.path.dirname(os.path.dirname(here)))
 
 
-def test_skill_phase45_parity_stays_pre_existing_only():
-    path = os.path.join(_repo_root_for_parity(), ".claude", "skills", "post-plan",
-                        "_phase-4-review-audit.md")
-    if not os.path.exists(path):
-        pytest.skip("skill file removed by #3367; harness is the only engine")
-    text = open(path).read()
-    block = text.split("# phase 4.5 remediate", 1)[1].split("```", 1)[0]
-    assert 'origin: "pre-existing"' in block
-    assert ". as $t |" in block and "$t.commentId" in block
-    assert "does not remediate same-run threads" in text
-
-
 def test_posting_procedure_parity_names_both_origins():
     from harness import thread_ingestion as ti
     root = _repo_root_for_parity()
@@ -1000,11 +988,6 @@ def test_posting_procedure_parity_names_both_origins():
     assert ti.ORIGIN_PRE_EXISTING in text
     assert ti.ORIGIN_SAME_RUN in text
     assert "so a run never dispositions its own fresh findings" not in text
-    skill = os.path.join(root, ".claude", "skills", "post-plan", "_phase-4-review-audit.md")
-    if os.path.exists(skill):
-        skill_text = open(skill).read()
-        assert ti.ORIGIN_PRE_EXISTING in skill_text
-        assert ti.ORIGIN_SAME_RUN in skill_text
 
 
 # ---------------------------------------------------------------------------

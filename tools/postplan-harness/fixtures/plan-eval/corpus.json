@@ -1,0 +1,147 @@
+{
+  "cases": [
+    {
+      "base_sha": "f6b9dfa2fc2f08a02a4993899626de5fd029e011",
+      "core": true,
+      "expected_files": [
+        ".github/workflows/tests.yml",
+        "ibl5/IBLbot/src/bug-bot/ecosystem-config.test.ts"
+      ],
+      "id": "bug-pipeline-e2e-guard-tests",
+      "merge_sha": "cab764d1651d54b03a11f2e66690ff3f9e3b8137",
+      "pr": 2609,
+      "prompt": "prompts/bug-pipeline-e2e-guard-tests.txt",
+      "tier": "plan-architect"
+    },
+    {
+      "base_sha": "f28a78842d0d4b8f2b6f064a948154ef67e9b2bb",
+      "core": false,
+      "expected_files": [
+        "bin/test-bug-pipeline-hunt",
+        "bin/test-bug-pipeline-tick"
+      ],
+      "id": "bug-pipeline-nonce-tags",
+      "merge_sha": "b5b4492af9f4a0d05da8d049c1c7d0416deba484",
+      "pr": 2521,
+      "prompt": "prompts/bug-pipeline-nonce-tags.txt",
+      "tier": "plan-architect-xhigh"
+    },
+    {
+      "base_sha": "467e2019e167ff435ac19cc46ccd82affdc883da",
+      "core": true,
+      "expected_files": [
+        ".claude/review-shared/_plan-verification.md",
+        "bin/test-check-plan"
+      ],
+      "id": "check-plan-gate-x-skip-code-spans",
+      "merge_sha": "7e39a2e77abe0c20aed917cfa7c935178e095e98",
+      "pr": 2576,
+      "prompt": "prompts/check-plan-gate-x-skip-code-spans.txt",
+      "tier": "plan-architect-xhigh"
+    },
+    {
+      "base_sha": "7359d80de4b6416adfb0ff23d83459847dc52d21",
+      "core": false,
+      "expected_files": [
+        "ibl5/design/base.css",
+        "ibl5/design/components/navigation.css",
+        "ibl5/tests/e2e/smoke/focus-visible-reduced-motion.spec.ts"
+      ],
+      "id": "css-focus-visible-reduced-motion",
+      "merge_sha": "b31a7de96f88eb108c8f075fbc8f304c8bd3da86",
+      "pr": 3069,
+      "prompt": "prompts/css-focus-visible-reduced-motion.txt",
+      "tier": "plan-architect-sonnet"
+    },
+    {
+      "base_sha": "cab764d1651d54b03a11f2e66690ff3f9e3b8137",
+      "core": false,
+      "expected_files": [
+        ".github/workflows/tests.yml",
+        "bin/lib/README.md",
+        "bin/lib/restore-rowcount-compare.sh",
+        "bin/test-restore-rowcount-compare"
+      ],
+      "id": "db-backup-restore-rowcount-check",
+      "merge_sha": "dfeea780d118099be91c5d4f071cf3a495fe0282",
+      "pr": 2610,
+      "prompt": "prompts/db-backup-restore-rowcount-check.txt",
+      "tier": "plan-architect"
+    },
+    {
+      "base_sha": "f2f2341868b483c648244f6847539c1b2091bef9",
+      "core": false,
+      "expected_files": [
+        "ibl5/docs/decisions/0086-runnerless-mac-poll-for-stale-docs-remediation.md",
+        "ibl5/docs/decisions/0104-verification-only-doc-refresh-auto-merge.md"
+      ],
+      "id": "docfix-veronly-claude-date-bumps",
+      "merge_sha": "7cc040638e7496cf776d9873152c701a299dc89b",
+      "pr": 2577,
+      "prompt": "prompts/docfix-veronly-claude-date-bumps.txt",
+      "tier": "plan-architect-xhigh"
+    },
+    {
+      "base_sha": "03950fd9785c0d849eafa22605eca3643ae57ae3",
+      "core": false,
+      "expected_files": [
+        "bin/automouse/prompt-impl",
+        "bin/automouse/prompt-postplan",
+        "bin/test-automouse-postplan-worktree"
+      ],
+      "id": "harness-malformed-handoff",
+      "merge_sha": "d560dbbdc7c39ef90a2753a4553143941e7289e4",
+      "pr": 2452,
+      "prompt": "prompts/harness-malformed-handoff.txt",
+      "tier": "plan-architect"
+    },
+    {
+      "base_sha": "bf366f4a6e1121562b2eb38e334fed956c231541",
+      "core": true,
+      "expected_files": [
+        "tools/postplan-harness/runner.py",
+        "tools/postplan-harness/tests/test_verdict_line.py"
+      ],
+      "id": "harness-slash-branch-result-line",
+      "merge_sha": "d40e338e3068a8ace7a313c689a377042ebdcba9",
+      "pr": 2448,
+      "prompt": "prompts/harness-slash-branch-result-line.txt",
+      "tier": "plan-architect"
+    },
+    {
+      "base_sha": "617769cb9c1bceabc96ddf941c0247b3379124c8",
+      "core": false,
+      "expected_files": [
+        ".claude/rules/ci-gotchas.md",
+        ".claude/rules/engine-go.md",
+        ".github/workflows/mutation-pr.yml",
+        "bin/check-composite-contracts",
+        "bin/test-check-composite-contracts",
+        "ibl5/docs/decisions/0065-mutation-testing-required-gate.md",
+        "ibl5/docs/decisions/0145-mutation-pr-required-own-workflow.md",
+        "ibl5/docs/decisions/README.md"
+      ],
+      "id": "mutation-required-check",
+      "merge_sha": "96f55a5f7c905a016ce4de3916cabf8e9b987934",
+      "pr": 2534,
+      "prompt": "prompts/mutation-required-check.txt",
+      "tier": "plan-architect"
+    },
+    {
+      "base_sha": "201497688fc38fecf1bd1d08b6a44583a543ff7c",
+      "core": true,
+      "expected_files": [
+        "ibl5/tests/DatabaseIntegration/PlayerRecordRepositoryTest.php",
+        "ibl5/tests/DatabaseIntegration/RecordAnnouncementRepositoryTest.php",
+        "ibl5/tests/DatabaseIntegration/TeamRecordRepositoryTest.php"
+      ],
+      "id": "recordholders-repository-tests",
+      "merge_sha": "8ea15dd1a441260efff74e5d3a241c2ca479ee31",
+      "pr": 3076,
+      "prompt": "prompts/recordholders-repository-tests.txt",
+      "tier": "plan-architect-sonnet"
+    }
+  ],
+  "schema_version": 1,
+  "window_days": 14
+}

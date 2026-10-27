@@ -66,6 +66,8 @@ class ReplayResult:
     gate: str
     outcome: str     # "flag" | "pass" | "error" | "timeout" | "skipped"
     detail: str      # first flagged stdout line, rc, or skip reason, max 160 chars
+    base_outcome: str = ""   # "", flag, pass, absent, error, timeout
+    base_detail: str = ""
 
 
 # --- Replay-spec registry --------------------------------------------------------------------
@@ -414,6 +416,7 @@ class GateTally:
     catches: list[int] | None = None
     false_flags: list[int] | None = None
     unsettled_flags: list[int] | None = None
+    pre_existing: list[int] | None = None
     skipped: int = 0
     errors: int = 0
     first_error: str = ""
@@ -422,6 +425,7 @@ class GateTally:
         self.catches = self.catches if self.catches is not None else []
         self.false_flags = self.false_flags if self.false_flags is not None else []
         self.unsettled_flags = self.unsettled_flags if self.unsettled_flags is not None else []
+        self.pre_existing = self.pre_existing if self.pre_existing is not None else []
 
 
 @dataclass(frozen=True)
@@ -452,7 +456,10 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             if state == "repaired":
                 tally.catches.append(r.pr)
             elif state == "clean":
-                tally.false_flags.append(r.pr)
+                if r.base_outcome == "flag":
+                    tally.pre_existing.append(r.pr)
+                else:
+                    tally.false_flags.append(r.pr)
             else:
                 tally.unsettled_flags.append(r.pr)
     return tally
@@ -526,21 +533,28 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     catches: list[int] = []
     false_flags: list[int] = []
     unsettled: list[int] = []
+    pre_existing: list[int] = []
     if verdict.per_gate:
-        lines += ["| Gate | Replayed | Catches | False flags | Unsettled flags | Skipped | Errors |",
-                  "|------|----------|---------|-------------|-----------------|---------|--------|"]
+        lines += ["| Gate | Replayed | Catches | False flags | Pre-existing flags | Unsettled flags "
+                  "| Skipped | Errors |",
+                  "|------|----------|---------|-------------|--------------------|"
+                  "-----------------|---------|--------|"]
         for path, t in verdict.per_gate.items():
             lines.append(f"| `{_clean(path)}` | {t.replayed} | {len(t.catches)} | "
-                         f"{len(t.false_flags)} | {len(t.unsettled_flags)} | {t.skipped} | "
-                         f"{t.errors} |")
+                         f"{len(t.false_flags)} | {len(t.pre_existing)} | "
+                         f"{len(t.unsettled_flags)} | {t.skipped} | {t.errors} |")
             catches += t.catches
             false_flags += t.false_flags
+            pre_existing += t.pre_existing
             unsettled += t.unsettled_flags
         lines.append("")
     if catches:
         lines.append("- Catches: " + _numbers(catches, truth))
     if false_flags:
         lines.append("- False flags: " + _numbers(false_flags))
+    if pre_existing:
+        lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
+                     + _numbers(pre_existing))
     if unsettled:
         lines.append("- Unsettled flags: " + _numbers(unsettled))
     for label, state in (("Not replayable", "not-replayable"), ("Unspecified", "unspecified"),

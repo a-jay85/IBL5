@@ -313,6 +313,13 @@ def test_verdict_cleared_below_threshold():
     assert v.per_gate["bin/check-foo"].false_flags == [10]
 
 
+def test_head_flag_without_base_outcome_counts_as_false_flag():
+    res = _results("bin/check-foo", _passes(1, 6) + [(10, "flag"), (11, "flag")])
+    v = compute_verdict([_g()], res, _truth(clean=range(1, 12)))
+    assert v.state == "HELD"
+    assert v.per_gate["bin/check-foo"].false_flags == [10, 11]
+
+
 def test_verdict_per_gate_not_summed():
     a = _results("bin/check-a", _passes(1, 6) + [(10, "flag")])
     b = _results("bin/check-b", _passes(1, 6) + [(11, "flag")])
@@ -368,6 +375,69 @@ def test_render_has_state_line_and_markers():
     assert "<!-- gate-backtest-state: HELD -->" in block
     assert "- False flags: #10, #11" in block
     assert "`bin/check-foo`" in block
+
+
+def _based(gate, rows):
+    """rows: list of (pr, outcome, base_outcome)"""
+    return [ReplayResult(pr, gate, outcome, "", base_outcome=base) for pr, outcome, base in rows]
+
+
+def _based_verdict(rows, truth=None):
+    res = _results("bin/check-foo", _passes(1, 6)) + _based("bin/check-foo", rows)
+    t = truth if truth is not None else _truth(clean=range(1, 12))
+    return res, t, compute_verdict([_g()], res, t)
+
+
+def test_tally_head_and_base_flag_is_pre_existing():
+    _, _, v = _based_verdict([(10, "flag", "flag")])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.pre_existing == [10]
+    assert tally.false_flags == []
+
+
+def test_tally_head_flag_base_clean_is_false_flag():
+    _, _, v = _based_verdict([(10, "flag", "pass")])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.false_flags == [10]
+    assert tally.pre_existing == []
+
+
+def test_tally_head_flag_base_absent_is_false_flag():
+    _, _, v = _based_verdict([(10, "flag", "absent")])
+    assert v.per_gate["bin/check-foo"].false_flags == [10]
+
+
+def test_tally_head_flag_base_error_or_timeout_is_false_flag():
+    for base in ("error", "timeout"):
+        _, _, v = _based_verdict([(10, "flag", base)])
+        tally = v.per_gate["bin/check-foo"]
+        assert tally.false_flags == [10], base
+        assert tally.errors == 0, base
+
+
+def test_tally_base_flag_on_repaired_pr_stays_catch():
+    t = _truth(clean=range(1, 10), repaired=(10,))
+    _, _, v = _based_verdict([(10, "flag", "flag")], t)
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.catches == [10]
+    assert tally.pre_existing == []
+
+
+def test_verdict_two_pre_existing_zero_new_is_cleared():
+    _, _, v = _based_verdict([(10, "flag", "flag"), (11, "flag", "flag")])
+    tally = v.per_gate["bin/check-foo"]
+    assert v.state == "CLEARED"
+    assert tally.pre_existing == [10, 11]
+    assert tally.false_flags == []
+
+
+def test_render_shows_pre_existing_line_and_count():
+    res, t, v = _based_verdict([(10, "flag", "flag"), (11, "flag", "flag")])
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    assert "| Pre-existing flags |" in block
+    assert ("- Pre-existing flags (base gate also flags, excluded from the threshold): "
+            "#10, #11") in block
+    assert "- False flags:" not in block
 
 
 def test_render_empty_for_non_gate_pr():

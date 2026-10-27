@@ -175,6 +175,11 @@ expect_eq "26e pinned split that HTML-escapes new output stays xhigh" "xhigh" \
 # 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
 expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"
+# 27b — NEGATED_PIN_RE: "unpinned" and "without characterization" are no pin
+expect_eq "27b unpinned split with escaped output stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split the unpinned PlayerBioRenderer::render, whose output is HTML-escaped, into helpers')"
+expect_eq "27c split without characterization tests stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split X into helpers without characterization tests; its labels are escaped')"
 # 28 — RESTRUCTURE_RE conjunct: pinned escape change with no restructure stays xhigh
 expect_eq "28 pinned escape change with no restructure stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Escape the team name in the player bio output after pinning its current output')"

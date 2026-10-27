@@ -97,6 +97,7 @@ NEGATED_DEFENSE_RE='(unescap|unsanitiz|missing[a-z -]*escap|missing[a-z -]*sanit
 DEFENSE_WORD_RE='(escap|sanitiz)[a-z]*'
 DESCRIBED_DEFENSE_RE='^(escaped|sanitized)$'
 PIN_RE='(pinning|pinned|pin [a-z]|byte-for-byte|characteriz)'
+NEGATED_PIN_RE='(unpinned|not pinned|no (pin|characteriz)|(without|skip|skipping|omit|omitting|before pinning|no need for)[a-z ,-]*(pinn|characteriz|byte-for-byte))'
 RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
 # Carve-out H1: an additive gate whose only weakening stem is a past
 # participle (an adjective such as a deleted symbol) is not a weakening.
@@ -117,7 +118,7 @@ first_token() {
 security_defense_only() {
     others="$(printf '%s' "$HAY" | grep -Eo "$SECURITY_RE" | grep -Ev "$DEFENSE_TOKEN_RE")"
     verbs="$(printf '%s' "$HAY" | grep -Eo "$DEFENSE_WORD_RE" | grep -Ev "$DESCRIBED_DEFENSE_RE")"
-    [ -z "$others" ] && [ -z "$verbs" ] && match "$PIN_RE" && match "$RESTRUCTURE_RE" \
+    [ -z "$others" ] && [ -z "$verbs" ] && match "$PIN_RE" && ! match "$NEGATED_PIN_RE" && match "$RESTRUCTURE_RE" \
         && ! match "$NEGATED_DEFENSE_RE"
 }
 

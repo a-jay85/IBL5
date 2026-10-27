@@ -516,6 +516,7 @@ B13="$(extract_block '# condition (13)')"
 B15="$(extract_block '# condition (15)')"
 B17="$(extract_block '# condition (17)')"
 B18="$(extract_block '# condition (18)')"
+BN="$(extract_block '# condition (20):')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
@@ -1681,6 +1682,173 @@ else
     out="$(run_cond19 yes empty pending)"
     expect_block "(19) pending journal -> BLOCK (fail-closed)" BLOCK "$out"
     expect_c18_text "(19) pending journal names the cause" "$out" "journal pending"
+fi
+
+# condition (20) predicate: pr_removed_guards_hold over the shared case table
+# bin/fixtures/removed-guards/cases.json is also read by tools/postplan-harness/tests/
+# test_removed_guards.py, so the shell predicate and the Python mirror answer one table.
+RG_CASES="$REPO_ROOT/bin/fixtures/removed-guards/cases.json"
+if [ ! -s "$RG_CASES" ]; then
+    echo "FAIL: cN-pred shared case table missing: $RG_CASES"; FAILED=1
+else
+    rg_n=0
+    while IFS= read -r rg_case; do
+        rg_n=$((rg_n + 1))
+        rg_name="$(jq -r '.name' <<< "$rg_case")"
+        rg_body="$(jq -r '.body' <<< "$rg_case")"
+        rg_keys="$(jq -r '.flagged_keys | join("\n")' <<< "$rg_case")"
+        rg_want="$(jq -r '.expected | join("\n")' <<< "$rg_case")"
+        rg_got="$(bash -c 'source "$1"; pr_removed_guards_hold "$2" "$3"' _ \
+            "$REPO_ROOT/bin/lib/pr-armable.sh" "$rg_body" "$rg_keys")"
+        if [ "$rg_got" = "$rg_want" ]; then
+            echo "ok: cN-pred $rg_name"
+        else
+            echo "FAIL: cN-pred $rg_name — want [$rg_want], got [$rg_got]"; FAILED=1
+        fi
+    done < <(jq -c '.[]' "$RG_CASES")
+    if [ "$rg_n" -lt 16 ]; then
+        echo "FAIL: cN-pred shared case table has $rg_n cases, expected at least 16"; FAILED=1
+    fi
+fi
+
+# condition (20) block: the real arm-time rerun in a scratch repo. Base commit has a
+# try/catch guard; the branch commit removes it. deleted-guards is symlinked, or
+# replaced by a stub that exits 2 for the detector-error case.
+CN_PHP='ibl5/classes/Season/Season.php'
+mk_cN_repo() { # dir  remove|keep  [stub-exit-code]
+    local d="$1"
+    rm -rf "$d"
+    mkdir -p "$d/bin/lib" "$d/ibl5/classes/Season" "$d/home"
+    git -C "$d" init -q
+    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$d/bin/lib/pr-armable.sh"
+    ln -s "$REPO_ROOT/bin/lib/plan-resolve.sh" "$d/bin/lib/plan-resolve.sh"
+    if [ -n "${3:-}" ]; then
+        printf '#!/bin/sh\nexit %s\n' "$3" > "$d/bin/lib/deleted-guards"
+        chmod +x "$d/bin/lib/deleted-guards"
+    else
+        ln -s "$REPO_ROOT/bin/lib/deleted-guards" "$d/bin/lib/deleted-guards"
+    fi
+    printf '<?php\nfunction f() {\n        try {\n            x();\n        } catch (\\RuntimeException $e) {\n        }\n}\n' \
+        > "$d/$CN_PHP"
+    git -C "$d" add -A
+    git -C "$d" -c user.name=t -c user.email=t@t commit -qm base
+    git -C "$d" update-ref refs/remotes/origin/master HEAD
+    git -C "$d" checkout -q -b cn-branch
+    if [ "$2" = "remove" ]; then
+        printf '<?php\nfunction f() {\n            x();\n}\n' > "$d/$CN_PHP"
+    else
+        printf '\n// note\n' >> "$d/$CN_PHP"
+    fi
+    git -C "$d" -c user.name=t -c user.email=t@t commit -qam change
+}
+run_condN() { # dir  body|__fail__
+    local fail=""
+    if [ "$2" = "__fail__" ]; then
+        fail=1
+        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
+    else
+        jq -n --arg b "$2" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
+    fi
+    # Clear the plan-resolve seams so a caller's PLAN_* env cannot pick a plan.
+    ( cd "$1" && unset PLAN_FILE PLAN_SLUG PLAN_DIR && HOME="$1/home" PATH="$SHIMD:$PATH" \
+        GH_PR_FIXTURE="$BASE_TMP/fixture.json" GH_PR_FAIL="$fail" bash -c "$BN" 2>&1 )
+}
+cN_body() { # dir  reason  ->  a Removed guards block for every flagged key
+    local keys
+    keys="$(cd "$1" && git diff origin/master...HEAD | "$REPO_ROOT/bin/lib/deleted-guards" --diff - \
+        | awk -F'\t' '$1=="REMOVED-GUARD"{print $2}')"
+    printf '## Summary\n- change\n\n<!-- removed-guards:begin -->\n## Removed guards\n'
+    while IFS= read -r k; do
+        [ -n "$k" ] && printf -- '- `%s` — Reason: %s\n  removed: `try {`\n' "$k" "$2"
+    done <<< "$keys"
+    printf '<!-- removed-guards:end -->\n'
+}
+
+if [ -z "$BN" ]; then
+    echo "FAIL: no block matching '# condition (20):' in $SKILL — marker drifted"
+    FAILED=1
+else
+    CN="$BASE_TMP/cN"
+    mk_cN_repo "$CN" remove
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-flagged-no-block-holds" BLOCK "$out"
+    expect_c18_text "cN-flagged-no-block-holds names UNLISTED" "$out" "UNLISTED"
+    out="$(run_condN "$CN" "$(cN_body "$CN" 'moved into SeasonRepository::load')")"
+    expect_block "cN-flagged-with-reason-passes" NONE "$out"
+    out="$(run_condN "$CN" "$(cN_body "$CN" '<one-line reason required>')")"
+    expect_block "cN-placeholder-holds" BLOCK "$out"
+    out="$(run_condN "$CN" __fail__)"
+    expect_block "cN-body-unreadable-holds" BLOCK "$out"
+    expect_c18_text "cN-body-unreadable-holds is fail-closed" "$out" "fail-closed"
+    # Stacked base: origin/<iblBase> already holds the removal, so the realized diff has none.
+    git -C "$CN" update-ref refs/remotes/origin/parent HEAD
+    git -C "$CN" config branch.cn-branch.iblBase parent
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-stacked-base-honored" NONE "$out"
+    # Intended removal: the branch plan's `### Intended removals` names the guard, so no
+    # body bullet is needed. The block reads the plan from $HOME/claude-plans/<branch>.md.
+    mk_cN_repo "$CN" remove
+    mkdir -p "$CN/home/claude-plans"
+    printf '## Must preserve\n\n- none — this scratch plan keeps no other guard\n\n### Intended removals\n\n- `%s` try: `try {` — moved into SeasonRepository::load\n- `%s` catch: `} catch` — moved into SeasonRepository::load\n' \
+        "$CN_PHP" "$CN_PHP" >"$CN/home/claude-plans/cn-branch.md"
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-intended-removal-passes" NONE "$out"
+    mk_cN_repo "$CN" keep
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-no-removal-passes" NONE "$out"
+    mk_cN_repo "$CN" remove 2
+    out="$(run_condN "$CN" "## Summary")"
+    expect_block "cN-detector-exit2-holds" BLOCK "$out"
+    expect_c18_text "cN-detector-exit2-holds is fail-closed" "$out" "exit 2, fail-closed"
+    # Self-judging: the PR is a linked worktree of a main checkout. The PR's own copies
+    # of deleted-guards and pr-armable.sh are weakened (uncommitted, so the realized diff
+    # holds only the PHP removal). The block must still hold off the main checkout's copies.
+    mk_cN_wt() { # what-to-weaken: det|lib|both
+        mk_cN_repo "$CN" remove
+        git -C "$CN" checkout -q --detach
+        rm -rf "$CN_WT"
+        git -C "$CN" worktree add -q "$CN_WT" cn-branch
+        mkdir -p "$CN_WT/home"
+        if [ "$1" != lib ]; then
+            rm -f "$CN_WT/bin/lib/deleted-guards"
+            printf '#!/bin/sh\nexit 0\n' > "$CN_WT/bin/lib/deleted-guards"
+            chmod +x "$CN_WT/bin/lib/deleted-guards"
+        fi
+        if [ "$1" != det ]; then
+            rm -f "$CN_WT/bin/lib/pr-armable.sh"
+            printf 'pr_removed_guards_hold() { return 0; }\n' > "$CN_WT/bin/lib/pr-armable.sh"
+        fi
+    }
+    CN_WT="$BASE_TMP/cN-wt"
+    for _cn_w in det lib both; do
+        mk_cN_wt "$_cn_w"
+        out="$(run_condN "$CN_WT" "## Summary")"
+        expect_block "cN-self-judge-weak-$_cn_w-holds" BLOCK "$out"
+        expect_c18_text "cN-self-judge-weak-$_cn_w-holds names UNLISTED" "$out" "UNLISTED"
+    done
+    # The main checkout's pr-armable.sh lacks the hold function: fail closed.
+    mk_cN_wt det
+    rm -f "$CN/bin/lib/pr-armable.sh"
+    printf ': no hold function here\n' > "$CN/bin/lib/pr-armable.sh"
+    out="$(run_condN "$CN_WT" "## Summary")"
+    expect_block "cN-main-lib-missing-holds" BLOCK "$out"
+    expect_c18_text "cN-main-lib-missing-holds is fail-closed" "$out" "fail-closed"
+    git -C "$CN" worktree remove --force "$CN_WT"
+    # The extracted condition (1)-(19) blocks must equal master's extraction byte for byte.
+    _cn_bad=0
+    _cn_mfile="$BASE_TMP/master-arm-conditions.md"
+    if ! git -C "$REPO_ROOT" show "origin/master:.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md" >"$_cn_mfile" 2>/dev/null; then
+        echo "FAIL: cN-conditions-1-19-blocks-unchanged: cannot read origin/master copy of the arm-conditions file"; FAILED=1; _cn_bad=1
+    else
+        for _cn_i in 1 3 4 5 6 7 8 10 12 13 15 17 18 19; do
+            _cn_v="B$_cn_i"
+            _cn_m="$(extract_block "# condition ($_cn_i)" "$_cn_mfile")"
+            if [ -z "${!_cn_v}" ] || [ "${!_cn_v}" != "$_cn_m" ]; then
+                echo "FAIL: cN-conditions-1-19-blocks-unchanged: B$_cn_i empty or differs from origin/master"; FAILED=1; _cn_bad=1
+            fi
+        done
+    fi
+    [ "$_cn_bad" = 0 ] && echo "ok: cN-conditions-1-19-blocks-unchanged"
 fi
 
 # --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
@@ -3781,9 +3949,11 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts nineteen conditions"        "$P25_TXT" '**All nineteen conditions**'
+have "§5.9k: SKILL.md counts twenty conditions"          "$P25_TXT" '**All twenty conditions**'
+lacks "§5.9k: SKILL.md no longer counts nineteen"       "$P25_TXT" '**All nineteen conditions**'
 have "§5.9k: the run-only enumeration ends /(14)/(19)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)/(19)'
 have "§5.9k: SKILL list carries the (19) entry"         "$P25_TXT" '**(19)'
+have "§5.9k: SKILL list carries the (20) entry"         "$P25_TXT" '20. **Removed guards.**'
 have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
 # Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
@@ -3815,7 +3985,7 @@ else
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
 # §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All nineteen conditions" count promises, as prose pointing at its block.
+# SKILL.md's "All twenty conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'

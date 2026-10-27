@@ -799,7 +799,7 @@ elif [ "$rc" -ne 0 ]; then
     DM_RESUME="bin/plan-now --resume $TS"
 elif [ -n "$plan" ]; then
     echo "plan-now: new plan -> $plan"
-    if "$CHECK_PLAN" "$plan"; then
+    if "$CHECK_PLAN" --require-must-preserve "$plan"; then
         echo "plan-now: RESULT ok — plan written and check-plan PASSED."
         DM_ICON="✅"; DM_VERDICT="ok — check-plan PASSED"; DM_PLAN="$plan"
         # The ONLY path to the queue. Everything above this line — a nonzero exit,
@@ -952,7 +952,7 @@ else
     fi
 
     if [ -n "$recovered" ]; then
-        if "$CHECK_PLAN" "$recovered"; then
+        if "$CHECK_PLAN" --require-must-preserve "$recovered"; then
             echo "plan-now: RESULT degraded (recovered) — no PLAN_FILE: line, but this run's plan was identified and check-plan PASSED."
             DM_ICON="⚠️"; DM_VERDICT="degraded (recovered) — check-plan PASSED"
             DM_PLAN="$recovered"

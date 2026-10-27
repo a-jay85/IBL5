@@ -291,7 +291,7 @@ Do **not** ask when: the fork is conventional (let the Plan agent's self-resolut
 
 ## Step 4: Validate the matrix
 
-Read `.claude/skills/plan/_validate-and-write.md` now, once. It holds every Step 4 gate (1-18) in its original wording and order, and the full Step 5 procedure. Read it only after the architect's last section has returned. Do not Read it at Step 1, Step 2, or Step 3. Do not Read it again at Step 5; you already hold it.
+Read `.claude/skills/plan/_validate-and-write.md` now, once. It holds every Step 4 gate (1-19) in its original wording and order, and the full Step 5 procedure. Read it only after the architect's last section has returned. Do not Read it at Step 1, Step 2, or Step 3. Do not Read it again at Step 5; you already hold it.
 
 ## Step 4.5: Challenge the auto-merge hold
 

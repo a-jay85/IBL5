@@ -435,6 +435,12 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
 
     try:
         sha = commit(COMMIT_MSG)
+    except HarnessError as e:
+        _revert_staged()
+        if e.kind in ("llm-usage-limit", "llm-auth-expired"):
+            log(f"phase5.0-fix: commit failed {e.kind} - tree reverted, re-raising")
+            raise
+        return _done("rejected", f"commit-denied ({e.kind})")
     except Exception:
         _revert_staged()
         log("phase5.0-fix: commit failed - tree reverted, re-raising")

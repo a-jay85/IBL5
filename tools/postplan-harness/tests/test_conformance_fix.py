@@ -429,17 +429,17 @@ def test_usage_limit_crash_reverts_then_reraises(tmp_path):
     assert git.commit_messages == []
 
 
-def test_rejected_commit_reverts_tree_then_reraises(tmp_path):
+def test_rejected_commit_reverts_tree_and_returns_rejected(tmp_path):
     wt, git, llm = _setup(tmp_path, writes={PROMISED: GOOD_PHP})
 
     def _reject(_msg):
         raise HarnessError("local-gate", "pre-commit hook said no")
 
-    with pytest.raises(HarnessError) as exc:
-        conformance_fix.remediate_missing(
-            llm, git, _plan(), str(wt), str(tmp_path / "out"), [ITEM_PATH],
-            commit=_reject, push=lambda: "", env={})
-    assert exc.value.kind == "local-gate"
+    rec = conformance_fix.remediate_missing(
+        llm, git, _plan(), str(wt), str(tmp_path / "out"), [ITEM_PATH],
+        commit=_reject, push=lambda: "", env={})
+    assert rec["reason"] == "rejected"
+    assert rec["detail"] == "commit-denied (local-gate)"
     assert not (wt / PROMISED).exists()
     assert git.unstaged == [[PROMISED]]
     assert git.pushes == 0

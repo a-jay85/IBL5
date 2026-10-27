@@ -20,7 +20,7 @@ The corpus lives in `tools/postplan-harness/fixtures/plan-eval/corpus.json`, wit
 `bin/plan-eval run` ends with one line of this shape: `plan-eval v=<12 hex> c=<12 hex> runs=<n> mech=<a>/<n> files=<h>/<e> tier=<t>/<n> no_plan=<x> degraded=<d> leaked=<l> cost_usd=<f>`.
 
 - `v` is the plan-surface hash and `c` is the corpus digest.
-- `runs` counts scored runs. A `degraded` or `leaked` run is left out of every denominator. A `no_plan` run stays in and scores zero.
+- `runs` counts scored runs. A `degraded` or `leaked` run is left out of every denominator. A `no_plan` run stays in, scores zero on `mech` and `files`, and can still match `tier` when it spawned the right architect.
 - `mech`, `files` and `tier` are the three measures above. `files` sums hits over the expected-file counts of the scored runs.
 - `degraded` counts runs that timed out, died, read the historical plan, or had no result event. `leaked` counts runs that wrote into `~/claude-plans`. Either above 0 makes `run` exit 3.
 - `cost_usd` sums the cost the transcripts report.

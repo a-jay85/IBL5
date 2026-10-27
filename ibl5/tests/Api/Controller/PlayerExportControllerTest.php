@@ -109,6 +109,8 @@ class PlayerExportControllerTest extends WideUnitTestCase
         $this->assertStringNotContainsString('Nickname', $firstLine);
         $this->assertStringContainsString('Injury Days', $firstLine);
         $this->assertStringContainsString('FA Security', $firstLine);
+        $this->assertStringContainsString('College', $firstLine);
+        $this->assertStringNotContainsString('Stamina', $firstLine);
         $this->assertStringContainsString('Position', $firstLine);
         $this->assertStringContainsString('GP', $firstLine);
         $this->assertStringContainsString('PPG', $firstLine);

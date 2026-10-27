@@ -71,7 +71,7 @@ class PlayerExportTransformerTest extends TestCase
             'r_fga' => 45, 'r_fgp' => 52, 'r_fta' => 30, 'r_ftp' => 75, 'r_3ga' => 20, 'r_3gp' => 36,
             'r_orb' => 10, 'r_drb' => 40, 'r_ast' => 50, 'r_stl' => 15, 'r_tvr' => 25, 'r_blk' => 8, 'r_foul' => 18,
             'oo' => 7, 'r_drive_off' => 8, 'po' => 6, 'r_trans_off' => 9, 'od' => 5, 'dd' => 6, 'pd' => 4, 'td' => 7,
-            'stamina' => 80, 'clutch' => 2, 'consistency' => 1,
+            'stats_gs' => 45, 'wt' => 250, 'draftyear' => 2003, 'draftround' => 1, 'draftpickno' => 1, 'college' => 'St. Vincent-St. Mary', 'clutch' => 2, 'consistency' => 1,
             'talent' => 5, 'skill' => 4, 'intangibles' => 3,
             'loyalty' => 2, 'playing_time' => 4, 'winner' => 5, 'tradition' => 3, 'security' => 1,
             'created_at' => '2026-01-01 00:00:00',
@@ -79,14 +79,14 @@ class PlayerExportTransformerTest extends TestCase
         ];
     }
 
-    public function testGetHeadersReturns75Columns(): void
+    public function testGetHeadersReturns80Columns(): void
     {
         $headers = $this->transformer->getHeaders();
 
-        $this->assertCount(75, $headers);
+        $this->assertCount(80, $headers);
         $this->assertSame('PID', $headers[0]);
         $this->assertSame('Name', $headers[1]);
-        $this->assertSame('FA Security', $headers[74]);
+        $this->assertSame('FA Security', $headers[79]);
     }
 
     public function testHeadersAreUnique(): void
@@ -119,7 +119,12 @@ class PlayerExportTransformerTest extends TestCase
         $this->assertSame('8', $result[$indexMap['rDO']]);
         $this->assertSame('9', $result[$indexMap['rTO']]);
         $this->assertSame('7', $result[$indexMap['rTD']]);
-        $this->assertSame('80', $result[$indexMap['Stamina']]);
+        $this->assertSame('45', $result[$indexMap['GS']]);
+        $this->assertSame('250', $result[$indexMap['Weight']]);
+        $this->assertSame('2003', $result[$indexMap['Draft Year']]);
+        $this->assertSame('1', $result[$indexMap['Draft Round']]);
+        $this->assertSame('1', $result[$indexMap['Draft Pick']]);
+        $this->assertSame('St. Vincent-St. Mary', $result[$indexMap['College']]);
         $this->assertSame('5', $result[$indexMap['Talent']]);
         $this->assertSame('4', $result[$indexMap['Skill']]);
         $this->assertSame('3', $result[$indexMap['Intangibles']]);

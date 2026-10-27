@@ -35,4 +35,25 @@ class HofRepository extends \Database\BaseMysqliRepository
             $record['pid']
         );
     }
+
+    /**
+     * Check if any Hall of Fame inductee is stored for a given induction year.
+     */
+    public function hasHofInducteesForYear(int $inductionYear): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM `ibl_jsb_hall_of_fame`
+             WHERE induction_year = ?",
+            'i',
+            $inductionYear,
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $cnt = $row['cnt'];
+
+        return is_int($cnt) && $cnt > 0;
+    }
 }

@@ -163,11 +163,17 @@ def append_delta(record, *, run_id, verdict, diff_id, delta_paths, reviewed_tree
 # --- pure helpers -------------------------------------------------------------------
 
 def changed_lines(diff) -> int:
+    """Count `+`/`-` lines inside hunks. File headers (`--- a/x`, `+++ b/x`) only appear
+    between a `diff ` line and the file's first `@@`, so a removed `-- foo` or `---` content
+    line inside a hunk still counts."""
     n = 0
+    in_hunk = False
     for line in (diff or "").splitlines():
-        if line.startswith(("+++", "---")):
-            continue
-        if line.startswith(("+", "-")):
+        if line.startswith("diff "):
+            in_hunk = False
+        elif line.startswith("@@"):
+            in_hunk = True
+        elif in_hunk and line.startswith(("+", "-")):
             n += 1
     return n
 

@@ -556,6 +556,16 @@ def test_changed_lines_ignores_headers():
     assert fidelity_delta.changed_lines(None) == 0
 
 
+def test_changed_lines_counts_dash_content_inside_hunks():
+    # A removed SQL comment `-- foo` shows as `--- foo`; a removed markdown rule `---`
+    # shows as `----`. Both are content, and the second file's headers are not.
+    diff = ("diff --git a/q.sql b/q.sql\nindex 1..2 100644\n--- a/q.sql\n+++ b/q.sql\n"
+            "@@ -1,3 +1,1 @@\n--- foo\n----\n ctx\n"
+            "diff --git a/n.md b/n.md\nnew file mode 100644\n--- /dev/null\n+++ b/n.md\n"
+            "@@ -0,0 +1,1 @@\n+++ added\n")
+    assert fidelity_delta.changed_lines(diff) == 3
+
+
 # --- Phase 3: excerpt, packet, attempt --------------------------------------------
 
 def test_plan_excerpt_sections():

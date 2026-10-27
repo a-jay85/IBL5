@@ -1,0 +1,27 @@
+Make the db-backup.yml nightly restore check compare restored row counts to prod counts taken before the dump
+
+## Exploration pointers
+- https://github.com/a-jay85/IBL5-backlog/issues/1257 — the issue.
+- .github/workflows/db-backup.yml ~line 148-175 "Restore dump into ephemeral MariaDB and run sanity queries" — today it only asserts ibl_team_info >= 28 and ibl_plr >= 1. A dump missing most of ibl_box_scores or ibl_hist passes.
+- Same file, the remote dump step (~line 100-138) runs over SSH on prod and writes backups/db/ibl5-*.sql.gz with a 1 MB floor and 14-day rotation.
+- bin/discord-dm — existing DM helper; check how this workflow already alerts on failure.
+
+## Resolved design decisions
+- Record exact COUNT(*) for the big tables on prod in the same SSH step, right before the dump. Pass the counts to the restore step (step output or a file pulled with the dump).
+- After restore, compare. Equal, or restored >= pre-dump count for append-mostly tables (rows written during the dump only add). Pick the exact rule per table inside the plan.
+- Fail the job on mismatch. Reuse the workflow's existing failure alert path; add a DM only if none exists.
+- Use COUNT(*), never information_schema table_rows (InnoDB estimate).
+
+## Scope
+1. Pre-dump counts on prod for ibl_box_scores, ibl_hist, ibl_plr, ibl_team_info, ibl_schedule and any other table the plan finds is large (resolve inside the plan).
+2. Restored-count comparison with a clear per-table log line.
+3. Keep the existing floors.
+Out of scope: changing dump format, rotation, or offsite pull (PR #2596 is in flight on backup pulls; do not touch bin/db-backups-pull).
+
+## Verification
+actionlint on the workflow. A local shell test of the comparison logic: a matching set passes, a truncated table fails, a table that grew during the dump passes.
+
+## Sequencing
+Slug `db-backup-restore-rowcount-check`, base master.
+## Hard constraints
+- Verify the issue's premise with a real scan or run before designing. Resolve migration numbers at implement time. Base on master. Do not touch these files held by other batch items: `tools/postplan-harness/harness/conformance.py, tools/postplan-harness/tests/test_planfile.py, bin/discord-dm, bin/test-discord-dm, bin/bug-pipeline-e2e, ibl5/IBLbot/ecosystem.bugbot-test.config.cjs, .claude/review-shared/_plan-verification.md, bin/bug-pipeline-test-env, ibl5/docs/decisions/README.md`. Emit `## Backlog issues` with `closes a-jay85/IBL5-backlog#1257`. A parser or gate change carries a corpus diff in its verification.

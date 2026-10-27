@@ -358,7 +358,9 @@ def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert cmd.count("caffeinate -s claude -p ") == 1
     assert "RESUMING at Phase 5.5" not in cmd
-    assert "then execute every phase" in cmd
+    assert "then execute every remaining phase of the shrunk skill" in cmd
+    # The crash-triage seam: the skill's Phase 2 reads the harness exit code from here.
+    assert 'POSTPLAN_HARNESS_RC="${rc:-}" ' in cmd
 
 
 def _rc3_gate(tmp_path, log_text="", block=None):
@@ -448,7 +450,7 @@ def test_every_other_failure_dms_with_the_rerun_command(tmp_path):
     The usage-limit line in the log fixture is the case that sent no DM before.
     """
     cmd = _generate_cmd(tmp_path)
-    seg = cmd.split("pp_rc=3; fi; ", 1)[1].split("conclude_status_badge", 1)[0]
+    seg = cmd.split("then pp_rc=$rc; fi; ", 1)[1].split("conclude_status_badge", 1)[0]
     real_dm = re.search(r'"([^"]+/bin/post-plan-fail-dm)"', seg).group(1)
     real_log = re.search(r'tail -n 3 "([^"]+)"', seg).group(1)
     root = real_dm[: -len("/bin/post-plan-fail-dm")]
@@ -950,7 +952,7 @@ def test_foreground_exit1_falls_back(tmp_path):
     claude_log = tmp_path / "claude-log.txt"
     assert claude_log.exists(), "claude stub must have been invoked for harness-rc=1"
     log_text = claude_log.read_text()
-    assert "then execute every phase" in log_text, \
+    assert "then execute every remaining phase of the shrunk skill" in log_text, \
         f"fallback prompt not found in claude args:\n{log_text!r}"
 
 
@@ -972,7 +974,7 @@ def test_foreground_exit4_takes_full_fallback_not_resume(tmp_path):
     claude_log = tmp_path / "claude-log.txt"
     assert claude_log.exists(), "claude stub must have been invoked for rc=4"
     log_text = claude_log.read_text()
-    assert "then execute every phase" in log_text, \
+    assert "then execute every remaining phase of the shrunk skill" in log_text, \
         f"full fallback prompt not found in claude args:\n{log_text!r}"
     assert "RESUMING at Phase 5.5" not in log_text, \
         "rc=4 must take the full fallback, not the old RESUME_PROMPT"

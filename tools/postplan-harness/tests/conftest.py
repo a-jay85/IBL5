@@ -108,3 +108,10 @@ def _private_log_dir(tmp_path_factory, monkeypatch):
     d = tmp_path_factory.mktemp("ppn-logs")
     monkeypatch.setenv("POSTPLAN_LOG_DIR", str(d))
     return d
+
+
+@pytest.fixture(autouse=True)
+def _verdict_cache_off(monkeypatch):
+    """Run every test on the unchanged verifier spawn path and keep it from writing into a real
+    repository's git dir. test_verifier_verdict_cache.py turns the cache back on per test."""
+    monkeypatch.setenv("POSTPLAN_VERDICT_CACHE", "0")

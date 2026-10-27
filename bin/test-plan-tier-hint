@@ -189,6 +189,9 @@ assert_contains "plan-prompt points at the canonical check" \
     '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
 assert_contains "agent def carries the directory clause" \
     '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
+# Bash 3.2 guard (macOS /bin/bash): the hint lowercases with tr, never with ${HAY,,}.
+assert_absent "hint avoids the Bash-4 lowercase expansion" \
+    'bin/plan-tier-hint' '${HAY,,}'
 assert_contains "canonical carries the pinned-restructure carve-out" \
     '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
 assert_contains "plan-prompt points at the pinned-restructure carve-out" \

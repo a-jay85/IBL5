@@ -22,6 +22,11 @@
     }
 }
 
+/* Throwaway VR demo for #2950 (do not merge) */
+.team-stats-block {
+    border-top: 6px solid var(--accent-600);
+}
+
 .team-page-rafters {
     margin-top: var(--space-4);
 }

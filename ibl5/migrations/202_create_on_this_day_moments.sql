@@ -3,6 +3,7 @@
 -- Derived data only. Truncate-and-rebuild is always safe; the source of truth is
 -- ibl_box_scores, ibl_box_scores_teams, ibl_hist/trade rows and ibl_plr.
 -- Rollback (never run here): DROP TABLE ibl_on_this_day_moments;
+-- rollback-incompatible: only production's SchemaInvariantTest FK-gap inventory breaks, since it pins the exact list of pid/teamid columns without an FK and this new table adds three; production PHP never reads this table
 CREATE TABLE IF NOT EXISTS ibl_on_this_day_moments (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     moment_key VARCHAR(96) NOT NULL,

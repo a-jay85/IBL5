@@ -39,4 +39,9 @@ export const config = {
     // Dedicated bug-report channel snowflake — injected via env, NEVER hardcoded.
     // Keep it a string (snowflake wire-type LOCKED — never parseInt it).
     bugChannelId: requireEnv('BUG_CHANNEL_ID'),
+    // The ONE Discord user whose @mention of the bot inside a bug thread wakes the
+    // pipeline. Required: with no operator nothing can ever wake. Must equal PHP's
+    // bug_pipeline_approver_discord_id (PHP re-checks and 403s a mismatch). A string
+    // snowflake — never parseInt it.
+    operatorDiscordId: requireEnv('BUG_OPERATOR_DISCORD_ID'),
 } as const;

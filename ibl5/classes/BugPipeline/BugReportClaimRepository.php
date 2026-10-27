@@ -196,9 +196,9 @@ class BugReportClaimRepository extends \Database\BaseMysqliRepository implements
      * The statement is the fixed TRANSITION_SQL literal; every optional column binds a
      * set-flag plus its value, so no runtime value reaches the SQL text.
      *
-     * @param array<string, int|string> $opts Accepted keys: pr_number, issue_number, hunt_attempts
+     * @param array<string, int|string|null> $opts Accepted keys: pr_number, issue_number, hunt_attempts
      *   (ints); class (ENUM string); thread_id, approval_message_id (snowflakes, bound "s");
-     *   blocked_until (DATETIME string). Any other key is ignored.
+     *   blocked_until (DATETIME string). A null value present in $opts NULLs the column. Any other key is ignored.
      * @param bool $releaseLease When true, atomically NULLs lease_owner + lease_expires in the
      *   SAME UPDATE. Required for →needs_human / →queued reset to be a single-flight-safe op.
      * @return bool True when the row (PK $id) was updated.

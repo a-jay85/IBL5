@@ -329,6 +329,69 @@ assert_match "L6-running-summary-wording running" \
     'Skipped #1: post-plan run in progress \(post-plan-running label\)' "$L6_SUMMARY"
 assert_absent "L6-running-summary-wording no conflict" 'merge conflict' "$L6_SUMMARY"
 
+# --- H: hotfix label sorts first ---
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)")"
+assert_match "H1-hotfix-jumps-line head" '^head=2$' "$OUT"
+assert_match "H1-hotfix-jumps-line action" '^action=update$' "$OUT"
+assert_match "H1-hotfix-jumps-line clear" '^clear=2 1$' "$OUT"
+assert_absent "H1-hotfix-jumps-line not head 1" '^head=1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 5 false master "$T7" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(labeled "$(pr_node 6 false master "$T6" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H2-hotfix-fifo-between head" '^head=6$' "$OUT"
+assert_match "H2-hotfix-fifo-between clear" '^clear=6 5 1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$RUN_RED")" hotfix)" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H3-red-hotfix-skipped head" '^head=2$' "$OUT"
+assert_match "H3-red-hotfix-skipped skipped" '^skipped=1:red$' "$OUT"
+assert_match "H3-red-hotfix-skipped clear" '^clear=2 3$' "$OUT"
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$RUN_RED")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H3-red-hotfix-skipped falls to arm order" '^head=3$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" DIRTY CONFLICTING "$NOCTX")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H4-dirty-hotfix-skipped head" '^head=3$' "$OUT"
+assert_match "H4-dirty-hotfix-skipped skipped" '^skipped=1:dirty$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 3 false master "$T7" BEHIND MERGEABLE "$NOCTX" | jq -c '. + {labels: null}')" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)")"
+assert_eq "H5-unlabeled-reads-non-hotfix exit" "$RC" "0"
+assert_match "H5-unlabeled-reads-non-hotfix head" '^head=2$' "$OUT"
+assert_match "H5-unlabeled-reads-non-hotfix clear" '^clear=2 1 3$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master null BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 2 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H6-unarmed-hotfix-out-of-line queue_len" '^queue_len=1$' "$OUT"
+assert_match "H6-unarmed-hotfix-out-of-line head" '^head=2$' "$OUT"
+assert_absent "H6-unarmed-hotfix-out-of-line not head 1" '^head=1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$NOCTX")" hotfix post-plan-running)" \
+    "$(pr_node 2 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H7-running-hotfix-skipped head" '^head=2$' "$OUT"
+assert_match "H7-running-hotfix-skipped skipped" '^skipped=1:running$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$NOCTX")" HOTFIX)" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix-candidate)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H8-near-miss-label head" '^head=3$' "$OUT"
+assert_match "H8-near-miss-label clear" '^clear=3 1 2$' "$OUT"
+
 # --- L: --list and --summary ---
 
 run_sel "$C5_SNAP" --list

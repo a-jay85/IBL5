@@ -188,6 +188,14 @@ export function parseManualBullets(body: string): { rows: ManualVrRow[]; errors:
 export type ManualShotSide = 'before' | 'after';
 export type ManualShotFile = ManualShotSide | 'side' | 'stack';
 
+// The after pass runs first and the before pass reuses the same seeded DB, so
+// `setup` already holds when the before pass starts. Re-sending it would fail
+// or stack a second mutation, and the before shot would show state the PR
+// never makes. Only the after pass applies `setup`.
+export function setupStepsFor(row: Pick<ManualVrRow, 'setup'>, side: ManualShotSide): VrSetup[] {
+  return side === 'before' ? [] : row.setup;
+}
+
 // `before` is the base-SHA pass; `after` (the default) keeps today's filename;
 // `side` / `stack` are the composites `--compose-manual` writes.
 export function manualShotFile(label: string, side: ManualShotFile = 'after'): string {

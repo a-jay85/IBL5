@@ -5,8 +5,11 @@ import {
   manualShotFile,
   manualShotUrl,
   buildManualSection,
+  setupStepsFor,
   type ManualRowResult,
 } from '../e2e/vr-manual-rows';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const PAGES_URL = 'https://a-jay85.github.io/IBL5/deadbeef/visual-review/';
 
@@ -321,5 +324,28 @@ describe('manual-row before/after', () => {
       PAGES_URL
     );
     expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+});
+
+// The after pass runs first and the before pass reuses its DB, so a `setup=`
+// mutation re-sent on the before pass would fail or apply twice.
+describe('manual-row setup runs on the after pass only', () => {
+  const setup = [
+    { method: 'POST', path: 'test-state.php?action=toggle-x' },
+    { method: 'DELETE', path: 'test-state.php?action=reset-y' },
+  ];
+
+  it('12a the after pass gets every setup step', () => {
+    expect(setupStepsFor({ setup }, 'after')).toEqual(setup);
+  });
+
+  it('12b the before pass gets no setup steps', () => {
+    expect(setupStepsFor({ setup }, 'before')).toEqual([]);
+  });
+
+  it('12c the capture spec sends setup only through setupStepsFor', () => {
+    const spec = readFileSync(resolve(__dirname, '../e2e/manual-rows.spec.ts'), 'utf-8');
+    expect(spec).toContain('setupStepsFor(row, SIDE)');
+    expect(spec).not.toMatch(/\brow\.setup\b/);
   });
 });

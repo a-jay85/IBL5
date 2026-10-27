@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { test } from './fixtures/base';
 import {
   manualShotFile,
+  setupStepsFor,
   type ManualRowResult,
   type ManualShotSide,
   type ManualRowStatus,
@@ -23,7 +24,8 @@ import {
  *         sticky PR comment.
  *         With VR_MANUAL_SIDE=before (the base-SHA pass) it writes
  *         <label>.before.png and merges `beforeStatus` (and `beforeError`)
- *         instead, leaving the after pass's fields intact.
+ *         instead, leaving the after pass's fields intact. It skips `setup`:
+ *         the after pass already applied it to the shared DB (setupStepsFor).
  *
  * These screenshots are one-shot review aids, never a gate: nothing is compared
  * against a baseline, and the workflow step runs under `continue-on-error`.
@@ -130,7 +132,7 @@ if (rows.length > 0) {
         }
 
         try {
-          for (const s of row.setup) {
+          for (const s of setupStepsFor(row, SIDE)) {
             const method = s.method.toUpperCase();
             const resp =
               method === 'POST'

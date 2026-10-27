@@ -1,0 +1,35 @@
+Make the per-PR mutation testing job "Infection PHP (per-PR diff)" a required status check on master, at --min-msi=100 with no escape hatch.
+
+## Exploration pointers
+- `.github/workflows/mutation.yml` — `on:` has `schedule` (Monday 11:00 UTC) and `pull_request`. Job `Infection PHP` (lines ~20-25) runs only on schedule or on the `mutation-test` label. Job `Infection PHP (per-PR diff)` (lines ~113-117) has `if: github.event_name == 'pull_request' && github.event.action != 'labeled'` and `timeout-minutes: 15`. A `Detect covered changes` step sets `skip=true/false`, and later steps are gated on `skip == 'false'`. Infection runs with `--git-diff-base=origin/${{ github.base_ref }} --git-diff-lines --skip-initial-tests --min-msi=100`.
+- The last 40 PR runs: 38 success, 1 failure, 1 cancelled. Median 1m, max 7m.
+- Branch protection on master (via `gh api repos/a-jay85/IBL5/branches/master/protection`): required contexts = "Tests and Analysis", "E2E Tests", "human-signoff", "Meta checks"; strict = true.
+
+## Resolved design decisions
+- User decision: required, `--min-msi=100` on changed lines, NO waive label, NO escape hatch, NO lowered threshold. Don't add a bypass. Don't reopen this.
+- A required check must report a status on every PR, or the PR is stuck forever. The per-PR job's `if:` skips the job when `action == 'labeled'`. A skipped job still reports its conclusion, but confirm this for this job name. Also confirm the workflow's `pull_request` trigger has no `paths`, `types`, or branch filter that would stop it starting on some PRs: docs-only, dependabot, draft, or labeled-only events. If any PR shape gets no status, fix the workflow so it always reports.
+- Check that the context name GitHub reports matches exactly what goes into branch protection. The job `name:` is `Infection PHP (per-PR diff)`.
+- Never use GitHub merge queue or `merge_group`.
+
+## Scope
+1. Make the per-PR job always report a status on every PR (fix only if the audit finds a gap).
+2. Record the exact `gh api` command that adds the context to master's required checks without dropping the existing four or strict=true. Record when to run it: after this PR merges and the job has reported on at least one PR. The post-plan flow or a documented manual step must run it. Say which.
+3. Update every doc and rule that lists the required checks.
+
+Out of scope: the weekly/labeled full `Infection PHP` job, the MSI threshold, `update-behind-prs.yml` and `rebase-prs.yml` (PR #2528), any other workflow.
+
+## Hard constraints
+- This adds a gate, so no weakening is involved. The branch-protection change is outward-facing and hard to undo casually. Set `auto_merge: false` if the plan applies the protection change automatically as part of shipping.
+
+## Blocking questions (resolve inside the plan)
+- Does a job skipped by `if:` on a `labeled` event overwrite an earlier success on the same head SHA with "skipped"? Does GitHub count "skipped" as passing for a required check? Decide from GitHub docs and behavior. If there's any risk, restructure so labeled events don't create a competing check run.
+- Where does the repo keep the canonical required-checks list (rules, docs, a `bin/` script)? Update it there.
+
+## Verification
+- actionlint passes.
+- A static check proves the `pull_request` trigger in `mutation.yml` has no `paths`/`paths-ignore`, and the per-PR job name matches the required-context string. Prefer extending an existing guard.
+- The plan lists the post-merge `gh api ... /protection` read-back that confirms 5 contexts and strict=true.
+
+
+## Sequencing
+Slug `mutation-required-check`, base `master`. A sibling plan `ci-runner-slot-diet` is in flight. It edits other workflows and possibly the same docs listing checks. Anchor on text, not line numbers. Don't depend on it or re-implement it.

@@ -1,0 +1,36 @@
+Harden the bug-pipeline prompt-injection defense (security surface): wrap untrusted GM-submitted text in per-block random-nonce tags instead of fixed tags
+
+## Exploration pointers
+- `bin/bug-pipeline-hunter-prompt` (UNTRUSTED DATA section, ~lines 15-36): wraps GM text in fixed `<report>`, `<transcript>`, `<attachments>` tags and tells the model the text inside is data only.
+- `bin/bug-pipeline-classify-prompt` and `bin/bug-pipeline-gather-prompt`: wrap the same GM text in one fixed `<untrusted>…</untrusted>` block.
+- `bin/bug-pipeline-tick` `render_hunter_prompt()` (comment "Render the hunter prompt with the claimed row's data"): substitutes `{{report}}`, `{{transcript}}`, `{{attachments_text}}` by bash parameter expansion. The classify and gather renders use the same substitution style (comment "Build a prompt by safe bash substitution").
+- `bin/bug-pipeline-tick` has no code that strips or escapes a closing `</report>`, `</transcript>`, or `</untrusted>` in GM text. Attachment filenames get control-char stripping only.
+- Anthropic's Opus 5.5 prompting guide, section "Mark pasted text in user messages": wrap each untrusted block in opening and closing tags that both carry the same short random ID generated per request, each tag on its own line, e.g. `<report id="ab12">` … `</report id="ab12">`, and tell the model the ID pairs the tags.
+- Existing tests: `bin/test-bug-pipeline-classify` and the other `bin/test-bug-pipeline-*` scripts.
+
+## Resolved design decisions
+- The gap: GM text containing `</report>` (or `</untrusted>`) closes the data block early, and whatever follows it reads as prompt text outside the data frame.
+- Fix: generate one random nonce per render (e.g. 8 hex chars from `/dev/urandom` or `openssl rand -hex 4`) and put it in every opening and closing tag of that render. Templates get a `{{nonce}}` placeholder. The framing text names the tags with the ID and says only a closing tag carrying the same ID ends the block.
+- Keep bash parameter-expansion substitution. Never sed or eval on untrusted text (existing invariant, comments in the file).
+- Substitute `{{nonce}}` BEFORE the untrusted fields, so a GM-supplied literal `{{nonce}}` string is never expanded.
+- Defense in depth: also neutralize any closing tag of the wrapped names inside the untrusted text (e.g. rewrite `</report` to `</report_` ) before substitution. Nonce tags are the primary defense; this is the backup.
+- Do not change the "treat as data" wording beyond what the nonce requires.
+
+## Scope
+1. Nonce generation + `{{nonce}}` substitution in every bug-pipeline render path that injects GM text (hunter, classify, gather; check ci-autofix and include it only if it injects GM-authored text).
+2. Template updates for those prompts.
+3. Closing-tag neutralization of untrusted fields.
+4. Tests.
+Out of scope: interactive-session `pasted_content` handling; any other pipeline; changing classifier logic or outputs.
+
+## Hard constraints
+- No sed/eval on untrusted content.
+- Nonce must differ per render, and must not be derived from row data.
+
+## Verification
+- A test renders each prompt with GM text containing `</report>`, `</untrusted>`, and a literal `{{nonce}}`, and asserts: every tag carries the same nonce; the injected closing tag is neutralized; the literal `{{nonce}}` survives unexpanded; two renders produce different nonces.
+- Existing `bin/test-bug-pipeline-*` suites still pass.
+
+
+## Sequencing
+Slug `bug-pipeline-nonce-tags`, base `master`. No peer session owns these files.

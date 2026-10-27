@@ -46,4 +46,25 @@ class RetRepository extends \Database\BaseMysqliRepository
             $pid
         );
     }
+
+    /**
+     * Check if the .ret import has already run for a given retirement year.
+     */
+    public function hasRetiredPlayersForYear(int $retirementYear): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM `ibl_jsb_retired_players`
+             WHERE retirement_year = ?",
+            'i',
+            $retirementYear,
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $cnt = $row['cnt'];
+
+        return is_int($cnt) && $cnt > 0;
+    }
 }

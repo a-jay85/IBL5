@@ -6,7 +6,7 @@ vi.mock('./config.js', () => ({
     },
 }));
 
-import { apiPost, enqueue, sourceUpdated, sourceDeleted, ApiError } from './php-client.js';
+import { apiPost, enqueue, wake, sourceUpdated, sourceDeleted, ApiError } from './php-client.js';
 
 function mockFetchOnce(body: unknown, init?: { ok?: boolean; status?: number }): ReturnType<typeof vi.fn> {
     const fn = vi.fn().mockResolvedValue({
@@ -136,5 +136,35 @@ describe('sourceDeleted', () => {
         mockFetchOnce({ status: 'error', error: { code: 'NOT_FOUND', message: 'no match' } }, { ok: true, status: 200 });
 
         await expect(sourceDeleted({ message_id: '444444444444444444' })).rejects.toBeInstanceOf(ApiError);
+    });
+});
+
+describe('wake', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('php-client: wake posts to /api/v1/bug-pipeline/wake', async () => {
+        const fetchFn = mockFetchOnce({ status: 'success', data: { id: 5, outcome: 'woke', status: 'queued' } });
+        const body = {
+            source_message_id: '111111111111111111',
+            thread_id: '222222222222222222',
+            message_id: '333333333333333333',
+            author_id: '444444444444444444',
+            content: 'wake',
+        };
+
+        const result = await wake(body);
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        const [url, opts] = fetchFn.mock.calls[0];
+        expect(url.endsWith('/api/v1/bug-pipeline/wake')).toBe(true);
+        expect(opts.headers['X-API-Key']).toBe('test-api-key');
+        expect(JSON.parse(opts.body)).toEqual(body);
+        expect(result).toEqual({ id: 5, outcome: 'woke', status: 'queued' });
     });
 });

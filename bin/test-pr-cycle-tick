@@ -449,16 +449,16 @@ err_has() { grep -qF -- "$1" "$ERR"; }
 no_file() { [[ ! -e "$1" ]]; }
 # True when gh was never called, or only for reads the tick makes on the way to a launch: the
 # stale-label sweep's `pr list ... isDraft,labels`, the rescue path's `pr list ...
-# isDraft,baseRefName`, and its `api repos/.../commits/<sha>/check-runs?per_page=100`. Any
+# isDraft,baseRefName,labels`, and its `api repos/.../commits/<sha>/check-runs?per_page=100`. Any
 # other call (a timeline read, a label DELETE) is not accepted.
 gh_sweep_only() {
     [[ ! -e "$SCRATCH/gh.log" ]] && return 0
-    ! grep -vE '^(pr list .*isDraft,(labels|baseRefName)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
+    ! grep -vE '^(pr list .*isDraft,(labels|baseRefName,labels)|api repos/[^ ]*/commits/[^ ]+/check-runs\?per_page=100)$' \
         "$SCRATCH/gh.log" | grep -q .
 }
 # Stricter: gh was never called, or only for the stale-label sweep's `pr list ... isDraft,labels`.
 # For the early-exit cases (usage pause, live worker), which must stop before the rescue path's
-# `isDraft,baseRefName` list and `check-runs` read.
+# `isDraft,baseRefName,labels` list and `check-runs` read.
 gh_stale_label_only() {
     [[ ! -e "$SCRATCH/gh.log" ]] && return 0
     ! grep -vE '^pr list .*isDraft,labels$' "$SCRATCH/gh.log" | grep -q .
@@ -739,7 +739,7 @@ done
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 run_tick
-grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -qE -- 'isDraft,baseRefName$' \
+grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -qE -- 'isDraft,baseRefName,labels$' \
     || fail "gh-sweep-widened: no baseRefName read in gh.log"
 grep -qE -- '^api repos/.*/commits/aaa1111/check-runs\?per_page=100$' "$SCRATCH/gh.log" \
     || fail "gh-sweep-widened: no check-runs call in gh.log"
@@ -756,7 +756,7 @@ grep -E -- '^pr list ' "$SCRATCH/gh.log" | grep -E -- 'isDraft,labels$' > "$SCRA
 cp "$SCRATCH/gh.log" "$SCRATCH/gh.log.full"
 cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
 gh_stale_label_only || fail "gh-sweep-widened: strict helper rejected the stale-label read"
-grep -E -- '^pr list ' "$SCRATCH/gh.log.full" | grep -E -- 'isDraft,baseRefName$' >> "$SCRATCH/gh.log"
+grep -E -- '^pr list ' "$SCRATCH/gh.log.full" | grep -E -- 'isDraft,baseRefName,labels$' >> "$SCRATCH/gh.log"
 gh_stale_label_only && fail "gh-sweep-widened: strict helper accepted a baseRefName read"
 cp "$SCRATCH/gh.log.strict" "$SCRATCH/gh.log"
 grep -E -- '^api repos/.*/check-runs\?per_page=100$' "$SCRATCH/gh.log.full" >> "$SCRATCH/gh.log"
@@ -1193,6 +1193,24 @@ out_has "stacked on" && fail "stacked-on-closed-branch-not-skipped: logged a sta
 [[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 2950,2989 --max-ready 2" ]] \
     || fail "stacked-on-closed-branch-not-skipped: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
 end_case stacked-on-closed-branch-not-skipped
+
+# A needs-a-human PR waits on a human's review: no rescue, even when DIRTY. A PR whose
+# only label is another one still qualifies.
+reset; begin_case
+set_prs '2950|feat-a|aaa1111|DIRTY|false' '2951|feat-c|ccc3333|DIRTY|false' '2952|feat-d|ddd4444|BLOCKED|false'
+set_checks ddd4444 red
+jq -c 'map(if .number == 2950 then .labels = [{name:"needs-a-human"}]
+           elif .number == 2952 then .labels = [{name:"needs-a-human"}, {name:"post-plan-running"}]
+           else .labels = [{name:"human-approved"}] end)' "$SCRATCH/prs.json" > "$SCRATCH/prs.tmp"
+mv "$SCRATCH/prs.tmp" "$SCRATCH/prs.json"
+run_tick
+out_has "skip PR 2950: needs-a-human" || fail "needs-a-human-skipped: no DIRTY skip line: $OUT"
+out_has "skip PR 2952: needs-a-human" || fail "needs-a-human-skipped: no red skip line: $OUT"
+[[ "$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)" == "--go --only 2951 --max-ready 1" ]] \
+    || fail "needs-a-human-skipped: pr-cycle argv was '$(cat "$SCRATCH/pr-cycle.log" 2>/dev/null)'"
+grep -qF "$(printf '2950\tneeds-a-human')" "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null \
+    || fail "needs-a-human-skipped: notes file lacks the skip line: $(cat "$SCRATCH/pr-cycle-skip-notes-copy" 2>/dev/null)"
+end_case needs-a-human-skipped
 
 reset; begin_case
 set_prs '2950|feat-a|aaa1111|CLEAN|false' '2989|feat-b|bbb2222|DIRTY|false|feat-a'

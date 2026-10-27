@@ -37,5 +37,4 @@ A bounded fixer (`harness/conformance_fix.py`) runs once per post-plan run, afte
 - `tools/postplan-harness/runner.py`
 - `tools/postplan-harness/harness/armable.py`
 - `tools/postplan-harness/harness/conformance.py`
-- `.claude/skills/post-plan/_phase-5-final-verification.md`
 - ADR-0092 (main-checkout harness pin)

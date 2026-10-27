@@ -468,7 +468,7 @@ elif ! command -v timeout &>/dev/null; then
     }
 fi
 
-# Signal to /post-plan that we're running headless (skips Phase 11:
+# Signal to /post-plan that we're running headless (skips Phase 10:
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1
 

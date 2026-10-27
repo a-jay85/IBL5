@@ -7,12 +7,11 @@
 #
 # Usage: source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
 #
-# Three consumers must agree on "is this entry exempt from must-appear?":
+# Two consumers must agree on "is this entry exempt from must-appear?":
 #   1. bin/check-plan            — gates [C] (counting) and [F] (format)
-#   2. _phase-5-final-verification.md Phase 5.0 conformance block
-#   3. tools/postplan-harness/harness/planfile.py
-# (1) and (2) source THIS file, so they are one implementation, not two copies.
-# (3) cannot source shell; it mirrors the three patterns below and is pinned to
+#   2. tools/postplan-harness/harness/planfile.py (conformance.py reads its parse)
+# (1) sources THIS file. The skill's Phase 5.0 block also sourced it until it was retired.
+# (2) cannot source shell; it mirrors the three patterns below and is pinned to
 # them byte-for-byte by tests/test_planfile.py::test_lib_pattern_sync and
 # ::test_lib_abs_prefix_pattern_sync.
 #

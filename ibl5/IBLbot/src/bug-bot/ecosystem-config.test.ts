@@ -24,6 +24,7 @@ const REQUIRED = [
     'BUG_CHANNEL_ID',
     'BUG_PIPELINE_API_BASE_URL',
     'API_KEY',
+    'BUG_OPERATOR_DISCORD_ID',
 ] as const;
 
 const VALID: Record<string, string> = {
@@ -32,6 +33,7 @@ const VALID: Record<string, string> = {
     BUG_CHANNEL_ID: '222',
     BUG_PIPELINE_API_BASE_URL: 'http://127.0.0.1:18080',
     API_KEY: 'test-key',
+    BUG_OPERATOR_DISCORD_ID: '333',
 };
 
 const PRINT_SCRIPT =

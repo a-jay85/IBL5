@@ -103,6 +103,25 @@ export function threadReply(body: ThreadReplyBody): Promise<ThreadReplyResult> {
     return apiPost<ThreadReplyResult>('thread-reply', body);
 }
 
+// Operator @mention wake. Every field is a non-empty string (snowflakes stay strings —
+// never Number()). PHP answers 403 when author_id is not the operator, 404 when no
+// report row exists for source_message_id.
+export interface WakeBody {
+    source_message_id: string;
+    thread_id: string;
+    message_id: string;
+    author_id: string;
+    content: string;
+}
+export interface WakeResult {
+    id: number;
+    outcome: 'woke' | 'restarted' | 'appended' | 'duplicate';
+    status: string;
+}
+export function wake(body: WakeBody): Promise<WakeResult> {
+    return apiPost<WakeResult>('wake', body);
+}
+
 export interface ReactionBody {
     message_id: string;
     emoji: string;

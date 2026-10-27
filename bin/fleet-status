@@ -163,6 +163,15 @@ fi
 # differently-rendered page than the one it pins.
 [ -n "${FLEET_STATUS_FORCE_LINKS:-}" ] && LINKS=1
 
+# A loose session's task text (the first line of its `claude -p` prompt) prints
+# only on a terminal. Another Claude session that runs this script reads the page
+# into its context, and a peer's prompt there is a cross-session injection vector,
+# the same reason the session registry never stores task text. Off a terminal the
+# row keeps its worktree and agent name. The override exists for the test.
+PROMPTS=0
+[ -t 1 ] && PROMPTS=1
+[ -n "${FLEET_STATUS_FORCE_PROMPTS:-}" ] && PROMPTS=1
+
 # ── helpers ────────────────────────────────────────────────────────────────────
 
 # link_file <path> [text] — print TEXT as an OSC 8 hyperlink that opens <path>
@@ -1271,6 +1280,53 @@ EOF_Q
 # On a healthy fleet this section is therefore EMPTY, and that is the useful
 # reading. A row here is a `claude -p` burning tokens with nothing supervising it
 # — a run whose parent died, or one started by hand and forgotten.
+#
+# Under each row, one line says what the session is doing: its worktree slug,
+# then its --agent name or the first line of its prompt (terminal only, see
+# PROMPTS). Both come from the process itself, so the line costs no tokens.
+
+# The working directory of <pid>: /proc on Linux, lsof on macOS. Empty if neither.
+pid_cwd() {
+    local d
+    d="$(readlink "/proc/$1/cwd" 2>/dev/null)"
+    [ -z "$d" ] && command -v lsof >/dev/null 2>&1 \
+        && d="$(lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')"
+    printf '%s' "$d"
+}
+
+# "<where> · <what>" for a loose session. <args> is its `ps` command line.
+loose_summary() {
+    local pid="$1" args="$2" cwd where rest what='' agent cols
+    cwd="$(pid_cwd "$pid")"
+    case "$cwd" in
+        */IBL5-worktrees/*) where="${cwd#*/IBL5-worktrees/}"; where="${where%%/*}" ;;
+        '')                 where='?' ;;
+        *)                  where="${cwd##*/}" ;;
+    esac
+    agent="$(printf '%s' "$args" | sed -n 's/.*--agent \([^ ]*\).*/\1/p' | head -n 1)"
+    if [ -n "$agent" ]; then
+        what="agent $agent"
+    elif [ "$PROMPTS" -eq 1 ]; then
+        # The prompt is the text after `-p`, unless flags come first. macOS ps
+        # prints a newline as \012; cut there, then drop any control bytes.
+        # Linux ps prints it as `?`, so read the real argv from /proc there.
+        [ -r "/proc/$pid/cmdline" ] && args="$(tr '\000' ' ' < "/proc/$pid/cmdline")"
+        rest="${args#*claude -p }"
+        case "$rest" in
+            "$args"|-*) ;;
+            *) what="${rest%%\\012*}"; what="${what%%$'\n'*}"
+               what="$(printf '%s' "$what" | tr -d '\000-\037\177')" ;;
+        esac
+    fi
+    what="${where}${what:+ · $what}"
+    cols="$(tput cols 2>/dev/null)"
+    case "$cols" in ''|*[!0-9]*) cols="${COLUMNS:-120}" ;; esac
+    case "$cols" in ''|*[!0-9]*) cols=120 ;; esac
+    cols=$(( cols - 7 ))
+    [ "$cols" -lt 20 ] && cols=20
+    [ "${#what}" -gt "$cols" ] && what="${what:0:$(( cols - 1 ))}…"
+    printf '%s' "$what"
+}
 
 render_loose() {
     local count=0 pid args name
@@ -1290,6 +1346,7 @@ render_loose() {
         count=$(( count + 1 ))
         printf '  %s●%s pid %-7s up %-8s %s\n' \
             "$YEL" "$R" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$name"
+        printf '      %s%s%s\n' "$DIM" "$(loose_summary "$pid" "$args")" "$R"
     done <<EOF
 $(pgrep -f 'claude -p' 2>/dev/null)
 EOF

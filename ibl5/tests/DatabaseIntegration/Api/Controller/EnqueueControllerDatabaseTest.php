@@ -64,7 +64,7 @@ class EnqueueControllerDatabaseTest extends DatabaseTestCase
         // Verify the row actually landed in the DB
         $row = $this->bugRepo->findById($captured['report_id']);
         self::assertNotNull($row);
-        self::assertSame('queued', $row['status']);
+        self::assertSame('dormant', $row['status']);
         self::assertSame(self::KNOWN_AUTHOR, $row['discord_author_id']);
     }
 

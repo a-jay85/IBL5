@@ -63,6 +63,7 @@ EXPECTED_MOVED=(
 # The presplit fixture cannot see them, so assertions 1-2 do not protect them; check_added_rules does.
 ADDED_RULES=(
   "**Existing tests the spec forces to edit.**	backlog#912: plans omitted existing test files their own spec changes forced to edit (PR #2336), and fidelity review flagged them as scope creep"
+  "**Executable mutations.**	ADR-0199: PR #3264 row 20 claimed a mutation its check never read; the keyed section makes the claim executable"
 )
 
 # ── Validate allowlists ───────────────────────────────────────────────────────

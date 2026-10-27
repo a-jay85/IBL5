@@ -8,7 +8,7 @@ namespace YourAccount;
  * Renders Breeze-inspired auth pages: Login, Register, Forgot Password,
  * Activation status, Logout, and error/status pages.
  *
- * All pages share a centered card layout using .auth-page > .auth-card.ibl-card
+ * All pages share a centered card layout using .auth-page > .auth-card.d-card
  * with the existing IBL5 design system components.
  *
  * Thin delegating facade over the per-flow sub-views: LoginView, RegistrationView,

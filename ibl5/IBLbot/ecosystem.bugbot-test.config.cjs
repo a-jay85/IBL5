@@ -14,7 +14,7 @@ const t = dotenv.parse(fs.readFileSync(TEST_ENV));
 // Fail closed: every var config.ts requires must be present AND non-empty here,
 // or the unset one silently falls through to the production .env.bugbot.
 const REQUIRED = ['BUG_BOT_DISCORD_TOKEN', 'DISCORD_GUILD_ID', 'BUG_CHANNEL_ID',
-                  'BUG_PIPELINE_API_BASE_URL', 'API_KEY'];
+                  'BUG_PIPELINE_API_BASE_URL', 'API_KEY', 'BUG_OPERATOR_DISCORD_ID'];
 const missing = REQUIRED.filter((k) => !t[k] || t[k].trim() === '');
 if (missing.length > 0) {
   throw new Error(`.env.bugbot.test: unset or empty: ${missing.join(', ')}`);
@@ -50,6 +50,7 @@ module.exports = {
       BUG_CHANNEL_ID: t.BUG_CHANNEL_ID,
       BUG_PIPELINE_API_BASE_URL: t.BUG_PIPELINE_API_BASE_URL,
       API_KEY: t.API_KEY,
+      BUG_OPERATOR_DISCORD_ID: t.BUG_OPERATOR_DISCORD_ID,
     },
   }],
 };

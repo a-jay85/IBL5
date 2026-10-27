@@ -23,7 +23,7 @@
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
 #                   `paths-ignore:` under it. push.paths stays legal.
-#   mutation-pr:    four invariants (M1-M4) that keep the required check
+#   mutation-pr:    five invariants (M1-M5) that keep the required check
 #                   `Infection PHP (per-PR diff)` reporting on every PR: M1 always
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
@@ -539,6 +539,43 @@ else
     fail=1
   else
     echo "composite-contracts: mutation-pr keeps --min-msi=100 with no continue-on-error on that step (M4)"
+  fi
+
+  # M5: Infection resolves the diff. `git config diff.relative true` makes
+  # Infection join classes/X.php to the repo root, match no source file, and
+  # exit 0 with zero mutants, so the required check passed without mutating
+  # anything (PR #3443). No non-comment line may set diff.relative, and the
+  # step that runs vendor/bin/infection must also run check-infection-ran,
+  # which fails that case for a class outside source.excludes. Comment lines
+  # count on neither side.
+  _m5_bad=""
+  _m5_code="$(tr -d '\r' < "$mp_file" | grep -vE '^[[:space:]]*#' || true)"
+  if grep -qF 'diff.relative' <<< "$_m5_code"; then
+    _m5_bad="a non-comment line sets diff.relative"
+  else
+    _m5_rc=0
+    awk '
+      { sub(/\r$/, "") }
+      /^[[:space:]]*[#]/ { next }
+      function flush() {
+        if (step ~ /vendor\/bin\/infection/) { seen=1; if (step !~ /check-infection-ran/) bad=1 }
+        step=""
+      }
+      /^    - / { flush() }
+      { step = step "\n" $0 }
+      END { flush(); if (!seen) exit 2; exit bad }
+    ' <<< "$job_blk" || _m5_rc=$?
+    case "$_m5_rc" in
+      0) ;;
+      2) _m5_bad="no step runs vendor/bin/infection" ;;
+      *) _m5_bad="the step running vendor/bin/infection does not call check-infection-ran" ;;
+    esac
+  fi
+  if [ -n "$_m5_bad" ]; then
+    echo "composite-contracts: mutation-pr (M5) — $_m5_bad; Infection could pass the required check with zero mutants ($mp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: mutation-pr resolves the diff (no diff.relative) and guards the Infection run (M5)"
   fi
 
 fi  # end mp_file present

@@ -7,11 +7,12 @@ namespace Tests\Player\Stats\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Stats\Views\PlayerRegularSeasonTotalsView */
 class PlayerRegularSeasonTotalsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     public function testRenderTotalsMatchesSnapshot(): void
     {

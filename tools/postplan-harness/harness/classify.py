@@ -25,6 +25,8 @@ REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
 GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
 GATE_FIX_END = "<!-- gate-fix:end -->"
+EXEC_MUTATIONS_BEGIN = "<!-- exec-mutations:begin -->"
+EXEC_MUTATIONS_END = "<!-- exec-mutations:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -458,6 +460,53 @@ def upsert_gate_fix(body: str, block: str) -> str:
     well_formed = begin_idx != -1 and end_idx != -1 and begin_idx < end_idx
     if well_formed:
         after_end = end_idx + len(GATE_FIX_END)
+        if not block:
+            head = body[:begin_idx].rstrip("\n")
+            tail = body[after_end:].lstrip("\n")
+            return head + ("\n\n" + tail if tail else "\n") if head else tail
+        return body[:begin_idx] + block + body[after_end:]
+    if not block:
+        return body
+    if not body.strip():
+        return block
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def render_exec_mutations(report) -> str:
+    """Marker-delimited executable-mutations block (ADR-0199), or "" for an empty report.
+
+    `report` is a harness.mutations.MutationReport. Every `detail` echoes the plan's
+    `check` text, so it goes through _neutralize_headings like other plan prose.
+    """
+    if report is None:
+        return ""
+    lines: list[str] = []
+    if not report.ran:
+        lines.append("- executor did not run — arming held")
+    for r in report.results:
+        lines.append(f"- row {r.row}: {r.kind}")
+        lines.extend(_neutralize_headings(r.detail))
+    for h in report.holding:
+        if not any(h.startswith(f"row {r.row} {r.kind} ") for r in report.results):
+            lines.append("- executor:")
+            lines.extend(_neutralize_headings(h))
+    if report.tree_suspect:
+        lines.append("- tree could not be verified clean after mutation; "
+                     "inspect the worktree before merging")
+    if not lines:
+        return ""
+    return "\n".join([EXEC_MUTATIONS_BEGIN, "### Executable mutations", "", *lines,
+                      EXEC_MUTATIONS_END])
+
+
+def upsert_exec_mutations(body: str, report) -> str:
+    """Insert, replace, or remove the exec-mutations block; same contract as upsert_gate_fix."""
+    block = render_exec_mutations(report)
+    body = body or ""
+    begin_idx = body.find(EXEC_MUTATIONS_BEGIN)
+    end_idx = body.find(EXEC_MUTATIONS_END)
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(EXEC_MUTATIONS_END)
         if not block:
             head = body[:begin_idx].rstrip("\n")
             tail = body[after_end:].lstrip("\n")

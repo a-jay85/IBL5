@@ -7,11 +7,12 @@ namespace Tests\Player\Stats\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerSimStatsView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Stats\Views\PlayerSimStatsView */
 class PlayerSimStatsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     private function makeView(): PlayerSimStatsView
     {

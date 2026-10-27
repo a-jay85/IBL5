@@ -97,7 +97,7 @@ RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
 # Carve-out H1: an additive gate whose only weakening stem is a past
 # participle (an adjective such as a deleted symbol) is not a weakening.
 ADDITIVE_RE='additive'
-HARD_WEAKEN_RE='(relax|disabl|weaken|loosen|bypass|waive|exempt|turn off|opt[- ]out|soften|remove([^d]|$)|removing|removal|delete([^d]|$)|deleting|deletion|strip([^p]|$)|stripping)'
+HARD_WEAKEN_RE='(relax|disabl|weaken|loosen|bypass|waive|exempt|turn off|opt[- ]out|soften|remove([^d]|$)|removing|removal|delete([^d]|$)|deleting|deletion|strip([^p]|$)|stripping|(get|gets|got|is|are|was|were|be|been|being) (removed|deleted|stripped))'
 
 match() {
     printf '%s' "$HAY" | grep -Eq "$1"

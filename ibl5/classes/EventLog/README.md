@@ -1,6 +1,6 @@
 ---
 description: Fire-and-forget product-analytics request logging to the ibl_events table, with traffic classification and domain-event instrumentation.
-last_verified: 2026-10-20
+last_verified: 2026-10-27
 ---
 
 # EventLog
@@ -13,7 +13,7 @@ Four columns were added in migration 159:
 
 - **`session_id`** (`VARCHAR(64) NULL`) — SHA-256 hash of `session_id()`. **NOT the raw session token** — the hash is one-way and cannot be replayed. Rotates on login (`session_regenerate_id(true)` at `classes/Auth/AuthService.php`), so one visit spanning a login produces two distinct hashes. `NULL` when no PHP session is active. Do not treat this as a stable visit key.
 - **`http_status`** (`SMALLINT NULL`) — HTTP response code, captured at shutdown by `EventLogger::flush()`. `NULL` when the request died before shutdown or returned a code outside 100–599.
-- **`traffic_class`** (`VARCHAR(32) NULL`) — Reporting label derived from the user agent and username. One of exactly five literals, evaluated in this order: `smoke-test`, `authenticated`, `crawler`, `spam`, `anonymous-human`. **NEVER use this column for authorization or rate-limiting** — it is a reporting label only, and an attacker can self-select into any class by crafting their user agent.
+- **`traffic_class`** (`VARCHAR(32) NULL`): Reporting label derived from the user agent and username. One of exactly five literals, evaluated in this order: `smoke-test`, `authenticated`, `crawler`, `spam`, `anonymous-human`. **NEVER use this column for authorization or rate-limiting**. It is a reporting label only, and an attacker can self-select into any class by crafting their user agent. An anonymous request whose user agent is missing, empty, or whitespace-only is a `crawler`; a logged-in GM with a blank user agent stays `authenticated`.
 - **`action`** (`VARCHAR(64) NULL`) — Domain-event literal set by a controller via `EventLogger::setAction()`. Always a hardcoded PHP string literal at the call site, never a value derived from `$_POST`/`$_GET`. `NULL` for plain pageviews.
 
 ## Return contract
@@ -45,11 +45,11 @@ Call `\EventLog\EventLogger::setAction('your_event')` on the **success path** of
 
 ## Weekly review
 
-`bin/events-review` is the only reader of `ibl_events` outside the backup workflow. launchd runs it Sundays at 16:03 UTC (08:03 and 09:03 local entries plus `--at-reset`, so one fire runs across the PDT/PST switch) on the owner's Mac. It reads the last 7 days through the ADR-0093 SELECT-only credential and builds a digest with these sections: traffic classes against the prior week, active GMs and an event-count histogram, top routes for logged-in GMs and for anonymous humans, domain actions, status classes, referer buckets, and a per-day trend. A tool-less `claude -p` run drafts 3 to 5 recommendations. The reply is defanged and posted to the #reviews channel through `bin/discord-dm`. Nothing is applied automatically. A week with fewer than 20 human events sends one line and spawns no model. The decision record is `ibl5/docs/decisions/0168-weekly-events-review.md`.
+`bin/events-review` is the only reader of `ibl_events` outside the backup workflow. launchd runs it Sundays at 16:03 UTC (08:03 and 09:03 local entries plus `--at-reset`, so one fire runs across the PDT/PST switch) on the owner's Mac. It reads the last 7 days through the ADR-0093 SELECT-only credential and builds a digest with these sections: traffic classes against the prior week, active GMs and an event-count histogram, top routes for logged-in GMs (each with its distinct-GM count, e.g. `40  trade (1 GM)`) and for anonymous humans, domain actions, status classes, a 4xx breakdown (counts by 404 / 403 / other 4xx, the number of distinct route names drawing 4xx, and the top 4xx routes per human class), referer buckets, and a per-day trend. A tool-less `claude -p` run drafts 3 to 5 recommendations. The reply is defanged and posted to the #reviews channel through `bin/discord-dm`. Nothing is applied automatically. A week with fewer than 20 human events sends one line and spawns no model. The decision record is `ibl5/docs/decisions/0168-weekly-events-review.md`.
 
 **Privacy contract.** The aggregate never selects `request_uri` or `user_agent`. It reduces `referer` to four literals: `none`, `internal`, `search`, `external`. `username` and `session_id` reach the output only as counts.
 
-**Rendering rule for authors of new events.** An `action` literal must match `^[a-z][a-z0-9_]{0,47}$` or the digest folds it into `other`. A route renders only if a logged-in GM hit it that week. Every other route name folds into `other`, because `route_name` comes from `?name=` and anyone can mint one.
+**Rendering rule for authors of new events.** An `action` literal must match `^[a-z][a-z0-9_]{0,47}$` or the digest folds it into `other`. A route renders only if a logged-in GM hit it that week. Every other route name folds into `other`, because `route_name` comes from `?name=` and anyone can mint one. The 4xx route list uses the same fold set: the top 25 routes by GM views. A 4xx name outside that set folds, even when a GM drew the 4xx.
 
 **Setup, in this order:**
 

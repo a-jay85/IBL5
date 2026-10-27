@@ -64,6 +64,22 @@ day	anonymous-human	2026-09-24	7
 day	anonymous-human	2026-09-25	9
 day	anonymous-human	2026-09-26	8
 day	anonymous-human	2026-09-27	9
+routegms	authenticated	team	9
+routegms	authenticated	player	7
+routegms	authenticated	depth_chart	5
+routegms	authenticated	trade	1
+routegms	anonymous-human	team	4
+status4xx	authenticated	404	2
+status4xx	anonymous-human	404	7
+status4xx	anonymous-human	403	2
+status4xx	anonymous-human	other4xx	1
+route4xxn	authenticated	all	2
+route4xxn	anonymous-human	all	3
+route4xx	authenticated	player	1
+route4xx	authenticated	zz_gm_typo	1
+route4xx	anonymous-human	wp_login	5
+route4xx	anonymous-human	player	2
+route4xx	anonymous-human	Wp-Login.php	1
 route	authenticated	team
 route	authenticated	team	12abc
 uri	x	y	5

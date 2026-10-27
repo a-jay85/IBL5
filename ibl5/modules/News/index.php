@@ -23,12 +23,9 @@ if (!defined('INDEX_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1;
-global $leagueContext;
-assert($mysqli_db instanceof \mysqli);
-assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
-
-$newsPageConfig = new \Topics\News\NewsPageConfig(
+global $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1;
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\NewsFactory::class);
+$controller = $factory->controller(
     storyHome: is_numeric($storyhome) ? (int) $storyhome : 0,
     userNews: is_numeric($user_news) ? (int) $user_news : 0,
     articleComm: is_numeric($articlecomm) ? (int) $articlecomm : 0,
@@ -36,24 +33,6 @@ $newsPageConfig = new \Topics\News\NewsPageConfig(
     multilingual: is_numeric($multilingual) ? (int) $multilingual : 0,
     currentLang: is_string($currentlang) ? $currentlang : '',
     tableBgcolor1: is_string($bgcolor1) ? $bgcolor1 : '#EEEEEE',
-);
-
-$controller = new \Topics\News\NewsController(
-    $newsPageConfig,
-    $authService,
-    new \Repositories\TeamIdentityRepository($mysqli_db),
-    new \LastSimRecap\LastSimRecapService(
-        new \LastSimRecap\LastSimRecapRepository($mysqli_db),
-        new \Repositories\PlayerLookupRepository($mysqli_db),
-    ),
-    new \LastSimRecap\LastSimRecapView(),
-    new \Topics\News\NewsService($mysqli_db),
-    new \Topics\News\NewsView(),
-    onThisDayService: \OnThisDay\OnThisDayFactory::createService(
-        $mysqli_db,
-        $leagueContext instanceof \League\LeagueContext ? $leagueContext : null,
-    ),
-    onThisDayView: new \OnThisDay\OnThisDayView(),
 );
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().

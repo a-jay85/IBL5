@@ -50,7 +50,7 @@ test.describe('daisyUI pilot -- FA negotiate page', () => {
       const button = page.getByRole('button', { name: 'Offer / Amend Free Agent Contract' });
       await expect(button).toBeVisible();
 
-      expect(await button.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(17, 24, 39)');
+      expect(await button.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(30, 41, 59)');
     });
 
     test('card title bar is navy with white text', async ({ page }) => {

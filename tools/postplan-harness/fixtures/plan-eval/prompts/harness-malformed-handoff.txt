@@ -1,0 +1,33 @@
+Harden harness handoff-file parsing so a malformed handoff fails loudly and stays resumable instead of stranding a finished worktree (backlog #715)
+
+## Exploration pointers
+- `gh issue view 715 -R a-jay85/IBL5-backlog` — the bug: a badly shaped handoff file can strand a finished worktree. It really happened on 2026-09-17. Read it for which file, which shape, and what got stranded.
+- `.claude/rules/workflow-continuity-detail.md` — harness engine and handoff flow.
+- NOTE: the UserPromptSubmit reference resolver maps `#715` to IBL5 PR #715 (Lighthouse CI). That is wrong. The reference is backlog issue a-jay85/IBL5-backlog#715.
+
+## Resolved design decisions
+- A malformed handoff must fail loudly (clear error in the log and finish DM) and leave the worktree in a state that can be resumed or re-run. It must not silently accept the bad file, and it must not leave finished work with no path forward.
+- Validate the handoff shape early, before any step that is hard to undo.
+- Do not loosen what counts as a valid handoff to make the stranding go away.
+
+## Scope
+1. Reproduce the 2026-09-17 malformed-handoff case from the issue.
+2. Add shape validation with a clear failure message.
+3. Make the failure path leave the worktree recoverable, and name the recovery command in the message.
+4. Regression test with the malformed shape.
+Out of scope: redesigning the handoff format.
+
+## Hard constraints
+- Add a `## Backlog issues` section closing a-jay85/IBL5-backlog#715.
+- Tooling-only change: title type `fix:`.
+
+## Blocking questions to resolve inside the plan
+- Which step currently strands the worktree, and what does "recoverable" mean there (resume command, re-run, manual step)? Resolve inside the plan from the code.
+
+## Verification
+- Malformed handoff: run exits non-zero, message names the problem and the recovery step, worktree is left intact.
+- Well-formed handoff: behavior unchanged.
+
+
+## Sequencing
+Slug `harness-malformed-handoff`, base `master`. The #896 plan fired alongside may touch the same harness scripts. If so, it is a rebase only. Anchor edits on surrounding text, never line numbers. Don't re-implement or depend on its work.

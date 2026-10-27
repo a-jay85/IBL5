@@ -18,26 +18,10 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Repositories\TeamIdentityRepository;
-use Schedule\ScheduleController;
-use Standings\StandingsRepository;
-use TeamSchedule\TeamScheduleRepository;
-use LeagueSchedule\LeagueScheduleRepository;
-
-global $mysqli_db, $leagueContext;
-/** @var \mysqli $mysqli_db */
-/** @var \League\LeagueContext $leagueContext */
-
 $teamidParam = $_GET['teamid'] ?? $_GET['teamID'] ?? null;
 $teamid = is_string($teamidParam) ? (int) $teamidParam : 0;
-$controller = new ScheduleController(
-    $mysqli_db,
-    $leagueContext,
-    new TeamIdentityRepository($mysqli_db),
-    new StandingsRepository($mysqli_db, $leagueContext),
-    new TeamScheduleRepository($mysqli_db, $leagueContext),
-    new LeagueScheduleRepository($mysqli_db, $leagueContext)
-);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ScheduleFactory::class);
+$controller = $factory->controller();
 
 PageLayout\PageLayout::header();
 echo $controller->render($teamid);

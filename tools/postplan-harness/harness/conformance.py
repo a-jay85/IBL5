@@ -1,5 +1,5 @@
 """Phase 5.0 — plan→test and plan→file (Critical Files) conformance. Pure port of
-_phase-5-final-verification.md's two check loops."""
+the retired post-plan skill Phase 5 text's (ported 2026-10-19) two check loops."""
 from __future__ import annotations
 
 import fnmatch

@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 22,
+        "argument.type": 3,
         "booleanNot.exprNotBoolean": 2,
         "equal.notAllowed": 2,
         "function.alreadyNarrowedType": 1,

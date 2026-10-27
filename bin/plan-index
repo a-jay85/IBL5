@@ -30,7 +30,7 @@
 # Fenced code blocks: a fenced block can contain a line starting with `## `, which would
 # index a phantom section. Fence tracking is width-aware (this repo wraps 3-backtick blocks
 # in 4-backtick ones, and per CommonMark a closing fence must be at least as long as its
-# opener), matching the same rule in post-plan's _phase-5-final-verification.md.
+# opener), matching the same rule in tools/postplan-harness/harness/planfile.py.
 
 set -euo pipefail
 

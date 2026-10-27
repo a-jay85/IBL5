@@ -30,7 +30,7 @@ def inputs(**kw):
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, current_tree=TREE,
-                merge_danger_state="TWO-WAY")
+                merge_danger_state="TWO-WAY", removed_guards_holds=[])
     base.update(kw)
     return ArmInputs(**base)
 

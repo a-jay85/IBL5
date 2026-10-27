@@ -46,8 +46,6 @@ class NewsController implements NewsControllerInterface
         private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
         private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
         private readonly \Api\Contracts\HtmlResponderInterface $htmlResponder = new \Api\Response\HtmlResponder(),
-        private readonly ?\OnThisDay\Contracts\OnThisDayServiceInterface $onThisDayService = null,
-        private readonly ?\OnThisDay\Contracts\OnThisDayViewInterface $onThisDayView = null,
     ) {}
 
     public function main(mixed $new_topic): void
@@ -59,7 +57,6 @@ class NewsController implements NewsControllerInterface
         $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
         $this->renderHeader();
         $this->renderSimRecap($userinfo);
-        $this->renderOnThisDay($new_topic);
 
         if (defined('HOME_FILE')) {
             blocks("Center");
@@ -121,25 +118,6 @@ class NewsController implements NewsControllerInterface
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * Homepage-only "On this day" card. A history query failure must never take the homepage down.
-     */
-    private function renderOnThisDay(int $newTopic): void
-    {
-        if ($this->onThisDayService === null || $this->onThisDayView === null || $newTopic !== 0) {
-            return;
-        }
-
-        try {
-            $html = $this->onThisDayView->renderHomepageBlock($this->onThisDayService->getMomentsForSim());
-            if ($html !== '') {
-                $this->htmlResponder->html($html);
-            }
-        } catch (\Throwable $e) {
-            error_log('[OnThisDay] homepage block skipped: ' . $e->getMessage());
         }
     }
 

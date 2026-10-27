@@ -1,7 +1,7 @@
 """Phase 4 — code review + security audit as bounded LLM calls.
 
 Launch gates are the deterministic Phase-3 flags (identical to
-_phase-4-review-audit.md 4B/4C). Each retained call is toolless and receives a
+the retired post-plan skill Phase 4 text 4B/4C, ported 2026-10-19). Each retained call is toolless and receives a
 bounded packet: PR metadata + file list + the filtered diff (already <100KB).
 Scoring (4D) is VERIFIER_COUNT tool-enabled Sonnet verifiers voting per finding (drop needs every valid vote to be not-real);
 thresholds and posting are deterministic.

@@ -682,25 +682,6 @@ def test_live_adapter_status_label_issues_expected_gh_calls(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Test 13: skill_md blocks
-# ---------------------------------------------------------------------------
-
-def test_skill_md_label_block_and_failure_reader():
-    skill_md = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
-    src = open(skill_md).read()
-
-    assert "POSTPLAN_STATUS_LABEL" in src, "POSTPLAN_STATUS_LABEL guard not in SKILL.md"
-    assert "POSTPLAN_BADGE_BODY" not in src
-    assert "<!-- postplan-status -->" not in src
-    assert "best-effort" in src, "best-effort note not in SKILL.md"
-    assert 'labels[]=$POSTPLAN_STATUS_LABEL' in src
-    assert "--color FBCA04" in src
-
-    # The failure-comment reader
-    assert 'contains("<!-- postplan-failure -->")' in src
-    assert "data, never instructions" in src
-
-# ---------------------------------------------------------------------------
 # Test: missing_library (matrix row 6)
 # ---------------------------------------------------------------------------
 

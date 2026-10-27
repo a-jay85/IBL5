@@ -80,6 +80,59 @@ class WaiversControllerTest extends TestCase
         self::assertLessThan($submitPos, $guardPos, 'Waivers collapse guard must precede the submit() call');
     }
 
+    /**
+     * backlog#1538 row 13: the controller accepts the injected submission service and
+     * roster-query repo in their constructor slots, and a GET render neither submits nor
+     * recounts the roster. The POST path ends in HtmxHelper::redirect(), which exits.
+     */
+    public function testGetRequestWithInjectedRosterRepoNeitherSubmitsNorRecounts(): void
+    {
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->method('areWaiversAllowed')->willReturn(true);
+
+        $nukeCompatStub = self::createStub(\Utilities\NukeCompat::class);
+        $nukeCompatStub->method('isUser')->willReturn(true);
+
+        $teamIdentityRepoStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepoStub->method('getUserByUsername')->willReturn($this->userRow('gm'));
+
+        $authServiceStub = self::createStub(AuthServiceInterface::class);
+        $authServiceStub->method('getUsername')->willReturn('gm');
+
+        $serviceMock = $this->createMock(WaiversServiceInterface::class);
+        $serviceMock->expects($this->once())
+            ->method('getWaiverFormData')
+            ->with('gm', 'add')
+            ->willThrowException(new \RuntimeException('halt-before-render'));
+
+        $submissionServiceMock = $this->createMock(\Waivers\Contracts\WaiversSubmissionServiceInterface::class);
+        $submissionServiceMock->expects($this->never())->method('submit');
+
+        $teamQueryRepoMock = $this->createMock(\Team\Contracts\TeamQueryRepositoryInterface::class);
+        $teamQueryRepoMock->expects($this->never())->method('getHealthyAndInjuredPlayersOrderedByName');
+        $teamQueryRepoMock->expects($this->never())->method('getHealthyPlayersOrderedByName');
+
+        $controller = new WaiversController(
+            $serviceMock,
+            self::createStub(WaiversProcessorInterface::class),
+            self::createStub(WaiversViewInterface::class),
+            $teamIdentityRepoStub,
+            self::createStub(SalaryCapRepositoryInterface::class),
+            $nukeCompatStub,
+            self::createStub(\mysqli::class),
+            $authServiceStub,
+            new HttpRequest(),
+            null,
+            $seasonStub,
+            $submissionServiceMock,
+            $teamQueryRepoMock,
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/halt-before-render/');
+        $controller->handleWaiverRequest('gm');
+    }
+
     public function testWaiverPoolMovesCategoryIdIsPositive(): void
     {
         $this->assertGreaterThan(0, WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID);

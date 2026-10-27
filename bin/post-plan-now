@@ -7,11 +7,16 @@
 # checkout (tools/postplan-harness, see its README) it runs `./run isolated <root>
 # --live` — the deterministic phase sequencer with bounded LLM calls (~65-100x
 # fewer gross tokens than a skill session). If the harness exits nonzero, or is
-# absent on this machine, the same launchd job falls back to the original
-# Sonnet 5.5 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
-# The harness intentionally omits backlog housekeeping, worktree teardown, the
-# E2E verify track, and Phase 10 preview — the skill fallback retains them.
-# The harness runs the Phase 5.5 fidelity review itself; there is no partial-run resume, so any harness exit other than 0, 3 or 7 re-runs the full skill.
+# absent on this machine, the same launchd job falls back to the shrunk
+# Sonnet 5.5 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path,
+# which ships nothing on its own (see the WARNING below the engine selection).
+# The harness owns every ship phase including backlog housekeeping (runner.py
+# out-of-scope sweep). The skill fallback is a thin remainder: harness-crash
+# triage (report and hold, never arm), a dedup-safe backlog repeat, the E2E verify
+# track, and Phase 10 preview; it does not tear the worktree down. Any harness exit other than
+# 0, 3 or 7 launches that remainder with POSTPLAN_HARNESS_RC set to the exit code.
+# Measured 2026-10-19 over the records on disk (about 8 days): 1 fallback in
+# roughly 300 runs.
 #
 # Either way the run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
@@ -87,6 +92,7 @@
 # tested logic here is exactly what runs there.
 # $2 = 1 in --rebase-only mode: the skill has no rebase-only path and would run the
 # full review on a PR only a human can clear, so a rebase-only failure never falls back.
+# The fallback never arms; see .claude/skills/post-plan/SKILL.md Phase 2.
 should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }
 # rebase_only_harness_arg <0|1>: the harness flag for --rebase-only, or nothing.
 rebase_only_harness_arg() { [ "${1:-0}" = 1 ] && printf ' --rebase-only'; return 0; }
@@ -709,9 +715,9 @@ if [ -n "$RESUME_SID" ] && usage_session_started "$SESSION_ID"; then
 fi
 
 if [ -n "$PLAN_OVERRIDE" ]; then
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
 else
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
 fi
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
@@ -808,6 +814,12 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_ST
     GATE_CLOSE="; elif postplan_killed \"\$rc\" \"\${_sigterm_received:-0}\" $LOG_Q; then echo \"post-plan-now: RESULT killed (harness rc=\$rc); no skill fallback and no usage-gate pause.\"; (exit 143); elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\" \"$FIX_ROOT\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
+# The shrunk skill never commits, pushes, opens a PR or arms. Without the harness a run
+# ships nothing, so say so up front instead of letting a silent exit 0 look like a ship.
+if [ -z "$HARNESS_SEG" ]; then
+    ENGINE="$ENGINE only (no harness: nothing is committed, pushed or opened as a PR)"
+    echo "post-plan-now: WARNING: harness not used (POST_PLAN_SKILL=1, a resume, or no $HARNESS/run). This run will not ship." >&2
+fi
 
 # launchd runs with a minimal env, so prepend the same PATH bin/automouse/run uses
 # (proven to find claude/gh/docker/node for full post-plan runs). CLAUDE_HEADLESS=1
@@ -867,6 +879,8 @@ esac
 # Every other failed run DMs too. Exit 3 already sent its own DM above; 143 is a
 # deliberate SIGTERM. The last log lines carry the cause, e.g. a usage-limit notice.
 # $fail_tail is read into a variable, so log text is data and never re-parsed as shell.
+# This is the only crash DM. The skill's crash triage only reports and sends no DM,
+# so a harness crash DMs once even when the skill session dies before its triage block.
 FAILDM_SEG="if [ \"\$pp_rc\" != 0 ] && [ \"\$pp_rc\" != 3 ] && [ \"\$pp_rc\" != 143 ] && [ \"\$pp_rc\" != 75 ]; then fail_tail=\$(tail -n 3 \"$LOG\" 2>/dev/null | tr '\n' ' ' | cut -c1-600); msg=\"post-plan-now: run FAILED on branch $SLUG (exit \$pp_rc). Last log lines: \${fail_tail:-none}. Re-run: cd $ROOT && bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi; "
 
 # A paused run (marker on disk, or a limit-hit log) exits 75 and skips the FAIL-DM; the
@@ -887,7 +901,7 @@ else
     SKILL_SESSION_ARG="--session-id $(shq "$SESSION_ID")"
 fi
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}POSTPLAN_HARNESS_RC=\"\${rc:-}\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; elif [ \"\$pp_rc\" = 0 ] && [ -n \"\${rc:-}\" ] && [ \"\$rc\" != 0 ] && [ \"\$rc\" != 7 ]; then pp_rc=\$rc; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"

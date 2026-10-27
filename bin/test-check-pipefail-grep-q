@@ -34,6 +34,10 @@ git -C "$REPO" init -q
 git -C "$REPO" config user.email "test@example.com"
 git -C "$REPO" config user.name "check-pipefail-grep-q test"
 git -C "$REPO" config commit.gpgsign false
+# No detached auto-gc/maintenance: it can still be writing .git when the
+# EXIT trap runs, and rm -rf then fails with "Directory not empty".
+git -C "$REPO" config gc.auto 0
+git -C "$REPO" config maintenance.auto false
 mkdir -p "$REPO/bin" "$REPO/scripts"
 cp "$SCRIPT" "$REPO/bin/check-pipefail-grep-q"
 chmod +x "$REPO/bin/check-pipefail-grep-q"

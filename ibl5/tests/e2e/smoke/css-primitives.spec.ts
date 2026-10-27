@@ -68,12 +68,12 @@ const EXPECTED_CHIPS: Record<string, Styles> = {
   },
   dc: {
     display: 'block', borderTopLeftRadius: '4.5px', fontWeight: '700', whiteSpace: 'normal',
-    textTransform: 'uppercase', paddingTop: '2px', paddingLeft: '6px', backgroundColor: 'rgb(17, 24, 39)',
+    textTransform: 'uppercase', paddingTop: '2px', paddingLeft: '6px', backgroundColor: 'rgb(30, 41, 59)',
     color: 'rgb(255, 255, 255)', fontSize: '12.375px', letterSpacing: 'normal', fontFamily: BARLOW,
   },
   league: {
     display: 'inline-flex', borderTopLeftRadius: '6.75px', fontWeight: '700', whiteSpace: 'normal',
-    textTransform: 'uppercase', paddingTop: '4.5px', paddingLeft: '13.5px', backgroundColor: 'rgb(17, 24, 39)',
+    textTransform: 'uppercase', paddingTop: '4.5px', paddingLeft: '13.5px', backgroundColor: 'rgb(30, 41, 59)',
     color: 'rgb(255, 255, 255)', fontSize: '15.75px', letterSpacing: '1.26px',
     fontFamily: '"Barlow Condensed", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   },
@@ -84,13 +84,13 @@ const EXPECTED_CHIPS: Record<string, Styles> = {
   },
   recap: {
     display: 'block', borderTopLeftRadius: '4.5px', fontWeight: '700', whiteSpace: 'normal',
-    textTransform: 'uppercase', paddingTop: '1px', paddingLeft: '6px', backgroundColor: 'rgb(17, 24, 39)',
+    textTransform: 'uppercase', paddingTop: '1px', paddingLeft: '6px', backgroundColor: 'rgb(30, 41, 59)',
     color: 'rgb(255, 255, 255)', fontSize: '12.375px', letterSpacing: '1.2375px',
     fontFamily: '"JetBrains Mono", "Fira Code", monospace',
   },
   allstar: {
     display: 'inline', borderTopLeftRadius: '9999px', fontWeight: '500', whiteSpace: 'nowrap',
-    textTransform: 'none', paddingTop: '2.25px', paddingLeft: '9px', backgroundColor: 'rgb(17, 24, 39)',
+    textTransform: 'none', paddingTop: '2.25px', paddingLeft: '9px', backgroundColor: 'rgb(30, 41, 59)',
     color: 'rgb(255, 255, 255)', fontSize: '15.75px', letterSpacing: 'normal', fontFamily: BARLOW,
   },
 };
@@ -110,7 +110,7 @@ const LABEL_PROPS = [
 
 const EXPECTED_LABEL: Styles = {
   display: 'block', fontSize: '18px', lineHeight: '27px', fontWeight: '600', letterSpacing: '1.8px',
-  textTransform: 'uppercase', color: 'rgb(107, 114, 128)', marginBottom: '9px',
+  textTransform: 'uppercase', color: 'rgb(156, 163, 175)', marginBottom: '9px',
 };
 
 test.describe('CSS shared primitives', () => {

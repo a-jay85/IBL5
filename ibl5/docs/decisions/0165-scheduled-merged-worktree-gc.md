@@ -1,6 +1,6 @@
 ---
-description: Scheduled launchd sweep that reaps merged worktrees via bin/cleanup --all and only surfaces stalled, unpushed and empty ones.
-last_verified: 2026-10-03
+description: Scheduled launchd sweep that reaps merged worktrees via bin/cleanup --all and only surfaces stalled, unpushed and empty ones. The EMPTY rejection is superseded in part by ADR-0212.
+last_verified: 2026-10-22
 ---
 
 # ADR-0165: Scheduled merged-worktree GC
@@ -59,3 +59,9 @@ label is registered in `bin/lib/launchd-expected-jobs.sh`, so
 - `bin/wt-status`: the read-only classifier the tick counts.
 - `bin/lib/launchd-expected-jobs.sh`: health-check registry that lists the label.
 - `ibl5/docs/decisions/0106-local-worktree-sync-fast-forward.md`: the gate set this driver copies.
+
+## Addendum 2026-10-22: Superseded in part by ADR-0212
+
+The Alternatives Considered entry that rejected reaping EMPTY worktrees is superseded for worktrees older than 7 days. ADR-0212 reaps them only after re-proving at reap time that they have no own commits, a clean tracked tree, and no live-work signal. EMPTY worktrees younger than 7 days are still only surfaced.
+
+**Superseded by:** `ibl5/docs/decisions/0212-wt-gc-reap-stale-junk.md`

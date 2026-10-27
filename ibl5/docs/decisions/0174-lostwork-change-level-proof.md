@@ -1,6 +1,6 @@
 ---
 description: The post-plan lost-work proof reads the post-rebase tree per branch line instead of comparing numstat rows, so master edits to the same file no longer block; ambiguity still blocks.
-last_verified: 2026-10-19
+last_verified: 2026-10-22
 ---
 
 # ADR-0174: Lost-work proof compares branch changes against the post-rebase tree
@@ -133,10 +133,10 @@ not an ancestor keeps the `iblBase` range. For #3105 this was not the cause; it 
 narrower case the investigation found.
 
 The harness loads the proof from the pinned `origin/master` SHA, so the rule change applies
-to runs started after this merges. The skill engine
-(`.claude/skills/post-plan/_phase-2-conflict-resolution.md`) runs the same script and
-inherits it. Tests: `tools/postplan-harness/tests/test_lostwork_change_level.py` (both
-type-change directions, the mode-mismatch and retargeted negatives, the unchanged real
+to runs started after this merges. The conflict ladder
+(`tools/postplan-harness/harness/conflict_ladder.py`) runs the same script and inherits it.
+The skill engine's conflict phase was retired by the post-plan skill shrink.
+Tests: `tools/postplan-harness/tests/test_lostwork_change_level.py` (both type-change directions, the mode-mismatch and retargeted negatives, the unchanged real
 lost deletion), `tools/postplan-harness/tests/test_gitad_squash_before_onto.py` (stale
 base with a reversed master deletion, a branch deletion still charged, the non-ancestor
 parent), and `bin/test-postplan-arm-conditions` §5.9g.
@@ -145,7 +145,7 @@ parent), and `bin/test-postplan-arm-conditions` §5.9g.
 
 - `.claude/review-shared/scripts/lostwork.sh`: the proof.
 - `tools/postplan-harness/harness/adapters/gitad.py`: `_load_lostwork`, `_prove_tree_equivalent`, `prove_lostwork` consume the unchanged contract.
-- `.claude/skills/post-plan/_phase-2-conflict-resolution.md`: Step 6 describes the proof.
+- `tools/postplan-harness/harness/adapters/gitad.py` and `tools/postplan-harness/harness/conflict_ladder.py`: the conflict-resolution path that runs the proof.
 - `tools/postplan-harness/tests/test_lostwork_change_level.py` and `bin/test-postplan-arm-conditions` §5.9g: the behavior table.
 - `tools/postplan-harness/scripts/lostwork-backtest.sh`: reconstructs the seven real runs.
 - `ibl5/docs/decisions/0134-harness-conflict-autoresolve.md`: the conjunctive gate this proof sits behind.

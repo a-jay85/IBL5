@@ -9,13 +9,6 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
 class NewsEntryPointTest extends ModuleEntryPointTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // No sim recorded: the On this day block stays out of these story characterizations.
-        $this->mockDb->onQuery('ibl_sim_dates', []);
-    }
-
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testCharacterizationHomeStoryRendersReadMore(): void

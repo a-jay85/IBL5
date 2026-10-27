@@ -106,7 +106,9 @@ class PlayerExportControllerTest extends WideUnitTestCase
         // Verify key column headers from PlayerExportTransformer::HEADERS
         $this->assertStringContainsString('PID', $firstLine);
         $this->assertStringContainsString('Name', $firstLine);
-        $this->assertStringContainsString('Nickname', $firstLine);
+        $this->assertStringNotContainsString('Nickname', $firstLine);
+        $this->assertStringContainsString('Injury Days', $firstLine);
+        $this->assertStringContainsString('FA Security', $firstLine);
         $this->assertStringContainsString('Position', $firstLine);
         $this->assertStringContainsString('GP', $firstLine);
         $this->assertStringContainsString('PPG', $firstLine);

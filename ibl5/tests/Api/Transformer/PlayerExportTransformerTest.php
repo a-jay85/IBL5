@@ -67,19 +67,79 @@ class PlayerExportTransformerTest extends TestCase
             'ft_percentage' => 0.800,
             'three_pt_percentage' => 0.364,
             'points_per_game' => 21.6,
+            'injured' => 12,
+            'r_fga' => 45, 'r_fgp' => 52, 'r_fta' => 30, 'r_ftp' => 75, 'r_3ga' => 20, 'r_3gp' => 36,
+            'r_orb' => 10, 'r_drb' => 40, 'r_ast' => 50, 'r_stl' => 15, 'r_tvr' => 25, 'r_blk' => 8, 'r_foul' => 18,
+            'oo' => 7, 'r_drive_off' => 8, 'po' => 6, 'r_trans_off' => 9, 'od' => 5, 'dd' => 6, 'pd' => 4, 'td' => 7,
+            'stamina' => 80, 'clutch' => 2, 'consistency' => 1,
+            'talent' => 5, 'skill' => 4, 'intangibles' => 3,
+            'loyalty' => 2, 'playing_time' => 4, 'winner' => 5, 'tradition' => 3, 'security' => 1,
             'created_at' => '2026-01-01 00:00:00',
             'updated_at' => '2026-01-15 12:00:00',
         ];
     }
 
-    public function testGetHeadersReturns43Columns(): void
+    public function testGetHeadersReturns75Columns(): void
     {
         $headers = $this->transformer->getHeaders();
 
-        $this->assertCount(43, $headers);
+        $this->assertCount(75, $headers);
         $this->assertSame('PID', $headers[0]);
         $this->assertSame('Name', $headers[1]);
-        $this->assertSame('3P%', $headers[42]);
+        $this->assertSame('FA Security', $headers[74]);
+    }
+
+    public function testHeadersAreUnique(): void
+    {
+        $headers = $this->transformer->getHeaders();
+
+        $this->assertSame($headers, array_values(array_unique($headers)));
+    }
+
+    public function testNoHeaderParsesAsTimeInSpreadsheets(): void
+    {
+        foreach ($this->transformer->getHeaders() as $header) {
+            $this->assertDoesNotMatchRegularExpression('/^\d+\s*[AP]M?$/i', $header);
+        }
+    }
+
+    public function testHeadersExcludeNickname(): void
+    {
+        $this->assertNotContains('Nickname', $this->transformer->getHeaders());
+    }
+
+    public function testTransformIncludesInjuryRatingsTsiAndFreeAgencyFactors(): void
+    {
+        $result = $this->transformer->transform($this->makePlayerRow());
+        $indexMap = array_flip($this->transformer->getHeaders());
+
+        $this->assertSame('12', $result[$indexMap['Injury Days']]);
+        $this->assertSame('45', $result[$indexMap['r2GA']]);
+        $this->assertSame('36', $result[$indexMap['r3G%']]);
+        $this->assertSame('8', $result[$indexMap['rDO']]);
+        $this->assertSame('9', $result[$indexMap['rTO']]);
+        $this->assertSame('7', $result[$indexMap['rTD']]);
+        $this->assertSame('80', $result[$indexMap['Stamina']]);
+        $this->assertSame('5', $result[$indexMap['Talent']]);
+        $this->assertSame('4', $result[$indexMap['Skill']]);
+        $this->assertSame('3', $result[$indexMap['Intangibles']]);
+        $this->assertSame('2', $result[$indexMap['FA Loyalty']]);
+        $this->assertSame('4', $result[$indexMap['FA Playing Time']]);
+        $this->assertSame('5', $result[$indexMap['FA Play for Winner']]);
+        $this->assertSame('3', $result[$indexMap['FA Tradition']]);
+        $this->assertSame('1', $result[$indexMap['FA Security']]);
+    }
+
+    public function testTransformOutputsEmptyStringForNullRatings(): void
+    {
+        $row = $this->makePlayerRow();
+        $row['injured'] = null;
+        $row['talent'] = null;
+        $result = $this->transformer->transform($row);
+        $indexMap = array_flip($this->transformer->getHeaders());
+
+        $this->assertSame('', $result[$indexMap['Injury Days']]);
+        $this->assertSame('', $result[$indexMap['Talent']]);
     }
 
     public function testTransformOutputMatchesHeaderCount(): void
@@ -97,9 +157,8 @@ class PlayerExportTransformerTest extends TestCase
 
         $this->assertSame('123', $result[0]); // PID
         $this->assertSame('LeBron James', $result[1]); // Name
-        $this->assertSame('King James', $result[2]); // Nickname
-        $this->assertSame('39', $result[3]); // Age
-        $this->assertSame('SF', $result[4]); // Position
+        $this->assertSame('39', $result[2]); // Age
+        $this->assertSame('SF', $result[3]); // Position
     }
 
     public function testTransformIncludesFullContractSalaries(): void
@@ -155,7 +214,7 @@ class PlayerExportTransformerTest extends TestCase
         $this->assertSame('', $result[$indexMap['PPG']]);
         $this->assertSame('', $result[$indexMap['FG%']]);
         $this->assertSame('', $result[$indexMap['FT%']]);
-        $this->assertSame('', $result[$indexMap['3P%']]);
+        $this->assertSame('', $result[$indexMap['3G%']]);
     }
 
     public function testTransformExcludesUuidsAndTimestamps(): void

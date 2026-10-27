@@ -7,10 +7,10 @@ namespace Api\Transformer;
 use Api\Contracts\TransformerInterface;
 
 /**
- * Transforms vw_player_current rows to flat CSV-ready string arrays.
+ * Transforms player export rows to flat CSV-ready string arrays.
  *
- * @phpstan-import-type PlayerCurrentRow from \Api\Repository\ApiPlayerRepository
- * @implements TransformerInterface<PlayerCurrentRow>
+ * @phpstan-import-type PlayerExportRow from \Api\Repository\ApiPlayerRepository
+ * @implements TransformerInterface<PlayerExportRow>
  */
 class PlayerExportTransformer implements TransformerInterface
 {
@@ -18,12 +18,12 @@ class PlayerExportTransformer implements TransformerInterface
     private const COLUMN_MAP = [
         'pid',
         'name',
-        'nickname',
         'age',
         'position',
         'htft',
         'htin',
         'dc_can_play_in_game',
+        'injured',
         'retired',
         'experience',
         'bird_rights',
@@ -59,18 +59,50 @@ class PlayerExportTransformer implements TransformerInterface
         'fg_percentage',
         'ft_percentage',
         'three_pt_percentage',
+        'r_fga',
+        'r_fgp',
+        'r_fta',
+        'r_ftp',
+        'r_3ga',
+        'r_3gp',
+        'r_orb',
+        'r_drb',
+        'r_ast',
+        'r_stl',
+        'r_tvr',
+        'r_blk',
+        'r_foul',
+        'oo',
+        'r_drive_off',
+        'po',
+        'r_trans_off',
+        'od',
+        'dd',
+        'pd',
+        'td',
+        'stamina',
+        'clutch',
+        'consistency',
+        'talent',
+        'skill',
+        'intangibles',
+        'loyalty',
+        'playing_time',
+        'winner',
+        'tradition',
+        'security',
     ];
 
     /** @var array<string, string> DB column → CSV header */
     private const HEADERS = [
         'pid' => 'PID',
         'name' => 'Name',
-        'nickname' => 'Nickname',
         'age' => 'Age',
         'position' => 'Position',
         'htft' => 'Height (ft)',
         'htin' => 'Height (in)',
         'dc_can_play_in_game' => 'Active',
+        'injured' => 'Injury Days',
         'retired' => 'Retired',
         'experience' => 'Experience',
         'bird_rights' => 'Bird Rights',
@@ -93,8 +125,8 @@ class PlayerExportTransformer implements TransformerInterface
         'field_goals_attempted' => 'FGA',
         'free_throws_made' => 'FTM',
         'free_throws_attempted' => 'FTA',
-        'three_pointers_made' => '3PM',
-        'three_pointers_attempted' => '3PA',
+        'three_pointers_made' => '3GM',
+        'three_pointers_attempted' => '3GA',
         'offensive_rebounds' => 'ORB',
         'defensive_rebounds' => 'DRB',
         'assists' => 'AST',
@@ -105,7 +137,39 @@ class PlayerExportTransformer implements TransformerInterface
         'points_per_game' => 'PPG',
         'fg_percentage' => 'FG%',
         'ft_percentage' => 'FT%',
-        'three_pt_percentage' => '3P%',
+        'three_pt_percentage' => '3G%',
+        'r_fga' => 'r2GA',
+        'r_fgp' => 'r2G%',
+        'r_fta' => 'rFTA',
+        'r_ftp' => 'rFT%',
+        'r_3ga' => 'r3GA',
+        'r_3gp' => 'r3G%',
+        'r_orb' => 'rORB',
+        'r_drb' => 'rDRB',
+        'r_ast' => 'rAST',
+        'r_stl' => 'rSTL',
+        'r_tvr' => 'rTVR',
+        'r_blk' => 'rBLK',
+        'r_foul' => 'rFOUL',
+        'oo' => 'rOO',
+        'r_drive_off' => 'rDO',
+        'po' => 'rPO',
+        'r_trans_off' => 'rTO',
+        'od' => 'rOD',
+        'dd' => 'rDD',
+        'pd' => 'rPD',
+        'td' => 'rTD',
+        'stamina' => 'Stamina',
+        'clutch' => 'Clutch',
+        'consistency' => 'Consistency',
+        'talent' => 'Talent',
+        'skill' => 'Skill',
+        'intangibles' => 'Intangibles',
+        'loyalty' => 'FA Loyalty',
+        'playing_time' => 'FA Playing Time',
+        'winner' => 'FA Play for Winner',
+        'tradition' => 'FA Tradition',
+        'security' => 'FA Security',
     ];
 
     /**
@@ -122,7 +186,7 @@ class PlayerExportTransformer implements TransformerInterface
     /**
      * Transform a player row to a flat list of strings for CSV output.
      *
-     * @param PlayerCurrentRow $row
+     * @param PlayerExportRow $row
      * @return list<string>
      */
     public function transform(array $row): array

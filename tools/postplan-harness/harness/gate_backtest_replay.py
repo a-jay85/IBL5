@@ -29,7 +29,7 @@ from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateC
 
 REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
-TOTAL_CAP = 900
+TOTAL_CAP = 1200
 HISTORY_LIMIT = 30
 FETCH_CAP = 250  # merged PRs fetched; the newest HISTORY_LIMIT settled ones are replayed
 
@@ -133,6 +133,14 @@ class ScratchTree:
                 fh.write(data)
             os.chmod(dest, 0o755 if mode == 0o100755 or mode & 0o111 else 0o644)
 
+    def remove(self, files) -> None:
+        """Delete each path from the tree. A path that is already absent is fine."""
+        for rel in files:
+            try:
+                os.remove(os.path.join(self.dir, rel))
+            except FileNotFoundError:
+                pass
+
     def _cleanup(self) -> None:
         directory, self.dir = self.dir, ""
         if not directory:
@@ -179,14 +187,35 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  history: list[HistoricalPR], overlay_files: dict[str, tuple[bytes, int]],
                  plans_dir: str, *, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                  total_cap: int = TOTAL_CAP, clock=time.monotonic,
-                 bodies: dict[int, str] | None = None) -> list[ReplayResult]:
-    """Replay every replayable gate against every historical PR's tree, newest first."""
+                 bodies: dict[int, str] | None = None,
+                 base_overlay: dict[str, tuple[bytes, int] | None] | None = None
+                 ) -> list[ReplayResult]:
+    """Replay every replayable gate against every historical PR's tree, newest first.
+
+    With `base_overlay` (the same keys as `overlay_files`, `None` marking a path absent at the
+    base ref), a head `flag` is followed by one replay of the base-ref gate on the same checkout.
+    The result rides on the head row as `base_outcome`/`base_detail` and never changes `outcome`.
+    """
     replayable = [g for g in gates if g.state == "replayable" and g.spec is not None]
     results: list[ReplayResult] = []
     if not replayable or not history:
         return results
     bodies = bodies or {}
     start = clock()
+    base_plan: dict[str, tuple[str, object]] = {}
+    if base_overlay is not None:
+        for g in replayable:
+            if g.path not in base_overlay:
+                base_plan[g.path] = ("run", g.spec)
+            elif base_overlay[g.path] is None:
+                base_plan[g.path] = ("absent", None)
+            else:
+                state, base_spec, _ = resolve_spec(
+                    g.path, base_overlay[g.path][0].decode("utf-8", "replace"))
+                if state == "replayable" and base_spec is not None:
+                    base_plan[g.path] = ("run", base_spec)
+                else:
+                    base_plan[g.path] = ("no-spec", None)
     first = next((p for p in history if p.parent_count == 1), None)
 
     def skip(pr: HistoricalPR, gate: GateChange, reason: str) -> None:
@@ -199,6 +228,33 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
         return results
 
     git = make_git(repo)
+
+    def execute(spec, ctx: dict, gate_path: str) -> tuple[str, str]:
+        """Run one gate replay in ctx["tree"] and return (outcome, detail)."""
+        env = dict(os.environ)
+        env.update(expand_env(spec, ctx))
+        stdin_path = expand_stdin(spec, ctx)
+        stdin_fh = None
+        if stdin_path:
+            try:
+                stdin_fh = open(stdin_path, "rb")
+            except OSError as exc:
+                return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160]
+        try:
+            proc = subprocess.run(
+                [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)],
+                cwd=ctx["tree"], env=env,
+                stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=per_replay_timeout)
+        except subprocess.TimeoutExpired:
+            return "timeout", f"{per_replay_timeout}s"
+        except OSError as exc:
+            return "error", re.sub(r"\s+", " ", str(exc))[:160]
+        finally:
+            if stdin_fh is not None:
+                stdin_fh.close()
+        return classify_exit(spec, proc.returncode, proc.stdout)
+
     work = tempfile.mkdtemp(prefix="gate-backtest-files-")
     capped = False
     try:
@@ -237,36 +293,29 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                         fh.write(bodies.get(pr.number, ""))
                     ctx = {"base": base, "head": pr.merge_sha, "tree": scratch.dir,
                            "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file}
-                    env = dict(os.environ)
-                    env.update(expand_env(spec, ctx))
-                    stdin_path = expand_stdin(spec, ctx)
-                    stdin_fh = None
-                    if stdin_path:
-                        try:
-                            stdin_fh = open(stdin_path, "rb")
-                        except OSError as exc:
-                            results.append(ReplayResult(pr.number, gate.path, "error",
-                                                        re.sub(r"\s+", " ", f"stdin: {exc}")[:160]))
-                            continue
-                    try:
-                        proc = subprocess.run(
-                            [os.path.join(scratch.dir, gate.path), *expand_argv(spec, ctx)],
-                            cwd=scratch.dir, env=env,
-                            stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
-                            capture_output=True, text=True, timeout=per_replay_timeout)
-                    except subprocess.TimeoutExpired:
-                        results.append(ReplayResult(pr.number, gate.path, "timeout",
-                                                    f"{per_replay_timeout}s"))
-                        continue
-                    except OSError as exc:
-                        results.append(ReplayResult(pr.number, gate.path, "error",
-                                                    re.sub(r"\s+", " ", str(exc))[:160]))
-                        continue
-                    finally:
-                        if stdin_fh is not None:
-                            stdin_fh.close()
-                    outcome, detail = classify_exit(spec, proc.returncode, proc.stdout)
-                    results.append(ReplayResult(pr.number, gate.path, outcome, detail))
+                    outcome, detail = execute(spec, ctx, gate.path)
+                    base_outcome = base_detail = ""
+                    if outcome == "flag" and base_overlay is not None:
+                        kind, base_spec = base_plan[gate.path]
+                        if kind == "absent":
+                            base_outcome = "absent"
+                        elif kind == "no-spec":
+                            base_outcome, base_detail = "error", "base-no-spec"
+                        elif clock() - start >= total_cap:
+                            base_outcome, base_detail = "timeout", "total-cap"
+                        else:
+                            try:
+                                scratch.overlay({k: v for k, v in base_overlay.items()
+                                                 if v is not None})
+                                scratch.remove([k for k, v in base_overlay.items() if v is None])
+                                base_outcome, base_detail = execute(base_spec, ctx, gate.path)
+                            except OSError as exc:
+                                base_outcome = "error"
+                                base_detail = re.sub(r"\s+", " ", f"base-overlay: {exc}")[:160]
+                            finally:
+                                scratch.overlay(overlay_files)
+                    results.append(ReplayResult(pr.number, gate.path, outcome, detail,
+                                                base_outcome, base_detail))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results
@@ -310,6 +359,28 @@ def _file_mode(repo: str, rev: str, path: str) -> int:
         return 0o100644
 
 
+def _base_overlay(repo: str, base: str, head: str,
+                  paths) -> dict[str, tuple[bytes, int] | None] | None:
+    """Each path's bytes at merge-base(base, head); None marks a path absent there.
+
+    An unresolvable base returns None, so no base replay runs and every head flag counts.
+    """
+    try:
+        rev = make_git(repo)(["merge-base", base, head]).strip()
+    except subprocess.CalledProcessError:
+        return None
+    if not rev:
+        return None
+    out: dict[str, tuple[bytes, int] | None] = {}
+    for path in paths:
+        try:
+            out[path] = (_git_bytes(repo, ["show", f"{rev}:{path}"]),
+                         _file_mode(repo, rev, path))
+        except subprocess.CalledProcessError:
+            out[path] = None
+    return out
+
+
 def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
             read: bool = True) -> list[GateChange]:
     """The gates `changes` touch. `read=False` skips every `git show` (replay-mode runner)."""
@@ -337,6 +408,7 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
                      limit: int = HISTORY_LIMIT, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                      total_cap: int = TOTAL_CAP, now: datetime | None = None,
                      exclude_pr: int | None = None,
+                     base: str = "origin/master",
                      forced_gate: tuple[str, str] | None = None) -> BacktestOutcome:
     """Detect the gates a change list touches and replay them against recent merged PRs.
 
@@ -383,9 +455,10 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             truth = classify_truth(fetched, now or datetime.now(timezone.utc))
             history = [p for p in fetched if truth[p.number].state != "unsettled"][:limit]
             window = len(history)
+            base_overlay = _base_overlay(repo, base, head, overlay_files)
             results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
                                    per_replay_timeout=per_replay_timeout, total_cap=total_cap,
-                                   bodies=bodies)
+                                   bodies=bodies, base_overlay=base_overlay)
         except Exception:
             results = None
             truth = {}
@@ -397,14 +470,15 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
 def backtest_from_refs(repo: str, base: str, head: str, **kw) -> BacktestOutcome:
     """CLI entry: the change list comes from `git diff --name-status <base>...<head>`."""
     out = make_git(repo)(["diff", "--name-status", f"{base}...{head}"])
-    return backtest_changes(repo, head, parse_name_status(out), **kw)
+    return backtest_changes(repo, head, parse_name_status(out), base=base, **kw)
 
 
 def backtest_branch(repo: str, head: str, changes: list[tuple[str, str]], *,
                     exclude_pr: int | None = None, fixture_history=None,
                     now: datetime | None = None, plans_dir: str | None = None,
                     per_replay_timeout: int = PER_REPLAY_TIMEOUT,
-                    total_cap: int = TOTAL_CAP) -> tuple[Verdict, str]:
+                    total_cap: int = TOTAL_CAP,
+                    base: str = "origin/master") -> tuple[Verdict, str]:
     """Runner entry: replay the gates in `changes`. A fixture history replaces `gh` and the fetch."""
     if plans_dir is None:
         home = os.environ.get("HOME", "")
@@ -414,7 +488,7 @@ def backtest_branch(repo: str, head: str, changes: list[tuple[str, str]], *,
         kw = {"gh_json": (lambda _argv: fixture_history), "fetch": False}
     out = backtest_changes(repo, head, changes, plans_dir=plans_dir, exclude_pr=exclude_pr,
                            now=now, per_replay_timeout=per_replay_timeout, total_cap=total_cap,
-                           **kw)
+                           base=base, **kw)
     return out.verdict, out.block
 
 

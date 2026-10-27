@@ -14,6 +14,8 @@
 // `|` is forbidden — it would split the matrix row and break matrix_split's
 // fixed 5-column read in bin/check-plan.
 
+import { pairPicture } from './vr-pr-body';
+
 export type VrRole = 'anon' | 'regular' | 'admin';
 
 export type VrSetup = { method: string; path: string };
@@ -40,6 +42,11 @@ export type ManualRowResult = {
   row: string;
   status: ManualRowStatus;
   error?: string;
+  // Base-SHA pass outcome; absent or not `ok` renders the after-only markup.
+  beforeStatus?: ManualRowStatus;
+  beforeError?: string;
+  // Set by `--compose-manual` once <label>.side.png / .stack.png are written.
+  composed?: boolean;
 };
 
 const ROLES: readonly string[] = ['anon', 'regular', 'admin'];
@@ -178,14 +185,27 @@ export function parseManualBullets(body: string): { rows: ManualVrRow[]; errors:
   return { rows, errors };
 }
 
-export function manualShotFile(label: string): string {
-  return `${label}.png`;
+export type ManualShotSide = 'before' | 'after';
+export type ManualShotFile = ManualShotSide | 'side' | 'stack';
+
+// The after pass runs first and the before pass reuses the same seeded DB, so
+// `setup` already holds when the before pass starts. Re-sending it would fail
+// or stack a second mutation, and the before shot would show state the PR
+// never makes. Only the after pass applies `setup`.
+export function setupStepsFor(row: Pick<ManualVrRow, 'setup'>, side: ManualShotSide): VrSetup[] {
+  return side === 'before' ? [] : row.setup;
+}
+
+// `before` is the base-SHA pass; `after` (the default) keeps today's filename;
+// `side` / `stack` are the composites `--compose-manual` writes.
+export function manualShotFile(label: string, side: ManualShotFile = 'after'): string {
+  return side === 'after' ? `${label}.png` : `${label}.${side}.png`;
 }
 
 // URL under the per-SHA Pages tree; mirrors newScreenUrl's slash-normalization.
-export function manualShotUrl(pagesUrl: string, label: string): string {
+export function manualShotUrl(pagesUrl: string, label: string, side: ManualShotFile = 'after'): string {
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
-  return `${base}manual-rows/${encodeURIComponent(label)}.png`;
+  return `${base}manual-rows/${encodeURIComponent(manualShotFile(label, side))}`;
 }
 
 // Sticky-comment markdown. Only an `ok` row gets an image; a failed or skipped
@@ -198,6 +218,18 @@ export function buildManualSection(results: ManualRowResult[], pagesUrl: string)
   for (const r of results) {
     if (r.status === 'ok') {
       lines.push(`**Row ${r.row} — \`${r.label}\`**`, '');
+      if (r.beforeStatus === 'ok' && r.composed === true) {
+        const side = manualShotUrl(pagesUrl, r.label, 'side');
+        const stack = manualShotUrl(pagesUrl, r.label, 'stack');
+        lines.push('_Before (base): left or top, red band · After (PR): right or bottom, green band_', '');
+        lines.push(pairPicture(side, stack, `${r.label} before and after`), '');
+        continue;
+      }
+      if (r.beforeStatus === 'ok') {
+        lines.push('**Before (base)**', '');
+        lines.push(`![${r.label} before](${manualShotUrl(pagesUrl, r.label, 'before')})`, '');
+        lines.push('**After (PR)**', '');
+      }
       lines.push(`![${r.label}](${manualShotUrl(pagesUrl, r.label)})`, '');
     } else {
       const why = r.error ? `: ${r.error}` : '';

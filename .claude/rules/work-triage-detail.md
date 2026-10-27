@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/skill-gate.sh"
@@ -79,6 +79,8 @@ Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now
 Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.
 
 ## Inline vs. delegated
+
+Until 2026-11-23, chunks under 5 files follow the inline-edit trial in `work-triage-inline-trial.md`.
 
 Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or

@@ -41,3 +41,9 @@ The new-screen image alt text now joins title and viewport with a middle dot (`d
 - PR bodies can grow by up to 40,000 characters of image markup.
 - Runs with the `update-baselines` label now push to `gh-pages` too.
 - Agent-shot directories sit under a real commit sha, so `bin/prune-vr-galleries` ages them out like any per-SHA directory.
+
+## Addendum: managed block at any position (2026-10-08)
+
+The Lineage line "the offset-0 splice ... stay as ADR-0076 defined them" no longer holds for block
+position. ADR-0185 supersedes ADR-0076 on that point: `spliceBody` finds the managed block at any
+position, replaces the first in place and strips later stale blocks.

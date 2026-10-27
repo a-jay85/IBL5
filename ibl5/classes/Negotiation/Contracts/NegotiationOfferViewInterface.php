@@ -74,7 +74,7 @@ interface NegotiationOfferViewInterface
      * @return string HTML alert div with escaped error message
      *
      * **Behaviors:**
-     * - Wraps message in .ibl-alert.ibl-alert--error div
+     * - Wraps message in a daisyUI error alert div (d-alert d-alert-error)
      * - Escapes message using HtmlSanitizer::e()
      */
     public static function renderError(string $error): string;

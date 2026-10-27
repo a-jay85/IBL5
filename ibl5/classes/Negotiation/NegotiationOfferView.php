@@ -56,15 +56,15 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         ?>
 
 <?php // Card 2: Contract Offer ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Contract Offer</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Contract Offer</h2>
     </div>
-    <div class="ibl-card__body">
-        <div class="ibl-alert ibl-alert--warning ibl-field-group">If you offer the max and I refuse, it means I am opting for Free Agency at the end of the season.</div>
+    <div class="d-card-body">
+        <div role="alert" class="d-alert d-alert-warning ibl-field-group">If you offer the max and I refuse, it means I am opting for Free Agency at the end of the season.</div>
 
         <div class="ibl-field-group">
-            <span class="ibl-label">Player Demands:</span>
+            <span class="d-label whitespace-normal">Player Demands:</span>
             <div class="ibl-field-group__content">
                 <?= HtmlSanitizer::trusted($this->buildDemandDisplay($demands)) ?>
             </div>
@@ -73,7 +73,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
         <form name="ExtensionOffer" method="post" action="modules/Player/extension.php">
             <?= \Security\CsrfGuard::generateToken('extension') ?>
             <div class="ibl-field-group">
-                <span class="ibl-label">Your Offer:</span>
+                <span class="d-label whitespace-normal">Your Offer:</span>
                 <div class="ibl-field-group__content">
                     <?php if (!$demandsExceedMax): ?>
                         <?= HtmlSanitizer::trusted($this->renderEditableOfferFields($demands)) ?>
@@ -90,17 +90,17 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
             <input type="hidden" name="playerName" value="<?= HtmlSanitizer::safeHtmlOutput($player->getName() ?? '') ?>">
             <input type="hidden" name="playerID" value="<?= HtmlSanitizer::e($playerID) ?>">
 
-            <button type="submit" class="ibl-btn ibl-btn--danger">Offer Extension</button>
+            <button type="submit" class="d-btn d-btn-error">Offer Extension</button>
         </form>
     </div>
 </div>
 
 <?php // Card 3: Notes / Reminders ?>
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Notes / Reminders</h2>
+<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">
+    <div class="bg-(image:--gradient-navy-header) px-(--space-4) py-(--space-3) text-white">
+        <h2 class="d-card-title justify-center text-center text-(length:--text-2xl)">Notes / Reminders</h2>
     </div>
-    <div class="ibl-card__body">
+    <div class="d-card-body">
         <ul class="ibl-notes">
             <li>You have <strong><?= HtmlSanitizer::e($capSpace) ?></strong> in cap space available; the amount you offer in year 1 cannot exceed this.</li>
             <li>Based on years of service, the maximum amount you can offer in year 1 is <strong><?= HtmlSanitizer::e($maxYearOneSalary) ?></strong>.</li>
@@ -136,7 +136,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     <?php foreach ($yearKeys as $index => $key): ?>
         <?php if ($demands[$key] !== 0): ?>
         <div class="offer-salary-cell">
-            <div class="ibl-label ibl-label--sm">Yr <?= HtmlSanitizer::e($index + 1) ?></div>
+            <div class="d-label text-sm">Yr <?= HtmlSanitizer::e($index + 1) ?></div>
             <div class="offer-salary-cell__value"><?= HtmlSanitizer::e($demands[$key]) ?></div>
         </div>
         <?php endif; ?>
@@ -159,8 +159,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 <div class="offer-salary-row offer-salary-row--inputs">
     <?php for ($i = 1; $i <= 5; $i++): ?>
     <div class="offer-salary-cell">
-        <label for="offerYear<?= HtmlSanitizer::e($i) ?>" class="ibl-label ibl-label--sm">Yr <?= HtmlSanitizer::e($i) ?></label>
-        <input type="number" id="offerYear<?= HtmlSanitizer::e($i) ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($demands['year' . $i]) ?>" min="0" max="9999">
+        <label for="offerYear<?= HtmlSanitizer::e($i) ?>" class="d-label text-sm">Yr <?= HtmlSanitizer::e($i) ?></label>
+        <input type="number" id="offerYear<?= HtmlSanitizer::e($i) ?>" class="d-input d-input-sm w-18 offer-salary-input" name="offerYear<?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($demands['year' . $i]) ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -189,8 +189,8 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
 <div class="offer-salary-row offer-salary-row--inputs">
     <?php for ($i = 0; $i < 5; $i++): ?>
     <div class="offer-salary-cell">
-        <label for="offerYear<?= HtmlSanitizer::e($i + 1) ?>" class="ibl-label ibl-label--sm">Yr <?= HtmlSanitizer::e($i + 1) ?></label>
-        <input type="number" id="offerYear<?= HtmlSanitizer::e($i + 1) ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offerYear<?= HtmlSanitizer::e($i + 1) ?>" value="<?= HtmlSanitizer::e($maxValues[$i]) ?>" min="0" max="9999">
+        <label for="offerYear<?= HtmlSanitizer::e($i + 1) ?>" class="d-label text-sm">Yr <?= HtmlSanitizer::e($i + 1) ?></label>
+        <input type="number" id="offerYear<?= HtmlSanitizer::e($i + 1) ?>" class="d-input d-input-sm w-18 offer-salary-input" name="offerYear<?= HtmlSanitizer::e($i + 1) ?>" value="<?= HtmlSanitizer::e($maxValues[$i]) ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -204,7 +204,7 @@ class NegotiationOfferView implements NegotiationOfferViewInterface
     public static function renderError(string $error): string
     {
         $escaped = HtmlSanitizer::e($error);
-        return '<div class="ibl-alert ibl-alert--error">' . $escaped . '</div>';
+        return '<div role="alert" class="d-alert d-alert-error mb-4">' . $escaped . '</div>';
     }
 
     /**

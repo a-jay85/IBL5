@@ -287,7 +287,7 @@ class NegotiationOfferViewTest extends TestCase
         $html = NegotiationOfferView::renderError($errorMessage);
 
         // Assert
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $html);
+        $this->assertStringContainsString('d-alert d-alert-error', $html);
         $this->assertStringContainsString('This is a test error', $html);
     }
 
@@ -409,7 +409,7 @@ class NegotiationOfferViewTest extends TestCase
             \League\ContractRules::getMaxContractSalary(0)
         );
 
-        $this->assertStringStartsWith('<div class="ibl-card">', ltrim($html));
+        $this->assertStringStartsWith('<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">', ltrim($html));
         $this->assertStringContainsString('Contract Offer', $html);
         $this->assertStringContainsString('Player Demands:', $html);
     }

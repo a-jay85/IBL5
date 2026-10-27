@@ -391,8 +391,13 @@ jobs:
           trap cleanup EXIT
           git worktree add --detach "$BASE" "${{ github.event.pull_request.base.sha }}"
           git ls-files -z --others --ignored --exclude-standard --directory -- ibl5 \
-            | grep -zvE '^ibl5/((node_modules|vr-[^/]*|test-results|playwright-report)/?$|logs/)' \
+            | grep -zvE '^ibl5/((node_modules|vr-[^/]*|test-results|playwright-report)/?$|logs/|themes/IBL/style/style\.css$)' \
             | rsync -a -r --from0 --files-from=- ./ "$BASE/"
+          # The compiled stylesheet is gitignored, so copying it would serve the
+          # PR's CSS as the "before". Build it from the base tree's design/ instead,
+          # with the PR checkout's node_modules for the Tailwind CLI.
+          ln -s "$GITHUB_WORKSPACE/ibl5/node_modules" "$BASE/ibl5/node_modules"
+          (cd "$BASE/ibl5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify)
           docker run -d --name php-base --network ibl5-e2e --network-alias php-base \
             -e DB_HOST=mariadb -e E2E_TESTING=1 \
             -v "$BASE/ibl5:/var/www/html/ibl5" ghcr.io/a-jay85/ibl5/php-apache:latest

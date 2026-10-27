@@ -132,7 +132,10 @@ const BEFORE_PASS = 'Capture manual-row before screenshots on the base SHA';
 // The base-SHA before pass copies gitignored runtime files into the base tree.
 // Copying ibl5/logs/ hands www-data runner-owned log files it cannot append to,
 // so the base app's login_success log write threw and every login answered 500
-// (demo PR #3586). The pass must also fail loudly, never silently after-only.
+// (demo PR #3586). Copying the gitignored compiled style.css served the PR's CSS
+// as the before, so every manual-row before matched its after (demo PR #3586,
+// 2026-10-27); the base tree must rebuild it. The pass must also fail loudly,
+// never silently after-only.
 function beforePassViolations(yaml: string): string[] {
   const s = e2eSteps(yaml).find((x) => x.name === BEFORE_PASS);
   if (!s) return [`missing: ${BEFORE_PASS}`];
@@ -143,6 +146,10 @@ function beforePassViolations(yaml: string): string[] {
     const re = new RegExp(filter);
     if (!re.test('ibl5/logs/ibl5-auth-2026-10-27.log')) out.push('copies-logs');
     if (re.test('ibl5/config.php') || re.test('ibl5/vendor/')) out.push('drops-runtime');
+    if (!re.test('ibl5/themes/IBL/style/style.css')) out.push('copies-pr-css');
+  }
+  if (!/cd "\$BASE\/ibl5" && bunx @tailwindcss\/cli -i design\/input\.css -o themes\/IBL\/style\/style\.css/.test(s.body)) {
+    out.push('no-base-css-build');
   }
   if (!s.body.includes('::error::')) out.push('silent-failure');
   return out;
@@ -154,8 +161,18 @@ describe('beforePassViolations', () => {
   });
 
   it('13b: dropping the logs/ exclusion is reported', () => {
-    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace('|logs/)', ')'));
+    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace('|logs/|', '|'));
     expect(beforePassViolations(mutant)).toEqual(['copies-logs']);
+  });
+
+  it('13d: copying the PR\'s compiled style.css is reported', () => {
+    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace('|themes/IBL/style/style\\.css$', ''));
+    expect(beforePassViolations(mutant)).toEqual(['copies-pr-css']);
+  });
+
+  it('13e: dropping the base-tree CSS build is reported', () => {
+    const mutant = mutateStep(REAL, BEFORE_PASS, (b) => b.replace(/^.*bunx @tailwindcss\/cli.*$/m, ''));
+    expect(beforePassViolations(mutant)).toEqual(['no-base-css-build']);
   });
 
   it('13c: dropping the ::error:: line is reported', () => {

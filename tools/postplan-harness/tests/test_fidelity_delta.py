@@ -647,7 +647,8 @@ _NO_ECHO = DELTA_READY_TEXT.replace("DELTA-ANCHOR: live-prior\n", "")
     _NO_ECHO,
     DELTA_READY_TEXT.replace("live-prior", "some-other-run"),
     DELTA_READY_TEXT.replace("\nREADY\n", "\nPROBABLY FINE\n"),
-], ids=["no-echo", "wrong-echo", "unknown-verdict-word"])
+    DELTA_READY_TEXT.replace(" — RESOLVED by hunk 2", ""),
+], ids=["no-echo", "wrong-echo", "unknown-verdict-word", "blocker-not-restated"])
 def test_attempt_rejects_candidate_without_anchor_echo(tmp_path, monkeypatch, text):
     out, logs, _, vpath = _run_attempt(tmp_path, monkeypatch, text=text)
     assert out is None

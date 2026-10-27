@@ -42,6 +42,8 @@ DECLINE_REASONS = (
 PURPOSE = "plan-fidelity-delta-review"
 PACKET_NAME = "fidelity-packet-delta"
 DELTA_ANCHOR_RE = re.compile(r"^DELTA-ANCHOR:[ \t]*(\S+)[ \t]*$", re.M)
+ANCHOR_BLOCKING_RE = re.compile(r"^[ \t]*[-*][ \t]*\[BLOCKING\]", re.M)
+RESTATEMENT_RE = re.compile(r"\b(?:UN)?RESOLVED\b")
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -427,8 +429,14 @@ def attempt(llm, out_dir, worktree, gh, plan, diff, pr_body, pr_number, master_s
     except OSError:
         return _decline("verdict-unwritable")
     verdict = fidelity.parse_verdict(candidate)
-    echo = DELTA_ANCHOR_RE.search(text.split(fidelity.DIGEST_CUT, 1)[0])
+    reviewed_part = text.split(fidelity.DIGEST_CUT, 1)[0]
+    echo = DELTA_ANCHOR_RE.search(reviewed_part)
     if verdict is None or echo is None or echo.group(1) != anchor["run_id"]:
+        return _decline("verdict-unparsed")
+    # Every anchor [BLOCKING] bullet needs a RESOLVED/UNRESOLVED restatement, else the
+    # reviewer may have ignored the old blocker and the delta cannot stand in for a full review.
+    blocking = len(ANCHOR_BLOCKING_RE.findall(anchor.get("findings") or ""))
+    if len(RESTATEMENT_RE.findall(reviewed_part)) < blocking:
         return _decline("verdict-unparsed")
     path = fidelity.verdict_path(pr_number)
     try:

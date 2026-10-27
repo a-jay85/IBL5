@@ -808,6 +808,22 @@ else
     failcase "W4-notice-running-arm — arm missing or malformed in the notice step"
 fi
 
+# W6: the hotfix dispatch path. Own concurrency group, bot wait kept, coalesce sleep skipped.
+W6_WF="${W6_WF:-$UPDATE_WF}"
+W6_GROUP=$(grep -cE "^  group: update-behind-prs.*'-dryrun'.*'-pr'.*inputs\.hotfix == true && '-hotfix'" "$W6_WF" || true)
+W6_INPUT=$(awk '/^      hotfix:/{f=1} f&&/type:/{print; exit}' "$W6_WF")
+W6_COALESCE=$(awk '/- name: Coalesce a burst of master merges/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
+W6_BOTWAIT=$(awk '/- name: Wait for master CI that can push a bot commit/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
+W6_ATTEMPTS=$(count_lines '[ "$HOTFIX" = "true" ]; then UNKNOWN_ATTEMPTS=20' "$W6_WF")
+if [ "$W6_GROUP" = 1 ] && grep -qF 'type: boolean' <<< "$W6_INPUT" \
+    && [ "$W6_COALESCE" = "        if: github.event_name == 'push'" ] \
+    && [ "$W6_BOTWAIT" = "        if: github.event_name == 'push' || inputs.hotfix == true" ] \
+    && [ "$W6_ATTEMPTS" = 1 ]; then
+    pass "W6-hotfix-dispatch-path"
+else
+    failcase "W6-hotfix-dispatch-path — group=$W6_GROUP input=[$W6_INPUT] coalesce=[$W6_COALESCE] botwait=[$W6_BOTWAIT] attempts=$W6_ATTEMPTS"
+fi
+
 W5_LABELS=$(count_lines 'labels(first:20) { nodes { name } }' "$SEL")
 if [ "$W5_LABELS" = 1 ]; then
     pass "W5-live-query-labels"

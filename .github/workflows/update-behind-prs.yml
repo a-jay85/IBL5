@@ -10,8 +10,9 @@ on:
     # so our own load is not the cause. The delay is GitHub-side and unreachable from here).
     # Push is therefore the only trigger this workflow can actually rely on.
     #
-    # Each pass updates at most ONE PR: the head of the merge line, which is the oldest
-    # auto-merge-armed PR that is not conflicted and not red on a required check. Native
+    # Each pass updates at most ONE PR: the head of the merge line. That is the first
+    # auto-merge-armed PR, hotfix-labeled PRs first and then oldest arm time, that is not
+    # conflicted and not red on a required check. Native
     # auto-merge lands the head, and its merge push starts the next pass. That is why one
     # merge no longer fans out across every armed PR. See the ADR-0081 Addendum.
     paths-ignore:
@@ -52,6 +53,11 @@ on:
         required: false
         default: false
         type: boolean
+      hotfix:
+        description: 'Hotfix pass from hotfix-dispatch.yml. Skips the coalesce sleep, keeps the bot-commit wait, runs in its own concurrency group.'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write        # update-branch writes a merge commit onto the PR head branch
@@ -61,9 +67,11 @@ permissions:
 concurrency:
   # A dry-run dispatch gets its own group so it never cancels a live push pass in flight.
   # A named-PR dispatch gets its own group so a manual one-PR update never cancels the
-  # head-of-line pass. On push and schedule both inputs are null, so the group is the plain
+  # head-of-line pass. A hotfix dispatch (hotfix-dispatch.yml) gets its own group so it never
+  # cancels a push pass during its coalesce or bot-commit wait; a second hotfix dispatch still
+  # cancels the first. On push and schedule every input is null, so the group is the plain
   # name and a second master merge still cancels the first pass during its coalesce wait.
-  group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}
+  group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}${{ inputs.hotfix == true && '-hotfix' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -88,7 +96,7 @@ jobs:
       # pass even re-updates it. The helper's header says which workflows push them and why
       # the check covers every master SHA. Past its 45-min cap the pass goes ahead as before.
       - name: Wait for master CI that can push a bot commit
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.hotfix == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -105,13 +113,15 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_PR: ${{ inputs.pr }}
           DRY_RUN: ${{ inputs.dry_run }}
+          HOTFIX: ${{ inputs.hotfix }}
         run: |
           set -euo pipefail
 
           # A push pass fires while GitHub is still recomputing mergeability for the open-PR
           # set, and it has no next tick: the run after a push is the next master merge. So it
           # gets a longer settle window than the scheduled backstop.
-          if [ "$EVENT_NAME" = "push" ]; then UNKNOWN_ATTEMPTS=20; else UNKNOWN_ATTEMPTS=5; fi
+          # A hotfix dispatch fires right after a label or arm event and has no next tick either.
+          if [ "$EVENT_NAME" = "push" ] || [ "$HOTFIX" = "true" ]; then UNKNOWN_ATTEMPTS=20; else UNKNOWN_ATTEMPTS=5; fi
 
           OUT="$RUNNER_TEMP/merge-line.out"
           SUM="$RUNNER_TEMP/merge-line.md"
@@ -207,7 +217,7 @@ jobs:
             esac
             body="$MARKER
           **Merge line: skipped.** This PR is armed for auto-merge, and the merge line passed over it because ${why}.
-          It stays armed and keeps its place by arm time. The line picks it up again on the first pass after ${fix}."
+          It stays armed and keeps its place in the line (hotfix PRs first, then arm time). The line picks it up again on the first pass after ${fix}."
             pr_sticky_upsert "$n" "$MARKER" "$body" || echo "::warning::could not post skip notice on #$n"
           done
           for n in $CLEAR; do

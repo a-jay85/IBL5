@@ -92,6 +92,10 @@ RECIPE_BACKED_RE='recipe-backed'
 # characterization-pinned restructure, is not a new security surface.
 DEFENSE_TOKEN_RE='^(escap[ei]|sanitiz)$'
 NEGATED_DEFENSE_RE='(unescap|unsanitiz|missing[a-z -]*escap|missing[a-z -]*sanitiz|not escap|not sanitiz|(remov|drop|strip|skip|disabl|delet|bypass|omit|without|weaken|relax|loosen)[a-z -]*(escap|sanitiz))'
+# Only the past participle names a defense already in place. Any other form
+# of the word (the verb, the gerund) means the task adds or changes one.
+DEFENSE_WORD_RE='(escap|sanitiz)[a-z]*'
+DESCRIBED_DEFENSE_RE='^(escaped|sanitized)$'
 PIN_RE='(pinning|pinned|pin [a-z]|byte-for-byte|characteriz)'
 RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
 # Carve-out H1: an additive gate whose only weakening stem is a past
@@ -108,10 +112,12 @@ first_token() {
 }
 
 # True when every SECURITY_RE hit is a defense-naming token, the task pins
-# behavior first, it restructures, and nothing says the defense is missing.
+# behavior first, it restructures, every defense word only describes existing
+# output, and nothing says the defense is missing.
 security_defense_only() {
     others="$(printf '%s' "$HAY" | grep -Eo "$SECURITY_RE" | grep -Ev "$DEFENSE_TOKEN_RE")"
-    [ -z "$others" ] && match "$PIN_RE" && match "$RESTRUCTURE_RE" \
+    verbs="$(printf '%s' "$HAY" | grep -Eo "$DEFENSE_WORD_RE" | grep -Ev "$DESCRIBED_DEFENSE_RE")"
+    [ -z "$others" ] && [ -z "$verbs" ] && match "$PIN_RE" && match "$RESTRUCTURE_RE" \
         && ! match "$NEGATED_DEFENSE_RE"
 }
 

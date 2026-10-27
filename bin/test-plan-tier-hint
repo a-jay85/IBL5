@@ -168,6 +168,10 @@ expect_eq "26b pinned split that drops the escaping stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into helpers after pinning its output, and drop the HTML escape on labels')"
 expect_eq "26c pinned split rendering without escaping stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split PlayerBioRenderer::render after pinning its output, and render names without escaping')"
+expect_eq "26d pinned split that adds escaping stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and escape the raw team names')"
+expect_eq "26e pinned split that HTML-escapes new output stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and HTML-escape the raw team names')"
 # 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
 expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"

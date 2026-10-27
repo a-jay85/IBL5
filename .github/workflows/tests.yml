@@ -927,6 +927,7 @@ jobs:
             bin/test-post-plan-fleet \
             bin/test-check-plan \
             bin/test-plan-exec-mutations \
+            bin/test-deleted-guards \
             bin/test-plan-now \
             bin/test-wt-sync-tick \
             bin/test-main-checkout-guard \

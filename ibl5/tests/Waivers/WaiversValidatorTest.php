@@ -801,6 +801,39 @@ class WaiversValidatorTest extends TestCase
         $this->assertTrue($result->isValid());
     }
 
+    /**
+     * backlog#1538 row 24: the server-side recount feeds these thresholds unchanged.
+     * Each pair sits on one side of a rule edge: open < 1, drop rosterSlots > 2,
+     * healthy < 4 over cap, and healthy > 3 over cap above the veteran minimum.
+     */
+    #[DataProvider('ruleEdgeProvider')]
+    public function testLeagueRuleEdgesHoldForServerCountedSlots(string $action, int $open, int $healthy, int $totalSalary, int $playerSalary, bool $expectedValid): void
+    {
+        $result = $action === 'drop'
+            ? $this->validator->validateDrop($open, $totalSalary)
+            : $this->validator->validateAdd(123, $open, $healthy, $totalSalary, $playerSalary, self::vetMin(4));
+
+        $this->assertSame($expectedValid, $result->isValid());
+    }
+
+    /**
+     * @return array<string, array{string, int, int, int, int, bool}>
+     */
+    public static function ruleEdgeProvider(): array
+    {
+        $overCap = League::HARD_CAP_MAX;
+
+        return [
+            'add with 0 open slots is refused'                    => ['add', 0, 5, 3000, self::vetMin(4), false],
+            'add with 1 open slot is allowed'                     => ['add', 1, 5, 3000, self::vetMin(4), true],
+            'drop over cap with 2 roster slots is allowed'        => ['drop', 2, 0, $overCap + 1, 0, true],
+            'drop over cap with 3 roster slots is refused'        => ['drop', 3, 0, $overCap + 1, 0, false],
+            'add over cap with 3 healthy slots is refused'        => ['add', 5, 3, $overCap, self::vetMin(4), false],
+            'add over cap with 4 healthy slots at vet-min passes' => ['add', 5, 4, $overCap, self::vetMin(4), true],
+            'add over cap with 4 healthy slots above vet-min fails' => ['add', 5, 4, $overCap, self::vetMin(4) + 1, false],
+        ];
+    }
+
     private static function vetMin(int $experience): int
     {
         return \League\ContractRules::getVeteranMinimumSalary($experience);

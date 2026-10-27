@@ -104,6 +104,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
     "bin/check-workflow-run-interpolation": _TREE,
+    "bin/check-vr-gallery-refs": ReplaySpec(argv=("--root", ".")),
     # Plan-file gates: the plan resolves from the historical PR's branch name.
     "bin/check-plan": _PLAN,
     "bin/check-plan-staleness": _PLAN,

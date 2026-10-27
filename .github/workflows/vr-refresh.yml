@@ -29,6 +29,8 @@ on:
       - 'bin/vr-refresh-targets'
       - 'ibl5/tests/e2e/vr-refresh.ts'
       - 'bin/prune-vr-galleries'
+      - 'bin/vr-dedupe-gallery'
+      - 'bin/check-vr-gallery-refs'
 
 permissions:
   contents: read
@@ -41,7 +43,7 @@ jobs:
   select:
     name: VR refresh select
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: read
@@ -101,6 +103,58 @@ jobs:
             (cd gh-pages && ../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Prod-clone rehearsal of the blob-store migration on this runner's throwaway
+      # gh-pages checkout (contents: read; nothing is committed or pushed). Asserts the
+      # live tree's refs are clean before, the dry-run projection at least halves the
+      # dirs it rewrites, the live migrate leaves no dangling ref, a second migrate is a
+      # no-op, and the post-migration GC dry-run still runs.
+      - name: Rehearse blob-store migration on the live gh-pages tree
+        if: steps.checkout-pages.outcome == 'success' && (github.event_name == 'pull_request' || inputs.dry_run)
+        run: |
+          set -o pipefail
+          cd gh-pages
+          ../bin/check-vr-gallery-refs --root .
+          ../bin/vr-dedupe-gallery --migrate --root . --dry-run > "$RUNNER_TEMP/vr-proj.txt"
+          total=$(grep '^TOTAL ' "$RUNNER_TEMP/vr-proj.txt")
+          before=$(sed -E 's/.* before=([0-9]+).*/\1/' <<< "$total")
+          after=$(sed -E 's/.* after=([0-9]+).*/\1/' <<< "$total")
+          store=$(sed -E 's/.* store_after=([0-9]+).*/\1/' <<< "$total")
+          store_before=$(sed -E 's/.* store_before=([0-9]+).*/\1/' <<< "$total")
+          # Compare like with like: both sides count the per-SHA dirs plus the blob store.
+          before=$(( before + store_before ))
+          projected=$(( after + store ))
+          { echo "### Blob-store migration projection"; echo '```'; echo "$total"; echo "projected_tree_bytes=${projected}"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "projected_tree_bytes=${projected}"
+          # The halving assertion looks only at the dirs the migration rewrites, so a stray
+          # legacy dir on an already-migrated tree (a late publish from an old workflow
+          # run) cannot trip it. Once nothing moves there is nothing to assert.
+          to_move=$(awk '/^DIR /{ split($5, kv, "="); m += kv[2] } END { print m + 0 }' "$RUNNER_TEMP/vr-proj.txt")
+          dir_before=$(awk '/^DIR /{ split($3, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
+          dir_after=$(awk '/^DIR /{ split($4, kv, "="); s += kv[2] } END { print s + 0 }' "$RUNNER_TEMP/vr-proj.txt")
+          # New blobs count against the rewritten dirs, so a dedupe that copies every
+          # reference still fails.
+          dir_projected=$(( dir_after + store - store_before ))
+          if [ "$to_move" -gt 0 ] && [ "$dir_projected" -ge $(( dir_before / 2 )) ]; then
+            echo "::error::Rewritten dirs plus new blobs project to ${dir_projected} B, not under half of ${dir_before} B."
+            exit 1
+          fi
+          if [ "$projected" -gt 1073741824 ]; then
+            echo "::warning::Projected tree ${projected} B is over 1 GiB."
+          fi
+          first=$(../bin/vr-dedupe-gallery --migrate --root .)
+          ../bin/check-vr-gallery-refs --root .
+          second=$(../bin/vr-dedupe-gallery --migrate --root .)
+          echo "migrated first=${first} second=${second}"
+          [ "$second" = "0" ] || { echo "::error::second --migrate was not a no-op (${second})"; exit 1; }
+          git add -u
+          if [ -d _vr-blobs ]; then git add -A -- _vr-blobs; fi
+          prune_out=$(../bin/prune-vr-galleries --dry-run --cutoff-days 7 --max-dirs 150 --keep-file "$RUNNER_TEMP/vr-keep.txt")
+          removed=$(tail -n 1 <<< "$prune_out")
+          case "$removed" in
+            (''|*[!0-9]*) echo "::error::post-migration prune dry-run did not end with a dir count (got '${removed}')"; exit 1 ;;
+          esac
+          echo "post-migration prune dry-run would remove ${removed} dir(s)"
 
   refresh:
     name: VR refresh (PR ${{ matrix.target.pr }})

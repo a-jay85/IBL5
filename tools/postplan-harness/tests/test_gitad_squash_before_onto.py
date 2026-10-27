@@ -821,8 +821,11 @@ def test_push_after_squash_rejects_when_remote_moved():
     try:
         result = g.autoresolve_stacked_rebase()
         assert result.resolved is True, result.reason
-        # Push to the URL so refs/remotes/pub/<branch> stays at pre_tip.
+        # Move the remote behind the worktree's back. git 2.56 can update
+        # refs/remotes/pub/<branch> on a URL push, so pin it back to pre_tip.
         _sh(d, "push", "--force", bare, f"{master_sha}:refs/heads/{branch}")
+        _sh(d, "update-ref", f"refs/remotes/pub/{branch}", pre_tip)
+        assert _rev(d, f"refs/remotes/pub/{branch}") == pre_tip
         with pytest.raises(HarnessError) as ei:
             g.push()
         assert ei.value.kind == "push-failed"

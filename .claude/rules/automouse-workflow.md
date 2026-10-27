@@ -121,7 +121,7 @@ Two optional line-1 fields, `stop_condition:` and `evidence:`, let a plan declar
 
 ## Feature PRs cannot auto-merge
 
-Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended. They wait for a human to apply the `human-approved` label after inspection (ADR-0062). The label covers one diff: a changing push removes it, a clean rebase keeps it. `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before, still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` for `feat:` PRs awaiting your label.
+Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and **never** auto-merge unattended. They wait for a human to apply the `human-approved` label after inspection (ADR-0062). The label covers one diff: a changing push removes it, a clean rebase keeps it. `/post-plan` Phase 6.5 condition (8) **never arms** a `feat:` PR (a literal title grep), so no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge, still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` for `feat:` PRs awaiting your label.
 
 ## `depends_on:` hold gate
 

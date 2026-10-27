@@ -67,6 +67,15 @@ def test_detector_root_ignores_worktree_copy(tmp_path):
     assert runner._detector_root(wt) == runner.conformance._HARNESS_REPO_ROOT
 
 
+def test_removed_guards_holds_ignore_weakened_worktree_detector(tmp_path):
+    # The PR worktree's detector is weakened to exit 0 with no rows. The arm-time hold must
+    # still come from the harness checkout's detector and classify_body, so it holds.
+    wt = _stub_detector(tmp_path, 0)
+    holds = runner._removed_guards_holds(wt, SEASON_DIFF, None, "## Summary\n- change")
+    assert any(h.startswith("removed-guards:UNLISTED:try@ibl5/classes/Season/Season.php#")
+               for h in holds)
+
+
 def test_runner_detector_error_holds(tmp_path, monkeypatch):
     wt = _stub_detector(tmp_path, 2)
     monkeypatch.setattr(runner, "_detector_root", lambda worktree: wt)

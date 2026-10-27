@@ -396,24 +396,29 @@ if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
 fi
 ```
 
-**(20) Removed guards.** The block reruns bin/lib/deleted-guards on the realized diff and passes its flagged keys to pr_removed_guards_hold, so a body without the block still holds. It only adds a hold and never clears another condition.
+**(20) Removed guards.** The block reruns bin/lib/deleted-guards on the realized diff and passes its flagged keys to pr_removed_guards_hold, so a body without the block still holds. The detector, pr_removed_guards_hold and resolve_plan_file all come from the main checkout, so a PR that weakens its own copy cannot clear the hold. A missing copy there holds. It only adds a hold and never clears another condition.
 
 ```bash
 # condition (20): block unless every guard removal flagged on the realized diff has a substantive body Reason
-ROOTN="$(git rev-parse --show-toplevel)"
-source "$ROOTN/bin/lib/pr-armable.sh"
+# take the detector, the hold function and the plan resolver from the main checkout,
+# so a PR that edits any of them cannot judge itself
+RG_MAIN="$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
+RG_DET="$RG_MAIN/bin/lib/deleted-guards"
+RG_LIB_OK=1
+source "$RG_MAIN/bin/lib/pr-armable.sh" 2>/dev/null || RG_LIB_OK=0
+declare -F pr_removed_guards_hold >/dev/null || RG_LIB_OK=0
+source "$RG_MAIN/bin/lib/plan-resolve.sh" 2>/dev/null || RG_LIB_OK=0
+declare -F resolve_plan_file >/dev/null || RG_LIB_OK=0
 RG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 RG_BASE="$(git config "branch.$RG_BRANCH.iblBase" || echo master)"
-source "$ROOTN/bin/lib/plan-resolve.sh"
 PLAN_SLUG_DRIFT=""
-resolve_plan_file
+[ "$RG_LIB_OK" = 1 ] && resolve_plan_file
 RG_PLAN_ARG=()
 [ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ] && RG_PLAN_ARG=(--plan "$PLAN_FILE")
 RG_DIFF="$(mktemp)"
-# run the detector from the main checkout so a PR that edits it cannot judge itself
-RG_MAIN="$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
-RG_DET="$RG_MAIN/bin/lib/deleted-guards"
-if [ ! -x "$RG_DET" ]; then
+if [ "$RG_LIB_OK" != 1 ]; then
+  echo "BLOCKED: removed guards: pr_removed_guards_hold or resolve_plan_file not found under $RG_MAIN/bin/lib (fail-closed)"
+elif [ ! -x "$RG_DET" ]; then
   echo "BLOCKED: removed guards: detector not found at $RG_DET (fail-closed)"
 elif ! git diff "origin/$RG_BASE...HEAD" > "$RG_DIFF"; then
   echo "BLOCKED: removed guards: cannot compute the realized diff against origin/$RG_BASE (fail-closed)"

@@ -1800,6 +1800,40 @@ else
     out="$(run_condN "$CN" "## Summary")"
     expect_block "cN-detector-exit2-holds" BLOCK "$out"
     expect_c18_text "cN-detector-exit2-holds is fail-closed" "$out" "exit 2, fail-closed"
+    # Self-judging: the PR is a linked worktree of a main checkout. The PR's own copies
+    # of deleted-guards and pr-armable.sh are weakened (uncommitted, so the realized diff
+    # holds only the PHP removal). The block must still hold off the main checkout's copies.
+    mk_cN_wt() { # what-to-weaken: det|lib|both
+        mk_cN_repo "$CN" remove
+        git -C "$CN" checkout -q --detach
+        rm -rf "$CN_WT"
+        git -C "$CN" worktree add -q "$CN_WT" cn-branch
+        mkdir -p "$CN_WT/home"
+        if [ "$1" != lib ]; then
+            rm -f "$CN_WT/bin/lib/deleted-guards"
+            printf '#!/bin/sh\nexit 0\n' > "$CN_WT/bin/lib/deleted-guards"
+            chmod +x "$CN_WT/bin/lib/deleted-guards"
+        fi
+        if [ "$1" != det ]; then
+            rm -f "$CN_WT/bin/lib/pr-armable.sh"
+            printf 'pr_removed_guards_hold() { return 0; }\n' > "$CN_WT/bin/lib/pr-armable.sh"
+        fi
+    }
+    CN_WT="$BASE_TMP/cN-wt"
+    for _cn_w in det lib both; do
+        mk_cN_wt "$_cn_w"
+        out="$(run_condN "$CN_WT" "## Summary")"
+        expect_block "cN-self-judge-weak-$_cn_w-holds" BLOCK "$out"
+        expect_c18_text "cN-self-judge-weak-$_cn_w-holds names UNLISTED" "$out" "UNLISTED"
+    done
+    # The main checkout's pr-armable.sh lacks the hold function: fail closed.
+    mk_cN_wt det
+    rm -f "$CN/bin/lib/pr-armable.sh"
+    printf ': no hold function here\n' > "$CN/bin/lib/pr-armable.sh"
+    out="$(run_condN "$CN_WT" "## Summary")"
+    expect_block "cN-main-lib-missing-holds" BLOCK "$out"
+    expect_c18_text "cN-main-lib-missing-holds is fail-closed" "$out" "fail-closed"
+    git -C "$CN" worktree remove --force "$CN_WT"
     # The extracted condition (1)-(19) blocks must equal master's extraction byte for byte.
     _cn_bad=0
     _cn_mfile="$BASE_TMP/master-arm-conditions.md"

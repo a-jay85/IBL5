@@ -14,8 +14,31 @@
 #
 # Gates, in order: kill switch (WT_GC_ENABLED=0), fail-closed HID-idle gate,
 # 6h minimum-interval stamp, single-flight PID lock. Every gated skip is exit 0.
-# Exit 1 only for a bad flag, an unresolvable repo root, or a failed
-# bin/cleanup / bin/wt-status (so the launchd health check alerts).
+# Exit 1 only for a bad flag, an unresolvable repo root, a failed
+# bin/cleanup / bin/wt-status, or a failed reap step (so the launchd health
+# check alerts).
+#
+# After the surface counts, six reap steps from bin/lib/wt-gc-reap.sh run in
+# order, each in a subshell behind its own kill switch ("0" disables it):
+#   empty         WT_GC_REAP_EMPTY         EMPTY worktrees older than
+#                                          WT_GC_EMPTY_DAYS (7), re-verified
+#   dirty-merged  WT_GC_REAP_DIRTY_MERGED  merged worktrees whose dirt is
+#                                          byte-identical to origin/master
+#   refs          WT_GC_REAP_REFS          backup branches (PR merged >
+#                                          WT_GC_BACKUP_DAYS, 7), refs/tmp,
+#                                          refs/wt-sync-backup, refs/backup
+#                                          (> WT_GC_REF_DAYS, 14), refs of
+#                                          remotes absent from `git remote`
+#   tmp-pack      WT_GC_REAP_TMP_PACK      objects/pack/tmp_pack_* older than
+#                                          WT_GC_TMP_PACK_DAYS (1), not open
+#   docker        WT_GC_DOCKER_PRUNE       image + builder prune, filter
+#                                          until=WT_GC_DOCKER_UNTIL (168h)
+#   stale-list    WT_GC_STALE_LIST         STALLED/UNPUSHED older than
+#                                          WT_GC_STALE_DAYS (7) to
+#                                          WT_GC_STALE_FILE for the digest
+# Every deleted branch/ref is first written as "<sha> <ref>" to a dated file
+# under WT_GC_TIPS_DIR. Every probe that gates a delete keeps on error. A step
+# failure logs, exits 1 and withholds the stamp, so the next idle tick retries.
 #
 # Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]
 #   --dry-run         Pass --dry-run to cleanup; never write the stamp.
@@ -43,6 +66,32 @@ WT_GC_IOREG="${WT_GC_IOREG:-/usr/sbin/ioreg}"
 WT_GC_REPO_ROOT="${WT_GC_REPO_ROOT:-}"         # empty = derive main checkout (below)
 WT_GC_CLEANUP="${WT_GC_CLEANUP:-$SCRIPT_DIR/cleanup}"        # test seam: argv-capture stub
 WT_GC_WT_STATUS="${WT_GC_WT_STATUS:-$SCRIPT_DIR/wt-status}"  # test seam: fixture output
+# Per-step kill switches: "0" disables that step only; unset/empty = enabled.
+WT_GC_REAP_EMPTY="${WT_GC_REAP_EMPTY:-1}"
+WT_GC_REAP_DIRTY_MERGED="${WT_GC_REAP_DIRTY_MERGED:-1}"
+WT_GC_REAP_REFS="${WT_GC_REAP_REFS:-1}"
+WT_GC_REAP_TMP_PACK="${WT_GC_REAP_TMP_PACK:-1}"
+WT_GC_DOCKER_PRUNE="${WT_GC_DOCKER_PRUNE:-1}"
+WT_GC_STALE_LIST="${WT_GC_STALE_LIST:-1}"
+# Ages (days) / Docker until-filter. Non-numeric or empty = that step skipped, rc=1.
+WT_GC_EMPTY_DAYS="${WT_GC_EMPTY_DAYS-7}"
+WT_GC_BACKUP_DAYS="${WT_GC_BACKUP_DAYS-7}"
+WT_GC_REF_DAYS="${WT_GC_REF_DAYS-14}"
+WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"
+WT_GC_STALE_DAYS="${WT_GC_STALE_DAYS-7}"
+WT_GC_DOCKER_UNTIL="${WT_GC_DOCKER_UNTIL-168h}"
+# Paths / binaries.
+WT_GC_TIPS_DIR="${WT_GC_TIPS_DIR:-$WT_GC_LOCK_DIR/tips}"
+WT_GC_STALE_FILE="${WT_GC_STALE_FILE:-$WT_GC_LOCK_DIR/stale-worktrees.tsv}"
+WT_GC_WT_REMOVE="${WT_GC_WT_REMOVE:-$SCRIPT_DIR/wt-remove}"
+WT_GC_QUEUE_DIR="${WT_GC_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
+WT_GC_SESSION_REGISTRY="${WT_GC_SESSION_REGISTRY:-$HOME/.claude/session-registry/active.json}"
+WT_GC_LAUNCHCTL="${WT_GC_LAUNCHCTL:-/bin/launchctl}"
+# The launchd PATH is minimal, so WT_GC_LSOF / WT_GC_GH / WT_GC_DOCKER are
+# resolved after the library loads: PATH first, then these dirs. A seam that
+# is set, even to "", is used as given and never resolved. "" or a missing
+# file means "not found", and the step that needs it keeps everything.
+WT_GC_BIN_DIRS="${WT_GC_BIN_DIRS-/usr/sbin:/opt/homebrew/bin:/usr/local/bin}"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 log() {
@@ -86,6 +135,13 @@ esac
 # ── Repo root ─────────────────────────────────────────────────────────────────
 # shellcheck source=bin/lib/git-helpers.sh disable=SC1091
 source "$SCRIPT_DIR/lib/git-helpers.sh"
+# shellcheck source=bin/lib/wt-guards.sh disable=SC1091
+source "$SCRIPT_DIR/lib/wt-guards.sh"
+# shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
+source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
+[ -n "${WT_GC_LSOF+x}" ]   || WT_GC_LSOF="$(_gc_resolve_bin lsof)"
+[ -n "${WT_GC_GH+x}" ]     || WT_GC_GH="$(_gc_resolve_bin gh)"
+[ -n "${WT_GC_DOCKER+x}" ] || WT_GC_DOCKER="$(_gc_resolve_bin docker)"
 if [ -z "$WT_GC_REPO_ROOT" ]; then
     WT_GC_REPO_ROOT="$(main_checkout_root "$SCRIPT_DIR/..")" || WT_GC_REPO_ROOT=""
 fi
@@ -151,7 +207,8 @@ if ! tick_lock_acquire "$LOCK_FILE" _gc_lock_event; then
 fi
 TMP_OUT="$(mktemp "${TMPDIR:-/tmp}/wt-gc-out.XXXXXX")"
 TMP_STATUS="$(mktemp "${TMPDIR:-/tmp}/wt-gc-status.XXXXXX")"
-trap 'tick_lock_release "$LOCK_FILE"; rm -f "$TMP_OUT" "$TMP_STATUS"' EXIT
+TMP_STEP="$(mktemp "${TMPDIR:-/tmp}/wt-gc-step.XXXXXX")"
+trap 'tick_lock_release "$LOCK_FILE"; rm -f "$TMP_OUT" "$TMP_STATUS" "$TMP_STEP"' EXIT
 
 EXIT_CODE=0
 
@@ -198,6 +255,34 @@ EOF
 awk '$1=="STALLED" || $1=="UNPUSHED" {print $1, $2}' "$TMP_STATUS" | while read -r cls wt; do
     log "SURFACE $cls $wt"
 done
+
+# ── Reap steps (bin/lib/wt-gc-reap.sh) ────────────────────────────────────────
+STEPS_FAILED=0
+# run_step <name> <switch-value> <switch-name> <fn>: kill switch, then the step
+# in a subshell so `set -e` inside it can never abort the sweep. Step log()
+# lines reach stdout and the log directly; stray stderr is appended to the log.
+run_step() {
+    local name="$1" sw="$2" swname="$3" fn="$4" rc=0
+    if [ "$sw" = 0 ]; then log "step $name disabled ($swname=0)"; return 0; fi
+    # Background + wait: a `( ... ) || cmd` list would run the subshell in a
+    # context where bash ignores errexit. errexit covers the step's own
+    # commands; helpers a step calls as `f || rc=1` run without it and rely on
+    # their explicit returns.
+    ( set -euo pipefail; "$fn" ) 2> "$TMP_STEP" &
+    wait $! || rc=$?
+    { cat "$TMP_STEP" >> "$WT_GC_LOG"; } 2>/dev/null || true
+    if [ "$rc" -ne 0 ]; then
+        log "step $name failed (rc=$rc) — continuing"
+        STEPS_FAILED=$((STEPS_FAILED + 1)); EXIT_CODE=1
+    fi
+}
+run_step empty        "$WT_GC_REAP_EMPTY"        WT_GC_REAP_EMPTY        reap_empty_worktrees
+run_step dirty-merged "$WT_GC_REAP_DIRTY_MERGED" WT_GC_REAP_DIRTY_MERGED reap_dirty_merged_worktrees
+run_step refs         "$WT_GC_REAP_REFS"         WT_GC_REAP_REFS         reap_stale_refs
+run_step tmp-pack     "$WT_GC_REAP_TMP_PACK"     WT_GC_REAP_TMP_PACK     reap_tmp_packs
+run_step docker       "$WT_GC_DOCKER_PRUNE"      WT_GC_DOCKER_PRUNE      docker_prune
+run_step stale-list   "$WT_GC_STALE_LIST"        WT_GC_STALE_LIST        write_stale_list
+log "reap done steps_failed=$STEPS_FAILED"
 
 log "done dry_run=$DRY_RUN cleaned=$cleaned skipped=$skipped stalled=$n_stalled unpushed=$n_unpushed empty=$n_empty open_pr=$n_open_pr merged=$n_merged rc=$EXIT_CODE"
 

@@ -358,6 +358,7 @@ fi
 # is conservative). Rows that do not fit are counted on a final line.
 DIGEST_BUDGET=1900
 HELD_BIN="${MORNING_DIGEST_PR_TRIAGE:-$REPO_ROOT/bin/pr-triage}"
+STALE_WT_FILE="${MORNING_DIGEST_STALE_WT:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/stale-worktrees.tsv}"
 HELD_TIMEOUT="${MORNING_DIGEST_HELD_TIMEOUT:-600}"
 case "$HELD_TIMEOUT" in ''|0|*[!0-9]*) HELD_TIMEOUT=600 ;; esac
 
@@ -414,6 +415,62 @@ else
 fi
 rm -f "$HELD_OUT" "$HELD_FLAG"
 BODY+=$'\n\n'"${HELD_SECTION}"
+
+# --- Stale worktrees ----------------------------------------------------------
+# Fed by the TSV bin/wt-gc-tick writes: line 1 "# generated YYYY-MM-DD HH:MM", then
+# "name<TAB>CLASS<TAB>age" rows. Read-only and fail-open: a missing, unreadable or
+# header-less file renders "unavailable". Same byte budget as Held PRs, which
+# already sits in BODY, so the whole DM stays one Discord message.
+STALE_SECTION=""
+stale_first=""
+if [ -f "$STALE_WT_FILE" ] && [ -r "$STALE_WT_FILE" ]; then
+  IFS= read -r stale_first < "$STALE_WT_FILE" || true
+fi
+case "$stale_first" in
+  "# generated "*)
+    stale_asof="${stale_first#"# generated "}"
+    stale_asof="${stale_asof%$'\r'}"
+    stale_rows=""
+    stale_n=0
+    stale_lineno=0
+    while IFS=$'\t' read -r s_name s_class s_age _rest || [ -n "$s_name" ]; do
+      stale_lineno=$(( stale_lineno + 1 ))
+      [ "$stale_lineno" -eq 1 ] && continue
+      [ -n "$s_name" ] && [ -n "$s_class" ] || continue
+      s_age="${s_age%$'\r'}"
+      stale_rows+="• ${s_name} (${s_class}, ${s_age:-?}d)"$'\n'
+      stale_n=$(( stale_n + 1 ))
+    done < "$STALE_WT_FILE"
+    if [ "$stale_n" -eq 0 ]; then
+      STALE_SECTION="Stale worktrees: none"
+    else
+      STALE_SECTION="Stale worktrees (${stale_n}, as of ${stale_asof})"
+      shown=0
+      while IFS= read -r row; do
+        [ -n "$row" ] || continue
+        cand="${STALE_SECTION}"$'\n'"${row}"
+        left=$(( stale_n - shown - 1 ))
+        tail_line=""
+        [ "$left" -gt 0 ] && tail_line=$'\n'"…and ${left} more"
+        if [ $(( $(_bytes "${BODY}"$'\n\n'"${cand}${tail_line}") )) -gt "$DIGEST_BUDGET" ]; then
+          break
+        fi
+        STALE_SECTION="$cand"
+        shown=$(( shown + 1 ))
+      done <<< "$stale_rows"
+      hidden=$(( stale_n - shown ))
+      [ "$hidden" -gt 0 ] && STALE_SECTION+=$'\n'"…and ${hidden} more"
+    fi
+    ;;
+  *)
+    STALE_SECTION="Stale worktrees: unavailable"
+    ;;
+esac
+# Never push the DM past the budget: drop the section when even it cannot fit.
+if [ $(( $(_bytes "${BODY}"$'\n\n'"${STALE_SECTION}") )) -gt "$DIGEST_BUDGET" ]; then
+  STALE_SECTION=""
+fi
+[ -z "$STALE_SECTION" ] || BODY+=$'\n\n'"${STALE_SECTION}"
 
 # --- Send or dry-run ----------------------------------------------------------
 

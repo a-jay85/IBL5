@@ -4,6 +4,10 @@ import {
   padRect,
   clusterSpots,
   planCrop,
+  planSpots,
+  bestSplit,
+  bandMask,
+  mapRow,
   regionLabel,
   type Rect,
 } from '../e2e/vr-crop';
@@ -94,8 +98,8 @@ describe('clusterSpots', () => {
 });
 
 describe('planCrop', () => {
-  it('4a falls back uncropped when dimensions change', () => {
-    expect(planCrop({ width: 100, height: 100 }, { width: 100, height: 120 }, null)).toEqual({
+  it('4a falls back uncropped when the width changes', () => {
+    expect(planCrop({ width: 100, height: 100 }, { width: 120, height: 100 }, new Uint8Array(120 * 100))).toEqual({
       kind: 'uncropped',
       reason: 'dimensions-changed',
     });
@@ -111,7 +115,67 @@ describe('planCrop', () => {
   it('4c returns one spot for a single set pixel at the same size', () => {
     const plan = planCrop({ width: 100, height: 100 }, { width: 100, height: 100 }, maskOf(100, 100, [[40, 40]]));
     expect(plan.kind).toBe('spots');
-    if (plan.kind === 'spots') expect(plan.rects).toHaveLength(1);
+    if (plan.kind === 'spots') expect(plan.spots).toHaveLength(1);
+  });
+
+  it('4d accepts a height change with a mask over the taller image', () => {
+    const plan = planCrop({ width: 100, height: 100 }, { width: 100, height: 106 }, maskOf(100, 106, [[40, 40]]));
+    expect(plan.kind).toBe('spots');
+  });
+});
+
+describe('bestSplit', () => {
+  it('6a finds the row where a band was inserted', () => {
+    // Rows >= 30 differ at offset 0 and match at offset d.
+    const diff0 = new Uint8Array(100).fill(0, 0, 30).fill(1, 30);
+    const diffD = new Uint8Array(100).fill(1, 0, 30).fill(0, 30);
+    expect(bestSplit(diff0, diffD, 100)).toBe(30);
+  });
+
+  it('6b keeps the lowest split on a tie', () => {
+    expect(bestSplit(new Uint8Array(10), new Uint8Array(10), 10)).toBe(0);
+  });
+});
+
+describe('mapRow', () => {
+  it('7a maps rows above, inside and below the band', () => {
+    expect(mapRow(10, 30, 6)).toBe(10);
+    expect(mapRow(32, 30, 6)).toBe(30);
+    expect(mapRow(40, 30, 6)).toBe(34);
+  });
+});
+
+describe('bandMask', () => {
+  const rgba = (w: number, h: number, v: number) => new Uint8Array(w * h * 4).fill(v);
+
+  it('8a marks only band pixels that differ from both seam rows', () => {
+    const short = rgba(10, 4, 255);
+    const tall = rgba(10, 6, 255);
+    // Band rows 2-3, dark at x 3..6.
+    for (const y of [2, 3]) for (let x = 3; x < 7; x++) tall.fill(0, (y * 10 + x) * 4, (y * 10 + x) * 4 + 3);
+    const m = bandMask(tall, short, 10, 4, 2, 2);
+    expect(Array.from(m.subarray(0, 10))).toEqual([0, 0, 0, 1, 1, 1, 1, 0, 0, 0]);
+  });
+
+  it('8b marks the full band when it matches its neighbours (blank space)', () => {
+    const m = bandMask(rgba(10, 6, 255), rgba(10, 4, 255), 10, 4, 2, 2);
+    expect(m.every((v) => v === 1)).toBe(true);
+  });
+});
+
+describe('planSpots', () => {
+  it('9a puts nearby boxes in one window and far ones in separate windows', () => {
+    const near = planSpots(maskOf(300, 1000, [[50, 100], [150, 110]]), 300, 1000);
+    expect(near).toHaveLength(1);
+    expect(near[0]!.boxes).toHaveLength(2);
+    const far = planSpots(maskOf(300, 1000, [[50, 100], [50, 800]]), 300, 1000);
+    expect(far).toHaveLength(2);
+  });
+
+  it('9b gives window-relative boxes', () => {
+    const [spot] = planSpots(maskOf(300, 300, [[150, 150]]), 300, 300);
+    expect(spot!.rect).toEqual({ x: 89, y: 89, w: 123, h: 123 });
+    expect(spot!.boxes).toEqual([{ x: 56, y: 56, w: 11, h: 11 }]);
   });
 });
 

@@ -61,7 +61,7 @@ const {
   buildAgentShotEntry,
   upsertAgentShots,
 } = await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
-const { cropPair, composePair } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop-png.ts'));
+const { cropPair, composePair, focusPair } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop-png.ts'));
 const { regionLabel } = await import(resolve(ibl5Dir, 'tests/e2e/vr-crop.ts'));
 const { parseManualBullets, buildManualSection, manualShotUrl, manualShotFile } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
@@ -209,11 +209,13 @@ if (publishAgentShots !== null) {
   const shotDir = `${sha}/visual-review/agent-shots`;
   // Pairs also get side/stack composites, built in a temp dir before any push.
   const composeDir = mkdtempSync(join(tmpdir(), 'vr-agent-pairs-'));
+  // Each composite is cropped to the change and boxed red (focusPair).
   const composites = (s: { label: string; before: string; after: string }) =>
     (['side', 'stack'] as const).map((layout) => {
       const src = join(composeDir, `${s.label}.${layout}.png`);
       try {
-        writeFileSync(src, composePair(readFileSync(s.before), readFileSync(s.after), layout));
+        const f = focusPair(readFileSync(s.before), readFileSync(s.after));
+        writeFileSync(src, composePair(f.before, f.after, layout));
       } catch (err) {
         fail(`cannot compose ${s.label} before/after: ${String(err)}`);
       }
@@ -336,7 +338,7 @@ if (copyDest !== null) {
 }
 
 // Crop mode — cut each changed cell's before/after pair down to its changed
-// spots, write <title>.<i>.before/after.png plus spots.json into DEST, then exit.
+// spots (each change boxed red on both halves, height shifts aligned), write <title>.<i>.before/after.png plus spots.json into DEST, then exit.
 // DEST is the deploy tree's changed/ dir. One bad cell is logged and skipped;
 // spots.json is always written, so the splice step reads [] when nothing changed.
 if (cropDest !== null) {
@@ -422,11 +424,10 @@ if (composeManual !== null) {
     const afterPath = join(composeManual, manualShotFile(r.label));
     if (!existsSync(beforePath) || !existsSync(afterPath)) continue;
     try {
+      // One slot per row: crop to the change and box it red (focusPair).
+      const f = focusPair(readFileSync(beforePath), readFileSync(afterPath));
       for (const layout of ['side', 'stack'] as const) {
-        writeFileSync(
-          join(composeManual, manualShotFile(r.label, layout)),
-          composePair(readFileSync(beforePath), readFileSync(afterPath), layout)
-        );
+        writeFileSync(join(composeManual, manualShotFile(r.label, layout)), composePair(f.before, f.after, layout));
       }
       r.composed = true;
       n++;

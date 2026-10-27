@@ -150,23 +150,172 @@ export function clusterSpots(
   return rects;
 }
 
+// Content shift. A change that adds or removes rows (a new 6px border, an
+// extra table row) pushes everything below it down or up. A plain
+// same-position diff then marks the whole lower page. We model the change as
+// ONE band of d = |tallH - shortH| rows inserted into the taller image at a
+// split row s: taller rows [0,s) line up with shorter rows [0,s), and taller
+// rows [s+d, tallH) line up with shorter rows [s, shortH). The glue layer
+// diffs both alignments (offset 0 and offset d), and bestSplit picks the s
+// that leaves the fewest changed rows. Only the band plus rows that still
+// differ under their alignment get boxed. Two separate insertions break the
+// one-band model. The rows between them then show as changed, which
+// over-boxes but never hides a change. Same-height pairs have d = 0 and
+// reduce to the plain diff.
+
+/**
+ * Split row s in [0, shortH] minimising (changed rows above s at offset 0) +
+ * (changed rows at or below s at offset d). diff0[i] / diffD[i] are 1 when
+ * shorter row i differs from taller row i / taller row i + d. Ties keep the
+ * lowest s.
+ */
+export function bestSplit(diff0: Uint8Array, diffD: Uint8Array, shortH: number): number {
+  let below = 0;
+  for (let i = 0; i < shortH; i++) below += diffD[i]!;
+  let above = 0;
+  let best = 0;
+  let bestCost = below;
+  for (let s = 1; s <= shortH; s++) {
+    above += diff0[s - 1]!;
+    below -= diffD[s - 1]!;
+    if (above + below < bestCost) {
+      bestCost = above + below;
+      best = s;
+    }
+  }
+  return best;
+}
+
+/** Map a taller-image row to the shorter image under split s and band height d. */
+export function mapRow(y: number, s: number, d: number): number {
+  if (y < s) return y;
+  if (y < s + d) return s;
+  return y - d;
+}
+
+/** Max per-channel RGB delta that still counts as "the same colour" in a band. */
+export const BAND_TOLERANCE = 24;
+
+/**
+ * Change mask (width x d) for the d band rows inserted at taller row s. tall
+ * and short are RGBA. A band pixel counts as changed when it differs from the
+ * shorter image's rows on both sides of the seam (rows s-1 and s, where they
+ * exist). So a full-width inserted line is boxed where it is visible, not
+ * across the page background. A band that matches its neighbours everywhere
+ * (pure blank space) is marked across its full width, so the shift is still
+ * boxed.
+ */
+export function bandMask(
+  tall: Uint8Array,
+  short: Uint8Array,
+  width: number,
+  shortH: number,
+  s: number,
+  d: number,
+): Uint8Array {
+  const mask = new Uint8Array(width * d);
+  const neighbours = [s - 1, s].filter((r) => r >= 0 && r < shortH);
+  let any = false;
+  for (let k = 0; k < d; k++) {
+    for (let x = 0; x < width; x++) {
+      const to = ((s + k) * width + x) * 4;
+      let differs = true;
+      for (const r of neighbours) {
+        const so = (r * width + x) * 4;
+        const delta = Math.max(
+          Math.abs(tall[to]! - short[so]!),
+          Math.abs(tall[to + 1]! - short[so + 1]!),
+          Math.abs(tall[to + 2]! - short[so + 2]!),
+        );
+        if (delta <= BAND_TOLERANCE) {
+          differs = false;
+          break;
+        }
+      }
+      if (differs) {
+        mask[k * width + x] = 1;
+        any = true;
+      }
+    }
+  }
+  if (!any) mask.fill(1);
+  return mask;
+}
+
+// Crop windows and red boxes. Changed pixels cluster into boxes with a small
+// outset, so the box stroke never paints over a thin change. Each box is
+// padded by the crop margin into a window. Overlapping windows merge, so one
+// window can hold several boxes. Past maxSpots windows, the tail folds into
+// one union window that keeps every box.
+export interface FocusOptions extends CropOptions { boxOutset: number; maxBoxes: number }
+export const DEFAULT_FOCUS: FocusOptions = { padding: 56, cell: 16, maxSpots: 3, boxOutset: 5, maxBoxes: 8 };
+
+/** One crop window (in the mask's coordinates) and its boxes (window-relative). */
+export interface Spot { rect: Rect; boxes: Rect[] }
+
+export function planSpots(mask: Uint8Array, width: number, height: number, opts: FocusOptions = DEFAULT_FOCUS): Spot[] {
+  const boxes = clusterSpots(mask, width, height, {
+    padding: opts.boxOutset,
+    cell: opts.cell,
+    maxSpots: opts.maxBoxes,
+  });
+  let groups = boxes.map((b) => ({ rect: padRect(b, opts.padding, width, height), boxes: [b] }));
+  let merged = true;
+  while (merged) {
+    merged = false;
+    outer: for (let i = 0; i < groups.length; i++) {
+      for (let j = i + 1; j < groups.length; j++) {
+        if (overlapsOrTouches(groups[i]!.rect, groups[j]!.rect)) {
+          const u = {
+            rect: unionRect(groups[i]!.rect, groups[j]!.rect),
+            boxes: [...groups[i]!.boxes, ...groups[j]!.boxes],
+          };
+          groups = groups.filter((_, k) => k !== i && k !== j);
+          groups.push(u);
+          merged = true;
+          break outer;
+        }
+      }
+    }
+  }
+  groups.sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x);
+  if (groups.length > opts.maxSpots) {
+    const kept = groups.slice(0, opts.maxSpots - 1);
+    const rest = groups.slice(opts.maxSpots - 1);
+    let u = rest[0]!;
+    for (let i = 1; i < rest.length; i++) {
+      u = { rect: unionRect(u.rect, rest[i]!.rect), boxes: [...u.boxes, ...rest[i]!.boxes] };
+    }
+    groups = [...kept, u];
+  }
+  return groups.map((g) => ({
+    rect: g.rect,
+    boxes: g.boxes.map((b) => ({ x: b.x - g.rect.x, y: b.y - g.rect.y, w: b.w, h: b.h })),
+  }));
+}
+
 export type CropPlan =
-  | { kind: 'spots'; rects: Rect[] }
+  | { kind: 'spots'; spots: Spot[] }
   | { kind: 'uncropped'; reason: 'dimensions-changed' | 'no-pixel-mask' };
 
-/** Top-level decision for one changed cell. mask is null when dims differ. */
+/**
+ * Top-level decision for one changed cell. mask covers the taller image
+ * (width x max height), built by the glue layer with the shift alignment
+ * above. It is null when the widths differ, the one size change we cannot
+ * align.
+ */
 export function planCrop(
   before: Size,
   after: Size,
   mask: Uint8Array | null,
-  opts: CropOptions = DEFAULT_CROP,
+  opts: FocusOptions = DEFAULT_FOCUS,
 ): CropPlan {
-  if (before.width !== after.width || before.height !== after.height || mask === null) {
+  if (before.width !== after.width || mask === null) {
     return { kind: 'uncropped', reason: 'dimensions-changed' };
   }
-  const rects = clusterSpots(mask, after.width, after.height, opts);
-  if (rects.length === 0) return { kind: 'uncropped', reason: 'no-pixel-mask' };
-  return { kind: 'spots', rects };
+  const spots = planSpots(mask, after.width, Math.max(before.height, after.height), opts);
+  if (spots.length === 0) return { kind: 'uncropped', reason: 'no-pixel-mask' };
+  return { kind: 'spots', spots };
 }
 
 /** Human region label for a heading: "top|middle|bottom, y <y0>-<y1> px" (band from the rect's vertical centre vs. image thirds). */

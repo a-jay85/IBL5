@@ -1,6 +1,6 @@
 ---
 description: Changed VR cells are published at the top of the PR body as cropped before/after pairs, the publish steps also run under update-baselines, manual-row shots gain a base-SHA before, and agents publish their own shots through bin/vr-review-comment.
-last_verified: 2026-10-21
+last_verified: 2026-10-27
 ---
 
 # ADR-0181: Publish cropped before/after pairs of changed VR screens in the PR body
@@ -18,7 +18,7 @@ ADR-0076 put first renders of brand-new VR views at the top of the PR body. Chan
 
 ## Decision
 
-1. For each changed cell, CI computes the changed pixels with pixelmatch at the gate's threshold and `diffMask`, clusters them into at most three padded spots, and crops before and after to the same box. A cell whose dimensions changed, or whose change sits below the threshold, is published uncropped and labelled so.
+1. For each changed cell, CI computes the changed pixels with pixelmatch at the gate's threshold and `diffMask`, clusters them into at most three padded spots, and crops before and after to the same box. A height change is aligned as one inserted or removed band, so content below it that only moved is not counted. Each change gets a red box on both halves (owner decision, 2026-10-27). A cell whose width changed, or whose change sits below the threshold, is published uncropped and labelled so.
 2. The ADR-0076 managed block gains a changed section: one `###` heading per spot (module, cell, region), then one `<picture>` of the pair, desktop first, mobile spots inside one `<details>` per module. A stamp with the short head SHA and the UTC run time opens the block. Spots stop at 40 entries or 40,000 characters, and a link to the full gallery follows.
 3. The gallery build, crop, deploy, assert, re-serve and splice steps also run while `update-baselines` is present. Each carries `continue-on-error` that is true on a labelled run, so a publish failure can never skip the baseline regen. The before image is master's committed baseline, so the evidence survives the regen. A unit test over `.github/workflows/e2e-tests.yml` fails if any of these steps regains the label guard or loses `continue-on-error`.
 4. Manual-row `vr:` shots gain a before taken from a second PHP container serving a worktree of the base SHA. Any failure falls back to the after-only shot.

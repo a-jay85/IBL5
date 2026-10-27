@@ -39,9 +39,11 @@ A second, review-only strict pass (ADR-0180) runs after this triage. It uses per
 ## Changed screens in the PR body
 
 Changed cells get cropped before/after pairs in the same block (ADR-0181). `--crop-changed` runs
-pixelmatch at the gate threshold (0.22) with `diffMask`, clusters changed pixels into at most three
-padded spots, and crops both sides to one box. A size change or a sub-threshold change publishes
-uncropped, labelled. Output: `changed/<title>.<i>.{before,after,side,stack}.png` plus
+pixelmatch at the gate threshold (0.22) with `diffMask`. A height change is aligned as one inserted
+or removed band, so content that only shifted is not marked. Changed pixels become red boxes (#e11d48,
+3 px) drawn at the same spot on both halves. Each box is padded by 56 px into a crop window, at most
+three windows per cell. A width change or a sub-threshold change publishes uncropped, labelled.
+Manual-row and agent-shot composites get one window holding every box. Output: `changed/<title>.<i>.{before,after,side,stack}.png` plus
 `changed/spots.json`. One `###` per spot (module, cell, region), desktop first, mobile in one
 `<details>` per module. Each spot is one `<picture>`: on screens 768 px and wider it shows the
 `side` composite (before left, after right), and narrower screens get `stack` (before above

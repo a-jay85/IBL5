@@ -25,19 +25,20 @@ final class ApiKeysFactory implements \Module\Contracts\ModuleFactoryInterface
 
     public function controller(): ApiKeysController
     {
-        $repository = new ApiKeysRepository($this->services->db());
+        $db = $this->services->db();
+        $repository = new ApiKeysRepository($db);
         $service = new ApiKeysService($repository);
         $view = new ApiKeysView();
+
         $googleFlow = null;
         $googleExport = null;
         if (\GoogleSheets\GoogleOAuthConfig::isConfigured()) {
             try {
-                $db = $this->services->db();
-                $request = $this->services->request();
-                $host = $request->server('HTTP_HOST');
+                $host = $this->services->request()->server('HTTP_HOST');
+                $https = $this->services->request()->server('HTTPS');
                 $googleConfig = \GoogleSheets\GoogleOAuthConfig::fromEnv(
-                    is_string($host) ? $host : 'localhost',
-                    ($request->server('HTTPS') ?? 'off') !== 'off'
+                    is_string($host) ? $host : '',
+                    ($https ?? 'off') !== 'off'
                 );
                 $googleHttp = new \GoogleSheets\CurlGoogleHttpClient();
                 $googleOAuth = new \GoogleSheets\GoogleOAuthClient($googleConfig, $googleHttp);
@@ -52,12 +53,17 @@ final class ApiKeysFactory implements \Module\Contracts\ModuleFactoryInterface
                 );
                 $googleFlow = new \GoogleSheets\GoogleOAuthFlowHandler($googleOAuth, $googleExport);
             } catch (\Security\SecretBoxKeyUnavailableException | \GoogleSheets\GoogleOAuthNotConfiguredException $e) {
-                $googleFlow = null;
-                $googleExport = null;
                 \Logging\LoggerFactory::getChannel('google-sheets')->error('google sheets disabled: ' . $e->getMessage());
             }
         }
 
-        return new ApiKeysController($service, $view, $this->services->nukeCompat(), $this->services->auth(), $googleFlow, $googleExport);
+        return new ApiKeysController(
+            $service,
+            $view,
+            $this->services->nukeCompat(),
+            $this->services->auth(),
+            $googleFlow,
+            $googleExport,
+        );
     }
 }

@@ -763,3 +763,306 @@ def test_fidelity_reusable_sees_no_delta_arm():
         fidelity=reviewcache.vet_fidelity(full, "run"))
     assert reviewcache.fidelity_reusable(
         record_full, VERSION, "a" * 40, "b" * 64) is not None
+
+
+# --- Phase 6: multi-invocation suite ------------------------------------------------
+#
+# Every test drives the real `_run_fidelity` once (run 1, a full NOT READY review that writes
+# the anchor record) and feeds that run's REAL outputs forward: the sticky is composed from
+# run 1's `res.fidelity`, and the record is whatever run 1 wrote. Hand-built state appears
+# only in the garbled-record cases, where the seed IS the input under test (invocation-2-only).
+# A run's id is the basename of its out_dir, which `_drive` sets to tmp_path, so the anchor
+# run id the delta reviewer must echo is `tmp_path.name`.
+
+from harness.armable import evaluate, select_fidelity_verdict  # noqa: E402
+
+
+def _diff_section(path, *hunks):
+    """One `diff --git` section. Each hunk is (start, removed_lines, added_lines)."""
+    out = (f"diff --git a/{path} b/{path}\nindex 1111111..2222222 100644\n"
+           f"--- a/{path}\n+++ b/{path}\n")
+    for start, removed, added in hunks:
+        out += (f"@@ -{start},{1 + len(removed)} +{start},{1 + len(added)} @@\n context\n"
+                + "".join(f"-{r}\n" for r in removed) + "".join(f"+{a}\n" for a in added))
+    return out
+
+
+# DIFF_MOVED (module level, Phase 1) moves a.py by one added line. The a.py section below
+# carries both hunks in ONE section: the per-file splitter keys on path, so a second section
+# for the same path would shadow the first.
+DIFF_MOVED_2 = DIFF + _diff_section("a.py", (10, [], ["    return 1"]), (30, [], ["    return 2"]))
+# Run 4 moves a.py again but stays inside the size and ratio bounds (2 of 4 changed lines),
+# so only the chaining cap stands between it and a third delta review.
+DIFF_MOVED_3 = DIFF + _diff_section("a.py", (10, [], ["    return 1"]), (30, [], ["    return 3"]))
+DIFF_REGRESS = DIFF + _diff_section("a.py", (10, ["def planned_helper():"], []))
+DIFF_BIG = DIFF + _diff_section("a.py", (1, [], [f"big {i}" for i in range(201)]))
+DIFF_RATIO = DIFF + _diff_section("a.py", (1, [], [f"ratio {i}" for i in range(30)]))
+DIFF_NEWFILE = DIFF + _diff_section("c.py", (1, [], ["new file line"]))
+DIFF_GATE_1 = DIFF + _diff_section(".github/workflows/x.yml", (1, [], ["name: one"]))
+DIFF_GATE = DIFF + _diff_section(".github/workflows/x.yml", (1, [], ["name: two"]))
+
+PLAN = ("# plan\n\n## Phase 2 — helper\nAdd the helper in a.py.\n\n"
+        "## Phase 3 — other\nAdjust b.py.\n\n"
+        "## Critical Files\n- a.py\n- b.py\n\n"
+        "## Verification Matrix\n| row | check |\n").encode("utf-8")
+PLAN_NO_A = ("# plan\n\n## Phase 2 — helper\nAdd the helper.\n\n"
+             "## Phase 3 — other\nAdjust b.py.\n\n"
+             "## Critical Files\n- b.py\n\n"
+             "## Verification Matrix\n| row | check |\n").encode("utf-8")
+
+READY_FULL = "6d\n\nREADY\n"
+DECLINED = "phase5.5 fidelity: delta declined ({})".format
+
+
+def _delta_text(tmp_path, *, ready=True):
+    """DELTA_READY_TEXT echoing the anchor run id of this test (run 1's out_dir name)."""
+    text = DELTA_READY_TEXT.replace("live-prior", pathlib.Path(tmp_path).name)
+    if not ready:
+        text = text.replace("RESOLVED by", "UNRESOLVED by").replace("\nREADY\n", "\nNOT READY\n")
+    return text
+
+
+def _run1(tmp_path, *, diff=DIFF, plan_body=PLAN):
+    """Run 1: a full NOT READY review. Asserts it spawned only the full reviewer and wrote the anchor."""
+    purposes = []
+    res, _, logs = _drive(tmp_path, prior_sticky=None, plan_body=plan_body, diff=diff,
+                          canned={"plan-fidelity-review": NOT_READY_TEXT},
+                          purposes_out=purposes, state_dir=_state_of(tmp_path), slug="s")
+    assert purposes == ["plan-fidelity-review"], logs
+    assert os.path.exists(fidelity_delta.record_path(_state_of(tmp_path), "s")), logs
+    return res
+
+
+def _sticky_from(res):
+    f = res.fidelity
+    return _sticky(verdict=f["verdict_1"], diff_id=f["diff_id"], plan_hash=f["plan_hash"],
+                   tree=f["reviewed_tree"])
+
+
+def _next_run(tmp_path, prev, *, diff, tree, canned, plan_body=PLAN, sticky=None):
+    """Run N+1: the sticky is built from run N's real result unless a case overrides it."""
+    purposes = []
+    res, _, logs = _drive(tmp_path, sticky if sticky is not None else _sticky_from(prev),
+                          plan_body=plan_body, diff=diff, tree=tree, canned=canned,
+                          purposes_out=purposes, state_dir=_state_of(tmp_path), slug="s")
+    return res, purposes, logs
+
+
+def _delta_file(tmp_path, name):
+    return pathlib.Path(tmp_path, fidelity_delta.PACKET_NAME, name).read_text()
+
+
+def _full_canned():
+    return {"plan-fidelity-review": READY_FULL}
+
+
+def _assert_full_fallback(purposes, logs, reason):
+    assert DECLINED(reason) in logs, logs
+    assert purposes == ["plan-fidelity-review"], purposes
+    assert not any("review: delta" in l for l in logs)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_small_delta_takes_delta_path(tmp_path):
+    res1 = _run1(tmp_path)
+    res2, purposes2, logs2 = _next_run(
+        tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+        canned={"plan-fidelity-review": READY_FULL, fidelity_delta.PURPOSE: _delta_text(tmp_path)})
+    assert purposes2 == [fidelity_delta.PURPOSE], logs2
+    assert res2.fidelity["review_kind"] == "delta"
+    assert res2.fidelity["verdict_1"] == "READY"
+    assert any(l.startswith("phase5.5 fidelity: review: delta (anchor ") for l in logs2), logs2
+    patch = _delta_file(tmp_path, "diff.patch")
+    assert "b/a.py" in patch and "b/b.py" not in patch
+    assert "phase 2 helper missing" in _delta_file(tmp_path, "anchor-findings.md")
+    plan_md = _delta_file(tmp_path, "plan.md")
+    assert "\n## Phase 3 — other" not in plan_md
+    assert "- Phase 3 — other" in plan_md.split("## Omitted sections", 1)[1]
+    rec = fidelity_delta.load_record(_state_of(tmp_path), "s")
+    assert rec is not None and len(rec["deltas"]) == 1
+    assert rec["anchor"]["verdict"] == "NOT READY"
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_regression_in_delta_is_in_packet_and_blocks(tmp_path):
+    res1 = _run1(tmp_path)
+    res2, purposes2, logs2 = _next_run(
+        tmp_path, res1, diff=DIFF_REGRESS, tree=TREE2,
+        canned={"plan-fidelity-review": READY_FULL,
+                fidelity_delta.PURPOSE: _delta_text(tmp_path, ready=False)})
+    assert purposes2 == [fidelity_delta.PURPOSE], logs2
+    assert "-def planned_helper():" in _delta_file(tmp_path, "diff.patch")
+    f = res2.fidelity
+    assert f["verdict_1"] == "NOT READY"
+    assert select_fidelity_verdict(f["verdict_1"], f["verdict_2"], f["reviewed_tree_2"],
+                                   TREE2) == ("NOT READY", "verdict-1")
+    from test_armable import inputs
+    d = evaluate(inputs(fidelity_verdict=f["verdict_1"], fidelity_verdict_2=f["verdict_2"],
+                        fidelity_tree_2=f["reviewed_tree_2"], current_tree=TREE2))
+    assert [(c.number, c.name) for c in d.holds if c.number == 12], d.holds
+    rec = fidelity_delta.load_record(_state_of(tmp_path), "s")
+    assert rec is not None
+    assert not [e for e in rec["deltas"] if e["verdict"] == "READY"]
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_large_delta_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_BIG, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "too-large")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_ratio_delta_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_RATIO, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "delta-ratio")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_new_file_in_delta_is_scope_change(tmp_path):
+    res1 = _run1(tmp_path)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_NEWFILE, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "scope-changed")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_gate_surface_delta_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path, diff=DIFF_GATE_1)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_GATE, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "gate-surface")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_unplanned_path_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path, plan_body=PLAN_NO_A)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned(), plan_body=PLAN_NO_A)
+    _assert_full_fallback(purposes2, logs2, "unplanned-path")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_missing_record_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path)
+    os.remove(fidelity_delta.record_path(_state_of(tmp_path), "s"))
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "no-record")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_stale_sticky_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path)
+    stale = _sticky(verdict="NOT READY", diff_id="9" * 40, plan_hash=res1.fidelity["plan_hash"],
+                    tree=TREE)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned(), sticky=stale)
+    _assert_full_fallback(purposes2, logs2, "sticky-mismatch")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_plan_changed_falls_back_to_full(tmp_path):
+    res1 = _run1(tmp_path)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned(), plan_body=PLAN + b"\nx\n")
+    _assert_full_fallback(purposes2, logs2, "plan-changed")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_version_changed_falls_back_to_full(tmp_path, monkeypatch):
+    res1 = _run1(tmp_path)
+    # `_drive` passes the module-level VERSION as cache_version on every run.
+    monkeypatch.setattr(sys.modules[__name__], "VERSION", "w" * 64)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "version-changed")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_remediated_prior_run_leaves_no_anchor(tmp_path, monkeypatch):
+    state = _state_of(tmp_path)
+    # Run 1's NOT READY round commits a remediation: the reviewed tree is no longer the one
+    # that ships, so no anchor may be recorded.
+    monkeypatch.setattr(runner.fidelity, "remediate", lambda *a, **kw: "r" * 40)
+    monkeypatch.setattr(runner.fidelity, "re_review",
+                        lambda *a, **kw: ("READY", TREE2, fidelity.verdict_path(99)))
+    # `_drive`'s plan stub has no PR-body plan fields; the body rewrites after a committed
+    # round are not under test here.
+    monkeypatch.setattr(runner, "_apply_backlog_closes", lambda body, plan, log: body)
+    monkeypatch.setattr(runner, "_upsert_no_adr_markers", lambda body, plan: body)
+    monkeypatch.setattr(runner, "_merge_danger_body", lambda body, *a, **kw: body)
+    purposes1 = []
+    res1, _, logs1 = _drive(tmp_path, prior_sticky=None, plan_body=PLAN, diff=DIFF,
+                            head_tree=TREE2, purposes_out=purposes1, state_dir=state, slug="s",
+                            canned={"plan-fidelity-review": NOT_READY_TEXT})
+    assert purposes1 == ["plan-fidelity-review"], logs1
+    assert res1.fidelity["remediation_sha"] == "r" * 40, logs1
+    assert not os.path.exists(fidelity_delta.record_path(state, "s")), logs1
+    assert any("delta record: cleared (remediated)" in l for l in logs1), logs1
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "no-record")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_chaining_cap_forces_full(tmp_path):
+    state = _state_of(tmp_path)
+    res1 = _run1(tmp_path)
+    delta_canned = {"plan-fidelity-review": READY_FULL,
+                    fidelity_delta.PURPOSE: _delta_text(tmp_path)}
+    res2, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                       canned=delta_canned)
+    assert purposes2 == [fidelity_delta.PURPOSE], logs2
+    res3, purposes3, logs3 = _next_run(tmp_path, res2, diff=DIFF_MOVED_2, tree="3" * 40,
+                                       canned=delta_canned)
+    assert purposes3 == [fidelity_delta.PURPOSE], logs3
+    patch3 = _delta_file(tmp_path, "diff.patch")
+    assert "+    return 1" in patch3 and "+    return 2" in patch3   # cumulative since the anchor
+    rec = fidelity_delta.load_record(state, "s")
+    assert rec is not None and len(rec["deltas"]) == 2
+    anchor_id = rec["anchor"]["diff_id"]
+    _, purposes4, logs4 = _next_run(tmp_path, res3, diff=DIFF_MOVED_3, tree="4" * 40,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes4, logs4, "delta-cap")
+    rec4 = fidelity_delta.load_record(state, "s")
+    assert rec4 is not None and rec4["deltas"] == []
+    assert rec4["anchor"]["diff_id"] != anchor_id
+    assert rec4["anchor"]["verdict"] == "READY"
+
+
+@pytest.mark.usefixtures("git_shim")
+@pytest.mark.parametrize("name", sorted(_GARBLED))
+def test_garbled_record_shapes_fall_back_to_full(tmp_path, name):
+    # Invocation-2-only: the garbled bytes ARE the input under test.
+    res1 = _run1(tmp_path)
+    with open(fidelity_delta.record_path(_state_of(tmp_path), "s"), "wb") as fh:
+        fh.write(_GARBLED[name]())
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "no-record")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_packet_failure_falls_back_to_full(tmp_path, monkeypatch):
+    res1 = _run1(tmp_path)
+
+    def _boom(*a, **kw):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(fidelity_delta, "build_delta_packet", _boom)
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "packet-failed")
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_ids_failure_falls_back_to_full(tmp_path, monkeypatch):
+    res1 = _run1(tmp_path)
+    monkeypatch.setattr(reviewcache, "per_file_patch_ids", lambda diff: {})
+    _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
+                                    canned=_full_canned())
+    _assert_full_fallback(purposes2, logs2, "current-ids-missing")

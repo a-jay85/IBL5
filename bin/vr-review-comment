@@ -499,12 +499,16 @@ if (updatePr !== null) {
     }
     runTime = new Date(runTimeArg);
   }
-  const raw = dryRun
-    ? bodyFileIn !== null && existsSync(bodyFileIn)
-      ? readFileSync(bodyFileIn, 'utf-8')
-      : ''
-    : execFileSync('gh', ['pr', 'view', updatePr, '--json', 'body', '-q', '.body'], { encoding: 'utf-8' });
-  const cur = normalizeBody(raw);
+  const readBody = (): string =>
+    normalizeBody(
+      dryRun
+        ? bodyFileIn !== null && existsSync(bodyFileIn)
+          ? readFileSync(bodyFileIn, 'utf-8')
+          : ''
+        : execFileSync('gh', ['pr', 'view', updatePr as string, '--json', 'body', '-q', '.body'], {
+            encoding: 'utf-8',
+          }),
+    );
   let spots: { beforeFile: string }[] = [];
   if (spotsPath !== null && existsSync(spotsPath)) {
     try {
@@ -514,17 +518,20 @@ if (updatePr !== null) {
       // unreadable spots.json -> no changed section, never a crash in CI
     }
   }
-  const section = buildPrBodyBlock({
-    newCells: rawNewCells,
-    spots,
-    pagesUrl,
-    headSha,
-    runTime,
-    agentShots: extractAgentShots(cur),
-  });
-  const next = spliceBody(cur, section);
+  const build = (body: string): string =>
+    spliceBody(
+      body,
+      buildPrBodyBlock({
+        newCells: rawNewCells,
+        spots,
+        pagesUrl,
+        headSha,
+        runTime,
+        agentShots: extractAgentShots(body),
+      }),
+    );
   if (dryRun) {
-    process.stdout.write(next + '\n');
+    process.stdout.write(build(readBody()) + '\n');
     process.exit(0);
   }
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
@@ -538,6 +545,9 @@ if (updatePr !== null) {
     const ok = await waitForFirstScreen(firstUrl);
     if (!ok) process.stderr.write('vr-review-comment: screen URL not live; editing anyway\n');
   }
+  // Read the body only after the poll so an edit made during the wait is not overwritten.
+  const cur = readBody();
+  const next = build(cur);
   if (next === cur) {
     process.stdout.write('vr-review-comment: PR body already current; no edit\n');
     process.exit(0);

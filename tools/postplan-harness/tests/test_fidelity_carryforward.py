@@ -786,3 +786,22 @@ def test_carry_forward_equivalent_for_old_and_new_re_review_footer():
     got_new = fidelity.carry_forward_predicate(new, diff_id, plan_hash)
     assert got_old[0] is None
     assert got_old == got_new
+
+
+# --- a delta review never carries forward -------------------------------------
+
+_DELTA_FID = {"review_kind": "delta", "delta_anchor": "live-prior", "delta_paths": ["a.py"],
+              "delta_lines": 3, "delta_full_lines": 40}
+
+
+def test_delta_sticky_declines_carry_forward():
+    delta = _sticky(**_DELTA_FID)
+    assert fidelity.carry_forward_predicate(delta, DIFF_ID, PLAN_HASH) == (None, "prior-review-delta")
+    assert fidelity.carry_forward_predicate(_sticky(), DIFF_ID, PLAN_HASH) == ("READY", "")
+
+
+def test_compose_sticky_emits_review_kind_line():
+    body = _sticky(**_DELTA_FID)
+    assert "**Review kind:** delta (anchor live-prior; 1 file(s), 3/40 changed lines" in body
+    assert fidelity.STICKY_REVIEW_KIND_DELTA_RE.search(body)
+    assert "**Review kind:**" not in _sticky()

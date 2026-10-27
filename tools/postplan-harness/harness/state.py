@@ -313,6 +313,7 @@ class RunResult:
     adr_path: Optional[str] = None          # repo-relative path of the drafted ADR; set even when the re-push was denied
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on
     gate_fix: dict = field(default_factory=dict)  # local-gate fixer record (harness/gatefix.py); omitted from result.json when empty
+    conformance_fix: dict = field(default_factory=dict)  # Phase 5.0-pre fixer record (harness/conformance_fix.py); omitted from result.json when empty
     # Phase 5.5 record: verdict_2 / reviewed_tree_2 / remediation_sha alias the last
     # remediation round; rounds (list of per-round dicts) / rounds_completed /
     # backlog_issue_numbers carry the full history.
@@ -336,7 +337,7 @@ class RunResult:
 
     def to_json(self) -> str:
         d = asdict(self)
-        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix",
+        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix", "conformance_fix",
                     "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)

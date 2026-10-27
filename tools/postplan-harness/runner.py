@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -506,6 +506,33 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             conf_files = git.conformance_files()
             diff = git.diff_vs_base()
             meta = gh.pr_meta() or meta
+        # ---- Phase 5.0-pre: write plan-promised tests/files Phase 5.0 would report MISSING ----
+        # Before the review worker starts, so a fix commit never moves the head under its
+        # posts and the cache key hashes the fixed diff. No handoff marker here: only the
+        # final 5.0 pass writes it, so the fixer's report can never clear condition (3).
+        confix_items = _conformance_items_pre_verify(plan, conf_files, diff, gh, meta, git)
+        res.conformance_fix = conformance_fix.remediate_missing(
+            llm, git, plan, worktree, out_dir, confix_items,
+            commit=lambda msg: _commit_with_gate_fix(
+                git, worktree, msg, log, phase="phase5.0-fix", llm=llm, res=res),
+            push=lambda: _push_with_gate_fix(git, log, "phase5.0-fix", llm=llm,
+                                             worktree=worktree, out_dir=out_dir,
+                                             res=res, gh=gh,
+                                             pr=(pr if isinstance(git, LiveGit) else None)),
+            log=log)
+        if res.conformance_fix.get("sha"):
+            sha = git.head()
+            files = git.changed_files()
+            conf_files = git.conformance_files()
+            diff = git.diff_vs_base()
+            meta = gh.pr_meta() or meta
+            cls = classify(files, diff, git.modified_files())
+            res.classification = cls
+            after = _conformance_items_pre_verify(plan, conf_files, diff, gh, meta, git)
+            res.conformance_fix["still_missing"] = after
+            res.conformance_fix["resolved"] = [i for i in confix_items if i not in after]
+            log(f"phase5.0-fix: re-check resolved={len(res.conformance_fix['resolved'])} "
+                f"still_missing={after or 'none'}")
         # Review cache key, taken after Phase 4.5 so it hashes the diff the review reads.
         cache_dir = _state_dir(out_dir, live, state_dir)
         cache_key, cache_files = _review_cache_context(git, worktree, _master_sha(worktree), meta, plan,
@@ -833,6 +860,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                     if mutation_report is not None else None),
             exec_mutations_tree_suspect=(mutation_report.tree_suspect
                                          if mutation_report is not None else True),
+            conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
             branch=git.branch(),
@@ -3371,6 +3399,14 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err
+
+
+def _conformance_items_pre_verify(plan, conf_files, diff, gh, meta, git) -> list[str]:
+    """Condition-(3) items as Phase 5.0 would see them, minus UNMET-CONTRACT (unknowable before verify)."""
+    items = conformance.check(plan, conf_files, diff, phase5_status=None, resolutions={},
+                              pr_body=gh.pr_body() or meta.get("body", ""),
+                              read_file=git.read_worktree_file)
+    return [i for i in items if not i.startswith("UNMET-CONTRACT:")]
 
 
 def _write_conformance_handoff(out_dir: str, unresolved: list[str]) -> None:

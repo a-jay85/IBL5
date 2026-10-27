@@ -763,3 +763,21 @@ def test_security_76_important_does_not_block_condition_2():
     """Characterization of the >= 80 floor. Mutation: lower it to 75 => fails."""
     f = Finding("security-audit", "security", "f.php", 1, "x", 76, label="important")
     assert evaluate(inputs(findings=[f])).armed
+
+
+def test_condition3_hold_line_carries_fixer_note():
+    """The fixer note decorates a condition-(3) hold line; it never creates or clears one.
+
+    Mutation: append the note without the `unresolved_conformance` guard => the empty-items
+    assertion fails.
+    """
+    held = evaluate(inputs(unresolved_conformance=["MISSING-METHOD: testFoo (plan required a test method the diff never wrote)"],
+                           conformance_fix_note="rejected (vacuous-test)"))
+    cond3 = next(c for c in held.conditions if c.number == 3)
+    assert cond3.blocked is True
+    assert cond3.reason.endswith(" [conformance-fix: rejected (vacuous-test)]")
+
+    clean = evaluate(inputs(unresolved_conformance=[], conformance_fix_note="rejected (vacuous-test)"))
+    cond3_clean = next(c for c in clean.conditions if c.number == 3)
+    assert cond3_clean.blocked is False
+    assert cond3_clean.reason == ""

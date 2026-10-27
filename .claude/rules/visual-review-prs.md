@@ -15,16 +15,15 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # Visual-review PRs
 
 See ADR-0068, ADR-0069, ADR-0073, ADR-0074, and ADR-0076 for the decisions and rationale. ADR-0074
-is the current gallery-selection model: the gallery is **change-driven** (built from rows whose PR
-render differs from master's committed baseline), not failure-driven. ADR-0076 extends it: brand-new
-views (`gallery.newCells`) are additionally published inline at the top of the PR body, not only in
-the sticky comment.
+is the current gallery-selection model. The gallery is **change-driven**, built from rows whose PR
+render differs from master's committed baseline. ADR-0076 also publishes brand-new views
+(`gallery.newCells`) inline at the top of the PR body.
 
 ## What runs
 
@@ -43,7 +42,7 @@ even when VR is green. The `update-baselines` label run skips them (see § Appro
    each row, and writes the static side-by-side `index.html` (with `<title>` anchors) + per-SHA
    artifacts into `ibl5/vr-gallery`, plus the pre-classified `gallery.json`
    (`changedCells`/`newCells`/`flakeCells`).
-3. **Deploy gallery to per-SHA Pages** — pushes `ibl5/vr-gallery` to the `gh-pages` branch under
+3. **Deploy gallery to per-SHA Pages.** `bin/vr-dedupe-gallery` re-shapes `ibl5/vr-gallery` into a stage dir, `ibl5/vr-pages-stage` (example), which is pushed to the `gh-pages` branch under
    `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
    preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
    durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
@@ -55,21 +54,22 @@ even when VR is green. The `update-baselines` label run skips them (see § Appro
    over-suppresses one push instead of silently no-opping. The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
-   out of the count, so one stuck run cannot block every later deploy. This stops a push fan-out (one
-   master push → multiple open-PR updates → N gh-pages pushes) from producing N deploys that the `pages`
-   concurrency group would mostly cancel. It collapses to roughly **two** deploys (one in-flight
-   plus one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   out of the count, so one stuck run cannot block every later deploy. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
    collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
    `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
-   fail. The retries absorb contention and never soften the gate.
+   fail. The retries absorb contention and never soften the gate. The per-cell before/after/diff PNGs
+   are published once each to the shared `_vr-blobs/` store at the `gh-pages` root by
+   `bin/vr-dedupe-gallery`, and the gallery's `index.html` refers to them there (ADR-0211).
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
+per-SHA gallery dirs whose newest commit is older than 7 days. The same job removes `_vr-blobs/` files
+no surviving gallery references once they are older than 7 days, migrates any legacy-form gallery into
+the store, and runs `bin/check-vr-gallery-refs` before it pushes. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
+`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its push lands).
 It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
 
 ## Refreshing stale galleries
@@ -84,14 +84,14 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 - **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
 - **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
 - **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 150-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
-- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, or `bin/prune-vr-galleries` runs the read-only `VR refresh select` job, which prints both lists.
+- **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, `bin/prune-vr-galleries`, `bin/vr-dedupe-gallery`, or `bin/check-vr-gallery-refs` runs the read-only `VR refresh select` job, which prints both lists and rehearses the migration.
 
 ## Reading the comment
 
 - The comment makes **no claim about the check's red/green color.** In the regen-into-branch steady
   state the VR gate can be **green** while the gallery still shows **changed** cells (the in-branch
   baseline was refreshed, but the render still differs from master's committed baseline). The prose
-  is true in both states — it never says the check "stays red until then."
+  is true in both states and never says the check "stays red until then."
 - Diffing views are grouped per module in `<details>` blocks; each link points into the static
   side-by-side gallery (the `<title>` anchor) where the master-vs-PR before/after shows desktop +
   mobile. The Playwright report (traces) is preserved under `…/playwright-report/`.
@@ -148,8 +148,7 @@ steps run after "Deploy gallery to per-SHA Pages" and "Post sticky comment":
   `update-baselines`), so it never goes stale. `--dry-run` exercises the splice without mutating a
   real PR.
 
-Both steps are `continue-on-error: true`. A failure here only means no inline image. The VR job
-and sticky comment still succeed. The pure splice/copy-plan logic lives in
+Both steps are `continue-on-error: true`, so a failure only loses the inline image. The pure splice/copy-plan logic lives in
 `ibl5/tests/e2e/vr-pr-body.ts` (unit-tested in `ibl5/tests/ts-unit/vr-pr-body.test.ts`); only `gh`/
 `fetch`/`fs` I/O lives in the `bin/vr-review-comment` glue layer.
 
@@ -200,16 +199,12 @@ invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/v
 
 ## One-time deployment prerequisite
 
-GitHub Pages must be set to source = **GitHub Actions** (`build_type: workflow`) — a one-time
-owner action. The gallery is served by `.github/workflows/pages-deploy.yml`, which uploads the
-whole `gh-pages` tree as the Pages artifact; the `gh-pages` branch stays the durable per-SHA
-accumulator. Repo Settings → Pages → Build and deployment → Source → GitHub Actions, or:
+GitHub Pages must use source = **GitHub Actions** (`build_type: workflow`). The owner sets it once
+in Repo Settings → Pages → Build and deployment → Source, or:
 
 ```bash
 gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
 ```
 
-Until the source is flipped, the `Deploy VR gallery to Pages` runs go red at the deploy step
-(expected; self-clears once flipped). After flipping, trigger one re-serve immediately via the
-workflow's `workflow_dispatch` (Actions → Deploy VR gallery to Pages → Run workflow) instead of
-waiting for the next PR.
+Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
+once via the workflow's `workflow_dispatch`.

@@ -80,6 +80,25 @@ def test_gate_backtest_result_live_exception_is_unknown(monkeypatch):
     gbr._MEMO.clear()
 
 
+def test_gate_backtest_result_replay_mode_makes_no_git_calls(monkeypatch):
+    gbr._MEMO.clear()
+    fired = []
+
+    def stub(*a, **k):
+        fired.append(1)
+        raise AssertionError("git call")
+
+    for name in ("make_git", "_git_bytes"):
+        monkeypatch.setattr(gbr, name, stub)
+    monkeypatch.setattr(gbr.subprocess, "run", stub)
+    fixture = {"gate_backtest": {"status": "CLEARED", "reason": "r", "block": "b"}}
+    r = gbr.gate_backtest_result("/nonexistent", GATE_DIFF, pr=1, live=False, fixture=fixture,
+                                 log=lambda _m: None)
+    assert tuple(r) == ("CLEARED", "r", "b")
+    assert fired == []
+    gbr._MEMO.clear()
+
+
 def test_gate_backtest_result_memoizes(monkeypatch):
     gbr._MEMO.clear()
     calls = []

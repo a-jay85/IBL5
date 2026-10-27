@@ -518,6 +518,14 @@ def test_scored_rows_unchanged_by_vote_record(tmp_path):
     assert "votes" not in json.dumps(scored, sort_keys=True)
 
 
+def test_only_verifier_calls_request_minimal_context(tmp_path):
+    _result, llm, _gh = _run(tmp_path)
+    assert llm.tooled_calls
+    for call in llm.tooled_calls:
+        assert call["purpose"] in VERIFIER_PURPOSES
+        assert call.get("minimal_context") is True
+
+
 def test_no_out_dir_skips_file_but_still_logs(tmp_path):
     lines = []
     _phase, _result, llm, _gh = _phase_run(tmp_path, lines=lines, out_dir=None)

@@ -1,6 +1,6 @@
 ---
 description: Changed ship-pipeline gates are replayed against recent merged PRs, and Phase 6.5 condition (17) holds auto-merge when the replay flags clean PRs.
-last_verified: 2026-10-02
+last_verified: 2026-10-27
 ---
 
 # ADR-0161: Backtest changed gates before they merge
@@ -37,3 +37,13 @@ When a PR adds or changes a `bin/check-*` script, a registered `bin/lib` gate, o
 - `tools/postplan-harness/harness/gate_backtest.py`
 - `tools/postplan-harness/harness/gate_backtest_replay.py`
 - `tools/postplan-harness/harness/armable.py`
+
+## Addendum — base-ref replay (2026-10-26) <!-- slop-ok -->
+
+The original rule counted every flag on a clean PR. On 2026-10-26 PR [#3520](https://github.com/a-jay85/IBL5/pull/3520) was held because the replay flagged two clean PRs that `origin/master`'s `bin/check-plan` also flags, and every later `bin/check-plan` PR would be held the same way ([backlog#1672](https://github.com/a-jay85/IBL5-backlog/issues/1672)).
+
+The backtest now replays the gate at `merge-base(<base>, <head>)` on the same checkout whenever the changed gate flags. A flag counts toward the threshold only when the base gate does not flag. Pre-existing flags get their own column and line in the block.
+
+Fail-closed rules: a gate absent at base, a base error, a base timeout, a base spec that is not replayable, or an unresolvable base all leave the flag counted. A head timeout still makes the gate UNKNOWN.
+
+The threshold (2), the 30-PR window, and the 48-hour settle time are unchanged. `TOTAL_CAP` rose from 900 to 1200 seconds because base replays share the clock; one `bin/check-plan` replay measured 45 s at plan time.

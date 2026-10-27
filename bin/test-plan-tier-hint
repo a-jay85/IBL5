@@ -164,6 +164,16 @@ expect_eq "25 audit row 15 auth-gated POST stays xhigh" "xhigh" \
 expect_eq "26 audit row 22 gate weakening stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Weaken the required All checks settled merge gate (bin/check-pr-checks-green V4 condition) so a ghost workflow run whose jobs all completed no longer holds it')"
 
+# 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
+expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"
+# 28 — RESTRUCTURE_RE conjunct: pinned escape change with no restructure stays xhigh
+expect_eq "28 pinned escape change with no restructure stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Escape the team name in the player bio output after pinning its current output')"
+# 29 — ADDITIVE_RE conjunct: a participle weakening without the additive marker stays xhigh
+expect_eq "29 participle weakening without additive stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'make bin/check-plan stop failing plans whose rows cite removed files')"
+
 echo
 echo "== static drift assertions (five copies of the trigger) =="
 

@@ -88,6 +88,16 @@ WEAKEN_RE='(remov|delet|relax|disabl|weaken|loosen|bypass|waive|exempt|turn off|
 RECIPE_RE='(explicit recipe|step-by-step recipe|mechanical sweep|marker[- ]swap)'
 PATTERN_RE='(existing pattern|pattern to copy|copy the pattern|same shape as)'
 RECIPE_BACKED_RE='recipe-backed'
+# Carve-out H2: a security token that only names an existing defense, on a
+# characterization-pinned restructure, is not a new security surface.
+DEFENSE_TOKEN_RE='^(escap[ei]|sanitiz)$'
+NEGATED_DEFENSE_RE='(unescap|unsanitiz|missing[a-z -]*escap|missing[a-z -]*sanitiz|not escap|not sanitiz)'
+PIN_RE='(pinning|pinned|pin [a-z]|byte-for-byte|characteriz)'
+RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
+# Carve-out H1: an additive gate whose only weakening stem is a past
+# participle (an adjective such as a deleted symbol) is not a weakening.
+ADDITIVE_RE='additive'
+HARD_WEAKEN_RE='(relax|disabl|weaken|loosen|bypass|waive|exempt|turn off|opt[- ]out|soften|remove([^d]|$)|removing|removal|delete([^d]|$)|deleting|deletion|strip([^p]|$)|stripping)'
 
 match() {
     printf '%s' "$HAY" | grep -Eq "$1"
@@ -97,10 +107,23 @@ first_token() {
     printf '%s' "$HAY" | grep -Eo "$1" | head -n 1
 }
 
+# True when every SECURITY_RE hit is a defense-naming token, the task pins
+# behavior first, it restructures, and nothing says the defense is missing.
+security_defense_only() {
+    others="$(printf '%s' "$HAY" | grep -Eo "$SECURITY_RE" | grep -Ev "$DEFENSE_TOKEN_RE")"
+    [ -z "$others" ] && match "$PIN_RE" && match "$RESTRUCTURE_RE" \
+        && ! match "$NEGATED_DEFENSE_RE"
+}
+
+# True when the task declares an additive gate and carries no hard weakening form.
+additive_only() {
+    match "$ADDITIVE_RE" && ! match "$HARD_WEAKEN_RE"
+}
+
 TIER=""
 REASON=""
 
-if match "$SECURITY_RE"; then
+if match "$SECURITY_RE" && ! security_defense_only; then
     TIER="xhigh"
     REASON="check 1a — security surface / trust boundary token '$(first_token "$SECURITY_RE")'"
 elif match "$DESTRUCTIVE_RE"; then
@@ -109,7 +132,7 @@ elif match "$DESTRUCTIVE_RE"; then
 elif match "$BOOTSTRAP_RE"; then
     TIER="xhigh"
     REASON="check 1b — bootstrap hazard token '$(first_token "$BOOTSTRAP_RE")'"
-elif match "$GATE_RE" && match "$WEAKEN_RE"; then
+elif match "$GATE_RE" && match "$WEAKEN_RE" && ! additive_only; then
     TIER="xhigh"
     REASON="check 1c — executable gate '$(first_token "$GATE_RE")' plus weakening verb '$(first_token "$WEAKEN_RE")'"
 elif match "$RECIPE_BACKED_RE"; then
@@ -121,6 +144,13 @@ elif match "$RECIPE_RE" && match "$PATTERN_RE"; then
 else
     TIER="default"
     REASON="check 3 — no check-1 trigger matched and nothing marks the task recipe-backed"
+fi
+
+if [ "$TIER" != "xhigh" ] && match "$SECURITY_RE"; then
+    REASON="$REASON; security token '$(first_token "$SECURITY_RE")' names an existing defense on a pinned restructure"
+fi
+if [ "$TIER" != "xhigh" ] && match "$GATE_RE" && match "$WEAKEN_RE"; then
+    REASON="$REASON; additive gate, weakening stem '$(first_token "$WEAKEN_RE")' is a participle"
 fi
 
 if [ "$EXPLAIN" -eq 1 ]; then

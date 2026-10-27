@@ -1068,7 +1068,9 @@ sidecar_paths() {
 }
 run_sweeps() {
     (
+        # shellcheck disable=SC2034  # read by the sourced sweep block
         QUEUE_DIR="$NDIR/queue"
+        # shellcheck disable=SC2034
         HANDOFF_DIR="$NDIR/handoff"
         # shellcheck source=/dev/null
         . "$SWEEP_SH"
@@ -1754,6 +1756,96 @@ if grep -qE '^MAX_ATTEMPTS=3([[:space:]]|$)' "$SCRIPT_DIR/automouse/run"; then
     h_pass "row-max-attempts-sync"
 else
     h_fail "row-max-attempts-sync — bin/automouse/run MAX_ATTEMPTS changed; update STATUS_MAX_ATTEMPTS in bin/automouse/queue"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 49 (matrix 18) — no prefix leak. A copy of the real runner claims a plan
+# whose entry is 040-plan-leak.md and runs impl + post-plan against stubs. The
+# claim lock, .attempts, the handoff JSON, the cost rows and every report name
+# use the bare plan-leak / plan-leak.md, never 040-plan-leak. The stubs list
+# queue/ and handoff/ while they run, because the run removes those sidecars
+# before it exits. .failure only appears after a failed impl, which this happy
+# run never has; the runner builds it from the same PLAN_NAME as .attempts.
+# The run loop needs macOS tools (caffeinate, BSD stat/date), so elsewhere this
+# row prints SKIP, like bin/test-automouse-single. AUTOMOUSE_QUEUE_UNAME
+# overrides the platform check.
+# ---------------------------------------------------------------------------
+if [ "${AUTOMOUSE_QUEUE_UNAME:-$(uname)}" != "Darwin" ]; then
+    echo "SKIP: row49 (matrix 18, no prefix leak) drives the run loop, which needs macOS."
+else
+    L_ROOT="$TMP/leak"
+    L_NDIR="$L_ROOT/automouse"
+    L_PDIR="$L_ROOT/plans"
+    L_STUB="$L_ROOT/stub"
+    L_TRACE="$L_ROOT/trace"
+    mkdir -p "$L_NDIR/queue" "$L_NDIR/handoff" "$L_NDIR/logs" "$L_NDIR/reports" \
+             "$L_NDIR/done" "$L_NDIR/skipped" "$L_PDIR" "$L_STUB" "$L_ROOT/wt"
+    # shellcheck source=bin/lib/usage-test-isolation.sh
+    . "$SCRIPT_DIR/lib/usage-test-isolation.sh"; usage_test_isolate "$L_ROOT/usage"
+
+    # Stub claude: the first call per plan (impl) writes the handoff named by
+    # PLAN_FILE=, then lists queue/ and handoff/ into the trace.
+    cat > "$L_STUB/claude" <<STUB
+#!/usr/bin/env bash
+plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+sleep 2
+if [ -n "\$plan" ] && [ ! -f "$L_NDIR/handoff/\$plan.json" ]; then
+    printf '{"branch":"x","plan":"%s","worktree":"%s"}\n' "\$plan" "$L_ROOT/wt" > "$L_NDIR/handoff/\$plan.json"
+fi
+{ echo "impl PLAN_FILE=\$plan"; ls -1A "$L_NDIR/queue" "$L_NDIR/handoff"; } >> "$L_TRACE"
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":2000,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+STUB
+    # Stub post-plan-now: list queue/ and handoff/, then finish the plan.
+    cat > "$L_STUB/post-plan-now" <<STUB
+#!/usr/bin/env bash
+plan="\$(basename "\${3:-}")"
+{ echo "postplan --plan \$plan"; ls -1A "$L_NDIR/queue" "$L_NDIR/handoff"; } >> "$L_TRACE"
+sleep 2
+for e in "$L_NDIR"/queue/[0-9][0-9][0-9]-"\$plan"; do mv "\$e" "$L_NDIR/done/\$plan" 2>/dev/null || true; done
+rm -f "$L_NDIR/handoff/\$plan.json" "$L_NDIR/queue/\$plan.attempts"
+exit 0
+STUB
+    printf '#!/usr/bin/env bash\ncat >/dev/null\nexit 0\n' > "$L_STUB/discord-dm"
+    chmod +x "$L_STUB/claude" "$L_STUB/post-plan-now" "$L_STUB/discord-dm"
+    L_RUNNER="$L_ROOT/run"
+    sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$L_NDIR\"#" \
+        -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
+        -e "s#^SELF_DIR=.*#SELF_DIR=\"$SCRIPT_DIR/automouse\"#" \
+        -e "s#^export PATH=.*#export PATH=\"$L_STUB:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+        -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$L_STUB/post-plan-now\"#" \
+        -e "s#\"\$SELF_DIR/../discord-dm\"#\"$L_STUB/discord-dm\"#" \
+        "$SCRIPT_DIR/automouse/run" > "$L_RUNNER"
+    chmod +x "$L_RUNNER"
+
+    printf -- '---\nimpl_model: sonnet\n---\n\n# plan-leak\n' > "$L_PDIR/plan-leak.md"
+    ln -s "$L_PDIR/plan-leak.md" "$L_NDIR/queue/040-plan-leak.md"
+    L_RC=0
+    AUTOMOUSE_LOGIN_PROBE_CMD="echo ok" PLANS_DIR="$L_PDIR" \
+        "$L_RUNNER" plan plan-leak > "$L_ROOT/run.out" 2>&1 || L_RC=$?
+    h_eq "row49 runner exits 0" "0" "$L_RC"
+    assert_present "row49 plan finished" "$L_NDIR/done/plan-leak.md"
+
+    L_TRACE_TXT=$(cat "$L_TRACE" 2>/dev/null)
+    # Positive: each sidecar was seen under its bare name, so an empty trace
+    # cannot pass the negative check below.
+    for n in 'impl PLAN_FILE=plan-leak.md' 'postplan --plan plan-leak.md' \
+             'plan-leak.md.lock' 'plan-leak.md.attempts' 'plan-leak.md.json'; do
+        grep -qxF -- "$n" <<< "$L_TRACE_TXT" \
+            || h_fail "row49 run saw bare $n" "trace: $L_TRACE_TXT"
+    done
+    L_COSTS=$(cat "$L_NDIR"/logs/*.costs.jsonl "$L_NDIR"/reports/*-costs.md 2>/dev/null)
+    grep -qF 'plan-leak.md' <<< "$L_COSTS" \
+        || h_fail "row49 a cost row names plan-leak.md" "costs: $L_COSTS"
+    L_NAMES=$(find "$L_NDIR" -print | sed 's#.*/##')
+    grep -qF 'plan-leak' <<< "$L_NAMES" \
+        || h_fail "row49 some output file is named for plan-leak" "files: $L_NAMES"
+    # Negative: the 040- prefix appears in none of them. The pattern names the
+    # slug, because every report name starts with a date like 2026-10-27.
+    L_ALL=$(printf '%s\n%s\n%s\n' "$L_TRACE_TXT" "$L_COSTS" "$(find "$L_NDIR" -path "$L_NDIR/queue" -prune -o -print | sed 's#.*/##')")
+    L_LEAKS=$(grep -E '(^|[^0-9])[0-9]{3}-plan-leak' <<< "$L_ALL" | grep -vxF '040-plan-leak.md' || true)
+    h_eq "row49 no NNN- prefix in a lock, sidecar, handoff, cost row or report name" "" "$L_LEAKS"
+    h_pass "row49 — claimed plan identifiers never carry the NNN- prefix"
 fi
 
 h_done

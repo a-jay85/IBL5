@@ -1,0 +1,28 @@
+[
+  {
+    "module": "player",
+    "viewport": "desktop",
+    "title": "player",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 1008-1235 px",
+    "beforeFile": "changed/player.1.before.png",
+    "afterFile": "changed/player.1.after.png",
+    "sideFile": "changed/player.1.side.png",
+    "stackFile": "changed/player.1.stack.png"
+  },
+  {
+    "module": "player",
+    "viewport": "mobile",
+    "title": "player-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 925-1149 px",
+    "beforeFile": "changed/player-mobile.1.before.png",
+    "afterFile": "changed/player-mobile.1.after.png",
+    "sideFile": "changed/player-mobile.1.side.png",
+    "stackFile": "changed/player-mobile.1.stack.png"
+  }
+]

@@ -65,9 +65,9 @@ default_branch_name() {
         _default_branch_err "not a git repository: ${dir}"
         return 1
     fi
-    head="$(git -C "$dir" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)" || head=""
+    head="$(git -C "$dir" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)" || head=""
     if [ -n "$head" ]; then
-        name="${head#origin/}"
+        name="${head#refs/remotes/origin/}"
         if [ "$name" = "$head" ] || ! _default_branch_valid_name "$name"; then
             _default_branch_err "origin/HEAD points at an invalid name: ${head}"
             return 1

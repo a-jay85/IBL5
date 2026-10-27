@@ -1,6 +1,6 @@
 ---
 description: A nightly doc-refresh PR may self-ship only when `bin/docfix-check-veronly` proves its realized diff is exclusively date bumps and same-line numeric corrections on tracked files under `ibl5/docs/` or at `ibl5/classes/*/README.md` (addendum 2026-09-24); every other docfix PR keeps ADR-0086's human-merge hold.
-last_verified: 2026-09-30
+last_verified: 2026-10-21
 ---
 
 # ADR-0104: Verification-only doc refreshes may self-ship
@@ -23,7 +23,7 @@ What makes that tax hard to justify is the shape of the overwhelmingly common do
 
    **Mechanism.** Digit-run masking uses the BRE `[0-9][0-9]*` applied by `sed`; the masked form is called the *skeleton*. Skeleton equality means every non-digit byte is identical at the same position and the digit-runs sit at the same offsets, so the two raw texts differ if and only if at least one digit-run differs — comparing raw texts after a skeleton match *is* the number-vector comparison with no separate extractor. Numbers may move in either direction; `@v2`→`@v3` and `147`→`17` are both acceptable provided the same file also carries a strictly-advancing `last_verified:` date bump.
 
-2. **Release happens at the plan seed, not in the merge gate.** On PASS, `bin/docfix-check-veronly` rewrites the seeded plan's frontmatter `auto_merge: false` → `true` and deletes its `## Automouse Hold Justification` section. `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` is **not** modified. The merge gate stays one generic mechanism with no docfix-shaped special case, and the grant stays auditable in a plan file a human can read.
+2. **Release happens at the plan seed, not in the merge gate.** <!-- slop-ok --> On PASS, `bin/docfix-check-veronly` rewrites the seeded plan's frontmatter `auto_merge: false` → `true` and deletes its `## Automouse Hold Justification` section. `tools/postplan-harness/harness/armable.py` is **not** modified. The merge gate stays one generic mechanism with no docfix-shaped special case, and the grant stays auditable in a plan file a human can read.
 
 3. **The flip is necessary, not sufficient.** Frontmatter only releases Phase 6.5 condition (7). Conditions (1)–(6), (8), the (9) realized-diff LLM safety verdict, and the (11) unresolved-scored-finding floor all still gate the arm independently. Nothing in this ADR can make a PR merge that Phase 6.5 otherwise refuses.
 
@@ -52,6 +52,10 @@ Coverage: `bin/test-docfix-run` Cases 66-70 (PASS on the README shape; HOLD on `
 
 Original figure: the 2026-09-24 addendum's "What stays held" paragraph held every `.claude/**`, `CLAUDE.md`, and `AGENTS.md` change under `path outside docfix allowlist`. Today's figure: `bin/docfix-check-veronly` classifies `.claude/**/*.md`, root `CLAUDE.md`, and root `AGENTS.md` as a second, stricter tier. A tier-2 file passes only when its whole diff against the merge-base is one hunk replacing the frontmatter `last_verified:` line with a strictly later date, on a regular 100644 file with no mode change. A numeric swap, a `paths:` edit, a body change, a bump to a `last_verified:` line outside the frontmatter, or a file with no closed frontmatter still holds, and the tier-1 allowlist (`ibl5/docs/**`, `ibl5/classes/*/README.md`) keeps its date-plus-numeric rule unchanged. What changed: the nightly audit kept flagging `.claude/rules/*` for a date-only refresh (PR #2559), and a date-only bump changes no agent behavior, so each such PR was costing a human merge for nothing. Phase 6.5 conditions still gate arming independently (clause 3). The "What stays held" sentence above is superseded for date-only tier-2 diffs; it remains accurate for every other `.claude/**`, `CLAUDE.md`, `AGENTS.md` change and for the repo-root `README.md`.
 
+## Addendum 2026-10-21: arming moved into the harness
+
+Decision item 2 and the References list originally named the post-plan skill's Phase 6.5 arming file. That file was deleted when the skill shrank, and the two paths were repaired to `tools/postplan-harness/harness/armable.py`, where condition (7) now lives. The decision is unchanged: the release still happens at the plan seed, and the merge gate is still not modified for docfix.
+
 ## Alternatives Considered
 
 - **Arm every docfix PR unconditionally** — drop the hold for the whole class. Rejected because: it discards ADR-0086's bound wholesale and would let a content-changing refresh (a corrected paragraph, a deleted `paths:` glob) land unread.
@@ -76,5 +80,5 @@ Original figure: the 2026-09-24 addendum's "What stays held" paragraph held ever
 - `bin/docfix-check-veronly` — the predicate and the plan-arming rewrite.
 - `bin/docfix-run` — seeds the hold plan and invokes the predicate before the PR opener.
 - `bin/docfix-poll` — the nightly launchd poll that fires the pipeline.
-- `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` — condition (7) reads the plan frontmatter this ADR releases; unmodified.
+- `tools/postplan-harness/harness/armable.py`: condition (7) reads the plan frontmatter this ADR releases; unmodified.
 - `bin/test-docfix-run` — per-branch coverage for the predicate, the dedupe, and the notification path.

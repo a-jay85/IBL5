@@ -1,0 +1,23 @@
+Add a committed regression harness for the bin/bug-pipeline-e2e guards and the bugbot-test ecosystem config required-var check
+
+## Exploration pointers
+- https://github.com/a-jay85/IBL5-backlog/issues/93 — the issue: guards in bin/bug-pipeline-e2e (including an lsof port guard that was once silently removed) and the required-var fail-closed check in ibl5/IBLbot/ecosystem.bugbot-test.config.cjs have no committed test.
+- bin/test-bug-pipeline-* (check, tick, classify, cron-setup, ...) — existing shell harnesses to copy. No bin/test-bug-pipeline-e2e exists on master.
+
+## Resolved design decisions
+- New harness bin/test-bug-pipeline-e2e, shaped like the sibling bin/test-bug-pipeline-* files, exercising each guard fail-closed without a real environment (stub lsof/env as siblings do).
+- The .cjs required-var check gets a node-run assertion (missing var throws/exits non-zero), wired into the same harness or IBLbot's existing test runner, whichever the plan finds already runs in CI.
+
+## Scope
+1. Inventory every guard in bin/bug-pipeline-e2e.
+2. One test case per guard, plus the .cjs required-var case.
+3. Wire the harness where sibling bin/test-bug-pipeline-* harnesses are run.
+Out of scope: changing guard behavior.
+
+## Verification
+Each case fails when its guard is deleted (mutation check, show it), passes on master.
+
+## Sequencing
+Slug `bug-pipeline-e2e-guard-tests`, base master.
+## Hard constraints
+- Verify the issue's premise with a real scan or run before designing. Resolve migration numbers at implement time. Base on master. Do not touch these files held by other batch items: `tools/postplan-harness/harness/conformance.py, tools/postplan-harness/tests/test_planfile.py, bin/discord-dm, bin/test-discord-dm, .github/workflows/db-backup.yml, .claude/review-shared/_plan-verification.md, bin/bug-pipeline-test-env, ibl5/docs/decisions/README.md`. Emit `## Backlog issues` with `closes a-jay85/IBL5-backlog#93`. A parser or gate change carries a corpus diff in its verification.

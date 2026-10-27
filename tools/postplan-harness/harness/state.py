@@ -50,7 +50,7 @@ class HarnessError(Exception):
 
 @dataclass
 class Classification:
-    """Phase 3 output — faithful port of _phase-3-classify-diff.md flags."""
+    """Phase 3 output — faithful port of the retired post-plan skill Phase 3 text (ported 2026-10-19) flags."""
     files: list[str] = field(default_factory=list)
     count_total: int = 0
     count_php: int = 0

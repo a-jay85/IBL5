@@ -1,7 +1,7 @@
 ---
 name: fix-and-prevent
 description: "Fix a reported bug/breakage AND land the prevention for its whole defect class in one pass — use whenever the user says something is broken, wrong, failing, or asks to fix a bug; the fix alone is never the finished unit of work."
-last_verified: 2026-09-28
+last_verified: 2026-10-27
 ---
 
 # /fix-and-prevent — Fix it, then make it not happen again
@@ -29,7 +29,7 @@ The user's issue text is `$ARGUMENTS`.
    ```
    Already in a worktree whose branch is **unrelated** to this defect (or carries someone else's dirty work)? Create a fresh one anyway — otherwise the fix rides an unrelated PR.
    Then work in `IBL5-worktrees/<slug>/ibl5/` and derive the Docker hostname per `.claude/rules/worktree-hostname.md`.
-2. **State the triage verdict** — ad-hoc vs `/plan` — per `.claude/rules/work-triage.md`, plus its safety mirror (security surface, destructive migration, new user-visible UI, subjective-judgment property → prefer `/plan`). One line, out loud. If the verdict is `/plan`, hand off to `/plan` and stop; the plan carries both phases.
+2. **State the triage verdict.** Pick ad-hoc or `/plan` per `.claude/rules/work-triage.md`, plus its safety mirror (security surface, destructive migration, new user-visible UI, subjective-judgment property → prefer `/plan`). One line, out loud. If the verdict is `/plan`, hand off to `/plan` and stop; the plan carries both phases. Before you stop, remove the unused worktree with `cd /Users/ajaynicolas/GitHub/IBL5-worktrees && /Users/ajaynicolas/GitHub/IBL5/bin/wt-remove <slug> --if-empty`. The `cd` must persist and must leave the worktree, because `--if-empty` keeps a worktree that your shell sits in. Use the worktrees parent: bash-guard Check 15 denies a persisting `cd` from a worktree into the main checkout. The implementation run makes its own worktree under the plan's slug, and an empty one left here would block that `bin/wt-new`. A worktree you already edited prints a `kept` line and stays.
 
 **Exception — prevention artifacts that live outside the repo tree** (`~/.claude/hooks/`, `~/.claude/settings*.json`, per-project memory): these are worktree-**exempt**, edited in place, and will **not** appear in the PR diff. See `_remediation.md` step 4, field 4 (artifact destination).
 

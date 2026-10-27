@@ -45,6 +45,11 @@ class WaiversController implements WaiversControllerInterface
      * Optional injected Season. When null, methods fall back to SharedSeason::get($db) (one shared instance per web request when armed).
      */
     private ?Season $season = null;
+    /**
+     * Optional injected roster query repo for the submit-path slot recount (backlog#1538).
+     * When null, getSubmissionService() builds a TeamQueryRepository on $db, mirroring the Season fallback.
+     */
+    private ?\Team\Contracts\TeamQueryRepositoryInterface $teamQueryRepo = null;
 
     public function __construct(
         WaiversServiceInterface $service,
@@ -58,7 +63,8 @@ class WaiversController implements WaiversControllerInterface
         HttpRequest $request,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null,
-        ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null
+        ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null,
+        ?\Team\Contracts\TeamQueryRepositoryInterface $teamQueryRepo = null
     ) {
         $this->service = $service;
         $this->view = $view;
@@ -72,6 +78,7 @@ class WaiversController implements WaiversControllerInterface
         $this->processor = $processor;
         $this->salaryCapRepo = $salaryCapRepo;
         $this->submissionService = $submissionService;
+        $this->teamQueryRepo = $teamQueryRepo;
     }
 
     /**
@@ -84,7 +91,11 @@ class WaiversController implements WaiversControllerInterface
             $this->submissionService = new \Waivers\WaiversSubmissionService(
                 $this->processor,
                 $this->salaryCapRepo,
-                $this->season ?? \Season\SharedSeason::get($this->db)
+                $this->season ?? \Season\SharedSeason::get($this->db),
+                new \Waivers\WaiversRosterSlotCounter(
+                    $this->teamQueryRepo ?? new \Team\TeamQueryRepository($this->db)
+                ),
+                $this->teamIdentityRepo
             );
         }
 

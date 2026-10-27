@@ -1,6 +1,6 @@
 ---
 description: Post-plan's Phase 4.5 fixer also dispositions the review threads the same run posted, one round, then a delta re-review.
-last_verified: 2026-10-21
+last_verified: 2026-10-23
 ---
 
 # ADR-0207: Same-run review thread remediation
@@ -33,4 +33,4 @@ Widen the Phase 4.5 candidate set to this run's own threads. They are identified
 
 - `tools/postplan-harness/README.md`, Safety model: Phase 4.5b same-run thread remediation.
 - `.claude/review-shared/_posting-procedure.md`, Remediating trusted threads.
-- `.claude/skills/post-plan/_phase-4-review-audit.md`, section 4.5.
+- The skill's Phase 4 file (retired 2026-10-21 by PR #3367), section 4.5. `tools/postplan-harness/harness/thread_ingestion.py` now holds the only copy.

@@ -115,7 +115,8 @@ class DraftPickLocatorViewTest extends TestCase
 
         // Heat's row should show Celtics' colors for the traded pick
         $this->assertStringContainsString('--pick-bg: #007A33', $result);
-        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-cell-color: #ffffff', $result);
+        $this->assertStringContainsString('--team-cell-shadow: #FFFFFF', $result);
     }
 
     public function testOwnPickDoesNotUseInlineColors(): void

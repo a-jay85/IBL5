@@ -10,10 +10,27 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__ . '/../vendor/autoload.php';
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db/db.php';
 
-$plrFile = fopen("IBL5.plr", "rb+");
+$rawArgv = $_SERVER['argv'] ?? [];
+$cliArgs = is_array($rawArgv) ? array_values(array_filter(array_slice($rawArgv, 1), 'is_string')) : [];
+
+try {
+    $session = \PlrParser\PlrBulkEditSession::fromCliArgs('drop-unsigned-fa', $cliArgs);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
+
+try {
+    $plrFile = $session->open();
+} catch (\RuntimeException $e) {
+    fwrite(STDERR, 'Aborted before any write: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+echo $session->isDryRun()
+    ? "DRY RUN: IBL5.plr opened read-only; no bytes will be written.\n"
+    : 'Backup written and verified: ' . $session->backupPath() . "\n";
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
 
@@ -37,7 +54,7 @@ while (!feof($plrFile)) {
         fseek($plrFile, -2, SEEK_CUR);
 
         $teamid = " 0";
-        fwrite($plrFile, $teamid, 2);
+        $session->write($plrFile, $teamid);
         // fseek($plrFile, +2, SEEK_CUR);
         echo "$name's new teamid = " . $teamid . "<br>";
         echo "<br>";
@@ -48,7 +65,7 @@ while (!feof($plrFile)) {
         fseek($plrFile, -2, SEEK_CUR);
 
         $contractOwnedBy = " 0";
-        fwrite($plrFile, $contractOwnedBy, 2);
+        $session->write($plrFile, $contractOwnedBy);
         // fseek($plrFile, +2, SEEK_CUR);
         echo "$name's new contractOwnedBy = " . $contractOwnedBy . "<br>";
         echo "<br>";
@@ -57,4 +74,4 @@ while (!feof($plrFile)) {
 }
 fclose($plrFile);
 
-echo "done.";
+echo $session->isDryRun() ? "done (dry run: no bytes written)." : "done.";

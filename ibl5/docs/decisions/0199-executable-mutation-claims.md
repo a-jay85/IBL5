@@ -1,6 +1,6 @@
 ---
 description: Verification Matrix mutation claims become executable through a keyed ## Executable Mutations section; one bin/lib script owns the grammar, Phase 5.0 applies each edit, requires the check to fail, reverts, and arming condition (19) holds on any claim that did not trip.
-last_verified: 2026-10-19
+last_verified: 2026-10-26
 ---
 
 # ADR-0199: Executable mutation claims
@@ -38,7 +38,7 @@ Arming condition (19) holds when the step did not run, when any entry is not `TR
 - Positive: a false mutation claim holds the merge and is named in the PR body, before a human reads it.
 - Positive: legacy plans and prose clauses stay silent, so the 1,703 existing plans need no edit.
 - Negative: every entry runs its check twice, bounded by the 30 s per-check cap.
-- Negative: per ADR-0092, `bin/post-plan-now` pins the main-checkout harness, so the harness step is inert until this merges. The skill-path Phase 5.0 block is the live writer until then.
+- Negative: per ADR-0092, `bin/post-plan-now` pins the main-checkout harness, so the harness step is inert until this merges.
 
 ## References
 
@@ -46,4 +46,4 @@ Arming condition (19) holds when the step did not run, when any entry is not `TR
 - `bin/test-plan-exec-mutations`: parse, run, recover and signal cases, plus the row-20 end-to-end case.
 - `bin/check-plan`: gate `[XM]`.
 - `tools/postplan-harness/harness/armable.py`: condition (19).
-- `.claude/skills/post-plan/_phase-5-final-verification.md`: the skill-path executor block.
+- `tools/postplan-harness/harness/mutations.py`: the harness-side executor (the skill-path block retired with the skill fallback shrink).

@@ -85,6 +85,27 @@ fi
 # --- 4. Create the worktree (base = master) -----------------------------------
 bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
 WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
+# Abort cleanup until the detached run is bootstrapped (disarmed in step 6).
+# A failed wt-new cleans up after itself (bin/wt-new's own EXIT trap), so this
+# arms only once wt-new returned 0. bin/wt-remove --if-empty re-checks emptiness
+# at removal time and keeps a worktree with any work; removing an empty one also
+# deletes the unpushed branch, so the step-3 dedupe does not skip the whole day.
+# A plist left behind would launch at next login against a gone worktree, so it
+# goes too. The seeded plan goes only when the worktree actually went.
+docfix_abort_cleanup() {
+    local rc=$?
+    if [ "$rc" != 0 ]; then
+        [ -n "${PLIST:-}" ] && rm -f "$PLIST"
+        [ -n "${RUNNER:-}" ] && rm -f "$RUNNER"
+        cd "$MAIN" 2>/dev/null || cd /
+        "$MAIN/bin/wt-remove" "$SLUG" --if-empty || true
+        if [ ! -d "$WT_ROOT" ] && [ -n "${PLAN_FILE:-}" ]; then
+            rm -f "$PLAN_FILE"
+        fi
+    fi
+    exit "$rc"
+}
+trap docfix_abort_cleanup EXIT
 
 # --- 5. Seed the auto_merge:docs-only-ready plan (resolved by slug at post-plan) ----
 PLAN_FILE="$(plans_dir)/$SLUG.md"
@@ -149,6 +170,7 @@ ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$WT_ROOT" "$LOG"
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+trap - EXIT   # the detached run owns the worktree from here
 
 echo "docfix-run: fired detached doc-fix run on '$SLUG' (issue #$ISSUE_NUM)."
 echo "  worklist: $SIG"

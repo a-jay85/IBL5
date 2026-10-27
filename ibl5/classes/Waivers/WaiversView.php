@@ -53,8 +53,6 @@ class WaiversView implements WaiversViewInterface
                             </select>
                         </div>
                         <input type="hidden" name="Action" value="<?= \Security\HtmlSanitizer::e($action) ?>">
-                        <input type="hidden" name="rosterslots" value="<?= \Security\HtmlSanitizer::e($openRosterSpots) ?>">
-                        <input type="hidden" name="healthyrosterslots" value="<?= \Security\HtmlSanitizer::e($healthyOpenRosterSpots) ?>">
                         <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">
                             Click to <?= \Security\HtmlSanitizer::e($action) ?> player(s) to/from Waiver Pool
                         </button>

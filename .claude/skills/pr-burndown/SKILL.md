@@ -29,6 +29,17 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   guess one of these.
 - Each owner decision gets its own card, and the owner's answer names its PR. Several
   cards may share one message. Never fold them into a ranked list with one answer for all.
+- Every card stands alone. The owner may read it hours later, cold, without the earlier
+  messages. A follow-up card (a merge question after a fix job, a second round on the same
+  PR) repeats the full context. A card that only names a PR and asks "merge?" is a vague
+  prompt. The owner treats it as unsafe and won't answer it.
+- Say what a thing is. A bare label tells the owner nothing. The owner can't decode
+  internal names: a manual-test row number ("row 43"), a hold code ("(7)", "(17)
+  gate-backtest"), a post-plan phase, a finding tag ("MISSING-FILE"), or a script name with no gloss. Write
+  the meaning in plain words. Add the label after it in parentheses only when the owner
+  needs it to act. For example, write "the live test: a GM connects a real Google account,
+  the sheet shows up in Drive, and Refresh updates it (manual test row 43)". Never write
+  "test row 43".
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
@@ -92,7 +103,16 @@ Tell the owner the count in each pile and name the PRs in Decide now.
 
 Build cards for the Decide-now pile right away. Build a prep PR's card once its job is
 done and post-plan has a verdict on the new head. Send the sign-off cards together, each
-with its own options.
+with its own options. A batched card uses the full
+shape below. Never shrink a card to a title and options to fit more cards in one message.
+Even the shortest card carries:
+
+- What the PR is for, in plain words a GM would follow, and who notices the change.
+- What merging changes, and what a revert does and doesn't undo.
+- What each option does, in words. Never point back at an earlier card ("you OK'd this
+  in M1") in place of the facts.
+- Each risk or open question, with the evidence for it.
+- Each test, hold reason, or check by what it does or checks, in plain words.
 
 Re-fetch the PR right before you show it. Then collect:
 
@@ -195,6 +215,10 @@ When the decision needs eyes:
   `~/claude-plans/_reports/` and show it with `html_render`. Name a pick and a runner-up.
 - **Slow previews:** many worktree stacks starve Docker of memory and freeze the preview.
   Count running stacks with `docker ps`. Offer to stop stacks no job is using.
+- **Try the flow yourself first.** Before you send the owner to try a flow, run it on that
+  stack. If it can't work there, because the stack lacks credentials (Google OAuth keys, a
+  mail or payment provider) or prod-only data, say so on the card. Name where it can run
+  and what the owner must set up first.
 
 ## Step 6: Carry out the pick
 

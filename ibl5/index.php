@@ -58,12 +58,16 @@ if (file_exists("themes/$ThemeSel/modules/$name/" . $mod_file . ".php")) {
 }
 $modpath .= "modules/$name/" . $mod_file . ".php";
 if (file_exists($modpath)) {
+    // The home page includes a module file directly, bypassing modules.php,
+    // so it must publish module services itself.
+    global $bootApp;
+    \Module\ModuleServices::publish(new \Module\ModuleServices($bootApp->getContainer()));
     include $modpath;
 } else {
     define('INDEX_FILE', true);
     PageLayout\PageLayout::header();
     OpenTable();
-    echo "<center>" . _HOMEPROBLEMUSER . "</center>";
+    echo "<div class=\"text-center\">" . _HOMEPROBLEMUSER . "</div>";
     CloseTable();
     PageLayout\PageLayout::footer();
 }

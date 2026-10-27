@@ -22,7 +22,7 @@ interface TeamCellHelperInterface
      * @param int $teamId Team ID (used for logo image and default link)
      * @param string $teamName Team name to display (will be HTML-escaped)
      * @param string $color1 Primary color (hex, without #) for background
-     * @param string $color2 Secondary color (hex, without #) for text
+     * @param string $color2 Secondary color (hex, without #) for the name's text shadow
      * @param string $extraClasses Additional CSS classes (e.g. 'sticky-col')
      * @param string $linkUrl Custom link URL; if empty, uses default team page URL
      * @param string $nameHtml Pre-escaped custom inner HTML; if empty, uses escaped team name
@@ -48,7 +48,7 @@ interface TeamCellHelperInterface
      * @param int $teamId Team ID (0 = free agent)
      * @param string $teamName Team name to display
      * @param string $color1 Primary color (hex, without #) for background
-     * @param string $color2 Secondary color (hex, without #) for text
+     * @param string $color2 Secondary color (hex, without #) for the name's text shadow
      * @param string $extraClasses Additional CSS classes (e.g. 'sticky-col')
      * @param string $freeAgentText Text to display for free agents (default: 'Free Agent')
      * @return string Complete <td> HTML element

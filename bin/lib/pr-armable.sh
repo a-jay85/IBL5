@@ -5,7 +5,7 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>):
+# Covers the live-derivable conditions (17: pr_gate_backtest_hold <body>; 18: pr_merge_danger_hold <body>; 20: pr_removed_guards_hold <body> [<flagged_keys>]):
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
@@ -208,6 +208,70 @@ pr_merge_danger_hold() {
     well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
     [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
     case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
+}
+
+# pr_removed_guards_hold <body> [<flagged_keys>]
+#   Phase 6.5 condition (20). Mirrors harness/removed_guards.py classify_body.
+#   <flagged_keys> is the newline-separated run-local detector key list; bin/pr-triage omits it.
+#   1. Counts the whole-line '<!-- removed-guards:begin -->' / '<!-- removed-guards:end -->' markers.
+#   2. No begin and no end marker: prints nothing without keys; with keys, 'removed-guards:UNLISTED:<key>' per key.
+#   3. Begin or end count != 1, end before begin, no '- ' bullet, or a bad bullet -> 'removed-guards:MALFORMED' (fail-closed).
+#   4. Each bullet whose trimmed reason is <15 chars, a none/n/a/tbd/todo word, or '<...>' -> 'removed-guards:UNJUSTIFIED:<key>'.
+#   5. Each flagged key with no bullet -> 'removed-guards:UNLISTED:<key>', after every UNJUSTIFIED line.
+pr_removed_guards_hold() {
+    local body="$1" flagged="${2:-}" line k reason lc nl='
+'
+    local nb=0 ne=0 order_bad=0 inside=0 nbul=0 bad=0 keys="" out=""
+    local bullet_re='^- `([a-z-]+@[^`#[:space:]]+#[0-9a-f]{8})` — Reason: (.*)$'
+    local filler_re='^(none|n/?a|tbd|todo|unknown|no reason|-+|\.+)\.?$'
+    local placeholder_re='^<.*>$'
+    while IFS= read -r line; do
+        line="${line%$'\r'}"
+        case "$line" in
+            '<!-- removed-guards:begin -->') nb=$((nb + 1)); inside=1; continue ;;
+            '<!-- removed-guards:end -->')   ne=$((ne + 1)); [ "$nb" = 0 ] && order_bad=1; inside=0; continue ;;
+        esac
+        [ "$inside" = 1 ] || continue
+        case "$line" in
+            '- '*)
+                nbul=$((nbul + 1))
+                if [[ "$line" =~ $bullet_re ]]; then
+                    k="${BASH_REMATCH[1]}"; reason="${BASH_REMATCH[2]}"
+                    reason="${reason#"${reason%%[![:space:]]*}"}"; reason="${reason%"${reason##*[![:space:]]}"}"
+                    keys="$keys$nl$k"
+                    lc=$(printf '%s' "$reason" | tr '[:upper:]' '[:lower:]')
+                    if [ "${#reason}" -lt 15 ] || [[ "$lc" =~ $filler_re ]] || [[ "$reason" =~ $placeholder_re ]]; then
+                        out="$out${nl}removed-guards:UNJUSTIFIED:$k"
+                    fi
+                else
+                    bad=1
+                fi ;;
+        esac
+    done <<EOF
+$body
+EOF
+    if [ "$nb" = 0 ] && [ "$ne" = 0 ]; then
+        while IFS= read -r k; do
+            [ -n "$k" ] && echo "removed-guards:UNLISTED:$k"
+        done <<EOF
+$flagged
+EOF
+        return 0
+    fi
+    if [ "$nb" != 1 ] || [ "$ne" != 1 ] || [ "$order_bad" = 1 ] || [ "$nbul" = 0 ] || [ "$bad" = 1 ]; then
+        echo "removed-guards:MALFORMED"; return 0
+    fi
+    while IFS= read -r k; do
+        [ -z "$k" ] && continue
+        case "$keys$nl" in
+            *"$nl$k$nl"*) ;;
+            *) out="$out${nl}removed-guards:UNLISTED:$k" ;;
+        esac
+    done <<EOF
+$flagged
+EOF
+    [ -n "$out" ] && printf '%s\n' "${out#"$nl"}"
+    return 0
 }
 
 # pr_docs_refresh_path_ok <repo-relative path>

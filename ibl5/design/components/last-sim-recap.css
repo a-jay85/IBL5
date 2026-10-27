@@ -11,6 +11,8 @@
 
 /* Header bar — slate-wide summary (3-section grid) */
 .last-sim-recap__head {
+    background: var(--gradient-navy-header);
+    color: white;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;

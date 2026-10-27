@@ -203,6 +203,22 @@ test.describe('uploadDraftClass.php', () => {
     await assertNoPhpErrors(page, 'on the rejected-extension form');
   });
 
+  test('client-side .csv error stays hidden until a non-.csv file is chosen', async ({
+    page,
+  }) => {
+    await page.goto(PAGE);
+    // The alert carries d-alert's grid display; preflight's [hidden] rule must still win.
+    await expect(page.locator('#draftClassClientError')).toBeHidden();
+
+    await page.locator('#draftClassFile').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('x'),
+    });
+
+    await expect(page.locator('#draftClassClientError.d-alert-error')).toBeVisible();
+  });
+
   // ── Escaping (matrix rows 25, 26) ─────────────────────────────────────────
 
   test('an HTML payload in a name renders as literal text in the preview cell', async ({
@@ -252,7 +268,7 @@ test.describe('uploadDraftClass.php', () => {
       ),
     });
 
-    const firstError = page.locator('.ibl-alert--error li').first();
+    const firstError = page.locator('.d-alert-error li').first();
     await expect(firstError).toContainText(XSS_PAYLOAD);
     await expect(page.locator('img[onerror]')).toHaveCount(0);
     expect(dialogFired, 'an alert() dialog fired — the payload executed').toBe(false);

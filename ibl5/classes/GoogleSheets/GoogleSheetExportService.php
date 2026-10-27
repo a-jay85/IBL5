@@ -152,14 +152,15 @@ class GoogleSheetExportService
 
             $rows ??= $this->buildRows();
             try {
+                $gridRows = max(self::MIN_ROWS, count($rows) + 1);
                 $this->sheets->ensureTab(
                     $accessToken,
                     $row['spreadsheet_id'],
                     GoogleSheetsClient::PLAYERS_TAB,
-                    max(self::MIN_ROWS, count($rows) + 1),
+                    $gridRows,
                     self::MIN_COLUMNS
                 );
-                $this->sheets->overwriteTab($accessToken, $row['spreadsheet_id'], GoogleSheetsClient::PLAYERS_TAB, $rows);
+                $this->sheets->overwriteTab($accessToken, $row['spreadsheet_id'], GoogleSheetsClient::PLAYERS_TAB, $rows, $gridRows, self::MIN_COLUMNS);
             } catch (GoogleSheetMissingException) {
                 return $this->broken($userId, GoogleSheetConnectionRepositoryInterface::REASON_SHEET_MISSING, $started);
             }

@@ -131,9 +131,11 @@ class GoogleSheetsClient
      * Write $rows starting at A1 as RAW values, in chunks, then clear the rows below them and the columns right of them.
      *
      * @param list<list<mixed>> $rows Header row first
+     * @param int $gridRows Row count the tab is known to have (at least what ensureTab was asked for)
+     * @param int $gridColumns Column count the tab is known to have
      * @throws GoogleSheetMissingException When the spreadsheet is gone
      */
-    public function overwriteTab(#[\SensitiveParameter] string $accessToken, string $spreadsheetId, string $tab, array $rows): void
+    public function overwriteTab(#[\SensitiveParameter] string $accessToken, string $spreadsheetId, string $tab, array $rows, int $gridRows = self::DEFAULT_ROWS, int $gridColumns = self::DEFAULT_COLUMNS): void
     {
         $base = self::BASE_URL . '/' . rawurlencode($spreadsheetId);
         $range = "'" . str_replace("'", "''", $tab) . "'";
@@ -159,12 +161,20 @@ class GoogleSheetsClient
         }
         // One batchClear wipes the rows below the data and the columns right of the
         // header width, so a narrower export leaves no stale cells.
+        // Both ranges end at the tab's real grid edge: Google rejects A1 ranges past the grid.
         $count = count($rows);
         $width = max(1, count($rows[0]));
-        $this->send($accessToken, 'POST', $base . '/values:batchClear', ['ranges' => [
-            $range . '!A' . ($count + 1) . ':ZZZ',
-            $range . '!' . self::columnLetter($width + 1) . '1:ZZZ' . $count,
-        ]], true);
+        $ranges = [];
+        if ($count + 1 <= $gridRows) {
+            $ranges[] = $range . '!A' . ($count + 1) . ':' . self::columnLetter($gridColumns) . $gridRows;
+        }
+        if ($width + 1 <= $gridColumns) {
+            $ranges[] = $range . '!' . self::columnLetter($width + 1) . '1:' . self::columnLetter($gridColumns) . min($count, $gridRows);
+        }
+        if ($ranges === []) {
+            return;
+        }
+        $this->send($accessToken, 'POST', $base . '/values:batchClear', ['ranges' => $ranges], true);
     }
 
     private static function columnLetter(int $number): string

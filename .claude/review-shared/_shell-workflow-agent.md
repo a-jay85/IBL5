@@ -1,6 +1,6 @@
 ---
 description: Shared shell / GitHub Actions / agent-prose reviewer (Agent E) used by /post-plan Phase 4B and /pr-review Step 3.
-last_verified: 2026-09-28
+last_verified: 2026-10-20
 ---
 
 # Agent E: Shell / Workflow / Agent-Prose Reviewer (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
@@ -61,7 +61,7 @@ Findings are consumed unchanged by the Phase 4D scoring/filtering/posting pipeli
 **Trigger:** the script sets any of `-e`, `-u`, `-o pipefail` (directly or via `set -euo pipefail`).
 
 **Flag pattern:**
-- Under `-e`, a command whose **non-zero exit is the expected answer** used without `|| true` / `if` / `!` — most commonly `grep`, `grep -c` (which exits 1 on zero matches while still printing `0`), `diff`, and `git diff --quiet`. This is the exact idiom `.claude/skills/post-plan/_phase-3-classify-diff.md` relies on; a count line missing its `|| true` aborts the whole phase on an empty match.
+- Under `-e`, a command whose **non-zero exit is the expected answer** used without `|| true` / `if` / `!`, most commonly `grep`, `grep -c` (which exits 1 on zero matches while still printing `0`), `diff`, and `git diff --quiet`. A count line missing its `|| true` aborts the whole script on an empty match.
 - Under `-u`, a read of an **optional** env var without a default — `$CLAUDE_HEADLESS`, `$CI`, a secret that is absent on forks. Use `${VAR:-}`.
 - `pipefail` changing a pipeline's status where the author wanted the tail's: `cmd | head -1` now fails when `cmd` dies of SIGPIPE; `producer | grep -q x` now fails when the producer exits non-zero even though the grep matched.
 - A `local x=$(cmd)` under `-e` — `local` swallows the substitution's exit status, so the guard the author thinks they have does not exist.

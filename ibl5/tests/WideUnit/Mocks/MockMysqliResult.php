@@ -53,6 +53,14 @@ class MockMysqliResult implements \Iterator
         return $this->mockResult->fetchAssoc();
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function fetch_all(int $mode = MYSQLI_NUM): array
+    {
+        return $this->data;
+    }
+
     public function free(): void
     {
         // Mock free - do nothing

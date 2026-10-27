@@ -15,7 +15,8 @@ class TeamCellHelperTest extends TestCase
 
         $this->assertStringContainsString('class="ibl-team-cell--colored"', $result);
         $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
-        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-cell-color: #000000', $result);
+        $this->assertStringContainsString('--team-cell-shadow: #FFFFFF', $result);
         $this->assertStringContainsString('images/logo/new1.png', $result);
         $this->assertStringContainsString('ibl-team-cell__text', $result);
         $this->assertStringContainsString('Miami', $result);
@@ -125,7 +126,8 @@ class TeamCellHelperTest extends TestCase
         $result = TeamCellHelper::renderTeamCell(1, 'Miami', '#FF0000', '#FFFFFF');
 
         $this->assertStringContainsString('--team-cell-bg: #FF0000', $result);
-        $this->assertStringContainsString('--team-cell-color: #FFFFFF', $result);
+        $this->assertStringContainsString('--team-cell-color: #000000', $result);
+        $this->assertStringContainsString('--team-cell-shadow: #FFFFFF', $result);
     }
 
     public function testRenderTeamCellWithExtraStylesPrependsBeforeTeamCellBg(): void
@@ -151,5 +153,78 @@ class TeamCellHelperTest extends TestCase
         $withEmptyExtra = TeamCellHelper::renderTeamCell(1, 'Miami', 'FF0000', 'FFFFFF', '', '', '', '');
 
         $this->assertSame($withoutParam, $withEmptyExtra);
+    }
+
+    public function testFailingPairUsesReadableTextWithSecondaryShadow(): void
+    {
+        $result = TeamCellHelper::renderTeamCell(4, 'Diesels', '006BB6', 'ED174C');
+
+        $this->assertStringContainsString(
+            '--team-cell-bg: #006BB6; --team-cell-color: #ffffff; --team-cell-shadow: #ED174C;',
+            $result,
+        );
+        $this->assertStringNotContainsString('--team-cell-color: #ED174C', $result);
+    }
+
+    public function testPassingPairAlsoUsesReadableTextWithSecondaryShadow(): void
+    {
+        // FDB927 on 000000 already clears 4.5:1, but every team gets white/black text.
+        $result = TeamCellHelper::renderTeamCell(1, 'Metros', '000000', 'FDB927');
+
+        $this->assertStringContainsString(
+            '--team-cell-bg: #000000; --team-cell-color: #ffffff; --team-cell-shadow: #FDB927;',
+            $result,
+        );
+        $this->assertStringNotContainsString('--team-cell-color: #FDB927', $result);
+    }
+
+    public function testHostileColorInputYieldsOnlyHexInStyle(): void
+    {
+        foreach (['red;background:url(x)', '"><script>alert(1)</script>', '#FFF'] as $hostile) {
+            $html = TeamCellHelper::renderTeamCell(1, 'X', $hostile, $hostile);
+
+            $this->assertSame(1, preg_match('/ style="([^"]*)"/', $html, $m));
+            // sanitizeColor accepts 3-digit hex, so '#FFF' passes through as the 3-digit bg and shadow.
+            $this->assertMatchesRegularExpression(
+                '/^--team-cell-bg: #(?:[0-9a-fA-F]{3}){1,2}; --team-cell-color: #[0-9a-fA-F]{6}; --team-cell-shadow: #(?:[0-9a-fA-F]{3}){1,2};$/',
+                $m[1],
+            );
+            $this->assertStringNotContainsString('url(', $html);
+            $this->assertStringNotContainsString('<script', $html);
+            $expected = $hostile === '#FFF'
+                ? '--team-cell-bg: #FFF; --team-cell-color: #000000; --team-cell-shadow: #FFF;'
+                : '--team-cell-bg: #000000; --team-cell-color: #ffffff; --team-cell-shadow: #000000;';
+            $this->assertSame($expected, $m[1]);
+        }
+    }
+
+    /**
+     * Color pairs the golden fixtures carry, with the white/black text they now expect.
+     * The secondary color moves to the shadow.
+     *
+     * @return array<string, array{string, string, string}>
+     */
+    public static function fixturePairProvider(): array
+    {
+        return [
+            '008348/BB9753 (Draft view)' => ['008348', 'BB9753', 'ffffff'],
+            '0C2340/C8102E (SeasonArchive detail)' => ['0C2340', 'C8102E', 'ffffff'],
+            'CE1141/000000 (SeasonArchive, Trading sidebar)' => ['CE1141', '000000', 'ffffff'],
+            '007A33/BA9653 (Trading sidebar)' => ['007A33', 'BA9653', 'ffffff'],
+            'FF0000/0000FF (BasketballStats league starters)' => ['FF0000', '0000FF', '000000'],
+            '000000/0000FF (BasketballStats hostile players)' => ['000000', '0000FF', 'ffffff'],
+            '006BB6/ED174C (ci-seed Diesels)' => ['006BB6', 'ED174C', 'ffffff'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('fixturePairProvider')]
+    public function testFixturePairEmitsReadableTextAndSecondaryShadow(string $bg, string $secondary, string $expected): void
+    {
+        $result = TeamCellHelper::renderTeamCell(1, 'X', $bg, $secondary);
+
+        $this->assertStringContainsString(
+            '--team-cell-bg: #' . $bg . '; --team-cell-color: #' . $expected . '; --team-cell-shadow: #' . $secondary . ';',
+            $result,
+        );
     }
 }

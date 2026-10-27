@@ -19,14 +19,9 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use SeasonHighs\SeasonHighsRepository;
-use SeasonHighs\SeasonHighsService;
-use SeasonHighs\SeasonHighsView;
-
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $leagueContext;
-/** @var \mysqli $mysqli_db */
+global $leagueContext;
 /** @var \League\LeagueContext $leagueContext */
 
 // IBL serves Season Highs from the Records page; Olympics keeps this standalone page.
@@ -38,7 +33,8 @@ if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlymp
 }
 
 // Get current season info
-$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonHighsFactory::class);
+$season = $factory->season();
 
 // Determine season phase (from request or current phase)
 $seasonPhaseParam = $_GET['seasonPhase'] ?? null;
@@ -49,13 +45,8 @@ $seasonPhase = is_string($seasonPhaseParam) && $seasonPhaseParam !== '' && $seas
 $pagetitle = "- $seasonPhase Stat Leaders";
 
 // Initialize services
-$repository = new \SeasonHighs\CachedSeasonHighsRepository(
-    new SeasonHighsRepository($mysqli_db, $leagueContext),
-    new \Cache\DatabaseCache($mysqli_db),
-    $leagueContext->getCurrentLeague()
-);
-$service = new SeasonHighsService($repository, $season);
-$view = new SeasonHighsView();
+$service = $factory->service();
+$view = $factory->view();
 
 // Get season highs data
 $data = $service->getSeasonHighsData($seasonPhase);

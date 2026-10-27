@@ -33,6 +33,13 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   messages. A follow-up card (a merge question after a fix job, a second round on the same
   PR) repeats the full context. A card that only names a PR and asks "merge?" is a vague
   prompt. The owner treats it as unsafe and won't answer it.
+- Say what a thing is. A bare label tells the owner nothing. The owner can't decode
+  internal names: a manual-test row number ("row 43"), a hold code ("(7)", "(17)
+  gate-backtest"), a post-plan phase, a finding tag ("MISSING-FILE"), or a script name with no gloss. Write
+  the meaning in plain words. Add the label after it in parentheses only when the owner
+  needs it to act. For example, write "the live test: a GM connects a real Google account,
+  the sheet shows up in Drive, and Refresh updates it (manual test row 43)". Never write
+  "test row 43".
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
@@ -105,6 +112,7 @@ Even the shortest card carries:
 - What each option does, in words. Never point back at an earlier card ("you OK'd this
   in M1") in place of the facts.
 - Each risk or open question, with the evidence for it.
+- Each test, hold reason, or check by what it does or checks, in plain words.
 
 Re-fetch the PR right before you show it. Then collect:
 

@@ -15,6 +15,16 @@ class StandingsEntryPointTest extends ModuleEntryPointTestCase
         $this->mockDb->setMockData([]);
     }
 
+    /**
+     * Standings stays listed in PageCache::MODULE_TTLS, so the front controller can
+     * store and serve its response. The publish step in modules.php sits after the
+     * cache HIT exit and must not stop that path from working.
+     */
+    public function testStandingsRemainsPageCacheable(): void
+    {
+        $this->assertTrue(\Cache\PageCache::isCacheable('Standings'));
+    }
+
     public function testRendersStandingsWithEndingYear(): void
     {
         $output = $this->runModule('Standings');

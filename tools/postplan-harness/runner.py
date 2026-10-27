@@ -1104,11 +1104,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
 
 # Phase 5.0's two conformance signals, written into the run dir beside result.json.
-# Run-dir-keyed, NOT $PPID-keyed: the skill path spells them /tmp/...-$PPID, and no
-# PID the harness could pick would be the one another process looks under. Phase 8
-# removed the rc=4 resume, so no skill session reads these today; they stay as the
-# run's audit trail and as the shape the skill-path block in
-# _phase-6.5-arm-auto-merge.md mirrors. Two suites read these names back rather than
+# Run-dir-keyed, NOT $PPID-keyed: the retired skill Phase 6.5 spelled them
+# /tmp/...-$PPID, and no PID the harness could pick would match another process.
+# No skill session reads these today; they stay as the run's audit trail.
+# Two suites read these names back rather than
 # hardcoding them, and that is what keeps every side in sync: the Python half in
 # tests/test_post_plan_now_fallback.py and the shell half in
 # bin/test-postplan-arm-conditions (harness_handoff_names). Renaming a constant here

@@ -27,7 +27,7 @@ class TrackResult:
 
 
 def aggregate(tracks: list[TrackResult]) -> str:
-    """PHASE5_VERIFY_STATUS rules from _phase-5-final-verification.md."""
+    """PHASE5_VERIFY_STATUS rules from the retired post-plan skill Phase 5 text (ported 2026-10-19)."""
     launched = [t for t in tracks if t.status in ("pass", "fail")]
     if any(t.status == "fail" for t in launched):
         return "fail"

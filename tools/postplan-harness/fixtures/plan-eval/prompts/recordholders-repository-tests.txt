@@ -1,0 +1,25 @@
+Add DatabaseIntegration tests for the untested RecordHolders repositories.
+
+## Exploration pointers
+- `ibl5/classes/RecordHolders/TeamRecordRepository.php` (370 lines), `PlayerRecordRepository.php` (298), `RecordAnnouncementRepository.php` (94). No test names them.
+- Copy an existing `ibl5/tests/DatabaseIntegration/*RepositoryTest.php`.
+
+## Resolved design decisions
+- One test file per repository, real schema, seeded rows, assert each public method's results. Read-only queries.
+
+## Scope
+In: three new test files.
+Out: changing the repositories (report bugs found in the PR body instead).
+
+## Hard constraints
+- Tests must fail on a wrong query (assert exact rows, not just non-empty).
+
+## Blocking questions to resolve inside the plan
+- What seed helpers do existing DatabaseIntegration tests use?
+
+## Verification
+- The new tests pass; a quick mutation run on the three repositories.
+
+
+## Sequencing
+Slug `recordholders-repository-tests`, base master.

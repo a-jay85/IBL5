@@ -18,21 +18,13 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use SeasonArchive\SeasonArchiveIndexView;
-use SeasonArchive\SeasonArchiveRepository;
-use SeasonArchive\SeasonArchiveService;
-use SeasonArchive\SeasonDetailView;
-
-global $mysqli_db, $leagueContext;
-/** @var \mysqli $mysqli_db */
-/** @var \League\LeagueContext|null $leagueContext */
-
 PageLayout\PageLayout::header();
 
-$repository = new SeasonArchiveRepository($mysqli_db, $leagueContext);
-$service = new SeasonArchiveService($repository);
-$indexView = new SeasonArchiveIndexView();
-$detailView = new SeasonDetailView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonArchiveFactory::class);
+$repository = $factory->repository();
+$service = $factory->service();
+$indexView = $factory->indexView();
+$detailView = $factory->detailView();
 
 $year = is_string($_GET['year'] ?? null) ? (int) $_GET['year'] : 0;
 

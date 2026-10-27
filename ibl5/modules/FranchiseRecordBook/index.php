@@ -15,13 +15,11 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 // Route HTMX API requests (no PageLayout, returns HTML fragment only)
 $op = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
 if ($op === 'api') {
-    $handler = new FranchiseRecordBook\FranchiseRecordBookApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\FranchiseRecordBookFactory::class);
+    $handler = $factory->apiHandler();
     $handler->handle();
     return;
 }

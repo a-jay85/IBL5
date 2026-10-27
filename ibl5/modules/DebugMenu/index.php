@@ -7,16 +7,13 @@ if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
-use Debug\DebugController;
-
-global $authService;
-/** @var \Auth\AuthService $authService */
-
 $op = $_REQUEST['op'] ?? '';
+
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\DebugMenuFactory::class);
 
 switch ($op) {
     case 'toggle_extensions':
-        (new DebugController($authService))->handleToggle();
+        $factory->controller()->handleToggle();
         break;
     default:
         \Utilities\HtmxHelper::redirect('/ibl5/');

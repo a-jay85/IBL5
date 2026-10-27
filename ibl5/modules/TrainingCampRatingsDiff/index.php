@@ -6,13 +6,8 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffService;
-use TrainingCampRatingsDiff\TrainingCampRatingsDiffView;
-
-global $mysqli_db, $user;
-/** @var \mysqli $mysqli_db */
-$nukeCompat = new \Utilities\NukeCompat();
+global $user;
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 if (!$nukeCompat->isUser($user)) {
     $nukeCompat->loginBox();
@@ -31,10 +26,9 @@ if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['stat
     $filterStatus = $_GET['status'];
 }
 
-$season     = \Season\SharedSeason::get($mysqli_db);
-$repository = new TrainingCampRatingsDiffRepository($mysqli_db);
-$service    = new TrainingCampRatingsDiffService($repository, $season->endingYear);
-$view       = new TrainingCampRatingsDiffView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TrainingCampRatingsDiffFactory::class);
+$service = $factory->service();
+$view    = $factory->view();
 
 $baselineYear  = $service->getBaselineYear($overrideYear);
 $baselinePhase = $service->getBaselinePhase($overrideYear);

@@ -16,25 +16,14 @@ $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
 $pagetitle = " - Depth Chart Entry";
 
-global $mysqli_db, $commonRepo, $nukeCompat, $user;
-/** @var \mysqli $mysqli_db */
-$commonRepo = new Repositories\TeamIdentityRepository($mysqli_db);
-$nukeCompat = new \Utilities\NukeCompat();
+global $commonRepo, $nukeCompat, $user;
+$commonRepo = \Module\ModuleServices::current()->teamIdentity();
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 function userinfo(string $username): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext;
-    /** @var \mysqli $mysqli_db */
-    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
-    /** @var \League\LeagueContext $leagueContext */
-
-    $repository = new DepthChart\DepthChartRepository($mysqli_db);
-    $service = new DepthChart\DepthChartService();
-    $view = new DepthChart\DepthChartView($leagueContext, $service);
-    $teamRepository = new Team\TeamRepository($mysqli_db);
-    $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
-    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $controller = $factory->controller();
     $controller->displayForm($username);
 }
 
@@ -62,10 +51,8 @@ function renderInlineSubmitError(): void
 
 function submit(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext, $authService, $nukeCompat;
-    /** @var \mysqli $mysqli_db */
+    global $commonRepo, $authService, $nukeCompat;
     /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
-    /** @var \League\LeagueContext $leagueContext */
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
     /** @var \Utilities\NukeCompat $nukeCompat */
 
@@ -95,41 +82,29 @@ function submit(mixed $user): void
         return;
     }
 
-    $repository = new DepthChart\DepthChartRepository($mysqli_db);
-    $service = new DepthChart\DepthChartService();
-    $view = new DepthChart\DepthChartView($leagueContext, $service);
-    $teamRepository = new Team\TeamRepository($mysqli_db);
-    $teamTableService = new Team\TeamTableService($mysqli_db, $teamRepository);
-    $submissionHandler = new DepthChart\DepthChartSubmissionHandler($mysqli_db, $commonRepo);
-    $httpRequest = \Http\HttpRequest::fromGlobals();
-    $controller = new DepthChart\DepthChartController($mysqli_db, $commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, $httpRequest);
-    $controller->handleSubmit($httpRequest->allPost(), $username);
+    $services = \Module\ModuleServices::current();
+    $factory = $services->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $controller = $factory->controller();
+    $controller->handleSubmit($services->request()->allPost(), $username);
 }
 
 function tabApi(): void
 {
-    global $mysqli_db, $commonRepo, $leagueContext;
-    /** @var \mysqli $mysqli_db */
-    /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
-    /** @var \League\LeagueContext $leagueContext */
-
-    $handler = new DepthChart\DepthChartApiHandler($mysqli_db, $commonRepo, $leagueContext);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->apiHandler();
     $handler->handle();
 }
 
 function nextSimApi(): void
 {
-    global $mysqli_db;
-    /** @var \mysqli $mysqli_db */
-
-    $handler = new NextSim\NextSimTabApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->nextSimTabApiHandler();
     $handler->handle();
 }
 
 function api(mixed $user): void
 {
-    global $mysqli_db, $commonRepo, $authService, $nukeCompat;
-    /** @var \mysqli $mysqli_db */
+    global $commonRepo, $authService, $nukeCompat;
     /** @var \Repositories\Contracts\TeamIdentityRepositoryInterface $commonRepo */
     /** @var \Auth\Contracts\AuthServiceInterface $authService */
     /** @var \Utilities\NukeCompat $nukeCompat */
@@ -174,7 +149,8 @@ function api(mixed $user): void
         $params = $httpRequest->allGet();
     }
 
-    $handler = new DepthChartSnapshot\DepthChartSnapshotApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DepthChartEntryFactory::class);
+    $handler = $factory->savedDepthChartApiHandler();
     $handler->handle($action, $teamid, $username, $params);
 }
 

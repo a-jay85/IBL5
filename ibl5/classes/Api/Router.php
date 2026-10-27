@@ -53,6 +53,7 @@ class Router implements RouterInterface
         'bug-pipeline/thread-by-pr'    => Controller\ThreadByPrController::class,
         'bug-pipeline/source-updated'  => Controller\SourceUpdatedController::class,
         'bug-pipeline/source-deleted'  => Controller\SourceDeletedController::class,
+        'bug-pipeline/wake'            => Controller\WakeController::class,
     ];
 
     /**

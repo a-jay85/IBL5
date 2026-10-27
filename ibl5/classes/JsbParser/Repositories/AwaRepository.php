@@ -25,4 +25,27 @@ class AwaRepository extends \Database\BaseMysqliRepository
             $name
         );
     }
+
+    /**
+     * Check if the .awa stat-leader awards (e.g. "Scoring Leader (1st)") are
+     * stored for a season. Other ibl_awards rows (All-Star, contests, Finals
+     * MVP) come from other writers, so only the rows .awa writes count.
+     */
+    public function hasStatLeaderAwardsForYear(int $year): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM `ibl_awards`
+             WHERE year = ? AND award LIKE '% Leader (%)'",
+            'i',
+            $year,
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $cnt = $row['cnt'];
+
+        return is_int($cnt) && $cnt > 0;
+    }
 }

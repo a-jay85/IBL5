@@ -274,16 +274,19 @@ describe('/get-thread-messages', () => {
     it('maps author_id as string, includes content + numeric ts, oldest-first', async () => {
         // supplied newest-first; expect oldest-first output
         const channel = threadChannel([
-            { author: { id: '20' }, content: 'second', createdTimestamp: 2000 },
-            { author: { id: '10' }, content: 'first', createdTimestamp: 1000 },
+            { id: '987654321098765432', author: { id: '20' }, content: 'second', createdTimestamp: 2000 },
+            { id: '987654321098765431', author: { id: '10' }, content: 'first', createdTimestamp: 1000 },
         ]);
         const res = await invoke('/get-thread-messages', { thread_id: 'T' }, clientWithChannel(channel));
         const payload = res.json.mock.calls[0][0];
         expect(payload.messages).toEqual([
-            { author_id: '10', content: 'first', ts: 1000, attachments: [] },
-            { author_id: '20', content: 'second', ts: 2000, attachments: [] },
+            { id: '987654321098765431', author_id: '10', content: 'first', ts: 1000, attachments: [] },
+            { id: '987654321098765432', author_id: '20', content: 'second', ts: 2000, attachments: [] },
         ]);
         expect(typeof payload.messages[0].author_id).toBe('string');
+        // The tick omits operator mentions from the transcript by this id; a snowflake
+        // must stay a string or it loses precision past 2^53.
+        expect(typeof payload.messages[0].id).toBe('string');
     });
 
     it('requests an explicit limit of 100', async () => {

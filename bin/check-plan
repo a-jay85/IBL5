@@ -14,7 +14,7 @@
 # the matrix?) — whether Sonnet is *trustworthy* for a given plan's content is
 # still Opus judgment at authoring time.
 #
-# Gates implemented (numbering mirrors .claude/skills/plan/SKILL.md Step 4):
+# Gates implemented (numbering mirrors .claude/skills/plan/_validate-and-write.md Step 4):
 #   1  Matrix exists        — the verification matrix header is present.
 #   3  No false manuals      — a Truly-manual row whose text uses an automatable
 #                              verb (verify / check that / confirm / ensure) is an

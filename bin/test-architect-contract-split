@@ -16,9 +16,10 @@
 #   4. Size caps  : _architect-contract.md ≤ 29696 B, _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
-#   6. Mutation rule: full-matrix mutation-rule text stays in the contract and SKILL.md gate 9
+#   6. Mutation rule: full-matrix mutation-rule text stays in the contract and _validate-and-write.md gate 9
 #   7. Added rules: every post-split bold lead-in in ADDED_RULES is resident in the contract (check_added_rules)
-#   8. Mutation pointers: the whole-matrix mutation bullet, its detail pointer, the detail heading and the SKILL.md gate-9 pointer all stay resident (check_mutation_pointers)
+#   8. Mutation pointers: the whole-matrix mutation bullet, its detail pointer, the detail heading and the _validate-and-write.md gate-9 pointer all stay resident (check_mutation_pointers)
+#   9. Companion reachability: the moved plan gates live in the plan companions and each is reachable from a SKILL.md stub (check_companion_reachability)
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
@@ -406,7 +407,7 @@ run_selftest() {
     exit 1
   fi
   h_mark st_mark; st_f0=$H_FAIL
-  check_mutation_rule "$mut_contract" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  check_mutation_rule "$mut_contract" "$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
   st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
   if [[ "$st_n" -gt 0 ]]; then
     h_pass 'detected dropped contract mutation-rule text'
@@ -417,7 +418,7 @@ run_selftest() {
   # Mutation 3: strip the gate-9 sentence from a SKILL.md copy.
   local mut_skill="$tmpdir/mut-SKILL.md"
   sed 's/each claim in a row names its own catching mutation//' \
-    "$REPO_ROOT/.claude/skills/plan/SKILL.md" > "$mut_skill"
+    "$REPO_ROOT/.claude/skills/plan/_validate-and-write.md" > "$mut_skill"
   if grep -qF 'each claim in a row names its own catching mutation' "$mut_skill"; then
     printf 'FAIL: self-test mutation 3 did not remove the target sentence\n' >&2
     exit 1
@@ -450,7 +451,7 @@ run_selftest() {
 
   # Mutations 5-8: check_mutation_pointers must fail when any one of its four anchors is removed.
   local detail_src="$REPO_ROOT/.claude/skills/plan/_architect-contract-detail.md"
-  local skill_src="$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  local skill_src="$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
 
   # Mutation 5 (A): delete the contract line carrying the bold lead-in.
   local mut_a="$tmpdir/contract-no-lead.md"
@@ -487,6 +488,38 @@ run_selftest() {
     exit 1
   fi
   expect_mutation_pointers_fails "stripped gate-9 pointer" "$rules_src" "$detail_src" "$mut_d"
+
+  # Mutations 9-11: check_companion_reachability must fail when a stub, a loader target or a gate drifts.
+  local plan_skill="$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  local plan_validate="$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
+  local plan_hold="$REPO_ROOT/.claude/skills/plan/_hold-and-remediation.md"
+
+  # Mutation 9: the Step 4 stub no longer names _validate-and-write.md. Probe 4 must fail.
+  local mut_e="$tmpdir/skill-no-stub-target.md"
+  sed '/^Read `.claude\/skills\/plan\/_validate-and-write.md` now/s/_validate-and-write\.md/gone.md/' \
+    "$plan_skill" > "$mut_e"
+  if grep -qF 'Read `.claude/skills/plan/_validate-and-write.md` now' "$mut_e"; then
+    printf 'FAIL: self-test mutation 9 did not remove the Step 4 stub target\n' >&2
+    exit 1
+  fi
+  expect_companion_reachability_fails "Step 4 stub without its target" \
+    "$mut_e" "$plan_validate" "$plan_hold" "$REPO_ROOT"
+
+  # Mutation 10: rename the drift section so its loader prints nothing. Probe 5 must fail.
+  local mut_f="$tmpdir/hold-renamed-drift.md"
+  sed 's/^## Drift remediation$/## Drift fix/' "$plan_hold" > "$mut_f"
+  if grep -qF '## Drift remediation' "$mut_f"; then
+    printf 'FAIL: self-test mutation 10 did not rename the drift section\n' >&2
+    exit 1
+  fi
+  expect_companion_reachability_fails "renamed drift section" \
+    "$plan_skill" "$plan_validate" "$mut_f" "$REPO_ROOT"
+
+  # Mutation 11: a gate-13 line comes back into SKILL.md. Probe 1 must fail.
+  local mut_g="$tmpdir/skill-gate13-back.md"
+  { cat "$plan_skill"; printf '13. **impl_model criterion.** stray copy\n'; } > "$mut_g"
+  expect_companion_reachability_fails "gate 13 back in SKILL.md" \
+    "$mut_g" "$plan_validate" "$plan_hold" "$REPO_ROOT"
 }
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -583,7 +616,7 @@ check_mutation_rule() {
   done
   probe='each claim in a row names its own catching mutation'
   if ! grep -qF -- "$probe" "$skill"; then
-    h_fail "$(printf '[mutation rule]: SKILL.md Step 4 gate 9 is missing: %s' "$probe")"
+    h_fail "$(printf '[mutation rule]: _validate-and-write.md Step 4 gate 9 is missing: %s' "$probe")"
   fi
 }
 
@@ -636,6 +669,153 @@ expect_mutation_pointers_fails() {
   fi
 }
 
+# -- Assertion 9: the moved plan gates stay in the companions and stay reachable -
+# Steps 4 and 5 live in _validate-and-write.md, and the Step 4.5 hold challenge plus two
+# remediation blocks live in _hold-and-remediation.md. SKILL.md keeps stubs that name them.
+# Losing a gate token, a stub target, or a loader's section strands the rule.
+
+# Counts lines of $1 that start with the literal token $2.
+count_at_line_start() {
+  TOK="$2" awk 'index($0, ENVIRON["TOK"]) == 1 {n++} END {print n + 0}' "$1"
+}
+
+check_companion_reachability() {
+  local skill="$1" validate="$2" hold="$3" repo_root="$4" f before tok n cmd out want
+  printf '\n=== companion reachability ===\n'
+  for f in "$skill" "$validate" "$hold"; do
+    if [[ ! -f "$f" ]]; then
+      h_fail "$(printf '[companion reachability]: missing file %s' "$f")"; return 0
+    fi
+  done
+  before=$H_FAIL
+
+  # Probe 1: each of the 18 Step 4 gates starts one line in validate and none in SKILL.md.
+  while IFS= read -r tok; do
+    [[ -n "$tok" ]] || continue
+    n="$(count_at_line_start "$validate" "$tok")"
+    if [[ "$n" -ne 1 ]]; then
+      h_fail "$(printf '[companion reachability]: gate token appears %s times in %s (want 1): %s' "$n" "$(basename "$validate")" "$tok")"
+    fi
+    n="$(count_at_line_start "$skill" "$tok")"
+    if [[ "$n" -ne 0 ]]; then
+      h_fail "$(printf '[companion reachability]: gate token still in %s: %s' "$(basename "$skill")" "$tok")"
+    fi
+  done <<'GATES'
+1. *(scripted — see above)*
+2. **No unclassified items**
+3. *(scripted — see above)*
+4. **Tests woven inline**
+5. **Production comparison classified correctly**
+6. **Test file paths present**
+7. **No unresolved decisions**
+8. *(scripted — `bin/check-plan` gate `[8]`)* **Decision-trigger pre-classified**
+9. **Negative-path coverage**
+10. **Hot-file extraction**
+11. **Refactor characterization**
+12. **Security surface resolved**
+13. **impl_model criterion.**
+14. **auto-merge hold criterion.**
+15. **verification-gap mechanization**
+16. **pre-prod exercise path.**
+17. **New `bin/` script exercise path.**
+18. **Literal and symbol provenance.**
+GATES
+
+  # Probe 2: Step 5 tokens live in validate and not in SKILL.md.
+  while IFS= read -r tok; do
+    [[ -n "$tok" ]] || continue
+    if ! grep -qF -- "$tok" "$validate"; then
+      h_fail "$(printf '[companion reachability]: %s lost: %s' "$(basename "$validate")" "$tok")"
+    fi
+    if grep -qF -- "$tok" "$skill"; then
+      h_fail "$(printf '[companion reachability]: %s still carries: %s' "$(basename "$skill")" "$tok")"
+    fi
+  done <<'VALIDATE_TOKENS'
+**Pre-finalize drift check — run FIRST
+### Staleness sweep (required)
+### Declaring the implementation model (required)
+### Holding auto-merge (optional)
+VALIDATE_TOKENS
+
+  # Probe 3: conditional tokens live in hold and in neither SKILL.md nor validate.
+  while IFS= read -r tok; do
+    [[ -n "$tok" ]] || continue
+    if ! grep -qF -- "$tok" "$hold"; then
+      h_fail "$(printf '[companion reachability]: %s lost: %s' "$(basename "$hold")" "$tok")"
+    fi
+    if grep -qF -- "$tok" "$skill" "$validate"; then
+      h_fail "$(printf '[companion reachability]: conditional token left in an always-read file: %s' "$tok")"
+    fi
+  done <<'HOLD_TOKENS'
+Reducible holds — dissolve or prove infeasible.
+Second challenge.
+EXCESS_LINE=
+| What the token actually is | Repair |
+**Escalation.**
+HOLD_TOKENS
+
+  # Probe 4: each stub names the companion that holds its step.
+  out="$(awk '/^## Step 4: Validate the matrix$/{f=1;next} /^## Step 4\.5:/{f=0} f' "$skill")"
+  if ! grep -qF -- '_validate-and-write.md' <<< "$out"; then
+    h_fail '[companion reachability]: SKILL.md Step 4 stub does not name _validate-and-write.md'
+  fi
+  out="$(awk '/^## Step 5: Write the plan file$/{f=1;next} /^## Step 5\.5:/{f=0} f' "$skill")"
+  if ! grep -qF -- '_validate-and-write.md' <<< "$out"; then
+    h_fail '[companion reachability]: SKILL.md Step 5 stub does not name _validate-and-write.md'
+  fi
+  out="$(awk '/^## Step 4\.5:/{f=1;next} /^## Step 5: Write the plan file$/{f=0} f' "$skill")"
+  if ! grep -qF -- '_hold-and-remediation.md' <<< "$out"; then
+    h_fail '[companion reachability]: SKILL.md Step 4.5 stub does not name _hold-and-remediation.md'
+  fi
+
+  # Probe 5: run every loader against the supplied hold file.
+  local -a loaders=()
+  while IFS= read -r cmd; do
+    [[ -n "$cmd" ]] && loaders+=("$cmd")
+  done < <(grep -ohE "awk '[^']*' \.claude/skills/plan/_hold-and-remediation\.md" "$skill" "$validate")
+  if [[ "${#loaders[@]}" -ne 3 ]]; then
+    h_fail "$(printf '[companion reachability]: found %d loaders (want 3)' "${#loaders[@]}")"
+  fi
+  for cmd in "${loaders[@]}"; do
+    case "$cmd" in
+      *'Step 4\.5'*)          want='Second challenge.' ;;
+      *'Drift remediation'*)  want='EXCESS_LINE=' ;;
+      *'Staleness remediation'*) want='**Escalation.**' ;;
+      *) h_fail "$(printf '[companion reachability]: unrecognised loader: %s' "$cmd")"; continue ;;
+    esac
+    cmd="${cmd//.claude\/skills\/plan\/_hold-and-remediation.md/$hold}"
+    out="$(cd "$repo_root" && bash -c "$cmd")"
+    if [[ -z "$out" ]]; then
+      h_fail "$(printf '[companion reachability]: loader printed nothing (want %s)' "$want")"
+    elif ! grep -qF -- "$want" <<< "$out"; then
+      h_fail "$(printf '[companion reachability]: loader output lacks: %s' "$want")"
+    fi
+  done
+
+  # Probe 6: the Phase 1 orient budget stays resident in SKILL.md.
+  for tok in '### Orient budget: hand off at 12 calls' 'Spend at most **12 tool calls**'; do
+    if ! grep -qF -- "$tok" "$skill"; then
+      h_fail "$(printf '[companion reachability]: %s lost: %s' "$(basename "$skill")" "$tok")"
+    fi
+  done
+
+  [[ "$H_FAIL" -eq "$before" ]] && printf 'companion reachability: all probes present\n'
+  return 0
+}
+
+# Runs check_companion_reachability on (skill, validate, hold, repo_root) and expects it to fail.
+expect_companion_reachability_fails() {
+  local label="$1" st_mark st_f0 st_n
+  h_mark st_mark; st_f0=$H_FAIL
+  check_companion_reachability "$2" "$3" "$4" "$5"
+  st_n=$((H_FAIL - st_f0)); h_rewind "$st_mark"
+  if [[ "$st_n" -gt 0 ]]; then
+    h_pass "$(printf 'self-test detected %s (%d failure(s))' "$label" "$st_n")"
+  else
+    h_fail "$(printf 'check_companion_reachability did not detect %s — checker is vacuous' "$label")"
+  fi
+}
+
 if [[ "$MODE" == selftest ]]; then
   run_selftest
 else
@@ -649,8 +829,13 @@ else
 
   check_read_budget
   check_added_rules "$CONTRACT_RULES"
-  check_mutation_rule "$CONTRACT_RULES" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
-  check_mutation_pointers "$CONTRACT_RULES" "$CONTRACT_DETAIL" "$REPO_ROOT/.claude/skills/plan/SKILL.md"
+  check_mutation_rule "$CONTRACT_RULES" "$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
+  check_mutation_pointers "$CONTRACT_RULES" "$CONTRACT_DETAIL" "$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
+  check_companion_reachability \
+    "$REPO_ROOT/.claude/skills/plan/SKILL.md" \
+    "$REPO_ROOT/.claude/skills/plan/_validate-and-write.md" \
+    "$REPO_ROOT/.claude/skills/plan/_hold-and-remediation.md" \
+    "$REPO_ROOT"
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in

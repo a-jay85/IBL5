@@ -4899,17 +4899,18 @@ _hdp_case "no-trailing-newline" '## Automouse Hold Justification
 **Decision:** last line' '**Decision:** last line'
 
 # regex_canon_divergence — the three call sites must stay byte-identical.
-# Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
+# Canon lives in bin/check-plan gate [D]; _hold-and-remediation.md and _architect-contract.md
 # restate it. Any divergence (notably \s for [[:space:]]) fails here.
 SCAF_RE='^[[:space:]]*[0-9]+\.[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
 BODY_RE='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
 _canon_failed=0
-for _f in bin/check-plan .claude/skills/plan/SKILL.md \
+for _f in bin/check-plan .claude/skills/plan/_hold-and-remediation.md \
          .claude/skills/plan/_architect-contract.md; do
   grep -qF "$SCAF_RE" "$_f" || { echo "FAIL: scaffold regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
   grep -qF "$BODY_RE" "$_f" || { echo "FAIL: body regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
 done
 if grep -nE '\\s' bin/check-plan .claude/skills/plan/SKILL.md \
+    .claude/skills/plan/_hold-and-remediation.md \
     .claude/skills/plan/_architect-contract.md 2>/dev/null | grep -qE '\(Phase\|Step\)'; then
   echo "FAIL: non-POSIX \\s found in canon expression"
   FAILED=1

@@ -29,7 +29,8 @@ P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
 PP7="$REPO_ROOT/.claude/skills/post-plan/_phase-7-ci-monitoring.md"
 P55_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5.5-fidelity.md"
 P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
-PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
+PLAN_VALIDATE="$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
+PLAN_HOLD="$REPO_ROOT/.claude/skills/plan/_hold-and-remediation.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
@@ -2373,17 +2374,17 @@ else
 fi
 
 # --- /plan SKILL.md gate 15 arm 2 + gate 16 shape (d) prose assertions -------
-if grep -qF 'Arm 2 fires regardless of why the hold exists' "$PLAN_SKILL"; then
-    echo "ok: plan SKILL.md gate 15 arm 2 prose present"
+if grep -qF 'Arm 2 fires regardless of why the hold exists' "$PLAN_VALIDATE"; then
+    echo "ok: plan _validate-and-write.md gate 15 arm 2 prose present"
 else
-    echo "FAIL: plan SKILL.md gate 15 arm 2 prose missing (expected 'Arm 2 fires regardless of why the hold exists')"
+    echo "FAIL: plan _validate-and-write.md gate 15 arm 2 prose missing (expected 'Arm 2 fires regardless of why the hold exists')"
     FAILED=1
 fi
 
-if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_SKILL"; then
-    echo "ok: plan SKILL.md gate 16 shape (d) prose present"
+if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_VALIDATE"; then
+    echo "ok: plan _validate-and-write.md gate 16 shape (d) prose present"
 else
-    echo "FAIL: plan SKILL.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
+    echo "FAIL: plan _validate-and-write.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
     FAILED=1
 fi
 
@@ -2394,7 +2395,7 @@ fi
 # em-dash, no leading/trailing markdown that a reflow would change.
 while IFS= read -r needle; do
     [ -n "$needle" ] || continue
-    if grep -qF -- "$needle" "$PLAN_SKILL"; then
+    if grep -qF -- "$needle" "$PLAN_VALIDATE" "$PLAN_HOLD"; then
         echo "ok: plan SKILL.md hold-trigger pin present ($needle)"
     else
         echo "FAIL: plan SKILL.md hold-trigger pin missing ('$needle')"

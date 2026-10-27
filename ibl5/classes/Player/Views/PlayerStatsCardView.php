@@ -49,50 +49,67 @@ class PlayerStatsCardView
         if ($statsType !== '') {
             $html .= '<div class="stats-type-indicator">' . HtmlSanitizer::e($statsType) . '</div>';
         }
-        $html .= $tableContent;
+        $html .= self::liftTitle($tableContent);
         $html .= '</div>';
         return $html;
     }
 
     /**
+     * Move a table's thead title row above the table, and put the table in its own scroller
+     *
+     * On a phone the columns scroll sideways inside the card. A title inside the
+     * table would scroll away with them, so it becomes a block above the scroller.
+     * Tables without a thead title row come back unchanged, which makes this safe
+     * to run twice (render() goes through styleTable() and then wrap()).
+     *
+     * @param string $tableHtml Table HTML whose title text is already escaped
+     * @return string Title block plus scroller, or the input when there is no title row
+     */
+    private static function liftTitle(string $tableHtml): string
+    {
+        $matched = preg_match(
+            '#<thead>\s*<tr>\s*<td(?: colspan=\d+)? class="(stats-table-header|player-view-table__title)">(.*?)</td>\s*</tr>\s*#s',
+            $tableHtml,
+            $match,
+            PREG_OFFSET_CAPTURE
+        );
+        if ($matched !== 1) {
+            return $tableHtml;
+        }
+
+        [$whole, $offset] = $match[0];
+        $table = substr($tableHtml, 0, $offset) . '<thead>' . "\n" . substr($tableHtml, $offset + strlen($whole));
+
+        return '<div class="' . $match[1][0] . '">' . $match[2][0] . '</div>'
+            . '<div class="player-stats-card__scroll">' . $table . '</div>';
+    }
+
+    /**
      * Apply stats card styling to an existing table by adding appropriate classes
      * 
-     * This method transforms standard player-table markup to use stats-card styling.
+     * Maps .player-view-table markup onto the gold card hooks (.stats-table, .stats-table-header).
      * 
      * @param string $tableHtml The original table HTML
      * @return string Modified table HTML with stats-card classes
      */
     public static function styleTable(string $tableHtml): string
     {
-        // Replace sortable player-table with stats-table
+        // Inside the gold card the legacy title-bar modifier gives way to the
+        // card's own hook; .ibl-data-table stays so the card themes the shared table.
         $styled = str_replace(
-            'class="sortable player-table"',
-            'class="stats-table sortable"',
+            'class="sortable ibl-data-table player-view-table"',
+            'class="sortable ibl-data-table stats-table"',
             $tableHtml
         );
-        
-        // Also handle sim-stats-table variant
+
+        // Title cell: legacy blue bar becomes the gold card header
         $styled = str_replace(
-            'class="sortable player-table sim-stats-table"',
-            'class="stats-table sortable sim-stats-table"',
-            $styled
-        );
-        
-        // Replace player-table-header with stats-table-header
-        $styled = str_replace(
-            'class="player-table-header"',
+            'class="player-view-table__title"',
             'class="stats-table-header"',
             $styled
         );
-        
-        // Add career-row class to bold rows for additional styling
-        $styled = str_replace(
-            'class="player-table-row-bold"',
-            'class="player-table-row-bold career-row"',
-            $styled
-        );
-        
-        return $styled;
+
+        return self::liftTitle($styled);
     }
 
     /**

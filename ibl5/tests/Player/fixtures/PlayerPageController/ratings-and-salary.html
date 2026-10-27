@@ -371,11 +371,9 @@
         </nav>
     </td>
 </tr>
-        <tr><td colspan="2"><div class="player-stats-card" style="--card-grad-start:#000000;--card-grad-mid:#b90f3a;--card-grad-end:#000000;--card-border:#eaeaea;--card-border-rgb:234, 234, 234;--card-accent:#ececec;--card-text:#ffffff;--card-text-muted:#cccccc"><table class="sortable player-table">
-    <tr>
-        <td colspan=24 class="player-table-header">Ratings by Year</td>
-    </tr>
-    <tr>
+        <tr><td colspan="2"><div class="player-stats-card" style="--card-grad-start:#000000;--card-grad-mid:#b90f3a;--card-grad-end:#000000;--card-border:#eaeaea;--card-border-rgb:234, 234, 234;--card-accent:#ececec;--card-text:#ffffff;--card-text-muted:#cccccc"><div class="player-view-table__title">Ratings by Year</div><div class="player-stats-card__scroll"><table class="sortable ibl-data-table player-view-table">
+<thead>
+<tr>
         <th>year</th>
         <th>2ga</th>
         <th>2gp</th>
@@ -401,11 +399,16 @@
         <th>Def</th>
         <th>Salary</th>
     </tr>
-            <tr>
+</thead>
+<tbody>
+        </tbody>
+<tfoot>
+    <tr>
         <td colspan=24 class="text-center font-bold">Total Career Salary Earned: 0 million dollars</td>
     </tr>
+</tfoot>
 </table>
-        </div></td></tr><script>
+        </div></div></td></tr><script>
 (function() {
     function initFlip() {
         var flipContainers = document.querySelectorAll('.card-flip-container');

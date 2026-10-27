@@ -379,11 +379,9 @@
         <!-- Front (Averages by default) -->
         <div class="stats-front">
             <div class="player-stats-card">
-                <table class="stats-table sortable">
-    <tr>
-        <td colspan=16 class="stats-table-header">Playoff Averages</td>
-    </tr>
-    <tr>
+                <div class="stats-table-header">Playoff Averages</div><div class="player-stats-card__scroll"><table class="sortable ibl-data-table stats-table">
+<thead>
+<tr>
         <th>year</th>
         <th>team</th>
         <th>g</th>
@@ -400,18 +398,19 @@
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
+        </tbody>
         </table>
-                    </div>
+        </div>            </div>
         </div>
 
         <!-- Back (Totals by default) -->
         <div class="stats-back">
             <div class="player-stats-card">
-                <table class="stats-table sortable">
-    <tr>
-        <td colspan=15 class="stats-table-header">Playoff Totals</td>
-    </tr>
-    <tr>
+                <div class="stats-table-header">Playoff Totals</div><div class="player-stats-card__scroll"><table class="sortable ibl-data-table stats-table">
+<thead>
+<tr>
         <th>year</th>
         <th>team</th>
         <th>g</th>
@@ -428,7 +427,11 @@
         <th>pf</th>
         <th>pts</th>
     </tr>
-            <tr class="player-table-row-bold career-row">
+</thead>
+<tbody>
+        </tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Playoff Totals</td>
         <td>0</td>
         <td>0</td>
@@ -444,8 +447,9 @@
         <td>0</td>
         <td>0</td>
     </tr>
+</tfoot>
 </table>
-                    </div>
+        </div>            </div>
         </div>
     </div>
 </div>

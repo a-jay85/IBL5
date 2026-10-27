@@ -371,11 +371,9 @@
         </nav>
     </td>
 </tr>
-        <tr><td colspan="2"><div class="player-stats-card" style="--card-grad-start:#000000;--card-grad-mid:#b90f3a;--card-grad-end:#000000;--card-border:#eaeaea;--card-border-rgb:234, 234, 234;--card-accent:#ececec;--card-text:#ffffff;--card-text-muted:#cccccc"><table class="stats-table sortable">
-    <tr>
-        <td colspan=22 class="stats-table-header">Game Log</td>
-    </tr>
-    <tr>
+        <tr><td colspan="2"><div class="player-stats-card" style="--card-grad-start:#000000;--card-grad-mid:#b90f3a;--card-grad-end:#000000;--card-border:#eaeaea;--card-border-rgb:234, 234, 234;--card-accent:#ececec;--card-text:#ffffff;--card-text-muted:#cccccc"><div class="stats-table-header">Game Log</div><div class="player-stats-card__scroll"><table class="sortable ibl-data-table stats-table">
+<thead>
+<tr>
         <th>Date</th>
         <th>Away</th>
         <th>Home</th>
@@ -399,8 +397,11 @@
         <th>PF</th>
         <th>PTS</th>
     </tr>
-        </table>
-        </div></td></tr><script>
+</thead>
+<tbody>
+        </tbody>
+</table>
+        </div></div></td></tr><script>
 (function() {
     function initFlip() {
         var flipContainers = document.querySelectorAll('.card-flip-container');

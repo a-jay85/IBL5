@@ -464,7 +464,7 @@ conflicting default in the skill):**
 - Before finishing, run \`bin/check-plan ~/claude-plans/<slug>.md\` and then
   \`bin/check-plan-staleness\` on the same file, and fix everything they report.
   This job re-runs both after you exit and logs the verdict; a plan that fails
-  either one is never queued. Step 5 of the skill has the remediation table.
+  either one is never queued. _hold-and-remediation.md has the remediation table.
 - **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
   other \`Agent\`) with \`run_in_background: true\`, and never start a long task, end
   your turn, and expect to collect it afterwards. Under \`claude -p\` the turn you

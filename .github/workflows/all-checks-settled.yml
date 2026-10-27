@@ -22,6 +22,7 @@ on:
       - ESLint
       - Weekly Flake Report
       - gitleaks
+      - Hotfix dispatch
       - Human Sign-off
       - Merge digest notify
       - Migration Safety
@@ -81,4 +82,4 @@ jobs:
             --context='All checks settled' --target-url="$RUN_URL" \
             --self='Aggregate check status,All checks settled' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
-            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Infection PHP,Notify Mutation Failure'
+            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Notify Mutation Failure'

@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
-last_verified: 2026-10-23
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once.
+last_verified: 2026-10-27
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -204,3 +204,19 @@ Two changes close the gap.
 ## Addendum - PR Fast-Canary retired (2026-10-22)
 
 The Decision bullet saying `pr-canary.yml` covers the armed line via `bin/merge-line-select --list` no longer holds. The workflow, `bin/pr-canary-check` (example), and its test were removed. Its jobs always exited 0 and only posted an advisory sticky comment that nothing read, while `update-behind-prs.yml` already brings the head PR up to date and its full required CI runs. `--list` stays in the selector but has no caller now.
+
+## Addendum: hotfix lane (2026-10-26)
+
+A PR labeled `hotfix` now sorts ahead of every other armed PR in the merge line. `bin/merge-line-select` adds `is_hotfix`, read from the same `labels` selection as `is_running`, and puts it first in the sort key. Hotfix PRs keep arm-time order among themselves, and the other armed PRs keep arm-time order behind them. The 2026-09-29 addendum's order by arm time, oldest first, now holds within each of those two groups.
+
+Order is the only change. The armed filter still decides who is in the line, so a labeled PR that is not armed stays out. A hotfix PR that is red, conflicted, or labeled `post-plan-running` is skipped exactly as before, and the line falls to the next hotfix, then to arm-time order. Required checks, `human-signoff`, and the `feat:` floor apply to a hotfix PR unchanged. Nothing arms auto-merge for it.
+
+Sorting first does nothing until the next pass runs, so `.github/workflows/hotfix-dispatch.yml` starts one. It is a `pull_request_target` workflow on the `labeled` and `auto_merge_enabled` events. It fires only when the PR is armed and carries the label, then runs `gh workflow run update-behind-prs.yml --ref master -f hotfix=true`. The `auto_merge_enabled` event covers a PR that was labeled before it was armed. The workflow holds `actions: write` and nothing else. It never checks out the repository, and no PR-controlled string reaches its `run:` line. `bin/test-merge-line-select` case W7 pins that shape.
+
+The hotfix pass runs in the `update-behind-prs-hotfix` concurrency group, so it cannot cancel a push pass that is waiting out its coalesce sleep or its bot-commit wait. It skips the 300-second coalesce sleep, still runs `master_bot_wait`, and gets the push pass's 20 mergeability attempts. A push pass and a hotfix pass that overlap pick the same head, and the second `update-branch` call only logs a warning.
+
+The dispatch is a head-of-line pass. The `pr` input was rejected for it because `--pr` mode skips the armed filter and does not refuse a red PR, so it could update a PR the line would pass over.
+
+The label audit for this change found one fix. `mutation.yml` put every label event in the same concurrency group as a real `mutation-test` run, so any other label cancelled that run. Other label events now get a per-run group, and `bin/test-merge-line-select` case W8 pins it. On a `feat:` PR a `hotfix` label event cancels the in-flight `human-signoff` run and starts a new one that reaches the same verdict. `human-signoff.yml` stays as it is, because splitting its group would touch the `feat:` floor. `e2e-tests.yml` and `auto-mergeable-label.yml` already give unrelated labels their own group.
+
+The label was created with `gh label create hotfix --force --color D73A4A --description "Jumps to the front of the merge line"`. Only collaborators can apply a label.

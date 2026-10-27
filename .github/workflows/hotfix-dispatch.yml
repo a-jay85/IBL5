@@ -1,0 +1,39 @@
+name: Hotfix dispatch
+# Starts an update-behind-prs.yml hotfix pass as soon as an armed PR carries the hotfix
+# label, so the hotfix becomes the merge-line head without waiting for the next master
+# merge (ADR-0081 addendum "hotfix lane"). Order only: no check, sign-off, or title floor
+# is skipped, and nothing here arms auto-merge.
+#
+# Security: pull_request_target runs master's copy of this file with a write token, so a
+# PR cannot change what runs. The job never checks out the repository and never runs PR
+# code. No PR-controlled string reaches run:. The label name is compared in if: only, and
+# only collaborators can add a label. bin/test-merge-line-select W7 pins this shape.
+#
+# An unarmed PR is not in the merge line, so labeling one dispatches nothing. Arming a
+# PR that already carries the label fires auto_merge_enabled instead.
+
+on:
+  pull_request_target:
+    types: [labeled, auto_merge_enabled]
+
+permissions:
+  actions: write   # gh workflow run update-behind-prs.yml
+
+jobs:
+  dispatch:
+    name: Dispatch hotfix pass
+    if: >-
+      github.event.pull_request.base.ref == 'master'
+      && github.event.pull_request.draft == false
+      && github.event.pull_request.auto_merge != null
+      && ((github.event.action == 'labeled' && github.event.label.name == 'hotfix')
+          || (github.event.action == 'auto_merge_enabled'
+              && contains(github.event.pull_request.labels.*.name, 'hotfix')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start a hotfix pass of the merge line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true

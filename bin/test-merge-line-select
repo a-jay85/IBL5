@@ -823,6 +823,42 @@ if [ "$W6_GROUP" = 1 ] && grep -qF 'type: boolean' <<< "$W6_INPUT" \
 else
     failcase "W6-hotfix-dispatch-path — group=$W6_GROUP input=[$W6_INPUT] coalesce=[$W6_COALESCE] botwait=[$W6_BOTWAIT] attempts=$W6_ATTEMPTS"
 fi
+# W7: hotfix-dispatch.yml is a pull_request_target workflow with a write token. Pin the
+# defence: no checkout or uses:, actions: write is the only permission, no ${{ }} in run:,
+# label and armed state compared in if:, and the only command is the dispatch.
+DISPATCH_WF="${DISPATCH_WF:-$REPO_ROOT/.github/workflows/hotfix-dispatch.yml}"
+W7_USES=$(grep -cE '^[[:space:]]*(-[[:space:]]*)?uses:' "$DISPATCH_WF" || true)
+W7_PERMKEYS=$(grep -cE '^[[:space:]]*permissions:' "$DISPATCH_WF" || true)
+W7_PERMS=$(awk '/^permissions:/{f=1;next} f&&/^[^[:space:]#]/{f=0} f&&/^[[:space:]]+[a-z-]+:/{sub(/[[:space:]]*#.*$/,""); print}' "$DISPATCH_WF")
+W7_RUNS=$(grep -cE '^[[:space:]]+run:' "$DISPATCH_WF" || true)
+W7_RUNEXPR=$(grep -cE '^[[:space:]]+run:.*(\$\{\{|[|>][[:space:]]*$)' "$DISPATCH_WF" || true)
+W7_CMD=$(count_lines 'run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true' "$DISPATCH_WF")
+W7_TRIGGER=$(count_lines 'types: [labeled, auto_merge_enabled]' "$DISPATCH_WF")
+W7_PLAINPR=$(grep -cE '^[[:space:]]+pull_request:' "$DISPATCH_WF" || true)
+W7_LABEL=$(count_lines "github.event.label.name == 'hotfix'" "$DISPATCH_WF")
+W7_ARMED=$(count_lines 'github.event.pull_request.auto_merge != null' "$DISPATCH_WF")
+W7_ARMEVT=$(count_lines "contains(github.event.pull_request.labels.*.name, 'hotfix')" "$DISPATCH_WF")
+W7_HEAD=$(grep -cE 'head\.(sha|ref|repo)|github\.head_ref' "$DISPATCH_WF" || true)
+if [ "$W7_USES" = 0 ] && [ "$W7_PERMKEYS" = 1 ] && [ "$W7_PERMS" = "  actions: write" ] \
+    && [ "$W7_RUNS" = 1 ] && [ "$W7_RUNEXPR" = 0 ] && [ "$W7_CMD" = 1 ] \
+    && [ "$W7_TRIGGER" = 1 ] && [ "$W7_PLAINPR" = 0 ] && [ "$W7_LABEL" = 1 ] \
+    && [ "$W7_ARMED" = 1 ] && [ "$W7_ARMEVT" = 1 ] && [ "$W7_HEAD" = 0 ]; then
+    pass "W7-hotfix-dispatcher-defence"
+else
+    failcase "W7-hotfix-dispatcher-defence — uses=$W7_USES permkeys=$W7_PERMKEYS perms=[$W7_PERMS] runs=$W7_RUNS runexpr=$W7_RUNEXPR cmd=$W7_CMD trigger=$W7_TRIGGER plainpr=$W7_PLAINPR label=$W7_LABEL armed=$W7_ARMED armevt=$W7_ARMEVT head=$W7_HEAD"
+fi
+
+# W8: a hotfix (or any unrelated) label event never cancels an in-flight labeled run.
+MUTATION_WF="${MUTATION_WF:-$REPO_ROOT/.github/workflows/mutation.yml}"
+W8_MUT=$(count_lines "github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id)" "$MUTATION_WF")
+W8_E2E=$(count_lines "github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id)" "$REPO_ROOT/.github/workflows/e2e-tests.yml")
+W8_MUTIF=$(count_lines "github.event.label.name == 'mutation-test')" "$MUTATION_WF")
+if [ "$W8_MUT" = 1 ] && [ "$W8_E2E" = 1 ] && [ "$W8_MUTIF" = 2 ]; then
+    pass "W8-label-events-own-group"
+else
+    failcase "W8-label-events-own-group — mutation=$W8_MUT e2e=$W8_E2E mutation-job-ifs=$W8_MUTIF"
+fi
+
 
 W5_LABELS=$(count_lines 'labels(first:20) { nodes { name } }' "$SEL")
 if [ "$W5_LABELS" = 1 ]; then

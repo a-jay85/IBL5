@@ -1,6 +1,6 @@
 ---
-description: Triage non-trivial work as ad-hoc vs /plan; ad-hoc bar, safety mirror, Sonnet execution routing, hook-enforced triggers.
-last_verified: 2026-10-25
+description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
+last_verified: 2026-10-26
 ---
 
 # Work Triage Rule
@@ -34,18 +34,25 @@ then prefer `/plan`, so the defense and its verification are designed up front. 
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
-The plan-vs-ad-hoc verdict decides *whether to plan*, not *who executes the edits*. Defaulting silently to inline Opus is the measured leak — see `work-triage-detail.md` § Execution routing context.
+The plan-vs-ad-hoc verdict decides *whether to plan*. Who executes the edits is a separate call. Silent inline editing was the measured leak (`work-triage-detail.md` § Execution routing context).
 
 **Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
 
 - **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
 - **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
-When both hold, **hand off by default and do not pause for permission**: state the routing call in one line ("execution is Sonnet-suitable — delegating"), then spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). Design, routing call, and final diff review stay on Opus.
+**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline. At 5 or more files, **hand off by default**, without pausing for permission, and spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). State the routing call in one line either way. Design and final diff review stay on Opus.
 
-One sub-agent is the floor. A single sweep stays with one agent, because its edits must agree with each other. When the work splits into chunks that do not depend on each other, spawn one agent per chunk, all in the same message, so they run at the same time. Detail: `work-triage-detail.md` § Inline vs. delegated.
+A single sweep stays with one agent. For independent chunks, spawn one agent per chunk, all in the same message. A chunk of 5 or more files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 
-Stay inline (Opus edits directly) only when: the edits are genuinely **entangled** with the design, or the chunk is **trivial**. Criteria and spawn-cost rationale: `work-triage-detail.md` § Inline vs. delegated.
+**Trial review by 2026-11-23.** Baseline: `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. `SPLIT` is `git log --format=%cs -S 'Inline-edit trial' -- .claude/rules/work-triage.md | tail -1`, then run:
+
+```bash
+bin/lib/automouse-pricer --index --since SPLIT |
+  jq -s --arg from SPLIT --arg to 2026-11-23 -f bin/lib/opus-trial-cost.jq
+```
+
+Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label. Limits: `work-triage-inline-trial.md`.
 
 ### The hard trigger: ≥5 distinct files in one turn
 

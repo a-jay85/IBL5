@@ -1,0 +1,467 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-deleted-guards: regression test for bin/lib/deleted-guards.
+#
+# Pins the guard taxonomy (one removal per kind per language), the paired-exit
+# rule, the same-file moved-guard rule, intended-removal suppression, the skip
+# list, usage errors, and two real PR replays (#3370, #3371) whose trimmed
+# diffs are committed under bin/fixtures/deleted-guards/.
+#
+# Run: bin/test-deleted-guards  (exit 0 = all pass, 1 = a case failed)
+#
+# shellcheck disable=SC2016  # backticks in single-quoted fixtures are markdown
+
+set -euo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+DG="$ROOT/bin/lib/deleted-guards"
+FIX="$ROOT/bin/fixtures/deleted-guards"
+h_tmp T
+
+# run_dg <args...>: sets OUT, ERR, RC.
+run_dg() {
+    RC=0
+    OUT="$("$DG" "$@" 2>"$T/err")" || RC=$?
+    ERR="$(cat "$T/err")"
+}
+
+count_removed() {
+    grep -c '^REMOVED-GUARD' <<< "$1" || true
+}
+
+# --- one removal per kind ---------------------------------------------------
+
+cat > "$T/php.diff" <<'EOF'
+diff --git a/ibl5/classes/Foo.php b/ibl5/classes/Foo.php
+--- a/ibl5/classes/Foo.php
++++ b/ibl5/classes/Foo.php
+@@ -1,9 +1,1 @@
+-        try {
+-        } catch (\RuntimeException $e) {
+-        } finally {
+-        if (class_exists(Discord::class)) {
+-        $this->cache->acquireLock('k', 5);
+-        if ($x === null) {
+-            return null;
+ }
+EOF
+run_dg --diff "$T/php.diff"
+h_eq "php-each-kind-flagged: exit 1" 1 "$RC"
+h_eq "php-each-kind-flagged: six lines" 6 "$(count_removed "$OUT")"
+for k in try catch finally exists-check lock null-return; do
+    h_contains "php-each-kind-flagged: $k" "$OUT" "	$k@ibl5/classes/Foo.php#"
+done
+
+cat > "$T/shell.diff" <<'EOF'
+diff --git a/bin/foo.sh b/bin/foo.sh
+--- a/bin/foo.sh
++++ b/bin/foo.sh
+@@ -1,7 +1,1 @@
+-command -v jq >/dev/null
+-flock -n 9
+-rm -f "$x" || true
+-trap 'cleanup' EXIT
+-set -euo pipefail
+-[ -z "$x" ] && exit 1
+ echo done
+EOF
+run_dg --diff "$T/shell.diff"
+h_eq "shell-each-kind-flagged: exit 1" 1 "$RC"
+h_eq "shell-each-kind-flagged: six lines" 6 "$(count_removed "$OUT")"
+for k in command-guard lock or-true trap strict-mode early-exit-test; do
+    h_contains "shell-each-kind-flagged: $k" "$OUT" "	$k@bin/foo.sh#"
+done
+
+cat > "$T/python.diff" <<'EOF'
+diff --git a/tools/foo/bar.py b/tools/foo/bar.py
+--- a/tools/foo/bar.py
++++ b/tools/foo/bar.py
+@@ -1,9 +1,1 @@
+-    try:
+-    except ValueError:
+-    finally:
+-    if not isinstance(x, int):
+-        return None
+-    with self._lock:
+-    if y is None:
+-        raise ValueError("y")
+ pass
+EOF
+run_dg --diff "$T/python.diff"
+h_eq "python-each-kind-flagged: exit 1" 1 "$RC"
+h_eq "python-each-kind-flagged: six lines" 6 "$(count_removed "$OUT")"
+for k in try except finally type-guard lock none-return; do
+    h_contains "python-each-kind-flagged: $k" "$OUT" "	$k@tools/foo/bar.py#"
+done
+
+# --- paired kinds need a removed exit statement -----------------------------
+
+cat > "$T/paired-bare.diff" <<'EOF'
+diff --git a/ibl5/classes/Foo.php b/ibl5/classes/Foo.php
+--- a/ibl5/classes/Foo.php
++++ b/ibl5/classes/Foo.php
+@@ -1,3 +1,1 @@
+-        if ($x === null) {
+-            $y = 1;
+ }
+diff --git a/bin/foo.sh b/bin/foo.sh
+--- a/bin/foo.sh
++++ b/bin/foo.sh
+@@ -1,2 +1,1 @@
+-[ -z "$x" ] && echo hi
+ echo done
+diff --git a/tools/foo/bar.py b/tools/foo/bar.py
+--- a/tools/foo/bar.py
++++ b/tools/foo/bar.py
+@@ -1,3 +1,1 @@
+-    if x is None:
+-        x = 1
+ pass
+EOF
+run_dg --diff "$T/paired-bare.diff"
+h_eq "paired-kind-needs-exit: bare if not flagged (exit)" 0 "$RC"
+h_eq "paired-kind-needs-exit: bare if not flagged (lines)" 0 "$(count_removed "$OUT")"
+
+cat > "$T/paired-exit.diff" <<'EOF'
+diff --git a/ibl5/classes/Foo.php b/ibl5/classes/Foo.php
+--- a/ibl5/classes/Foo.php
++++ b/ibl5/classes/Foo.php
+@@ -1,3 +1,1 @@
+-        if ($x === null) {
+-            return null;
+ }
+EOF
+run_dg --diff "$T/paired-exit.diff"
+h_eq "paired-kind-needs-exit: with return flagged" 1 "$RC"
+h_contains "paired-kind-needs-exit: null-return key" "$OUT" "null-return@ibl5/classes/Foo.php#"
+
+# --- intended removals ------------------------------------------------------
+
+cat > "$T/plan-intended.md" <<'EOF'
+# Plan
+
+## Must preserve
+
+- `ibl5/classes/Foo.php` keeps its lock and try/catch guards
+
+### Intended removals
+
+- `ibl5/classes/Foo.php` exists-check: `class_exists(Discord::class)` — Discord always loads now
+
+## Critical Files
+EOF
+run_dg --diff "$T/php.diff" --plan "$T/plan-intended.md"
+h_contains "intended-removal-suppressed: INTENDED" "$OUT" "INTENDED	exists-check@ibl5/classes/Foo.php#"
+h_not_contains "intended-removal-suppressed: not REMOVED-GUARD" "$OUT" "REMOVED-GUARD	exists-check@"
+h_eq "intended-removal-suppressed: five still flagged" 5 "$(count_removed "$OUT")"
+
+sed 's/class_exists(Discord::class)/class_exists(Foo::class)/' "$T/plan-intended.md" > "$T/plan-mismatch.md"
+run_dg --diff "$T/php.diff" --plan "$T/plan-mismatch.md"
+h_contains "intended-needle-mismatch-still-flagged" "$OUT" "REMOVED-GUARD	exists-check@ibl5/classes/Foo.php#"
+h_eq "intended-needle-mismatch-still-flagged: exit 1" 1 "$RC"
+
+# long-line-needle: a needle past character 120 of the normalized line must
+# still match, because the match runs on the full line, not the printed snippet.
+PAD="$(printf 'a%.0s' $(seq 1 130))"
+cat > "$T/long.diff" <<EOT
+diff --git a/ibl5/classes/Long.php b/ibl5/classes/Long.php
+--- a/ibl5/classes/Long.php
++++ b/ibl5/classes/Long.php
+@@ -1,2 +1,1 @@
+-        if (class_exists(Foo::class, \$$PAD) && class_exists(TailNeedle::class)) {
+-        }
+ }
+EOT
+cat > "$T/plan-long.md" <<'EOT'
+# Plan
+
+## Must preserve
+
+- `ibl5/classes/Long.php` keeps its guards
+
+### Intended removals
+
+- `ibl5/classes/Long.php` exists-check: `class_exists(TailNeedle::class)` — tail of a long guard line is gone
+
+## Critical Files
+EOT
+run_dg --diff "$T/long.diff" --plan "$T/plan-long.md"
+h_contains "long-line-needle: INTENDED past char 120" "$OUT" "INTENDED	exists-check@ibl5/classes/Long.php#"
+h_not_contains "long-line-needle: not REMOVED-GUARD" "$OUT" "REMOVED-GUARD	exists-check@"
+
+sed 's/ — Discord always loads now$//' "$T/plan-intended.md" > "$T/plan-malformed.md"
+run_dg --diff "$T/php.diff" --plan "$T/plan-malformed.md"
+h_contains "malformed-intended-bullet-flags: warning" "$ERR" "deleted-guards: ignoring malformed intended-removal bullet:"
+h_contains "malformed-intended-bullet-flags: still flagged" "$OUT" "REMOVED-GUARD	exists-check@ibl5/classes/Foo.php#"
+
+printf '# Plan\n\n## Critical Files\n\n- `ibl5/classes/Foo.php`\n' > "$T/plan-legacy.md"
+run_dg --diff "$T/php.diff" --plan "$T/plan-legacy.md"
+h_eq "legacy-plan-flags-all: six lines" 6 "$(count_removed "$OUT")"
+h_eq "legacy-plan-flags-all: exit 1" 1 "$RC"
+
+# lint-plan-shares-intended-parser: --lint-plan and --diff --plan read the
+# same bullets through parse_must_preserve.
+run_dg --lint-plan "$T/plan-intended.md"
+h_eq "lint-plan-shares-intended-parser: valid plan lints clean" 0 "$RC"
+h_eq "lint-plan-shares-intended-parser: no violations" "" "$OUT"
+run_dg --lint-plan "$T/plan-malformed.md"
+h_eq "lint-plan-shares-intended-parser: malformed rejected" 1 "$RC"
+h_contains "lint-plan-shares-intended-parser: violation line" "$OUT" "MP-VIOLATION: malformed intended-removal bullet"
+
+# --- moved guards -----------------------------------------------------------
+
+cat > "$T/moved-same.diff" <<'EOF'
+diff --git a/ibl5/classes/A.php b/ibl5/classes/A.php
+--- a/ibl5/classes/A.php
++++ b/ibl5/classes/A.php
+@@ -1,3 +1,3 @@
+-        try {
++    try {
+ }
+EOF
+run_dg --diff "$T/moved-same.diff"
+h_eq "moved-same-file-not-flagged" 0 "$RC"
+
+cat > "$T/moved-cross.diff" <<'EOF'
+diff --git a/ibl5/classes/a.php b/ibl5/classes/a.php
+--- a/ibl5/classes/a.php
++++ b/ibl5/classes/a.php
+@@ -1,2 +1,1 @@
+-        try {
+ }
+diff --git a/ibl5/classes/b.php b/ibl5/classes/b.php
+--- a/ibl5/classes/b.php
++++ b/ibl5/classes/b.php
+@@ -1,1 +1,2 @@
++        try {
+ }
+EOF
+run_dg --diff "$T/moved-cross.diff"
+h_eq "moved-cross-file-flagged: exit 1" 1 "$RC"
+h_contains "moved-cross-file-flagged: key" "$OUT" "try@ibl5/classes/a.php#"
+
+# bare-guard-cancels-only-in-hunk: a `try {` removed in one hunk must not
+# cancel against an unrelated `try {` added in another hunk of the same file.
+cat > "$T/bare-other-hunk.diff" <<'EOF'
+diff --git a/ibl5/classes/A.php b/ibl5/classes/A.php
+--- a/ibl5/classes/A.php
++++ b/ibl5/classes/A.php
+@@ -1,3 +1,2 @@
+-        try {
+ $a = 1;
+ $b = 2;
+@@ -40,2 +39,3 @@
++        try {
+ $c = 3;
+EOF
+run_dg --diff "$T/bare-other-hunk.diff"
+h_eq "bare-guard-cancels-only-in-hunk: exit 1" 1 "$RC"
+h_contains "bare-guard-cancels-only-in-hunk: key" "$OUT" "try@ibl5/classes/A.php#"
+
+# paired-exit-must-be-adjacent: a removed `return` far below a removed
+# null-check (kept body in between) is not that guard's exit.
+cat > "$T/paired-far.diff" <<'EOF'
+diff --git a/ibl5/classes/Foo.php b/ibl5/classes/Foo.php
+--- a/ibl5/classes/Foo.php
++++ b/ibl5/classes/Foo.php
+@@ -1,6 +1,4 @@
+-        if (isset($x)) {
+             $y = 1;
+             $z = 2;
+             $w = 3;
+-        return $q;
+ }
+EOF
+run_dg --diff "$T/paired-far.diff"
+h_eq "paired-exit-must-be-adjacent: not flagged" 0 "$RC"
+
+# deleted-extensionless-python: a deleted bin/ Python script gets Python rules
+# from the removed shebang, whatever the cwd; without a shebang in view the
+# type is unknown and every language's rules apply.
+cat > "$T/deleted-py.diff" <<'EOF'
+diff --git a/bin/gone-tool b/bin/gone-tool
+deleted file mode 100755
+--- a/bin/gone-tool
++++ /dev/null
+@@ -1,4 +0,0 @@
+-#!/usr/bin/env python3
+-try:
+-    run()
+-except OSError:
+EOF
+RC=0
+OUT="$(cd "$T" && "$DG" --diff "$T/deleted-py.diff" 2>/dev/null)" || RC=$?
+h_eq "deleted-extensionless-python: exit 1 from another cwd" 1 "$RC"
+h_contains "deleted-extensionless-python: try key" "$OUT" "try@bin/gone-tool#"
+h_contains "deleted-extensionless-python: except key" "$OUT" "except@bin/gone-tool#"
+cat > "$T/deleted-noshebang.diff" <<'EOF'
+diff --git a/bin/gone-tool2 b/bin/gone-tool2
+--- a/bin/gone-tool2
++++ b/bin/gone-tool2
+@@ -20,2 +20,1 @@
+-except OSError:
+ pass
+EOF
+RC=0
+OUT="$(cd "$T" && "$DG" --diff "$T/deleted-noshebang.diff" 2>/dev/null)" || RC=$?
+h_eq "missing-extensionless-file: unknown type still flags (exit)" 1 "$RC"
+h_contains "missing-extensionless-file: except key" "$OUT" "except@bin/gone-tool2#"
+
+# none-prefixed-guard-bullet: a real guard bullet starting with "none of" is
+# a guard bullet, not a `- none` bullet.
+cat > "$T/plan-none-prefix.md" <<'EOF'
+# Plan
+
+## Must preserve
+
+- none of the early returns in `bin/foo` may go — they gate the lock
+- `ibl5/classes/Foo.php` keeps its lock around the rebuild
+EOF
+run_dg --lint-plan "$T/plan-none-prefix.md" --require
+h_eq "none-prefixed-guard-bullet: lints clean" 0 "$RC"
+h_eq "none-prefixed-guard-bullet: no violations" "" "$OUT"
+
+# --- skipped paths ----------------------------------------------------------
+
+: > "$T/skip.diff"
+for p in ibl5/tests/Foo/BarTest.php ibl5/classes/FooTest.php bin/test-x \
+         bin/fixtures/x.sh docs/notes.md tools/foo/test_bar.py; do
+    printf 'diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n@@ -1,2 +1,1 @@\n-try {\n-try:\n-set -e\n x\n' \
+        "$p" "$p" "$p" "$p" >> "$T/skip.diff"
+done
+run_dg --diff "$T/skip.diff"
+h_eq "test-paths-skipped" 0 "$RC"
+h_eq "test-paths-skipped: no lines" "" "$OUT"
+
+# --- usage errors -----------------------------------------------------------
+
+for args in "" "--diff" "--bogus" "--plan=$T/plan-intended.md --diff $T/php.diff" \
+            "--diff $T/missing.diff" "--diff $T/php.diff --plan $T/missing.md"; do
+    # shellcheck disable=SC2086  # word-split the arg list on purpose
+    run_dg $args
+    h_eq "usage-errors-exit-2: [$args]" 2 "$RC"
+    h_contains "usage-errors-exit-2: usage line [$args]" "$ERR" "Usage: bin/lib/deleted-guards"
+done
+
+# --- real PR replays --------------------------------------------------------
+
+run_dg --diff "$FIX/pr3370-trimmed.diff"
+h_eq "replay-pr3370-flags: exit 1" 1 "$RC"
+h_eq "replay-pr3370-flags: pinned line count" 17 "$(count_removed "$OUT")"
+h_contains "replay-pr3370-flags: Extension exists-check" "$OUT" "exists-check@ibl5/classes/Extension/ExtensionService.php#"
+h_contains "replay-pr3370-flags: record holders lock" "$OUT" "lock@ibl5/classes/RecordHolders/CachedRecordHoldersService.php#"
+h_contains "replay-pr3370-flags: DatabaseCache lock" "$OUT" "lock@ibl5/classes/Cache/DatabaseCache.php#"
+h_not_contains "replay-pr3370-flags: serverName re-indent not flagged" "$OUT" "serverName"
+
+run_dg --diff "$FIX/pr3371-trimmed.diff"
+h_eq "replay-pr3371-flags: exit 1" 1 "$RC"
+h_eq "replay-pr3371-flags: pinned line count" 2 "$(count_removed "$OUT")"
+h_contains "replay-pr3371-flags: try" "$OUT" "try@ibl5/classes/Season/Season.php#"
+h_contains "replay-pr3371-flags: catch" "$OUT" "catch@ibl5/classes/Season/Season.php#"
+
+# --- launchd-like empty environment -----------------------------------------
+
+RC=0
+env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/lib/deleted-guards --diff bin/fixtures/deleted-guards/pr3371-trimmed.diff >/dev/null || [ $? -eq 1 ]' || RC=$?
+h_eq "empty-env-strict" 0 "$RC"
+
+# --- impl Step 6.8 deleted-guard block (bin/automouse/prompt-impl) ---------
+
+PROMPT_IMPL="$ROOT/bin/automouse/prompt-impl"
+DG_ANCHOR='# Step 6.8 deleted-guard check:'
+
+# extract_dg_block <file>: print the one ```bash fence holding the anchor.
+# Fails loudly when the anchor sits in zero or several fences, so a second
+# anchor can never be picked up silently.
+extract_dg_block() {
+    awk -v want="$DG_ANCHOR" '
+        /^```bash$/ { inb=1; buf=""; next }
+        /^```$/     { if (inb && index(buf, want) > 0) { n++; out = buf } ; inb=0; next }
+        inb         { buf = buf $0 "\n" }
+        END {
+            if (n != 1) { printf "extract_dg_block: anchor found in %d fences\n", n > "/dev/stderr"; exit 1 }
+            printf "%s", out
+        }
+    ' "$1"
+}
+
+h_eq "impl-step-anchor-unique" 1 "$(grep -c "$DG_ANCHOR" "$PROMPT_IMPL")"
+
+# Scratch repo: origin/master holds a guarded file, the branch removes the guard.
+DGR="$T/dg-repo"
+mkdir -p "$DGR/ibl5/classes"
+dgit() { git -C "$DGR" -c user.name=t -c user.email=t@t -c core.hooksPath=/dev/null -c commit.gpgsign=false "$@"; }
+dgit init -q -b work
+printf '<?php\nfunction f() {\n        try {\n            g();\n        } catch (\\RuntimeException $e) {\n        }\n}\n' > "$DGR/ibl5/classes/A.php"
+dgit add -A
+dgit commit -q -m base
+dgit update-ref refs/remotes/origin/master HEAD
+
+# run_dg_step <prompt-file> [ENV=VAL...]: run the extracted block in the repo.
+run_dg_step() {
+    local src="$1" block
+    shift
+    RC=0
+    block="$(extract_dg_block "$src" 2>"$T/extract-err")" || RC=$?
+    if [ "$RC" -ne 0 ]; then
+        OUT="EXTRACT-FAILED: $(cat "$T/extract-err")"
+        return 0
+    fi
+    OUT="$(cd "$DGR" && env "$@" bash -c "$block" 2>&1)" || RC=$?
+}
+
+run_dg_step "$PROMPT_IMPL" DG_SCRIPT="$DG"
+h_contains "impl-step-clean" "$OUT" "DG_VERDICT=clean"
+
+printf '<?php\nfunction f() {\n            g();\n}\n' > "$DGR/ibl5/classes/A.php"
+dgit commit -q -am "drop guard"
+
+run_dg_step "$PROMPT_IMPL" DG_SCRIPT="$DG"
+h_contains "impl-step-flags-removal: verdict" "$OUT" "DG_VERDICT=flagged"
+h_contains "impl-step-flags-removal: try key" "$OUT" "REMOVED-GUARD	try@ibl5/classes/A.php#"
+
+cat > "$T/plan-step68.md" <<'PLAN'
+# Plan
+
+## Must preserve
+
+- `ibl5/classes/A.php` keeps every other guard in the file
+
+### Intended removals
+
+- `ibl5/classes/A.php` try: `try {` — g() no longer throws at all
+- `ibl5/classes/A.php` catch: `} catch (\RuntimeException $e) {` — paired with the try removal
+
+## Critical Files
+PLAN
+run_dg_step "$PROMPT_IMPL" DG_SCRIPT="$DG" PLAN_PATH="$T/plan-step68.md"
+h_contains "impl-step-plan-intended" "$OUT" "DG_VERDICT=clean"
+
+run_dg_step "$PROMPT_IMPL" DG_SCRIPT=/nonexistent
+h_contains "impl-step-unavailable" "$OUT" "DG_VERDICT=unavailable"
+
+printf '#!/bin/sh\nexit 2\n' > "$T/dg-stub"
+chmod +x "$T/dg-stub"
+run_dg_step "$PROMPT_IMPL" DG_SCRIPT="$T/dg-stub"
+h_contains "impl-step-error" "$OUT" "DG_VERDICT=error"
+
+# Mutation: a forced-clean line right after the anchor must turn the flagged
+# check red, which proves the extraction lands on the guarded block.
+awk -v want="$DG_ANCHOR" '{ print } index($0, want) == 1 { print "DG_VERDICT=clean; echo \"DG_VERDICT=$DG_VERDICT\"; exit 0" }' \
+    "$PROMPT_IMPL" > "$T/prompt-mutated"
+run_dg_step "$T/prompt-mutated" DG_SCRIPT="$DG"
+h_not_contains "impl-step-anchor-mutation-caught: forced clean defeats flagged check" "$OUT" "DG_VERDICT=flagged"
+# A duplicated anchor fence must fail extraction loudly.
+{ cat "$PROMPT_IMPL"; printf '\n```bash\n%s duplicate\necho DG_VERDICT=clean\n```\n' "$DG_ANCHOR"; } > "$T/prompt-dup"
+run_dg_step "$T/prompt-dup" DG_SCRIPT="$DG"
+h_contains "impl-step-anchor-mutation-caught: duplicate anchor fails loudly" "$OUT" "EXTRACT-FAILED: extract_dg_block: anchor found in 2 fences"
+
+STEP68="$(awk '/^## Step 6\.8:/{f=1} /^## Step 7:/{f=0} f' "$PROMPT_IMPL")"
+h_contains "impl-step-mentions-rubric-and-complement: rubric" "$STEP68" "_review-rubric.md"
+h_contains "impl-step-mentions-rubric-and-complement: complement" "$STEP68" "never replaces it"
+
+h_done

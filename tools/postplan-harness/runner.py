@@ -34,6 +34,7 @@ import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -64,11 +65,13 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
-                              upsert_gate_fix,
+                              upsert_exec_mutations, upsert_gate_fix,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
+from harness import removed_guards
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
@@ -218,6 +221,43 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     classifiers; _finish redacts it when writing result.json."""
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
+
+
+
+def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
+    """Executable mutation claims (ADR-0199), run after verify and before arming.
+
+    Replay reads the report from the fixture (default: an empty, passing report). A run
+    with no plan has no `## Executable Mutations` section, so it gets the same empty
+    report. A live run with a plan but no worktree returns None, which condition (19)
+    holds on. A crash never aborts the run: it becomes a holding report with
+    tree_suspect=True, because the journal may hold an unreverted edit.
+    """
+    if not live:
+        fx = fixture or {}
+        return MutationReport(ran=True, results=(),
+                              holding=tuple(fx.get("exec_mutations_holding") or ()),
+                              tree_suspect=bool(fx.get("exec_mutations_tree_suspect", False)))
+    if plan is None or not getattr(plan, "found", False) or not getattr(plan, "path", None):
+        log("exec-mutations: no plan — nothing to run")
+        return MutationReport(ran=True, results=(), holding=(), tree_suspect=False)
+    if not (worktree and os.path.isdir(worktree)):
+        log("exec-mutations: skipped (no worktree) — condition (19) holds")
+        return None
+    try:
+        report = run_executable_mutations(Path(plan.path), Path(worktree))
+    except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
+        report = MutationReport(ran=False, results=(),
+                                holding=(f"executor-crashed: {e}",), tree_suspect=True)
+    for r in report.results:
+        log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
+    for h in report.holding:
+        log(f"exec-mutations HOLD: {h}")
+    if report.tree_suspect:
+        log("exec-mutations: tree suspect — journal may hold an unreverted edit")
+    if not report.results and not report.holding:
+        log("exec-mutations: no executable mutations in plan")
+    return report
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
@@ -381,6 +421,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        _inject_removed_guards(copy, plan, diff, worktree, log)
         if _inject_merge_danger(copy, worktree, diff, log):
             merge_danger_degraded = True
         phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
@@ -762,14 +803,36 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
+        if live and pr and mutation_report is not None:
+            # A second body edit: the Phase 6 body write above runs before this step.
+            # Log-and-continue like the merge-digest write: a failed or empty read must never
+            # blank the body, and a failed edit must never abort the run.
+            try:
+                _xm_cur = gh.pr_body_fresh() or ""
+                if not _xm_cur:
+                    log("phase6.5: exec-mutations body write skipped (PR body read empty)")
+                else:
+                    _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
+                    if _xm_new != _xm_cur:
+                        gh.pr_edit_body(pr, _xm_new)
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
         _arm_body = gh.pr_body() or body
         if live and pr:
             _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
                                             git.diff_vs_base(), log, res)
+        # Condition (20): rerun the detector on the realized diff so a body without the
+        # Removed guards block (or a hand-edited one) cannot release the hold.
+        _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
+            exec_mutations_holding=(mutation_report.holding
+                                    if mutation_report is not None else None),
+            exec_mutations_tree_suspect=(mutation_report.tree_suspect
+                                         if mutation_report is not None else True),
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
             branch=git.branch(),
@@ -799,6 +862,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gate_backtest_reason=_gb.reason,
             merge_danger_state=merge_danger.classify_body(_arm_body),
             retried_stages=sorted(res.retries),
+            removed_guards_holds=_rg_holds,
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -2384,6 +2448,47 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
         f"triggers={list(final.triggers)}")
     return merge_danger.inject_merge_danger(body, final)
+
+
+def _detector_root(worktree) -> str:
+    """Repo root holding bin/lib/deleted-guards: always this harness's checkout, like plan-scope-conformance.
+
+    Never the PR worktree: a PR that weakens the detector would judge its own condition (20).
+    Tests stub the detector by monkeypatching this function.
+    """
+    return conformance._HARNESS_REPO_ROOT
+
+
+def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list[str]:
+    """Condition (20) arm input: hold lines from the realized-diff rerun. Fails closed."""
+    ok, rows = removed_guards.run_detector(
+        _detector_root(worktree), diff_body,
+        plan.path if (plan and getattr(plan, "found", False)) else None)
+    if not ok:
+        return ["removed-guards:DETECTOR-ERROR"]
+    return removed_guards.classify_body(arm_body, [r[0] for r in rows])
+
+
+def _inject_removed_guards(copy: dict, plan, diff_body: str, worktree, log) -> bool:
+    """Phase 2: upsert the `## Removed guards` block into copy["summary_md"].
+
+    Runs right after _inject_scope_notes and touches only its own marker span. Each
+    flagged key gets the impl session's reason from the reasons file under the git dir,
+    or the placeholder, which holds condition (20). A detector error upserts nothing;
+    the arm-time rerun then holds with DETECTOR-ERROR. Returns False on a detector error.
+    """
+    ok, rows = removed_guards.run_detector(
+        _detector_root(worktree), diff_body,
+        plan.path if (plan and getattr(plan, "found", False)) else None)
+    if not ok:
+        log("phase2 removed-guards: detector error")
+        return False
+    reasons = removed_guards.read_reasons(worktree) if worktree else {}
+    copy["summary_md"] = removed_guards.upsert_block(
+        copy["summary_md"], removed_guards.render_block(rows, reasons))
+    for r in rows:
+        log(f"phase2 removed-guard: {r[0]}")
+    return True
 
 
 def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,

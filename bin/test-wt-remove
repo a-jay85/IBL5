@@ -241,7 +241,7 @@ R15="$(awk '
     END {
         n = 0; miss = 0
         for (i = 1; i <= NR; i++) {
-            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"/) {
+            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"|dispose_entry .* skipped/) {
                 n++; hit = 0
                 for (j = i + 1; j <= i + 15 && j <= NR; j++)
                     if (index(line[j], "reap_empty_worktree ") || index(line[j], "reap-exempt:")) hit = 1

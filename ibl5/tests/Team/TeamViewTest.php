@@ -326,7 +326,7 @@ class TeamViewTest extends TestCase
             'extensionMsg' => 'I accept your offer!',
         ]));
 
-        $this->assertStringContainsString('ibl-alert--success', $output);
+        $this->assertStringContainsString('d-alert-success', $output);
         $this->assertStringContainsString('I accept your offer!', $output);
         $this->assertStringContainsString('used up your successful extension', $output);
     }
@@ -338,7 +338,7 @@ class TeamViewTest extends TestCase
             'extensionMsg' => 'No thanks, I want more money.',
         ]));
 
-        $this->assertStringContainsString('ibl-alert--info', $output);
+        $this->assertStringContainsString('d-alert-info', $output);
         $this->assertStringContainsString('No thanks, I want more money.', $output);
         $this->assertStringContainsString('another attempt next sim', $output);
     }
@@ -350,7 +350,7 @@ class TeamViewTest extends TestCase
             'extensionMsg' => 'Offer exceeds salary cap.',
         ]));
 
-        $this->assertStringContainsString('ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert-error', $output);
         $this->assertStringContainsString('Offer exceeds salary cap.', $output);
         $this->assertStringContainsString('will not be recorded', $output);
     }
@@ -362,9 +362,9 @@ class TeamViewTest extends TestCase
             'extensionMsg' => null,
         ]));
 
-        $this->assertStringNotContainsString('ibl-alert--success', $output);
-        $this->assertStringNotContainsString('ibl-alert--info', $output);
-        $this->assertStringNotContainsString('ibl-alert--error', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
+        $this->assertStringNotContainsString('d-alert-info', $output);
+        $this->assertStringNotContainsString('d-alert-error', $output);
     }
 
     public function testRenderEscapesExtensionMessageContent(): void
@@ -393,7 +393,7 @@ class TeamViewTest extends TestCase
         ]));
 
         $this->assertStringContainsString('<div id="stub-banner"></div>', $output);
-        $this->assertStringNotContainsString('ibl-alert--success', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
     }
 
     public function testRenderNormalizedHtmlMatchesCharacterization(): void

@@ -169,6 +169,89 @@ def test_total_cap_marks_remaining(tmp_path):
     assert len(results) == 6
 
 
+BASE_FLAG_GATE = "#!/bin/sh\n# gate-backtest-argv:\n" + NEW_GATE.split("\n", 1)[1]
+CLEAN_BASE_GATE = "#!/bin/sh\n# gate-backtest-argv:\nexit 0\n"
+
+
+def base(script, mode=0o100755):
+    return {"bin/check-fake": (script.encode(), mode)}
+
+
+def test_scratch_remove_then_overlay_restores_file(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    with ScratchTree(str(repo), shas[0]) as scratch:
+        scratch.overlay(overlay())
+        target = os.path.join(scratch.dir, "bin/check-fake")
+        scratch.remove(["bin/check-fake", "bin/never-there"])
+        assert not os.path.exists(target)
+        scratch.overlay(overlay())
+        with open(target, "rb") as fh:
+            assert fh.read() == NEW_GATE.encode()
+        assert os.access(target, os.X_OK)
+
+
+def test_base_replay_pre_existing_on_same_checkout(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas, tmp_path, base_overlay=base(BASE_FLAG_GATE))
+    by_pr = {r.pr: r for r in results}
+    for n in (3, 5):
+        assert by_pr[n].outcome == "flag" and by_pr[n].base_outcome == "flag"
+    for n in (1, 2, 4, 6):
+        assert by_pr[n].outcome == "pass" and by_pr[n].base_outcome == ""
+
+
+def test_base_replay_clean_base_keeps_flag_and_restores_head(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    twin = "bin/check-twin"
+    head = {"bin/check-fake": (NEW_GATE.encode(), 0o100755), twin: (NEW_GATE.encode(), 0o100755)}
+    clean = (CLEAN_BASE_GATE.encode(), 0o100755)
+    history = fetch_history(fake_gh(shas), make_git(str(repo)))
+    results = run_backtest(str(repo), "HEAD", [gate(), gate(path=twin)], history, head,
+                           str(tmp_path / "plans"),
+                           base_overlay={"bin/check-fake": clean, twin: clean})
+    rows = [r for r in results if r.pr in (3, 5)]
+    assert len(rows) == 4
+    for r in rows:
+        assert r.outcome == "flag" and r.base_outcome == "pass", (r.pr, r.gate)
+
+
+def test_base_replay_absent_gate_is_absent(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas, tmp_path, base_overlay={"bin/check-fake": None})
+    for r in (r for r in results if r.pr in (3, 5)):
+        assert r.outcome == "flag" and r.base_outcome == "absent"
+
+
+def test_base_replay_timeout_fails_closed(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas, tmp_path, per_replay_timeout=2,
+                  base_overlay=base("#!/bin/sh\n# gate-backtest-argv:\nsleep 5\n"))
+    for r in (r for r in results if r.pr in (3, 5)):
+        assert r.outcome == "flag"
+        assert r.base_outcome == "timeout" and r.base_detail == "2s"
+
+
+def test_base_replay_no_spec_fails_closed(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas, tmp_path, base_overlay=base("#!/bin/sh\nexit 1\n"))
+    for r in (r for r in results if r.pr in (3, 5)):
+        assert r.base_outcome == "error" and r.base_detail == "base-no-spec"
+
+
+def test_base_replay_total_cap_fails_closed(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    ticks = iter([0, 0, 5000])
+
+    def clock():
+        return next(ticks, 5000)
+
+    results = run(repo, [shas[2]], tmp_path, base_overlay=base(BASE_FLAG_GATE), total_cap=900,
+                  clock=clock)
+    assert len(results) == 1
+    assert results[0].outcome == "flag"
+    assert results[0].base_outcome == "timeout" and results[0].base_detail == "total-cap"
+
+
 def test_non_squash_skipped(tmp_path):
     repo, shas = build_repo(tmp_path, with_merge=True)
     results = run(repo, shas, tmp_path)

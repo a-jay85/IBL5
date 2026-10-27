@@ -133,6 +133,14 @@ class ScratchTree:
                 fh.write(data)
             os.chmod(dest, 0o755 if mode == 0o100755 or mode & 0o111 else 0o644)
 
+    def remove(self, files) -> None:
+        """Delete each path from the tree. A path that is already absent is fine."""
+        for rel in files:
+            try:
+                os.remove(os.path.join(self.dir, rel))
+            except FileNotFoundError:
+                pass
+
     def _cleanup(self) -> None:
         directory, self.dir = self.dir, ""
         if not directory:
@@ -179,14 +187,35 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  history: list[HistoricalPR], overlay_files: dict[str, tuple[bytes, int]],
                  plans_dir: str, *, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                  total_cap: int = TOTAL_CAP, clock=time.monotonic,
-                 bodies: dict[int, str] | None = None) -> list[ReplayResult]:
-    """Replay every replayable gate against every historical PR's tree, newest first."""
+                 bodies: dict[int, str] | None = None,
+                 base_overlay: dict[str, tuple[bytes, int] | None] | None = None
+                 ) -> list[ReplayResult]:
+    """Replay every replayable gate against every historical PR's tree, newest first.
+
+    With `base_overlay` (the same keys as `overlay_files`, `None` marking a path absent at the
+    base ref), a head `flag` is followed by one replay of the base-ref gate on the same checkout.
+    The result rides on the head row as `base_outcome`/`base_detail` and never changes `outcome`.
+    """
     replayable = [g for g in gates if g.state == "replayable" and g.spec is not None]
     results: list[ReplayResult] = []
     if not replayable or not history:
         return results
     bodies = bodies or {}
     start = clock()
+    base_plan: dict[str, tuple[str, object]] = {}
+    if base_overlay is not None:
+        for g in replayable:
+            if g.path not in base_overlay:
+                base_plan[g.path] = ("run", g.spec)
+            elif base_overlay[g.path] is None:
+                base_plan[g.path] = ("absent", None)
+            else:
+                state, base_spec, _ = resolve_spec(
+                    g.path, base_overlay[g.path][0].decode("utf-8", "replace"))
+                if state == "replayable" and base_spec is not None:
+                    base_plan[g.path] = ("run", base_spec)
+                else:
+                    base_plan[g.path] = ("no-spec", None)
     first = next((p for p in history if p.parent_count == 1), None)
 
     def skip(pr: HistoricalPR, gate: GateChange, reason: str) -> None:
@@ -199,6 +228,33 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
         return results
 
     git = make_git(repo)
+
+    def execute(spec, ctx: dict, gate_path: str) -> tuple[str, str]:
+        """Run one gate replay in ctx["tree"] and return (outcome, detail)."""
+        env = dict(os.environ)
+        env.update(expand_env(spec, ctx))
+        stdin_path = expand_stdin(spec, ctx)
+        stdin_fh = None
+        if stdin_path:
+            try:
+                stdin_fh = open(stdin_path, "rb")
+            except OSError as exc:
+                return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160]
+        try:
+            proc = subprocess.run(
+                [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)],
+                cwd=ctx["tree"], env=env,
+                stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
+                capture_output=True, text=True, timeout=per_replay_timeout)
+        except subprocess.TimeoutExpired:
+            return "timeout", f"{per_replay_timeout}s"
+        except OSError as exc:
+            return "error", re.sub(r"\s+", " ", str(exc))[:160]
+        finally:
+            if stdin_fh is not None:
+                stdin_fh.close()
+        return classify_exit(spec, proc.returncode, proc.stdout)
+
     work = tempfile.mkdtemp(prefix="gate-backtest-files-")
     capped = False
     try:
@@ -237,36 +293,29 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                         fh.write(bodies.get(pr.number, ""))
                     ctx = {"base": base, "head": pr.merge_sha, "tree": scratch.dir,
                            "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file}
-                    env = dict(os.environ)
-                    env.update(expand_env(spec, ctx))
-                    stdin_path = expand_stdin(spec, ctx)
-                    stdin_fh = None
-                    if stdin_path:
-                        try:
-                            stdin_fh = open(stdin_path, "rb")
-                        except OSError as exc:
-                            results.append(ReplayResult(pr.number, gate.path, "error",
-                                                        re.sub(r"\s+", " ", f"stdin: {exc}")[:160]))
-                            continue
-                    try:
-                        proc = subprocess.run(
-                            [os.path.join(scratch.dir, gate.path), *expand_argv(spec, ctx)],
-                            cwd=scratch.dir, env=env,
-                            stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
-                            capture_output=True, text=True, timeout=per_replay_timeout)
-                    except subprocess.TimeoutExpired:
-                        results.append(ReplayResult(pr.number, gate.path, "timeout",
-                                                    f"{per_replay_timeout}s"))
-                        continue
-                    except OSError as exc:
-                        results.append(ReplayResult(pr.number, gate.path, "error",
-                                                    re.sub(r"\s+", " ", str(exc))[:160]))
-                        continue
-                    finally:
-                        if stdin_fh is not None:
-                            stdin_fh.close()
-                    outcome, detail = classify_exit(spec, proc.returncode, proc.stdout)
-                    results.append(ReplayResult(pr.number, gate.path, outcome, detail))
+                    outcome, detail = execute(spec, ctx, gate.path)
+                    base_outcome = base_detail = ""
+                    if outcome == "flag" and base_overlay is not None:
+                        kind, base_spec = base_plan[gate.path]
+                        if kind == "absent":
+                            base_outcome = "absent"
+                        elif kind == "no-spec":
+                            base_outcome, base_detail = "error", "base-no-spec"
+                        elif clock() - start >= total_cap:
+                            base_outcome, base_detail = "timeout", "total-cap"
+                        else:
+                            try:
+                                scratch.overlay({k: v for k, v in base_overlay.items()
+                                                 if v is not None})
+                                scratch.remove([k for k, v in base_overlay.items() if v is None])
+                                base_outcome, base_detail = execute(base_spec, ctx, gate.path)
+                            except OSError as exc:
+                                base_outcome = "error"
+                                base_detail = re.sub(r"\s+", " ", f"base-overlay: {exc}")[:160]
+                            finally:
+                                scratch.overlay(overlay_files)
+                    results.append(ReplayResult(pr.number, gate.path, outcome, detail,
+                                                base_outcome, base_detail))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\OnThisDay;
 
 use OnThisDay\OnThisDayCalendar;
+use OnThisDay\OnThisDayRepository;
 use PHPUnit\Framework\TestCase;
 
 class OnThisDayCalendarTest extends TestCase
@@ -44,6 +45,20 @@ class OnThisDayCalendarTest extends TestCase
             ['02-29', '03-01', '03-02'],
             $this->calendar->monthDayWindow('2026-03-01', 1)
         );
+    }
+
+    /**
+     * The widest radius is one week each side, the #3351 (8c6049c75e) cap, and
+     * that window fills the repository's month-day list exactly.
+     */
+    public function testWidestRadiusSpansOneWeekEachSideAndFitsTheReaderList(): void
+    {
+        $radii = OnThisDayCalendar::WIDENING_RADII;
+        $window = $this->calendar->monthDayWindow('2026-03-15', $radii[array_key_last($radii)]);
+
+        $this->assertSame('03-08', $window[0]);
+        $this->assertSame('03-22', $window[array_key_last($window)]);
+        $this->assertCount(OnThisDayRepository::MONTH_DAY_LIST_WIDTH, $window);
     }
 
     public function testOctoberDateBelongsToNextSeasonYear(): void

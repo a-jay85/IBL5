@@ -189,5 +189,9 @@ assert_contains "plan-prompt points at the canonical check" \
     '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
 assert_contains "agent def carries the directory clause" \
     '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
+assert_contains "canonical carries the pinned-restructure carve-out" \
+    '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
+assert_contains "plan-prompt points at the pinned-restructure carve-out" \
+    '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
 
 h_done

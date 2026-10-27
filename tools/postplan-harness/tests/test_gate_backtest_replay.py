@@ -357,3 +357,72 @@ def test_backtest_changes_replays_settled_prs_past_the_young_ones(monkeypatch, t
                                limit=2, now=now)
     assert seen["numbers"] == [1, 2]
     assert out.window == 2
+
+
+HEADER_FAIL_GATE = "#!/bin/sh\n# gate-backtest-argv:\nexit 1\n"
+
+
+def _feature_repo(tmp_path, rel="bin/check-fake", content=HEADER_FAIL_GATE):
+    """build_repo, then `feature` commits `rel` while master moves bin/check-fake afterwards."""
+    repo, shas = build_repo(tmp_path)
+    sh(repo, "checkout", "-q", "-b", "feature")
+    commit_file(repo, rel, content, "feature gate", mode=0o755)
+    sh(repo, "checkout", "-q", "master")
+    commit_file(repo, "bin/check-fake", "#!/bin/sh\nexit 3\n", "master moved", mode=0o755)
+    return repo, shas
+
+
+def test_base_overlay_reads_merge_base_bytes(tmp_path):
+    from harness.gate_backtest_replay import _base_overlay
+    repo, _ = _feature_repo(tmp_path)
+    out = _base_overlay(str(repo), "master", "feature", ["bin/check-fake"])
+    assert out["bin/check-fake"] == (OLD_GATE.encode(), 0o100755)
+
+
+def test_base_overlay_marks_absent_path_none(tmp_path):
+    from harness.gate_backtest_replay import _base_overlay
+    repo, _ = _feature_repo(tmp_path)
+    out = _base_overlay(str(repo), "master", "feature", ["bin/check-new"])
+    assert out == {"bin/check-new": None}
+
+
+def test_base_overlay_unresolvable_base_is_none(tmp_path):
+    from harness.gate_backtest_replay import _base_overlay
+    repo, _ = build_repo(tmp_path)
+    assert _base_overlay(str(repo), "no-such-ref", "HEAD", ["bin/check-fake"]) is None
+
+
+def _record_run_backtest(monkeypatch):
+    from harness import gate_backtest_replay as gbr
+    seen = {}
+
+    def fake_run(*a, **k):
+        seen.update(k)
+        return []
+
+    monkeypatch.setattr(gbr, "run_backtest", fake_run)
+    return gbr, seen
+
+
+def test_backtest_changes_passes_base_overlay_to_run_backtest(monkeypatch, tmp_path):
+    repo, shas = _feature_repo(tmp_path)
+    gbr, seen = _record_run_backtest(monkeypatch)
+    gbr.backtest_changes(str(repo), "feature", [("M", "bin/check-fake")], gh_json=fake_gh(shas),
+                         fetch=False, base="master", now=T0 + timedelta(days=30))
+    assert seen["base_overlay"]["bin/check-fake"][0] == OLD_GATE.encode()
+
+
+def test_forced_gate_new_at_base_is_absent(monkeypatch, tmp_path):
+    repo, shas = _feature_repo(tmp_path, rel="bin/check-new")
+    gbr, seen = _record_run_backtest(monkeypatch)
+    gbr.backtest_changes(str(repo), "feature", [], gh_json=fake_gh(shas), fetch=False,
+                         base="master", now=T0 + timedelta(days=30),
+                         forced_gate=("bin/check-new", "feature"))
+    assert seen["base_overlay"] == {"bin/check-new": None}
+
+
+def test_total_cap_default_is_1200():
+    import inspect
+    from harness import gate_backtest_replay as gbr
+    assert gbr.TOTAL_CAP == 1200
+    assert inspect.signature(gbr.run_backtest).parameters["total_cap"].default == 1200

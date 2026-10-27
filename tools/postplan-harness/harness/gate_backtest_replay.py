@@ -29,7 +29,7 @@ from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateC
 
 REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
-TOTAL_CAP = 900
+TOTAL_CAP = 1200
 HISTORY_LIMIT = 30
 FETCH_CAP = 250  # merged PRs fetched; the newest HISTORY_LIMIT settled ones are replayed
 
@@ -359,6 +359,28 @@ def _file_mode(repo: str, rev: str, path: str) -> int:
         return 0o100644
 
 
+def _base_overlay(repo: str, base: str, head: str,
+                  paths) -> dict[str, tuple[bytes, int] | None] | None:
+    """Each path's bytes at merge-base(base, head); None marks a path absent there.
+
+    An unresolvable base returns None, so no base replay runs and every head flag counts.
+    """
+    try:
+        rev = make_git(repo)(["merge-base", base, head]).strip()
+    except subprocess.CalledProcessError:
+        return None
+    if not rev:
+        return None
+    out: dict[str, tuple[bytes, int] | None] = {}
+    for path in paths:
+        try:
+            out[path] = (_git_bytes(repo, ["show", f"{rev}:{path}"]),
+                         _file_mode(repo, rev, path))
+        except subprocess.CalledProcessError:
+            out[path] = None
+    return out
+
+
 def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
             read: bool = True) -> list[GateChange]:
     """The gates `changes` touch. `read=False` skips every `git show` (replay-mode runner)."""
@@ -386,6 +408,7 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
                      limit: int = HISTORY_LIMIT, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                      total_cap: int = TOTAL_CAP, now: datetime | None = None,
                      exclude_pr: int | None = None,
+                     base: str = "origin/master",
                      forced_gate: tuple[str, str] | None = None) -> BacktestOutcome:
     """Detect the gates a change list touches and replay them against recent merged PRs.
 
@@ -432,9 +455,10 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             truth = classify_truth(fetched, now or datetime.now(timezone.utc))
             history = [p for p in fetched if truth[p.number].state != "unsettled"][:limit]
             window = len(history)
+            base_overlay = _base_overlay(repo, base, head, overlay_files)
             results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
                                    per_replay_timeout=per_replay_timeout, total_cap=total_cap,
-                                   bodies=bodies)
+                                   bodies=bodies, base_overlay=base_overlay)
         except Exception:
             results = None
             truth = {}
@@ -446,14 +470,15 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
 def backtest_from_refs(repo: str, base: str, head: str, **kw) -> BacktestOutcome:
     """CLI entry: the change list comes from `git diff --name-status <base>...<head>`."""
     out = make_git(repo)(["diff", "--name-status", f"{base}...{head}"])
-    return backtest_changes(repo, head, parse_name_status(out), **kw)
+    return backtest_changes(repo, head, parse_name_status(out), base=base, **kw)
 
 
 def backtest_branch(repo: str, head: str, changes: list[tuple[str, str]], *,
                     exclude_pr: int | None = None, fixture_history=None,
                     now: datetime | None = None, plans_dir: str | None = None,
                     per_replay_timeout: int = PER_REPLAY_TIMEOUT,
-                    total_cap: int = TOTAL_CAP) -> tuple[Verdict, str]:
+                    total_cap: int = TOTAL_CAP,
+                    base: str = "origin/master") -> tuple[Verdict, str]:
     """Runner entry: replay the gates in `changes`. A fixture history replaces `gh` and the fetch."""
     if plans_dir is None:
         home = os.environ.get("HOME", "")
@@ -463,7 +488,7 @@ def backtest_branch(repo: str, head: str, changes: list[tuple[str, str]], *,
         kw = {"gh_json": (lambda _argv: fixture_history), "fetch": False}
     out = backtest_changes(repo, head, changes, plans_dir=plans_dir, exclude_pr=exclude_pr,
                            now=now, per_replay_timeout=per_replay_timeout, total_cap=total_cap,
-                           **kw)
+                           base=base, **kw)
     return out.verdict, out.block
 
 

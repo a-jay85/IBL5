@@ -498,6 +498,17 @@ export CLAUDE_HEADLESS=1
 # degradation and 2x-cost edge — and to accept that it no longer tracks the
 # interactive setting.
 
+# Hand a parked plan's worktree to bin/wt-remove --if-empty, which removes it
+# (and its never-pushed branch) only when it holds no work: 0 commits ahead of
+# origin/master, clean tree, no untracked non-ignored file. A worktree with any
+# work, a _pool-* slot, or an in-use one prints one "kept" line and stays. A
+# plan skipped before Step 5 has no worktree; that prints "nothing to remove".
+# Never fails the run. Called at every terminal skipped/ disposal after an attempt,
+# including a plan the impl agent moved to skipped/ itself. The unusable-impl_model
+# skip runs before any attempt and is marked reap-exempt instead.
+reap_empty_worktree() {
+    (cd "$REPO" && "$REPO/bin/wt-remove" "$1" --if-empty) >> "$LOG" 2>&1 || true
+}
 REPO="/Users/ajaynicolas/GitHub/IBL5"
 # This script's OWN tree, used to resolve the two prompt files it feeds to
 # `claude -p`. Without it the prompts resolve against the `cd "$REPO"` below, so a
@@ -1334,6 +1345,7 @@ dispose_plan_postplan_blocked() {
     touch -h -- "$NIGHTLY_DIR/skipped/${plan_name}" 2>/dev/null || true
     rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" \
           "$HANDOFF_DIR/${plan_name}.json"
+    reap_empty_worktree "$plan_slug"
     reports_dir="$NIGHTLY_DIR/reports"
     {
         printf 'Plan "%s" was skipped. It did not ship, and running it again will not fix it.\n\n' \
@@ -2284,6 +2296,7 @@ while true; do
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
         touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+        reap_empty_worktree "${PLAN_NAME%.md}"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -2316,6 +2329,8 @@ while true; do
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
         touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+        # reap-exempt: no attempt ran, so no worktree of ours exists. A worktree with
+        # this slug belongs to a human, and wt-remove --if-empty cannot tell.
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -2724,6 +2739,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
             if [ -e "$NIGHTLY_DIR/skipped/$PLAN_NAME" ]; then
+                reap_empty_worktree "${PLAN_NAME%.md}"
                 note_failure "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
             fi
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
@@ -2753,6 +2769,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             write_plan_defect_report "$PLAN_NAME" "$PLAN_DEFECT_FILE" "$(( ATTEMPTS + 1 ))"
             note_failure "${PLAN_NAME%.md} has a plan defect: its Verification Matrix could not be realised, so it was moved to skipped/ after one try. Fix the plan, then requeue. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${PLAN_NAME%.md}.md"
             rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+            reap_empty_worktree "${PLAN_NAME%.md}"
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
             # queue/, the env-stop guard did NOT fire (it breaks above), and the
@@ -2782,6 +2799,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
                 note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
                 rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+                reap_empty_worktree "${PLAN_NAME%.md}"
             fi
         fi
     fi

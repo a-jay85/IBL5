@@ -1,0 +1,203 @@
+diff --git a/ibl5/classes/Cache/DatabaseCache.php b/ibl5/classes/Cache/DatabaseCache.php
+index d91e01362f..53adfadca5 100644
+--- a/ibl5/classes/Cache/DatabaseCache.php
++++ b/ibl5/classes/Cache/DatabaseCache.php
+@@ -149,37 +149,4 @@ public function delete(string $key): void
+             $this->channelLogger->error('cache_delete_failed', ['cache_key' => $key, 'error' => $e->getMessage()]);
+         }
+     }
+-
+-    /**
+-     * @see DatabaseCacheInterface::acquireLock()
+-     */
+-    public function acquireLock(string $key, int $timeoutSeconds): bool
+-    {
+-        try {
+-            $row = $this->fetchOne("SELECT GET_LOCK(?, ?) AS got", 'si', $key, $timeoutSeconds);
+-        } catch (\RuntimeException $e) {
+-            $this->channelLogger->error('cache_lock_acquire_failed', ['lock_key' => $key, 'error' => $e->getMessage()]);
+-            return false;
+-        }
+-
+-        if ($row === null) {
+-            return false; // GET_LOCK returned NULL (error/killed) — do not rebuild
+-        }
+-
+-        /** @var array{got: int|string|null} $row */
+-        return (int) ($row['got'] ?? 0) === 1;
+-    }
+-
+-    /**
+-     * @see DatabaseCacheInterface::releaseLock()
+-     */
+-    public function releaseLock(string $key): void
+-    {
+-        try {
+-            // DO (not SELECT) avoids leaving an unconsumed result set → "commands out of sync".
+-            $this->execute("DO RELEASE_LOCK(?)", 's', $key);
+-        } catch (\RuntimeException $e) {
+-            $this->channelLogger->error('cache_lock_release_failed', ['lock_key' => $key, 'error' => $e->getMessage()]);
+-        }
+-    }
+ }
+diff --git a/ibl5/classes/Extension/ExtensionService.php b/ibl5/classes/Extension/ExtensionService.php
+index f615a5938b..61d17333eb 100644
+--- a/ibl5/classes/Extension/ExtensionService.php
++++ b/ibl5/classes/Extension/ExtensionService.php
+@@ -276,13 +276,11 @@ private function handleAcceptedExtension(
+             'details' => $offerDetails,
+         ]);
+ 
+-        if (class_exists(Discord::class)) {
+-            $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+-            Discord::postToChannel('#extensions', $hometext);
++        $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
++        Discord::postToChannel('#extensions', $hometext);
+ 
+-            if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
+-                Discord::postToChannel('#general-chat', $hometext);
+-            }
++        if ($this->serverName !== 'localhost' && $this->serverName !== '127.0.0.1') {
++            Discord::postToChannel('#general-chat', $hometext);
+         }
+ 
+         $emailsubject = "Successful Extension - " . $playerName;
+@@ -302,7 +300,7 @@ private function handleAcceptedExtension(
+             'extensionYears' => $offerYears,
+             'offerInMillions' => $offerInMillions,
+             'offerDetails' => $offerDetails,
+-            'discordNotificationSent' => class_exists(Discord::class),
++            'discordNotificationSent' => true,
+             'discordChannel' => '#extensions',
+         ];
+     }
+@@ -332,10 +330,8 @@ private function handleRejectedExtension(
+             'total_millions' => $offerInMillions,
+         ]);
+ 
+-        if (class_exists(Discord::class)) {
+-            $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
+-            Discord::postToChannel('#extensions', $hometext);
+-        }
++        $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
++        Discord::postToChannel('#extensions', $hometext);
+ 
+         $emailsubject = "Unsuccessful Extension - " . $playerName;
+         $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
+@@ -354,7 +350,7 @@ private function handleRejectedExtension(
+             'extensionYears' => $offerYears,
+             'offerInMillions' => $offerInMillions,
+             'offerDetails' => $offerDetails,
+-            'discordNotificationSent' => class_exists(Discord::class),
++            'discordNotificationSent' => true,
+             'discordChannel' => '#extensions',
+         ];
+     }
+diff --git a/ibl5/classes/RecordHolders/CachedRecordHoldersService.php b/ibl5/classes/RecordHolders/CachedRecordHoldersService.php
+index d8113494cd..c3670a46d6 100644
+--- a/ibl5/classes/RecordHolders/CachedRecordHoldersService.php
++++ b/ibl5/classes/RecordHolders/CachedRecordHoldersService.php
+@@ -12,7 +12,8 @@
+  *
+  * Wraps an inner service and caches the getAllRecords() result via DatabaseCacheInterface.
+  * On cache hit, returns data from the cache without calling the inner service.
+- * On cache miss or expiration, delegates to the inner service and stores the result.
++ * On expiration, serves the stale entry; the cron calls rebuildCache() to refresh it.
++ * On a cold miss (no row at all), delegates to the inner service and stores the result.
+  *
+  * @phpstan-import-type AllRecordsData from RecordHoldersServiceInterface
+  */
+@@ -20,8 +21,6 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
+ {
+     private const CACHE_KEY = 'record_holders';
+     private const TTL_SECONDS = 86400; // 24 hours
+-    private const LOCK_KEY = 'record_holders_rebuild';
+-    private const LOCK_TIMEOUT_SECONDS = 10;
+ 
+     private RecordHoldersServiceInterface $inner;
+     private DatabaseCacheInterface $cache;
+@@ -33,13 +32,13 @@ public function __construct(RecordHoldersServiceInterface $inner, DatabaseCacheI
+     }
+ 
+     /**
+-     * Serve-stale-first, single-flight cold build.
++     * Serve-stale-first read.
+      *
+-     * 1. Fresh hit → return it.
+-     * 2. Expired entry present → serve the stale value immediately; the cron (rebuildCache)
++     * 1. Fresh hit: return it.
++     * 2. Expired entry present: serve the stale value immediately. The cron (rebuildCache)
+      *    is the refresher, so no heavy inline rebuild happens on a user's request.
+-     * 3. Cold/empty → only the request that wins the single-flight lock rebuilds inline;
+-     *    concurrent requests fall through to an empty structure (thundering-herd guard).
++     * 3. Cold (no row at all): build inline from the inner service, store it, return it.
++     *    Two concurrent cold requests may both build; the cache write is idempotent.
+      *
+      * @return AllRecordsData
+      */
+@@ -57,62 +56,10 @@ public function getAllRecords(): array
+             return $stale;
+         }
+ 
+-        if ($this->cache->acquireLock(self::LOCK_KEY, self::LOCK_TIMEOUT_SECONDS)) {
+-            try {
+-                // Another request may have built the entry while we waited for the lock.
+-                $again = $this->cache->get(self::CACHE_KEY);
+-                if ($again !== null) {
+-                    /** @var AllRecordsData $again */
+-                    return $again;
+-                }
+-
+-                $records = $this->inner->getAllRecords();
+-                $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
+-
+-                return $records;
+-            } finally {
+-                $this->cache->releaseLock(self::LOCK_KEY);
+-            }
+-        }
+-
+-        // Lock timed out — degrade: serve whatever a concurrent builder produced, else empty.
+-        $again = $this->cache->get(self::CACHE_KEY);
+-        if ($again !== null) {
+-            /** @var AllRecordsData $again */
+-            return $again;
+-        }
+-
+-        return $this->emptyRecords();
+-    }
++        $records = $this->inner->getAllRecords();
++        $this->cache->set(self::CACHE_KEY, $records, self::TTL_SECONDS);
+ 
+-    /**
+-     * Empty AllRecordsData structure served when the cache is cold and the single-flight
+-     * lock could not be acquired (a concurrent request is already rebuilding).
+-     *
+-     * @return AllRecordsData
+-     */
+-    private function emptyRecords(): array
+-    {
+-        return [
+-            'playerSingleGame' => [
+-                'regularSeason' => [],
+-                'playoffs' => [],
+-                'heat' => [],
+-            ],
+-            'quadrupleDoubles' => [],
+-            'allStarRecord' => [
+-                'name' => '',
+-                'pid' => null,
+-                'teams' => '',
+-                'teamTids' => '',
+-                'amount' => 0,
+-                'years' => '',
+-            ],
+-            'playerFullSeason' => [],
+-            'teamGameRecords' => [],
+-            'teamSeasonRecords' => [],
+-            'teamFranchise' => [],
+-        ];
++        return $records;
+     }
+ 
+     /**

@@ -91,7 +91,7 @@ RECIPE_BACKED_RE='recipe-backed'
 # Carve-out H2: a security token that only names an existing defense, on a
 # characterization-pinned restructure, is not a new security surface.
 DEFENSE_TOKEN_RE='^(escap[ei]|sanitiz)$'
-NEGATED_DEFENSE_RE='(unescap|unsanitiz|missing[a-z -]*escap|missing[a-z -]*sanitiz|not escap|not sanitiz)'
+NEGATED_DEFENSE_RE='(unescap|unsanitiz|missing[a-z -]*escap|missing[a-z -]*sanitiz|not escap|not sanitiz|(remov|drop|strip|skip|disabl|delet|bypass|omit|without|weaken|relax|loosen)[a-z -]*(escap|sanitiz))'
 PIN_RE='(pinning|pinned|pin [a-z]|byte-for-byte|characteriz)'
 RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
 # Carve-out H1: an additive gate whose only weakening stem is a past

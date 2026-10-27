@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-10-22
+last_verified: 2026-10-27
 paths: "bin/automouse/**"
 ---
 
@@ -72,12 +72,12 @@ Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.m
 
 At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged by their *own* mtime and still resolve after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
-Archival mtimes never affect run order.
+Archival never affects run order.
 
 **Run order is the entry's `NNN-` prefix** (`queue_entries`, `bin/lib/automouse-queue-order.sh`).
 Editing a plan never moves it. Enqueue appends +10; `reorder`/`renumber` rename to 010,
 020, …. `normalize_queue` prefixes legacy bare entries once (old mtime order). Move
-entries only with `queue dispose` (strips the prefix): `done/`, `skipped/`, locks and
+entries only via `queue dispose` (drops the prefix): `done/`, `skipped/`, locks and
 sidecars use `<slug>.md`.
 
 ### Self-heal

@@ -342,6 +342,7 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
         // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.
         $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));

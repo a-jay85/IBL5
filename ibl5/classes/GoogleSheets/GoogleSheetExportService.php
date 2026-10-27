@@ -80,8 +80,12 @@ class GoogleSheetExportService
                     self::MIN_COLUMNS
                 );
                 $spreadsheet = ['id' => $existing['spreadsheet_id'], 'url' => $existing['spreadsheet_url']];
-            } catch (GoogleSheetMissingException) {
-                // Sheet was deleted on Google's side; fall through and create a new one.
+            } catch (GoogleApiException $e) {
+                // Deleted sheet (404), or a sheet the new Google account cannot open (403):
+                // fall through and create a new one. Anything else propagates.
+                if (!$e instanceof GoogleSheetMissingException && $e->status !== 403) {
+                    throw $e;
+                }
             }
         }
         if ($spreadsheet === null) {

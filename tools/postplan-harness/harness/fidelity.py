@@ -1336,6 +1336,7 @@ EXCERPT_LIMIT = 30000
 _RE_REVIEW_TERMINAL_RE = re.compile(r"^(?:NOT READY|READY WITH NOTES|READY) \(re-review\)")
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+STICKY_REVIEW_KIND_DELTA_RE = re.compile(r"^\*\*Review kind:\*\* delta\b", re.M)
 STICKY_REUSED_FROM_RE = re.compile(r"^\*\*Reused from:\*\* (\S+) \(([a-z-]+(?:, [a-z-]+)*)\)$", re.M)
 CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
 
@@ -1580,7 +1581,7 @@ def carry_forward_predicate(sticky_body, diff_id: str,
     reviewer spawn, (None, reason) to run the full review.
 
     Fail-closed on every arm: a missing sticky, an unreadable field, a changed branch
-    diff, a changed plan, a plan-blind run, a NOT READY, and a remediated verdict all
+    diff, a changed plan, a plan-blind run, a NOT READY, a remediated verdict, and a delta review all
     decline. The only path that returns a verdict is an exact three-way match.
 
     The HEAD tree is deliberately not an arm. The reviewer judges the diff, and a rebase
@@ -1602,6 +1603,8 @@ def carry_forward_predicate(sticky_body, diff_id: str,
         return None, "no-prior-plan-hash"
     if h.group(1) != plan_hash:
         return None, "plan-changed"
+    if STICKY_REVIEW_KIND_DELTA_RE.search(sticky_body):
+        return None, "prior-review-delta"
     verdict = _sticky_prior_verdict(sticky_body)
     if verdict not in CARRY_FORWARD_VERDICTS:
         return None, "prior-verdict-not-terminal"
@@ -1937,6 +1940,11 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         else:
             out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
                        "plan unchanged since the recorded verdict")
+    if fid.get("review_kind") == "delta":
+        out.append(f"**Review kind:** delta (anchor {fid.get('delta_anchor') or 'unrecorded'}; "
+                   f"{len(fid.get('delta_paths') or [])} file(s), "
+                   f"{fid.get('delta_lines', 0)}/{fid.get('delta_full_lines', 0)} changed lines "
+                   "since the last full review)")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")

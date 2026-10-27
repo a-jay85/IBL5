@@ -306,6 +306,20 @@ try {
         $updaterService->addStep(new Updater\Steps\EndOfSeasonImportStep(
             $jsbRepo, $jsbService, $season->endingYear, $sourceResolver, $hasFinalsMvp,
         ));
+
+        // Prior season: its .dra/.ret/.hof/.awa live in the PRIOR season's backup
+        // archive. The step reads archive-only (no disk fallback) and gates on
+        // the prior season's champion row.
+        $priorSeasonLabel = BulkImport\BackupArchiveLocator::seasonLabel(
+            $season->beginningYear - 1,
+            $season->endingYear - 1,
+        );
+        $priorSourceResolver = new Updater\JsbSourceResolver(
+            $backupLocator, $archiveExtractor, $basePath . '/backups/' . $priorSeasonLabel, $basePath, $filePrefix,
+        );
+        $updaterService->addStep(new Updater\Steps\PriorSeasonEndOfSeasonImportStep(
+            $jsbRepo, $jsbService, $season->endingYear - 1, $priorSourceResolver,
+        ));
     }
 
     // IBL-only: snapshot player stats + refresh materialized ibl_hist table
@@ -328,6 +342,7 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
         // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.
         $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));

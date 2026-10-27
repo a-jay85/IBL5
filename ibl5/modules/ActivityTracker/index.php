@@ -18,16 +18,11 @@ if (stripos(is_string($phpSelf) ? $phpSelf : '', "modules.php") === false) {
 
 $module_name = basename(dirname(__FILE__));
 
-use ActivityTracker\ActivityTrackerRepository;
-use ActivityTracker\ActivityTrackerView;
-
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 PageLayout\PageLayout::header();
 
-$repository = new ActivityTrackerRepository($mysqli_db);
-$view = new ActivityTrackerView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\ActivityTrackerFactory::class);
+$repository = $factory->repository();
+$view = $factory->view();
 
 $teams = $repository->getTeamActivity();
 echo $view->render($teams);

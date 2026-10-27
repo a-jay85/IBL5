@@ -1,0 +1,28 @@
+Restore visible keyboard focus where CSS removes it, and add a global prefers-reduced-motion rule, using existing tokens only.
+
+## Exploration pointers
+- `outline: none` with no visible replacement: `ibl5/design/components/tables.css:1159`, `navigation.css:611,816,886`, `last-sim-recap.css:98`, `team-splits.css:56`, `sco-parser.css:131`.
+- Already-correct pattern to copy: `forms.css:23`, `search.css:52`, `draft.css:101` use `var(--ring-accent)`.
+- No `prefers-reduced-motion` anywhere in `ibl5/design`; 79 `transition:` and 14 animation lines.
+
+## Resolved design decisions
+- Each site gets a `:focus-visible` ring with `var(--ring-accent)`, copying forms.css. No new tokens, colors or styles.
+- One `@media (prefers-reduced-motion: reduce)` block in the base stylesheet that zeroes transition and animation durations.
+
+## Scope
+In: the seven sites and one media block.
+Out: new UI, skip links, htmx focus management, token sweeps (open PRs #2512, #2515, #2518).
+
+## Hard constraints
+- Mouse users see no change (`:focus-visible` only).
+- Visual-regression baseline for non-focus states stays unchanged.
+
+## Blocking questions to resolve inside the plan
+- Which file is the base stylesheet loaded on every page?
+
+## Verification
+- Playwright: Tab to an element at each site and assert a non-none outline or box-shadow; emulate reducedMotion and assert transition-duration 0s.
+
+
+## Sequencing
+Slug `css-focus-visible-reduced-motion`, base master.

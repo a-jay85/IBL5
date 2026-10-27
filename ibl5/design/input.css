@@ -60,11 +60,12 @@
    (e.g., bg-navy-800, text-accent-500, font-display). These values match what
    the CDN play script previously provided at runtime. */
 @theme {
-  /* Navy palette */
-  --color-navy-900: #0a0f1a;
-  --color-navy-800: #111827;
-  --color-navy-700: #1a2234;
-  --color-navy-600: #243044;
+  /* Navy palette: slate ramp (navy-800 = #1e293b). Light text on these
+     surfaces is pinned to WCAG AA by tests/ts-unit/navy-contrast.test.ts. */
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
+  --color-navy-700: #334155;
+  --color-navy-600: #475569;
 
   /* Accent palette (orange) */
   --color-accent-600: #ea580c;
@@ -131,6 +132,10 @@
   --color-txn-release-fg: #00838f;
 
   /* Neutrals (promoted so utilities + tokens share source) */
+  /* League brand primaries. Mirrored by League\LeagueContext::IBL_PRIMARY_COLOR
+     and ::OLYMPICS_PRIMARY_COLOR; LeagueContextTest fails on drift. */
+  --color-ibl-primary: #1a365d;
+  --color-olympics-primary: #c53030;
   --color-gray-50:  #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
@@ -229,7 +234,6 @@
 @import './components/htmx.css';
 @import './components/debug.css';
 @import './components/last-sim-recap.css';
-@import './components/on-this-day.css';
 @import './components/game-boxscore.css';
 @import './components/head-to-head-records.css';
 

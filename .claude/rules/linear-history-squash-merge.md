@@ -61,10 +61,7 @@ If that's you: run `git merge origin/master`, resolve three-way, commit, then re
 `bin/post-plan-now --auto`.
 When the stacked `--onto` fallback (`gitad.py` `_autoresolve_stacked_rebase`) finds a merge commit in the `iblBase..HEAD` range, it first collapses the range into one commit with the identical tree, parented on `merge-base(iblBase, HEAD)`, and it moves the branch back to the original tip on every decline.
 
-**Skill** (`POST_PLAN_SKILL=1`, or the harness is absent). Phase 2 prints `STOP-AND-RESOLVE:`
-and the run **continues** into `.claude/skills/post-plan/_phase-2-conflict-resolution.md`,
-which re-runs the merge against the pinned master SHA, resolves three-way, and proves
-`TREE-EQUIVALENT` before any push. A resolved conflict holds auto-merge at Phase 6.5 condition (14) until step 7.5's conflict-resolution review clears it for the current `HEAD`.
+**Skill** (`POST_PLAN_SKILL=1`): the shrunk skill has no Phase 2 rebase; conflict resolution is harness-only (`tools/postplan-harness/harness/conflict.py`, `conflict_ladder.py`).
 
 No path spawns a skill session *because of* a conflict. Engine split and exit codes:
 `.claude/rules/workflow-continuity-detail.md`, ADR-0092.

@@ -17,6 +17,17 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 #[PreserveGlobalState(false)]
 class OneOnOneGameEntryPointTest extends ModuleEntryPointTestCase
 {
+    public function testOneOnOneGameRendersForAnonymousGet(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('OneOnOneGame', [], [], $this->dbGlobals());
+
+        $this->assertNotSame('', $output);
+        $this->assertStringContainsString('One-on-One Match', $output);
+        $this->assertQueryExecuted('ibl_plr');
+    }
+
     public function testAuthenticatedRunDecodesCookieIntoGlobal(): void
     {
         $this->authenticateAs('testgm');

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# vr-apply-baselines: copy the strict pass's flagged renders over their
+# committed visual-regression baselines.
+#
+# Reads the gallery.json written by bin/vr-build-gallery. Targets are the
+# changedCells + newCells titles minus any flakeCells title. Render
+# <actuals>/<title>.a.png becomes baseline <snapshot-dir>/<title>.png.
+#
+# Usage: vr-apply-baselines --gallery=<gallery.json> --actuals=<dir> \
+#          --snapshot-dir=<dir> --list-out=<file>
+#        vr-apply-baselines --check-staged=<list-file>
+# The second form fails when the git index (cwd repo) stages any path that
+# the list file does not name.
+# Exit codes: 0 ok, 1 data error, 2 usage error.
+set -euo pipefail
+
+usage() {
+  echo "usage: vr-apply-baselines --gallery=<json> --actuals=<dir> --snapshot-dir=<dir> --list-out=<file>"
+  echo "       vr-apply-baselines --check-staged=<list-file>"
+}
+
+for arg in "$@"; do
+  case "$arg" in --check-staged=*)
+    [ "$#" -eq 1 ] || { echo "vr-apply-baselines: --check-staged= takes no other flags" >&2; exit 2; }
+    list="${arg#*=}"
+    [ -f "$list" ] || { echo "vr-apply-baselines: list file not found: $list" >&2; exit 1; }
+    staged="$(mktemp)"
+    trap 'rm -f "$staged"' EXIT
+    git diff --cached --name-only > "$staged"
+    n=0 outside=0
+    while IFS= read -r path; do
+      n=$((n + 1))
+      grep -Fxq -- "$path" "$list" || { echo "vr-apply-baselines: staged outside target list: $path" >&2; outside=1; }
+    done < "$staged"
+    [ "$outside" -eq 0 ] || exit 1
+    echo "vr-apply-baselines: $n staged path(s) within target list"
+    exit 0 ;;
+  esac
+done
+
+gallery="" actuals="" snapdir="" list_out=""
+for arg in "$@"; do
+  case "$arg" in
+    --gallery=*) gallery="${arg#*=}" ;;
+    --actuals=*) actuals="${arg#*=}" ;;
+    --snapshot-dir=*) snapdir="${arg#*=}" ;;
+    --list-out=*) list_out="${arg#*=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "vr-apply-baselines: unknown argument: $arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
+[ -n "$gallery" ] || { echo "vr-apply-baselines: --gallery= is required" >&2; exit 2; }
+[ -n "$actuals" ] || { echo "vr-apply-baselines: --actuals= is required" >&2; exit 2; }
+[ -n "$snapdir" ] || { echo "vr-apply-baselines: --snapshot-dir= is required" >&2; exit 2; }
+[ -n "$list_out" ] || { echo "vr-apply-baselines: --list-out= is required" >&2; exit 2; }
+
+command -v jq >/dev/null 2>&1 || { echo "vr-apply-baselines: jq not found" >&2; exit 2; }
+[ -f "$gallery" ] || { echo "vr-apply-baselines: gallery not found: $gallery" >&2; exit 1; }
+jq -e '(.changedCells|type=="array") and (.newCells|type=="array") and (.flakeCells|type=="array")' \
+  "$gallery" >/dev/null 2>&1 || { echo "vr-apply-baselines: malformed gallery json: $gallery" >&2; exit 1; }
+[ -d "$actuals" ] || { echo "vr-apply-baselines: actuals is not a directory: $actuals" >&2; exit 1; }
+[ -d "$snapdir" ] || { echo "vr-apply-baselines: snapshot dir is not a directory: $snapdir" >&2; exit 1; }
+snapdir="${snapdir%/}"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+jq -r '
+  def t: if (.title|type)=="string" then .title else error("cell without a string title") end;
+  ([(.changedCells + .newCells)[] | t] - [.flakeCells[] | t]) | unique | .[]
+' "$gallery" > "$tmp" 2>"$tmp.err" || { cat "$tmp.err" >&2; rm -f "$tmp.err"; echo "vr-apply-baselines: could not read titles from $gallery" >&2; exit 1; }
+rm -f "$tmp.err"
+titles=(); while IFS= read -r t; do titles+=("$t"); done < "$tmp"
+
+# Pass 1: validate everything before writing anything.
+for t in ${titles[@]+"${titles[@]}"}; do
+  [[ "$t" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "vr-apply-baselines: refusing invalid title: $t" >&2; exit 1; }
+  [ -f "$actuals/$t.a.png" ] || { echo "vr-apply-baselines: missing render for $t: $actuals/$t.a.png" >&2; exit 1; }
+done
+
+# Pass 2: write.
+for t in ${titles[@]+"${titles[@]}"}; do
+  cp -- "$actuals/$t.a.png" "$snapdir/$t.png"
+done
+: > "$list_out"
+for t in ${titles[@]+"${titles[@]}"}; do
+  printf '%s\n' "$snapdir/$t.png" >> "$list_out"
+done
+echo "vr-apply-baselines: ${#titles[@]} snapshot(s) rewritten"

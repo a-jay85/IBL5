@@ -9,13 +9,6 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 
 class NewsEntryPointTest extends ModuleEntryPointTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // No sim recorded: the On this day block stays out of these story characterizations.
-        $this->mockDb->onQuery('ibl_sim_dates', []);
-    }
-
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testCharacterizationHomeStoryRendersReadMore(): void
@@ -234,7 +227,7 @@ class NewsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotSame('', $output);
     }
 
-    public function testTopicBannerUsesThemeBgcolorGlobals(): void
+    public function testTopicBannerUsesBgcolor1AndIgnoresRemovedBgcolor2Global(): void
     {
         $this->mockDb->onQuery('topictext', [
             ['topictext' => 'Some Topic'],
@@ -245,11 +238,13 @@ class NewsEntryPointTest extends ModuleEntryPointTestCase
             get: ['new_topic' => '1'],
             extraGlobals: [
                 'storyhome' => 10, 'multilingual' => 0, 'user_news' => 0, 'articlecomm' => 0,
-                'bgcolor1' => '#BBBBBB', 'bgcolor2' => '#CCCCCC',
+                'bgcolor1' => '#BBBBBB', 'bgcolor2' => '#B0B0B2',
             ],
         );
 
         $this->assertStringContainsString('bgcolor="#BBBBBB"', $output);
         $this->assertStringNotContainsString('bgcolor="#EEEEEE"', $output);
+        // PR #2515 removed the $bgcolor2 global; News must not read it back.
+        $this->assertStringNotContainsString('#B0B0B2', $output);
     }
 }

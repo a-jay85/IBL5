@@ -103,6 +103,47 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
         $this->assertSame(0, $player['salary_yr2']);
     }
 
+    /**
+     * backlog#1538 row 18: one PlayerData conversion feeds both the contract salary and the
+     * validator's veteran minimum. Over the hard cap with 4 healthy slots, an uncontracted
+     * 4-year player is allowed only because the player's salary equals that player's own veteran minimum.
+     */
+    public function testOverCapAddSignsUncontractedPlayerAtOwnVeteranMinimum(): void
+    {
+        $pid = self::TEST_PID_BASE + 4;
+        $this->insertTestPlayer($pid, 'Waiver Over Cap Vet Min', [
+            'teamid' => 0,
+            'cy' => 0,
+            'cyt' => 0,
+            'salary_yr1' => 0,
+            'salary_yr2' => 0,
+            'exp' => 4,
+            'bird' => 0,
+            'ordinal' => 1000,
+            'droptime' => 1000000,
+        ]);
+
+        $processor = new WaiversProcessor(
+            new WaiversRepository($this->db),
+            $this->teamIdentityRepository,
+            $this->playerLookupRepository,
+            new WaiversValidator(),
+            new NewsRepository($this->db),
+            $this->db,
+            null,
+            new \Season\Season($this->db)
+        );
+
+        $result = $processor->processAdd($pid, 'Metros', 1, 4, \League\League::HARD_CAP_MAX);
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+
+        $player = $this->playerLookupRepository->getPlayerByID($pid);
+        $this->assertNotNull($player);
+        $this->assertSame(1, $player['teamid']);
+        $this->assertSame(\League\ContractRules::getVeteranMinimumSalary(4), $player['salary_yr1']);
+    }
+
     public function testSignPlayerWithExistingContractPreservesContract(): void
     {
         $pid = self::TEST_PID_BASE + 3;

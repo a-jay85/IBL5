@@ -25,6 +25,15 @@ name: Human Sign-off
 # read-only. Labels applied with GITHUB_TOKEN do not start new workflow runs,
 # so the label toggle cannot loop back into this workflow.
 #
+# The human-approved label is pinned to the PR diff (ADR-0062 Update). The gate
+# job checks out the PR head and computes the patch-id of origin/<base>...HEAD.
+# When the event is the label being applied, the gate passes and the
+# human-approved-fingerprint job records that id in a github-actions[bot]
+# comment. On every other event for a feat: PR holding the label, the gate
+# compares the current id with the newest bot record. A mismatch, a missing
+# record, or any error reds the gate in the same run (so auto-merge cannot
+# complete first), and the write job removes the label and comments why.
+#
 # Job-level skip (ADR 0210, see ibl5/docs/decisions/): the `human-signoff` job
 # skips a labeled/unlabeled event for any label except `human-approved`, and an
 # `edited` event that did not change the title, but ONLY when the title contains
@@ -46,6 +55,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
   pull-requests: read
 
 concurrency:
@@ -57,20 +67,93 @@ jobs:
     name: human-signoff
     if: ${{ !(!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) }}
     runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.eval.outputs.verdict }}
+      reason: ${{ steps.eval.outputs.reason }}
+      fingerprint: ${{ steps.eval.outputs.fingerprint }}
+      comment_body: ${{ steps.eval.outputs.comment_body }}
     steps:
-      # Checkout is required so the run step can source the shared classifier lib.
-      - name: Checkout (for the shared classifier lib)
+      # Check out the PR HEAD (not the default refs/pull/N/merge), shallow. The
+      # eval step deepens history only for a feat: PR holding the label, so the
+      # fingerprint is the PR's own diff against its merge base.
+      - name: Checkout the PR head (shared classifier lib)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Require human sign-off for feature PRs
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+      - name: Evaluate human sign-off and the approved-diff fingerprint
+        id: eval
         env:
           TITLE: ${{ github.event.pull_request.title }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           # shellcheck source=bin/lib/human-signoff-classifier.sh
           source bin/lib/human-signoff-classifier.sh
 
-          hs_eval_pull_request "$TITLE" "$LABELS"
+          # Every failure below leaves FP or COMMENTS empty/absent, and
+          # hs_eval_approval turns that into a red gate for a feat: PR holding
+          # the label. Non-feat PRs never read either value.
+          # Only a feat: PR holding the label reads FP or COMMENTS. Every other
+          # PR skips the deep fetch, the diff, and the comment read.
+          FP=""
+          COMMENTS="$RUNNER_TEMP/hs-comments.json"
+          if hs_is_feat_title "$TITLE" && hs_pr_cleared "$TITLE" "$LABELS"; then
+            if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+              git fetch --no-tags --quiet --unshallow origin || echo "::warning::could not deepen history"
+            fi
+            if ! git fetch --no-tags --quiet origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"; then
+              echo "::warning::could not fetch origin/$BASE_REF"
+            fi
+            if FP=$(hs_diff_fingerprint "origin/$BASE_REF" "$HEAD_SHA"); then
+              echo "Diff fingerprint: $FP (origin/$BASE_REF...$HEAD_SHA)"
+            else
+              FP=""
+              echo "Diff fingerprint: unavailable (origin/$BASE_REF...$HEAD_SHA)"
+            fi
+
+            if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \
+                   && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$COMMENTS"; }; then
+              rm -f "$COMMENTS"
+              echo "Comment read failed; a feat: PR holding the label will fail closed"
+            fi
+          fi
+
+          hs_eval_approval "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" || true
+
+          BODY=""
+          case "$HS_VERDICT" in
+            record) BODY=$(hs_record_comment_body "$FP" "$HEAD_SHA") ;;
+            drop) BODY=$(hs_drop_comment_body "$HS_DROP_REASON" "$HEAD_SHA") ;;
+          esac
+          delim="HS_BODY_$(openssl rand -hex 12)"
+          {
+            echo "verdict=$HS_VERDICT"
+            echo "reason=$HS_DROP_REASON"
+            echo "fingerprint=$FP"
+            echo "comment_body<<$delim"
+            printf '%s\n' "$BODY"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+      # A separate step maps the verdict to the check result, so the outputs
+      # above are always published for the write job. An unset or unknown
+      # verdict (the eval step crashed) is red.
+      - name: Require human sign-off for feature PRs
+        env:
+          VERDICT: ${{ steps.eval.outputs.verdict }}
+        run: |
+          set -euo pipefail
+          case "$VERDICT" in
+            pass|keep|record) echo "Human sign-off gate: $VERDICT" ;;
+            *) echo "Human sign-off gate: ${VERDICT:-unset} (red)"; exit 1 ;;
+          esac
 
   needs-a-human-label:
     name: needs-a-human label
@@ -103,4 +186,39 @@ jobs:
             gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=needs-a-human' >/dev/null
           elif [ "$HAS_LABEL" = "true" ]; then
             gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/needs-a-human" >/dev/null
+          fi
+
+  human-approved-fingerprint:
+    name: human-approved fingerprint
+    needs: human-signoff
+    # Runs only when the gate asked for a write: record on approval, or drop.
+    # A cancelled gate was superseded by a newer run, which owns the write.
+    # !cancelled() so a cancelled run skips this job even if its gate finished.
+    if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Record or revoke the approved diff fingerprint
+        # A failed write never adds a red check (pr-armable.sh condition 15).
+        # A failed record leaves no fingerprint, so the next push drops the
+        # label (fail closed). A failed drop leaves the gate red, and the
+        # revoked marker posted first makes the next run drop again.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          VERDICT: ${{ needs.human-signoff.outputs.verdict }}
+          BODY: ${{ needs.human-signoff.outputs.comment_body }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BODY" ]; then
+            echo "::warning::empty comment body for verdict $VERDICT; nothing written"
+            exit 1
+          fi
+          gh api --method POST "repos/$GH_REPO/issues/$PR/comments" -f body="$BODY" >/dev/null
+          if [ "$VERDICT" = "drop" ]; then
+            gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/human-approved" >/dev/null
           fi

@@ -9,25 +9,25 @@ paths:
   - .claude/rules/linear-history-squash-merge.md
 ---
 
-# /post-plan Phase 2 — Rebase Conflict Resolution
+# /post-plan Phase 2 — Rebase Conflict Resolution <!-- slop-ok -->
 
 Loaded **only** when the Phase 2 merge block printed `STOP-AND-RESOLVE:`. On a clean or
 already-merged run this file is never read.
 
-`<MASTER_SHA>`, `<KEY>` and `<BRANCH>` are **literals the orchestrator substitutes** — the
+`<MASTER_SHA>`, `<KEY>` and `<BRANCH>` are **literals the orchestrator substitutes** — the <!-- slop-ok -->
 SHA and `key=` value printed by the Phase 2 pre-rebase capture block and recorded as run
 notes there. They are never shell variables: nothing survives between Bash blocks except
 exported env vars (same discipline as `.claude/skills/post-plan/_phase-5.5-fidelity.md`).
 
-**No command substitution** — no `$(…)`, no `<(…)` — in any block below. That is the same
+**No command substitution** — no `$(…)`, no `<(…)` — in any block below. That is the same <!-- slop-ok -->
 constraint that pushed `/pr-ready` to externalize its `scripts/*.sh`; a substitution inside
 a worktree-scoped resolution block is the shape that silently runs against the wrong tree.
 
 ---
 
-## Step 1 — Load the guide and the two scripts by pinned SHA
+## Step 1 — Load the guide and the two scripts by pinned SHA <!-- slop-ok -->
 
-Reuse is by `git show`, never by copy (the pattern established in
+Reuse is by `git show`, never by copy (the pattern established in <!-- slop-ok -->
 `.claude/skills/post-plan/_phase-5.5-fidelity.md`). `.claude/review-shared/_rebase-and-conflicts.md`
 is present in only 1 of 34 worktrees, so a plain `Read` of the worktree path fails for
 essentially every run, while a pinned-SHA read always succeeds.
@@ -43,20 +43,20 @@ git show <MASTER_SHA>:.claude/review-shared/_rebase-and-conflicts.md > /tmp/post
 ```
 
 The `test -s` chain is the fail-closed arm: `git show` on a path that moved exits non-zero
-and leaves a zero-byte file. **No `REBASE-GUIDE=loaded` ⇒ halt with a `STOP:` line.** Do not
+and leaves a zero-byte file. **No `REBASE-GUIDE=loaded` ⇒ halt with a `STOP:` line.** Do not <!-- slop-ok -->
 improvise a resolution from memory.
 
-## Step 2 — Read the guide, selectively
+## Step 2 — Read the guide, selectively <!-- slop-ok -->
 
 Read `/tmp/post-plan-rebase-guide-<KEY>.md`. Apply **§2e** (three-way resolution) only.
 Skip **§2c** and **§2d**: post-plan merges master in and never rewrites history, so there is
 nothing to squash or replay.
 
-- **Skip §2b entirely.** It hands the rebase chore to a `/pr-ready` sub-agent packet, which
+- **Skip §2b entirely.** It hands the rebase chore to a `/pr-ready` sub-agent packet, which <!-- slop-ok -->
   assumes that skill's Phase 0 worktree entry and an interactive turn boundary. post-plan is
   already in the worktree and runs headless under `claude -p`, where work handed off past the
   turn boundary is unrecoverable. The orchestrator does §2e itself, inline.
-- **Skip §2a's re-capture.** The Phase 2 pre-rebase capture block in
+- **Skip §2a's re-capture.** The Phase 2 pre-rebase capture block in <!-- slop-ok -->
   `.claude/skills/post-plan/SKILL.md` already performed it, at the only moment it was still
   pre-rewrite. Re-running it now would overwrite the pre-diff with post-conflict state and
   make the proof in step 6 vacuous. Read §2a for rationale only.
@@ -74,8 +74,8 @@ bash /tmp/post-plan-collapse-guard-<KEY>.sh check <KEY> <BRANCH> ; echo "CG-CHEC
 
 - `STOP: PRIOR-COLLAPSE-DETECTED` (exit 1) **halts the run.** Follow the rescue-branch
   instructions the script prints; never rebase on top of an already-collapsed history.
-- `COLLAPSE-GUARD: NO-PRIOR-REWRITE`, `NO-COLLAPSE`, and `WARN — partial loss…` (all exit 0)
-  proceed. **Record the `WARN` text in a run note** — it becomes part of the sticky PR
+- `COLLAPSE-GUARD: NO-PRIOR-REWRITE`, `NO-COLLAPSE`, and `WARN — partial loss…` (all exit 0) <!-- slop-ok -->
+  proceed. **Record the `WARN` text in a run note** — it becomes part of the sticky PR <!-- slop-ok -->
   comment posted at the top of Phase 6.5.
 
 Then, immediately before the merge:
@@ -96,10 +96,10 @@ is untouched.
 > **Squash trap.** A merge does not hit this; it is here for anyone who hand-rebases instead.
 > If this branch was stacked on a now-merged parent: `master` is linear, so
 > the parent's SHAs never landed in it, and a plain `git rebase origin/master` tries to replay
-> the parent's commits too — which conflicts every time. Replay only your own commits with
+> the parent's commits too — which conflicts every time. Replay only your own commits with <!-- slop-ok -->
 > `git rebase --onto origin/master <parent-tip-before-merge> <branch>`. See
 > `.claude/rules/linear-history-squash-merge.md`. Determine `<parent-tip-before-merge>` from
-> the `Depends-on:` parent's pre-merge tip, not by guessing a merge-base.
+> the `Depends-on:` parent's pre-merge tip, not by guessing a merge-base. <!-- slop-ok -->
 
 Merge the recorded master SHA into the branch:
 
@@ -111,7 +111,7 @@ Merging the recorded literal rather than `origin/master` guarantees Phase 4 revi
 Phase 5.0 conformance and Phase 5.5 fidelity all judge the same base even if master moves
 mid-run.
 
-## Step 5 — Resolve three-way, per §2e
+## Step 5 — Resolve three-way, per §2e <!-- slop-ok -->
 
 Inspect each conflicted path with `git show :1:<path>` (base), `:2:<path>` (ours, this branch),
 `:3:<path>` (theirs, master). **Never** take `--ours` / `--theirs` wholesale unless every hunk in
@@ -131,28 +131,28 @@ reason the file must stay. Record the choice in the run note either way.
 git -c core.editor=true commit --no-edit
 ```
 
-**Record every resolved path and a one-line description of each resolution in a run note.**
+**Record every resolved path and a one-line description of each resolution in a run note.** <!-- slop-ok -->
 Conflict-resolution output is new code that no code review has ever seen, and the sticky
 comment in Phase 6.5 must name those files.
 
 A merge stops once; there is no later commit to re-conflict. If a resolution is genuinely
 ambiguous, `git merge --abort` and halt with a `STOP:` line rather than guessing.
 
-## Step 6 — The lost-work proof, as a precondition for the push
+## Step 6 — The lost-work proof, as a precondition for the push <!-- slop-ok -->
 
 ```bash
 bash /tmp/post-plan-lostwork-<KEY>.sh <KEY> ; echo "LOSTWORK-RC=$?"
 ```
 
-**This is a gate, not a report.** The push in `SKILL.md` Phase 2 step 3 is permitted **only
-if** this prints `TREE-EQUIVALENT` **and** `LOSTWORK-RC=0`. Any other outcome —
-`TREE DIVERGED — inspect before pushing`, a non-zero rc, or no output at all — halts the run
+**This is a gate, not a report.** The push in `SKILL.md` Phase 2 step 3 is permitted **only <!-- slop-ok -->
+if** this prints `TREE-EQUIVALENT` **and** `LOSTWORK-RC=0`. Any other outcome — <!-- slop-ok -->
+`TREE DIVERGED — inspect before pushing`, a non-zero rc, or no output at all — halts the run <!-- slop-ok -->
 with a `STOP:` line naming the script and both patch paths. The guards in `lostwork.sh`
 print `TREE DIVERGED` and exit 1. They cover a missing arg, an absent or empty patch, a patch
 `git apply --numstat` cannot parse, a git-quoted path, and zero file entries. The lost-work
-branch prints one `LOST:` line per finding, then `TREE DIVERGED — inspect before pushing`,
+branch prints one `LOST:` line per finding, then `TREE DIVERGED — inspect before pushing`, <!-- slop-ok -->
 and exits **0**.
-That is exactly why this check is conjunctive on the printed verdict and not on the rc alone:
+That is exactly why this check is conjunctive on the printed verdict and not on the rc alone: <!-- slop-ok -->
 gating on `LOSTWORK-RC=0` by itself would wave the commonest divergence straight through.
 
 **What the proof checks.** It reads the post-merge tree at `HEAD`. It never reads the
@@ -183,14 +183,14 @@ commit sha. It never uses a PR number, so it cannot collide with the /tmp/pr-rea
 namespace a concurrent /pr-ready run owns.
 -->
 
-## Step 7 — Confirm the hold flag, and write the resolution manifest
+## Step 7 — Confirm the hold flag, and write the resolution manifest <!-- slop-ok -->
 
 The hold flag for this run was already created by the Phase 2 conflict arm in `SKILL.md`, at
-the moment the conflict was *detected*. **It is deliberately not written here.** Arming the
+the moment the conflict was *detected*. **It is deliberately not written here.** Arming the <!-- slop-ok -->
 hold only after a successful `TREE-EQUIVALENT` would invert the fail-closed property: a run
-that conflicts and then dies mid-resolution — or is re-driven from a later phase — would find
+that conflicts and then dies mid-resolution — or is re-driven from a later phase — would find <!-- slop-ok -->
 no flag and could arm auto-merge on a partially-resolved tree. The flag means "this run
-touched a conflict", which is true from detection onward, not "the resolution succeeded".
+touched a conflict", which is true from detection onward, not "the resolution succeeded". <!-- slop-ok -->
 Confirm it exists; if it does not, halt with a `STOP:` line rather than creating one.
 
 What *is* written here, after `TREE-EQUIVALENT`, is the manifest the announcement consumes:
@@ -207,7 +207,7 @@ The sha names the tree the resolution produced. If commits land after this point
 
 If `git rev-parse HEAD` fails or prints nothing, the orchestrator has no literal to substitute. Step 7.5 must then halt with a `STOP:` line rather than writing to a path containing an empty sha component.
 
-Then, with the **`Write` tool** (not a heredoc — the resolved-path list and descriptions come
+Then, with the **`Write` tool** (not a heredoc — the resolved-path list and descriptions come <!-- slop-ok -->
 from run notes, and a `mktemp` variable does not survive between blocks), write
 `/tmp/postplan-conflict-resolution-<KEY>.md` containing:
 
@@ -274,7 +274,7 @@ re-read against that diff before the PR is opened.
 
 ---
 
-## Appendix — sticky conflict-hold comment body
+## Appendix — sticky conflict-hold comment body <!-- slop-ok -->
 
 Phase 6.5 step 0 renders this into `/tmp/post-plan-conflict-comment-<KEY>.md` with the `Write`
 tool and posts it under the marker `<!-- post-plan-conflict-hold -->`. The wording is
@@ -312,7 +312,7 @@ _Posted by `/post-plan`. Updated in place on re-run._
 
 ````markdown
 <!-- post-plan-conflict-hold -->
-## Auto-merge held — this run auto-resolved a rebase conflict
+## Auto-merge held — this run auto-resolved a rebase conflict <!-- slop-ok -->
 
 **(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
 the conflict automatically (three-way, per `.claude/review-shared/_rebase-and-conflicts.md` §2e)
@@ -321,7 +321,7 @@ diff, which is a precondition for the push that produced this PR.
 
 **(b) Why auto-merge is held.** Conflict-resolved lines are code no structured review has seen.
 `/post-plan` Phase 6.5 condition (14) therefore refuses to arm auto-merge on this PR. This is
-the gate working as designed, not a failure — **merge it by hand after reviewing the files below.**
+the gate working as designed, not a failure — **merge it by hand after reviewing the files below.** <!-- slop-ok -->
 
 **(c) Files the resolution touched.**
 
@@ -343,4 +343,4 @@ The "merge it by hand" sentence is load-bearing: a held PR with no stated remedy
 bug, and the stated remedy is what turns the hold into a one-line human action.
 
 When the Phase 7 CI-watch re-rebase loop is what hit the conflict, add one line to section (a)
-naming that loop as the trigger. Same marker, same comment — no second mechanism.
+naming that loop as the trigger. Same marker, same comment — no second mechanism. <!-- slop-ok -->

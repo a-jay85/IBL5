@@ -24,6 +24,21 @@ class WaiversServiceTest extends TestCase
         );
     }
 
+    public function testAcceptsInjectedSlotCounter(): void
+    {
+        $service = new WaiversService(
+            self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class),
+            self::createStub(WaiversProcessorInterface::class),
+            self::createStub(TeamQueryRepositoryInterface::class),
+            self::createStub(\mysqli::class),
+            null,
+            self::createStub(\Waivers\Contracts\WaiversRosterSlotCounterInterface::class)
+        );
+
+        // @phpstan-ignore-next-line (asserting return type as intentional contract test)
+        self::assertInstanceOf(WaiversServiceInterface::class, $service);
+    }
+
     public function testAddOptionsOmitWaitTimeForRecentlyDroppedPlayer(): void
     {
         $player = self::createStub(Player::class);

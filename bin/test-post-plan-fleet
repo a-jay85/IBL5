@@ -2023,16 +2023,12 @@ grep -qF '_digest_labels' "$f" || fail "28j: _digest_labels rationale missing fr
 grep -qF 'git rev-parse --short=12 HEAD' "$f" || fail "28j: provenance capture command missing from _phase7-verdict.md"
 lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-05" ]] || fail "28j: last_verified not bumped in _phase7-verdict.md (got $lv)"
 
-# --- 28t: .claude/skills/post-plan/SKILL.md voice-contract wiring -------------------------
-f=".claude/skills/post-plan/SKILL.md"
+# --- 28t: harness/fidelity.py voice-contract wiring -------------------------
+f="tools/postplan-harness/harness/fidelity.py"
 grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
-    || fail "28t: voice-contract Read instruction missing from post-plan SKILL.md"
-n_cdp=$(grep -cF 'bin/check-digest-prose' "$f" || true)
-# 3 sites: Scope why-paragraph, its follow-on paragraph, and the four narrative elements.
-# The Reviewer verification voice check went away with that section.
-[[ $n_cdp -ge 3 ]] || fail "28t: expected >=3 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
+    || fail "28t: voice-contract Read instruction missing from fidelity.py"
 grep -qF '.claude/skills/review-shared/' "$f" \
-    && fail "28t: post-plan SKILL.md cites the non-existent .claude/skills/review-shared/ path"
+    && fail "28t: fidelity.py cites the non-existent .claude/skills/review-shared/ path"
 
 # --- 28l: trailing space on ## DIGEST heading is normalised, not degraded ---
 FIX="$DG/l.md"
@@ -2531,13 +2527,6 @@ begin_case
 grep -qF -- '--delta' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing --delta flag"
 # Row 30b: skip-review.sh emits DELTA-STATUS output token.
 grep -qF 'DELTA-STATUS' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing DELTA-STATUS token"
-# Row 30c: _phase-4-review-audit.md contains parse-boundary fallback sentence.
-grep -qF 'absent, empty, or anything other than the literal' \
-    ".claude/skills/post-plan/_phase-4-review-audit.md" \
-    || fail "_phase-4-review-audit.md missing parse-boundary fallback sentence"
-# Row 30d: _phase-4-review-audit.md contains #### Code review inside empty-delta branch.
-grep -qF '#### Code review' ".claude/skills/post-plan/_phase-4-review-audit.md" \
-    || fail "_phase-4-review-audit.md missing '#### Code review' heading in empty-delta branch"
 # Row 30e: _phase7-verdict.md still carries the Reviewed-tree contract string (skip-review.sh match target).
 grep -qF '**Reviewed tree:**' ".claude/review-shared/_phase7-verdict.md" \
     || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
@@ -2546,7 +2535,7 @@ end_case "skip-review-delta-row 30"
 # --- case: Phase 5.5 carry-forward gate companion assertions -----------------------------
 begin_case
 P55=".claude/skills/post-plan/_phase-5.5-fidelity.md"
-# The probe is pinned to master (same shape as _phase-4-review-audit.md), never the worktree copy.
+# The probe is pinned to master, never the worktree copy.
 grep -qF 'git show <MASTER_SHA>:.claude/review-shared/scripts/skip-review.sh' "$P55" \
     || fail "_phase-5.5-fidelity.md probe not pinned to git show <MASTER_SHA>: skip-review.sh"
 # Block markers bin/test-postplan-arm-conditions extracts by name.

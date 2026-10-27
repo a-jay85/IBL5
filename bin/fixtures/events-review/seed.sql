@@ -55,3 +55,24 @@ SELECT
     CURDATE() - INTERVAL (1 + n.n MOD 6) DAY + INTERVAL 3 HOUR
 FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
       UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10) n;
+
+-- Anonymous 4xx: a probe name no GM hit (must fold) and a GM route (renders).
+INSERT INTO ibl_events
+    (request_uri, route_name, http_method, username, team_id, referer, user_agent,
+     session_id, traffic_class, http_status, action, created_at)
+SELECT
+    CONCAT('/ibl5/index.php?name=', IF(n.n <= 3, 'wp_login', 'player')),
+    IF(n.n <= 3, 'wp_login', 'player'), 'GET', NULL, NULL, NULL, 'events-review-fixture',
+    CONCAT('deadbeef', LEFT(SHA2(CONCAT('probe-', n.n), 256), 56)), 'anonymous-human', 404, NULL,
+    CURDATE() - INTERVAL 2 DAY + INTERVAL 15 HOUR
+FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4) n;
+
+-- One GM, many views of one route: the digest must say (1 GM).
+INSERT INTO ibl_events
+    (request_uri, route_name, http_method, username, team_id, referer, user_agent,
+     session_id, traffic_class, http_status, action, created_at)
+SELECT
+    '/ibl5/index.php?name=schedule', 'schedule', 'GET', 'fixture_gm_1', 1, NULL, 'events-review-fixture',
+    SHA2('fixture-session-1', 256), 'authenticated', 200, NULL,
+    CURDATE() - INTERVAL n.n DAY + INTERVAL 12 HOUR
+FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4) n;

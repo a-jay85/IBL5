@@ -65,6 +65,8 @@ class OnThisDayPipelineTest extends DatabaseTestCase
             points3m: 3,
             points3a: 8,
         );
+
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
     }
 
     public function testFactoryStepPostsOnceAndRerunSkips(): void
@@ -95,6 +97,21 @@ class OnThisDayPipelineTest extends DatabaseTestCase
     public function testFactoryStepSkipsWhenNoMomentInWindow(): void
     {
         $this->execSql("UPDATE `ibl_sim_dates` SET end_date = '2031-08-15' WHERE sim = " . self::SIM_LATEST);
+
+        $result = OnThisDayFactory::createPostStep($this->db)->execute();
+
+        self::assertTrue($result->skipped, $result->detail);
+
+        $claimed = $this->db->query(
+            "SELECT setting_value FROM `ibl_settings` WHERE setting_key = '" . OnThisDayRepository::LAST_POSTED_SIM_KEY . "' AND league = 'ibl'"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $claimed);
+        self::assertSame(0, $claimed->num_rows);
+    }
+
+    public function testPostStepSkipsAndLeavesSimUnclaimedWhenStoreIsEmpty(): void
+    {
+        $this->execSql('DELETE FROM `ibl_on_this_day_moments`');
 
         $result = OnThisDayFactory::createPostStep($this->db)->execute();
 

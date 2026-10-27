@@ -7,11 +7,15 @@ namespace Tests\DatabaseIntegration;
 use League\League;
 use OnThisDay\Moment;
 use OnThisDay\MomentKind;
+use OnThisDay\OnThisDayFactory;
+use OnThisDay\OnThisDayMomentBuilder;
 use OnThisDay\OnThisDayRepository;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
- * DB-integration tests for OnThisDayRepository.
+ * DB-integration tests for the rebuild round trip: box-score fixtures go in,
+ * OnThisDayMomentBuilder::rebuild() stores them in ibl_on_this_day_moments, and
+ * OnThisDayRepository::findMoments() reads them back.
  *
  * Fixtures sit in seasons 1890-1901 so they never collide with seed data, and
  * every test passes beforeSeasonYear explicitly. Dates outside June/Sept/Oct are
@@ -34,8 +38,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(self::PID_A, 'Fifty Scorer');
         $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 6, points3m: 4);
+        $this->rebuild();
 
-        $moments = $this->only($this->repo->findFiftyPointGames(['01-09', '01-10', '01-11'], 1902), self::PID_A);
+        $moments = $this->only($this->stored(['01-09', '01-10', '01-11'], 1902, MomentKind::FiftyPointGame), self::PID_A);
 
         self::assertCount(1, $moments);
         self::assertSame(MomentKind::FiftyPointGame, $moments[0]->kind);
@@ -51,8 +56,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(self::PID_A, 'Almost Fifty');
         $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 5, points3m: 4);
+        $this->rebuild();
 
-        self::assertSame([], $this->only($this->repo->findFiftyPointGames(['01-10'], 1902), self::PID_A));
+        self::assertSame([], $this->only($this->stored(['01-10'], 1902, MomentKind::FiftyPointGame), self::PID_A));
     }
 
     public function testPhantomDuplicateBoxScoreRowsCountOnce(): void
@@ -60,8 +66,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(self::PID_A, 'Phantom Scorer');
         $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 8, points3m: 4);
         $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 8, points3m: 4, gameOfDay: 2);
+        $this->rebuild();
 
-        $moments = $this->only($this->repo->findFiftyPointGames(['01-10'], 1902), self::PID_A);
+        $moments = $this->only($this->stored(['01-10'], 1902, MomentKind::FiftyPointGame), self::PID_A);
 
         self::assertCount(1, $moments);
         self::assertSame(52, $moments[0]->facts['points']);
@@ -71,8 +78,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(self::PID_A, 'Current Season');
         $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 11, points3m: 4);
+        $this->rebuild();
 
-        self::assertSame([], $this->only($this->repo->findFiftyPointGames(['01-10'], 1901), self::PID_A));
+        self::assertSame([], $this->only($this->stored(['01-10'], 1901, MomentKind::FiftyPointGame), self::PID_A));
     }
 
     public function testFindsTripleDoubleKeyedOnPidNotName(): void
@@ -80,8 +88,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(self::PID_A, 'Right Name');
         // 20 pts, 12 reb, 11 ast; the box-score name is deliberately wrong.
         $this->insertGame('1901-01-12', self::PID_A, 1, 2, 1, orb: 4, drb: 8, ast: 11, name: 'Wrong Name');
+        $this->rebuild();
 
-        $moments = $this->only($this->repo->findTripleDoubles(['01-12'], 1902), self::PID_A);
+        $moments = $this->only($this->stored(['01-12'], 1902, MomentKind::TripleDouble), self::PID_A);
 
         self::assertCount(1, $moments);
         self::assertSame(MomentKind::TripleDouble, $moments[0]->kind);
@@ -100,9 +109,10 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         $this->insertGame('1890-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
         $this->insertGame('1890-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
         $this->insertGame('1890-01-07', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
+        $this->rebuild();
 
         $moments = array_values(array_filter(
-            $this->only($this->repo->findRecordGames(['01-03', '01-05', '01-07'], 1891), self::PID_A),
+            $this->only($this->stored(['01-03', '01-05', '01-07'], 1891, MomentKind::RecordGame), self::PID_A),
             static fn (Moment $m): bool => $m->statLabel === 'rebounds',
         ));
 
@@ -118,9 +128,10 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         // 1889 precedes every other box score, so 01-05 beats only a one-game history.
         $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 10);
         $this->insertGame('1889-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20);
+        $this->rebuild();
 
         $moments = array_values(array_filter(
-            $this->only($this->repo->findRecordGames(['01-05'], 1890), self::PID_A),
+            $this->only($this->stored(['01-05'], 1890, MomentKind::RecordGame), self::PID_A),
             static fn (Moment $m): bool => $m->statLabel === 'rebounds',
         ));
 
@@ -134,9 +145,10 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         $this->insertGame('1901-06-05', self::PID_A, 2, 1, 1);
         $this->insertGame('1901-06-07', self::PID_A, 1, 2, 1);
         $this->insertPlayoffSeriesResultRow(1901, 4, 1, 2, 'Winners', 'Losers', 4, 3);
+        $this->rebuild();
 
-        $hits = $this->season1901($this->repo->findSeriesClinchers(['06-07'], 1902));
-        $misses = $this->season1901($this->repo->findSeriesClinchers(['06-05'], 1902));
+        $hits = $this->season1901($this->stored(['06-07'], 1902, MomentKind::SeriesClincher));
+        $misses = $this->season1901($this->stored(['06-05'], 1902, MomentKind::SeriesClincher));
 
         self::assertCount(1, $hits);
         self::assertSame('1901-06-07', $hits[0]->date);
@@ -155,8 +167,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             $this->insertGame($date, self::PID_A, 1, 3, 1, points2m: 7, ftm: 1, points3m: 0);
         }
         $this->insertGame('1901-02-10', self::PID_A, 2, 3, 2);
+        $this->rebuild();
 
-        $moments = $this->season1901($this->repo->findTrades(['02-10'], 1902));
+        $moments = $this->season1901($this->stored(['02-10'], 1902, MomentKind::Trade));
 
         self::assertCount(1, $moments);
         self::assertSame(MomentKind::Trade, $moments[0]->kind);
@@ -187,8 +200,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             );
         }
         $this->insertGame('1901-02-10', self::PID_A, 2, 3, 2);
+        $this->rebuild();
 
-        self::assertSame([], $this->season1901($this->repo->findTrades(['02-10'], 1902)));
+        self::assertSame([], $this->season1901($this->stored(['02-10'], 1902, MomentKind::Trade)));
     }
 
     public function testRookieGameFiftyPointGameIsIgnored(): void
@@ -205,8 +219,9 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             ftm: 6,
             points3m: 4,
         );
+        $this->rebuild();
 
-        self::assertSame([], $this->only($this->repo->findFiftyPointGames(['02-10'], 1902), self::PID_A));
+        self::assertSame([], $this->only($this->stored(['02-10'], 1902, MomentKind::FiftyPointGame), self::PID_A));
     }
 
     public function testAllStarGameIsNeverARecord(): void
@@ -223,9 +238,10 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             orb: 10,
             drb: 30,
         );
+        $this->rebuild();
 
         $moments = array_values(array_filter(
-            $this->only($this->repo->findRecordGames(['02-10'], 1891), self::PID_A),
+            $this->only($this->stored(['02-10'], 1891, MomentKind::RecordGame), self::PID_A),
             static fn (Moment $m): bool => $m->statLabel === 'rebounds',
         ));
 
@@ -246,17 +262,145 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
             League::ALL_STAR_HOME_TEAMID,
             League::ALL_STAR_AWAY_TEAMID,
         );
+        $this->rebuild();
 
-        self::assertSame([], $this->season1901($this->repo->findTrades(['02-10'], 1902)));
+        self::assertSame([], $this->season1901($this->stored(['02-10'], 1902, MomentKind::Trade)));
     }
 
     public function testLeapDayGameMatchedOnlyByFebruary29(): void
     {
         $this->insertTestPlayer(self::PID_A, 'Leap Scorer');
         $this->insertGame('1896-02-29', self::PID_A, 1, 2, 1, points2m: 16, ftm: 6, points3m: 4);
+        $this->rebuild();
 
-        self::assertCount(1, $this->only($this->repo->findFiftyPointGames(['02-29'], 1897), self::PID_A));
-        self::assertSame([], $this->only($this->repo->findFiftyPointGames(['02-28', '03-01'], 1897), self::PID_A));
+        self::assertCount(1, $this->only($this->stored(['02-29'], 1897, MomentKind::FiftyPointGame), self::PID_A));
+        self::assertSame([], $this->only($this->stored(['02-28', '03-01'], 1897, MomentKind::FiftyPointGame), self::PID_A));
+    }
+
+    public function testRebuildReplacesEarlierRows(): void
+    {
+        $this->insertStaleMoment();
+
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
+
+        self::assertSame(0, $this->staleMomentCount());
+    }
+
+    public function testFailedRebuildKeepsEarlierRows(): void
+    {
+        $this->insertStaleMoment();
+        $builder = new class ($this->db) extends OnThisDayMomentBuilder {
+            /**
+             * Two moments sharing one key: the second INSERT violates the unique key.
+             *
+             * @return list<Moment>
+             */
+            public function collect(): array
+            {
+                $moment = new Moment(
+                    kind: MomentKind::FiftyPointGame,
+                    key: 'fifty_point:1901-01-10:1',
+                    date: '1901-01-10',
+                    seasonYear: 1901,
+                    pid: 1,
+                    playerName: 'Duplicate Key',
+                    teamId: 1,
+                    teamName: 'Home',
+                    opponentTeamId: 2,
+                    opponentName: 'Away',
+                    facts: ['points' => 50],
+                );
+
+                return [$moment, $moment];
+            }
+        };
+
+        try {
+            $builder->rebuild();
+            self::fail('rebuild() should have thrown on the duplicate moment key');
+        } catch (\RuntimeException | \mysqli_sql_exception) {
+            self::assertSame(1, $this->staleMomentCount());
+        }
+    }
+
+    public function testRebuildStoresMonthDayFromDate(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Month Day Scorer');
+        $this->insertGame('2029-03-17', self::PID_A, 1, 2, 1, points2m: 16, ftm: 6, points3m: 4);
+
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
+
+        $result = $this->db->query(
+            "SELECT month_day FROM `ibl_on_this_day_moments` WHERE moment_key = 'fifty_point:2029-03-17:" . self::PID_A . "'"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertSame('03-17', $row['month_day']);
+    }
+
+    public function testRecordStreamTieIsNotARecord(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Tie Scorer');
+        // 1889 is the first season (20 points). Both 1890 games score 34, above that
+        // high; the later one only ties the new high, so it is not a record.
+        $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1);
+        $this->insertGame('1890-01-05', self::PID_A, 1, 2, 1, points2m: 12);
+        $this->insertGame('1890-01-07', self::PID_A, 1, 2, 1, points2m: 12);
+
+        $this->rebuild();
+
+        $moments = array_values(array_filter(
+            $this->only($this->stored(['01-05', '01-07'], 1891, MomentKind::RecordGame), self::PID_A),
+            static fn (Moment $m): bool => $m->statLabel === 'points',
+        ));
+
+        self::assertCount(1, $moments);
+        self::assertSame('1890-01-05', $moments[0]->date);
+        self::assertSame(34, $moments[0]->facts['value']);
+    }
+
+    private function rebuild(): void
+    {
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
+    }
+
+    /**
+     * Read stored moments of one kind back through the production reader.
+     *
+     * @param list<string> $window
+     * @return list<Moment>
+     */
+    private function stored(array $window, int $beforeSeasonYear, MomentKind $kind): array
+    {
+        return array_values(array_filter(
+            $this->repo->findMoments($window, $beforeSeasonYear),
+            static fn (Moment $m): bool => $m->kind === $kind,
+        ));
+    }
+
+    private function insertStaleMoment(): void
+    {
+        $this->insertRow('ibl_on_this_day_moments', [
+            'moment_key' => 'stale:2001-01-01:1',
+            'kind' => MomentKind::FiftyPointGame->value,
+            'game_date' => '2001-01-01',
+            'month_day' => '01-01',
+            'season_year' => 2001,
+            'facts_json' => '{"points":50}',
+        ]);
+    }
+
+    private function staleMomentCount(): int
+    {
+        $result = $this->db->query(
+            "SELECT COUNT(*) AS n FROM `ibl_on_this_day_moments` WHERE moment_key = 'stale:2001-01-01:1'"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+
+        return (int) $row['n'];
     }
 
     /**

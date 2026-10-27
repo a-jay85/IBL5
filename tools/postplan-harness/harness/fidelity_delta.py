@@ -42,7 +42,7 @@ DECLINE_REASONS = (
 PURPOSE = "plan-fidelity-delta-review"
 PACKET_NAME = "fidelity-packet-delta"
 DELTA_ANCHOR_RE = re.compile(r"^DELTA-ANCHOR:[ \t]*(\S+)[ \t]*$", re.M)
-ANCHOR_BLOCKING_RE = re.compile(r"^[ \t]*[-*][ \t]*\[BLOCKING\]", re.M)
+ANCHOR_BLOCKING_RE = re.compile(r"^.*\[BLOCKING\]", re.M)
 RESTATEMENT_RE = re.compile(r"\b(?:UN)?RESOLVED\b")
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -436,6 +436,9 @@ def attempt(llm, out_dir, worktree, gh, plan, diff, pr_body, pr_number, master_s
     # Every anchor [BLOCKING] bullet needs a RESOLVED/UNRESOLVED restatement, else the
     # reviewer may have ignored the old blocker and the delta cannot stand in for a full review.
     blocking = len(ANCHOR_BLOCKING_RE.findall(anchor.get("findings") or ""))
+    # A NOT READY anchor with no countable blocker is a parse miss, so fail closed.
+    if anchor.get("verdict") == "NOT READY" and blocking == 0:
+        return _decline("verdict-unparsed")
     if len(RESTATEMENT_RE.findall(reviewed_part)) < blocking:
         return _decline("verdict-unparsed")
     path = fidelity.verdict_path(pr_number)

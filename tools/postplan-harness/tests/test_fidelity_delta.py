@@ -1071,3 +1071,12 @@ def test_ids_failure_falls_back_to_full(tmp_path, monkeypatch):
     _, purposes2, logs2 = _next_run(tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
                                     canned=_full_canned())
     _assert_full_fallback(purposes2, logs2, "current-ids-missing")
+
+
+@pytest.mark.parametrize("line", [
+    "- [BLOCKING] a.py: x", "* [BLOCKING] a.py: x", "1. [BLOCKING] a.py: x",
+    "- **[BLOCKING]** a.py: x", "  - [BLOCKING] nested",
+])
+def test_anchor_blocking_regex_counts_every_bullet_shape(line):
+    """Catches a narrow marker regex that counts 0 and lets a delta skip the restatement check."""
+    assert len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(line + "\n")) == 1

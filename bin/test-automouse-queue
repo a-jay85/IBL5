@@ -976,6 +976,141 @@ assert_entries "row44b the new plan runs last" "010-plan-a.md 020-plan-b.md 030-
 assert_absent "row44b .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
 h_pass "row44b — an enqueue never reuses a prefix a renumber is handing out"
 
+# ---------------------------------------------------------------------------
+# Row 44c — a dispose that lands mid-renumber waits for .normalize.lock instead
+# of moving an entry the renumber is about to rename (backlog#1576). Covers both
+# movers: `queue dispose` (the CLI) and dispose_entry (bin/automouse/run, taken
+# out by its anchor and sourced with the lib). The queue is fully prefixed, so
+# the CLI's normalize_queue takes its fast path and never touches the lock.
+# ---------------------------------------------------------------------------
+RUN_SRC="$SCRIPT_DIR/automouse/run"
+DISPOSE_FN="$TMP/dispose-entry.sh"
+awk '/^dispose_entry\(\) \{/,/^\}/' "$RUN_SRC" > "$DISPOSE_FN"
+h_eq "row44c dispose_entry anchor is unique" "1" "$(grep -c '^dispose_entry() {' "$RUN_SRC")"
+
+# 44c-cli — `queue dispose` while the lock is held.
+setup
+mkplan plan-a.md plan-b.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/020-plan-b.md"
+mkdir "$NDIR/queue/.normalize.lock"
+run_queue dispose plan-a 'done' >/dev/null 2>&1 &
+pid_dis=$!
+sleep 2
+assert_present "row44c cli: entry stays queued while the lock is held" "$NDIR/queue/010-plan-a.md"
+assert_absent "row44c cli: nothing lands in done/ mid-renumber" "$NDIR/done/plan-a.md"
+rmdir "$NDIR/queue/.normalize.lock"
+rc_dis=0
+wait "$pid_dis" || rc_dis=$?
+h_eq "row44c cli: dispose exits 0 once the lock frees" "0" "$rc_dis"
+assert_present "row44c cli: entry lands bare in done/" "$NDIR/done/plan-a.md"
+assert_not_queued "row44c cli: entry left the queue" plan-a
+assert_absent "row44c cli: .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
+h_pass "row44c — queue dispose waits for the queue lock"
+
+# 44c-run — the runner's dispose_entry while the lock is held.
+setup
+mkplan plan-a.md plan-b.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/020-plan-b.md"
+mkdir "$NDIR/queue/.normalize.lock"
+(
+    QUEUE_DIR="$NDIR/queue"
+    NIGHTLY_DIR="$NDIR"
+    # shellcheck source=/dev/null
+    . "$DISPOSE_FN"
+    dispose_entry plan-a.md skipped
+) >/dev/null 2>&1 &
+pid_dis=$!
+sleep 2
+assert_present "row44c run: entry stays queued while the lock is held" "$NDIR/queue/010-plan-a.md"
+assert_absent "row44c run: nothing lands in skipped/ mid-renumber" "$NDIR/skipped/plan-a.md"
+rmdir "$NDIR/queue/.normalize.lock"
+rc_dis=0
+wait "$pid_dis" || rc_dis=$?
+h_eq "row44c run: dispose_entry returns 0 once the lock frees" "0" "$rc_dis"
+assert_present "row44c run: entry lands bare in skipped/" "$NDIR/skipped/plan-a.md"
+assert_not_queued "row44c run: entry left the queue" plan-a
+assert_present "row44c run: the other entry is untouched" "$NDIR/queue/020-plan-b.md"
+assert_absent "row44c run: .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
+h_pass "row44c — dispose_entry waits for the queue lock"
+
+# ---------------------------------------------------------------------------
+# Row 44d (matrix 19) — the runner's end-of-run sweeps test queue membership by
+# slug. A queued NNN-<slug>.md entry keeps all of its slug-keyed sidecars
+# (.attempts, .failure, .cap-refunds, the claim lock, handoff/<slug>.md.json).
+# A control plan with no entry loses all of them in the same pass, which proves
+# the sweeps ran. Once the queued entry is gone, a second pass sweeps it too.
+# The sweep block is taken from bin/automouse/run by its anchors and run as is.
+# ---------------------------------------------------------------------------
+SWEEP_SH="$TMP/sweeps.sh"
+awk '/^# Clean up any leftover attempt files/,/^echo "=== Automouse session complete/' \
+    "$RUN_SRC" | sed '$d' > "$SWEEP_SH"
+h_eq "row44d sweep anchor is unique" "1" \
+     "$(grep -c '^# Clean up any leftover attempt files' "$RUN_SRC")"
+for loop in '*.attempts' '*.failure' '*.cap-refunds' '*.json' '*.md.lock'; do
+    grep -qF -- "/$loop; do" "$SWEEP_SH" \
+        || h_fail "row44d sweep block holds the $loop loop" "missing from $SWEEP_SH"
+done
+
+# sidecars <slug> — create every slug-keyed sidecar the sweeps look at.
+sidecars() {
+    touch "$NDIR/queue/$1.md.attempts" "$NDIR/queue/$1.md.failure" \
+          "$NDIR/queue/$1.md.cap-refunds"
+    mkdir -p "$NDIR/queue/$1.md.lock" "$NDIR/handoff"
+    printf '{}\n' > "$NDIR/handoff/$1.md.json"
+}
+# sidecar_paths <slug> — the same five paths, one per line.
+sidecar_paths() {
+    printf '%s\n' "$NDIR/queue/$1.md.attempts" "$NDIR/queue/$1.md.failure" \
+        "$NDIR/queue/$1.md.cap-refunds" "$NDIR/queue/$1.md.lock" \
+        "$NDIR/handoff/$1.md.json"
+}
+run_sweeps() {
+    (
+        QUEUE_DIR="$NDIR/queue"
+        HANDOFF_DIR="$NDIR/handoff"
+        # shellcheck source=/dev/null
+        . "$SWEEP_SH"
+    )
+}
+
+setup
+mkplan plan-live.md
+ln -s "$PDIR/plan-live.md" "$NDIR/queue/030-plan-live.md"
+sidecars plan-live
+sidecars plan-gone
+run_sweeps
+while IFS= read -r p; do
+    assert_present "row44d queued entry keeps $(basename "$p")" "$p"
+done < <(sidecar_paths plan-live)
+while IFS= read -r p; do
+    assert_absent "row44d unqueued control loses $(basename "$p")" "$p"
+done < <(sidecar_paths plan-gone)
+rm -f "$NDIR/queue/030-plan-live.md"
+run_sweeps
+while IFS= read -r p; do
+    assert_absent "row44d disposed entry loses $(basename "$p")" "$p"
+done < <(sidecar_paths plan-live)
+h_pass "row44d — end-of-run sweeps keep a queued prefixed entry's sidecars"
+
+# ---------------------------------------------------------------------------
+# Row 44e (Phase 4.6) — a claim lock taken before the cutover survives it. The
+# lock is keyed on the bare <slug>.md name, so renaming the entry to NNN- leaves
+# it in place, and it still resolves to the renamed entry by slug.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-fly.md
+ln -s "$PDIR/plan-fly.md" "$NDIR/queue/plan-fly.md"
+mkdir "$NDIR/queue/plan-fly.md.lock"
+printf '4242\n' > "$NDIR/queue/plan-fly.md.lock/pid"
+normalize_queue "$NDIR/queue"
+assert_entries "row44e entry is prefixed" "010-plan-fly.md plan-fly.md.lock"
+h_eq "row44e lock keeps its pid" "4242" "$(cat "$NDIR/queue/plan-fly.md.lock/pid" 2>/dev/null)"
+h_eq "row44e lock's slug resolves to the renamed entry" "010-plan-fly.md" \
+     "$(queue_entry_for_slug "$NDIR/queue" plan-fly.md 2>/dev/null)"
+h_pass "row44e — an in-flight claim lock survives the cutover"
+
 # ===========================================================================
 # renumber (matrix 17)
 # ===========================================================================
@@ -1538,13 +1673,31 @@ for i in $(seq 1 89); do
     touch "$PDIR/full-$i.md"
     ln -s "$PDIR/full-$i.md" "$NDIR/queue/$(printf '%03d' $((i * 10)))-full-$i.md"
 done
-mkplan plan-over.md
+mkplan plan-over.md plan-back.md
+# A failed add must not evict the plan's done/ link (backlog#1576): eviction
+# runs only after append_entry succeeds.
+ln -s "$PDIR/plan-over.md" "$NDIR/done/plan-over.md"
+touch "$NDIR/done/plan-over.md.staleness"
 rq plan-over
 assert_not_queued "full queue: overflow plan not queued" plan-over
 if [ "$RC" -ne 0 ] && grep -qF "queue is full" <<< "$OUT"; then
     h_pass "full queue — add fails loudly"
 else
     h_fail "full queue — add fails loudly (rc=$RC): $OUT"
+fi
+if [ -L "$NDIR/done/plan-over.md" ] && [ -e "$NDIR/done/plan-over.md.staleness" ]; then
+    h_pass "full queue — failed add keeps the done/ link and its sidecar"
+else
+    h_fail "full queue — failed add keeps the done/ link and its sidecar"
+fi
+# Same for requeue: a full queue leaves the skipped/ link where it was.
+ln -s "$PDIR/plan-back.md" "$NDIR/skipped/plan-back.md"
+rq requeue
+assert_not_queued "full queue: requeued plan not queued" plan-back
+if [ "$RC" -ne 0 ] && [ -L "$NDIR/skipped/plan-back.md" ]; then
+    h_pass "full queue — failed requeue keeps the skipped/ link"
+else
+    h_fail "full queue — failed requeue keeps the skipped/ link (rc=$RC): $OUT"
 fi
 UNNUMBERED=0
 for f in "$NDIR"/queue/-*; do

@@ -1542,12 +1542,21 @@ plan_still_queued() { queue_entry_for_slug "$QUEUE_DIR" "$PLAN_SLUG" >/dev/null;
 
 # dispose_entry <name> <done|skipped> — move the plan's queue entry to done/ or
 # skipped/ under its bare <slug>.md name, which self-heal and requeue match on.
-# A no-op when the plan already left queue/.
+# A no-op when the plan already left queue/. Holds the queue lock from lookup
+# through mv, like `queue dispose`, so a reorder or renumber cannot rename the
+# entry in between. A lock it cannot take returns 1 with nothing moved.
 dispose_entry() {
-    local e
-    e=$(queue_entry_for_slug "$QUEUE_DIR" "$1") || return 0
-    mkdir -p "$NIGHTLY_DIR/$2"
-    mv -f "$QUEUE_DIR/$e" "$NIGHTLY_DIR/$2/$(entry_to_name "$1")"
+    local e rc=0
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "dispose_entry: $QUEUE_DIR/.normalize.lock is held; $1 not moved to $2/." >&2
+        return 1
+    fi
+    if e=$(queue_entry_for_slug "$QUEUE_DIR" "$1"); then
+        mkdir -p "$NIGHTLY_DIR/$2"
+        mv -f "$QUEUE_DIR/$e" "$NIGHTLY_DIR/$2/$(entry_to_name "$1")" || rc=$?
+    fi
+    queue_unlock "$QUEUE_DIR"
+    return "$rc"
 }
 
 # Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan

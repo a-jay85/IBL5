@@ -60,6 +60,7 @@ printf '%s\n' "$*" >> "$FIX/calls.log"
 case "$1 $2" in
   "auth status") exit 0 ;;
   "pr list")     cat "$FIX/prs.json" ;;
+  "pr diff")     [ -f "$FIX/pr-diff.patch" ] && cat "$FIX/pr-diff.patch"; exit 0 ;;
   "pr merge")    rc=0; [ -f "$FIX/merge-rc" ] && rc="$(cat "$FIX/merge-rc")"; exit "$rc" ;;
   "pr view")     echo '{"state":"MERGED"}' ;;
   "api graphql") echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}' ;;

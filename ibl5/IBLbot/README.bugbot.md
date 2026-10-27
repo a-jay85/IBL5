@@ -26,7 +26,23 @@ Two I/O directions:
      (NOT a worktree slug, torn down on merge; NOT prod)
    - `API_KEY` — a valid `ibl_api_keys` key; **must be a high/unlimited rate-limit
      tier** so startup backfill isn't 429-throttled into silently dropping reports
+   - `BUG_OPERATOR_DISCORD_ID`: the league operator's Discord user snowflake. Unset and
+     empty both abort startup. The test bot's `.env.bugbot.test` needs it too.
    - `BUG_CHANNEL_ID` — the dedicated bug-report channel snowflake
+
+## Message routing
+
+`classifyMessage` in `ibl5/IBLbot/src/bug-bot/handlers.ts` picks one route per message:
+
+- **`wake`** runs first. A message inside a bug thread whose author ID equals
+  `BUG_OPERATOR_DISCORD_ID` and that mentions the bot calls
+  `POST /api/v1/bug-pipeline/wake`. PHP checks the author again and decides the outcome. The
+  bot reacts 👀 on the operator's message for every outcome except `duplicate`. A 404 means the report
+  was never enqueued, so the bot enqueues the thread starter and retries once.
+- **`thread-reply`** covers every other message in a bug thread.
+- **`enqueue`** covers a top-level post in the bug channel. The row lands as `dormant` and the
+  pipeline ignores it until the operator wakes it (ADR-0213). The old ✴️ enqueue react is gone,
+  so a GM sees no pickup react until then.
 
 ## Start
 

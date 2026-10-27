@@ -56,6 +56,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     private readonly BugReportClaimRepositoryInterface $claims;
     private readonly BugReporterProfileRepositoryInterface $reporterProfile;
     private readonly BugPipelineStateRepositoryInterface $pipelineState;
+    private readonly BugReportOperatorContextRepository $operatorContext;
 
     public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
     {
@@ -65,6 +66,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
         $this->claims = new BugReportClaimRepository($db, $leagueContext);
         $this->reporterProfile = new BugReporterProfileRepository($db, $leagueContext);
         $this->pipelineState = new BugPipelineStateRepository($db, $leagueContext);
+        $this->operatorContext = new BugReportOperatorContextRepository($db, $leagueContext);
     }
 
     // -------------------------------------------------------------------------
@@ -141,7 +143,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     {
         $rows = $this->fetchAll(
             "SELECT * FROM `ibl_bug_reports`
-             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open','filed')
+             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open','filed','dormant')
                AND (blocked_until IS NULL OR blocked_until <= NOW())
                AND (
                      (status = 'queued' AND class IS NULL)
@@ -177,12 +179,12 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     // Crash-safe enqueue (owns its own transaction; delegates the watermark write)
     // -------------------------------------------------------------------------
 
-    public function insertQueuedReport(string $authorId, string $channelId, string $messageId, string $text): int
+    public function insertDormantReport(string $authorId, string $channelId, string $messageId, string $text): int
     {
         $this->execute(
             'INSERT INTO `ibl_bug_reports`
                 (discord_author_id, channel_id, original_message_id, original_text, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, \'queued\', NOW(), NOW())',
+             VALUES (?, ?, ?, ?, \'dormant\', NOW(), NOW())',
             'ssss',
             $authorId,
             $channelId,
@@ -210,11 +212,59 @@ class BugReportRepository extends \Database\BaseMysqliRepository
                 return $existing['id'];
             }
             // Insert + watermark advance in the SAME transaction => crash between them rolls back both.
-            $newId = $this->insertQueuedReport($authorId, $channelId, $messageId, $text);
+            $newId = $this->insertDormantReport($authorId, $channelId, $messageId, $text);
             $this->pipelineState->upsertPipelineState($channelId, $messageId);
             return $newId;
         });
         return $id;
+    }
+
+    /**
+     * Operator @mention wake: log the operator's message, then move the row per its status.
+     * Duplicate message ids are a no-op (bot retry safety); an unknown report id writes nothing.
+     * dormant -> queued; stopped rows (needs_human/parked_idle/dropped) restart through classify;
+     * every other status only gains context (and a thread_id if it had none).
+     * The row is read FOR UPDATE, so the status branch below sees what the transition writes over.
+     *
+     * @return array{outcome: 'woke'|'restarted'|'appended'|'duplicate'|'unknown', status: ?string}
+     */
+    public function wakeByOperator(int $id, string $threadId, string $messageId, string $authorId, string $content): array
+    {
+        /** @var array{outcome: 'woke'|'restarted'|'appended'|'duplicate'|'unknown', status: ?string} $result */
+        $result = $this->transactional(function () use ($id, $threadId, $messageId, $authorId, $content): array {
+            $locked = $this->fetchOne('SELECT * FROM `ibl_bug_reports` WHERE id = ? LIMIT 1 FOR UPDATE', 'i', $id);
+            $row = $locked === null ? null : $this->castRow($locked);
+            if ($row === null) {
+                return ['outcome' => 'unknown', 'status' => null];
+            }
+            if (!$this->operatorContext->append($id, $messageId, $authorId, $content)) {
+                return ['outcome' => 'duplicate', 'status' => $row['status']];
+            }
+            if ($row['status'] === 'dormant') {
+                $this->claims->transition($id, 'queued', ['thread_id' => $threadId], true);
+                return ['outcome' => 'woke', 'status' => 'queued'];
+            }
+            if (in_array($row['status'], ['needs_human', 'parked_idle', 'dropped'], true)) {
+                $this->claims->transition($id, 'queued', [
+                    'thread_id' => $threadId,
+                    'class' => null,
+                    'approval_message_id' => null,
+                    'blocked_until' => null,
+                    'hunt_attempts' => 0,
+                ], true);
+                return ['outcome' => 'restarted', 'status' => 'queued'];
+            }
+            if ($row['thread_id'] === null) {
+                $this->claims->transition($id, $row['status'], ['thread_id' => $threadId]);
+            }
+            // The operator's mention used to arrive as a thread-reply. awaiting_info and
+            // gathering rows re-run only on that stamp, so keep it for them.
+            if (in_array($row['status'], ['awaiting_info', 'gathering'], true)) {
+                $this->claims->stampThreadReply($threadId);
+            }
+            return ['outcome' => 'appended', 'status' => $row['status']];
+        });
+        return $result;
     }
 
     // -------------------------------------------------------------------------
@@ -306,6 +356,28 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     }
 
     // -------------------------------------------------------------------------
+    // Operator-context delegations
+    // -------------------------------------------------------------------------
+
+    /**
+     * @see BugReportOperatorContextRepository::listForReportIds()
+     * @param list<int> $ids
+     * @return array<int, list<array{message_id: string, created_at: string, content: string}>>
+     */
+    public function findOperatorContextForReportIds(array $ids): array
+    {
+        return $this->operatorContext->listForReportIds($ids);
+    }
+
+    /**
+     * @return list<array{message_id: string, created_at: string, content: string}>
+     */
+    public function findOperatorContextByReportId(int $id): array
+    {
+        return $this->operatorContext->listForReportIds([$id])[$id] ?? [];
+    }
+
+    // -------------------------------------------------------------------------
     // Reporter-profile delegations
     // -------------------------------------------------------------------------
 
@@ -394,7 +466,7 @@ class BugReportRepository extends \Database\BaseMysqliRepository
 
     /**
      * @see BugReportClaimRepository::transition()
-     * @param array<string, int|string> $opts
+     * @param array<string, int|string|null> $opts
      */
     public function transition(int $id, string $status, array $opts = [], bool $releaseLease = false): bool
     {

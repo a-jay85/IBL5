@@ -7,6 +7,7 @@ bin/lib/plan-model-consistency       # legacy-accept: maps old impl_model ids
 bin/automouse/queue                  # legacy-accept: old plan input still accepted
 bin/automouse/run                    # legacy-accept: old plan input still accepted
 .claude/skills/plan/SKILL.md         # documents accepted legacy impl_model ids
+.claude/skills/plan/_validate-and-write.md  # gate 13 documents accepted legacy impl_model ids
 .claude/rules/automouse-workflow.md  # documents accepted legacy impl_model ids
 bin/measure-delegate-cost            # historical measurement note
 ibl5/docs/decisions/0085-just-in-time-opus-escalation-on-final-automouse-retry.md  # immutable ADR

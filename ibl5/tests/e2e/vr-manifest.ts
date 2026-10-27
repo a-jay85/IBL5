@@ -49,6 +49,9 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'index', auth: 'public', url: 'index.php', anchor: 'article',
     extraMask: ['div.news-article__body'],
     sourceGlobs: ['ibl5/index.php', 'ibl5/themes/**', 'ibl5/modules/News/**'] },
+  { name: 'on-this-day', auth: 'public', url: 'index.php', anchor: '.on-this-day__list',
+    viewports: ['desktop', 'mobile'],
+    sourceGlobs: ['ibl5/classes/OnThisDay/**', 'ibl5/design/components/on-this-day.css', 'ibl5/modules/News/**'] },
   { name: 'activity-tracker', auth: 'public', url: 'modules.php?name=ActivityTracker',
     anchor: '.ibl-data-table', extraMask: ['.activity-row time'],
     viewports: ['desktop', 'mobile'] },
@@ -147,6 +150,12 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.search-results', viewports: ['desktop', 'mobile'] },
   { name: 'your-account', auth: 'public', url: 'modules.php?name=YourAccount',
     anchor: '.auth-page', viewports: ['desktop', 'mobile'] },
+  { name: 'your-account-register', auth: 'public', url: 'modules.php?name=YourAccount&op=new_user',
+    anchor: '.auth-page:has(#register-username)', viewports: ['desktop', 'mobile'],
+    notes: 'Registration form (RegistrationView), daisyUI d-card/d-input/d-btn. Logged-out only; a logged-in user is redirected away, so the row is public.' },
+  { name: 'your-account-forgot-password', auth: 'public', url: 'modules.php?name=YourAccount&op=pass_lost',
+    anchor: '.auth-page:has(#reset-email)', viewports: ['desktop', 'mobile'],
+    notes: 'Forgot-password form (PasswordResetView), daisyUI d-card/d-input/d-btn. Logged-out only.' },
 
   // ── Error pages ──────────────────────────────────────────────
   { name: 'error-invalid-module', auth: 'public', url: 'modules.php?name=NonExistentModule',

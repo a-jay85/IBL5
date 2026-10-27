@@ -911,6 +911,75 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertSame(200050001, $row['pid']);
     }
 
+    public function testHasRetiredPlayersForYearReturnsTrueWhenRowExists(): void
+    {
+        $this->repo->upsertRetiredPlayer([
+            'jsb_pid' => 99903,
+            'retirement_year' => 2095,
+            'player_name' => 'Prior Retiree',
+            'pid' => null,
+        ]);
+
+        self::assertTrue($this->repo->hasRetiredPlayersForYear(2095));
+    }
+
+    public function testHasRetiredPlayersForYearReturnsFalseForYearWithNoRows(): void
+    {
+        $this->repo->upsertRetiredPlayer([
+            'jsb_pid' => 99903,
+            'retirement_year' => 2095,
+            'player_name' => 'Prior Retiree',
+            'pid' => null,
+        ]);
+
+        self::assertFalse($this->repo->hasRetiredPlayersForYear(2094));
+    }
+
+    public function testHasDraftResultsForYearMatchesOnlyStoredDraftYear(): void
+    {
+        $this->repo->upsertDraftResult([
+            'draft_year' => 2095,
+            'round' => 1,
+            'pick' => 1,
+            'team_name' => 'Prior Team',
+            'pos' => 'PG',
+            'player_name' => 'Prior Pick',
+            'pid' => null,
+        ]);
+
+        self::assertTrue($this->repo->hasDraftResultsForYear(2095));
+        self::assertFalse($this->repo->hasDraftResultsForYear(2094));
+    }
+
+    public function testHasHofInducteesForYearMatchesOnlyStoredInductionYear(): void
+    {
+        $this->repo->upsertHofInductee([
+            'jsb_pid' => 99904,
+            'player_name' => 'Prior Inductee',
+            'pos' => 'C',
+            'induction_year' => 2095,
+            'pid' => null,
+        ]);
+
+        self::assertTrue($this->repo->hasHofInducteesForYear(2095));
+        self::assertFalse($this->repo->hasHofInducteesForYear(2094));
+    }
+
+    /**
+     * Only .awa stat-leader rows count. An All-Star row for the same year does not.
+     */
+    public function testHasStatLeaderAwardsForYearIgnoresOtherAwards(): void
+    {
+        $this->repo->upsertAward(2095, 'Western Conference All-Star', 'Prior Star');
+
+        self::assertFalse($this->repo->hasStatLeaderAwardsForYear(2095));
+
+        $this->repo->upsertAward(2095, 'Scoring Leader (1st)', 'Prior Scorer');
+
+        self::assertTrue($this->repo->hasStatLeaderAwardsForYear(2095));
+        self::assertFalse($this->repo->hasStatLeaderAwardsForYear(2094));
+    }
+
     // ── markPlayerRetired ────────────────────────────────────────
 
     /** @return array<string, int|string|null> */

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-19
+last_verified: 2026-10-26
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -35,9 +35,34 @@ Write the mutation into the row's **How** cell as a clause on the command, so an
 
 **Compliant exemplar (extract and run).** `bin/test-automouse-postplan-engine` (lines 71 to 74) awk-extracts the real runner span and `eval`s it, so the test executes production text. Its row 12-neg is the mutation control.
 
-**Rejected executable gates (measured 2026-10-02 for backlog#922).** A comment regex over test code (`to simulate`, `simulate the X logic`) hit 13 of 1603 test files, with 2 real instances. A PHP heuristic that flags test methods whose body references no production class flagged 238 of 9031 methods. Sampled hits such as `ibl5/tests/Bootstrap/FilterFunctionTest.php` and `ibl5/tests/YourAccount/BuildRedirectUrlTest.php` call production global functions and are false positives, and the heuristic sees only PHP while the plan-originated cases are TypeScript and bash. The fix therefore lives in plan guidance. A plan-time mutation-presence check would need `bin/check-plan`, which backlog#947 owns. <!-- slop-ok -->
+**Example mutation clause.** "delete the `--model` arm ⇒ this assertion fails" is the shape a **How** cell carries. <!-- slop-ok -->
+
+**Restating shapes that satisfy nothing.** A test seeds a state file instead of driving the loop N times, cancels before time advances, or asserts behind an `if` that can be false. Each passes with production reverted.
+
+**Rejected executable gates (measured 2026-10-02 for backlog#922).** A comment regex over test code (`to simulate`, `simulate the X logic`) hit 13 of 1603 test files, with 2 real instances. A PHP heuristic that flags test methods whose body references no production class flagged 238 of 9031 methods. Sampled hits such as `ibl5/tests/Bootstrap/FilterFunctionTest.php` and `ibl5/tests/YourAccount/BuildRedirectUrlTest.php` call production global functions and are false positives, and the heuristic sees only PHP while the plan-originated cases are TypeScript and bash. The fix therefore lives in plan guidance. A plan-time mutation-presence check would need `bin/check-plan`, which backlog#947 owns. Superseded 2026-10: the keyed-section form made the plan-time gate buildable; see § Executable mutations. <!-- slop-ok -->
+
+### Executable mutations
+
+A plan states each catching mutation as data in a `## Executable Mutations` section. One entry per post-impl CLI-executable row:
+
+````text
+```mutation
+row: 20
+file: .github/workflows/merge-digest-notify.yml
+match: <one line copied verbatim from the file>
+replace: <the same line with the mutation applied>
+```
+````
+
+- **Keys.** `row:` names a post-impl CLI-executable matrix row. `file:` is a repo-relative path. `match:` is a single-line literal that must occur exactly once in the file. `replace:` is a literal; an empty value deletes the match. `check:` is optional and defaults to the row's location cell after gate `[V]` strips its backticks. An override must itself pass gate `[V]`'s runnable test.
+- **Literals.** Both values are single lines, compared byte for byte. No regex and no escapes.
+- **Paths.** A leading `/`, a `..` segment, a `.git/` prefix, or a symlink is rejected. The file must exist in the tree or be named in `## Critical Files`.
+- **When prose stays.** A row whose mutation needs a DB, a browser, GitHub Actions, or a multi-line edit ends its "What to verify" cell with `(mutation-prose: <reason>)`. The reason is 15 or more characters. A `(one-time-check:)` row needs neither.
+- **Who runs it.** `bin/check-plan` gate `[XM]` checks the grammar and coverage at plan time. `/post-plan` Phase 5.0 runs `bin/lib/plan-exec-mutations`, which applies each entry, requires the check to exit non-zero, reverts, and verifies the tree byte-identical. Arming condition (19) holds on any result other than `TRIPPED`.
 
 ### Critical Files parsing — counter-examples
+
+Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`. All tokens match as **whole words**.
 
 The `(conditional)` marker exempts an entry from the MISSING-FILE check, but only when `conditional` *opens* the parenthesized group immediately followed by `)` or a separator (`—`/`–`/`-`/`:`/`;`/`,`):
 
@@ -90,6 +115,8 @@ Gates `[13]` (`impl_model` consistency, via `bin/lib/plan-model-consistency`), `
 The prohibition is on *invoking the script*, not on the gates themselves: `[C]` (size budget), `[F]` (list-form `## Critical Files`), `[8]` (creation phrasing), and `[T]` (tier lines) remain **authoring constraints you satisfy while writing** — self-verify them by reading what you wrote.
 
 ### Pre-prod exercise path — slice elaboration
+
+Deploy-dependent behavior includes a file CI ships on merge, an applied migration, a registered daemon/cron, a new `.github/workflows/` job, and a live-service call.
 
 When a behavior looks untestable pre-prod, **split it by slice before conceding**:
 
@@ -233,6 +260,8 @@ Omit the field entirely when the phase needs nothing beyond the always-on set. A
 
 ## One-time-check tag shape
 
+Typical single plan-time runs: a corpus diff over local transcripts, a counterfactual working-tree mutation, or one command's printed output.
+
 The reason is 15 or more characters, free of `(`, `)`, `|` and backticks, so a reviewer can rerun the check by hand. `bin/lib/plan-matrix-assertions` skips a tagged row instead of reporting it unrealised; a malformed tag is ignored fail-closed and the row is checked. `bin/check-plan` gate `[Y]` rejects a bad shape, a tag on a non-`CLI-executable` row, and a matrix with tagged rows above one third of its rows.
 
 Out-of-repo and post-PR rows carry the tag at write time. A `CLI-executable` row whose location cell runs only `~/`, `$HOME`, or `/tmp` paths (a scratch script under `~/claude-plans/_scripts/`, a memory file, a hook) or queries the open PR with `gh run`, `gh pr`, or `gh api` has no footprint a diff can carry, so Step 6.7 would stop on its tokens. End its What-to-verify cell with `(one-time-check: <reason>)` as you write it; `bin/check-plan` gate `[Z]` fails the plan otherwise. A command that also runs a repo `bin/` script, a repo test, `composer`, `php`, `npx`, `docker`, or `curl` is in-repo and stays untagged. Tokens that sit only inside a `Mutation:` clause (from the label to its `⇒`, sentence end, or cell end) are excluded by `bin/lib/plan-matrix-assertions` and need no tag. A token also named outside the clause is still checked.
@@ -265,3 +294,15 @@ Gate `[PM]` catches three abuse shapes:
 - **Wrong type.** The tag sits on a row that is not `Truly-manual`, such as a PHPUnit row marked `post-merge: runs after deploy`. Automated rows run in CI on the open PR, so the tag has no meaning there.
 - **Thin or off-vocabulary reason.** `post-merge: easier after it ships` is under the vocabulary bar. A valid reason names the dependency, for example `post-merge: launchd scheduling on the live host only fires after deploy`.
 - **Look-and-feel row.** A row asking a human to judge a new layout carries the tag to avoid holding the merge. That judgment can happen on the open PR, so the row stays in the Manual-Testing window.
+
+## Durable absence checks
+
+PR #2515 deleted the `$bgcolor2` global and proved the deletion with a plan-only negated grep in its Verification Matrix. Post-plan Phase 5.0 ran that cell once and it passed. Master then added a reader in `ibl5/modules/News/index.php` (#3080). The branch merged master, CI stayed green because News fell back to its default, and the regression shipped. The assertion existed only in `~/claude-plans/`, which no CI job reads.
+
+The rule covers any `post-impl` `CLI-executable` row that uses a negated grep to assert that a deleted symbol, global, file, or pattern stays absent. A durable check is a PHPUnit or Playwright test under `ibl5/tests/`, a `*_test.go` file, a `bin/test-*` harness, or a CI-wired `bin/check-*` script that holds the assertion. The row runs it in its own command, outside the negated grep: the path is the command word, or an argument of a test runner such as `vendor/bin/phpunit`. A test path that is only the grep's target does not count, and neither does a path in an `echo` or a shell comment. A `vendor/bin/test-*` path is not a `bin/test-*` harness. A command segment annotated `# (one-shot)` does not count, because that annotation says the script is not CI-run. The note voids only its own segment, so a durable check elsewhere in the same cell still counts. When the absence is not worth a durable check, the row ends its "What to verify" cell with `(one-time-check: <reason>)`, and the one-third cap in gate `[Y]` still applies.
+
+The fix is a pointer to a durable check. The gate generates nothing. The row names an in-repo check that holds the absence assertion, and gate `[AB]` in `bin/check-plan` rejects a `post-impl` `CLI-executable` row whose command is a negated grep with no durable token. Gate `[AB]` checks that the named file exists and contains the longest literal run of one grepped pattern (one per `|` alternative, with regex escapes and a trailing `$` removed). For `! grep -rq 'bgcolor2' ibl5/modules && bin/test-foo`, `bin/test-foo` must contain `bgcolor2`. A `bin/` file must also be named in a workflow, or carry `# (wired in this PR)`, because gate `[G]` skips a cell that holds a `(one-shot)` note. A check the PR adds or extends cannot be read at plan time, so listing it in `## Critical Files` as a change target satisfies the gate, and post-plan Phase 5.0 then requires it in the diff. The gate reads Timing the way Phase 5.0 does, any cell matching `post-impl` in any case.
+
+That is as far as a lint can go. It shows the check mentions the token, and it cannot show the check asserts the token is absent. A harness that greps for the token to prove it is present passes too. A bare runner such as `vendor/bin/phpunit --filter X`, `npx vitest` or `go test ./...` names no file to read, so it never counts. Name the test file instead. A harness that holds the assertion only by calling another file also fails the gate, so name the file that holds it. Auto-generating tests from matrix rows was rejected: the row is prose, and a generated test would pin the grep rather than the behaviour.
+
+The detector is deliberately narrow. The 2026-10-20 corpus scan over `~/claude-plans/*.md` found 326 `post-impl` CLI rows with a negated grep, 251 of them without a durable token. The `grep -c ... = 0` form (140 rows) and the `test -z "$(grep ...)"` form (20 rows) were sampled and found dominated by `git diff | grep -c` diff-hygiene counts and mixed presence-and-absence checks, so they are out of scope for the gate. Docs-only negated greps (about 51 of the 251) are in scope: a wording-absence check regresses the same way a symbol-absence check does, and the opt-out tag costs one clause.

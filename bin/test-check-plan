@@ -3173,6 +3173,19 @@ assert_viol "gateMT-seam-empty-silent" 0 '[MT]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
+# Drift guard: _mt_blank_clauses in bin/check-plan is a hand copy of the Mutation-clause
+# loop in bin/lib/plan-matrix-assertions. Compare the two loops line by line, leading
+# whitespace ignored, from the label match through the cut that advances `rest`.
+MT_LOOP_AWK='on && !/^[ \t]*chk = ""; rest/ { sub(/^[ \t]+/, ""); print } /chk = ""; rest = / { on = 1 } on && /rest = substr\(body, stop \+ 1\)/ { exit }'
+MT_LOOP_CP="$(awk "$MT_LOOP_AWK" "$GUARD")"
+MT_LOOP_HELPER="$(awk "$MT_LOOP_AWK" "$SCRIPT_DIR/lib/plan-matrix-assertions")"
+if [ -z "$MT_LOOP_CP" ] || [ -z "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "could not extract the Mutation-clause loop from both files"
+elif [ "$MT_LOOP_CP" != "$MT_LOOP_HELPER" ]; then
+    h_fail "gateMT-blanker-loop-parity" "_mt_blank_clauses in bin/check-plan differs from the loop in bin/lib/plan-matrix-assertions"
+else
+    h_pass "gateMT-blanker-loop-parity"
+fi
 # Seam unset: real repo, a valid plan with corrected forms passes.
 unset CHECK_PLAN_MT_GIT_ROOT
 assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
@@ -3180,6 +3193,148 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '"$YROW"'
 <!-- no-test-methods: fixture rows are gate MT props -->
 '
+
+# ---------------------------------------------------------------------------
+# Gate [MT]/[MU] unrealisable-token fixtures (22 cases)
+# ---------------------------------------------------------------------------
+# A throwaway repo whose tracked text holds one bare :LINE literal and one scratch
+# path, for the tracked-token cases. Rejected-shape literals in the rows below are
+# spliced from variables so no contiguous copy of them sits in this tracked file.
+NT_REPO="$TMP/nt-repo"
+mkdir -p "$NT_REPO/e2e"
+git -C "$NT_REPO" init -q
+printf "test('x', async () => {});\n" > "$NT_REPO/e2e/vr.spec.ts"
+printf 'See line :7070 and the log at /tmp/nt-tracked.log here.\n' > "$NT_REPO/README.md"
+git -C "$NT_REPO" add -A
+export CHECK_PLAN_MT_GIT_ROOT="$NT_REPO"
+NT_CO=':'
+NT_SL='/'
+NT_OB='{'
+# [MT] a bare :LINE after the Mutation arrow (the worktree-abort-cleanup shape).
+assert_viol "gateMT-bare-line-after-arrow-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a bare :LINE outside any Mutation clause.
+assert_viol "gateMT-bare-line-outside-mutation-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a path-prefixed :LINE after the arrow (the trade-lock-skip-completed shape).
+assert_viol "gateMT-path-line-after-arrow-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ `NtWideTest.php'"$NT_CO"'277` goes red | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a :LINE inside the clause, before the arrow, is blanked: silent.
+assert_viol "gateMT-line-in-clause-before-arrow-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: delete the branch at `x.php:12` ⇒ the case fails | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a bare :LINE that tracked text holds is pre-existing to the helper: silent.
+assert_viol "gateMT-bare-line-tracked-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: drop the guard ⇒ the case fails at `:7070` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a host:port token after the arrow keeps its exemption: silent.
+assert_viol "gateMT-host-port-after-arrow-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds. Mutation: stop the stack ⇒ `wt-x.localhost:8080` refuses | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] the bare-token message says where the line number goes.
+assert_msg "gateMT-bare-line-message-says-prose" 1 'Write the line number in prose outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | the case holds. Mutation: drop the guard ⇒ the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a scratch file under /tmp (the phpunit-group-attribute-deprecation shape).
+assert_viol "gateMU-tmp-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a scratch path that tracked text holds is pre-existing to the helper: silent.
+assert_viol "gateMU-tmp-tracked-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | the run writes `/tmp/nt-tracked.log` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] a brace placeholder (the trade-suggestions-needs-engine shape).
+assert_viol "gateMU-template-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a brace placeholder with a +N offset.
+assert_viol "gateMU-template-offset-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt+1}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a dollar-brace shell expansion is no template: silent. The tracked e2e/
+# token makes the pre-filter match, so the helper runs.
+assert_viol "gateMU-shell-expansion-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `${NT_VAR}` expands under `e2e/` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] a PHP brace-dollar interpolation is no template: silent.
+assert_viol "gateMU-php-interpolation-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | `salary_yr{$nt}` resolves under `e2e/` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+'
+# [MU] both new messages tell the author to move the token out of backticks.
+assert_msg "gateMU-tmp-message-says-outside-backticks" 1 'Write the scratch name outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_msg "gateMU-template-message-says-outside-backticks" 1 'Write the template outside backticks' '[Z]' "$FM$YHDR"'
+| 1 | the engine reads `salary_yr'"$NT_OB"'nt}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a lowercase-only mutation: label blanks its clause, as the helper does: silent.
+assert_viol "gateMT-lowercase-mutation-label-silent" 0 '[MT]' "$FM$YHDR"'
+| 1 | `pinned_thing` holds; mutation: delete the branch at `x.php:12` ⇒ the case fails | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MT props -->
+'
+# [MT] a word ending in Mutation: is no label, so the helper scans the token: fires.
+assert_viol "gateMT-word-ending-in-mutation-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case holds. PreMutation: run `NtWideTest.php'"$NT_CO"'277` ⇒ the case fails | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] macOS temp paths count as scratch too: the per-user tree and both private forms.
+assert_viol "gateMU-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'T'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-tmp-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'tmp'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+assert_viol "gateMU-private-var-folders-scratch-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | counts match between `'"$NT_SL"'private'"$NT_SL"'var'"$NT_SL"'folders'"$NT_SL"'nt'"$NT_SL"'nt-before.txt` and the second run | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MU] a template the plan's own code block adds literally (a route pattern): silent.
+assert_viol "gateMU-template-in-phase-code-silent" 0 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | PHPUnit | post-impl | `tests/XTest.php` |
+'"$YROW"'
+<!-- no-test-methods: fixture rows are gate MU props -->
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}'"'"', TeamController::class);
+```
+'
+# [MU] a code block that lacks the template does not exempt it: fires.
+assert_viol "gateMU-template-not-in-phase-code-fires" 1 '[MU]' "$FM$YHDR"'
+| 1 | the router maps `'"$NT_SL"'teams'"$NT_SL$NT_OB"'teamId}` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+
+```php
+$router->get('"'$NT_SL"'teams'"$NT_SL"'7'"'"', TeamController::class);
+```
+'
+unset CHECK_PLAN_MT_GIT_ROOT
 
 # ---------------------------------------------------------------------------
 # Gate [MU] fixtures (22 cases)
@@ -3562,6 +3717,156 @@ assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate XM: executable mutation claims (ADR-0199). The grammar lives in
+# bin/lib/plan-exec-mutations; these fixtures pin the gate's wiring. Fixture
+# plans sit in $TMP, so --root falls back to this repo and `bin/check-docs`
+# is a real target on disk.
+# ---------------------------------------------------------------------------
+XF='```'
+XM_MATRIX='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+xm_block() {
+    printf '%smutation\nrow: 1\nfile: %s\n' "$XF" "$1"
+    [ -z "${2:-}" ] || printf 'check: %s\n' "$2"
+    printf 'match: set -u\nreplace: set +u\n%s\n' "$XF"
+}
+
+assert_viol "xm-wellformed-clean" 0 '[XM]' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-missing-key" 1 'missing key' "$FM$XM_MATRIX
+## Executable Mutations
+
+${XF}mutation
+row: 1
+file: bin/check-docs
+replace: set +u
+${XF}
+"
+
+assert_viol "xm-target-absent" 1 '[XM]' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/no-such-xm-target)
+"
+
+assert_viol "xm-target-in-critical-files" 0 '[XM]' "$FM$XM_MATRIX
+## Critical Files
+
+- \`bin/no-such-xm-target\` — NEW
+
+## Executable Mutations
+
+$(xm_block bin/no-such-xm-target)
+"
+
+assert_viol "xm-check-override-not-runnable" 1 'check override is not runnable' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'Phase 3')
+"
+
+assert_viol "xm-legacy-silent" 0 '[XM]' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean. Mutation: delete the arm ⇒ fails | CLI-executable | post-impl | `bin/check-docs` |
+'
+
+XM_TWO='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | docs clean | CLI-executable | post-impl | `bin/check-docs` |
+'
+assert_viol "xm-coverage-uncovered" 1 'carries neither' "$FM$XM_TWO| 2 | docs again | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-ok" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-trailing-paren" 1 'too short' "$FM$XM_TWO| 2 | docs again (mutation-prose: n/a) (see row 3 for the long story) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-nested-paren-ok" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (mutation-prose: needs a running Docker DB (see ADR-1)) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+assert_viol "xm-coverage-prose-short" 1 'too short' "$FM$XM_TWO| 2 | docs again (mutation-prose: db) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+# The --root is the repo being checked, never the plan's own git toplevel:
+# $HOME/claude-plans/ can sit inside an unrelated repo (a dotfiles repo).
+XM_FOREIGN="$(mktemp -d)"
+git -C "$XM_FOREIGN" init -q
+printf '%s\n' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+" > "$XM_FOREIGN/plan.md"
+XM_FOREIGN_OUT="$("$GUARD" "$XM_FOREIGN/plan.md" 2>&1)"
+if grep -qF '[XM]' <<< "$XM_FOREIGN_OUT"; then
+    h_fail "xm-root-ignores-plan-repo" "plan inside a foreign repo fired [XM]: $XM_FOREIGN_OUT"
+else
+    h_pass "xm-root-ignores-plan-repo"
+fi
+rm -rf "$XM_FOREIGN"
+
+assert_viol "xm-coverage-one-time-exempt" 0 '[XM]' "$FM$XM_TWO| 2 | docs again (one-time-check: corpus diff printed zero) | CLI-executable | post-impl | \`bin/check-docs --self-test\` |
+| 3 | docs third (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --no-staleness\` |
+| 4 | docs fourth (mutation-prose: needs a running Docker DB) | CLI-executable | post-impl | \`bin/check-docs --help\` |
+
+## Executable Mutations
+
+$(xm_block bin/check-docs)
+"
+
+# Gate survival: the row-20 shape block (a workflow line full of braces,
+# dollars and colons) sits in a fence under its own heading, so gates N, V, Y,
+# Z and MT never see it.
+XM_SURV="$TMP/xm-survival.md"
+printf '%s' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | checkout pinned. Mutation: point ref at head ⇒ fails | CLI-executable | post-impl | `bin/test-after-merge-checklist` |
+
+## Executable Mutations
+
+```mutation
+row: 1
+file: .github/workflows/merge-digest-notify.yml
+match: ref: ${{ github.event.pull_request.base.ref }}
+replace: ref: ${{ github.event.pull_request.head.sha }}
+```
+' > "$XM_SURV"
+XM_SURV_OUT="$("$GUARD" "$XM_SURV" 2>&1)"; XM_SURV_RC=$?
+if [ "$XM_SURV_RC" -eq 0 ] \
+    && ! grep -vF '[N] checked' <<< "$XM_SURV_OUT" | grep -qE '\[(N|V|Y|Z|MT|XM)\]'; then
+    h_pass "xm-gate-survival (exit 0)"
+else
+    h_fail "xm-gate-survival" "expected a clean run, got exit $XM_SURV_RC: $XM_SURV_OUT"
+fi
+
+# ---------------------------------------------------------------------------
 # Gate V: a CLI-executable row's location cell must be ONE runnable command.
 # Every fixture carries "$FM" (impl_model: sonnet) so a 0-manual matrix does
 # not reattribute the exit code to gate 13 — the trap the header comment at
@@ -3770,14 +4075,16 @@ _corpus_guard_ok() {
     # exit, and only when the failure is provably all-downgradeable. Read ONLY
     # the violations block: [W] advisories and the [N] coverage line print on a
     # clean run too, so a bare '^\[' match would flag passing plans.
+    # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
+    # the plans it flags carry genuine plan-only negated greps (true positives).
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -4594,17 +4901,18 @@ _hdp_case "no-trailing-newline" '## Automouse Hold Justification
 **Decision:** last line' '**Decision:** last line'
 
 # regex_canon_divergence — the three call sites must stay byte-identical.
-# Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
+# Canon lives in bin/check-plan gate [D]; _hold-and-remediation.md and _architect-contract.md
 # restate it. Any divergence (notably \s for [[:space:]]) fails here.
 SCAF_RE='^[[:space:]]*[0-9]+\.[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
 BODY_RE='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
 _canon_failed=0
-for _f in bin/check-plan .claude/skills/plan/SKILL.md \
+for _f in bin/check-plan .claude/skills/plan/_hold-and-remediation.md \
          .claude/skills/plan/_architect-contract.md; do
   grep -qF "$SCAF_RE" "$_f" || { echo "FAIL: scaffold regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
   grep -qF "$BODY_RE" "$_f" || { echo "FAIL: body regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
 done
 if grep -nE '\\s' bin/check-plan .claude/skills/plan/SKILL.md \
+    .claude/skills/plan/_hold-and-remediation.md \
     .claude/skills/plan/_architect-contract.md 2>/dev/null | grep -qE '\(Phase\|Step\)'; then
   echo "FAIL: non-POSIX \\s found in canon expression"
   FAILED=1
@@ -4878,5 +5186,163 @@ for L_CASE in overflow verbatim; do
         FAILED=1
     fi
 done
+
+# ---------------------------------------------------------------------------
+# Gate [AB] fixtures (40 assert_viol cases + 1 deny-message case)
+# A post-impl CLI-executable row with a negated grep must name a durable
+# in-repo check that contains the grepped token, or carry
+# (one-time-check: <reason>). Rows are read from the fence-aware matrix, so a
+# fenced example never trips the gate. The cases run a copy of bin/ inside a
+# scratch repo, so which named checks exist and what they hold is fixed here.
+# ---------------------------------------------------------------------------
+AB_REPO="$(mktemp -d)"
+: > "$AB_REPO/.git"
+trap 'rm -rf "$AB_REPO"; rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
+mkdir -p "$AB_REPO/bin"
+cp "$SCRIPT_DIR/check-plan" "$SCRIPT_DIR/check-prose" "$AB_REPO/bin/"
+cp -R "$SCRIPT_DIR/lib" "$AB_REPO/bin/lib"
+mkdir -p "$AB_REPO/vendor/bin" "$AB_REPO/ibl5/tests/Ab" "$AB_REPO/.github/workflows"
+# Gate [G] wants every named bin/test-* wired in a workflow.
+printf '%s\n' 'jobs:' '  ab:' '    steps:' '      - run: bin/test-ab-holds && bin/test-ab-other && ./bin/test-ab-dot' \
+    '      - run: $GITHUB_WORKSPACE/bin/test-ab-ws' \
+    '      - run: cd ibl5 && ../bin/test-ab-up' \
+    > "$AB_REPO/.github/workflows/ab.yml"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-dot"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-ws"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-up"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-holds"
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/test-ab-other"
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-unwired"
+# Gate [BX] wants every named bin/ script to exist; the (one-shot) cases name this one.
+printf '%s\n' '#!/bin/sh' 'echo unrelated' > "$AB_REPO/bin/check-foo"
+# A prefix of a wired script: a substring match would count it as wired.
+printf '%s\n' '#!/bin/sh' '! grep -rq bgcolor2 ibl5/modules' > "$AB_REPO/bin/test-ab-hol"
+printf '%s\n' '#!/bin/sh' 'echo bgcolor2' > "$AB_REPO/vendor/bin/test-ab-holds"
+printf '%s\n' '<?php // asserts no reader of bgcolor2' > "$AB_REPO/ibl5/tests/Ab/NoBgcolor2Test.php"
+AB_GUARD_SAVED="$GUARD"
+GUARD="$AB_REPO/bin/check-plan"
+AB_BASE="$FM$YHDR"'
+'"$YROW"
+AB_NOTE='<!-- no-test-methods: fixture rows are gate AB props -->'
+AB_CANARY=$(cat <<'AB_CANARY_EOF'
+| 7 | `grep -cE` for `bgcolor=`, `cellspacing=` and `cellpadding=` in `ibl5/themes/IBL/theme.php` prints 0, and no PHP file reads `bgcolor2`. Catches: restoring the `bgcolor=` echo in `OpenTable()` ⇒ count 1 | CLI-executable | post-impl (Phase 2) | ! grep -q -e 'bgcolor=' -e 'cellspacing=' -e 'cellpadding=' ibl5/themes/IBL/theme.php && ! grep -rq --include='*.php' 'bgcolor2' ibl5/themes ibl5/classes ibl5/modules ibl5/index.php ibl5/modules.php |
+AB_CANARY_EOF
+)
+AB_WHAT='no PHP file reads bgcolor2; the harness holds the assertion'
+# ab_row <name> <want> <location cell> — one-row [AB] fixture.
+ab_row() {
+    assert_viol "$1" "$2" '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `'"$3"'` |
+'"$AB_NOTE"
+}
+
+# A bin/test-* harness that holds the grepped token: durable.
+ab_row "AB-pass-bin" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A harness that exists but never mentions the token is not durable.
+ab_row "AB-fail-bin-unrelated" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-other'
+# A named harness that does not exist is not durable.
+ab_row "AB-fail-bin-missing" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-nope'
+# vendor/bin/test-* is not bin/test-*, even when it holds the token.
+ab_row "AB-fail-vendor-bin" 1 '! grep -rq bgcolor2 ibl5/modules && vendor/bin/test-ab-holds'
+# A bare runner names no file that could hold the assertion.
+ab_row "AB-fail-runner-bare" 1 'vendor/bin/phpunit --filter testNoBgcolor2Reader && ! grep -rq bgcolor2 ibl5/modules'
+# A runner given a test file that holds the token: durable (cd ibl5 path).
+ab_row "AB-pass-runner-path" 0 'cd ibl5 && vendor/bin/phpunit tests/Ab/NoBgcolor2Test.php && ! grep -rq bgcolor2 modules'
+# A bare vitest / go test word anywhere in the cell is not durable.
+ab_row "AB-fail-vitest-word" 1 '! grep -rq bgcolor2 ibl5/modules && echo vitest go test-free'
+ab_row "AB-fail-runner-anchored" 1 '! grep -rq bgcolor2 ibl5/modules; npx vitest run; go test ./...'
+# A test path that is only the grep target is not durable.
+ab_row "AB-fail-grep-target" 1 '! grep -rq bgcolor2 ibl5/tests/Ab/NoBgcolor2Test.php'
+# The motivating css-legacy-markup-styles.md row 7: plan-only negated grep.
+assert_viol "AB-fail-canary" 1 '[AB]' "$AB_BASE"'
+'"$AB_CANARY"'
+'"$AB_NOTE"
+# The (one-shot) annotation voids the token it annotates.
+ab_row "AB-fail-one-shot" 1 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-holds # (one-shot)'
+# A (one-shot) note on one token does not void a different durable token.
+ab_row "AB-pass-one-shot-other-token" 0 'bin/test-ab-holds && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# The token comes from the -e pattern, not from a path or flag value.
+ab_row "AB-pass-e-pattern" 0 "! grep -rq --include='*.php' -e 'bgcolor2' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-fail-path-word" 1 '! grep -rq nosuchtoken ibl5/bgcolor2 && bin/test-ab-holds'
+# Each | alternative of a quoted pattern is its own token.
+ab_row "AB-pass-alternation" 0 "! grep -rqE 'getStyles\\|bgcolor2' ibl5/modules && bin/test-ab-holds"
+# Opt-out tag at the trailing end of the What cell.
+assert_viol "AB-optout" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/ count 1 | CLI-executable/ count 1 (one-time-check: ran once at plan time and printed nothing) | CLI-executable}"'
+'"$AB_NOTE"
+# pre-impl rows are characterization runs, not regression claims.
+assert_viol "AB-pre-impl-ignored" 0 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/pre-impl (characterization)}"'
+'"$AB_NOTE"
+# Escaped pipe inside the location cell: the detector reads the whole cell.
+ab_row "AB-escaped-pipe-fail" 1 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures'
+ab_row "AB-escaped-pipe-pass" 0 '! grep -r bgcolor2 ibl5/modules \| grep -v fixtures; bin/test-ab-holds'
+# Phase 5.0 runs any Timing cell matching post-impl in any case, so [AB] does too.
+assert_viol "AB-fail-timing-case" 1 '[AB]' "$AB_BASE"'
+'"${AB_CANARY/post-impl (Phase 2)/Post-impl (Phase 2)}"'
+'"$AB_NOTE"
+# A harness the PR itself adds is listed in ## Critical Files: durable.
+assert_viol "AB-pass-critical-files" 0 '[AB]' "$AB_BASE"'
+| 1 | '"$AB_WHAT"' | CLI-executable | post-impl | `! grep -rq bgcolor2 ibl5/modules && bin/test-ab-new # (wired in this PR)` |
+'"$AB_NOTE"'
+
+## Critical Files
+
+- `bin/test-ab-new`
+'
+# An unwired harness is not durable, even when a (one-shot) note makes [G] skip the cell.
+ab_row "AB-fail-unwired-one-shot" 1 'bin/test-ab-unwired && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# A path that only prefixes a wired script is not wired.
+ab_row "AB-fail-wired-prefix" 1 'bin/test-ab-hol && ! grep -rq bgcolor2 ibl5/modules; bin/check-foo # (one-shot)'
+# A workflow that runs the script as ./bin/... wires it.
+ab_row "AB-pass-wired-dot-slash" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-dot'
+# A workflow that runs the script behind any /-ending prefix wires it.
+ab_row "AB-pass-wired-workspace-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-ws'
+ab_row "AB-pass-wired-dotdot-prefix" 0 '! grep -rq bgcolor2 ibl5/modules && bin/test-ab-up'
+# A negated grep on a here-string or a pipe is still an absence check on a
+# repo file read upstream, so it needs a durable check like any other row.
+ab_row "AB-fail-herestring" 1 "out=\$(awk '/^## Step 4\\.5:/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md); grep -qF 'Second challenge.' <<< \"\$out\" && ! grep -qF 'EXCESS_LINE=' <<< \"\$out\""
+ab_row "AB-fail-pipe" 1 "awk '/^## Drift/,/^<!-- end -->\$/' .claude/skills/plan/_hold.md \\| ! grep -qF 'bgcolor2'"
+# A here-string negation next to a negated grep on a repo file also fails.
+ab_row "AB-fail-herestring-plus-file" 1 "out=\$(cat ibl5/x.md); ! grep -qF 'bgcolor2' <<< \"\$out\" && ! grep -qF 'bgcolor2' ibl5/modules/x.md"
+# A clustered flag ending in e takes the next word as its pattern.
+ab_row "AB-pass-clustered-e" 0 "! grep -rqe 'bgcolor2' -e 'zzzz' ibl5/modules && bin/test-ab-holds"
+# Regex escapes and anchors do not stick to the token.
+ab_row "AB-pass-word-boundary" 0 "! grep -rqE '\\bbgcolor2\\b' ibl5/modules && bin/test-ab-holds"
+ab_row "AB-pass-end-anchor" 0 "! grep -rqE 'bgcolor2\$' ibl5/modules && bin/test-ab-holds"
+# A subshell paren is not the pattern.
+ab_row "AB-pass-subshell" 0 '( ! grep -rq bgcolor2 ibl5/modules ) && bin/test-ab-holds'
+# A flag value is not the pattern.
+ab_row "AB-pass-flag-value" 0 '! grep -rq -d skip bgcolor2 ibl5/modules && bin/test-ab-holds'
+# A path that is only echoed or sits in a comment is not run.
+ab_row "AB-fail-echo-mention" 1 '! grep -rq bgcolor2 ibl5/modules && echo see bin/test-ab-holds'
+ab_row "AB-fail-comment-mention" 1 '! grep -rq bgcolor2 ibl5/modules && true # covered by bin/test-ab-holds'
+ab_row "AB-fail-comment-separator" 1 '! grep -rq bgcolor2 ibl5/modules # see; bin/test-ab-holds'
+ab_row "AB-fail-comment-after-separator" 1 '! grep -rq bgcolor2 ibl5/modules;# see; bin/test-ab-holds'
+# A quoted # is part of the pattern, so the command after it still runs.
+ab_row "AB-pass-quoted-hash" 0 "! grep -rqF 'see #bgcolor2' ibl5/modules && bin/test-ab-holds"
+# A matrix header plus the canary inside a fence: invisible to the
+# fence-aware row source.
+assert_viol "AB-fenced-ignored" 0 '[AB]' "$AB_BASE"'
+'"$AB_NOTE"'
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$AB_CANARY"'
+```
+'
+
+# Deny message names the durable path and the opt-out tag.
+f="$TMP/AB-deny-message.md"; printf '%s\n' "$AB_BASE" "$AB_CANARY" "$AB_NOTE" > "$f"
+out="$("$GUARD" "$f" 2>&1)"; got=$?
+if [ "$got" -eq 1 ] \
+   && grep -qF 'Point the Test file / location cell at a durable in-repo check' <<< "$out" \
+   && grep -qF '(one-time-check: <reason>)' <<< "$out"; then
+    h_pass "AB-deny-message (exit $got)"
+else
+    h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
+fi
+GUARD="$AB_GUARD_SAVED"
 
 h_done

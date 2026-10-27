@@ -108,6 +108,13 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             );
         }
 
+        if ($controllerClass === \Api\Controller\WakeController::class) {
+            return new \Api\Controller\WakeController(
+                new \BugPipeline\BugReportRepository($db),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
+        }
+
         $bugPipelineControllers = [
             \Api\Controller\ThreadReplyController::class,
             \Api\Controller\ReactionController::class,

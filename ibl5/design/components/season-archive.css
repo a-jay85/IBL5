@@ -27,7 +27,7 @@
     margin-bottom: var(--space-8);
 }
 
-.season-archive-section h3 {
+.season-archive-section h2 {
     font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: var(--font-weight-semibold);
@@ -47,8 +47,8 @@
     min-width: 250px;
 }
 
-.season-archive-roster-col h4,
-.season-archive-section h4 {
+.season-archive-roster-col h3,
+.season-archive-section h3 {
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--font-weight-semibold);

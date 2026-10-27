@@ -131,6 +131,10 @@
   --color-txn-release-fg: #00838f;
 
   /* Neutrals (promoted so utilities + tokens share source) */
+  /* League brand primaries. Mirrored by League\LeagueContext::IBL_PRIMARY_COLOR
+     and ::OLYMPICS_PRIMARY_COLOR; LeagueContextTest fails on drift. */
+  --color-ibl-primary: #1a365d;
+  --color-olympics-primary: #c53030;
   --color-gray-50:  #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
@@ -229,6 +233,7 @@
 @import './components/htmx.css';
 @import './components/debug.css';
 @import './components/last-sim-recap.css';
+@import './components/on-this-day.css';
 @import './components/game-boxscore.css';
 @import './components/head-to-head-records.css';
 
@@ -262,6 +267,22 @@
     font-size: 1rem;
     color: var(--gray-600);
     white-space: normal;
+  }
+
+  /* YourAccount auth pages: auth.css lives in @layer components and loses to the
+     d-input and d-card-body padding, so the auth padding is restated here. */
+  .d-input.auth-input--with-icon {
+    padding-left: calc(var(--space-3) + 20px + var(--space-2));
+  }
+
+  .auth-card .d-card-body {
+    padding: var(--space-4) var(--space-6) var(--space-6);
+  }
+
+  @media (max-width: 480px) {
+    .auth-card .d-card-body {
+      padding: var(--space-3) var(--space-4) var(--space-4);
+    }
   }
 
   /* The ibl theme makes Tailwind emit a .text-error utility. Keep the Updater's own red. */

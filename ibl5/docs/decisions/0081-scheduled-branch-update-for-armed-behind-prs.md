@@ -1,6 +1,6 @@
 ---
 description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -175,7 +175,7 @@ Branch protection, `strict: true`, the required checks, and every arming conditi
 
 ## Addendum: post-plan BEHIND cap hands off to the merge line (2026-10-04)
 
-**Original behavior.** `/post-plan` Phase 7 re-rebases a strict-protection PR up to three times while `mergeStateStatus` reads `BEHIND`. When the branch was still BEHIND after the third re-rebase, both the compiled harness (`tools/postplan-harness/runner.py`, `_resolve_behind`) and the Sonnet skill fallback (`.claude/skills/post-plan/_phase-7-ci-monitoring.md`, the ceiling block) disabled auto-merge and reported the PR as blocked for a human. The rationale was that an armed PR left BEHIND would wait behind master forever, so the disarm made someone look.
+**Original behavior.** `/post-plan` Phase 7 re-rebases a strict-protection PR up to three times while `mergeStateStatus` reads `BEHIND`. When the branch was still BEHIND after the third re-rebase, both the compiled harness (`tools/postplan-harness/runner.py`, `_resolve_behind`) and the Sonnet skill fallback (the skill's Phase 7 file (retired 2026-10-19), the ceiling block) disabled auto-merge and reported the PR as blocked for a human. The rationale was that an armed PR left BEHIND would wait behind master forever, so the disarm made someone look.
 
 **Live evidence.** On 2026-10-04, during a burndown in which master moved three or more times, #2766 and #2702 both carried READY verdicts and were armed. The cap fired (`phase7: BEHIND cap hit after 3 re-rebases — disarming auto-merge` in each run's `audit.log`), auto-merge was disabled, and both PRs sat open until a human re-armed them by hand. The workflow this ADR describes would have carried both to merge unattended.
 

@@ -1,7 +1,7 @@
 ---
 name: ship
 description: "Commit, push, and open a PR via /post-plan, which decides whether auto-merge arms; /ship never arms directly."
-last_verified: 2026-10-06
+last_verified: 2026-10-23
 ---
 
 # /ship — Commit, push, PR via /post-plan

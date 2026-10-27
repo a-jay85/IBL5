@@ -5,9 +5,10 @@
 #
 # Consumers:
 #   bin/check-plan      gate [H] (hold_check_violations, hold_decision_paragraphs)
-#   .claude/skills/post-plan/SKILL.md Phase 6 (hold_decision_paragraphs,
-#                       hold_manual_confirmation_block)
 #   tools/postplan-harness/harness/classify.py (Python mirror)
+# hold_manual_confirmation_block has no live caller since the skill's Phase 6 was
+# retired. The harness builds that block in Python, and
+# tools/postplan-harness/tests/test_decision_render_parity.py pins the two renders equal.
 #
 # Usage: source "$(dirname "$0")/lib/hold-check.sh"
 #        (or source with an absolute path)

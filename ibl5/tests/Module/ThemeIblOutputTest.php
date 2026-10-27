@@ -52,7 +52,7 @@ namespace Tests\Module {
 
             // theme.php assigns its colour variables at file scope; bind them to the
             // globals the functions read via `global`.
-            global $bgcolor1, $bgcolor2, $bgcolor3, $textcolor1, $textcolor2;
+            global $bgcolor1, $bgcolor3, $textcolor1, $textcolor2;
 
             // themeheader() calls is_user()/is_admin(); the real ones read $authService.
             require_once dirname(__DIR__, 2) . '/classes/Bootstrap/LegacyFunctions.php';
@@ -187,6 +187,22 @@ namespace Tests\Module {
             });
 
             $this->assertGolden($name, $output);
+        }
+
+        /**
+         * PR #2515 removed the $bgcolor2 global; OpenTable() styles its tables with CSS classes.
+         */
+        public function testOpenTableIgnoresBgcolor2Global(): void
+        {
+            $GLOBALS['bgcolor2'] = '#B0B0B2';
+            $openTable = $this->themeFunction('OpenTable');
+
+            $output = $this->capture(static function () use ($openTable): void {
+                $openTable();
+            });
+
+            $this->assertStringContainsString('class="nuke-block-outer nuke-block--full"', $output);
+            $this->assertStringNotContainsString('#B0B0B2', $output);
         }
 
         public function testThemeindexAcceptsNullThetext(): void

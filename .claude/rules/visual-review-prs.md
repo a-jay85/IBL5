@@ -1,5 +1,5 @@
 ---
-description: On a visual-change PR, the visual-regression run builds a change-driven before/after gallery (rows whose render differs from master's committed baseline) and posts a sticky visual-review PR comment grouped by module, with a "changed but NOT covered" coverage-gap section. A daily and on-demand refresh workflow republishes stale galleries, and retention cleanup keeps every gallery dir an open PR links to.
+description: VR PRs get a change-driven before/after gallery and a sticky review comment grouped by module, with a coverage-gap section. The update-baselines label commits only strict-pass-flagged views. A refresh workflow republishes stale galleries; retention keeps linked galleries.
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/pages-deploy.yml"
@@ -10,11 +10,12 @@ paths:
   - "ibl5/tests/e2e/vr-pr-body.ts"
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
+  - "bin/vr-apply-baselines"
   - "bin/vr-review-comment"
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-23
+last_verified: 2026-10-26
 ---
 
 # Visual-review PRs
@@ -28,9 +29,8 @@ render differs from master's committed baseline. ADR-0076 also publishes brand-n
 
 On a PR run of the visual-regression (VR) step in `.github/workflows/e2e-tests.yml` (the `e2e`
 "Visual Regression" job) — whenever the `update-baselines` label is **absent** — five steps fire,
-in order, AFTER the VR run and BEFORE baseline regen. They fire on **pass OR fail**: selection is
-decoupled from the VR check outcome (ADR-0074), so the gallery publishes even when VR is green.
-They are skipped only during baseline regen (the `update-baselines` label).
+in order, AFTER the VR run. They fire on **pass OR fail** (ADR-0074), so the gallery publishes
+even when VR is green. The `update-baselines` label run skips them (see § Approving).
 
 1. **Compute coverage** — `git diff --name-only <base>...HEAD | bin/vr-changed-coverage`
    maps the changed files onto `vr-manifest.ts` rows (uncovered website paths and a global-change
@@ -109,10 +109,12 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 
 ## Approving (sign-off)
 
-Apply the **`update-baselines`** label. That regenerates the baselines, auto-commits them,
-and re-runs VR green — the auto-commit is the durable approval record. There is no separate
-approval mechanism. Because the gallery reads master's committed baseline via
-`git show <base.sha>:…`, the before/after evidence survives this regen instead of vanishing.
+Apply the **`update-baselines`** label. The label run reruns the strict pass against the branch's
+own baselines (`bin/vr-build-gallery --base-sha=HEAD`), then `bin/vr-apply-baselines` copies the
+changed and new cells' `.a.png` over their baselines and commits only those. Flake, infra, and
+unflagged cells stay byte-identical. That commit is the approval record; no flagged view, no
+commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
+VR job (ADR-0214).
 
 ## When the comment is missing
 

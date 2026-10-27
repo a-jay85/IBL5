@@ -1,0 +1,28 @@
+Fix the post-plan harness result line dropping file names when the branch name contains a slash (backlog #896)
+
+## Exploration pointers
+- `gh issue view 896 -R a-jay85/IBL5-backlog` — the bug: when a branch name contains `/`, the harness's result line loses the file names. Read it for the exact symptom and where the result line comes from.
+- `.claude/rules/workflow-continuity-detail.md` — describes the post-plan harness engine.
+- NOTE: the UserPromptSubmit reference resolver maps `#896` to IBL5 PR #896 (an e2e smoke PR). That is wrong. The reference is backlog issue a-jay85/IBL5-backlog#896.
+
+## Resolved design decisions
+- Likely cause is the branch name being used raw as a path segment, sed delimiter, or in a glob. Confirm in code, don't assume.
+- Fix it wherever the branch name feeds a path or pattern in that code path. Don't rename branches or ban `/` in branch names.
+
+## Scope
+1. Find where the result line is built and why `/` drops the file names.
+2. Fix it so file names show for slashed and plain branch names alike.
+3. Add a regression test with a slashed branch name.
+Out of scope: other harness output formatting.
+
+## Hard constraints
+- Add a `## Backlog issues` section closing a-jay85/IBL5-backlog#896.
+- Tooling-only change: title type `fix:`.
+
+## Verification
+- Regression test with a branch like `foo/bar` shows the file names in the result line. It fails on master.
+- A plain branch name still produces the same output as before.
+
+
+## Sequencing
+Slug `harness-slash-branch-result-line`, base `master`. The #715 plan fired alongside may touch the same harness scripts. If so, it is a rebase only. Anchor edits on surrounding text, never line numbers. Don't re-implement or depend on its work.

@@ -17,27 +17,22 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use NextSim\NextSimService;
-use NextSim\NextSimView;
-use Standings\StandingsRepository;
-use TeamSchedule\TeamScheduleRepository;
-
-global $db, $user, $mysqli_db, $authService;
-$nukeCompat = new \Utilities\NukeCompat();
+global $db, $user, $authService;
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 if (!$nukeCompat->isUser($user)) {
     $nukeCompat->loginBox();
 } else {
-    /** @var \mysqli $mysqli_db */
-    /** @var \Auth\Contracts\AuthServiceInterface $authService */
-    $commonRepository = new Repositories\TeamIdentityRepository($mysqli_db);
-    $season = \Season\SharedSeason::get($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\NextSimFactory::class);
+    $commonRepository = $factory->teamIdentity();
+    $season = $factory->season();
 
     $module_name = basename(dirname(__FILE__));
     $pagetitle = "- $module_name";
 
     // Load power rankings for SOS tier indicators
-    $standingsRepo = new StandingsRepository($mysqli_db);
+    $standingsRepo = $factory->standingsRepository();
     $allStreakData = $standingsRepo->getAllStreakData();
     /** @var array<int, float> $teamPowerRankings */
     $teamPowerRankings = [];
@@ -49,12 +44,11 @@ if (!$nukeCompat->isUser($user)) {
 
     $username = $authService->getUsername() ?? '';
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
+    $userTeam = \Team\Team::initialize(\Module\ModuleServices::current()->db(), $userTeamName);
 
     // Initialize services
-    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
-    $service = new NextSimService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
-    $view = new NextSimView($season);
+    $service = $factory->service($teamPowerRankings);
+    $view = $factory->view();
 
     // Get next sim games
     $games = $service->getNextSimGames($userTeam->teamid, $season);

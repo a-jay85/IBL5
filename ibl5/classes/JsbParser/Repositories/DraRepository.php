@@ -37,4 +37,25 @@ class DraRepository extends \Database\BaseMysqliRepository
             $record['pid']
         );
     }
+
+    /**
+     * Check if any draft pick is stored for a given draft year.
+     */
+    public function hasDraftResultsForYear(int $draftYear): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM `ibl_jsb_draft_results`
+             WHERE draft_year = ?",
+            'i',
+            $draftYear,
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $cnt = $row['cnt'];
+
+        return is_int($cnt) && $cnt > 0;
+    }
 }

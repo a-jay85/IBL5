@@ -61,6 +61,46 @@ class PlayerOverviewViewTest extends TestCase
         $this->assertSnapshotMatches($html, 'PlayerOverviewView-boxscores.html');
     }
 
+    public function testGameLogPointsIsLastColumn(): void
+    {
+        $view = $this->makeView($this->boxScores());
+
+        $html = $view->renderOverview(1, self::createStub(Player::class), self::createStub(PlayerStats::class), $this->makeSeason());
+
+        $previous = libxml_use_internal_errors(true);
+        $doc = new \DOMDocument();
+        $doc->loadHTML($html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $headers = [];
+        foreach ($doc->getElementsByTagName('th') as $th) {
+            $headers[] = trim($th->textContent);
+        }
+        $this->assertCount(22, $headers);
+        $this->assertSame('PTS', $headers[21]);
+        $this->assertSame('PF', $headers[20]);
+        $this->assertCount(1, array_keys($headers, 'PTS', true));
+
+        // Row 1 PTS = 2*7 + 3*3 + 5 = 28 (PF is 4); row 2 PTS = 2*4 + 3*2 + 8 = 22 (PF is 3).
+        $lastCells = [];
+        $secondToLast = [];
+        foreach ($doc->getElementsByTagName('tr') as $tr) {
+            $cells = [];
+            foreach ($tr->childNodes as $child) {
+                if ($child instanceof \DOMElement && $child->tagName === 'td' && $child->getAttribute('class') === 'gamelog') {
+                    $cells[] = trim($child->textContent);
+                }
+            }
+            if (count($cells) === 22) {
+                $lastCells[] = $cells[21];
+                $secondToLast[] = $cells[20];
+            }
+        }
+        $this->assertSame(['28', '22'], $lastCells);
+        $this->assertSame(['4', '3'], $secondToLast);
+    }
+
     public function testPreseasonPhaseDoesNotThrow(): void
     {
         $view = $this->makeView();

@@ -20,6 +20,9 @@ interface WaiversSubmissionServiceInterface
     /**
      * Process a waiver add/waive submission on behalf of the verified acting team.
      *
+     * Roster counts are recomputed server-side from the verified team's roster (backlog#1538);
+     * any posted slot fields are ignored.
+     *
      * @param array<string, mixed> $postData
      * @param ?string $verifiedTeamName Acting team, derived from the authenticated session — never from POST.
      *                                  Null or empty means the caller could not establish an acting team;

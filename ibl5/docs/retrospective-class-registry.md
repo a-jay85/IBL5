@@ -1,6 +1,6 @@
 ---
 description: Class registry for /post-plan Phase 9 retrospective routing — one row per defect class, written by /post-plan, never edited by hand.
-last_verified: 2026-10-06
+last_verified: 2026-10-20
 ---
 
 # Retrospective Class Registry
@@ -373,7 +373,7 @@ Landing rung: **rung 1** — a test row plus the matching `bin/bug-pipeline-tick
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
 | 1 | `bin/lib/pr-armable.sh` — OR-semantics accumulation in `pr_manual_testing_clearance` | yes | was live; fixed this pass (PR #2043) | fixed this pass |
-| 2 | `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` — all `pr_manual_testing_clearance` call sites pass only `$BODY` | yes | live | not fixed — filed |
+| 2 | `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (example): all `pr_manual_testing_clearance` call sites pass only `$BODY` | yes | live | not fixed — filed | <!-- slop-ok -->
 | 3 | `.claude/skills/pr-ready/scripts/holds.sh:37` — `run_predicate "manual-testing-clearance" pr_manual_testing_clearance "$BODY"` passes only one arg | yes | live | not fixed — filed |
 | 4 | `bin/pr-triage:288` — `pr_manual_testing_clearance "$BODY"` passes only one arg | yes | live | not fixed — filed |
 
@@ -381,12 +381,12 @@ Landing rung: **rung 1** — a test row plus the matching `bin/bug-pipeline-tick
 
 - rung 0 — no existing gate checks argument arity of sourced-shell-function calls.
 - rung 1 — `bin/check-docs` or a dedicated `bin/test-pr-armable-wiring` (example) could grep each caller site and assert it passes two arguments; extend-before-add bar favors extending an existing test script if one already covers these callers. Effort: S.
-- rung 2 — adding a note to `_phase-6.5-arm-auto-merge.md` naming the required second argument is cheaper but prose-only, so insufficient on its own for a headless caller that cannot read rules mid-run.
+- rung 2: adding a note to `_phase-6.5-arm-auto-merge.md` (file retired 2026-10-19; harness-owned) naming the required second argument is cheaper but prose-only, so insufficient on its own for a headless caller that cannot read rules mid-run.
 - rung 3 — not applicable (shell surface; PHPStan does not parse shell scripts).
 - rung 4 — a CI gate that greps caller sites for the single-arg pattern after the function signature changes. Possible; rung 1 is the natural form for this repo.
 - rung 5 — not warranted per `meta-tooling-bar.md`; rung 1 is the correct host.
 
-Landing rung: **1** — extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.php` or a shell-level wiring test to assert that each caller in `_phase-6.5-arm-auto-merge.md` and `scripts/holds.sh` passes the `changed_files` argument.
+Landing rung: **1**. Extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.php` or a shell-level wiring test to assert that each caller in `_phase-6.5-arm-auto-merge.md` (file retired 2026-10-19; harness-owned) and `scripts/holds.sh` passes the `changed_files` argument.
 
 **artifact destination:** `ibl5/tests/Cli/PrArmableLibCliTest.php` (in-repo, extends existing test class) or a new `bin/test-pr-armable-wiring` (example) (in-repo shell test).
 

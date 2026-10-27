@@ -17,31 +17,13 @@ if (preg_match('/modules\.php/i', is_string($phpSelfGuard) ? $phpSelfGuard : '')
     die("You can't access this file directly...");
 }
 
-// Get database connection from the global context
-global $mysqli_db, $leagueContext;
-/** @var \mysqli $mysqli_db */
-/** @var \League\LeagueContext $leagueContext */
-
-// Ensure database connection is available
-if (!isset($mysqli_db)) {
-    echo '<p>Error: Database connection not available.</p>';
-    return;
-}
-
-// Create repository and view instances
-$repository = new Standings\StandingsRepository($mysqli_db, $leagueContext);
-$season = \Season\SharedSeason::get($mysqli_db, $leagueContext);
-
-if ($leagueContext !== null && $leagueContext->isOlympics()) {
-    $realTeamIds = \League\OlympicsTeamFilter::getRealTeamIds($mysqli_db);
-    $view = new Standings\OlympicsStandingsView($repository, $season->endingYear, $realTeamIds);
-} else {
-    $view = new Standings\StandingsView($repository, $season->endingYear);
-}
+// The factory builds the IBL or Olympics view from the shared services
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\StandingsFactory::class);
+$view = $factory->view();
 
 // Render and output the standings
     PageLayout\PageLayout::header();
-    
+
     echo $view->render();
 
     PageLayout\PageLayout::footer();

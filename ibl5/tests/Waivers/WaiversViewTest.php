@@ -229,6 +229,22 @@ class WaiversViewTest extends TestCase
         $this->assertStringContainsString('<option value="2">B 200</option>', $output);
     }
 
+    public function testRenderWaiverFormOmitsClientRosterSlotHiddenInputs(): void
+    {
+        $html = $this->view->renderWaiverForm('Test Team', 1, 'add', [], 5, 3);
+
+        $this->assertStringContainsString('name="Action"', $html);
+        $this->assertStringNotContainsString('name="rosterslots"', $html);
+        $this->assertStringNotContainsString('name="healthyrosterslots"', $html);
+    }
+
+    public function testRenderWaiverFormHeaderShowsPassedSlotCounts(): void
+    {
+        $html = $this->view->renderWaiverForm('Test Team', 1, 'add', [], 5, 3);
+
+        $this->assertStringContainsString('5 OPEN SPOTS / 3 HEALTHY SPOTS', $html);
+    }
+
     public function testBuildPlayerOptionHasNoWaitTimeParameter(): void
     {
         $m = new \ReflectionMethod(\Waivers\WaiversView::class, 'buildPlayerOption');

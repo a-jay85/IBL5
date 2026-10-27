@@ -360,3 +360,84 @@ else
   esac
 fi
 ```
+
+**(19) exec-mutations.** Phase 5.0's executable-mutation step writes one `EXEC-MUTATION:` line per held result to the bridge file `/tmp/post-plan-exec-mutations-$PPID`. Any line holds. A missing done-marker also holds, because then the step did not run. A pending mutation journal also holds, because a hard-killed Phase 5 run can leave the tree carrying a mutation. The block also upserts the `<!-- exec-mutations:begin -->` PR-body block with the same markers the harness writes, so either path replaces the other's block. Each line is prefixed `> ` so plan text cannot forge a heading. It only adds a hold and never clears another condition.
+
+```bash
+# condition (19): block unless every executable mutation tripped and the tree verified clean
+XMF="/tmp/post-plan-exec-mutations-$PPID"
+if [ ! -e "/tmp/post-plan-exec-mutations-done-$PPID" ]; then
+  echo "BLOCKED: exec-mutations: the executable-mutation step did not run"
+elif [ -s "$XMF" ]; then
+  echo "BLOCKED: exec-mutations: $(head -c 300 "$XMF" | tr '\n' ';')"
+fi
+if "$(git rev-parse --show-toplevel)/bin/lib/plan-exec-mutations" pending --root "$(git rev-parse --show-toplevel)" >/dev/null 2>&1; then
+  echo "BLOCKED: exec-mutations: journal pending, the tree may still carry a mutation"
+fi
+if XM_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+  # Drop the old block, so a clean rerun clears a stale HELD block. Strip only when
+  # the first begin marker and the first end marker are present and in order, the same pairing
+  # as classify.upsert_exec_mutations. Delete by line number, so a stray later begin marker
+  # cannot widen the range to EOF.
+  XM_NEW="$XM_BODY"
+  XM_B=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:begin -->' | cut -d: -f1)
+  XM_E=$(printf '%s\n' "$XM_BODY" | grep -n -m1 '<!-- exec-mutations:end -->' | cut -d: -f1)
+  # A missing done-marker means the step never ran, so keep the old block untouched.
+  if [ -e "/tmp/post-plan-exec-mutations-done-$PPID" ] && [ -n "$XM_B" ] && [ -n "$XM_E" ] && [ "$XM_B" -lt "$XM_E" ]; then
+    XM_NEW=$(printf '%s\n' "$XM_BODY" | sed "${XM_B},${XM_E}d")
+  fi
+  if [ -s "$XMF" ]; then
+    XM_BLOCK=$(printf '<!-- exec-mutations:begin -->\n### Executable mutations\n\n'
+               sed 's/^/> /' "$XMF"
+               printf '<!-- exec-mutations:end -->')
+    XM_NEW=$(printf '%s\n\n%s\n' "$XM_NEW" "$XM_BLOCK")
+  fi
+  [ "$XM_NEW" = "$XM_BODY" ] || printf '%s\n' "$XM_NEW" | gh pr edit --body-file - >/dev/null
+fi
+```
+
+**(20) Removed guards.** The block reruns bin/lib/deleted-guards on the realized diff and passes its flagged keys to pr_removed_guards_hold, so a body without the block still holds. The detector, pr_removed_guards_hold and resolve_plan_file all come from the main checkout, so a PR that weakens its own copy cannot clear the hold. A missing copy there holds. It only adds a hold and never clears another condition.
+
+```bash
+# condition (20): block unless every guard removal flagged on the realized diff has a substantive body Reason
+# take the detector, the hold function and the plan resolver from the main checkout,
+# so a PR that edits any of them cannot judge itself
+RG_MAIN="$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')"
+RG_DET="$RG_MAIN/bin/lib/deleted-guards"
+RG_LIB_OK=1
+source "$RG_MAIN/bin/lib/pr-armable.sh" 2>/dev/null || RG_LIB_OK=0
+declare -F pr_removed_guards_hold >/dev/null || RG_LIB_OK=0
+source "$RG_MAIN/bin/lib/plan-resolve.sh" 2>/dev/null || RG_LIB_OK=0
+declare -F resolve_plan_file >/dev/null || RG_LIB_OK=0
+RG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+RG_BASE="$(git config "branch.$RG_BRANCH.iblBase" || echo master)"
+PLAN_SLUG_DRIFT=""
+[ "$RG_LIB_OK" = 1 ] && resolve_plan_file
+RG_PLAN_ARG=()
+[ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ] && RG_PLAN_ARG=(--plan "$PLAN_FILE")
+RG_DIFF="$(mktemp)"
+if [ "$RG_LIB_OK" != 1 ]; then
+  echo "BLOCKED: removed guards: pr_removed_guards_hold or resolve_plan_file not found under $RG_MAIN/bin/lib (fail-closed)"
+elif [ ! -x "$RG_DET" ]; then
+  echo "BLOCKED: removed guards: detector not found at $RG_DET (fail-closed)"
+elif ! git diff "origin/$RG_BASE...HEAD" > "$RG_DIFF"; then
+  echo "BLOCKED: removed guards: cannot compute the realized diff against origin/$RG_BASE (fail-closed)"
+else
+  RG_RC=0
+  RG_OUT=$("$RG_DET" --diff "$RG_DIFF" ${RG_PLAN_ARG[@]+"${RG_PLAN_ARG[@]}"}) || RG_RC=$?
+  if [ "$RG_RC" -gt 1 ]; then
+    echo "BLOCKED: removed guards: bin/lib/deleted-guards failed (exit $RG_RC, fail-closed)"
+  elif ! RG_BODY=$(gh pr view --json body --jq '.body' 2>/dev/null); then
+    echo "BLOCKED: removed guards: cannot read the PR body (fail-closed)"
+  else
+    RG_KEYS=$(awk -F'\t' '$1=="REMOVED-GUARD"{print $2}' <<< "$RG_OUT")
+    RG_HOLD=$(pr_removed_guards_hold "$RG_BODY" "$RG_KEYS")
+    if [ -n "$RG_HOLD" ]; then
+      while IFS= read -r RG_L; do
+        echo "BLOCKED: removed guards: $RG_L (restore the guard or add a Reason; _pr-body-claims.md § Removed guards rule)"
+      done <<< "$RG_HOLD"
+    fi
+  fi
+fi
+rm -f "$RG_DIFF"
+```

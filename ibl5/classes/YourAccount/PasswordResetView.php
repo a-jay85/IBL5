@@ -23,31 +23,31 @@ class PasswordResetView
         ?>
 <div class="auth-page">
     <?= HtmlSanitizer::trusted($this->renderLogo()) ?>
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__header">
-            <h1 class="ibl-card__title">Reset Password</h1>
-            <p class="ibl-card__subtitle">We'll email you a reset link</p>
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="auth-card__header">
+            <h1 class="d-card-title justify-center">Reset Password</h1>
+            <p class="auth-card__subtitle">We'll email you a reset link</p>
         </div>
-        <div class="ibl-card__body">
+        <div class="d-card-body">
             <div class="auth-info-text mb-4">
                 Enter your email address and we'll send you a link to reset your password.
             </div>
 
             <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
-                    <label class="ibl-label ibl-label--required" for="reset-email">Email Address</label>
+                    <label class="d-label auth-label--required" for="reset-email">Email Address</label>
                     <div class="auth-input-wrapper">
                         <?= HtmlSanitizer::trusted($this->emailIcon()) ?>
-                        <input type="email" name="user_email" id="reset-email" class="ibl-input auth-input--with-icon" maxlength="255" required placeholder="Enter your email address" autocomplete="email">
+                        <input type="email" name="user_email" id="reset-email" class="d-input w-full auth-input--with-icon" maxlength="255" required placeholder="Enter your email address" autocomplete="email">
                     </div>
                 </div>
 
                 <?= CsrfGuard::generateToken('forgot_password') ?>
                 <input type="hidden" name="op" value="mailpasswd">
-                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Send Reset Link</button>
+                <button type="submit" class="d-btn d-btn-primary d-btn-block">Send Reset Link</button>
             </form>
         </div>
-        <div class="ibl-card__footer">
+        <div class="auth-card__footer">
             <div class="auth-links">
                 <a href="modules.php?name=YourAccount">Remember your password? Sign in</a>
                 <span class="auth-links__divider">|</span>
@@ -68,8 +68,8 @@ class PasswordResetView
         ob_start();
         ?>
 <div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="d-card-body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--info">
                     <?= HtmlSanitizer::trusted($this->infoIcon()) ?>
@@ -79,7 +79,7 @@ class PasswordResetView
                     If an account exists with that email address, we've sent a password reset link. Please check your inbox and follow the instructions.
                 </div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Back to Sign In</a>
+                    <a href="modules.php?name=YourAccount" class="d-btn d-btn-primary">Back to Sign In</a>
                 </div>
             </div>
         </div>
@@ -98,26 +98,26 @@ class PasswordResetView
         ?>
 <div class="auth-page">
     <?= HtmlSanitizer::trusted($this->renderLogo()) ?>
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__header">
-            <h1 class="ibl-card__title">Reset Password</h1>
-            <p class="ibl-card__subtitle">Enter your new password</p>
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="auth-card__header">
+            <h1 class="d-card-title justify-center">Reset Password</h1>
+            <p class="auth-card__subtitle">Enter your new password</p>
         </div>
-        <div class="ibl-card__body">
+        <div class="d-card-body">
             <form action="modules.php?name=YourAccount" method="post" hx-boost="false">
                 <div class="ibl-form-group">
-                    <label class="ibl-label ibl-label--required" for="reset-new-password">New Password</label>
+                    <label class="d-label auth-label--required" for="reset-new-password">New Password</label>
                     <div class="auth-input-wrapper">
                         <?= HtmlSanitizer::trusted($this->lockIcon()) ?>
-                        <input type="password" name="new_password" id="reset-new-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Enter new password" autocomplete="new-password">
+                        <input type="password" name="new_password" id="reset-new-password" class="d-input w-full auth-input--with-icon" maxlength="60" required placeholder="Enter new password" autocomplete="new-password">
                     </div>
                 </div>
 
                 <div class="ibl-form-group">
-                    <label class="ibl-label ibl-label--required" for="reset-confirm-password">Confirm Password</label>
+                    <label class="d-label auth-label--required" for="reset-confirm-password">Confirm Password</label>
                     <div class="auth-input-wrapper">
                         <?= HtmlSanitizer::trusted($this->lockIcon()) ?>
-                        <input type="password" name="new_password2" id="reset-confirm-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Re-enter new password" autocomplete="new-password">
+                        <input type="password" name="new_password2" id="reset-confirm-password" class="d-input w-full auth-input--with-icon" maxlength="60" required placeholder="Re-enter new password" autocomplete="new-password">
                     </div>
                 </div>
 
@@ -125,10 +125,10 @@ class PasswordResetView
                 <input type="hidden" name="token" value="<?= HtmlSanitizer::e($token) ?>">
                 <?= CsrfGuard::generateToken('reset_password') ?>
                 <input type="hidden" name="op" value="do_reset_password">
-                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Reset Password</button>
+                <button type="submit" class="d-btn d-btn-primary d-btn-block">Reset Password</button>
             </form>
         </div>
-        <div class="ibl-card__footer">
+        <div class="auth-card__footer">
             <div class="auth-links">
                 <a href="modules.php?name=YourAccount">Back to Sign In</a>
             </div>
@@ -147,8 +147,8 @@ class PasswordResetView
         ob_start();
         ?>
 <div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="d-card-body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--success">
                     <?= HtmlSanitizer::trusted($this->checkIcon()) ?>
@@ -158,7 +158,7 @@ class PasswordResetView
                     Your password has been reset successfully. You can now sign in with your new password.
                 </div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Sign In</a>
+                    <a href="modules.php?name=YourAccount" class="d-btn d-btn-primary">Sign In</a>
                 </div>
             </div>
         </div>
@@ -176,8 +176,8 @@ class PasswordResetView
         ob_start();
         ?>
 <div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
+    <div class="auth-card d-card d-card-border bg-base-100 shadow-sm">
+        <div class="d-card-body">
             <div class="auth-status">
                 <div class="auth-status__icon auth-status__icon--error">
                     <?= HtmlSanitizer::trusted($this->errorIcon()) ?>
@@ -185,7 +185,7 @@ class PasswordResetView
                 <div class="auth-status__title">Reset Error</div>
                 <div class="auth-status__message"><?= HtmlSanitizer::e($error) ?></div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="ibl-btn ibl-btn--primary">Try Again</a>
+                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="d-btn d-btn-primary">Try Again</a>
                 </div>
             </div>
         </div>

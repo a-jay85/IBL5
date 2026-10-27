@@ -1,6 +1,6 @@
 ---
 description: Testing philosophy, conventions, and requirements for IBL5.
-last_verified: 2026-10-03
+last_verified: 2026-10-23
 ---
 
 # IBL5 Testing Standards
@@ -236,6 +236,14 @@ private InterfaceName $mockObject;
 - Leave test files unregistered in phpunit.xml
 - Create tests without verifying they run via `vendor/bin/phpunit`
 - Assume tests will be discovered automatically - they must be explicitly registered
+
+---
+
+## Golden Snapshot Tests
+
+Snapshot tests compare rendered HTML to a committed file in a `__snapshots__` directory beside the test. They use `Tests\Support\GoldenSnapshotTrait` (`ibl5/tests/Support/GoldenSnapshotTrait.php`). The trait is covered by the `Support Tests` suite in `ibl5/phpunit.xml`.
+
+A missing snapshot fails the test with a hint to run with `UPDATE_SNAPSHOTS=1`. To create or regenerate snapshots, run `UPDATE_SNAPSHOTS=1 vendor/bin/phpunit <test path>` from `ibl5/`, review the `git diff`, and commit the files with the test change. Only the value `1` writes. The full rule, including the per-file switches of the five golden helpers that do not use the trait, is in `.claude/rules/phpunit-tests-detail.md` under "Golden snapshots".
 
 ---
 

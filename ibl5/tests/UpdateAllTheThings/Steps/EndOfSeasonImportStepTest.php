@@ -61,6 +61,35 @@ class EndOfSeasonImportStepTest extends TestCase
         $this->assertStringContainsString('No champion', $result->detail);
     }
 
+    public function testEndOfSeasonImportSkipsEvenWhenPriorYearHasChampion(): void
+    {
+        $repo = self::createStub(JsbImportRepositoryInterface::class);
+        $repo->method('hasChampionForSeason')->willReturnMap([[2008, true], [2009, false]]);
+
+        $step = new EndOfSeasonImportStep($repo, $this->stubService, 2009, $this->stubResolver);
+
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertStringContainsString('No champion determined yet', $result->detail);
+    }
+
+    public function testEndOfSeasonImportNeverCallsImportServiceWhenSkipped(): void
+    {
+        $repo = self::createStub(JsbImportRepositoryInterface::class);
+        $repo->method('hasChampionForSeason')->willReturnMap([[2008, true], [2009, false]]);
+
+        $this->stubResolver->method('getContents')->willReturn('x');
+
+        $service = self::createMock(JsbImportService::class);
+        $service->expects(self::never())->method('processRetData');
+        $service->expects(self::never())->method('processAwaData');
+
+        $step = new EndOfSeasonImportStep($repo, $service, 2009, $this->stubResolver);
+
+        $step->execute();
+    }
+
     public function testRunsImportsWhenChampionExists(): void
     {
         $this->stubRepo->method('hasChampionForSeason')->willReturn(true);

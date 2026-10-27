@@ -121,11 +121,11 @@ def _decision(**kw):
     base = dict(pr_body="## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed "
                         "— covered.\n",
                 pr_title="chore: x", pr_labels=[], classification=Classification(),
-                findings=[], unresolved_conformance=[], phase5_status="pass",
+                findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False, phase5_status="pass",
                 plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, current_tree=TREE,
-                merge_danger_state="TWO-WAY")
+                merge_danger_state="TWO-WAY", removed_guards_holds=[])
     base.update(kw)
     return evaluate(ArmInputs(**base))
 

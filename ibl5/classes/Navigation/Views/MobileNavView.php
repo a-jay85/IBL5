@@ -67,7 +67,7 @@ class MobileNavView implements MobileNavViewInterface
                                 <svg class="w-5 h-5 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             </div>
                             <div>
-                                <div class="text-xs text-gray-500 uppercase tracking-wide">Welcome back</div>
+                                <div class="text-xs text-gray-400 uppercase tracking-wide">Welcome back</div>
                                 <div class="text-white font-semibold"><?= HtmlSanitizer::e($this->config->username) ?></div>
                             </div>
                         </div>
@@ -135,7 +135,7 @@ class MobileNavView implements MobileNavViewInterface
                     <?= HtmlSanitizer::trusted($this->renderDropdownIcon($icon)) ?>
                     <span class="font-display text-lg font-semibold"><?= HtmlSanitizer::e($title) ?></span>
                 </span>
-                <svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg class="dropdown-arrow w-4 h-4 text-gray-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
             <div class="hidden bg-black/20">

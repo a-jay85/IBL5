@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Player\Contracts\PlayerRepositoryInterface;
 use Player\PlayerRepository;
 use Player\Views\PlayerAwardsAndNewsView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * @covers \Player\Views\PlayerAwardsAndNewsView
@@ -17,7 +18,7 @@ use Player\Views\PlayerAwardsAndNewsView;
  */
 class PlayerAwardsAndNewsViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * @param list<AwardRow> $awards

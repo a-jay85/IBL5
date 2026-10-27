@@ -175,6 +175,7 @@ class NewsLegacyPagesEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runArticle(['sid' => '1']);
 
         $this->assertStringContainsString('<h1 class="ibl-title">Story One</h1>', $output);
+        // themearticle() rewrites exactly '<font class="storycat">' into the ibl-badge span; other markup loses the badge.
         $this->assertStringContainsString(
             '<a href="modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=15"><font class="storycat">Trades</font></a>: Story One',
             $output,

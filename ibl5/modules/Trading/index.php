@@ -32,15 +32,8 @@ switch ($op) {
         $controller->handleTradeOffer($user, $partner);
         break;
     case "trade-mode":
-        $modeController = new \TradeSuggestions\TeamModeController(
-            $authService,
-            $teamIdentityRepo,
-            new \TradeSuggestions\TeamModeService(
-                new \TradeSuggestions\TeamModeRepository($mysqli_db),
-                new \TradeSuggestions\TeamModeGuesser()
-            )
-        );
-        $methodRaw = $httpRequest->server('REQUEST_METHOD');
+        $modeController = $factory->teamModeController();
+        $methodRaw = $services->request()->server('REQUEST_METHOD');
         \Utilities\HtmxHelper::redirect(
             $modeController->handleSetMode(is_string($methodRaw) ? $methodRaw : '', $_POST)
         );

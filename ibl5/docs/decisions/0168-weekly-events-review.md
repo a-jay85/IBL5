@@ -1,6 +1,6 @@
 ---
 description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and DMs recommendations to the owner. Raw URIs, user agents and identities never leave the database.
-last_verified: 2026-10-21
+last_verified: 2026-10-27
 ---
 
 # 0168. Weekly product-analytics review from ibl_events
@@ -47,3 +47,15 @@ The Decision above says the output is sent only to the owner through `bin/discor
 The job also gained a fixed schedule. It fires on Sunday at 16:03 UTC, the weekly Claude usage reset. launchd times are local only, so the plist holds two Sunday entries (08:03 and 09:03 local) and passes `--at-reset`. At any other UTC hour the script exits 0, so exactly one of the two fires runs in both PDT and PST. The exception is a catch-up: if launchd ran a fire late (the Mac was asleep) and no review went out in the last 6 days, the script runs at that hour, except on Sunday before 16 UTC, which waits for the 16:xx fire.
 
 Everything else in the Decision is unchanged, including the SELECT-only credential, the tool-less model run, and the defanging.
+
+## Addendum (2026-10-27): 4xx routes, distinct GMs per route, blank-UA crawlers
+
+The digest gained two breakdowns.
+
+Each authenticated route line now carries its distinct-GM count, for example `40  trade (1 GM)`. One GM produced 68 of 69 `trading` views on 2026-10-23, and a raw view count let that one user read as a trend. The count is `COUNT(DISTINCT username)`; `ibl_events` uses `utf8mb4_unicode_ci`, so case variants of one username count once.
+
+A 4xx section reports, per human class, 4xx counts split into 404, 403, and other 4xx; the number of distinct route names that drew a 4xx; and the top 10 of those route names. Route names in this section follow the existing rule: a name renders only if it is one of the week's top 25 GM-viewed routes, and every other name counts into `other`. Probe names are attacker-mintable, so they always fold. The status split and the distinct-name count are the signal that survives the fold. Writing a bot rule still needs the URI or user agent, which the digest never carries; the owner reads `ibl_events` directly for that.
+
+`TrafficClassifier` now files an anonymous request with a missing or blank user agent as `crawler`, and recognizes more HTTP-library user agents (`go-http-client`, `axios`, `scrapy`, `httpclient`, `java/`, `okhttp`, `node-fetch`, `libwww`, `headless`). Existing rows keep their stored class. The human bucket the digest reads gets cleaner from the deploy date on.
+
+The privacy contract is unchanged. Every new statement is a SELECT under the same credential and selects neither `request_uri` nor `user_agent`. Usernames leave the database only as counts.

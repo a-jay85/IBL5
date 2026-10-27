@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-10-25
+last_verified: 2026-10-27
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -157,7 +157,8 @@ isn't obvious:
   condition, or a Phase 6.5 arming condition previously rejected now pass) or a
   **bootstrap hazard** (the change rewrites the rule governing its own merge) →
   **`plan-architect-xhigh`**. Directory alone is never the trigger; full text at
-  `/plan` Step 3 check 1.
+  `/plan` Step 3 check 1. A characterization-pinned split of existing SQL, POST or
+  rendering code that adds no surface goes to **`plan-architect`** (same check).
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**

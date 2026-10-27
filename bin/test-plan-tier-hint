@@ -19,7 +19,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-HINT="$SCRIPT_DIR/plan-tier-hint"
+# PLAN_TIER_HINT overrides the script under test (mutation check runs master's copy).
+HINT="${PLAN_TIER_HINT:-$SCRIPT_DIR/plan-tier-hint}"
 h_tmp BASE_TMP
 
 OUT="$BASE_TMP/out"
@@ -127,6 +128,69 @@ expect_eq "15 empty input prints nothing on stdout" "" "$(cat "$OUT")"
 expect_match "15 empty input prints usage on stderr" '^Usage:' "$ERR"
 
 echo
+echo "== audited task lines, 2026-10-18..24 xhigh routing audit =="
+
+# 16 — class H1 (audit row 13): additive gate, 'deleted' is an adjective
+expect_eq "16 audit row 13 additive gate with deleted symbol" "default" \
+    "$("$HINT" --desc 'Add a /plan rule and an additive bin/check-plan gate requiring Verification Matrix rows that assert a deleted symbol stays absent to point at an in-repo test or CI-wired bin/check-* script instead of a plan-only CLI command')"
+
+# 17 — class H2 (audit row 02): escape names an existing defense on a pinned split
+expect_eq "17 audit row 02 pinned split with escaped output" "default" \
+    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into a cash-collection helper and one table-driven row builder, after pinning its HTML-escaped label output.')"
+
+# 18 — class D1 (audit row 01): already default; pins that it stays there
+expect_eq "18 audit row 01 byte-pinned rendering split" "default" \
+    "$("$HINT" --desc 'Split TeamTableService::getTableOutput into roster, starters and view-wrapper helpers after pinning its tab and dropdown wrapper output byte-for-byte.')"
+
+# 19 — class D1 (audit row 29): already default; pins that it stays there
+expect_eq "19 audit row 29 characterization-pinned table-drive" "default" \
+    "$("$HINT" --desc 'Pin FreeAgencyProcessor::parseOfferData for every offer type with characterization tests, then table-drive its offer1-6 ladder.')"
+
+# 20-24 — boundary: the H1/H2 carve-outs must not swallow a real trigger
+expect_eq "20 additive gate plus a real removal stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Add an additive bin/check-plan gate and remove the 500-line condition')"
+expect_eq "21 additive gate plus relax on a deleted row stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Add an additive bin/check-plan gate and relax the deleted-row check')"
+expect_eq "22 row 02 line plus authorization stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into helpers after pinning its HTML-escaped label output, and add an authorization check')"
+expect_eq "23 escape fix with no pin stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'fix the missing HTML escape on the player bio output')"
+expect_eq "24 pinned split that fixes unescaped output stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render after pinning its output byte-for-byte, and fix the unescaped player names')"
+
+# 25-26 — audited true triggers keep firing
+expect_eq "25 audit row 15 auth-gated POST stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Tighten authorization on the auth-gated draft selection POST endpoint so only the team owning the on-the-clock pick can submit, and rename the misnamed `wildCards` in ProjectedDraftOrder.')"
+expect_eq "26 audit row 22 gate weakening stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Weaken the required All checks settled merge gate (bin/check-pr-checks-green V4 condition) so a ghost workflow run whose jobs all completed no longer holds it')"
+
+expect_eq "26b pinned split that drops the escaping stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into helpers after pinning its output, and drop the HTML escape on labels')"
+expect_eq "26c pinned split rendering without escaping stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render after pinning its output, and render names without escaping')"
+expect_eq "26d pinned split that adds escaping stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and escape the raw team names')"
+expect_eq "26e pinned split that HTML-escapes new output stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and HTML-escape the raw team names')"
+# 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
+expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"
+# 27b — NEGATED_PIN_RE: "unpinned" and "without characterization" are no pin
+expect_eq "27b unpinned split with escaped output stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split the unpinned PlayerBioRenderer::render, whose output is HTML-escaped, into helpers')"
+expect_eq "27c split without characterization tests stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Split X into helpers without characterization tests; its labels are escaped')"
+# 28 — RESTRUCTURE_RE conjunct: pinned escape change with no restructure stays xhigh
+expect_eq "28 pinned escape change with no restructure stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Escape the team name in the player bio output after pinning its current output')"
+# 29b — passive-voice removal is a real weakening, not an adjective
+expect_eq "29b additive gate plus passive removal stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'Add an additive bin/check-plan gate; the 500-line condition gets removed')"
+# 29 — ADDITIVE_RE conjunct: a participle weakening without the additive marker stays xhigh
+expect_eq "29 participle weakening without additive stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'make bin/check-plan stop failing plans whose rows cite removed files')"
+
+echo
 echo "== static drift assertions (five copies of the trigger) =="
 
 assert_contains "canonical states the behavioural test" \
@@ -141,5 +205,12 @@ assert_contains "plan-prompt points at the canonical check" \
     '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
 assert_contains "agent def carries the directory clause" \
     '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
+# Bash 3.2 guard (macOS /bin/bash): the hint lowercases with tr, never with ${HAY,,}.
+assert_absent "hint avoids the Bash-4 lowercase expansion" \
+    'bin/plan-tier-hint' '${HAY,,}'
+assert_contains "canonical carries the pinned-restructure carve-out" \
+    '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
+assert_contains "plan-prompt points at the pinned-restructure carve-out" \
+    '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
 
 h_done

@@ -42,6 +42,7 @@ HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
+from harness import fidelity_delta
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
@@ -709,6 +710,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                       scored_findings=res.scored_findings,
                       cache_rec=cache_rec, cache_version=cache_key["version"],
                       conflict_only=conflict_only,
+                      state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
                       body_hash=reviewcache.body_hash_of(copy["summary_md"]))
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
@@ -3020,7 +3022,8 @@ def _plan_hash(plan) -> str:
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
-                  cache_rec=None, cache_version="", conflict_only=False, body_hash=""):
+                  cache_rec=None, cache_version="", conflict_only=False, body_hash="",
+                  state_dir=None, slug=""):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
@@ -3138,10 +3141,20 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
-    verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
-                                   reviewed_tree=reviewed_tree)
+    delta_hit = fidelity_delta.attempt(
+        llm, out_dir, worktree or ".", gh, plan, diff, body, pr, master_sha,
+        reviewed_tree, live, log, state_dir=state_dir, slug=slug, plan_hash=plan_hash,
+        diff_id=diff_id, cache_version=cache_version, phase4b_ran=phase4b_ran,
+        review_findings=review_findings)
+    if delta_hit is None:
+        verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
+                                       reviewed_tree=reviewed_tree)
+        delta_info = {}
+    else:
+        verdict, err, delta_info = delta_hit
     log(f"phase5.5 fidelity: verdict={verdict or 'INDETERMINATE'}"
-        + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}")
+        + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}"
+        + (" review_kind=delta" if delta_info else ""))
     res.fidelity = {"verdict_1": verdict, "error_kind": err or None,
                     "reviewed_tree": reviewed_tree,
                     "verdict_path": fidelity.verdict_path(pr),
@@ -3150,7 +3163,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "findings_round": 0,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
-                    "diff_id": diff_id, "plan_hash": plan_hash}
+                    "diff_id": diff_id, "plan_hash": plan_hash, **delta_info}
     # Shadow-mode arming record (procedure 6f). Set after the wholesale replacement above;
     # nothing on the verdict, remediation or arming path reads it.
     res.fidelity["shadow"] = (
@@ -3398,6 +3411,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
+    fidelity_delta.record_outcome(state_dir, slug, res.fidelity, pr_number=pr,
+                                  run_id=os.path.basename(os.path.normpath(out_dir)),
+                                  version=cache_version, diff=diff,
+                                  final_tree=git.head_tree(), log=log)
     return final_verdict, final_err
 
 

@@ -8,10 +8,10 @@ active GMs: 12
   GMs by event count: 1-5: 2, 6-20: 4, 21-50: 5, 51+: 1
 Sessions: authenticated 31, anonymous-human 22
 Top routes (authenticated):
-  140  team
-  90  player
-  75  depth_chart
-  40  trade
+  140  team (9 GMs)
+  90  player (7 GMs)
+  75  depth_chart (5 GMs)
+  40  trade (1 GM)
   22  free_agency
 Top routes (anonymous-human):
   20  team
@@ -25,6 +25,14 @@ Actions:
   3  other
 Status classes (authenticated): 2xx 470, 3xx 8, 4xx 2
 Status classes (anonymous-human): 2xx 50, 4xx 10
+4xx by status (authenticated): 404 2
+4xx by status (anonymous-human): 404 7, 403 2, other4xx 1
+Top 4xx routes (authenticated, 2 distinct names):
+  1  player
+  1  other
+Top 4xx routes (anonymous-human, 3 distinct names):
+  2  player
+  6  other
 Referer mix (anonymous-human): none 30, internal 10, search 15, external 5
 Daily events (authenticated, last 7 days with data):
   2026-09-21  60
@@ -42,7 +50,7 @@ Daily events (anonymous-human, last 7 days with data):
   2026-09-25  9
   2026-09-26  8
   2026-09-27  9
-dropped malformed rows: 3
+dropped malformed rows: 4
 --- end digest ---
 --- prompt ---
 You review one week of aggregate product analytics for a 17-GM basketball league site. A human reads your output; nothing you write is applied automatically.
@@ -63,10 +71,10 @@ active GMs: 12
   GMs by event count: 1-5: 2, 6-20: 4, 21-50: 5, 51+: 1
 Sessions: authenticated 31, anonymous-human 22
 Top routes (authenticated):
-  140  team
-  90  player
-  75  depth_chart
-  40  trade
+  140  team (9 GMs)
+  90  player (7 GMs)
+  75  depth_chart (5 GMs)
+  40  trade (1 GM)
   22  free_agency
 Top routes (anonymous-human):
   20  team
@@ -80,6 +88,14 @@ Actions:
   3  other
 Status classes (authenticated): 2xx 470, 3xx 8, 4xx 2
 Status classes (anonymous-human): 2xx 50, 4xx 10
+4xx by status (authenticated): 404 2
+4xx by status (anonymous-human): 404 7, 403 2, other4xx 1
+Top 4xx routes (authenticated, 2 distinct names):
+  1  player
+  1  other
+Top 4xx routes (anonymous-human, 3 distinct names):
+  2  player
+  6  other
 Referer mix (anonymous-human): none 30, internal 10, search 15, external 5
 Daily events (authenticated, last 7 days with data):
   2026-09-21  60
@@ -97,6 +113,6 @@ Daily events (anonymous-human, last 7 days with data):
   2026-09-25  9
   2026-09-26  8
   2026-09-27  9
-dropped malformed rows: 3
+dropped malformed rows: 4
 </digest>
 --- end prompt ---

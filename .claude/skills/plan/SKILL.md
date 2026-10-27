@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -249,6 +249,7 @@ Launch a **single Plan agent** with a prompt containing ALL of the items listed 
 
    - **Gate removal or weakening** — the diff deletes, relaxes, or disables an **executable gate**. A gate is *executable* when it can reject: a hook that emits a deny, a `bin/check-*` failure condition, the tier/model logic under `bin/lib/plan-*`, or a `/post-plan` Phase 6.5 arming condition. The test is behavioural: **after the change, some input that the gate previously rejected now passes.** If no input changes verdict, it is not a removal or weakening — decision-procedure-preserving prose, an additive gate, a mechanism/plumbing refactor, and a non-gating skill step all fail that test and go to the default `plan-architect` (check 3), *whatever directory they sit in*. `.claude/skills`, `.claude/rules`, and `~/.claude/hooks` are where to **look** for an executable gate; they are not themselves the trigger.
    - **Bootstrap hazard** — the diff edits the arming, escalation, or auto-merge rule that governs **its own merge**: a Phase 6.5 arming condition, the `feat:` human-signoff floor, or `auto_merge` handling in `/post-plan`. Rewriting routing that will govern some *later, unrelated* plan is **not** a bootstrap hazard.
+   - **Pinned restructure of a security surface.** A split, extraction, table-drive, or dedupe of existing SQL, POST-handling, or rendering code goes to the default `plan-architect` (check 3) when the task pins today's output with characterization tests first. The change must also be a pure-function move or state-free extraction. It may add nothing to the irreducible list: actor identity, a new POST/form endpoint, a new SQL construction site, or new user-facing output rendering. A changed rendered or queried result, or any doubt, keeps it at xhigh.
 
    For a mechanical second opinion before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It prints `xhigh`, `default`, or `sonnet` and exits 0; `--explain` prints the matching reason. **The hint is advisory — this checklist is authoritative and you own the final call.**
 

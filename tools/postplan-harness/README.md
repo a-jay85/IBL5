@@ -139,6 +139,16 @@ intent log — without touching GitHub.
 
 - **Shadow fields never arm.** No `ArmInputs` field carries the shadow record. `tests/test_fidelity_shadow.py` asserts this and that a shadow hold leaves the arm decision unchanged.
 
+### Delta re-review (Phase 5.5)
+
+- **When it fires.** A prior full review of the same branch, plan hash and harness `version` ended `READY`, `READY WITH NOTES` or `NOT READY` with no remediation commit. That run left an anchor record at `<state-dir>/<slug>.fidelity-delta.json`. The delta path runs when the sticky's `**Reviewed diff:**` matches the record's last reviewed diff id and the per-file patch-id delta since the anchor passes every limit: at most 200 changed lines, at most 8 files, at most 0.5 of the full diff's changed lines. It also needs no new or removed file, no path outside the plan (lockfiles and the phpstan baseline are exempt), and no gate-surface path (`fidelity.LOCAL_GATE_PATH_PREFIXES`).
+- **What the reviewer sees.** Only the delta hunks, the anchor's findings excerpt, and the plan sections that name the touched files plus `## Critical Files`. The reviewer restates each anchor `[BLOCKING]` finding as RESOLVED or UNRESOLVED and echoes `DELTA-ANCHOR: <run_id>`. A reply without them is discarded and the harness runs the full review.
+- **Chaining.** At most 2 consecutive deltas, each cumulative against the last full anchor. The third run is full. A delta run never becomes an anchor, never seeds carry-forward (log reason `prior-review-delta`), and never enters the review cache (`vet_fidelity`).
+- **Verdict handling.** Unchanged. A delta `NOT READY` lands in `verdict_1` and blocks arming through condition (12) like a full one.
+- **Fail-closed.** Every decline reason in `fidelity_delta.DECLINE_REASONS` logs `phase5.5 fidelity: delta declined (<reason>)` and runs the full reviewer. Nothing is skipped. To force a full review by hand, delete the record file.
+- **Audit trail.** The sticky comment gains `**Review kind:** delta (anchor <run_id>; N file(s), x/y changed lines since the last full review)`. The run log line gains `review_kind=delta`.
+- **Measured basis (2026-10-25).** Across 311 plan-unchanged consecutive packet pairs, 13 % of re-reviews qualify. Eligible packets are 5.3 KB at p50 against a 64 KB median plan.
+
 ## Installation (executed 2026-07-16 with explicit approval)
 
 1. ✅ `LiveGh` (`harness/adapters/ghad.py`) executes the seven allowlisted

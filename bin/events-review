@@ -409,6 +409,36 @@ UNION ALL
  WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
    AND created_at >= @start AND created_at < @end
  GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
+SELECT 'routegms', 'authenticated', route_name, COUNT(DISTINCT username)
+FROM ibl_events
+WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
+  AND created_at >= @start AND created_at < @end
+GROUP BY 3 ORDER BY COUNT(*) DESC, 3 LIMIT 25;
+SELECT 'status4xx', traffic_class,
+  CASE WHEN http_status = 404 THEN '404' WHEN http_status = 403 THEN '403' ELSE 'other4xx' END,
+  COUNT(*)
+FROM ibl_events
+WHERE traffic_class IN ('authenticated', 'anonymous-human')
+  AND http_status BETWEEN 400 AND 499
+  AND created_at >= @start AND created_at < @end
+GROUP BY 2, 3;
+SELECT 'route4xxn', traffic_class, 'all', COUNT(DISTINCT route_name)
+FROM ibl_events
+WHERE traffic_class IN ('authenticated', 'anonymous-human')
+  AND http_status BETWEEN 400 AND 499 AND route_name IS NOT NULL
+  AND created_at >= @start AND created_at < @end
+GROUP BY 2;
+(SELECT 'route4xx', 'authenticated', route_name, COUNT(*) FROM ibl_events
+ WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
+   AND http_status BETWEEN 400 AND 499
+   AND created_at >= @start AND created_at < @end
+ GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
+UNION ALL
+(SELECT 'route4xx', 'anonymous-human', route_name, COUNT(*) FROM ibl_events
+ WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
+   AND http_status BETWEEN 400 AND 499
+   AND created_at >= @start AND created_at < @end
+ GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
 SELECT 'action', 'all', action, COUNT(*)
 FROM ibl_events
 WHERE action IS NOT NULL AND created_at >= @start AND created_at < @end
@@ -439,7 +469,7 @@ SQL
 
 # ── Stage B: digest ───────────────────────────────────────────────────────────
 # Every printed token is re-checked here; anything that fails its shape check
-# folds into an "other" line or is dropped. A route prints only if an
+# folds into an "other" line or is dropped. A route (in any route or 4xx section) prints only if an
 # authenticated GM also hit it in the same input: anonymous traffic can mint
 # any route_name through ?name=, logged-in GMs cannot be spoofed that way.
 # Intervals (x{0,39}) are avoided on purpose: older mawk lacks them.
@@ -479,6 +509,11 @@ function delta(cur, prev) {
     if (prev <= 0) return "n/a"
     d = (cur - prev) * 100 / prev
     return sprintf("%+d%%", (d >= 0) ? int(d + 0.5) : -int(-d + 0.5))
+}
+# Distinct-GM suffix for an authenticated route line; empty when unknown.
+function gm_suffix(c, r) {
+    if (c != "authenticated" || !(r in rg)) return ""
+    return (rg[r] == 1) ? " (1 GM)" : sprintf(" (%d GMs)", rg[r])
 }
 {
     if (NF != 4 || !ok_num($4)) { dropped++; next }
@@ -523,6 +558,23 @@ function delta(cur, prev) {
             if (!((k, sk) in dy)) dlist[k, ++dn[k]] = sk
             dy[k, sk] += v
         } else dropped++
+    } else if (s == "routegms") {
+        if (k == "authenticated" && ok_route(sk)) rg[sk] = v
+        else dropped++
+    } else if (s == "status4xx") {
+        if (ok_human(k) && (sk == "404" || sk == "403" || sk == "other4xx")) s4[k, sk] += v
+        else dropped++
+    } else if (s == "route4xxn") {
+        if (ok_human(k) && sk == "all") r4distinct[k] += v
+        else dropped++
+    } else if (s == "route4xx") {
+        # Never sets auth[]: the fold set stays the GM top-25 view list.
+        if (!ok_human(k)) { dropped++; next }
+        r4total[k] += v
+        if (ok_route(sk)) {
+            if (!((k, sk) in r4)) r4list[k, ++r4rows[k]] = sk
+            r4[k, sk] += v
+        }
     } else {
         dropped++
     }
@@ -557,7 +609,7 @@ END {
         pn = top_n(m, tn, tc, 15, on, oc)
         printf "Top routes (%s):\n", c
         printed = 0
-        for (i = 1; i <= pn; i++) { printf "  %d  %s\n", oc[i], on[i]; printed += oc[i] }
+        for (i = 1; i <= pn; i++) { printf "  %d  %s%s\n", oc[i], on[i], gm_suffix(c, on[i]); printed += oc[i] }
         if (rtotal[c] - printed > 0) printf "  %d  other\n", rtotal[c] - printed
     }
     if (atotal > 0) {
@@ -577,6 +629,31 @@ END {
             if ((c, key) in st) line = line ((line == "") ? "" : ", ") sprintf("%s %d", key, st[c, key])
         }
         if (line != "") printf "Status classes (%s): %s\n", c, line
+    }
+    split("404 403 other4xx", fx, " ")
+    for (h = 1; h <= 2; h++) {
+        c = hc[h]
+        line = ""
+        for (q = 1; q <= 3; q++) {
+            if ((c, fx[q]) in s4) line = line ((line == "") ? "" : ", ") sprintf("%s %d", fx[q], s4[c, fx[q]])
+        }
+        if (line != "") printf "4xx by status (%s): %s\n", c, line
+    }
+    for (h = 1; h <= 2; h++) {
+        c = hc[h]
+        if (r4total[c] == 0) continue
+        m = 0
+        split("", tn); split("", tc)
+        for (i = 1; i <= r4rows[c]; i++) {
+            r = r4list[c, i]
+            if (r in auth) { m++; tn[m] = r; tc[m] = r4[c, r] }
+        }
+        split("", on); split("", oc)
+        pn = top_n(m, tn, tc, 10, on, oc)
+        printf "Top 4xx routes (%s, %d distinct names):\n", c, r4distinct[c]
+        printed = 0
+        for (i = 1; i <= pn; i++) { printf "  %d  %s\n", oc[i], on[i]; printed += oc[i] }
+        if (r4total[c] - printed > 0) printf "  %d  other\n", r4total[c] - printed
     }
     line = ""
     split("none internal search external", rl, " ")

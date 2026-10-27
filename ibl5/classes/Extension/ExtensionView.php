@@ -30,21 +30,21 @@ class ExtensionView implements ExtensionViewInterface
         $msgSafe = HtmlSanitizer::e($msg ?? '');
 
         if ($result === 'extension_error') {
-            return '<div class="ibl-alert ibl-alert--error">'
+            return '<div role="alert" class="d-alert d-alert-error mb-4">'
                 . $msgSafe
                 . ' Your extension attempt was not legal and will not be recorded.'
                 . '</div>';
         }
 
         if ($result === 'extension_accepted') {
-            return '<div class="ibl-alert ibl-alert--success">'
+            return '<div role="alert" class="d-alert d-alert-success mb-4">'
                 . '<strong>Player response:</strong> ' . $msgSafe
                 . '<br>Note from the commissioner\'s office: You have used up your successful extension for this season and may not make any more extension attempts.'
                 . '</div>';
         }
 
         if ($result === 'extension_rejected') {
-            return '<div class="ibl-alert ibl-alert--info">'
+            return '<div role="alert" class="d-alert d-alert-info mb-4">'
                 . '<strong>Player response:</strong> ' . $msgSafe
                 . '<br>Note from the commissioner\'s office: You will be able to make another attempt next sim as you have not yet used up your successful extension for this season.'
                 . '</div>';

@@ -24,7 +24,15 @@ final class TrafficClassifier
         'curl/',
         'wget',
         'python-requests',
-        'headlesschrome',
+        'headless',
+        'go-http-client',
+        'axios',
+        'scrapy',
+        'httpclient',
+        'java/',
+        'okhttp',
+        'node-fetch',
+        'libwww',
         'Nexus 5 Build/MRA58N',
     ];
 
@@ -33,7 +41,7 @@ final class TrafficClassifier
      *
      * 1. smoke-test  — UA contains IBL5-smoke/ (our own synthetic traffic)
      * 2. authenticated — username is not null
-     * 3. crawler     — UA matches a known bot pattern
+     * 3. crawler     — UA is null/blank after trim, or matches a known bot pattern
      * 4. spam        — anonymous request with op=new_user
      * 5. anonymous-human — default
      */
@@ -51,8 +59,9 @@ final class TrafficClassifier
             return 'authenticated';
         }
 
-        // Rule 3: known crawler/bot UA.
-        if ($userAgent !== null && $userAgent !== '' && self::isCrawler($userAgent)) {
+        // Rule 3: crawler — a blank UA (no browser sends one) or a known bot UA.
+        // Runs after rule 2, so a logged-in GM with a blank UA stays authenticated.
+        if ($userAgent === null || trim($userAgent) === '' || self::isCrawler($userAgent)) {
             return 'crawler';
         }
 

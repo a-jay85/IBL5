@@ -563,9 +563,6 @@ if (updatePr !== null) {
     process.stdout.write(build(readBody()) + '\n');
     process.exit(0);
   }
-  // Poll before reading the live body so the body snapshot is as fresh as
-  // possible — a concurrent edit that lands during the poll window would
-  // otherwise be overwritten with the stale version read before the wait.
   const base = pagesUrl.endsWith('/') ? pagesUrl : pagesUrl + '/';
   const firstUrl =
     rawNewCells.length > 0

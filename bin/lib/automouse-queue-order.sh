@@ -126,13 +126,31 @@ next_prefix() {
 # *.md glob. mkdir is atomic. A lock older than 60s belongs to a crashed holder
 # and is removed. The default 65 tries outlasts that, so a killed holder never
 # fails the next caller.
+#
+# The steal renames the stale lock to a unique name first. Only the caller whose
+# rename succeeded owns the stale dir. If the renamed dir turns out fresh, a
+# rival stole first and re-took the lock, so put it back instead of deleting it.
+_queue_lock_steal() {
+    local lock=$1 stale="$1.stale.$$.$RANDOM" now mt
+    if ! mv "$lock" "$stale" 2>/dev/null; then return 0; fi
+    now=$(date +%s)
+    mt=$(lstat_mtime "$stale") || mt=0
+    if [ $((now - mt)) -gt 60 ]; then
+        rmdir "$stale" 2>/dev/null || true
+    elif [ ! -e "$lock" ] && mv "$stale" "$lock" 2>/dev/null; then
+        :
+    else
+        rmdir "$stale" 2>/dev/null || true
+    fi
+}
+
 queue_lock() {
     local lock="$1/.normalize.lock" max=${2:-65} tries=0 now age
     while ! mkdir "$lock" 2>/dev/null; do
         now=$(date +%s)
         age=$(lstat_mtime "$lock") || age=$now
         if [ $((now - age)) -gt 60 ]; then
-            rmdir "$lock" 2>/dev/null || true
+            _queue_lock_steal "$lock"
             continue
         fi
         tries=$((tries + 1))

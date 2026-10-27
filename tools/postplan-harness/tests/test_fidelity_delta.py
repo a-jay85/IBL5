@@ -504,6 +504,7 @@ def test_sticky_compares_to_last_reviewed_diff():
     rec = fidelity_delta.append_delta(kw["record"], run_id="r2", verdict="READY",
                                       diff_id="2" * 40, delta_paths=["a.py"], reviewed_tree=TREE)
     kw["record"] = rec
+    # Matrix row 8: the sticky is compared to deltas[-1] when a delta exists, else the anchor.
     assert rec["deltas"][-1]["diff_id"] == "2" * 40
     # The sticky still names the anchor's diff, but the last reviewed diff is the delta's.
     kw["sticky_body"] = _sticky(verdict="NOT READY", diff_id=ANCHOR_DIFF_ID,
@@ -870,6 +871,7 @@ def test_small_delta_takes_delta_path(tmp_path):
         tmp_path, res1, diff=DIFF_MOVED, tree=TREE2,
         canned={"plan-fidelity-review": READY_FULL, fidelity_delta.PURPOSE: _delta_text(tmp_path)})
     assert purposes2 == [fidelity_delta.PURPOSE], logs2
+    # Matrix row 15: purposes == [plan-fidelity-delta-review]
     assert purposes2 == ["plan-fidelity-delta-review"]
     assert res2.fidelity["review_kind"] == "delta"
     assert res2.fidelity["verdict_1"] == "READY"

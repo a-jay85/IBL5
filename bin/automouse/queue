@@ -1,15 +1,19 @@
 #!/bin/bash
 # Queue a plan for automouse autonomous execution.
 #
-# Creates a symlink in the automouse queue pointing to the original plan
-# in ~/claude-plans/. The original plan stays in place; the symlink
-# is what gets moved to done/ or skipped/ after execution.
+# Creates a symlink NNN-<slug>.md in the automouse queue pointing to the
+# original plan in ~/claude-plans/. Run order is the lexical order of the NNN
+# prefixes; a new entry is appended last. The original plan stays in place;
+# the symlink moves to done/ or skipped/ (as bare <slug>.md) after execution.
 #
 # Usage:
 #   bin/automouse/queue [add] <plan-slug-or-filename> [--force]
 #   bin/automouse/queue                          # show current queue
 #   bin/automouse/queue requeue                  # move all skipped plans back to queue
 #   bin/automouse/queue remove <plan-slug>       # remove a plan from the queue
+#   bin/automouse/queue reorder <slug1> ...      # rename the queue into this order
+#   bin/automouse/queue dispose <slug> <done|skipped> [--staleness]
+#   bin/automouse/queue renumber                 # compact prefixes to 010, 020, …
 #   bin/automouse/queue status                   # one next-action line per item needing attention
 #
 # Examples:
@@ -22,7 +26,7 @@
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    cat <<'EOF'
+    cat <<'HELP'
 Usage:
   bin/automouse/queue [add] <plan-slug-or-filename> [--force]
                                                 queue a plan; runs bin/check-plan first
@@ -30,6 +34,9 @@ Usage:
   bin/automouse/queue requeue                   move all skipped plans back to queue
   bin/automouse/queue remove <plan-slug>        remove a plan from the queue
   bin/automouse/queue reorder <slug1> ...       reorder the full queue
+  bin/automouse/queue dispose <slug> <done|skipped> [--staleness]
+                                                move a queued plan to done/ or skipped/
+  bin/automouse/queue renumber                  compact prefixes to 010, 020, 030, …
   bin/automouse/queue status                    one next-action line per item needing attention
 
 Arguments:
@@ -44,20 +51,23 @@ Env vars:
   AUTOMOUSE_CHECK_PLAN  plan gate executable (default: <repo>/bin/check-plan)
 
 Exit codes: 0 = success, 1 = error or refusal
-EOF
+HELP
     exit 0
 fi
 
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 DONE_DIR="$NIGHTLY_DIR/done"
 
 mkdir -p "$QUEUE_DIR"
 
-# shellcheck source=bin/automouse/lib-queue-order
-source "$(cd "$(dirname "$0")" && pwd)/lib-queue-order"
+# shellcheck source=../lib/automouse-queue-order.sh
+source "$SCRIPT_DIR/../lib/automouse-queue-order.sh"
+# One-shot cutover of a legacy bare-named queue; a no-op once every entry is prefixed.
+normalize_queue "$QUEUE_DIR"
 
 # Evict any stale same-basename disposition symlink (and its sidecar counters)
 # from skipped/ and done/ before (re)queuing. queue/ is the cut vertex: a plan
@@ -69,52 +79,36 @@ evict_dispositions() {
           "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure" "$DONE_DIR/${name}.cap-refunds" "$DONE_DIR/${name}.force-override"
 }
 
-# --- Run-order stamping -----------------------------------------------------
-# lstat_mtime and queue_entries_ordered are provided by lib-queue-order (sourced
-# above). Run order is the symlink's own lstat mtime (oldest-first), computed by
-# queue_entries_ordered — which is portable across BSD and GNU stat without
-# dereferences. Editing a queued plan's TARGET file no longer changes its
-# position: only touch -h on the queue symlink itself affects order.
+# --- Run order --------------------------------------------------------------
+# Entries are named NNN-<slug>.md and run in plain lexical order (queue_entries,
+# from bin/lib/automouse-queue-order.sh). Every ordering change is a rename
+# inside queue/, so editing a queued plan's file never moves it.
 
-# Stamp a just-queued entry to the BACK of the run order.
-#
-# Run order is oldest symlink lstat mtime first (queue_entries_ordered). An
-# entry created by a bare `ln -s` / `mv` inherits its queue position from
-# whenever the plan file happened to be authored. That is not "the back":
-# `reorder` writes its ladder into the PAST (now - N*60), so any plan authored
-# before the last reorder jumps to the FRONT and runs next. Stamp explicitly.
-#
-# Stamp = max(now, newest existing SYMLINK lstat mtime + 60s) — the +60 mirrors
-# `reorder`'s spacing so a same-second tie can never produce ambiguous order,
-# and the max() keeps us behind a ladder already stamped at or past now.
-# The symlink (sort key) is touched with -h; the target is also touched for
-# dev-inspection parity (harmless — it no longer affects ordering).
-stamp_back_of_queue() {
-    local name=$1
-    local newest=0 f m t epoch stamp
-    for f in "$QUEUE_DIR"/*.md; do
-        # Unmatched glob (empty queue) fails both tests and is skipped.
-        { [ -L "$f" ] || [ -e "$f" ]; } || continue
-        # Explicit `if`, not `[ … ] && continue`: the latter yields a non-zero
-        # statement status on a NON-match, which `set -e` would treat as a fatal
-        # error and abort the stamp mid-scan.
-        if [ "$(basename "$f")" = "$name" ]; then continue; fi
-        # Sort key is the SYMLINK's own lstat mtime only — target mtime is no
-        # longer the sort key, so we skip scanning it here.
-        m=$(lstat_mtime "$f") || m=""
-        if [ -n "$m" ] && [ "$m" -gt "$newest" ]; then newest=$m; fi
-    done
-
-    epoch=$(date +%s)
-    if [ "$(( newest + 60 ))" -gt "$epoch" ]; then epoch=$(( newest + 60 )); fi
-    # epoch -> touch stamp, portable: GNU (-d @epoch) first, BSD (-r epoch) fallback.
-    stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
-
-    touch -h -t "$stamp" "$QUEUE_DIR/$name"
-    t=$(readlink "$QUEUE_DIR/$name" 2>/dev/null) || t=""
-    if [ -n "$t" ] && [ -e "$t" ]; then
-        touch -t "$stamp" "$t"
+# append_entry <source-path> <name> — link <source-path> into the queue as the
+# LAST entry. Compacts once if the prefix band is exhausted. Holds the queue
+# lock from the membership check to the link, so a racing enqueue or a renumber
+# parked in the 900-999 band can never hand out the same prefix.
+append_entry() {
+    local source=$1 name=$2 prefix rc=1
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: could not queue $name — another queue rename holds $QUEUE_DIR/.normalize.lock." >&2
+        return 1
     fi
+    if queue_entry_for_slug "$QUEUE_DIR" "$name" >/dev/null; then
+        rc=0
+    else
+        if ! prefix=$(next_prefix "$QUEUE_DIR"); then
+            _renumber_queue_locked "$QUEUE_DIR" || true
+            prefix=$(next_prefix "$QUEUE_DIR") || prefix=""
+        fi
+        if [ -z "$prefix" ]; then
+            echo "Error: could not queue $name — the queue is full (89 entries); dispose or remove a plan first." >&2
+        elif ln -s "$source" "$QUEUE_DIR/${prefix}-${name}"; then
+            rc=0
+        fi
+    fi
+    queue_unlock "$QUEUE_DIR"
+    return "$rc"
 }
 
 show_queue() {
@@ -122,27 +116,28 @@ show_queue() {
     printf "  %4s  %-44s %-17s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
     local found=0
     local i=1
-    while IFS= read -r f; do
+    while IFS= read -r entry; do
         found=1
-        local name impl_model auto_merge title
-        name=$(basename "$f")
-        if [ -e "$f" ]; then
+        local name path impl_model auto_merge title
+        name=$(entry_to_name "$entry")
+        path="$QUEUE_DIR/$entry"
+        if [ -e "$path" ]; then
             # Extract frontmatter values (between first pair of --- markers).
             # Title = first H1 outside frontmatter and code fences, so a
             # `# shellcheck` line inside a ```bash block is never picked.
             # || true: awk/grep under set -e + pipefail; keep going on any error.
-            impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$f" 2>/dev/null) || true
-            auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$f" 2>/dev/null) || true
-            title=$(awk 'NR==1&&/^---/{fm=1;next} fm{if(/^---/)fm=0;next} /^ ? ? ?(```|~~~)/{fence=!fence;next} !fence&&/^# /{sub(/^# /,"");print;exit}' "$f" 2>/dev/null) || true
-            [ -z "$title" ] && title=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^title:/{sub(/^title:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$f" 2>/dev/null) || true
+            impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$path" 2>/dev/null) || true
+            auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$path" 2>/dev/null) || true
+            title=$(awk 'NR==1&&/^---/{fm=1;next} fm{if(/^---/)fm=0;next} /^ ? ? ?(```|~~~)/{fence=!fence;next} !fence&&/^# /{sub(/^# /,"");print;exit}' "$path" 2>/dev/null) || true
+            [ -z "$title" ] && title=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^title:/{sub(/^title:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$path" 2>/dev/null) || true
         else
-            impl_model="" auto_merge="" title="(BROKEN LINK -> $(readlink "$f"))"
+            impl_model="" auto_merge="" title="(BROKEN LINK -> $(readlink "$path"))"
         fi
         impl_model=${impl_model:-opus}
         auto_merge=${auto_merge:-true}
         printf "  %4d. %-44s %-17s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
         i=$((i + 1))
-    done < <(queue_entries_ordered)
+    done < <(queue_entries "$QUEUE_DIR")
     if [ "$found" -eq 0 ]; then
         echo "  (empty)"
     fi
@@ -194,7 +189,7 @@ if [ "$1" = "status" ]; then
 
     for f in "$QUEUE_DIR"/*.md; do
         { [ -L "$f" ] || [ -e "$f" ]; } || continue
-        name=$(basename "$f"); slug="${name%.md}"
+        name=$(entry_to_name "$f"); slug="${name%.md}"
         attempts=0
         if [ -f "$QUEUE_DIR/${name}.attempts" ]; then
             attempts=$(tr -cd '0-9' < "$QUEUE_DIR/${name}.attempts")
@@ -229,18 +224,22 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
         echo "Usage: bin/automouse/queue remove <plan-slug>" >&2
         exit 1
     fi
-    TARGET=$(basename "$2")
-    case "$TARGET" in
-        *.md) ;;
-        *) TARGET="${TARGET}.md" ;;
-    esac
-    if [ ! -e "$QUEUE_DIR/$TARGET" ]; then
+    TARGET=$(entry_to_name "$(basename "$2")")
+    # Hold the queue lock from lookup through rm, so a racing reorder/renumber
+    # cannot rename the entry between resolving it and deleting it.
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: another queue rename holds $QUEUE_DIR/.normalize.lock; nothing removed." >&2
+        exit 1
+    fi
+    if ! ENTRY=$(queue_entry_for_slug "$QUEUE_DIR" "$TARGET"); then
+        queue_unlock "$QUEUE_DIR"
         echo "Error: $TARGET is not in the queue." >&2
         echo "" >&2
         show_queue >&2
         exit 1
     fi
-    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds" "$QUEUE_DIR/${TARGET}.force-override"
+    rm -f "$QUEUE_DIR/$ENTRY" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds" "$QUEUE_DIR/${TARGET}.force-override"
+    queue_unlock "$QUEUE_DIR"
     echo "Removed from queue: $TARGET (original plan in $PLANS_DIR is untouched)"
     echo ""
     show_queue
@@ -255,16 +254,19 @@ if [ "$1" = "requeue" ]; then
     count=0
     for f in "$SKIPPED_DIR"/*.md; do
         name=$(basename "$f")
-        if [ -e "$QUEUE_DIR/$name" ]; then
+        case "$name" in
+            [0-9][0-9][0-9]-*)
+                echo "  skip: $name (NNN- plan names are reserved for run order; rename the plan)" >&2
+                continue ;;
+        esac
+        if queue_entry_for_slug "$QUEUE_DIR" "$name" >/dev/null; then
             echo "  skip: $name (already queued)"
             continue
         fi
-        mv "$f" "$QUEUE_DIR/$name"
+        # Re-link to the same target as the LAST entry, then drop the skipped/ link.
+        append_entry "$(readlink "$f")" "$name"
         rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure" "$QUEUE_DIR/${name}.cap-refunds" "$QUEUE_DIR/${name}.force-override"
         evict_dispositions "$name"
-        # `mv` carries the skipped/ mtime over; without this the requeued plan
-        # would re-enter at its authoring position, not the back.
-        stamp_back_of_queue "$name"
         count=$((count + 1))
         echo "  requeued: $name"
     done
@@ -275,13 +277,66 @@ if [ "$1" = "requeue" ]; then
     exit 0
 fi
 
-# Reorder the queue by re-touching both the queue SYMLINKS (the sort key) and
-# their target plan files with ascending mtimes. Run order is oldest symlink
-# lstat mtime first (queue_entries_ordered), so first arg = oldest = runs first.
-# The argument list must be an EXACT permutation of the current queue: every arg
-# queued, none repeated, counts equal. Validation is a full first pass — no
-# mtime is touched unless it passes, so a rejected reorder leaves the queue
-# untouched.
+# Move a queue entry to done/ or skipped/ under its bare <slug>.md name, so
+# self-heal and evict_dispositions keep matching it. The impl agent and the
+# runner call this instead of `mv`-ing a prefixed entry themselves.
+# --staleness also drops the <slug>.md.staleness marker self-heal reads.
+# Idempotent: an entry already in the target dir is a no-op success.
+if [ "$1" = "dispose" ]; then
+    shift
+    STALENESS=0
+    if [ "${3:-}" = "--staleness" ]; then STALENESS=1; fi
+    if [ $# -lt 2 ] || { [ "$2" != "done" ] && [ "$2" != "skipped" ]; } \
+       || { [ $# -gt 2 ] && [ "$STALENESS" -eq 0 ]; } || [ $# -gt 3 ]; then
+        echo "Usage: bin/automouse/queue dispose <plan-slug> <done|skipped> [--staleness]" >&2
+        exit 1
+    fi
+    if [ "$2" = "done" ]; then TARGET_DIR="$DONE_DIR"; else TARGET_DIR="$SKIPPED_DIR"; fi
+    if [ "$STALENESS" -eq 1 ] && [ "$2" != "skipped" ]; then
+        echo "Error: --staleness applies only to skipped." >&2
+        exit 1
+    fi
+    # basename strips any leading path -> path-traversal / arbitrary-file defense.
+    NAME=$(entry_to_name "$(basename "$1")")
+    # Hold the queue lock from lookup through mv, so a racing reorder/renumber
+    # cannot rename the entry between resolving it and moving it.
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: another queue rename holds $QUEUE_DIR/.normalize.lock; nothing disposed." >&2
+        exit 1
+    fi
+    if ENTRY=$(queue_entry_for_slug "$QUEUE_DIR" "$NAME"); then
+        mkdir -p "$TARGET_DIR"
+        if ! mv "$QUEUE_DIR/$ENTRY" "$TARGET_DIR/$NAME"; then
+            queue_unlock "$QUEUE_DIR"
+            exit 1
+        fi
+        queue_unlock "$QUEUE_DIR"
+        echo "Disposed: $ENTRY -> $2/$NAME"
+    elif [ -L "$TARGET_DIR/$NAME" ] || [ -e "$TARGET_DIR/$NAME" ]; then
+        queue_unlock "$QUEUE_DIR"
+        echo "Already disposed (no change): $2/$NAME"
+    else
+        queue_unlock "$QUEUE_DIR"
+        echo "Error: $NAME is in neither queue/ nor $2/." >&2
+        exit 1
+    fi
+    if [ "$STALENESS" -eq 1 ]; then touch "$TARGET_DIR/${NAME}.staleness"; fi
+    exit 0
+fi
+
+# Compact the queue to 010, 020, 030, … in its current order. A no-op when the
+# queue is already canonical.
+if [ "$1" = "renumber" ]; then
+    renumber_queue "$QUEUE_DIR"
+    show_queue
+    exit 0
+fi
+
+# Reorder the queue by renaming every entry to 010, 020, … in the order given
+# (first arg runs first). The argument list must be an EXACT permutation of the
+# current queue: every arg queued, none repeated, counts equal. Validation is a
+# full first pass — nothing is renamed unless it passes, so a rejected reorder
+# leaves the queue untouched.
 if [ "$1" = "reorder" ]; then
     shift
     if [ $# -lt 1 ]; then
@@ -290,30 +345,34 @@ if [ "$1" = "reorder" ]; then
         exit 1
     fi
 
-    # Current queue basenames, space-wrapped for membership tests (" a.md b.md ").
+    # Hold the queue lock from validation through the rename, so the permutation
+    # checked is the one renamed. The EXIT trap releases it on every exit below.
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: another queue rename holds $QUEUE_DIR/.normalize.lock; nothing reordered." >&2
+        exit 1
+    fi
+    trap 'queue_unlock "$QUEUE_DIR"' EXIT
+
+    # Current queue names, space-wrapped for membership tests (" a.md b.md ").
     queued=" "
     queued_count=0
-    while IFS= read -r f; do
-        queued="$queued$(basename "$f") "
+    while IFS= read -r e; do
+        queued="$queued$(entry_to_name "$e") "
         queued_count=$((queued_count + 1))
-    done < <(queue_entries_ordered)
+    done < <(queue_entries "$QUEUE_DIR")
 
     if [ "$queued_count" -eq 0 ]; then
         echo "Error: the queue is empty; nothing to reorder." >&2
         exit 1
     fi
 
-    # Validate (touch nothing this pass). $ordered collects normalized names.
+    # Validate (rename nothing this pass). $ordered collects queue entry names.
     seen=" "
-    ordered=""
+    ordered=()
     given_count=0
     for arg in "$@"; do
         # basename strips any leading path -> path-traversal / arbitrary-file defense.
-        name=$(basename "$arg")
-        case "$name" in
-            *.md) ;;
-            *) name="${name}.md" ;;
-        esac
+        name=$(entry_to_name "$(basename "$arg")")
         case "$queued" in
             *" $name "*) ;;
             *)
@@ -327,7 +386,7 @@ if [ "$1" = "reorder" ]; then
                 exit 1 ;;
         esac
         seen="$seen$name "
-        ordered="$ordered$name "
+        ordered+=("$(queue_entry_for_slug "$QUEUE_DIR" "$name")")
         given_count=$((given_count + 1))
     done
 
@@ -339,25 +398,7 @@ if [ "$1" = "reorder" ]; then
         exit 1
     fi
 
-    # Apply: distinct mtimes 60s apart, computed from one clock snapshot so
-    # loop drift can't tie two stamps (a same-second tie lets `ls` fall back to
-    # filename order and scramble the request). First arg = oldest = runs first.
-    now=$(date +%s)
-    base=$(( now - given_count * 60 ))
-    i=0
-    for name in $ordered; do
-        target=$(readlink "$QUEUE_DIR/$name")
-        # epoch -> touch stamp, portable: GNU (-d @epoch) first for Linux CI,
-        # BSD (-r epoch) fallback for the macOS automouse host.
-        epoch=$(( base + i * 60 ))
-        stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
-        # Run order = symlink lstat mtime (queue_entries_ordered). Touch the symlink
-        # first (sort key, -h so the symlink itself is stamped, not its target);
-        # target touch keeps it in sync for dev inspection and is harmless.
-        touch -h -t "$stamp" "$QUEUE_DIR/$name"
-        touch    -t "$stamp" "$target"
-        i=$((i + 1))
-    done
+    _renumber_queue_locked "$QUEUE_DIR" "${ordered[@]}"
 
     echo "Reordered $given_count plan(s)."
     echo ""
@@ -414,8 +455,16 @@ fi
 
 FILENAME=$(basename "$SOURCE")
 
-if [ -e "$QUEUE_DIR/$FILENAME" ] || [ -L "$QUEUE_DIR/$FILENAME" ]; then
-    EXISTING=$(readlink "$QUEUE_DIR/$FILENAME" 2>/dev/null || true)
+# A plan name that already starts with NNN- reads as a run-order prefix, so
+# entry_to_slug would strip the plan's own digits and every slug lookup would miss.
+case "$FILENAME" in
+    [0-9][0-9][0-9]-*)
+        echo "Error: plan name $FILENAME starts with three digits and a dash, which the queue reserves for run order. Rename the plan." >&2
+        exit 1 ;;
+esac
+
+if QUEUED_ENTRY=$(queue_entry_for_slug "$QUEUE_DIR" "$FILENAME"); then
+    EXISTING=$(readlink "$QUEUE_DIR/$QUEUED_ENTRY" 2>/dev/null || true)
     EXISTING_PHYS=""
     if [ -n "$EXISTING" ] && [ -e "$EXISTING" ]; then
         EXISTING_PHYS=$( (cd "$(dirname "$EXISTING")" && printf '%s/%s' "$(pwd)" "$(basename "$EXISTING")") 2>/dev/null || true )
@@ -509,10 +558,10 @@ else
     rm -f "$FORCE_SIDECAR"
 fi
 
+# Append first: append_entry can fail (queue full, lock held, ln -s error), and
+# a failed add must leave the skipped/ or done/ link and its sidecars intact.
+append_entry "$SOURCE" "$FILENAME" || exit 1
 evict_dispositions "$FILENAME"
-
-ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"
-stamp_back_of_queue "$FILENAME"
 if [ "$CHECK_RC" -ne 0 ]; then
     FORCED_AT=$(date +%Y-%m-%dT%H:%M:%S%z)
     # Gate lines are the `[tag] ...` lines; fall back to raw output when none
@@ -533,6 +582,7 @@ if [ "$CHECK_RC" -ne 0 ]; then
         "$CHECK_RC" "$FIRST_GATE" >> "$NIGHTLY_DIR/force-overrides.log"
     echo "Force override logged: $FORCE_SIDECAR"
 fi
-echo "Queued: $FILENAME -> $(readlink "$QUEUE_DIR/$FILENAME")"
+QUEUED_ENTRY=$(queue_entry_for_slug "$QUEUE_DIR" "$FILENAME")
+echo "Queued: $QUEUED_ENTRY -> $(readlink "$QUEUE_DIR/$QUEUED_ENTRY")"
 echo ""
 show_queue

@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-default-branch — regression harness for bin/lib/default-branch.
+# Scratch repos with a local bare origin; never touches the network or HOME.
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=bin/lib/harness.sh
+. "$ROOT/bin/lib/harness.sh"
+BIN="$ROOT/bin/lib/default-branch"
+
+h_tmp T
+
+# mk_repo DIR MODE — scratch repo + bare origin. MODE: master-only | main-only | both | neither.
+# After h_git_repo --bare-origin: refs/remotes/origin/master exists, origin/HEAD is unset.
+mk_repo() {
+    local dir="$1" mode="$2"
+    h_git_repo "$dir" --bare-origin
+    case "$mode" in
+        master-only) ;;
+        main-only)
+            git -C "$dir" branch -q main master
+            git -C "$dir" push -q origin main
+            git -C "$dir" update-ref -d refs/remotes/origin/master
+            ;;
+        both)
+            git -C "$dir" branch -q main master
+            git -C "$dir" push -q origin main
+            ;;
+        neither)
+            git -C "$dir" update-ref -d refs/remotes/origin/master
+            ;;
+    esac
+}
+
+# run CMD... — sets RC, OUT (stdout), ERR (stderr).
+run() {
+    OUT="$("$@" 2>"$T/err")"
+    RC=$?
+    ERR="$(cat "$T/err")"
+}
+
+# --- origin/HEAD set ---
+mk_repo "$T/r1" master-only
+git -C "$T/r1" remote set-head origin master
+run "$BIN" --repo "$T/r1"
+h_eq "origin/HEAD=master resolves master" "master" "$OUT"
+h_eq "origin/HEAD=master rc 0" "0" "$RC"
+h_eq "success: stderr empty" "" "$ERR"
+
+mk_repo "$T/r2" both
+git -C "$T/r2" remote set-head origin main
+run "$BIN" --repo "$T/r2"
+h_eq "origin/HEAD=main resolves main" "main" "$OUT"
+
+# --- origin/HEAD unset: fallback scan ---
+mk_repo "$T/r3" master-only
+run "$BIN" --repo "$T/r3"
+h_eq "HEAD unset, only origin/master -> master" "master" "$OUT"
+
+mk_repo "$T/r4" main-only
+run "$BIN" --repo "$T/r4"
+h_eq "HEAD unset, only origin/main -> main" "main" "$OUT"
+
+mk_repo "$T/r5" both
+run "$BIN" --repo "$T/r5"
+h_eq "HEAD unset, both -> main wins" "main" "$OUT"
+
+mk_repo "$T/r6" neither
+run "$BIN" --repo "$T/r6"
+h_eq "HEAD unset, neither -> rc 1" "1" "$RC"
+h_eq "neither: stdout empty" "" "$OUT"
+h_contains "neither: stderr names both missing refs" "$ERR" "neither origin/main nor origin/master exists"
+
+# --- hostile or broken origin/HEAD targets (fail closed, no fallback) ---
+mk_repo "$T/r7" master-only
+# Only allowed characters, so the leading-character rule alone rejects it (an `=` would also trip the charset rule).
+printf 'ref: refs/remotes/origin/--upload-pack\n' > "$T/r7/.git/refs/remotes/origin/HEAD"
+run "$BIN" --repo "$T/r7"
+h_eq "hostile HEAD target (option-shaped) -> rc 1" "1" "$RC"
+h_eq "hostile HEAD target (option-shaped) -> stdout empty" "" "$OUT"
+h_contains "hostile HEAD target names invalid name" "$ERR" "origin/HEAD points at an invalid name"
+
+mk_repo "$T/r8" master-only
+printf 'ref: refs/remotes/origin/main;touch\n' > "$T/r8/.git/refs/remotes/origin/HEAD"
+run "$BIN" --repo "$T/r8"
+h_eq "hostile HEAD target (shell metachar) -> rc 1" "1" "$RC"
+
+mk_repo "$T/r9" master-only
+git -C "$T/r9" symbolic-ref refs/remotes/origin/HEAD refs/heads/master
+run "$BIN" --repo "$T/r9"
+h_eq "HEAD target outside origin/ -> rc 1" "1" "$RC"
+
+# Dangling origin/HEAD: the target passes the allowlist but the ref is gone (post-rename, pre set-head).
+mk_repo "$T/r10" main-only
+git -C "$T/r10" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+run "$BIN" --repo "$T/r10"
+h_eq "dangling origin/HEAD (master deleted) with origin/main -> main" "main" "$OUT"
+h_eq "dangling origin/HEAD with origin/main -> rc 0" "0" "$RC"
+
+mk_repo "$T/r11" neither
+git -C "$T/r11" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/master
+run "$BIN" --repo "$T/r11"
+h_eq "dangling origin/HEAD with neither -> rc 1" "1" "$RC"
+h_contains "dangling origin/HEAD with neither -> cannot-resolve message" "$ERR" "neither origin/main nor origin/master exists"
+
+# --- CLI surface ---
+run "$BIN" --repo "$T/r1" --ref
+h_eq "--ref prints origin/<name>" "origin/master" "$OUT"
+run "$BIN" "--repo=$T/r1"
+h_eq "--repo=DIR form accepted" "master" "$OUT"
+run "$BIN" --bogus
+h_eq "unknown argument -> rc 2" "2" "$RC"
+h_contains "unknown argument names it" "$ERR" "unknown argument: --bogus"
+h_contains "unknown argument prints usage" "$ERR" "Usage:"
+run "$BIN" "$T/r1"
+h_eq "positional argument -> rc 2" "2" "$RC"
+run "$BIN" --repo
+h_eq "--repo without value -> rc 2" "2" "$RC"
+run "$BIN" --repo ""
+h_eq "--repo empty -> rc 2" "2" "$RC"
+run "$BIN" --repo=
+h_eq "--repo= empty -> rc 2" "2" "$RC"
+run "$BIN" --repo -x
+h_eq "--repo option-shaped dir -> rc 2" "2" "$RC"
+h_contains "--repo option-shaped dir names it" "$ERR" "invalid repo dir: -x"
+run "$BIN" --repo "$T/no-such-dir"
+h_eq "--repo non-directory -> rc 2" "2" "$RC"
+mkdir -p "$T/plain"
+run "$BIN" --repo "$T/plain"
+h_eq "--repo non-repo dir -> rc 1" "1" "$RC"
+h_contains "--repo non-repo dir names it" "$ERR" "not a git repository"
+run "$BIN" --help
+h_eq "--help -> rc 0" "0" "$RC"
+h_contains "--help prints Usage" "$OUT" "Usage: bin/lib/default-branch"
+
+# --- sourced mode ---
+run bash -c 'set -u; . "$1"' _ "$BIN"
+h_eq "sourced under set -u: no output" "" "$OUT$ERR"
+h_eq "sourced under set -u: rc 0" "0" "$RC"
+run bash -c 'set -u; . "$1"; default_branch_name "$2"' _ "$BIN" "$T/r2"
+h_eq "sourced: default_branch_name returns name" "main" "$OUT"
+run bash -c 'set -u; . "$1"; default_branch_ref "$2"' _ "$BIN" "$T/r2"
+h_eq "sourced: default_branch_ref returns origin/name" "origin/main" "$OUT"
+run bash -c 'set -euo pipefail; . "$1"; if n=$(default_branch_name "$2"); then echo "got:$n"; else echo "caught:$?"; fi; echo alive' _ "$BIN" "$T/r6"
+h_eq "sourced under set -e: failure returns 1 without exiting caller" "caught:1
+alive" "$OUT"
+run bash -c 'set -u; . "$1"; . "$1"; default_branch_name "$2"' _ "$BIN" "$T/r1"
+h_eq "sourced twice: still resolves" "master" "$OUT"
+
+# --- launchd-like environment and offline proof ---
+run env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; "$1" --repo "$2"' _ "$BIN" "$T/r1"
+h_eq "env -i launchd-like: resolves under set -euo pipefail" "master" "$OUT"
+git -C "$T/r1" remote set-url origin /nonexistent/origin.git
+run "$BIN" --repo "$T/r1"
+h_eq "offline: resolves with unreachable origin URL" "master" "$OUT"
+
+h_done

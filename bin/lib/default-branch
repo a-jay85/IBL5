@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/default-branch — the one resolver for the remote default branch name (ADR-0219).
+#
+# Dual-mode. SOURCED by bash callers: no top-level side effects, no `set`, safe under the
+# caller's set -euo pipefail, every expansion ${VAR:-} guarded. EXECUTED as a CLI by Python
+# and PHP callers (one subprocess, one line on stdout).
+#
+# Resolution order (offline; never fetches):
+#   1. git symbolic-ref refs/remotes/origin/HEAD with `origin/` stripped. A name that fails the
+#      allowlist returns 1 (hostile; no fallback). A name that passes but whose
+#      refs/remotes/origin/<name> is gone (dangling: right after a rename and prune, before
+#      `git remote set-head origin -a`) falls through to step 2.
+#   2. The first of main, master that exists as refs/remotes/origin/<name>.
+#   3. Return 1 with one line on stderr.
+# There is NO environment-variable override. Tests build scratch repos instead.
+#
+# Sourced API:
+#   default_branch_name [repo_dir]   prints <name>           (repo_dir defaults to .)
+#   default_branch_ref  [repo_dir]   prints origin/<name>
+# Return codes (same for the CLI): 0 resolved, one line on stdout, stderr empty;
+#   1 cannot resolve or not a git repo, stdout empty, one stderr line;
+#   2 bad argument, stdout empty, one stderr line.
+#
+# CLI: bin/lib/default-branch [--repo DIR] [--ref] [-h|--help]
+
+_default_branch_err() {
+    printf 'default-branch: %s\n' "$1" >&2
+}
+
+# Copied from bin/lib/branch-base.sh _branch_base_valid_name. Pure case statements, no
+# subprocess, no Bash =~. The leading-character rule keeps a value such as
+# "--upload-pack=evil" from reaching git as an option.
+_default_branch_valid_name() {
+    local n="${1:-}"
+    [ -n "$n" ] || return 1
+    case "$n" in [!A-Za-z0-9]*) return 1 ;; esac
+    case "$n" in *[!A-Za-z0-9._/-]*) return 1 ;; esac
+    case "$n" in *'..'*) return 1 ;; esac
+    return 0
+}
+
+# The repo dir is caller input (Python and PHP pass it through). Reject anything git -C
+# could read as an option and anything that is not a directory.
+_default_branch_valid_dir() {
+    local d="${1:-}"
+    [ -n "$d" ] || return 1
+    case "$d" in -*) return 1 ;; esac
+    [ -d "$d" ] || return 1
+    return 0
+}
+
+_default_branch_ref_exists() {
+    git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$2^{commit}" >/dev/null 2>&1
+}
+
+default_branch_name() {
+    local dir="${1:-.}" head name
+    if ! _default_branch_valid_dir "$dir"; then
+        _default_branch_err "invalid repo dir: ${dir}"
+        return 2
+    fi
+    if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+        _default_branch_err "not a git repository: ${dir}"
+        return 1
+    fi
+    head="$(git -C "$dir" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null)" || head=""
+    if [ -n "$head" ]; then
+        name="${head#refs/remotes/origin/}"
+        if [ "$name" = "$head" ] || ! _default_branch_valid_name "$name"; then
+            _default_branch_err "origin/HEAD points at an invalid name: ${head}"
+            return 1
+        fi
+        if _default_branch_ref_exists "$dir" "$name"; then
+            printf '%s\n' "$name"
+            return 0
+        fi
+        # Dangling origin/HEAD (target gone: post-rename, pre set-head). Fall through to the scan.
+    fi
+    for name in main master; do
+        if _default_branch_ref_exists "$dir" "$name"; then
+            printf '%s\n' "$name"
+            return 0
+        fi
+    done
+    _default_branch_err "cannot resolve default branch in ${dir}: origin/HEAD unset or dangling, and neither origin/main nor origin/master exists"
+    return 1
+}
+
+default_branch_ref() {
+    local name rc=0
+    name="$(default_branch_name "${1:-.}")" || rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
+    printf 'origin/%s\n' "$name"
+    return 0
+}
+
+_default_branch_usage() {
+    cat <<'USAGE'
+Usage: bin/lib/default-branch [--repo DIR] [--ref] [-h|--help]
+  --repo DIR   git working tree to inspect (default: current directory); --repo=DIR also accepted
+  --ref        print origin/<name> instead of <name>
+  -h, --help   print this help and exit 0
+Exit: 0 resolved; 1 cannot resolve or not a git repo; 2 usage error.
+USAGE
+}
+
+_default_branch_main() {
+    local repo="." want_ref=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --repo)
+                if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+                    _default_branch_err "--repo requires a directory"
+                    _default_branch_usage >&2
+                    return 2
+                fi
+                repo="$2"
+                shift 2
+                ;;
+            --repo=*)
+                repo="${1#--repo=}"
+                if [ -z "$repo" ]; then
+                    _default_branch_err "--repo requires a directory"
+                    _default_branch_usage >&2
+                    return 2
+                fi
+                shift
+                ;;
+            --ref)
+                want_ref=1
+                shift
+                ;;
+            -h | --help)
+                _default_branch_usage
+                return 0
+                ;;
+            *)
+                _default_branch_err "unknown argument: $1"
+                _default_branch_usage >&2
+                return 2
+                ;;
+        esac
+    done
+    if [ "$want_ref" -eq 1 ]; then
+        default_branch_ref "$repo"
+    else
+        default_branch_name "$repo"
+    fi
+}
+
+# Executed (not sourced): run the CLI. Sourced: define functions only.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    set -uo pipefail
+    _default_branch_main "$@"
+    exit "$?"
+fi

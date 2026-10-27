@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-default-branch-agnostic — program acceptance test for the default-branch-agnostic
+# program (chore-default-branch-agnostic units 1-7; shared context in ~/claude-plans).
+#
+# Landed SKIPPED by unit 1 (chore-default-branch-agnostic-1-resolver). Unit 7
+# (chore-default-branch-agnostic-7-claude-prose-hooks) deletes the SKIP block below and
+# writes the three seam checks with bin/lib/harness.sh helpers:
+#   1. bin/lib/default-branch -> tools/postplan-harness (Python subprocess) and ibl5/classes
+#      (PHP subprocess): a scratch repo with origin/HEAD=main makes both callers return
+#      main; one with origin/HEAD=master returns master.
+#   2. bin/lib/default-branch -> bin/wt-new, bin/wt-rebase, bin/wt-status (sourced): each,
+#      run against a scratch clone renamed to main with set-head, bases on origin/main and
+#      exits 0; on a master clone each behaves as before. Use the scripts' existing test
+#      seams (see bin/test-wt-new-root); never a live Docker stack.
+#   3. tools/postplan-harness test suite is green under a main scratch remote.
+# Read each seam address (script path, CLI flag) from the serving code at that time.
+set -uo pipefail
+
+# --- SKIP block: unit 7 deletes these three lines. ---
+printf 'SKIP: bin/test-default-branch-agnostic is landed skipped by unit 1; unit 7 (chore-default-branch-agnostic-7-claude-prose-hooks) un-skips it once every seam is wired.\n'
+exit 0

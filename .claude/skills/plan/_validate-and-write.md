@@ -75,24 +75,7 @@ bin/check-plan --draft "$DRAFT"
 
 Exit 0 → continue below. Exit 1 (gate `[D]` drift violation — body phase count exceeds the scaffold's) → the architect appended a phase the outline never declared; delete the excess phase sections, then re-run below. Exit 2 → path error: `$DRAFT` was not found or `--draft` was not passed; stop, verify `<slug>` is the slug you derived at the top of this step, and confirm the draft exists before retrying.
 
-```
-SCAF=$(awk '/<!-- PLAN OUTLINE/,/-->/' "$DRAFT" \
-  | grep -cE '^[[:space:]]*[0-9]+\.[[:space:]]+(Phase|Step)[[:space:]]*[0-9]')
-BODY=$(grep -cE '^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]' "$DRAFT")
-if [ "$SCAF" -gt 0 ] && [ "$BODY" -gt "$SCAF" ]; then
-  # first body phase heading beyond the scaffold's declared count
-  EXCESS_LINE=$(grep -nE '^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]' "$DRAFT" \
-    | awk -F: -v n="$SCAF" 'NR==n+1{print $1}')
-  # first NON-phase level-2 heading at/after it; else end of file
-  CLOSE_LINE=$(awk -v s="$EXCESS_LINE" \
-    'NR>=s && /^## / && !/^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]/ {print NR; exit}' "$DRAFT")
-  if [ -n "$CLOSE_LINE" ]; then END=$((CLOSE_LINE-1)); else END='$'; fi
-  sed -i "" "${EXCESS_LINE},${END}d" "$DRAFT"   # macOS BSD sed: -i takes an empty-string suffix
-fi
-bin/check-plan --draft "$DRAFT"
-```
-
-Re-run the check **once**. If it still exits non-zero, stop and report — do not loop; an unbounded retry burns the run, exactly as the Turn-1 outline retry is bounded. The deleted prose is recoverable from the architect's transcript if it mattered; a drifted plan silently shipped is not.
+On exit 1, load the remediation with `awk '/^## Drift remediation$/,/^<!-- end: drift-remediation -->$/' .claude/skills/plan/_hold-and-remediation.md` and run it.
 
 **Source the plan from the persisted draft.** Across Step 3's sectioned delivery the draft at `$HOME/claude-plans/.drafts/<slug>.draft.md` was assembled incrementally — you seeded its title + outline scaffold and the agent Bash-appended one section per turn (see Step 3 § Deliver the plan in sections). Read **that draft file** as the source of truth, and drop the `<!-- PLAN OUTLINE … -->` scaffold comment when writing `$PLAN_PATH`. **Drop any frontmatter or plan-metadata *section* the draft carries, too** — a body heading such as `## Plan Metadata, Frontmatter, …`, a `<!-- FRONTMATTER: … -->` comment, or a fenced restatement of the `---` block. `_architect-contract.md` forbids the architect emitting one (it cannot write line 1), so such a section is a build directive addressed to **you**, already satisfied the moment you prepend the real block below. Fold any *justification* prose it carries into `## Automouse Hold Justification` or **Approach** and drop the directive and the fenced restatement. It is inert to every parser — `bin/lib/plan-impl-model` and `bin/lib/plan-model-consistency` are both `NR==1`-anchored — but left in place it ships a satisfied build directive into every implementation run's context, where it reads as a live instruction. The per-section acks carry no plan content, so never reconstruct the plan from the streamed messages — the draft on disk is authoritative. If the draft is missing or empty (the agent errored before appending any section), re-run the Step-3 sectioned delivery. If `bin/check-plan --draft` failed with a gate `[D]` drift violation, run the remediation above and re-run `bin/check-plan --draft` before continuing — never finalize a draft whose body phases outnumber its scaffold. After writing the final `$PLAN_PATH` and passing `bin/check-plan`, delete the draft (`rm -f "$HOME/claude-plans/.drafts/<slug>.draft.md"`).
 
@@ -122,23 +105,7 @@ bin/check-plan-staleness "$PLAN_PATH"
 
 Exit 0 → continue. Exit 2 → path/usage error; fix the argument and re-run. Exit 1 → it prints one `STALE: <token>` line per unresolved path: remediate the plan and re-run, at most 3 attempts. Do this here and not later because the guard's other callers run *inside* the automouse implementation session, which a queued plan reaches only after it is queued. A dead token there costs all three nightly attempts, and you are the only actor holding the design context that separates a typo from a path this plan creates.
 
-**Put the cue on the token's own physical line.** The guard tests `grep -F <token> … | grep -E <cues>` line by line, and plans hard-wrap, so a cue that opens the sentence one line above does not count. Find the token's line and place the cue adjacent to its backtick span:
-
-```
-`ibl5/classes/Module/ModuleAccessControl.php` (example) (moved from `ibl5/classes/ModuleAccessControl.php` (example))
-```
-
-| What the token actually is | Repair |
-|---|---|
-| A typo (the path exists at a different name) | Correct the path. No cue needed; a live path never flags. |
-| Created, moved or renamed by this plan | Add a same-line cue from `_architect-contract.md` § safe positions: `— NEW`, `Create`, `Write`, `moved from`, `→`. |
-| Cited only as an alternative this plan rejected | Move the line under a non-dependency heading (`## Out of Scope`, `## Non-Goals`, `## Rejected`, `## Alternatives`). |
-| Illustrative path, never real | Append `(example)` after the closing backtick (`bin/check-docs` convention). |
-| A path you cannot resolve to anything | Escalate (see below). |
-
-A `>` blockquote is **not** a safe position; quoted prose is scanned exactly like body prose. A fenced code block is.
-
-**Escalation.** After 3 attempts, or immediately for a token with no resolvable target: stop remediating and do not loop further. Never delete the plan. Leave the plan file on disk, add `auto_merge: false` to the line-1 frontmatter, write an `## Automouse Hold Justification` entry naming each unresolved `STALE:` token and why it could not be resolved, and skip Step 5.5. The plan is written for a human to pick up.
+On exit 1, load the repair table and the escalation rule with `awk '/^## Staleness remediation$/,/^<!-- end: staleness-remediation -->$/' .claude/skills/plan/_hold-and-remediation.md`.
 
 ### Declaring the implementation model (required)
 

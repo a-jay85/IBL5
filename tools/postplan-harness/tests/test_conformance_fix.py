@@ -374,6 +374,24 @@ def test_rejects_test_path_with_no_test_declaration(tmp_path):
     assert conformance_fix._vacuous("tools/x/tests/test_a.py", "import os\n")
 
 
+def test_stub_file_detector_counts_only_real_code_lines():
+    assert conformance_fix._stub_file("<?php\n")
+    assert conformance_fix._stub_file("<?php\ndeclare(strict_types=1);\n// todo\n/** x */\n")
+    real = ("<?php\nfinal class Thing\n{\n    public function a(): int\n    {\n"
+            "        return 1;\n    }\n}\n")
+    assert not conformance_fix._stub_file(real)
+
+
+def test_rejects_stub_of_missing_non_test_promised_file(tmp_path):
+    path = "ibl5/classes/Fixer/Thing.php"
+    item = f"MISSING-FILE: {path} (plan Critical File never appeared in the diff)"
+    wt, git, llm = _setup(tmp_path, writes={path: "<?php\n"})
+    rec = _remediate(tmp_path, [item], wt, git, llm)
+    assert rec["reason"] == "rejected" and rec["detail"] == "stub-file"
+    assert not (wt / path).exists()
+    assert git.commit_messages == []
+
+
 def test_rejects_missing_method_not_written(tmp_path):
     wrong = GOOD_PHP.replace("testFoo", "testBar")
     wt, git, llm = _setup(tmp_path, writes={PROMISED: wrong})

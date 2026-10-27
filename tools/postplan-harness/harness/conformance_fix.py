@@ -41,6 +41,7 @@ MAX_ITEMS = 6
 MAX_FILES = 8
 MAX_ADDED_LINES_PER_FILE = 150
 MAX_ADDED_LINES_TOTAL = 400
+MIN_PROMISED_FILE_CODE_LINES = 5
 CONFIX_DENIED_PREFIXES = fidelity.LOCAL_GATE_PATH_PREFIXES + (
     "ibl5/migrations/", ".github/", "ibl5/phpstan-baseline.neon")
 CONFIX_DENIED_SUBSTRINGS = ("-snapshots/",)
@@ -242,6 +243,16 @@ def _vacuous(path: str, added_text: str) -> bool:
     return False
 
 
+_NON_CODE_LINE_RE = re.compile(
+    r"^\s*(?:$|<\?php\s*$|declare\(strict_types=1\);\s*$|//|#(?!\[)|/?\*|\*/|\?>)")
+
+
+def _stub_file(added_text: str) -> bool:
+    """True when a new non-test file holds too few real lines to be more than a stub."""
+    code = [ln for ln in added_text.splitlines() if not _NON_CODE_LINE_RE.match(ln)]
+    return len(code) < MIN_PROMISED_FILE_CODE_LINES
+
+
 def _matrix_rows(plan, items: list[str]) -> list[str]:
     """Plan lines that are matrix rows naming any item's path or method."""
     path = getattr(plan, "path", "") or ""
@@ -419,6 +430,9 @@ def remediate_missing(llm, gitad, plan, worktree: str, out_dir: str, items: list
         if TEST_PATH_RE.search(p) and _vacuous(p, "\n".join(added)):
             _revert()
             return _done("rejected", "vacuous-test")
+        if not TEST_PATH_RE.search(p) and _stub_file("\n".join(added)):
+            _revert()
+            return _done("rejected", "stub-file")
     for t in cls.fixable:
         if t.kind != "method":
             continue

@@ -178,6 +178,7 @@ def base(script, mode=0o100755):
 
 
 def test_scratch_remove_then_overlay_restores_file(tmp_path):
+    """ScratchTree.remove drops a path, tolerates an absent one, and overlay restores it."""
     repo, shas = build_repo(tmp_path)
     with ScratchTree(str(repo), shas[0]) as scratch:
         scratch.overlay(overlay())

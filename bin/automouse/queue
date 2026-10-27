@@ -225,13 +225,21 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
         exit 1
     fi
     TARGET=$(entry_to_name "$(basename "$2")")
+    # Hold the queue lock from lookup through rm, so a racing reorder/renumber
+    # cannot rename the entry between resolving it and deleting it.
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: another queue rename holds $QUEUE_DIR/.normalize.lock; nothing removed." >&2
+        exit 1
+    fi
     if ! ENTRY=$(queue_entry_for_slug "$QUEUE_DIR" "$TARGET"); then
+        queue_unlock "$QUEUE_DIR"
         echo "Error: $TARGET is not in the queue." >&2
         echo "" >&2
         show_queue >&2
         exit 1
     fi
     rm -f "$QUEUE_DIR/$ENTRY" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds" "$QUEUE_DIR/${TARGET}.force-override"
+    queue_unlock "$QUEUE_DIR"
     echo "Removed from queue: $TARGET (original plan in $PLANS_DIR is untouched)"
     echo ""
     show_queue

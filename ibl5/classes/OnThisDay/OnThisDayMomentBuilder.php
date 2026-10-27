@@ -71,7 +71,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
           WHERE g.game_type = 1
           ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid";
 
-    private const INSERT_SQL = "INSERT INTO ibl_on_this_day_moments
+    private const INSERT_SQL = "INSERT INTO `ibl_on_this_day_moments`
             (moment_key, kind, game_date, month_day, season_year, pid, player_name,
              teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -109,7 +109,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
         $moments = $this->collect();
 
         return $this->transactional(function () use ($moments): int {
-            $this->execute('DELETE FROM ibl_on_this_day_moments');
+            $this->execute('DELETE FROM `ibl_on_this_day_moments`');
             foreach ($moments as $moment) {
                 $this->execute(
                     self::INSERT_SQL,
@@ -202,7 +202,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
         $moments = [];
 
         // Unbuffered stream over literal SQL with no binds; prepared statements would buffer the result.
-        $result = $this->db->query(self::RECORD_STREAM_SQL, MYSQLI_USE_RESULT);
+        $result = $this->db->query(self::RECORD_STREAM_SQL, MYSQLI_USE_RESULT); // @phpstan-ignore ibl.directMysqliQuery (unbuffered stream over literal SQL, no binds)
         if (!$result instanceof \mysqli_result) {
             throw new \RuntimeException('On This Day record stream failed: ' . $this->db->error);
         }

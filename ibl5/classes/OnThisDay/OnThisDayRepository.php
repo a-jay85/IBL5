@@ -29,9 +29,10 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
     /** MariaDB ER_NO_SUCH_TABLE: the migration has not been applied yet. */
     private const ER_NO_SUCH_TABLE = 1146;
 
+    // @phpstan-ignore ibl.orderByMissingTiebreaker (moment_key is UNIQUE uq_otd_moment_key; not on the rule allowlist)
     private const MOMENTS_QUERY = "SELECT moment_key, kind, game_date, season_year, pid, player_name,
             teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label
-          FROM ibl_on_this_day_moments
+          FROM `ibl_on_this_day_moments`
           WHERE season_year < ? AND month_day IN ({IN})
           ORDER BY game_date, moment_key";
 

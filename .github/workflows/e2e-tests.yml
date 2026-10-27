@@ -440,6 +440,7 @@ jobs:
           cat coverage.json
 
       - name: Build VR gallery
+        id: vr-gallery
         if: always() && env.VRCTX_PUBLISH == 'true'
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
         run: |
@@ -687,8 +688,11 @@ jobs:
           number: ${{ env.VRCTX_PR }}
           path: vr-manual-comment.md
 
+      # Gated on the gallery build succeeding: a failed build (allowed under
+      # update-baselines) must keep the block an earlier run published
+      # (ADR-0181 decision 3). The script also skips on a missing or empty gallery.
       - name: Splice new-screen images into PR body
-        if: always() && env.VRCTX_PUBLISH == 'true'
+        if: always() && env.VRCTX_PUBLISH == 'true' && steps.vr-gallery.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

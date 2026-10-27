@@ -315,10 +315,24 @@ type ManualRowResult = {
   beforeStatus?: string;
   composed?: boolean;
 };
-let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
+let gallery: {
+  changedCells?: LeanCell[];
+  newCells?: LeanCell[];
+  flakeCells?: LeanCell[];
+  renderedCells?: number;
+} = {};
+// True only for a real build: cell arrays present and at least one screen
+// rendered. Update-body mode needs this to tell "zero changed screens" apart
+// from "the build failed or had no actuals" (ADR-0181 decision 3).
+let galleryBuilt = false;
 if (galleryPath !== null && existsSync(galleryPath)) {
   try {
     gallery = JSON.parse(readFileSync(galleryPath, 'utf-8'));
+    galleryBuilt =
+      Array.isArray(gallery.changedCells) &&
+      Array.isArray(gallery.newCells) &&
+      typeof gallery.renderedCells === 'number' &&
+      gallery.renderedCells > 0;
   } catch {
     // keep empty gallery
   }
@@ -511,13 +525,27 @@ if (updatePr !== null) {
           }),
     );
   let spots: { beforeFile: string }[] = [];
+  let spotsOk = spotsPath === null;
   if (spotsPath !== null && existsSync(spotsPath)) {
     try {
       const parsed = JSON.parse(readFileSync(spotsPath, 'utf-8'));
-      if (Array.isArray(parsed)) spots = parsed;
+      if (Array.isArray(parsed)) {
+        spots = parsed;
+        spotsOk = true;
+      }
     } catch {
-      // unreadable spots.json -> no changed section, never a crash in CI
+      // unreadable spots.json -> treated as a failed crop below
     }
+  }
+  // A failed or empty gallery build, or a failed crop of real changed cells,
+  // would rebuild an empty block and strip pairs an earlier run published.
+  // Keep the old block instead; only a real build may clear it.
+  const cropMissing = !spotsOk && (gallery.changedCells ?? []).length > 0;
+  if (!galleryBuilt || cropMissing) {
+    const why = !galleryBuilt ? 'gallery input missing or not built' : 'spots.json missing or unreadable';
+    process.stderr.write(`vr-review-comment: ${why}; leaving the PR body untouched\n`);
+    if (dryRun) process.stdout.write(readBody() + '\n');
+    process.exit(0);
   }
   const build = (body: string): string =>
     spliceBody(

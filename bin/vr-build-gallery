@@ -274,6 +274,9 @@ writeFileSync(
       changedCells: changedCells.map(lean),
       newCells: newCells.map(lean),
       flakeCells: flakeCells.map(lean),
+      // Screens the VR run rendered. Zero means no actuals, so bin/vr-review-comment
+      // keeps the PR-body block instead of clearing it.
+      renderedCells: titles.length,
     },
     null,
     2,

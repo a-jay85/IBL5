@@ -77,8 +77,14 @@ describe('bin/vr-build-gallery', () => {
     expect(res.status).toBe(0);
     expect(res.stderr).toBe('vr-build-gallery: 0 changed, 0 new, 0 infra/flake\n');
     expect(readFileSync(json, 'utf-8')).toBe(
-      JSON.stringify({ changedCells: [], newCells: [], flakeCells: [] }, null, 2) + '\n',
+      JSON.stringify({ changedCells: [], newCells: [], flakeCells: [], renderedCells: 1 }, null, 2) + '\n',
     );
+  });
+
+  it('G1b: no actuals records zero rendered cells', () => {
+    const res = run();
+    expect(res.status).toBe(0);
+    expect(JSON.parse(readFileSync(json, 'utf-8')).renderedCells).toBe(0);
   });
 
   it('G2: a sub-gate recolor surfaces as a changed cell with the lean gallery.json shape', () => {
@@ -89,7 +95,7 @@ describe('bin/vr-build-gallery', () => {
     expect(res.status).toBe(0);
     expect(res.stderr).toContain('vr-build-gallery: 1 changed, 0 new, 0 infra/flake');
     const parsed = JSON.parse(readFileSync(json, 'utf-8'));
-    expect(Object.keys(parsed).sort()).toEqual(['changedCells', 'flakeCells', 'newCells']);
+    expect(Object.keys(parsed).sort()).toEqual(['changedCells', 'flakeCells', 'newCells', 'renderedCells']);
     expect(Object.keys(parsed.changedCells[0]).sort()).toEqual(['module', 'title', 'viewport']);
     expect(parsed.changedCells[0].title).toBe('standings');
     expect(parsed.changedCells[0].viewport).toBe('desktop');

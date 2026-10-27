@@ -87,6 +87,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0208](0208-merged-digest-pings-owner-for-post-merge-steps.md) | The merge digest pings the owner when a post-merge step needs them | Accepted | `bin/digest-dm-build` @mentions the owner on the single #merged digest only for a manual row, a failed auto row, or a failed checklist job, decided by `pmr_ping_decision` from job outputs and never from PR text. |
 | [0218](0218-opus-inline-edit-trial-under-five-files.md) | Opus inline-edit trial for chunks under 5 files | Accepted | Until 2026-11-23 Opus edits a design-resolved, machine-verifiable chunk of under 5 files inline; `bin/lib/opus-trial-cost.jq` compares per-task cost against a saved baseline at review. |
 | [0214](0214-vr-update-baselines-targeted-rewrite.md) | Targeted update-baselines rewrite from the in-job strict pass | Accepted | The label run rebuilds the gallery against branch HEAD and `bin/vr-apply-baselines` commits only the changed and new cells' renders; flake cells and unflagged baselines stay untouched. |
+| [0219](0219-default-branch-resolver.md) | One shared resolver for the remote default branch name | Accepted | `bin/lib/default-branch` resolves the default branch offline from `origin/HEAD`, then `main`, then `master`; bash sources it, Python and PHP exec it, with no env override, and a caller fails closed on nonzero exit. |
 
 ## When an ADR is Required
 

@@ -1,12 +1,23 @@
 ---
 description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, and publishing agent shots.
-last_verified: 2026-10-21
+last_verified: 2026-10-27
 paths:
+  - ".github/workflows/e2e-tests.yml"
+  - ".github/workflows/pages-deploy.yml"
+  - "ibl5/tests/e2e/vr-manifest.ts"
+  - "ibl5/tests/e2e/vr-coverage-map.ts"
   - "ibl5/tests/e2e/vr-gallery.ts"
+  - "ibl5/tests/e2e/vr-review-comment.ts"
+  - "ibl5/tests/e2e/vr-pr-body.ts"
   - "ibl5/tests/e2e/vr-crop.ts"
   - "ibl5/tests/e2e/vr-crop-png.ts"
+  - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
+  - "bin/vr-apply-baselines"
   - "bin/vr-review-comment"
+  - "ibl5/tests/e2e/vr-manual-rows.ts"
+  - "ibl5/tests/e2e/manual-rows.spec.ts"
+  - "ibl5/playwright.manual-rows.config.ts"
 ---
 
 # Visual Review PRs Detail
@@ -28,7 +39,7 @@ A second, review-only strict pass (ADR-0180) runs after this triage. It uses per
 ## Changed screens in the PR body
 
 Changed cells get cropped before/after pairs in the same block (ADR-0181). `--crop-changed` runs
-pixelmatch at the gate threshold (0.2) with `diffMask`, clusters changed pixels into at most three
+pixelmatch at the gate threshold (0.22) with `diffMask`, clusters changed pixels into at most three
 padded spots, and crops both sides to one box. A size change or a sub-threshold change publishes
 uncropped, labelled. Output: `changed/<title>.<i>.{before,after,side,stack}.png` plus
 `changed/spots.json`. One `###` per spot (module, cell, region), desktop first, mobile in one

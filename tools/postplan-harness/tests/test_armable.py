@@ -20,10 +20,11 @@ BODY_HELD = "## Summary\nx\n\n## Manual Testing\n\n- [ ] eyeball the layout\n"
 
 def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(), findings=[], unresolved_conformance=[],
+                classification=Classification(), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
-                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY",
+                removed_guards_holds=[])
     base.update(kw)
     return ArmInputs(**base)
 
@@ -163,14 +164,54 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..17} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..20} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
     local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
-    not run. (18) holds unless the body's Merge danger line is well-formed and two-way."""
+    not run. (18) holds unless the body's Merge danger line is well-formed and two-way.
+    (19) holds unless every executable mutation tripped and the tree verified clean.
+    (20) holds unless every flagged guard removal carries a substantive Reason."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert nums == list(range(1, 21))   # [1..20], one entry per SKILL condition
+
+
+def test_condition_removed_guards_uncomputed_blocks():
+    """`removed_guards_holds=None` means the run never computed (20): fail closed.
+
+    Catches `rg is None or len(rg) > 0` rewritten as `bool(rg)`, which would arm on None.
+    """
+    d = evaluate(inputs(removed_guards_holds=None))
+    assert not d.armed
+    c20 = [c for c in d.conditions if c.number == 20]
+    assert len(c20) == 1 and c20[0].blocked and c20[0].reason == "state=UNCOMPUTED"
+
+
+def test_condition_removed_guards_hold_lines_block():
+    holds = ["removed-guards:UNJUSTIFIED:try@a.php#1a2b3c4d", "removed-guards:UNLISTED:lock@b.php#0badc0de"]
+    d = evaluate(inputs(removed_guards_holds=holds))
+    assert not d.armed
+    c20 = [c for c in d.conditions if c.number == 20][0]
+    assert c20.blocked and c20.name == "removed-guards"
+    assert c20.reason == "; ".join(holds)
+
+
+def test_condition_removed_guards_empty_arms():
+    d = evaluate(inputs(removed_guards_holds=[]))
+    assert d.armed
+    assert not [c for c in d.conditions if c.number == 20][0].blocked
+
+
+def test_conditions_1_to_19_unchanged_by_removed_guards():
+    """(20) adds a hold; it never moves conditions 1-19, armed or held."""
+    for kw in ({}, dict(merge_danger_state="ONE-WAY"), dict(phase5_status="fail"),
+               dict(pr_title="feat: x")):
+        clean = evaluate(inputs(removed_guards_holds=[], **kw))
+        held = evaluate(inputs(removed_guards_holds=["removed-guards:MALFORMED"], **kw))
+        before = [(c.number, c.blocked, c.reason) for c in clean.conditions if c.number <= 19]
+        after = [(c.number, c.blocked, c.reason) for c in held.conditions if c.number <= 19]
+        assert before == after
+        assert [c.number for c in clean.conditions][-1] == 20
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -605,6 +646,49 @@ def test_condition_3_blocks_on_missing_phase_item():
     result_clean = evaluate(clean_inputs)
     cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
     assert cond3_clean.blocked is False
+
+
+# --- Condition (19): executable mutation claims (ADR-0199) ---------------------------
+
+def _c19(d):
+    return next(c for c in d.conditions if c.number == 19)
+
+
+def test_condition_19_passes_when_all_tripped():
+    assert _c19(evaluate(inputs(exec_mutations_holding=(),
+                                exec_mutations_tree_suspect=False))).blocked is False
+
+
+def test_condition_19_holds_on_held_row():
+    c = _c19(evaluate(inputs(
+        exec_mutations_holding=("row 20 HELD — x still exited 0 under mutation",))))
+    assert c.blocked is True
+    assert "row 20 HELD" in c.reason
+
+
+def test_condition_19_holds_when_step_did_not_run():
+    base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
+                classification=Classification(), findings=[], unresolved_conformance=[],
+                phase5_status="pass", plan_auto_merge_false=False, headless=True,
+                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
+                unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY")
+    d = evaluate(ArmInputs(**base))   # exec_mutations_* deliberately omitted
+    c = _c19(d)
+    assert c.blocked is True and "did not run" in c.reason
+    assert d.armed is False
+
+
+def test_condition_19_holds_on_tree_suspect():
+    c = _c19(evaluate(inputs(exec_mutations_holding=(), exec_mutations_tree_suspect=True)))
+    assert c.blocked is True
+    assert "tree not verified clean" in c.reason
+
+
+def test_condition_19_never_releases_other_holds():
+    d = evaluate(inputs(unresolved_conformance=["MISSING: x"],
+                        exec_mutations_holding=(), exec_mutations_tree_suspect=False))
+    assert d.armed is False
+    assert {c.number for c in d.holds} == {3}
 
 
 # --- condition (9): migration blindness ----------------------------------------------------------

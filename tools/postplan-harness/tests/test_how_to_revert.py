@@ -163,5 +163,3 @@ def test_pr_body_claims_documents_how_to_revert_rule():
     for needle in (htr.FIELD_PREFIX, f"shorter than {htr.MIN_TEXT} characters",
                    "bin/db-sync-prod", "ibl5/.htaccess", "ibl5/composer.json"):
         assert needle in section, needle
-    skill = (REPO_ROOT / ".claude/skills/post-plan/SKILL.md").read_text(encoding="utf-8")
-    assert "§ How to revert rule" in skill

@@ -31,8 +31,9 @@
 #                             cancelled/absent, or body declares an expected-red
 #   4. HELD                   Manual-Testing real rows, golden touched, a
 #                             belt-and-suspenders body hold marker, a gate
-#                             backtest hold, or a merge-danger line that is
-#                             one-way, missing or malformed
+#                             backtest hold, a merge-danger line that is
+#                             one-way, missing or malformed, or a removed-guards
+#                             block with an unjustified or malformed entry
 #   5. BLOCKED-DEP            an unmerged Depends-on: predecessor
 #   6. PIPELINE-HELD          bug-pipeline PR (pipeline-authored label OR a
 #                             `bug-<id>` branch name); UNCONDITIONAL — no label
@@ -383,6 +384,61 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     LATEST="$(echo "$CR_JSON" | jq '[.check_runs | group_by(.name) | .[]
         | sort_by(.completed_at // .started_at) | last]')"
 
+    # --- live commit STATUSES for the same head (combined-status endpoint) ---
+    # A required context posted as a commit STATUS (All checks settled, written by
+    # bin/settle-pr-status from the all-checks-settled workflows) never appears in
+    # check-runs, so without this fetch it reads `absent` on every PR and nothing arms.
+    # The combined endpoint already returns the latest status per context, but it pages
+    # at 30 by default: ask for 100 and treat total_count > statuses as truncation.
+    #
+    # Every error path FAILS CLOSED to an empty list: fetch error, empty body, non-JSON
+    # body, non-object entries, truncated page. An empty list leaves each status-only
+    # context `absent`, which withholds an arm and never grants one. That is why the
+    # `|| true` / `|| echo '[]'` defaults are safe here: shell-fail-open-probe forbids a
+    # swallowed failure only when the default reaches a destructive action, and this
+    # default reaches BLOCKED-CHECK.
+    #
+    # Read ONLY .statuses[]. GitHub reports top-level .state == "pending" for a commit
+    # with ZERO statuses, so the top-level field cannot distinguish "no status" from
+    # "status pending" and is never consulted.
+    ST_RAW="$($GH_API_CMD "repos/$SLUG/commits/$sha/status?per_page=100" 2>/dev/null || true)"
+    STATUS_LIST="$(printf '%s' "$ST_RAW" | jq -c '
+        if (.total_count // 0) > ((.statuses // []) | length) then []
+        else [ .statuses[]? | select(type == "object" and (.context | type) == "string"
+                                     and (.state | type) == "string") ]
+        end' 2>/dev/null || echo '[]')"
+    [ -n "$STATUS_LIST" ] || STATUS_LIST='[]'
+    # --- fold statuses into LATEST; the WORSE state wins per name ---
+    # Each status becomes a check-run-shaped object so state_of/rerun_id need no change:
+    #   name=context, status=completed|in_progress, conclusion=success|failure|null,
+    #   completed_at=updated_at, details_url=target_url.
+    # Status state -> conclusion: success -> success (green); pending -> in_progress
+    # (pending); failure, error and ANY other string -> failure (failing). Unknown is
+    # never green.
+    # Rank (worst first): failing 3 > cancelled 2 > pending 1 > green 0. The check-run
+    # dedupe above stays latest-wins (a green rerun still supersedes an older red run);
+    # worst-wins applies only when the SAME name arrives from both sources, so a newer
+    # green status never masks a red check-run and a green check-run never masks a red
+    # status. If this jq fails (malformed input), LATEST becomes [] and every required
+    # context reads `absent`: fail closed, the sweep continues.
+    LATEST="$(jq -n -c --argjson cr "$LATEST" --argjson st "$STATUS_LIST" '
+        def rank:
+            if .status != "completed" then 1
+            elif .conclusion == "cancelled" then 2
+            elif (.conclusion | IN("success","skipped","neutral")) then 0
+            else 3 end;
+        ($st | map({
+            name: .context,
+            status: (if .state == "pending" then "in_progress" else "completed" end),
+            conclusion: (if .state == "success" then "success"
+                         elif .state == "pending" then null
+                         else "failure" end),
+            completed_at: (.updated_at // .created_at // null),
+            details_url: (.target_url // "")
+        })) as $norm
+        | ($cr + $norm) | group_by(.name) | map(sort_by(rank) | last)' 2>/dev/null \
+        || echo '[]')"
+
     # --- compute signals ---
     changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
     clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"
@@ -393,12 +449,15 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     pipeline="$(pr_pipeline_authored_hold "$labels" "$head_ref" | tr '\n' ' ')"
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
     unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
-    # Phase 6.5 (17) and (18): read from the body, so pr-triage holds the same PRs
-    # post-plan held. Without them --arm armed a PR whose body declared a one-way door.
+    # Phase 6.5 (17), (18) and (20): read from the body, so pr-triage holds the same PRs
+    # post-plan held. (20) reads the body's removed-guards block only.
+    # (17) and (18) are needed because --arm once armed a PR whose body declared a one-way door.
     # A body with no merge-danger line holds too (fail-closed, as in Phase 6.5): an old
     # PR needs a two-way `**Merge danger:**` line before sign-off can arm it.
     backtest="$(pr_gate_backtest_hold "$body")"
     danger="$(pr_merge_danger_hold "$body")"
+    # Body-only: triage sees no plan or diff, so a body without the block is not held here.
+    removed="$(pr_removed_guards_hold "$body" | tr '\n' ' ')"
 
     check_states=()
     blocked_check=0
@@ -441,7 +500,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
             [ -n "$rid" ] && RERUN_HINTS="${RERUN_HINTS}hint: gh run rerun ${rid}  # ${cancelled_ctx} was CANCELLED on PR #${num}"$'\n'
         fi
     elif [ "$clearance" = "HELD" ] || [ -n "$golden" ] || [ "$held_body" = "1" ] || [ -n "$unresolved" ] \
-        || [ -n "$backtest" ] || [ -n "$danger" ]; then
+        || [ -n "$backtest" ] || [ -n "$danger" ] || [ -n "$removed" ]; then
         bucket="HELD"; action="human review"
     elif [ -n "$deps" ]; then
         bucket="BLOCKED-DEP"; action="wait for predecessor"
@@ -480,6 +539,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ -n "$golden" ];          then holds="${holds}${golden} "; fi
     if [ -n "$backtest" ];        then holds="${holds}${backtest} "; fi
     if [ -n "$danger" ];          then holds="${holds}${danger} "; fi
+    if [ -n "$removed" ];         then holds="${holds}${removed}"; fi
     if [ -n "$deps" ];            then holds="${holds}${deps}"; fi
     if [ -n "$feat" ];            then holds="${holds}${feat} "; fi
     if [ -n "$pipeline" ];        then holds="${holds}${pipeline}"; fi

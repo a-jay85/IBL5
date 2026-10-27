@@ -2,25 +2,16 @@
 
 declare(strict_types=1);
 
-use Http\HttpRequest;
-use Player\PlayerActionController;
-use Player\PlayerPageController;
-use RookieOption\RookieOptionController;
-use Repositories\TeamIdentityRepository;
-use Repositories\SalaryCapRepository;
-
-global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest, $authService, $prefix, $user;
-$nukeCompat = new \Utilities\NukeCompat();
-/** @var \mysqli $mysqli_db */
+global $authService, $prefix, $user;
 /** @var \Auth\AuthService $authService */
-
-$commonRepository = new TeamIdentityRepository($mysqli_db);
-$salaryCapRepo = new SalaryCapRepository($mysqli_db);
 
 $phpSelfGuard = $_SERVER['PHP_SELF'] ?? '';
 if (stripos(is_string($phpSelfGuard) ? $phpSelfGuard : '', "modules.php") === false) {
     die("You can't access this file directly...");
 }
+
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\PlayerFactory::class);
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 $module_name = basename(dirname(__FILE__));
 
@@ -31,20 +22,16 @@ $pa       = is_string($_REQUEST['pa']       ?? null) ? $_REQUEST['pa']       : '
 $pid      = is_string($_REQUEST['pid']      ?? null) ? $_REQUEST['pid']      : null;
 $pageView = is_string($_REQUEST['pageView'] ?? null) ? $_REQUEST['pageView'] : null;
 
-// Single request snapshot for this request, injected into controllers so they
-// never read superglobals themselves (maintenance items 14.8 + 14.12).
-$httpRequest = HttpRequest::fromGlobals();
-
 $pagetitle = "- Player Archives";
 
 switch ($pa) {
 
     case "negotiate":
-        $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
+        $actionController = $factory->actionController();
         $username = $authService->getUsername() ?? '';
         $serverName = $_SERVER['SERVER_NAME'] ?? null;
         $debugCookie = $_COOKIE[\Debug\DebugSession::COOKIE_NAME] ?? null;
-        $debugSession = new \Debug\DebugSession(
+        $debugSession = \Debug\DebugSession::forRequest(
             $username,
             is_string($serverName) ? $serverName : null,
             is_string($debugCookie) ? $debugCookie : null,
@@ -60,7 +47,7 @@ switch ($pa) {
         break;
 
     case "rookieoption":
-        $actionController = new PlayerActionController($mysqli_db, $commonRepository, $salaryCapRepo);
+        $actionController = $factory->actionController();
         $username = $authService->getUsername() ?? '';
         PageLayout\PageLayout::header();
         echo $actionController->renderRookieOption(
@@ -74,12 +61,7 @@ switch ($pa) {
         break;
 
     case "processrookieoption":
-        $rookieController = new RookieOptionController(
-            $mysqli_db,
-            $commonRepository,
-            new \RookieOption\RookieOptionRepository($mysqli_db),
-            new \Topics\News\NewsRepository($mysqli_db),
-        );
+        $rookieController = $factory->rookieOptionController();
         $redirectUrl = $rookieController->handleSubmission(
             static fn (): bool => $nukeCompat->isUser($user),
             static fn (): bool => \Security\CsrfGuard::validateSubmittedToken('rookie_option'),
@@ -97,12 +79,7 @@ switch ($pa) {
         break;
 
     case "showpage":
-        $pageController = new PlayerPageController(
-            $mysqli_db,
-            $commonRepository,
-            new \Player\PlayerPageService($mysqli_db, $commonRepository),
-            $httpRequest,
-        );
+        $pageController = $factory->pageController();
         $username = $authService->getUsername() ?? '';
         $pageHtml = $pageController->showPage($pid, $pageView, $username);
         if ($pageController->responseStatus() !== 200) {
@@ -119,7 +96,7 @@ switch ($pa) {
         // body fails Lighthouse with NO_FCP. Render page chrome with a notice.
         PageLayout\PageLayout::header();
         echo '<div class="ibl-alert ibl-alert--info">No player selected. Choose a player from a roster, leaderboard, or search to view their archives.</div>';
-        echo '<a href="index.php" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Return to Home</a>';
+        echo '<a href="index.php" class="ibl-btn ibl-btn--primary mt-2 inline-block">Return to Home</a>';
         PageLayout\PageLayout::footer();
         break;
 }

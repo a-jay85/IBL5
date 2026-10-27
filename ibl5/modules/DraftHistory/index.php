@@ -7,14 +7,12 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 // Keep serving op=api HTMX fast path — a redirect here would swap a full page layout
 // into the HTMX target. Route directly to the handler before the redirect.
 $getOp = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
 if ($getOp === 'api') {
-    $handler = new DraftHistory\DraftHistoryApiHandler($mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftHistoryFactory::class);
+    $handler = $factory->apiHandler();
     $handler->handle();
     return;
 }

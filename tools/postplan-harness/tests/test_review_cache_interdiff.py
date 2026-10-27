@@ -109,9 +109,9 @@ def _spy_agent_a(monkeypatch):
     seen = []
     real = review.agent_a_prompt
 
-    def spy(meta, cls, plan):
+    def spy(meta, cls, plan, **sections):
         seen.append(cls.filtered_diff)
-        return real(meta, cls, plan)
+        return real(meta, cls, plan, **sections)
 
     monkeypatch.setattr(review, "agent_a_prompt", spy)
     return seen
@@ -220,23 +220,23 @@ def test_empty_delta_with_changed_diff_id_forces_full_review(monkeypatch, tmp_pa
     _assert_full_review(res, seen)
 
 
-class _DegradingB(FixtureLlm):
-    """review-agent-b returns unparseable output on both attempts (the degraded path)."""
+class _DegradingA(FixtureLlm):
+    """review-agent-a returns unparseable output on both attempts (the degraded path)."""
 
     def call(self, purpose, *a, **k):
-        if purpose == "review-agent-b":
+        if purpose == "review-agent-a":
             raise HarnessError("llm-invalid-output", purpose)
         return super().call(purpose, *a, **k)
 
 
 def test_degraded_interdiff_propagates(monkeypatch, tmp_path):
-    canned = {k: v for k, v in CANNED_FINDINGS.items() if k != "review-agent-b"}
-    llm = _DegradingB(UsageLedger(), canned)
+    canned = {k: v for k, v in CANNED_FINDINGS.items() if k != "review-agent-a"}
+    llm = _DegradingA(UsageLedger(), canned)
     res, _ = _interdiff_drive(monkeypatch, tmp_path, name="degraded", canned=canned, llm=llm)
     assert res.terminal != TerminalState.FAILED, res.error
 
     assert res.review_delta == [BETA]                 # it really was the interdiff path
-    assert "review-agent-b" in res.degraded_agents
+    assert "review-agent-a" in res.degraded_agents
     assert res.arm.armed is False
     assert any(c.blocked for c in res.arm.conditions)
 

@@ -10,6 +10,7 @@ use LastSimRecap\Dto\RecapSlate;
 use LastSimRecap\Dto\RecapStarter;
 use LastSimRecap\LastSimRecapView;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * Golden master pin for the LastSimRecapView extraction (backlog 1.29).
@@ -22,6 +23,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class LastSimRecapViewGoldenMasterTest extends TestCase
 {
+    use GoldenSnapshotTrait;
+
     public function testInjuriesBothSidesSnapshot(): void
     {
         $game = $this->makeGame(
@@ -79,24 +82,6 @@ final class LastSimRecapViewGoldenMasterTest extends TestCase
 
         $this->assertStringContainsString('ibl-card last-sim-recap', $html);
         $this->assertStringContainsString('ibl-card__header last-sim-recap__head', $html);
-    }
-
-    private function assertSnapshotMatches(string $actual, string $snapshotFilename): void
-    {
-        $snapshotDir = __DIR__ . '/__snapshots__';
-        $path = $snapshotDir . '/' . $snapshotFilename;
-
-        if (!file_exists($path)) {
-            if (!is_dir($snapshotDir)) {
-                mkdir($snapshotDir, 0755, true);
-            }
-            file_put_contents($path, $actual);
-            $this->assertFileExists($path, "Snapshot $snapshotFilename was not created");
-            return;
-        }
-
-        $expected = file_get_contents($path);
-        $this->assertSame($expected, $actual, "Golden master mismatch for $snapshotFilename");
     }
 
     private function makeInjury(

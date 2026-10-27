@@ -8,11 +8,12 @@ use PHPUnit\Framework\TestCase;
 use Player\Player;
 use Player\Stats\PlayerStats;
 use Player\Views\PlayerTradingCardBackView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Views\PlayerTradingCardBackView */
 class PlayerTradingCardBackViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * Build a Player stub with every getter called by CardBaseStyles::preparePlayerData().

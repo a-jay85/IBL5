@@ -1,7 +1,7 @@
 """Phase 4 — code review + security audit as bounded LLM calls.
 
 Launch gates are the deterministic Phase-3 flags (identical to
-_phase-4-review-audit.md 4B/4C). Each retained call is toolless and receives a
+the retired post-plan skill Phase 4 text 4B/4C, ported 2026-10-19). Each retained call is toolless and receives a
 bounded packet: PR metadata + file list + the filtered diff (already <100KB).
 Scoring (4D) is VERIFIER_COUNT tool-enabled Sonnet verifiers voting per finding (drop needs every valid vote to be not-real);
 thresholds and posting are deterministic.
@@ -122,58 +122,54 @@ OUTPUT_CONTRACT_HEAD = "OUTPUT CONTRACT (restated at the end of this prompt):\n"
 OUTPUT_CONTRACT = "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _CONTRACT_BODY
 
 
-def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
-    sections = ["Look for architectural-fitness problems: Repository/Service/View split, "
-                "SQL literals consistent with the baseline schema, native-type "
-                "comparisons (=== 0 vs === '0') correct for column types, refactors "
-                "preserve tested behavior, clean PR scope (no drive-by changes)."]
-    if not cls.migration_only:
-        sections.append(
-            "Look for production-impact bugs: bind_param type-char "
-            "swaps; native-type mismatch (=== '0' on INT columns like tid/retired/hasMLE); "
-            "contract-year cy1-vs-cy2 confusion; COUNT(*) on ibl_box_scores without "
-            "gameMIN > 0; related-row writes without transactional(); free-agent tid "
-            "compared as string. Skip stylistic issues and linter-catchable problems.")
-    if cls.has_php:
-        sections.append(
-            "Look for measurable DB-performance problems: unbounded fetchAll() on "
-            "growing tables (ibl_box_scores, ibl_players, ibl_transactions); N+1 "
-            "query loops (fetch inside foreach/while); ORDER BY/WHERE on unindexed "
-            "columns; redundant repeat queries; unindexed JOINs.")
+def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo, *,
+                   run_core: bool = True, run_history: bool = False,
+                   run_comments: bool = False, any_files: bool = False) -> str:
+    sections = []
+    if run_core:
+        sections.append("Look for architectural-fitness problems: Repository/Service/View split, "
+                        "SQL literals consistent with the baseline schema, native-type "
+                        "comparisons (=== 0 vs === '0') correct for column types, refactors "
+                        "preserve tested behavior, clean PR scope (no drive-by changes).")
+        if not cls.migration_only:
+            sections.append(
+                "Look for production-impact bugs: bind_param type-char "
+                "swaps; native-type mismatch (=== '0' on INT columns like tid/retired/hasMLE); "
+                "contract-year cy1-vs-cy2 confusion; COUNT(*) on ibl_box_scores without "
+                "gameMIN > 0; related-row writes without transactional(); free-agent tid "
+                "compared as string. Skip stylistic issues and linter-catchable problems.")
+        if cls.has_php:
+            sections.append(
+                "Look for measurable DB-performance problems: unbounded fetchAll() on "
+                "growing tables (ibl_box_scores, ibl_players, ibl_transactions); N+1 "
+                "query loops (fetch inside foreach/while); ORDER BY/WHERE on unindexed "
+                "columns; redundant repeat queries; unindexed JOINs.")
+    if run_history:
+        sections.append("Look for regression risk: for the "
+                        + ("" if any_files else "PHP ") + "files with the most "
+                        "changed lines, does the change risk re-introducing a bug the "
+                        "file's structure suggests was fixed (guard clauses, boundary "
+                        "checks, type casts being removed)?")
+    if run_comments:
+        sections.append("Look for code-comment compliance problems: does the change comply with guidance "
+                        "in code comments visible in the diff's @@ context windows? Flag "
+                        "changes that contradict an adjacent comment's stated constraint.")
     reuse = ""
-    if plan.found and plan.has_reuse and plan.reuse_section:
+    if run_core and plan.found and plan.has_reuse and plan.reuse_section:
         reuse = ("\n\nPLANNED REUSE (flag any step that hand-rolled logic the plan "
                  "directed to reuse):\n" + plan.reuse_section)
+    # With the core sections off (an engine-only diff with comment edits), the call checks
+    # history and comments only, so it keeps the narrower regression/compliance persona.
+    persona = ("You are a Senior PHP Architect and Staff Engineer reviewing a PR for "
+               "architectural fitness, correctness bugs, and database performance.\n\n"
+               if run_core else
+               "You are a Senior Software Engineer reviewing regression risk and in-code "
+               "guidance compliance.\n\n")
     return (
-        OUTPUT_CONTRACT_HEAD
-        + "You are a Senior PHP Architect and Staff Engineer reviewing a PR for "
-        "architectural fitness, correctness bugs, and database performance.\n\n"
+        OUTPUT_CONTRACT_HEAD + persona
         + AUTOMATIC_ZERO_NOTE + "\n\n" + REPORTABLE_BAR + "\n\n" + "\n\n".join(sections) + reuse
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + f"Files changed:\n" + "\n".join(cls.files)
-        + "\n\nDIFF:\n" + cls.filtered_diff + OUTPUT_CONTRACT
-    )
-
-
-def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool,
-                   *, any_files: bool = False) -> str:
-    parts = []
-    if run_history:
-        parts.append("Look for regression risk: for the "
-                     + ("" if any_files else "PHP ") + "files with the most "
-                     "changed lines, does the change risk re-introducing a bug the "
-                     "file's structure suggests was fixed (guard clauses, boundary "
-                     "checks, type casts being removed)?")
-    if run_comments:
-        parts.append("Look for code-comment compliance problems: does the change comply with guidance "
-                     "in code comments visible in the diff's @@ context windows? Flag "
-                     "changes that contradict an adjacent comment's stated constraint.")
-    return (
-        OUTPUT_CONTRACT_HEAD
-        + "You are a Senior Software Engineer reviewing regression risk and in-code "
-        "guidance compliance.\n\n" + AUTOMATIC_ZERO_NOTE + "\n\n" + REPORTABLE_BAR + "\n\n"
-        + "\n\n".join(parts)
-        + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + "\n\nDIFF:\n" + cls.filtered_diff + OUTPUT_CONTRACT
     )
 
@@ -381,14 +377,14 @@ class ReviewPhase:
         self.last_votes: list[dict] = []     # vote records of the most recent run()
 
     def gates(self, cls: Classification) -> dict:
-        b_hist = cls.has_php and cls.lines_php_changed > 50
+        a_hist = cls.has_php and cls.lines_php_changed > 50
         if self.depth == DEEP:
-            b_hist = not cls.non_code_only
-        b_comm = (not cls.non_code_only) and cls.has_comments_in_diff
+            a_hist = not cls.non_code_only
+        a_comm = (not cls.non_code_only) and cls.has_comments_in_diff
+        a_core = not (cls.non_code_only or cls.engine_only)
         g = {
-            "A": not (cls.non_code_only or cls.engine_only),
-            "B_history": b_hist, "B_comments": b_comm,
-            "B": b_hist or b_comm,
+            "A": a_core or a_hist or a_comm,
+            "A_core": a_core, "A_history": a_hist, "A_comments": a_comm,
             "C": not (cls.non_code_only or not cls.has_modified or cls.lines_php_changed <= 50),
             "D": cls.has_e2e_specs,
             "security": cls.has_php,
@@ -518,10 +514,9 @@ class ReviewPhase:
         tasks: list[tuple[str, str, str, str, str]] = []
         if gates["A"]:
             tasks.append(("A", "code-review", "review-agent-a", "sonnet" if self.depth != DEEP else "opus",
-                          agent_a_prompt(meta, cls, plan)))
-        if gates["B"]:
-            tasks.append(("B", "code-review", "review-agent-b", "sonnet",
-                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"],
+                          agent_a_prompt(meta, cls, plan, run_core=gates["A_core"],
+                                         run_history=gates["A_history"],
+                                         run_comments=gates["A_comments"],
                                          any_files=(self.depth == DEEP))))
         # Agent C (previous-PR feedback) requires live gh search — replay serves
         # recorded "no prior feedback"; a live variant would add a gh-read adapter.
@@ -553,7 +548,7 @@ class ReviewPhase:
             # f.result() re-raises any terminal exception from _call_agent
             results = [f.result() for f in futures]
 
-        # Aggregate in stable submission order (A → B → D → security).
+        # Aggregate in stable submission order (A → D → security).
         for agent, source, purpose, data, degraded_purpose in results:
             if degraded_purpose is not None:
                 degraded_agents.append(degraded_purpose)

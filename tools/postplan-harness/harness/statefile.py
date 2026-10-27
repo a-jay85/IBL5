@@ -14,7 +14,6 @@ SCHEMA_VERSION = 1
 
 REVIEW_AGENTS = {
     "A": "review-agent-a",
-    "B": "review-agent-b",
     "D": "review-agent-d",
     "security": "security-audit",
 }

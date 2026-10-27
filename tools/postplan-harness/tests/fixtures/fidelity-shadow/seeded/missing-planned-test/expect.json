@@ -1,0 +1,7 @@
+{
+  "case": "missing-planned-test",
+  "expect": {
+    "3": "hold"
+  },
+  "why": "Matrix names tools/demo/tests/test_helper.py and test_rejects_empty; the diff adds the code but no test file."
+}

@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-10-22
+last_verified: 2026-10-26
 paths: ".github/workflows/**"
 ---
 
@@ -44,7 +44,7 @@ A new protection context is a separate decision (ADR-0120, ADR-0145). The workfl
 
 ## Mutation testing: per-PR diff job required, full suite label-gated
 
-`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M4) enforces the trigger, name, `if:`, and threshold.
+`.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M5) enforces the trigger, name, `if:`, threshold, and diff resolution. Never set `git config diff.relative` in that workflow. With it, Infection joins `classes/X.php` to the repo root, prints `No source file found`, and exits 0 with zero mutants, so class changes passed the required check unmutated ([#3443](https://github.com/a-jay85/IBL5/pull/3443)). The Infection step tees its output to a log and then runs `ibl5/bin/check-infection-ran`, which exits 5 when Infection matched no source but a changed class sits outside `source.excludes`. A diff that touches only excluded classes still passes.
 
 ## `ssh-keyscan` needs `|| true`
 
@@ -52,11 +52,11 @@ Bare `ssh-keyscan host >> ~/.ssh/known_hosts` can exit non-zero on transient net
 
 ## Update-baselines label flow
 
-The `update-baselines` label in `.github/workflows/e2e-tests.yml` triggers Visual Regression baseline regeneration and commit back to the PR branch. Three fixed bugs to avoid re-learning:
+The `update-baselines` label in `.github/workflows/e2e-tests.yml` rewrites only the baselines the gallery's strict pass flags, then commits them back to the PR branch. Three fixed bugs to avoid re-learning:
 
-1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. The regen/commit steps must check `steps.visual-regression.outcome == 'failure'` — `outcome` retains the real result.
-2. **Missing `always()` on Commit step**: when Regenerate fails, GitHub Actions skips later steps. The Commit step's `if:` must include `always()`.
-3. **Premature label removal**: "Remove update-baselines label" must be gated on `steps.regen-baselines.outcome != 'skipped'`; otherwise a label event where regen is skipped still removes the label, preventing retry.
+1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. The regen step must read `steps.visual-regression.outcome`, which keeps the real result. It runs on `success` or `failure`, because a sub-gate drift that the strict pass flags leaves VR green (ADR-0214).
+2. **Missing `always()` on Commit step**: when Regenerate fails, GitHub Actions skips later steps. The Commit step's `if:` must include `always()`, plus `steps.regen-baselines.outcome != 'skipped'` so a skipped regen commits nothing.
+3. **Premature label removal**: "Remove update-baselines label" must be gated on `steps.regen-baselines.outcome != 'skipped'`; otherwise a label event where regen is skipped still removes the label, preventing retry. It must also run before "Commit and push updated baselines". The push's synchronize event snapshots the labels, so a push made while the label is still on starts a second regen run and a second bot commit (`bin/test-vr-apply-baselines` pins the order).
 
 **CI-storm fix:** label events no longer rerun the full E2E suite. `src` dropped `action == 'labeled'`; a new `baseline` output (`github.event.action == 'labeled' && github.event.label.name == 'update-baselines'`) gates only the Visual Regression job. Skipped shards are safe for auto-merge — the required `E2E Tests` gate (`if: always()`, fails only on `failure`/`cancelled`) treats skipped as passing.
 

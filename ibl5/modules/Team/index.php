@@ -18,16 +18,8 @@ $teamid = is_numeric($teamidInput) ? (int) $teamidInput : 0;
 
 $pagetitle = "- Team Pages";
 
-global $mysqli_db, $authService, $leagueContext;
-/** @var \mysqli $mysqli_db */
-/** @var \Auth\Contracts\AuthServiceInterface $authService */
-/** @var \League\LeagueContext $leagueContext */
-
-$commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$teamRepository = new Team\TeamRepository($mysqli_db);
-$service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext);
-$view = new Team\TeamView();
-$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $service, $view, \Http\HttpRequest::fromGlobals());
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\TeamFactory::class);
+$controller = $factory->controller();
 
 switch ($op) {
     case "team":
@@ -35,7 +27,7 @@ switch ($op) {
         break;
 
     case "api":
-        $handler = new Team\TeamApiHandler($mysqli_db);
+        $handler = $factory->apiHandler();
         $handler->handle();
         break;
 

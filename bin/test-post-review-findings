@@ -421,9 +421,8 @@ reply_review_thread 42 999 'x' >/dev/null 2>&1 || rc=$?
 if [ "$rc" -eq 1 ]; then ok "reply-4: unknown comment id → exit 1"; else fail "reply-4: exit $rc, expected 1"; fi
 assert_absent "reply-4: no reply posted" "$REPLY_OUT"
 
-# ── structural case 7: all 3 callers reference the helper ────────────────────
+# ── structural case 7: both skill callers reference the helper ────────────────────
 for f in \
-    "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
     "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
     "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
 do
@@ -452,12 +451,11 @@ do
     fi
 done
 
-# ── structural case 13: all 3 callers document the DISPOSITION step ──────────
+# ── structural case 13: both skill callers document the DISPOSITION step ──────────
 # The posting half without the disposition half is exactly the defect this guards:
 # a session that fixes a finding reaches for `gh pr comment`, which can never close
 # the thread. Each skill that posts findings must also name resolve_review_finding.
 for f in \
-    "$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md" \
     "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
     "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
 do
@@ -828,15 +826,6 @@ post_review_findings 42 deadbeefcafe "Code review" "$f39b"
 PRF_NIT_CAP="$SAVED_NIT_CAP"
 assert_jq "case39b: PRF_NIT_CAP=2 keeps two nits" '.comments | length == 2' "$REVIEW_OUT"
 
-# ── structural: condition (11) block exists and is self-contained ─────────────
-COND11_FILE="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
-if grep -q '# condition (11)' "$COND11_FILE" \
-    && grep -A4 '# condition (11)' "$COND11_FILE" | grep -q 'bin/lib/pr-armable.sh'; then
-    ok "structural: condition (11) block exists and references pr-armable.sh"
-else
-    fail "structural: condition (11) block missing or does not reference pr-armable.sh in first 4 lines"
-fi
-
 # ── structural case 25: every emitter surface forbids hand-writing the comment ──
 # Backlog E24: Phase 4B's posting step used to mandate the helper in prose only, so a
 # run could compose the comment freehand. The review still happened, but the artifact
@@ -844,8 +833,8 @@ fi
 # false-negative), to resolve_review_finding, and to unresolved-findings-hold. Observed
 # on PRs #1956 and #2001. The prohibition is prose, so assert it statically — deleting
 # it must fail CI rather than silently reopening the hole.
+# shellcheck disable=SC2066 # one-file list kept as a loop so another doc can be added
 for f in \
-    "$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md" \
     "$REPO_ROOT/.claude/review-shared/_posting-procedure.md"
 do
     name="$(basename "$f")"
@@ -1101,6 +1090,7 @@ fi
 # t8 author null                   → excluded (deleted account is untrusted)
 # t9 "bot" User                    → excluded (suffix must be literal "[bot]")
 # t10 comments empty (ghost)       → excluded (no commentId), must not abort
+# t11 "stranger", isOutdated true  → excluded in both modes (untrusted)
 fixT="$BASE_TMP/threads-trust.json"
 cat > "$fixT" <<'THREADST'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -1123,7 +1113,9 @@ cat > "$fixT" <<'THREADST'
   {"id":"PRRT_t9","isResolved":false,"isOutdated":false,"path":"classes/I.php","line":12,
    "comments":{"nodes":[{"databaseId":609,"body":"Bare bot","author":{"login":"bot","__typename":"User"}}]}},
   {"id":"PRRT_t10","isResolved":false,"isOutdated":false,"path":null,"line":null,
-   "comments":{"nodes":[]}}
+   "comments":{"nodes":[]}},
+  {"id":"PRRT_t11","isResolved":false,"isOutdated":true,"path":"classes/J.php","line":null,
+   "comments":{"nodes":[{"databaseId":611,"body":"Old from a stranger","author":{"login":"stranger","__typename":"User"}}]}}
 ]}}}}}
 THREADST
 GH_THREADS_FIXTURE="$fixT"
@@ -1143,6 +1135,7 @@ assert_not_contains "trust: login prefix imposter 607 excluded" "$TRUST_OUT" '"c
 assert_not_contains "trust: null author 608 excluded"           "$TRUST_OUT" '"commentId":608'
 assert_not_contains "trust: bare 'bot' login 609 excluded"      "$TRUST_OUT" '"commentId":609'
 assert_not_contains "trust: ghost thread never listed as null"  "$TRUST_OUT" '"commentId":null'
+assert_not_contains "trust: untrusted outdated 611 excluded by default" "$TRUST_OUT" '"commentId":611'
 if jq -e 'has("id") and has("path") and has("line") and has("body") and has("score")' \
       "$TRUST_OUT" >/dev/null 2>&1; then
     ok "trust: full thread objects (id/path/line/body/score) pass through"
@@ -1177,6 +1170,49 @@ if [ "$(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')" = "111 " ]; then
 else
     fail "trust-default: got $(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')"
 fi
+
+# ── trust-outdated: --include-outdated lists trusted outdated threads ──────────
+GH_THREADS_FIXTURE="$fixT"
+TO_OUT="$BASE_TMP/trust-outdated.jsonl"
+list_trusted_open_threads 42 --include-outdated > "$TO_OUT"; rcO=$?
+[ "$rcO" -eq 0 ] && ok "trust-outdated: rc 0 with the flag" || fail "trust-outdated: rc $rcO, expected 0"
+got=$(jq -r '.commentId' "$TO_OUT" | sort | tr '\n' ' ')
+if [ "$got" = "601 602 603 605 " ]; then
+    ok "trust-outdated: 605 joins 601 602 603 (trusted outdated listed)"
+else
+    fail "trust-outdated: expected '601 602 603 605 ', got '$got'"
+fi
+# 605 must keep the shape fix-or-decline reads: isOutdated:true and line:null.
+if jq -e 'select(.commentId == 605) | .isOutdated == true and .line == null' "$TO_OUT" >/dev/null 2>&1; then
+    ok "trust-outdated: 605 carries isOutdated true and line null"
+else
+    fail "trust-outdated: 605 lost isOutdated/line"
+fi
+assert_not_contains "trust-outdated: untrusted outdated 611 still excluded" "$TO_OUT" '"commentId":611'
+assert_not_contains "trust-outdated: resolved 606 still excluded"           "$TO_OUT" '"commentId":606'
+assert_not_contains "trust-outdated: untrusted 604 still excluded"          "$TO_OUT" '"commentId":604'
+assert_not_contains "trust-outdated: null author 608 still excluded"        "$TO_OUT" '"commentId":608'
+
+# ── trust-badflag: an unknown option fails loudly, prints nothing ─────────────
+BF_OUT="$BASE_TMP/trust-badflag.jsonl"
+list_trusted_open_threads 42 --include-outdatedd > "$BF_OUT" 2>"$BASE_TMP/trust-badflag.err"; rcB=$?
+if [ "$rcB" -eq 2 ] && [ ! -s "$BF_OUT" ]; then
+    ok "trust-badflag: --include-outdatedd → rc 2, empty stdout"
+else
+    fail "trust-badflag: rc $rcB, stdout $(wc -l < "$BF_OUT") lines; expected rc 2 and empty"
+fi
+assert_contains "trust-badflag: stderr names the unknown option" "$BASE_TMP/trust-badflag.err" "unknown option '--include-outdatedd'"
+
+# ── trust-cap-flag: the 100-node cap still applies with the flag ──────────────
+GH_THREADS_FIXTURE="$fixTcap"
+CF_OUT="$BASE_TMP/trust-cap-flag.jsonl"
+list_trusted_open_threads 42 --include-outdated > "$CF_OUT" 2>"$BASE_TMP/trust-cap-flag.err"; rcCF=$?
+if [ "$rcCF" -eq 2 ] && [ ! -s "$CF_OUT" ]; then
+    ok "trust-cap-flag: 100 nodes with --include-outdated → empty stdout, rc 2"
+else
+    fail "trust-cap-flag: rc $rcCF, stdout $(wc -l < "$CF_OUT") lines; expected rc 2 and empty"
+fi
+assert_contains "trust-cap-flag: stderr names the cap" "$BASE_TMP/trust-cap-flag.err" "100-thread page cap"
 
 # ── hold-1: score 50 (below the old floor) now holds with its score ───────────
 fixH1="$BASE_TMP/threads-hold1.json"
@@ -1224,38 +1260,13 @@ pr_unresolved_findings_hold 42 > "$outH3"
     || fail "hold-4: non-zero exit with findings present"
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
-# ── p45: Phase 4.5 doc blocks exist once, parse, and sit in the right order ────
-P4DOC="$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md"
+# ── p45: posting-procedure doc names the trusted-thread helper and the decline convention ──
 PPDOC="$REPO_ROOT/.claude/review-shared/_posting-procedure.md"
-p45_block() { awk -v m="$1" '$0==m{f=1} f&&/^```$/{exit} f' "$P4DOC"; }
-for m in '# phase 4.5 snapshot' '# phase 4.5 remediate' '# phase 4.5 commit-and-resolve'; do
-    [ "$(grep -cF "$m" "$P4DOC")" -eq 1 ] && ok "p45: marker '$m' once" || fail "p45: marker '$m' count != 1"
-    p45_block "$m" | bash -n 2>/dev/null && ok "p45: block '$m' parses" || fail "p45: block '$m' does not parse"
-done
-snap_ln=$(grep -nF '# phase 4.5 snapshot' "$P4DOC" | cut -d: -f1)
-post_ln=$(grep -nF 'post_review_findings "$PR" "$FULL_SHA" "Code review"' "$P4DOC" | head -1 | cut -d: -f1)
-[ "$snap_ln" -lt "$post_ln" ] && ok "p45: snapshot precedes the first posting call" \
-    || fail "p45: snapshot ($snap_ln) is not before the first post_review_findings ($post_ln)"
-for f in "$P4DOC" "$PPDOC"; do
+# shellcheck disable=SC2066 # one-file list kept as a loop so another doc can be added
+for f in "$PPDOC"; do
     assert_contains "p45: $(basename "$f") names list_trusted_open_threads" "$f" "list_trusted_open_threads"
     assert_contains "p45: $(basename "$f") states the decline convention"  "$f" "Declined: "
 done
-assert_contains "p45: SKILL.md routes 4D -> 4.5 -> 5" "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" "then 4.5, in order"
-
-# ── p45-filter: the remediate block honors the pre-4D snapshot ────────────────
-# Default fixture: 111 is trusted+open. Snapshot {111} → 1 work item; snapshot {999} → 0.
-run_p45_remediate() { # snapshot-ids-newline-separated
-    ( export PR=42; PPID_FAKE=$$; printf '%s\n' "$1" > "/tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt"
-      p45_block '# phase 4.5 remediate' | sed "s/\$PPID/$PPID_FAKE/g" | bash
-      wc -l < "/tmp/post-plan-p45-work-$PPID_FAKE.jsonl" | tr -d ' '
-      rm -f /tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt /tmp/post-plan-p45-*-$PPID_FAKE.jsonl )
-}
-[ "$(run_p45_remediate 111 | tail -1)" = "1" ] && ok "p45-filter: pre-existing 111 selected" \
-    || fail "p45-filter: expected 1 work item for snapshot {111}"
-[ "$(run_p45_remediate 999 | tail -1)" = "0" ] && ok "p45-filter: fresh thread (not in snapshot) skipped" \
-    || fail "p45-filter: expected 0 work items for snapshot {999}"
-[ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
-    || fail "p45-filter: expected 0 work items for an empty snapshot"
 
 # ── agent marker: written at post time (inline comments only) and parsed back ─
 reset_outputs

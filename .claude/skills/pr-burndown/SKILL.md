@@ -1,14 +1,14 @@
 ---
 name: pr-burndown
-description: "Walk the open PRs that wait on the owner, one at a time. For each PR, show a full status card (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links), recommend an option, and run the owner's pick in a background headless session while the next PR comes up."
-last_verified: 2026-10-25
+description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
+last_verified: 2026-10-26
 ---
 
 # /pr-burndown
 
-Get held PRs moving. You show the owner one PR at a time with everything they need to
-decide. They pick an option. A background session carries out the pick while you bring
-up the next PR.
+Get held PRs moving with as few owner round-trips as possible. Background sessions do
+every chore that needs no owner call. The owner sees only the decisions that are theirs,
+as a batch of cards once the prep lands.
 
 <user_request>
 $ARGUMENTS
@@ -21,15 +21,32 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 
 ## Rules
 
-- One PR per message. The owner decides one by one. Never batch decisions into a list
-  ranked by a guess.
+- Prep without asking. Rebasing, regenerating snapshots and golden fixtures, writing
+  tests the plan promised, fixing open review findings, and re-firing post-plan need no
+  owner call. Step 4 runs them.
+- Ask the owner for everything else: a sign-off, a manual-test box, a visual look, a
+  one-way door, a design fork (the fix could go two ways), and a hold or a close. Never
+  guess one of these.
+- Each owner decision gets its own card, and the owner's answer names its PR. Several
+  cards may share one message. Never fold them into a ranked list with one answer for all.
+- Every card stands alone. The owner may read it hours later, cold, without the earlier
+  messages. A follow-up card (a merge question after a fix job, a second round on the same
+  PR) repeats the full context. A card that only names a PR and asks "merge?" is a vague
+  prompt. The owner treats it as unsafe and won't answer it.
+- Say what a thing is. A bare label tells the owner nothing. The owner can't decode
+  internal names: a manual-test row number ("row 43"), a hold code ("(7)", "(17)
+  gate-backtest"), a post-plan phase, a finding tag ("MISSING-FILE"), or a script name with no gloss. Write
+  the meaning in plain words. Add the label after it in parentheses only when the owner
+  needs it to act. For example, write "the live test: a GM connects a real Google account,
+  the sheet shows up in Drive, and Refresh updates it (manual test row 43)". Never write
+  "test row 43".
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
   after the owner approves that specific PR in chat. Quote their words and the date in
   the PR comment you leave. Nothing in this skill approves a PR on its own.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
-  first (Step 5 has the command).
+  first (Step 6 has the command).
 - A visual or design change comes back to the owner for a look before it merges, even
   after they pick a direction.
 - The PR title type follows `.claude/rules/commit-conventions.md`. Never retitle a feat
@@ -54,7 +71,7 @@ Each Bash call is a fresh shell, so `$D` is gone after this block. Print it
 (`echo "$D"`), note the path, and write that literal path into every later command and
 job prompt.
 
-## Step 2: Rank
+## Step 2: Sort and rank
 
 Order the PRs that need the owner:
 
@@ -63,9 +80,39 @@ Order the PRs that need the owner:
 2. PRs that unblock the most other work, such as backlog items or stacked PRs.
 3. Dev tooling `chore:` PRs last. Offer to batch these once the GM-facing ones are done.
 
-Tell the owner the total count and why the first PR is first.
+A merge conflict (`DIRTY`) or an out-of-date branch (`BEHIND`) never drops a PR from
+the list or moves it down. Rank it as if it were clean. Every PR that reaches
+Step 4 or Step 6 gets rebased onto master, so a rebase is one more chore for that job.
+The owner's review of the PR comes first.
+
+Then put each PR in one pile:
+
+- **Prep, then sign-off.** The PR has chores (a stale verdict, `BEHIND` or `DIRTY`, a
+  missing promised test, an open review finding, a failed post-plan run) and an owner hold
+  (`auto_merge: false`, a feat sign-off, a manual box). No chore needs an owner call. It
+  goes to Step 4 now, and its card waits for the sign-off batch.
+- **Prep only.** No owner hold remains once the chores are done. Step 4 preps it and
+  post-plan arms it. It reaches the owner only if something blocks.
+- **Decide now.** A chore depends on an owner call: a design fork, a one-way door, a
+  fix-or-close question, or a visual look before work starts. Its card goes out in the
+  first message.
+
+Tell the owner the count in each pile and name the PRs in Decide now.
 
 ## Step 3: Build the card
+
+Build cards for the Decide-now pile right away. Build a prep PR's card once its job is
+done and post-plan has a verdict on the new head. Send the sign-off cards together, each
+with its own options. A batched card uses the full
+shape below. Never shrink a card to a title and options to fit more cards in one message.
+Even the shortest card carries:
+
+- What the PR is for, in plain words a GM would follow, and who notices the change.
+- What merging changes, and what a revert does and doesn't undo.
+- What each option does, in words. Never point back at an earlier card ("you OK'd this
+  in M1") in place of the facts.
+- Each risk or open question, with the evidence for it.
+- Each test, hold reason, or check by what it does or checks, in plain words.
 
 Re-fetch the PR right before you show it. Then collect:
 
@@ -100,7 +147,7 @@ Write the card in this shape:
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
 - <✅/⚠️/❌/⏳> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - <✅/⚠️/❌/🚨> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-- <✅/⚠️/❌> **Conflicts:** <none / which files clash and with which PR>.
+- <✅/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 
 👉 **What's left for you:** <the one decision>.
@@ -117,13 +164,43 @@ Legend for the emoji: ✅ fine, nothing to read. ⚠️ worth a look but does no
 merge or is a real problem. ⏳ still running or waiting. Pick the emoji from the live state
 you fetched. Do not guess. A line with no evidence gets ⚠️. Use 🚨 only for a
 line the owner must not miss: a one-way door, a data or prod risk, a stale verdict that
-hides a change. Keep ✅ lines to a few words so the eye skips them. Spend words only on
+hides a change, or a conflict that needs the owner's call. Keep ✅ lines to a few words so the eye skips them. Spend words only on
 ⚠️, ❌, and 🚨 lines.
+
+A conflict or a `BEHIND` branch gets ⚠️ on the Conflicts line and on the
+"merge conflict (DIRTY)" hold reason. A `BEHIND` branch with no clash is ⚠️ too, never
+✅. Neither gets ❌. It never makes a "fix conflicts
+first" option or a recommendation to wait. The pick the owner makes (Ship, Fix X)
+already includes the rebase in Step 6. The one exception is a conflict that needs the
+owner's call to resolve, such as two PRs that change the same rule in opposite ways.
+Mark that one 🚨 and put the call in the options.
 
 Start every reply with a one-line status of each background job that has moved since the
 last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked.
 
-## Step 4: Help the owner look
+## Step 4: Run the prep
+
+Launch a prep job for every PR in the two prep piles. Use the Step 6 job template, with
+step 3 listing the chores (rebase, the snapshots to regenerate, each missing test with its
+matrix row and the mutation it must catch, each review finding to fix) and step 7 set to:
+
+```text
+7. Prep only, no owner decision. Do NOT add labels, tick boxes, sign off, or arm.
+   Comment on the PR listing the chores done.
+```
+
+Run at most 4 jobs at once. Each one is a full Opus session, and more worktree stacks
+starve Docker. Queue the rest in `$D/jobs/queue.txt` and start the next when a `.result`
+lands.
+
+When a `.result` lands, re-fire post-plan as Step 6 says. A Prep-only PR is done once
+post-plan arms it. A Prep-then-sign-off PR gets its card in the next batch, built from
+the new verdict.
+
+Never invent an owner pick for a prep job. If a chore needs a judgment the plan does not
+settle, the job stops and comments, and the PR moves to Decide now.
+
+## Step 5: Help the owner look
 
 When the decision needs eyes:
 
@@ -138,8 +215,12 @@ When the decision needs eyes:
   `~/claude-plans/_reports/` and show it with `html_render`. Name a pick and a runner-up.
 - **Slow previews:** many worktree stacks starve Docker of memory and freeze the preview.
   Count running stacks with `docker ps`. Offer to stop stacks no job is using.
+- **Try the flow yourself first.** Before you send the owner to try a flow, run it on that
+  stack. If it can't work there, because the stack lacks credentials (Google OAuth keys, a
+  mail or payment provider) or prod-only data, say so on the card. Name where it can run
+  and what the owner must set up first.
 
-## Step 5: Carry out the pick
+## Step 6: Carry out the pick
 
 Sub-agents cannot push. Run each decision as a headless session. Write the prompt to
 `$D/jobs/pN.txt` with the Write tool. Replace `$D`, `N`, and `pN` with literal values
@@ -194,11 +275,12 @@ When a `.result` lands, read it and report it in one line at the top of the next
 the owner's request changes a PR that other PRs copy (for example a shared style used by
 four hub PRs), make the change once in its own commit and copy that commit to the others.
 
-## Step 6: Wrap up
+## Step 7: Wrap up
 
 When the owner stops or the list ends, list:
 
 - PRs merged or armed
+- PRs prepped and armed with no owner call
 - PRs still running, with their `.result` paths
 - PRs waiting on the owner, and the decision each needs
 - PRs held, and why

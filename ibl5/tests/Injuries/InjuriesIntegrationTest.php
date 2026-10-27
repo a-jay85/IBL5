@@ -334,7 +334,9 @@ class InjuriesIntegrationTest extends WideUnitTestCase
         $result = $this->view->render($injuredPlayers);
 
         $this->assertStringContainsString('--team-cell-bg: #006BB6', $result);
-        $this->assertStringContainsString('--team-cell-color: #FDB927', $result);
+        $this->assertStringContainsString('--team-cell-color: #ffffff', $result);
+        $this->assertStringContainsString('--team-cell-shadow: #FDB927', $result);
+        $this->assertStringNotContainsString('--team-cell-color: #FDB927', $result);
     }
 
     /**

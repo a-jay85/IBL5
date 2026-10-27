@@ -252,7 +252,7 @@ def test_row21_flag_blocks_even_with_clean_post_pr(tmp_path):
         pr_labels=[],
         classification=cls,
         findings=[],
-        unresolved_conformance=[],
+        unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
         phase5_status="pass",
         plan_auto_merge_false=False,
         headless=False,

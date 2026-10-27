@@ -156,3 +156,48 @@ has_untracked_files() {
     out=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null)
     [ -n "$out" ]
 }
+
+# Print the reason a worktree must be kept; print nothing when it is empty.
+# Empty = HEAD has 0 commits not on origin/master AND no tracked diff AND no
+# untracked non-ignored file. Fail-closed (shell-fail-open-probe.md): when
+# rev-list cannot run, that is a keep reason, never "0 ahead". The diff and
+# ls-files probes are inlined rather than reusing has_uncommitted_changes and
+# has_untracked_files: those treat a git failure (unreadable file, corrupt
+# index) as "clean", which would let --if-empty delete a worktree holding work.
+worktree_keep_reason() {
+    local wt="$1" ahead rc untracked
+    if ! ahead=$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null); then
+        echo "cannot verify emptiness (origin/master or HEAD unresolvable)"
+        return 0
+    fi
+    if [ "$ahead" != "0" ]; then
+        echo "$ahead commit(s) ahead of origin/master"
+        return 0
+    fi
+    git -C "$wt" diff --quiet 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+        echo "uncommitted changes"
+        return 0
+    elif [ "$rc" -ne 0 ]; then
+        echo "cannot verify emptiness (git diff exited $rc)"
+        return 0
+    fi
+    git -C "$wt" diff --cached --quiet 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+        echo "uncommitted changes"
+        return 0
+    elif [ "$rc" -ne 0 ]; then
+        echo "cannot verify emptiness (git diff --cached exited $rc)"
+        return 0
+    fi
+    if ! untracked=$(git -C "$wt" ls-files --others --exclude-standard 2>/dev/null); then
+        echo "cannot verify emptiness (git ls-files failed)"
+        return 0
+    fi
+    if [ -n "$untracked" ]; then
+        echo "untracked files"
+        return 0
+    fi
+}

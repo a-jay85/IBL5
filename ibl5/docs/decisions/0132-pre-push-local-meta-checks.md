@@ -1,6 +1,6 @@
 ---
 description: Before every post-plan push, `bin/run-meta-checks-local` runs CI's hard-gate checks locally, deriving path filters at runtime from the workflow YAML; a failing run pushes anyway but withholds auto-merge.
-last_verified: 2026-09-19
+last_verified: 2026-10-20
 ---
 
 # ADR-0132: Pre-push local meta-check gate
@@ -54,4 +54,4 @@ Pure-Python runner: every step the orchestrator runs is an existing shell script
 - `.github/workflows/pr-meta-checks.yml` (the workflow this gate mirrors locally)
 - `tools/postplan-harness/runner.py` (harness integration, Phase 5)
 - `.claude/skills/post-plan/SKILL.md` (skill integration, Phase 6)
-- `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (condition 16, Phase 7)
+- `tools/postplan-harness/harness/armable.py` (condition 16, Phase 7)

@@ -176,7 +176,7 @@ class SeasonDetailViewTest extends TestCase
         $result = $this->view->renderSeasonDetail($seasonData);
 
         // Single merged "Rosters" section replaces old separate sections
-        $this->assertStringContainsString('>Rosters</h3>', $result);
+        $this->assertStringContainsString('>Rosters</h2>', $result);
         $this->assertStringNotContainsString('Championship Rosters', $result);
         $this->assertStringNotContainsString('All-Star Rosters', $result);
         // All three roster columns present
@@ -193,6 +193,48 @@ class SeasonDetailViewTest extends TestCase
         // Uses flexbox layout
         $this->assertStringContainsString('season-archive-roster-flex', $result);
         $this->assertStringContainsString('season-archive-roster-col', $result);
+    }
+
+    public function testSectionHeadingsAreH2AndRosterSubheadingsAreH3(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['championRosters'] = [
+            'ibl' => ['Player A', 'Player B'],
+            'heat' => ['Player C'],
+        ];
+        $seasonData['allStarRosters'] = [
+            'east' => ['East Player 1', 'East Player 2'],
+            'west' => ['West Player 1'],
+        ];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        // Section headings sit one level under the page <h1>
+        $this->assertStringContainsString('<h2>Tournaments</h2>', $result);
+        $this->assertStringContainsString('<h2>All-Star Weekend</h2>', $result);
+        $this->assertStringContainsString('<h2>Major Awards</h2>', $result);
+        $this->assertStringContainsString('<h2>Statistical Leaders</h2>', $result);
+        $this->assertStringContainsString('<h2>All-League Teams</h2>', $result);
+        $this->assertStringContainsString('<h2>All-Defensive Teams</h2>', $result);
+        $this->assertStringContainsString('<h2>All-Rookie Teams</h2>', $result);
+        $this->assertStringContainsString('<h2>Rosters</h2>', $result);
+
+        // Roster sub-headings sit one level under the Rosters <h2>
+        $this->assertStringContainsString('<h3>IBL Champions</h3>', $result);
+        $this->assertStringContainsString('<h3>Eastern Conf. All-Stars</h3>', $result);
+        $this->assertStringContainsString('<h3>Western Conf. All-Stars</h3>', $result);
+        $this->assertStringContainsString('<h3>H.E.A.T. Champions</h3>', $result);
+
+        // No level is skipped: only the four roster sub-headings are <h3>, and no <h4> remains
+        $this->assertSame(4, substr_count($result, '<h3'));
+        $this->assertStringNotContainsString('<h4', $result);
+
+        // The page <h1> precedes the first section <h2>
+        $h1Pos = strpos($result, '<h1');
+        $h2Pos = strpos($result, '<h2');
+        $this->assertNotFalse($h1Pos);
+        $this->assertNotFalse($h2Pos);
+        $this->assertLessThan($h2Pos, $h1Pos);
     }
 
     public function testRostersSectionShowsAllStarCoachCaptions(): void
@@ -248,7 +290,7 @@ class SeasonDetailViewTest extends TestCase
         $this->assertStringContainsString('new5.png', $result);
         $this->assertStringContainsString('alt="Clippers"', $result);
         // Logo appears after the "IBL Champions" heading (below the roster table)
-        $headingPos = strpos($result, 'IBL Champions</h4>');
+        $headingPos = strpos($result, 'IBL Champions</h3>');
         $logoPos = strpos($result, 'class="season-archive-champion-logo"');
         $this->assertNotFalse($headingPos);
         $this->assertNotFalse($logoPos);
@@ -269,7 +311,7 @@ class SeasonDetailViewTest extends TestCase
         $this->assertStringContainsString('Head Coach: Brandon Tomyoy', $result);
         // Coach caption appears before "IBL Champions" heading
         $captionPos = strpos($result, 'Head Coach: Brandon Tomyoy');
-        $headingPos = strpos($result, 'IBL Champions</h4>');
+        $headingPos = strpos($result, 'IBL Champions</h3>');
         $this->assertNotFalse($captionPos);
         $this->assertNotFalse($headingPos);
         $this->assertLessThan($headingPos, $captionPos);

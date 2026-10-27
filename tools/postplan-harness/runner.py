@@ -34,6 +34,7 @@ import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -64,14 +65,17 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
-                              upsert_gate_fix,
+                              upsert_exec_mutations, upsert_gate_fix,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
+from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
+from harness import removed_guards
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
+from harness import snapshot_regen
 from harness.review import ReviewPhase
 from harness import review_depth
 from harness import baseline_guard
@@ -217,6 +221,43 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     classifiers; _finish redacts it when writing result.json."""
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
+
+
+
+def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
+    """Executable mutation claims (ADR-0199), run after verify and before arming.
+
+    Replay reads the report from the fixture (default: an empty, passing report). A run
+    with no plan has no `## Executable Mutations` section, so it gets the same empty
+    report. A live run with a plan but no worktree returns None, which condition (19)
+    holds on. A crash never aborts the run: it becomes a holding report with
+    tree_suspect=True, because the journal may hold an unreverted edit.
+    """
+    if not live:
+        fx = fixture or {}
+        return MutationReport(ran=True, results=(),
+                              holding=tuple(fx.get("exec_mutations_holding") or ()),
+                              tree_suspect=bool(fx.get("exec_mutations_tree_suspect", False)))
+    if plan is None or not getattr(plan, "found", False) or not getattr(plan, "path", None):
+        log("exec-mutations: no plan — nothing to run")
+        return MutationReport(ran=True, results=(), holding=(), tree_suspect=False)
+    if not (worktree and os.path.isdir(worktree)):
+        log("exec-mutations: skipped (no worktree) — condition (19) holds")
+        return None
+    try:
+        report = run_executable_mutations(Path(plan.path), Path(worktree))
+    except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
+        report = MutationReport(ran=False, results=(),
+                                holding=(f"executor-crashed: {e}",), tree_suspect=True)
+    for r in report.results:
+        log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
+    for h in report.holding:
+        log(f"exec-mutations HOLD: {h}")
+    if report.tree_suspect:
+        log("exec-mutations: tree suspect — journal may hold an unreverted edit")
+    if not report.results and not report.holding:
+        log("exec-mutations: no executable mutations in plan")
+    return report
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
@@ -380,6 +421,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _inject_residual_phases(copy, plan, conf_files, log)
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
+        _inject_removed_guards(copy, plan, diff, worktree, log)
         if _inject_merge_danger(copy, worktree, diff, log):
             merge_danger_degraded = True
         phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
@@ -524,10 +566,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
-            code_review_purposes = {"review-agent-a", "review-agent-b", "review-agent-d"}
-            expected_code = [p for p in ("review-agent-a", "review-agent-b", "review-agent-d")
-                             if gates.get({"review-agent-a": "A", "review-agent-b": "B",
-                                           "review-agent-d": "D"}[p])]
+            code_review_purposes = {"review-agent-a", "review-agent-d"}
+            expected_code = [p for p in ("review-agent-a", "review-agent-d")
+                             if gates.get({"review-agent-a": "A", "review-agent-d": "D"}[p])]
             code_degraded = [p for p in degraded_agents if p in code_review_purposes]
             res.phase4b_code_ran = bool(expected_code) and len(code_degraded) < len(expected_code)
             res.phase4b_reviewed_head = meta.get("headRefOid") or ""
@@ -762,14 +803,36 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                    fixture=fixture, log=log)
+        mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
+        if live and pr and mutation_report is not None:
+            # A second body edit: the Phase 6 body write above runs before this step.
+            # Log-and-continue like the merge-digest write: a failed or empty read must never
+            # blank the body, and a failed edit must never abort the run.
+            try:
+                _xm_cur = gh.pr_body_fresh() or ""
+                if not _xm_cur:
+                    log("phase6.5: exec-mutations body write skipped (PR body read empty)")
+                else:
+                    _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
+                    if _xm_new != _xm_cur:
+                        gh.pr_edit_body(pr, _xm_new)
+            except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
         _arm_body = gh.pr_body() or body
         if live and pr:
             _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
                                             git.diff_vs_base(), log, res)
+        # Condition (20): rerun the detector on the realized diff so a body without the
+        # Removed guards block (or a hand-edited one) cannot release the hold.
+        _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
         inputs = ArmInputs(
             pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
+            exec_mutations_holding=(mutation_report.holding
+                                    if mutation_report is not None else None),
+            exec_mutations_tree_suspect=(mutation_report.tree_suspect
+                                         if mutation_report is not None else True),
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
             branch=git.branch(),
@@ -799,6 +862,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gate_backtest_reason=_gb.reason,
             merge_danger_state=merge_danger.classify_body(_arm_body),
             retried_stages=sorted(res.retries),
+            removed_guards_holds=_rg_holds,
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -1040,11 +1104,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
 
 # Phase 5.0's two conformance signals, written into the run dir beside result.json.
-# Run-dir-keyed, NOT $PPID-keyed: the skill path spells them /tmp/...-$PPID, and no
-# PID the harness could pick would be the one another process looks under. Phase 8
-# removed the rc=4 resume, so no skill session reads these today; they stay as the
-# run's audit trail and as the shape the skill-path block in
-# _phase-6.5-arm-auto-merge.md mirrors. Two suites read these names back rather than
+# Run-dir-keyed, NOT $PPID-keyed: the retired skill Phase 6.5 spelled them
+# /tmp/...-$PPID, and no PID the harness could pick would match another process.
+# No skill session reads these today; they stay as the run's audit trail.
+# Two suites read these names back rather than
 # hardcoding them, and that is what keeps every side in sync: the Python half in
 # tests/test_post_plan_now_fallback.py and the shell half in
 # bin/test-postplan-arm-conditions (harness_handoff_names). Renaming a constant here
@@ -1245,6 +1308,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
         out = run_thread_ingestion(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
             outcome_log_path=outcome_log_path,
+            include_outdated=True,   # Phase 4.5 re-runs drain outdated trusted threads left by earlier runs
             commit=lambda msg: _commit_with_gate_fix(
                 git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
@@ -2385,6 +2449,47 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     return merge_danger.inject_merge_danger(body, final)
 
 
+def _detector_root(worktree) -> str:
+    """Repo root holding bin/lib/deleted-guards: always this harness's checkout, like plan-scope-conformance.
+
+    Never the PR worktree: a PR that weakens the detector would judge its own condition (20).
+    Tests stub the detector by monkeypatching this function.
+    """
+    return conformance._HARNESS_REPO_ROOT
+
+
+def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list[str]:
+    """Condition (20) arm input: hold lines from the realized-diff rerun. Fails closed."""
+    ok, rows = removed_guards.run_detector(
+        _detector_root(worktree), diff_body,
+        plan.path if (plan and getattr(plan, "found", False)) else None)
+    if not ok:
+        return ["removed-guards:DETECTOR-ERROR"]
+    return removed_guards.classify_body(arm_body, [r[0] for r in rows])
+
+
+def _inject_removed_guards(copy: dict, plan, diff_body: str, worktree, log) -> bool:
+    """Phase 2: upsert the `## Removed guards` block into copy["summary_md"].
+
+    Runs right after _inject_scope_notes and touches only its own marker span. Each
+    flagged key gets the impl session's reason from the reasons file under the git dir,
+    or the placeholder, which holds condition (20). A detector error upserts nothing;
+    the arm-time rerun then holds with DETECTOR-ERROR. Returns False on a detector error.
+    """
+    ok, rows = removed_guards.run_detector(
+        _detector_root(worktree), diff_body,
+        plan.path if (plan and getattr(plan, "found", False)) else None)
+    if not ok:
+        log("phase2 removed-guards: detector error")
+        return False
+    reasons = removed_guards.read_reasons(worktree) if worktree else {}
+    copy["summary_md"] = removed_guards.upsert_block(
+        copy["summary_md"], removed_guards.render_block(rows, reasons))
+    for r in rows:
+        log(f"phase2 removed-guard: {r[0]}")
+    return True
+
+
 def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_body: str,
                         log) -> list[str]:
     """Phase 2: upsert `## Unplanned changes` into copy["summary_md"] from scope notes.
@@ -2903,6 +3008,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
         log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
         res.fidelity = {"verdict_1": "READY", "error_kind": None,
+                        "shadow": fidelity.shadow_absent("replay-synthetic"),
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
@@ -2969,6 +3075,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True,
+                        "shadow": fidelity.carried_shadow(
+                            ((cache_rec or {}).get("fidelity") or {}).get("shadow"), reuse_run),
                         **({"carry_reason": carry_reason} if carry_reason else {})}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
@@ -2988,10 +3096,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
-            review_findings=review_findings)
+            review_findings=review_findings, shadow_request=True)
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,
+                        "shadow": fidelity.shadow_absent(f"packet-error:{e.kind}"),
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
@@ -3014,6 +3123,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
+    # Shadow-mode arming record (procedure 6f). Set after the wholesale replacement above;
+    # nothing on the verdict, remediation or arming path reads it.
+    res.fidelity["shadow"] = (
+        fidelity.shadow_absent(f"review-error:{err}") if err
+        else fidelity.read_shadow(fidelity.verdict_path(pr), source="verdict-1",
+                                  reviewed_tree=reviewed_tree,
+                                  plan_blind=not getattr(plan, "found", False)))
     # What code review the PR shows. `code_review_seen` reads the cache the one existing
     # comments fetch filled, so this adds no network call. `res.fidelity` was replaced
     # wholesale just above, so the key is set after it.
@@ -3196,7 +3312,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-                current_verdict_path, round_num=round_num, log=log)
+                current_verdict_path, round_num=round_num, shadow_request=True, log=log)
             if v_n is not None:
                 break
             # Count the extra attempt, never the first one, so retries stays the
@@ -3217,6 +3333,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["remediation_sha"] = str(sha)
         res.fidelity["verdict_2"] = v_n
         res.fidelity["reviewed_tree_2"] = tree_n
+        # A body-recheck round never changes the tree, so the prior Opus shadow stands.
+        if review_kind == "full" and path_n:
+            res.fidelity["shadow"] = fidelity.read_shadow(
+                path_n, source=f"round-{round_num}", reviewed_tree=tree_n,
+                plan_blind=not getattr(plan, "found", False))
         log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
             f"outcome={rec['outcome']} sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'}")
@@ -3299,10 +3420,16 @@ def _state_dir(out_dir: str, live: bool, override) -> str:
 def _finish(res: RunResult, out_dir: str) -> RunResult:
     if res.ledger:
         res.ledger.finished_at = time.time()
+    # The shadow record is finalized on a copy, so the live `res` never changes. `_finish`
+    # runs on every exit path, so a run that never reached Phase 5.5 records not-reached.
+    fid = dict(res.fidelity or {})
+    fid[fidelity.SHADOW_KEY] = fidelity.finalize_shadow(fid.get(fidelity.SHADOW_KEY), res.arm)
+    shadow_line = fidelity.shadow_audit_line(fid[fidelity.SHADOW_KEY])
     stored = dataclasses.replace(
         res,
         error=_redact(res.error) if res.error else res.error,
-        audit=[_redact(ln) for ln in res.audit],
+        fidelity=fid,
+        audit=[_redact(ln) for ln in res.audit + [shadow_line]],
     )
     with open(os.path.join(out_dir, "result.json"), "w") as fh:
         fh.write(stored.to_json())
@@ -3658,6 +3785,13 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
         pass
 
 
+def _log_snapshot_regens(git, log) -> None:
+    worktree = getattr(git, "worktree", "") or ""
+    if worktree:
+        for line in snapshot_regen.pop_audit_lines(worktree):
+            log(f"phase2: {line}")
+
+
 def _phase2_rebase(git, res, log) -> tuple[str, str]:
     """Phase 2 merge of origin/master, shared by the full path and rebase-only mode.
 
@@ -3668,6 +3802,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
     pre_rebase = git.head()
     conflict_resolved = None
     try:
+        snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
         git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
         # A plain merge the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
@@ -3676,6 +3811,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             log(f"phase2: {line}")
         for path, cmd in getattr(git, "last_lockfile_regens", ()):
             log(f"phase2: lockfile regenerated: {path} via {cmd}")
+        _log_snapshot_regens(git, log)
         res.conflict_rung = getattr(git, "last_conflict_rung", "") or None
         res.conflict_fix_summary = getattr(git, "last_conflict_fix_summary", "") or None
         res.retries.update(getattr(git, "conflict_review_retries", {}) or {})
@@ -3716,6 +3852,7 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
             f"manifest={conflict_resolved.manifest_path} "
             f"notes={conflict_resolved.notes_path} "
             f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+        _log_snapshot_regens(git, log)
         for line in audit_lines_for_adaptations(
                 getattr(conflict_resolved, "adapted_lines", ())):
             log(f"phase2: {line}")

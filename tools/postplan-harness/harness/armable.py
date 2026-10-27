@@ -1,15 +1,15 @@
-"""Phase 6.5 — the seventeen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the twenty ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..17} with no gaps: condition (11) shells out to
+now {1..20} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
 probes for already-red CI checks at arm time, condition (16) checks the
 pre-push local meta-check gate, and condition (17) holds when the gate backtest
 flagged clean PRs or could not run.
 
-Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
-bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
+Sole arming authority. Ported from the retired post-plan skill Phase 6.5 (2026-10-19); the skill carries no arming logic.
+Shell halves live in bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
 Bash turn; here the whole AND-of-not-blocked set is one deterministic pass.
 
 Fail-closed: any indeterminate input BLOCKS (a false HOLD costs one manual
@@ -190,6 +190,10 @@ class ArmInputs:
     plan_auto_merge_false: bool
     headless: bool
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
+    # Condition (19) — executable mutation claims (ADR-0199); first defaulted fields, since
+    # a dataclass cannot default a field ahead of the required ones above. None = the step did not run (holds).
+    exec_mutations_holding: Optional[tuple[str, ...]] = None
+    exec_mutations_tree_suspect: bool = True
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
@@ -206,6 +210,7 @@ class ArmInputs:
     gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
     gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
+    removed_guards_holds: Optional[list[str]] = None   # removed_guards.classify_body(body, flagged keys); None = never computed -> BLOCKS
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
@@ -560,5 +565,23 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     md_retried = " after 1 retry" if md == "MISSING" and "merge-danger" in inp.retried_stages else ""
     cs.append(ConditionResult(18, "merge-danger", md_blocked,
                               f"state={md}{md_retried}" if md_blocked else ""))
+
+    # condition (19) — executable mutations: every claimed mutation tripped its check and
+    # the tree was verified byte-identical afterwards. Run-local, fail-closed, additive.
+    xm = inp.exec_mutations_holding
+    xm_blocked = xm is None or bool(xm) or inp.exec_mutations_tree_suspect
+    if xm is None:
+        xm_reason = "executable-mutation step did not run"
+    else:
+        parts = (["tree not verified clean after mutation"] if inp.exec_mutations_tree_suspect
+                 else []) + list(xm)
+        xm_reason = "; ".join(parts)[:300]
+    cs.append(ConditionResult(19, "exec-mutations", xm_blocked, xm_reason if xm_blocked else ""))
+
+    # Condition (20): removed guards. Every flagged removal needs a substantive body Reason.
+    rg = inp.removed_guards_holds
+    rg_blocked = rg is None or len(rg) > 0
+    rg_reason = "state=UNCOMPUTED" if rg is None else "; ".join(rg)
+    cs.append(ConditionResult(20, "removed-guards", rg_blocked, rg_reason if rg_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

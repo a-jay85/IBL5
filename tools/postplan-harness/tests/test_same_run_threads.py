@@ -52,9 +52,9 @@ class _CountingGh(RecordingGh):
         self.thread_id_calls += 1
         return super().pr_thread_ids(pr)
 
-    def trusted_open_threads(self, pr):
+    def trusted_open_threads(self, pr, include_outdated=False):
         self.trusted_calls += 1
-        return super().trusted_open_threads(pr)
+        return super().trusted_open_threads(pr, include_outdated=include_outdated)
 
 
 def _gh(tmp_path, fixture, *, seed=((PATH, BODY),), cls=_CountingGh):
@@ -217,7 +217,7 @@ def test_post_snapshot_failure_acts_on_nothing(tmp_path):
 
 def test_same_run_pass_error_returns_error_and_acts_on_nothing(tmp_path):
     class _BoomGh(_CountingGh):
-        def trusted_open_threads(self, pr):
+        def trusted_open_threads(self, pr, include_outdated=False):
             raise RuntimeError("graphql exploded")
 
     gh = _gh(tmp_path, {"thread_ids": [111, 222], "trusted_threads": [_thread(222)]},

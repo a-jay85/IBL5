@@ -14,7 +14,7 @@
 # the matrix?) — whether Sonnet is *trustworthy* for a given plan's content is
 # still Opus judgment at authoring time.
 #
-# Gates implemented (numbering mirrors .claude/skills/plan/SKILL.md Step 4):
+# Gates implemented (numbering mirrors .claude/skills/plan/_validate-and-write.md Step 4):
 #   1  Matrix exists        — the verification matrix header is present.
 #   3  No false manuals      — a Truly-manual row whose text uses an automatable
 #                              verb (verify / check that / confirm / ensure) is an
@@ -76,6 +76,7 @@
 #                              [K] —
 #                              would all fire spuriously; draft mode exits 0/1 on
 #                              gate D alone.
+#   MP Must preserve section — present and well-formed; required only with --require-must-preserve
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
 #                              (outside fences) must name **Invariant:**,
 #                              **Asserted by:** <path>Test.php, and **Not covered:**,
@@ -258,6 +259,11 @@
 #                              runs must exist at the repo root or under ibl5/,
 #                              or be named in ## Critical Files. Covers
 #                              (one-shot) rows, which gate G skips.
+#   XM Executable mutations  — bin/lib/plan-exec-mutations parse must pass; a
+#                              check: override obeys gate V (gatev_nonrunnable);
+#                              with `## Executable Mutations` present, every
+#                              post-impl CLI row needs a block or a
+#                              (mutation-prose: <reason ≥15>) tag (ADR-0199).
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -288,12 +294,13 @@
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>
+Usage: bin/check-plan [--print-critical-files] [--require-must-preserve] [--draft] <plan-file>
 
 Mechanical lint for /plan output (the Step-4 deterministic gates).
 
   --print-critical-files  Print the parsed critical-files section and exit
   --draft                 Run only gate [D] (phase-count drift) against a draft plan
+  --require-must-preserve  Fail gate [MP] when ## Must preserve is absent (authoring path)
   <plan-file>             Path to the plan file to check
 
 Gate catalogue: the header comment of this file lists every gate letter,
@@ -317,24 +324,29 @@ set -u
 export LC_ALL=C
 
 usage() {
-    echo "Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>" >&2
+    echo "Usage: bin/check-plan [--print-critical-files] [--require-must-preserve] [--draft] <plan-file>" >&2
 }
 
 CF_PRINT_ONLY=0
-if [ "${1:-}" = "--print-critical-files" ]; then
-    CF_PRINT_ONLY=1
-    shift
-fi
-
 # --draft: run ONLY gate [D] (phase-count drift) against an in-progress
 # sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
 # (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
 # [T], [S], [K] — would all fire spuriously; draft mode never reaches them.
 DRAFT_MODE=0
-if [ "${1:-}" = "--draft" ]; then
-    DRAFT_MODE=1
-    shift
-fi
+# --require-must-preserve: gate [MP] fails an absent `## Must preserve`
+# section. Only the authoring paths (bin/plan-now, plan SKILL.md Step 5) pass
+# it; plain runs lint the section only when present (the grandfather rule).
+REQUIRE_MP=0
+# Flags are accepted in any order before <plan-file>.
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --print-critical-files) CF_PRINT_ONLY=1; shift ;;
+        --draft) DRAFT_MODE=1; shift ;;
+        --require-must-preserve) REQUIRE_MP=1; shift ;;
+        --require-must-preserve=*) usage; exit 2 ;;
+        *) break ;;
+    esac
+done
 
 PLAN_FILE="${1:-}"
 if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
@@ -429,6 +441,49 @@ MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
 _LOOKFEEL_LEX='(look|feel|visual|appearance|layout|spacing|alignment|legible|readable|styl|design|renders?|\bui\b|\bux\b)'
 
 mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
+
+# gatev_nonrunnable <cell> — gate V's predicate chain. Prints why the cell is
+# not ONE runnable shell command, or nothing when it is. Shared by gate V and
+# gate [XM]'s check: override so both obey the same rules.
+gatev_nonrunnable() {
+    local MC_LOC="$1" _bad _probe _stripped _bt_ct
+    _bad=""
+    # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
+    # not an elision — mask ranges before testing. Corpus-verified: without this
+    # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
+    # A trailing `path/...` is a Go package wildcard (`go build ./...`), also not
+    # an elision — mask it too. The `(^|space)…/\.\.\.` anchor keys on a `/`
+    # immediately before `...`, so it clears `./...` and `dir/...` but leaves a
+    # genuine path elision (`~/.claude/plans/...`, leading `.../ibl5`) flagged.
+    # Corpus-verified: 16 bare `go build/test/vet ./...` cells were false-flagged.
+    _probe=$(printf '%s' "$MC_LOC" \
+        | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
+        | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
+    # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
+    # Mirror that strip, count what is left: an odd count means a stray
+    # backtick survives into the command (`cmd` trailing prose → cmd` trailing
+    # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
+    _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+    _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
+    if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
+        _bad="a phase/step pointer, not a command"
+    elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
+        _bad="an elided command (ellipsis)"
+    elif printf '%s' "$MC_LOC" | grep -qE '<[A-Za-z_][A-Za-z0-9_./-]*>'; then
+        _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
+    elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
+        _bad="a bare file path with no command verb (reclassify the row, or run it)"
+    elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
+        _bad="bare SQL — wrap it in bin/db-query"
+    elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
+        _bad="prose referring to another row, not a command"
+    elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
+        _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
+    elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
+        _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
+    fi
+    printf '%s' "$_bad"
+}
 
 # matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
 # surrounding backticks stripped, pipes restored) and MC_PIPES (count of
@@ -565,41 +620,7 @@ while IFS= read -r row; do
     # Gate V: a CLI-executable row's location cell must be ONE runnable command.
     # Fires only on CLI-executable rows, so a plan with none passes silently.
     if printf '%s' "$low" | grep -qE 'cli[- ]executable' && matrix_split "$row"; then
-        _bad=""
-        # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
-        # not an elision — mask ranges before testing. Corpus-verified: without this
-        # mask, 2 of 79 flagged cells were valid `git diff origin/master...HEAD`.
-        # A trailing `path/...` is a Go package wildcard (`go build ./...`), also not
-        # an elision — mask it too. The `(^|space)…/\.\.\.` anchor keys on a `/`
-        # immediately before `...`, so it clears `./...` and `dir/...` but leaves a
-        # genuine path elision (`~/.claude/plans/...`, leading `.../ibl5`) flagged.
-        # Corpus-verified: 16 bare `go build/test/vet ./...` cells were false-flagged.
-        _probe=$(printf '%s' "$MC_LOC" \
-            | sed -E 's#[A-Za-z0-9_/@^~.-]+\.\.\.[A-Za-z0-9_/@^~-]+#RANGE#g' \
-            | sed -E 's#(^|[[:space:]])[A-Za-z0-9_./@-]*/\.\.\.#\1WILD#g')
-        # Phase 5.0 strips ONE leading and ONE trailing backtick before `bash -c`.
-        # Mirror that strip, count what is left: an odd count means a stray
-        # backtick survives into the command (`cmd` trailing prose → cmd` trailing
-        # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
-        _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
-        _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
-        if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
-            _bad="a phase/step pointer, not a command"
-        elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
-            _bad="an elided command (ellipsis)"
-        elif printf '%s' "$MC_LOC" | grep -qE '<[A-Za-z_][A-Za-z0-9_./-]*>'; then
-            _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
-        elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
-            _bad="a bare file path with no command verb (reclassify the row, or run it)"
-        elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
-            _bad="bare SQL — wrap it in bin/db-query"
-        elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
-            _bad="prose referring to another row, not a command"
-        elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
-            _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
-        elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
-            _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
-        fi
+        _bad=$(gatev_nonrunnable "$MC_LOC")
         if [ -n "$_bad" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
         elif [ "$MHDR_PIPES" -gt 0 ] && [ "$MC_PIPES" -gt "$MHDR_PIPES" ]; then
@@ -878,6 +899,77 @@ GATEK_RC=$?
 if [ "$GATEK_RC" -eq 1 ]; then
     viol "[K] ${GATEK_MSG}"
 fi
+
+# ---------------------------------------------------------------------------
+# Gate XM: executable mutation claims (ADR-0199).
+# ---------------------------------------------------------------------------
+# Delegates the grammar to bin/lib/plan-exec-mutations, which the /post-plan
+# Phase 5.0 executor and the harness also call (gate-K idiom: rc 1 is the one
+# violation line, rc 2 is a usage error and is ignored). A check: override is
+# held to gate V's predicates. Coverage runs only when the plan carries the
+# `## Executable Mutations` heading outside fences: that is the mechanical
+# "authored after this shipped" test, so every legacy plan is silent.
+# The root is the repo being checked, never the plan's own directory: plans live
+# in $HOME/claude-plans/, which can sit inside an unrelated git repo.
+XM_ROOT="$REPO_ROOT"
+XM_REC="$(mktemp)"
+"$SCRIPT_DIR/lib/plan-exec-mutations" parse --root "$XM_ROOT" "$PLAN_FILE" > "$XM_REC"
+XM_RC=$?
+if [ "$XM_RC" -eq 1 ]; then
+    viol "[XM] $(head -1 "$XM_REC")"
+elif [ "$XM_RC" -eq 0 ]; then
+    XM_ROWS=" "
+    while IFS= read -r -d '' _xm_row && IFS= read -r -d '' _xm_file \
+        && IFS= read -r -d '' _xm_check && IFS= read -r -d '' _xm_match \
+        && IFS= read -r _xm_replace; do
+        XM_ROWS="${XM_ROWS}${_xm_row} "
+        _xm_cell=""
+        while IFS= read -r row; do
+            matrix_split "$row" || continue
+            if [ "$MC_NUM" = "$_xm_row" ]; then
+                _xm_cell=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
+                break
+            fi
+        done < "$GATEP_MATRIX"
+        if [ "$_xm_check" != "$_xm_cell" ]; then
+            _bad=$(gatev_nonrunnable "$_xm_check")
+            [ -z "$_bad" ] || viol "[XM] row ${_xm_row}: check override is not runnable — ${_bad}"
+        fi
+    done < "$XM_REC"
+    if grep -qE '^## Executable Mutations[[:space:]]*$' "$GATEP_BODY"; then
+        while IFS= read -r row; do
+            matrix_split "$row" || continue
+            [ "$MC_NUM" != "#" ] || continue
+            printf '%s' "$MC_TYPE" | grep -qiE 'cli[- ]executable' || continue
+            case "$(printf '%s' "$MC_TIME" | tr '[:upper:]' '[:lower:]')" in post-impl*) : ;; *) continue ;; esac
+            case "$MC_WHAT" in *'(one-time-check:'*) continue ;; esac
+            case "$XM_ROWS" in *" $MC_NUM "*) continue ;; esac
+            if grep -qF '(mutation-prose:' <<< "$MC_WHAT"; then
+                # Text after the tag up to the tag's own closing ")". Nested pairs inside the reason
+                # are kept, so a later "(see row 3)" in the cell cannot pad a short reason.
+                _xm_rest=${MC_WHAT#*'(mutation-prose:'}
+                _xm_reason=""
+                _xm_depth=1
+                while [ -n "$_xm_rest" ]; do
+                    _xm_ch=${_xm_rest:0:1}
+                    _xm_rest=${_xm_rest:1}
+                    case "$_xm_ch" in
+                        '(') _xm_depth=$((_xm_depth + 1)) ;;
+                        ')') _xm_depth=$((_xm_depth - 1)); [ "$_xm_depth" -gt 0 ] || break ;;
+                    esac
+                    _xm_reason="$_xm_reason$_xm_ch"
+                done
+                _xm_reason=$(mtrim "$_xm_reason")
+                if [ "${#_xm_reason}" -lt 15 ]; then
+                    viol "[XM] row ${MC_NUM}: mutation-prose reason too short (need 15 or more characters): ${row}"
+                fi
+                continue
+            fi
+            viol "[XM] row ${MC_NUM} is a post-impl CLI-executable row in an opted-in plan but carries neither a mutation block nor (mutation-prose: <reason ≥15 chars>)"
+        done < "$GATEP_MATRIX"
+    fi
+fi
+rm -f "$XM_REC"
 
 # ---------------------------------------------------------------------------
 # Gate B: Security-Surface Discharge completeness (Step 4 gate 14b release condition).
@@ -1535,6 +1627,154 @@ if [ "$_y_tagged" -gt 0 ] && [ $((_y_tagged * 3)) -gt "$_y_total" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Gate AB: a post-impl CLI-executable row that asserts an absence with a negated
+# grep (`! grep`, `! rg`, `! git grep`) must name a durable in-repo check in its
+# location cell, or end its What-to-verify cell with (one-time-check: <reason>).
+# Post-plan Phase 5.0 runs the cell once and CI never re-runs it, so a later
+# master merge can reintroduce the deleted symbol with no signal (PR #2515:
+# $bgcolor2 was deleted, master grew a reader in News, CI stayed green).
+# Rows come from $GATEP_MATRIX (fence-aware) so a documented example never
+# trips it. Additive by construction: the gate only appends viol lines, shares
+# no state with any other gate, and reads _y_shape from gate Y above.
+# Detector is the narrow negated-grep form only. `grep -c ... = 0` and
+# `test -z "$(grep ...)"` are left alone: the 2026-10-20 corpus sample showed
+# them dominated by diff-hygiene counts and presence-and-absence mixes.
+# Durable means: a command segment outside the negated greps runs a file
+# (bin/test-*, bin/check-*, a test under ibl5/tests/, or a *_test.go) as its
+# command word or as an argument of a test runner. Either the file exists
+# under $REPO_ROOT and contains the longest literal run of one grepped
+# pattern, or ## Critical Files lists it as a change target (the PR writes
+# it, so the file cannot be read at plan time). A bin/ file must also be
+# named in a workflow, or its segment must carry `# (wired in this PR)`.
+# That shows the check plausibly carries the assertion; it cannot show the
+# check asserts absence. A bare runner (`vendor/bin/phpunit --filter X`,
+# `vitest`, `go test`) names no file, so it never counts. A path in an echo
+# or a shell comment does not count. A segment carrying `(one-shot)` is
+# dropped on its own; the rest still count.
+# ---------------------------------------------------------------------------
+_ab_neg='(^|[;(&|])[[:space:]]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_seg_neg='^[[:space:](]*![[:space:]]*(grep|rg|git[[:space:]]+grep)([[:space:]]|$)'
+_ab_durable='^(\./)?(bin/(test|check)-[A-Za-z0-9_.-]+|(ibl5/)?tests/[A-Za-z0-9_./-]+\.(php|ts)|[A-Za-z0-9_./-]*_test\.go)$'
+_ab_runner='^(\./)?(vendor/bin/phpunit|npx|bash|sh|php|go)$'
+_ab_cf="$(cf_parse_section "$PLAN_FILE" 2>/dev/null | sed -n 's/^MUST_APPEAR://p')"
+# _ab_split <cell> — one command segment per line, split on ; & | outside quotes.
+# An unquoted `#` at a word start opens a comment: the rest of the cell stays in
+# the current segment unsplit, so a `;` inside a comment starts no new command.
+_ab_split() {
+    awk '{
+        n = length($0); seg = ""; q = ""
+        for (i = 1; i <= n; i++) {
+            c = substr($0, i, 1)
+            if (q != "") { seg = seg c; if (c == q) q = ""; continue }
+            if (c == "\047" || c == "\"") { q = c; seg = seg c; continue }
+            if (c == "#" && (i == 1 || substr($0, i - 1, 1) ~ /[ \t;&|()]/)) { seg = seg substr($0, i); break }
+            if (c == ";" || c == "&" || c == "|") { print seg; seg = ""; continue }
+            seg = seg c
+        }
+        print seg
+    }' <<< "$1"
+}
+# _ab_cores <negated-grep segment> — print the longest identifier-like run
+# (3+ chars) of each `|` alternative of each pattern the grep searches for.
+# Patterns are the -e / --regexp values, else the first non-option word.
+# Regex escapes (`\b`, `\(`) split runs, and a trailing `$` anchor is dropped.
+# xargs does the shell-style unquoting; an unbalanced quote prints nothing,
+# so the row stays undurable (fail-closed).
+_ab_cores() {
+    _abc_words="$(printf '%s\n' "$1" | xargs -n1 printf '%s\n' 2>/dev/null)" || return 0
+    _abc_pats=""; _abc_first=""; _abc_take=0; _abc_skip=0; _abc_e=0
+    while IFS= read -r _abc_w; do
+        if [ "$_abc_take" = 1 ]; then _abc_pats+="$_abc_w"$'\n'; _abc_take=0; continue; fi
+        if [ "$_abc_skip" = 1 ]; then _abc_skip=0; continue; fi
+        case "$_abc_w" in
+            '!'|'('|'(!'|grep|rg|git) : ;;
+            -e|--regexp) _abc_take=1; _abc_e=1 ;;
+            --regexp=*) _abc_pats+="${_abc_w#--regexp=}"$'\n'; _abc_e=1 ;;
+            -f|-m|-A|-B|-C|-d|-D|-g|-t|-T|-j|-M|--include|--exclude|--exclude-dir|--exclude-from|--glob|--type|--type-not|--max-count|--max-depth|--context|--replace) _abc_skip=1 ;;
+            -[A-Za-z]*e) _abc_take=1; _abc_e=1 ;;
+            -[A-Za-z]*[fmABCdDgtTjM]) _abc_skip=1 ;;
+            -*) : ;;
+            *) [ -n "$_abc_first" ] || _abc_first="$_abc_w" ;;
+        esac
+    done <<< "$_abc_words"
+    [ "$_abc_e" = 1 ] || _abc_pats="$_abc_first"
+    while IFS= read -r _abc_p; do
+        [ -n "$_abc_p" ] || continue
+        _abc_p="${_abc_p//\\|/|}"
+        _abc_p="$(sed -E 's/\\./ /g' <<< "$_abc_p")"
+        while IFS= read -r _abc_alt; do
+            grep -oE '[A-Za-z0-9_$][A-Za-z0-9_$-]{2,}' <<< "$_abc_alt" | sed 's/\$$//' \
+                | awk '{ if (length($0) > length(b)) b = $0 } END { if (length(b) > 2) print b }'
+        done <<< "${_abc_p//|/$'\n'}"
+    done <<< "$_abc_pats"
+}
+# _ab_path_ok <path> <segment> <cores> — 0 when the named file can carry the
+# assertion: listed as a Critical Files change target, or on disk holding a
+# core. A bin/ file must also be wired in a workflow or noted wired in this PR.
+_ab_path_ok() {
+    _abp_p="${1#./}"; _abp_f="$REPO_ROOT/$_abp_p"
+    case "$_abp_p" in
+        tests/*) [ -f "$_abp_f" ] || { _abp_f="$REPO_ROOT/ibl5/$_abp_p"; _abp_p="ibl5/$_abp_p"; } ;;
+        bin/*)
+            case "$2" in
+                *'(wired in this PR)'*) : ;;
+                # Whole-token match with gate [BX]'s left boundary: any path
+                # prefix ending in `/` is allowed (`./`, `../`,
+                # `$GITHUB_WORKSPACE/`), but a longer script name is not.
+                *) _abp_re="$(sed 's/[.]/\\./g' <<< "$_abp_p")"
+                   grep -rqE -- "(^|[^A-Za-z0-9_.-])([^[:space:]\`]*/)?${_abp_re}([^A-Za-z0-9_.-]|\$)" "$REPO_ROOT/.github/workflows" 2>/dev/null || return 1 ;;
+            esac ;;
+    esac
+    grep -qxF -- "$_abp_p" <<< "$_ab_cf" && return 0
+    [ -f "$_abp_f" ] || return 1
+    while IFS= read -r _abp_c; do
+        [ -n "$_abp_c" ] || continue
+        grep -qF -- "$_abp_c" "$_abp_f" && return 0
+    done <<< "$3"
+    return 1
+}
+# _ab_is_durable <cell> — 0 when a segment outside the negated greps runs a
+# file that passes _ab_path_ok.
+_ab_is_durable() {
+    _abd_cores=""; _abd_rest=""
+    while IFS= read -r _abd_seg; do
+        case "$_abd_seg" in *'(one-shot)'*) continue ;; esac
+        if grep -qE "$_ab_seg_neg" <<< "$_abd_seg"; then
+            _abd_cores+="$(_ab_cores "$_abd_seg")"$'\n'
+        else
+            _abd_rest+="$_abd_seg"$'\n'
+        fi
+    done < <(_ab_split "$1")
+    [ -n "${_abd_cores//[[:space:]]/}" ] || return 1
+    while IFS= read -r _abd_seg; do
+        _abd_cmd="${_abd_seg%%#*}"
+        _abd_cmd="${_abd_cmd//[\`()]/ }"
+        read -ra _abd_w <<< "$_abd_cmd"
+        [ "${#_abd_w[@]}" -gt 0 ] || continue
+        if grep -qE "$_ab_durable" <<< "${_abd_w[0]}"; then
+            _ab_path_ok "${_abd_w[0]}" "$_abd_seg" "$_abd_cores" && return 0
+        elif grep -qE "$_ab_runner" <<< "${_abd_w[0]}"; then
+            for _abd_a in "${_abd_w[@]:1}"; do
+                grep -qE "$_ab_durable" <<< "$_abd_a" || continue
+                _ab_path_ok "$_abd_a" "$_abd_seg" "$_abd_cores" && return 0
+            done
+        fi
+    done <<< "$_abd_rest"
+    return 1
+}
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    [ "$MC_NUM" != "#" ] || continue
+    [ "$MC_TYPE" = "CLI-executable" ] || continue
+    # The same Timing test post-plan Phase 5.0 uses to pick the rows it runs.
+    grep -qiE 'post-impl' <<< "$MC_TIME" || continue
+    grep -qE "$_ab_neg" <<< "$MC_LOC" || continue
+    grep -qE "$_y_shape" <<< "${MC_WHAT//$MSEN/|}" && continue
+    _ab_is_durable "$MC_LOC" && continue
+    viol "[AB] matrix row ${MC_NUM} asserts an absence with a plan-only negated grep; post-plan runs the cell once and CI never re-runs it, so a later master merge can bring the deleted symbol back unseen. Point the Test file / location cell at a durable in-repo check that holds the assertion (a test under ibl5/tests/, a bin/test-* harness, or a CI-wired bin/check-* script, named by path in its own command and containing the grepped token), or end the What-to-verify cell with (one-time-check: <reason>) when the absence is not worth a durable check: ${row}"
+done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
 # Gate Z: an untagged CLI-executable row whose command runs only outside the repo
 # or against a post-PR CI run. Two arms, checked in order:
 #  (1) ~/, $HOME, /tmp, or gh run|pr|api. A row that also runs a repo path or a
@@ -1588,31 +1828,70 @@ done < "$MATRIX_FILE"
 #  (2) a bare word equal to the stem of a tracked *-snapshots/*.png: it never enters
 #      arm 2c, and arm 3 saves it only when git grep finds it in tracked text, so it is
 #      rejected only when that grep finds nothing.
+#  (3) a bare :<digits> or :<digits>-<digits> token with no path: it names no file, so it
+#      is rejected unless git grep over the whole repo finds it in tracked text, which
+#      is where the helper's tree arm would find it.
 # Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
-# skipped, as the helper skips it. Text from the first `Mutation:` label on is ignored,
-# mirroring the helper's blanking (it under-rejects; accepted). A `name=value` token is
+# skipped, as the helper skips it. The whole cell goes through _mt_blank_clauses,
+# which picks Mutation labels with the helper's own regex (`Mutation:` or `mutation:`
+# after a non-letter, optional bold) and blanks each clause up to its first arrow or
+# sentence end. Text before the first label and after each closer is scanned. A
+# `name=value` token is
 # cut at `=`, as the helper cuts it. CHECK_PLAN_MT_GIT_ROOT is a test seam naming the
 # repo whose snapshots and tracked text rule (2) reads; unset or empty means $REPO_ROOT.
 # Outside a git repo the snapshot list is empty and rule (2) is skipped; rule (1) needs
-# no git and always runs.
+# no git and always runs; rule (3) rejects when git grep fails outside a repo.
 # ---------------------------------------------------------------------------
 _mt_root="${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}"
 _mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?$'
+_mt_bare_line_re='^:[0-9]+(-[0-9]+)?$'
 _mt_host_ext_re='^(localhost|local|test|com|net|org|io|dev)$'
 _mt_stem_re='^[A-Za-z0-9_-]+$'
+# Blank each Mutation clause the way bin/lib/plan-matrix-assertions does (keep this
+# awk in step with its Mutation-clause loop): from a Mutation label to its first
+# arrow, or a period plus space, or the end, outside backtick spans. The label, the
+# closer and the text after the closer stay. LC_ALL=C keeps the multibyte arrows
+# byte-wise on BSD and GNU awk, as the helper does.
+_mt_blank_clauses() {
+    LC_ALL=C awk '{
+        chk = ""; rest = $0;
+        while (match(rest, /(^|[^A-Za-z])(\*\*)?[Mm]utation:(\*\*)?/)) {
+            chk = chk substr(rest, 1, RSTART + RLENGTH - 1) " ";
+            body = substr(rest, RSTART + RLENGTH);
+            L = length(body); tick = 0; stop = L;
+            for (k = 1; k <= L; k++) {
+                c = substr(body, k, 1);
+                if (c == "`") { tick = !tick; continue; }
+                if (tick) continue;
+                if (substr(body, k, 3) == "⇒" || substr(body, k, 3) == "→") { stop = k - 1; break; }
+                if (substr(body, k, 2) == "=>" || substr(body, k, 2) == "->") { stop = k - 1; break; }
+                if (c == "." && (k == L || substr(body, k + 1, 1) == " ")) { stop = k - 1; break; }
+            }
+            rest = substr(body, stop + 1);
+        }
+        print chk rest
+    }'
+}
 _mt_snaps=$(git -C "$_mt_root" ls-files 2>/dev/null | grep -E -- '-snapshots/.*\.png$' || true)
 while IFS= read -r row; do
     matrix_split "$row" || continue
     [ "$MC_NUM" != "#" ] || continue
     _mt_what="${MC_WHAT//$MSEN/|}"
     grep -qE "$_y_shape" <<< "$_mt_what" && continue
-    _mt_what="${_mt_what%%Mutation:*}"
+    # One pass of the helper's own blanker over the whole cell: the awk picks every
+    # Mutation label, so no second label rule lives here to disagree with it.
+    _mt_what="$(_mt_blank_clauses <<< "$_mt_what")"
     while IFS= read -r _mt_tok; do
         _mt_tok="${_mt_tok#\`}"; _mt_tok="${_mt_tok%\`}"; _mt_tok="${_mt_tok%%=*}"
         [ -n "$_mt_tok" ] || continue
         if [[ "$_mt_tok" =~ $_mt_line_re ]]; then
             [[ "${BASH_REMATCH[1]}" =~ $_mt_host_ext_re ]] && continue
             viol "[MT] matrix token \`${_mt_tok}\` ends in a :LINE suffix; bin/lib/plan-matrix-assertions matches only a whole path or a /-aligned path suffix, so the row stays UNREALISED and Step 6.7 stops. Cite the bare path \`${_mt_tok%:*}\` and put the line number in prose outside backticks: ${row}"
+            continue
+        fi
+        if [[ "$_mt_tok" =~ $_mt_bare_line_re ]]; then
+            git -C "$_mt_root" grep -qF -e "$_mt_tok" -- ':/' 2>/dev/null && continue
+            viol "[MT] matrix token \`${_mt_tok}\` is a bare :LINE reference with no path; it is in no tracked text and a correct diff never adds it, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Write the line number in prose outside backticks and backtick the file path instead: ${row}"
             continue
         fi
         [ -n "$_mt_snaps" ] || continue
@@ -1627,7 +1906,7 @@ done < "$GATEP_MATRIX"
 # ---------------------------------------------------------------------------
 # Gate MU: a What-to-verify backtick token that bin/lib/plan-matrix-assertions
 # reports missing against the current tree and that a correct diff never adds, so
-# Step 6.7 stops with UNREALISED-ASSERTION after implementation. Two shapes:
+# Step 6.7 stops with UNREALISED-ASSERTION after implementation. Four shapes:
 #  (a) a PHPStan error identifier (a category, a dot, then a name): the first
 #      segment is a PHPStan identifier category. It names tool output, lives in no
 #      tracked file, and only a baseline entry or an @phpstan-ignore line would ever
@@ -1635,6 +1914,17 @@ done < "$GATEP_MATRIX"
 #  (b) a directory token (trailing slash) with no tracked file beneath it: arm 2c
 #      matches files only and arm 2b needs a deletion, so a new directory is realised
 #      only when a tracked or added line names it literally.
+#  (c) a scratch-file token under a system temp directory: the tmp directory at the
+#      root, the macOS per-user temp tree under var/folders, or either one under the
+#      private prefix macOS resolves them to. No tracked file holds it, and only a
+#      diff that commits a script writing that exact path would realise it, so the
+#      row should cite that script or command instead.
+#  (d) a token holding a brace placeholder (an identifier, optionally plus a number,
+#      in braces, with no dollar sign right before the opening brace): a diff carries
+#      the expanded name, never the template. Shell and PHP interpolation stay silent.
+#      A token that also sits inside a fenced code block of the plan stays silent too:
+#      the phases show the diff carrying the template literally (a route pattern, a
+#      docblock path, a format string), so the helper would find it on an added line.
 # The tokens come from the helper itself: it runs on the plan with an EMPTY diff and
 # MATRIX_ASSERT_ROOT set to the toplevel, so fence skipping, duplicate-id skipping,
 # the one-time-check tag, Mutation-clause blanking and the name=value cut are the
@@ -1652,7 +1942,9 @@ _mu_id_re="^(${_mu_cats})\.[a-z][A-Za-z]*(\.[a-z][A-Za-z]*)*\$"
 # a common extension, or the extension of any tracked file.
 _mu_ext_re='\.(php|phtml|ts|tsx|js|jsx|mjs|cjs|json|jsonl|md|txt|yml|yaml|sh|py|css|scss|html|neon|xml|sql|lock|toml|ini|csv|tsv|go|rb|svg|png|log|env|dist)$'
 _mu_dir_re='^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*/$'
-_mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/)`'
+_mu_tmp_re='^/(private/)?(tmp|var/folders)/.'
+_mu_tmpl_re='(^|[^$])[{][A-Za-z_][A-Za-z0-9_]*([+][0-9]+)?[}]'
+_mu_cand_re='`(('"${_mu_cats}"')\.[a-z][A-Za-z.]*|[A-Za-z0-9_./-]+/|/(private/)?(tmp|var/folders)/[^`[:space:]]+|[^`[:space:]]*[{][A-Za-z_][A-Za-z0-9_]*([+][0-9]+)?[}][^`[:space:]]*)`'
 _mu_helper="$SCRIPT_DIR/lib/plan-matrix-assertions"
 _mu_root="$(git -C "${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}" rev-parse --show-toplevel 2>/dev/null)" || _mu_root=""
 if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_FILE"; then
@@ -1660,6 +1952,9 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_
     _mu_out="$(MATRIX_ASSERT_ROOT="$_mu_root" "$_mu_helper" "$PLAN_FILE" "$_mu_empty" 2>&1)" || true
     rm -f "$_mu_empty"
     _mu_files="$(git -C "$_mu_root" ls-files 2>/dev/null || true)"
+    # Text inside the plan's fenced code blocks (backtick or tilde fences), for the
+    # brace-template exemption.
+    _mu_fenced="$(awk '/^[[:space:]]*(```|~~~)/ { f = !f; next } f' "$PLAN_FILE")"
     _mu_exts="|$(sed -n 's/.*\.\([A-Za-z][A-Za-z]*\)$/\1/p' <<< "$_mu_files" | sort -u | tr '\n' '|')"
     _mu_is_file_name() {
         [[ "$1" =~ $_mu_ext_re ]] && return 0
@@ -1702,6 +1997,14 @@ if [ -n "$_mu_root" ] && [ -x "$_mu_helper" ] && grep -qE "$_mu_cand_re" "$PLAN_
         for _mu_tok in "${_mu_toks[@]}"; do
             if [[ "$_mu_tok" =~ $_mu_id_re ]] && ! _mu_is_file_name "$_mu_tok"; then
                 viol "[MU] matrix token \`${_mu_tok}\` is a PHPStan error identifier that appears only in tool output: it is in no tracked file and a correct diff never adds it, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Put the identifier in prose outside backticks and backtick the test name or the file the diff carries instead (a baseline entry or @phpstan-ignore line the diff adds is cited by its file path): ${row}"
+                continue
+            fi
+            if [[ "$_mu_tok" =~ $_mu_tmp_re ]]; then
+                viol "[MU] matrix token \`${_mu_tok}\` names a scratch file under a system temp directory: no tracked file holds it, and bin/lib/plan-matrix-assertions realises it only when a committed line writes that exact path, so the row stays UNREALISED and Step 6.7 stops. Write the scratch name outside backticks and backtick the command, test or file the diff carries instead: ${row}"
+                continue
+            fi
+            if [[ "$_mu_tok" =~ $_mu_tmpl_re ]] && ! grep -qF -- "$_mu_tok" <<< "$_mu_fenced"; then
+                viol "[MU] matrix token \`${_mu_tok}\` holds a brace template placeholder: the diff carries the expanded names, never the template, so bin/lib/plan-matrix-assertions reports the row UNREALISED and Step 6.7 stops. Write the template outside backticks and backtick each expanded name the diff carries instead: ${row}"
                 continue
             fi
             if [[ "$_mu_tok" =~ $_mu_dir_re ]]; then
@@ -1776,7 +2079,16 @@ while IFS= read -r row; do
         [ "$_bx_tok" != "bin/" ] || continue
         [ -e "$REPO_ROOT/$_bx_tok" ] && continue
         [ -e "$REPO_ROOT/ibl5/$_bx_tok" ] && continue
-        grep -qF -- "$_bx_tok" <<< "$CF_SECTION" && continue
+        # Whole-token match: a listed script whose name merely starts with the
+        # missing script's name must not excuse it.
+        # Not preceded by a path char; followed by end/non-path char, or a `.` that
+        # itself ends the token (sentence period), so a backticked name followed by
+        # "(new)" still counts.
+        # Any path prefix ending in `/` is allowed, so an ibl5/ prefix, a `./` prefix,
+        # and an absolute worktree path all excuse the token.
+        _bx_esc="${_bx_tok//./\\.}"
+        _bx_left='(^|[^A-Za-z0-9_.-])([^[:space:]`]*/)?'
+        grep -qE -- "${_bx_left}${_bx_esc}(\\.?\$|\\.?[^A-Za-z0-9_./-])" <<< "$CF_SECTION" && continue
         viol "[BX] matrix row runs $_bx_tok, which does not exist at the repo root or under ibl5/ and is not named in ## Critical Files — fix the path, or list the script in ## Critical Files if this plan creates it: ${row}"
     done < <(grep -oE "$_bx_tok_re" <<< "$cell" || true)
 done < "$MATRIX_FILE"
@@ -2494,6 +2806,27 @@ if [ -n "$_u_bad" ]; then
     while IFS= read -r _u_line; do
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
+fi
+
+# Gate [MP]: `## Must preserve` grammar. bin/lib/deleted-guards --lint-plan is
+# the single grammar owner (the detector reads `### Intended removals` through
+# the same parser), so this gate only relays its MP-VIOLATION lines. Absent
+# section: fails only under --require-must-preserve. A lint crash fails closed.
+_mp_args=(--lint-plan "$PLAN_FILE")
+if [ "$REQUIRE_MP" -eq 1 ]; then _mp_args+=(--require); fi
+_mp_rc=0
+_mp_out=$("$SCRIPT_DIR/lib/deleted-guards" "${_mp_args[@]}" 2>&1) || _mp_rc=$?
+if [ "$_mp_rc" -eq 0 ] || [ "$_mp_rc" -eq 1 ]; then
+    while IFS= read -r _mp_line; do
+        case "$_mp_line" in
+            "MP-VIOLATION: "*) viol "[MP] ${_mp_line#MP-VIOLATION: }" ;;
+        esac
+    done <<< "$_mp_out"
+    if [ "$_mp_rc" -eq 1 ] && ! grep -q '^MP-VIOLATION: ' <<< "$_mp_out"; then
+        viol "[MP] bin/lib/deleted-guards --lint-plan failed (exit 1 with no violation line)"
+    fi
+else
+    viol "[MP] bin/lib/deleted-guards --lint-plan failed (exit $_mp_rc)"
 fi
 
 # ---------------------------------------------------------------------------

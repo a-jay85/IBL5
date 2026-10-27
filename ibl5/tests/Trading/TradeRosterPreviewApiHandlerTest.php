@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use Tests\Support\GoldenSnapshotTrait;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Trading\Contracts\TradeAssetRepositoryInterface;
@@ -15,6 +16,8 @@ use Trading\TradeRosterPreviewCashRowBuilder;
 
 class TradeRosterPreviewApiHandlerTest extends TestCase
 {
+    use GoldenSnapshotTrait;
+
     private MockDatabase $mockDb;
     private TradeAssetRepositoryInterface $stubTradeAssetRepo;
 
@@ -460,23 +463,6 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $this->assertIsString($decoded['html']);
 
         return $decoded['html'];
-    }
-
-    private function assertSnapshotMatches(string $actual, string $snapshotFile): void
-    {
-        if (!is_dir(__DIR__ . '/__snapshots__')) {
-            mkdir(__DIR__ . '/__snapshots__');
-        }
-        $snapshotPath = __DIR__ . '/__snapshots__/' . $snapshotFile;
-
-        if (!file_exists($snapshotPath)) {
-            file_put_contents($snapshotPath, $actual);
-            $this->assertFileExists($snapshotPath);
-            return;
-        }
-
-        $expected = file_get_contents($snapshotPath);
-        $this->assertSame($expected, $actual, "Snapshot mismatch for {$snapshotFile}. Delete the snapshot file to regenerate.");
     }
 
     public function testHandleRatingsSuccessPathMatchesSnapshot(): void

@@ -1,0 +1,50 @@
+Let bin/docfix-check-veronly arm auto-merge when .claude/**, CLAUDE.md, or AGENTS.md files change only by a strictly-advancing last_verified date bump
+
+## Exploration pointers
+
+- `bin/docfix-check-veronly` Step 2.4 "Name-status gate" (comment near line 141-146): allowlist is `ibl5/docs/**` or depth-one `ibl5/classes/*/README.md`; agent-steering files (`.claude/**`, `CLAUDE.md`, `AGENTS.md`) fall to the catch-all and HOLD with `path outside docfix allowlist: '<path>'`. Later steps in the same script hold the content predicate (date bump strictly advancing + optional same-line numeric-only edits).
+- `bin/docfix-run`: seeds the `auto_merge: false` hold plan and embeds `$PROMPT`, which tells the headless agent the allowlist and says "Any `.claude/` file, `CLAUDE.md`, or `AGENTS.md` in the diff holds the plan even when its own change is a date bump." Also defines `$TODAY`.
+- `bin/test-docfix-run`: Cases 66-70 from PR #2398 — 67 HOLD on `.claude/rules`, 68a/68b mixed allowed+disallowed diff in both row orders, 69 `CLAUDE.md`, 70 README outside `ibl5/classes/`.
+- PR #2398 (commit 9719c9eb9, "widen veronly allowlist to cover class READMEs"): the pattern to copy — script change + prompt update + test cases + `## Addendum` on ADR-0104 + ADR-0086 cross-ref update.
+- PR #2064 (4f77b7c4d): added the numeric-count/version-bump same-line allowance.
+- PR #2559 (branch docs-stale-refresh-20260929): the live trigger. Diff = date-only bumps on `.claude/rules/environment.md` and ADR-0036. Rerunning the helper gives `HOLD — path outside docfix allowlist: '.claude/rules/environment.md'`.
+
+## Resolved design decisions
+
+- Add a second, stricter tier for agent-steering files: `.claude/**`, `CLAUDE.md`, `AGENTS.md` PASS only when the file's whole diff is exactly one `-`/`+` pair on the frontmatter `last_verified:` line, strictly advancing. Any other change in those files (including numeric-only same-line swaps, `paths:` glob edits, body text) still HOLDs.
+- `ibl5/docs/**` and `ibl5/classes/*/README.md` rules are unchanged.
+- Status must still be exactly `M`. Adds/deletes/renames still HOLD. Every other path still HOLDs.
+- Rationale: a date-only bump changes no agent behavior, and the nightly audit keeps flagging `.claude/rules/*` files, so each one otherwise needs a human merge.
+- Do not touch Phase 6.5 arming conditions or post-plan; only the helper's predicate changes.
+
+## Scope
+
+1. `bin/docfix-check-veronly`: implement the stricter tier and update the Step 2.4 comment and `--help` text.
+2. `bin/docfix-run`: update `$PROMPT` so it states the new rule accurately.
+3. `bin/test-docfix-run`: date-only `.claude/rules/*.md` → PASS; `.claude` file with numeric same-line swap → HOLD; `.claude` with body change → HOLD; `CLAUDE.md` / `AGENTS.md` date-only → PASS and with other edit → HOLD; mixed diff (allowed doc + `.claude` date-only) → PASS in both row orders; mixed diff where the `.claude` file has more than a date bump → HOLD in both orders; non-advancing or equal date in a `.claude` file → HOLD. Rework cases 67/68a/68b/69 accordingly; keep every other existing case passing.
+4. ADR-0104 `## Addendum — <topic> (<local date>)`, matching #2398's style; update ADR-0086 cross-ref only if it restates the allowlist. Bump `last_verified` on edited docs.
+5. Only if `bin/docfix-run` computes `$TODAY` in UTC (check first): switch it to local date. PR #2559's reviewer saw `last_verified: 2026-09-30` written at 21:05 PDT on 2026-09-29, and `.claude/rules/doc-freshness.md` requires local date. If `$TODAY` is already local, the UTC date came from the agent or `bin/check-docs --fix-dates`; find which and fix at that source, or drop the item and say why.
+
+Out of scope: merging or editing PR #2559; changing `bin/check-docs` future-date logic unless item 5 lands there; widening numeric edits to `.claude` files.
+
+## Hard constraints
+
+- Fail-closed: any doubt holds. Empty diff still HOLDs.
+- This is a gate weakening of ship-pipeline arming machinery and it governs auto-merge of docfix PRs. Plan `auto_merge: false` with an Automouse Hold Justification.
+- Title type `chore:`.
+
+## Blocking questions to resolve inside the plan
+
+- Does the existing content predicate already isolate "exactly one -/+ pair on `last_verified:`" as a reusable check, or is the numeric-swap allowance interleaved so the stricter tier needs its own branch? Read the script and decide.
+- Is the `last_verified:` line in `.claude/rules/*.md` frontmatter shaped the same as in `ibl5/docs/` (so one regex serves both)?
+
+## Verification
+
+- `bin/test-docfix-run` passes with the new and reworked cases, and each new PASS case would HOLD on current master (show the red-then-green).
+- Replay PR #2559's diff shape in a test (date-only `.claude/rules/environment.md` + date-only ADR) → PASS.
+- `bin/check-docs` and shellcheck (bash 3.2 compat) clean on touched scripts.
+
+
+## Sequencing
+
+Slug `docfix-veronly-claude-date-bumps`, base `master`. No peer sessions own these files.

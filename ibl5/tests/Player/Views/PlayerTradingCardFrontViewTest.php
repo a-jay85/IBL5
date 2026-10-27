@@ -7,10 +7,11 @@ namespace Tests\Player\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
 use Player\Views\PlayerTradingCardFrontView;
+use Tests\Support\GoldenSnapshotTrait;
 /** @covers \Player\Views\PlayerTradingCardFrontView */
 class PlayerTradingCardFrontViewTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     /**
      * Build a Player stub with every getter called by PlayerTradingCardFrontView::render()

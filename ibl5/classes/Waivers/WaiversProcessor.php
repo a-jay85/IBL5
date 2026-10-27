@@ -9,6 +9,7 @@ use Player\Player;
 use Player\Contract\PlayerContractCalculator;
 use Season\Season;
 use Player\PlayerDataConverter;
+use Player\PlayerData;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversRepositoryInterface;
 use Waivers\Contracts\WaiversValidatorInterface;
@@ -115,8 +116,20 @@ class WaiversProcessor implements WaiversProcessorInterface
      */
     public function determineContractData(array $playerData, Season $season): array
     {
-        $playerDataObj = PlayerDataConverter::arrayToPlayerData($playerData);
+        return $this->determineContractDataFromPlayer(
+            PlayerDataConverter::arrayToPlayerData($playerData),
+            $season
+        );
+    }
 
+    /**
+     * DTO-based worker for determineContractData(); processAdd() calls this
+     * directly so one conversion serves the contract salary and the veteran minimum.
+     *
+     * @return array{hasExistingContract: bool, salary: int}
+     */
+    private function determineContractDataFromPlayer(PlayerData $playerDataObj, Season $season): array
+    {
         if ($season->isOffseasonPhase()) {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
         } else {
@@ -132,7 +145,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             ];
         }
 
-        $vetMinSalary = $this->resolveVeteranMinimum($playerData, $season);
+        $vetMinSalary = $this->resolveVeteranMinimum($playerDataObj, $season);
 
         return [
             'hasExistingContract' => false,
@@ -143,22 +156,18 @@ class WaiversProcessor implements WaiversProcessorInterface
     /**
      * Single source for the veteran minimum, shared by the signed contract
      * (determineContractData) and the validator's over-cap check (processAdd).
-     *
-     * @param PlayerRow $playerData
      */
-    private function resolveVeteranMinimum(array $playerData, Season $season): int
+    private function resolveVeteranMinimum(PlayerData $playerDataObj, Season $season): int
     {
-        return $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerData, $season));
+        return $this->calculateVeteranMinimumSalary($this->resolveContractExperience($playerDataObj, $season));
     }
 
     /**
      * Experience used for contract math: one extra year during the offseason phase.
-     *
-     * @param PlayerRow $playerData
      */
-    private function resolveContractExperience(array $playerData, Season $season): int
+    private function resolveContractExperience(PlayerData $playerDataObj, Season $season): int
     {
-        $yearsOfExperience = PlayerDataConverter::arrayToPlayerData($playerData)->yearsOfExperience ?? 0;
+        $yearsOfExperience = $playerDataObj->yearsOfExperience ?? 0;
         return $season->isOffseasonPhase() ? $yearsOfExperience + 1 : $yearsOfExperience;
     }
 
@@ -226,11 +235,11 @@ class WaiversProcessor implements WaiversProcessorInterface
         }
 
         $season = $this->season ?? \Season\SharedSeason::get($this->db);
-        /** @var array{hasExistingContract: bool, salary: int} $contractData */
-        $contractData = $this->determineContractData($player, $season);
+        $playerDataObj = PlayerDataConverter::arrayToPlayerData($player);
+        $contractData = $this->determineContractDataFromPlayer($playerDataObj, $season);
         $playerSalary = $contractData['salary'];
 
-        $veteranMinimum = $this->resolveVeteranMinimum($player, $season);
+        $veteranMinimum = $this->resolveVeteranMinimum($playerDataObj, $season);
 
         $addValidation = $this->validator->validateAdd(
             $playerID,

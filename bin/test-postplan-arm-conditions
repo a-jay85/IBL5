@@ -1,22 +1,16 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-postplan-arm-conditions — regression guard for the /post-plan blocks
-# that must survive being run in their own shell — the Phase 6.5 auto-merge
-# conditions and the Phase 6 body-marker preservation blocks (L20: a body
-# rewrite that drops `Depends-on:` silently disarms condition (6)).
-# Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
-# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings, (13) slug-drift hold), plus
-# condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
+# bin/test-postplan-arm-conditions — regression guard for the fallback /post-plan skill
+# and the shared arming predicates it no longer carries.
 #
-# Why this exists: those blocks live as separate ```bash blocks inside
-# _phase-6.5-arm-auto-merge.md and SKILL.md, and the orchestrator runs each
-# block in its OWN shell after Reading those files. A block that relied on a
-# hoisted `source` or a shared `PR_JSON` from a preamble would have an UNDEFINED
-# predicate function — and for condition (8) that fails OPEN (no BLOCKED line
-# emitted → a feat: PR auto-arms). This test runs each block in an
-# isolated `bash -c` against a gh shim and asserts the holds, plus a structural
-# check that every predicate-using block re-`source`s the lib itself.
+# The compiled harness (tools/postplan-harness) owns arming; its pytest suite covers
+# conditions 1-18, Phase 5.0 conformance, and the Phase 2/6/7 flows. What stays here:
+#   - the shared predicates in bin/lib/pr-armable.sh (exit-status invariant, Manual-Testing
+#     clearance), plus the bin/pr-triage merge-state allowlist and clearance wiring;
+#   - bin/lib/critical-files.sh and bin/lib/plan-scope-conformance, driven directly;
+#   - the Phase 5.5 fidelity blocks in _phase-5.5-fidelity.md and the /plan SKILL.md pins;
+#   - a guard that the fallback skill (.claude/skills/post-plan) carries no arming logic.
 #
 # Run: bin/test-postplan-arm-conditions  (exit 0 = all pass, 1 = a case failed)
 
@@ -24,12 +18,9 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
-P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
-PP7="$REPO_ROOT/.claude/skills/post-plan/_phase-7-ci-monitoring.md"
 P55_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5.5-fidelity.md"
-P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
-PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
+PLAN_VALIDATE="$REPO_ROOT/.claude/skills/plan/_validate-and-write.md"
+PLAN_HOLD="$REPO_ROOT/.claude/skills/plan/_hold-and-remediation.md"
 
 BASE_TMP="$(mktemp -d)"
 trap 'rm -rf "$BASE_TMP"' EXIT
@@ -105,105 +96,15 @@ chmod +x "$SHIMD/gh"
 # extract_block <literal-marker> [file] — print the first ```bash fenced block
 # whose body contains the literal marker substring (e.g. "# condition (8)").
 # Uses index() (literal), not regex, so the parens in the marker are matched
-# verbatim. File defaults to $SKILL when omitted.
+# verbatim. The file argument is required.
 extract_block() {
     awk -v want="$1" '
         /^```bash$/ { inb=1; buf=""; next }
         /^```$/     { if (inb && index(buf, want) > 0) { printf "%s", buf } ; inb=0; next }
         inb         { buf = buf $0 "\n" }
-    ' "${2:-$SKILL}"
+    ' "$2"
 }
 
-# run_isolated <block> <fixture-json> <golden_changed> <headless> — run the block
-# in its OWN fresh shell (the failure model) and echo its stdout.
-run_isolated() {
-    printf '%s' "$2" > "$BASE_TMP/fixture.json"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        GOLDEN_CHANGED="$3" CLAUDE_HEADLESS="$4" \
-        bash -c "$1" 2>&1
-}
-
-# harness_handoff_names — echo "<done-basename> <bridge-basename>" exactly as the
-# compiled harness spells them in its run dir. DERIVED, never hardcoded: this is the
-# shell half of the cross-language name binding whose Python half is
-# tools/postplan-harness/tests/test_post_plan_now_fallback.py. Hardcoding the two
-# names here would let a rename pass this suite while breaking the live contract.
-# Source moved in Phase 8: bin/post-plan-now's rc=4 RESUME_SEG spelled them until the
-# resume arm was deleted, and runner.py's two constants are now the only spelling.
-harness_handoff_names() {
-    local d b
-    d="$(grep -m1 -oE 'CONFORMANCE_DONE_NAME = "[A-Za-z0-9._-]+' \
-         "$REPO_ROOT/tools/postplan-harness/runner.py")"
-    b="$(grep -m1 -oE 'CONFORMANCE_BRIDGE_NAME = "[A-Za-z0-9._-]+' \
-         "$REPO_ROOT/tools/postplan-harness/runner.py")"
-    printf '%s %s\n' "${d##*\"}" "${b##*\"}"
-}
-
-# run_cond3 <block> <marker: yes|no> <bridge: absent|empty|items|fileitems> [style: flat|rundir]
-# — condition (3) reads file state rather than gh, so it gets its own runner: the
-# block's $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
-# style=flat (default) uses arbitrary names; style=rundir reproduces the compiled
-# harness's run dir, using the basenames runner.py actually writes.
-run_cond3() {
-    local mark="$BASE_TMP/done-marker" bridge="$BASE_TMP/bridge"
-    if [ "${4:-flat}" = "rundir" ]; then
-        local dn bn rd
-        read -r dn bn <<< "$(harness_handoff_names)"
-        if [ -z "$dn" ] || [ -z "$bn" ]; then
-            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from tools/postplan-harness/runner.py"
-            FAILED=1
-            return 1
-        fi
-        rd="$BASE_TMP/live-slug-ts"
-        mkdir -p "$rd"
-        mark="$rd/$dn"
-        bridge="$rd/$bn"
-    fi
-    rm -f "$mark" "$bridge"
-    [ "$2" = "yes" ] && touch "$mark"
-    case "$3" in
-        empty) : > "$bridge" ;;
-        items) echo 'MISSING: ibl5/tests/FooTest.php (matrix planned a test the diff never wrote)' > "$bridge" ;;
-        fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
-        phaseitems) echo 'MISSING-PHASE: 2 — Foo (phase cites harness/b.py; none appeared in the diff)' > "$bridge" ;;
-    esac
-    DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
-}
-
-# run_cond7 <block> <plan-body|""> — run condition (7) in its own shell.
-# Sets PLAN_FILE to a temp file (if plan-body non-empty) or unsets it (no plan -> no hold).
-# Also sets PLAN_DIR to an empty temp dir when plan-body is empty, so resolve_plan_file
-# cannot find the real branch plan file and silently return BLOCKED.
-run_cond7() {
-    local plan_f="$BASE_TMP/c7-plan.md"
-    local empty_dir="$BASE_TMP/c7-empty-plans"
-    mkdir -p "$empty_dir"
-    rm -f "$plan_f"
-    if [ -n "$2" ]; then
-        printf '%s' "$2" > "$plan_f"
-        PLAN_DIR="$empty_dir" PLAN_FILE="$plan_f" bash -c "$1" 2>&1
-    else
-        PLAN_FILE="" PLAN_DIR="$empty_dir" bash -c "$1" 2>&1
-    fi
-}
-
-# run_cond13 <block> <slug> <plan-dir> — run condition (13) in its own shell.
-# PLAN_DIR and PLAN_SLUG are the test seams; the block calls resolve_plan_file.
-run_cond13() {
-    PLAN_DIR="$3" PLAN_SLUG="$2" bash -c "$1" 2>&1
-}
-
-run_cond12() {
-    local vf="$BASE_TMP/fidelity-verdict.md"
-    local vf2="$BASE_TMP/fidelity-verdict-2.md"
-    mk_verdict_fixture "$2" "$vf"
-    rm -f "$vf2"
-    [ -n "${3:-}" ] && mk_verdict_fixture "$3" "$vf2"
-    [ -n "${4:-}" ] && printf 'REVIEWED_TREE=%s\n' "$4" >> "$vf2"
-    printf '{"number":2100}' > "$BASE_TMP/fixture.json"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        FIDELITY_VERDICT_FILE="$vf" FIDELITY_VERDICT_FILE_2="$vf2" bash -c "$1" 2>&1
-}
 run_p55() {
     local vf="$BASE_TMP/p55-verdict.md"
     mk_verdict_fixture "$2" "$vf"
@@ -310,36 +211,12 @@ expect_fidelity() {
     fi
 }
 
-expect_warn() { # name  WARN|NOWARN  output
-    local got_warn=0
-    [[ "$3" == *WARNING* ]] && got_warn=1
-    if { [ "$2" = "WARN" ] && [ "$got_warn" -eq 1 ]; } \
-        || { [ "$2" = "NOWARN" ] && [ "$got_warn" -eq 0 ]; }; then
-        echo "ok: $1"
-    else
-        echo "FAIL: $1 — expected $2, got: '$3'"
-        FAILED=1
-    fi
-}
-
-expect_block() { # name  BLOCK|NONE  output
-    local got_block=0
-    [[ "$3" == *BLOCKED* ]] && got_block=1
-    if { [ "$2" = "BLOCK" ] && [ "$got_block" -eq 1 ]; } \
-        || { [ "$2" = "NONE" ] && [ "$got_block" -eq 0 ]; }; then
-        echo "ok: $1"
-    else
-        echo "FAIL: $1 — expected $2, got: '$3'"
-        FAILED=1
-    fi
-}
-
 # expect_rc0 <name> <predicate call> — assert a pr-armable.sh predicate exits 0 on
 # its CLEAR path (found nothing to hold).
 #
-# Why this is separate from the expect_block cases above: the Phase 6.5 blocks PIPE
-# the predicate (`pr_dep_holds ... | while read`), which DISCARDS its exit status —
-# so every one of those cases passes against a predicate that returns 1. bin/pr-triage
+# Why a dedicated runner: the harness-retired Phase 6.5 blocks PIPE the predicate
+# (`pr_dep_holds ... | while read`), which DISCARDS its exit status, so a block-driven
+# case passes against a predicate that returns 1. bin/pr-triage
 # is the caller that cares: it CAPTURES the predicate (`deps="$(pr_dep_holds ...)"`)
 # under `set -euo pipefail`, where a nonzero rc aborts the whole cross-PR sweep
 # mid-loop. pr_dep_holds did exactly that from its introduction until 2026-08-22 (a
@@ -386,107 +263,6 @@ expect_mss() { # name  mss  block|arm
     fi
 }
 
-assert_self_contained() { # marker name
-    local block; block="$(extract_block "$1")"
-    if [ -z "$block" ]; then
-        echo "FAIL: $2 — no block matching '$1' found in SKILL.md"
-        FAILED=1
-        return
-    fi
-    if printf '%s' "$block" | grep -q 'source' && printf '%s' "$block" | grep -q 'pr-armable.sh'; then
-        echo "ok: $2 self-sources the predicate"
-    else
-        echo "FAIL: $2 — block uses the predicate but does NOT source pr-armable.sh in-block (hoisted source = fail-open risk)"
-        FAILED=1
-    fi
-}
-
-# run_p50 <block> <planfile> — run the Phase 5.0 conformance block in its OWN
-# shell against an EMPTY changed-file list, so every must-appear entry surfaces
-# as a MISSING-FILE line. That makes the block's CLASSIFICATION observable,
-# which is what the three-way agreement test compares. The prelude runs in the
-# same bash instance as the block, so its $PPID is the block's $PPID.
-run_p50() {
-    ( cd "$REPO_ROOT" && PLAN_FILE="$2" bash -c ': > "/tmp/post-plan-changed-$PPID"
-'"$1"'
-rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
-}
-
-# run_p50c <block> <planfile> <changed-list-file>
-# run_p50 with a NON-empty changed list, so plan->file conformance can be
-# exercised on both sides of "is the Critical File in the diff".
-run_p50c() {
-    ( cd "$REPO_ROOT" && PLAN_FILE="$2" CHANGED_SRC="$3" \
-        bash -c 'cp "$CHANGED_SRC" "/tmp/post-plan-changed-$PPID"
-'"$1"'
-rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
-}
-
-# assert_block_sources <marker> <name> <lib-substring> <file>
-# Generalized sibling of assert_self_contained: assert_self_contained is
-# hardwired to pr-armable.sh and $SKILL, and its call sites must not change.
-assert_block_sources() {
-    local block; block="$(extract_block "$1" "$4")"
-    if [ -z "$block" ]; then
-        echo "FAIL: $2 — no block matching '$1' found in $4"; FAILED=1; return
-    fi
-    if printf '%s' "$block" | grep -q 'source' && printf '%s' "$block" | grep -qF "$3"; then
-        echo "ok: $2 self-sources $3"
-    else
-        echo "FAIL: $2 — block does NOT source $3 in-block (hoisted source = undefined function = silent fail-open)"
-        FAILED=1
-    fi
-}
-
-# run_markers <before-body-json> <after-body-json> — run the Phase 6 capture block
-# against the body as it stood BEFORE the rewrite, then the verify block against the
-# body as it stands AFTER it, sharing one $MARKERS_FILE. Each block gets its OWN
-# fresh shell (the failure model). $GH_EDIT_RECORD collects any repair write.
-run_markers() {
-    local mf="$BASE_TMP/markers" rec="$BASE_TMP/edit-record"
-    rm -f "$mf" "$mf".* "$rec"; : > "$rec"
-    printf '%s' "$1" > "$BASE_TMP/fixture.json"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" MARKERS_FILE="$mf" \
-        GH_EDIT_RECORD="$rec" bash -c "$BMC" 2>&1
-    printf '%s' "$2" > "$BASE_TMP/fixture.json"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" MARKERS_FILE="$mf" \
-        GH_EDIT_RECORD="$rec" bash -c "$BMV" 2>&1
-}
-
-expect_out() { # name  expected-substring  output
-    if [[ "$3" == *"$2"* ]]; then echo "ok: $1"
-    else echo "FAIL: $1 — expected '$2' in: '$3'"; FAILED=1; fi
-}
-
-# expect_p25 <name> <A|B|C|none> <hit|miss|absent> <output> — assert the verdict,
-# the probe state, and that EXACTLY ONE verdict line was printed (a second one
-# would mean a fallthrough, and the orchestrator reads only the first).
-expect_p25() {
-    local v p n
-    v="$(printf '%s\n' "$4" | grep -m1 '^BL_TRIGGER=' | cut -d= -f2)"
-    p="$(printf '%s\n' "$4" | grep -m1 '^BL_PROBE=' | cut -d= -f2)"
-    n="$(printf '%s\n' "$4" | grep -c '^BL_TRIGGER=')"
-    [ -z "$p" ] && p="absent"
-    if [ "$v" = "$2" ] && [ "$p" = "$3" ] && [ "$n" -eq 1 ]; then
-        echo "ok: $1"
-    else
-        echo "FAIL: $1 — expected trigger=$2 probe=$3 (1 verdict), got trigger='$v' probe='$p' verdicts=$n; output: '$4'"
-        FAILED=1
-    fi
-}
-
-# mk_bl_dir <name> <entry-location> — fixture backlog dir with ONE entry whose
-# **Location:** names <entry-location>, plus a README.md and an archive/ entry
-# that name the SAME path. The probe must ignore those two.
-mk_bl_dir() {
-    local d="$BASE_TMP/bl-$1"
-    mkdir -p "$d/archive"
-    printf $'# X\n\n**Location:** `%s`\n' "$2" > "$d/x-backlog.md"
-    printf $'# Index\n\n**Location:** `%s`\n' "$2" > "$d/README.md"
-    printf $'# Old\n\n**Location:** `%s`\n' "$2" > "$d/archive/old-backlog.md"
-    echo "$d"
-}
-
 mk_verdict_fixture() {
     rm -f "$2"
     case "$1" in
@@ -502,63 +278,6 @@ mk_verdict_fixture() {
     esac
 }
 
-B1="$(extract_block '# condition (1)')"
-B3="$(extract_block '# condition (3)')"
-B4="$(extract_block '# condition (4)')"
-run_cond4() { PHASE5_STATUS_FILE="${1}" bash -c "$B4" 2>&1; }
-B5="$(extract_block '# condition (5)')"
-B6="$(extract_block '# condition (6)')"
-B8="$(extract_block '# condition (8)')"
-B10="$(extract_block '# condition (10)')"
-B7="$(extract_block '# condition (7)')"
-B13="$(extract_block '# condition (13)')"
-B15="$(extract_block '# condition (15)')"
-B17="$(extract_block '# condition (17)')"
-B18="$(extract_block '# condition (18)')"
-BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
-BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
-S1X="$(extract_block '# phase 6 step 1 extract' "$P25_SKILL")"
-TICKB="$(extract_block '# phase 6 manual-row tick' "$P25_SKILL")"
-for _m in '# phase 6 step 1 extract' '# phase 6 manual-row tick'; do
-    _n=$(grep -cF "$_m" "$P25_SKILL")
-    if [ "$_n" -eq 1 ]; then echo "ok: marker '$_m' is unique"
-    else echo "FAIL: marker '$_m' appears $_n times in SKILL.md (want 1)"; FAILED=1; fi
-done
-# tick-ok: portable twin of tick-rows.sh. Reads the same PASS file, flips the
-# same `- [ ] **<id>**` shape in the fixture body, records the write.
-cat > "$SHIMD/tick-ok" <<'STUB'
-#!/usr/bin/env bash
-pass="/tmp/pr-ready-manual-rows-$1.txt"
-cp "$pass" "${TICK_PASS_SEEN:-/dev/null}" 2>/dev/null || true
-body="$(jq -r '.body' "$GH_PR_FIXTURE")"
-while IFS= read -r l; do
-  id="${l#ROW }"; id="${id% PASS}"; old="- [ ] **${id}**"; new="- [x] **${id}**"
-  body="${body//"$old"/$new}"
-done < <(grep -E '^ROW .+ PASS$' "$pass" 2>/dev/null)
-jq --arg b "$body" '.body = $b' "$GH_PR_FIXTURE" > "$GH_PR_FIXTURE.t" && mv "$GH_PR_FIXTURE.t" "$GH_PR_FIXTURE"
-printf '%s' "$body" >> "${GH_EDIT_RECORD:-/dev/null}"
-STUB
-printf '#!/usr/bin/env bash\nexit 0\n' > "$SHIMD/tick-noop"
-printf '#!/usr/bin/env bash\nexit 1\n' > "$SHIMD/tick-fail"
-chmod +x "$SHIMD/tick-ok" "$SHIMD/tick-noop" "$SHIMD/tick-fail"
-
-# run_tick <body> <ids-text> <delete-text> <stub> — run the Phase 6 tick block
-# in its own shell against a fixture PR 99691; body file lands at $TB.
-TB="$BASE_TMP/tick-body.md"
-run_tick() {
-    jq -n --arg b "$1" '{number: 99691, body: $b}' > "$BASE_TMP/fixture.json"
-    printf '%s' "$2" > "$BASE_TMP/tick-ids"; printf '%s' "$3" > "$BASE_TMP/tick-del"
-    rm -f "$TB" "$BASE_TMP/pass-seen"; : > "$BASE_TMP/edit-record"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        TICK_IDS_FILE="$BASE_TMP/tick-ids" TICK_DELETE_FILE="$BASE_TMP/tick-del" \
-        TICK_ROWS_SCRIPT="$SHIMD/$4" TICK_PR=99691 TICK_SLUG=fixture \
-        TICK_BODY_OUT="$TB" TICK_PASS_SEEN="$BASE_TMP/pass-seen" \
-        GH_EDIT_RECORD="$BASE_TMP/edit-record" GH_PR_FAIL="${TICK_GH_FAIL:-}" \
-        bash -c "$TICKB" 2>&1
-    rm -f /tmp/pr-ready-manual-rows-99691.txt
-}
-with_sentinel() { awk '{print} /^## Manual Testing/ && !d {print ""; print "No manual testing needed — remaining steps are covered by automated checks run in Phase 6; verification is automated: bin/test-foo"; d=1}' "$1"; }
-B12="$(extract_block '# condition (12)')"
 B55="$(extract_block '# phase 5.5 verdict parse' "$P55_SKILL")"
 # The findings-render block added in Phase 2. The literal marker is the ONLY binding
 # between the spec and this suite: if Phase 2's fence carries a different first-line
@@ -568,165 +287,16 @@ if [ -z "$B58F" ]; then
     echo "FAIL: no block matching '# phase 5.8 findings render' in $P55_SKILL — marker drifted"
     FAILED=1
 fi
-BREB="$(extract_block '# phase 2 merge' "$P25_SKILL")"
 
-# --- structural: every predicate-using block must source the lib itself ---
-assert_self_contained '# condition (1)' "condition (1)"
-assert_self_contained '# condition (5)' "condition (5)"
-assert_self_contained '# condition (6)' "condition (6)"
-assert_self_contained '# condition (8)' "condition (8)"
-assert_self_contained '# condition (10)' "condition (10)"
-assert_self_contained '# condition (11)' "condition (11)"
-
-# condition (11) prose + block agree on the widened rule (PR: thread remediation)
-if grep -qF '**(11) Unresolved review thread.**' "$SKILL" \
-   && ! grep -qF '**(11) Unresolved scored review finding**' "$SKILL"; then
-    echo "ok: c11_doc_widened_heading"
-else
-    echo "FAIL: c11_doc_widened_heading — condition (11) prose still describes the >= 80 floor"; FAILED=1
-fi
-if grep -qF 'BLOCKED: unresolved review thread(s) [$UNRESOLVED_HOLD]' "$SKILL" \
-   && ! grep -qF 'scored >= 80 [$UNRESOLVED_HOLD]' "$SKILL"; then
-    echo "ok: c11_block_message_widened"
-else
-    echo "FAIL: c11_block_message_widened — condition (11) block still reports the >= 80 floor"; FAILED=1
-fi
-if grep -qF 'label: pre-existing' "$SKILL" \
-   && grep -qF 'label: nit' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md"; then
-    echo "ok: c11_doc_label_exception"
-else
-    echo "FAIL: c11_doc_label_exception — condition (11) prose lacks the nit/pre-existing label exception"; FAILED=1
-fi
-if grep -qE '^2\. No `Important` review/audit finding' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" \
-   && ! grep -qF '11. Unresolved scored finding' "$REPO_ROOT/.claude/skills/post-plan/SKILL.md"; then
-    echo "ok: c2_doc_important_only"
-else
-    echo "FAIL: c2_doc_important_only — SKILL.md conditions (2)/(11) prose is stale"; FAILED=1
-fi
+# condition (11) label exception is documented in the shared predicate lib header
 if grep -qF 'Exception (2026-10)' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
     echo "ok: c11_lib_header_exception"
 else
     echo "FAIL: c11_lib_header_exception — pr-armable.sh header lacks the label exception note"; FAILED=1
 fi
-if grep -qE '^#   thread holds auto-merge: scored' "$REPO_ROOT/bin/lib/pr-armable.sh" \
-   && ! grep -qF 'Human (unscored) threads, scores < 80, and resolved threads NEVER block' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
-    echo "ok: c11_lib_header_widened"
-else
-    echo "FAIL: c11_lib_header_widened — pr-armable.sh header still promises unscored threads never block"; FAILED=1
-fi
-assert_self_contained '# condition (15)' "condition (15)"
-assert_self_contained '# condition (17)' "condition (17)"
-assert_self_contained '# condition (18)' "condition (18)"
-assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
-assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
-# --- behavioral: each block, run in isolation, holds correctly ---
-expect_block "(1) HELD manual rows -> BLOCK" BLOCK \
-    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\n- review the new <h1>"}' '' '')"
-expect_block "(1) cleared sentinel -> NONE" NONE \
-    "$(run_isolated "$B1" '{"body":"## Manual Testing\nNo manual testing needed — automated."}' '' '')"
-expect_block "(1) no section (UNKNOWN) -> BLOCK (fail-closed)" BLOCK \
-    "$(run_isolated "$B1" '{"body":"hand-made PR, no manual testing heading"}' '' '')"
-# (1) with the Decision-only hold notice: the block sits before ## Manual Testing,
-# every line `> `-prefixed, so the clearance window is unchanged.
-_hd_dir="$(mktemp -d)"
-_hd_plan="$_hd_dir/plan.md"
-printf '%s\n' '## Automouse Hold Justification' '' \
-    '**Category:** intrinsic, self-gating change.' '' \
-    "**Decision:** Merge if you're OK with about 7% more PRs being held." \
-    '- [x] counterfeit checkbox in a Decision continuation line' '' \
-    '**Discharged by matrix rows:** 3, 4.' '' '## Verification Matrix' > "$_hd_plan"
-_hd_block="$(bash -c 'source "$1"; hold_manual_confirmation_block "$2"' _ \
-    "$SCRIPT_DIR/lib/hold-check.sh" "$_hd_plan")"
-expect_block "(1) Decision block before cleared sentinel -> NONE" NONE \
-    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\nNo manual testing needed — automated.' '{body:$b}')" '' '')"
-expect_block "(1) Decision block before held rows -> BLOCK" BLOCK \
-    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block"$'\n\n## Manual Testing\n\n- review the new <h1>' '{body:$b}')" '' '')"
-expect_block "(1) Decision block alone, no Manual Testing -> BLOCK (fail-closed)" BLOCK \
-    "$(run_isolated "$B1" "$(jq -n --arg b "$_hd_block" '{body:$b}')" '' '')"
-rm -rf "$_hd_dir"
-# S1: tail names unit, non-test file — predicate holds when files key is present.
-expect_block "S1: tail names unit, non-test file → BLOCK" BLOCK \
-    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"bin/pr-triage"}]}' '' '')"
-# S2: same sentinel tail, but the changed file is a unit test — clears.
-expect_block "S2: tail names unit, Test.php in diff → NONE" NONE \
-    "$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed — covered by unit tests","files":[{"path":"ibl5/tests/Foo/BarTest.php"}]}' '' '')"
-# S3: no files key; the (.files // [])[].path guard must not jq-error.
-_s3_out="$(run_isolated "$B1" '{"body":"## Manual Testing\n\nNo manual testing needed"}' '' '')"
-expect_block "S3: no files key → NONE (null guard)" NONE "$_s3_out"
-if grep -qF 'jq: error' <<< "$_s3_out"; then
-    echo "FAIL: S3: jq error on missing files key (remove // [] guard)"
-    FAILED=1
-else
-    echo "ok: S3: no jq error when files key absent"
-fi
-
-# condition (3) — the fail-open this gate closed: an empty bridge file is
-# byte-identical for "5.0 ran clean" and "5.0 died", so only the done-marker
-# distinguishes them. The marker+absent-bridge case is the plan-blind majority
-# (Phase 5.0 skipped) — if it ever BLOCKs, nearly every PR stops arming.
-expect_block "(3) no done-marker -> BLOCK (indeterminate, fail-closed)" BLOCK \
-    "$(run_cond3 "$B3" no empty)"
-expect_block "(3) marker + unresolved items -> BLOCK" BLOCK \
-    "$(run_cond3 "$B3" yes items)"
-expect_block "(3) marker + empty bridge -> NONE (5.0 ran clean)" NONE \
-    "$(run_cond3 "$B3" yes empty)"
-expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE \
-    "$(run_cond3 "$B3" yes absent)"
-
-# (3) A real MISSING-FILE — the item THIS PR's parser produces — must block
-# arming exactly as a MISSING: test item does. Requirement 5.
-expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
-    "$(run_cond3 "$B3" yes fileitems)"
-expect_block "(3) marker + unresolved MISSING-PHASE -> BLOCK" BLOCK \
-    "$(run_cond3 "$B3" yes phaseitems)"
-
-# --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
-# Same block, same three states, but driven through the real filenames
-# runner.py writes into its own run dir. These names are derived from runner.py,
-# so a rename on either side fails here.
-
-# State 1 — indeterminate: the harness never reached the end of Phase 5.0 (crash in
-# phases 1-4, or conformance.check() itself raised), so runner.py wrote no marker.
-# Fail-closed is CORRECT here and must never be "fixed" into a pass.
-expect_block "(3) harness: no conformance-done -> BLOCK (indeterminate, fail-closed)" BLOCK \
-    "$(run_cond3 "$B3" no empty rundir)"
-
-# State 2 — unresolved items: marker present, bridge non-empty.
-out_h2="$(run_cond3 "$B3" yes items rundir)"
-expect_block "(3) harness: marker + unresolved items -> BLOCK" BLOCK "$out_h2"
-if grep -qF 'MISSING: ibl5/tests/FooTest.php' <<< "$out_h2"; then
-    echo "ok: (3) harness: blocker report cats the bridge contents"
-else
-    echo "FAIL: (3) harness: blocker report omitted the bridge contents — got: '$out_h2'"
-    FAILED=1
-fi
-
-# State 3 — clean: marker present, bridge ZERO BYTES. This is the dominant harness
-# outcome and the whole point of the PR; if it BLOCKs, nothing ever arms.
-expect_block "(3) harness: marker + zero-byte bridge -> NONE (5.0 ran clean)" NONE \
-    "$(run_cond3 "$B3" yes empty rundir)"
-
-# Boundary — the run dir itself does not exist (harness died before os.makedirs, or a
-# stale --out path reached the resumed session). $DONE_MARK's PARENT is missing, so
-# `[ ! -f "$DONE_MARK" ]` must still resolve cleanly to indeterminate, not error out.
-expect_block "(3) harness: run dir absent -> BLOCK (indeterminate)" BLOCK \
-    "$(DONE_MARK="$BASE_TMP/no-such-run-dir/conformance-done" \
-       BRIDGE="$BASE_TMP/no-such-run-dir/missing-tests" bash -c "$B3" 2>&1)"
-
-# --- Critical Files parser: structural + three-way behavioral agreement -----
-B50="$(extract_block '# Reuses /tmp/post-plan-changed-' "$P5_SKILL")"
-assert_block_sources '# Reuses /tmp/post-plan-changed-' "phase 5.0 conformance" \
-    'bin/lib/critical-files.sh' "$P5_SKILL"
-
-# No parser may re-inline its own regex — that IS the divergence being deleted.
-if grep -qF 'EXEMPT_RE=' "$P5_SKILL"; then
-    echo "FAIL: phase 5.0 block still inlines EXEMPT_RE (re-divergence)"; FAILED=1
-else
-    echo "ok: phase 5.0 block inlines no exempt regex"
-fi
-
-# THREE-WAY AGREEMENT. Every shape below is corpus-derived; the indented entry
+# --- Critical Files parser: bin/lib/critical-files.sh vs planfile.py agreement ----
+# TWO-WAY AGREEMENT. Every shape below is corpus-derived; the indented entry
 # pins the leading-whitespace divergence check-plan's old `^- ` awk had.
 CF_FIX="$BASE_TMP/cf-agreement.md"
 cat > "$CF_FIX" <<'CFEOF'
@@ -759,7 +329,6 @@ CFEOF
 
 CF_LIB=$( cd "$REPO_ROOT" && bash -c 'source bin/lib/critical-files.sh && cf_parse_section "$1"' _ "$CF_FIX" \
             | sed -n 's/^MUST_APPEAR://p' )
-CF_BLOCK=$( run_p50 "$B50" "$CF_FIX" | sed -n 's/^MISSING-FILE: \([^ ]*\).*/\1/p' )
 CF_PY=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
 import sys
 from harness.planfile import parse_critical_files
@@ -768,12 +337,11 @@ for p, _a, ex in parse_critical_files(open(sys.argv[1]).read()):
         print(p)
 ' "$CF_FIX" )
 
-if [ "$CF_LIB" = "$CF_BLOCK" ] && [ "$CF_LIB" = "$CF_PY" ]; then
-    echo "ok: three-way parser agreement (lib == phase-5.0 block == planfile.py)"
+if [ "$CF_LIB" = "$CF_PY" ]; then
+    echo "ok: parser agreement (lib == planfile.py)"
 else
     echo "FAIL: parser divergence"
     echo "  lib:   $(printf '%s' "$CF_LIB"   | tr '\n' ' ')"
-    echo "  block: $(printf '%s' "$CF_BLOCK" | tr '\n' ' ')"
     echo "  py:    $(printf '%s' "$CF_PY"    | tr '\n' ' ')"
     FAILED=1
 fi
@@ -824,9 +392,8 @@ else
     echo "FAIL: cf-abs lib — got: $(printf '%s' "$_abs_lib" | tr '\n' ' ')"; FAILED=1
 fi
 
-# Three-way agreement holds on the absolute fixture too.
+# Agreement holds on the absolute fixture too.
 _abs_lib_ma=$(printf '%s\n' "$_abs_lib" | sed -n 's/^MUST_APPEAR://p')
-_abs_block=$( run_p50 "$B50" "$CF_ABS" | sed -n 's/^MISSING-FILE: \([^ ]*\).*/\1/p' )
 _abs_py=$( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
 import sys
 from harness.planfile import parse_critical_files
@@ -834,12 +401,11 @@ for p, _a, ex in parse_critical_files(open(sys.argv[1]).read()):
     if not ex:
         print(p)
 ' "$CF_ABS" )
-if [ "$_abs_lib_ma" = "$_abs_block" ] && [ "$_abs_lib_ma" = "$_abs_py" ]; then
-    echo "ok: cf-abs three-way agreement on absolute paths"
+if [ "$_abs_lib_ma" = "$_abs_py" ]; then
+    echo "ok: cf-abs parser agreement on absolute paths (lib == planfile.py)"
 else
     echo "FAIL: cf-abs parser divergence"
     echo "  lib:   $(printf '%s' "$_abs_lib_ma" | tr '\n' ' ')"
-    echo "  block: $(printf '%s' "$_abs_block"  | tr '\n' ' ')"
     echo "  py:    $(printf '%s' "$_abs_py"     | tr '\n' ' ')"
     FAILED=1
 fi
@@ -864,51 +430,9 @@ else
     echo "FAIL: cf-abs raw — got: '$_raw'"; FAILED=1
 fi
 
-# --- Phase 5.0 plan->file arming condition (3), the intentional weakening ---
-# Before #1211 an absolute Critical File NEVER matched `git diff --name-only`,
-# so it held arming forever. Now it matches iff the file is in the diff.
-CF_P50="$BASE_TMP/cf-p50-abs.md"
-printf '## Critical Files\n\n- `/Users/ajaynicolas/GitHub/IBL5-worktrees/my-slug/ibl5/classes/Foo.php`\n- `/Users/ajaynicolas/claude-plans/notes.md`\n' > "$CF_P50"
-printf 'ibl5/classes/Foo.php\nbin/other\n' > "$BASE_TMP/p50-changed-hit.txt"
-printf 'bin/other\n' > "$BASE_TMP/p50-changed-miss.txt"
-
-_hit=$( run_p50c "$B50" "$CF_P50" "$BASE_TMP/p50-changed-hit.txt" )
-if printf '%s\n' "$_hit" | grep -q 'MISSING-FILE: ibl5/classes/Foo.php'; then
-    echo "FAIL: p50-abs-in-diff — absolute CF in the diff still reported MISSING"; FAILED=1
-elif printf '%s\n' "$_hit" | grep -q 'MISSING-FILE: /Users/ajaynicolas/claude-plans/notes.md'; then
-    echo "ok: p50-abs-in-diff (in-repo absolute CF matches the diff; out-of-repo still MISSING)"
-else
-    echo "FAIL: p50-abs-in-diff — out-of-repo CF lost its MISSING hold: $_hit"; FAILED=1
-fi
-
-_miss=$( run_p50c "$B50" "$CF_P50" "$BASE_TMP/p50-changed-miss.txt" )
-if printf '%s\n' "$_miss" | grep -q 'MISSING-FILE: ibl5/classes/Foo.php'; then
-    echo "ok: p50-abs-not-in-diff (normalised path reported MISSING when absent from diff)"
-else
-    echo "FAIL: p50-abs-not-in-diff — expected MISSING-FILE: ibl5/classes/Foo.php, got: $_miss"; FAILED=1
-fi
-
-# --- Phase 5.0 diff->plan conformance: run_p50u helper + U1..U4 cases -------
-
-# run_p50u <block> <planfile> <changed-list-file> <PLAN_FOUND> <pr-body-json>
-# Sibling of run_p50 for the diff->plan block: that block additionally reads
-# $PLAN_FOUND and `gh pr view --json body`, and needs a NON-empty changed list.
-run_p50u() {
-    printf '%s' "$5" > "$BASE_TMP/u-fixture.json"
-    ( cd "$REPO_ROOT" && PATH="$SHIMD:$PATH" \
-        GH_PR_FIXTURE="$BASE_TMP/u-fixture.json" \
-        PLAN_FILE="$2" PLAN_FOUND="$4" CHANGED_SRC="$3" \
-        bash -c 'cp "$CHANGED_SRC" "/tmp/post-plan-changed-$PPID"
-'"$1"'
-rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
-}
-UB="$(extract_block '# Diff→plan conformance' "$P5_SKILL")"
-
-if grep -qF 'bin/lib/plan-scope-conformance' <<< "$UB"; then
-    echo "ok: phase 5.0 diff->plan block invokes bin/lib/plan-scope-conformance"
-else
-    echo "FAIL: phase 5.0 diff->plan block does not invoke bin/lib/plan-scope-conformance"; FAILED=1
-fi
+# --- plan-scope-conformance helper wiring + direct conformance case ---
+# The Phase 5.0 skill block is gone (the harness owns conformance). These checks pin the
+# helper itself, and the direct case below replaces the old block-driven U1 case.
 if grep -v '^[[:space:]]*#' "$REPO_ROOT/bin/lib/plan-scope-conformance" \
         | grep -qE '^[[:space:]]*(source|\.)[[:space:]].*critical-files\.sh'; then
     echo "ok: plan-scope-conformance helper sources bin/lib/critical-files.sh"
@@ -922,9 +446,13 @@ else
     echo "ok: plan-scope-conformance helper does not call cf_is_exempt (polarity correct)"
 fi
 
-# Case U1 — both verdicts count as planned (MUST_APPEAR and EXEMPT both dismiss).
+# plan_scope_conformance_direct (formerly U1, which drove the helper through the deleted
+# Phase 5.0 block): both parse verdicts count as planned (MUST_APPEAR and EXEMPT both
+# dismiss); the unplanned .claude/ path holds, the unplanned non-.claude/ path is a note.
 _u1_plan="$BASE_TMP/u1-plan.md"
 _u1_changed="$BASE_TMP/u1-changed.txt"
+_u1_body="$BASE_TMP/u1-body.md"
+_u1_added="$BASE_TMP/u1-added.txt"
 cat > "$_u1_plan" <<'U1PLANEOF'
 ## Critical Files
 
@@ -936,133 +464,19 @@ printf '%s\n' \
     '.claude/rules/doc-freshness.md' \
     '.claude/rules/rogue.md' \
     'ibl5/index.php' > "$_u1_changed"
-_u1_out="$(run_p50u "$UB" "$_u1_plan" "$_u1_changed" 'found' '{"body":"no scope section"}')"
-_u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out")"
+printf 'no scope section\n' > "$_u1_body"
+: > "$_u1_added"
+_u1_out="$("$REPO_ROOT/bin/lib/plan-scope-conformance" "$_u1_plan" "$_u1_changed" "$_u1_body" "$_u1_added" 2>&1)"
+_u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out" || true)"
 if [ "$_u1_count" -eq 1 ] \
         && grep -qF 'UNPLANNED-FILE: .claude/rules/rogue.md' <<< "$_u1_out" \
         && grep -qF 'SCOPE-NOTE: unplanned ibl5/index.php' <<< "$_u1_out" \
         && ! grep -q '^UNPLANNED-FILE:.*ibl5/index.php' <<< "$_u1_out" \
         && ! grep -qF 'SKILL.md' <<< "$_u1_out" \
         && ! grep -qF 'doc-freshness.md' <<< "$_u1_out"; then
-    echo "ok: U1 both parse verdicts count as planned"
+    echo "ok: plan_scope_conformance_direct"
 else
-    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md plus SCOPE-NOTE: unplanned ibl5/index.php, got: '$_u1_out'"
-    FAILED=1
-fi
-
-# Case U2 — plan-blind skip: PLAN_FOUND=none emits no findings.
-_u2_out="$(run_p50u "$UB" '/dev/null' "$_u1_changed" 'none' '{"body":"no scope section"}')"
-_u2_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u2_out" || true)"
-if [ "$_u2_count" -eq 0 ]; then
-    echo "ok: U2 plan-blind run emits no findings"
-else
-    echo "FAIL: U2 — expected 0 UNPLANNED-FILE: lines, got: '$_u2_out'"
-    FAILED=1
-fi
-
-# Case U3 — worktree-prefix normalization, both directions.
-_u3_plan="$BASE_TMP/u3-plan.md"
-_u3_changed="$BASE_TMP/u3-changed.txt"
-cat > "$_u3_plan" <<'U3PLANEOF'
-## Critical Files
-
-- `.claude/skills/post-plan/SKILL.md` — edit
-U3PLANEOF
-printf '%s\n' \
-    'IBL5-worktrees/some-wt/.claude/skills/post-plan/SKILL.md' \
-    'IBL5-worktrees/some-wt/.claude/rules/rogue.md' > "$_u3_changed"
-_u3_out="$(run_p50u "$UB" "$_u3_plan" "$_u3_changed" 'found' '{"body":"no scope section"}')"
-_u3_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u3_out")"
-if [ "$_u3_count" -eq 1 ] \
-        && grep -qF 'rogue.md' <<< "$_u3_out" \
-        && ! grep -qF 'IBL5-worktrees/' <<< "$_u3_out"; then
-    echo "ok: U3 worktree prefix normalized on both sides"
-else
-    echo "FAIL: U3 — expected 1 UNPLANNED-FILE: naming .claude/rules/rogue.md without IBL5-worktrees/, got: '$_u3_out'"
-    FAILED=1
-fi
-
-# Case U4 — '## Declared scope' dismissal is section-bounded.
-_u4_plan="$BASE_TMP/u4-plan.md"
-_u4_changed="$BASE_TMP/u4-changed.txt"
-cat > "$_u4_plan" <<'U4PLANEOF'
-## Critical Files
-
-- `ibl5/index.php` — edit
-U4PLANEOF
-printf '%s\n' \
-    '.claude/rules/declared.md' \
-    '.claude/rules/elsewhere.md' > "$_u4_changed"
-_u4_body='{"body":"## Declared scope\n\n- .claude/rules/declared.md (intended)\n\n## Other notes\n\n- .claude/rules/elsewhere.md\n"}'
-_u4_out="$(run_p50u "$UB" "$_u4_plan" "$_u4_changed" 'found' "$_u4_body")"
-_u4_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u4_out")"
-if [ "$_u4_count" -eq 1 ] \
-        && grep -qF 'elsewhere.md' <<< "$_u4_out" \
-        && ! grep -qF 'declared.md' <<< "$_u4_out"; then
-    echo "ok: U4 declared-scope dismissal is section-bounded"
-else
-    echo "FAIL: U4 — expected 1 UNPLANNED-FILE: naming elsewhere.md (declared.md absent); got: '$_u4_out'"
-    FAILED=1
-fi
-
-# Case U5 — live block wiring: the gh body reaches the helper, a real bullet
-# clears, and a path only inside the generated files-changed span stays flagged.
-_u5_plan="$BASE_TMP/u5-plan.md"
-_u5_changed="$BASE_TMP/u5-changed.txt"
-printf '%s\n' '## Critical Files' '' '- `ibl5/planned.php` — edit' > "$_u5_plan"
-printf '%s\n' 'ibl5/planned.php' 'ibl5/decl.php' 'ibl5/undecl.php' > "$_u5_changed"
-_u5_body='{"body":"## Declared scope\n\n- ibl5/decl.php (intended)\n\n<!-- files-changed:begin -->\n- `A` `ibl5/undecl.php`\n<!-- files-changed:end -->\n"}'
-_u5_out="$(run_p50u "$UB" "$_u5_plan" "$_u5_changed" 'found' "$_u5_body")"
-_u5_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u5_out" || true)"
-if [ "$_u5_count" -eq 0 ] \
-        && grep -qF 'SCOPE-NOTE: unplanned ibl5/undecl.php' <<< "$_u5_out" \
-        && ! grep -qF 'ibl5/decl.php' <<< "$_u5_out"; then
-    echo "ok: U5 block passes the gh body to the helper; generated span stays flagged"
-else
-    echo "FAIL: U5 — expected SCOPE-NOTE: unplanned ibl5/undecl.php only (no UNPLANNED-FILE:), got: '$_u5_out'"
-    FAILED=1
-fi
-
-# Case U6 — a helper usage error surfaces as an indeterminate finding (fail-closed).
-_u6_out="$(run_p50u "$UB" "$BASE_TMP/does-not-exist.md" "$_u5_changed" 'found' '{"body":""}')"
-if grep -qF 'UNPLANNED-FILE: helper exited 2 (indeterminate)' <<< "$_u6_out"; then
-    echo "ok: U6 helper exit 2 surfaces as an indeterminate UNPLANNED-FILE: line"
-else
-    echo "FAIL: U6 — expected 'UNPLANNED-FILE: helper exited 2 (indeterminate)', got: '$_u6_out'"
-    FAILED=1
-fi
-
-# Case U7 — label plumbing: condition (3) and the Phase 5.0 END list name
-# UNPLANNED-FILE: and neither names SCOPE-NOTE or the retired gap label, so
-# advisory notes can never gate. SKILL.md points at the helper and the Plan gaps heading.
-_u7_bad=0
-_u7_cond3="$(grep -m1 '^3\. No unresolved' "$P25_SKILL" || true)"
-_u7_end="$(grep -m1 '^At Phase 5.0 END, append each remaining' "$P5_SKILL" || true)"
-if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_cond3"; then
-    echo "FAIL: U7 — SKILL.md condition (3) does not name UNPLANNED-FILE:"; _u7_bad=1
-fi
-if ! grep -qF -- 'UNPLANNED-FILE:' <<< "$_u7_end"; then
-    echo "FAIL: U7 — Phase 5.0 END list does not name UNPLANNED-FILE:"; _u7_bad=1
-fi
-if [ -z "$_u7_cond3" ] || [ -z "$_u7_end" ]; then
-    echo "FAIL: U7 — could not locate condition (3) or the Phase 5.0 END line"; _u7_bad=1
-fi
-for _u7_label in 'SCOPE-NOTE' 'UNEXPLAINED''-GAP'; do
-    if grep -qF -- "$_u7_label" <<< "$_u7_cond3"; then
-        echo "FAIL: U7 — SKILL.md condition (3) names $_u7_label"; _u7_bad=1
-    fi
-    if grep -qF -- "$_u7_label" <<< "$_u7_end"; then
-        echo "FAIL: U7 — Phase 5.0 END list names $_u7_label"; _u7_bad=1
-    fi
-done
-for _u7_tok in 'bin/lib/plan-scope-conformance' '## Plan gaps'; do
-    if ! grep -qF -- "$_u7_tok" "$P25_SKILL"; then
-        echo "FAIL: U7 — SKILL.md does not name $_u7_tok"; _u7_bad=1
-    fi
-done
-if [ "$_u7_bad" -eq 0 ]; then
-    echo "ok: U7 UNPLANNED-FILE: reaches condition (3) and the END list; SCOPE-NOTE never does"
-else
+    echo "FAIL: plan_scope_conformance_direct — expected 1 UNPLANNED-FILE: naming rogue.md plus SCOPE-NOTE: unplanned ibl5/index.php, got: '$_u1_out'"
     FAILED=1
 fi
 
@@ -1326,599 +740,25 @@ else
     FAILED=1
 fi
 
-# The prose half of the same parser (Phase 5.0 is model-performed for the matrix,
-# unlike the Critical Files block which sources the shell lib) has no executable
-# host, so pin the instruction itself against silent removal.
-if grep -qF 'Skip every row inside a fenced code block' "$P5_SKILL"; then
-    echo "ok: phase 5.0 prose instructs skipping fenced matrix rows"
-else
-    echo "FAIL: phase 5.0 matrix prose lost its fenced-row skip (diverges from planfile.py)"
-    FAILED=1
-fi
-
-expect_block "(5) golden + headless -> BLOCK" BLOCK \
-    "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '1')"
-expect_block "(5) golden + interactive -> NONE (warn-only)" NONE \
-    "$(run_isolated "$B5" '{"files":[{"path":"engine/internal/sim/testdata/golden.json"}]}' '' '')"
-
-expect_block "(6) unmerged Depends-on -> BLOCK" BLOCK \
-    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
-expect_block "(6) merged Depends-on -> NONE" NONE \
-    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1071"}' '' '')"
-
-# condition (7) — plan-time auto_merge: false hold
-c7_auto_merge_false="$(printf '%s\n' '---' 'auto_merge: false' '---' '# Plan')"
-c7_auto_merge_true="$(printf '%s\n' '---' 'auto_merge: true' '---' '# Plan')"
-expect_block "(7) plan auto_merge: false -> BLOCK" BLOCK \
-    "$(run_cond7 "$B7" "$c7_auto_merge_false")"
-expect_block "(7) plan auto_merge: true -> NONE" NONE \
-    "$(run_cond7 "$B7" "$c7_auto_merge_true")"
-expect_block "(7) no plan file -> NONE" NONE \
-    "$(run_cond7 "$B7" "")"
-
-# condition (7) via SLUG DERIVATION — the fail-open the bare-slug derivation had.
-# run_cond7_slug <block> <slug> <plan-dir>: PLAN_FILE empty so the block derives from
-# the slug through resolve_plan_file (variant-aware + drift-aware).
-run_cond7_slug() { PLAN_FILE="" PLAN_DIR="$3" PLAN_SLUG="$2" bash -c "$1" 2>&1; }
-
-c7_dir="$BASE_TMP/c7-plans"; mkdir -p "$c7_dir"
-# A superseded <slug>.md says auto_merge: true; the live <slug>-2.md says false.
-# The old bare-slug derivation read <slug>.md and did NOT hold — that was the bug.
-printf '%s\n' '---' 'auto_merge: true'  '---' '# superseded' > "$c7_dir/myvar.md"
-printf '%s\n' '---' 'auto_merge: false' '---' '# live'       > "$c7_dir/myvar-2.md"
-expect_block "(7) highest variant declares auto_merge: false -> BLOCK" BLOCK \
-    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
-# Inverse: superseded says false, live variant says true -> no hold (variant really wins).
-printf '%s\n' '---' 'auto_merge: false' '---' '# superseded' > "$c7_dir/myvar.md"
-printf '%s\n' '---' 'auto_merge: true'  '---' '# live'       > "$c7_dir/myvar-2.md"
-expect_block "(7) highest variant declares auto_merge: true -> NONE" NONE \
-    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
-# Drift: no <slug>.md at all, one <prefix>-<slug>.md declaring auto_merge: false.
-rm -f "$c7_dir"/myvar*.md
-printf '%s\n' '---' 'auto_merge: false' '---' '# drifted' > "$c7_dir/plan-myvar.md"
-expect_block "(7) drift-adopted plan declares auto_merge: false -> BLOCK" BLOCK \
-    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
-
-# condition (7), docs-only-ready — PR facts through the env seams (no gh shim).
-# run_cond7_token <block> <plan-value> <head-ref> <files-json> <body> <verdict-kind>
-# verdict-kind is a mk_verdict_fixture kind (ready, notes, absent).
-c7_two_way='**Merge danger:** Door: two-way · Blast radius: localized · Why: doc text only, no code path changes.'
-c7_one_way='**Merge danger:** Door: one-way · Blast radius: localized · Why: doc text only, no code path changes.'
-c7_docs_files='[{"path":"ibl5/docs/decisions/0086-x.md"},{"path":"ibl5/classes/Foo/README.md"}]'
-c7_have() { # name haystack needle (the shared have() is defined further down)
-    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"
-    else echo "FAIL: $1 — missing literal '$3' in: '$2'"; FAILED=1; fi
-}
-run_cond7_token() {
-    local plan_f="$BASE_TMP/c7-token-plan.md" vf="$BASE_TMP/c7-token-verdict.md"
-    printf '%s\n' '---' "auto_merge: $2" '---' '# Plan' > "$plan_f"
-    mk_verdict_fixture "$6" "$vf"
-    PLAN_DIR="$BASE_TMP/c7-empty-plans" PLAN_FILE="$plan_f" PR_NUM=0 PR_HEAD_REF="$3" \
-      PR_FILES_JSON="$4" PR_BODY="$5" FIDELITY_VERDICT_FILE="$vf" \
-      FIDELITY_VERDICT_FILE_2="$BASE_TMP/c7-no-verdict-2.md" bash -c "$1" 2>&1
-}
-expect_block "(7) docs-only-ready, qualifying PR -> NONE" NONE \
-    "$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
-expect_block "(7) false with a qualifying PR -> BLOCK" BLOCK \
-    "$(run_cond7_token "$B7" false docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
-c7_unknown="$(run_cond7_token "$B7" maybe docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" ready)"
-expect_block "(7) unknown value -> BLOCK" BLOCK "$c7_unknown"
-c7_have "(7) unknown value names it" "$c7_unknown" "unknown auto_merge value 'maybe'"
-c7_branch="$(run_cond7_token "$B7" docs-only-ready feature-x "$c7_docs_files" "$c7_two_way" ready)"
-expect_block "(7) token on a non-refresh branch -> BLOCK" BLOCK "$c7_branch"
-c7_have "(7) names the branch clause" "$c7_branch" 'docs-refresh:branch:feature-x'
-c7_paths="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 '[{"path":"ibl5/docs/a.md"},{"path":".claude/rules/x.md"}]' "$c7_two_way" ready)"
-expect_block "(7) token with a .claude/ path -> BLOCK" BLOCK "$c7_paths"
-c7_have "(7) names the paths clause" "$c7_paths" 'docs-refresh:paths:.claude/rules/x.md'
-c7_oneway="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_one_way" ready)"
-expect_block "(7) token with one-way door -> BLOCK" BLOCK "$c7_oneway"
-c7_have "(7) names the merge-danger clause" "$c7_oneway" 'docs-refresh:merge-danger:ONE-WAY'
-c7_nomd="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "body without the line" ready)"
-expect_block "(7) token with MISSING merge-danger line -> BLOCK" BLOCK "$c7_nomd"
-c7_have "(7) names MISSING" "$c7_nomd" 'docs-refresh:merge-danger:MISSING'
-c7_notes="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" notes)"
-expect_block "(7) token with READY WITH NOTES -> BLOCK" BLOCK "$c7_notes"
-c7_have "(7) names the verdict clause" "$c7_notes" 'docs-refresh:verdict:READY WITH NOTES'
-c7_noverdict="$(run_cond7_token "$B7" docs-only-ready docs-stale-refresh-20261015 "$c7_docs_files" "$c7_two_way" absent)"
-expect_block "(7) token with no verdict file -> BLOCK" BLOCK "$c7_noverdict"
-c7_have "(7) names <none>" "$c7_noverdict" 'docs-refresh:verdict:<none>'
-
-# condition (13) — slug-drift hold
-c13_dir="$BASE_TMP/c13-plans"
-mkdir -p "$c13_dir"
-# drift case: no exact slug.md, but plan-<slug>.md exists
-printf '# A plan\n' > "$c13_dir/plan-myfeature.md"
-expect_block "(13) slug drift adopted -> BLOCK" BLOCK \
-    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
-# exact match: <slug>.md exists -> PLAN_SLUG_DRIFT stays empty -> NONE
-printf '# A plan\n' > "$c13_dir/myfeature.md"
-expect_block "(13) exact slug match -> NONE" NONE \
-    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
-# no plan at all -> plan-blind -> NONE
-rm -f "$c13_dir/myfeature.md" "$c13_dir/plan-myfeature.md"
-expect_block "(13) plan-blind -> NONE" NONE \
-    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
-
-# condition (15) — already-red CI checks, demoted to a WARNING only when master's
-# protection lists the aggregator context (ADR-0149).
-# run_cond15 <checks-json> [protection-json] — run the block with GH_CHECKS_FIXTURE
-# set to the given JSON. With a second arg, GH_PROTECTION_FIXTURE carries it; without
-# one it stays empty, so the shim fails the protection read (unreadable protection).
-# GH_PR_FIXTURE must carry a number field for the PR_NUM derivation inside the block.
-# The block's exit code is appended to $C15_RC_LOG: a set -e caller must never abort.
-C15_RC_LOG="$BASE_TMP/c15-rc.log"
-: > "$C15_RC_LOG"
-run_cond15() {
-    local checks_f="$BASE_TMP/checks-c15-$$.json"
-    local prot_f=""
-    local rc=0
-    printf '%s' "$1" > "$checks_f"
-    printf '{"number":2100}' > "$BASE_TMP/fixture.json"
-    if [ $# -ge 2 ]; then
-        prot_f="$BASE_TMP/prot-c15-$$.json"
-        printf '%s' "$2" > "$prot_f"
-    fi
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        GH_CHECKS_FIXTURE="$checks_f" GH_PROTECTION_FIXTURE="$prot_f" \
-        bash -c "$B15" 2>&1 || rc=$?
-    echo "$rc" >> "$C15_RC_LOG"
-}
-
-C15_RED='[{"name":"pytest (stdlib harness)","bucket":"fail"}]'
-C15_PROT_BASE='"Tests and Analysis","E2E Tests","human-signoff","Meta checks","Infection PHP (per-PR diff)"'
-C15_PROT_ABSENT="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE]}}}"
-C15_PROT_PRESENT="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks settled\"]}}}"
-C15_PROT_NEARMISS="{\"protection\":{\"required_status_checks\":{\"contexts\":[$C15_PROT_BASE,\"All checks settled \"]}}}"
-
-if [ -z "$B15" ]; then
-    echo "FAIL: no block matching '# condition (15)' in $SKILL — marker drifted"
+# --- pr_aggregator_required directly (shared predicate in bin/lib/pr-armable.sh) ---
+# Fail-closed without a fixture, true when master's protection lists the aggregator context.
+c15_prot_f="$BASE_TMP/prot-c15-direct.json"
+printf '%s' '{"protection":{"required_status_checks":{"contexts":["Tests and Analysis","All checks settled"]}}}' > "$c15_prot_f"
+# shellcheck disable=SC2016
+if PATH="$SHIMD:$PATH" GH_PROTECTION_FIXTURE="" bash -c \
+        'source "$1"; pr_aggregator_required' _ "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+    echo "FAIL: pr_aggregator_required returned 0 with unreadable protection (must fail closed)"
     FAILED=1
 else
-    out="$(run_cond15 "$C15_RED")"
-    expect_block "(15) red, protection unreadable -> BLOCK" BLOCK "$out"
-    expect_warn "(15) red, protection unreadable -> no WARNING" NOWARN "$out"
-
-    out="$(run_cond15 "$C15_RED" "$C15_PROT_ABSENT")"
-    expect_block "(15) red, aggregator context absent -> BLOCK" BLOCK "$out"
-    expect_warn "(15) red, aggregator context absent -> no WARNING" NOWARN "$out"
-
-    out="$(run_cond15 "$C15_RED" "$C15_PROT_PRESENT")"
-    expect_block "(15) red, aggregator context present -> not BLOCKED" NONE "$out"
-    expect_warn "(15) red, aggregator context present -> WARNING" WARN "$out"
-    if [[ "$out" == *"pytest (stdlib harness)"* ]]; then
-        echo "ok: (15) WARNING names the red check"
-    else
-        echo "FAIL: (15) WARNING should name pytest (stdlib harness), got: '$out'"
-        FAILED=1
-    fi
-
-    out="$(run_cond15 "$C15_RED" "$C15_PROT_NEARMISS")"
-    expect_block "(15) red, near-miss context name (trailing space) -> BLOCK (C15 near-miss stays not-required)" BLOCK "$out"
-
-    out="$(run_cond15 '[{"name":"human-signoff","bucket":"fail"}]' "$C15_PROT_PRESENT")"
-    expect_block "(15) only human-signoff red -> NONE (ignored by design)" NONE "$out"
-    expect_warn "(15) only human-signoff red -> no WARNING" NOWARN "$out"
-
-    out="$(run_cond15 '[{"name":"pytest (stdlib harness)","bucket":"pass"}]')"
-    expect_block "(15) no red checks -> NONE" NONE "$out"
-    expect_warn "(15) no red checks -> no WARNING" NOWARN "$out"
-
-    if [ -s "$C15_RC_LOG" ] && ! grep -qvx '0' "$C15_RC_LOG"; then
-        echo "ok: (15) block exits 0 on every path"
-    else
-        echo "FAIL: (15) block must exit 0 on every path, got rcs: $(tr '\n' ' ' < "$C15_RC_LOG")"
-        FAILED=1
-    fi
-
-    # pr_aggregator_required directly: fail-closed without a fixture, true with the context.
-    c15_prot_f="$BASE_TMP/prot-c15-direct.json"
-    printf '%s' "$C15_PROT_PRESENT" > "$c15_prot_f"
-    # shellcheck disable=SC2016
-    if PATH="$SHIMD:$PATH" GH_PROTECTION_FIXTURE="" bash -c \
-            'source "$1"; pr_aggregator_required' _ "$REPO_ROOT/bin/lib/pr-armable.sh"; then
-        echo "FAIL: pr_aggregator_required returned 0 with unreadable protection (must fail closed)"
-        FAILED=1
-    else
-        echo "ok: pr_aggregator_required fails closed on unreadable protection"
-    fi
-    # shellcheck disable=SC2016
-    if PATH="$SHIMD:$PATH" GH_PROTECTION_FIXTURE="$c15_prot_f" bash -c \
-            'source "$1"; pr_aggregator_required' _ "$REPO_ROOT/bin/lib/pr-armable.sh"; then
-        echo "ok: pr_aggregator_required returns 0 when the context is listed"
-    else
-        echo "FAIL: pr_aggregator_required returned 1 with 'All checks settled' listed"
-        FAILED=1
-    fi
+    echo "ok: pr_aggregator_required fails closed on unreadable protection"
 fi
-
-# condition (17) — gate backtest hold. The block reads the PR body: a Gate backtest block
-# is judged by its state line, and a body with no block runs bin/gate-backtest itself.
-# run_cond17 <body|__fail__> [stub-rc] — scratch repo with the real predicate library
-# symlinked and a stub bin/gate-backtest that records the call and exits with stub-rc.
-c17_block() { # state-line-token...  -> a Gate backtest block with one state line per arg
-    printf '%s\n' '<!-- gate-backtest:begin -->'
-    local s
-    for s in "$@"; do printf '<!-- gate-backtest-state: %s -->\n' "$s"; done
-    printf '%s\n' '### Gate backtest' '<!-- gate-backtest:end -->'
-}
-run_cond17() {
-    local c17="$BASE_TMP/c17"
-    rm -rf "$c17"
-    mkdir -p "$c17/bin/lib"
-    git -C "$c17" init -q
-    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c17/bin/lib/pr-armable.sh"
-    printf '#!/bin/sh\ntouch "%s/called"\nexit %s\n' "$c17" "${2:-0}" > "$c17/bin/gate-backtest"
-    chmod +x "$c17/bin/gate-backtest"
-    local fail=""
-    if [ "$1" = "__fail__" ]; then
-        fail=1
-        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
-    else
-        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
-    fi
-    ( cd "$c17" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        GH_PR_FAIL="$fail" bash -c "$B17" 2>&1 )
-}
-c17_called() { [ -e "$BASE_TMP/c17/called" ] && echo yes || echo no; }
-
-if [ -z "$B17" ]; then
-    echo "FAIL: no block matching '# condition (17)' in $SKILL — marker drifted"
+# shellcheck disable=SC2016
+if PATH="$SHIMD:$PATH" GH_PROTECTION_FIXTURE="$c15_prot_f" bash -c \
+        'source "$1"; pr_aggregator_required' _ "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+    echo "ok: pr_aggregator_required returns 0 when the context is listed"
+else
+    echo "FAIL: pr_aggregator_required returned 1 with 'All checks settled' listed"
     FAILED=1
-else
-    expect_block "(17) HELD block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block HELD)")"
-    expect_block "(17) UNKNOWN block -> BLOCK" BLOCK "$(run_cond17 "$(c17_block UNKNOWN)")"
-    expect_block "(17) CLEARED block -> NONE" NONE "$(run_cond17 "$(c17_block CLEARED)")"
-    [ "$(c17_called)" = no ] && echo "ok: (17) CLEARED block does not run the stub" \
-        || { echo "FAIL: (17) CLEARED block ran bin/gate-backtest"; FAILED=1; }
-    expect_block "(17) NOT-APPLICABLE block -> NONE" NONE "$(run_cond17 "$(c17_block NOT-APPLICABLE)")"
-    expect_block "(17) block without a state line -> BLOCK" BLOCK "$(run_cond17 "$(c17_block)")"
-    expect_block "(17) two state lines -> BLOCK" BLOCK "$(run_cond17 "$(c17_block CLEARED CLEARED)")"
-    expect_block "(17) no block, stub rc 0 -> NONE" NONE "$(run_cond17 'plain body' 0)"
-    [ "$(c17_called)" = yes ] && echo "ok: (17) no block runs the stub" \
-        || { echo "FAIL: (17) no block did not run bin/gate-backtest"; FAILED=1; }
-    expect_block "(17) no block, stub rc 1 -> BLOCK" BLOCK "$(run_cond17 'plain body' 1)"
-    expect_block "(17) no block, stub rc 3 -> BLOCK" BLOCK "$(run_cond17 'plain body' 3)"
-    expect_block "(17) no block, stub rc 2 -> BLOCK" BLOCK "$(run_cond17 'plain body' 2)"
-    out="$(run_cond17 __fail__)"
-    expect_block "(17) unreadable PR body -> BLOCK" BLOCK "$out"
-    if [[ "$out" == *"cannot read the PR body"* ]]; then
-        echo "ok: (17) unreadable body names the cause"
-    else
-        echo "FAIL: (17) unreadable body should say 'cannot read the PR body', got: '$out'"
-        FAILED=1
-    fi
-fi
-
-# condition (18) — merge danger door. The block reads the PR body's Merge danger line
-# through pr_merge_danger_hold; only one well-formed two-way line passes.
-# run_cond18 <body|__fail__> — scratch repo with the real predicate library symlinked.
-MD_TWO='**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff'
-MD_ONE='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: mechanical: arming-path:bin/lib/pr-armable.sh'
-run_cond18() {
-    local c18="$BASE_TMP/c18"
-    rm -rf "$c18"
-    mkdir -p "$c18/bin/lib"
-    git -C "$c18" init -q
-    ln -s "$REPO_ROOT/bin/lib/pr-armable.sh" "$c18/bin/lib/pr-armable.sh"
-    local fail=""
-    if [ "$1" = "__fail__" ]; then
-        fail=1
-        printf '{"number":2100,"body":""}' > "$BASE_TMP/fixture.json"
-    else
-        jq -n --arg b "$1" '{number: 2100, body: $b}' > "$BASE_TMP/fixture.json"
-    fi
-    ( cd "$c18" && PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        GH_PR_FAIL="$fail" bash -c "$B18" 2>&1 )
-}
-expect_c18_text() { # label out needle
-    if [[ "$2" == *"$3"* ]]; then
-        echo "ok: $1"
-    else
-        echo "FAIL: $1 should say '$3', got: '$2'"
-        FAILED=1
-    fi
-}
-
-if [ -z "$B18" ]; then
-    echo "FAIL: no block matching '# condition (18)' in $SKILL — marker drifted"
-    FAILED=1
-else
-    expect_block "(18) two-way line -> NONE" NONE "$(run_cond18 "## Summary"$'\n'"$MD_TWO")"
-    out="$(run_cond18 "## Summary"$'\n'"$MD_ONE")"
-    expect_block "(18) one-way line -> BLOCK" BLOCK "$out"
-    expect_c18_text "(18) one-way names the door" "$out" "Door is one-way"
-    out="$(run_cond18 "## Summary"$'\n'"no field here")"
-    expect_block "(18) no line -> BLOCK" BLOCK "$out"
-    expect_c18_text "(18) missing line names the field" "$out" "no **Merge danger:** line"
-    out="$(run_cond18 "$MD_TWO"$'\n'"$MD_TWO")"
-    expect_block "(18) two lines -> BLOCK" BLOCK "$out"
-    expect_c18_text "(18) two lines read as malformed" "$out" "malformed (MALFORMED)"
-    out="$(run_cond18 '**Merge danger:** Door: maybe · Blast radius: module · Why: twenty characters at least')"
-    expect_block "(18) bad door value -> BLOCK" BLOCK "$out"
-    out="$(run_cond18 __fail__)"
-    expect_block "(18) unreadable PR body -> BLOCK" BLOCK "$out"
-    expect_c18_text "(18) unreadable body is fail-closed" "$out" "fail-closed"
-fi
-
-# --- Phase 5.0d autonomy contract: run_p50d helper + D1..D6 cases ---------
-# The 5.0d block regenerates /tmp/post-plan-changed-$PPID from
-# `git diff --name-only origin/master...HEAD` when the list is absent. Nothing
-# else runs that path, so this section runs the REAL block in a scratch repo and
-# proves the regeneration with two in-test mutants (M1, M2).
-
-P5D="$(extract_block '# Phase 5.0d' "$P5_SKILL")"
-_p5d_n=$(grep -rF '# Phase 5.0d' "$REPO_ROOT/.claude/skills" | wc -l | tr -d ' ')
-[ "$_p5d_n" = "1" ] && echo "ok: p5d marker unique in .claude/skills" \
-    || { echo "FAIL: p5d marker '# Phase 5.0d' appears $_p5d_n times (expected 1)"; FAILED=1; }
-if [ -n "$P5D" ] && printf '%s' "$P5D" | bash -n 2>/dev/null; then
-    echo "ok: p5d block extracted and parses"
-else
-    echo "FAIL: p5d block empty or does not parse"; FAILED=1
-fi
-
-# Scratch repo: origin/master ref, three committed files on top, bin/lib
-# symlinked afterwards (untracked, so it never enters the diff).
-P5D_REPO="$BASE_TMP/p5d-repo"
-mkdir -p "$P5D_REPO"
-(
-    cd "$P5D_REPO" || exit 1
-    git init -q
-    git config user.name t
-    git config user.email t@example.invalid
-    git config commit.gpgsign false
-    echo base > base.txt
-    git add base.txt
-    git commit -q -m base
-    git update-ref refs/remotes/origin/master HEAD
-    mkdir -p docs x/deep/tools/z bin
-    echo a > docs/exact.md
-    echo b > x/deep/tools/z/check.sh
-    echo c > bin/xylophone
-    git add docs x bin
-    git commit -q -m feature
-    ln -s "$REPO_ROOT/bin/lib" bin/lib
-)
-
-# run_p50d <block> <planfile> <PLAN_FOUND> <status-or-empty> [seed-list-file]
-# Runs the 5.0d block in the scratch repo. Prints the missing-tests lines,
-# then '@@LIST' + the changed list if one exists after the run. Everything
-# happens in ONE bash -c so prelude, block and cleanup share $PPID.
-run_p50d() {
-    ( cd "$P5D_REPO" && PLAN_FILE="$2" PLAN_FOUND="$3" \
-        P5D_STATUS="$4" P5D_SEED="${5:-}" \
-        bash -c 'rm -f "/tmp/post-plan-changed-$PPID" "/tmp/post-plan-missing-tests-$PPID"
-unset PHASE5_VERIFY_STATUS
-if [ -n "$P5D_STATUS" ]; then export PHASE5_VERIFY_STATUS="$P5D_STATUS"; fi
-if [ -n "$P5D_SEED" ]; then cp "$P5D_SEED" "/tmp/post-plan-changed-$PPID"; fi
-'"$1"'
-cat "/tmp/post-plan-missing-tests-$PPID" 2>/dev/null
-if [ -f "/tmp/post-plan-changed-$PPID" ]; then echo "@@LIST"; cat "/tmp/post-plan-changed-$PPID"; fi
-rm -f "/tmp/post-plan-changed-$PPID" "/tmp/post-plan-missing-tests-$PPID"' 2>&1 )
-}
-
-# mk_p5d_plan <name> <stop_condition-or-empty> <evidence-or-empty>
-mk_p5d_plan() {
-    {
-        if [ -n "$2" ] || [ -n "$3" ]; then
-            printf -- '---\n'
-            [ -n "$2" ] && printf 'stop_condition: %s\n' "$2"
-            [ -n "$3" ] && printf 'evidence: %s\n' "$3"
-            printf -- '---\n'
-        fi
-        printf '# Plan\n'
-    } > "$BASE_TMP/$1.md"
-    printf '%s' "$BASE_TMP/$1.md"
-}
-
-# p5d_expect <label> <expected> <actual>
-p5d_expect() {
-    if [ "$2" = "$3" ]; then
-        echo "ok: $1"
-    else
-        echo "FAIL: $1"; echo "  expected: $2"; echo "  actual:   $3"; FAILED=1
-    fi
-}
-
-P5D_PLAN_EV="$(mk_p5d_plan p5d-evidence-present evidence-present 'docs/exact.md,tools/z/check.sh,bin/x,docs/missing.md')"
-P5D_PLAN_NONE="$(mk_p5d_plan p5d-no-contract '' '')"
-P5D_PLAN_BAD="$(mk_p5d_plan p5d-malformed evidence-present 'a,,b')"
-P5D_PLAN_TG="$(mk_p5d_plan p5d-tests-green tests-green 'docs/exact.md')"
-printf 'bin/x\ndocs/missing.md\n' > "$BASE_TMP/p5d-seed.txt"
-
-# Each contract fixture must parse (or not) as its case intends.
-for _f in "$P5D_PLAN_EV" "$P5D_PLAN_TG"; do
-    "$REPO_ROOT/bin/lib/plan-autonomy-contract" --print "$_f" >/dev/null 2>&1 \
-        || { echo "FAIL: p5d fixture $_f should parse"; FAILED=1; }
-done
-if "$REPO_ROOT/bin/lib/plan-autonomy-contract" --print "$P5D_PLAN_BAD" >/dev/null 2>&1; then
-    echo "FAIL: p5d fixture malformed should be rejected"; FAILED=1
-fi
-
-D1_LIST="$(printf '@@LIST\nbin/xylophone\ndocs/exact.md\nx/deep/tools/z/check.sh')"
-D1_EXPECT="$(printf 'UNMET-CONTRACT: evidence bin/x declared but never appeared in the diff\nUNMET-CONTRACT: evidence docs/missing.md declared but never appeared in the diff\n%s' "$D1_LIST")"
-D2_EXPECT="$(printf 'UNMET-CONTRACT: evidence docs/exact.md declared but never appeared in the diff\nUNMET-CONTRACT: evidence tools/z/check.sh declared but never appeared in the diff\n@@LIST\nbin/x\ndocs/missing.md')"
-
-# D1: list absent -> regenerated; exact, suffix and exact-not-substring pinned.
-p5d_expect "p5d D1 absent list regenerated" "$D1_EXPECT" \
-    "$(run_p50d "$P5D" "$P5D_PLAN_EV" x '')"
-
-# D2: list present -> survives byte-for-byte and drives the verdicts.
-p5d_expect "p5d D2 seeded list preserved" "$D2_EXPECT" \
-    "$(run_p50d "$P5D" "$P5D_PLAN_EV" x '' "$BASE_TMP/p5d-seed.txt")"
-
-# D3: no contract -> silent, no list created.
-p5d_expect "p5d D3 no contract is silent" "" \
-    "$(run_p50d "$P5D" "$P5D_PLAN_NONE" x '')"
-
-# D4: malformed -> exactly one line, prefix-checked, no list.
-_d4="$(run_p50d "$P5D" "$P5D_PLAN_BAD" x '')"
-_d4_prefix='UNMET-CONTRACT: malformed autonomy contract — '
-if [ "$(printf '%s\n' "$_d4" | wc -l | tr -d ' ')" = "1" ] && [ "${_d4#"$_d4_prefix"}" != "$_d4" ]; then
-    echo "ok: p5d D4 malformed reported once"
-else
-    echo "FAIL: p5d D4 expected one malformed line, got: $_d4"; FAILED=1
-fi
-
-# D5: plan-blind -> silent.
-p5d_expect "p5d D5 plan-blind is silent" "" \
-    "$(run_p50d "$P5D" "$P5D_PLAN_EV" none '')"
-
-# D6: tests-green is met only on pass.
-D6_LIST="$(printf '@@LIST\nbin/xylophone\ndocs/exact.md\nx/deep/tools/z/check.sh')"
-_d6_ok=1
-_d6_pass="$(run_p50d "$P5D" "$P5D_PLAN_TG" x pass)"
-[ "$_d6_pass" = "$D6_LIST" ] || { _d6_ok=0; echo "FAIL: p5d D6 pass: $_d6_pass"; }
-for _pair in "fail:fail" "skipped:skipped" ":none"; do
-    _in="${_pair%%:*}"; _shown="${_pair#*:}"
-    _want="$(printf 'UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=%s\n%s' "$_shown" "$D6_LIST")"
-    _got="$(run_p50d "$P5D" "$P5D_PLAN_TG" x "$_in")"
-    [ "$_got" = "$_want" ] || { _d6_ok=0; echo "FAIL: p5d D6 status '$_in': $_got"; }
-done
-if [ "$_d6_ok" = "1" ]; then
-    echo "ok: p5d D6 tests-green x status (4 cases)"
-else
-    FAILED=1
-fi
-
-# M1: delete the regeneration line. D1 must FAIL against this mutant.
-P5D_M1="$(printf '%s\n' "$P5D" | grep -vF 'git diff --name-only origin/master...HEAD > "/tmp/post-plan-changed-')"
-if [ "$P5D_M1" = "$P5D" ]; then
-    echo "FAIL: p5d mutant M1 identical to original (anchor drifted)"; FAILED=1
-elif [ "$(printf '%s\n' "$P5D" | wc -l)" -ne "$(( $(printf '%s\n' "$P5D_M1" | wc -l) + 1 ))" ]; then
-    echo "FAIL: p5d mutant M1 removed other than exactly one line"; FAILED=1
-elif [ "$(run_p50d "$P5D_M1" "$P5D_PLAN_EV" x '')" != "$D1_EXPECT" ]; then
-    echo "ok: p5d D1 detects missing regeneration (M1)"
-else
-    echo "FAIL: p5d D1 did not detect M1 (regeneration deleted)"; FAILED=1
-fi
-
-# M2: make the regeneration unconditional. D2 must FAIL against this mutant.
-_m2_pat='[ -f "/tmp/post-plan-changed-$PPID" ] || '
-P5D_M2="${P5D/"$_m2_pat"/}"
-if [ "$P5D_M2" = "$P5D" ]; then
-    echo "FAIL: p5d mutant M2 identical to original (anchor drifted)"; FAILED=1
-elif [ "$(run_p50d "$P5D_M2" "$P5D_PLAN_EV" x '' "$BASE_TMP/p5d-seed.txt")" != "$D2_EXPECT" ]; then
-    echo "ok: p5d D2 detects unconditional regeneration (M2)"
-else
-    echo "FAIL: p5d D2 did not detect M2 (unconditional regeneration)"; FAILED=1
-fi
-
-# --- Phase 5.0d TWO-WAY AGREEMENT: 5.0d block vs harness.conformance.check ---
-# The block and conformance.check both enforce the autonomy contract. This
-# section feeds them the same plan and the same changed list and requires the
-# same ordered UNMET-CONTRACT lines. The parse half (lib vs planfile.py) is
-# pinned by test_contract_lib_sync in the harness pytest job. The malformed
-# line is compared by prefix only: the two sides word it differently by design.
-
-P5D_REPO="$BASE_TMP/p5d-agree-repo"
-mkdir -p "$P5D_REPO"
-(
-    cd "$P5D_REPO" || exit 1
-    git init -q
-    git config user.name t
-    git config user.email t@example.invalid
-    git config commit.gpgsign false
-    echo base > base.txt
-    git add base.txt
-    git commit -q -m base
-    git update-ref refs/remotes/origin/master HEAD
-    mkdir -p docs x/deep/tools/z aXb bin
-    echo a > docs/exact.md
-    echo b > x/deep/tools/z/check.sh
-    echo c > aXb/c
-    echo d > bin/xylophone
-    echo e > plain.txt
-    git add docs x aXb bin plain.txt
-    git commit -q -m feature
-    ln -s "$REPO_ROOT/bin/lib" bin/lib
-    git diff --name-only origin/master...HEAD > "$BASE_TMP/p5d-agree-changed.txt"
-)
-
-P5D_AGREE_EV='docs/exact.md,tools/z/check.sh,check.sh,z/check.sh,exact.md,a.b/c,aXb/c,bin/x,bin/xylophone,./plain.txt,plain.txt/,plain.txt,docs/missing.md'
-
-# py_p5d <planfile> <status-or-empty> — UNMET-CONTRACT lines from conformance.check
-py_p5d() {
-    ( cd "$REPO_ROOT/tools/postplan-harness" && python3 -c '
-import sys
-from harness import conformance
-from harness.planfile import frontmatter_autonomy_contract
-from harness.state import PlanInfo
-sc, ev, err = frontmatter_autonomy_contract(open(sys.argv[1]).read())
-changed = open(sys.argv[2]).read().split()
-plan = PlanInfo(found=True, stop_condition=sc, evidence=ev, contract_error=err)
-for item in conformance.check(plan, changed, phase5_status=(sys.argv[3] or None)):
-    if item.startswith("UNMET-CONTRACT:"):
-        print(item)
-' "$1" "$BASE_TMP/p5d-agree-changed.txt" "$2" )
-}
-
-# p5d_norm — keep UNMET-CONTRACT lines; collapse the malformed line to its prefix.
-p5d_norm() {
-    grep '^UNMET-CONTRACT:' | sed 's/^\(UNMET-CONTRACT: malformed autonomy contract\).*/\1/'
-}
-
-_agree_n=0
-_agree_bad=0
-# p5d_agree <label> <planfile> <status-or-empty>
-p5d_agree() {
-    _agree_n=$((_agree_n + 1))
-    _sh="$(run_p50d "$P5D_AGREE_BLOCK" "$2" x "$3" | p5d_norm)"
-    _py="$(py_p5d "$2" "$3" | p5d_norm)"
-    if [ "$_sh" != "$_py" ]; then
-        _agree_bad=$((_agree_bad + 1))
-        echo "FAIL: p5d two-way disagreement on $1"
-        echo "  block: $(printf '%s' "$_sh" | tr '\n' '|')"
-        echo "  py:    $(printf '%s' "$_py" | tr '\n' '|')"
-    fi
-}
-
-P5D_AGREE_BLOCK="$P5D"
-for _sc in evidence-present tests-green; do
-    _plan="$(mk_p5d_plan "p5d-agree-$_sc" "$_sc" "$P5D_AGREE_EV")"
-    for _st in "" pass fail skipped; do
-        p5d_agree "$_sc/${_st:-unset}" "$_plan" "$_st"
-    done
-done
-p5d_agree "malformed a,,b" "$(mk_p5d_plan p5d-agree-m1 evidence-present 'a,,b')" fail
-p5d_agree "malformed a..b" "$(mk_p5d_plan p5d-agree-m2 evidence-present 'a..b')" fail
-p5d_agree "malformed ,a" "$(mk_p5d_plan p5d-agree-m3 evidence-present ',a')" fail
-p5d_agree "malformed /etc/x" "$(mk_p5d_plan p5d-agree-m4 evidence-present '/etc/x')" fail
-p5d_agree "malformed bogus stop_condition" "$(mk_p5d_plan p5d-agree-m5 bogus 'docs/exact.md')" fail
-p5d_agree "malformed stop_condition alone" "$(mk_p5d_plan p5d-agree-m6 tests-green '')" fail
-p5d_agree "no contract" "$P5D_PLAN_NONE" fail
-
-if [ "$_agree_n" -ne 15 ]; then
-    echo "FAIL: p5d two-way agreement ran $_agree_n cases (expected 15)"; FAILED=1
-elif [ "$_agree_bad" -ne 0 ]; then
-    echo "FAIL: p5d two-way agreement: $_agree_bad of 15 cases disagree"; FAILED=1
-else
-    echo "ok: p5d two-way agreement (15 cases)"
-fi
-
-# Agreed-but-wrong negative half: pin three agreed outputs to literal strings.
-P5D_FIVE="$(printf 'UNMET-CONTRACT: evidence a.b/c declared but never appeared in the diff\nUNMET-CONTRACT: evidence bin/x declared but never appeared in the diff\nUNMET-CONTRACT: evidence ./plain.txt declared but never appeared in the diff\nUNMET-CONTRACT: evidence plain.txt/ declared but never appeared in the diff\nUNMET-CONTRACT: evidence docs/missing.md declared but never appeared in the diff')"
-p5d_expect "p5d agreed output pinned" "$P5D_FIVE" \
-    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
-p5d_expect "p5d agreed output pinned" \
-    "$(printf 'UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=none\n%s' "$P5D_FIVE")" \
-    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-tests-green.md" x '' | p5d_norm)"
-p5d_expect "p5d agreed output pinned" "UNMET-CONTRACT: malformed autonomy contract" \
-    "$(run_p50d "$P5D" "$BASE_TMP/p5d-agree-m2.md" x fail | p5d_norm)"
-
-# M3: disable the block's suffix arm. The comparator must see the divergence.
-_m3_pat='! grep -qE "/$('
-_m3_rep='! false "/$('
-P5D_M3="${P5D/"$_m3_pat"/"$_m3_rep"}"
-if [ "$P5D_M3" = "$P5D" ]; then
-    echo "FAIL: p5d mutant M3 identical to original (anchor drifted)"; FAILED=1
-else
-    _m3_sh="$(run_p50d "$P5D_M3" "$BASE_TMP/p5d-agree-evidence-present.md" x pass | p5d_norm)"
-    _m3_py="$(py_p5d "$BASE_TMP/p5d-agree-evidence-present.md" pass | p5d_norm)"
-    if [ "$_m3_sh" != "$_m3_py" ]; then
-        echo "ok: p5d agreement detects a one-sided suffix-match break (M3)"
-    else
-        echo "FAIL: p5d agreement did not detect M3 (suffix arm disabled)"; FAILED=1
-    fi
 fi
 
 # --- predicate exit-status invariant (the truncation bug) -------------------
@@ -2076,7 +916,6 @@ expect_clearance_2arg "(1) static wording + appended unit-test tail, non-test fi
 # Positive half: the call must carry two double-quoted arguments. The regex
 # is generic on purpose so Phase 2 may name its variable freely.
 PT="$REPO_ROOT/bin/pr-triage"
-P65="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 TWO_ARG_RE='pr_manual_testing_clearance "[^"]+" "[^"]+"'
 if grep -qF 'pr_manual_testing_clearance "$body")' "$PT"; then
     echo "FAIL: pr-triage still calls pr_manual_testing_clearance with the body only (tail clause never checked)"
@@ -2090,19 +929,6 @@ else
     echo "FAIL: pr-triage has no two-arg pr_manual_testing_clearance call"
     FAILED=1
 fi
-if grep -qF "pr_manual_testing_clearance \"\$(gh pr view --json body --jq '.body')\")" "$P65"; then
-    echo "FAIL: phase 6.5 condition (1) still calls pr_manual_testing_clearance with the body only"
-    FAILED=1
-else
-    echo "ok: phase 6.5 condition (1) no longer makes the one-arg clearance call"
-fi
-if grep -qE "$TWO_ARG_RE" "$P65"; then
-    echo "ok: phase 6.5 condition (1) passes changed files to pr_manual_testing_clearance"
-else
-    echo "FAIL: phase 6.5 condition (1) has no two-arg pr_manual_testing_clearance call"
-    FAILED=1
-fi
-
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
 expect_rc0 "rc0: pr_feat_hold, non-feat title" \
@@ -2189,156 +1015,15 @@ else
     FAILED=1
 fi
 
-# The fail-open this whole test exists to catch:
-expect_block "(8) feat: no label -> BLOCK (fail-open guard)" BLOCK \
-    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[]}' '' '')"
-expect_block "(8) feat: + human-approved -> NONE" NONE \
-    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[{"name":"human-approved"}]}' '' '')"
-expect_block "(8) fix: title -> NONE" NONE \
-    "$(run_isolated "$B8" '{"title":"fix: bug","labels":[]}' '' '')"
-
-expect_block "(10) pipeline-authored label -> BLOCK" BLOCK \
-    "$(run_isolated "$B10" '{"labels":[{"name":"pipeline-authored"}],"headRefName":"feature-x"}' '' '')"
-expect_block "(10) no pipeline label -> NONE" NONE \
-    "$(run_isolated "$B10" '{"labels":[],"headRefName":"feature-x"}' '' '')"
-expect_block "(10) bug-<id> branch, no label -> BLOCK (label-timing fail-open guard)" BLOCK \
-    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-2-odd-one-here"}' '' '')"
-expect_block "(10) bare bug-<id> branch -> BLOCK" BLOCK \
-    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-7"}' '' '')"
-expect_block "(10) bug-pipeline-* human branch -> NONE (digit anchor)" NONE \
-    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-pipeline-reproduce-gate"}' '' '')"
-
-# --- Phase 6 body-marker preservation (L20) --------------------------------
-# Fixtures: #1100 is OPEN (shim), everything else MERGED, so a preserved
-# Depends-on: #1100 still BLOCKs condition (6).
-
-# 1. Capture pulls a Depends-on: line
-BODY_DEP_BOTH='{"body":"intro\nDepends-on: #1100\n\n## Manual Testing\n- [ ] x"}'
-out_capture_depends_on="$(run_markers "$BODY_DEP_BOTH" "$BODY_DEP_BOTH")"
-expect_out 'markers_capture_depends_on' 'BODY_MARKERS_CAPTURED=1' "$out_capture_depends_on"
-expect_out 'markers_capture_depends_on (line present)' 'Depends-on: #1100' "$out_capture_depends_on"
-
-# 2. Capture is case-insensitive (matches pr_dep_holds's grep -iE)
-out_capture_ci="$(run_markers \
-    "$(printf '{"body":"%s"}' 'intro\ndepends-on: #1100\n\n## Manual Testing\n- [ ] x')" \
-    "$(printf '{"body":"%s"}' 'intro\ndepends-on: #1100\n\n## Manual Testing\n- [ ] x')")"
-expect_out 'markers_capture_case_insensitive' 'BODY_MARKERS_CAPTURED=1' "$out_capture_ci"
-
-# 3. Capture carries a multi-line <!-- no-adr: --> through its closing delimiter
-BEFORE_BODY_NOADR="$(cat <<'BEOF'
-{"body":"intro\n<!-- no-adr:\n  schema-only change, no decision recorded\n-->\n\n## Manual Testing\n- [ ] x"}
-BEOF
-)"
-out_capture_noadr="$(run_markers "$BEFORE_BODY_NOADR" "$BEFORE_BODY_NOADR")"
-expect_out 'markers_capture_multiline_no_adr (count=3)' 'BODY_MARKERS_CAPTURED=3' "$out_capture_noadr"
-expect_out 'markers_capture_multiline_no_adr (closing delimiter)' '-->' "$out_capture_noadr"
-
-# 4. Preserved marker => verdict=preserved, zero repair writes
-BODY_WITH_DEP='{"body":"Depends-on: #1100\n\n## Manual Testing\n..."}'
-out_preserved="$(run_markers "$BODY_WITH_DEP" "$BODY_WITH_DEP")"
-expect_out 'markers_verify_preserved_no_write' 'BODY_MARKERS=preserved' "$out_preserved"
-rec_preserved="$BASE_TMP/edit-record"
-if [ ! -s "$rec_preserved" ]; then
-    echo "ok: markers_verify_preserved_no_write (zero writes)"
-else
-    echo "FAIL: markers_verify_preserved_no_write — repair write fired on a preserved body"
-    FAILED=1
-fi
-
-# 5. Dropped marker => verdict=dropped, repair write fires with marker as first line
-BEFORE_BODY_DROP='{"body":"Depends-on: #1100\n\n## Manual Testing\n..."}'
-AFTER_BODY_DROP='{"body":"## Manual Testing\n...\n\n<!-- files-changed:begin -->\n- foo.php\n<!-- files-changed:end -->"}'
-out_dropped="$(run_markers "$BEFORE_BODY_DROP" "$AFTER_BODY_DROP")"
-expect_out 'markers_verify_dropped_repairs (verdict)' 'BODY_MARKERS=dropped:' "$out_dropped"
-rec_dropped="$BASE_TMP/edit-record"
-first_line_dropped="$(head -1 "$rec_dropped" 2>/dev/null)"
-if [ "$first_line_dropped" = "Depends-on: #1100" ]; then
-    echo "ok: markers_verify_dropped_repairs (first line of repair = Depends-on: #1100)"
-else
-    echo "FAIL: markers_verify_dropped_repairs — first line of repair body is '$first_line_dropped', expected 'Depends-on: #1100'"
-    FAILED=1
-fi
-
-# 6. End-to-end: repaired body makes condition (6) BLOCK again
-repaired_body_json="$(jq -Rs '{body:.}' < "$rec_dropped" 2>/dev/null)"
-if [ -n "$repaired_body_json" ]; then
-    expect_block 'markers_repaired_body_rearms_cond6' BLOCK \
-        "$(run_isolated "$B6" "$repaired_body_json" '' '')"
-else
-    echo "FAIL: markers_repaired_body_rearms_cond6 — rec_dropped was empty, case 5 must have failed"
-    FAILED=1
-fi
-
-# 7. Inline prose mention counts as dropped (grep -qxF = whole-line match)
-AFTER_BODY_INLINE='{"body":"See Depends-on: #1100 above for context.\n\n## Manual Testing\n..."}'
-out_inline="$(run_markers "$BEFORE_BODY_DROP" "$AFTER_BODY_INLINE")"
-expect_out 'markers_inline_mention_is_dropped' 'BODY_MARKERS=dropped:' "$out_inline"
-
-# 8. No markers => BODY_MARKERS_CAPTURED=0, verdict=none, zero writes
-BODY_NO_MARKERS='{"body":"## Manual Testing\nNo manual testing needed — automated."}'
-out_none="$(run_markers "$BODY_NO_MARKERS" "$BODY_NO_MARKERS")"
-expect_out 'markers_none_no_capture_no_write (captured=0)' 'BODY_MARKERS_CAPTURED=0' "$out_none"
-expect_out 'markers_none_no_capture_no_write (verdict=none)' 'BODY_MARKERS=none' "$out_none"
-rec_none="$BASE_TMP/edit-record"
-if [ ! -s "$rec_none" ]; then
-    echo "ok: markers_none_no_capture_no_write (zero writes)"
-else
-    echo "FAIL: markers_none_no_capture_no_write — spurious repair write on a marker-free body"
-    FAILED=1
-fi
-
-# --- Static assertions on instruction text ----------------------------------
-
-# 5s. Each literal block marker appears exactly once (extract_block latches on first match)
-for m in '# phase 6 body-marker capture' '# phase 6 body-marker verify'; do
-    cnt=$(grep -cF "$m" "$P25_SKILL")
-    if [ "$cnt" -eq 1 ]; then
-        echo "ok: markers_block_markers_unique ($m)"
-    else
-        echo "FAIL: markers_block_markers_unique — '$m' appears $cnt times in $P25_SKILL (expected 1)"
-        FAILED=1
-    fi
-done
-
-# 6s. Both extracted blocks parse as valid shell
-if printf '%s' "$BMC" | bash -n 2>/dev/null; then
-    echo "ok: markers_blocks_parse (capture block)"
-else
-    echo "FAIL: markers_blocks_parse — capture block does not parse as shell"
-    FAILED=1
-fi
-if printf '%s' "$BMV" | bash -n 2>/dev/null; then
-    echo "ok: markers_blocks_parse (verify block)"
-else
-    echo "FAIL: markers_blocks_parse — verify block does not parse as shell"
-    FAILED=1
-fi
-
-# 14s. Re-emit instruction text is present (an agent follows this prose)
-if grep -qF 're-emit every line the capture block printed, verbatim' "$P25_SKILL"; then
-    echo "ok: markers_reemit_prose_present"
-else
-    echo "FAIL: markers_reemit_prose_present — prose 're-emit every line the capture block printed, verbatim' not found in $P25_SKILL"
-    FAILED=1
-fi
-
-# 7s. BMC contains the same regex anchor as pr_dep_holds
-if printf '%s' "$BMC" | grep -qF '^[[:space:]]*depends-on:'; then
-    echo "ok: markers_regex_matches_predicate"
-else
-    echo "FAIL: markers_regex_matches_predicate — BMC does not contain '^[[:space:]]*depends-on:' (must match pr_dep_holds)"
-    FAILED=1
-fi
-
 # --- /plan SKILL.md gate 15 arm 2 + gate 16 shape (d) prose assertions -------
-if grep -qF 'Arm 2 fires regardless of why the hold exists' "$PLAN_SKILL"; then
+if grep -qF 'Arm 2 fires regardless of why the hold exists' "$PLAN_VALIDATE"; then
     echo "ok: plan SKILL.md gate 15 arm 2 prose present"
 else
     echo "FAIL: plan SKILL.md gate 15 arm 2 prose missing (expected 'Arm 2 fires regardless of why the hold exists')"
     FAILED=1
 fi
 
-if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_SKILL"; then
+if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_VALIDATE"; then
     echo "ok: plan SKILL.md gate 16 shape (d) prose present"
 else
     echo "FAIL: plan SKILL.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
@@ -2352,7 +1037,7 @@ fi
 # em-dash, no leading/trailing markdown that a reflow would change.
 while IFS= read -r needle; do
     [ -n "$needle" ] || continue
-    if grep -qF -- "$needle" "$PLAN_SKILL"; then
+    if grep -qF -- "$needle" "$PLAN_VALIDATE" "$PLAN_HOLD"; then
         echo "ok: plan SKILL.md hold-trigger pin present ($needle)"
     else
         echo "FAIL: plan SKILL.md hold-trigger pin missing ('$needle')"
@@ -2422,61 +1107,11 @@ never a whole-plan escape
 Which slice of this is intrinsic
 PINS
 
-# --- §5.5 condition (12): fidelity verdict gate behavioural cases ----------------
-expect_block "(12) no verdict file -> BLOCK (indeterminate, fail-closed)" BLOCK \
-    "$(run_cond12 "$B12" absent)"
-expect_block "(12) empty verdict file -> BLOCK (indeterminate)" BLOCK \
-    "$(run_cond12 "$B12" empty)"
-expect_block "(12) NOT READY -> BLOCK" BLOCK \
-    "$(run_cond12 "$B12" notready)"
-expect_block "(12) no parseable verdict word -> BLOCK (indeterminate)" BLOCK \
-    "$(run_cond12 "$B12" noverdict)"
-expect_block "(12) READY -> NONE (armable)" NONE \
-    "$(run_cond12 "$B12" ready)"
-expect_block "(12) READY WITH NOTES -> NONE (notes advisory; 5.5 already remediated)" NONE \
-    "$(run_cond12 "$B12" notes)"
-expect_block "(12) digest body says READY but verdict says NOT READY -> BLOCK" BLOCK \
-    "$(run_cond12 "$B12" digestready)"
-
-for pair in "absent:no Phase 5.5 fidelity verdict" \
-            "notready:is NOT READY" \
-            "noverdict:no parseable verdict word"; do
-    st="${pair%%:*}"; tok="${pair#*:}"
-    out="$(run_cond12 "$B12" "$st")"
-    if printf '%s' "$out" | grep -qF "$tok"; then
-        echo "ok: (12) $st takes its own arm ('$tok')"
-    else
-        echo "FAIL: (12) $st took the wrong BLOCKED arm — no '$tok' in: '$out'"
-        FAILED=1
-    fi
-done
-
-if grep -qF 'READY WITH NOTES' "$P55_SKILL" && grep -qF 'READY WITH NOTES' "$SKILL"; then
-    echo "ok: READY WITH NOTES is named in both the 5.5 procedure and the arming condition"
+# --- §5.5 fidelity verdict parse cases ----------------------------------------------
+if grep -qF 'READY WITH NOTES' "$P55_SKILL"; then
+    echo "ok: READY WITH NOTES is named in the 5.5 procedure"
 else
-    echo "FAIL: READY WITH NOTES named in only one of $P55_SKILL / $SKILL — remediation and arming have drifted"
-    FAILED=1
-fi
-
-DEFAULT_VF="/tmp/post-plan-fidelity-verdict-999002.md"
-printf '{"number":999002}' > "$BASE_TMP/fixture.json"
-mk_verdict_fixture ready "$DEFAULT_VF"
-
-# unset: production shape. Must resolve to the PR-keyed default and clear.
-expect_block "(12) var unset -> default path keyed to the derived PR number -> NONE" NONE \
-    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$B12" 2>&1)"
-
-# set-but-empty: the colon form treats it as unset. Same outcome, deliberately.
-expect_block "(12) var set-but-empty behaves as unset (colon form) -> NONE" NONE \
-    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE='' bash -c "$B12" 2>&1)"
-
-rm -f "$DEFAULT_VF"
-out_unset_gone="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$B12" 2>&1)"
-expect_block "(12) var unset, default path absent -> BLOCK" BLOCK "$out_unset_gone"
-if printf '%s' "$out_unset_gone" | grep -qF "$DEFAULT_VF"; then
-    echo "ok: (12) default path is PR-keyed (PR_NUM derived in-block)"
-else
-    echo "FAIL: (12) default path is NOT PR-keyed — a dropped in-block PR_NUM would block every PR: '$out_unset_gone'"
+    echo "FAIL: READY WITH NOTES missing from $P55_SKILL"
     FAILED=1
 fi
 
@@ -2522,143 +1157,6 @@ elif grep -qF 'rev-parse' <<< "$B55"; then
     FAILED=1
 else
     echo "ok: B55 (phase 5.5 verdict parse) contains no 'rev-parse' (hermetic)"
-fi
-
-# --- §5.8b condition (12): second-verdict (re-review) behavioural cases ------------
-CUR_TREE="$(git -C "$REPO_ROOT" rev-parse "HEAD^{tree}" 2>/dev/null || echo none)"
-STALE_TREE="0000000000000000000000000000000000000000"
-
-# 8.1 v2 absent → falls back to v1 (ready)
-expect_block "(12) v2 absent, v1 ready -> NONE" NONE \
-    "$(run_cond12 "$B12" ready)"
-
-# 8.2 v2 tree-match, v2 READY → arm; overrides v1 NOT READY
-expect_block "(12) v2 tree-match, v2 READY -> NONE (overrides v1 NOT READY)" NONE \
-    "$(run_cond12 "$B12" notready ready "$CUR_TREE")"
-
-# 8.3 v2 tree-match, v2 NOT READY → block
-expect_block "(12) v2 tree-match, v2 NOT READY -> BLOCK" BLOCK \
-    "$(run_cond12 "$B12" ready notready "$CUR_TREE")"
-
-# 8.4 v2 tree-match, v2 no parseable verdict → BLOCK (indeterminate)
-expect_block "(12) v2 tree-match, v2 no verdict -> BLOCK (indeterminate)" BLOCK \
-    "$(run_cond12 "$B12" ready noverdict "$CUR_TREE")"
-
-# 8.5 v2 tree-match, v2 READY WITH NOTES → arm (advisory)
-expect_block "(12) v2 tree-match, v2 READY WITH NOTES -> NONE (advisory)" NONE \
-    "$(run_cond12 "$B12" notready notes "$CUR_TREE")"
-
-# 8.6 v2 stale tree → NOTE diagnostic + falls back to v1 (ready) → arm
-out86="$(run_cond12 "$B12" ready ready "$STALE_TREE")"
-expect_block "(12) v2 stale tree, v1 ready -> NONE (falls back to v1)" NONE "$out86"
-if grep -qF 'stale re-review' <<< "$out86"; then
-    echo "ok: (12) stale re-review emits NOTE diagnostic"
-else
-    echo "FAIL: (12) stale re-review missing NOTE diagnostic: '$out86'"
-    FAILED=1
-fi
-
-# 8.7 v2 stale tree, v1 NOT READY → falls back to v1 → block
-expect_block "(12) v2 stale tree, v1 NOT READY -> BLOCK (falls back to v1 NOT READY)" BLOCK \
-    "$(run_cond12 "$B12" notready ready "$STALE_TREE")"
-
-# 8.8 v2 empty file (-s fails) → falls back to v1 (ready) → arm
-expect_block "(12) v2 empty (-s fails) -> NONE (falls back to v1)" NONE \
-    "$(run_cond12 "$B12" ready empty "")"
-
-# 8.9 v2 no REVIEWED_TREE line → treated as stale → NOTE + falls back to v1 → arm
-out89="$(run_cond12 "$B12" ready ready "")"
-expect_block "(12) v2 no REVIEWED_TREE line -> NONE (stale, falls back to v1)" NONE "$out89"
-if grep -qF 'stale re-review' <<< "$out89"; then
-    echo "ok: (12) missing REVIEWED_TREE treated as stale (NOTE emitted)"
-else
-    echo "FAIL: (12) missing REVIEWED_TREE not treated as stale: '$out89'"
-    FAILED=1
-fi
-
-# Case 8.7 (plan) — verdict-1 record integrity: after v2 clears condition 12,
-# re-parse v1 and assert it still yields NOT READY with a byte-identical pre-DIGEST body.
-# Byte identity of the whole file is the wrong assertion (Phase 5.5 appends REVIEWED_TREE=
-# to v1), so compare only the pre-## DIGEST section.
-vf1_87="$BASE_TMP/fidelity-verdict-87.md"
-vf2_87="$BASE_TMP/fidelity-verdict-87-2.md"
-mk_verdict_fixture notready "$vf1_87"
-mk_verdict_fixture ready "$vf2_87"
-printf 'REVIEWED_TREE=%s\n' "$CUR_TREE" >> "$vf2_87"
-printf '{"number":2100}' > "$BASE_TMP/fixture.json"
-out87="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-    FIDELITY_VERDICT_FILE="$vf1_87" FIDELITY_VERDICT_FILE_2="$vf2_87" bash -c "$B12" 2>&1)"
-expect_block "(12) case 8.7 setup: v2 clears v1 NOT READY -> NONE" NONE "$out87"
-# Re-parse v1 with the canonical expression
-v1_word_87="$(sed '/^## DIGEST/,$d' "$vf1_87" \
-    | grep -E '^(READY WITH NOTES|NOT READY|READY)[[:space:]]*$' | tail -1 | sed 's/[[:space:]]*$//')"
-if [ "$v1_word_87" = "NOT READY" ]; then
-    echo "ok: (12) v1 record integrity: re-parse still yields NOT READY"
-else
-    echo "FAIL: (12) v1 record integrity: re-parse yielded '$v1_word_87', expected NOT READY"
-    FAILED=1
-fi
-# Assert pre-DIGEST body byte-identical to a fresh notready fixture
-vf_ref87="$BASE_TMP/fidelity-verdict-ref87.md"
-mk_verdict_fixture notready "$vf_ref87"
-v1_body_87="$(sed '/^## DIGEST/,$d' "$vf1_87")"
-ref_body_87="$(sed '/^## DIGEST/,$d' "$vf_ref87")"
-if [ "$v1_body_87" = "$ref_body_87" ]; then
-    echo "ok: (12) v1 record integrity: pre-DIGEST body byte-identical to notready fixture"
-else
-    echo "FAIL: (12) v1 record integrity: pre-DIGEST body modified — verdict 1 was mutated"
-    FAILED=1
-fi
-
-# --- §5.6 condition (12): structural assertions (no assert_self_contained — see below) --
-# Condition (12) reads run-local /tmp state and sources no library, so
-# assert_self_contained — hardwired to `source` + pr-armable.sh — does NOT apply and
-# must not be called on it; it would FAIL unconditionally. Its self-containment
-# obligation is in-block re-derivation: each /post-plan block runs in its own shell,
-# so a block that inherited $PR_NUM would key the default path to the empty string
-# and block every PR forever, silently.
-# cond12_structural <block> — printed verdict, so the vacuity mutant below can
-# assert the guard actually fires.
-# shellcheck disable=SC2016  # grep patterns match literal ${VAR:-...} text in the block
-cond12_structural() {
-    printf '%s' "$1" | grep -q 'gh pr view --json number' \
-        && printf '%s' "$1" | grep -qF 'FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-' \
-        && grep -qF 'FIDELITY_VERDICT_FILE_2="${FIDELITY_VERDICT_FILE_2:-' <<< "$1" \
-        && { echo derives; return; }
-    echo missing
-}
-
-if [ -z "$B12" ]; then
-    echo "FAIL: condition (12) — no block matching '# condition (12)' in $SKILL"
-    FAILED=1
-elif [ "$(cond12_structural "$B12")" = derives ]; then
-    echo "ok: condition (12) re-derives PR_NUM and FIDELITY_VERDICT_FILE in-block"
-else
-    echo "FAIL: condition (12) does NOT re-derive PR_NUM/FIDELITY_VERDICT_FILE in-block (cross-shell state = permanent silent block)"
-    FAILED=1
-fi
-
-# Vacuity mutant: strip the derivation and confirm the guard notices.
-if [ "$(cond12_structural "$(printf '%s' "$B12" | grep -v 'gh pr view')")" = missing ]; then
-    echo "ok: cond12_structural is not vacuous (mutant detected)"
-else
-    echo "FAIL: cond12_structural passes a block with no PR_NUM derivation — the guard is vacuous"
-    FAILED=1
-fi
-
-# Vacuity mutant 2: strip FIDELITY_VERDICT_FILE_2 and confirm the guard notices.
-if [ "$(cond12_structural "$(printf '%s' "$B12" | grep -v 'FIDELITY_VERDICT_FILE_2')")" = missing ]; then
-    echo "ok: cond12_structural is not vacuous on FIDELITY_VERDICT_FILE_2 (mutant 2 detected)"
-else
-    echo "FAIL: cond12_structural passes a block with no FIDELITY_VERDICT_FILE_2 derivation — guard 2 is vacuous"
-    FAILED=1
-fi
-
-if printf '%s' "$B12" | grep -vE '^[[:space:]]*#' | grep -qE '\$\$|\$PPID'; then
-    echo "FAIL: condition (12) keys its verdict path to \$\$/\$PPID — Phase 5.5 wrote that file from a different shell"
-    FAILED=1
-else
-    echo "ok: condition (12) verdict path is not PID-keyed"
 fi
 
 # --- §5.5 Step 1b carry-forward gate behavioural cases ---------------------------------
@@ -2824,9 +1322,6 @@ grep -qxF '## DIGEST' "$CF_VF" 2>/dev/null || { echo "FAIL: cf-materialise-happy
 printf '{"number":%s}' "$CF_PR" > "$BASE_TMP/fixture.json"
 expect_fidelity "cf-materialise-happy: verdict parse reads READY" "READY" \
     "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE="$CF_VF" bash -c "$B55" 2>&1)"
-expect_block "cf-materialise-happy: condition (12) arms on the carried file -> NONE" NONE \
-    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE="$CF_VF" \
-        FIDELITY_VERDICT_FILE_2="$BASE_TMP/cf-vf-none-2.md" bash -c "$B12" 2>&1)"
 [ "$FAILED" = "$CF_FAILED_BEFORE" ] && echo "ok: cf-materialise-happy"
 rm -f "/tmp/post-plan-digest-lines-$CF_PR.txt"
 
@@ -3193,31 +1688,22 @@ if [ -n "$_DL_FN" ]; then
     fi
 fi
 
-# 4f: no fixture writes /tmp/post-plan-fidelity-verdict-<digit> paths outside
-# DEFAULT_VF.  Pattern uses a bracketed char-class so the source line for the
+# 4f: no fixture writes /tmp/post-plan-fidelity-verdict-<digit> paths.  Pattern uses a bracketed char-class so the source line for the
 # _VPATH_PAT assignment does not contain '/tmp/...' + digit and cannot self-match.
 _VPATH_PAT='post-plan-fidelity-verdict-[0-9]'
 _vpath_hits="$(grep -c "/tmp/${_VPATH_PAT}" "$SCRIPT_DIR/test-postplan-arm-conditions" || true)"
-if [ "$_vpath_hits" -eq 1 ]; then
-    echo "ok: 5.8c fixture hygiene: no /tmp verdict paths with digit outside DEFAULT_VF"
+if [ "$_vpath_hits" -eq 0 ]; then
+    echo "ok: 5.8c fixture hygiene: no fixture writes a /tmp verdict path keyed by a digit"
 else
-    echo "FAIL: 5.8c fixture hygiene: $_vpath_hits lines contain /tmp/post-plan-fidelity-verdict-<digit> (expected only the DEFAULT_VF line)"
+    echo "FAIL: 5.8c fixture hygiene: $_vpath_hits lines contain /tmp/post-plan-fidelity-verdict-<digit> (expected none)"
     FAILED=1
 fi
 
-# --- §5.7 drift guards: path stem + parse agreement across phases ------------------
-for f in "$P55_SKILL" "$SKILL"; do
-    grep -qF 'post-plan-fidelity-verdict-' "$f" \
-        || { echo "FAIL: drift — $(basename "$f") lost the verdict-path stem"; FAILED=1; }
-    if grep -qE 'post-plan-fidelity-verdict-(\$\$|\$PPID)' "$f"; then
-        echo "FAIL: drift — $(basename "$f") keys the verdict path to a PID; the writer and the reader are different shells"
-        FAILED=1
-    fi
-done
-if grep -qF 'post-plan-fidelity-verdict-$PR_NUM-2.md' <<< "$B12"; then
-    echo "ok: condition (12) block names the -2 verdict path"
-else
-    echo "FAIL: drift — condition (12) block lost the -2 verdict path (post-plan-fidelity-verdict-\$PR_NUM-2.md)"
+# --- §5.7 drift guards: path stem + parse tokens in the fidelity phase -----------
+grep -qF 'post-plan-fidelity-verdict-' "$P55_SKILL" \
+    || { echo "FAIL: drift — $(basename "$P55_SKILL") lost the verdict-path stem"; FAILED=1; }
+if grep -qE 'post-plan-fidelity-verdict-(\$\$|\$PPID)' "$P55_SKILL"; then
+    echo "FAIL: drift — $(basename "$P55_SKILL") keys the verdict path to a PID; the writer and the reader are different shells"
     FAILED=1
 fi
 # shellcheck disable=SC2016  # literal shell text, not expansions
@@ -3227,176 +1713,13 @@ PARSE_TOKENS=(
     'tail -1'
 )
 for tok in "${PARSE_TOKENS[@]}"; do
-    for pair in "5.5:$B55" "cond12:$B12"; do
-        who="${pair%%:*}"; blk="${pair#*:}"
-        if printf '%s' "$blk" | grep -qF -- "$tok"; then
-            echo "ok: $who verdict parse carries [$tok]"
-        else
-            echo "FAIL: verdict-parse drift — $who is missing [$tok]; Phase 5.5 and condition (12) can now disagree about the same verdict file"
-            FAILED=1
-        fi
-    done
-done
-
-# --- §5.8 phase 2 merge gate behavioural cases ----------------------------------
-# mk_rebase_repo <kind: clean|behind|conflict|hookdeny> — echo the path of a throwaway repo.
-# hookdeny is the behind shape plus a pre-merge-commit hook that exits 1. git merge runs
-# pre-merge-commit (never pre-commit) before it writes the merge commit, so this is the
-# hook that can refuse a conflict-free merge. core.hooksPath is pinned to the fixture's
-# own hooks dir so a developer's global hooksPath cannot bypass it.
-# CI has no global git identity; set it per-repo or every commit here aborts.
-mk_rebase_repo() {
-    local d; d="$(mktemp -d "$BASE_TMP/rebase-XXXXXX")"
-    git -C "$d" init --quiet -b main
-    git -C "$d" config user.email 'postplan-test@example.invalid'
-    git -C "$d" config user.name  'postplan test'
-    printf 'base\n' > "$d/f.txt"
-    git -C "$d" add f.txt
-    git -C "$d" commit --quiet -m base
-    git -C "$d" branch fakebase
-    case "$1" in
-        clean) ;;                                  # HEAD already contains fakebase
-        behind|hookdeny)                           # base moves on a DIFFERENT file
-            git -C "$d" checkout --quiet fakebase
-            printf 'other\n' > "$d/g.txt"; git -C "$d" add g.txt
-            git -C "$d" commit --quiet -m advance
-            git -C "$d" checkout --quiet main
-            printf 'mine\n' > "$d/h.txt"; git -C "$d" add h.txt
-            git -C "$d" commit --quiet -m mine ;;
-        conflict)                                  # both sides rewrite the same line
-            git -C "$d" checkout --quiet fakebase
-            printf 'theirs\n' > "$d/f.txt"; git -C "$d" commit --quiet -am theirs
-            git -C "$d" checkout --quiet main
-            printf 'mine\n'   > "$d/f.txt"; git -C "$d" commit --quiet -am mine ;;
-    esac
-    if [ "$1" = hookdeny ]; then
-        git -C "$d" config core.hooksPath "$d/.git/hooks"
-        mkdir -p "$d/.git/hooks"
-        printf '#!/bin/sh\nexit 1\n' > "$d/.git/hooks/pre-merge-commit"
-        chmod +x "$d/.git/hooks/pre-merge-commit"
-    fi
-    printf '%s' "$d"
-}
-
-# run_rebase <block> <repo> <base-ref> — own shell, own cwd.
-run_rebase() { ( cd "$2" && REBASE_BASE_REF="$3" bash -c "$1" 2>&1 ); }
-
-# expect_reb <name> <want-substr> <stop|resolve|nostop> <output>
-# `resolve` is the conflict arm's hand-off token: it must print ^STOP-AND-RESOLVE: and
-# must NOT print a bare ^STOP:, which in this codebase means the skill halts.
-expect_reb() {
-    local ok=1
-    printf '%s' "$4" | grep -qF "$2" || ok=0
-    if [ "$3" = stop ]; then printf '%s' "$4" | grep -q '^STOP:' || ok=0
-    elif [ "$3" = resolve ]; then
-        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' || ok=0
-        printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    if printf '%s' "$B55" | grep -qF -- "$tok"; then
+        echo "ok: 5.5 verdict parse carries [$tok]"
     else
-        printf '%s' "$4" | grep -q '^STOP:' && ok=0
-        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' && ok=0
-    fi
-    if [ "$ok" -eq 1 ]; then echo "ok: $1"
-    else echo "FAIL: $1 — expected '$2' and $3, got: '$4'"; FAILED=1; fi
-}
-
-if [ -z "$BREB" ]; then
-    echo "FAIL: phase 2 merge — no block matching '# phase 2 merge' in $P25_SKILL"
-    FAILED=1
-else
-    # Already up to date -> clean, no STOP. Also the empty-range boundary for the
-    # pre-existing `git diff origin/master...HEAD` check whose base this step moves.
-    R="$(mk_rebase_repo clean)"
-    expect_reb "phase 2 merge: already contains base -> REBASE=clean, no STOP" \
-        "REBASE=clean" nostop "$(run_rebase "$BREB" "$R" fakebase)"
-
-    # Behind, non-conflicting -> merged, no STOP, HEAD advances to a merge commit.
-    R="$(mk_rebase_repo behind)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 merge: behind, no conflict -> REBASE=merged, no STOP" \
-        "REBASE=merged" nostop "$(run_rebase "$BREB" "$R" fakebase)"
-    [ "$(git -C "$R" rev-parse HEAD)" != "$BEFORE" ] \
-        && echo "ok: phase 2 merge: HEAD advanced onto the base" \
-        || { echo "FAIL: phase 2 merge: HEAD unchanged after a reported merge"; FAILED=1; }
-    # A rebase also advances HEAD, so only a second parent proves the block merged.
-    # Mutation: swap the block back to `git rebase` and HEAD^2 does not resolve.
-    git -C "$R" rev-parse -q --verify HEAD^2 >/dev/null \
-        && git -C "$R" merge-base --is-ancestor fakebase HEAD \
-        && echo "ok: phase 2 merge: HEAD is a merge commit containing the base" \
-        || { echo "FAIL: phase 2 merge: HEAD has no second parent containing the base"; FAILED=1; }
-    [ "$(git -C "$R" rev-parse HEAD^1)" = "$BEFORE" ] \
-        && echo "ok: phase 2 merge: the branch tip is the merge commit's first parent" \
-        || { echo "FAIL: phase 2 merge: the first parent is not the pre-merge branch tip"; FAILED=1; }
-
-    # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
-    R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    OUT="$(run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 merge: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
-        "REBASE=conflict" resolve "$OUT"
-    grep -qF 'linear-history-squash-merge.md' <<< "$OUT" \
-        && echo "ok: phase 2 merge: STOP text names the linear-history rule" \
-        || { echo "FAIL: phase 2 merge: STOP text omits the linear-history rule the label promises"; FAILED=1; }
-    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 merge: HEAD unchanged after a conflict" \
-        || { echo "FAIL: phase 2 merge: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
-    [ -z "$(git -C "$R" status --porcelain)" ] \
-        && echo "ok: phase 2 merge: working tree clean after a conflict" \
-        || { echo "FAIL: phase 2 merge: tree left dirty after a conflict"; FAILED=1; }
-    [ ! -d "$R/.git/rebase-merge" ] && [ ! -d "$R/.git/rebase-apply" ] \
-        && echo "ok: phase 2 merge: no rebase left in progress" \
-        || { echo "FAIL: phase 2 merge: left an in-progress rebase behind"; FAILED=1; }
-    # Mutation: delete `git merge --abort` from the conflict arm and MERGE_HEAD survives.
-    [ ! -f "$R/.git/MERGE_HEAD" ] \
-        && echo "ok: phase 2 merge: no merge left in progress" \
-        || { echo "FAIL: phase 2 merge: left an in-progress merge (MERGE_HEAD) behind"; FAILED=1; }
-
-    # NEGATIVE: a hook refuses the merge commit of a conflict-free merge. MERGE_HEAD
-    # exists but no path is unmerged, so the --diff-filter=U arm must NOT claim a
-    # conflict. Mutation: remove that arm and this case reports REBASE=conflict.
-    R="$(mk_rebase_repo hookdeny)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    mkdir -p "$BASE_TMP/hookdeny-flag"
-    OUT="$(PPCAP_TMP="$BASE_TMP/hookdeny-flag" run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 merge: hook refuses the merge commit -> REBASE=indeterminate + STOP" \
-        "REBASE=indeterminate" stop "$OUT"
-    grep -qF 'REBASE=conflict' <<< "$OUT" \
-        && { echo "FAIL: phase 2 merge: a hook refusal was reported as REBASE=conflict"; FAILED=1; } \
-        || echo "ok: phase 2 merge: a hook refusal is not reported as REBASE=conflict"
-    ls "$BASE_TMP/hookdeny-flag"/postplan-conflict-resolved-* >/dev/null 2>&1 \
-        && { echo "FAIL: phase 2 merge: a hook refusal wrote the conflict flag"; FAILED=1; } \
-        || echo "ok: phase 2 merge: a hook refusal writes no conflict flag"
-    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 merge: HEAD unchanged after a hook refusal" \
-        || { echo "FAIL: phase 2 merge: HEAD moved despite a hook refusal"; FAILED=1; }
-    [ ! -f "$R/.git/MERGE_HEAD" ] \
-        && echo "ok: phase 2 merge: no merge left in progress after a hook refusal" \
-        || { echo "FAIL: phase 2 merge: left MERGE_HEAD behind after a hook refusal"; FAILED=1; }
-    [ -z "$(git -C "$R" status --porcelain)" ] \
-        && echo "ok: phase 2 merge: working tree clean after a hook refusal" \
-        || { echo "FAIL: phase 2 merge: tree left dirty after a hook refusal"; FAILED=1; }
-
-    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing merged.
-    R="$(mk_rebase_repo clean)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
-    expect_reb "phase 2 merge: unresolvable base ref -> REBASE=indeterminate + STOP" \
-        "REBASE=indeterminate" stop "$(run_rebase "$BREB" "$R" refs/heads/no-such-ref)"
-    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
-        && echo "ok: phase 2 merge: HEAD unchanged on an unresolvable base" \
-        || { echo "FAIL: phase 2 merge: HEAD moved on an unresolvable base"; FAILED=1; }
-
-    # NEGATIVE: no override flag exists — a "proceed anyway" branch would be a
-    # gate weakening, so assert the block has no escape hatch.
-    if printf '%s' "$BREB" | grep -qiE 'FORCE|SKIP_REBASE|proceed anyway|--continue'; then
-        echo "FAIL: phase 2 merge block grew an override/proceed-anyway path"
+        echo "FAIL: verdict-parse drift — 5.5 is missing [$tok]"
         FAILED=1
-    else
-        echo "ok: phase 2 merge has no override path"
     fi
-fi
-
-
-# --- §5.9 conflict-resolution + BEHIND re-rebase ---------------------------------
-# These extend §5.8 rather than living in a sibling harness: mk_rebase_repo,
-# extract_block and run_isolated are already here, and a second bin/test-* would
-# duplicate then drift from them (.claude/rules/meta-tooling-bar.md).
-CRES="$REPO_ROOT/.claude/skills/post-plan/_phase-2-conflict-resolution.md"
-CIMON="$REPO_ROOT/.claude/skills/post-plan/_phase-7-ci-monitoring.md"
+done
 
 # have <name> <haystack> <needle> — literal substring assertion. Herestring, never a
 # pipe into grep -q: .claude/rules/shell-pipefail-grep.md.
@@ -3410,319 +1733,6 @@ lacks() {
         echo "FAIL: $1 — must NOT contain '$3'"; FAILED=1
     else echo "ok: $1"; fi
 }
-# before <name> <haystack> <first> <second> — assert <first> appears at a lower line
-# number than <second>. Ordering assertions are how a "do it, then check it"
-# reordering gets caught; a plain both-present grep cannot see it.
-before() {
-    local a b
-    a="$(grep -nF -- "$3" <<< "$2" | head -1 | cut -d: -f1)"
-    b="$(grep -nF -- "$4" <<< "$2" | tail -1 | cut -d: -f1)"
-    if [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]; then echo "ok: $1"
-    else echo "FAIL: $1 — '$3' (line ${a:-none}) must precede '$4' (line ${b:-none})"; FAILED=1; fi
-}
-
-# §5.9a marker isolation. extract_block matches the FIRST fence whose body contains
-# the literal as a SUBSTRING, so a capture block marked "# phase 2 merge capture"
-# would silently steal $BREB and run every §5.8 assertion against the wrong code
-# while still reporting green. The live marker is "# phase 2 pre-rebase capture"
-# precisely so that substring never matches.
-BCAP="$(extract_block '# phase 2 pre-rebase capture' "$P25_SKILL")"
-if [ -z "${BREB:-}" ] || [ -z "$BCAP" ]; then
-    echo "FAIL: §5.9a — could not extract both the rebase and the pre-rebase capture block"
-    FAILED=1
-else
-    have  "§5.9a: '# phase 2 merge' still binds to the merge block" "$BREB" 'git merge --abort'
-    lacks "§5.9a: '# phase 2 merge' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
-    have  "§5.9a: the capture block is the one that prints PRECAPTURE=ok" "$BCAP" 'PRECAPTURE=ok'
-
-    # §5.9b deliberate asymmetry: lostwork.sh hardcodes `git diff origin/master...HEAD`,
-    # so the capture block must too. "Fixing" it to follow $REBASE_BASE_REF makes EVERY
-    # run — clean ones included — report TREE DIVERGED.
-    have  "§5.9b: capture block pins the literal origin/master...HEAD base" "$BCAP" 'git diff origin/master...HEAD'
-    lacks "§5.9b: capture block ignores the REBASE_BASE_REF seam" "$BCAP" 'REBASE_BASE_REF'
-    # Test seams must stay defaulted, or the block writes into a developer's real /tmp.
-    have  "§5.9b: PPCAP_TMP seam keeps its default" "$BCAP" 'PPCAP_TMP:-/tmp'
-    have  "§5.9b: PPCAP_KEY seam keeps its default" "$BCAP" 'PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD'
-    have  "§5.9b: capture block sanitises the branch slug" "$BCAP" "tr '/:' '--'"
-fi
-
-# §5.9c condition (14): the flag decides, and it must decide in BOTH directions.
-B14="$(extract_block '# phase 6.5 condition 14' "$P25_SKILL")"
-if [ -z "$B14" ]; then
-    echo "FAIL: §5.9c — no block matching '# phase 6.5 condition 14' in $P25_SKILL"
-    FAILED=1
-else
-    # The awk region is delimited by one anchor comment. Two anchors and
-    # extract_block silently returns the wrong span, so every §5.9c
-    # assertion below would pass against text that never runs.
-    ANCHOR_N="$(grep -cF '# phase 6.5 condition 14' "$P25_SKILL")"
-    if [ "$ANCHOR_N" != "1" ]; then
-        echo "FAIL: §5.9c — anchor '# phase 6.5 condition 14' appears $ANCHOR_N times in $P25_SKILL"
-        FAILED=1
-    fi
-    have "§5.9c: CONFLICT_FLAG seam keeps its default" "$B14" 'CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-'
-    lacks "§5.9c: condition (14) never arms auto-merge itself" "$B14" 'gh pr merge'
-
-    # Characterization (pre-impl): this group runs with NO verdict file anywhere
-    # under the scratch root. Phase 5 makes that precondition load-bearing —
-    # this is matrix case 2 (conflict + no verdict → HOLDS).
-    VC="$(find "$BASE_TMP" -name 'postplan-conflict-verdict-*' 2>/dev/null | wc -l | tr -d ' ')"
-    if [ "$VC" != "0" ]; then
-        echo "FAIL: §5.9c — scratch root holds $VC verdict file(s); the hold case is vacuous"
-        FAILED=1
-    fi
-
-    VDIR="$BASE_TMP/verdicts"; mkdir -p "$VDIR"
-    VKEY="cond14-fixture"
-    HS="$(git rev-parse HEAD)"
-    VOK="$VDIR/postplan-conflict-verdict-$VKEY-$HS.ok"
-
-    # Flag present -> hold, with the full remedy wording. A HOLD line that does not
-    # say what the human should do reads as a bug report, not a gate.
-    F14="$BASE_TMP/cond14-present"; : > "$F14"
-    O14="$(CONFLICT_FLAG="$F14" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
-    have "§5.9c: flag present -> COND14=blocked"            "$O14" 'COND14=blocked'
-    have "§5.9c: HOLD names the condition"                  "$O14" 'condition (14)'
-    have "§5.9c: HOLD says the lost-work proof passed"      "$O14" 'TREE-EQUIVALENT'
-    have "§5.9c: HOLD names the remedy"                     "$O14" 'merge by hand'
-    have "§5.9c: HOLD names the non-remedy"                 "$O14" 'do not re-run /post-plan'
-    lacks "§5.9c: a held run emits no arming command"       "$O14" 'gh pr merge --squash --auto'
-
-    # NEGATIVE, and the highest-value case in the set: an inverted `[ ! -e ]` would
-    # hold EVERY clean run and stall the whole merge pipeline while every other
-    # assertion here stayed green.
-    O14C="$(CONFLICT_FLAG="$BASE_TMP/cond14-absent" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
-    have  "§5.9c: no flag -> COND14=clear"        "$O14C" 'COND14=clear'
-    lacks "§5.9c: a clean run emits no HOLD line" "$O14C" 'HOLD:'
-
-    # Same block, a second unrelated tmp root: proves nothing leaks between runs.
-    ALT_TMP="$(mktemp -d "$BASE_TMP/alt-XXXXXX")"
-    O14D="$(CONFLICT_FLAG="$ALT_TMP/cond14-absent" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
-    have "§5.9c: clear verdict is not sticky across tmp roots" "$O14D" 'COND14=clear'
-
-    run14() { CONFLICT_FLAG="$1" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1; }
-
-    printf 'CONFLICT-REVIEW=CLEAN\n' > "$VOK"
-    OK1="$(run14 "$F14")"
-    have  "§5.9c: clean verdict for this HEAD -> COND14=clear" "$OK1" 'COND14=clear'
-    lacks "§5.9c: a cleared conflict emits no HOLD line"       "$OK1" 'HOLD:'
-
-    : > "$VOK"
-    have "§5.9c: empty verdict -> blocked"       "$(run14 "$F14")" 'COND14=blocked'
-
-    printf 'CONFLICT-REVIEW=CLEANISH\nCONFLICT-REVIEW=CLEAN\n' > "$VOK"
-    have "§5.9c: superstring verdict -> blocked" "$(run14 "$F14")" 'COND14=blocked'
-
-    printf 'CONFLICT-REVIEW=FOUND-PROBLEM\n## Findings\n- x\n' > "$VOK"
-    have "§5.9c: negative verdict -> blocked"    "$(run14 "$F14")" 'COND14=blocked'
-
-    rm -f "$VOK"
-    printf 'CONFLICT-REVIEW=CLEAN\n' > "$VDIR/postplan-conflict-verdict-$VKEY-deadbeefdeadbeefdeadbeefdeadbeefdeadbeef.ok"
-    have "§5.9c: verdict keyed to a stale sha -> blocked" "$(run14 "$F14")" 'COND14=blocked'
-
-    printf 'CONFLICT-REVIEW=FOUND-PROBLEM\n' > "$VOK"
-    have "§5.9c: no flag -> clear even with a negative verdict" "$(run14 "$BASE_TMP/cond14-absent")" 'COND14=clear'
-    rm -f "$VOK"
-
-    have  "§5.9c: verdict dir seam keeps its default"          "$B14" 'CONFLICT_VERDICT_DIR:-/tmp'
-    have  "§5.9c: the HEAD sha is not seam-overridable"        "$B14" '.ok"'
-    have  "§5.9c: line 1 is compared by exact equality"        "$B14" '"$VERDICT_LINE" = "CONFLICT-REVIEW=CLEAN"'
-    lacks "§5.9c: no pattern match replaces the equality test" "$B14" 'grep'
-    lacks "§5.9c: existence alone never clears the hold"       "$B14" 'test -f "$CONFLICT_VERDICT"'
-fi
-
-# §5.9d Phase 6.5 step 0 announcement guard.
-BANN="$(extract_block '# phase 6.5 conflict-hold announcement' "$P25_SKILL")"
-if [ -z "$BANN" ]; then
-    echo "FAIL: §5.9d — no block matching '# phase 6.5 conflict-hold announcement' in $P25_SKILL"
-    FAILED=1
-else
-    OA="$(CONFLICT_FLAG="$BASE_TMP/ann-absent" bash -c "$BANN" 2>&1)"
-    have "§5.9d: no flag -> CONFLICT-HOLD=none" "$OA" 'CONFLICT-HOLD=none'
-    lacks "§5.9d: a clean run posts no comment" "$OA" 'gh pr comment'
-    FA="$BASE_TMP/ann-present"; : > "$FA"
-    OB="$(CONFLICT_FLAG="$FA" bash -c "$BANN" 2>&1)"
-    have "§5.9d: flag present -> CONFLICT-HOLD=fired" "$OB" 'CONFLICT-HOLD=fired'
-fi
-
-# §5.9e sticky-marker isolation. Reusing /pr-ready's canary or verdict marker would
-# OVERWRITE that comment on the same PR, destroying an unrelated verdict.
-P25_TXT="$(cat "$P25_SKILL")"; CRES_TXT="$(cat "$CRES")"
-have  "§5.9e: the conflict comment has its own marker"   "$P25_TXT" '<!-- post-plan-conflict-hold -->'
-have  "§5.9e: the appendix carries the same marker"      "$CRES_TXT" '<!-- post-plan-conflict-hold -->'
-# The appendix body is what a reviewer actually reads; asserting only that the posting
-# code path ran would pass with an empty comment, which is the realistic failure.
-have "§5.9e: appendix states the hold"        "$CRES_TXT" 'Auto-merge held — this run auto-resolved a rebase conflict'
-have "§5.9e: appendix cites the proof"        "$CRES_TXT" 'TREE-EQUIVALENT'
-have "§5.9e: appendix names the condition"    "$CRES_TXT" 'condition (14)'
-have "§5.9e: appendix names the remedy"       "$CRES_TXT" 'merge it by hand'
-
-# §5.9f the lost-work proof is a GATE, not a report: the invocation must precede the
-# push instruction, with TREE-EQUIVALENT named in between. A "push first, print the
-# verdict after" reordering satisfies a naive both-present grep and protects nothing.
-before "§5.9f: lostwork.sh runs before the push instruction" "$CRES_TXT" 'lostwork-' 'Proceed to Phase 2 step 3 (push)'
-have   "§5.9f: TREE-EQUIVALENT is named as the precondition" "$CRES_TXT" 'TREE-EQUIVALENT'
-before "§5.9f: collapse-guard check precedes collapse-guard record" "$CRES_TXT" 'collapse-guard-<KEY>.sh check' 'collapse-guard-<KEY>.sh record'
-have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git rebase --onto origin/master <parent-tip-before-merge> <branch>'
-have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
-# Step 4 re-runs the merge against the pinned SHA, and Step 5 finishes it with a commit.
-# Mutation: revert Step 5's fence and the lacks pin fails.
-have   "§5.9f: the merge recipe is spelled out"              "$CRES_TXT" 'git -c core.editor=true merge --no-edit <MASTER_SHA>'
-lacks  "§5.9f: no rebase --continue remains"                 "$CRES_TXT" 'git rebase --continue'
-
-# §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
-# The proof is change-level: every line the branch changed before the rebase must still
-# be in the HEAD tree. Gained work (an extra commit after the capture) is expected to
-# pass; only a dropped branch line diverges.
-# The fixtures need a real refs/remotes/origin/master — the script hardcodes
-# `git diff origin/master...HEAD` and ignores every seam, so without the ref its
-# post-diff is empty and a DIVERGED case would pass for the wrong reason.
-LW="$REPO_ROOT/.claude/review-shared/scripts/lostwork.sh"
-mk_lostwork_repo() {
-    local d; d="$(mktemp -d "$BASE_TMP/lw-XXXXXX")"
-    git -C "$d" init --quiet -b main
-    git -C "$d" config user.email 'postplan-test@example.invalid'
-    git -C "$d" config user.name  'postplan test'
-    printf 'base\n' > "$d/f.txt"; git -C "$d" add f.txt; git -C "$d" commit --quiet -m base
-    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
-    printf 'mine\n' >> "$d/f.txt"; git -C "$d" commit --quiet -am mine
-    printf '%s' "$d"
-}
-# Baseline fixture for the second exemption (ADR-0174 addendum): X ignores a Foo path,
-# Y a Bar path. The branch trims X and (when $1 = 0) deletes Foo; the "resolution"
-# restores X, standing in for a rebase that dropped the branch's deletion.
-lw_neon_fixture() {
-    printf 'parameters:\n\tignoreErrors:\n'
-    local b; for b in "$@"; do
-        case "$b" in
-          X) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: foo.dead\n\t\t\tcount: 1\n\t\t\tpath: modules/Foo/index.php\n\n' "'Call to foo().'" ;;
-          Y) printf '\t\t-\n\t\t\trawMessage: %s\n\t\t\tidentifier: bar.live\n\t\t\tcount: 2\n\t\t\tpath: modules/Bar/index.php\n\n' "'Call to bar().'" ;;
-        esac
-    done
-}
-mk_lostwork_baseline_repo() {
-    local keep=$1 key=$2 d; d="$(mktemp -d "$BASE_TMP/lwb-XXXXXX")"
-    git -C "$d" init --quiet -b main
-    git -C "$d" config user.email 'postplan-test@example.invalid'
-    git -C "$d" config user.name  'postplan test'
-    mkdir -p "$d/ibl5/modules/Foo" "$d/ibl5/modules/Bar"
-    printf '<?php\n' > "$d/ibl5/modules/Foo/index.php"
-    printf '<?php\n' > "$d/ibl5/modules/Bar/index.php"
-    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
-    git -C "$d" add -A; git -C "$d" commit --quiet -m base
-    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
-    [ "$keep" = 1 ] || git -C "$d" rm --quiet ibl5/modules/Foo/index.php
-    lw_neon_fixture Y > "$d/ibl5/phpstan-baseline.neon"
-    printf 'work\n' > "$d/branch-note.txt"
-    git -C "$d" add -A; git -C "$d" commit --quiet -m trim
-    git -C "$d" diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$key.patch"
-    lw_neon_fixture X Y > "$d/ibl5/phpstan-baseline.neon"
-    git -C "$d" commit --quiet -am 'resolution kept master entries'
-    printf '%s' "$d"
-}
-if [ ! -x "$LW" ]; then
-    echo "FAIL: §5.9g — $LW missing or not executable"; FAILED=1
-else
-    # Happy twin: unchanged tree -> TREE-EQUIVALENT, rc 0. Without this the DIVERGED
-    # case below could pass against a script that always says DIVERGED.
-    LWR="$(mk_lostwork_repo)"; LWK="lw-clean-$$"
-    ( cd "$LWR" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK.patch" )
-    LWO="$( cd "$LWR" && bash "$LW" "$LWK" 2>&1 )"; LWRC=$?
-    have "§5.9g: unchanged tree -> TREE-EQUIVALENT" "$LWO" 'TREE-EQUIVALENT'
-    if [ "$LWRC" -eq 0 ]; then echo "ok: §5.9g: TREE-EQUIVALENT exits 0"
-    else echo "FAIL: §5.9g: TREE-EQUIVALENT exited $LWRC"; FAILED=1; fi
-
-    # GAINED WORK: a commit added after the capture does not touch any branch line, so
-    # the change-level proof still holds. The old numstat comparison called this DIVERGED.
-    LWR2="$(mk_lostwork_repo)"; LWK2="lw-div-$$"
-    ( cd "$LWR2" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK2.patch" )
-    ( cd "$LWR2" && printf 'extra\n' >> f.txt && git commit --quiet -am extra )
-    LWO2="$( cd "$LWR2" && bash "$LW" "$LWK2" 2>&1 )" || true
-    have  "§5.9g: a tree that gained work -> TREE-EQUIVALENT (change-level proof)" "$LWO2" 'TREE-EQUIVALENT'
-    lacks "§5.9g: gained work is not reported as LOST" "$LWO2" 'LOST:'
-
-    # NEGATIVE: a commit that drops the branch's added line ('mine') must diverge. The
-    # replacement line keeps the post diff non-empty so the empty-diff guard is not what
-    # trips. rc stays 0 (the conjunctive-gate contract: callers read the verdict string).
-    LWR3="$(mk_lostwork_repo)"; LWK3="lw-lost-$$"
-    ( cd "$LWR3" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK3.patch" )
-    ( cd "$LWR3" && printf 'base\nother\n' > f.txt && git commit --quiet -am drop-mine )
-    LWRC3=0
-    LWO3="$( cd "$LWR3" && bash "$LW" "$LWK3" 2>&1 )" || LWRC3=$?
-    have "§5.9g: a dropped branch line -> TREE DIVERGED" "$LWO3" 'TREE DIVERGED — inspect before pushing'
-    have "§5.9g: the dropped line is named" "$LWO3" 'LOST: '
-    if [ "$LWRC3" -eq 0 ]; then echo "ok: §5.9g: TREE DIVERGED still exits 0"
-    else echo "FAIL: §5.9g: TREE DIVERGED exited $LWRC3"; FAILED=1; fi
-    # The differing-numstat branch is the ONE failure path that exits 0, which is why
-    # _phase-2-conflict-resolution.md gates on the printed verdict, not on the rc alone.
-    have "§5.9g: the doc gates on the verdict string, not just the rc" "$CRES_TXT" 'exits **0**'
-
-    # Slug sanitation: a branch with a slash must key the patch file as a flat slug,
-    # or the capture block's redirect lands in a nonexistent directory and the halt
-    # that follows is spurious.
-    SL="$(printf '%s' 'feat/slash-in-name' | tr '/:' '--')"
-    if [ "$SL" = 'feat-slash-in-name' ]; then echo "ok: §5.9g: branch slug sanitation flattens a slash"
-    else echo "FAIL: §5.9g: slug sanitation produced '$SL'"; FAILED=1; fi
-    rm -f "/tmp/pr-ready-diff-pre-$LWK.patch" "/tmp/pr-ready-diff-pre-$LWK2.patch" \
-          "/tmp/pr-ready-diff-post-$LWK.patch" "/tmp/pr-ready-diff-post-$LWK2.patch" \
-          "/tmp/pr-ready-numstat-pre-$LWK.txt" "/tmp/pr-ready-numstat-post-$LWK.txt" \
-          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt" \
-          "/tmp/pr-ready-diff-pre-$LWK3.patch" "/tmp/pr-ready-diff-post-$LWK3.patch" \
-          "/tmp/pr-ready-numstat-pre-$LWK3.txt" "/tmp/pr-ready-numstat-post-$LWK3.txt"
-
-    # §5.9g baseline exemption: a trimmed block whose path is gone at HEAD is not lost.
-    LWK4="lw-neon-dead-$$"; LWR4="$(mk_lostwork_baseline_repo 0 "$LWK4")"
-    LWO4="$(cd "$LWR4" && bash "$LW" "$LWK4" 2>&1 || true)"
-    have  "§5.9g: dead-path baseline block is exempt (TREE-EQUIVALENT)" "$LWO4" 'TREE-EQUIVALENT'
-    lacks "§5.9g: dead-path baseline block emits no LOST line"          "$LWO4" 'LOST:'
-    rm -f "/tmp/pr-ready-diff-pre-$LWK4.patch" "/tmp/pr-ready-diff-post-$LWK4.patch"
-    # §5.9g hard constraint: the same trimmed block with its path still at HEAD is lost.
-    LWK5="lw-neon-live-$$"; LWR5="$(mk_lostwork_baseline_repo 1 "$LWK5")"
-    LWO5="$(cd "$LWR5" && bash "$LW" "$LWK5" 2>&1 || true)"
-    have  "§5.9g: live-path baseline block is still LOST"  "$LWO5" "LOST: ibl5/phpstan-baseline.neon: -$(printf '\t\t\t')path: modules/Foo/index.php"
-    have  "§5.9g: live-path baseline block diverges"       "$LWO5" 'TREE DIVERGED — inspect before pushing'
-    rm -f "/tmp/pr-ready-diff-pre-$LWK5.patch" "/tmp/pr-ready-diff-post-$LWK5.patch"
-fi
-
-# §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved
-# with per-step blocks, not one runnable script, so the bound and the ordering are
-# asserted statically against that text — a mutation to either fails here.
-CIMON_TXT="$(cat "$CIMON")"
-have  "§5.9h: the loop bound is stated as 3"          "$CIMON_TXT" '**Bound: 3 iterations.**'
-have  "§5.9h: iteration 4 is explicitly excluded"     "$CIMON_TXT" 'Iteration 4 does not run.'
-have  "§5.9h: the ceiling halt carries its literal"   "$CIMON_TXT" '3-iteration ceiling'
-have  "§5.9h: the ceiling runs the re-arm gate first"  "$CIMON_TXT" 'The re-arm gate has already run'
-have  "§5.9h: the ceiling hands off to the merge line" "$CIMON_TXT" 'update-behind-prs.yml (ADR-0081)'
-lacks "§5.9h: the ceiling no longer disarms"           "$CIMON_TXT" 'left disarmed'
-# Disarm must precede the rewrite: a reordering rewrites the branch out from under an
-# armed auto-merge, the one sequence that can merge a tree nobody watched land.
-before "§5.9h: --disable-auto precedes the merge invocation" \
-    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 merge` block'
-before "§5.9h: prior arm state is recorded before the disarm" \
-    "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt' 'gh pr merge <N> --disable-auto'
-# The re-arm gate is the second entry point into the hold — condition (14) cannot
-# cover it, because Phase 6.5 has already run by then.
-have  "§5.9h: re-arm is gated on the prior arm state"   "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt)" = armed'
-have  "§5.9h: re-arm is gated on the conflict flag too" "$CIMON_TXT" '! test -e /tmp/postplan-conflict-resolved-<KEY>'
-have  "§5.9h: the loop forbids deleting the branch"     "$CIMON_TXT" 'Never add `--delete-branch`'
-# The strict probe is fail-safe AWAY from rewriting history.
-have  "§5.9h: the strict probe defaults to not-strict"  "$P25_TXT" '.required_status_checks.strict // false'
-have  "§5.9h: the probe reads mergeStateStatus"         "$P25_TXT" 'mergeStateStatus'
-# Worktrees have no upstream, so a lease flag with no named ref silently no-ops there.
-have  "§5.9h: the rewrite push names remote and ref"    "$CIMON_TXT" 'origin HEAD:<BRANCH>'
-have  "§5.9h: indeterminate still halts, fail-closed"   "$CIMON_TXT" '`REBASE=indeterminate` → **halt**'
-
-# §5.9i clean-run inertness. A flag write hoisted above the `if` would hold auto-merge
-# on every run forever, and every other assertion here would stay green.
-for KIND in clean behind; do
-    R="$(mk_rebase_repo "$KIND")"
-    PPCAP_TMP="$BASE_TMP" run_rebase "$BREB" "$R" fakebase > /dev/null 2>&1 || true
-done
-if ls "$BASE_TMP"/postplan-conflict-resolved-* >/dev/null 2>&1; then
-    echo "FAIL: §5.9i — a non-conflicting rebase wrote a conflict flag"; FAILED=1
-else
-    echo "ok: §5.9i: clean and behind rebases write no conflict flag"
-fi
 
 # §5.9j the shared surfaces condition (14) must never reach. Its evidence is a /tmp flag
 # local to one run — not live-derivable, so a predicate reading it would emit
@@ -3734,155 +1744,37 @@ for F in bin/lib/pr-armable.sh bin/pr-triage; do
     lacks "§5.9j: $F never reads the conflict flag" "$F_TXT" '/tmp/postplan-conflict-resolved-'
     lacks "§5.9j: $F never names condition (14)"    "$F_TXT" 'condition (14)'
 done
-
-# §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
-# catches: a block can be perfect while the surrounding prose still claims twelve
-# conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts eighteen conditions"        "$P25_TXT" '**All eighteen conditions**'
-have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
-have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
-
-# Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
-# The resolution file runs under claude -p (bin/post-plan-now:364, one session, not
-# interactive). A foreground spawn (run_in_background: false) completes within that
-# same turn; background spawns handed past the turn boundary are unrecoverable under
-# claude -p. Headless runs must not use Agent(); that shape is blocked below.
-CRES_SPAWN_N="$(grep -cF 'subagent_type' <<< "$CRES_TXT")"
-if [ "$CRES_SPAWN_N" -eq 1 ]; then
-    echo "ok: §5.9k: the resolution file spawns exactly one sub-agent"
-else
-    echo "FAIL: §5.9k — 'subagent_type' expected exactly 1 line in $CRES, got $CRES_SPAWN_N"
-    FAILED=1
-fi
-have  "§5.9k: the resolution file sub-agent spawn is foreground" "$CRES_TXT" 'run_in_background: false'
-lacks "§5.9k: the resolution file calls no Agent()"              "$CRES_TXT" 'Agent('
-# The flag is written at conflict DETECTION in SKILL.md, never here — writing it after a
-# successful proof would invert the fail-closed property (a run that dies mid-resolution
-# would find no flag and could arm).
-lacks "§5.9k: the resolution file never creates the flag" "$CRES_TXT" 'touch /tmp/postplan-conflict-resolved-'
-have  "§5.9k: the resolution file keeps the --onto form"  "$CRES_TXT" '--onto origin/master'
-
-# Marker isolation, at the one place it can actually do damage: the block that posts.
-BANN2="$(extract_block '# phase 6.5 conflict-hold announcement' "$P25_SKILL")"
-if [ -z "$BANN2" ]; then
-    echo "FAIL: §5.9k — announcement block vanished"; FAILED=1
-else
-    lacks "§5.9k: the announcement never reuses pr-fast-canary"  "$BANN2" 'pr-fast-canary'
-    lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
-fi
-# §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
-# SKILL.md's "All eighteen conditions" count promises, as prose pointing at its block.
-ARM_TXT="$(cat "$SKILL")"
-have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
-have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
-have  "§5.9l: reference doc has a (15) entry"               "$ARM_TXT" '**(15)'
-have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
-lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
-
-# §5.9e Phase 7 re-arm gate: the BEHIND loop's re-arm block must know the verdict path
-# and require an exact match, just as condition (14) does.
-A7="$(grep -cF '# phase 7 re-arm gate' "$PP7")"
-if [ "$A7" != "1" ]; then
-    echo "FAIL: §5.9e — anchor '# phase 7 re-arm gate' appears $A7 times in $PP7"
-    FAILED=1
-fi
-B7="$(extract_block '# phase 7 re-arm gate' "$PP7")"
-if [ -z "$B7" ]; then
-    echo "FAIL: §5.9e — no block matching '# phase 7 re-arm gate' in $PP7"
-    FAILED=1
-else
-    have  "§5.9e: re-arm names the HEAD-keyed verdict path"  "$B7" 'postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok'
-    have  "§5.9e: re-arm still requires the prior arm state" "$B7" '= armed'
-    have  "§5.9e: re-arm still ends in the arming command"   "$B7" 'gh pr merge <N> --squash --auto'
-    have  "§5.9e: re-arm compares line 1 by exact equality"  "$B7" '"$VL" = "CONFLICT-REVIEW=CLEAN"'
-    lacks "§5.9e: no command substitution for the sha"       "$B7" 'git rev-parse'
-fi
-
-# §5.9f independence: clearing condition (14) must not clear any other condition.
-# VDIR, VKEY, and VOK are already defined from §5.9c above.
-printf 'CONFLICT-REVIEW=CLEAN\n' > "$VOK"
-export CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY"
-expect_block "§5.9f: a clean verdict does not clear the feat: floor" BLOCK \
-    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[]}' '' '')"
-expect_block "§5.9f: a clean verdict does not clear the stacked-PR hold" BLOCK \
-    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
-unset CONFLICT_VERDICT_DIR CONFLICT_VERDICT_KEY
-rm -f "$VOK"
-
-# --- condition (4) ---
-have "§cond4: PHASE5_STATUS_FILE seam is present in block" "$B4" 'PHASE5_STATUS_FILE'
-
-# §cond4 — phase5 status file
-F4_PASS="$BASE_TMP/cond4-pass";  printf 'PHASE5_VERIFY_STATUS=pass\n'    > "$F4_PASS"
-F4_FAIL="$BASE_TMP/cond4-fail";  printf 'PHASE5_VERIFY_STATUS=fail\n'    > "$F4_FAIL"
-F4_SKIP="$BASE_TMP/cond4-skip";  printf 'PHASE5_VERIFY_STATUS=skipped\n' > "$F4_SKIP"
-
-have  "§cond4: fail -> BLOCKED"       "$(run_cond4 "$F4_FAIL")"                    'BLOCKED'
-lacks "§cond4: pass -> no BLOCKED"    "$(run_cond4 "$F4_PASS")"                    'BLOCKED'
-have  "§cond4: absent -> BLOCKED"     "$(run_cond4 "$BASE_TMP/cond4-nonexistent")" 'BLOCKED'
-lacks "§cond4: skipped -> no BLOCKED" "$(run_cond4 "$F4_SKIP")"                   'BLOCKED'
-
-# --- Phase 6 tick block (backlog#691) ----------------------------------------
-TWO="$(printf '## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n- [ ] **Row 2** — does the page look right?\n\n## Reviewer verification\n')"
-o="$(run_tick "$TWO" $'Row 1\nRow 2\n' '' tick-ok)"
-expect_out 'tick_all_confirmed (Row 1)' 'TICK-CONFIRMED Row 1' "$o"
-expect_out 'tick_all_confirmed (sentinel)' 'SENTINEL=write' "$o"
-expect_out 'tick_all_confirmed (audit trail kept)' '- [x] **Row 2**' "$(cat "$TB")"
-expect_out 'tick_writes_pass_file' 'ROW Row 2 PASS' "$(cat "$BASE_TMP/pass-seen")"
-expect_clearance 'tick_all_confirmed composed body → CLEARED' 'CLEARED' "$(with_sentinel "$TB")"
-
-o="$(run_tick "$TWO" $'Row 1\n' '' tick-ok)"
-expect_out 'tick_truly_manual_left (withhold)' 'SENTINEL=withhold' "$o"
-expect_out 'tick_truly_manual_left (count)' 'UNTICKED_AFTER=1' "$o"
-expect_clearance 'tick_truly_manual_left even with a stray sentinel → HELD' 'HELD' "$(with_sentinel "$TB")"
-
-ONE="$(printf '## Manual Testing\n\n- [ ] **Row 1** — run bin/test-foo\n')"
-o="$(run_tick "$ONE" $'Row 1\n' '' tick-noop)"
-expect_out 'tick_unconfirmed_falls_back (verdict)' 'TICK-FALLBACK-DELETE Row 1' "$o"
-lacks 'tick_unconfirmed_falls_back (row deleted)' "$(cat "$TB")" '**Row 1**'
-expect_out 'tick_unconfirmed_falls_back (sentinel)' 'SENTINEL=write' "$o"
-
-o="$(run_tick "$ONE" $'Row 1\n' '' tick-fail)"
-expect_out 'tick_script_fails (flagged)' 'TICK-SCRIPT-FAILED' "$o"
-expect_out 'tick_script_fails (fallback)' 'TICK-FALLBACK-DELETE Row 1' "$o"
-
-UNSHAPED="$(printf '## Manual Testing\n\n- [ ] Check the log line by hand\n')"
-o="$(run_tick "$UNSHAPED" '' $'- [ ] Check the log line by hand\n' tick-ok)"
-expect_out 'tick_unshaped_row_verbatim_delete (deleted)' 'DELETED=1' "$o"
-expect_out 'tick_unshaped_row_verbatim_delete (sentinel)' 'SENTINEL=write' "$o"
-o="$(run_tick "$UNSHAPED" '' $'- [ ] Check the log line\n' tick-ok)"
-expect_out 'tick_verbatim_mismatch_fails_closed' 'SENTINEL=withhold' "$o"
-
-o="$(TICK_GH_FAIL=1 run_tick "$ONE" $'Row 1\n' '' tick-ok)"
-expect_out 'tick_unreadable_body_legacy' 'TICK_MODE=legacy-delete' "$o"
-
-printf 'ROW Row 2 PASS\n' > /tmp/pr-ready-manual-rows-99691.txt
-o="$(run_tick "$TWO" $'Row 1\n' '' tick-ok)"
-expect_out 'tick_stale_pass_line_truncated' 'SENTINEL=withhold' "$o"
-expect_out 'tick_stale_pass_line_truncated (Row 2 still open)' '- [ ] **Row 2**' "$(cat "$TB")"
-
-TEN="$(printf '## Manual Testing\n\n- [x] **Row 10** — done\n- [ ] **Row 1** — run bin/test-foo\n')"
-o="$(run_tick "$TEN" $'Row 1\n' '' tick-noop)"
-expect_out 'tick_row1_never_matches_row10' 'TICK-FALLBACK-DELETE Row 1' "$o"
-
-o="$(run_tick "$TWO" $'Row 1\nRow 2' '' tick-ok)"
-expect_out 'tick_unterminated_ids' 'TICK-CONFIRMED Row 2' "$o"
-
-# --- Phase 6 Step 1 extract: re-run skip --------------------------------------
-run_s1x() { jq -n --arg b "$1" '{body: $b}' > "$BASE_TMP/fixture.json"
-    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$S1X" 2>&1; }
-o="$(run_s1x "$(printf '## Manual Testing\n\nNo manual testing needed — x\n\n- [x] **Row 1** — done\n- [ ] **Row 2** — open\n')")"
-expect_out 'extract_rerun_keeps_open_row' '**Row 2**' "$o"
-lacks 'extract_rerun_skips_ticked_row' "$o" '**Row 1**'
-o="$(run_s1x "$(printf '## Manual confirmation needed\n\n> ## Manual Testing\n> - [ ] **Row 9** — quoted\n\n## Manual Testing\n\n- [ ] **Row 2** — open\n')")"
-lacks 'extract_quoted_heading_ignored' "$o" '**Row 9**'
-expect_out 'extract_quoted_heading_real_rows_kept' '**Row 2**' "$o"
-
-# --- Mode A contract carries the row id ---------------------------------------
-P6M="$REPO_ROOT/.claude/skills/post-plan/_phase-6-manual-testing.md"
-if grep -qF '"row": "Row 3"' "$P6M" && grep -qF 'is a copy, never a judgment' "$P6M"; then
-    echo "ok: mode_a_contract_has_row_field"
-else echo "FAIL: mode_a_contract_has_row_field"; FAILED=1; fi
+# --- skill carries no arming logic (postplan-skill-shrink) ---
+# tools/postplan-harness/harness/armable.py is the only arming authority. POSTPLAN_SKILL_DIR is a
+# test seam so the mutation proof can point at a copy with one arming string injected.
+_SKILL_DIR="${POSTPLAN_SKILL_DIR:-$REPO_ROOT/.claude/skills/post-plan}"
+_ARM_RE='gh pr merge [^`]*(--|[[:space:]]-[[:alpha:]])|enablePullRequestAutoMerge|enable-auto-merge|^# condition \([0-9]+\)|^[[:space:]]*(\.|source)[[:space:]]+[^ ]*pr-armable\.sh|^## Phase 6\.5'
+_hits=$(grep -nE "$_ARM_RE" "$_SKILL_DIR"/*.md 2>/dev/null || true)
+if [ -z "$_hits" ]; then echo "ok: no_arming_logic_in_skill"
+else echo "FAIL: no_arming_logic_in_skill — arming-shaped text in the fallback skill:"; printf '%s\n' "$_hits"; FAILED=1; fi
+_retired_present=0
+for _f in _phase-2-conflict-resolution.md _phase-3-classify-diff.md _phase-4-review-audit.md \
+          _phase-5-final-verification.md _phase-6-manual-testing.md _phase-6.5-arm-auto-merge.md \
+          _phase-7-ci-monitoring.md; do
+    [ -e "$_SKILL_DIR/$_f" ] && { echo "FAIL: retired_phase_file_present — $_f"; FAILED=1; _retired_present=1; }
+done
+[ "$_retired_present" -eq 0 ] && echo "ok: retired_phase_file_present (none)"
+if grep -qE 'never runs .gh pr merge.' "$_SKILL_DIR/SKILL.md"; then echo "ok: skill_states_no_arm"
+else echo "FAIL: skill_states_no_arm — SKILL.md intro lost the no-arming sentence"; FAILED=1; fi
+# Repo-wide sweep: no live reference to a retired _phase-{2,3,4,5-final,6,6.5,7} file.
+# Excluded: harness path lists and fixtures, the two sibling-owned skill files, this guard,
+# and the registry rows that carry (example) / retired markers.
+_dangling=$(git -C "$REPO_ROOT" grep -n -e '_phase-2-conflict' -e '_phase-3-classify' \
+    -e '_phase-4-review' -e '_phase-5-final' -e '_phase-6-manual' -e '_phase-6\.5-arm' -e '_phase-7-ci' -- . \
+    ':!tools/postplan-harness/harness/gate_backtest.py' ':!tools/postplan-harness/harness/fidelity.py' \
+    ':!tools/postplan-harness/tests/fixtures' ':!tools/postplan-harness/tests/test_gatefix.py' \
+    ':!tools/postplan-harness/tests/test_resolver_self_heal.py' \
+    ':!tools/postplan-harness/harness/llm_calls.py' ':!.claude/skills/post-plan/_phase-5.5-fidelity.md' \
+    ':!.claude/skills/post-plan/_pr-body-claims.md' ':!bin/test-postplan-arm-conditions' \
+    ':!ibl5/docs/retrospective-class-registry.md' 2>/dev/null || true)
+if [ -z "$_dangling" ]; then echo "ok: no_dangling_retired_phase_refs"
+else echo "FAIL: no_dangling_retired_phase_refs:"; printf '%s\n' "$_dangling"; FAILED=1; fi
+# --- end skill carries no arming logic ---
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

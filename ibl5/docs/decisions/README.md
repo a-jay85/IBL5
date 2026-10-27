@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-23
+last_verified: 2026-10-26
 ---
 
 # IBL5 Architecture Decision Records
@@ -74,15 +74,18 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0197](0197-owner-owned-league-rules.md) | Owner-owned league rules file | Accepted | The owner owns `ibl5/docs/LEAGUE_RULES.md`; agents editing `ibl5/classes/` check it and ask before changing a rule; the weekly digest marks likely rule changes. |
 | [0200](0200-weekly-code-slice-review.md) | Weekly rotating review of existing code | Accepted | `bin/code-slice-review` reviews one `ibl5/classes` module a week on the owner's Mac with the PR-review prompts extracted at runtime, scores findings with a second call, de-dups by fingerprint, and files at most N backlog issues; it never fixes or opens PRs. |
 | [0198](0198-post-merge-manual-rows-after-merge-section.md) | Post-merge manual rows move to an After merge section | Accepted | A Truly-manual row tagged `post-merge: <reason>` (gate `[PM]`) renders under `## After merge`, outside the Phase 6.5 condition (1) window; `bin/after-merge-checklist` posts it as a checklist comment on merge. |
+| [0199](0199-executable-mutation-claims.md) | Executable mutation claims | Accepted | A `## Executable Mutations` section keys literal edits to post-impl CLI rows; `bin/lib/plan-exec-mutations` applies each one, requires the check to fail, reverts, and arming condition (19) holds on any claim that did not trip. |
 | [0201](0201-reviewer-eval-corpus.md) | Reviewer eval corpus and before/after score check | Accepted | A committed corpus of blame-confirmed bug cases and clean cases scores the post-plan reviewer offline; `bin/check-reviewer-eval` requires before/after score lines whenever a PR changes the review-surface hash. |
 | [0194](0194-engine-freeze-gates.md) | Freeze engine/ and gate new decompile tokens | Accepted | `bin/check-engine-freeze` runs in the required meta-checks job on every PR; it fails additions to `engine/` and any added line carrying a decompile token; the cutover PR retires it. |
 | [0202](0202-review-depth-by-merge-danger.md) | Phase 4 review depth follows the Merge danger line | Accepted | Phase 4 review depth is standard or deep from the PR body's Merge danger line; one-way, site-wide, external, or a missing line selects deep, which raises agent tiers and never skips an agent. |
 | [0203](0203-last-verified-merge-driver.md) | Merge driver for last_verified-only conflicts | Accepted | `bin/lib/merge-last-verified`, selected by `merge=lastverified` in `.gitattributes` and registered per clone, keeps the newer date when `last_verified` is the only conflict; an unregistered clone gets git's plain conflict. |
 | [0204](0204-fidelity-remediation-rules-file-carveout.md) | Phase 5.5 remediation may commit a small fix to a rules file a blocking finding names | Accepted | The harness fixer may edit and commit a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes, within line and frontmatter limits; every other gate-owning path stays denied. |
+| [0206](0206-must-preserve-removed-guards-hold.md) | Must preserve plans and the removed-guards arming hold | Accepted | New plans list guards to keep; `bin/lib/deleted-guards` flags removed guards in a diff; automouse impl self-reviews before handoff; arming condition (20) holds a PR whose removed guards lack a reason. |
 | [0207](0207-same-run-review-thread-remediation.md) | Same-run review thread remediation | Accepted | Phase 4.5 also fixes or declines the review threads the same run posted, one round, then re-reviews the fix delta; arming predicates are unchanged. |
 | [0209](0209-launchd-per-run-jobs-write-no-plist.md) | Per-run launchd jobs write no LaunchAgents plist | Accepted | `ljob_submit` replaces per-run plists for plan-now and post-plan-now; tests sandbox HOME and assert the real agents dir stays unchanged. |
 | [0210](0210-required-context-payload-provable-job-skip.md) | Payload-provable job-level skips on PR label and edit events | Accepted | `human-signoff` and `auto-mergeable label` skip label and edit events their verdict cannot read, with the predicate copied into a per-run concurrency group; `Meta checks` stays unfiltered. |
 | [0208](0208-merged-digest-pings-owner-for-post-merge-steps.md) | The merge digest pings the owner when a post-merge step needs them | Accepted | `bin/digest-dm-build` @mentions the owner on the single #merged digest only for a manual row, a failed auto row, or a failed checklist job, decided by `pmr_ping_decision` from job outputs and never from PR text. |
+| [0214](0214-vr-update-baselines-targeted-rewrite.md) | Targeted update-baselines rewrite from the in-job strict pass | Accepted | The label run rebuilds the gallery against branch HEAD and `bin/vr-apply-baselines` commits only the changed and new cells' renders; flake cells and unflagged baselines stay untouched. |
 
 ## When an ADR is Required
 

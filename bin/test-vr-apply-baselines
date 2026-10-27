@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+# test-vr-apply-baselines: pins bin/vr-apply-baselines behavior with mktemp fixtures.
+# Usage: bin/test-vr-apply-baselines   (exit 0 all pass, 1 any failure)
+# VR_APPLY_SCRIPT overrides the script under test (used by the mutation case).
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT="${VR_APPLY_SCRIPT:-$REPO_ROOT/bin/vr-apply-baselines}"
+
+FIXTURES=()
+cleanup() {
+  local d
+  for d in ${FIXTURES[@]+"${FIXTURES[@]}"}; do rm -rf "$d"; done
+}
+trap cleanup EXIT
+
+REASON=""
+FIX=""
+
+# mkfix <titles-with-renders...>: fresh fixture; baselines a-d, renders for the given titles.
+mkfix() {
+  FIX="$(mktemp -d)"
+  FIXTURES+=("$FIX")
+  mkdir "$FIX/snaps" "$FIX/actuals"
+  local t
+  for t in a b c d; do printf 'base-%s' "$t" > "$FIX/snaps/$t.png"; done
+  for t in "$@"; do printf 'new-%s' "$t" > "$FIX/actuals/$t.a.png"; done
+}
+
+# cell <title>: one gallery cell as JSON.
+cell() { printf '{"module":"m","viewport":"v","title":"%s"}' "$1"; }
+
+# gallery <changed> <new> <flake>: write $FIX/g.json from comma-joined cell JSON lists.
+gallery() {
+  printf '{"changedCells":[%s],"newCells":[%s],"flakeCells":[%s]}' "$1" "$2" "$3" > "$FIX/g.json"
+}
+
+# run_script <script> [clean]: run with the four flags; sets RC, OUT, ERR.
+RC=0 OUT="" ERR=""
+run_script() {
+  local script="$1" mode="${2:-}"
+  local args=("--gallery=$FIX/g.json" "--actuals=$FIX/actuals" "--snapshot-dir=$FIX/snaps" "--list-out=$FIX/list.txt")
+  RC=0
+  if [ "$mode" = clean ]; then
+    env -i PATH=/usr/bin:/bin bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
+  else
+    bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
+  fi
+  OUT="$(cat "$FIX/out")"
+  ERR="$(cat "$FIX/err")"
+}
+
+bad() { REASON="$1"; return 1; }
+
+# unchanged <title...>: baselines still hold their original bytes.
+unchanged() {
+  local t
+  for t in "$@"; do
+    printf 'base-%s' "$t" | cmp -s - "$FIX/snaps/$t.png" || bad "$t.png was modified" || return 1
+  done
+}
+
+# assert_flagged_only <script> [clean]: shared flagged-only assertions; nonzero on any mismatch.
+assert_flagged_only() {
+  mkfix a c e
+  gallery "$(cell a)" "$(cell e)" "$(cell c)"
+  run_script "$1" "${2:-}"
+  [ "$RC" -eq 0 ] || bad "exit $RC, stderr: $ERR" || return 1
+  cmp -s "$FIX/snaps/a.png" "$FIX/actuals/a.a.png" || bad "a.png not rewritten" || return 1
+  cmp -s "$FIX/snaps/e.png" "$FIX/actuals/e.a.png" || bad "e.png not created" || return 1
+  unchanged b c d || return 1
+  [ "$(cat "$FIX/list.txt")" = "$(printf '%s\n%s' "$FIX/snaps/a.png" "$FIX/snaps/e.png")" ] || bad "list content wrong" || return 1
+  case "$OUT" in *"2 snapshot(s) rewritten") ;; *) bad "stdout tail wrong: $OUT"; return 1 ;; esac
+}
+
+case_flagged_only() { assert_flagged_only "$SCRIPT"; }
+
+case_flake_never_written() {
+  mkfix a c
+  gallery "$(cell a)" "" "$(cell a),$(cell c)"
+  run_script "$SCRIPT"
+  [ "$RC" -eq 0 ] || bad "exit $RC, stderr: $ERR" || return 1
+  unchanged a c || return 1
+  [ ! -s "$FIX/list.txt" ] || bad "list not empty" || return 1
+  case "$OUT" in *"0 snapshot(s) rewritten") ;; *) bad "stdout tail wrong: $OUT"; return 1 ;; esac
+}
+
+case_empty_list() {
+  mkfix
+  gallery "" "" ""
+  run_script "$SCRIPT"
+  [ "$RC" -eq 0 ] || bad "exit $RC, stderr: $ERR" || return 1
+  [ -f "$FIX/list.txt" ] || bad "list file missing" || return 1
+  [ ! -s "$FIX/list.txt" ] || bad "list file not empty" || return 1
+  unchanged a b c d || return 1
+}
+
+case_invalid_title() {
+  local title
+  for title in '../evil' 'A-Upper'; do
+    mkfix a
+    gallery "$(cell "$title")" "" ""
+    : > "$FIX/marker"
+    run_script "$SCRIPT"
+    [ "$RC" -eq 1 ] || bad "$title: exit $RC" || return 1
+    case "$ERR" in *"refusing invalid title"*) ;; *) bad "$title: stderr: $ERR"; return 1 ;; esac
+    # out/err are the harness's own capture files, written by run_script.
+    [ -z "$(find "$FIX" -newer "$FIX/marker" -type f ! -name out ! -name err)" ] || bad "$title: files written" || return 1
+    [ ! -e "$FIX/list.txt" ] || bad "$title: list written" || return 1
+    unchanged a b c d || return 1
+  done
+}
+
+case_missing_actual() {
+  mkfix a
+  gallery "$(cell a),$(cell b)" "" ""
+  run_script "$SCRIPT"
+  [ "$RC" -eq 1 ] || bad "exit $RC" || return 1
+  case "$ERR" in *"missing render for b"*) ;; *) bad "stderr: $ERR"; return 1 ;; esac
+  unchanged a || return 1
+}
+
+case_null_title() {
+  mkfix a
+  gallery '{"module":"x","viewport":"y"}' "" ""
+  run_script "$SCRIPT"
+  [ "$RC" -eq 1 ] || bad "exit $RC" || return 1
+  case "$ERR" in *"cell without a string title"*) ;; *) bad "stderr: $ERR"; return 1 ;; esac
+}
+
+case_rejected_flags() {
+  mkfix a
+  gallery "$(cell a)" "" ""
+  local rc=0 err
+  err="$(bash "$SCRIPT" --bogus=1 2>&1 >/dev/null)" || rc=$?
+  [ "$rc" -eq 2 ] || bad "--bogus=1: exit $rc" || return 1
+  case "$err" in *"--bogus=1"*) ;; *) bad "--bogus=1 not named: $err"; return 1 ;; esac
+  rc=0
+  err="$(bash "$SCRIPT" --gallery "$FIX/g.json" --actuals="$FIX/actuals" --snapshot-dir="$FIX/snaps" --list-out="$FIX/list.txt" 2>&1 >/dev/null)" || rc=$?
+  [ "$rc" -eq 2 ] || bad "space form: exit $rc" || return 1
+  case "$err" in *"--gallery"*) ;; *) bad "space form not named: $err"; return 1 ;; esac
+  rc=0
+  err="$(bash "$SCRIPT" --gallery="$FIX/g.json" --actuals="$FIX/actuals" --snapshot-dir="$FIX/snaps" 2>&1 >/dev/null)" || rc=$?
+  [ "$rc" -eq 2 ] || bad "missing --list-out: exit $rc" || return 1
+  case "$err" in *"--list-out="*) ;; *) bad "--list-out not named: $err"; return 1 ;; esac
+}
+
+case_empty_env() { assert_flagged_only "$SCRIPT" clean; }
+
+case_mutation_wrong_title() {
+  local copy
+  copy="$(mktemp)"
+  FIXTURES+=("$copy")
+  sed '/cp -- /s|"\$snapdir/\$t\.png"|"$snapdir/b.png"|' "$SCRIPT" > "$copy"
+  ! cmp -s "$SCRIPT" "$copy" || bad "sed did not change the copy (anchor stale)" || return 1
+  if (VR_APPLY_SCRIPT="$copy" assert_flagged_only "$copy"); then
+    bad "mutant passed the flagged-only assertions"
+    return 1
+  fi
+}
+
+# mkrepo: fresh git repo in $FIX with an empty initial commit and snaps/a.png + other.txt.
+mkrepo() {
+  FIX="$(mktemp -d)"
+  FIXTURES+=("$FIX")
+  git -C "$FIX" init -q
+  git -C "$FIX" -c user.name=t -c user.email=t@t commit --allow-empty -qm init
+  mkdir "$FIX/snaps"
+  printf 'x' > "$FIX/snaps/a.png"
+  printf 'y' > "$FIX/other.txt"
+  printf 'snaps/a.png\n' > "$FIX/list.txt"
+}
+
+# run_check: run --check-staged= from inside the fixture repo; sets RC, OUT, ERR.
+run_check() {
+  RC=0
+  (cd "$FIX" && bash "$SCRIPT" --check-staged="$FIX/list.txt") > "$FIX/.out" 2> "$FIX/.err" || RC=$?
+  OUT="$(cat "$FIX/.out")"
+  ERR="$(cat "$FIX/.err")"
+}
+
+case_staged_outside_list() {
+  mkrepo
+  git -C "$FIX" add snaps/a.png other.txt
+  run_check
+  [ "$RC" -eq 1 ] || bad "exit $RC" || return 1
+  case "$ERR" in *"staged outside target list: other.txt"*) ;; *) bad "stderr: $ERR"; return 1 ;; esac
+  case "$ERR" in *"snaps/a.png"*) bad "listed path reported: $ERR"; return 1 ;; esac
+}
+
+case_staged_subset_ok() {
+  mkrepo
+  run_check
+  [ "$RC" -eq 0 ] || bad "empty index: exit $RC, stderr: $ERR" || return 1
+  case "$OUT" in *"0 staged path(s) within target list") ;; *) bad "empty index stdout: $OUT"; return 1 ;; esac
+  git -C "$FIX" add snaps/a.png
+  run_check
+  [ "$RC" -eq 0 ] || bad "listed-only: exit $RC, stderr: $ERR" || return 1
+  case "$OUT" in *"1 staged path(s) within target list") ;; *) bad "listed-only stdout: $OUT"; return 1 ;; esac
+}
+
+# The label must come off before the bot push. A push while the label is still
+# on fires a synchronize run whose payload still carries it, so regen runs twice.
+WORKFLOW="${VR_WORKFLOW_FILE:-$REPO_ROOT/.github/workflows/e2e-tests.yml}"
+case_label_removed_before_push() {
+  local remove commit
+  remove="$(grep -n -- '- name: Remove update-baselines label' "$WORKFLOW" | head -n 1 | cut -d: -f1)"
+  commit="$(grep -n -- '- name: Commit and push updated baselines' "$WORKFLOW" | head -n 1 | cut -d: -f1)"
+  [ -n "$remove" ] || bad "no Remove update-baselines label step in $WORKFLOW" || return 1
+  [ -n "$commit" ] || bad "no Commit and push updated baselines step in $WORKFLOW" || return 1
+  [ "$remove" -lt "$commit" ] || bad "label removal (line $remove) runs after the push step (line $commit)" || return 1
+}
+
+FAILED=0
+run_case() {
+  REASON=""
+  if "$1"; then echo "PASS $1"; else echo "FAIL $1: $REASON"; FAILED=1; fi
+}
+
+run_case case_flagged_only
+run_case case_flake_never_written
+run_case case_empty_list
+run_case case_invalid_title
+run_case case_missing_actual
+run_case case_null_title
+run_case case_rejected_flags
+run_case case_empty_env
+run_case case_mutation_wrong_title
+run_case case_staged_outside_list
+run_case case_staged_subset_ok
+run_case case_label_removed_before_push
+
+exit "$FAILED"

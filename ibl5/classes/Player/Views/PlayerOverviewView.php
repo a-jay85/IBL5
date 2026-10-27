@@ -88,7 +88,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <th>Away</th>
         <th>Home</th>
         <th>MIN</th>
-        <th>PTS</th>
         <th>FGM</th>
         <th>FGA</th>
         <th>FG%</th>
@@ -106,6 +105,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <th>TO</th>
         <th>BLK</th>
         <th>PF</th>
+        <th>PTS</th>
     </tr>
         <?php
         foreach ($boxScores as $row) {
@@ -124,7 +124,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td class="gamelog"><?= HtmlSanitizer::e($awayTeam) ?></td>
         <td class="gamelog"><?= HtmlSanitizer::e($homeTeam) ?></td>
         <td class="gamelog"><?= (int) $row['game_min'] ?></td>
-        <td class="gamelog"><?= (int) $pts ?></td>
         <td class="gamelog"><?= (int) $fgm ?></td>
         <td class="gamelog"><?= (int) $fga ?></td>
         <td class="gamelog"><?= HtmlSanitizer::e(StatsFormatter::formatPercentage($fgm, $fga)) ?></td>
@@ -142,6 +141,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <td class="gamelog"><?= (int) $row['game_tov'] ?></td>
         <td class="gamelog"><?= (int) $row['game_blk'] ?></td>
         <td class="gamelog"><?= (int) $row['game_pf'] ?></td>
+        <td class="gamelog"><?= (int) $pts ?></td>
     </tr>
             <?php
         }

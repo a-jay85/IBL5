@@ -292,8 +292,8 @@ DIRTY=$(git status --porcelain)
 
 If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean working tree), the branch is identical to master — the plan is already merged. Take the already-merged disposition (the plan's work shipped — it is DONE, not skipped, so it lands in `done/`):
 
-1. Delete the pushed remote branch if `bin/wt-new` created one: `git push origin --delete <slug> || true`
-2. `bin/wt-remove <slug>` to remove the empty worktree and local branch.
+1. `cd /Users/ajaynicolas/GitHub/IBL5-worktrees && /Users/ajaynicolas/GitHub/IBL5/bin/wt-remove <slug> --if-empty` to remove the empty worktree and its local branch. The `cd` must persist and must leave the worktree, because `--if-empty` keeps any worktree that a process (your own shell included) sits in. Use the worktrees parent, not the main checkout: bash-guard Check 15 denies a persisting `cd` from this worktree into `/Users/ajaynicolas/GitHub/IBL5`, and a `(cd ... && ...)` subshell leaves your shell inside the worktree. It re-checks emptiness at removal time. If it prints a `kept` line, the worktree could not be removed: it is in use, `lsof` is missing, or its emptiness could not be verified (`bin/wt-remove` names the reason). Leave the remote branch alone, so nothing is half-cleaned. Do not take steps 2-6, and do not go on to Step 6.6, since an empty branch must never reach the post-plan agent. Instead, `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/skipped/"`, then `touch -h "$NIGHTLY_DIR/skipped/$PLAN_FILE"`. Write a report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-<slug>.md` that quotes the `kept` line and says the branch looked already merged. Do NOT write a handoff file, and STOP.
+2. Only after step 1 removed the worktree, delete the pushed remote branch if `bin/wt-new` created one: `git -C /Users/ajaynicolas/GitHub/IBL5 push origin --delete <slug> || true`. Step 1 ran while the remote branch still existed, so `bin/wt-remove` kept the local branch. Delete it now, only if it holds nothing master lacks: `git -C /Users/ajaynicolas/GitHub/IBL5 merge-base --is-ancestor <slug> origin/master && git -C /Users/ajaynicolas/GitHub/IBL5 branch -D <slug> || true`. A leftover local `<slug>` branch would block the next `bin/wt-new <slug>`.
 3. `mv "$NIGHTLY_DIR/queue/$PLAN_FILE" "$NIGHTLY_DIR/done/"`, then `touch -h "$NIGHTLY_DIR/done/$PLAN_FILE"` so the entry carries the completion time the morning digest selects on
 4. Write an ALREADY-MERGED report to `$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-done-<slug>.md` — same already-merged wording as Step 2.6, and note that the **empty-diff backstop** caught it (the title cross-reference did not).
 5. Do NOT write a handoff file.
@@ -399,6 +399,68 @@ When the verdict is still `unrealised` or `unavailable` after your fix attempts,
 
 This step has no budget-wall fallback and no waiver. An unresolved row never proceeds to Step 7. Never add a `WAIVE-MATRIX-ROW:` line, and never edit the plan's Verification Matrix to make this check pass.
 
+The same holds for the plan's `## Executable Mutations` entries: /post-plan Phase 5.0 applies each one and requires its check to exit non-zero. A `HELD` result means the mutation claim was wrong and the check is fine. Report it in the PR body and leave the entry as written.
+
+## Step 6.8: Pre-Handoff Self-Review and Deleted-Guard Check
+
+This step catches review findings and unplanned guard deletions before post-plan opens the PR. It adds to post-plan's Phase 4 review and never replaces it. Post-plan still runs its full review.
+
+**Self-review.** Commit a checkpoint first. Derive the two values the spawn needs; the bash block below sets them too, but it runs after this step:
+
+```bash
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
+DG_BASE="$(git config "branch.$(git rev-parse --abbrev-ref HEAD).iblBase" || echo master)"
+echo "MAIN_CHECKOUT=$MAIN_CHECKOUT DG_BASE=$DG_BASE"
+```
+
+Put the printed literal values into the sub-agent prompt, because the sub-agent does not inherit your shell variables. Spawn **one** foreground `subagent_type: "sonnet-5-5"` agent (review is Sonnet tier per `.claude/rules/agent-tiering.md`). Its prompt tells it to Read `$MAIN_CHECKOUT/.claude/review-shared/_review-rubric.md` once, review `git diff "origin/$DG_BASE...HEAD"` against it, and return only findings it scores `>= 80`, each as `file:line — finding`. Fix every returned finding, commit, and do not re-spawn. Past 90% of the time budget, skip the self-review and say `self-review: skipped (budget)` in the final message. The deleted-guard check below is never skipped. It is deterministic and takes seconds.
+
+**Deleted-guard check.** Run this block. Its first line is the anchor `bin/test-deleted-guards` extracts.
+
+```bash
+# Step 6.8 deleted-guard check: flagged removals must be restored or given a reason
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
+DG_SCRIPT="${DG_SCRIPT:-$MAIN_CHECKOUT/bin/lib/deleted-guards}"
+DG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+DG_BASE="$(git config "branch.$DG_BRANCH.iblBase" || echo master)"
+# Bash calls do not share variables, so rebuild the plan path from the queue entry, as the top of this prompt does
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+PLAN_PATH="${PLAN_PATH:-$NIGHTLY_DIR/queue/$PLAN_FILE}"
+[ -f "$PLAN_PATH" ] || echo "deleted-guards: WARNING plan not found at $PLAN_PATH; running plan-less, Intended removals not netted out"
+if [ ! -x "$DG_SCRIPT" ]; then
+    DG_VERDICT=unavailable
+else
+    DG_DIFF="$(mktemp)"
+    DG_RC=0
+    DG_OUT=""
+    if ! git diff "origin/$DG_BASE...HEAD" > "$DG_DIFF"; then
+        DG_RC=2
+        DG_OUT="deleted-guards: git diff origin/$DG_BASE...HEAD failed"
+    elif [ -n "${PLAN_PATH:-}" ] && [ -f "$PLAN_PATH" ]; then
+        DG_OUT=$("$DG_SCRIPT" --diff "$DG_DIFF" --plan "$PLAN_PATH") || DG_RC=$?
+    else
+        DG_OUT=$("$DG_SCRIPT" --diff "$DG_DIFF") || DG_RC=$?
+    fi
+    rm -f "$DG_DIFF"
+    case "$DG_RC" in
+        0) DG_VERDICT=clean ;;
+        1) DG_VERDICT=flagged ;;
+        *) DG_VERDICT=error ;;
+    esac
+    printf '%s\n' "$DG_OUT"
+fi
+echo "DG_VERDICT=$DG_VERDICT"
+```
+
+Act on the verdict line:
+
+- `clean`: proceed to Step 7.
+- `flagged`: for each `REMOVED-GUARD` line, restore the guard unless the plan's phases require its removal. Restoring is the default. Commit and rerun the block until every remaining key is one the plan requires. For each remaining key, write `<key><TAB><one-line reason of at least 15 chars>` to `$(git rev-parse --absolute-git-dir)/removed-guards-reasons.tsv`. Rewrite the whole file on each pass so stale keys drop out. That path sits under the git dir and is never committed. Post-plan copies each reason into the PR body's `## Removed guards` block. A key without a reason holds auto-merge at condition (20).
+- `unavailable` or `error`: say so in the final message and continue. Post-plan's condition (20) fails closed on a detector error, so nothing ships unchecked.
+
+Never edit the plan's `## Must preserve` or `### Intended removals` to silence a flag. The same rule applies to the Verification Matrix in Step 6.7.
+
 ## Step 7: Write Handoff File
 
 After all implementation is complete and the final checkpoint is pushed, write a handoff file so the post-plan agent can pick up:
@@ -462,3 +524,4 @@ If ANY step fails after worktree creation (Step 5):
 - If you encounter ANY ambiguity about requirements, skip and report. Do not guess. A taken migration or ADR number is not ambiguity: renumber per Step 6
 - All CLAUDE.md project rules apply at all times
 - Work only in worktrees, never modify files on the master branch directly
+- Never edit the plan's `## Must preserve` section, and never write a placeholder or one-word reason into the removed-guards reasons file, to get past Step 6.8.

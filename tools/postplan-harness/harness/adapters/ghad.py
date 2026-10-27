@@ -93,6 +93,7 @@ class RecordingGh:
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
         self.fixture = fixture or {}
+        self.trusted_open_threads_flags: list[bool] = []
         os.makedirs(out_dir, exist_ok=True)
         self.actions_path = os.path.join(out_dir, "actions.jsonl")
         # Review and verification phases run on parallel threads; serialize appends
@@ -121,7 +122,11 @@ class RecordingGh:
     def pr_thread_ids(self, pr: int) -> set[int]:
         return {int(x) for x in self.fixture.get("thread_ids", [])}
 
-    def trusted_open_threads(self, pr: int) -> list[dict] | None:
+    def trusted_open_threads(self, pr: int, include_outdated: bool = False) -> list[dict] | None:
+        # Fixture rows come back verbatim in both modes so the Python recheck in
+        # fetch_trusted_threads is what the tests exercise. The flag is kept so a
+        # wiring test can assert which pass asked for outdated threads.
+        self.trusted_open_threads_flags.append(bool(include_outdated))
         return self.fixture.get("trusted_threads", [])
 
     def review_threads_all(self, pr: int) -> list[dict] | None:
@@ -459,18 +464,19 @@ class LiveGh(RecordingGh):
                     pass
         return result
 
-    def trusted_open_threads(self, pr: int) -> list[dict] | None:
-        return self._prf_rows("list_trusted_open_threads", pr)
+    def trusted_open_threads(self, pr: int, include_outdated: bool = False) -> list[dict] | None:
+        extra = ("--include-outdated",) if include_outdated else ()
+        return self._prf_rows("list_trusted_open_threads", pr, *extra)
 
     def review_threads_all(self, pr: int) -> list[dict] | None:
         return self._prf_rows("prf_review_threads", pr)
 
-    def _prf_rows(self, fn_name: str, pr: int) -> list[dict] | None:
+    def _prf_rows(self, fn_name: str, pr: int, *extra: str) -> list[dict] | None:
         from .llm import _run_reaped
         if not PRF_LIB.exists():
             return None
-        argv = ["bash", "-c", 'source "$1"; "$2" "$3"', "_",
-                str(PRF_LIB), fn_name, str(pr)]
+        argv = ["bash", "-c", 'source "$1"; "$2" "$3" "${@:4}"', "_",
+                str(PRF_LIB), fn_name, str(pr), *extra]
         env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
         try:
             proc = _run_reaped(argv, None, self.timeout, self.worktree, env)

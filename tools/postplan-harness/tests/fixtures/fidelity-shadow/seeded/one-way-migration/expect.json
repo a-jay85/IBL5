@@ -1,0 +1,8 @@
+{
+  "case": "one-way-migration",
+  "expect": {
+    "3": "clear",
+    "18": "hold"
+  },
+  "why": "The migration runs DROP COLUMN with no backfill, so the merge cannot be undone."
+}

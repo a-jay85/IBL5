@@ -7,6 +7,7 @@ namespace Tests\SeasonArchive;
 use PHPUnit\Framework\TestCase;
 use SeasonArchive\SeasonArchiveIndexView;
 use SeasonArchive\SeasonDetailView;
+use Tests\Support\GoldenSnapshotTrait;
 
 /**
  * Golden-master snapshot tests pinned against the split view classes.
@@ -22,7 +23,7 @@ use SeasonArchive\SeasonDetailView;
  */
 class SeasonArchiveGoldenMasterTest extends TestCase
 {
-    use SnapshotTestTrait;
+    use GoldenSnapshotTrait;
 
     private SeasonArchiveIndexView $indexView;
     private SeasonDetailView $detailView;
@@ -36,6 +37,12 @@ class SeasonArchiveGoldenMasterTest extends TestCase
     public function testDetailRichSnapshotMatchesUnmodifiedClass(): void
     {
         $html = $this->detailView->renderSeasonDetail($this->createRichSeasonData());
+        // Heading-level guards: sections are h2 under the page h1, roster columns are h3, no h4 remains.
+        $this->assertStringContainsString('<h2>Playoff Bracket</h2>', $html);
+        $this->assertStringContainsString('<h2>Rosters</h2>', $html);
+        $this->assertStringContainsString('<h3>IBL Champions</h3>', $html);
+        $this->assertSame(4, substr_count($html, '<h3'));
+        $this->assertStringNotContainsString('<h4', $html);
 
         // Branch-marker guards — these run on emit AND every future run to defend the rich dataset.
         // Fail here = the rich dataset is missing a branch, not a stale snapshot.
@@ -57,6 +64,11 @@ class SeasonArchiveGoldenMasterTest extends TestCase
     public function testDetailMinimalSnapshotMatchesUnmodifiedClass(): void
     {
         $html = $this->detailView->renderSeasonDetail($this->createMinimalSeasonData());
+        // Heading-level guards: every section heading is h2, and no h3 or h4 appears without rosters.
+        $this->assertStringContainsString('<h2>Tournaments</h2>', $html);
+        $this->assertStringContainsString('<h2>Statistical Leaders</h2>', $html);
+        $this->assertStringNotContainsString('<h3', $html);
+        $this->assertStringNotContainsString('<h4', $html);
 
         // Empty-optional sections must be absent (boundary characterization).
         $this->assertStringNotContainsString('bracket-round-start', $html);

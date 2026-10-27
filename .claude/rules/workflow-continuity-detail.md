@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -22,13 +22,14 @@ branch; it survives you closing Claude Code. Engine selection:
 - **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy, never the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session, used if the harness
-  fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
+- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session if the harness is
+  absent or exits outside 0, 3 and 7. It triages and holds the PR; it never arms.
+  `POST_PLAN_SKILL=1` forces it.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
-  verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
-  no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
-  Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
+  verdict to arming condition (12). It exits **0**, **1** or **3** only (**7** is
+  `bin/post-plan-now`'s main-checkout refusal). It has no exit 4 and no Phase-5.5 re-entry.
+  Exit **3** is the fail-closed sentinel and suppresses the skill fallback.
   These reach it: a rebase conflict, a **diverged remote head** (the PR branch was rewritten
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
   refusal), a **usage limit** (`llm-usage-limit`),
@@ -58,10 +59,10 @@ branch; it survives you closing Claude Code. Engine selection:
   with scripts off under a 600-second bound, stages the result, and logs
   `phase2: lockfile regenerated: <path> via <cmd>`. The proof treats the lockfile like the
   baseline. A failed regen exits 3 with `lockfile: <path> (regen failed: <cmd> ...)`. Other
-  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`. Condition (14)
-  still needs `CONFLICT-REVIEW=CLEAN`.
+  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`.
   Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
-  goes through the four-rung conflict ladder: `tools/postplan-harness/README.md` § Conflict ladder.
+  goes through the four-rung conflict ladder (rung 1 also rebuilds conflicted golden snapshots):
+  `tools/postplan-harness/README.md` § Conflict ladder.
   The arming hold for an auto-resolved conflict, condition (14), reads a marker file the
   harness binds to the resolving commit. At each rebase start the harness drops the marker
   when that commit has left the branch history (a squash or rebase) and logs

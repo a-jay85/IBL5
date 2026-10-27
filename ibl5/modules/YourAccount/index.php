@@ -8,10 +8,9 @@ if (!defined('MODULE_FILE')) {
 
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $authService, $user;
-/** @var \mysqli $mysqli_db */
+global $authService, $user;
 /** @var \Auth\Contracts\AuthServiceInterface $authService */
-$nukeCompat = new \Utilities\NukeCompat();
+$nukeCompat = \Module\ModuleServices::current()->nukeCompat();
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
@@ -31,17 +30,14 @@ $adminMail = is_string($adminmail ?? null) ? $adminmail : '';
 $minPasswordLength = is_numeric($minpass ?? null) ? (int) $minpass : 5;
 
 // Wire dependencies
-$commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
-$service = new \YourAccount\YourAccountService(
-    $authService,
-    $commonRepository,
-    \Mail\MailService::fromConfig(),
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\YourAccountFactory::class);
+$service = $factory->service(
     $siteUrl,
     $siteName,
     $adminMail,
     $minPasswordLength,
 );
-$accountView = new \YourAccount\YourAccountView();
+$accountView = $factory->view();
 
 switch ($op) {
     case 'logout':

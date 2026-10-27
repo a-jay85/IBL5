@@ -297,3 +297,45 @@ wt_sync_base() {
         echo "Warning: could not reach origin; creating worktree from local $base." >&2
     fi
 }
+
+# Mint the one backup-branch name: backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>.
+# Slug first so a person can pair the backup with its PR branch; dated so names
+# never collide across runs. <reason> is kebab-case (pre-rebase, presquash,
+# local). A "/" in <slug> (feat/foo) flattens to "-" so the slug stays one ref
+# path component. Prints the name and returns 0; the caller runs `git branch`:
+#   name=$(wt_backup_branch_name "$slug" pre-rebase) || exit 1
+#   git branch "$name" HEAD
+# Fails loudly (stderr, return 1, nothing on stdout) instead of picking another
+# shape when git cannot hold the name: a flat branch backup/<slug> (legacy
+# shape) or a branch named "backup" blocks every backup/<slug>/... name, since
+# git cannot store a ref and a ref directory under one path.
+# refs/wt-sync-backup/<branch> (bin/wt-sync-tick) is a separate ref namespace
+# on purpose and is never minted here; see the comment on backup_and_reset.
+wt_backup_branch_name() {
+    local slug="${1:-}" reason="${2:-}" ts name blocker
+    if [ -z "$slug" ] || [ -z "$reason" ]; then
+        echo "wt_backup_branch_name: usage: wt_backup_branch_name <slug> <reason>" >&2
+        return 1
+    fi
+    case "$reason" in
+        *[!a-z0-9-]*|-*) echo "wt_backup_branch_name: reason '$reason' must be kebab-case [a-z0-9-]" >&2; return 1 ;;
+    esac
+    slug="${slug//\//-}"
+    ts="$(date +%Y%m%d-%H%M%S)"
+    name="backup/$slug/$ts-$reason"
+    if ! git check-ref-format "refs/heads/$name"; then
+        echo "wt_backup_branch_name: '$name' is not a valid branch name" >&2
+        return 1
+    fi
+    for blocker in "backup" "backup/$slug"; do
+        if git show-ref --verify --quiet "refs/heads/$blocker"; then
+            echo "wt_backup_branch_name: branch '$blocker' exists and blocks '$name'. Stop and report it; do not pick another name." >&2
+            return 1
+        fi
+    done
+    if git show-ref --verify --quiet "refs/heads/$name"; then
+        echo "wt_backup_branch_name: branch '$name' already exists" >&2
+        return 1
+    fi
+    printf '%s\n' "$name"
+}

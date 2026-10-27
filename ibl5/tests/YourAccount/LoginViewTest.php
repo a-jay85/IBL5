@@ -30,14 +30,14 @@ final class LoginViewTest extends TestCase
 
         self::assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         self::assertStringNotContainsStringIgnoringCase($payload, $html);
-        self::assertStringContainsString('ibl-alert--error', $html);
+        self::assertStringContainsString('d-alert-error', $html);
     }
 
     public function testLoginPageOmitsErrorBlockWhenErrorIsNull(): void
     {
         $html = $this->view->renderLoginPage(null);
 
-        self::assertStringNotContainsString('ibl-alert--error', $html);
+        self::assertStringNotContainsString('d-alert-error', $html);
     }
 
     public function testLoginPageIncludesCsrfToken(): void

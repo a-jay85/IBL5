@@ -151,7 +151,6 @@ REVIEW_SURFACE_PATHS = (
     ".claude/review-shared/_review-agents.md",
     ".claude/review-shared/_security-agents.md",
     ".claude/review-shared/_review-rubric.md",
-    ".claude/skills/post-plan/_phase-4-review-audit.md",
 )
 MODEL_MAP_SOURCE = "tools/postplan-harness/harness/adapters/llm.py"
 MODEL_MAP_RE = re.compile(r"^MODEL_MAP = \{\n.*?^\}", re.M | re.S)
@@ -607,7 +606,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 DEFAULT_CACHE_REL = "tools/postplan-harness/out/reviewer-eval/cache"
 _TRAILING_PR_RE = re.compile(r"\s*\(#(\d+)\)\s*$")
-_AGENT_GATES = ("A", "B", "D", "security")
+_AGENT_GATES = ("A", "D", "security")
 
 
 class NullGh:

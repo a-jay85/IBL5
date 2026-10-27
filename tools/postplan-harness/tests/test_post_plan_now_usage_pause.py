@@ -234,7 +234,7 @@ def test_stray_75_without_marker_falls_back(tmp_path):
     run = _run_foreground_with(tmp_path, "exit 75")
     assert _markers(run.state) == []
     assert _claude_ran(run), f"stdout={run.r.stdout!r} stderr={run.r.stderr!r}"
-    assert run.claude_log.read_text().count("then execute every phase") == 1
+    assert run.claude_log.read_text().count("then execute every remaining phase of the shrunk skill") == 1
     assert PAUSED_LINE not in run.r.stdout
 
 

@@ -122,7 +122,15 @@ jobs:
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
             echo "Flush OPcache" > /tmp/ibl5-last-deploy-step
-            killall lsphp && echo "OPcache flushed (lsphp workers killed)" || echo "No lsphp processes found"
+            # killall is not installed on the host; pkill exits 1 when nothing matched, 2+ on error.
+            if pkill -u "$(id -un)" lsphp; then
+              echo "OPcache flushed (lsphp workers killed)"
+            elif [ $? -eq 1 ]; then
+              echo "No lsphp processes found"
+            else
+              echo "::error::pkill failed; OPcache was NOT flushed"
+              exit 1
+            fi
           '
 
       - name: Purge page cache

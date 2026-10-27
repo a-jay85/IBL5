@@ -16,7 +16,7 @@ namespace TradeSuggestions;
 final class SuggestionRanker
 {
     public const int MAX_SUGGESTIONS = 3;
-    public const int MAX_VALIDATIONS = 40;
+    public const int MAX_VALIDATIONS = 8;
     public const float SIGNIFICANCE_WEIGHT = 0.1;
 
     /**

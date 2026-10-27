@@ -433,10 +433,14 @@ MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $
 DG_SCRIPT="${DG_SCRIPT:-$MAIN_CHECKOUT/bin/lib/deleted-guards}"
 DG_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 DG_BASE="$(git config "branch.$DG_BRANCH.iblBase" || echo master)"
-# Bash calls do not share variables, so rebuild the plan path from the queue entry, as the top of this prompt does
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
-PLAN_PATH="${PLAN_PATH:-$NIGHTLY_DIR/queue/$PLAN_FILE}"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
 [ -f "$PLAN_PATH" ] || echo "deleted-guards: WARNING plan not found at $PLAN_PATH; running plan-less, Intended removals not netted out"
 if [ ! -x "$DG_SCRIPT" ]; then
     DG_VERDICT=unavailable

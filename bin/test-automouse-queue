@@ -1094,9 +1094,9 @@ h_contains "row48 prompt-impl carries the done dispose command" \
     "$(cat "$PROMPT_IMPL")" 'bin/automouse/queue dispose "${PLAN_FILE%.md}" done'
 h_contains "row48 prompt-postplan disposes through the queue script" \
     "$(cat "$PROMPT_PP")" 'bin/automouse/queue dispose "<plan-filename>" done'
-# The PLAN_PATH block from prompt-impl, minus its PLAN_FILE placeholder line and
+# The first PLAN_PATH block from prompt-impl, minus its PLAN_FILE placeholder line and
 # its absolute-path `source` (the harness sources the worktree's helper instead).
-RESOLVE=$(sed -n '/^PLAN_FILE="<the PLAN_FILE value/,/^fi$/p' "$PROMPT_IMPL" | sed '1d; /^source /d')
+RESOLVE=$(sed -n '/^PLAN_FILE="<the PLAN_FILE value/,/^fi$/{p;/^fi$/q;}' "$PROMPT_IMPL" | sed '1d; /^source /d')
 h_contains "row48 PLAN_PATH block resolves through queue_entry_for_slug" "$RESOLVE" 'queue_entry_for_slug'
 resolve_plan_path() {
     # shellcheck disable=SC1090,SC2034  # both vars are read by the eval-ed block

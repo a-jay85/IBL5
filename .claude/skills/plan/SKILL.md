@@ -35,7 +35,7 @@ Read `.claude/review-shared/_plan-verification.md` and use its full content as `
 
 **Prefer direct tool calls over Explore agents.** Most orientation can be done without spawning an agent:
 
-1. Read `.claude/rules/codebase-map.md` to identify affected modules and their file locations
+1. Read `.claude/rules/codebase-map.md` to identify affected modules and their file locations. Skip it when the request's pointers already name the files.
 2. Run targeted `grep`/`find` via Bash for specific symbols, callers, or file paths
 3. Read key files directly (migrations, interfaces, existing tests)
 
@@ -52,11 +52,25 @@ Tier per `.claude/rules/agent-tiering.md`:
 
 Provide each agent a single concrete question, pre-resolved paths, and a response cap (under 150 lines). An agent spawned purely for byte isolation must return **distilled pointers** (`path:line` + the load-bearing fact), not pasted file bodies — pasting the contents back defeats the isolation.
 
-Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code, **the specific existing helpers/services/repositories the implementation should reuse** (name the exact methods, e.g. `SalaryCapRepository::getTeamTotalSalary()`, so the plan directs reuse instead of leaving the impl agent to rediscover them), and **which security surfaces the change touches** (SQL queries, POST/form endpoints, auth/authz-gated routes, user-facing output rendering). If none of these surfaces are touched, record that explicitly. Also record **whether the task resolves a finding tracked in GitHub Issues** (repo: `a-jay85/IBL5-backlog`). If so, record the issue number and its current state, so Step 3 can record it in the plan's `## Backlog issues` section, which closes it when this PR merges. List open issues with `gh issue list --repo a-jay85/IBL5-backlog --state open --limit 100`; search by keyword with `bin/backlog search <terms>`. Separately, record **whether the work leaves a follow-up that can only run *after* the PR merges**, meaning something the merge event itself unblocks: a stale memory/doc/plan that stays valid until the change lands (e.g. a `MEMORY.md` "delete this entry when #N merges" pointer), a temporary compat shim that can be removed once its consumer deploys, a feature flag to retire post-rollout. Note each one so Step 3 can **mechanize** it as a merge-triggered watcher rather than leaving it to the user's memory. When Step 2.5 seeds a shared-context artifact because the work splits into multiple PRs **or** because this invocation arrived with trusted context (see below), these pointers (`path:line` + the one load-bearing fact per file) are the **source** of the artifact's exploration-pointers section. Step 2.5 persists them **once** at SEED so nothing re-derives them, and Step 3 hands the `plan-architect` the artifact rather than re-inlining them. Keep them as pointers here (never file bodies) so they transcribe straight into the artifact.
+Collect: file paths, existing patterns, dependencies, blast radius, existing test coverage for affected code, **the specific existing helpers/services/repositories the implementation should reuse** (name the exact methods, e.g. `SalaryCapRepository::getTeamTotalSalary()`, so the plan directs reuse instead of leaving the impl agent to rediscover them), and **which security surfaces the change touches** (SQL queries, POST/form endpoints, auth/authz-gated routes, user-facing output rendering). If none of these surfaces are touched, record that explicitly. Also record **whether the task resolves a finding tracked in GitHub Issues** (repo: `a-jay85/IBL5-backlog`). If so, record the issue number and its current state, so Step 3 can record it in the plan's `## Backlog issues` section, which closes it when this PR merges. Search by keyword with `bin/backlog search <terms>`, using two or three terms from the task. When the request names an issue number, read that one issue with `gh issue view <N> --repo a-jay85/IBL5-backlog --json number,title,state`. Do not list every open issue. The 100-row listing was the largest single result in measured Step 2 runs. Separately, record **whether the work leaves a follow-up that can only run *after* the PR merges**, meaning something the merge event itself unblocks: a stale memory/doc/plan that stays valid until the change lands (e.g. a `MEMORY.md` "delete this entry when #N merges" pointer), a temporary compat shim that can be removed once its consumer deploys, a feature flag to retire post-rollout. Note each one so Step 3 can **mechanize** it as a merge-triggered watcher rather than leaving it to the user's memory. When Step 2.5 seeds a shared-context artifact because the work splits into multiple PRs **or** because this invocation arrived with trusted context (see below), these pointers (`path:line` + the one load-bearing fact per file) are the **source** of the artifact's exploration-pointers section. Step 2.5 persists them **once** at SEED so nothing re-derives them, and Step 3 hands the `plan-architect` the artifact rather than re-inlining them. Keep them as pointers here (never file bodies) so they transcribe straight into the artifact.
 
 ```bash
-gh issue list --repo a-jay85/IBL5-backlog --state open --limit 100
+bin/backlog search <terms>
 ```
+
+### Orient budget: hand off at 12 calls
+
+This budget binds every run, interactive or headless.
+
+**Budget.** Spend at most **12 tool calls** from the Step 1 Read up to the Step 3 `plan-architect` spawn. Step 2.1's three signals and the Step 2.5 artifact write count against it. Under trusted context, the 1-2 targeted confirmations come out of the same 12.
+
+**Batch.** Put independent calls in one message: greps, `ls` checks, and all three Step 2.1 signals. Each extra turn keeps its thinking in context for the rest of the run.
+
+**Pointers only.** Read no source file past about 40 lines in this session. Use `grep -n`, or `sed -n 'A,Bp'` over a range under 40 lines. Write pointers into the artifact (`path:line` plus one fact). Paste no file body into it.
+
+**Hand-off test.** Go to Step 2.5 and Step 3 as soon as you can name, for every file in the blast radius, its path and the one fact the architect needs. The architect re-reads the code in its own window and holds one `Explore` spawn for questions left open.
+
+**At the cap.** At call 12, stop orienting. Write each unanswered item into the artifact as a named open question for the architect. The cap never skips Step 2.1. If the cap would cut it, run Step 2.1 and drop the remaining orientation.
 
 ### Trusted context — when the caller already did the exploration
 

@@ -653,8 +653,13 @@ conflicting default in the skill):**
 _SLUG_LINE_RE = re.compile(r"^- Branch slug: .*$", re.M)
 
 
-def run_slug(case_id: str, k: int) -> str:
-    return f"eval-{case_id}-r{k}"
+def run_token(cache_dir: Path) -> str:
+    """Short id of one run's cache dir, so two runs sharing ~/claude-plans never share slugs."""
+    return hashlib.sha256(str(Path(cache_dir).resolve()).encode()).hexdigest()[:8]
+
+
+def run_slug(case_id: str, k: int, token: str) -> str:
+    return f"eval-{token}-{case_id}-r{k}"
 
 
 def build_prompt(case_prompt: str, slug: str, plans_dir: Path, orig_slug: str) -> str:
@@ -798,7 +803,9 @@ DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TIMEOUT = 10800
 GATE_TIMEOUT = 300
 CACHE_ROOT = "tools/postplan-harness/out/plan-eval/cache"
-LEAK_ANY_RE = re.compile(r"^eval-[a-z0-9-]+-r\d+([.-]|$)")
+def leak_any_re(token: str) -> "re.Pattern[str]":
+    """Any case's slug for the run that owns this token, and no other run's."""
+    return re.compile("^eval-" + re.escape(token) + r"-[a-z0-9-]+-r\d+([.-]|$)")
 _MARKER_RE = re.compile(r"^(PLAN_FILE|NO_PLAN):\s*(.*)$")
 
 
@@ -978,9 +985,9 @@ def _invoke_claude(argv: list[str], cwd: Path, env: dict, timeout: int) -> tuple
 def run_case(case: dict, k: int, *, repo: Path, source_root: Path, corpus_dir: Path,
              cache_dir: Path, claude: Optional[str] = None, model: str = DEFAULT_MODEL,
              timeout: int = DEFAULT_TIMEOUT, plans_home: Optional[Path] = None) -> dict:
-    slug = run_slug(case["id"], k)
-    home = Path(plans_home) if plans_home else Path.home() / "claude-plans"
     cache_dir = Path(cache_dir)
+    slug = run_slug(case["id"], k, run_token(cache_dir))
+    home = Path(plans_home) if plans_home else Path.home() / "claude-plans"
     cache_dir.mkdir(parents=True, exist_ok=True)
     record: dict = {
         "case_id": case["id"], "run": k, "slug": slug, "model": model,
@@ -1154,7 +1161,8 @@ def key_state(cache_dir: Path, case_id: str, k: int, timeout: int, now: float,
             return "missing"
         if _terminal(cache_dir, key):  # finished between the two checks
             return "terminal"
-        write_record(cache_dir, {"case_id": case_id, "run": k, "slug": run_slug(case_id, k),
+        write_record(cache_dir, {"case_id": case_id, "run": k,
+                                 "slug": run_slug(case_id, k, run_token(cache_dir)),
                                  "status": "degraded", "detail": "worker died",
                                  "cost_usd": 0.0, "tier_chosen": ""})
         pending.unlink()
@@ -1291,7 +1299,7 @@ def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = s
             return 4
         sleep(min(POLL_SECONDS, remaining))
 
-    extra_leaks = sweep_leaks(plans_home, pattern=LEAK_ANY_RE)
+    extra_leaks = sweep_leaks(plans_home, pattern=leak_any_re(run_token(cache_dir)))
     records, scores = [], []
     for case, k in keys:
         rec = json.loads(_terminal(cache_dir, f"{case['id']}-r{k}").read_text())  # type: ignore[union-attr]
@@ -1313,7 +1321,7 @@ def _cmd_run(args: argparse.Namespace, out: TextIO = sys.stdout, err: TextIO = s
     score = compute_score(scores, records, v=v, c=c)
     if extra_leaks:
         from dataclasses import replace
-        score = replace(score, leaked=score.leaked + 1)
+        score = replace(score, leaked=score.leaked + len(extra_leaks))
     print(format_score_line(score), file=out)
     return 3 if score.degraded + score.leaked > 0 else 0
 

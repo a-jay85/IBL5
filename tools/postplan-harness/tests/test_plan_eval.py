@@ -668,7 +668,30 @@ def test_sweep_leaks_deletes_only_prefixed_files(tmp_path):
     assert not (home / ".drafts/eval-a-r1.draft.md").exists()
     for name in ("eval-a-r10.md", "evaluation.md", "plan-eval.md", "eval-a-r1"):
         assert (home / name).exists(), name
-    assert pe.sweep_leaks(home, pattern=pe.LEAK_ANY_RE) == ["eval-a-r10.md"]
+
+
+def test_run_slug_carries_cache_dir_token(tmp_path):
+    ta, tb = pe.run_token(tmp_path / "a"), pe.run_token(tmp_path / "b")
+    assert ta != tb and len(ta) == 8
+    assert ta == pe.run_token(tmp_path / "a")
+    assert pe.run_slug("x", 1, ta) == f"eval-{ta}-x-r1"
+
+
+def test_leak_sweep_touches_only_its_own_run(tmp_path):
+    home = tmp_path / "claude-plans"
+    (home / ".drafts").mkdir(parents=True)
+    ta, tb = pe.run_token(tmp_path / "a"), pe.run_token(tmp_path / "b")
+    a_files = [f"{pe.run_slug('x', 1, ta)}.md", f".drafts/{pe.run_slug('y', 2, ta)}.draft.md"]
+    b_files = [f"{pe.run_slug('x', 1, tb)}.md", f"{pe.run_slug('y', 2, tb)}.md"]
+    for name in a_files + b_files + ["evaluation.md"]:
+        (home / name).write_text("x\n")
+    # Per-worker sweep: run a's slug never matches run b's file for the same case.
+    assert pe.sweep_leaks(home, pe.run_slug("x", 1, ta)) == [a_files[0]]
+    assert (home / b_files[0]).exists()
+    # Final sweep: each run removes and counts only its own files.
+    assert pe.sweep_leaks(home, pattern=pe.leak_any_re(ta)) == [a_files[1]]
+    assert sorted(pe.sweep_leaks(home, pattern=pe.leak_any_re(tb))) == sorted(b_files)
+    assert (home / "evaluation.md").exists()
 
 
 def test_claude_bin_empty_env_uses_default(monkeypatch):
@@ -723,7 +746,7 @@ def test_run_case_end_to_end_fake_claude(tmp_path, monkeypatch):
     assert on_disk["check_plan_rc"] == 0
     assert on_disk["tier_chosen"] == "plan-architect"
     assert "## Verification Matrix" in on_disk["plan_text"]
-    assert (cache / "eval-x-r1.stream.jsonl").is_file()
+    assert (cache / f"{pe.run_slug('x', 1, pe.run_token(cache))}.stream.jsonl").is_file()
     assert seen and not seen[0].exists()
 
 
@@ -739,8 +762,9 @@ def test_run_case_leak_marks_leaked(tmp_path, monkeypatch):
     rec, cache, seen, home = _e2e(tmp_path, monkeypatch, mode="leak")
     on_disk = json.loads((cache / "x-r1.degraded.json").read_text())
     assert on_disk["status"] == "leaked"
-    assert "eval-x-r1.md" in on_disk["detail"]
-    assert not (home / "eval-x-r1.md").exists()
+    leak = f"{pe.run_slug('x', 1, pe.run_token(cache))}.md"
+    assert leak in on_disk["detail"]
+    assert not (home / leak).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -813,6 +837,25 @@ def test_run_scores_from_cache_without_launching(tmp_path):
     assert "mech=4/4 files=8/8 tier=4/4" in lines[0]
     assert launcher.calls == []
     assert err.count("case c") == 4
+
+
+def test_run_final_sweep_counts_every_leaked_file(tmp_path):
+    root, cpath, corpus = _run_env(tmp_path)
+    cache = _cache_of(root, cpath, corpus)
+    cache.mkdir(parents=True)
+    for case in corpus["cases"]:
+        pe.write_record(cache, _ok_record(case))
+    home = tmp_path / "plans-home"
+    home.mkdir()
+    tok = pe.run_token(cache)
+    for i in range(1, 4):
+        (home / f"{pe.run_slug('stray', i, tok)}.md").write_text("x\n")
+    other = home / f"{pe.run_slug('stray', 1, pe.run_token(tmp_path / 'other'))}.md"
+    other.write_text("x\n")
+    rc, out, err = _run(tmp_path, root, cpath, launcher=_Launcher())
+    assert rc == 3, err
+    assert " leaked=3 " in out
+    assert other.exists()
 
 
 def test_run_parallel_cap(tmp_path):

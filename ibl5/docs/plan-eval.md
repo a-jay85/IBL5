@@ -41,7 +41,7 @@ Useful flags: `--cases core|all|ID[,ID...]`, `--runs 1-3`, `--parallel 1-4`, `--
 
 `bin/plan-eval smoke` and `bin/plan-eval smoke --detached` exercise the whole path with a fake model and spend no tokens.
 
-Records live in `tools/postplan-harness/out/plan-eval/cache/<v>-<c>/`, which git ignores. A non-default `--model` adds a `-<model>` suffix to that folder name, so two models never share records. Each run also keeps its raw transcript there as `eval-<id>-r<k>.stream.jsonl`.
+Records live in `tools/postplan-harness/out/plan-eval/cache/<v>-<c>/`, which git ignores. A non-default `--model` adds a `-<model>` suffix to that folder name, so two models never share records. Each run also keeps its raw transcript there as `eval-<token>-<id>-r<k>.stream.jsonl`. The `<token>` is the first 8 hex digits of the SHA-256 of that folder's absolute path, so two runs with different folders never share a slug.
 
 ## Cost
 
@@ -60,8 +60,8 @@ Check usage headroom before a full run. `--dry-run` prints the estimate for the 
 - Today's plan surface is copied over the clone, so the run uses today's skill on the old repo.
 - `CLAUDE_HEADLESS=1` is set, and nothing calls `bin/plan-now`, so no plan reaches the automouse queue.
 - A stub `gh` that prints nothing and exits 0 sits first on `PATH`.
-- The prompt coda points the plans dir at a scratch dir in the clone's temp root and renames the slug to `eval-<caseid>-r<k>`.
-- After each run, a sweep deletes regular files named `eval-<caseid>-r<k>` plus `.`, `-` or nothing in `~/claude-plans` and its `.drafts/`. A hit marks the run `leaked`. `run` repeats the sweep for any `eval-` name at the end.
+- The prompt coda points the plans dir at a scratch dir in the clone's temp root and renames the slug to `eval-<token>-<caseid>-r<k>`.
+- After each run, a sweep deletes regular files named `eval-<token>-<caseid>-r<k>` plus `.`, `-` or nothing in `~/claude-plans` and its `.drafts/`. A hit marks the run `leaked`. At the end, `run` repeats the sweep for any case under its own `eval-<token>-` prefix and adds each file it finds to `leaked`. A concurrent run with another cache folder has another token, so neither run deletes or counts the other's files.
 - A tool call that reads the case's historical plan from `~/claude-plans` marks the run `degraded`. A shared-context file the prompt names may still be read.
 
 ## Adding a case

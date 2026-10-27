@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-10-22
+last_verified: 2026-10-27
 ---
 
 # bin/lib — Shared Library Files
@@ -38,6 +38,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |
 | `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
 | `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file; rejects any value outside the `plan-model-tier` whitelist (exit 1, one line on stderr) instead of defaulting to Opus |
+| `default-branch` | The one resolver for the remote default branch name (ADR-0219): `origin/HEAD`, else the first of `main`, `master` that exists as `refs/remotes/origin/<name>`, else exit 1 with one stderr line; offline, no env override, hostile names and repo dirs rejected before they reach git. Sourced by bash callers (`default_branch_name` / `default_branch_ref`) and executed as a CLI (`--repo DIR`, `--ref`) by the Python harness and PHP; exit 0/1/2; tested by `bin/test-default-branch` |
 | `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, invoked by `bin/check-plan` gate `[13]` and by the `bin/automouse/queue` add-time backstop |
 | `plan-resolve.sh` | Shared plan-file resolver for `/post-plan` Phase 1, condition (7), and condition (13): variant-aware and drift-aware resolution of `$PLAN_FILE` and `$PLAN_SLUG_DRIFT`; mirrors `harness/planfile.py::locate_plan/_resolve_variant/_resolve_drift`; also exports `plans_dir [SEAM_VAR ...]`, the single resolver for the plans directory (`$HOME/claude-plans`, or the first non-empty named seam variable) |
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |

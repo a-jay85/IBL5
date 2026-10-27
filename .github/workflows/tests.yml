@@ -1008,6 +1008,8 @@ jobs:
             bin/test-ci-image-mirror \
             bin/test-check-workflow-run-interpolation \
             bin/test-check-composite-contracts \
+            bin/test-default-branch \
+            bin/test-default-branch-agnostic \
             bin/test-promote-master-to-production \
             bin/test-check-e2e-mutator-isolation \
             bin/test-check-e2e-fixture-drift \

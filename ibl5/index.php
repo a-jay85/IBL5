@@ -63,7 +63,7 @@ if (file_exists($modpath)) {
     define('INDEX_FILE', true);
     PageLayout\PageLayout::header();
     OpenTable();
-    echo "<center>" . _HOMEPROBLEMUSER . "</center>";
+    echo "<div class=\"text-center\">" . _HOMEPROBLEMUSER . "</div>";
     CloseTable();
     PageLayout\PageLayout::footer();
 }

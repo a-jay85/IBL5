@@ -23,7 +23,8 @@ if (!defined('INDEX_FILE')) {
 }
 $module_name = basename(dirname(__FILE__));
 
-global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1, $bgcolor2, $leagueContext;
+global $mysqli_db, $authService, $storyhome, $user_news, $articlecomm, $sitename, $multilingual, $currentlang, $bgcolor1;
+global $leagueContext;
 assert($mysqli_db instanceof \mysqli);
 assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
 
@@ -35,7 +36,6 @@ $newsPageConfig = new \Topics\News\NewsPageConfig(
     multilingual: is_numeric($multilingual) ? (int) $multilingual : 0,
     currentLang: is_string($currentlang) ? $currentlang : '',
     tableBgcolor1: is_string($bgcolor1) ? $bgcolor1 : '#EEEEEE',
-    tableBgcolor2: is_string($bgcolor2) ? $bgcolor2 : '#CCCCCC',
 );
 
 $controller = new \Topics\News\NewsController(

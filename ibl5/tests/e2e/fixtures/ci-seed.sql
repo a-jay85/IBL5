@@ -811,6 +811,32 @@ INSERT INTO ibl_box_scores (
    3, 5, 3, 2, 1, 2, 2,
    '00000000-0000-0000-0000-000000000002');
 
+-- On this day: past-season moments for the homepage block (Phase 7)
+INSERT INTO ibl_box_scores (
+  `game_date`, pid, name, pos, visitor_teamid, home_teamid, teamid,
+  game_of_that_day,
+  game_min, game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  `uuid`
+) VALUES
+  ('2024-03-07', 1, 'Test Player', 'SG', 2, 1, 1,
+   1,
+   40, 16, 24, 8, 9, 4, 9,
+   1, 5, 4, 1, 2, 0, 2,
+   '0e000000-0000-0000-0000-000000000001'),
+  ('2021-03-07', 2, 'Test Player Two', 'PF', 1, 2, 1,
+   1,
+   38, 8, 15, 4, 5, 0, 1,
+   3, 9, 11, 1, 2, 1, 3,
+   '0e000000-0000-0000-0000-000000000002'),
+  -- League-first game (outside the 03-07 window): sets the prior high so the two
+  -- rows above are not record games and keep their fifty_point / triple_double cards.
+  ('2020-01-15', 1, 'Test Player', 'SG', 2, 1, 1,
+   1,
+   42, 21, 30, 9, 10, 1, 3,
+   3, 12, 12, 2, 2, 2, 2,
+   '0e000000-0000-0000-0000-000000000003');
+
 -- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows
 -- calc_points, calc_rebounds, calc_fg_made are generated columns

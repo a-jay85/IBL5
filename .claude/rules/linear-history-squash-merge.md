@@ -1,6 +1,6 @@
 ---
 description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-10-20
+last_verified: 2026-10-22
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - "tools/postplan-harness/**"
@@ -35,6 +35,17 @@ git rebase --onto origin/master <parent-tip-before-merge> <your-branch>
 `<parent-tip-before-merge>` is the last commit that belonged to the parent;
 everything after it is yours. Expect a clean replay; conflicts here usually mean the
 range is wrong.
+
+If you keep a backup branch before a rebase, a squash, or a reset, mint its name.
+Never type one by hand:
+
+```bash
+source bin/lib/git-helpers.sh
+name=$(wt_backup_branch_name <your-branch> pre-rebase) || exit 1
+git branch "$name" <your-branch>
+```
+
+The name is `backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>`, with reason `pre-rebase`, `presquash`, or `local`. If the helper fails because an older flat `backup/<slug>` branch exists, stop and report the name it printed. `refs/wt-sync-backup/*` is a separate ref namespace written by `bin/wt-sync-tick`; leave it alone.
 
 Both `/post-plan` engines now merge `origin/master` into the branch (`git merge --no-edit`).
 A merge sees the squash-merged parent's content on both sides and does not replay it, so the

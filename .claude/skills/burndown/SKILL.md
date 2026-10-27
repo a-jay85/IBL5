@@ -205,9 +205,10 @@ A failed item:
 
 ```bash
 bin/backlog burndown-record <ledger> <n> route=ad-hoc slug=<slug> status=skipped why=<what failed>
+cd /Users/ajaynicolas/GitHub/IBL5 && bin/wt-remove <slug> --if-empty
 ```
 
-Its worktree stays dirty and keeps the issue in flight through the Phase 3c worktree check.
+`bin/wt-remove --if-empty` removes the worktree only when the helper left it empty (no commit, no tracked diff, no untracked file). An item whose helper edited anything prints a `kept` line, and its dirty worktree keeps the issue in flight through the Phase 3c worktree check. An item whose helper changed nothing loses its worktree and branch, so a later run can pick a fresh slug without leaving an empty one behind.
 A failed ad-hoc item keeps its unit and its cost. Any other skip records cost 0, so the ledger's units_used counts only live units.
 
 **Backfill.** Once every item in the current ledger has a settled status (closed-fixed,

@@ -4,13 +4,18 @@
 # Uses --force for git because symlinked files (vendor, config.php, .env.test,
 # node_modules) appear as untracked changes and block normal removal.
 #
-# Usage: bin/wt-remove <worktree-name> [--force] [--volumes]
+# Usage: bin/wt-remove <worktree-name> [--force] [--volumes] [--if-empty]
 
 set -euo pipefail
+# lsof lives in /usr/sbin on macOS. Without it is_worktree_in_use reads "not in
+# use" (empty pipe), which is fail-open for a destructive call. Append the
+# system sbin dirs so a stripped PATH (launchd, env -i) still finds it. If it is
+# still missing, the --if-empty and non---force paths below refuse to remove.
+PATH="$PATH:/usr/sbin:/sbin"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/wt-remove <worktree-name> [--force] [--volumes]
+Usage: bin/wt-remove <worktree-name> [--force] [--volumes] [--if-empty]
 
 Remove a git worktree and its Docker environment. Tears down Docker containers
 first (if running), then removes the worktree directory and git tracking.
@@ -21,6 +26,11 @@ Arguments:
 Options:
   --force     Remove even if the worktree is actively in use or has uncommitted changes.
   --volumes   Also remove Docker volumes when tearing down the environment.
+  --if-empty  Remove only when the worktree is empty: 0 commits ahead of
+              origin/master, no tracked diff, no untracked non-ignored file.
+              Never removes _pool-* slots or an in-use worktree. A refusal
+              prints one "kept" line and exits 0. Also deletes the local
+              branch when it has no origin/<branch> and sits on origin/master.
 EOF
     exit 0
 fi
@@ -34,21 +44,46 @@ WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 NAME=""
 FORCE=false
 VOLUMES=false
+IF_EMPTY=false
 for arg in "$@"; do
     case "$arg" in
         --force) FORCE=true ;;
         --volumes) VOLUMES=true ;;
+        --if-empty) IF_EMPTY=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) NAME="$arg" ;;
     esac
 done
 
 if [ -z "$NAME" ]; then
-    echo "Usage: bin/wt-remove <worktree-name> [--force] [--volumes]" >&2
+    echo "Usage: bin/wt-remove <worktree-name> [--force] [--volumes] [--if-empty]" >&2
     exit 1
 fi
 
-WT_PATH=$(get_worktree_path "$NAME")
+# --force skips the in-use check, which --if-empty must never skip.
+if [ "$IF_EMPTY" = true ] && [ "$FORCE" = true ]; then
+    echo "Error: --if-empty cannot be combined with --force" >&2
+    exit 1
+fi
+
+# An absolute path inside the worktrees parent names the directory exactly. The
+# branch lookup below would first match a different worktree that has a branch
+# of the same name checked out (bin/wt-new's abort trap passes the path).
+case "$NAME" in
+    /*)
+        # A trailing slash would make the last "*" in the nested check match empty.
+        NAME="${NAME%/}"
+        case "$NAME" in
+            */..|*/../*|*/.|*/./*) echo "Error: '$NAME' is outside $WT_PARENT (dot segments are not resolved)" >&2; exit 1 ;;
+            "$WT_PARENT"/*/*) echo "Error: '$NAME' is nested below $WT_PARENT; name one worktree directory" >&2; exit 1 ;;
+            "$WT_PARENT"/*) ;;
+            *) echo "Error: '$NAME' is outside $WT_PARENT" >&2; exit 1 ;;
+        esac
+        WT_PATH="$NAME"
+        NAME="$(basename "$NAME")"
+        ;;
+    *) WT_PATH=$(get_worktree_path "$NAME") ;;
+esac
 
 # Fall back to the conventional location if git doesn't know the branch
 # (e.g., branch already deleted but directory remains).
@@ -57,11 +92,37 @@ if [ -z "$WT_PATH" ]; then
 fi
 
 if [ ! -d "$WT_PATH" ]; then
+    # A trap can fire twice or after another cleaner ran; the caller must not
+    # die under set -e.
+    if [ "$IF_EMPTY" = true ]; then
+        echo "wt-remove: '$NAME' not found; nothing to remove"
+        exit 0
+    fi
     echo "Error: worktree '$NAME' not found at $WT_PATH" >&2
     exit 1
 fi
 
+# --if-empty: re-check emptiness at removal time. A refusal is a normal outcome
+# for its callers (EXIT traps, set -e scripts), so it exits 0 with a kept line.
+BRANCH=""
+if [ "$IF_EMPTY" = true ]; then
+    keep() { echo "wt-remove: kept '$NAME': $1"; exit 0; }
+    case "$NAME" in _pool-*) keep "pool slot" ;; esac
+    case "$(basename "$WT_PATH")" in _pool-*) keep "pool slot" ;; esac
+    command -v lsof >/dev/null 2>&1 || keep "cannot check in-use (lsof not on PATH)"
+    is_worktree_in_use "$WT_PATH" && keep "in use"
+    reason="$(worktree_keep_reason "$WT_PATH")"
+    [ -n "$reason" ] && keep "$reason"
+    BRANCH="$(git -C "$WT_PATH" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    case "$BRANCH" in _pool-*) keep "pool slot" ;; esac
+fi
+
 # Safety: refuse to remove a worktree that is actively in use
+if [ "$FORCE" != true ] && ! command -v lsof >/dev/null 2>&1; then
+    echo "Error: cannot check whether '$NAME' is in use (lsof not on PATH)" >&2
+    echo "Use --force to remove anyway." >&2
+    exit 1
+fi
 if [ "$FORCE" != true ] && is_worktree_in_use "$WT_PATH"; then
     echo "Error: worktree '$NAME' is in active use (processes detected in directory)" >&2
     echo "Use --force to remove anyway." >&2
@@ -81,5 +142,19 @@ fi
 echo "Removing worktree '$NAME'..."
 # Docker on macOS sets deny-delete ACLs on bind-mount dirs (e.g. ibl5/backups)
 chmod -R -N "$WT_PATH" 2>/dev/null || true
-git worktree remove --force "$WT_PATH"
+if ! git worktree remove --force "$WT_PATH"; then
+    # An untracked directory (e.g. a half-finished wt-new abort) fails here;
+    # --if-empty callers must still get a kept line and exit 0.
+    [ "$IF_EMPTY" = true ] && keep "git could not remove it (not a tracked worktree?)"
+    exit 1
+fi
+# An empty, never-pushed branch would block a same-slug retry (wt-new's
+# existing-branch guard) and docfix-run's per-day branch dedupe. -D is safe:
+# the ancestor test proves the tip is already on origin/master.
+if [ "$IF_EMPTY" = true ] && [ -n "$BRANCH" ] \
+    && ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/remotes/origin/$BRANCH" \
+    && git -C "$REPO_ROOT" merge-base --is-ancestor "refs/heads/$BRANCH" origin/master; then
+    git -C "$REPO_ROOT" branch -D "$BRANCH" >/dev/null
+    echo "Deleted local branch '$BRANCH' (empty, never pushed)."
+fi
 echo "Done. Worktree '$NAME' removed."

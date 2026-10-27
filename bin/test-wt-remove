@@ -283,6 +283,10 @@ h_eq "case 17: reap command present once" 1 \
     "$(grep -cF 'bin/wt-remove <slug> --if-empty' "$FP")"
 h_contains "case 17: same line as the /plan hand-off" \
     "$(grep -F 'bin/wt-remove <slug> --if-empty' "$FP")" 'hand off to `/plan`'
+h_eq "case 17: reap cds to the worktrees parent" 1 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5-worktrees && /Users/ajaynicolas/GitHub/IBL5/bin/wt-remove <slug> --if-empty' "$FP")"
+h_eq "case 17: no cd into the main checkout" 0 \
+    "$(grep -cF 'cd /Users/ajaynicolas/GitHub/IBL5 &&' "$FP")"
 
 echo "== case 17a: prompt-impl Step 6.5 leaves the worktree by a cd bash-guard allows"
 # Run from inside the worktree under CLAUDE_HEADLESS, so bash-guard Check 15 denies a

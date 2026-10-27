@@ -64,6 +64,7 @@ PLAN_SURFACE_ENTRIES = (
     "bin/plan-tier-hint",
     "bin/lib/plan-",
     "bin/lib/critical-files.sh",
+    "bin/lib/deleted-guards",
     "bin/lib/hold-check.sh",
     "bin/lib/hold-check-patterns.txt",
 )

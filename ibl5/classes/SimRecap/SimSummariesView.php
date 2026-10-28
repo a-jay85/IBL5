@@ -117,7 +117,6 @@ class SimSummariesView
     <section class="ibl-card" id="recap-panel">
         <h2 class="ibl-title">Sim <?= HtmlSanitizer::e($recap['sim'] ?? '') ?></h2>
         <p>Status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?> · Attempts: <?= HtmlSanitizer::e($recap['attempts'] ?? '') ?> · Generated: <?= HtmlSanitizer::e($recap['generated_at'] ?? '—') ?></p>
-        <p id="recap-themes">Themes: <?= HtmlSanitizer::e($this->themeSummary($recap)) ?></p>
 <?php if ($orphanedGames !== []): ?>
 <?php $this->renderOrphanWarning($orphanedGames); ?>
 <?php endif; ?>
@@ -125,18 +124,9 @@ class SimSummariesView
 <?php if (!is_string($body)): ?>
         <p id="recap-missing">No recap text stored yet — status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?>.</p>
 <?php else: ?>
-<?php $intro = $recap['intro_text'] ?? null; ?>
-<?php if (is_string($intro) && $intro !== ''): ?>
-        <p id="recap-intro" class="whitespace-pre-line"><?= HtmlSanitizer::e($intro) ?></p>
-<?php endif; ?>
-<?php if ($gameRecaps !== []): ?>
-<?php $this->renderGameRecaps($gameRecaps); ?>
-<?php endif; ?>
-<?php $outro = $recap['outro_text'] ?? null; ?>
-<?php if (is_string($outro) && $outro !== ''): ?>
-        <p id="recap-outro" class="whitespace-pre-line"><?= HtmlSanitizer::e($outro) ?></p>
-<?php endif; ?>
 <?php
+        $intro = $recap['intro_text'] ?? null;
+        $outro = $recap['outro_text'] ?? null;
         // recap_text is usually a ~220-char teaser; the postable document only exists as
         // intro + per-game rows + outro. postableText() falls back to the stored text
         // when there is nothing to assemble or the parts lost their GM mention lines,
@@ -188,28 +178,6 @@ class SimSummariesView
 <?php
     }
 
-    /**
-     * @param list<array<string, mixed>> $gameRecaps
-     */
-    private function renderGameRecaps(array $gameRecaps): void
-    {
-        ?>
-        <ol id="recap-games">
-<?php foreach ($gameRecaps as $game): ?>
-<?php
-            $gDate = $game['game_date'] ?? null;
-            $gVid  = $game['visitor_teamid'] ?? null;
-            $gHid  = $game['home_teamid'] ?? null;
-?>
-            <li class="recap-game">
-                <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
-                <p class="recap-game__text whitespace-pre-line"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
-            </li>
-<?php endforeach; ?>
-        </ol>
-<?php
-    }
-
     private function renderHead(): string
     {
         return "<head>\n"
@@ -231,41 +199,5 @@ class SimSummariesView
         $length = $row['recap_length'] ?? null;
 
         return is_numeric($length) ? ((string) (int) $length) . ' bytes' : '—';
-    }
-
-    /**
-     * `themes_used` is a JSON column and is never rendered raw. The return value
-     * is plain text that the caller escapes — nothing here is pre-rendered HTML,
-     * so `trusted()` never touches a recap value. A payload that does not decode
-     * to a non-empty array renders as a literal em dash; unit 1's
-     * `recentThemesToleratesMalformedJson()` proves such rows exist.
-     *
-     * @param array<string, mixed> $recap
-     */
-    private function themeSummary(array $recap): string
-    {
-        $raw = $recap['themes_used'] ?? null;
-        if (!is_string($raw) || $raw === '') {
-            return '—';
-        }
-
-        try {
-            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return '—';
-        }
-
-        if (!is_array($decoded)) {
-            return '—';
-        }
-
-        $parts = [];
-        foreach ($decoded as $theme) {
-            if (is_scalar($theme)) {
-                $parts[] = (string) $theme;
-            }
-        }
-
-        return $parts === [] ? '—' : implode(', ', $parts);
     }
 }

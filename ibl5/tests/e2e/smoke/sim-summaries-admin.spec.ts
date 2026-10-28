@@ -65,24 +65,16 @@ test.describe('Sim recap admin viewer', () => {
     await assertNoPhpErrors(page);
   });
 
-  test('single recap renders its stored body and themes', async ({ page }) => {
+  test('single recap renders its stored body once, without themes', async ({ page }) => {
     const response = await page.goto('simSummaries.php?sim=689');
 
     expect(response?.status()).toBe(200);
     await expect(page.locator('#recap-body')).toHaveValue(SIM_689_BODY);
-    await expect(page.locator('#recap-themes')).toContainText('comeback');
-    await expect(page.locator('#recap-intro')).toContainText(
-      'Another week of IBL action delivered drama from tip-off to the final buzzer.',
-    );
-    await expect(page.locator('#recap-outro')).toContainText(
-      'The Cannons are one to watch as the season reaches its final stretch.',
-    );
-    const gameItems = page.locator('#recap-games li');
-    await expect(gameItems).toHaveCount(3);
-    // Games must appear in sort_order order: 2026-02-20 → 2026-03-03 → 2026-03-05.
-    await expect(gameItems.nth(0)).toContainText('2026-02-20');
-    await expect(gameItems.nth(1)).toContainText('2026-03-03');
-    await expect(gameItems.nth(2)).toContainText('2026-03-05');
+    // The recap shows only in the textarea; no second copy as page paragraphs.
+    await expect(page.locator('#recap-themes')).toHaveCount(0);
+    await expect(page.locator('#recap-intro')).toHaveCount(0);
+    await expect(page.locator('#recap-outro')).toHaveCount(0);
+    await expect(page.locator('#recap-games')).toHaveCount(0);
     await assertNoPhpErrors(page);
   });
 

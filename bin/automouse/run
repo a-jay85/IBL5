@@ -2979,11 +2979,24 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         JUDGE_OUT="$NIGHTLY_DIR/logs/$(date +%Y-%m-%d)-judge-${PLAN_NAME%.md}.jsonl"
         rm -f "$JUDGE_OUT"
         JUDGE_VERDICT=missing
+        JUDGE_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
         if [ -n "$JUDGE_WT" ] && [ -d "$JUDGE_WT" ]; then
             run_manual_judge "$NEXT_PLAN" "$JUDGE_WT" "$JUDGE_OUT"
             JUDGE_VERDICT=$(parse_judge_verdict "$JUDGE_OUT") || true
         fi
         echo "[$(date +%H:%M:%S)] judge verdict: $JUDGE_VERDICT ($JUDGE_MODEL) for $PLAN_NAME" >> "$LOG"
+        # A judge killed by a usage/rate limit, auth error, or stall yields
+        # `missing` too. That is environmental, not a verdict: refund, keep the
+        # handoff, and stop the loop like the impl breaker does.
+        if [ "$JUDGE_VERDICT" = missing ] && [ -n "$JUDGE_WT" ] && [ -d "$JUDGE_WT" ] \
+            && { phase_env_error "$JUDGE_LOG_BEFORE" || phase_stalled "$JUDGE_LOG_BEFORE"; }; then
+            JUDGE_REASON="usage/rate limit, auth error, or transient during the judge spawn"
+            echo "Environmental failure during judge — $JUDGE_REASON. Refunding attempt, handoff kept, stopping loop." >> "$LOG"
+            note_stop "Judging ${PLAN_NAME%.md} hit a problem that was not the plan's fault ($JUDGE_REASON). The run stopped, the try was not counted, and the judge will run next time." "Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-env-stop-${PLAN_NAME%.md}.md"
+            refund_attempt
+            write_env_stop_report "$PLAN_NAME" judge "$JUDGE_REASON" "$JUDGE_LOG_BEFORE"
+            break
+        fi
         if [ "$JUDGE_VERDICT" != pass ]; then
             hold_plan_judge "$PLAN_NAME" "$NEXT_PLAN" "$JUDGE_OUT" "$JUDGE_VERDICT"
         fi

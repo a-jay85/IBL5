@@ -377,7 +377,7 @@ PRIOR_RUN = "live-prior"
 
 
 def _record(diff_id, plan_hash, version=VERSION, verdict="READY", remediated=False,
-            key_diff_id=None, run_id=PRIOR_RUN, files=None, body_hash=""):
+            key_diff_id=None, run_id=PRIOR_RUN, files=None, body_hash="", own_id=None):
     """A review-cache record carrying a clean fidelity arm, built through the real builder.
 
     `diff_id` / `plan_hash` go on the fidelity arm; `key_diff_id` (default `diff_id`) is the
@@ -390,6 +390,8 @@ def _record(diff_id, plan_hash, version=VERSION, verdict="READY", remediated=Fal
            "plan_hash": plan_hash, "remediated": remediated}
     if body_hash:
         arm["body_hash"] = body_hash
+    if own_id is not None:
+        arm["own_id"] = own_id
     return reviewcache.build_record(slug="s", pr_number=99, run_id=run_id, key=key,
                                     per_file_ids={"a.py": "1" * 40}, fidelity=arm)
 
@@ -988,3 +990,201 @@ def test_review_cache_arm_stores_own_id(tmp_path):
                                str(tmp_path / "out" / "live-new"), {}, lambda _m: None)
     rec = reviewcache.load_record(cache_dir, "s")
     assert rec["fidelity"]["own_id"] == expected
+
+
+# --- own-change carry arm -------------------------------------------------------
+
+_CTX_TEMPLATE = """\
+diff --git a/foo.py b/foo.py
+index aaaaaaa..bbbbbbb 100644
+--- a/foo.py
++++ b/foo.py
+@@ -1,5 +1,5 @@
+ one
+ {ctx}
+-old
++new
+ three
+ four
+"""
+
+# Same +/- lines, one differing context line: master edited next to the hunk.
+CTX_DIFF_A = _CTX_TEMPLATE.format(ctx="ctx-a")
+CTX_DIFF_B = _CTX_TEMPLATE.format(ctx="ctx-b")
+CTX_DIFF_C = _CTX_TEMPLATE.format(ctx="ctx-c")
+U0_DIFF = """\
+diff --git a/foo.py b/foo.py
+index aaaaaaa..bbbbbbb 100644
+--- a/foo.py
++++ b/foo.py
+@@ -3 +3 @@
+-old
++new
+"""
+U0_DIFF_NEW = (U0_DIFF.replace("@@ -3 +3 @@", "@@ -3 +3,2 @@")
+               + "+brand new code line\n")
+assert U0_DIFF_NEW != U0_DIFF
+
+OWN_PLAN_BODY = b"# plan\n"
+OWN_PLAN_HASH = hashlib.sha256(OWN_PLAN_BODY).hexdigest()
+
+
+def _own_ids():
+    old_id, new_id = fidelity.diff_patch_id(CTX_DIFF_A), fidelity.diff_patch_id(CTX_DIFF_B)
+    own_id = fidelity.own_change_id(U0_DIFF)
+    assert old_id and new_id and old_id != new_id
+    assert fidelity.diff_patch_id(CTX_DIFF_C) not in (old_id, new_id)
+    assert own_id
+    return old_id, new_id, own_id
+
+
+def _own_drive(tmp_path, sticky, cache_rec, own_diff=U0_DIFF, diff=CTX_DIFF_B, **kw):
+    purposes = []
+    res, spawns, logs = _drive_cf(
+        tmp_path, prior_sticky=sticky, plan_body=OWN_PLAN_BODY, diff=diff, canned=CANNED_READY,
+        cache_rec=cache_rec, cache_version=VERSION, own_diff=own_diff, purposes_out=purposes, **kw)
+    return res, spawns, logs
+
+
+def _own_fixture(**sticky_over):
+    old_id, _, own_id = _own_ids()
+    sticky_kw = dict(diff_id=old_id, plan_hash=OWN_PLAN_HASH, own_id=own_id)
+    sticky_kw.update(sticky_over)
+    return _sticky(**sticky_kw), _record(old_id, OWN_PLAN_HASH, own_id=own_id)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_adjacent_master_merge_reuses_verdict_without_reviewer(tmp_path):
+    old_id, _, _ = _own_ids()
+    sticky, rec = _own_fixture()
+    res, spawns, logs = _own_drive(tmp_path, sticky, rec)
+    assert spawns == 0
+    assert res.fidelity["carried_forward"] is True
+    assert res.fidelity["carry_reason"] == "own-change"
+    assert res.fidelity["diff_id"] == old_id
+    assert any("(own-change match, reviewed " in ln for ln in logs)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_new_code_commit_never_carries(tmp_path):
+    sticky, rec = _own_fixture()
+    res, spawns, logs = _own_drive(tmp_path, sticky, rec, own_diff=U0_DIFF_NEW)
+    assert spawns == 1
+    assert "carried_forward" not in res.fidelity
+    assert any("carry-forward declined: diff-changed) diff-id=" in ln
+               and "own-arm=own-change-changed" in ln for ln in logs), logs
+
+
+def test_own_change_carry_diff_rejects_a_different_own_id():
+    old_id, _, own_id = _own_ids()
+    sticky = _sticky(diff_id=old_id, own_id=own_id)
+    assert fidelity.own_change_carry_diff(
+        sticky, fidelity.own_change_id(U0_DIFF_NEW)) == ("", "own-change-changed")
+
+
+def test_own_change_carry_diff_arms():
+    old_id, _, own_id = _own_ids()
+    sticky = _sticky(diff_id=old_id, own_id=own_id)
+    no_diff_line = _drop_line(sticky, "**Reviewed diff:**")
+    # a sticky can't carry an own line without a reviewed line, so splice one in by hand
+    no_diff_line += f"\n**Own change:** {own_id}"
+    cases = [
+        (None, own_id, ("", "no-prior-sticky")),
+        (sticky, "", ("", "no-own-id")),
+        (sticky, "A" * 40, ("", "no-own-id")),
+        (_sticky(diff_id=old_id), own_id, ("", "no-prior-own-id")),
+        (no_diff_line, own_id, ("", "no-prior-diff-id")),
+        (sticky, own_id, (old_id, "")),
+    ]
+    for body, oid, expected in cases:
+        assert fidelity.own_change_carry_diff(body, oid) == expected, (oid, expected)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_old_sticky_without_own_line_declines_diff_changed(tmp_path):
+    old_id, _, own_id = _own_ids()
+    sticky = _sticky(diff_id=old_id, plan_hash=OWN_PLAN_HASH)
+    res, spawns, logs = _own_drive(tmp_path, sticky, _record(old_id, OWN_PLAN_HASH, own_id=own_id))
+    assert spawns == 1
+    assert any("carry-forward declined: diff-changed)" in ln and "own-arm=no-prior-own-id" in ln
+               for ln in logs), logs
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_pre_pr_cache_record_declines_own_change(tmp_path):
+    old_id, _, _ = _own_ids()
+    sticky, _ = _own_fixture()
+    res, spawns, logs = _own_drive(tmp_path, sticky, _record(old_id, OWN_PLAN_HASH))
+    assert spawns == 1
+    assert not res.fidelity.get("carried_forward")
+    assert any("carry-forward declined: diff-changed)" in ln
+               and "own-arm=cache-own-id-mismatch" in ln for ln in logs), logs
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_own_match_with_plan_change_declines(tmp_path):
+    sticky, rec = _own_fixture(plan_hash="d" * 64)
+    res, spawns, logs = _own_drive(tmp_path, sticky, rec)
+    assert spawns == 1
+    assert any("carry-forward declined: diff-changed)" in ln and "own-arm=plan-changed" in ln
+               for ln in logs), logs
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_own_match_never_carries_not_ready(tmp_path):
+    sticky, rec = _own_fixture(verdict="NOT READY")
+    res, spawns, logs = _own_drive(tmp_path, sticky, rec)
+    assert spawns == 1
+    assert any("own-arm=prior-verdict-not-terminal" in ln for ln in logs), logs
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_unreadable_own_change_diff_declines(tmp_path):
+    def _boom():
+        raise RuntimeError("git exploded")
+
+    sticky, rec = _own_fixture()
+    res, spawns, logs = _own_drive(tmp_path, sticky, rec, own_diff=_boom)
+    assert spawns == 1
+    assert any("own-id=- own-arm=no-own-id" in ln for ln in logs), logs
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_own_change_carry_keeps_reviewed_diff_in_cache_and_sticky(tmp_path):
+    old_id, new_id, own_id = _own_ids()
+    sticky, rec = _own_fixture()
+    res, spawns, _ = _own_drive(tmp_path / "hop1", sticky, rec)
+    assert spawns == 0
+    res.pr_number = 99
+    key = reviewcache.make_key(diff_id=new_id, plan_hash=OWN_PLAN_HASH, version=VERSION,
+                               pr_title="chore: t", file_list=["a.py"])
+    cache_dir = str(tmp_path / "state")
+    runner._write_review_cache(res, key, {"a.py": "1" * 40}, rec, cache_dir, "s",
+                               str(tmp_path / "out" / "live-hop1"), {}, lambda _m: None)
+    written = reviewcache.load_record(cache_dir, "s")
+    assert written["fidelity"]["diff_id"] == old_id
+    assert written["fidelity"]["own_id"] == own_id
+
+    fid = res.fidelity
+    sticky2 = fidelity.compose_sticky(
+        "rebased", "ci", fid, None, ["a", "b", "c", "d", "e"], "findings",
+        fidelity.terminal_line(fid.get("verdict_1"), None, None, None, None, 0),
+        diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+        own_id=fid.get("own_id", ""), reused_from=res.reused_from)
+    assert fidelity.STICKY_REVIEWED_DIFF_RE.search(sticky2).group(1) == old_id
+
+    res2, spawns2, _ = _own_drive(tmp_path / "hop2", sticky2, written, diff=CTX_DIFF_C)
+    assert spawns2 == 0
+    assert res2.fidelity["carry_reason"] == "own-change"
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_condition_12_identical_for_own_change_carry(tmp_path):
+    sticky, rec = _own_fixture()
+    res_own, spawns_own, _ = _own_drive(tmp_path / "own", sticky, rec)
+    assert spawns_own == 0
+    res_full, spawns_full, _ = _drive_cf(tmp_path / "full", prior_sticky=None,
+                                         plan_body=OWN_PLAN_BODY, canned=CANNED_READY)
+    assert spawns_full == 1
+    assert _cond12(res_own, TREE) == _cond12(res_full, TREE)
+    assert _cond12(res_own, TREE) == ([], ("READY", "verdict-1"))

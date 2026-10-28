@@ -2980,7 +2980,8 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
         if fid_arm and "fidelity" not in res.reused_from:
             fid_arm = dict(fid_arm, own_id=((getattr(res, "fidelity", None) or {})
                                             .get("own_id", "") or ""))
-        if "fidelity" in res.reused_from and fid_arm:
+        if ("fidelity" in res.reused_from and fid_arm
+                and (getattr(res, "fidelity", None) or {}).get("carry_reason") != "own-change"):
             fid_arm = dict(fid_arm, diff_id=cache_key["diff_id"])   # conflict-only: valid for the current diff
         doc = reviewcache.build_record(slug=slug, pr_number=int(res.pr_number), run_id=this_run,
                                        key=cache_key, per_file_ids=cache_files, review=rev_arm,
@@ -3084,6 +3085,21 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         carried, decline_reason = fidelity.carry_forward_predicate(
             prior_sticky, reuse_diff, plan_hash)
         carry_reason = "conflict-only-delta" if carried else ""
+    # Own-change arm: the full-context patch-id moved, but the branch's own changed lines
+    # are byte-identical to the diff the reviewer judged (a master edit landed inside a
+    # hunk's context window). Re-checks every strict arm against the reviewed diff.
+    own_reason = ""
+    if not carried and decline_reason == "diff-changed" and own_id:
+        prior_diff, own_reason = fidelity.own_change_carry_diff(prior_sticky, own_id)
+        if prior_diff:
+            inner, inner_reason = fidelity.carry_forward_predicate(
+                prior_sticky, prior_diff, plan_hash)
+            if inner:
+                carried, reuse_diff, carry_reason = inner, prior_diff, "own-change"
+            else:
+                own_reason = inner_reason
+    elif not carried and decline_reason == "diff-changed":
+        own_reason = "no-own-id"
     if carried:
         reuse_run = reviewcache.fidelity_reusable(cache_rec, cache_version, reuse_diff, plan_hash,
                                                  body_hash)
@@ -3096,6 +3112,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                               else "body-changed" if body_hash
                               and (cache_rec.get("fidelity") or {}).get("body_hash") != body_hash
                               else "cache-arm-unusable")
+    if carry_reason == "own-change":
+        cached_own = (((cache_rec or {}).get("fidelity") or {}).get("own_id", "") or "")
+        if carried and cached_own != own_id:
+            carried, decline_reason = None, "cache-own-id-mismatch"
+        if not carried:
+            own_reason, decline_reason, carry_reason = decline_reason, "diff-changed", ""
     # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
     # carrying would overwrite the prior sticky's real excerpt and digest with
     # placeholders, so decline and let the full review regenerate the file.
@@ -3104,7 +3126,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     if carried:
         res.reused_from["fidelity"] = reuse_run
         log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})"
-            + (" (conflict-only delta)" if carry_reason else ""))
+            + {"conflict-only-delta": " (conflict-only delta)",
+               "own-change": f" (own-change match, reviewed {reuse_diff[:12]})"}
+            .get(carry_reason, ""))
         res.fidelity = {"verdict_1": carried, "error_kind": None,
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
@@ -3113,13 +3137,15 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": [],
+                        "diff_id": reuse_diff if carry_reason == "own-change" else diff_id,
+                        "own_id": own_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True,
                         "shadow": fidelity.carried_shadow(
                             ((cache_rec or {}).get("fidelity") or {}).get("shadow"), reuse_run),
                         **({"carry_reason": carry_reason} if carry_reason else {})}
         return carried, ""
-    log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
+    log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})"
+        f" diff-id={diff_id or '-'} own-id={own_id or '-'} own-arm={own_reason or '-'}")
     # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.
     if before_remediation is not None:
         before_remediation()

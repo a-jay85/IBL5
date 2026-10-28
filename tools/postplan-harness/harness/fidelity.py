@@ -1620,6 +1620,25 @@ def carry_forward_predicate(sticky_body, diff_id: str,
     return verdict, ""
 
 
+def own_change_carry_diff(sticky_body, own_id: str) -> tuple[str, str]:
+    """(prior reviewed diff id, "") when the sticky records this own-change id, else
+    ("", reason). Only selects the diff to re-check; the caller must still run
+    carry_forward_predicate on the returned id, which keeps every other arm."""
+    if not sticky_body:
+        return "", "no-prior-sticky"
+    if not own_id or not re.fullmatch(r"[0-9a-f]{40}", own_id):
+        return "", "no-own-id"
+    o = STICKY_OWN_CHANGE_RE.search(sticky_body)
+    if not o:
+        return "", "no-prior-own-id"
+    if o.group(1) != own_id:
+        return "", "own-change-changed"
+    m = STICKY_REVIEWED_DIFF_RE.search(sticky_body)
+    if not m:
+        return "", "no-prior-diff-id"
+    return m.group(1), ""
+
+
 # Status lines the runner builds on every clean run. The composer prints only a line that
 # deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
 _EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",

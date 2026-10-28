@@ -1,6 +1,6 @@
 ---
 description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 ---
 
 # Work Triage Rule
@@ -27,7 +27,7 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **gate removal or weakening** (input an executable gate, meaning a hook deny, a `bin/check-*` condition, or a Phase 6.5 arming condition, previously rejected now passes) or a **bootstrap hazard** (it rewrites the rule governing its own merge); prose that keeps the decision procedure, additive gates, and plumbing changes don't count, or
+- a **gate removal or weakening** (input an executable gate, meaning a hook deny, a `bin/check-*` condition, or a Phase 6.5 arming condition, previously rejected now passes) or a **bootstrap hazard** (it rewrites the rule governing its own merge); prose that keeps the decision procedure, additive gates, tightenings that add a hold or narrow what passes, and plumbing changes don't count, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.

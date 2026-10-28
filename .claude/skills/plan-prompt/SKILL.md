@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -159,13 +159,18 @@ isn't obvious:
   **`plan-architect-xhigh`**. Directory alone is never the trigger; full text at
   `/plan` Step 3 check 1. A characterization-pinned split of existing SQL, POST or
   rendering code that adds no surface goes to **`plan-architect`** (same check).
+  Adding a hold, narrowing what passes, or changing what can clear arming
+  condition N without letting a held input pass is not a trigger. Before you
+  declare xhigh for a gate change, name the input that newly passes.
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**
 
 Before writing the tier directive, run `bin/plan-tier-hint --explain --desc "<task-line>"` on
 the `/plan` task statement line and confirm the returned tier matches your call. `bin/plan-now`
-now cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
+cross-checks the declared tier against this hint. A mismatch involving xhigh exits 4, except
+that a `plan-architect` declaration against a check-1b or check-1c xhigh hint prints a
+warning and proceeds. A check-1a hint still exits 4 unless you pass `--tier-ok "reason"`.
 
 Also pick the orchestrator model — a single item → **Sonnet**; several items decomposed
 in one pass → **Opus** (`agent-tiering.md` § `/plan` orchestrator model) — and pass

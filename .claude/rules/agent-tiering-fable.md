@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, the xhigh human overrule. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
 
@@ -55,7 +55,7 @@ Reproduce: `python3 -m harness.tier_measure run --repo-root ../.. --out <path> -
 
 A def whose frontmatter pins `model: fable` always runs on Fable. Today that is `plan-architect-xhigh` at high effort, selected by `/plan` Step 3 check 1.
 
-A human may overrule check 1 and route an xhigh-triggered task to `plan-architect`. The overrule applies only when the prompt names the trigger risks and names an empirical backstop that would catch a wrong plan: shadow mode, a replay corpus, or the `feat:` signoff hold. It is never automatic. Headless and automouse runs follow check 1 and the `bin/plan-now` tier cross-check unchanged, and an overruled run records the reason in its plan's Approach. Aligning the cross-check is backlog follow-up F1 ([backlog#1667](https://github.com/a-jay85/IBL5-backlog/issues/1667)).
+A human may overrule check 1 and route an xhigh-triggered task to `plan-architect`. The overrule applies only when the prompt names the trigger risks and names an empirical backstop that would catch a wrong plan: shadow mode, a replay corpus, or the `feat:` signoff hold. It is never automatic. Headless and automouse runs follow check 1 and the `bin/plan-now` tier cross-check, and an overruled run records the reason in its plan's Approach. The cross-check is the headless overrule path, so no separate overrule marker exists. A `plan-architect` declaration against a check-1b or check-1c xhigh hint prints a warning and proceeds. A check-1a hint, or any other mismatch involving xhigh, exits 4 unless the run passes `--tier-ok "reason"`.
 
 ## Asm-level static RE (JSB engine): Fable is the default
 

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/skill-gate.sh"
@@ -73,6 +73,7 @@ Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now
 ## Safety mirror backstop
 
 **What counts as a gate removal/weakening** (the resident bullet carries the trigger; these are the examples): deleting, relaxing, or disabling an enforcement mechanism — a hook deny, a `bin/check-plan` gate condition, a `plan-gate-edit` check, a `/post-plan` Phase 6.5 arming condition. **Bootstrap hazard** means the change rewrites the arming, escalation, or auto-merge rules that govern its own merge. Same trigger as `/plan` Step 3's `plan-architect-xhigh` escalation — full clause in `.claude/skills/plan/SKILL.md` Step 3 check 1.
+Adding a hold, narrowing what passes, or changing what can clear an arming condition without letting a held input pass is not a weakening. Routing that will govern a later, unrelated plan is not a bootstrap hazard.
 
 **Why these five bullets.** The trigger list mirrors the surfaces `/plan` Step 4 gate 14 (the auto-merge hold criterion) holds the merge for: a subjective/`Truly-manual` row (14a), a touched security surface (14b), a destructive or schema-tightening migration (14c), new or redesigned user-visible UI/UX (14d), and gate weakening or a bootstrap hazard (14e, the same clause as the `plan-architect-xhigh` escalation). Gate 14 also holds a golden-snapshot change (14f) and a recorded-and-unresolved fork (14g); neither is a triage trigger, because both are plan-time outcomes with no surface to spot before planning. A change that would be held at merge is routed into `/plan` at the start instead, so the defense and its verification get designed up front.
 

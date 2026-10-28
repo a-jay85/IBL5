@@ -292,5 +292,29 @@ assert_contains "canonical carries the pinned-restructure carve-out" \
     '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
 assert_contains "plan-prompt points at the pinned-restructure carve-out" \
     '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
+assert_contains "canonical names tightening as a non-trigger" \
+    '.claude/skills/plan/SKILL.md' 'adds a hold or narrows what passes'
+assert_contains "canonical names the clearing-path test" \
+    '.claude/skills/plan/SKILL.md' 'what can clear arming condition N'
+assert_contains "canonical states the plan-now warn branch" \
+    '.claude/skills/plan/SKILL.md' 'check 1b or check 1c prints a warning'
+assert_contains "plan-prompt names the clearing-path non-trigger" \
+    '.claude/skills/plan-prompt/SKILL.md' 'changing what can clear arming'
+assert_contains "plan-prompt states the warn branch" \
+    '.claude/skills/plan-prompt/SKILL.md' 'check-1b or check-1c xhigh hint'
+assert_contains "tiers table says adding a hold is not a trigger" \
+    '.claude/rules/agent-tiering.md' 'adding a hold is not a trigger'
+assert_contains "safety mirror names tightenings" \
+    '.claude/rules/work-triage.md' 'tightenings that add a hold'
+assert_contains "triage detail names the clearing-path non-trigger" \
+    '.claude/rules/work-triage-detail.md' 'changing what can clear an arming condition'
+assert_contains "xhigh def names the hold non-trigger" \
+    '.claude/agents/plan-architect-xhigh.md' 'Adding a hold, narrowing what passes'
+assert_absent "default def drops the ship-pipeline wording" \
+    '.claude/agents/plan-architect.md' 'ship-pipeline gate removals'
+assert_contains "fable overrule states the warn branch" \
+    '.claude/rules/agent-tiering-fable.md' 'check-1b or check-1c xhigh hint'
+assert_absent "fable overrule no longer defers F1" \
+    '.claude/rules/agent-tiering-fable.md' 'backlog follow-up F1'
 
 h_done

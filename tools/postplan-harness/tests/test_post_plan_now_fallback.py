@@ -1743,9 +1743,15 @@ def test_no_force_passes_postplan_force_zero(tmp_path, monkeypatch):
 def test_detached_cmd_carries_postplan_force(tmp_path):
     """The detached HARNESS_SEG carries POSTPLAN_FORCE too, not only the foreground one."""
     cmd = _generate_cmd(tmp_path, args=("--force",))
-    assert "POSTPLAN_FORCE=1 POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=" in cmd
+    assert ("POSTPLAN_FORCE=1 POSTPLAN_FIRED_BY='post-plan-now' "
+            "POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=") in cmd
     plain = _generate_cmd(tmp_path / "plain")
-    assert "POSTPLAN_FORCE=0 POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=" in plain
+    assert ("POSTPLAN_FORCE=0 POSTPLAN_FIRED_BY='post-plan-now' "
+            "POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=") in plain
+    fleet = _generate_cmd(tmp_path / "fleet",
+                          extra_env={"POSTPLAN_FIRED_BY": "post-plan-fleet"})
+    assert ("POSTPLAN_FORCE=0 POSTPLAN_FIRED_BY='post-plan-fleet' "
+            "POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=") in fleet
 
 
 _STATE_CHANGED_PROBE_HARNESS = (
@@ -1785,11 +1791,12 @@ def test_no_state_changed_passes_zero_not_ambient(tmp_path, monkeypatch):
 def test_detached_cmd_carries_postplan_state_changed(tmp_path):
     """Both HARNESS_SEG lines carry the var; the detached one is checked here, FORCE order intact."""
     cmd = _generate_cmd(tmp_path, args=("--state-changed",))
-    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=" in cmd
+    tail = "POSTPLAN_FIRED_BY='post-plan-now' POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH="
+    assert f"POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 {tail}" in cmd
     rebase = _generate_cmd(tmp_path / "rebase", args=("--rebase-only",))
-    assert "POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=" in rebase
+    assert f"POSTPLAN_STATE_CHANGED=1 POSTPLAN_FORCE=0 {tail}" in rebase
     plain = _generate_cmd(tmp_path / "plain")
-    assert "POSTPLAN_STATE_CHANGED=0 POSTPLAN_FORCE=0 POSTPLAN_CONFORMANCE_FIX='' POSTPLAN_LOG_PATH=" in plain
+    assert f"POSTPLAN_STATE_CHANGED=0 POSTPLAN_FORCE=0 {tail}" in plain
     assert "POSTPLAN_STATE_CHANGED=1" not in plain
 
 

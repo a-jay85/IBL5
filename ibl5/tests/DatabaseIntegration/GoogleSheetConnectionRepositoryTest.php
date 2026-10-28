@@ -99,9 +99,21 @@ class GoogleSheetConnectionRepositoryTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertNotNull($row['last_error']);
         self::assertSame(255, strlen($row['last_error']));
-        self::assertSame(0, $row['refresh_pending']);
+        // A sim landing mid-write re-sets the flag, so markRefreshed() must leave it alone.
+        self::assertSame(1, $row['refresh_pending']);
         self::assertSame('error', $row['last_refresh_status']);
         self::assertNotNull($row['last_refresh_at']);
+    }
+
+    public function testClearPendingClearsOnlyThatUser(): void
+    {
+        $this->repo->upsert(900001, 'v1.a', 'sheet-a', 'https://docs.google.com/spreadsheets/d/sheet-a');
+        $this->repo->upsert(900002, 'v1.b', 'sheet-b', 'https://docs.google.com/spreadsheets/d/sheet-b');
+        $this->repo->markAllActivePending();
+
+        $this->repo->clearPending(900001);
+
+        self::assertSame([900002], array_column($this->repo->findPending(10), 'user_id'));
     }
 
     public function testMarkBrokenSetsReasonAndClearsPending(): void
@@ -146,7 +158,7 @@ class GoogleSheetConnectionRepositoryTest extends DatabaseTestCase
 
         $methods = [
             'findByUserId', 'upsert', 'updateRefreshToken', 'markAllActivePending',
-            'findPending', 'markRefreshed', 'markBroken', 'deleteByUserId',
+            'findPending', 'clearPending', 'markRefreshed', 'markBroken', 'deleteByUserId',
         ];
         foreach ($methods as $method) {
             $reflection = new \ReflectionMethod(GoogleSheetConnectionRepository::class, $method);

@@ -51,22 +51,22 @@ final class RecapDocumentTest extends TestCase
     public function testAssemblesTheWholeDocumentInExemplarShape(): void
     {
         $doc = RecapDocument::assemble(
-            "IBL SIM RECAPS\n====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n====",
+            "IBL SIM RECAPS\n====",
             [
                 $this->game('2008-02-26', "**A 100 @ B 114**\n<@1> · <@2>\n\nFirst game."),
                 $this->game('2008-02-26', "**C 103 @ D 139**\n<@3> · <@4>\n\nSecond game."),
                 $this->game('2008-03-01', "**E 111 @ F 120**\n<@5> · <@6>\n\nThird game."),
             ],
-            "====\nEND. 3 games."
+            "====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n\n====\nEND. 3 games."
         );
 
-        $expected = "IBL SIM RECAPS\n====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n===="
+        $expected = "IBL SIM RECAPS\n===="
             . "\n\n\n" . self::FEB_26_RULE
             . "\n\n" . "**A 100 @ B 114**\n<@1> · <@2>\n\nFirst game."
             . "\n\n" . "**C 103 @ D 139**\n<@3> · <@4>\n\nSecond game."
             . "\n\n\n" . self::MAR_1_RULE
             . "\n\n" . "**E 111 @ F 120**\n<@5> · <@6>\n\nThird game."
-            . "\n\n\n" . "====\nEND. 3 games.\n";
+            . "\n\n\n" . "====\n\nWHERE THINGS STAND\n\nUtah is still Utah.\n\n====\nEND. 3 games.\n";
 
         self::assertSame($expected, $doc);
     }

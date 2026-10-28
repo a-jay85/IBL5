@@ -79,10 +79,18 @@ class GoogleSheetConnectionRepository extends BaseMysqliRepository implements Go
      */
     public function markAllActivePending(): int
     {
-        return $this->execute(
+        $this->execute(
             "UPDATE `ibl_google_sheet_connections` SET refresh_pending = 1 WHERE status = 'active'",
             ''
         );
+
+        // UPDATE's affected-row count skips rows that were already pending, so count the active rows directly.
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS n FROM `ibl_google_sheet_connections` WHERE status = 'active'",
+            ''
+        );
+
+        return is_array($row) && is_int($row['n'] ?? null) ? $row['n'] : 0;
     }
 
     /**

@@ -1,0 +1,67 @@
+[
+  {
+    "module": "api-keys",
+    "viewport": "desktop",
+    "title": "api-keys",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 2954-4338 px",
+    "beforeFile": "changed/api-keys.1.before.png",
+    "afterFile": "changed/api-keys.1.after.png",
+    "sideFile": "changed/api-keys.1.side.png",
+    "stackFile": "changed/api-keys.1.stack.png"
+  },
+  {
+    "module": "api-keys-guide",
+    "viewport": "desktop",
+    "title": "api-keys-guide",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 2954-4338 px",
+    "beforeFile": "changed/api-keys-guide.1.before.png",
+    "afterFile": "changed/api-keys-guide.1.after.png",
+    "sideFile": "changed/api-keys-guide.1.side.png",
+    "stackFile": "changed/api-keys-guide.1.stack.png"
+  },
+  {
+    "module": "api-keys",
+    "viewport": "mobile",
+    "title": "api-keys-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 3986-7120 px",
+    "beforeFile": "changed/api-keys-mobile.1.before.png",
+    "afterFile": "changed/api-keys-mobile.1.after.png",
+    "sideFile": "changed/api-keys-mobile.1.side.png",
+    "stackFile": "changed/api-keys-mobile.1.stack.png"
+  },
+  {
+    "module": "draft-history",
+    "viewport": "desktop",
+    "title": "draft-history",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 105-270 px",
+    "beforeFile": "changed/draft-history.1.before.png",
+    "afterFile": "changed/draft-history.1.after.png",
+    "sideFile": "changed/draft-history.1.side.png",
+    "stackFile": "changed/draft-history.1.stack.png"
+  },
+  {
+    "module": "draft-history",
+    "viewport": "mobile",
+    "title": "draft-history-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 96-242 px",
+    "beforeFile": "changed/draft-history-mobile.1.before.png",
+    "afterFile": "changed/draft-history-mobile.1.after.png",
+    "sideFile": "changed/draft-history-mobile.1.side.png",
+    "stackFile": "changed/draft-history-mobile.1.stack.png"
+  }
+]

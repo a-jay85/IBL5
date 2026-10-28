@@ -2137,7 +2137,10 @@ run_manual_judge() {
           --output-format stream-json \
           --verbose \
           --name "automouse-judge-$(date +%Y-%m-%d-%H%M)" ) \
-      2>> "$LOG" | tee "$out_file" >> "$LOG" || true
+      2>> "$LOG" | tee "$out_file" \
+      | bin/lib/automouse-stream-filter.sh "$NIGHTLY_DIR/.heartbeat-$$-judge" "" "$PLAN_SLUG" judge \
+      >> "$LOG" || true
+    rm -f "$NIGHTLY_DIR/.heartbeat-$$-judge"
     append_cost_row "$PLAN_NAME" judge "$log_before" "$JUDGE_MODEL" || true
 }
 

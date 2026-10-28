@@ -371,7 +371,7 @@ if [ "\$kind" = judge ]; then
     case "\${JUDGE_STUB:-}" in
         pass)
             printf '{"type":"system","subtype":"init"}\n'
-            jq -nc --arg r \$'ROW 1: PASS - ok\nJUDGE_VERDICT: pass' '{type:"result",result:\$r}'
+            jq -nc --arg r \$'ROW 1: PASS - ok\nJUDGE_VERDICT: pass' '{type:"result",result:\$r,session_id:"judge-sid",total_cost_usd:0.002,usage:{input_tokens:1,output_tokens:1}}'
             exit 0 ;;
         fail)
             printf '{"type":"system","subtype":"init"}\n'
@@ -851,6 +851,8 @@ want           "e2-judge-pass: impl spawn used Sonnet"      "$J_CALLS" "claude-s
 want           "e2-judge-pass: log records the verdict"     "$J_LOG" "judge verdict: pass (claude-opus-5-5)"
 # Positive control for e2-no-judge's ledger probe: a judge spawn writes a judge row.
 assert_eq      "e2-judge-pass: one judge ledger row"        "$(judge_ledger_rows)" "1"
+assert_eq      "e2-judge-pass: judge ledger row has a numeric cost" \
+    "$(cat "$E2_NDIR/logs"/*.costs.jsonl 2>/dev/null | jq -c 'select(.phase == "judge") | .cost | type' | head -1)" '"number"'
 
 echo ""
 echo "# e2-judge-prompt: the judge prompt carries its rows and only its rows"

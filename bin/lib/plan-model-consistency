@@ -114,6 +114,7 @@ ROW_RECORDS=$(awk '
             gsub(/^[[:space:]]+|[[:space:]]+$/, "", c)
             if (c != "") { loc = c; break }
         }
+        gsub(/`/, "", loc)
         tagged = 0; reason = ""
         if (match(loc, /(^|;)[[:space:]]*opus-judge:[[:space:]]*/)) {
             tagged = 1

@@ -112,7 +112,7 @@ NEGATED_PIN_RE='(unpinned|not pinned|no (pin|characteriz)|(without|skip|skipping
 RESTRUCTURE_RE='(split|extract|table-driv|dedup|share one|consolidat)'
 # Carve-out H1: an additive gate whose only weakening stem is a past
 # participle (an adjective such as a deleted symbol) is not a weakening.
-ADDITIVE_RE='(additive|adds? (a |an )?(new )?hold|tighten)'
+ADDITIVE_RE='(additive|add(s|ing)? (a |an )?(new )?hold|tighten)'
 HARD_WEAKEN_RE='(relax|escape hatch|disabl|weaken|loosen|bypass|waive|exempt|turn off|opt[- ]out|soften|remove([^d]|$)|removing|removal|delete([^d]|$)|deleting|deletion|strip([^p]|$)|stripping|(get|gets|got|is|are|was|were|be|been|being) (removed|deleted|stripped))'
 
 match() {

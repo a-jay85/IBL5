@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { expectButtonRowCentered } from '../helpers/centered-row';
 
 // API Keys management flow — tests the full generate → view → revoke cycle.
 // Serial: key operations mutate user state.
@@ -93,6 +94,16 @@ test.describe('API Keys flow', () => {
     // and the column-reference table renders below the key card instead.
     await expect(page.getByRole('link', { name: /Player Export Guide/i })).toHaveCount(0);
     await expect(page.getByText('Column Reference')).toBeVisible();
+  });
+
+  test('revoke button is centered in the API Key card at 1280 and 390', async ({ page }) => {
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('modules.php?name=ApiKeys');
+      const row = page.locator('#api-key-actions');
+      await expect(row.getByRole('button', { name: /Revoke Key/i })).toBeVisible();
+      await expectButtonRowCentered(row);
+    }
   });
 
   test('revoke key returns to no-key state', async ({ page }) => {

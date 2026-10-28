@@ -28,6 +28,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('Generate API Key', $html);
         $this->assertStringContainsString('op=generate', $html);
         $this->assertStringContainsString("don't have an API key yet", $html);
+        $this->assertStringContainsString('id="api-key-actions" class="flex flex-wrap justify-center', $html);
     }
 
     public function testRenderNewKeyStateContainsRawKey(): void
@@ -39,6 +40,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString($rawKey, $html);
         $this->assertStringContainsString("won't be shown again", $html);
         $this->assertStringContainsString('IMPORTDATA', $html);
+        $this->assertStringContainsString('id="api-key-actions" class="flex flex-wrap justify-center', $html);
     }
 
     public function testRenderNewKeyStateWarnsThatUrlKeysAreLogged(): void
@@ -88,6 +90,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('ibl_test', $html);
         $this->assertStringContainsString('Revoke Key', $html);
         $this->assertStringContainsString('op=revoke', $html);
+        $this->assertStringContainsString('id="api-key-actions" class="flex flex-wrap justify-center', $html);
         $this->assertStringContainsString('2026-01-15 10:30:00', $html);
         $this->assertStringContainsString('2026-03-20 14:00:00', $html);
     }
@@ -269,6 +272,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('op=google_start', $html);
         $this->assertStringContainsString('name="_csrf_token"', $html);
         $this->assertStringContainsString('id="google-sheet-connect"', $html);
+        $this->assertStringContainsString('id="google-sheet-actions" class="flex flex-wrap justify-center', $html);
         $this->assertStringNotContainsString('id="google-sheet-open"', $html);
         $this->assertStringNotContainsString('id="google-sheet-refresh"', $html);
     }

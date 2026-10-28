@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth-regular';
 import type { APIRequestContext } from '@playwright/test';
+import { expectButtonRowCentered } from '../helpers/centered-row';
 
 /**
  * Google Sheets card on the ApiKeys page, driven by seeded connection rows for
@@ -115,32 +116,19 @@ test.describe('Google Sheets card', () => {
     });
   }
 
-  for (const status of ['active', 'broken'] as const) {
+  for (const status of ['none', 'active', 'broken'] as const) {
     for (const width of [1280, 390]) {
       test(`${status} card centers every line of the button row at ${width}px`, async ({ page }) => {
-        await seed(page.request, status, status === 'broken' ? 'invalid_grant' : '');
+        if (status !== 'none') {
+          await seed(page.request, status, status === 'broken' ? 'invalid_grant' : '');
+        }
         await page.setViewportSize({ width, height: 900 });
         await page.goto(API_KEYS);
 
-        const actions = page.locator('#google-sheet-actions');
-        await expect(actions.locator('.ibl-btn').first()).toBeVisible();
-        // Group the buttons into visual lines by top edge, then compare each
-        // line's left and right gap inside the row container.
-        const gaps = await actions.evaluate((row) => {
-          const box = row.getBoundingClientRect();
-          const lines = new Map<number, { left: number; right: number }>();
-          for (const btn of row.querySelectorAll('.ibl-btn')) {
-            const r = btn.getBoundingClientRect();
-            const top = Math.round(r.top);
-            const line = lines.get(top) ?? { left: r.left, right: r.right };
-            lines.set(top, { left: Math.min(line.left, r.left), right: Math.max(line.right, r.right) });
-          }
-          return [...lines.values()].map((l) => ({ left: l.left - box.left, right: box.right - l.right }));
-        });
-        expect(gaps.length).toBeGreaterThan(0);
-        for (const gap of gaps) {
-          expect(Math.abs(gap.left - gap.right)).toBeLessThanOrEqual(3);
-        }
+        await expectButtonRowCentered(page.locator('#google-sheet-actions'));
+        // The API Key card above shares the page, so its action row (Revoke
+        // or Generate, whichever state this user is in) must be centered too.
+        await expectButtonRowCentered(page.locator('#api-key-actions'));
       });
     }
   }

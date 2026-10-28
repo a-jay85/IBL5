@@ -107,10 +107,12 @@ GS;
     <div class="ibl-card__body">
         <p class="mb-4">You don't have an API key yet. Generate one to use the Player Export feature with Google Sheets.</p>
         <p class="mb-6 text-sm text-gray-600">An API key lets you pull live player data directly into your spreadsheet using Google Sheets' <code>IMPORTDATA</code> function.</p>
-        <form method="post" action="modules.php?name=ApiKeys&amp;op=generate">
-            <?= \Security\CsrfGuard::generateToken('api_keys_generate') ?>
-            <button type="submit" class="ibl-btn ibl-btn--primary">Generate API Key</button>
-        </form>
+        <div id="api-key-actions" class="flex flex-wrap justify-center gap-4 items-center">
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=generate">
+                <?= \Security\CsrfGuard::generateToken('api_keys_generate') ?>
+                <button type="submit" class="ibl-btn ibl-btn--primary">Generate API Key</button>
+            </form>
+        </div>
     </div>
 </div>
         <?php
@@ -148,7 +150,9 @@ GS;
 
         <?= self::URL_KEY_NOTICE ?>
 
-        <a href="modules.php?name=ApiKeys" class="ibl-btn ibl-btn--primary">Done</a>
+        <div id="api-key-actions" class="flex flex-wrap justify-center gap-4 items-center">
+            <a href="modules.php?name=ApiKeys" class="ibl-btn ibl-btn--primary">Done</a>
+        </div>
     </div>
 </div>
         <?php
@@ -205,10 +209,12 @@ GS;
         <p class="text-sm text-gray-600">Google Sheets sync is not configured on this server.</p>
         <?php elseif ($summary === null): ?>
         <p class="mb-4">Sign in with Google and the site creates a spreadsheet in your Drive, then rewrites its Players tab with the full player export after every sim. Other tabs you add are never touched.</p>
-        <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start" hx-boost="false">
-            <?= \Security\CsrfGuard::generateToken('google_start') ?>
-            <button type="submit" id="google-sheet-connect" class="ibl-btn ibl-btn--primary">Sign in with Google</button>
-        </form>
+        <div id="google-sheet-actions" class="flex flex-wrap justify-center gap-4 items-center">
+            <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start" hx-boost="false">
+                <?= \Security\CsrfGuard::generateToken('google_start') ?>
+                <button type="submit" id="google-sheet-connect" class="ibl-btn ibl-btn--primary">Sign in with Google</button>
+            </form>
+        </div>
         <?php else: ?>
             <?php if ($isBroken): ?>
         <div class="ibl-alert ibl-alert--warning mb-4">Your Google connection needs attention: <?= HtmlSanitizer::e(self::REASON_TEXT[$reason] ?? 'Please reconnect.') ?></div>
@@ -297,7 +303,7 @@ GS;
             </tbody>
         </table>
 
-        <div class="flex gap-4 items-center">
+        <div id="api-key-actions" class="flex flex-wrap justify-center gap-4 items-center">
             <form method="post" action="modules.php?name=ApiKeys&amp;op=revoke" onsubmit="return confirm('Are you sure? You will need to generate a new key and update any spreadsheets that use the current one.');">
                 <?= \Security\CsrfGuard::generateToken('api_keys_revoke') ?>
                 <button type="submit" class="ibl-btn ibl-btn--danger">Revoke Key</button>

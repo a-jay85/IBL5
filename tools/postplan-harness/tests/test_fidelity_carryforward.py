@@ -805,3 +805,63 @@ def test_compose_sticky_emits_review_kind_line():
     assert "**Review kind:** delta (anchor live-prior; 1 file(s), 3/40 changed lines" in body
     assert fidelity.STICKY_REVIEW_KIND_DELTA_RE.search(body)
     assert "**Review kind:**" not in _sticky()
+
+
+# --- characterization: every decline arm keeps its reason token ----------------
+
+def _drop_line(body, prefix):
+    lines = body.split("\n")
+    kept = [ln for ln in lines if not ln.startswith(prefix)]
+    assert len(kept) == len(lines) - 1, f"expected exactly one {prefix!r} line"
+    return "\n".join(kept)
+
+
+_PREDICATE_DECLINE_CASES = [
+    ("none-sticky", None, DIFF_ID, PLAN_HASH, "no-prior-sticky"),
+    ("blank-diff-id", _sticky(), "", PLAN_HASH, "no-diff-id"),
+    ("short-diff-id", _sticky(), "abc123", PLAN_HASH, "no-diff-id"),
+    ("plan-blind", _sticky(), DIFF_ID, "", "no-plan-hash"),
+    ("no-reviewed-diff-line", _drop_line(_sticky(), "**Reviewed diff:**"), DIFF_ID, PLAN_HASH,
+     "no-prior-diff-id"),
+    ("other-diff", _sticky(), "f" * 40, PLAN_HASH, "diff-changed"),
+    ("no-plan-hash-line", _drop_line(_sticky(), "**Plan hash:**"), DIFF_ID, PLAN_HASH,
+     "no-prior-plan-hash"),
+    ("other-plan", _sticky(), DIFF_ID, "e" * 64, "plan-changed"),
+    ("prior-delta", _sticky(**_DELTA_FID), DIFF_ID, PLAN_HASH, "prior-review-delta"),
+    ("not-ready-prior", _sticky(verdict="NOT READY"), DIFF_ID, PLAN_HASH,
+     "prior-verdict-not-terminal"),
+]
+
+
+@pytest.mark.parametrize(
+    "sticky,diff_id,plan_hash,reason",
+    [c[1:] for c in _PREDICATE_DECLINE_CASES],
+    ids=[c[0] for c in _PREDICATE_DECLINE_CASES])
+def test_every_predicate_decline_arm_keeps_its_reason(sticky, diff_id, plan_hash, reason):
+    assert fidelity.carry_forward_predicate(sticky, diff_id, plan_hash) == (None, reason)
+
+
+@pytest.mark.usefixtures("git_shim")
+@pytest.mark.parametrize("case,reason", [
+    ("no-cache-record", "no-cache-record"),
+    ("version-changed", "version-changed"),
+    ("body-changed", "body-changed"),
+    ("verdict-file-missing", "verdict-file-missing"),
+])
+def test_runner_decline_arms_log_their_reason(tmp_path, case, reason):
+    plan_body, _, _, sticky = _cf_setup()
+    kw = dict(_cache(plan_body))
+    if case == "no-cache-record":
+        kw = {"cache_rec": None, "cache_version": VERSION}
+    elif case == "version-changed":
+        kw = _cache(plan_body, version="w" * 64)
+        kw["cache_version"] = VERSION
+    elif case == "body-changed":
+        kw["body_hash"] = "b" * 64
+    elif case == "verdict-file-missing":
+        kw["verdict_text"] = None
+    res, spawns, logs = _drive_cf(tmp_path, prior_sticky=sticky, plan_body=plan_body,
+                                  canned=CANNED_READY, **kw)
+    assert spawns == 1
+    assert not res.fidelity.get("carried_forward")
+    assert any(f"carry-forward declined: {reason})" in ln for ln in logs), logs

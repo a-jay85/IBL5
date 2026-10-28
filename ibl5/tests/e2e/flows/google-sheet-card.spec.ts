@@ -100,6 +100,21 @@ test.describe('Google Sheets card', () => {
     await expect(page.locator('#google-sheet-refresh')).toHaveCount(0);
   });
 
+  for (const status of ['active', 'broken'] as const) {
+    test(`${status} card keeps Disconnect inside the card at 390px`, async ({ page }) => {
+      await seed(page.request, status, status === 'broken' ? 'invalid_grant' : '');
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(API_KEYS);
+
+      const disconnect = page.locator('#google-sheet-disconnect');
+      await expect(disconnect).toBeVisible();
+      const cardRight = await page.locator('#google-sheet-card').evaluate((el) => el.getBoundingClientRect().right);
+      const buttonRight = await disconnect.evaluate((el) => el.getBoundingClientRect().right);
+      expect(buttonRight).toBeLessThanOrEqual(cardRight);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    });
+  }
+
   test('refresh without a token is rejected and leaves the row active', async ({ page }) => {
     await seed(page.request, 'active');
 

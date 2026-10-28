@@ -213,7 +213,7 @@ GS;
             <?php if ($isBroken): ?>
         <div class="ibl-alert ibl-alert--warning mb-4">Your Google connection needs attention: <?= HtmlSanitizer::e(self::REASON_TEXT[$reason] ?? 'Please reconnect.') ?></div>
             <?php else: ?>
-        <table class="ibl-data-table mb-4">
+        <table class="ibl-data-table api-keys-table mb-4">
             <tbody>
                 <tr>
                     <th class="text-left">Status</th>
@@ -233,9 +233,9 @@ GS;
         <div class="ibl-alert ibl-alert--warning mb-4">Last refresh failed: <?= HtmlSanitizer::e($summary['last_error'] ?? 'unknown error') ?></div>
                 <?php endif; ?>
             <?php endif; ?>
-        <div class="flex gap-4 items-center">
+        <div class="flex flex-wrap gap-4 items-center">
             <?php if ($showOpen && $safeUrl !== null): ?>
-            <a id="google-sheet-open" class="ibl-btn" href="<?= HtmlSanitizer::e($safeUrl) ?>" target="_blank" rel="noopener">Open sheet</a>
+            <a id="google-sheet-open" class="ibl-btn ibl-btn--primary" href="<?= HtmlSanitizer::e($safeUrl) ?>" target="_blank" rel="noopener">Open sheet</a>
             <?php endif; ?>
             <?php if ($isBroken): ?>
             <form method="post" action="modules.php?name=ApiKeys&amp;op=google_start" hx-boost="false">
@@ -245,7 +245,7 @@ GS;
             <?php else: ?>
             <form method="post" action="modules.php?name=ApiKeys&amp;op=google_refresh">
                 <?= \Security\CsrfGuard::generateToken('google_refresh') ?>
-                <button type="submit" id="google-sheet-refresh" class="ibl-btn">Refresh now</button>
+                <button type="submit" id="google-sheet-refresh" class="ibl-btn ibl-btn--primary">Refresh now</button>
             </form>
             <?php endif; ?>
             <form method="post" action="modules.php?name=ApiKeys&amp;op=google_disconnect" onsubmit="return confirm('Disconnect Google? The spreadsheet stays in your Drive but will stop updating.');">
@@ -272,7 +272,7 @@ GS;
         <h1 class="ibl-card__title">API Key</h1>
     </div>
     <div class="ibl-card__body">
-        <table class="ibl-data-table mb-6">
+        <table class="ibl-data-table api-keys-table mb-6">
             <tbody>
                 <tr>
                     <th class="text-left">Key</th>

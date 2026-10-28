@@ -277,9 +277,9 @@ class ApiKeysViewTest extends TestCase
     {
         $html = $this->view->renderGoogleSheetCard(self::googleSummary(), true);
 
-        $this->assertStringContainsString('id="google-sheet-open" class="ibl-btn" href="https://docs.google.com/spreadsheets/d/sheet-1/edit"', $html);
+        $this->assertStringContainsString('id="google-sheet-open" class="ibl-btn ibl-btn--primary" href="https://docs.google.com/spreadsheets/d/sheet-1/edit"', $html);
         $this->assertStringContainsString('op=google_refresh', $html);
-        $this->assertStringContainsString('id="google-sheet-refresh"', $html);
+        $this->assertStringContainsString('id="google-sheet-refresh" class="ibl-btn ibl-btn--primary"', $html);
         $this->assertStringContainsString('id="google-sheet-disconnect"', $html);
         $this->assertStringContainsString('2026-09-01 12:00:00', $html);
         $this->assertStringNotContainsString('id="google-sheet-reconnect"', $html);

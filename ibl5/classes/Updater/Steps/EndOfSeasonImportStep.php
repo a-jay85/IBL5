@@ -76,7 +76,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
 
         $draResult = $this->jsbService->processDraData($data);
         $result->merge($draResult);
-        $messages[] = 'DRA: ' . $draResult->summary();
+        array_push($messages, 'DRA: ' . $draResult->summary(), ...$draResult->messages);
     }
 
     /**
@@ -91,7 +91,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
 
         $retResult = $this->jsbService->processRetData($data, $this->seasonEndingYear);
         $result->merge($retResult);
-        $messages[] = 'RET: ' . $retResult->summary();
+        array_push($messages, 'RET: ' . $retResult->summary(), ...$retResult->messages);
     }
 
     /**
@@ -106,7 +106,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
 
         $hofResult = $this->jsbService->processHofData($data);
         $result->merge($hofResult);
-        $messages[] = 'HOF: ' . $hofResult->summary();
+        array_push($messages, 'HOF: ' . $hofResult->summary(), ...$hofResult->messages);
     }
 
     /**
@@ -122,7 +122,7 @@ final class EndOfSeasonImportStep implements PipelineStepInterface
 
         $awaResult = $this->jsbService->processAwaData($awaData, $carData, $this->seasonEndingYear);
         $result->merge($awaResult);
-        $messages[] = 'AWA: ' . $awaResult->summary();
+        array_push($messages, 'AWA: ' . $awaResult->summary(), ...$awaResult->messages);
     }
 
     private function renderFinalsMvpCard(): string

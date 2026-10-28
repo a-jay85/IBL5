@@ -260,4 +260,25 @@ class GoogleSheetsClientTest extends TestCase
             self::assertStringNotContainsString(self::TOKEN, (string) $request['body']);
         }
     }
+
+    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    {
+        $this->http->queue(200, []);
+        $this->http->queue(200, []);
+
+        $rows = [['Name', 'Pos'], ['=SUM(1,2)', 'SG']];
+        $this->client->overwriteTab(self::TOKEN, self::SHEET_ID, 'Players', $rows);
+
+        // The batch write carries the header plus rows as RAW (a formula-looking cell stays text), then batchClear wipes the stale tail.
+        self::assertCount(2, $this->http->requests);
+        self::assertSame('POST', $this->http->requests[0]['method']);
+        self::assertStringEndsWith('/values:batchUpdate', $this->http->requests[0]['url']);
+        self::assertStringEndsWith('/values:batchClear', $this->http->requests[1]['url']);
+        $body = $this->body(0);
+        self::assertSame('RAW', $body['valueInputOption']);
+        self::assertNotSame('USER_ENTERED', $body['valueInputOption']);
+        self::assertSame("'Players'!A1", $body['data'][0]['range']);
+        self::assertSame($rows, $body['data'][0]['values']);
+        self::assertArrayHasKey('ranges', $this->body(1));
+    }
 }

@@ -1407,6 +1407,53 @@ test_coord_tick_busy() {
     assert_contains coord_busy:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "tick-busy"
 }
 
+# icebox_seed <nightly-dir>: one iced plan, an empty queue.
+icebox_seed() {
+    mkdir -p "$1/icebox" "$1/queue" "$T/plans"
+    printf -- '---\nimpl_model: sonnet\n---\n\n# iced\n' > "$T/plans/iced.md"
+    ln -s "$T/plans/iced.md" "$1/icebox/050-iced.md"
+}
+
+test_coord_icebox_thaws_under_threshold() {
+    coord_setup 10
+    seed_cache "$(date +%s)" "$(usage_json 10 3)"
+    icebox_seed "$T/n"
+    NIGHTLY_DIR="$T/n" run_coord --once >/dev/null 2>&1
+    assert_no_file icebox_low:left-icebox "$T/n/icebox/050-iced.md"
+    assert_file icebox_low:queued "$T/n/queue/010-iced.md"
+    assert_contains icebox_low:dm "$(cat "$T/dm.txt" 2>/dev/null)" "back on the queue"
+}
+
+test_coord_icebox_holds_and_stamps() {
+    coord_setup 10
+    local reset=$(( $(date +%s) + 86400 ))
+    seed_cache "$(date +%s)" "$(usage_json_resets 10 75 "" "$reset")"
+    icebox_seed "$T/n"
+    NIGHTLY_DIR="$T/n" run_coord --once >/dev/null 2>&1
+    assert_file icebox_hold:still-iced "$T/n/icebox/050-iced.md"
+    assert_eq icebox_hold:stamp "$reset" "$(cat "$T/n/icebox/.frozen-resets-at" 2>/dev/null)"
+}
+
+test_coord_icebox_thaws_after_reset() {
+    coord_setup 10
+    seed_cache "$(date +%s)" "$(usage_json 10 75)"
+    icebox_seed "$T/n"
+    printf '%s\n' "$(( $(date +%s) - 60 ))" > "$T/n/icebox/.frozen-resets-at"
+    NIGHTLY_DIR="$T/n" run_coord --once >/dev/null 2>&1
+    assert_no_file icebox_reset:left-icebox "$T/n/icebox/050-iced.md"
+    assert_no_file icebox_reset:stamp-dropped "$T/n/icebox/.frozen-resets-at"
+}
+
+test_coord_icebox_test_state_never_touches_default() {
+    coord_setup 10
+    seed_cache "$(date +%s)" "$(usage_json 10 0)"
+    seed_home ""
+    local real="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+    icebox_seed "$real"
+    run_coord --once >/dev/null 2>&1
+    assert_file icebox_guard:default-untouched "$real/icebox/050-iced.md"
+}
+
 test_coord_empty_launchd_env() {
     new_env
     local h out rc

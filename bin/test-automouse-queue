@@ -1752,6 +1752,40 @@ else
     h_fail "renumber_queue — 90 entries refused, nothing renamed (rc=$RC)"
 fi
 
+# ---------------------------------------------------------------------------
+# icebox — ice moves an entry and its sidecars out, keeps a locked plan, and
+# thaw re-appends in icebox order behind what is still queued
+# ---------------------------------------------------------------------------
+setup
+for s in ice-a ice-b ice-c ice-keep; do printf -- '---\nimpl_model: sonnet\n---\n\n# %s\n' "$s" > "$PDIR/$s.md"; done
+ln -s "$PDIR/ice-a.md" "$NDIR/queue/010-ice-a.md"
+ln -s "$PDIR/ice-b.md" "$NDIR/queue/020-ice-b.md"
+ln -s "$PDIR/ice-c.md" "$NDIR/queue/030-ice-c.md"
+ln -s "$PDIR/ice-keep.md" "$NDIR/queue/040-ice-keep.md"
+echo 2 > "$NDIR/queue/ice-a.md.attempts"
+mkdir "$NDIR/queue/ice-c.md.lock"
+OUT=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" ice --all-except ice-keep 2>&1)
+h_exists "icebox: ice moves the entry with its prefix" "$NDIR/icebox/010-ice-a.md"
+h_exists "icebox: ice moves the attempts sidecar" "$NDIR/icebox/ice-a.md.attempts"
+h_exists "icebox: a locked plan stays queued" "$NDIR/queue/030-ice-c.md"
+h_contains "icebox: the locked plan is named as skipped" "$OUT" "Skipped ice-c.md"
+h_exists "icebox: --all-except keeps the named plan" "$NDIR/queue/040-ice-keep.md"
+h_absent "icebox: the run lock never moves" "$NDIR/icebox/ice-c.md.lock"
+LIST=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" icebox 2>&1)
+h_contains "icebox: the listing shows an iced plan" "$LIST" "ice-b.md"
+rmdir "$NDIR/queue/ice-c.md.lock"
+echo 1700000000 > "$NDIR/icebox/.frozen-resets-at"
+NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" thaw >/dev/null 2>&1
+h_eq "icebox: thaw appends in icebox order behind the queue" \
+    "ice-c.md ice-keep.md ice-a.md ice-b.md" \
+    "$(queue_entries "$NDIR/queue" | while IFS= read -r e; do entry_to_name "$e"; done | tr '\n' ' ' | sed 's/ $//')"
+h_exists "icebox: thaw brings the sidecar back" "$NDIR/queue/ice-a.md.attempts"
+h_absent "icebox: an empty icebox drops the freeze stamp" "$NDIR/icebox/.frozen-resets-at"
+ln -s "$PDIR/ice-b.md" "$NDIR/icebox/020-ice-b.md"
+NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" remove ice-b >/dev/null 2>&1
+NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" ice-b >/dev/null 2>&1
+h_absent "icebox: queue add evicts the iced copy" "$NDIR/icebox/020-ice-b.md"
+
 if grep -qE '^MAX_ATTEMPTS=3([[:space:]]|$)' "$SCRIPT_DIR/automouse/run"; then
     h_pass "row-max-attempts-sync"
 else

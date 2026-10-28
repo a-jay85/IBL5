@@ -253,6 +253,50 @@ if [ "$DRY" -ne 1 ]; then
     usage_token_reclaim_dead
 fi
 
+# Automouse icebox thaw. `bin/automouse/queue ice` parks plans in icebox/ while weekly
+# usage is tight. The first fresh tick after that stamps the weekly reset time. A later
+# tick thaws them once that time passes, or once weekly use drops under
+# AUTOMOUSE_THAW_BELOW_PCT (default 5), which catches an unannounced reset.
+#
+# icebox_dir: print the icebox path and return 0 when it holds a plan. A run on a
+# non-default usage state dir (every bin/test-usage-gate case) needs an explicit
+# NIGHTLY_DIR, so a coordinator test never thaws the real icebox.
+icebox_dir() {
+    local ib
+    if [ -z "${NIGHTLY_DIR:-}" ] && [ "$STATE" != "$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate" ]; then
+        return 1
+    fi
+    ib="${NIGHTLY_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}/icebox"
+    ls "$ib"/*.md >/dev/null 2>&1 || return 1
+    printf '%s\n' "$ib"
+}
+
+icebox_tick() {  # <usage-json>
+    local ib week reset stamp reason out
+    ib=$(icebox_dir) || return 0
+    week=$(jq -r '.seven_day.utilization // empty' <<< "$1" 2>/dev/null | cut -d. -f1)
+    case "$week" in ''|*[!0-9]*) return 0 ;; esac
+    stamp=$(tr -dc '0-9' 2>/dev/null < "$ib/.frozen-resets-at")
+    if [ -z "$stamp" ]; then
+        reset=$(usage_resets_epoch "$1" seven_day)
+        if [ -n "$reset" ] && [ "$DRY" -ne 1 ]; then printf '%s\n' "$reset" > "$ib/.frozen-resets-at"; fi
+    fi
+    reason=""
+    if [ "$week" -lt "${AUTOMOUSE_THAW_BELOW_PCT:-5}" ]; then
+        reason="weekly use is ${week}%"
+    elif [ -n "$stamp" ] && [ "$NOW" -ge "$stamp" ]; then
+        reason="the weekly window reset"
+    fi
+    [ -n "$reason" ] || return 0
+    if [ "$DRY" -eq 1 ]; then printf 'ACTION icebox-thaw %s\n' "$week"; return 0; fi
+    if out=$(NIGHTLY_DIR="${ib%/icebox}" "$ROOT/bin/automouse/queue" thaw 2>&1); then
+        usage_log "icebox-thaw week=$week"
+        send_dm "automouse: $reason, so the iceboxed plans are back on the queue. ${out%%$'\n'*}"
+    else
+        usage_log "icebox-thaw-failed week=$week"
+    fi
+}
+
 # ---------------------------------------------------------------- tick
 
 MARKERS=$(usage_markers_sorted)
@@ -260,6 +304,15 @@ if [ -z "$MARKERS" ] && [ ! -d "$(usage_token_dir)" ]; then
     if [ "$DRY" -eq 1 ]; then
         printf 'ZONE unknown PCT 0 CACHE_AGE %s\n' "$(usage_cache_age)"
         printf 'ACTION idle\n'
+    fi
+    # Idle ticks fetch nothing, except while the icebox holds plans. Then a
+    # 10-minute-old cache is fresh enough to decide a thaw.
+    if icebox_dir >/dev/null; then
+        idle_body=$(usage_fetch 600); idle_rc=$?
+        idle_age=$(usage_cache_age)
+        if [ -n "$idle_body" ] && { [ "$idle_rc" -eq 0 ] || { [ "$idle_rc" -eq 2 ] && [ "$idle_age" -ge 0 ] && [ "$idle_age" -lt 900 ]; }; }; then
+            icebox_tick "$idle_body"
+        fi
     fi
     exit 0
 fi
@@ -350,6 +403,7 @@ fi
 zone=$(usage_zone "$body")
 pct=$(usage_zone_pct "$body")
 if [ "$DRY" -eq 1 ]; then printf 'ZONE %s PCT %s CACHE_AGE %s\n' "$zone" "$pct" "$age"; fi
+icebox_tick "$body"
 
 case "$zone" in
     normal)

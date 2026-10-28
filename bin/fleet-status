@@ -1267,6 +1267,38 @@ EOF_Q
     return 0
 }
 
+# Plans set aside by `bin/automouse/queue ice`, listed under the queue in icebox
+# order (the order a thaw re-appends them). bin/usage-gate-coordinator thaws them
+# at the stamped weekly reset or when weekly use drops under 5%. Prints nothing
+# when the icebox is empty.
+render_icebox() {
+    local ib="$AUTOMOUSE_DIR/icebox" list f base meta model merge title pad stamp when n=0
+    ls "$ib"/*.md >/dev/null 2>&1 || return 0
+    stamp="$(tr -dc '0-9' 2>/dev/null < "$ib/.frozen-resets-at")"
+    when='thaws at the weekly reset or under 5% weekly use'
+    [ -n "$stamp" ] && when="thaws $(date -r "$stamp" '+%a %-I:%M %p') or under 5% weekly use"
+    section "AUTOMOUSE ICEBOX$R$DIM  ·  $when$R"
+    list="$(queue_entries_ordered "$ib")"
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        base="$(entry_to_name "$f")"
+        n=$(( n + 1 ))
+        meta="$(plan_meta "$f")"
+        model="$(printf '%s' "$meta" | cut -f1)"
+        merge="$(printf '%s' "$meta" | cut -f2)"
+        title="$(clip_field "$(printf '%s' "$meta" | cut -f3-)" 100)"
+        pad=''
+        [ "${#base}" -lt 44 ] && pad="$(printf '%*s' $(( 44 - ${#base} )) '')"
+        printf '  %s%2d.%s %s%s %-17s %-6s %s%s%s\n' \
+            "$DIM" "$n" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
+            "$DIM" 'iced' "$R"
+        [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
+    done <<EOF_I
+$list
+EOF_I
+    return 0
+}
+
 # ── section 3: unaccounted headless sessions ───────────────────────────────────
 #
 # Headless `claude -p` processes with NO job above them — an orphan detector.
@@ -1479,6 +1511,7 @@ render_all() {
     printf '%sFLEET STATUS%s  %s%s%s\n' "$B" "$R" "$DIM" "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$R"
     render_launchd
     render_queue
+    render_icebox
     render_loose
     render_paused
     printf '\n'

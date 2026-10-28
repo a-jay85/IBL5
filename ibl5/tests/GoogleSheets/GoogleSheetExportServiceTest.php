@@ -45,10 +45,21 @@ class GoogleSheetExportServiceTest extends TestCase
         $this->service = $this->buildService($this->box);
     }
 
-    private function buildService(SecretBox $box, ?GoogleSheetConnectionRepositoryInterface $repo = null): GoogleSheetExportService
-    {
+    private function buildService(
+        SecretBox $box,
+        ?GoogleSheetConnectionRepositoryInterface $repo = null,
+        ?\Closure $onExportRead = null,
+    ): GoogleSheetExportService {
         $players = self::createStub(ApiPlayerRepository::class);
-        $players->method('getAllPlayersForExport')->willReturn([['pid' => 1], ['pid' => 2]]);
+        $players->method('getAllPlayersForExport')->willReturnCallback(
+            static function () use ($onExportRead): array {
+                if ($onExportRead !== null) {
+                    $onExportRead();
+                }
+
+                return [['pid' => 1], ['pid' => 2]];
+            }
+        );
         $transformer = self::createStub(PlayerExportTransformer::class);
         $transformer->method('getHeaders')->willReturn(['PID', 'Name']);
         $transformer->method('transform')->willReturnCallback(
@@ -107,6 +118,22 @@ class GoogleSheetExportServiceTest extends TestCase
         }
 
         return $text;
+    }
+
+    public function testSimLandingDuringRefreshLeavesRowPending(): void
+    {
+        $this->seedConnection();
+        $this->repo->markAllActivePending();
+        $this->queueAccessToken();
+        $this->queueSheetWriteOk();
+        $service = $this->buildService($this->box, null, function (): void {
+            $this->repo->markAllActivePending();
+        });
+
+        $result = $service->refreshConnection($this->row());
+
+        self::assertSame(GoogleSheetExportService::RESULT_OK, $result);
+        self::assertSame(1, $this->row()['refresh_pending']);
     }
 
     public function testRefreshConnectionOkPathMarksRefreshedOk(): void

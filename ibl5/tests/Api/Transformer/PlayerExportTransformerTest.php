@@ -147,6 +147,31 @@ class PlayerExportTransformerTest extends TestCase
         $this->assertSame('', $result[$indexMap['Talent']]);
     }
 
+    public function testTransformOutputsEmptyStringForNullPlrColumns(): void
+    {
+        $row = $this->makePlayerRow();
+        $row['wt'] = null;
+        $row['stats_gs'] = null;
+        $row['draftyear'] = null;
+        $row['draftround'] = null;
+        $row['draftpickno'] = null;
+        $row['college'] = null;
+        $result = $this->transformer->transform($row);
+        $indexMap = array_flip($this->transformer->getHeaders());
+
+        $this->assertSame('', $result[$indexMap['Weight']]);
+        $this->assertSame('', $result[$indexMap['GS']]);
+        $this->assertSame('', $result[$indexMap['Draft Year']]);
+        $this->assertSame('', $result[$indexMap['Draft Round']]);
+        $this->assertSame('', $result[$indexMap['Draft Pick']]);
+        $this->assertSame('', $result[$indexMap['College']]);
+    }
+
+    public function testHeadersExcludeStamina(): void
+    {
+        $this->assertNotContains('Stamina', $this->transformer->getHeaders());
+    }
+
     public function testTransformOutputMatchesHeaderCount(): void
     {
         $row = $this->makePlayerRow();

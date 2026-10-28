@@ -57,8 +57,8 @@ class OnThisDayViewTest extends TestCase
 
         $this->assertStringContainsString('data-component="on-this-day"', $html);
         $this->assertStringContainsString('League history around Feb 14', $html);
-        $this->assertStringContainsString('<span class="ibl-badge ibl-badge--info">1 season ago</span>', $html);
-        $this->assertStringContainsString('<span class="ibl-badge ibl-badge--info">10 seasons ago</span>', $html);
+        $this->assertStringContainsString('<span class="ibl-badge ibl-badge--info on-this-day__when">1 season ago</span>', $html);
+        $this->assertStringContainsString('<span class="ibl-badge ibl-badge--info on-this-day__when">10 seasons ago</span>', $html);
         $this->assertStringContainsString('data-moment-kind="fifty_point"', $html);
         $this->assertStringContainsString('Feb 14, 2025', $html);
         $this->assertSame(2, substr_count($html, '<li class="centerbox-item"'));

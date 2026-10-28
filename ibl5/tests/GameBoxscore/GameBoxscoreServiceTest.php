@@ -6,6 +6,7 @@ namespace Tests\GameBoxscore;
 
 use GameBoxscore\Contracts\GameBoxscoreRepositoryInterface;
 use GameBoxscore\GameBoxscoreService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -159,6 +160,56 @@ class GameBoxscoreServiceTest extends TestCase
         $this->assertSame('Unknown', $result['awayPlayers'][0]['name']);
         $this->assertSame('FFFFFF', $result['awayTeam']['color1']);
         $this->assertSame('000000', $result['awayTeam']['color2']);
+    }
+
+    #[DataProvider('validTeamIdProvider')]
+    public function testParseSelectedTeamIdAcceptsPositiveIntegers(mixed $raw, int $expected): void
+    {
+        $service = new GameBoxscoreService(self::createStub(GameBoxscoreRepositoryInterface::class));
+
+        self::assertSame($expected, $service->parseSelectedTeamId($raw));
+    }
+
+    /**
+     * @return array<string, array{mixed, int}>
+     */
+    public static function validTeamIdProvider(): array
+    {
+        return [
+            'int' => [7, 7],
+            'digit string' => ['7', 7],
+            'leading zeros' => ['007', 7],
+            'two digits' => ['28', 28],
+        ];
+    }
+
+    #[DataProvider('invalidTeamIdProvider')]
+    public function testParseSelectedTeamIdReturnsZeroForMissingOrMalformedInput(mixed $raw): void
+    {
+        $service = new GameBoxscoreService(self::createStub(GameBoxscoreRepositoryInterface::class));
+
+        self::assertSame(0, $service->parseSelectedTeamId($raw));
+    }
+
+    /**
+     * @return array<string, array{mixed}>
+     */
+    public static function invalidTeamIdProvider(): array
+    {
+        return [
+            'null (param missing)' => [null],
+            'empty string' => [''],
+            'zero string' => ['0'],
+            'zero int' => [0],
+            'negative int' => [-3],
+            'negative string' => ['-3'],
+            'trailing junk' => ['5abc'],
+            'leading space' => [' 5'],
+            'decimal string' => ['1.5'],
+            'float' => [1.5],
+            'array (team[]=5)' => [['5']],
+            'bool' => [true],
+        ];
     }
 
     /**

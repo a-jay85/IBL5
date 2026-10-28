@@ -49,7 +49,7 @@ class GameBoxscoreService implements GameBoxscoreServiceInterface
     public function getBoxscore(mixed $rawDate, mixed $rawGame): array
     {
         $date = $this->validateDate($rawDate);
-        $game = $this->validateGame($rawGame);
+        $game = $this->parsePositiveInt($rawGame);
 
         if ($date === null || $game === null) {
             return $this->notFound();
@@ -95,6 +95,14 @@ class GameBoxscoreService implements GameBoxscoreServiceInterface
         ];
     }
 
+    /**
+     * @see GameBoxscoreServiceInterface::parseSelectedTeamId()
+     */
+    public function parseSelectedTeamId(mixed $rawTeam): int
+    {
+        return $this->parsePositiveInt($rawTeam) ?? 0;
+    }
+
     private function validateDate(mixed $raw): ?string
     {
         if (!is_string($raw)) {
@@ -107,7 +115,7 @@ class GameBoxscoreService implements GameBoxscoreServiceInterface
         return checkdate($m, $d, $y) ? $raw : null;
     }
 
-    private function validateGame(mixed $raw): ?int
+    private function parsePositiveInt(mixed $raw): ?int
     {
         if (is_int($raw)) {
             return $raw > 0 ? $raw : null;

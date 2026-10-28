@@ -53,6 +53,15 @@ class GameBoxscoreViewTest extends TestCase
         self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
     }
 
+    public function testRenderWithoutSelectedTeamKeepsHomeChecked(): void
+    {
+        $output = $this->view->render($this->buildViewModel());
+
+        self::assertStringContainsString('id="boxscore-team-home" checked', $output);
+        self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
+        self::assertSame(1, substr_count($output, ' checked'));
+    }
+
     public function testEachTableCarriesItsOwnTeamColorVariables(): void
     {
         $output = $this->view->render($this->buildViewModel());

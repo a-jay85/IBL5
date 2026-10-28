@@ -62,7 +62,13 @@ interface GoogleSheetConnectionRepositoryInterface
     public function findPending(int $limit): array;
 
     /**
-     * Record a refresh attempt outcome and clear the pending flag.
+     * Clear the pending flag before the export is read, so a sim that lands during the
+     * write sets it again and survives markRefreshed().
+     */
+    public function clearPending(int $userId): void;
+
+    /**
+     * Record a refresh attempt outcome. Leaves refresh_pending alone; see clearPending().
      *
      * @param string $status One of ok, error, timeout
      * @param string|null $error Sanitized message; truncated to 255 characters

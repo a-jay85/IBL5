@@ -114,6 +114,18 @@ class GoogleSheetConnectionRepository extends BaseMysqliRepository implements Go
     }
 
     /**
+     * @see GoogleSheetConnectionRepositoryInterface::clearPending()
+     */
+    public function clearPending(int $userId): void
+    {
+        $this->execute(
+            'UPDATE `ibl_google_sheet_connections` SET refresh_pending = 0 WHERE user_id = ?',
+            'i',
+            $userId
+        );
+    }
+
+    /**
      * @see GoogleSheetConnectionRepositoryInterface::markRefreshed()
      */
     public function markRefreshed(int $userId, string $status, ?string $error): void
@@ -122,7 +134,7 @@ class GoogleSheetConnectionRepository extends BaseMysqliRepository implements Go
 
         $this->execute(
             'UPDATE `ibl_google_sheet_connections`
-             SET refresh_pending = 0, last_refresh_at = NOW(), last_refresh_status = ?, last_error = ?
+             SET last_refresh_at = NOW(), last_refresh_status = ?, last_error = ?
              WHERE user_id = ?',
             'ssi',
             $status,

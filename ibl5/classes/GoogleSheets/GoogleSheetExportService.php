@@ -136,6 +136,9 @@ class GoogleSheetExportService
         $started = hrtime(true);
 
         try {
+            // Cleared before the export is read: a sim landing mid-write re-sets it.
+            $this->connections->clearPending($userId);
+
             try {
                 $refreshToken = $this->box->decrypt($row['refresh_token_enc']);
             } catch (SecretBoxDecryptException) {

@@ -42,6 +42,27 @@ test.describe('GameBoxscore smoke tests', () => {
     await expect(page.locator('[data-team-panel="away"]')).toContainText('Metros PG');
   });
 
+  test('team=<away id> opens on away (Metros)', async ({ page }) => {
+    await page.goto('modules.php?name=GameBoxscore&date=2026-02-20&game=1&team=1');
+    await expect(page.locator('#boxscore-team-away')).toBeChecked();
+    await expect(page.locator('[data-team-panel="away"]')).toBeVisible();
+    await expect(page.locator('[data-team-panel="home"]')).not.toBeVisible();
+    await assertNoPhpErrors(page, 'boxscore team=1');
+  });
+
+  test('[negative] team=home id or junk keeps home (Stars)', async ({ page }) => {
+    await page.goto('modules.php?name=GameBoxscore&date=2026-02-20&game=1&team=2');
+    await expect(page.locator('#boxscore-team-home')).toBeChecked();
+    await expect(page.locator('[data-team-panel="home"]')).toBeVisible();
+    await assertNoPhpErrors(page, 'boxscore team=2');
+
+    await page.goto('modules.php?name=GameBoxscore&date=2026-02-20&game=1&team=zz1junk');
+    await expect(page.locator('#boxscore-team-home')).toBeChecked();
+    await expect(page.locator('[data-team-panel="home"]')).toBeVisible();
+    await assertNoPhpErrors(page, 'boxscore team=zz1junk');
+    await expect(page.locator('.game-boxscore')).not.toContainText('zz1junk');
+  });
+
   test('column sort is descending-first (sorttable.js)', async ({ page }) => {
     await page.goto('modules.php?name=GameBoxscore&date=2026-02-20&game=1');
     await page.locator('label[for="boxscore-team-away"]').click();

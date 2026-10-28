@@ -36,6 +36,10 @@ if (!is_admin()) {
     die('Forbidden');
 }
 
+// Admin-only endpoint: lift the web statement-time cap (Database\StatementTimeout).
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
 /** @var mysqli $mysqli_db */
 
 $query = <<<'SQL'

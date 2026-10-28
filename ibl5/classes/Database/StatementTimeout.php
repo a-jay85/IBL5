@@ -64,7 +64,7 @@ final class StatementTimeout
         $sql = 'SET SESSION max_statement_time = ' . $seconds;
         try {
             if ($connection instanceof \mysqli) {
-                return $connection->query($sql) !== false;
+                return $connection->real_query($sql);
             }
             return $connection->exec($sql) !== false;
         } catch (\mysqli_sql_exception | \PDOException $e) {

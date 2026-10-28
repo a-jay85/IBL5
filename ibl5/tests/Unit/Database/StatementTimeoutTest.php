@@ -46,7 +46,7 @@ class StatementTimeoutTest extends TestCase
     {
         $mysqli = self::createMock(\mysqli::class);
         $mysqli->expects($this->once())
-            ->method('query')
+            ->method('real_query')
             ->with('SET SESSION max_statement_time = 10')
             ->willReturn(true);
 
@@ -68,7 +68,7 @@ class StatementTimeoutTest extends TestCase
     {
         $mysqli = self::createMock(\mysqli::class);
         $mysqli->expects($this->once())
-            ->method('query')
+            ->method('real_query')
             ->willReturn(true);
 
         $this->assertTrue(StatementTimeout::apply($mysqli, null, 'cli-server'));
@@ -77,7 +77,7 @@ class StatementTimeoutTest extends TestCase
     public function testApplySkipsCliSapi(): void
     {
         $mysqli = self::createMock(\mysqli::class);
-        $mysqli->expects($this->never())->method('query');
+        $mysqli->expects($this->never())->method('real_query');
 
         $this->assertFalse(StatementTimeout::apply($mysqli, null, 'cli'));
     }
@@ -93,7 +93,7 @@ class StatementTimeoutTest extends TestCase
     public function testApplyFailsOpenWhenSetThrows(): void
     {
         $mysqli = self::createStub(\mysqli::class);
-        $mysqli->method('query')
+        $mysqli->method('real_query')
             ->willThrowException(new \mysqli_sql_exception('Unknown system variable', 1193));
 
         $this->assertFalse(StatementTimeout::apply($mysqli, null, 'litespeed'));

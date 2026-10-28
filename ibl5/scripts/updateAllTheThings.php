@@ -48,6 +48,11 @@ if (!\Security\CsrfGuard::validateToken($csrfToken, 'lcp_update_all')) {
 // Allow up to 5 minutes for the full update (production shared hosting has 30s default)
 set_time_limit(300);
 
+// The updater runs multi-minute statements; lift the web statement-time cap
+// set in db/db.php (Database\StatementTimeout). Reached only after is_admin + POST + CSRF.
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
 // Wall-clock start of this updater run; RefreshRecordHoldersStep skips its rebuild when too much of the 300 s is gone
 $updaterClock = new Clock\SystemClock();
 $updaterStartedAt = $updaterClock->microtime();

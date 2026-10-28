@@ -30,6 +30,7 @@ class StatementTimeoutIntegrationTest extends DatabaseTestCase
             }
         }
         $this->openMysqli = [];
+        \Logging\LoggerFactory::reset();
 
         parent::tearDown();
     }
@@ -103,6 +104,87 @@ class StatementTimeoutIntegrationTest extends DatabaseTestCase
         $row = $result->fetch_assoc();
         $this->assertIsArray($row);
         $this->assertEquals(0, $row['s']);
+    }
+
+    public function testPdoConnectionSingletonCapsWebSapiOnly(): void
+    {
+        $keys = ['dbhost', 'dbuname', 'dbpass', 'dbname', 'dbStatementTimeoutSeconds'];
+        $saved = [];
+        foreach ($keys as $key) {
+            $saved[$key] = ['set' => array_key_exists($key, $GLOBALS), 'value' => $GLOBALS[$key] ?? null];
+        }
+
+        try {
+            $GLOBALS['dbhost'] = self::env('DB_HOST');
+            $GLOBALS['dbuname'] = self::env('DB_USER');
+            $GLOBALS['dbpass'] = self::env('DB_PASS');
+            $GLOBALS['dbname'] = self::env('DB_NAME');
+            unset($GLOBALS['dbStatementTimeoutSeconds']);
+
+            \Database\PdoConnection::reset();
+            $web = \Database\PdoConnection::getInstance('litespeed');
+            $this->assertEqualsWithDelta(10.0, $this->pdoSessionCap($web), 0.0001);
+
+            \Database\PdoConnection::reset();
+            $cli = \Database\PdoConnection::getInstance();
+            $this->assertEqualsWithDelta(0.0, $this->pdoSessionCap($cli), 0.0001);
+        } finally {
+            \Database\PdoConnection::reset();
+            foreach ($saved as $key => $state) {
+                if ($state['set']) {
+                    $GLOBALS[$key] = $state['value'];
+                } else {
+                    unset($GLOBALS[$key]);
+                }
+            }
+        }
+    }
+
+    public function testRepositoryTimeoutIsLoggedWithQueryAndRethrown(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($handler);
+
+        $conn = $this->openMysqli();
+        StatementTimeout::apply($conn, 1, 'litespeed');
+
+        $repository = new class ($conn) extends \Database\BaseMysqliRepository {
+            /** @return array<string, mixed>|null */
+            public function run(): ?array
+            {
+                return $this->fetchOne('SELECT SLEEP(3) AS s');
+            }
+        };
+
+        $caught = null;
+        try {
+            $repository->run();
+        } catch (\mysqli_sql_exception $e) {
+            $caught = $e;
+        }
+
+        $this->assertInstanceOf(\mysqli_sql_exception::class, $caught);
+        $this->assertSame(StatementTimeout::ER_STATEMENT_TIMEOUT, $caught->getCode());
+        $this->assertTrue($handler->hasErrorThatContains('max_statement_time'));
+
+        $matching = array_values(array_filter(
+            $handler->getRecords(),
+            static fn ($record): bool => str_contains($record->message, 'max_statement_time')
+        ));
+        $this->assertCount(1, $matching);
+        $this->assertSame('SELECT SLEEP(3) AS s', $matching[0]->context['query'] ?? null);
+    }
+
+    private function pdoSessionCap(\PDO $pdo): float
+    {
+        $statement = $pdo->query('SELECT @@session.max_statement_time AS t');
+        $this->assertInstanceOf(\PDOStatement::class, $statement);
+        $row = $statement->fetch(\PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
+        $value = $row['t'];
+        $this->assertTrue(is_int($value) || is_float($value) || is_string($value));
+
+        return (float) $value;
     }
 
     private function openMysqli(): \mysqli

@@ -87,7 +87,7 @@ final class RecapPanelRenderer
         $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
         $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
         $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
-        $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId);
+        $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId, $slate->teamTid);
 
         $h  = '<div class="last-sim-recap__cell">';
         $h .= '  <div class="last-sim-recap__cell-head-row">';

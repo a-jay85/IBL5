@@ -211,7 +211,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     {
         $game = $row['game'];
         $isUserHome = ($game->home_teamid === $userTeamId);
-        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID);
+        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID, $userTeamId);
 
         [
             'visitorName' => $visitorName,

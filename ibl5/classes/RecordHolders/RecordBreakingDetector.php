@@ -230,7 +230,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $isTied,
                     $record['date'],
                     $record['game_of_that_day'],
-                    $record['box_id']
+                    $record['box_id'],
+                    $record['teamid']
                 );
             }
         }
@@ -283,7 +284,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $isAscending,
                     $record['date'],
                     $record['game_of_that_day'],
-                    $record['box_id']
+                    $record['box_id'],
+                    $record['teamid']
                 );
             }
         }
@@ -320,7 +322,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $gameTypeLabel,
                     $qd['date'],
                     $qd['game_of_that_day'],
-                    $qd['box_id']
+                    $qd['box_id'],
+                    $qd['teamid']
                 );
             }
         }
@@ -394,10 +397,11 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         bool $isTied,
         string $date,
         int $gameOfThatDay,
-        int $boxId
+        int $boxId,
+        int $teamId
     ): string {
         $playerLink = '[' . $playerName . '](' . self::SITE_BASE_URL . '/modules.php?name=Player&pa=showpage&pid=' . $pid . ')';
-        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        $boxScoreUrl = $this->buildAbsoluteBoxScoreUrl($date, $gameOfThatDay, $boxId, $teamId);
         $statText = $newValue . ' ' . $statUnit;
         $linkedStat = $boxScoreUrl !== '' ? '[**' . $statText . '**](' . $boxScoreUrl . ')' : '**' . $statText . '**';
 
@@ -428,10 +432,11 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         bool $isAscending,
         string $date,
         int $gameOfThatDay,
-        int $boxId
+        int $boxId,
+        int $teamId
     ): string {
         $label = ($isAscending ? 'fewest ' : 'most ') . $statUnit;
-        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        $boxScoreUrl = $this->buildAbsoluteBoxScoreUrl($date, $gameOfThatDay, $boxId, $teamId);
         $statText = $newValue . ' ' . $label;
         $linkedStat = $boxScoreUrl !== '' ? '[**' . $statText . '**](' . $boxScoreUrl . ')' : '**' . $statText . '**';
 
@@ -463,10 +468,11 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         string $gameTypeLabel,
         string $date,
         int $gameOfThatDay,
-        int $boxId
+        int $boxId,
+        int $teamId
     ): string {
         $playerLink = '[' . $playerName . '](' . self::SITE_BASE_URL . '/modules.php?name=Player&pa=showpage&pid=' . $pid . ')';
-        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        $boxScoreUrl = $this->buildAbsoluteBoxScoreUrl($date, $gameOfThatDay, $boxId, $teamId);
 
         $stats = $points . 'pts/' . $rebounds . 'reb/' . $assists . 'ast/' . $steals . 'stl';
         if ($blocks >= 10) {
@@ -478,6 +484,26 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         return "**NEW QUADRUPLE DOUBLE!**\n"
             . $playerLink . ' (' . $teamName . ') recorded a quadruple double (' . $linkedStats
             . ') in a ' . $gameTypeLabel . ' game!';
+    }
+
+    /**
+     * Build an absolute box score URL for Discord (relative links do not resolve there).
+     *
+     * Uses the same SITE_BASE_URL prefix as the player links. Legacy `./ibl/IBL/box{N}.htm`
+     * URLs have their leading `./` stripped. Returns '' when no box score is available.
+     */
+    private function buildAbsoluteBoxScoreUrl(string $date, int $gameOfThatDay, int $boxId, int $teamId): string
+    {
+        $url = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId, $teamId);
+        if ($url === '') {
+            return '';
+        }
+
+        if (str_starts_with($url, './')) {
+            $url = substr($url, 2);
+        }
+
+        return self::SITE_BASE_URL . '/' . $url;
     }
 
     /**

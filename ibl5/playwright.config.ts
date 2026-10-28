@@ -73,6 +73,8 @@ export default defineConfig({
         /depth-chart-entry-submission\.spec\.ts$/,
         /faprep-xss-escape\.spec\.ts$/,
         /projected-draft-order-submission\.spec\.ts$/,
+        /google-sheet-card\.spec\.ts$/,
+        /google-sheets-oauth\.spec\.ts$/,
       ],
     },
     {
@@ -131,6 +133,8 @@ export default defineConfig({
       // [1..12] lottery save also puts any posted team projected at pick 13+ in
       // round 1 twice, which doubled the Metros notes toggle that
       // projected-draft-order.spec's notes test counts.
+      // google-sheet-card and google-sheets-oauth both rewrite the E2E regular
+      // user's ibl_google_sheet_connections row and assert which card state renders.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
@@ -149,6 +153,8 @@ export default defineConfig({
         /depth-chart-entry-submission\.spec\.ts$/,
         /faprep-xss-escape\.spec\.ts$/,
         /projected-draft-order-submission\.spec\.ts$/,
+        /google-sheet-card\.spec\.ts$/,
+        /google-sheets-oauth\.spec\.ts$/,
       ],
     },
   ],

@@ -61,6 +61,9 @@
         <testsuite name="Security Tests">
             <directory>tests/Security</directory>
         </testsuite>
+        <testsuite name="GoogleSheets Tests">
+            <directory>tests/GoogleSheets</directory>
+        </testsuite>
         <testsuite name="Utilities Tests">
             <directory>tests/Utilities</directory>
         </testsuite>

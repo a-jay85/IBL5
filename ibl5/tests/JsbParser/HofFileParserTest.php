@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\JsbParser;
 
 use JsbParser\HofFileParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -19,10 +20,10 @@ class HofFileParserTest extends TestCase
      *
      * @param list<list<array{pos: string, name: string, pid: int, year: int}>> $blocks Each inner list = entries for one block
      */
-    private function buildHofFile(array $blocks): string
+    private function buildHofFile(array $blocks, int $blockCount = 14): string
     {
         $content = '';
-        for ($i = 0; $i < 14; $i++) {
+        for ($i = 0; $i < $blockCount; $i++) {
             $blockEntries = $blocks[$i] ?? [];
             $blockContent = '';
             foreach ($blockEntries as $entry) {
@@ -189,10 +190,58 @@ class HofFileParserTest extends TestCase
         HofFileParser::parse(str_repeat(' ', 100));
     }
 
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function invalidSizeProvider(): array
+    {
+        return [
+            'empty' => [0],
+            'not a block multiple' => [7001],
+        ];
+    }
+
+    #[DataProvider('invalidSizeProvider')]
+    public function testParseRejectsSizeThatIsNotABlockMultiple(int $size): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('HOF data size mismatch');
+        HofFileParser::parse(str_repeat(' ', $size));
+    }
+
     public function testParseAcceptsValidSizedData(): void
     {
         $data = str_repeat(' ', 7000);
         $result = HofFileParser::parse($data);
         $this->assertIsArray($result);
+    }
+
+    /**
+     * The file grows 1000 bytes a season, so every block in a 9000-byte file
+     * must be read, including the last one.
+     */
+    public function testParsesEntriesInBlocksPastTheFourteenth(): void
+    {
+        $blocks = array_fill(0, 18, []);
+        $blocks[17] = [['pos' => 'C', 'name' => 'Arvydas Sabonis', 'pid' => 327, 'year' => 2007]];
+
+        $result = HofFileParser::parse($this->buildHofFile($blocks, 18));
+
+        $this->assertCount(1, $result);
+        $this->assertSame(327, $result[0]['jsb_pid']);
+        $this->assertSame(2007, $result[0]['induction_year']);
+    }
+
+    public function testParsesPidThatTouchesAFullWidthName(): void
+    {
+        $data = str_pad("SG Marin Mijaljevic621 2002 \r\n", 500);
+
+        $result = HofFileParser::parse($data);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('Marin Mijaljevic', $result[0]['player_name']);
+        $this->assertSame(621, $result[0]['jsb_pid']);
+        $this->assertSame('SG', $result[0]['pos']);
+        $this->assertSame(2002, $result[0]['induction_year']);
     }
 }

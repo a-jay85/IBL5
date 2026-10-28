@@ -42,7 +42,7 @@ final class OnThisDayView implements Contracts\OnThisDayViewInterface
             $h .= '<li class="centerbox-item" data-moment-kind="' . HtmlSanitizer::e($moment->kind->value) . '">';
             $h .= '<span class="ibl-badge ibl-badge--info on-this-day__when">' . HtmlSanitizer::e($this->formatter->seasonsAgoLabel($seasonsAgo)) . '</span> ';
             $h .= '<span>' . HtmlSanitizer::e($this->formatter->describe($moment)) . '</span> ';
-            $h .= '<span class="ibl-card__subtitle">' . HtmlSanitizer::e($this->formatter->dateLabel($moment->date)) . '</span>';
+            $h .= '<span class="on-this-day__date">' . HtmlSanitizer::e($this->formatter->dateLabel($moment->date)) . '</span>';
             $h .= '</li>';
         }
 

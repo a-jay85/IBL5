@@ -8,6 +8,7 @@ use OnThisDay\Moment;
 use OnThisDay\MomentKind;
 use OnThisDay\OnThisDaySelection;
 use OnThisDay\OnThisDayView;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class OnThisDayViewTest extends TestCase
@@ -19,24 +20,32 @@ class OnThisDayViewTest extends TestCase
         $this->view = new OnThisDayView();
     }
 
+    /**
+     * @param array<string, int> $facts
+     */
     private function makeMoment(
         int $seasonYear,
         string $date,
         string $playerName = 'Test Player',
         string $teamName = 'Hawks',
+        int $gameOfThatDay = 0,
+        MomentKind $kind = MomentKind::FiftyPointGame,
+        int $pid = 1,
+        array $facts = ['points' => 51],
     ): Moment {
         return new Moment(
-            kind: MomentKind::FiftyPointGame,
+            kind: $kind,
             key: 'fifty_point:' . $date . ':1',
             date: $date,
             seasonYear: $seasonYear,
-            pid: 1,
+            pid: $pid,
             playerName: $playerName,
             teamId: 1,
             teamName: $teamName,
             opponentTeamId: 2,
             opponentName: 'Celtics',
-            facts: ['points' => 51],
+            facts: $facts,
+            gameOfThatDay: $gameOfThatDay,
         );
     }
 
@@ -90,5 +99,80 @@ class OnThisDayViewTest extends TestCase
 
         $this->assertSame(1, substr_count($html, '<li class="centerbox-item"'));
         $this->assertStringContainsString('1 season ago', $html);
+    }
+
+    /**
+     * @return array<string, array{MomentKind, array<string, int>, int, bool}>
+     */
+    public static function linkKindProvider(): array
+    {
+        return [
+            'fifty point' => [MomentKind::FiftyPointGame, ['points' => 52], 7, true],
+            'triple double' => [MomentKind::TripleDouble, ['points' => 21, 'rebounds' => 12, 'assists' => 10], 7, true],
+            'record game' => [MomentKind::RecordGame, ['value' => 17], 7, true],
+            'series clincher' => [MomentKind::SeriesClincher, ['round' => 3, 'wins' => 4, 'losses' => 2], 0, false],
+            'trade' => [MomentKind::Trade, ['players_moved' => 1, 'mover_pid' => 7], 0, true],
+        ];
+    }
+
+    /**
+     * @param array<string, int> $facts
+     */
+    #[DataProvider('linkKindProvider')]
+    public function testRendersEscapedBoxScoreAndPlayerLinksPerKind(
+        MomentKind $kind,
+        array $facts,
+        int $pid,
+        bool $hasPlayerLink,
+    ): void {
+        $html = $this->view->renderHomepageBlock($this->makeSelection([
+            $this->makeMoment(1999, '1999-03-04', gameOfThatDay: 3, kind: $kind, pid: $pid, facts: $facts),
+        ]));
+
+        $this->assertStringContainsString(
+            '<a href="modules.php?name=GameBoxscore&amp;date=1999-03-04&amp;game=3&amp;team=1">',
+            $html,
+        );
+        if ($hasPlayerLink) {
+            $this->assertStringContainsString(
+                '<a href="modules.php?name=Player&amp;pa=showpage&amp;pid=7">',
+                $html,
+            );
+        } else {
+            $this->assertStringNotContainsString('name=Player', $html);
+        }
+    }
+
+    public function testHrefNeverContainsRawAmpersand(): void
+    {
+        $html = $this->view->renderHomepageBlock($this->makeSelection([
+            $this->makeMoment(1999, '1999-03-04', gameOfThatDay: 3, pid: 7),
+        ]));
+
+        $count = preg_match_all('/href="([^"]*)"/', $html, $matches);
+        $this->assertGreaterThanOrEqual(2, $count);
+        foreach ($matches[1] as $href) {
+            $this->assertSame(0, preg_match('/&(?!amp;)/', $href), 'Raw ampersand in href: ' . $href);
+        }
+    }
+
+    public function testUnknownOrdinalRendersNoBoxScoreLink(): void
+    {
+        $html = $this->view->renderHomepageBlock($this->makeSelection([
+            $this->makeMoment(1999, '1999-03-04', gameOfThatDay: 0, pid: 7),
+        ]));
+
+        $this->assertStringNotContainsString('GameBoxscore', $html);
+        $this->assertStringContainsString('scored 51 points against the Celtics', $html);
+    }
+
+    public function testEscapesXssInsideLinkText(): void
+    {
+        $html = $this->view->renderHomepageBlock($this->makeSelection([
+            $this->makeMoment(1999, '1999-03-04', '<script>alert(1)</script>', gameOfThatDay: 3, pid: 7),
+        ]));
+
+        $this->assertMatchesRegularExpression('/<a href="[^"]*">&lt;script&gt;/', $html);
+        $this->assertStringNotContainsString('<script', $html);
     }
 }

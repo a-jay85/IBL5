@@ -956,13 +956,27 @@ def test_own_change_id_blank_for_empty_diff():
     assert fidelity.own_change_id("   \n") == ""
 
 
-def test_own_change_diff_uses_zero_context(tmp_path):
+def test_own_change_diff_uses_one_context_line(tmp_path):
     repo, _, _ = _own_repo(tmp_path)
     git = LiveGit(str(repo))
     own = git.own_change_diff("master")
     assert "+line5-branch" in own
-    assert "\n line4\n" not in own and "\n line6\n" not in own   # context lines
-    assert "\n line4\n" in git.diff_vs_base("master")
+    assert "\n line4\n" in own and "\n line6\n" in own
+    assert "\n line3\n" not in own and "\n line7\n" not in own
+    assert "\n line3\n" in git.diff_vs_base("master")
+
+
+def test_own_change_id_moves_on_hunk_relocation(tmp_path):
+    repo, base, _ = _own_repo(tmp_path)
+    _gitc(repo, "checkout", "-q", "master")
+    _gitc(repo, "checkout", "-q", "-B", "feature2")
+    ins_a = base[:4] + ["guard"] + base[4:]
+    _commit_file(repo, "f.txt", ins_a, "guard early")
+    _, own_before = _ids(repo)
+    ins_b = base[:8] + ["guard"] + base[8:]
+    _commit_file(repo, "f.txt", ins_b, "guard moved below")
+    _, own_after = _ids(repo)
+    assert own_before and own_after and own_before != own_after
 
 
 def test_sticky_records_own_change_line():

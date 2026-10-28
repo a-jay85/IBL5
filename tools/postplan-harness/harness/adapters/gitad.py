@@ -404,9 +404,9 @@ class LiveGit:
         return self._run("diff", self._merge_base(base))
 
     def own_change_diff(self, base: str = "origin/master") -> str:
-        # Same range as diff_vs_base, zero context lines. Feeds the own-change id,
+        # Same range as diff_vs_base, one context line. Feeds the own-change id,
         # which must not move when master edits a line next to a PR hunk.
-        return self._run("diff", "-U0", self._merge_base(base))
+        return self._run("diff", "-U1", self._merge_base(base))
 
     def working_diff(self) -> str:
         # staged + unstaged, vs HEAD (what Phase 2 would commit)

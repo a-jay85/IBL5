@@ -1576,12 +1576,14 @@ def diff_patch_id(diff: str) -> str:
     return pid if re.fullmatch(r"[0-9a-f]{40}", pid) else ""
 
 
-def own_change_id(diff_u0: str) -> str:
-    """Patch-id of the branch's own changed lines: `diff_patch_id` over a zero-context
-    diff. A master edit adjacent to a PR hunk moves `diff_patch_id` (context lines are
-    hashed) but not this id. "" for an empty or unreadable diff, and "" always declines.
+def own_change_id(diff_u1: str) -> str:
+    """Patch-id of the branch's own changed lines: `diff_patch_id` over a one-context-line
+    diff. A master edit 2+ lines from a PR hunk moves `diff_patch_id` (3 context lines are
+    hashed) but not this id. The single context line pins each hunk in place, so moving a
+    changed line next to different neighbours moves the id. "" for an empty or unreadable
+    diff, and "" always declines.
     """
-    return diff_patch_id(diff_u0)
+    return diff_patch_id(diff_u1)
 
 
 def carry_forward_predicate(sticky_body, diff_id: str,

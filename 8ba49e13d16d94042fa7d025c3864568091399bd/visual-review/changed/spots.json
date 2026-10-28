@@ -1,0 +1,28 @@
+[
+  {
+    "module": "draft-history",
+    "viewport": "desktop",
+    "title": "draft-history",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 105-270 px",
+    "beforeFile": "changed/draft-history.1.before.png",
+    "afterFile": "changed/draft-history.1.after.png",
+    "sideFile": "changed/draft-history.1.side.png",
+    "stackFile": "changed/draft-history.1.stack.png"
+  },
+  {
+    "module": "draft-history",
+    "viewport": "mobile",
+    "title": "draft-history-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 96-242 px",
+    "beforeFile": "changed/draft-history-mobile.1.before.png",
+    "afterFile": "changed/draft-history-mobile.1.after.png",
+    "sideFile": "changed/draft-history-mobile.1.side.png",
+    "stackFile": "changed/draft-history-mobile.1.stack.png"
+  }
+]

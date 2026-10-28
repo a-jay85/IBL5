@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 ---
 
 # IBL5 Architecture Decision Records
@@ -90,6 +90,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0218](0218-opus-inline-edit-trial-under-five-files.md) | Opus inline-edit trial for chunks under 5 files | Accepted | Until 2026-11-23 Opus edits a design-resolved, machine-verifiable chunk of under 5 files inline; `bin/lib/opus-trial-cost.jq` compares per-task cost against a saved baseline at review. |
 | [0214](0214-vr-update-baselines-targeted-rewrite.md) | Targeted update-baselines rewrite from the in-job strict pass | Accepted | The label run rebuilds the gallery against branch HEAD and `bin/vr-apply-baselines` commits only the changed and new cells' renders; flake cells and unflagged baselines stay untouched. |
 | [0219](0219-default-branch-resolver.md) | One shared resolver for the remote default branch name | Accepted | `bin/lib/default-branch` resolves the default branch offline from `origin/HEAD`, then `main`, then `master`; bash sources it, Python and PHP exec it, with no env override, and a caller fails closed on nonzero exit. |
+| [0221](0221-runner-opus-judge-for-manual-rows.md) | A runner-side Opus judge for Truly-manual rows | Accepted | `manual_judge: opus` lets a Sonnet impl run carry Truly-manual rows; `bin/automouse/run` then spawns a read-only `claude-opus-5-5` judge that rules on `opus-judge:` rows and holds the plan to `skipped/` on any non-pass outcome. |
 
 ## When an ADR is Required
 

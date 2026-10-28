@@ -503,7 +503,10 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
 
     /**
      * Per-game recap rows for one sim that have a verified archived box score,
-     * sorted by sort_order ascending — the admin viewer's display read.
+     * sorted by sort_order ascending.
+     *
+     * Not the source of the postable document: a bad `game_of_that_day` index makes
+     * this filter drop games silently, so RecapBox reads every row via findGameRecaps().
      *
      * Distinct from findGameRecaps(), which is the unfiltered write-verification
      * read. Join partner is `ibl_box_scores_teams`, NOT `ibl_schedule`
@@ -535,7 +538,7 @@ class SimSummaryRepository extends \Database\BaseMysqliRepository
     /**
      * Exact complement of findDisplayableGameRecaps() over the same sim: every row
      * from findGameRecaps() appears in exactly one of the two. Callers render these
-     * as a warning; they are never rendered into the postable document.
+     * as a warning. The rows still go in the postable document (RecapBox).
      *
      * @return list<array<string, mixed>>
      */

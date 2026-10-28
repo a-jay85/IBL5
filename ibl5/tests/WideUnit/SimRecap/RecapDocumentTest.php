@@ -183,24 +183,44 @@ final class RecapDocumentTest extends TestCase
     }
 
     /**
-     * Sim-722 shape: game parts are multi-line bare prose with no mention line at
-     * index 1. postableText() must return the stored text verbatim — assembling
-     * mention-less parts would silently drop every GM's Discord tag.
+     * The game parts as they come out of storage, one per game, every one well formed.
+     *
+     * @return list<array<string, mixed>>
      */
-    public function testPostableTextReturnsStoredTextWhenPartsAreBareProse(): void
+    private function wellFormedGames(int $n): array
     {
-        $stored = "Stored monolith including <@7> and <@12> tags.\n\nAll 56 games are here.";
-        $game   = $this->game('2026-07-26', "The visitors came out strong.\nThey held the lead."); // line 1 is prose, not a mention
+        $parts = [];
+        for ($i = 1; $i <= $n; $i++) {
+            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame {$i} prose.");
+        }
 
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', $stored);
+        return $parts;
+    }
 
-        self::assertSame($stored, $result);
+    /** The outro is the last block: nothing but the trailing newline follows it. */
+    private static function assertEndsWithOutro(string $outro, string $document): void
+    {
+        self::assertStringEndsWith("\n\n\n" . $outro . "\n", $document);
     }
 
     /**
-     * Sim-721 shape: every part carries a mention line at index 1. Assembly is
-     * preferred — the stored text is a ~220-char teaser, not the document.
+     * Sim-722 shape: game parts are bare prose with no mention line. They still go in
+     * the box; the page warns about the missing tags (gamesMissingMentionLines()).
+     * The stored text is never swapped in.
      */
+    public function testPostableTextKeepsBareProseGamesInTheDocument(): void
+    {
+        $stored = "Stored monolith including <@7> and <@12> tags.\n\nAll 56 games are here.";
+        $game   = $this->game('2026-07-26', "The visitors came out strong.\nThey held the lead.");
+
+        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', $stored);
+
+        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
+        self::assertStringContainsString('The visitors came out strong.', $result);
+        self::assertStringNotContainsString('Stored monolith', $result);
+        self::assertEndsWithOutro('Outro.', $result);
+    }
+
     public function testPostableTextReturnsAssembledDocumentWhenPartsAreWellFormed(): void
     {
         $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
@@ -210,33 +230,31 @@ final class RecapDocumentTest extends TestCase
     }
 
     /**
-     * Sim-725 shape. Seven parts survived the displayable filter and every one of them
-     * is well formed, so gamesCarryTheirMentionLines() votes for assembly. The stored
-     * document holds all 49 games. Assembling would post 7 and discard 42.
+     * Sim-725 shape at the document level: the stored text names 49 games and the
+     * parts hold 49. Every game is in the document, the outro is last, and the stored
+     * text is not used. Before the owner decision, a header count above the part count
+     * swapped the whole document for the stored text.
      */
-    public function testPostableTextPrefersStoredTextWhenPartsAreShortOfTheStoredDocument(): void
+    public function testPostableTextPutsEveryGameInTheDocumentWithTheOutroLast(): void
     {
-        $stored = $this->storedDocumentWith(49);
-        $parts  = [];
-        for ($i = 1; $i <= 7; $i++) {
-            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
-        }
+        $parts  = $this->wellFormedGames(49);
+        $result = RecapDocument::postableText('Intro.', $parts, 'WHERE THINGS STAND outro.', $this->storedDocumentWith(60));
 
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
+        for ($i = 1; $i <= 49; $i++) {
+            self::assertStringContainsString("**A {$i} @ B {$i}**", $result);
+        }
+        self::assertStringStartsWith('Intro.', $result);
+        self::assertEndsWithOutro('WHERE THINGS STAND outro.', $result);
     }
 
     /**
-     * A complete, well-formed sim: 49 parts against a 49-header stored document. Nothing
-     * is missing and nothing is degraded, so the assembly wins. Without this the guard
-     * could be tightened into always preferring stored text and no test would notice.
+     * One game short of the stored document used to fall back to the stored text. Now
+     * the assembled document is returned.
      */
-    public function testPostableTextReturnsAssembledDocumentWhenEveryStoredGameIsPresent(): void
+    public function testPostableTextIgnoresAShortfallAgainstTheStoredDocument(): void
     {
         $stored = $this->storedDocumentWith(49);
-        $parts  = [];
-        for ($i = 1; $i <= 49; $i++) {
-            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
-        }
+        $parts  = $this->wellFormedGames(48);
 
         self::assertSame(
             RecapDocument::assemble('Intro.', $parts, 'Outro.'),
@@ -244,83 +262,61 @@ final class RecapDocumentTest extends TestCase
         );
     }
 
-    /**
-     * Boundary: one game short (48 parts vs 49 headers in the stored document).
-     * The completeness guard fires and prefers the stored text.
-     */
-    public function testPostableTextPrefersStoredTextWhenOneGameIsMissing(): void
-    {
-        $stored = $this->storedDocumentWith(49);
-        $parts  = [];
-        for ($i = 1; $i <= 48; $i++) {
-            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
-        }
-
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
-    }
-
-    public function testPostableTextCountsRenderedGamesNotRawRowsAgainstTheStoredDocument(): void
-    {
-        $stored = $this->storedDocumentWith(6);
-        $parts  = [];
-        for ($i = 1; $i <= 5; $i++) {
-            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
-        }
-        $parts[] = $this->game('2026-02-26', '');
-        $parts[] = $this->game('2026-02-26', '   ');
-
-        self::assertSame($stored, RecapDocument::postableText('Intro.', $parts, 'Outro.', $stored));
-    }
-
-    public function testPostableTextTreatsThePinnedExemplarAsAnEightGameDocument(): void
+    public function testPostableTextIgnoresThePinnedExemplarAsStoredText(): void
     {
         $exemplar = file_get_contents(dirname(__DIR__, 4) . '/bin/lib/sim-recap-exemplar.txt');
         self::assertIsString($exemplar);
 
-        $parts = [];
-        for ($i = 1; $i <= 7; $i++) {
-            $parts[] = $this->game('2026-02-26', "**A {$i} @ B {$i}**\n<@1> · <@2>\nGame prose.");
-        }
+        $parts = $this->wellFormedGames(7);
 
-        self::assertSame($exemplar, RecapDocument::postableText('Intro.', $parts, 'Outro.', $exemplar));
+        self::assertSame(
+            RecapDocument::assemble('Intro.', $parts, 'Outro.'),
+            RecapDocument::postableText('Intro.', $parts, 'Outro.', $exemplar)
+        );
     }
 
     /**
-     * One game carries its mention line; the other is a single-line string with no
-     * index-1 entry at all. gamesCarryTheirMentionLines() is all-or-nothing — the
-     * mixed batch must fall back to the stored text.
+     * One game carries its mention line and one does not. Both go in the document,
+     * in order, with the outro last.
      */
-    public function testPostableTextIsAllOrNothingAcrossGames(): void
+    public function testPostableTextKeepsAGameMissingItsMentionLine(): void
     {
         $wellFormed = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
-        $bareProse  = $this->game('2026-02-26', 'Single-line prose.');
+        $untagged   = $this->game('2026-02-26', "**C 90 @ D 88**\nNo mention line here.");
 
-        $result = RecapDocument::postableText('Intro.', [$wellFormed, $bareProse], 'Outro.', 'Stored.');
+        $result = RecapDocument::postableText('Intro.', [$wellFormed, $untagged], 'Outro.', 'Stored.');
 
-        self::assertSame('Stored.', $result);
+        self::assertSame(RecapDocument::assemble('Intro.', [$wellFormed, $untagged], 'Outro.'), $result);
+        self::assertStringContainsString('**C 90 @ D 88**', $result);
+        self::assertLessThan(strpos($result, '**C 90 @ D 88**'), strpos($result, '**A 100 @ B 114**'));
+        self::assertEndsWithOutro('Outro.', $result);
     }
 
     /**
-     * Zero game rows: the assembled document is either empty (no intro/outro) or
-     * carries no game sections (intro+outro only). Both paths fall back to the stored
-     * text — via the $document === '' guard when parts are absent entirely, and via
-     * gamesCarryTheirMentionLines() returning false when intro+outro assembles but
-     * the game check still fails.
+     * Legacy rows: no intro, no game rows, no outro. The stored text is the only
+     * thing there is, so it is returned verbatim.
      */
-    public function testPostableTextReturnsStoredTextWhenNoGameParts(): void
+    public function testPostableTextShowsTheStoredTeaserForALegacyRow(): void
     {
-        // No intro, no outro, no games → assemble() returns '' → $document === '' guard fires.
         self::assertSame('Stored.', RecapDocument::postableText(null, [], null, 'Stored.'));
-
-        // Intro + outro, no games → assemble() is non-empty but gamesCarryTheirMentionLines([]) is false.
-        self::assertSame('Stored.', RecapDocument::postableText('Intro.', [], 'Outro.', 'Stored.'));
+        self::assertSame("  Teaser.\n", RecapDocument::postableText(null, [], null, "  Teaser.\n"));
+        // Rows whose text is empty count as no rows.
+        self::assertSame('Stored.', RecapDocument::postableText(null, [$this->game('2026-02-26', '  ')], null, 'Stored.'));
     }
 
     /**
-     * Empty-string and whitespace-only game rows are skipped by gamesCarryTheirMentionLines().
-     * The one remaining non-empty row carries a mention line, so assembly is preferred.
+     * Intro and outro but no game rows: the assembled document is returned. The stored
+     * text is only for rows with no parts at all.
      */
-    public function testPostableTextSkipsEmptyGameRowsWhenCheckingMentionLines(): void
+    public function testPostableTextPrefersIntroAndOutroOverTheStoredTeaser(): void
+    {
+        self::assertSame(
+            RecapDocument::assemble('Intro.', [], 'Outro.'),
+            RecapDocument::postableText('Intro.', [], 'Outro.', 'Stored.')
+        );
+    }
+
+    public function testPostableTextSkipsEmptyGameRows(): void
     {
         $empty      = $this->game('2026-02-26', '');
         $whitespace = $this->game('2026-02-26', '   ');
@@ -331,11 +327,6 @@ final class RecapDocumentTest extends TestCase
         self::assertSame(RecapDocument::assemble('Intro.', [$empty, $whitespace, $wellFormed], 'Outro.'), $result);
     }
 
-    /**
-     * When stored text is empty, null, or whitespace, the assembled document is
-     * returned regardless of whether parts carry mention lines — there is nothing
-     * to fall back to.
-     */
     public function testPostableTextReturnsAssembledDocumentWhenStoredTextIsEmpty(): void
     {
         $game      = $this->game('2026-02-26', 'Bare prose with no mention line.');
@@ -347,40 +338,58 @@ final class RecapDocumentTest extends TestCase
     }
 
     /**
-     * A single mention at index 1 with no middle dot is well-formed — the regex
-     * /^<@\d+>(?:\s*·\s*<@\d+>)*$/u matches a bare <@id> with zero repetitions.
-     */
-    public function testPostableTextCountsSingleMentionAsWellFormed(): void
-    {
-        $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@7>\nGame prose.");
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', 'Stored.');
-
-        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
-    }
-
-    /**
-     * A part already in the exemplar's four-line shape (header / mentions / blank /
-     * prose) passes the mention-line check at index 1. This is the shape
-     * normalizeGameBlock() produces; the regression guard ensures a round-trip is stable.
-     */
-    public function testPostableTextCountsAlreadyNormalizedPartAsWellFormed(): void
-    {
-        $game   = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\n\nGame prose.");
-        $result = RecapDocument::postableText('Intro.', [$game], 'Outro.', 'Stored.');
-
-        self::assertSame(RecapDocument::assemble('Intro.', [$game], 'Outro.'), $result);
-    }
-
-    /**
-     * When there are no parts, no intro, no outro, and no stored text (null, empty,
-     * or whitespace), postableText() returns '' — Copy shows nothing rather than an
-     * undefined value.
+     * When there are no parts and no stored text (null, empty, or whitespace),
+     * postableText() returns '' so Copy shows nothing rather than an undefined value.
      */
     public function testPostableTextReturnsEmptyStringWhenThereIsNothingAtAll(): void
     {
         self::assertSame('', RecapDocument::postableText(null, [], null, null));
         self::assertSame('', RecapDocument::postableText(null, [], null, ''));
         self::assertSame('', RecapDocument::postableText(null, [], null, '   '));
+    }
+
+    public function testListsNoGamesWhenEveryGameCarriesItsMentionLine(): void
+    {
+        $games = [
+            $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose."),
+            $this->game('2026-02-26', "**C 90 @ D 88**\n<@7>\n\nAlready normalized."),
+            $this->game('2026-02-26', ''),
+        ];
+
+        self::assertSame([], RecapDocument::gamesMissingMentionLines($games));
+    }
+
+    /**
+     * A game with a score header is named by the header. A game with no header is
+     * named by its date and team ids. A one-line game has no mention line at all.
+     */
+    public function testNamesEachGameMissingItsMentionLine(): void
+    {
+        $tagged     = $this->game('2026-02-26', "**A 100 @ B 114**\n<@1> · <@2>\nGame prose.");
+        $headerOnly = $this->game('2026-02-26', "**Boston Celtics 100 @ Miami Heat 114**\nProse, no tags.");
+        $bareProse  = [
+            'game_date'      => '2026-02-27',
+            'visitor_teamid' => 5,
+            'home_teamid'    => 12,
+            'recap_text'     => "The visitors came out strong.\nThey held the lead.",
+        ];
+        $oneLine    = $this->game('2026-02-28', 'Single-line prose.');
+
+        self::assertSame(
+            [
+                'Boston Celtics 100 @ Miami Heat 114',
+                '2026-02-27 · team 5 at team 12',
+                '2026-02-28 · team 1 at team 2',
+            ],
+            RecapDocument::gamesMissingMentionLines([$tagged, $headerOnly, $bareProse, $oneLine])
+        );
+    }
+
+    public function testNamesAGameWithMissingKeyColumnsWithoutFailing(): void
+    {
+        $game = ['visitor_teamid' => null, 'recap_text' => 'Prose only.'];
+
+        self::assertSame([' · team  at team '], RecapDocument::gamesMissingMentionLines([$game]));
     }
 
     /**

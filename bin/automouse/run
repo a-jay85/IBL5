@@ -2153,6 +2153,8 @@ hold_plan_judge() {
     touch -h "$NIGHTLY_DIR/skipped/$plan_name" 2>/dev/null || true
     rm -f "$HANDOFF_DIR/${plan_name}.json"
     rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+    # --if-empty keeps a worktree with committed work, so a requeue still resumes it.
+    reap_empty_worktree "${plan_name%.md}"
     mkdir -p "$NIGHTLY_DIR/reports"
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${plan_name%.md}.md"
     final=$(jq -R -r 'fromjson? | select(.type=="result") | .result // empty' "$out_file" 2>/dev/null | tail -n 200) || final=""

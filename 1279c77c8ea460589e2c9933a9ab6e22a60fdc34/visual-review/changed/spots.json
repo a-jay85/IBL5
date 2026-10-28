@@ -1,0 +1,93 @@
+[
+  {
+    "module": "error-invalid-module",
+    "viewport": "desktop",
+    "title": "error-invalid-module",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 90-439 px",
+    "beforeFile": "changed/error-invalid-module.1.before.png",
+    "afterFile": "changed/error-invalid-module.1.after.png",
+    "sideFile": "changed/error-invalid-module.1.side.png",
+    "stackFile": "changed/error-invalid-module.1.stack.png"
+  },
+  {
+    "module": "index",
+    "viewport": "desktop",
+    "title": "index",
+    "index": 1,
+    "count": 2,
+    "kind": "spot",
+    "region": "top, y 90-439 px",
+    "beforeFile": "changed/index.1.before.png",
+    "afterFile": "changed/index.1.after.png",
+    "sideFile": "changed/index.1.side.png",
+    "stackFile": "changed/index.1.stack.png"
+  },
+  {
+    "module": "index",
+    "viewport": "desktop",
+    "title": "index",
+    "index": 2,
+    "count": 2,
+    "kind": "spot",
+    "region": "top, y 536-671 px",
+    "beforeFile": "changed/index.2.before.png",
+    "afterFile": "changed/index.2.after.png",
+    "sideFile": "changed/index.2.side.png",
+    "stackFile": "changed/index.2.stack.png"
+  },
+  {
+    "module": "last-sim-recap",
+    "viewport": "desktop",
+    "title": "last-sim-recap",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 567-917 px",
+    "beforeFile": "changed/last-sim-recap.1.before.png",
+    "afterFile": "changed/last-sim-recap.1.after.png",
+    "sideFile": "changed/last-sim-recap.1.side.png",
+    "stackFile": "changed/last-sim-recap.1.stack.png"
+  },
+  {
+    "module": "last-sim-recap",
+    "viewport": "mobile",
+    "title": "last-sim-recap-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 864-1356 px",
+    "beforeFile": "changed/last-sim-recap-mobile.1.before.png",
+    "afterFile": "changed/last-sim-recap-mobile.1.after.png",
+    "sideFile": "changed/last-sim-recap-mobile.1.side.png",
+    "stackFile": "changed/last-sim-recap-mobile.1.stack.png"
+  },
+  {
+    "module": "news",
+    "viewport": "desktop",
+    "title": "news",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 90-439 px",
+    "beforeFile": "changed/news.1.before.png",
+    "afterFile": "changed/news.1.after.png",
+    "sideFile": "changed/news.1.side.png",
+    "stackFile": "changed/news.1.stack.png"
+  },
+  {
+    "module": "news",
+    "viewport": "mobile",
+    "title": "news-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 90-583 px",
+    "beforeFile": "changed/news-mobile.1.before.png",
+    "afterFile": "changed/news-mobile.1.after.png",
+    "sideFile": "changed/news-mobile.1.side.png",
+    "stackFile": "changed/news-mobile.1.stack.png"
+  }
+]

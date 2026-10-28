@@ -357,27 +357,37 @@ GS;
             <tbody>
                 <tr><td>PID</td><td>Player ID</td></tr>
                 <tr><td>Name</td><td>Player name</td></tr>
-                <tr><td>Nickname</td><td>Player nickname</td></tr>
                 <tr><td>Age</td><td>Player age</td></tr>
                 <tr><td>Position</td><td>PG, SG, SF, PF, or C</td></tr>
                 <tr><td>Height (ft) / Height (in)</td><td>Height in feet and inches</td></tr>
+                <tr><td>Weight</td><td>Weight in pounds</td></tr>
                 <tr><td>Active</td><td>1 = on a depth chart, 0 = not</td></tr>
+                <tr><td>Injury Days</td><td>Days left on the current injury (0 = healthy)</td></tr>
                 <tr><td>Retired</td><td>1 = retired, 0 = active</td></tr>
                 <tr><td>Experience</td><td>Years of experience</td></tr>
+                <tr><td>Draft Year / Draft Round / Draft Pick</td><td>Draft details</td></tr>
+                <tr><td>College</td><td>College or last school</td></tr>
                 <tr><td>Bird Rights</td><td>Bird rights status</td></tr>
                 <tr><td>Team ID / Team City / Team Name</td><td>Team information (empty for free agents)</td></tr>
                 <tr><td>Owner</td><td>Team owner username</td></tr>
                 <tr><td>Contract Year</td><td>Current year of contract (1-6, 0 = unsigned)</td></tr>
                 <tr><td>Current Salary</td><td>Salary for the current contract year (thousands)</td></tr>
                 <tr><td>Year 1-6 Salary</td><td>Full contract breakdown by year (thousands)</td></tr>
-                <tr><td>GP / MIN</td><td>Games played / minutes played (season totals)</td></tr>
+                <tr><td>GP / GS / MIN</td><td>Games played / games started / minutes played (season totals)</td></tr>
                 <tr><td>FGM / FGA</td><td>Field goals made / attempted (season totals)</td></tr>
                 <tr><td>FTM / FTA</td><td>Free throws made / attempted (season totals)</td></tr>
-                <tr><td>3PM / 3PA</td><td>Three-pointers made / attempted (season totals)</td></tr>
+                <tr><td>3GM / 3GA</td><td>Three-pointers made / attempted (season totals)</td></tr>
                 <tr><td>ORB / DRB</td><td>Offensive / defensive rebounds (season totals)</td></tr>
                 <tr><td>AST / STL / TO / BLK / PF</td><td>Assists, steals, turnovers, blocks, personal fouls (season totals)</td></tr>
                 <tr><td>PPG</td><td>Points per game</td></tr>
-                <tr><td>FG% / FT% / 3P%</td><td>Shooting percentages</td></tr>
+                <tr><td>FG% / FT% / 3G%</td><td>Shooting percentages</td></tr>
+                <tr><td>r2GA / r2G% / rFTA / rFT% / r3GA / r3G%</td><td>Shooting ratings</td></tr>
+                <tr><td>rORB / rDRB / rAST / rSTL / rTVR / rBLK / rFOUL</td><td>Rebounding, passing, defense, turnover, and foul ratings</td></tr>
+                <tr><td>rOO / rDO / rPO / rTO</td><td>Outside, drive, post, and transition offense ratings</td></tr>
+                <tr><td>rOD / rDD / rPD / rTD</td><td>Outside, drive, post, and transition defense ratings</td></tr>
+                <tr><td>Clutch / Consistency</td><td>Clutch and consistency ratings</td></tr>
+                <tr><td>Talent / Skill / Intangibles</td><td>TSI ratings</td></tr>
+                <tr><td>FA Loyalty / FA Playing Time / FA Play for Winner / FA Tradition / FA Security</td><td>Free agency factors</td></tr>
             </tbody>
         </table>
 

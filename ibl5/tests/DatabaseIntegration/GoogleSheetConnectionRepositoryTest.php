@@ -116,6 +116,22 @@ class GoogleSheetConnectionRepositoryTest extends DatabaseTestCase
         self::assertSame([900002], array_column($this->repo->findPending(10), 'user_id'));
     }
 
+    public function testMarkPendingFlagsOnlyThatActiveUser(): void
+    {
+        $this->repo->upsert(900001, 'v1.a', 'sheet-a', 'https://docs.google.com/spreadsheets/d/sheet-a');
+        $this->repo->upsert(900002, 'v1.b', 'sheet-b', 'https://docs.google.com/spreadsheets/d/sheet-b');
+        $this->repo->upsert(900003, 'v1.c', 'sheet-c', 'https://docs.google.com/spreadsheets/d/sheet-c');
+        $this->repo->markBroken(900003, GoogleSheetConnectionRepository::REASON_SHEET_MISSING);
+
+        $this->repo->markPending(900001);
+        $this->repo->markPending(900003);
+
+        self::assertSame([900001], array_column($this->repo->findPending(10), 'user_id'));
+        $broken = $this->repo->findByUserId(900003);
+        self::assertNotNull($broken);
+        self::assertSame(0, $broken['refresh_pending']);
+    }
+
     public function testMarkBrokenSetsReasonAndClearsPending(): void
     {
         $this->repo->upsert(900001, 'v1.a', 'sheet-a', 'https://docs.google.com/spreadsheets/d/sheet-a');

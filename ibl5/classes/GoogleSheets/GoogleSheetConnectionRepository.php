@@ -126,6 +126,18 @@ class GoogleSheetConnectionRepository extends BaseMysqliRepository implements Go
     }
 
     /**
+     * @see GoogleSheetConnectionRepositoryInterface::markPending()
+     */
+    public function markPending(int $userId): void
+    {
+        $this->execute(
+            "UPDATE `ibl_google_sheet_connections` SET refresh_pending = 1 WHERE user_id = ? AND status = 'active'",
+            'i',
+            $userId
+        );
+    }
+
+    /**
      * @see GoogleSheetConnectionRepositoryInterface::markRefreshed()
      */
     public function markRefreshed(int $userId, string $status, ?string $error): void

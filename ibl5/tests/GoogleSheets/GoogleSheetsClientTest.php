@@ -138,7 +138,7 @@ class GoogleSheetsClientTest extends TestCase
         self::assertContains("'Players'!C1:BL3", $this->body(1)['ranges']);
     }
 
-    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    public function testOverwriteTabWritesRowsRawThenClearsTail(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);

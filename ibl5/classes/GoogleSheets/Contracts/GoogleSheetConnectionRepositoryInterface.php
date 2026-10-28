@@ -68,6 +68,12 @@ interface GoogleSheetConnectionRepositoryInterface
     public function clearPending(int $userId): void;
 
     /**
+     * Re-flag one active connection, so a refresh that cleared the flag but never
+     * read the export is retried on the next tick.
+     */
+    public function markPending(int $userId): void;
+
+    /**
      * Record a refresh attempt outcome. Leaves refresh_pending alone; see clearPending().
      *
      * @param string $status One of ok, error, timeout

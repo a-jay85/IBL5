@@ -127,7 +127,8 @@ class GoogleSheetExportService
      * Write the current export to one GM's sheet. Never throws.
      *
      * @param ConnectionRow $row
-     * @param list<list<string>>|null $rows Pre-built export rows, so a batch builds them once
+     * @param list<list<string>>|null $rows Export rows the caller built after clearing this GM's
+     *                                      pending flag. Null clears the flag here, then builds them.
      * @return string One of RESULT_OK, RESULT_ERROR, RESULT_BROKEN
      */
     public function refreshConnection(array $row, ?array $rows = null): string
@@ -137,7 +138,9 @@ class GoogleSheetExportService
 
         try {
             // Cleared before the export is read: a sim landing mid-write re-sets it.
-            $this->connections->clearPending($userId);
+            if ($rows === null) {
+                $this->connections->clearPending($userId);
+            }
 
             try {
                 $refreshToken = $this->box->decrypt($row['refresh_token_enc']);

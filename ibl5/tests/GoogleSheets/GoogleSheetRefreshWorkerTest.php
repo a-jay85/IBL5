@@ -216,6 +216,19 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         self::assertContains('processed=0 failed=1 deferred=2', $this->output);
     }
 
+    public function testSimLandingDuringBuildLeavesRowPendingForNextTick(): void
+    {
+        $this->connect(1);
+        $this->repo->markAllActivePending();
+        $this->queueOkRefresh();
+
+        $exit = $this->worker(new FixedClock(1000), null, false, true)->run(100, 240, false, false, $this->collect());
+
+        self::assertSame(0, $exit);
+        self::assertContains('user_id=1 status=ok', $this->output);
+        self::assertSame(1, $this->repo->rows[1]['refresh_pending']);
+    }
+
     public function testRunLogsNoTokens(): void
     {
         $this->connect(1);
@@ -273,11 +286,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         $this->http->queue(200, []);
     }
 
-    private function worker(ClockInterface $clock, ?Logger $logger = null, bool $buildFails = false): GoogleSheetRefreshWorker
-    {
+    private function worker(
+        ClockInterface $clock,
+        ?Logger $logger = null,
+        bool $buildFails = false,
+        bool $simLandsDuringBuild = false
+    ): GoogleSheetRefreshWorker {
         $players = self::createStub(ApiPlayerRepository::class);
         if ($buildFails) {
             $players->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
+        } elseif ($simLandsDuringBuild) {
+            $players->method('getAllPlayersForExport')->willReturnCallback(function (): array {
+                $this->repo->markAllActivePending();
+
+                return [];
+            });
         } else {
             $players->method('getAllPlayersForExport')->willReturn([]);
         }

@@ -88,6 +88,13 @@ final class InMemoryConnectionRepository implements GoogleSheetConnectionReposit
         }
     }
 
+    public function markPending(int $userId): void
+    {
+        if (isset($this->rows[$userId]) && $this->rows[$userId]['status'] === 'active') {
+            $this->rows[$userId]['refresh_pending'] = 1;
+        }
+    }
+
     public function markRefreshed(int $userId, string $status, ?string $error): void
     {
         if (!isset($this->rows[$userId])) {

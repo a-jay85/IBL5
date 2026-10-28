@@ -64,12 +64,16 @@ class GoogleSheetRefreshWorker
                 break;
             }
 
-            // A build failure is a server-side glitch, not a GM's fault. Leave every
-            // remaining row pending so the next tick retries them.
+            // Cleared before the rows are built, so a sim landing mid-build re-sets the
+            // flag and the next tick writes the post-sim data.
+            $this->connections->clearPending($row['user_id']);
+
+            // A build failure is a server-side glitch, not a GM's fault. Re-flag this
+            // row and leave the rest pending so the next tick retries them.
             try {
-                // Built per GM so a sim landing mid-tick is never cleared by markRefreshed() against stale rows.
                 $exportRows = $this->export->buildRows();
             } catch (\Throwable $e) {
+                $this->connections->markPending($row['user_id']);
                 $this->logger?->error('google sheet export rows build failed', ['exception' => $e::class]);
                 $failures++;
                 break;

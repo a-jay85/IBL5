@@ -16,6 +16,10 @@ if (!is_admin()) {
     exit;
 }
 
+// Admin-only endpoint: lift the web statement-time cap (Database\StatementTimeout).
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
 const SIM_MAX = 4294967295; // INT UNSIGNED ceiling of ibl_sim_summaries.sim
 
 // A non-string `sim` (e.g. `?sim[]=1`) is treated as malformed rather than cast.

@@ -18,8 +18,10 @@ class PdoConnection
      * Get the singleton PDO instance.
      *
      * Creates a new connection on first call using config.php globals.
+     *
+     * @param string $sapi Injected for tests; web SAPIs get the statement-time cap.
      */
-    public static function getInstance(): \PDO
+    public static function getInstance(string $sapi = \PHP_SAPI): \PDO
     {
         if (self::$instance !== null) {
             return self::$instance;
@@ -33,6 +35,8 @@ class PdoConnection
         global $dbpass;
         /** @var string $dbname */
         global $dbname;
+        /** @var mixed $dbStatementTimeoutSeconds */
+        global $dbStatementTimeoutSeconds;
 
         $dsn = 'mysql:host=' . $dbhost . ';dbname=' . $dbname . ';charset=utf8mb4';
 
@@ -46,6 +50,8 @@ class PdoConnection
                 \PDO::ATTR_EMULATE_PREPARES => false,
             ]
         );
+
+        StatementTimeout::apply(self::$instance, $dbStatementTimeoutSeconds ?? null, $sapi);
 
         return self::$instance;
     }

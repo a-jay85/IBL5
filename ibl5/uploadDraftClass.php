@@ -16,6 +16,10 @@ if (!is_admin()) {
     die('Access denied. Administrator privileges required.');
 }
 
+// Admin-only endpoint: lift the web statement-time cap (Database\StatementTimeout).
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
 /** Session key carrying the parsed-but-uncommitted rows between the upload and commit requests. */
 const DRAFT_CLASS_SESSION_KEY = 'draft_class_import_rows';
 

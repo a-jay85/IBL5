@@ -71,7 +71,7 @@ class ConfigBootstrap implements BootstrapStepInterface
     {
         // config.php assigns variables at file scope. When required from within a
         // class method, those assignments are method-local unless declared global here.
-        global $dbhost, $dbuname, $dbpass, $dbname, $prefix, $user_prefix, $dbtype;
+        global $dbhost, $dbuname, $dbpass, $dbname, $prefix, $user_prefix, $dbtype, $dbStatementTimeoutSeconds;
         global $sitekey, $subscription_url, $admin_file, $display_errors;
         global $reasons, $badreasons, $AllowableHTML, $CensorList, $tipath, $commercial_license;
 
@@ -88,7 +88,7 @@ class ConfigBootstrap implements BootstrapStepInterface
     {
         // db.php reads config variables and writes $db / $mysqli_db — declare all global
         // so values flow in from loadConfig() and out to the rest of the application.
-        global $dbhost, $dbuname, $dbpass, $dbname, $dbtype, $db, $mysqli_db;
+        global $dbhost, $dbuname, $dbpass, $dbname, $dbtype, $db, $mysqli_db, $dbStatementTimeoutSeconds;
 
         /** @phpstan-ignore ibl.requireOnce (initializes $db and $mysqli_db globals; not a class) */
         require_once $this->basePath . '/db/db.php';

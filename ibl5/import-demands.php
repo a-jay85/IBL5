@@ -14,6 +14,10 @@ if (!is_admin()) {
     die('Access denied. Administrator privileges required.');
 }
 
+// Admin-only endpoint: lift the web statement-time cap (Database\StatementTimeout).
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
 /**
  * Strip accents/diacriticals from a string for loose name matching.
  *

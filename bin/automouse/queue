@@ -15,6 +15,9 @@
 #   bin/automouse/queue dispose <slug> <done|skipped> [--staleness]
 #   bin/automouse/queue renumber                 # compact prefixes to 010, 020, …
 #   bin/automouse/queue status                   # one next-action line per item needing attention
+#   bin/automouse/queue ice <slug> ...           # move queued plans to the icebox
+#   bin/automouse/queue thaw                     # move every iceboxed plan back to the queue
+#   bin/automouse/queue icebox                   # show the icebox
 #
 # Examples:
 #   bin/automouse/queue velvet-brewing-starlight
@@ -38,6 +41,11 @@ Usage:
                                                 move a queued plan to done/ or skipped/
   bin/automouse/queue renumber                  compact prefixes to 010, 020, 030, …
   bin/automouse/queue status                    one next-action line per item needing attention
+  bin/automouse/queue ice <slug> ...            move queued plans to the icebox (skips a running plan)
+  bin/automouse/queue ice --all-except <slug> ...
+                                                ice every queued plan except these
+  bin/automouse/queue thaw                      append every iceboxed plan back onto the queue
+  bin/automouse/queue icebox                    show the icebox
 
 Arguments:
   <plan-slug-or-filename>   plan slug or filename (with or without .md), or path
@@ -61,6 +69,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 DONE_DIR="$NIGHTLY_DIR/done"
+# icebox/ holds plans set aside while weekly usage is tight. Entries keep their
+# NNN- prefix so `thaw` re-appends them in their old order. bin/usage-gate-coordinator
+# writes .frozen-resets-at and runs `thaw` once the weekly window resets.
+ICEBOX_DIR="$NIGHTLY_DIR/icebox"
 
 mkdir -p "$QUEUE_DIR"
 
@@ -77,6 +89,27 @@ evict_dispositions() {
     local name=$1
     rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds" "$SKIPPED_DIR/${name}.force-override" \
           "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure" "$DONE_DIR/${name}.cap-refunds" "$DONE_DIR/${name}.force-override"
+    local iced
+    if iced=$(queue_entry_for_slug "$ICEBOX_DIR" "$name"); then
+        rm -f "$ICEBOX_DIR/$iced"
+        # An emptied icebox must not keep its freeze stamp, or the next ice
+        # would inherit a stale reset time and thaw on the coordinator's next tick.
+        if [ -z "$(queue_entries "$ICEBOX_DIR")" ]; then
+            rm -f "$ICEBOX_DIR/.frozen-resets-at"
+        fi
+    fi
+}
+
+# move_sidecars <from-dir> <to-dir> <name> — move every <name>.* sidecar except a
+# run lock. Used by ice and thaw, so attempt counters and force overrides travel
+# with the plan.
+move_sidecars() {
+    local from=$1 to=$2 name=$3 f
+    for f in "$from/$name".*; do
+        [ -e "$f" ] || continue
+        case "$f" in *.lock) continue ;; esac
+        mv "$f" "$to/"
+    done
 }
 
 # --- Run order --------------------------------------------------------------
@@ -111,8 +144,10 @@ append_entry() {
     return "$rc"
 }
 
+# show_queue [dir] [header] — list a queue-shaped dir (queue/ by default, or icebox/).
 show_queue() {
-    echo "Automouse queue (next to run first):"
+    local dir=${1:-$QUEUE_DIR}
+    echo "${2:-Automouse queue (next to run first):}"
     printf "  %4s  %-44s %-17s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
     local found=0
     local i=1
@@ -120,7 +155,7 @@ show_queue() {
         found=1
         local name path impl_model auto_merge title
         name=$(entry_to_name "$entry")
-        path="$QUEUE_DIR/$entry"
+        path="$dir/$entry"
         if [ -e "$path" ]; then
             # Extract frontmatter values (between first pair of --- markers).
             # Title = first H1 outside frontmatter and code fences, so a
@@ -137,7 +172,7 @@ show_queue() {
         auto_merge=${auto_merge:-true}
         printf "  %4d. %-44s %-17s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
         i=$((i + 1))
-    done < <(queue_entries "$QUEUE_DIR")
+    done < <(queue_entries "$dir")
     if [ "$found" -eq 0 ]; then
         echo "  (empty)"
     fi
@@ -146,6 +181,96 @@ show_queue() {
 if [ $# -eq 0 ]; then
     show_queue
     exit 0
+fi
+
+if [ "$1" = "icebox" ]; then
+    show_queue "$ICEBOX_DIR" "Automouse icebox (thaws back onto the queue when weekly usage resets):"
+    exit 0
+fi
+
+# ice <slug>... | ice --all-except <slug>... — move queued plans into icebox/,
+# keeping each entry's NNN- prefix and its sidecars. A plan holding a run lock is
+# left in place, since a runner is working on it.
+if [ "$1" = "ice" ]; then
+    shift
+    EXCEPT=0
+    if [ "${1:-}" = "--all-except" ]; then
+        EXCEPT=1
+        shift
+    fi
+    if [ "$EXCEPT" -eq 0 ] && [ $# -eq 0 ]; then
+        echo "Error: ice requires at least one plan slug (or --all-except <slug>...)." >&2
+        exit 1
+    fi
+    mkdir -p "$ICEBOX_DIR"
+    if ! queue_lock "$QUEUE_DIR"; then
+        echo "Error: another queue rename holds $QUEUE_DIR/.normalize.lock; nothing iced." >&2
+        exit 1
+    fi
+    TARGETS=()
+    if [ "$EXCEPT" -eq 1 ]; then
+        KEEP=" "
+        for a in "$@"; do KEEP="$KEEP$(entry_to_name "$(basename "$a")") "; done
+        while IFS= read -r entry; do
+            name=$(entry_to_name "$entry")
+            case "$KEEP" in *" $name "*) continue ;; esac
+            TARGETS+=("$name")
+        done < <(queue_entries "$QUEUE_DIR")
+    else
+        for a in "$@"; do TARGETS+=("$(entry_to_name "$(basename "$a")")"); done
+    fi
+    RC=0
+    for name in "${TARGETS[@]+"${TARGETS[@]}"}"; do
+        if ! entry=$(queue_entry_for_slug "$QUEUE_DIR" "$name"); then
+            echo "Error: $name is not in the queue." >&2
+            RC=1
+            continue
+        fi
+        if [ -e "$QUEUE_DIR/${name}.lock" ]; then
+            echo "Skipped $name: a runner holds its lock." >&2
+            continue
+        fi
+        mv "$QUEUE_DIR/$entry" "$ICEBOX_DIR/$entry"
+        move_sidecars "$QUEUE_DIR" "$ICEBOX_DIR" "$name"
+        echo "Iced: $name"
+    done
+    queue_unlock "$QUEUE_DIR"
+    echo ""
+    show_queue
+    exit "$RC"
+fi
+
+# thaw — append every iceboxed plan to the END of the queue in icebox order, with
+# its sidecars, and drop the freeze stamp once the icebox is empty. No bin/check-plan
+# re-run: each plan passed it (or was forced) when it was first queued, and the run's
+# staleness gate still checks it before implementation.
+if [ "$1" = "thaw" ]; then
+    THAWED=0
+    RC=0
+    if [ -d "$ICEBOX_DIR" ]; then
+        while IFS= read -r entry; do
+            name=$(entry_to_name "$entry")
+            if ! source=$(readlink "$ICEBOX_DIR/$entry"); then
+                echo "Error: $ICEBOX_DIR/$entry is not a symlink; left in the icebox." >&2
+                RC=1
+                continue
+            fi
+            if append_entry "$source" "$name"; then
+                rm -f "$ICEBOX_DIR/$entry"
+                move_sidecars "$ICEBOX_DIR" "$QUEUE_DIR" "$name"
+                THAWED=$((THAWED + 1))
+            else
+                RC=1
+            fi
+        done < <(queue_entries "$ICEBOX_DIR")
+        if [ -z "$(queue_entries "$ICEBOX_DIR")" ]; then
+            rm -f "$ICEBOX_DIR/.frozen-resets-at"
+        fi
+    fi
+    echo "Thawed $THAWED plan(s) back onto the queue."
+    echo ""
+    show_queue
+    exit "$RC"
 fi
 
 # Read-only triage: one next-action line per skipped/failed/paused/held/forced

@@ -92,6 +92,11 @@ evict_dispositions() {
     local iced
     if iced=$(queue_entry_for_slug "$ICEBOX_DIR" "$name"); then
         rm -f "$ICEBOX_DIR/$iced"
+        # An emptied icebox must not keep its freeze stamp, or the next ice
+        # would inherit a stale reset time and thaw on the coordinator's next tick.
+        if [ -z "$(queue_entries "$ICEBOX_DIR")" ]; then
+            rm -f "$ICEBOX_DIR/.frozen-resets-at"
+        fi
     fi
 }
 

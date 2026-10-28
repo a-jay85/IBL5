@@ -171,4 +171,7 @@ def test_report_empty_out_dir(tmp_path):
         assert out[name]["full_per_pr"] == 0.0
         assert out[name]["histogram"] == {}
     assert out["skipped"] == {}
-    assert run_report(tmp_path).returncode == 0
+    proc = run_report(tmp_path)
+    assert proc.returncode == 0
+    # Without the zero-PR guard the division raises ZeroDivisionError and the script exits 1.
+    assert "ZeroDivisionError" not in proc.stderr

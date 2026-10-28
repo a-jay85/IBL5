@@ -97,21 +97,19 @@ fi
 # =============================================================================
 # Block 1: Voice spec (verbatim from /tmp/sim-recap-decisions-digest.md)
 #
-# The original voice spec ends with: "add a standings-context paragraph at the end,
-# as a big wrap-up summary of what transpired during the entire sim."
+# WHERE THINGS STAND closes the recap. It is the outro: the commissioner reads it
+# at the end of the sim to wrap everything up. The pinned exemplar (below) carries
+# it at the BOTTOM, after the last game, and the voice spec and output contract say
+# the same. There is no separate wrap-up outro anymore.
 #
-# The pinned exemplar (below) opens with WHERE THINGS STAND at the TOP — before any
-# per-game recaps. These contradict. Resolution (plan 2b): the exemplar wins on layout.
-# That single clause is replaced here with the exemplar-authoritative ordering sentence.
-#
-# Do NOT restore "at the end" or any variant. If both instructions reach the model,
-# it emits two standings sections — one at the top and a second at the end.
+# Do NOT add a standings section at the top, or a second wrap-up after WHERE THINGS
+# STAND. If two placements reach the model, it emits two standings sections.
 # =============================================================================
 cat <<'VOICE_EOF'
 
 == VOICE SPEC ==
 
-on production, the most recent sim results are up. write a summary paragraph for each simmed game, similar to an ESPN-style write-up. write in the voice of Bill Simmons. avoid writing like an LLM (e.g. no em-dashes, short punchy sentences, "it's not this, it's that", "and here's the thing", "load-bearing" – all of those cliché LLM patterns of speech). try to use Simmons' humor (ideally his actually funny humor, not just what's funny to him). whenever you find yourself repeating an old theme, try to tie in a pop culture reference, whether of the player's real-life era, the era the games are simulated in, or of the real-life era of today. these paragraphs will be posted on Discord. before each paragraph, write the team names and the final scores, and on a line below, @mention the GM's of each team. don't list GM names next to the Discord mentions, it will look redundant. use mysql to pull data. ibl_sim_dates holds the dates of the last sim. ibl_box_scores and ibl_box_scores_teams has the raw box score data. ibl_schedule and ibl_standings will tell you the league schedule and where teams are in the standings. ibl_jsb_transactions lists injuries AND trades during the sim. mention the injuries in each game when possible. when a player was recently traded to their current team (use ibl_plr.teamid for current team, never from_teamid which is a frozen historical marker), note it in their first game recap. ibl_power contains post-sim win/loss streak information. Use it to call out any long streaks and to know when a big streak was snapped. open with a WHERE THINGS STAND standings-context section at the top of the output, first, before any per-game recaps — the pinned exemplar's ordering is authoritative. here's a sample of what you produced last time – ok to improve, expand upon, or change it for the better. if you don't continuously improve, expand, or change it up, referencing old content to create new content will become an ouroboros and get stale too quickly.
+on production, the most recent sim results are up. write a summary paragraph for each simmed game, similar to an ESPN-style write-up. write in the voice of Bill Simmons. avoid writing like an LLM (e.g. no em-dashes, short punchy sentences, "it's not this, it's that", "and here's the thing", "load-bearing" – all of those cliché LLM patterns of speech). try to use Simmons' humor (ideally his actually funny humor, not just what's funny to him). whenever you find yourself repeating an old theme, try to tie in a pop culture reference, whether of the player's real-life era, the era the games are simulated in, or of the real-life era of today. these paragraphs will be posted on Discord. before each paragraph, write the team names and the final scores, and on a line below, @mention the GM's of each team. don't list GM names next to the Discord mentions, it will look redundant. use mysql to pull data. ibl_sim_dates holds the dates of the last sim. ibl_box_scores and ibl_box_scores_teams has the raw box score data. ibl_schedule and ibl_standings will tell you the league schedule and where teams are in the standings. ibl_jsb_transactions lists injuries AND trades during the sim. mention the injuries in each game when possible. when a player was recently traded to their current team (use ibl_plr.teamid for current team, never from_teamid which is a frozen historical marker), note it in their first game recap. ibl_power contains post-sim win/loss streak information. Use it to call out any long streaks and to know when a big streak was snapped. close with a WHERE THINGS STAND standings-context section at the end of the output, after the last per-game recap. it is the wrap-up for the whole sim, and nothing comes after it. the pinned exemplar's ordering is authoritative. here's a sample of what you produced last time – ok to improve, expand upon, or change it for the better. if you don't continuously improve, expand, or change it up, referencing old content to create new content will become an ouroboros and get stale too quickly.
 
 VOICE_EOF
 
@@ -270,6 +268,10 @@ Shape:
     header and the mention line above it, so never start a paragraph with a score,
     a team-mention line, or a blank line.
   - recap_text (top level): a teaser of about 220 characters for the whole sim.
+  - intro_text: the title line, the Voice/Format preamble lines, and the 80-character
+    = separator. No standings here and no scene-setting prose.
+  - outro_text: the WHERE THINGS STAND section, framed by 80-character = separators,
+    then the END line. This is the whole outro. Do not write any other wrap-up.
   - intro_text, outro_text, every games value: non-empty strings.
   - themes: array of strings, the narrative angles you used this run (for the next ledger).
 
@@ -308,12 +310,13 @@ The following is the authoritative format reference. Match its structure exactly
   - Title line (e.g. "IBL SIM RECAPS — Month DD – Month DD, YYYY (N games)")
   - Voice/Format preamble lines
   - 80-character = separator
-  - WHERE THINGS STAND section (standings, scene-setter) — at the TOP, before game recaps
-  - 80-character = separator
   - Per date: ================================ Mon DD ========================================= separator
   - Per game: **Away Team NNN @ Home Team NNN** header (bold), then <@id> · <@id> mentions
     line (away snowflake · home snowflake, middle-dot separated), then a blank line, then
     one prose paragraph
+  - 80-character = separator
+  - WHERE THINGS STAND section (standings, sim wrap-up) — at the BOTTOM, after the last game
+  - 80-character = separator, then the END line
 
 Paragraph length is part of the format, not a style preference. Every game paragraph in
 the exemplar below runs between 504 and 639 characters, averaging 565. Hit that band. A

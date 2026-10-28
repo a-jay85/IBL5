@@ -1,4 +1,5 @@
-import { expect, type Locator } from '@playwright/test';
+import type { Locator } from '@playwright/test';
+import { expect } from '../fixtures/base';
 
 /**
  * Asserts every visual line of `.ibl-btn` buttons inside `row` is centered:

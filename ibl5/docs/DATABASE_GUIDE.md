@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-10-14
+last_verified: 2026-10-28
 ---
 
 # IBL5 Database Guide
@@ -238,6 +238,16 @@ Consumed by `ibl5/classes/Player/Stats/PlayerStats.php`. The prefixes follow a `
 | `c_td` | Career triple doubles | — |
 
 Depth-chart codes (`dc_of`, `dc_df`, `dc_oi`, `dc_di`, `dc_bh`) are documented in `ibl5/docs/JSB_FILE_FORMATS.md`.
+
+## Statement Time Cap (Web Requests)
+
+Every web request caps each SQL statement at 10 seconds. `ibl5/db/db.php` and `Database\PdoConnection` run `SET SESSION max_statement_time = 10` right after they connect. MariaDB aborts a statement that runs longer with error 1969 (`Query execution was interrupted (max_statement_time exceeded)`) and frees the connection. A repository query that times out is logged on the `db` channel with its SQL, and the `mysqli_sql_exception` is rethrown.
+
+The cap exists because one slow homepage query, added by the On This Day feature in [PR 3351](https://github.com/a-jay85/IBL5/pull/3351), held 28 of 30 `max_user_connections` for up to two hours. Normal pages finish in under 0.5 seconds.
+
+- CLI runs keep no cap. That covers cron jobs, migrations, PHPUnit and `bin/` scripts (`PHP_SAPI === 'cli'`). `php -S` reports `cli-server` and is capped like LiteSpeed.
+- The sim updater (`ibl5/scripts/updateAllTheThings.php`) and the admin pages `uploadDraftClass.php`, `import-demands.php`, `faprep.php` and `simSummaries.php` lift the cap with `StatementTimeout::disable()` after their admin check. `StatementTimeoutExemptionsTest` fails if any other file calls it.
+- To change the cap, set `$dbStatementTimeoutSeconds` (an int from 0 to 3600) in `config.local.php`. A value of `0` turns the cap off. An unset, out-of-range or non-int value falls back to 10.
 
 ## Need Help?
 - Check `000_baseline_schema.sql` for table structures and relationships

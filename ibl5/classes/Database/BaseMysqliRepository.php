@@ -624,10 +624,12 @@ abstract class BaseMysqliRepository
      * executeQuery(). Only code 1969 is logged; the original exception is always
      * rethrown.
      *
+     * @param \mysqli_stmt $stmt
      * @return \mysqli_result|false
      */
-    private function getResultLoggingTimeout(\mysqli_stmt $stmt, string $query): \mysqli_result|false
+    private function getResultLoggingTimeout(object $stmt, string $query): mixed
     {
+        /** @var \mysqli_stmt $stmt */
         try {
             return $stmt->get_result();
         } catch (\mysqli_sql_exception $e) {

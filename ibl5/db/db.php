@@ -109,8 +109,11 @@ if ($dbtype == 'MySQL') {
     }
 
     // Cap each statement on web requests so a runaway query cannot hold a
-    // connection for hours (incident 2026-10-27). CLI keeps no cap.
-    \Database\StatementTimeout::apply($mysqli_db, $dbStatementTimeoutSeconds ?? null);
+    // connection for hours (incident 2026-10-27). CLI keeps no cap. The SAPI
+    // check stays here too: some CLI callers include db.php with no autoloader.
+    if (PHP_SAPI !== 'cli') {
+        \Database\StatementTimeout::apply($mysqli_db, $dbStatementTimeoutSeconds ?? null);
+    }
 } else if ($dbtype == 'sqlite') {
     $db = new SQLite($dbhost);
 } else {

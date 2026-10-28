@@ -1110,6 +1110,9 @@ M_JUDGE="$_g13_hdr"'
 M_JUDGE_VR="$_g13_hdr"'
 | 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: the page reads as a coherent new layout; vr: label=judge-vr; role=anon; url=/ibl5/index.php; anchor=body |
 '
+M_JUDGE_VR_TICKS="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | `opus-judge: the page reads as a coherent new layout`; `vr: label=judge-vr; role=anon; url=/ibl5/index.php; anchor=body` |
+'
 M_JUDGE_SHORT="$_g13_hdr"'
 | 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: short |
 '
@@ -1179,6 +1182,11 @@ manual_judge: sonnet
 g13_judge_viol "gate13-judge-with-vr" '---
 impl_model: opus
 ---' "$M_JUDGE_VR" 'look-and-feel row stays human-only'
+# Backtick-wrapped tokens: the location cell's backticks are stripped before
+# the `(^|;)` anchor, so a wrapped `vr:` beside `opus-judge:` still fails.
+g13_judge_viol "gate13-judge-with-vr-backticked" '---
+impl_model: opus
+---' "$M_JUDGE_VR_TICKS" 'look-and-feel row stays human-only'
 g13_judge_viol "gate13-judge-short" '---
 impl_model: opus
 ---' "$M_JUDGE_SHORT" 'at least 15 characters'

@@ -2105,8 +2105,8 @@ plan_requires_judge() {
 
 # run_manual_judge <plan_path> <worktree> <out_file> — spawn the read-only Opus
 # judge in the worktree and capture its stream-json to <out_file>. The exit
-# status is deliberately ignored: only parse_judge_verdict decides, so a crash,
-# timeout or usage-gate pause yields `missing` and holds.
+# status is deliberately ignored: only parse_judge_verdict decides, so a crash
+# or timeout yields `missing` and holds.
 run_manual_judge() {
     local plan_path=$1 wt=$2 out_file=$3 prompt jr_out rows head_sha base branch cap remaining judge_prompt log_before
     shopt -u patsub_replacement 2>/dev/null || true
@@ -2127,8 +2127,11 @@ run_manual_judge() {
     if [ "$remaining" -lt "$cap" ]; then cap=$remaining; fi
     if [ "$cap" -lt 60 ]; then cap=60; fi
     log_before=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+    # Not usage-gated. A gate pause needs a session id and a resume bin, and
+    # automouse's resume path re-enters a paused session as impl, so a judge
+    # pause would strand or resume as the wrong phase. A limit hit mid-judge is
+    # caught after the spawn by phase_env_error, which refunds and env-stops.
     ( cd "$wt" && \
-      IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$JUDGE_MODEL" \
       timeout "$cap" claude -p "$judge_prompt" \
           --dangerously-skip-permissions \
           --model "$JUDGE_MODEL" \

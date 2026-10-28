@@ -535,6 +535,7 @@ If ANY step fails after worktree creation (Step 5):
 - NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
 - NEVER use the ExitPlanMode tool — you are not in plan mode
 - NEVER invoke /post-plan — a separate agent handles that
+- NEVER judge, tick, or record a verdict for a Truly-manual row, and never write a JUDGE_VERDICT line. The runner spawns an Opus judge after you exit; it rules on rows tagged opus-judge:, and every other manual row belongs to a human on the PR.
 - If you encounter ANY ambiguity about requirements, skip and report. Do not guess. A taken migration or ADR number is not ambiguity: renumber per Step 6
 - All CLAUDE.md project rules apply at all times
 - Work only in worktrees, never modify files on the master branch directly

@@ -233,7 +233,7 @@ GS;
         <div class="ibl-alert ibl-alert--warning mb-4">Last refresh failed: <?= HtmlSanitizer::e($summary['last_error'] ?? 'unknown error') ?></div>
                 <?php endif; ?>
             <?php endif; ?>
-        <div class="flex flex-wrap gap-4 items-center">
+        <div id="google-sheet-actions" class="flex flex-wrap justify-center gap-4 items-center">
             <?php if ($showOpen && $safeUrl !== null): ?>
             <a id="google-sheet-open" class="ibl-btn ibl-btn--primary" href="<?= HtmlSanitizer::e($safeUrl) ?>" target="_blank" rel="noopener">Open sheet</a>
             <?php endif; ?>
@@ -245,7 +245,7 @@ GS;
             <?php else: ?>
             <form method="post" action="modules.php?name=ApiKeys&amp;op=google_refresh">
                 <?= \Security\CsrfGuard::generateToken('google_refresh') ?>
-                <button type="submit" id="google-sheet-refresh" class="ibl-btn ibl-btn--primary">Refresh now</button>
+                <button type="submit" id="google-sheet-refresh" class="ibl-btn ibl-btn--primary">Refresh</button>
             </form>
             <?php endif; ?>
             <form method="post" action="modules.php?name=ApiKeys&amp;op=google_disconnect" onsubmit="return confirm('Disconnect Google? The spreadsheet stays in your Drive but will stop updating.');">

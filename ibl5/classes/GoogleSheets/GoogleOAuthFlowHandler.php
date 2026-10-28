@@ -18,7 +18,7 @@ class GoogleOAuthFlowHandler
     public const TEXT_CANCELLED = 'Google sign-in was cancelled.';
     public const TEXT_BAD_STATE = 'Sign-in link expired or invalid. Please try again.';
     public const TEXT_FIRST_WRITE_BROKEN = 'Google Sheet created, but the first write was rejected. Use Reconnect Google below.';
-    public const TEXT_FIRST_WRITE_FAILED = 'Google Sheet created, but the first refresh failed. Use Refresh now to retry.';
+    public const TEXT_FIRST_WRITE_FAILED = 'Google Sheet created, but the first refresh failed. Use Refresh to retry.';
     public const TEXT_SUCCESS = 'Google Sheet created. Your player export will refresh after every sim.';
 
     public function __construct(

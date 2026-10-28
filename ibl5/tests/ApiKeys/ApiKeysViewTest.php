@@ -279,7 +279,8 @@ class ApiKeysViewTest extends TestCase
 
         $this->assertStringContainsString('id="google-sheet-open" class="ibl-btn ibl-btn--primary" href="https://docs.google.com/spreadsheets/d/sheet-1/edit"', $html);
         $this->assertStringContainsString('op=google_refresh', $html);
-        $this->assertStringContainsString('id="google-sheet-refresh" class="ibl-btn ibl-btn--primary"', $html);
+        $this->assertStringContainsString('id="google-sheet-refresh" class="ibl-btn ibl-btn--primary">Refresh</button>', $html);
+        $this->assertStringContainsString('id="google-sheet-actions" class="flex flex-wrap justify-center', $html);
         $this->assertStringContainsString('id="google-sheet-disconnect"', $html);
         $this->assertStringContainsString('2026-09-01 12:00:00', $html);
         $this->assertStringNotContainsString('id="google-sheet-reconnect"', $html);
@@ -313,6 +314,7 @@ class ApiKeysViewTest extends TestCase
             $this->assertStringContainsString('ibl-alert--warning', $html, $reason);
             $this->assertStringContainsString($text, $html, $reason);
             $this->assertStringContainsString('id="google-sheet-reconnect"', $html, $reason);
+            $this->assertStringContainsString('id="google-sheet-actions" class="flex flex-wrap justify-center', $html, $reason);
             $this->assertStringContainsString('id="google-sheet-disconnect"', $html, $reason);
             $this->assertStringNotContainsString('id="google-sheet-refresh"', $html, $reason);
             $this->assertStringNotContainsString('op=google_refresh', $html, $reason);

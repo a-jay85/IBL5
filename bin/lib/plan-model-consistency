@@ -12,7 +12,7 @@
 # at least one Truly-manual row may declare `impl_model: sonnet` only when the
 # line-1 key `manual_judge: opus` routes its `opus-judge:` rows and the final
 # diff to the runner's Opus judge (bin/automouse/prompt-judge; ADR
-# ibl5/docs/decisions/NNNN-runner-opus-judge-for-manual-rows.md). Sonnet never
+# ibl5/docs/decisions/0221-runner-opus-judge-for-manual-rows.md). Sonnet never
 # self-judges a subjective row.
 #
 #   manual >= 1 AND haiku-tier                               -> VIOLATION (always)

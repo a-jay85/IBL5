@@ -536,7 +536,7 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/claude-plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap: impl tries until the handoff, which reseeds the count at 1, then post-plan gets MAX_ATTEMPTS runs in total
-JUDGE_MODEL=claude-opus-5-5   # runner-side Opus judge (ADR NNNN); never derived from IMPL_MODEL or BASE_MODEL
+JUDGE_MODEL=claude-opus-5-5   # runner-side Opus judge (ADR 0221); never derived from IMPL_MODEL or BASE_MODEL
 JUDGE_CAP_SECS=1800           # wall cap for one judge spawn
 # Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated
 # retry is at most this many lines AND this many bytes (whichever is smaller),
@@ -2956,7 +2956,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         fi
     fi
 
-    # Opus judge gate (ADR NNNN). The runner, never the impl agent, spawns the
+    # Opus judge gate (ADR 0221). The runner, never the impl agent, spawns the
     # judge and reads its verdict from this spawn's own output, so a Sonnet impl run cannot
     # skip or forge it. Anything other than this run's own pass holds the plan.
     if [ -f "$HANDOFF_FILE" ] && plan_requires_judge "$NEXT_PLAN" "$BASE_MODEL"; then

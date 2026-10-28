@@ -1418,7 +1418,8 @@ def test_audit_log_is_populated_mid_run(tmp_path, sticky_tmp):
     assert llm.snapshot is not None, "the run made no LLM call, so nothing was sampled"
     assert "phase1 plan:" in llm.snapshot, llm.snapshot
     # The sampled text must match the format bin/fleet-status greps for: `[HH:MM:SS] phase…`
-    first = llm.snapshot.splitlines()[0]
+    # The leading `postplan: fired-by=` attribution line is not a phase line; skip it.
+    first = next(ln for ln in llm.snapshot.splitlines() if "postplan: fired-by=" not in ln)
     assert re.match(r"^\[\d{2}:\d{2}:\d{2}\] phase", first), first
 
 

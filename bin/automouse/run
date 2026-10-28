@@ -2921,6 +2921,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         else
             CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
             NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
+            POSTPLAN_FIRED_BY=automouse \
             timeout "$REMAINING_SECS" \
                 bash -c 'cd "$1" && exec "$2" --foreground --plan "$3"' _ \
                     "$PP_WORKTREE" "$SELF_DIR/../post-plan-now" "$PLANS_DIR/$PLAN_NAME" \

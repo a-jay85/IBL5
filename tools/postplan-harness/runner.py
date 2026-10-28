@@ -330,6 +330,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     ledger=ledger, audit=audit)
     global _active_audit
     _active_audit = audit
+    res.fired_by = _fired_by()
+    log(f"postplan: fired-by={res.fired_by}")
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
@@ -3005,6 +3007,16 @@ def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root,
                                pr_title=(meta or {}).get("title", "") or "",
                                file_list=sorted(per_file))
     return key, per_file
+
+
+_FIRED_BY_RE = re.compile(r"[a-z][a-z0-9-]{0,39}")
+
+
+def _fired_by() -> str:
+    """Caller label from POSTPLAN_FIRED_BY, or "unknown". Attribution only: the value
+    never reaches a decision, so any unset, empty, or malformed value is "unknown"."""
+    v = os.environ.get("POSTPLAN_FIRED_BY", "")
+    return v if _FIRED_BY_RE.fullmatch(v) else "unknown"
 
 
 def _plan_hash(plan) -> str:

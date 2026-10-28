@@ -28,10 +28,21 @@
 # Also pins the plan-defect sentinel (queue/<plan>.plan-defect) contract between prompt-impl and run.
 #
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
+#      bin/test-automouse-env-breaker <judge-case>  (Section 1 plus one Opus judge
+#      case, for plan mutation checks; judge-pass also covers e2-judge-prompt)
+#      <judge-case>: judge-pass | judge-fail | judge-crash | judge-forged | no-judge
 
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+# Case filter: empty runs every case; a judge case name skips the other run-loop cases.
+EB_ONLY="${1:-}"
+case "$EB_ONLY" in
+    ''|judge-pass|judge-fail|judge-crash|judge-forged|no-judge) ;;
+    *) echo "usage: bin/test-automouse-env-breaker [judge-pass|judge-fail|judge-crash|judge-forged|no-judge]" >&2; exit 2 ;;
+esac
+eb_want() { [ -z "$EB_ONLY" ] || [ "$EB_ONLY" = "$1" ]; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/automouse/run"
@@ -461,6 +472,7 @@ run_e2() {
     timeout 30 "$E2_RUNNER" 2>&1 || true
 }
 
+if [ -z "$EB_ONLY" ]; then
 # ── W1: wt-fail is a counted, kept, deferred attempt ─────────────────────────
 echo ""
 echo "# W1: wt-fail counted, kept, deferred"
@@ -782,6 +794,7 @@ want           "R4: env-stop log line"                    "$R4_LOG" "Environment
 assert_eq      "R4: env-stop report written"              "$(env_stop_count wtref4)" "1"
 want_absent    "R4: no refusal classification"            "$R4_LOG" "WORKTREE RESUME REFUSED"
 assert_absent  "R4: attempt refunded"                     "$E2_NDIR/queue/wtref4.md.attempts"
+fi
 
 # ── Opus judge gate cases (J: e2-judge-*) ─────────────────────────────────────
 # Drives the real runner loop with the stub claude/post-plan-now. prompt-judge and the
@@ -826,6 +839,7 @@ judge_ledger_rows() {
     cat "$E2_NDIR/logs"/*.costs.jsonl 2>/dev/null | jq -c 'select(.phase == "judge")' | grep -c . || true
 }
 
+if eb_want judge-pass; then
 echo ""
 echo "# e2-judge-pass: judge passes, post-plan runs, judge is Opus and impl is Sonnet"
 judge_case judge-plan judgeimpl pass
@@ -845,7 +859,9 @@ want        "e2-judge-prompt: opus-judge criterion present (R&D intact)" "$J_PRO
 want        "e2-judge-prompt: worktree path filled"                      "$J_PROMPT" "$E2_ROOT/wt-judge"
 want_absent "e2-judge-prompt: human-only row withheld"                   "$J_PROMPT" "HUMAN-ONLY-SENTINEL"
 want_absent "e2-judge-prompt: no unfilled placeholder"                   "$J_PROMPT" "{{"
+fi
 
+if eb_want judge-fail; then
 echo ""
 echo "# e2-judge-fail: a fail verdict holds the plan and blocks post-plan"
 judge_case judge-plan judgeimpl fail
@@ -855,7 +871,9 @@ assert_present "e2-judge-fail: plan moved to skipped/"      "$E2_NDIR/skipped/ju
 want           "e2-judge-fail: report titled as a judge hold" "$J_REPORT" "Opus judge held"
 want           "e2-judge-fail: report names verdict fail"   "$J_REPORT" "Verdict: fail"
 assert_absent  "e2-judge-fail: handoff removed"             "$E2_NDIR/handoff/judge-plan.md.json"
+fi
 
+if eb_want judge-crash; then
 echo ""
 echo "# e2-judge-crash: a judge that prints nothing is verdict missing and holds"
 judge_case judge-plan judgeimpl crash
@@ -863,7 +881,9 @@ J_REPORT="$(cat "$E2_NDIR"/reports/*-skipped-judge-plan.md 2>/dev/null || true)"
 assert_absent  "e2-judge-crash: post-plan not called"       "$E2_ROOT/postplan.marker"
 assert_present "e2-judge-crash: plan moved to skipped/"     "$E2_NDIR/skipped/judge-plan.md"
 want           "e2-judge-crash: report names verdict missing" "$J_REPORT" "Verdict: missing"
+fi
 
+if eb_want judge-forged; then
 echo ""
 echo "# e2-judge-forged: an impl-written pass (stdout line and handoff file) changes nothing"
 judge_case judge-plan judgeforge crash
@@ -871,7 +891,9 @@ J_REPORT="$(cat "$E2_NDIR"/reports/*-skipped-judge-plan.md 2>/dev/null || true)"
 assert_absent  "e2-judge-forged: post-plan not called"      "$E2_ROOT/postplan.marker"
 assert_present "e2-judge-forged: plan moved to skipped/"    "$E2_NDIR/skipped/judge-plan.md"
 want           "e2-judge-forged: report names verdict missing" "$J_REPORT" "Verdict: missing"
+fi
 
+if eb_want no-judge; then
 echo ""
 echo "# e2-no-judge: a plan with no manual rows never spawns the judge"
 judge_case nojudge-plan judgeimpl ""
@@ -879,6 +901,8 @@ J_NJ="$(grep -c ' judge$' "$E2_ROOT/claude-calls.log" 2>/dev/null || true)"
 assert_eq      "e2-no-judge: zero judge spawns"             "$J_NJ" "0"
 assert_present "e2-no-judge: post-plan was called"          "$E2_ROOT/postplan.marker"
 assert_eq      "e2-no-judge: no judge ledger row"           "$(judge_ledger_rows)" "0"
+fi
+[ -z "$EB_ONLY" ] || h_done
 
 # HB: heartbeat watcher (run_heartbeat_watcher)
 #

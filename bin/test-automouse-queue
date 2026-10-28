@@ -17,6 +17,7 @@
 # dispose -> self-heal round trip.
 #
 # Run: bin/test-automouse-queue  (exit 0 = all pass, 1 = any case failed)
+#      bin/test-automouse-queue judge  (only judge-ok / judge-missing, for plan mutation checks)
 
 set -u
 # shellcheck source=bin/lib/harness.sh
@@ -34,6 +35,8 @@ h_tmp TMP
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
 HQ="$TMP/hq"   # bare helper-unit fixture dir (never a real NIGHTLY_DIR)
+# Case filter: empty runs every case; `judge` runs only judge-ok / judge-missing.
+AQ_ONLY="${1:-}"
 # Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
 export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
 
@@ -169,6 +172,7 @@ hq_files() {
     done
 }
 
+if [ "$AQ_ONLY" != judge ]; then
 # ---------------------------------------------------------------------------
 # Row 1 — plan in skipped/ only → evicted, lands in queue/
 # ---------------------------------------------------------------------------
@@ -1245,6 +1249,7 @@ OUT=$(resolve_plan_path fixture.md)
 h_contains "row48 disposed plan leaves PLAN_PATH empty" "$OUT" "PLAN_PATH=[]"
 h_contains "row48 disposed plan fails loudly" "$OUT" "ERROR: no queue entry for fixture.md"
 h_pass "row48 — prompts dispose through the queue script and resolve PLAN_PATH by slug"
+fi
 
 # ===========================================================================
 # impl_model presence/validity gate — enforced independently of whether the
@@ -1271,6 +1276,7 @@ expect_reject() {
     return 0
 }
 
+if [ "$AQ_ONLY" != judge ]; then
 # Row 24 — NO matrix, valid `impl_model: sonnet` → queues.  Proves the gate does
 # not over-reject the (common) matrix-less plan.
 setup
@@ -1305,6 +1311,7 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
 expect_reject row28 plan-q "Truly-manual row forbids impl_model: sonnet"
 h_pass "row28 — consistency backstop still fires under the new gate"
+fi
 # judge-ok / judge-missing — a sonnet plan with a tagged Truly-manual row queues
 # only when `manual_judge: opus` declares the runner's Opus judge.
 # shellcheck disable=SC2016  # literal fixture text; nothing here should expand.
@@ -1325,6 +1332,7 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$JUDGE_MATRIX" > "$PDIR/plan-judge-missing.md"
 expect_reject judge-missing plan-judge-missing 'without `manual_judge: opus`' 'manual_judge: marker'
 h_pass "judge-missing — sonnet without manual_judge refused, hint names the marker"
+[ "$AQ_ONLY" != judge ] || h_done
 
 # ---------------------------------------------------------------------------
 # Phase 2 rows — add alias, --force position, unknown flags, usage errors

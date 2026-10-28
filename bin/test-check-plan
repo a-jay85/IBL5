@@ -9,6 +9,7 @@
 # copy of the check and now trusts this script.
 #
 # Run: bin/test-check-plan  (exit 0 = all pass, 1 = a case failed)
+#      bin/test-check-plan gate13  (only the gate 13 block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # are literal markdown code spans, not command substitution — single quotes are
@@ -22,6 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
+# Case filter: empty runs every case; `gate13` skips the cases outside gate 13.
+TCP_ONLY="${1:-}"
 
 # Inline checks further below still set FAILED=1 directly; h_done reads it.
 
@@ -155,6 +158,7 @@ CF_MATRIX='
 | 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
 
+if [ "$TCP_ONLY" != gate13 ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -382,6 +386,7 @@ assert "reuse-constant-not-method" 0 "$FM"'
 
 **Reuse:** the `TotallyMadeUpClass::SOME_CONSTANT` value for the default.
 '
+fi
 
 # ---------------------------------------------------------------------------
 # Gate 8: decision-trigger ADR.
@@ -400,6 +405,7 @@ M='
 - `testStubMethodSatisfyingGateM`
 '
 
+if [ "$TCP_ONLY" != gate13 ]; then
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
 assert "gate8-bin-with-adr" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` to do the thing.
@@ -937,6 +943,7 @@ assert "gateC-many-phases-flags" 1 "$FM$M$PHASES12"
 assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11
 sonnet-recipe: gate-C size fixture; recipe completeness not under test.
 "
+fi
 
 # ---------------------------------------------------------------------------
 # Gate 13: impl_model <-> Verification Matrix consistency.
@@ -1236,6 +1243,7 @@ if [ "$_ec" -eq 2 ]; then
 else
     echo "FAIL: consistency-bad-flag — expected exit 2, got $_ec"; FAILED=1
 fi
+[ "$TCP_ONLY" != gate13 ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels must bind to a packet or an inline marker.

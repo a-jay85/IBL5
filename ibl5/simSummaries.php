@@ -61,16 +61,9 @@ if ($wantsTxt) {
         exit;
     }
 
-    // recap_text is usually a ~220-char teaser; assemble the full document from parts
-    // before emitting headers so a fatal in assembly cannot produce partial output.
-    $introText = $row['intro_text'] ?? null;
-    $outroText = $row['outro_text'] ?? null;
-    $document  = \SimRecap\RecapDocument::postableText(
-        is_string($introText) ? $introText : null,
-        $repo->findDisplayableGameRecaps($sim),
-        is_string($outroText) ? $outroText : null,
-        (string) $row['recap_text']
-    );
+    // Same text as the page's copy-paste box. Built before emitting headers so a fatal
+    // in assembly cannot produce partial output.
+    $document    = \SimRecap\RecapBox::text($repo, $sim, $row);
     $orphanCount = count($repo->findOrphanedGameRecaps($sim));
 
     header('Content-Type: text/plain; charset=utf-8');
@@ -88,7 +81,7 @@ $rows = $repo->listAll();
 $gameRecaps    = [];
 $orphanedGames = [];
 if ($sim !== null && $row !== null && $row['recap_text'] !== null) {
-    $gameRecaps    = $repo->findDisplayableGameRecaps($sim);
+    $gameRecaps    = \SimRecap\RecapBox::gameRecaps($repo, $sim);
     $orphanedGames = $repo->findOrphanedGameRecaps($sim);
 }
 

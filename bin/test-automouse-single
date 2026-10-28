@@ -445,7 +445,7 @@ fi
 # Case 15 — note_stop sits only at loop break sites (static census of the runner)
 # ===========================================================================
 echo "--- case 15: note_stop break-site census ---"
-check "case15 exactly 12 note_stop sites" test "$(grep -c 'note_stop "' "$RUNNER_SRC")" = 12
+check "case15 exactly 13 note_stop sites" test "$(grep -c 'note_stop "' "$RUNNER_SRC")" = 13
 check "case15 login expiry stays note_failure" test "$(grep -cF 'note_failure "Your Claude login has expired' "$RUNNER_SRC")" = 1
 check "case15 login expiry is never note_stop" test "$(grep -c 'note_stop "Your Claude login' "$RUNNER_SRC")" = 0
 c15_far=$(awk '

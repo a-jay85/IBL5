@@ -65,24 +65,16 @@ test.describe('Sim recap admin viewer', () => {
     await assertNoPhpErrors(page);
   });
 
-  test('single recap renders its stored body and themes', async ({ page }) => {
+  test('single recap renders its stored body once, without themes', async ({ page }) => {
     const response = await page.goto('simSummaries.php?sim=689');
 
     expect(response?.status()).toBe(200);
     await expect(page.locator('#recap-body')).toHaveValue(SIM_689_BODY);
-    await expect(page.locator('#recap-themes')).toContainText('comeback');
-    await expect(page.locator('#recap-intro')).toContainText(
-      'Another week of IBL action delivered drama from tip-off to the final buzzer.',
-    );
-    await expect(page.locator('#recap-outro')).toContainText(
-      'The Cannons are one to watch as the season reaches its final stretch.',
-    );
-    const gameItems = page.locator('#recap-games li');
-    await expect(gameItems).toHaveCount(3);
-    // Games must appear in sort_order order: 2026-02-20 → 2026-03-03 → 2026-03-05.
-    await expect(gameItems.nth(0)).toContainText('2026-02-20');
-    await expect(gameItems.nth(1)).toContainText('2026-03-03');
-    await expect(gameItems.nth(2)).toContainText('2026-03-05');
+    // The recap shows only in the textarea; no second copy as page paragraphs.
+    await expect(page.locator('#recap-themes')).toHaveCount(0);
+    await expect(page.locator('#recap-intro')).toHaveCount(0);
+    await expect(page.locator('#recap-outro')).toHaveCount(0);
+    await expect(page.locator('#recap-games')).toHaveCount(0);
     await assertNoPhpErrors(page);
   });
 
@@ -95,6 +87,28 @@ test.describe('Sim recap admin viewer', () => {
     await expect(download).toHaveAttribute('href', /sim=689&format=txt/);
     await assertNoPhpErrors(page);
   });
+
+  for (const width of [1280, 390]) {
+    test(`the recap box stays inside its card at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('simSummaries.php?sim=689');
+
+      await expect(page.locator('#recap-body')).toBeVisible();
+      const overflow = await page.evaluate(() => {
+        const box = document.getElementById('recap-body')!.getBoundingClientRect();
+        const card = document.getElementById('recap-panel')!.getBoundingClientRect();
+        return {
+          left: card.left - box.left,
+          right: box.right - card.right,
+          page: card.right - document.documentElement.clientWidth,
+        };
+      });
+      expect(overflow.left).toBeLessThanOrEqual(0);
+      expect(overflow.right).toBeLessThanOrEqual(0);
+      expect(overflow.page).toBeLessThanOrEqual(0);
+      await assertNoPhpErrors(page);
+    });
+  }
 
   test('a queued row with no text shows its status instead of a body', async ({ page }) => {
     // Sim 687 is seeded `pending` with recap_text NULL.
@@ -215,15 +229,22 @@ test.describe('Sim recap plain-text export', () => {
     expect(await response.text()).toContain('No recap text available.');
   });
 
-  test('bare-prose parts fall back to the stored monolith', async ({ request }) => {
+  test('bare-prose games stay in the download with the outro last', async ({ request }) => {
     const response = await request.get('simSummaries.php?sim=690&format=txt');
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/^text\/plain/);
     expect(response.headers()['content-disposition']).toContain('sim-690-recap.txt');
     const body = await response.text();
-    expect(body).toContain('<@5>');
-    expect(body).toContain('<@12>');
-    expect(body).not.toContain('================================');
+    expect(body).toContain('The visiting team came out strong and never gave the lead back.');
+    expect(body).toContain('A grind-it-out road win in a game that never opened up.');
+    expect(body).not.toContain('Sim 690 full monolith recap.');
+    expect(body.endsWith('A gritty performance to cap the week.\n')).toBe(true);
+  });
+
+  test('bare-prose games are named in the mention warning', async ({ page }) => {
+    await page.goto('simSummaries.php?sim=690');
+    await expect(page.locator('#recap-mention-warning')).toContainText('2 games');
+    await expect(page.locator('.recap-untagged')).toHaveCount(2);
   });
 
   test('plain-text export reports the orphaned-game count in a header', async ({ request }) => {

@@ -3747,6 +3747,7 @@ CREATE TABLE `ibl_team_info` (
   `sim_depth` varchar(100) NOT NULL DEFAULT 'No Depth Chart' COMMENT 'Depth chart status at last sim',
   `asg_vote` varchar(100) NOT NULL DEFAULT 'No Vote' COMMENT 'All-Star voting status',
   `eoy_vote` varchar(100) NOT NULL DEFAULT 'No Vote' COMMENT 'End-of-year voting status',
+  `trade_mode` enum('auto','win_now','rebuild') NOT NULL DEFAULT 'auto' COMMENT 'Trade-suggestion team mode. auto = guessed from record and roster age; win_now/rebuild = GM override.',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL DEFAULT uuid(),

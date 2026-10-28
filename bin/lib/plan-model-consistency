@@ -9,15 +9,26 @@
 # carries zero Truly-manual rows is (by definition) uniformly machine-checkable,
 # so `impl_model: sonnet` is the encouraged choice and its ABSENCE is now a
 # violation (a deliberate opus reason must be recorded instead); a plan carrying
-# at least one Truly-manual row can never declare `impl_model: sonnet` — Sonnet
-# cannot be trusted to self-judge a subjective row.
+# at least one Truly-manual row may declare `impl_model: sonnet` only when the
+# line-1 key `manual_judge: opus` routes its `opus-judge:` rows and the final
+# diff to the runner's Opus judge (bin/automouse/prompt-judge; ADR
+# ibl5/docs/decisions/0221-runner-opus-judge-for-manual-rows.md). Sonnet never
+# self-judges a subjective row.
 #
-#   Truly-manual rows >= 1  AND impl_model: sonnet          -> VIOLATION (forbidden combo)
-#   Truly-manual rows == 0  AND impl_model absent            -> VIOLATION (undeclared default)
-#   Truly-manual rows == 0  AND impl_model: opus (explicit)  -> ok
-#   Truly-manual rows == 0  AND impl_model: sonnet           -> ok (the encouraged case)
-#   Truly-manual rows >= 1  AND impl_model absent            -> VIOLATION (must declare impl_model: opus)
-#   Truly-manual rows >= 1  AND impl_model: opus (explicit)  -> ok
+#   manual >= 1 AND haiku-tier                               -> VIOLATION (always)
+#   manual >= 1 AND sonnet-tier AND manual_judge: opus       -> ok (Opus judge path)
+#   manual >= 1 AND sonnet-tier AND manual_judge absent      -> VIOLATION
+#   manual >= 1 AND impl_model absent                        -> VIOLATION (unchanged)
+#   manual >= 1 AND opus-tier                                -> ok (manual_judge optional)
+#   manual == 0 AND manual_judge: opus                       -> VIOLATION (nothing to judge)
+#   manual == 0 AND impl_model absent                        -> VIOLATION (unchanged)
+#   manual == 0 AND impl_model sonnet|opus                   -> ok (unchanged)
+#
+# A Truly-manual row is Opus-judgeable only when its location cell (the last
+# non-empty cell) opens with `opus-judge: <criterion>`, or carries it after a
+# `;`, with a criterion of at least 15 characters. Every other manual row is
+# human-only. The token beside `vr:`/`no-vr:`, on a non-manual row, or with a
+# short criterion is a violation.
 #
 # Deliberately NOT bin/lib/plan-impl-model: that script RESOLVES impl_model to a
 # model id for `claude -p --model`, and its `case` statement collapses explicit
@@ -40,9 +51,12 @@
 # about.
 #
 # Usage: bin/lib/plan-model-consistency <plan-file>
+#        bin/lib/plan-model-consistency --judge-rows <plan-file>
 #   exit 0, no output           -> consistent, or nothing to check (no matrix)
 #   exit 1, one line on stdout  -> the violation message (caller prefixes/labels it)
-#   exit 2                      -> usage error (missing arg / file)
+#   exit 2                      -> usage error (missing arg / file, unknown flag)
+#   --judge-rows prints MANUAL_COUNT=<n>, MANUAL_JUDGE=<opus or empty> and one
+#   `ROW: <raw row>` line per Opus-judgeable row, then exits 0 without the rules.
 
 set -u
 
@@ -50,26 +64,80 @@ set -u
 # byte-wise glob/char-class matching across locales.
 export LC_ALL=C
 
+USAGE="Usage: bin/lib/plan-model-consistency [--judge-rows] <plan-file>"
+MODE=check
+case "${1:-}" in
+    --judge-rows) MODE=judge-rows; shift ;;
+    --*) echo "$USAGE" >&2; exit 2 ;;
+esac
+
 PLAN_FILE="${1:-}"
 if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
-    echo "Usage: bin/lib/plan-model-consistency <plan-file>" >&2
+    echo "$USAGE" >&2
     exit 2
 fi
 
+# Parse the RAW manual_judge value from the same line-1-anchored frontmatter
+# block the impl_model parse below reads.
+JUDGE_RAW=$(awk '
+  NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+  infm && /^---[[:space:]]*$/ {infm=0; exit}
+  infm && /^manual_judge:[[:space:]]*/ {sub(/^manual_judge:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
+' "$PLAN_FILE" 2>/dev/null)
+
 # No Verification Matrix at all -> not this script's gate to report.
 if ! grep -qiE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE"; then
+    if [ "$MODE" = judge-rows ]; then
+        printf 'MANUAL_COUNT=0\nMANUAL_JUDGE=%s\n' "$JUDGE_RAW"
+    fi
     exit 0
 fi
 
-# Isolate the matrix region and count Truly-manual rows: identical isolation +
-# detection pattern to bin/check-plan gate 3 ("false manuals"), kept in sync
-# deliberately — a row is "Truly-manual" for gate-3 mislabeling purposes and
-# for THIS gate's counting purposes by the exact same text match.
-MANUAL_COUNT=$(awk '
+# Isolate the matrix region and classify each row: identical isolation +
+# Truly-manual detection pattern to bin/check-plan gate 3 ("false manuals"),
+# kept in sync deliberately. Each record is `<kind>\t<raw row>`, kind one of
+# manual, judge, judge-with-vr, judge-short, judge-on-nonmanual. Rows that are
+# neither manual nor tagged emit nothing. The token only counts in the location
+# cell (last non-empty cell), at its start or after a `;`.
+ROW_RECORDS=$(awk '
     /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm=1; next }
-    inm && /^[[:space:]]*\|/ { print; next }
     inm && !/^[[:space:]]*\|/ { inm=0 }
-' "$PLAN_FILE" | tr '[:upper:]' '[:lower:]' | grep -cE 'truly[- ]manual')
+    inm {
+        raw = $0
+        low = tolower($0)
+        gsub(/\\\|/, "\001", low)
+        manual = (low ~ /truly[- ]manual/)
+        n = split(low, cells, "|")
+        loc = ""
+        for (i = n; i >= 1; i--) {
+            c = cells[i]
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", c)
+            if (c != "") { loc = c; break }
+        }
+        gsub(/`/, "", loc)
+        tagged = 0; reason = ""
+        if (match(loc, /(^|;)[[:space:]]*opus-judge:[[:space:]]*/)) {
+            tagged = 1
+            reason = substr(loc, RSTART + RLENGTH)
+            sub(/;.*/, "", reason)
+            gsub(/[[:space:]]+$/, "", reason)
+        }
+        hasvr = (loc ~ /(^|;)[[:space:]]*(no-)?vr:/)
+        if (!tagged) { if (manual) print "manual\t" raw; next }
+        if (!manual) { print "judge-on-nonmanual\t" raw; next }
+        if (hasvr) { print "judge-with-vr\t" raw; next }
+        if (length(reason) < 15) { print "judge-short\t" raw; next }
+        print "judge\t" raw
+    }
+' "$PLAN_FILE")
+
+MANUAL_COUNT=$(grep -cE '^(manual|judge|judge-with-vr|judge-short)	' <<< "$ROW_RECORDS")
+
+if [ "$MODE" = judge-rows ]; then
+    printf 'MANUAL_COUNT=%s\nMANUAL_JUDGE=%s\n' "$MANUAL_COUNT" "$JUDGE_RAW"
+    grep -E '^judge	' <<< "$ROW_RECORDS" | sed 's/^judge	/ROW: /'
+    exit 0
+fi
 
 # Parse the RAW impl_model value from ONLY the first line-1-anchored
 # frontmatter block (mirrors bin/lib/plan-impl-model's awk verbatim, but
@@ -91,12 +159,42 @@ else
     exit 1
 fi
 
+# Closed value set: absent or exactly `opus`. Checked after the tier call so a
+# garbled impl_model still reports first.
+if [ -n "$JUDGE_RAW" ] && [ "$JUDGE_RAW" != "opus" ]; then
+    echo "manual_judge must be \`opus\` (got: $JUDGE_RAW)"
+    exit 1
+fi
+
+if grep -qE '^judge-with-vr	' <<< "$ROW_RECORDS"; then
+    echo "opus-judge: row also carries a vr:/no-vr: cell; a look-and-feel row stays human-only"
+    exit 1
+fi
+if grep -qE '^judge-on-nonmanual	' <<< "$ROW_RECORDS"; then
+    echo "opus-judge: applies only to a Truly-manual row"
+    exit 1
+fi
+if grep -qE '^judge-short	' <<< "$ROW_RECORDS"; then
+    echo "opus-judge: needs a reason of at least 15 characters"
+    exit 1
+fi
+
 # Keyed on the resolved TIER, not the literal string: `claude-sonnet-4-6` used to
 # slip past a `[ "$RAW" = "sonnet" ]` test and reach the runner unchallenged.
-# haiku-tier is covered for the same reason — a Truly-manual row under Haiku is a
-# strictly worse instance of the identical defect.
-if [ "$MANUAL_COUNT" -ge 1 ] && { [ "$TIER" = "sonnet-tier" ] || [ "$TIER" = "haiku-tier" ]; }; then
+# haiku-tier is a strictly worse instance of the same defect, so the Opus judge
+# never unlocks it.
+if [ "$MANUAL_COUNT" -ge 1 ] && [ "$TIER" = "haiku-tier" ]; then
     echo "Truly-manual row forbids impl_model: $RAW — strip the marker or mechanize the row"
+    exit 1
+fi
+
+if [ "$MANUAL_COUNT" -ge 1 ] && [ "$TIER" = "sonnet-tier" ] && [ "$JUDGE_RAW" != "opus" ]; then
+    echo "Truly-manual row forbids impl_model: $RAW without \`manual_judge: opus\`: declare the Opus judge, use impl_model: opus, or mechanize the row"
+    exit 1
+fi
+
+if [ "$MANUAL_COUNT" -eq 0 ] && [ "$JUDGE_RAW" = "opus" ]; then
+    echo "manual_judge: opus needs at least one Truly-manual row"
     exit 1
 fi
 

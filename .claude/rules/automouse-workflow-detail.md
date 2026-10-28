@@ -1,6 +1,6 @@
 ---
-description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter). Companion to automouse-workflow.md; attaches on the same paths.
-last_verified: 2026-10-11
+description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter) and the cost ledger columns. Companion to automouse-workflow.md; attaches on the same paths.
+last_verified: 2026-10-28
 paths: "bin/automouse/**"
 ---
 
@@ -29,3 +29,11 @@ evidence: bin/lib/plan-autonomy-contract, bin/test-check-plan
 ```
 
 Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so the example above never self-selects. Enforced by `bin/lib/plan-autonomy-contract`, `bin/check-plan` `[K]`, `/post-plan` Phase 5.0.
+
+## Cost ledger columns
+
+**Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits, because subagent transcripts are still flushing when `result` fires.
+
+**Prov column:** `recomputed` (no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's `result.json` usage ledger; harness-only runs exiting 0 or 3).
+
+**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed(-anomalous) rows with a compaction, else an em-dash (—).

@@ -811,6 +811,21 @@ INSERT INTO ibl_box_scores (
    3, 5, 3, 2, 1, 2, 2,
    '00000000-0000-0000-0000-000000000002');
 
+-- On this day: precomputed past-season moments for the homepage card.
+-- CI sim 689 ends 2026-03-07, so the window centers on 03-07 and season 2026 is excluded.
+-- Facts match the #3351 box-score rows (52-point game, 20/12/11 triple-double).
+INSERT INTO ibl_on_this_day_moments (
+  moment_key, kind, game_date, month_day, season_year,
+  pid, player_name, teamid, team_name, opponent_teamid, opponent_name,
+  facts_json, stat_label
+) VALUES
+  ('fifty_point:2024-03-07:1', 'fifty_point', '2024-03-07', '03-07', 2024,
+   1, 'Test Player', 1, 'Metros', 2, 'Stars',
+   '{"points":52,"rebounds":6,"assists":4,"steals":1,"blocks":0}', NULL),
+  ('triple_double:2021-03-07:2', 'triple_double', '2021-03-07', '03-07', 2021,
+   2, 'Test Player Two', 1, 'Metros', 2, 'Stars',
+   '{"points":20,"rebounds":12,"assists":11,"steals":1,"blocks":1}', NULL);
+
 -- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows
 -- calc_points, calc_rebounds, calc_fg_made are generated columns

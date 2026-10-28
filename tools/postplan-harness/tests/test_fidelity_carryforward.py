@@ -1120,8 +1120,8 @@ def test_old_sticky_without_own_line_declines_diff_changed(tmp_path):
     sticky = _sticky(diff_id=old_id, plan_hash=OWN_PLAN_HASH)
     res, spawns, logs = _own_drive(tmp_path, sticky, _record(old_id, OWN_PLAN_HASH, own_id=own_id))
     assert spawns == 1
-    assert any("carry-forward declined: diff-changed)" in ln and "own-arm=no-prior-own-id" in ln
-               for ln in logs), logs
+    assert any("carry-forward declined: diff-changed)" in ln
+               and ln.endswith(" own-arm=no-prior-own-id") for ln in logs), logs
 
 
 @pytest.mark.usefixtures("git_shim")

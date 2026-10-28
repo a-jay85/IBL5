@@ -1336,6 +1336,7 @@ EXCERPT_LIMIT = 30000
 _RE_REVIEW_TERMINAL_RE = re.compile(r"^(?:NOT READY|READY WITH NOTES|READY) \(re-review\)")
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+STICKY_OWN_CHANGE_RE = re.compile(r"^\*\*Own change:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_REVIEW_KIND_DELTA_RE = re.compile(r"^\*\*Review kind:\*\* delta\b", re.M)
 STICKY_REUSED_FROM_RE = re.compile(r"^\*\*Reused from:\*\* (\S+) \(([a-z-]+(?:, [a-z-]+)*)\)$", re.M)
 CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
@@ -1575,6 +1576,16 @@ def diff_patch_id(diff: str) -> str:
     return pid if re.fullmatch(r"[0-9a-f]{40}", pid) else ""
 
 
+def own_change_id(diff_u1: str) -> str:
+    """Patch-id of the branch's own changed lines: `diff_patch_id` over a one-context-line
+    diff. A master edit 2+ lines from a PR hunk moves `diff_patch_id` (3 context lines are
+    hashed) but not this id. The single context line pins each hunk in place, so moving a
+    changed line next to different neighbours moves the id. "" for an empty or unreadable
+    diff, and "" always declines.
+    """
+    return diff_patch_id(diff_u1)
+
+
 def carry_forward_predicate(sticky_body, diff_id: str,
                             plan_hash: str) -> tuple[str | None, str]:
     """Reuse a prior Phase 5.5 verdict, or decline. Returns (verdict, "") to skip the
@@ -1609,6 +1620,25 @@ def carry_forward_predicate(sticky_body, diff_id: str,
     if verdict not in CARRY_FORWARD_VERDICTS:
         return None, "prior-verdict-not-terminal"
     return verdict, ""
+
+
+def own_change_carry_diff(sticky_body, own_id: str) -> tuple[str, str]:
+    """(prior reviewed diff id, "") when the sticky records this own-change id, else
+    ("", reason). Only selects the diff to re-check; the caller must still run
+    carry_forward_predicate on the returned id, which keeps every other arm."""
+    if not sticky_body:
+        return "", "no-prior-sticky"
+    if not own_id or not re.fullmatch(r"[0-9a-f]{40}", own_id):
+        return "", "no-own-id"
+    o = STICKY_OWN_CHANGE_RE.search(sticky_body)
+    if not o:
+        return "", "no-prior-own-id"
+    if o.group(1) != own_id:
+        return "", "own-change-changed"
+    m = STICKY_REVIEWED_DIFF_RE.search(sticky_body)
+    if not m:
+        return "", "no-prior-diff-id"
+    return m.group(1), ""
 
 
 # Status lines the runner builds on every clean run. The composer prints only a line that
@@ -1833,7 +1863,7 @@ def _status_sections(fid: dict, final_word: str | None) -> list[str]:
 
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
-                   diff_id: str = "", plan_hash: str = "",
+                   diff_id: str = "", plan_hash: str = "", own_id: str = "",
                    posted_at: str = "", reused_from: dict | None = None) -> str:
     """The full sticky comment body, marker last.
 
@@ -1926,6 +1956,8 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     out.append(f"**Reviewed tree:** {fid.get('reviewed_tree') or 'unrecorded'}")
     if diff_id:
         out.append(f"**Reviewed diff:** {diff_id}")
+        if own_id and re.fullmatch(r"[0-9a-f]{40}", own_id):
+            out.append(f"**Own change:** {own_id}")
     if plan_hash:
         out.append(f"**Plan hash:** {plan_hash}")
     by_run: dict = {}

@@ -91,6 +91,8 @@ else
 fi
 STATE="$(pcw_state_dir)" || { echo "pr-cycle-tick: HOME is unset" >&2; exit 2; }
 PR_CYCLE_CMD="${PR_CYCLE_TICK_PR_CYCLE_CMD:-$ROOT/bin/pr-cycle}"
+# Fire source for the post-plan rerun report; post-plan-fleet and post-plan-now keep it.
+export POSTPLAN_FIRED_BY="${POSTPLAN_FIRED_BY:-pr-cycle-tick}"
 DM_CMD="$(dm_bin "$ROOT/bin" PR_CYCLE_TICK_DM_CMD)"
 
 # shellcheck source=bin/lib/usage-gate.sh

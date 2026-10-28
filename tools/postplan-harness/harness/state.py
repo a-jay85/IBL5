@@ -332,6 +332,7 @@ class RunResult:
     rearm: dict | None = None  # RunResult.rearm: Phase 7 re-arm outcome after the fix loop; None = never ran
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     rebase_only: dict | None = None  # rebase-only mode record (eligible, hold, pre/post patch-id, pushed, noop, record_refreshed); omitted from result.json when unset
+    fired_by: str = "unknown"  # POSTPLAN_FIRED_BY caller label (attribution only; never read by a decision)
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
 

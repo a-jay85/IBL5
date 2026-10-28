@@ -101,6 +101,7 @@ class SchemaInvariantTest extends DatabaseTestCase
     private const EXPECTED_UNIQUE_KEYS = [
         'ibl_plr.uuid' => ['ibl_plr', 'uuid'],
         'ibl_team_info.uuid' => ['ibl_team_info', 'uuid'],
+        'ibl_on_this_day_moments.moment_key' => ['ibl_on_this_day_moments', 'moment_key'],
     ];
 
     /**
@@ -117,6 +118,7 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_plr_snapshots.idx_snapshot_phase_year' => ['ibl_plr_snapshots', 'snapshot_phase,season_year'],
         'ibl_box_scores.idx_pid_date' => ['ibl_box_scores', 'pid,game_date'],
         'ibl_trade_info.idx_trade_info_offer_from_to' => ['ibl_trade_info', 'tradeofferid,trade_from,trade_to'],
+        'ibl_on_this_day_moments.idx_otd_month_day_season' => ['ibl_on_this_day_moments', 'month_day,season_year'],
     ];
 
     /**
@@ -199,6 +201,9 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_olympics_rcb_season_records.teamid' => 'Olympics record-book aggregate; denormalized, rebuilt on demand',
         'ibl_olympics_saved_depth_charts.teamid' => 'user-saved Olympics depth-chart snapshot; decoupled from team lifecycle',
         'ibl_olympics_saved_depth_chart_players.pid' => 'user-saved Olympics depth-chart snapshot; decoupled from roster lifecycle',
+        'ibl_on_this_day_moments.opponent_teamid' => 'On This Day precomputed moments; derived cache truncated and rebuilt nightly',
+        'ibl_on_this_day_moments.pid' => 'On This Day precomputed moments; derived cache truncated and rebuilt nightly',
+        'ibl_on_this_day_moments.teamid' => 'On This Day precomputed moments; derived cache truncated and rebuilt nightly',
         'ibl_plb_snapshots.pid' => 'PLB archive import snapshot; references external/archived identities',
         'ibl_plb_snapshots.teamid' => 'PLB archive import snapshot; references external/archived identities',
         'ibl_plr_snapshots.pid' => 'point-in-time roster snapshot (phase archive); no cascade by design',

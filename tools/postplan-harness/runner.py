@@ -1107,8 +1107,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.terminal = TerminalState.ALREADY_SHIPPED
             res.pr_number = int(merged["number"])
             res.final_pr_state = "MERGED"
-            log(f"already-shipped: diff vs origin/master is empty and PR "
-                f"#{res.pr_number} is MERGED; suppressing {e.kind} ({(e.detail or '')[:120]})")
+            why = merged.get("why") or "diff vs origin/master is empty"
+            log(f"already-shipped: {why} and PR #{res.pr_number} is MERGED; "
+                f"suppressing {e.kind} ({(e.detail or '')[:120]})")
         else:
             res.terminal = TerminalState.FAILED
             res.error = f"{e.kind}: {e.detail}"
@@ -1248,9 +1249,23 @@ _EMPTY_DIFF_MARKERS = ("diff vs origin/master is empty", "nothing was compared",
 
 
 def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
-    """{"number", "url"} of the merged PR when `e` is an empty-diff failure on a branch
-    whose PR already merged, else None. Never relaxes the proof for a non-empty diff:
-    the live diff vs origin/master must itself be empty, and a merged PR must exist."""
+    """{"number", "url", "why"} of the merged PR when the branch's PR already merged
+    what this run shipped, else None. Two proofs, each needing a merged PR:
+    - an empty-diff failure whose live diff vs origin/master is itself empty;
+    - a deleted remote branch whose merged PR head equals this run's lease. GitHub
+      merged exactly what this run pushed (auto-merge landed mid-run), so any local
+      commit past the lease is this run's own post-merge work, e.g. a moot CI fix.
+    A foreign tip, a different merged head or an unprovable probe keeps the failure."""
+    lease = getattr(e, "deleted_lease", "")
+    if e.kind == "remote-head-diverged" and lease:
+        try:
+            merged = gh.merged_pr()
+        except Exception as exc:  # noqa: BLE001 - unknown means keep the original failure
+            log(f"already-shipped: probe failed ({exc!r}); keeping {e.kind}")
+            return None
+        if merged and merged.get("head") == lease:
+            return {**merged, "why": f"PR merged at lease {lease[:8]} before the run ended"}
+        return None
     if e.kind not in ("lostwork-unproved", "gh"):
         return None
     if not any(m in (e.detail or "") for m in _EMPTY_DIFF_MARKERS):
@@ -1309,7 +1324,7 @@ def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
         _fail_closed_on_divergence(
             None, log, None, phase,
             f"{remote}/{branch} was deleted (lease {lease[:8]}); refusing to recreate it",
-            disarm=False)
+            disarm=False, deleted_lease=lease)
     why = gitutil.owned_remote_tip(lease, pre_head, tip, git.worktree, run_git=run_git)
     if not why:
         # the ownership helpers' `git fetch origin` may have moved the tracking ref to
@@ -1577,12 +1592,16 @@ def _push_with_gate_fix(git, log, phase, *, llm, worktree, out_dir, res, pr=None
 
 
 def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
-                               disarm: bool) -> None:
-    """Remote PR head was rewritten with different content. Never push over it."""
+                               disarm: bool, deleted_lease: str = "") -> None:
+    """Remote PR head was rewritten with different content. Never push over it.
+    `deleted_lease`: the branch is gone from the remote; the full lease SHA rides on
+    the error so `_already_shipped` can check whether GitHub merged exactly it."""
     if disarm and pr:
         gh.pr_disable_auto_merge(pr)
     log(f"{phase}: ERROR {evidence}; failing closed (remote-head-diverged)")
-    raise HarnessError("remote-head-diverged", f"{phase}: {evidence}")
+    err = HarnessError("remote-head-diverged", f"{phase}: {evidence}")
+    err.deleted_lease = deleted_lease
+    raise err
 
 
 def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
@@ -4352,7 +4371,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 f"{_flat(res.error) or 'no detail'}{pr}")
     if res.terminal == TerminalState.ALREADY_SHIPPED:
         return (f"RESULT: post-plan complete — terminal=already-shipped{pr} "
-                "(PR already merged; branch diff vs master is empty); no action needed.")
+                "(PR already merged); no action needed.")
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")

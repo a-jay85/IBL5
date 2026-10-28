@@ -205,6 +205,9 @@
         <testsuite name="LastSimRecap Module Tests">
             <directory>tests/LastSimRecap</directory>
         </testsuite>
+        <testsuite name="OnThisDay Module Tests">
+            <directory>tests/OnThisDay</directory>
+        </testsuite>
         <testsuite name="Search Module Tests">
             <directory>tests/Search</directory>
         </testsuite>

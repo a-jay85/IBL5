@@ -53,7 +53,7 @@ set_time_limit(300);
 /** @var \mysqli $mysqli_db */
 \Database\StatementTimeout::disable($mysqli_db);
 
-// Wall-clock start of this updater run; RefreshRecordHoldersStep skips its rebuild when too much of the 300 s is gone
+// Wall-clock start of this updater run; RebuildOnThisDayMomentsStep and RefreshRecordHoldersStep skip when too much of the 300 s is gone
 $updaterClock = new Clock\SystemClock();
 $updaterStartedAt = $updaterClock->microtime();
 
@@ -350,6 +350,8 @@ try {
         $updaterService->addStep(new Updater\Steps\QueueGoogleSheetRefreshStep(
             new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
         ));
+        $updaterService->addStep(Updater\Steps\RebuildOnThisDayMomentsStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
         // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.
         $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));

@@ -403,6 +403,11 @@ class LiveGit:
         # turns every post-plan-now invocation into a false "nothing to ship".
         return self._run("diff", self._merge_base(base))
 
+    def own_change_diff(self, base: str = "origin/master") -> str:
+        # Same range as diff_vs_base, zero context lines. Feeds the own-change id,
+        # which must not move when master edits a line next to a PR hunk.
+        return self._run("diff", "-U0", self._merge_base(base))
+
     def working_diff(self) -> str:
         # staged + unstaged, vs HEAD (what Phase 2 would commit)
         return self._run("diff", "HEAD")
@@ -1794,6 +1799,9 @@ class ReplayGit:
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""
+
+    def own_change_diff(self, base: str = "origin/master") -> str:
+        return self.fx.get("own_change_diff", "")
 
     def working_diff(self) -> str:
         return self.fx.get("worktree_diff") or self.fx.get("diff") or ""

@@ -52,14 +52,15 @@ index aaaaaaa..bbbbbbb 100644
 """
 
 
-def _sticky(verdict="READY", diff_id=DIFF_ID, plan_hash=PLAN_HASH, tree=TREE, **fid_extra):
+def _sticky(verdict="READY", diff_id=DIFF_ID, plan_hash=PLAN_HASH, tree=TREE, own_id="",
+            **fid_extra):
     """Build a sticky body through the real composer, so the parser and the writer
     can never drift apart in this test file."""
     fid = {"verdict_1": verdict, "reviewed_tree": tree, "error_kind": None, **fid_extra}
     return fidelity.compose_sticky(
         "rebased", "ci", fid, None, ["a", "b", "c", "d", "e"], "findings",
         fidelity.terminal_line(verdict, None, None, None, None, 0),
-        diff_id=diff_id, plan_hash=plan_hash)
+        diff_id=diff_id, plan_hash=plan_hash, own_id=own_id)
 
 
 # --- row 1: full match --------------------------------------------------------
@@ -284,8 +285,12 @@ exit 0
     yield str(shim_bin)
 
 
-def _git(head_trees=None):
-    """Minimal ReplayGit-like object for _run_fidelity."""
+def _git(head_trees=None, own_diff=None):
+    """Minimal ReplayGit-like object for _run_fidelity.
+
+    `own_diff` (a str, or a callable that may raise) adds `own_change_diff`; without it the
+    fake defines only `diff_vs_base`, like the many older fakes.
+    """
     trees = (head_trees or [TREE, TREE])[:]
 
     class _G:
@@ -306,13 +311,16 @@ def _git(head_trees=None):
         def push(self, branch):
             pass
 
+    if own_diff is not None:
+        _G.own_change_diff = lambda self, base="origin/master": (
+            own_diff() if callable(own_diff) else own_diff)
     return _G()
 
 
 def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=DIFF,
               tree=TREE, git_shim_fixture=None, verdict_text="6d checks\n\nREADY\n",
               cache_rec=None, cache_version="", conflict_only=False, purposes_out=None,
-              body_hash=""):
+              body_hash="", own_diff=None):
     """Run _run_fidelity in live mode against RecordingGh.
 
     verdict_text=None leaves the verdict file absent.
@@ -352,7 +360,7 @@ def _drive_cf(tmp_path, prior_sticky, plan_body=b"# plan\n", canned=None, diff=D
         runner.fidelity.review = counting_review
         runner.fidelity.verdict_path = _tmp_verdict_path
         runner._run_fidelity(
-            llm, str(tmp_path), str(tmp_path), _git(head_trees=[tree, tree]),
+            llm, str(tmp_path), str(tmp_path), _git(head_trees=[tree, tree], own_diff=own_diff),
             gh, plan_obj, diff, "body", 99, "dead" * 10, tree, True, logs.append, res,
             cache_rec=cache_rec, cache_version=cache_version, conflict_only=conflict_only,
             body_hash=body_hash)
@@ -865,3 +873,118 @@ def test_runner_decline_arms_log_their_reason(tmp_path, case, reason):
     assert spawns == 1
     assert not res.fidelity.get("carried_forward")
     assert any(f"carry-forward declined: {reason})" in ln for ln in logs), logs
+
+
+# --- own-change identity -------------------------------------------------------
+
+import subprocess  # noqa: E402
+
+from harness.adapters.gitad import LiveGit  # noqa: E402
+
+
+def _gitc(repo, *args):
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True)
+
+
+def _commit_file(repo, name, lines, msg):
+    (repo / name).write_text("".join(f"{ln}\n" for ln in lines))
+    _gitc(repo, "add", name)
+    _gitc(repo, "commit", "-q", "-m", msg)
+
+
+def _own_repo(tmp_path):
+    """A repo with a 10-line file on master and a `feature` branch that changes line 5."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _gitc(repo, "init", "-q", "-b", "master")
+    _gitc(repo, "config", "user.email", "t@example.com")
+    _gitc(repo, "config", "user.name", "t")
+    _gitc(repo, "config", "commit.gpgsign", "false")
+    base = [f"line{i}" for i in range(1, 11)]
+    _commit_file(repo, "f.txt", base, "base")
+    _gitc(repo, "checkout", "-q", "-b", "feature")
+    branch = list(base)
+    branch[4] = "line5-branch"
+    _commit_file(repo, "f.txt", branch, "branch change")
+    return repo, base, branch
+
+
+def _ids(repo):
+    git = LiveGit(str(repo))
+    return (fidelity.diff_patch_id(git.diff_vs_base("master")),
+            fidelity.own_change_id(git.own_change_diff("master")))
+
+
+def test_own_change_id_survives_adjacent_master_edit(tmp_path):
+    repo, base, branch = _own_repo(tmp_path)
+    full_before, own_before = _ids(repo)
+    _gitc(repo, "checkout", "-q", "master")
+    master = list(base)
+    master[2] = "line3-master"   # inside the 3-line context of the line-5 hunk, no conflict
+    _commit_file(repo, "f.txt", master, "master change")
+    _gitc(repo, "checkout", "-q", "feature")
+    _gitc(repo, "merge", "-q", "--no-edit", "master")
+    full_after, own_after = _ids(repo)
+    assert own_before and own_before == own_after
+    assert full_before and full_after and full_before != full_after   # the F2 premise
+
+
+def test_own_change_id_moves_on_a_new_code_line(tmp_path):
+    repo, _, branch = _own_repo(tmp_path)
+    _, own_before = _ids(repo)
+    more = list(branch)
+    more[8] = "line9-branch"
+    _commit_file(repo, "f.txt", more, "another branch line")
+    _, own_after = _ids(repo)
+    assert own_before and own_after and own_before != own_after
+
+
+def test_own_change_id_moves_on_whitespace_edit(tmp_path):
+    repo, base, branch = _own_repo(tmp_path)
+    _, own_before = _ids(repo)
+    spaced = list(base)
+    spaced[4] = "  line5-branch"
+    (repo / "f.txt").write_text("".join(f"{ln}\n" for ln in spaced))   # working tree only
+    _, own_after = _ids(repo)
+    assert own_before and own_after and own_before != own_after
+
+
+def test_own_change_id_blank_for_empty_diff():
+    assert fidelity.own_change_id("") == ""
+    assert fidelity.own_change_id("   \n") == ""
+
+
+def test_own_change_diff_uses_zero_context(tmp_path):
+    repo, _, _ = _own_repo(tmp_path)
+    git = LiveGit(str(repo))
+    own = git.own_change_diff("master")
+    assert "+line5-branch" in own
+    assert "\n line4\n" not in own and "\n line6\n" not in own   # context lines
+    assert "\n line4\n" in git.diff_vs_base("master")
+
+
+def test_sticky_records_own_change_line():
+    m = fidelity.STICKY_OWN_CHANGE_RE.search(_sticky(own_id="a" * 40))
+    assert m and m.group(1) == "a" * 40
+    assert not fidelity.STICKY_OWN_CHANGE_RE.search(_sticky())
+    assert "**Own change:**" not in _sticky(own_id="a" * 39)
+    assert "**Own change:**" not in _sticky(own_id="A" * 40)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_review_cache_arm_stores_own_id(tmp_path):
+    diff_u0 = DIFF.replace("@@ -1,3 +1,4 @@", "@@ -1,0 +2 @@")
+    expected = fidelity.own_change_id(diff_u0)
+    assert expected
+    res, spawns, _ = _drive_cf(tmp_path / "run", prior_sticky=None, canned=CANNED_READY,
+                               own_diff=diff_u0)
+    assert spawns == 1
+    assert res.fidelity["own_id"] == expected
+    res.pr_number = 99
+    key = reviewcache.make_key(diff_id=res.fidelity["diff_id"], plan_hash=res.fidelity["plan_hash"],
+                               version=VERSION, pr_title="chore: t", file_list=["a.py"])
+    cache_dir = str(tmp_path / "state")
+    runner._write_review_cache(res, key, {"a.py": "1" * 40}, None, cache_dir, "s",
+                               str(tmp_path / "out" / "live-new"), {}, lambda _m: None)
+    rec = reviewcache.load_record(cache_dir, "s")
+    assert rec["fidelity"]["own_id"] == expected

@@ -953,6 +953,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                            fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                            fid.get("rounds_completed", 0)),
                     diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                    own_id=fid.get("own_id", ""),
                     reused_from=res.reused_from,
                     posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
                 try:
@@ -2976,6 +2977,9 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
                    else reviewcache.vet_fidelity(res.fidelity, this_run))
         if fid_arm and "fidelity" not in res.reused_from and body_hash:
             fid_arm = dict(fid_arm, body_hash=body_hash)   # the prose check 4 graded
+        if fid_arm and "fidelity" not in res.reused_from:
+            fid_arm = dict(fid_arm, own_id=((getattr(res, "fidelity", None) or {})
+                                            .get("own_id", "") or ""))
         if "fidelity" in res.reused_from and fid_arm:
             fid_arm = dict(fid_arm, diff_id=cache_key["diff_id"])   # conflict-only: valid for the current diff
         doc = reviewcache.build_record(slug=slug, pr_number=int(res.pr_number), run_id=this_run,
@@ -3035,6 +3039,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     """
     plan_hash = _plan_hash(plan)
     diff_id = fidelity.diff_patch_id(diff)
+    _own_diff = getattr(git, "own_change_diff", None)
+    try:
+        own_id = fidelity.own_change_id(_own_diff()) if callable(_own_diff) else ""
+    except Exception:
+        own_id = ""   # fail closed: an unreadable own-change diff never carries
     canned = getattr(llm, "canned", None)
     if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
         log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
@@ -3047,7 +3056,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
+                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": []}
         return "READY", ""
     # Carry-forward: when the branch diff under review (by patch-id, so a clean rebase
     # onto a moved master still matches) and the plan behind it are both unchanged from
@@ -3104,7 +3113,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
+                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True,
                         "shadow": fidelity.carried_shadow(
                             ((cache_rec or {}).get("fidelity") or {}).get("shadow"), reuse_run),
@@ -3139,7 +3148,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
+                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
     delta_hit = fidelity_delta.attempt(
         llm, out_dir, worktree or ".", gh, plan, diff, body, pr, master_sha,
@@ -3163,7 +3172,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "findings_round": 0,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
-                    "diff_id": diff_id, "plan_hash": plan_hash, **delta_info}
+                    "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, **delta_info}
     # Shadow-mode arming record (procedure 6f). Set after the wholesale replacement above;
     # nothing on the verdict, remediation or arming path reads it.
     res.fidelity["shadow"] = (

@@ -140,7 +140,7 @@ class SimSummariesView
 <?php if ($untagged !== []): ?>
 <?php $this->renderMentionWarning($untagged); ?>
 <?php endif; ?>
-        <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($document) ?></textarea>
+        <textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24"><?= HtmlSanitizer::e($document) ?></textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>
             <span id="recap-copied" hidden>Copied</span>

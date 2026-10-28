@@ -88,6 +88,28 @@ test.describe('Sim recap admin viewer', () => {
     await assertNoPhpErrors(page);
   });
 
+  for (const width of [1280, 390]) {
+    test(`the recap box stays inside its card at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('simSummaries.php?sim=689');
+
+      await expect(page.locator('#recap-body')).toBeVisible();
+      const overflow = await page.evaluate(() => {
+        const box = document.getElementById('recap-body')!.getBoundingClientRect();
+        const card = document.getElementById('recap-panel')!.getBoundingClientRect();
+        return {
+          left: card.left - box.left,
+          right: box.right - card.right,
+          page: card.right - document.documentElement.clientWidth,
+        };
+      });
+      expect(overflow.left).toBeLessThanOrEqual(0);
+      expect(overflow.right).toBeLessThanOrEqual(0);
+      expect(overflow.page).toBeLessThanOrEqual(0);
+      await assertNoPhpErrors(page);
+    });
+  }
+
   test('a queued row with no text shows its status instead of a body', async ({ page }) => {
     // Sim 687 is seeded `pending` with recap_text NULL.
     const response = await page.goto('simSummaries.php?sim=687');

@@ -284,7 +284,7 @@ final class SimSummariesViewTest extends TestCase
             null
         );
 
-        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerOpen  = '<textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24">';
         $markerClose = '</textarea>';
         $startOffset = strpos($html, $markerOpen);
         self::assertIsInt($startOffset);
@@ -313,7 +313,7 @@ final class SimSummariesViewTest extends TestCase
             null
         );
 
-        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerOpen  = '<textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24">';
         $markerClose = '</textarea>';
         $startOffset = strpos($html, $markerOpen);
         self::assertIsInt($startOffset);
@@ -325,9 +325,21 @@ final class SimSummariesViewTest extends TestCase
         self::assertStringContainsString('Fallback teaser.', $textareaBody);
     }
 
+    /**
+     * A fixed cols="100" box ran past the card's right edge on a 390px phone.
+     * The theme's full-width field class sizes it to the card instead.
+     */
+    public function testTextareaFillsItsCardInsteadOfAFixedColumnCount(): void
+    {
+        $html = $this->view->render([], $this->recapRow('Body.'), [], null);
+
+        self::assertMatchesRegularExpression('/<textarea id="recap-body" class="ibl-input[ "]/', $html);
+        self::assertDoesNotMatchRegularExpression('/<textarea[^>]*\bcols=/', $html);
+    }
+
     private function textareaBody(string $html): string
     {
-        $markerOpen  = '<textarea id="recap-body" readonly rows="24" cols="100">';
+        $markerOpen  = '<textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24">';
         $markerClose = '</textarea>';
         $startOffset = strpos($html, $markerOpen);
         self::assertIsInt($startOffset, 'Expected recap-body textarea in rendered output');
@@ -635,7 +647,7 @@ HTML;
             <li class="recap-untagged"> · team abc at team </li>
             </ul>
         </div>
-        <textarea id="recap-body" readonly rows="24" cols="100">{{DOC}}</textarea>
+        <textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24">{{DOC}}</textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>
             <span id="recap-copied" hidden>Copied</span>

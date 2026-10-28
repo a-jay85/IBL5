@@ -1229,6 +1229,99 @@ want    "T-9: mismatch message printed"         "$TPRE_OUT" "TIER MISMATCH"
 want_no "T-9: no runner written"                "$TPRE_OUT" "runner:"
 preflight_cleanup "$TPRE_OUT"
 
+# T-10. Fixture B declares default; stub hints xhigh for a check-1c reason
+#       (keyword or pipeline weakening) → warning, proceeds, runner written.
+TIER_1C_STUB="$TMP/tier-hint-1c"
+cat > "$TIER_1C_STUB" <<'TIER_1C_EOF'
+#!/usr/bin/env bash
+printf 'xhigh\tcheck 1c — ship-pipeline gate SEAM-1C-MARKER\n'
+exit 0
+TIER_1C_EOF
+chmod +x "$TIER_1C_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_1C_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-10: check-1c hint vs default: warns, exits 0" || \
+    fail "T-10: check-1c hint vs default: warns, exits 0 (got $TPRE_RC)"
+want    "T-10: warning printed"                 "$TPRE_OUT" "TIER WARNING"
+want    "T-10: warning names the proceed"       "$TPRE_OUT" "proceeding on the declared Opus architect"
+want    "T-10: hint reason echoed"              "$TPRE_OUT" "SEAM-1C-MARKER"
+want_no "T-10: no mismatch decline"             "$TPRE_OUT" "TIER MISMATCH"
+want    "T-10: runner is written"               "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-11. Same as T-10 with a check-1b reason → warns, exits 0.
+TIER_1B_STUB="$TMP/tier-hint-1b"
+cat > "$TIER_1B_STUB" <<'TIER_1B_EOF'
+#!/usr/bin/env bash
+printf 'xhigh\tcheck 1b — bootstrap hazard token SEAM-1B-MARKER\n'
+exit 0
+TIER_1B_EOF
+chmod +x "$TIER_1B_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_1B_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-11: check-1b hint vs default: warns, exits 0" || \
+    fail "T-11: check-1b hint vs default: warns, exits 0 (got $TPRE_RC)"
+want    "T-11: warning printed"                 "$TPRE_OUT" "TIER WARNING"
+want    "T-11: runner is written"               "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-12. Same fixture, check-1a security reason → exit 4, no runner, no warning.
+TIER_1A_STUB="$TMP/tier-hint-1a"
+cat > "$TIER_1A_STUB" <<'TIER_1A_EOF'
+#!/usr/bin/env bash
+printf 'xhigh\tcheck 1a — security surface / trust boundary token SEAM-1A-MARKER\n'
+exit 0
+TIER_1A_EOF
+chmod +x "$TIER_1A_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_1A_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-12: check-1a hint vs default: exits 4" || \
+    fail "T-12: check-1a hint vs default: exits 4 (got $TPRE_RC)"
+want    "T-12: mismatch message printed"        "$TPRE_OUT" "TIER MISMATCH"
+want    "T-12: hint reason echoed"              "$TPRE_OUT" "SEAM-1A-MARKER"
+want_no "T-12: no warning branch"               "$TPRE_OUT" "TIER WARNING"
+want_no "T-12: no runner written"               "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-13. Declared sonnet vs check-1c xhigh hint → exit 4 (warn is default-only).
+TIER_PROMPT_S="$TMP/tier-prompt-s.md"
+printf '/plan Add a helper method to the standings renderer.\n\nStep 3 MUST route to `plan-architect-sonnet`.\n' > "$TIER_PROMPT_S"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_1C_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_S" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-13: sonnet declared vs check-1c xhigh: exits 4" || \
+    fail "T-13: sonnet declared vs check-1c xhigh: exits 4 (got $TPRE_RC)"
+want_no "T-13: no warning branch"               "$TPRE_OUT" "TIER WARNING"
+preflight_cleanup "$TPRE_OUT"
+
+# T-14. Near-miss reason "check 1" with no letter → exit 4 (allowlist is exact).
+TIER_1X_STUB="$TMP/tier-hint-1x"
+cat > "$TIER_1X_STUB" <<'TIER_1X_EOF'
+#!/usr/bin/env bash
+printf 'xhigh\tcheck 1 — SEAM-1X-MARKER\n'
+exit 0
+TIER_1X_EOF
+chmod +x "$TIER_1X_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_1X_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-14: bare check-1 reason: exits 4" || \
+    fail "T-14: bare check-1 reason: exits 4 (got $TPRE_RC)"
+preflight_cleanup "$TPRE_OUT"
+
 echo "── Phase 7: review-DM button assignments ──"
 
 # Phase 7 assertion 1 (two sites): check-plan-FAILED outcomes send a payload with

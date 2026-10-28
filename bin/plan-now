@@ -29,7 +29,9 @@
 #   before spending a model run and exits 3. --implement always bypasses the gate.
 #   Pre-flight tier gate (all dispositions): compares the declared tier in the prompt
 #   against bin/plan-tier-hint. Exits 4 when the declared and hinted tiers differ AND
-#   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
+#   at least one is xhigh, except: a default declaration against an xhigh hint whose
+#   reason is check 1b or 1c prints a TIER WARNING and proceeds. A check-1a hint
+#   (security, destructive) still exits 4. Always overridable with --tier-ok "reason".
 #   The hint is fed the prompt's /plan task statement line only — the whole file
 #   false-positives on security words sitting inside negations. Gate skips silently
 #   when: the hint is not executable, no `MUST route to` directive, the hint exits
@@ -334,6 +336,13 @@ if [ -z "$RESUME_ID" ] && [ -x "$TIER_HINT" ]; then
                             if [ "$DECLARED_TIER" = "xhigh" ] || [ "$HINTED_TIER" = "xhigh" ]; then
                                 if [ -n "$TIER_OK_REASON" ]; then
                                     echo "plan-now: tier-ok override: declared=$DECLARED_TIER hinted=$HINTED_TIER reason: $TIER_OK_REASON"
+                                elif [ "$DECLARED_TIER" = "default" ] && [ "$HINTED_TIER" = "xhigh" ] \
+                                    && grep -qE '^check 1[bc] ' <<< "$HINT_EXPLAIN"; then
+                                    {
+                                        printf 'plan-now: TIER WARNING — declared default but bin/plan-tier-hint says xhigh\n'
+                                        printf 'plan-now: hint reason: %s\n' "$HINT_EXPLAIN"
+                                        printf 'plan-now: proceeding on the declared Opus architect; only a check-1a hint blocks a default declaration\n'
+                                    } >&2
                                 else
                                     {
                                         printf 'plan-now: TIER MISMATCH — declared %s but bin/plan-tier-hint says %s\n' "$DECLARED_TIER" "$HINTED_TIER"

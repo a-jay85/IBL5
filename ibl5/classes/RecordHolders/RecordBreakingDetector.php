@@ -489,7 +489,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Build an absolute box score URL for Discord (relative links do not resolve there).
      *
-     * Uses SITE_BASE_URL plus the `/ibl5` app path (the bare root only 301-redirects there). Legacy `./ibl/IBL/box{N}.htm`
+     * Uses SITE_BASE_URL plus the `/ibl5` app path. Legacy `./ibl/IBL/box{N}.htm`
      * URLs have their leading `./` stripped. Returns '' when no box score is available.
      */
     private function buildAbsoluteBoxScoreUrl(string $date, int $gameOfThatDay, int $boxId, int $teamId): string

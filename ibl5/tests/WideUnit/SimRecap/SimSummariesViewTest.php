@@ -339,31 +339,64 @@ final class SimSummariesViewTest extends TestCase
 
     /**
      * Sim-722 shape: per-game parts are bare prose with no mention line at index 1.
-     * postableText() falls back to the stored monolith so no GM Discord tag is dropped.
-     * HtmlSanitizer::e() escapes the '<@' markers: '<@5>' → '&lt;@5&gt;'.
+     * The games still go in the box, and a warning above the box names them so the
+     * commissioner can add the tags before posting.
      */
-    public function testTextareaShowsStoredMonolithWhenPartsAreBareProse(): void
+    public function testBoxKeepsUntaggedGamesAndWarnsAboutThem(): void
     {
-        $game = [
+        $tagged = [
+            'game_date'        => '2026-07-26',
+            'visitor_teamid'   => 3,
+            'home_teamid'      => 7,
+            'game_of_that_day' => 1,
+            'sort_order'       => 0,
+            'recap_text'       => "**Away 110 @ Home 104**\n<@3> · <@7>\nTagged game prose.",
+        ];
+        $untagged = [
             'game_date'        => '2026-07-26',
             'visitor_teamid'   => 5,
             'home_teamid'      => 12,
-            'game_of_that_day' => 1,
-            'sort_order'       => 0,
+            'game_of_that_day' => 2,
+            'sort_order'       => 1,
             'recap_text'       => "The visiting team came out strong.\nThey held the lead all night.",
         ];
         $stored = "Full monolith with <@5> and <@12> mention tags stored in recap_text.";
         $html = $this->view->render(
             [],
             $this->recapRow($stored, null, 'Intro text.', 'Outro text.'),
-            [$game],
+            [$tagged, $untagged],
             null
         );
         $body = $this->textareaBody($html);
-        // The stored text is used verbatim; the escaped '<@' markers must appear.
-        self::assertStringContainsString('&lt;@5&gt;', $body);
-        // No date rule — the stored monolith is not re-assembled.
-        self::assertStringNotContainsString('================================', $body);
+
+        self::assertStringContainsString('The visiting team came out strong.', $body);
+        self::assertStringContainsString('Tagged game prose.', $body);
+        self::assertStringEndsWith("Outro text.\n", $body);
+        self::assertStringNotContainsString('Full monolith', $html);
+
+        self::assertStringContainsString('id="recap-mention-warning"', $html);
+        self::assertStringContainsString('1 game in the box below has no GM mention line', $html);
+        self::assertSame(1, substr_count($html, 'class="recap-untagged"'));
+        self::assertStringContainsString('<li class="recap-untagged">2026-07-26 · team 5 at team 12</li>', $html);
+        $warningPos = strpos($html, 'id="recap-mention-warning"');
+        $boxPos     = strpos($html, 'id="recap-body"');
+        self::assertIsInt($warningPos);
+        self::assertIsInt($boxPos);
+        self::assertLessThan($boxPos, $warningPos, 'The tag warning sits above the box');
+    }
+
+    public function testMentionWarningNamesGamesByScoreHeaderAndEscapesThem(): void
+    {
+        $games = [
+            ['game_date' => '2026-07-26', 'visitor_teamid' => 1, 'home_teamid' => 2, 'recap_text' => "**<img src=x> 100 @ B 90**\nNo tags."],
+            ['game_date' => '2026-07-26', 'visitor_teamid' => 3, 'home_teamid' => 4, 'recap_text' => "**C 80 @ D 70**\nNo tags either."],
+        ];
+        $html = $this->view->render([], $this->recapRow('Teaser.'), $games, null);
+
+        self::assertStringContainsString('2 games in the box below have no GM mention line', $html);
+        self::assertStringContainsString('<li class="recap-untagged">&lt;img src=x&gt; 100 @ B 90</li>', $html);
+        self::assertStringContainsString('<li class="recap-untagged">C 80 @ D 70</li>', $html);
+        self::assertStringNotContainsString('<img src=x>', $html);
     }
 
     /**
@@ -394,6 +427,8 @@ final class SimSummariesViewTest extends TestCase
         self::assertStringContainsString('&lt;@3&gt;', $body);
         // The short teaser is not the textarea content.
         self::assertNotSame('Short teaser.', $body);
+        // Every game is tagged, so there is no tag warning.
+        self::assertStringNotContainsString('recap-mention-warning', $html);
     }
 
     public function testRendersOrphanWarningWhenGamesAreUnmatched(): void
@@ -445,8 +480,9 @@ final class SimSummariesViewTest extends TestCase
 
         self::assertStringContainsString('1 game', $html, 'Single orphan must render "1 game"');
         self::assertStringNotContainsString('1 games', $html, 'Must not render "1 games"');
-        self::assertStringContainsString('is omitted', $html, 'Single orphan must render "is omitted"');
-        self::assertStringNotContainsString('are omitted', $html);
+        self::assertStringContainsString('It is still in the box below.', $html, 'Single orphan must render "It is"');
+        self::assertStringNotContainsString('They are', $html);
+        self::assertStringNotContainsString('omitted', $html, 'Unmatched games are no longer left out of the box');
     }
 
     public function testToleratesAnOrphanRowWithMissingKeyColumns(): void
@@ -557,7 +593,10 @@ final class SimSummariesViewTest extends TestCase
 
         $html = $this->view->render($rows, $recap, $gameRecaps, null, null, $orphanedGames);
 
-        $document = \SimRecap\RecapDocument::postableText($intro, $gameRecaps, $outro, $body);
+        // Neither game carries a mention line. The box still holds both games with the
+        // outro last; the stored teaser ($body) is never swapped in.
+        $document = \SimRecap\RecapDocument::assemble($intro, $gameRecaps, $outro);
+        self::assertStringNotContainsString('Teaser', $document);
 
         $indexRows = <<<'HTML'
             <tr>
@@ -583,10 +622,17 @@ HTML;
         <h2 class="ibl-title">Sim 689</h2>
         <p>Status: done&quot;&gt;&lt;img src=x onerror=alert(1)&gt; · Attempts: 2 · Generated: 2026-03-01 10:05:00</p>
         <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
-            <p><strong>Warning:</strong> 2 games in this sim recap could not be matched to a box score and are omitted from the postable document. Unresolvable keys:</p>
+            <p><strong>Warning:</strong> 2 games in this sim recap could not be matched to a box score. They are still in the box below. Unresolvable keys:</p>
             <ul>
             <li class="recap-orphan">2026-02-21 · team 3 at team 9 · game 2 of that day</li>
             <li class="recap-orphan">&lt;x&gt; · team  at team h&lt; · game  of that day</li>
+            </ul>
+        </div>
+        <div id="recap-mention-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> 2 games in the box below have no GM mention line, so their GMs will not be tagged. Add the tags before posting:</p>
+            <ul>
+            <li class="recap-untagged">2026-02-20 · team 5 at team 12</li>
+            <li class="recap-untagged"> · team abc at team </li>
             </ul>
         </div>
         <textarea id="recap-body" readonly rows="24" cols="100">{{DOC}}</textarea>
@@ -632,7 +678,7 @@ HTML;
         <h2 class="ibl-title">Sim 689</h2>
         <p>Status: pending · Attempts: 1 · Generated: 2026-03-01 10:05:00</p>
         <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
-            <p><strong>Warning:</strong> 1 game in this sim recap could not be matched to a box score and is omitted from the postable document. Unresolvable keys:</p>
+            <p><strong>Warning:</strong> 1 game in this sim recap could not be matched to a box score. It is still in the box below. Unresolvable keys:</p>
             <ul>
             <li class="recap-orphan">2026-02-21 · team 3 at team 9 · game 1 of that day</li>
             </ul>

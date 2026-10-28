@@ -207,15 +207,22 @@ test.describe('Sim recap plain-text export', () => {
     expect(await response.text()).toContain('No recap text available.');
   });
 
-  test('bare-prose parts fall back to the stored monolith', async ({ request }) => {
+  test('bare-prose games stay in the download with the outro last', async ({ request }) => {
     const response = await request.get('simSummaries.php?sim=690&format=txt');
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toMatch(/^text\/plain/);
     expect(response.headers()['content-disposition']).toContain('sim-690-recap.txt');
     const body = await response.text();
-    expect(body).toContain('<@5>');
-    expect(body).toContain('<@12>');
-    expect(body).not.toContain('================================');
+    expect(body).toContain('The visiting team came out strong and never gave the lead back.');
+    expect(body).toContain('A grind-it-out road win in a game that never opened up.');
+    expect(body).not.toContain('Sim 690 full monolith recap.');
+    expect(body.endsWith('A gritty performance to cap the week.\n')).toBe(true);
+  });
+
+  test('bare-prose games are named in the mention warning', async ({ page }) => {
+    await page.goto('simSummaries.php?sim=690');
+    await expect(page.locator('#recap-mention-warning')).toContainText('2 games');
+    await expect(page.locator('.recap-untagged')).toHaveCount(2);
   });
 
   test('plain-text export reports the orphaned-game count in a header', async ({ request }) => {

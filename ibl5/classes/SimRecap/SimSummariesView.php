@@ -24,7 +24,7 @@ class SimSummariesView
     /**
      * @param list<array<string, mixed>> $rows          From SimSummaryRepository::listAll()
      * @param array<string, mixed>|null  $recap         From SimSummaryRepository::find(), or null
-     * @param list<array<string, mixed>> $gameRecaps    From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
+     * @param list<array<string, mixed>> $gameRecaps    From RecapBox::gameRecaps(): every game row for the sim, sorted by sort_order
      * @param string|null                $error         'malformed' | 'notfound' | null
      * @param int|null                   $requestedSim  The validated sim behind a 'notfound' notice
      * @param list<array<string, mixed>> $orphanedGames From SimSummaryRepository::findOrphanedGameRecaps()
@@ -127,17 +127,19 @@ class SimSummariesView
 <?php
         $intro = $recap['intro_text'] ?? null;
         $outro = $recap['outro_text'] ?? null;
-        // recap_text is usually a ~220-char teaser; the postable document only exists as
-        // intro + per-game rows + outro. postableText() falls back to the stored text
-        // when there is nothing to assemble or the parts lost their GM mention lines,
-        // so Copy is never empty and never silently drops a tag.
+        // recap_text is usually a ~220-char teaser; the postable document is intro +
+        // every game row + outro. The teaser shows only for legacy rows with no parts.
         $document = RecapDocument::postableText(
             is_string($intro) ? $intro : null,
             $gameRecaps,
             is_string($outro) ? $outro : null,
             $body
         );
+        $untagged = RecapDocument::gamesMissingMentionLines($gameRecaps);
 ?>
+<?php if ($untagged !== []): ?>
+<?php $this->renderMentionWarning($untagged); ?>
+<?php endif; ?>
         <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($document) ?></textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>
@@ -162,7 +164,7 @@ class SimSummariesView
     {
         ?>
         <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
-            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score and <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'is' : 'are') ?> omitted from the postable document. Unresolvable keys:</p>
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score. <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'It is' : 'They are') ?> still in the box below. Unresolvable keys:</p>
             <ul>
 <?php foreach ($orphanedGames as $orphan): ?>
 <?php
@@ -172,6 +174,23 @@ class SimSummariesView
             $oGotd = $orphan['game_of_that_day'] ?? null;
 ?>
             <li class="recap-orphan"><?= HtmlSanitizer::e(is_string($oDate) ? $oDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($oVid) ? (string) $oVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($oHid) ? (string) $oHid : '') ?> · game <?= HtmlSanitizer::e(is_scalar($oGotd) ? (string) $oGotd : '') ?> of that day</li>
+<?php endforeach; ?>
+            </ul>
+        </div>
+<?php
+    }
+
+    /**
+     * @param list<string> $untagged Labels from RecapDocument::gamesMissingMentionLines()
+     */
+    private function renderMentionWarning(array $untagged): void
+    {
+        ?>
+        <div id="recap-mention-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($untagged)) ?> <?= HtmlSanitizer::e(count($untagged) === 1 ? 'game' : 'games') ?> in the box below <?= HtmlSanitizer::e(count($untagged) === 1 ? 'has' : 'have') ?> no GM mention line, so <?= HtmlSanitizer::e(count($untagged) === 1 ? 'its GMs' : 'their GMs') ?> will not be tagged. Add the tags before posting:</p>
+            <ul>
+<?php foreach ($untagged as $label): ?>
+            <li class="recap-untagged"><?= HtmlSanitizer::e($label) ?></li>
 <?php endforeach; ?>
             </ul>
         </div>

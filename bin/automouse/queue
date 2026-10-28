@@ -562,6 +562,11 @@ if [ -z "$INPUT" ]; then
     exit 1
 fi
 
+# The add path never asks a question, so detach stdin: no gate below (or any
+# helper it runs) can sit waiting on the terminal. Every add now runs the way
+# `queue add <slug> < /dev/null` does. bin/test-automouse-queue row 50 pins it.
+exec </dev/null
+
 # Resolve the plan file path
 if [ -f "$INPUT" ]; then
     SOURCE=$(cd "$(dirname "$INPUT")" && pwd)/$(basename "$INPUT")
@@ -663,6 +668,9 @@ fi
 # real gate, so a blank override can never disable it.
 CHECK_PLAN="${AUTOMOUSE_CHECK_PLAN:-${LIB_DIR%/lib}/check-plan}"
 CHECK_RC=0
+# check-plan prints nothing until it ends, often 30s or more. Say so first, so
+# the wait does not look like a hang.
+echo "Checking $FILENAME with bin/check-plan (this can take 30s or more)..." >&2
 CHECK_OUT=$("$CHECK_PLAN" "$SOURCE" 2>&1) || CHECK_RC=$?
 FORCE_SIDECAR="$QUEUE_DIR/${FILENAME}.force-override"
 if [ "$CHECK_RC" -ne 0 ]; then

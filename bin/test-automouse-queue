@@ -1793,6 +1793,26 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Row 50 — the add path detaches stdin. The check-plan stub reads stdin to EOF,
+# and the caller's stdin is a pipe that stays open for 60s. Without the detach
+# the stub blocks and `timeout 15` kills the add. The stub writes a marker
+# after the read, so a stub that never ran cannot pass.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-stdin.md
+CP_STDIN="$TMP/cp-stdin"
+printf '#!/bin/bash\ncat >/dev/null\ntouch "%s/cp-stdin-ran"\nexit 0\n' "$TMP" > "$CP_STDIN"
+chmod +x "$CP_STDIN"
+rm -f "$TMP/cp-stdin-ran"
+RC=0
+OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_STDIN" NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" \
+    timeout 15 "$SCRIPT" add plan-stdin < <(sleep 60) 2>&1) || RC=$?
+h_eq "row50 add exits 0 with an open stdin pipe" "0" "$RC"
+assert_present "row50 check-plan stub ran to the end" "$TMP/cp-stdin-ran"
+assert_queued "row50 plan queued" plan-stdin.md
+h_contains "row50 progress line printed before check-plan" "$OUT" "Checking plan-stdin.md with bin/check-plan"
+
+# ---------------------------------------------------------------------------
 # Row 49 (matrix 18) — no prefix leak. A copy of the real runner claims a plan
 # whose entry is 040-plan-leak.md and runs impl + post-plan against stubs. The
 # claim lock, .attempts, the handoff JSON, the cost rows and every report name

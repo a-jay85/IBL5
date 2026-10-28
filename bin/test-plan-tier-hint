@@ -205,6 +205,72 @@ expect_eq "30d corpus 115439 weaken arming condition (9) stays xhigh" "xhigh" \
     "$("$HINT" --desc '/plan Weaken arming condition (9) and the destructive-migration gate so SQL comments no longer trip them, and tighten the LLM one-way door bar in armable.py and pr-armable.sh')"
 
 echo
+echo "== 2026-10-27 corpus: keyword-only and additive tasks hint default =="
+
+expect_eq "31a corpus 113618 review threads before auto-merge is default" "default" \
+    "$("$HINT" --desc '/plan Make /post-plan reply to and resolve every PR review thread before arming auto-merge, and flag "armed + unresolved thread" PRs in bin/pr-triage and the merge digest, so GitHub'"'"'s "Require conversation resolution before merging" can be enabled on master safely.')"
+expect_eq "31b corpus 114441 state-changed plumbing is default" "default" \
+    "$("$HINT" --desc '/plan Make post-plan'"'"'s `--state-changed` flag reach the compiled harness so its early hold-repeat check stops declining PRs that pr-cycle sent because they have new conflicts or red CI')"
+expect_eq "31c corpus 153924 branch-name-agnostic is default" "default" \
+    "$("$HINT" --desc '/plan Make every script, workflow, hook, gate and Phase 6.5 arming condition branch-name-agnostic so the default branch can be renamed from master to main without breaking anything')"
+expect_eq "31d explain names check 1c for a pipeline weakening" "check 1c" \
+    "$("$HINT" --explain --desc 'Narrow Phase 6.5 arming condition (3) so post-plan stops holding on a MISSING item' | cut -f2 | cut -c1-8)"
+
+echo
+echo "== each dropped keyword: additive default, weakening xhigh =="
+
+expect_eq "32a auto-merge additive hold is default" "default" \
+    "$("$HINT" --desc 'Add a hold that blocks auto-merge on PRs whose diff has deleted test files')"
+expect_eq "32b auto-merge relaxed is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Relax the auto-merge hold for docs-only PRs')"
+expect_eq "32c so-PRs-auto-merge is xhigh" "xhigh" \
+    "$("$HINT" --desc 'change the merge policy so digest-bearing PRs auto-merge')"
+expect_eq "33a human signoff added is default" "default" \
+    "$("$HINT" --desc 'Add a human signoff hold for PRs that touch the migrations directory')"
+expect_eq "33b human signoff exempted is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Exempt chore PRs from the human signoff floor')"
+expect_eq "34a phase 6.5 tightened is default" "default" \
+    "$("$HINT" --desc 'Tighten Phase 6.5 so a PR with a stale plan file is held')"
+expect_eq "34b phase 6.5 stops holding is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Make Phase 6.5 stop holding PRs whose only failure is a flaky e2e shard')"
+expect_eq "35a new arming condition is default" "default" \
+    "$("$HINT" --desc 'Add a new arming condition that holds PRs touching workflow files')"
+expect_eq "35b arming condition no longer holds is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Narrow arming condition (12) so it no longer holds docs-only PRs')"
+expect_eq "35c arming condition lets X pass is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Change arming condition (5) so it lets digest-only PRs pass')"
+
+echo
+echo "== terminology near-misses =="
+
+expect_eq "36a narrows what passes is default" "default" \
+    "$("$HINT" --desc 'Tighten arming condition (4) so it narrows what passes to green-CI PRs only')"
+expect_eq "36b tighten one condition and relax another is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Tighten arming condition (4) and relax arming condition (6)')"
+expect_eq "36c adds a hold and stops holding is xhigh" "xhigh" \
+    "$("$HINT" --desc 'Add a hold for unsigned commits and make Phase 6.5 stop holding PRs with a stale digest')"
+
+echo
+echo "== security and destructive token qualifiers =="
+
+expect_eq "37a slop-ok escape hatch doc is default" "default" \
+    "$("$HINT" --desc 'Document the slop-ok escape hatch in the prose-style rule')"
+expect_eq "37b gate escape hatch reaches check 1c" "check 1c" \
+    "$("$HINT" --explain --desc 'Add an escape hatch to bin/check-prose for quoted transcripts' | cut -f2 | cut -c1-8)"
+expect_eq "37c escape hatch around csrf stays check 1a" "check 1a" \
+    "$("$HINT" --explain --desc 'Add an escape hatch that skips the CSRF check on the trade form' | cut -f2 | cut -c1-8)"
+expect_eq "37d pre-authorized shipping is default" "default" \
+    "$("$HINT" --desc 'Make post-plan shipping pre-authorized for branches this session created')"
+expect_eq "38a truncate prose is default" "default" \
+    "$("$HINT" --desc 'Truncate long Discord DM bodies to 2000 characters')"
+expect_eq "38b truncate a table is xhigh" "xhigh" \
+    "$("$HINT" --desc 'TRUNCATE ibl_box_scores before the reimport')"
+expect_eq "38c delete from prose is default" "default" \
+    "$("$HINT" --desc 'Delete from the backlog any issue already merged')"
+expect_eq "38d delete from a table is xhigh" "xhigh" \
+    "$("$HINT" --desc 'DELETE FROM ibl_plr_snapshots WHERE season < 2000')"
+
+echo
 echo "== static drift assertions (five copies of the trigger) =="
 
 assert_contains "canonical states the behavioural test" \

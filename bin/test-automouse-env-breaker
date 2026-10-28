@@ -815,10 +815,15 @@ write_judge_plans() {
 judge_case() {
     reset_e2
     rm -f "$E2_NDIR/skipped"/* "$E2_NDIR/reports"/* "$E2_NDIR/handoff"/* \
-          "$E2_ROOT/claude-calls.log" "$E2_ROOT/judge-prompt.txt" "$E2_ROOT/postplan.marker"
+          "$E2_ROOT/claude-calls.log" "$E2_ROOT/judge-prompt.txt" "$E2_ROOT/postplan.marker" \
+          "$E2_NDIR/logs"/*.costs.jsonl
     write_judge_plans
     ln -sf "$E2_PLANS/$1.md" "$E2_NDIR/queue/$1.md"
     JUDGE_STUB="$3" STUB_MODE="$2" run_e2 > /dev/null 2>&1
+}
+# judge_ledger_rows: count `phase: judge` rows in this case's sidecar cost ledger.
+judge_ledger_rows() {
+    cat "$E2_NDIR/logs"/*.costs.jsonl 2>/dev/null | jq -c 'select(.phase == "judge")' | grep -c . || true
 }
 
 echo ""
@@ -830,6 +835,8 @@ assert_present "e2-judge-pass: post-plan was called"        "$E2_ROOT/postplan.m
 want           "e2-judge-pass: judge spawn used Opus"       "$J_CALLS" "claude-opus-5-5 judge"
 want           "e2-judge-pass: impl spawn used Sonnet"      "$J_CALLS" "claude-sonnet-5-5 impl"
 want           "e2-judge-pass: log records the verdict"     "$J_LOG" "judge verdict: pass (claude-opus-5-5)"
+# Positive control for e2-no-judge's ledger probe: a judge spawn writes a judge row.
+assert_eq      "e2-judge-pass: one judge ledger row"        "$(judge_ledger_rows)" "1"
 
 echo ""
 echo "# e2-judge-prompt: the judge prompt carries its rows and only its rows"
@@ -871,6 +878,7 @@ judge_case nojudge-plan judgeimpl ""
 J_NJ="$(grep -c ' judge$' "$E2_ROOT/claude-calls.log" 2>/dev/null || true)"
 assert_eq      "e2-no-judge: zero judge spawns"             "$J_NJ" "0"
 assert_present "e2-no-judge: post-plan was called"          "$E2_ROOT/postplan.marker"
+assert_eq      "e2-no-judge: no judge ledger row"           "$(judge_ledger_rows)" "0"
 
 # HB: heartbeat watcher (run_heartbeat_watcher)
 #

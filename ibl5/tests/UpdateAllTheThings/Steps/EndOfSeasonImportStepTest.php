@@ -150,6 +150,10 @@ class EndOfSeasonImportStepTest extends TestCase
 
         $this->assertTrue($result->success);
         $this->assertSame(2, $result->messageErrorCount);
+        $this->assertSame(
+            ['DRA: 2 errors', 'ERROR: Parse failed', 'ERROR: Another error'],
+            $result->messages,
+        );
     }
 
     public function testAwaSkippedWhenCarDataNull(): void

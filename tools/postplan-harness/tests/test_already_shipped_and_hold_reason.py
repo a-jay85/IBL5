@@ -130,6 +130,69 @@ def test_detector_probe_failure_keeps_failure():
     assert runner._already_shipped(e, _Git(""), Boom(), lambda m: None) is None
 
 
+# ---- Fix 1b: auto-merge landed mid-run, then GitHub deleted the branch -------
+
+LEASE = "a9153becfc6a7f0f4218a54edaebd8f39b365574"
+DELETED = ("phase7: origin/b was deleted (lease a9153bec); refusing to recreate it")
+
+
+def _deleted(lease=LEASE):
+    e = HarnessError("remote-head-diverged", DELETED)
+    e.deleted_lease = lease
+    return e
+
+
+def test_deleted_branch_merged_at_lease_is_already_shipped():
+    # the local diff is NOT empty: a ci-fix commit landed after the merge
+    git = _Git("diff --git a/x.png b/x.png\n")
+    got = runner._already_shipped(_deleted(), git, _Gh({**MERGED, "head": LEASE}),
+                                  lambda m: None)
+    assert got["number"] == 2706 and "a9153bec" in got["why"]
+
+
+def test_deleted_branch_merged_at_other_head_stays_failed():
+    gh = _Gh({**MERGED, "head": "f" * 40})
+    assert runner._already_shipped(_deleted(), _Git(""), gh, lambda m: None) is None
+
+
+def test_deleted_branch_without_merged_pr_stays_failed():
+    assert runner._already_shipped(_deleted(), _Git(""), _Gh(None), lambda m: None) is None
+
+
+def test_deleted_branch_probe_failure_stays_failed():
+    class Boom(_Gh):
+        def merged_pr(self):
+            raise HarnessError("gh", "boom")
+    assert runner._already_shipped(_deleted(), _Git(""), Boom(), lambda m: None) is None
+
+
+def test_foreign_tip_divergence_is_never_already_shipped():
+    # no deleted_lease: the remote branch moved to a tip this run did not push
+    e = HarnessError("remote-head-diverged",
+                     "phase7: remote head deadbeef diverged from lease a9153bec")
+    gh = _Gh({**MERGED, "head": LEASE})
+    assert runner._already_shipped(e, _Git(""), gh, lambda m: None) is None
+
+
+def test_reclaim_stale_lease_carries_full_lease_on_deleted_branch(monkeypatch):
+    monkeypatch.setattr(runner.gitutil, "probe_remote_tip", lambda *a, **k: (True, ""))
+
+    class G:
+        worktree = "."
+    with pytest.raises(HarnessError) as ei:
+        runner._reclaim_stale_lease(G(), lambda m: None, "phase7",
+                                    ("origin", "b", LEASE, "c" * 40))
+    assert ei.value.kind == "remote-head-diverged"
+    assert ei.value.deleted_lease == LEASE
+
+
+def test_already_shipped_result_line_drops_empty_diff_claim():
+    r = RunResult(terminal=TerminalState.ALREADY_SHIPPED, slug="b", pr_number=3599)
+    line = runner.verdict_line(r, 0, "https://github.com/o/r/pull")
+    assert line.endswith("(PR already merged); no action needed.")
+    assert runner.exit_code_for(r) == 0
+
+
 # ---- LiveGh.merged_pr is a read-only `pr list` -------------------------------
 
 def _shim(tmp_path, monkeypatch, body):
@@ -147,11 +210,12 @@ def _shim(tmp_path, monkeypatch, body):
 
 def test_live_merged_pr_reads_pr_list(tmp_path, monkeypatch):
     log = _shim(tmp_path, monkeypatch,
-                'echo \'[{"number":2706,"url":"https://github.com/o/r/pull/2706"}]\'')
+                'echo \'[{"number":2706,"url":"https://github.com/o/r/pull/2706",'
+                f'"headRefOid":"{LEASE}"}}]\'')
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
-    assert gh.merged_pr() == MERGED
+    assert gh.merged_pr() == {**MERGED, "head": LEASE}
     assert log.read_text().splitlines() == [
-        "pr list --head my-branch --state merged --json number,url --limit 1"]
+        "pr list --head my-branch --state merged --json number,url,headRefOid --limit 1"]
     assert gh.actions() == []          # a read: nothing audited as a mutation
 
 

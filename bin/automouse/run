@@ -536,6 +536,8 @@ QUEUE_DIR="$NIGHTLY_DIR/queue"
 PLANS_DIR="${PLANS_DIR:-$HOME/claude-plans}"
 MAX_ELAPSED=17100  # ~4h45m — stops around 4:45am, leaves headroom in the 5h usage window
 MAX_ATTEMPTS=3     # per-plan retry cap: impl tries until the handoff, which reseeds the count at 1, then post-plan gets MAX_ATTEMPTS runs in total
+JUDGE_MODEL=claude-opus-5-5   # runner-side Opus judge (ADR NNNN); never derived from IMPL_MODEL or BASE_MODEL
+JUDGE_CAP_SECS=1800           # wall cap for one judge spawn
 # Failure-report caps (ADR-0085): the `.failure` sidecar fed to an escalated
 # retry is at most this many lines AND this many bytes (whichever is smaller),
 # so a multi-hour transcript can never blow the retry's context window.
@@ -2056,6 +2058,115 @@ plan_defect_marker_present() {
     [ "$_pdm_line" = "automouse-plan-defect: v1" ]
 }
 
+# parse_judge_verdict <out_file> — read the Opus judge's verdict from the
+# runner's own capture of the judge spawn's stream-json. Prints exactly one of
+# pass, fail, missing; returns 0 only for pass. Tolerance lives in the
+# decoration (bold, backticks, a list marker), never in the validation
+# (.claude/rules/headless-marker-contract.md).
+parse_judge_verdict() {
+    local out_file=$1 text last
+    if [ ! -r "$out_file" ]; then
+        echo missing
+        return 1
+    fi
+    text=$(jq -R -r 'fromjson? | select(.type=="result") | .result // empty' "$out_file" 2>/dev/null) || text=""
+    last=$(printf '%s\n' "$text" | awk 'NF {l=$0} END {print l}') || last=""
+    last=$(printf '%s' "$last" | sed -E 's/^[[:space:]]+//; s/^([-*>])[[:space:]]+//; s/^\*\*(.*)\*\*$/\1/; s/^`(.*)`$/\1/; s/[[:space:]]+$//') || last=""
+    case "$last" in
+        "JUDGE_VERDICT: pass")
+            echo pass
+            return 0 ;;
+        "JUDGE_VERDICT: fail")
+            echo fail
+            return 1 ;;
+    esac
+    echo missing
+    return 1
+}
+
+# plan_requires_judge <plan_path> <base_model> — returns 0 when the Opus judge
+# must run before post-plan. Fails closed: a consistency-script error means the
+# judge runs. A --force-queued non-Opus plan with manual rows is judged even
+# without manual_judge, so the gate never depends on the queue check.
+plan_requires_judge() {
+    local plan_path=$1 base_model=$2 jr_out count
+    if ! jr_out=$("$SELF_DIR/../lib/plan-model-consistency" --judge-rows "$plan_path" 2>/dev/null); then
+        return 0
+    fi
+    if grep -qx 'MANUAL_JUDGE=opus' <<< "$jr_out"; then
+        return 0
+    fi
+    count=$(sed -n 's/^MANUAL_COUNT=//p' <<< "$jr_out") || count=""
+    if [ "${count:-0}" -ge 1 ] 2>/dev/null && [ "$base_model" != "claude-opus-5-5" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# run_manual_judge <plan_path> <worktree> <out_file> — spawn the read-only Opus
+# judge in the worktree and capture its stream-json to <out_file>. The exit
+# status is deliberately ignored: only parse_judge_verdict decides, so a crash,
+# timeout or usage-gate pause yields `missing` and holds.
+run_manual_judge() {
+    local plan_path=$1 wt=$2 out_file=$3 prompt jr_out rows head_sha base branch cap remaining judge_prompt log_before
+    shopt -u patsub_replacement 2>/dev/null || true
+    prompt=$(cat "$SELF_DIR/prompt-judge")
+    jr_out=$("$SELF_DIR/../lib/plan-model-consistency" --judge-rows "$plan_path" 2>/dev/null) || jr_out=""
+    rows=$(grep '^ROW:' <<< "$jr_out") || true
+    [ -n "$rows" ] || rows='(none)'
+    head_sha=$(git -C "$wt" rev-parse HEAD 2>/dev/null) || head_sha=unknown
+    branch=$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null) || branch=""
+    base=$(git -C "$wt" config "branch.$branch.iblBase" 2>/dev/null) || base=master
+    judge_prompt=${prompt//\{\{PLAN_PATH\}\}/$plan_path}
+    judge_prompt=${judge_prompt//\{\{WORKTREE\}\}/$wt}
+    judge_prompt=${judge_prompt//\{\{BASE\}\}/$base}
+    judge_prompt=${judge_prompt//\{\{HEAD_SHA\}\}/$head_sha}
+    judge_prompt=${judge_prompt//\{\{JUDGE_ROWS\}\}/$rows}
+    remaining=$(( MAX_ELAPSED - $(( $(date +%s) - START )) ))
+    cap=$JUDGE_CAP_SECS
+    if [ "$remaining" -lt "$cap" ]; then cap=$remaining; fi
+    if [ "$cap" -lt 60 ]; then cap=60; fi
+    log_before=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+    ( cd "$wt" && \
+      IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=automouse IBL5_USAGE_GATE_MODEL="$JUDGE_MODEL" \
+      timeout "$cap" claude -p "$judge_prompt" \
+          --dangerously-skip-permissions \
+          --model "$JUDGE_MODEL" \
+          --disallowedTools Edit Write NotebookEdit Agent \
+          --effort high \
+          --output-format stream-json \
+          --verbose \
+          --name "automouse-judge-$(date +%Y-%m-%d-%H%M)" ) \
+      2>> "$LOG" | tee "$out_file" >> "$LOG" || true
+    append_cost_row "$PLAN_NAME" judge "$log_before" "$JUDGE_MODEL" || true
+}
+
+# hold_plan_judge <plan_name> <plan_path> <out_file> <verdict> — fail-closed
+# disposal when the judge did not pass. Mirrors the plan-defect block: the plan
+# goes to skipped/ with a report, the handoff is removed so post-plan cannot
+# fire, and the worktree stays so a requeue resumes from the committed work.
+hold_plan_judge() {
+    local plan_name=$1 plan_path=$2 out_file=$3 verdict=$4 report final
+    echo "JUDGE HOLD — $plan_name: Opus judge verdict '$verdict'; moving to skipped/ without post-plan." >> "$LOG"
+    mkdir -p "$NIGHTLY_DIR/skipped"
+    dispose_entry "$plan_name" skipped || true
+    touch -h "$NIGHTLY_DIR/skipped/$plan_name" 2>/dev/null || true
+    rm -f "$HANDOFF_DIR/${plan_name}.json"
+    rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
+    mkdir -p "$NIGHTLY_DIR/reports"
+    report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${plan_name%.md}.md"
+    final=$(jq -R -r 'fromjson? | select(.type=="result") | .result // empty' "$out_file" 2>/dev/null | tail -n 200) || final=""
+    {
+        printf '# Opus judge held: %s\n\n' "${plan_name%.md}"
+        printf 'Verdict: %s\n\n' "$verdict"
+        printf 'Plan: %s\n\n' "$plan_path"
+        printf '## Judge final message\n\n'
+        printf '%s\n\n' "${final:-(no final message captured)}"
+        printf 'Fix the branch, then run bin/automouse/queue requeue. The judge runs again before post-plan.\n'
+    } > "$report"
+    note_failure "${plan_name%.md} was held by the Opus judge (verdict: $verdict) and moved to skipped/. Read $report" || true
+}
+
 # Write the skipped report for a plan stopped on a plan defect. Same path shape
 # as write_repeat_failure_report; morning-digest surfaces it. Carries the
 # sentinel's lines 2..101 verbatim (the marker line itself is never copied).
@@ -2842,6 +2953,29 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
                 reap_empty_worktree "${PLAN_NAME%.md}"
             fi
+        fi
+    fi
+
+    # Opus judge gate (ADR NNNN). The runner, never the impl agent, spawns the
+    # judge and reads its verdict from this spawn's own output, so a Sonnet impl run cannot
+    # skip or forge it. Anything other than this run's own pass holds the plan.
+    if [ -f "$HANDOFF_FILE" ] && plan_requires_judge "$NEXT_PLAN" "$BASE_MODEL"; then
+        if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
+            echo "Login expired before the judge spawn: refunding attempt, handoff kept, stopping loop." >> "$LOG"
+            refund_attempt
+            break
+        fi
+        JUDGE_WT=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || JUDGE_WT=""
+        JUDGE_OUT="$NIGHTLY_DIR/logs/$(date +%Y-%m-%d)-judge-${PLAN_NAME%.md}.jsonl"
+        rm -f "$JUDGE_OUT"
+        JUDGE_VERDICT=missing
+        if [ -n "$JUDGE_WT" ] && [ -d "$JUDGE_WT" ]; then
+            run_manual_judge "$NEXT_PLAN" "$JUDGE_WT" "$JUDGE_OUT"
+            JUDGE_VERDICT=$(parse_judge_verdict "$JUDGE_OUT") || true
+        fi
+        echo "[$(date +%H:%M:%S)] judge verdict: $JUDGE_VERDICT ($JUDGE_MODEL) for $PLAN_NAME" >> "$LOG"
+        if [ "$JUDGE_VERDICT" != pass ]; then
+            hold_plan_judge "$PLAN_NAME" "$NEXT_PLAN" "$JUDGE_OUT" "$JUDGE_VERDICT"
         fi
     fi
 

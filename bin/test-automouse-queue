@@ -1305,6 +1305,26 @@ setup
 printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
 expect_reject row28 plan-q "Truly-manual row forbids impl_model: sonnet"
 h_pass "row28 — consistency backstop still fires under the new gate"
+# judge-ok / judge-missing — a sonnet plan with a tagged Truly-manual row queues
+# only when `manual_judge: opus` declares the runner's Opus judge.
+# shellcheck disable=SC2016  # literal fixture text; nothing here should expand.
+JUDGE_MATRIX=$(printf '%s\n' \
+  '' \
+  '| # | What to verify | Test type | Timing | Test file / location |' \
+  '|---|---------------|-----------|--------|---------------------|' \
+  '| 1 | a human eyeballs the rendered page | Truly-manual | post-impl | opus-judge: the queue fixture row reads as a coherent rule |')
+setup
+printf -- '---\nimpl_model: sonnet\nmanual_judge: opus\n---\n%s\n' "$JUDGE_MATRIX" > "$PDIR/plan-judge-ok.md"
+rq plan-judge-ok
+if [ "$RC" -eq 0 ] && queue_entry_for_slug "$NDIR/queue" plan-judge-ok >/dev/null; then
+    h_pass "judge-ok — sonnet plus manual_judge: opus queues"
+else
+    h_fail "judge-ok" "expected queued plan (rc=$RC): $OUT"
+fi
+setup
+printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$JUDGE_MATRIX" > "$PDIR/plan-judge-missing.md"
+expect_reject judge-missing plan-judge-missing 'without `manual_judge: opus`' 'manual_judge: marker'
+h_pass "judge-missing — sonnet without manual_judge refused, hint names the marker"
 
 # ---------------------------------------------------------------------------
 # Phase 2 rows — add alias, --force position, unknown flags, usage errors

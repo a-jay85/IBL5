@@ -22,6 +22,7 @@ $service = $factory->service();
 $view = $factory->view();
 
 $viewModel = $service->getBoxscore($_GET['date'] ?? null, $_GET['game'] ?? null);
+$selectedTeamId = $service->parseSelectedTeamId($_GET['team'] ?? null);
 
 if ($viewModel['found'] !== true) {
     http_response_code(404);
@@ -31,5 +32,5 @@ if ($viewModel['found'] !== true) {
 }
 
 PageLayout\PageLayout::header();
-echo $view->render($viewModel);
+echo $view->render($viewModel, $selectedTeamId);
 PageLayout\PageLayout::footer();

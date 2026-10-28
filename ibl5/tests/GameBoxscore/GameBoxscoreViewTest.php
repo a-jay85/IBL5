@@ -6,6 +6,7 @@ namespace Tests\GameBoxscore;
 
 use GameBoxscore\Contracts\GameBoxscoreServiceInterface;
 use GameBoxscore\GameBoxscoreView;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -60,6 +61,48 @@ class GameBoxscoreViewTest extends TestCase
         self::assertStringContainsString('id="boxscore-team-home" checked', $output);
         self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
         self::assertSame(1, substr_count($output, ' checked'));
+    }
+
+    public function testRenderWithAwayTeamIdChecksAwayRadio(): void
+    {
+        $output = $this->view->render($this->buildViewModel(), 1);
+
+        self::assertStringContainsString('id="boxscore-team-away" checked', $output);
+        self::assertStringNotContainsString('id="boxscore-team-home" checked', $output);
+        self::assertSame(1, substr_count($output, ' checked'));
+    }
+
+    #[DataProvider('nonAwayTeamIdProvider')]
+    public function testRenderKeepsHomeCheckedForNonAwayTeamIds(int $selectedTeamId): void
+    {
+        $output = $this->view->render($this->buildViewModel(), $selectedTeamId);
+
+        self::assertStringContainsString('id="boxscore-team-home" checked', $output);
+        self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function nonAwayTeamIdProvider(): array
+    {
+        return [
+            'home id' => [2],
+            'no selection (missing or junk narrowed to 0)' => [0],
+            'unknown id' => [99],
+            'negative id' => [-1],
+        ];
+    }
+
+    public function testRenderKeepsHomeCheckedWhenAwayTeamIdIsZero(): void
+    {
+        $viewModel = $this->buildViewModel();
+        $viewModel['awayTeam']['teamId'] = 0;
+
+        $output = $this->view->render($viewModel, 0);
+
+        self::assertStringContainsString('id="boxscore-team-home" checked', $output);
+        self::assertStringNotContainsString('id="boxscore-team-away" checked', $output);
     }
 
     public function testEachTableCarriesItsOwnTeamColorVariables(): void

@@ -489,7 +489,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     /**
      * Build an absolute box score URL for Discord (relative links do not resolve there).
      *
-     * Uses the same SITE_BASE_URL prefix as the player links. Legacy `./ibl/IBL/box{N}.htm`
+     * Uses SITE_BASE_URL plus the `/ibl5` app path (the bare root only 301-redirects there). Legacy `./ibl/IBL/box{N}.htm`
      * URLs have their leading `./` stripped. Returns '' when no box score is available.
      */
     private function buildAbsoluteBoxScoreUrl(string $date, int $gameOfThatDay, int $boxId, int $teamId): string
@@ -503,7 +503,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
             $url = substr($url, 2);
         }
 
-        return self::SITE_BASE_URL . '/' . $url;
+        return self::SITE_BASE_URL . '/ibl5/' . $url;
     }
 
     /**

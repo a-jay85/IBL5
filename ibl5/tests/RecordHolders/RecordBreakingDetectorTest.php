@@ -275,7 +275,7 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertSame(
             "**NEW IBL RECORD!**\n"
             . '[New Star](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=100) (Heat) '
-            . 'just recorded [**85 points**](https://iblhoops.net/modules.php?name=GameBoxscore&date=2007-01-15&game=4&team=2) in a regular season game, '
+            . 'just recorded [**85 points**](https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2007-01-15&game=4&team=2) in a regular season game, '
             . "breaking Bob Pettit's all-time record of 80 points!",
             $result[0]
         );
@@ -308,7 +308,7 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertSame(
             "**NEW QUADRUPLE DOUBLE!**\n"
             . '[Brandon Tomyoy](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=3282) (Magic) '
-            . 'recorded a quadruple double ([**18pts/10reb/10ast/10stl**](https://iblhoops.net/modules.php?name=GameBoxscore&date=2007-02-21&game=2&team=5)) '
+            . 'recorded a quadruple double ([**18pts/10reb/10ast/10stl**](https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2007-02-21&game=2&team=5)) '
             . 'in a regular season game!',
             $result[0]
         );
@@ -338,7 +338,7 @@ final class RecordBreakingDetectorTest extends TestCase
 
         $result = $this->detector->detectAndAnnounce(['2007-02-21']);
 
-        $this->assertStringContainsString('([**18pts/10reb/10ast/10stl**](https://iblhoops.net/ibl/IBL/box545.htm))', $result[0]);
+        $this->assertStringContainsString('([**18pts/10reb/10ast/10stl**](https://iblhoops.net/ibl5/ibl/IBL/box545.htm))', $result[0]);
     }
 
     // --- Quadruple double tests ---

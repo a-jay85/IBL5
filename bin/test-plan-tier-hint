@@ -191,6 +191,20 @@ expect_eq "29 participle weakening without additive stays xhigh" "xhigh" \
     "$("$HINT" --desc 'make bin/check-plan stop failing plans whose rows cite removed files')"
 
 echo
+echo "== 2026-10-27 corpus: real arming-condition weakenings stay xhigh =="
+
+# Verbatim first lines from the plan-now corpus. Each lets an input a Phase 6.5
+# arming condition held before now pass, so each must keep reaching Fable.
+expect_eq "30a corpus 134111 narrow arming condition (3) stays xhigh" "xhigh" \
+    "$("$HINT" --desc '/plan Narrow Phase 6.5 arming condition (3) so post-plan stops holding on a MISSING item when a plan matrix row names a file only as a reference or environment location that the plan says gets no edit.')"
+expect_eq "30b corpus 144516 narrow arming condition (14) stays xhigh" "xhigh" \
+    "$("$HINT" --desc '/plan Narrow Phase 6.5 arming condition (14) so a leftover /tmp/postplan-conflict-resolved-<slug> marker from an earlier post-plan run stops holding a PR whose current rebase was clean.')"
+expect_eq "30c corpus 191125 relaxing arming condition (17) stays xhigh" "xhigh" \
+    "$("$HINT" --desc '/plan Make gate-backtest count a false flag only when the head gate flags and the base-ref gate does not, relaxing arming condition (17) (backlog#1672)')"
+expect_eq "30d corpus 115439 weaken arming condition (9) stays xhigh" "xhigh" \
+    "$("$HINT" --desc '/plan Weaken arming condition (9) and the destructive-migration gate so SQL comments no longer trip them, and tighten the LLM one-way door bar in armable.py and pr-armable.sh')"
+
+echo
 echo "== static drift assertions (five copies of the trigger) =="
 
 assert_contains "canonical states the behavioural test" \

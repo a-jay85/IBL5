@@ -2960,6 +2960,16 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
     # judge and reads its verdict from this spawn's own output, so a Sonnet impl run cannot
     # skip or forge it. Anything other than this run's own pass holds the plan.
     if [ -f "$HANDOFF_FILE" ] && plan_requires_judge "$NEXT_PLAN" "$BASE_MODEL"; then
+        # Budget gate: a judge cut short by run_manual_judge's cap clamp yields
+        # `missing` and would dispose a good plan. Defer instead, handoff kept,
+        # like the post-plan MIN_PP_SECS deferral; the next run judges first.
+        JUDGE_REMAINING=$(( MAX_ELAPSED - ( $(date +%s) - START ) ))
+        if [ "$JUDGE_REMAINING" -lt "$JUDGE_CAP_SECS" ]; then
+            echo "Judge deferred: ${JUDGE_REMAINING}s left under MAX_ELAPSED, below JUDGE_CAP_SECS=${JUDGE_CAP_SECS}s." >> "$LOG"
+            note_failure "The time limit was reached before judging ${PLAN_NAME%.md}. The judge will run next time."
+            refund_attempt
+            break
+        fi
         if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
             echo "Login expired before the judge spawn: refunding attempt, handoff kept, stopping loop." >> "$LOG"
             refund_attempt

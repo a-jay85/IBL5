@@ -116,7 +116,7 @@ test.describe('Rivalries flow', () => {
     // Two stacked cards: the franchise's rivals, then its current GM's rivals (GM TestUser owns team 1).
     // Captions are CSS-uppercased; the accessible name keeps the source case.
     await expect(page.getByRole('heading', { name: "New York Metros's Rivals" })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /'s Rivals$/ }).last()).toBeVisible();
+    await expect(page.getByRole('heading', { name: "GM TestUser's Rivals" })).toBeVisible();
     await expect(
       page.locator('td.rivalries-gradient a[href*="op=teams&a=1&b=2"]'),
     ).not.toHaveCount(0);

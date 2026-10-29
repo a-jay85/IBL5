@@ -50,10 +50,7 @@ def test_single_condition_each(tmp_path):
         8: "8 feat-commit-type-floor",
     }
     for n, text in expected.items():
-        # `observe` writes no record for a hold with no structural condition (1 alone),
-        # so seed a structural record and overwrite its hold_set.
-        _seed(d, [7])
-        _set_hold_set(d, [[n, f"cond-{n}", "r"]])
+        _seed(d, [n])
         assert holdrepeat.human_only_names(d, SLUG) == text
 
 

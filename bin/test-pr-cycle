@@ -2696,6 +2696,26 @@ grep -qF '**Skipped (1)**' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks S
 grep -qF 'manual-testing-clearance' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks the condition name: $_dm"
 hr_cleanup
 
+# A hold on condition 1 alone, written by the production `observe`, is skipped.
+hu_prep "1"
+env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$SCRATCH/hrstate" first-slug "$SCRATCH/wt-first-slug" <<'PY'
+import sys
+from harness.holdrepeat import fingerprint, observe
+from harness.planfile import locate_plan
+sd, slug, wt = sys.argv[1:4]
+fp = fingerprint(locate_plan(slug).path or "", wt)
+assert fp, "seed fingerprint empty"
+observe(sd, slug, armed=False, conditions=[{"number": 1, "name": "manual-testing-clearance", "blocked": True, "reason": "r"}],
+        fingerprint=fp, pr=101, now="t")
+PY
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "human-only-skip-1-alone: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for (1)' "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-alone: skip line lacks 'held it for (1)'"
+grep -qF 'waiting on: 1 manual-testing-clearance' "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-alone: skip line lacks the condition name"
+hr_cleanup
+
 # A new head (current patch-id differs from the sticky) is not skipped by Fix 4. The pre-fire
 # holdrepeat skip may still decline it at zero tokens, so these rows key on the Fix 4 skip line.
 hu_prep "1,7,8" "$DIFF_B"

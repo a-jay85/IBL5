@@ -179,7 +179,25 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
     key = structural_key(conditions)
     structural = _structural(conditions)
     if armed or key == "":
-        clear_record(state_dir, slug)
+        nums = {t[0] for t in hold_set(conditions)}
+        if not armed and nums and nums <= HUMAN_ONLY_CONDITIONS:
+            # A hold with no structural condition (1 alone) still needs a record so
+            # `human_only_names` can skip it. Empty dm_sent_key/structural_key keep
+            # `should_decline` and the repeat DM off.
+            _save_record(state_dir, slug, {
+                "schema_version": SCHEMA_VERSION,
+                "slug": slug,
+                "structural_key": "",
+                "hold_set": hold_set(conditions),
+                "structural": [],
+                "repeat_count": 1,
+                "dm_sent_key": None,
+                "fingerprint": fingerprint,
+                "pr": pr,
+                "updated_at": now,
+            })
+        else:
+            clear_record(state_dir, slug)
         return Observation("cleared", key, 0, [])
 
     record = load_record(state_dir, slug)

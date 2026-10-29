@@ -22,12 +22,14 @@ interface SeasonArchiveIndexViewInterface
      * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
      * @param array<string, int> $playerIds
      * @param array<string, int> $teamIds
+     * @param array<int, array<string, array{color1: string, color2: string, teamid: int}>> $teamColorsByYear Era colors per season; override $teamColors for that row
      * @return string HTML output
      */
     public function renderIndex(
         array $seasons,
         array $teamColors = [],
         array $playerIds = [],
-        array $teamIds = []
+        array $teamIds = [],
+        array $teamColorsByYear = []
     ): string;
 }

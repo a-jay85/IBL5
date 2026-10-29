@@ -128,4 +128,68 @@ class DraftHistoryRepositoryTest extends DatabaseTestCase
         $ordered = array_values(array_filter(array_column($rows, 'pid'), static fn ($p): bool => in_array($p, [200139161, 200139162, 200139163], true)));
         self::assertSame([200139163, 200139161, 200139162], $ordered);
     }
+
+    public function testRetiredDraftNameGetsEraFranchiseCityAndColors(): void
+    {
+        $this->insertTestPlayer(200030010, 'DH EraPick', [
+            'draftyear' => 2096, 'draftround' => 1, 'draftpickno' => 1, 'draftedby' => 'EraDraftTeam',
+        ]);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Era City', 'team_name' => 'EraDraftTeam',
+        ]);
+        $this->insertRow('ibl_franchise_era_branding', [
+            'franchise_id' => 1, 'team_city' => 'Era City', 'team_name' => 'EraDraftTeam',
+            'color1' => '112233', 'color2' => '445566',
+        ]);
+
+        $pick = $this->findPick($this->repo->getDraftPicksByYear(2096), 200030010);
+
+        self::assertSame(1, $pick['teamid']);
+        self::assertSame('Era City', $pick['team_city']);
+        self::assertSame('112233', $pick['color1']);
+        self::assertSame('445566', $pick['color2']);
+    }
+
+    public function testReusedNameResolvesToFranchiseThatHeldItInDraftYear(): void
+    {
+        // 'Metros' is franchise 1's current name; in 2095 franchise 2 used it.
+        $this->insertTestPlayer(200030011, 'DH ReusePick', [
+            'draftyear' => 2095, 'draftround' => 1, 'draftpickno' => 1, 'draftedby' => 'Metros',
+        ]);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 2, 'season_year' => 2094, 'season_ending_year' => 2095,
+            'team_city' => 'Reuse City', 'team_name' => 'Metros',
+        ]);
+
+        $pick = $this->findPick($this->repo->getDraftPicksByYear(2095), 200030011);
+
+        self::assertSame(2, $pick['teamid']);
+        self::assertSame('Reuse City', $pick['team_city']);
+    }
+
+    public function testNameWithoutFranchiseSeasonRowFallsBackToCurrentTeamMatch(): void
+    {
+        $this->insertTestPlayer(200030012, 'DH FallbackPick', [
+            'draftyear' => 2094, 'draftround' => 1, 'draftpickno' => 1, 'draftedby' => 'Metros',
+        ]);
+
+        $pick = $this->findPick($this->repo->getDraftPicksByYear(2094), 200030012);
+
+        self::assertSame(1, $pick['teamid']);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $picks
+     * @return array<string, mixed>
+     */
+    private function findPick(array $picks, int $pid): array
+    {
+        foreach ($picks as $pick) {
+            if ($pick['pid'] === $pid) {
+                return $pick;
+            }
+        }
+        self::fail('Pick ' . $pid . ' not found');
+    }
 }

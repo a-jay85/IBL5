@@ -439,8 +439,12 @@ final class SqlConcatGoldenSqlTest extends TestCase
 
     private const SEASON_LEADERS_HEAD = 'SELECT h.pid, h.name, h.year, h.team, h.teamid, h.games, h.minutes, h.fgm, h.fga, '
         . 'h.ftm, h.fta, h.tgm, h.tga, h.orb, h.reb, h.ast, h.stl, h.tvr, h.blk, h.pf, '
-        . 't.team_city, t.color1, t.color2 FROM ibl_hist h LEFT JOIN ibl_team_info t ON '
-        . 'h.teamid = t.teamid WHERE h.name IS NOT NULL ';
+        . 'COALESCE(fs.team_city, t.team_city) AS team_city, COALESCE(NULLIF(eb.color1, \'\'), t.color1) '
+        . 'AS color1, COALESCE(NULLIF(eb.color2, \'\'), t.color2) AS color2 FROM ibl_hist h LEFT JOIN '
+        . 'ibl_team_info t ON h.teamid = t.teamid LEFT JOIN ibl_franchise_seasons fs ON fs.franchise_id = '
+        . 'h.teamid AND fs.season_ending_year = h.year LEFT JOIN ibl_franchise_era_branding eb ON '
+        . 'eb.franchise_id = fs.franchise_id AND eb.team_city COLLATE utf8mb4_unicode_ci = fs.team_city '
+        . 'AND eb.team_name COLLATE utf8mb4_unicode_ci = fs.team_name WHERE h.name IS NOT NULL ';
 
     private const PLAYER_SEARCH_HEAD = 'SELECT `ibl_plr`.*, `ibl_team_info`.`team_name` AS teamname, '
         . '`ibl_team_info`.`color1`, `ibl_team_info`.`color2` FROM `ibl_plr` LEFT JOIN '

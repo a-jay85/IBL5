@@ -41,7 +41,7 @@ if ($year > 0) {
         }
         $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
         $playerIds = $repository->getPlayerIdsByNames($mvpNames);
-        echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
+        echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds, $repository->getTeamColorsByYear());
     }
 } else {
     $seasons = $service->getAllSeasons();
@@ -52,7 +52,7 @@ if ($year > 0) {
     }
     $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
     $playerIds = $repository->getPlayerIdsByNames($mvpNames);
-    echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
+    echo $indexView->renderIndex($seasons, $teamColors, $playerIds, $teamIds, $repository->getTeamColorsByYear());
 }
 
 PageLayout\PageLayout::footer();

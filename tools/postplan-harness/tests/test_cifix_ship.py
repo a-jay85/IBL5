@@ -7,6 +7,7 @@ proposals. Every fake lives in this file.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -804,3 +805,37 @@ def test_survivor_comment_without_refusals_unchanged():
     plain = cifix.survivor_comment(s, trail, False)
     assert plain == cifix.survivor_comment(s, trail, False, refused=())
     assert "Proposed PR body" not in plain
+
+
+# ---------------------------------------------------------------------------
+# Characterization: stale-red and merged-probe behavior that must not change
+# ---------------------------------------------------------------------------
+
+def test_slow_watch_red_runs_cifix_without_regrace(monkeypatch, tmp_path):
+    """A red recorded by a 600 s watch is real: one ci-fix call, no check snapshot."""
+    path = runner.ciwatch.outcome_path(str(tmp_path), "a" * 40)
+    with open(path, "w") as fh:
+        json.dump({"sha": "a" * 40, "status": "failure",
+                   "failed_checks": ["PHPUnit"], "evidence": "seeded",
+                   "started": 0.0, "finished": 600.0}, fh)
+    snap_calls: list = []
+    monkeypatch.setattr(runner.ciwatch, "snapshot_checks",
+                        lambda *a, **kw: snap_calls.append(a) or [])
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), llm,
+             failed=["PHPUnit"], commit=("b" * 40,),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert len(llm.calls) == 1
+    assert snap_calls == []
+    assert r.out[1].exit_code == 0
+
+
+def test_gh_without_merged_probe_runs_cifix_and_commits(monkeypatch, tmp_path):
+    """A gh adapter with no merged_pr probe keeps today's flow."""
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), llm,
+             failed=["PHPUnit"], commit=("b" * 40,),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert len(llm.calls) == 1
+    assert r.out[0] == "b" * 40
+    assert r.out[1].exit_code == 0

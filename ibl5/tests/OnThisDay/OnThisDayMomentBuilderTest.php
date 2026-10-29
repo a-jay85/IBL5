@@ -177,7 +177,7 @@ final class OnThisDayMomentBuilderTest extends TestCase
         $this->assertSame('New Home Hornets', $moment->teamName);
         $this->assertSame(10, $moment->opponentTeamId);
         $this->assertSame('Old Home Otters', $moment->opponentName);
-        $this->assertSame(['players_moved' => 2], $moment->facts);
+        $this->assertSame(['players_moved' => 2, 'mover_pid' => 44], $moment->facts);
     }
 
     public function testTradeQueryBindsMinimumScoringAndGames(): void
@@ -236,7 +236,7 @@ final class OnThisDayMomentBuilderTest extends TestCase
         $this->assertNotNull($insert);
         $this->assertTrue($begin < $delete && $delete < $insert && $insert < $commit);
 
-        $this->assertSame('ssssiisisisss', $this->mockDb->getLastBoundTypes());
+        $this->assertSame('ssssiisisisssi', $this->mockDb->getLastBoundTypes());
         $this->assertSame(
             [
                 'series_clincher:2010-04-28:2-7',
@@ -252,6 +252,7 @@ final class OnThisDayMomentBuilderTest extends TestCase
                 'Loser Town Lynx',
                 '{"round":1,"wins":4,"losses":0}',
                 null,
+                0,
             ],
             $this->mockDb->getLastBoundParams(),
         );

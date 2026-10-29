@@ -817,14 +817,14 @@ INSERT INTO ibl_box_scores (
 INSERT INTO ibl_on_this_day_moments (
   moment_key, kind, game_date, month_day, season_year,
   pid, player_name, teamid, team_name, opponent_teamid, opponent_name,
-  facts_json, stat_label
+  facts_json, stat_label, game_of_that_day
 ) VALUES
   ('fifty_point:2024-03-07:1', 'fifty_point', '2024-03-07', '03-07', 2024,
    1, 'Test Player', 1, 'Metros', 2, 'Stars',
-   '{"points":52,"rebounds":6,"assists":4,"steals":1,"blocks":0}', NULL),
+   '{"points":52,"rebounds":6,"assists":4,"steals":1,"blocks":0}', NULL, 1),
   ('triple_double:2021-03-07:2', 'triple_double', '2021-03-07', '03-07', 2021,
    2, 'Test Player Two', 1, 'Metros', 2, 'Stars',
-   '{"points":20,"rebounds":12,"assists":11,"steals":1,"blocks":1}', NULL);
+   '{"points":20,"rebounds":12,"assists":11,"steals":1,"blocks":1}', NULL, 1);
 
 -- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows

@@ -180,7 +180,8 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $moments[0]->opponentTeamId);
         self::assertSame($this->teamName(2), $moments[0]->teamName);
         self::assertSame($this->teamName(1), $moments[0]->opponentName);
-        self::assertSame(['players_moved' => 1], $moments[0]->facts);
+        self::assertSame(['players_moved' => 1, 'mover_pid' => self::PID_A], $moments[0]->facts);
+        self::assertSame(0, $moments[0]->pid);
     }
 
     public function testTradeIgnoresLowScoringMover(): void
@@ -358,6 +359,127 @@ class OnThisDayRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $moments);
         self::assertSame('1890-01-05', $moments[0]->date);
         self::assertSame(34, $moments[0]->facts['value']);
+    }
+
+    public function testPhantomDuplicateGameLinksLowestOrdinal(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Phantom Linker');
+        $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 8, points3m: 4, gameOfDay: 2);
+        $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 8, points3m: 4, gameOfDay: 5);
+        $this->insertTeamPair('1901-01-10', 2, 1, 2);
+        $this->insertTeamPair('1901-01-10', 5, 1, 2);
+        $this->rebuild();
+
+        $moments = $this->only($this->stored(['01-10'], 1902, MomentKind::FiftyPointGame), self::PID_A);
+
+        self::assertCount(1, $moments);
+        self::assertSame(2, $moments[0]->gameOfThatDay);
+    }
+
+    public function testGameWithoutTeamBoxScoreHasZeroOrdinal(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Unlinked Scorer');
+        $this->insertGame('1901-01-10', self::PID_A, 1, 2, 1, points2m: 16, ftm: 6, points3m: 4, gameOfDay: 3);
+        $this->rebuild();
+
+        $moments = $this->only($this->stored(['01-10'], 1902, MomentKind::FiftyPointGame), self::PID_A);
+
+        self::assertCount(1, $moments);
+        self::assertSame(0, $moments[0]->gameOfThatDay);
+    }
+
+    public function testRecordGameCarriesOrdinal(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Record Linker');
+        $this->insertGame('1889-01-03', self::PID_A, 1, 2, 1, orb: 5, drb: 15);
+        $this->insertGame('1890-01-05', self::PID_A, 1, 2, 1, orb: 5, drb: 20, gameOfDay: 4);
+        $this->insertTeamPair('1890-01-05', 4, 1, 2);
+        $this->rebuild();
+
+        $moments = array_values(array_filter(
+            $this->only($this->stored(['01-05'], 1891, MomentKind::RecordGame), self::PID_A),
+            static fn (Moment $m): bool => $m->statLabel === 'rebounds',
+        ));
+
+        self::assertCount(1, $moments);
+        self::assertSame(4, $moments[0]->gameOfThatDay);
+    }
+
+    public function testSeriesClincherCarriesClinchGameOrdinal(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Playoff Linker');
+        $this->insertGame('1901-06-03', self::PID_A, 1, 2, 1);
+        $this->insertGame('1901-06-05', self::PID_A, 2, 1, 1);
+        $this->insertGame('1901-06-07', self::PID_A, 1, 2, 1);
+        $this->insertPlayoffSeriesResultRow(1901, 4, 1, 2, 'Winners', 'Losers', 4, 3);
+        $this->insertTeamPair('1901-06-03', 1, 1, 2);
+        $this->insertTeamPair('1901-06-05', 1, 2, 1);
+        $this->insertTeamPair('1901-06-07', 3, 1, 2);
+        $this->rebuild();
+
+        $hits = $this->season1901($this->stored(['06-07'], 1902, MomentKind::SeriesClincher));
+
+        self::assertCount(1, $hits);
+        self::assertSame(3, $hits[0]->gameOfThatDay);
+    }
+
+    public function testTradeCarriesDebutGameOrdinal(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Moved Linker');
+        foreach (['1901-01-02', '1901-01-04', '1901-01-06', '1901-01-08', '1901-01-10'] as $date) {
+            $this->insertGame($date, self::PID_A, 1, 3, 1, points2m: 7, ftm: 1, points3m: 0);
+        }
+        $this->insertGame('1901-02-10', self::PID_A, 2, 3, 2);
+        $this->insertTeamPair('1901-01-10', 2, 3, 1);
+        $this->insertTeamPair('1901-02-10', 6, 3, 2);
+        $this->rebuild();
+
+        $moments = $this->season1901($this->stored(['02-10'], 1902, MomentKind::Trade));
+
+        self::assertCount(1, $moments);
+        self::assertSame(6, $moments[0]->gameOfThatDay);
+    }
+
+    public function testTradeStoresMoverPidFact(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Moved Fact');
+        foreach (['1901-01-02', '1901-01-04', '1901-01-06', '1901-01-08', '1901-01-10'] as $date) {
+            $this->insertGame($date, self::PID_A, 1, 3, 1, points2m: 7, ftm: 1, points3m: 0);
+        }
+        $this->insertGame('1901-02-10', self::PID_A, 2, 3, 2);
+        $this->rebuild();
+
+        $moments = $this->season1901($this->stored(['02-10'], 1902, MomentKind::Trade));
+
+        self::assertCount(1, $moments);
+        self::assertSame(self::PID_A, $moments[0]->facts['mover_pid']);
+        self::assertSame(0, $moments[0]->pid);
+    }
+
+    public function testRebuildStoresGameOfThatDayColumn(): void
+    {
+        $this->insertTestPlayer(self::PID_A, 'Stored Ordinal');
+        $this->insertGame('2029-03-17', self::PID_A, 1, 2, 1, points2m: 16, ftm: 6, points3m: 4, gameOfDay: 2);
+        $this->insertTeamPair('2029-03-17', 2, 1, 2);
+
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
+
+        $result = $this->db->query(
+            "SELECT game_of_that_day FROM `ibl_on_this_day_moments` WHERE moment_key = 'fifty_point:2029-03-17:" . self::PID_A . "'"
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertSame(2, (int) $row['game_of_that_day']);
+    }
+
+    /**
+     * Seed the visitor and home team box-score rows of one game.
+     */
+    private function insertTeamPair(string $date, int $gameOfDay, int $visitorTid, int $homeTid): void
+    {
+        $this->insertTeamBoxscoreRow($date, 'Visitor', $gameOfDay, $visitorTid, $homeTid);
+        $this->insertTeamBoxscoreRow($date, 'Home', $gameOfDay, $visitorTid, $homeTid);
     }
 
     private function rebuild(): void

@@ -31,7 +31,7 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
 
     // @phpstan-ignore ibl.orderByMissingTiebreaker (moment_key is UNIQUE uq_otd_moment_key; not on the rule allowlist)
     private const MOMENTS_QUERY = "SELECT moment_key, kind, game_date, season_year, pid, player_name,
-            teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label
+            teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label, game_of_that_day
           FROM `ibl_on_this_day_moments`
           WHERE season_year < ? AND month_day IN ({IN})
           ORDER BY game_date, moment_key";
@@ -147,6 +147,7 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
             'opponentName' => $row['opponent_name'] ?? null,
             'facts' => json_decode($factsJson, true, 4, JSON_THROW_ON_ERROR),
             'statLabel' => $statLabel,
+            'gameOfThatDay' => self::intOrNull($row['game_of_that_day'] ?? null) ?? 0,
         ]);
     }
 

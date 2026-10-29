@@ -41,4 +41,12 @@ final class OnThisDayFactory
             new DiscordMomentPoster(),
         );
     }
+
+    public static function createRecordShownStep(\mysqli $db): \Updater\Steps\RecordOnThisDayShownStep
+    {
+        return new \Updater\Steps\RecordOnThisDayShownStep(
+            self::createService($db),
+            new OnThisDayRepository($db),
+        );
+    }
 }

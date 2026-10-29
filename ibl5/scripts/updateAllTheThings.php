@@ -351,6 +351,7 @@ try {
             new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
         ));
         $updaterService->addStep(Updater\Steps\RebuildOnThisDayMomentsStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createRecordShownStep($mysqli_db));
         $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
         // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.

@@ -23,6 +23,7 @@ class OnThisDayPipelineTest extends DatabaseTestCase
     private const PID = 200_920_001;
     private const SIM_PREVIOUS = 900001;
     private const SIM_LATEST = 900002;
+    private const SIM_NEXT_SEASON = 900003;
 
     protected function setUp(): void
     {
@@ -122,6 +123,109 @@ class OnThisDayPipelineTest extends DatabaseTestCase
         );
         self::assertInstanceOf(\mysqli_result::class, $claimed);
         self::assertSame(0, $claimed->num_rows);
+    }
+
+    public function testRecordStepIsIdempotentPerSim(): void
+    {
+        $expected = count(OnThisDayFactory::createService($this->db)->getMomentsForSim()->moments);
+        self::assertGreaterThan(0, $expected);
+
+        $first = OnThisDayFactory::createRecordShownStep($this->db)->execute();
+        self::assertTrue($first->success, $first->detail);
+        self::assertFalse($first->skipped, $first->detail);
+        $afterFirst = $this->countShownRows(self::SIM_LATEST);
+
+        $second = OnThisDayFactory::createRecordShownStep($this->db)->execute();
+        self::assertTrue($second->success, $second->detail);
+        $afterSecond = $this->countShownRows(self::SIM_LATEST);
+
+        self::assertGreaterThan(0, $afterFirst);
+        self::assertSame($afterFirst, $afterSecond);
+        self::assertSame($expected, $afterSecond);
+    }
+
+    public function testSecondSeasonWithSameSimDatesShowsDifferentMoments(): void
+    {
+        // Three more fifty-point games inside the sim's month-days. With the
+        // 60-point game that is four candidates, above both the limit of 3 and
+        // the per-kind cap of 2, so some always stay unshown.
+        $extraGames = [
+            [self::PID + 1, '2028-03-12', 24, 6, 1],
+            [self::PID + 2, '2027-03-14', 22, 7, 1],
+            [self::PID + 3, '2026-03-16', 20, 8, 1],
+        ];
+        foreach ($extraGames as [$pid, $date, $twoPointers, $freeThrows, $threes]) {
+            $this->insertTestPlayer($pid, 'Extra Scorer ' . ($pid - self::PID));
+            $this->insertPlayerBoxscoreRow(
+                $date,
+                $pid,
+                'Box Name',
+                'PG',
+                2,
+                1,
+                1,
+                points2m: $twoPointers,
+                points2a: $twoPointers + 8,
+                ftm: $freeThrows,
+                fta: $freeThrows + 2,
+                points3m: $threes,
+                points3a: $threes + 4,
+            );
+        }
+        OnThisDayFactory::createRebuilder($this->db)->rebuild();
+
+        $service = OnThisDayFactory::createService($this->db);
+        $recorded = OnThisDayFactory::createRecordShownStep($this->db)->execute();
+        self::assertFalse($recorded->skipped, $recorded->detail);
+        $seasonOneKeys = $this->momentKeys($service->getMomentsForSim()->moments);
+        self::assertGreaterThan(0, count($seasonOneKeys));
+
+        $this->insertRow('ibl_sim_dates', [
+            'sim' => self::SIM_NEXT_SEASON,
+            'start_date' => '2032-03-11',
+            'end_date' => '2032-03-17',
+        ]);
+
+        $seasonTwo = $service->getMomentsForSim();
+        $seasonTwoKeys = $this->momentKeys($seasonTwo->moments);
+
+        self::assertSame(self::SIM_NEXT_SEASON, $seasonTwo->sim);
+        self::assertGreaterThan(0, count($seasonTwoKeys));
+        self::assertNotSame($seasonOneKeys[0], $seasonTwoKeys[0]);
+        self::assertSame([], array_intersect($seasonOneKeys, $seasonTwoKeys));
+    }
+
+    public function testMissingHistoryTableKeepsCardWorking(): void
+    {
+        $db = new RecordingMysqli($this->db, 1146, 'ibl_on_this_day_shown');
+
+        $selection = OnThisDayFactory::createService($db)->getMomentsForSim();
+
+        self::assertGreaterThan(0, count($selection->moments));
+        self::assertSame(60, $selection->moments[0]->facts['points']);
+
+        $result = OnThisDayFactory::createRecordShownStep($db)->execute();
+
+        self::assertTrue($result->skipped, $result->detail);
+    }
+
+    /**
+     * @param list<\OnThisDay\Moment> $moments
+     * @return list<string>
+     */
+    private function momentKeys(array $moments): array
+    {
+        return array_map(static fn (\OnThisDay\Moment $m): string => $m->key, $moments);
+    }
+
+    private function countShownRows(int $sim): int
+    {
+        $result = $this->db->query('SELECT COUNT(*) AS c FROM `ibl_on_this_day_shown` WHERE sim = ' . $sim);
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+
+        return (int) $row['c'];
     }
 
     private function execSql(string $sql): void

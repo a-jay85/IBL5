@@ -192,6 +192,35 @@ headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness 
 unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
 Rung 4 runs one headless Sonnet 5.5 session capped at $5, 25 minutes and 100 turns on the same merge commit (`harness/conflict_fix.py`). It may edit the conflicted files, the branch's own files, and test files master added under `ibl5/tests/`, `bin/test-*` or `tools/postplan-harness/tests/`. The harness amends the merge commit and re-runs the proof. It runs at most once per branch head and master tip. The marker is a `<key>.sonnet-fix.json` file in the harness state dir, `tools/postplan-harness/out/state/`. The session cannot push, commit, fetch, run gh, or move any ref, and a moved ref or HEAD fails the rung. When it ran and the proof still failed, `blocked-ship.txt` adds a `Headless Sonnet fix:` line and the session's summary labelled as untrusted text.
 
+## Held-unchanged skip
+
+`bin/pr-cycle` Stage 1 skips a PR without calling the fleet when its
+newest harness run (ignoring `rebased-held`) ended `shipped-held` on conditions only a human
+clears, (1), (3), (7) or (8), the patch-id equals the sticky `**Reviewed diff:**`, and
+`python3 -m harness.holdrepeat human-only-eligible` exits **10**. That call reads the hold record
+through `load_record`, so a missing or unreadable record, a foreign condition or a stale
+fingerprint means the PR runs. `PR_CYCLE_SKIP_HELD_UNCHANGED=0` turns the skip off. A DIRTY or
+BLOCKED-CHECK PR is exempt, so `bin/pr-cycle-tick` needs no filter: its retry cap already stops
+a second rescue on an unchanged patch-id. A skipped PR stays in the your-turn DM under
+`**Skipped (K)**` with the condition names after `waiting on:`. The skip never arms a PR.
+
+## Rebase-only mode
+
+`bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the
+PR's last hold record names only conditions (3), (7) and (8) and its patch-id still equals the
+sticky `**Reviewed diff:**`. `PR_CYCLE_REBASE_ONLY_HELD=0` turns this off. The flag reaches the
+harness as `--rebase-only` through `bin/post-plan-fleet` and `bin/post-plan-now`, where it also
+implies `--state-changed`. The harness re-checks the record with
+`python3 -m harness.holdrepeat rebase-eligible` and runs the full path when the record is
+absent or names any other condition. An eligible run merges `origin/master` with the usual
+conflict resolver and lost-work proof, pushes, and ends with terminal `rebased-held` and exit
+**0**. It runs no review, fidelity or manual-test call, never posts the sticky verdict and never
+arms. A failed proof stops before the push. When the patch-id is unchanged, the run refreshes
+the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
+record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
+back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
+without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove. When a PR's only failure is the `All checks green` gate timing out on anchors that have since gone green on the same head, the tick runs `gh run rerun <id> --failed` in place of a rescue, at most `PCW_GATE_RERUN_CAP` (2) times per head SHA, and the gate's fail-closed check is unchanged (ADR-0167, addendum `gate-timeout reruns`).
+
 ## Exit codes
 
 | rc | Meaning |

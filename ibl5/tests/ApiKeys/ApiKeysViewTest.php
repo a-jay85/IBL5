@@ -51,14 +51,6 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('X-API-Key', $html);
     }
 
-    public function testRenderExportGuideWarnsThatUrlKeysAreLogged(): void
-    {
-        $html = $this->view->renderExportGuide();
-
-        $this->assertStringContainsString('Your key is part of this URL.', $html);
-        $this->assertStringContainsString('X-API-Key', $html);
-    }
-
     public function testRenderNewKeyStateEscapesKey(): void
     {
         // Key with characters that could be XSS if not escaped
@@ -151,43 +143,6 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringNotContainsString('name=ApiKeys', $html);
     }
 
-    public function testExportGuideRendersAppsScriptSectionWithHeaderAuth(): void
-    {
-        $html = $this->view->renderExportGuide();
-
-        self::assertStringContainsString('Apps Script (header auth)', $html);
-        self::assertStringContainsString('setIblApiKey', $html);
-        self::assertStringContainsString('IBL_PLAYERS', $html);
-        self::assertStringContainsString('PropertiesService.getUserProperties', $html);
-        self::assertStringContainsString('UrlFetchApp.fetch', $html);
-        self::assertStringContainsString('https://iblhoops.net/ibl5/api/v1/players/export\'', html_entity_decode($html, ENT_QUOTES | ENT_HTML5));
-    }
-
-    public function testExportGuideSnippetMatchesStandaloneScript(): void
-    {
-        $file = file_get_contents(__DIR__ . '/../../docs/api/google-sheets-header-auth.gs');
-        self::assertIsString($file);
-        $start = strpos($file, 'var IBL_EXPORT_URL');
-        self::assertNotFalse($start);
-        $expected = rtrim(substr($file, $start));
-
-        $html = html_entity_decode($this->view->renderExportGuide(), ENT_QUOTES | ENT_HTML5);
-        self::assertStringContainsString($expected, $html, 'Rendered snippet must match google-sheets-header-auth.gs');
-    }
-
-    public function testExportGuideKeepsImportdataFormulaAndOrdersItFirst(): void
-    {
-        $html = $this->view->renderExportGuide();
-
-        $importdataPos = strpos($html, '=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")');
-        $scriptPos = strpos($html, 'Apps Script (header auth)');
-
-        self::assertNotFalse($importdataPos, 'IMPORTDATA example must survive (additive change)');
-        self::assertNotFalse($scriptPos);
-        self::assertLessThan($scriptPos, $importdataPos, 'IMPORTDATA block renders before the Apps Script block');
-        self::assertSame(2, substr_count($html, 'ibl-code-block'));
-    }
-
     public function testRenderNoKeyStateTitleIsHeadingOne(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
@@ -238,7 +193,31 @@ class ApiKeysViewTest extends TestCase
 
         $this->assertSame(0, substr_count($html, '<h1'));
         $this->assertStringContainsString('<h2 class="ibl-card__title">Player Export Guide</h2>', $html);
-        $this->assertStringContainsString('<h3 class="mb-2">Quick Start</h3>', $html);
+        $this->assertStringContainsString('<h3 class="mb-2">Column Reference</h3>', $html);
+    }
+
+    public function testRenderExportGuideHasNoApiKeyInstructions(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringNotContainsString('IMPORTDATA', $html);
+        $this->assertStringNotContainsString('API key', $html);
+        $this->assertStringNotContainsString('setIblApiKey', $html);
+        $this->assertStringNotContainsString('Key Management', $html);
+        $this->assertStringContainsString('Players tab', $html);
+    }
+
+    public function testGoogleCardTitleIsHeadingOneInEveryState(): void
+    {
+        foreach ([
+            $this->view->renderGoogleSheetCard(null, false),
+            $this->view->renderGoogleSheetCard(null, true),
+            $this->view->renderGoogleSheetCard(self::googleSummary(), true),
+            $this->view->renderGoogleSheetCard(self::googleSummary('broken', 'invalid_grant'), true),
+        ] as $html) {
+            $this->assertStringContainsString('<h1 class="ibl-card__title">Google Sheets Sync</h1>', $html);
+            $this->assertSame(1, substr_count($html, '<h1'));
+        }
     }
 
     /**

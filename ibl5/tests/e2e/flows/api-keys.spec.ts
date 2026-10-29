@@ -1,256 +1,39 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
-import { expectButtonRowCentered } from '../helpers/centered-row';
 
-// API Keys management flow — tests the full generate → view → revoke cycle.
-// Serial: key operations mutate user state.
-test.describe.configure({ mode: 'serial' });
-
-test.describe('API Keys flow', () => {
-  test('page loads for authenticated user', async ({ page }) => {
+// Player Export page (modules.php?name=ApiKeys). Google Sheets Sync is the way GMs get a
+// sheet; the API key card is hidden. The generate/revoke ops still exist server-side.
+test.describe('Player Export page', () => {
+  test('leads with Google Sheets Sync and shows no API key card', async ({ page }) => {
     await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('.ibl-card__title').first()).toContainText(/API Key/i);
-    await assertNoPhpErrors(page, 'on ApiKeys page');
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Google Sheets Sync');
+    await expect(page.getByRole('button', { name: /Generate API Key/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Revoke Key/i })).toHaveCount(0);
+    await assertNoPhpErrors(page, 'Player Export page');
   });
 
-  test('export guide offers Apps Script header auth alongside IMPORTDATA', async ({ page }) => {
+  test('guide keeps the column reference and tips without key instructions', async ({ page }) => {
     await page.goto('modules.php?name=ApiKeys');
 
-    // Guide renders below every key-state card, so this holds regardless of key state.
-    await expect(page.getByRole('heading', { name: /Apps Script \(header auth\)/i })).toBeVisible();
-
-    const codeBlocks = page.locator('pre.ibl-code-block');
-    await expect(codeBlocks).toHaveCount(2);
-    await expect(codeBlocks.nth(0)).toContainText('=IMPORTDATA(');
-    await expect(codeBlocks.nth(0)).toContainText('?key=YOUR_KEY');
-    await expect(codeBlocks.nth(1)).toContainText('setIblApiKey');
-    await expect(codeBlocks.nth(1)).toContainText('IBL_PLAYERS');
-    await expect(codeBlocks.nth(1)).toContainText('PropertiesService.getUserProperties');
-    await expect(codeBlocks.nth(1)).toContainText('UrlFetchApp.fetch');
-    await expect(codeBlocks.nth(1)).not.toContainText('?key=');
-    await expect(codeBlocks.nth(1)).toContainText("'X-API-Key'");
-
-    await assertNoPhpErrors(page, 'on ApiKeys export guide');
+    const guide = page.locator('.ibl-card', { has: page.getByRole('heading', { name: 'Player Export Guide' }) });
+    await expect(guide.getByRole('heading', { name: 'Column Reference' })).toBeVisible();
+    await expect(guide.getByRole('heading', { name: 'Tips' })).toBeVisible();
+    await expect(guide).toContainText('Players tab');
+    await expect(guide).not.toContainText('IMPORTDATA');
+    await expect(guide).not.toContainText('API key');
+    await expect(guide.locator('pre')).toHaveCount(0);
   });
 
-  test('shows generate button when no key exists', async ({ page }) => {
-    // Clean up any existing key first by revoking it
-    await page.goto('modules.php?name=ApiKeys');
-
-    const revokeButton = page.getByRole('button', { name: /Revoke Key/i });
-    if (await revokeButton.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: cleanup precondition — revoke button presence depends on prior test state
-      // Accept the confirmation dialog
-      page.once('dialog', (dialog) => dialog.accept());
-      await revokeButton.click();
-      // The URL already matches before the revoke POST lands, so wait for
-      // the no-key state instead of the URL.
-      await expect(page.getByRole('button', { name: /Generate API Key/i })).toBeVisible();
-    }
-
-    // Now should see the generate state
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(page.getByRole('button', { name: /Generate API Key/i })).toBeVisible();
-    await expect(page.getByText("don't have an API key yet")).toBeVisible();
-  });
-
-  test('generate key shows raw key once', async ({ page }) => {
-    await page.goto('modules.php?name=ApiKeys');
-
-    // Click generate
-    await page.getByRole('button', { name: /Generate API Key/i }).click();
-
-    // Should see the key generated state
-    await expect(page.locator('.ibl-card__title').first()).toContainText(/Generated/i);
-    await expect(page.getByText("won't be shown again")).toBeVisible();
-
-    // The raw key input should contain an ibl_ prefixed key
-    const keyInput = page.locator('input.ibl-input[readonly]').first();
-    await expect(keyInput).toBeVisible();
-    const keyValue = await keyInput.inputValue();
-    expect(keyValue).toMatch(/^ibl_[0-9a-f]{32}$/);
-
-    // IMPORTDATA formula should be in the second readonly input
-    const formulaInput = page.locator('input.ibl-input[readonly]').nth(1);
-    await expect(formulaInput).toHaveValue(/IMPORTDATA/);
-
-    await assertNoPhpErrors(page, 'on ApiKeys generate page');
-  });
-
-  test('revisit shows prefix and revoke button', async ({ page }) => {
-    await page.goto('modules.php?name=ApiKeys');
-
-    // Should see the active key state (not the generate button)
-    await expect(page.getByRole('button', { name: /Revoke Key/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Generate API Key/i })).not.toBeVisible();
-
-    // Key prefix should be visible (ibl_ + 4 chars + ...)
-    await expect(page.locator('code').first()).toContainText(/^ibl_[0-9a-f]{4}\.\.\.$/);
-
-    // Should show permission and rate limit info
-    await expect(page.getByText('public')).toBeVisible();
-    await expect(page.getByText('60 requests/min')).toBeVisible();
-
-    // The guide is folded into this page now, so the cross-module link is gone
-    // and the column-reference table renders below the key card instead.
-    await expect(page.getByRole('link', { name: /Player Export Guide/i })).toHaveCount(0);
-    await expect(page.getByText('Column Reference')).toBeVisible();
-  });
-
-  test('revoke button is centered in the API Key card at 1280 and 390', async ({ page }) => {
-    for (const width of [1280, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto('modules.php?name=ApiKeys');
-      const row = page.locator('#api-key-actions');
-      await expect(row.getByRole('button', { name: /Revoke Key/i })).toBeVisible();
-      await expectButtonRowCentered(row);
-    }
-  });
-
-  test('revoke key returns to no-key state', async ({ page }) => {
-    await page.goto('modules.php?name=ApiKeys');
-
-    // Accept the confirmation dialog
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /Revoke Key/i }).click();
-
-    // Should redirect back to ApiKeys showing the no-key state
-    await expect(page.getByRole('button', { name: /Generate API Key/i })).toBeVisible();
-  });
-
-  test('can generate new key after revoking', async ({ page }) => {
-    await page.goto('modules.php?name=ApiKeys');
-
-    // Should be in no-key state from previous test
-    await page.getByRole('button', { name: /Generate API Key/i }).click();
-
-    // Should see the new key
-    await expect(page.locator('.ibl-card__title').first()).toContainText(/Generated/i);
-    const keyInput = page.locator('input.ibl-input[readonly]').first();
-    const keyValue = await keyInput.inputValue();
-    expect(keyValue).toMatch(/^ibl_[0-9a-f]{32}$/);
-
-    await assertNoPhpErrors(page, 'on ApiKeys regenerate page');
-  });
-});
-
-async function revokeIfPresent(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('modules.php?name=ApiKeys');
-  const revokeButton = page.getByRole('button', { name: /Revoke Key/i });
-  const generateButton = page.getByRole('button', { name: /Generate API Key/i });
-  // Wait for one of the two key states before branching, so an early
-  // isVisible() check can't skip the revoke.
-  await expect(revokeButton.or(generateButton)).toBeVisible();
-  if (await revokeButton.isVisible()) { // e2e-hygiene-allow: cleanup precondition — key state already rendered above; branch depends on prior test state
-    page.once('dialog', (dialog) => dialog.accept());
-    await revokeButton.click();
-    // waitForLoadState resolves on the already-loaded page, so a following
-    // goto could abort the revoke POST. Wait for the no-key state instead.
-    await expect(generateButton).toBeVisible();
-  }
-}
-
-test.describe('API Keys direct POST submission', () => {
-  test.afterEach(async ({ page }) => {
-    await revokeIfPresent(page);
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(
-      page.getByRole('button', { name: /Generate API Key/i }),
-    ).toBeVisible();
-  });
-
-  test('generate POST returns key shown once', async ({ page, request }) => {
-    await revokeIfPresent(page);
-
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('form[action*="op=generate"]')).toBeVisible();
-    const token = await page
-      .locator('form[action*="op=generate"] input[name="_csrf_token"]')
-      .getAttribute('value');
-
-    const response = await request.post(
-      'modules.php?name=ApiKeys&op=generate',
-      {
-        form: { _csrf_token: token ?? '' },
-        maxRedirects: 0,
-      },
-    );
-
-    expect(response.status()).toBe(200);
-    const body = await response.text();
-    expect(body).toContain('API Key Generated');
-    expect(body).toContain("won't be shown again");
-
-    const keyMatch = body.match(/value="(ibl_[0-9a-f]{32})"/);
-    expect(keyMatch).not.toBeNull();
-    const rawKey = keyMatch![1];
-
-    const exactMatches = body.match(/value="ibl_[0-9a-f]{32}"/g);
-    expect(exactMatches?.length).toBe(1);
-
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('code').first()).toContainText(
-      rawKey.substring(0, 8) + '...',
-    );
-
-    await assertNoPhpErrors(page, 'after generate submission');
-  });
-
-  test('revoke POST removes key from list', async ({ page, request }) => {
-    await revokeIfPresent(page);
-
-    // revokeIfPresent leaves the no-key state, so generate unconditionally.
-    await page.getByRole('button', { name: /Generate API Key/i }).click();
-    await expect(page.locator('.ibl-card__title').first()).toContainText(
-      /Generated/i,
-    );
-
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('form[action*="op=revoke"]')).toBeVisible();
-    const token = await page
-      .locator('form[action*="op=revoke"] input[name="_csrf_token"]')
-      .getAttribute('value');
-
-    const response = await request.post(
-      'modules.php?name=ApiKeys&op=revoke',
-      {
-        form: { _csrf_token: token ?? '' },
-        maxRedirects: 0,
-      },
-    );
-
-    expect([301, 302, 303]).toContain(response.status());
-    expect(response.headers()['location']).toBe('modules.php?name=ApiKeys');
-
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(
-      page.getByRole('button', { name: /Generate API Key/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /Revoke Key/i }),
-    ).not.toBeVisible();
-  });
-
-  test('generate without CSRF token renders error banner', async ({
-    page,
-    request,
-  }) => {
-    await revokeIfPresent(page);
-
-    const response = await request.post(
-      'modules.php?name=ApiKeys&op=generate',
-      {
-        form: {},
-        maxRedirects: 0,
-      },
-    );
+  test('generate without CSRF token renders error banner', async ({ request }) => {
+    const response = await request.post('modules.php?name=ApiKeys&op=generate', {
+      form: {},
+      maxRedirects: 0,
+    });
 
     expect(response.status()).toBe(200);
     const body = await response.text();
     expect(body).toContain('Invalid or expired form submission');
-
-    await page.goto('modules.php?name=ApiKeys');
-    await expect(
-      page.getByRole('button', { name: /Generate API Key/i }),
-    ).toBeVisible();
+    expect(body).not.toContain('API Key Generated');
   });
 });

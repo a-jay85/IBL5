@@ -220,4 +220,21 @@ class ApiKeysControllerTest extends WideUnitTestCase
         $output = $this->runHandle($this->buildController($service), 'revoke');
         self::assertSame('', $output);
     }
+
+    public function testMainPageShowsGoogleCardAndGuideButNoKeyCard(): void
+    {
+        $service = self::createMock(ApiKeysServiceInterface::class);
+        $service->expects(self::never())->method('getUserKeyStatus');
+
+        $view = self::createMock(ApiKeysViewInterface::class);
+        $view->expects(self::never())->method('renderNoKeyState');
+        $view->expects(self::never())->method('renderActiveKeyState');
+        $view->expects(self::once())->method('renderGoogleSheetCard')->willReturn('GOOGLE-CARD');
+        $view->expects(self::once())->method('renderExportGuide')->willReturn('EXPORT-GUIDE');
+
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        $output = $this->runHandle($this->buildController($service, null, null, $view), 'main');
+        self::assertLessThan(strpos($output, 'EXPORT-GUIDE'), strpos($output, 'GOOGLE-CARD'));
+    }
 }

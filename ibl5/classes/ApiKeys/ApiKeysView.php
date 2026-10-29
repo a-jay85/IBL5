@@ -28,72 +28,6 @@ class ApiKeysView implements ApiKeysViewInterface
         . '</div>';
 
     /**
-     * Header-auth alternative to IMPORTDATA. Mirrors google-sheets-header-auth.gs;
-     * keep the two in sync when the endpoint or header changes.
-     */
-    private const APPS_SCRIPT_SNIPPET = <<<'GS'
-var IBL_EXPORT_URL = 'https://iblhoops.net/ibl5/api/v1/players/export';
-var IBL_KEY_PROPERTY = 'IBL_API_KEY';
-
-/**
- * Store the API key once. Edit the literal, run this function from the editor,
- * then change the literal back to "YOUR_KEY" so the key does not sit in source.
- */
-function setIblApiKey() {
-  var key = 'YOUR_KEY';
-  if (key === 'YOUR_KEY' || key === '') {
-    throw new Error('Edit setIblApiKey() and replace YOUR_KEY with your real key before running it.');
-  }
-  PropertiesService.getUserProperties().setProperty(IBL_KEY_PROPERTY, key);
-}
-
-/**
- * Custom function. Returns the full player export as a 2-D array.
- *
- * @param {string} refresh Optional. Sheets caches custom-function results. Point
- *     this at a cell you edit by hand (for example =IBL_PLAYERS(A1)) and change
- *     that cell to re-fetch. NOW() and RAND() are not allowed as arguments.
- * @return {Array<Array<string|number>>} Rows of the CSV export, header row first.
- * @customfunction
- */
-function IBL_PLAYERS(refresh) {
-  var key = PropertiesService.getUserProperties().getProperty(IBL_KEY_PROPERTY);
-  if (!key) {
-    throw new Error('No API key stored. Run setIblApiKey() from the Apps Script editor first.');
-  }
-
-  var response = UrlFetchApp.fetch(IBL_EXPORT_URL, {
-    method: 'get',
-    headers: { 'X-API-Key': key },
-    muteHttpExceptions: true
-  });
-
-  var status = response.getResponseCode();
-  if (status === 401) {
-    throw new Error('IBL5 rejected the API key (HTTP 401). Re-run setIblApiKey() with a current key.');
-  }
-  if (status !== 200) {
-    throw new Error('IBL5 export failed with HTTP ' + status + '. Try again later.');
-  }
-
-  // The server prefixes the CSV with a UTF-8 BOM. Drop it so the first header is clean.
-  var body = response.getContentText();
-  if (body.charCodeAt(0) === 0xFEFF) {
-    body = body.slice(1);
-  }
-  if (body === '') {
-    throw new Error('IBL5 export returned an empty body.');
-  }
-  // parseCsv returns strings only. Convert numeric cells so SUM and division work.
-  return Utilities.parseCsv(body).map(function (row) {
-    return row.map(function (cell) {
-      return /^-?(0|[1-9][0-9]*)([.][0-9]+)?$/.test(cell) ? Number(cell) : cell;
-    });
-  });
-}
-GS;
-
-    /**
      * @see ApiKeysViewInterface::renderNoKeyState()
      */
     public function renderNoKeyState(): string
@@ -202,7 +136,7 @@ GS;
         ?>
 <div class="ibl-card" id="google-sheet-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Google Sheets Sync</h2>
+        <h1 class="ibl-card__title">Google Sheets Sync</h1>
     </div>
     <div class="ibl-card__body">
         <?php if (!$configured): ?>
@@ -318,7 +252,7 @@ GS;
 
     /**
      * Static Player Export guide (moved from the retired PlayerExportGuide module).
-     * Rendered below every key-state card by ApiKeysController::handle().
+     * Rendered below the Google Sheets card by ApiKeysController::handle().
      */
     public function renderExportGuide(): string
     {
@@ -329,23 +263,6 @@ GS;
         <h2 class="ibl-card__title">Player Export Guide</h2>
     </div>
     <div class="ibl-card__body">
-        <p class="mb-4">Prefer a sheet the site keeps fresh for you? Use Google Sheets Sync above; the IMPORTDATA formula below keeps working either way.</p>
-        <h3 class="mb-2">Quick Start</h3>
-        <ol class="mb-6">
-            <li class="mb-2">Go to API Key Management and generate an API key.</li>
-            <li class="mb-2">Copy the Google Sheets formula shown after key generation.</li>
-            <li class="mb-2">Paste the formula into any cell in Google Sheets. The full player database will populate automatically.</li>
-        </ol>
-
-        <h3 class="mb-2">Manual Formula</h3>
-        <p class="mb-4">If you already have your API key, paste this into a Google Sheets cell (replace <code>YOUR_KEY</code> with your actual key):</p>
-        <pre class="ibl-code-block mb-4">=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")</pre>
-        <?= self::URL_KEY_NOTICE ?>
-
-        <h3 class="mb-2">Apps Script (header auth)</h3>
-        <p class="mb-4">To keep the key out of the URL, use a Google Apps Script instead of <code>IMPORTDATA</code>. In your sheet open <strong>Extensions &gt; Apps Script</strong>, paste this script. Edit <code>setIblApiKey</code> and replace <code>YOUR_KEY</code> with your actual key, then run <code>setIblApiKey</code> once from the editor. In any cell enter <code>=IBL_PLAYERS()</code>. The key is stored in User Properties and travels in the <code>X-API-Key</code> header, so neither the sheet nor the server log contains it. After that run, change the key in <code>setIblApiKey</code> back to <code>YOUR_KEY</code> and save, so the key does not stay in the script. Sheets caches the result. To refresh, use <code>=IBL_PLAYERS(A1)</code> and change the value in <code>A1</code>.</p>
-        <pre class="ibl-code-block mb-4"><?= HtmlSanitizer::e(self::APPS_SCRIPT_SNIPPET) ?></pre>
-
         <h3 class="mb-2">Column Reference</h3>
         <table class="ibl-data-table mb-6">
             <thead>
@@ -393,14 +310,12 @@ GS;
 
         <h3 class="mb-2">Tips</h3>
         <ul class="mb-6">
-            <li class="mb-1">Data refreshes each time Google Sheets recalculates (approximately every hour) for IMPORTDATA. <code>=IBL_PLAYERS()</code> refreshes only when its argument cell changes.</li>
+            <li class="mb-1">The site rewrites the Players tab after every sim. Press Refresh above to update it sooner.</li>
+            <li class="mb-1">Don't edit the Players tab, since the next refresh overwrites it. Build your own tabs that pull from it; the sync never touches them.</li>
             <li class="mb-1">Use Google Sheets' built-in FILTER, SORT, and QUERY functions to slice the data.</li>
             <li class="mb-1">Salary values are in thousands (e.g., 1500 = $1,500K).</li>
             <li class="mb-1">Stats columns (GP, MIN, FGM, etc.) are season totals. Divide by GP for per-game averages.</li>
         </ul>
-
-        <h3 class="mb-2">Key Management</h3>
-        <p>Visit API Key Management to view, revoke, or regenerate your key. Each user can have one active key at a time.</p>
     </div>
 </div>
         <?php

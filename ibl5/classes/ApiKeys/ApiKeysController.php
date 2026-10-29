@@ -122,12 +122,8 @@ class ApiKeysController implements ApiKeysControllerInterface
     {
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->view->renderFlash($this->takeFlash()));
-        $keyStatus = $this->service->getUserKeyStatus($userId);
-        if ($keyStatus === null) {
-            $responder->html($this->view->renderNoKeyState());
-        } else {
-            $responder->html($this->view->renderActiveKeyState($keyStatus));
-        }
+        // The API key card is hidden: Google Sheets Sync replaced it as the way GMs get a sheet.
+        // The generate/revoke ops and key views stay so the card can come back later.
         $responder->html($this->view->renderGoogleSheetCard(
             $this->googleExport?->connectionSummaryFor($userId),
             $this->googleExport !== null

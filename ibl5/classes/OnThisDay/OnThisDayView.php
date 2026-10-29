@@ -25,7 +25,7 @@ final class OnThisDayView implements Contracts\OnThisDayViewInterface
 
         $centerLabel = (new \DateTimeImmutable($selection->centerDate))->format('M j');
 
-        $h  = '<section class="ibl-card" data-component="on-this-day">';
+        $h  = '<section class="ibl-card on-this-day" data-component="on-this-day">';
         $h .= '<div class="ibl-card__header">';
         $h .= '<h2 class="ibl-card__title">On this day</h2>';
         $h .= '<span class="ibl-card__subtitle">League history around ' . HtmlSanitizer::e($centerLabel) . '</span>';

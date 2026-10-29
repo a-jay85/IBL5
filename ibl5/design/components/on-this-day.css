@@ -1,3 +1,9 @@
+/* Match the Last-Sim Recap card width on the homepage. */
+.on-this-day {
+  max-width: 1400px;
+  margin-inline: auto;
+}
+
 .on-this-day__list {
   list-style: none;
   margin: 0;

@@ -126,9 +126,6 @@ test.describe('Google Sheets card', () => {
         await page.goto(API_KEYS);
 
         await expectButtonRowCentered(page.locator('#google-sheet-actions'));
-        // The API Key card above shares the page, so its action row (Revoke
-        // or Generate, whichever state this user is in) must be centered too.
-        await expectButtonRowCentered(page.locator('#api-key-actions'));
       });
     }
   }

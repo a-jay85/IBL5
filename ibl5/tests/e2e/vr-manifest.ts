@@ -221,7 +221,7 @@ export const VR_MANIFEST: VrRow[] = [
     notes: 'Admin-only game-runner; baseline reflects empty state under CI seed.' },
   { name: 'api-keys-guide', auth: 'auth-regular', url: 'modules.php?name=ApiKeys',
     anchor: '.ibl-card',
-    notes: 'Player Export guide now renders below the key card on the ApiKeys page.' },
+    notes: 'Player Export guide (column reference + tips) renders below the Google Sheets card; the API key card is hidden.' },
   { name: 'voting-admin-results', auth: 'auth', url: 'modules.php?name=Voting',
     anchor: '[onclick="ShowAndHideResults()"]',
     notes: 'Admin-only results expander; .voting-category alone matches every ballot category.' },

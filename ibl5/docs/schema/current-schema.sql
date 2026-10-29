@@ -2785,6 +2785,20 @@ CREATE TABLE `ibl_on_this_day_moments` (
   KEY `idx_otd_month_day_season` (`month_day`,`season_year`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_on_this_day_shown`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_on_this_day_shown` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `moment_key` varchar(96) NOT NULL,
+  `sim` int(10) unsigned NOT NULL,
+  `season_year` smallint(5) unsigned NOT NULL,
+  `shown_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_otd_shown_key_sim` (`moment_key`,`sim`),
+  KEY `idx_otd_shown_sim` (`sim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_one_on_one`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

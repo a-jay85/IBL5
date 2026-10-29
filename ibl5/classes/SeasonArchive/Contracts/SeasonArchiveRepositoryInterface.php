@@ -89,6 +89,15 @@ interface SeasonArchiveRepositoryInterface
     public function getTeamColors(): array;
 
     /**
+     * Get era-correct team colors for every season, keyed by season ending year then the
+     * team_name the franchise used that season. Retired identities carry their era colors;
+     * the current identity carries ibl_team_info colors.
+     *
+     * @return array<int, array<string, array{color1: string, color2: string, teamid: int}>>
+     */
+    public function getTeamColorsByYear(): array;
+
+    /**
      * Batch-lookup player IDs by name
      *
      * @param list<string> $names Player names to look up

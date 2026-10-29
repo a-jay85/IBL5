@@ -185,4 +185,48 @@ class SeasonRosterChangesRepositoryTest extends DatabaseTestCase
         }
         return null;
     }
+
+    public function testOldSideUsesEraCityAndColorsWhileNewSideStaysCurrent(): void
+    {
+        $pid = 200110020;
+        $this->insertTestPlayer($pid, 'PMV EraOld', ['teamid' => 2]);
+        $this->insertHistRow($pid, 'PMV EraOld', 2096, ['teamid' => 1, 'team' => 'EraOldTeam']);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Era City', 'team_name' => 'EraOldTeam',
+        ]);
+        $this->insertRow('ibl_franchise_era_branding', [
+            'franchise_id' => 1, 'team_city' => 'Era City', 'team_name' => 'EraOldTeam',
+            'color1' => '112233', 'color2' => '445566',
+        ]);
+
+        $found = $this->findByPid($this->repo->getSeasonRosterChanges(2096), $pid);
+
+        self::assertNotNull($found);
+        self::assertSame('Era City', $found['old_city']);
+        self::assertSame('112233', $found['old_color1']);
+        self::assertSame('445566', $found['old_color2']);
+        self::assertNotSame('112233', $found['new_color1']);
+    }
+
+    public function testOldSideWithoutEraBrandingKeepsCurrentColors(): void
+    {
+        $pid = 200110021;
+        $this->insertTestPlayer($pid, 'PMV NoEraOld', ['teamid' => 2]);
+        $this->insertHistRow($pid, 'PMV NoEraOld', 2096, ['teamid' => 1]);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Current City', 'team_name' => 'CurrentName',
+        ]);
+        $res = $this->db->query('SELECT color1 FROM ibl_team_info WHERE teamid = 1');
+        self::assertInstanceOf(\mysqli_result::class, $res);
+        $current = $res->fetch_assoc();
+        self::assertIsArray($current);
+
+        $found = $this->findByPid($this->repo->getSeasonRosterChanges(2096), $pid);
+
+        self::assertNotNull($found);
+        self::assertSame('Current City', $found['old_city']);
+        self::assertSame($current['color1'], $found['old_color1']);
+    }
 }

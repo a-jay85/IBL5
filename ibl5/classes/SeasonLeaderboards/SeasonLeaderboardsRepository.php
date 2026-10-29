@@ -68,13 +68,22 @@ class SeasonLeaderboardsRepository extends \Database\BaseMysqliRepository implem
         // `ibl_hist` has 57 columns but only these 20 are consumed. Selecting `h.*`
         // tripled the cached blob (5.1MB -> 1.95MB after trimming) and its decode
         // cost on every page load. See CachedSeasonLeaderboardsRepository.
+        // City and colors resolve per season (fs + eb) so a retired identity keeps its era look.
         $query = "SELECT
                 h.pid, h.name, h.year, h.team, h.teamid, h.games, h.minutes,
                 h.fgm, h.fga, h.ftm, h.fta, h.tgm, h.tga,
                 h.orb, h.reb, h.ast, h.stl, h.tvr, h.blk, h.pf,
-                t.team_city, t.color1, t.color2
+                COALESCE(fs.team_city, t.team_city) AS team_city,
+                COALESCE(NULLIF(eb.color1, ''), t.color1) AS color1,
+                COALESCE(NULLIF(eb.color2, ''), t.color2) AS color2
             FROM `ibl_hist` h
             LEFT JOIN `ibl_team_info` t ON h.teamid = t.teamid
+            LEFT JOIN `ibl_franchise_seasons` fs
+                   ON fs.franchise_id = h.teamid AND fs.season_ending_year = h.year
+            LEFT JOIN `ibl_franchise_era_branding` eb
+                   ON eb.franchise_id = fs.franchise_id
+                  AND eb.team_city COLLATE utf8mb4_unicode_ci = fs.team_city
+                  AND eb.team_name COLLATE utf8mb4_unicode_ci = fs.team_name
             WHERE h.name IS NOT NULL" . $yearClause . $teamClause . " ORDER BY " . $sortBy . " DESC, h.pid ASC"
             . $limitClause;
 

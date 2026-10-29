@@ -454,7 +454,7 @@
    Table Scroll Wrapper
 
    Wrapper/container pattern used by responsive-tables.js for tables that
-   overflow on mobile. Provides horizontal scrolling + scroll-shadow indicator.
+   overflow on mobile. Provides horizontal scrolling.
 
    Structure:
      <div class="table-scroll-wrapper">
@@ -469,14 +469,14 @@
     white-space: nowrap;
 }
 
-/* Wrapper for scroll container - holds the fixed shadow */
+/* Wrapper for scroll container */
 .table-scroll-wrapper {
     position: relative;
     margin-bottom: var(--space-4);
 }
 
-/* Remove table's own bottom margin when inside wrapper so the scroll shadow
-   doesn't extend past the table's visible border. */
+/* Remove table's own bottom margin when inside wrapper; the wrapper
+   supplies the spacing. */
 .table-scroll-wrapper .ibl-data-table {
     margin-bottom: 0;
 }
@@ -565,27 +565,6 @@
     }
 }
 
-/* Scroll indicator shadow on right edge - on wrapper so it doesn't scroll */
-.table-scroll-wrapper::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 24px;
-    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
-    pointer-events: none;
-    opacity: 1;
-    transition: opacity var(--transition-slow);
-    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-    z-index: var(--z-raised-2);
-}
-
-/* Hide scroll indicator when scrolled to the end */
-.table-scroll-wrapper.scrolled-end::after {
-    opacity: 0;
-}
-
 /* ==========================================================================
    Sticky Header + Column Tables
 
@@ -641,10 +620,6 @@
    that would add extra overflow:hidden and break sticky positioning */
 .sticky-scroll-wrapper .table-scroll-wrapper {
     overflow: visible;
-}
-
-.sticky-scroll-wrapper .table-scroll-wrapper::after {
-    display: none;
 }
 
 .sticky-scroll-wrapper .table-scroll-container {

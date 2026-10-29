@@ -80,7 +80,7 @@ class RecordFormatter implements RecordFormatterInterface
                 'teamAbbr' => $teamAbbr,
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id'], $record['teamid']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
                 'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -122,7 +122,7 @@ class RecordFormatter implements RecordFormatterInterface
                 'teamAbbr' => $teamAbbr,
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id'], $record['teamid']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], $gameType),
                 'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -198,7 +198,7 @@ class RecordFormatter implements RecordFormatterInterface
                 'teamAbbr' => self::teamAbbreviation($record['teamid']),
                 'teamTid' => $record['teamid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id'], $record['teamid']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => self::teamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
@@ -225,7 +225,7 @@ class RecordFormatter implements RecordFormatterInterface
                 'teamAbbr' => self::teamAbbreviation($record['winner_tid']),
                 'teamTid' => $record['winner_tid'],
                 'teamYr' => (string) $seasonYear,
-                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id']),
+                'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['game_of_that_day'], $record['box_id'], $record['winner_tid']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => self::teamAbbreviation($record['loser_tid']),
                 'oppTid' => $record['loser_tid'],
@@ -421,10 +421,11 @@ class RecordFormatter implements RecordFormatterInterface
      * Build a box score URL via BoxScoreUrlBuilder (GameBoxscore module URL, or a legacy box{N}.htm file).
      *
      * Returns empty string if gameOfThatDay is not available (historical records).
+     * $teamId opens the page on that team's tab.
      */
-    private function buildBoxScoreUrl(string $date, int $gameOfThatDay, int $boxId = 0): string
+    private function buildBoxScoreUrl(string $date, int $gameOfThatDay, int $boxId = 0, int $teamId = 0): string
     {
-        return \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        return \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId, $teamId);
     }
 
     /**

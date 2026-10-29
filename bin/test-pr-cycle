@@ -500,6 +500,12 @@ grep -qF 'PRs fill the cap first, then DIRTY rescues' <<< "$OUT" \
     && fail "--help still carries the old ordered-first --max-ready wording"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
+grep -qF 'feat-commit-type-floor' <<< "$OUT" \
+    || fail "--help omits the widened held-unchanged condition names"
+grep -qF 'manual-testing-clearance' <<< "$OUT" \
+    || fail "--help omits condition 1's name in the held-unchanged text"
+grep -qF 'conditions {3,7} only' <<< "$OUT" \
+    && fail "--help still carries the old {3,7}-only held-unchanged wording"
 grep -qF 'judged-empty form' <<< "$OUT" \
     || fail "--help omits the gate-nominee handling note"
 for bad in "--nope" "--max-ready 0" "--max-ready -1" "--max-ready abc" "--max-ready" \
@@ -2540,6 +2546,64 @@ run --worker
 grep -qF 'skipping pr-ready' <<< "$OUT" || fail "fix3 legacy tree: skip line missing"
 end_case "case fix3 harness-format sticky verdict"
 
+# A real copy of the harness, so the fingerprint's harness hash is stable and the copy owns
+# its own out/state. Seed and check both load this copy, so they hash the same bytes.
+HRH="$SCRATCH/hrh/tools/postplan-harness"
+mkdir -p "$HRH"
+cp -R "$SCRIPT_DIR/../tools/postplan-harness/harness" "$HRH/"
+cp "$SCRIPT_DIR/../tools/postplan-harness/runner.py" "$HRH/"
+HR_BRANCHES=()
+
+# hr_fixture <pr> <branch> <conds> [state-dir] [nowt]
+# Builds a PR worktree with a committed change, a plan file, a harness result blocking <conds>,
+# an armed-state entry carrying headRefOid, and a seeded holdrepeat record (DM already sent).
+# With nowt, the worktree is removed after seeding, so the record exists but no worktree does.
+hr_fixture() {
+    local n="$1" branch="$2" conds="$3" sd="${4:-$SCRATCH/hrstate}" nowt="${5:-}"
+    local wt="$SCRATCH/wt-$branch" oid tmp
+    git -C "$REPO" rev-parse --verify -q refs/remotes/origin/master >/dev/null \
+        || git -C "$REPO" update-ref refs/remotes/origin/master HEAD
+    git -C "$REPO" worktree add -q "$wt" -b "$branch" >/dev/null 2>&1
+    HR_BRANCHES+=("$branch")
+    echo "change $branch" > "$wt/hrfile"
+    git -C "$wt" add hrfile
+    git -C "$wt" commit -qm "hr $branch"
+    oid="$(git -C "$wt" rev-parse HEAD)"
+    mkdir -p "$SCRATCH/claude-plans"
+    echo "# plan $branch" > "$SCRATCH/claude-plans/$branch.md"
+    install_harness_result "$n" "$branch" shipped-held "$conds" CLEAN
+    tmp="$SCRATCH/armed-state.tmp"
+    jq --argjson n "$n" --arg oid "$oid" \
+        'map(if .number == $n then . + {headRefOid: $oid} else . end)' \
+        "$SCRATCH/armed-state.json" > "$tmp" && mv "$tmp" "$SCRATCH/armed-state.json"
+    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$sd" "$branch" "$wt" "$conds" <<'PY'
+import json, os, sys
+from harness.holdrepeat import SCHEMA_VERSION, fingerprint, record_path
+from harness.planfile import locate_plan
+sd, slug, wt, conds = sys.argv[1:5]
+fp = fingerprint(locate_plan(slug).path or "", wt)
+assert fp, "seed fingerprint empty"
+os.makedirs(sd, exist_ok=True)
+rec = {"schema_version": SCHEMA_VERSION, "structural_key": conds, "repeat_count": 3,
+       "dm_sent_key": conds, "fingerprint": fp,
+       "hold_set": [[int(c), ""] for c in conds.split(",") if c]}
+open(record_path(sd, slug), "w").write(json.dumps(rec))
+PY
+    if [[ "$nowt" == nowt ]]; then
+        git -C "$REPO" worktree remove --force "$wt" >/dev/null 2>&1
+    fi
+}
+
+hr_cleanup() {
+    local b
+    for b in ${HR_BRANCHES[@]+"${HR_BRANCHES[@]}"}; do
+        git -C "$REPO" worktree remove --force "$SCRATCH/wt-$b" >/dev/null 2>&1 || true
+        git -C "$REPO" branch -D "$b" >/dev/null 2>&1 || true
+    done
+    HR_BRANCHES=()
+    rm -rf "$SCRATCH/hrstate" "$HRH/out" "$SCRATCH/claude-plans" "$SCRATCH/hr-empty" "$SCRATCH/hr-boom"
+}
+
 # ==========================================================================================
 # Fix 4 — held-unchanged skip
 # ==========================================================================================
@@ -2549,14 +2613,15 @@ reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 install_harness_verdict 101 "$DIFF_A"
-install_harness_result 101 "first-slug" "shipped-held" "3" "CLEAN"
-run --worker
+hr_fixture 101 first-slug "3"
+HRHARNESS="$HRH" run --worker
 [[ $RC -eq 0 ]] || fail "fix4 held-cond3: exit $RC, want 0"
 [[ "$(calls ready)" == "0" ]] || fail "fix4 held-cond3: fleet ran $(calls ready) time(s), want 0"
 grep -qF 'held it for' <<< "$OUT" || fail "fix4 held-cond3: held-skip log line missing"
 grep -qF 'unchanged' <<< "$OUT" || fail "fix4 held-cond3: 'unchanged' not in log line"
+hr_cleanup
 
-# Case B: held for {3,12} — 12 is not in {3,7} → must NOT skip
+# Case B: held for {3,12} — 12 is not in {1,3,7,8} → must NOT skip
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
@@ -2603,65 +2668,114 @@ SKIPHELD=0 run --worker
 unset SKIPHELD
 end_case "case fix4 held-unchanged skip"
 
+# hu_prep <conds> [actual-diff] — one NEEDS-WORK PR whose last hold blocked <conds>, a sticky
+# whose **Reviewed diff:** is $DIFF_A, a current patch-id of [actual-diff] (default $DIFF_A),
+# and a real hold record from hr_fixture.
+hu_prep() {
+    reset_state
+    printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+    triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+    install_harness_verdict 101 "$DIFF_A" "${2:-$DIFF_A}"
+    hr_fixture 101 first-slug "$1"
+}
+
+begin_case
+# A hold on {1,7,8} with an unchanged head is skipped and the skip names every condition.
+hu_prep "1,7,8"
+triage_report > "$SCRATCH/triage-out"   # no row for 101, so its stage1 reason shows under Skipped
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "human-only-skip-1-7-8: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "human-only-skip-1-7-8: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for (1,7,8)' "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-7-8: skip line lacks 'held it for (1,7,8)'"
+grep -qF 'waiting on: 1 manual-testing-clearance, 7 plan-auto-merge-hold, 8 feat-commit-type-floor' \
+    "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-7-8: skip line lacks the condition names"
+_dm="$(cat "$SCRATCH/dm.argv")"
+grep -qF '**Skipped (1)**' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks Skipped (1): $_dm"
+grep -qF 'manual-testing-clearance' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks the condition name: $_dm"
+hr_cleanup
+
+# A hold on condition 1 alone, written by the production `observe`, is skipped.
+hu_prep "1"
+env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$SCRATCH/hrstate" first-slug "$SCRATCH/wt-first-slug" <<'PY'
+import sys
+from harness.holdrepeat import fingerprint, observe
+from harness.planfile import locate_plan
+sd, slug, wt = sys.argv[1:4]
+fp = fingerprint(locate_plan(slug).path or "", wt)
+assert fp, "seed fingerprint empty"
+observe(sd, slug, armed=False, conditions=[{"number": 1, "name": "manual-testing-clearance", "blocked": True, "reason": "r"}],
+        fingerprint=fp, pr=101, now="t")
+PY
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "human-only-skip-1-alone: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for (1)' "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-alone: skip line lacks 'held it for (1)'"
+grep -qF 'waiting on: 1 manual-testing-clearance' "$(rundir)/stage1-skipped.txt" \
+    || fail "human-only-skip-1-alone: skip line lacks the condition name"
+hr_cleanup
+
+# A new head (current patch-id differs from the sticky) is not skipped by Fix 4. The pre-fire
+# holdrepeat skip may still decline it at zero tokens, so these rows key on the Fix 4 skip line.
+hu_prep "1,7,8" "$DIFF_B"
+HRHARNESS="$HRH" run --worker
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "human-only-new-head-runs: skip line written for a changed diff"
+hr_cleanup
+
+# A foreign condition (2) in the harness result is not skipped, even with a human-only record
+# ({1,7}): the shell subset test is the only gate that stops it.
+hu_prep "1,7"
+printf '{"terminal":"shipped-held","pr_number":101,"arm":{"conditions":[{"number":1,"blocked":true},{"number":7,"blocked":true},{"number":2,"blocked":true}]}}\n' \
+    > "$SCRATCH/harness-out/live-first-slug-20260901-120000-99999/result.json"
+HRHARNESS="$HRH" run --worker
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "human-only-foreign-condition-runs: skip line written for {1,7,2}"
+hr_cleanup
+
+# A foreign condition (2) in the hold record is not skipped either: the Python subset test.
+hu_prep "1,7,2"
+HRHARNESS="$HRH" run --worker
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "human-only-foreign-record-runs: skip line written for a {1,7,2} record"
+hr_cleanup
+
+# An unreadable hold record runs the fleet.
+hu_prep "1,7,8"
+printf '{not json' > "$SCRATCH/hrstate/first-slug.holdrepeat.json"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "human-only-unreadable-record-runs: fleet ran $(calls ready) time(s), want 1"
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "human-only-unreadable-record-runs: skip line written with an unreadable record"
+hr_cleanup
+
+# A missing hold record runs the fleet.
+hu_prep "1,7,8"
+rm -f "$SCRATCH/hrstate/first-slug.holdrepeat.json"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "human-only-missing-record-runs: fleet ran $(calls ready) time(s), want 1"
+hr_cleanup
+
+# A plan edit (diff and record untouched) moves the fingerprint and runs the fleet.
+hu_prep "1,7,8"
+echo "plan edited" >> "$SCRATCH/claude-plans/first-slug.md"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "1" ]] || fail "human-only-plan-edit-runs: fleet ran $(calls ready) time(s), want 1"
+hr_cleanup
+
+# The kill switch runs a PR that would otherwise be skipped.
+hu_prep "1,7,8"
+SKIPHELD=0 HRHARNESS="$HRH" run --worker
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "human-only-kill-switch: skip line written despite the kill switch"
+unset SKIPHELD
+hr_cleanup
+end_case "case fix4 human-only held-unchanged skip"
+
 # ==========================================================================================
 # Pre-fire holdrepeat skip
 # ==========================================================================================
-# A real copy of the harness, so the fingerprint's harness hash is stable and the copy owns
-# its own out/state. Seed and check both load this copy, so they hash the same bytes.
-HRH="$SCRATCH/hrh/tools/postplan-harness"
-mkdir -p "$HRH"
-cp -R "$SCRIPT_DIR/../tools/postplan-harness/harness" "$HRH/"
-cp "$SCRIPT_DIR/../tools/postplan-harness/runner.py" "$HRH/"
-HR_BRANCHES=()
-
-# hr_fixture <pr> <branch> <conds> [state-dir] [nowt]
-# Builds a PR worktree with a committed change, a plan file, a harness result blocking <conds>,
-# an armed-state entry carrying headRefOid, and a seeded holdrepeat record (DM already sent).
-# With nowt, the worktree is removed after seeding, so the record exists but no worktree does.
-hr_fixture() {
-    local n="$1" branch="$2" conds="$3" sd="${4:-$SCRATCH/hrstate}" nowt="${5:-}"
-    local wt="$SCRATCH/wt-$branch" oid tmp
-    git -C "$REPO" rev-parse --verify -q refs/remotes/origin/master >/dev/null \
-        || git -C "$REPO" update-ref refs/remotes/origin/master HEAD
-    git -C "$REPO" worktree add -q "$wt" -b "$branch" >/dev/null 2>&1
-    HR_BRANCHES+=("$branch")
-    echo "change $branch" > "$wt/hrfile"
-    git -C "$wt" add hrfile
-    git -C "$wt" commit -qm "hr $branch"
-    oid="$(git -C "$wt" rev-parse HEAD)"
-    mkdir -p "$SCRATCH/claude-plans"
-    echo "# plan $branch" > "$SCRATCH/claude-plans/$branch.md"
-    install_harness_result "$n" "$branch" shipped-held "$conds" CLEAN
-    tmp="$SCRATCH/armed-state.tmp"
-    jq --argjson n "$n" --arg oid "$oid" \
-        'map(if .number == $n then . + {headRefOid: $oid} else . end)' \
-        "$SCRATCH/armed-state.json" > "$tmp" && mv "$tmp" "$SCRATCH/armed-state.json"
-    env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$sd" "$branch" "$wt" "$conds" <<'PY'
-import json, os, sys
-from harness.holdrepeat import SCHEMA_VERSION, fingerprint, record_path
-from harness.planfile import locate_plan
-sd, slug, wt, conds = sys.argv[1:5]
-fp = fingerprint(locate_plan(slug).path or "", wt)
-assert fp, "seed fingerprint empty"
-os.makedirs(sd, exist_ok=True)
-rec = {"schema_version": SCHEMA_VERSION, "structural_key": conds, "repeat_count": 3,
-       "dm_sent_key": conds, "fingerprint": fp}
-open(record_path(sd, slug), "w").write(json.dumps(rec))
-PY
-    if [[ "$nowt" == nowt ]]; then
-        git -C "$REPO" worktree remove --force "$wt" >/dev/null 2>&1
-    fi
-}
-
-hr_cleanup() {
-    local b
-    for b in ${HR_BRANCHES[@]+"${HR_BRANCHES[@]}"}; do
-        git -C "$REPO" worktree remove --force "$SCRATCH/wt-$b" >/dev/null 2>&1 || true
-        git -C "$REPO" branch -D "$b" >/dev/null 2>&1 || true
-    done
-    HR_BRANCHES=()
-    rm -rf "$SCRATCH/hrstate" "$HRH/out" "$SCRATCH/claude-plans" "$SCRATCH/hr-empty" "$SCRATCH/hr-boom"
-}
 
 # hr_run_case <label> <branch> <conds> — A-C: held PR is skipped, slot never fires.
 hr_skip_case() {
@@ -2813,6 +2927,23 @@ grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-not-eligib
 grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-not-eligible: argv lacks --state-changed-prs=101: $(ro_argv)"
 end_case "rebase-only-not-eligible"
 
+# A DIRTY PR held on {1,7} is outside the rebase-only set {3,7,8}: the widened skip must not
+# swallow it. It is routed state-changed so the harness can review the rebased tree.
+begin_case
+ro_setup 101 first-slug DIRTY
+install_harness_result 101 first-slug shipped-held "1,7" DIRTY
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+RO_STUB_RC=0 HRHARNESS="$RO_STUB" run --worker
+[[ $RC -eq 0 ]] || fail "dirty-1-7-not-skipped-not-rebase-only: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "dirty-1-7-not-skipped-not-rebase-only: fleet ran $(calls ready) time(s), want 1"
+grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" \
+    || fail "dirty-1-7-not-skipped-not-rebase-only: argv lacks --state-changed-prs=101: $(ro_argv)"
+grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" \
+    && fail "dirty-1-7-not-skipped-not-rebase-only: argv carries --rebase-only-prs: $(ro_argv)"
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "dirty-1-7-not-skipped-not-rebase-only: skip line written for a DIRTY PR"
+end_case "case dirty-1-7-not-skipped-not-rebase-only"
+
 begin_case
 ro_setup 101 first-slug DIRTY "$DIFF_B"
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2874,14 +3005,15 @@ reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 install_harness_verdict 101 "$DIFF_A"
-install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+hr_fixture 101 first-slug "3,7"
 mkdir -p "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999"
 printf '{"terminal":"rebased-held","pr_number":101}\n' \
     > "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999/result.json"
-run --worker
+HRHARNESS="$HRH" run --worker
 [[ "$(calls ready)" == "0" ]] || fail "held-unchanged-survives-rebased-held: fleet ran $(calls ready) time(s), want 0"
 grep -qF 'held it for' <<< "$OUT" || fail "held-unchanged-survives-rebased-held: held-skip line missing (out: $OUT)"
 rm -rf "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999"
+hr_cleanup
 end_case "held-unchanged-survives-rebased-held"
 
 begin_case
@@ -3335,14 +3467,15 @@ reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
 install_harness_verdict 101 "$DIFF_A"
-install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
-run --worker
+hr_fixture 101 first-slug "3,7"
+HRHARNESS="$HRH" run --worker
 [[ $RC -eq 0 ]] || fail "feat-awaiting-signoff-no-bypass: exit $RC, want 0"
 grep -qF 'last post-plan run held it for (3,7) and the diff is unchanged' "$(rundir)/stage1-skipped.txt" \
     || fail "feat-awaiting-signoff-no-bypass: held-unchanged skip line missing"
 grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "feat-awaiting-signoff-no-bypass: 101 is in stage1.txt"
 grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
     && fail "feat-awaiting-signoff-no-bypass: --state-changed-prs passed"
+hr_cleanup
 end_case "case feat-awaiting-signoff-no-bypass"
 
 # 4: a stacked PR is skipped on both paths, even when red and held; the flag never names it.
@@ -3475,14 +3608,15 @@ for _mode in skip-notes-env-unset skip-notes-env-empty skip-notes-env-missing; d
     printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
     triage_report > "$SCRATCH/triage-out"   # no row for 101, so its reason shows under Skipped
     install_harness_verdict 101 "$DIFF_A"
-    install_harness_result 101 "first-slug" "shipped-held" "3,7" "CLEAN"
+    hr_fixture 101 first-slug "3,7"
     case "$_mode" in
         *-unset)   unset PR_CYCLE_SKIP_NOTES ;;
         *-empty)   export PR_CYCLE_SKIP_NOTES= ;;
         *-missing) export PR_CYCLE_SKIP_NOTES="$SCRATCH/missing.tsv" ;;
     esac
-    run --worker
+    HRHARNESS="$HRH" run --worker
     unset PR_CYCLE_SKIP_NOTES
+    hr_cleanup
     [[ $RC -eq 0 ]] || fail "$_mode: exit $RC, want 0"
     _dm="$(cat "$SCRATCH/dm.argv")"
     grep -qF '**Skipped (1)**' <<< "$_dm" || fail "$_mode: Skipped (1) missing: $_dm"

@@ -181,10 +181,7 @@ final class PostOnThisDayStepTest extends TestCase
         self::assertTrue($result->success);
         self::assertSame([12], $claims->claimed);
         self::assertCount(1, $poster->messages);
-        self::assertStringContainsString(
-            (new MomentFormatter())->describe($this->makeMoment()),
-            $poster->messages[0],
-        );
+        self::assertSame((new MomentFormatter())->discordLine($this->makeMoment(), 2), $poster->messages[0]);
         self::assertStringContainsString('2 seasons ago', $poster->messages[0]);
         self::assertStringContainsString('Posted sim 12', $result->detail);
     }

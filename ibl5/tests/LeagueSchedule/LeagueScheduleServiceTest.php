@@ -293,6 +293,8 @@ class LeagueScheduleServiceTest extends TestCase
             'boxid' => 101,
             'gameOfThatDay' => 1,
             'boxScoreUrl' => 'modules.php?name=GameBoxscore&date=2025-11-01&game=1',
+            'visitorBoxScoreUrl' => 'modules.php?name=GameBoxscore&date=2025-11-01&game=1&team=1',
+            'homeBoxScoreUrl' => 'modules.php?name=GameBoxscore&date=2025-11-01&game=1&team=2',
             'isUnplayed' => false,
             'isUpcoming' => false,
             'visitorWon' => true,
@@ -307,6 +309,14 @@ class LeagueScheduleServiceTest extends TestCase
         $this->assertSame(
             './ibl/IBL/box101.htm',
             $legacy['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]['boxScoreUrl']
+        );
+        $this->assertSame(
+            './ibl/IBL/box101.htm',
+            $legacy['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]['visitorBoxScoreUrl']
+        );
+        $this->assertSame(
+            './ibl/IBL/box101.htm',
+            $legacy['gamesByMonth']['2025-11']['dates']['2025-11-01'][0]['homeBoxScoreUrl']
         );
     }
 

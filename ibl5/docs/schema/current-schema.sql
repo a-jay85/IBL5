@@ -2776,6 +2776,7 @@ CREATE TABLE `ibl_on_this_day_moments` (
   `team_name` varchar(64) NOT NULL DEFAULT '',
   `opponent_teamid` int(11) NOT NULL DEFAULT 0,
   `opponent_name` varchar(64) NOT NULL DEFAULT '',
+  `game_of_that_day` tinyint(3) unsigned NOT NULL DEFAULT 0,
   `facts_json` text NOT NULL,
   `stat_label` varchar(32) DEFAULT NULL,
   `built_at` timestamp NOT NULL DEFAULT current_timestamp(),

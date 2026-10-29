@@ -73,8 +73,8 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
 
     private const INSERT_SQL = "INSERT INTO `ibl_on_this_day_moments`
             (moment_key, kind, game_date, month_day, season_year, pid, player_name,
-             teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+             teamid, team_name, opponent_teamid, opponent_name, facts_json, stat_label, game_of_that_day)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     /** Minimum old-team scoring average for a mover to count as a trade. */
     private const TRADE_MIN_PPG = 15;
@@ -87,13 +87,45 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
      */
     public function collect(): array
     {
-        return array_merge(
+        $moments = array_merge(
             $this->collectPlayerGames(MomentKind::FiftyPointGame),
             $this->collectPlayerGames(MomentKind::TripleDouble),
             $this->collectRecordGames(),
             $this->collectSeriesClinchers(),
             $this->collectTrades(),
         );
+
+        return $this->stampOrdinals($moments);
+    }
+
+    /**
+     * Stamp each moment with its game's league-wide ordinal, the box-score link
+     * key. GAME_OF_THAT_DAY_SUBQUERY takes MIN over (date, visitor, home), the
+     * rule the schedule page links by, so a phantom copy never supplies the
+     * ordinal. No doubleheaders: date|teamId names one game. A missing key or an
+     * out-of-range value stamps 0 (no link). Runs after every collector, so the
+     * unbuffered record stream is already freed.
+     *
+     * @param list<Moment> $moments
+     * @return list<Moment>
+     */
+    private function stampOrdinals(array $moments): array
+    {
+        $ordinals = [];
+        $sql = 'SELECT gotd.game_date, gotd.visitor_teamid, gotd.home_teamid, gotd.game_of_that_day FROM '
+            . self::GAME_OF_THAT_DAY_SUBQUERY . ' gotd';
+        foreach ($this->fetchAll($sql) as $row) {
+            $date = $this->str($row, 'game_date');
+            $ordinal = $this->int($row, 'game_of_that_day');
+            $ordinals[$date . '|' . $this->int($row, 'visitor_teamid')] = $ordinal;
+            $ordinals[$date . '|' . $this->int($row, 'home_teamid')] = $ordinal;
+        }
+
+        return array_map(static function (Moment $m) use ($ordinals): Moment {
+            $ordinal = $ordinals[$m->date . '|' . $m->teamId] ?? 0;
+
+            return $m->withGameOfThatDay($ordinal >= 1 && $ordinal <= 255 ? $ordinal : 0);
+        }, $moments);
     }
 
     /**
@@ -113,7 +145,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
             foreach ($moments as $moment) {
                 $this->execute(
                     self::INSERT_SQL,
-                    'ssssiisisisss',
+                    'ssssiisisisssi',
                     $moment->key,
                     $moment->kind->value,
                     $moment->date,
@@ -127,6 +159,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
                     $moment->opponentName,
                     json_encode($moment->facts, JSON_THROW_ON_ERROR),
                     $moment->statLabel,
+                    $moment->gameOfThatDay,
                 );
             }
 
@@ -374,7 +407,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
                 teamName: $this->str($row, 'to_name'),
                 opponentTeamId: $from,
                 opponentName: $this->str($row, 'from_name'),
-                facts: ['players_moved' => $this->int($row, 'players_moved')],
+                facts: ['players_moved' => $this->int($row, 'players_moved'), 'mover_pid' => $this->int($row, 'pid')],
             );
         }
 

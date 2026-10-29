@@ -158,4 +158,45 @@ final class MomentTest extends TestCase
 
         Moment::fromArray($row);
     }
+
+    public function testRoundTripKeepsGameOfThatDay(): void
+    {
+        $row = self::validRow();
+        $row['gameOfThatDay'] = 3;
+
+        $moment = Moment::fromArray($row);
+
+        $this->assertSame(3, $moment->gameOfThatDay);
+        $this->assertSame(3, $moment->toArray()['gameOfThatDay']);
+        $this->assertEquals($moment, Moment::fromArray($moment->toArray()));
+    }
+
+    public function testMissingGameOfThatDayDefaultsToZero(): void
+    {
+        $this->assertSame(0, Moment::fromArray(self::validRow())->gameOfThatDay);
+    }
+
+    public function testRejectsNonIntGameOfThatDay(): void
+    {
+        $row = self::validRow();
+        $row['gameOfThatDay'] = '3';
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/^Malformed moment row$/');
+
+        Moment::fromArray($row);
+    }
+
+    public function testWithGameOfThatDayKeepsEveryOtherField(): void
+    {
+        $original = Moment::fromArray(self::validRow());
+
+        $stamped = $original->withGameOfThatDay(5);
+
+        $this->assertSame(5, $stamped->gameOfThatDay);
+        $this->assertSame(0, $original->gameOfThatDay);
+        $expected = $original->toArray();
+        $expected['gameOfThatDay'] = 5;
+        $this->assertSame($expected, $stamped->toArray());
+    }
 }

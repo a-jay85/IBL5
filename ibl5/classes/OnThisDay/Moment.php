@@ -11,7 +11,7 @@ namespace OnThisDay;
  * - FiftyPointGame, TripleDouble: points, rebounds, assists, steals, blocks
  * - RecordGame: value (plus $statLabel)
  * - SeriesClincher: round, wins, losses
- * - Trade: players_moved
+ * - Trade: players_moved, mover_pid (the headline mover; pid stays 0)
  */
 final readonly class Moment
 {
@@ -20,6 +20,7 @@ final readonly class Moment
      * @param string $date Y-m-d (box-score Date)
      * @param int $pid 0 for Trade / SeriesClincher
      * @param array<string, int> $facts
+     * @param int $gameOfThatDay League-wide ordinal of the moment's game on its date (box-score link key); 0 = unknown, no link
      */
     public function __construct(
         public MomentKind $kind,
@@ -34,7 +35,27 @@ final readonly class Moment
         public string $opponentName,
         public array $facts,
         public ?string $statLabel = null,
+        public int $gameOfThatDay = 0,
     ) {
+    }
+
+    public function withGameOfThatDay(int $gameOfThatDay): self
+    {
+        return new self(
+            $this->kind,
+            $this->key,
+            $this->date,
+            $this->seasonYear,
+            $this->pid,
+            $this->playerName,
+            $this->teamId,
+            $this->teamName,
+            $this->opponentTeamId,
+            $this->opponentName,
+            $this->facts,
+            $this->statLabel,
+            $gameOfThatDay,
+        );
     }
 
     /**
@@ -55,6 +76,7 @@ final readonly class Moment
             'opponentName' => $this->opponentName,
             'facts' => $this->facts,
             'statLabel' => $this->statLabel,
+            'gameOfThatDay' => $this->gameOfThatDay,
         ];
     }
 
@@ -78,6 +100,7 @@ final readonly class Moment
         $opponentName = $row['opponentName'] ?? null;
         $facts = $row['facts'] ?? null;
         $statLabel = $row['statLabel'] ?? null;
+        $gameOfThatDay = $row['gameOfThatDay'] ?? 0;
 
         if (
             !is_string($kind) || !is_string($key) || !is_string($date)
@@ -85,6 +108,7 @@ final readonly class Moment
             || !is_int($teamId) || !is_string($teamName) || !is_int($opponentTeamId)
             || !is_string($opponentName) || !is_array($facts)
             || ($statLabel !== null && !is_string($statLabel))
+            || !is_int($gameOfThatDay)
         ) {
             throw new \InvalidArgumentException('Malformed moment row');
         }
@@ -115,6 +139,7 @@ final readonly class Moment
             opponentName: $opponentName,
             facts: $cleanFacts,
             statLabel: $statLabel,
+            gameOfThatDay: $gameOfThatDay,
         );
     }
 }

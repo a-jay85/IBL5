@@ -22,9 +22,9 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
     public const LAST_POSTED_SIM_KEY = 'on_this_day_last_posted_sim';
 
     /**
-     * Widest month/day window: radius 7 on each side of the center date.
+     * Widest month/day window: a MAX_SPAN_DAYS sim span plus radius 7 on each side.
      */
-    public const MONTH_DAY_LIST_WIDTH = 15;
+    public const MONTH_DAY_LIST_WIDTH = OnThisDayCalendar::MAX_SPAN_DAYS + 14;
 
     /** MariaDB ER_NO_SUCH_TABLE: the migration has not been applied yet. */
     private const ER_NO_SUCH_TABLE = 1146;
@@ -83,21 +83,6 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
         }
 
         return $moments;
-    }
-
-    /**
-     * @see OnThisDayRepositoryInterface::findSimEndDate()
-     */
-    public function findSimEndDate(int $sim): ?string
-    {
-        $row = $this->fetchOne('SELECT end_date FROM `ibl_sim_dates` WHERE sim = ?', 'i', $sim);
-        if ($row === null) {
-            return null;
-        }
-
-        $endDate = $row['end_date'] ?? null;
-
-        return is_string($endDate) && $endDate !== '' ? $endDate : null;
     }
 
     /**

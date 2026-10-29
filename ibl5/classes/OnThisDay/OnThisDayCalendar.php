@@ -7,7 +7,7 @@ namespace OnThisDay;
 use RecordHolders\IblSeasonDateHelper;
 
 /**
- * Month-day window and season-year arithmetic for the "on this day" lookup.
+ * Sim-span month-day window and season-year arithmetic for the "on this day" lookup.
  *
  * Pure logic: no I/O.
  */
@@ -22,22 +22,44 @@ final class OnThisDayCalendar
     private const REFERENCE_LEAP_YEAR = '2000';
 
     /**
-     * Month-day strings (`MM-DD`) within $radius days of the center date's month/day.
+     * Longest sim span searched, in days. A longer span (bad data, or a long
+     * break) keeps only its last MAX_SPAN_DAYS days, which end on the sim's end date.
+     */
+    public const MAX_SPAN_DAYS = 31;
+
+    /**
+     * Month-day strings (`MM-DD`) from $radius days before the start date's
+     * month/day through $radius days after the end date's month/day.
      *
-     * The window is laid out on leap year 2000, so Feb 29 is a real day: a Feb 29
-     * center at radius 0 matches only Feb 29, and a Mar 1 center at radius 1
-     * includes `02-29`. Year-end wraps naturally.
+     * Laid out on leap year 2000, so Feb 29 is a real day. A span that crosses
+     * Dec 31 (end month/day before start month/day) moves the start back one
+     * year, so the list runs through year-end in order. A start after the end
+     * collapses to the end day. A span longer than MAX_SPAN_DAYS keeps its last
+     * MAX_SPAN_DAYS days. A single-day span equals the old center-date window.
      *
      * @return list<string>
      */
-    public function monthDayWindow(string $centerDate, int $radius): array
+    public function spanWindow(string $startDate, string $endDate, int $radius): array
     {
-        $center = new \DateTimeImmutable($centerDate);
-        $reference = new \DateTimeImmutable(self::REFERENCE_LEAP_YEAR . '-' . $center->format('m-d'));
+        $start = new \DateTimeImmutable($startDate);
+        $end = new \DateTimeImmutable($endDate);
+        if ($start > $end) {
+            $start = $end;
+        }
+
+        $first = new \DateTimeImmutable(self::REFERENCE_LEAP_YEAR . '-' . $start->format('m-d'));
+        $last = new \DateTimeImmutable(self::REFERENCE_LEAP_YEAR . '-' . $end->format('m-d'));
+        if ($last < $first) {
+            $first = $first->modify('-1 year');
+        }
+        if ((int) $first->diff($last)->days >= self::MAX_SPAN_DAYS) {
+            $first = $last->modify(sprintf('-%d days', self::MAX_SPAN_DAYS - 1));
+        }
 
         $window = [];
-        for ($offset = -$radius; $offset <= $radius; $offset++) {
-            $window[] = $reference->modify(sprintf('%+d days', $offset))->format('m-d');
+        $stop = $last->modify(sprintf('+%d days', $radius));
+        for ($day = $first->modify(sprintf('-%d days', $radius)); $day <= $stop; $day = $day->modify('+1 day')) {
+            $window[] = $day->format('m-d');
         }
 
         return $window;

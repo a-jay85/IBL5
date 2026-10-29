@@ -147,9 +147,9 @@ class OnThisDayReadPathTest extends DatabaseTestCase
         self::assertSame(MomentKind::FiftyPointGame, $moments[0]->kind);
     }
 
-    public function testMonthDayListAbove15Throws(): void
+    public function testMonthDayListAboveWidestWindowThrows(): void
     {
-        $monthDays = array_fill(0, 16, '03-17');
+        $monthDays = array_fill(0, OnThisDayRepository::MONTH_DAY_LIST_WIDTH + 1, '03-17');
 
         $this->expectException(\InvalidArgumentException::class);
 

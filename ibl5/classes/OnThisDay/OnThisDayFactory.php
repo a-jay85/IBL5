@@ -16,8 +16,11 @@ final class OnThisDayFactory
         \mysqli $db,
         ?\League\LeagueContext $leagueContext = null,
     ): OnThisDayService {
+        $repository = new OnThisDayRepository($db, $leagueContext);
+
         return new OnThisDayService(
-            new OnThisDayRepository($db, $leagueContext),
+            $repository,
+            $repository,
             new \Season\SeasonQueryRepository($db, $leagueContext),
             new WowScorer(),
             new OnThisDayCalendar(),

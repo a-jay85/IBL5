@@ -26,6 +26,12 @@
     background-color: var(--accent-200);
 }
 
+/* accent-700 fails AA contrast on the clinch-conference tint */
+.ibl-data-table tbody tr.clinch-conference td.ibl-stat-highlight,
+.ibl-data-table tbody tr.clinch-conference td .ibl-stat-highlight {
+    color: var(--accent-800);
+}
+
 .ibl-data-table tbody tr.clinch-division:nth-child(odd),
 .ibl-data-table tbody tr.clinch-division:nth-child(even) {
     background-color: var(--accent-100);
@@ -50,7 +56,7 @@
 .ibl-data-table tbody tr.bottom-locked:nth-child(odd),
 .ibl-data-table tbody tr.bottom-locked:nth-child(even) {
     background-color: var(--gray-100);
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 .ibl-data-table tbody tr.bottom-locked:nth-child(odd):hover,
@@ -62,7 +68,7 @@
 .ibl-data-table tbody tr.bottom-locked td a,
 .ibl-data-table tbody tr.bottom-locked td .ibl-stat-highlight,
 .ibl-data-table tbody tr.bottom-locked td .ibl-clinched-indicator {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 .ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored {

@@ -13,8 +13,8 @@ namespace Tests\DatabaseIntegration;
  * transaction, so fixtures stay visible. Every mysqli method the read path
  * uses (prepare, and query for `@@in_transaction`) is overridden here.
  *
- * With a $failCode, any statement naming `ibl_on_this_day_moments` is recorded
- * and then fails with a mysqli_sql_exception carrying that code, which mimics a
+ * With a $failCode, any statement naming `$failTable` (default
+ * `ibl_on_this_day_moments`) is recorded and then fails with a mysqli_sql_exception carrying that code, which mimics a
  * missing table (1146) or any other server error.
  */
 final class RecordingMysqli extends \mysqli
@@ -22,8 +22,11 @@ final class RecordingMysqli extends \mysqli
     /** @var list<string> */
     public array $statements = [];
 
-    public function __construct(private readonly \mysqli $inner, private readonly ?int $failCode = null)
-    {
+    public function __construct(
+        private readonly \mysqli $inner,
+        private readonly ?int $failCode = null,
+        private readonly string $failTable = 'ibl_on_this_day_moments',
+    ) {
         // No arguments: like DatabaseTestCase's `new \mysqli()`, this opens no connection.
         parent::__construct();
     }
@@ -46,7 +49,7 @@ final class RecordingMysqli extends \mysqli
     {
         $this->statements[] = $query;
 
-        if ($this->failCode !== null && str_contains($query, 'ibl_on_this_day_moments')) {
+        if ($this->failCode !== null && str_contains($query, $this->failTable)) {
             throw new \mysqli_sql_exception('forced', $this->failCode);
         }
     }

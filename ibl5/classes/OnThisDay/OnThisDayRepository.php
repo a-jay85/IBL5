@@ -16,7 +16,7 @@ use OnThisDay\Contracts\OnThisDayRepositoryInterface;
  *
  * @see \Database\BaseMysqliRepository For base class documentation
  */
-class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface, Contracts\SimPostClaimInterface
+class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface, Contracts\SimPostClaimInterface, Contracts\ShownMomentHistoryInterface
 {
     /** ibl_settings key holding the last sim the Discord step posted for. */
     public const LAST_POSTED_SIM_KEY = 'on_this_day_last_posted_sim';
@@ -119,6 +119,61 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
         );
 
         return $affected > 0;
+    }
+
+    /**
+     * One fixed prepared INSERT per key (a selection holds at most 3). The
+     * no-op duplicate update reports 0 affected rows, so a re-run returns 0.
+     *
+     * @see Contracts\ShownMomentHistoryInterface::recordShown()
+     */
+    public function recordShown(int $sim, int $seasonYear, array $momentKeys): int
+    {
+        $inserted = 0;
+        foreach (array_unique($momentKeys) as $key) {
+            $inserted += $this->execute(
+                'INSERT INTO `ibl_on_this_day_shown` (moment_key, sim, season_year)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE id = id',
+                'sii',
+                $key,
+                $sim,
+                $seasonYear,
+            );
+        }
+
+        return $inserted;
+    }
+
+    /**
+     * @see Contracts\ShownMomentHistoryInterface::findShownBefore()
+     */
+    public function findShownBefore(int $sim): array
+    {
+        try {
+            $rows = $this->fetchAll(
+                'SELECT moment_key, MAX(sim) AS last_sim FROM `ibl_on_this_day_shown`
+                 WHERE sim < ? GROUP BY moment_key',
+                'i',
+                $sim,
+            );
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() === self::ER_NO_SUCH_TABLE) {
+                return [];
+            }
+            throw $e;
+        }
+
+        $shown = [];
+        foreach ($rows as $row) {
+            $key = $row['moment_key'] ?? null;
+            $lastSim = $row['last_sim'] ?? null;
+            if (is_string($key) && $key !== '' && is_numeric($lastSim)) {
+                $shown[$key] = (int) $lastSim;
+            }
+        }
+
+        return $shown;
     }
 
     /**

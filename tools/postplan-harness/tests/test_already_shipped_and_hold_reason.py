@@ -174,6 +174,17 @@ def test_foreign_tip_divergence_is_never_already_shipped():
     assert runner._already_shipped(e, _Git(""), gh, lambda m: None) is None
 
 
+def test_already_shipped_maps_merged_mid_fix():
+    e = HarnessError("pr-merged-mid-fix", "x")
+    e.merged = {"number": 7, "url": "", "why": "w"}
+    assert runner._already_shipped(e, None, None, lambda m: None) == e.merged
+
+
+def test_already_shipped_merged_mid_fix_without_payload_is_none():
+    e = HarnessError("pr-merged-mid-fix", "x")
+    assert runner._already_shipped(e, None, None, lambda m: None) is None
+
+
 def test_reclaim_stale_lease_carries_full_lease_on_deleted_branch(monkeypatch):
     monkeypatch.setattr(runner.gitutil, "probe_remote_tip", lambda *a, **k: (True, ""))
 

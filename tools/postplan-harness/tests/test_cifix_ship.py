@@ -7,6 +7,7 @@ proposals. Every fake lives in this file.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
@@ -149,7 +150,7 @@ META_CHECKS_ROW = {"name": "Meta checks", "state": "FAILURE",
 
 
 def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
-         rewatch=(), res=None, run_started=None):
+         rewatch=(), res=None, run_started=None, live_watch=None):
     """Drive _ci_fix_loop in live mode with every external call faked. `commit` is a
     sequence of new SHAs or HarnessErrors, one per attempt. `rewatch` is the list of
     CiOutcomes watch_or_reuse hands back."""
@@ -179,7 +180,7 @@ def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
     # A no-change attempt reaches the rerun probe, which sleeps and watches live.
     monkeypatch.setattr(runner.time, "sleep", lambda s: None)
     monkeypatch.setattr(runner.ciwatch, "watch_live",
-                        lambda *a, **kw: CiOutcome(-1, [], "probe not scripted"))
+                        lambda *a, **kw: live_watch or CiOutcome(-1, [], "probe not scripted"))
     res = res if res is not None else RunResult(terminal=TerminalState.FAILED)
     out = runner._ci_fix_loop(git, gh, llm, lines.append, res, worktree=None, pr=4242,
                               sha="a" * 40, outcome=CiOutcome(8, list(failed), "red"),
@@ -804,3 +805,212 @@ def test_survivor_comment_without_refusals_unchanged():
     plain = cifix.survivor_comment(s, trail, False)
     assert plain == cifix.survivor_comment(s, trail, False, refused=())
     assert "Proposed PR body" not in plain
+
+
+# ---------------------------------------------------------------------------
+# Characterization: stale-red and merged-probe behavior that must not change
+# ---------------------------------------------------------------------------
+
+def test_slow_watch_red_runs_cifix_without_regrace(monkeypatch, tmp_path):
+    """A red recorded by a 600 s watch is real: one ci-fix call, no check snapshot."""
+    path = runner.ciwatch.outcome_path(str(tmp_path), "a" * 40)
+    with open(path, "w") as fh:
+        json.dump({"sha": "a" * 40, "status": "failure",
+                   "failed_checks": ["PHPUnit"], "evidence": "seeded",
+                   "started": 0.0, "finished": 600.0}, fh)
+    snap_calls: list = []
+    monkeypatch.setattr(runner.ciwatch, "snapshot_checks",
+                        lambda *a, **kw: snap_calls.append(a) or [])
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), llm,
+             failed=["PHPUnit"], commit=("b" * 40,),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert len(llm.calls) == 1
+    assert snap_calls == []
+    assert r.out[1].exit_code == 0
+
+
+def test_gh_without_merged_probe_runs_cifix_and_commits(monkeypatch, tmp_path):
+    """A gh adapter with no merged_pr probe keeps today's flow."""
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), llm,
+             failed=["PHPUnit"], commit=("b" * 40,),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert len(llm.calls) == 1
+    assert r.out[0] == "b" * 40
+    assert r.out[1].exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# Merged-state probe: stop before and after the ci-fix LLM call
+# ---------------------------------------------------------------------------
+
+class MergedGh(CiFixGh):
+    """CiFixGh with a scripted merged_pr probe. `merged` is a dict, None, or an exception
+    to raise. `script` (a list) overrides it per call, the last entry repeating."""
+
+    def __init__(self, merged=None, script=None, **kw):
+        super().__init__(**kw)
+        self.merged = merged
+        self.script = list(script) if script is not None else None
+        self.probes = 0
+
+    def merged_pr(self):
+        self.probes += 1
+        val = self.merged
+        if self.script is not None:
+            val = self.script[min(self.probes, len(self.script)) - 1]
+        if isinstance(val, BaseException):
+            raise val
+        return val
+
+
+_FIX_ARGS = dict(failed=["PHPUnit"], commit=("b" * 40,),
+                 rewatch=(CiOutcome(0, [], "green"),))
+
+
+def test_merged_before_attempt_raises_without_llm_call(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    with pytest.raises(HarnessError) as ei:
+        _run(monkeypatch, tmp_path, CiFixGit(),
+             MergedGh(merged={"number": 4242, "url": "u"}), llm, **_FIX_ARGS)
+    assert ei.value.kind == "pr-merged-mid-fix"
+    assert ei.value.merged["number"] == 4242
+    assert llm.calls == []
+    assert not (tmp_path / "ci-fix-1").exists()
+
+
+def test_merged_probe_error_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(),
+             MergedGh(merged=RuntimeError("gh down")), llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+    assert r.out[1].exit_code == 0
+
+
+def test_merged_other_pr_number_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    _run(monkeypatch, tmp_path, CiFixGit(), MergedGh(merged={"number": 999, "url": "u"}),
+         llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+
+
+def test_merged_number_unparseable_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    _run(monkeypatch, tmp_path, CiFixGit(), MergedGh(merged={"number": "abc"}),
+         llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+
+
+def test_merged_during_llm_call_skips_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", {"number": 4242, "url": "u"})])
+    git = CiFixGit()
+    with pytest.raises(HarnessError) as ei:
+        _run(monkeypatch, tmp_path, git, gh, llm, failed=["PHPUnit"],
+             commit=(AssertionError("commit ran after merge"),),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert ei.value.kind == "pr-merged-mid-fix"
+    assert "during" in ei.value.merged["why"]
+    assert len(llm.calls) == 1
+    assert gh.probes == 2
+    assert git.pushes == 0
+
+
+def test_merged_probe_error_after_llm_keeps_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", RuntimeError("gh down"))])
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+    assert r.out[0] == "b" * 40
+    assert gh.probes == 2
+
+
+def test_merged_after_llm_other_pr_keeps_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", {"number": 999, "url": "u"})])
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, **_FIX_ARGS)
+    assert r.out[0] == "b" * 40
+
+
+# ---------------------------------------------------------------------------
+# Stale-red grace re-probe: a red from a seconds-long watch may be superseded
+# ---------------------------------------------------------------------------
+
+def _seed_watch(tmp_path, took):
+    path = runner.ciwatch.outcome_path(str(tmp_path), "a" * 40)
+    with open(path, "w") as fh:
+        json.dump({"sha": "a" * 40, "status": "failure",
+                   "failed_checks": ["PHPUnit"], "evidence": "seeded",
+                   "started": 1000.0, "finished": 1000.0 + took}, fh)
+
+
+def _regrace(monkeypatch, tmp_path, took, rows, **run_kw):
+    """Seed a watch of `took` seconds, script the re-probe snapshot, and drive the loop.
+    Returns (result, llm, waits, snapshot_call_count)."""
+    _seed_watch(tmp_path, took)
+    waits: list = []
+    snaps: list = []
+    monkeypatch.setattr(runner, "_stale_red_wait", waits.append)
+    monkeypatch.setattr(runner.ciwatch, "snapshot_checks",
+                        lambda *a, **kw: snaps.append(a) or rows)
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(), CiFixGh(), llm,
+             failed=["PHPUnit"], commit=("b" * 40,),
+             rewatch=(CiOutcome(0, [], "green"),), **run_kw)
+    return r, llm, waits, len(snaps)
+
+
+def test_fast_watch_regrace_green_skips_cifix(monkeypatch, tmp_path):
+    rows = [{"name": "E2E Tests", "state": "SUCCESS", "bucket": "pass"},
+            {"name": "Visual Regression", "state": "SKIPPED", "bucket": "skipping"}]
+    r, llm, waits, _n = _regrace(monkeypatch, tmp_path, 2, rows)
+    assert llm.calls == []
+    assert r.out[1].exit_code == 0
+    assert waits == [runner._STALE_RED_GRACE_SECS]
+
+
+def test_fast_watch_regrace_still_red_runs_cifix(monkeypatch, tmp_path):
+    rows = [{"name": "PHPUnit", "state": "FAILURE", "bucket": "fail"}]
+    r, llm, _waits, _n = _regrace(monkeypatch, tmp_path, 2, rows)
+    assert len(llm.calls) == 1
+
+
+def test_fast_watch_regrace_pending_rewatches_green(monkeypatch, tmp_path):
+    rows = [{"name": "E2E Tests", "state": "IN_PROGRESS", "bucket": "pending"}]
+    r, llm, _waits, _n = _regrace(monkeypatch, tmp_path, 2, rows,
+                                  live_watch=CiOutcome(0, [], "fresh green"))
+    assert llm.calls == []
+    assert r.out[1].exit_code == 0
+
+
+def test_fast_watch_regrace_pending_indeterminate_keeps_red(monkeypatch, tmp_path):
+    rows = [{"name": "E2E Tests", "state": "IN_PROGRESS", "bucket": "pending"}]
+    r, llm, _waits, _n = _regrace(monkeypatch, tmp_path, 2, rows)
+    assert len(llm.calls) == 1
+
+
+def test_fast_watch_snapshot_unavailable_runs_cifix(monkeypatch, tmp_path):
+    r, llm, waits, _n = _regrace(monkeypatch, tmp_path, 2, None)
+    assert len(llm.calls) == 1
+    assert len(waits) == 1
+
+
+def test_watch_at_threshold_skips_regrace(monkeypatch, tmp_path):
+    r, llm, waits, n_snaps = _regrace(monkeypatch, tmp_path,
+                                      runner._STALE_RED_FAST_WATCH_SECS, [])
+    assert waits == []
+    assert n_snaps == 0
+    assert len(llm.calls) == 1
+
+
+def test_regrace_skipped_when_budget_short(monkeypatch, tmp_path):
+    started = time.time() - (runner._CI_FIX_WALL_BUDGET_SECS
+                             - runner._CI_FIX_MIN_ITER_SECS
+                             - runner._STALE_RED_GRACE_SECS + 60)
+    r, llm, waits, _n = _regrace(monkeypatch, tmp_path, 2, [], run_started=started)
+    assert waits == []
+    assert len(llm.calls) == 1

@@ -1050,3 +1050,68 @@ def test_timeout_status_restarts_once_then_falls_back(monkeypatch, tmp_path):
     assert watched == [_A]
     assert len(live_calls) == 1
     assert got.exit_code == -1
+
+
+# ---------------------------------------------------------------------------
+# watch_duration / regrace_verdict (stale-red grace re-probe helpers)
+# ---------------------------------------------------------------------------
+
+def test_watch_duration_reads_span(tmp_path):
+    _seed(tmp_path, "aaa111", started=10.0, finished=12.5)
+    assert ciwatch.watch_duration(str(tmp_path), "aaa111") == 2.5
+
+
+def _seed_missing(tmp_path):
+    pass
+
+
+def _seed_other_sha(tmp_path):
+    """A file at aaa111's path whose recorded sha is bbb222."""
+    path = _seed(tmp_path, "aaa111", started=10.0, finished=12.5)
+    data = json.loads(path.read_text())
+    data["sha"] = "bbb222"
+    path.write_text(json.dumps(data))
+
+
+def _seed_str_started(tmp_path):
+    _seed(tmp_path, "aaa111", started="10", finished=12.5)
+
+
+def _seed_bool_started(tmp_path):
+    _seed(tmp_path, "aaa111", started=True, finished=12.5)
+
+
+def _seed_no_finished(tmp_path):
+    path = _seed(tmp_path, "aaa111", started=10.0)
+    data = json.loads(path.read_text())
+    del data["finished"]
+    path.write_text(json.dumps(data))
+
+
+def _seed_backwards(tmp_path):
+    _seed(tmp_path, "aaa111", started=20.0, finished=10.0)
+
+
+@pytest.mark.parametrize("seeder", [
+    _seed_missing, _seed_other_sha, _seed_str_started, _seed_bool_started,
+    _seed_no_finished, _seed_backwards,
+], ids=lambda f: f.__name__)
+def test_watch_duration_unknown_shapes_are_none(tmp_path, seeder):
+    seeder(tmp_path)
+    assert ciwatch.watch_duration(str(tmp_path), "aaa111") is None
+
+
+@pytest.mark.parametrize("rows, expected", [
+    (None, "unknown"),
+    ([], "unknown"),
+    ([{"bucket": "pass"}, {"bucket": "skipping"}], "green"),
+    ([{"bucket": "pass"}, {"bucket": "pending"}], "pending"),
+    ([{"bucket": "fail"}, {"bucket": "pending"}], "pending"),
+    ([{"bucket": "fail"}, {"bucket": "pass"}], "red"),
+    ([{"bucket": "cancel"}], "red"),
+    ([{"bucket": "PASS"}], "green"),
+    ([{"bucket": "neutral"}], "unknown"),
+    ([{}], "unknown"),
+])
+def test_regrace_verdict_buckets(rows, expected):
+    assert ciwatch.regrace_verdict(rows) == expected

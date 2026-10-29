@@ -119,6 +119,7 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_box_scores.idx_pid_date' => ['ibl_box_scores', 'pid,game_date'],
         'ibl_trade_info.idx_trade_info_offer_from_to' => ['ibl_trade_info', 'tradeofferid,trade_from,trade_to'],
         'ibl_on_this_day_moments.idx_otd_month_day_season' => ['ibl_on_this_day_moments', 'month_day,season_year'],
+        'ibl_on_this_day_shown.uq_otd_shown_key_sim' => ['ibl_on_this_day_shown', 'moment_key,sim'],
     ];
 
     /**

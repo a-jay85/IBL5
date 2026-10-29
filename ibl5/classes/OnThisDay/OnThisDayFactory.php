@@ -16,8 +16,11 @@ final class OnThisDayFactory
         \mysqli $db,
         ?\League\LeagueContext $leagueContext = null,
     ): OnThisDayService {
+        $repository = new OnThisDayRepository($db, $leagueContext);
+
         return new OnThisDayService(
-            new OnThisDayRepository($db, $leagueContext),
+            $repository,
+            $repository,
             new \Season\SeasonQueryRepository($db, $leagueContext),
             new WowScorer(),
             new OnThisDayCalendar(),
@@ -36,6 +39,14 @@ final class OnThisDayFactory
             new OnThisDayRepository($db),
             new \Season\SeasonQueryRepository($db),
             new DiscordMomentPoster(),
+        );
+    }
+
+    public static function createRecordShownStep(\mysqli $db): \Updater\Steps\RecordOnThisDayShownStep
+    {
+        return new \Updater\Steps\RecordOnThisDayShownStep(
+            self::createService($db),
+            new OnThisDayRepository($db),
         );
     }
 }

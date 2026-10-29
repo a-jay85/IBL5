@@ -16,15 +16,15 @@ use OnThisDay\Contracts\OnThisDayRepositoryInterface;
  *
  * @see \Database\BaseMysqliRepository For base class documentation
  */
-class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface, Contracts\SimPostClaimInterface
+class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnThisDayRepositoryInterface, Contracts\SimPostClaimInterface, Contracts\ShownMomentHistoryInterface
 {
     /** ibl_settings key holding the last sim the Discord step posted for. */
     public const LAST_POSTED_SIM_KEY = 'on_this_day_last_posted_sim';
 
     /**
-     * Widest month/day window: radius 7 on each side of the center date.
+     * Widest month/day window: a MAX_SPAN_DAYS sim span plus radius 7 on each side.
      */
-    public const MONTH_DAY_LIST_WIDTH = 15;
+    public const MONTH_DAY_LIST_WIDTH = OnThisDayCalendar::MAX_SPAN_DAYS + 14;
 
     /** MariaDB ER_NO_SUCH_TABLE: the migration has not been applied yet. */
     private const ER_NO_SUCH_TABLE = 1146;
@@ -86,21 +86,6 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
     }
 
     /**
-     * @see OnThisDayRepositoryInterface::findSimEndDate()
-     */
-    public function findSimEndDate(int $sim): ?string
-    {
-        $row = $this->fetchOne('SELECT end_date FROM `ibl_sim_dates` WHERE sim = ?', 'i', $sim);
-        if ($row === null) {
-            return null;
-        }
-
-        $endDate = $row['end_date'] ?? null;
-
-        return is_string($endDate) && $endDate !== '' ? $endDate : null;
-    }
-
-    /**
      * Single-statement upsert: only a strictly newer sim changes the stored
      * value, so a re-run or an older sim affects 0 rows.
      *
@@ -119,6 +104,61 @@ class OnThisDayRepository extends \Database\BaseMysqliRepository implements OnTh
         );
 
         return $affected > 0;
+    }
+
+    /**
+     * One fixed prepared INSERT per key (a selection holds at most 3). The
+     * no-op duplicate update reports 0 affected rows, so a re-run returns 0.
+     *
+     * @see Contracts\ShownMomentHistoryInterface::recordShown()
+     */
+    public function recordShown(int $sim, int $seasonYear, array $momentKeys): int
+    {
+        $inserted = 0;
+        foreach (array_unique($momentKeys) as $key) {
+            $inserted += $this->execute(
+                'INSERT INTO `ibl_on_this_day_shown` (moment_key, sim, season_year)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE id = id',
+                'sii',
+                $key,
+                $sim,
+                $seasonYear,
+            );
+        }
+
+        return $inserted;
+    }
+
+    /**
+     * @see Contracts\ShownMomentHistoryInterface::findShownBefore()
+     */
+    public function findShownBefore(int $sim): array
+    {
+        try {
+            $rows = $this->fetchAll(
+                'SELECT moment_key, MAX(sim) AS last_sim FROM `ibl_on_this_day_shown`
+                 WHERE sim < ? GROUP BY moment_key',
+                'i',
+                $sim,
+            );
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() === self::ER_NO_SUCH_TABLE) {
+                return [];
+            }
+            throw $e;
+        }
+
+        $shown = [];
+        foreach ($rows as $row) {
+            $key = $row['moment_key'] ?? null;
+            $lastSim = $row['last_sim'] ?? null;
+            if (is_string($key) && $key !== '' && is_numeric($lastSim)) {
+                $shown[$key] = (int) $lastSim;
+            }
+        }
+
+        return $shown;
     }
 
     /**

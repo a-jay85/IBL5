@@ -17,48 +17,99 @@ class OnThisDayCalendarTest extends TestCase
         $this->calendar = new OnThisDayCalendar();
     }
 
-    public function testRadiusZeroReturnsCenterOnly(): void
+    public function testSingleDaySpanAtRadiusZeroReturnsThatDay(): void
     {
-        $this->assertSame(['03-15'], $this->calendar->monthDayWindow('2026-03-15', 0));
+        $this->assertSame(['03-15'], $this->calendar->spanWindow('2026-03-15', '2026-03-15', 0));
     }
 
-    public function testWindowWrapsAcrossYearEnd(): void
+    public function testSingleDaySpanWrapsAcrossYearEnd(): void
     {
         $this->assertSame(
             ['12-29', '12-30', '12-31', '01-01', '01-02'],
-            $this->calendar->monthDayWindow('2026-12-31', 2)
+            $this->calendar->spanWindow('2026-12-31', '2026-12-31', 2)
         );
         $this->assertSame(
             ['12-31', '01-01', '01-02'],
-            $this->calendar->monthDayWindow('2027-01-01', 1)
+            $this->calendar->spanWindow('2027-01-01', '2027-01-01', 1)
         );
     }
 
-    public function testFebruary29CenterAtRadiusZeroMatchesOnlyItself(): void
+    public function testFebruary29SingleDaySpanMatchesOnlyItself(): void
     {
-        $this->assertSame(['02-29'], $this->calendar->monthDayWindow('2028-02-29', 0));
+        $this->assertSame(['02-29'], $this->calendar->spanWindow('2028-02-29', '2028-02-29', 0));
     }
 
-    public function testMarchFirstWindowIncludesFebruary29(): void
+    public function testMarchFirstSingleDaySpanIncludesFebruary29(): void
     {
         $this->assertSame(
             ['02-29', '03-01', '03-02'],
-            $this->calendar->monthDayWindow('2026-03-01', 1)
+            $this->calendar->spanWindow('2026-03-01', '2026-03-01', 1)
+        );
+    }
+
+    public function testSpanCoversEveryDayFromStartThroughEnd(): void
+    {
+        $this->assertSame(
+            ['03-09', '03-10', '03-11', '03-12', '03-13', '03-14', '03-15'],
+            $this->calendar->spanWindow('2026-03-09', '2026-03-15', 0)
+        );
+    }
+
+    public function testSpanAcrossYearEndRunsInOrder(): void
+    {
+        $this->assertSame(
+            ['12-29', '12-30', '12-31', '01-01', '01-02'],
+            $this->calendar->spanWindow('2026-12-29', '2027-01-02', 0)
         );
     }
 
     /**
-     * The widest radius is one week each side, the #3351 (8c6049c75e) cap, and
-     * that window fills the repository's month-day list exactly.
+     * The real year 2027 is not a leap year, so this proves the layout year decides.
      */
-    public function testWidestRadiusSpansOneWeekEachSideAndFitsTheReaderList(): void
+    public function testSpanCrossingFebruaryIncludesFebruary29(): void
+    {
+        $this->assertSame(
+            ['02-27', '02-28', '02-29', '03-01'],
+            $this->calendar->spanWindow('2027-02-27', '2027-03-01', 0)
+        );
+    }
+
+    public function testRadiusWidensFromBothSpanEdges(): void
+    {
+        $window = $this->calendar->spanWindow('2026-03-09', '2026-03-15', 3);
+
+        $this->assertSame('03-06', $window[0]);
+        $this->assertSame('03-18', $window[array_key_last($window)]);
+        $this->assertCount(13, $window);
+    }
+
+    public function testStartAfterEndCollapsesToEndDay(): void
+    {
+        $this->assertSame(['03-15'], $this->calendar->spanWindow('2026-03-20', '2026-03-15', 0));
+    }
+
+    public function testOverlongSpanKeepsItsLastDays(): void
+    {
+        $window = $this->calendar->spanWindow('2026-01-01', '2026-03-15', 0);
+
+        $this->assertCount(OnThisDayCalendar::MAX_SPAN_DAYS, $window);
+        $this->assertSame('03-15', $window[array_key_last($window)]);
+    }
+
+    /**
+     * The widest window (an overlong span at the last widening radius) fills the
+     * repository's month-day list exactly; a non-leap February crossing fits it.
+     */
+    public function testWidestWindowFitsTheReaderList(): void
     {
         $radii = OnThisDayCalendar::WIDENING_RADII;
-        $window = $this->calendar->monthDayWindow('2026-03-15', $radii[array_key_last($radii)]);
+        $widest = $radii[array_key_last($radii)];
 
-        $this->assertSame('03-08', $window[0]);
-        $this->assertSame('03-22', $window[array_key_last($window)]);
-        $this->assertCount(OnThisDayRepository::MONTH_DAY_LIST_WIDTH, $window);
+        $overlong = $this->calendar->spanWindow('2026-01-01', '2026-03-15', $widest);
+        $this->assertCount(OnThisDayRepository::MONTH_DAY_LIST_WIDTH, $overlong);
+
+        $februaryCrossing = $this->calendar->spanWindow('2027-02-01', '2027-03-10', $widest);
+        $this->assertLessThanOrEqual(OnThisDayRepository::MONTH_DAY_LIST_WIDTH, count($februaryCrossing));
     }
 
     public function testOctoberDateBelongsToNextSeasonYear(): void

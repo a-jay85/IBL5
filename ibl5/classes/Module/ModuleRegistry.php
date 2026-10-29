@@ -44,6 +44,7 @@ final class ModuleRegistry
         'ProjectedDraftOrder',
         'RecordHolders',
         'Records',
+        'Rivalries',
         'Schedule',
         'Search',
         'SeasonArchive',

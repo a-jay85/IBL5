@@ -1,0 +1,198 @@
+@layer components {
+
+/* ==========================================================================
+   Rivalries Tables
+
+   Overrides for .ibl-data-table on the Rivalries pages.
+   Source: class="ibl-data-table rivalries-table"
+   ========================================================================== */
+
+/* Short numeric columns sit under wide uppercase headers, so the base
+   0.1rem side padding runs header labels together ("GAMES POINTS").
+   Give every cell the 0.75rem the base table gives its edge cells. */
+.rivalries-table th,
+.rivalries-table td {
+    padding-inline: 0.75rem;
+}
+
+.rivalries-table {
+    border: 0;
+}
+
+/* The leader's points borrow the Season Leaders headline style, sized down
+   so a 1.5x number fits a table row beside base-size values. */
+.rivalries-table .rivalries-top-value {
+    font-size: var(--text-2xl);
+    padding-left: 0;
+}
+
+/* Franchise pair heading: the two Team page banners with "vs" between.
+   Phones stack them; wide screens fit all three on one line. */
+.rivalries-banner-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    margin: 0 0 var(--space-4);
+    line-height: 1;
+}
+
+/* Each banner links to its Team page inside a .team-banner-box
+   (navigation.css), which backs a square logo with a banner-sized frame. */
+
+.rivalries-banner-vs {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    color: var(--navy-900);
+}
+
+@media (min-width: 960px) {
+    .rivalries-banner-title {
+        flex-direction: row;
+        justify-content: center;
+        gap: var(--space-4);
+    }
+}
+
+/* Title strip joined to the navy header like the Team page's view dropdown.
+   It sits above the scroll box, so it stays put when a phone scrolls the
+   table sideways. A neutral navy tint stands in for the team color, since
+   these tables belong to no one team. */
+.rivalries-caption {
+    margin: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-2) var(--space-3);
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-display);
+    color: var(--navy-800);
+    background: color-mix(in srgb, var(--navy-800) 10%, white);
+}
+
+/* Franchise pair page: blend the two teams' colors across each strip, like the
+   Trading roster preview header. RivalriesView sets the colors and picks the
+   text color that stays readable across the whole blend. */
+.rivalries-pair .rivalries-caption {
+    background: linear-gradient(to right, var(--rivalry-color-a), var(--rivalry-color-b));
+    color: var(--rivalry-text);
+    text-shadow: 0 1px 2px color-mix(in srgb, var(--rivalry-text-shadow) 60%, transparent);
+}
+
+/* Franchise rivals page: the strips take the page franchise's color the way the
+   Team page's view dropdown does. RivalriesView sets --team-tab-bg-color. */
+.rivalries-team-colored .rivalries-caption {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white);
+    color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
+}
+
+/* Franchise and GM rival lists: each Rivalry cell blends the two sides'
+   colors with the same text logic as the pair page's strips. The cell
+   background covers the row's stripe, hover, and user-team highlight. */
+.rivalries-table td.rivalries-gradient {
+    background: linear-gradient(to right, var(--rivalry-color-a), var(--rivalry-color-b));
+    color: var(--rivalry-text);
+    text-shadow: 0 1px 2px color-mix(in srgb, var(--rivalry-text-shadow) 60%, transparent);
+}
+
+.rivalries-table td.rivalries-gradient a,
+.rivalries-table td.rivalries-gradient a:hover {
+    color: inherit;
+}
+
+/* Title and table form one card: the section shrinks to the wider of the two
+   and centers, and the table fills it. max-width lets a wide table scroll
+   inside its grid column instead of widening it. */
+.rivalries-section {
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto var(--space-4);
+}
+
+/* Pair page game and scorer cards: two by two, one column on phones, and
+   all four in one row once the window fits them. */
+.rivalries-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Phones: every card fills the column. A fit-content card is sized by its
+   table, while responsive-tables.js sizes the table from the card, so each
+   resize flipped the layout between two widths. */
+@media (max-width: 640px) {
+    .rivalries-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .rivalries-section {
+        width: 100%;
+    }
+}
+
+/* The widest of the four tables is about 505px, so four equal columns fit
+   it from here up. Narrower columns would squeeze it into a scroll box. */
+@media (min-width: 2160px) {
+    .rivalries-cards {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+/* The grid gap already spaces stacked cards. */
+.ibl-grid > .rivalries-section {
+    margin-bottom: 0;
+}
+
+.rivalries-section .table-scroll-wrapper {
+    width: auto;
+    margin: 0;
+}
+
+.rivalries-section .rivalries-table {
+    width: 100%;
+}
+
+/* Head-to-head summary: a card under its own title strip, like the tables.
+   The strip carries the rounded top, so the card squares off its own. */
+.rivalries-summary {
+    margin: 0;
+    padding: var(--space-1) var(--space-4);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.rivalries-summary p {
+    margin: var(--space-2) 0;
+}
+
+/* The title strip carries the rounded top, so square off the table's. */
+.rivalries-section .table-scroll-wrapper,
+.rivalries-section .table-scroll-container,
+.rivalries-section .rivalries-table {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.rivalries-nowrap {
+    white-space: nowrap;
+}
+
+/* Game margin from the viewer's side, in the Last Sim Recap W/L colors. */
+.rivalries-margin {
+    font-weight: var(--font-weight-semibold);
+}
+
+.rivalries-table td.rivalries-margin--win,
+.rivalries-summary .rivalries-margin--win {
+    color: var(--success-600);
+}
+
+.rivalries-table td.rivalries-margin--loss,
+.rivalries-summary .rivalries-margin--loss {
+    color: var(--error-600);
+}
+
+} /* end @layer components */

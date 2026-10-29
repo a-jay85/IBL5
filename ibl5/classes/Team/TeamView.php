@@ -41,6 +41,7 @@ class TeamView implements TeamViewInterface
         $awardsCard = $pageData['awardsCard'];
         $franchiseHistoryCard = $pageData['franchiseHistoryCard'];
         $rafters = $pageData['rafters'];
+        $rivalsCard = $pageData['rivalsCard'] ?? '';
         $userTeamName = $pageData['userTeamName'];
         $isOwnTeam = $pageData['isOwnTeam'];
         $extensionResult = $pageData['extensionResult'];
@@ -58,7 +59,7 @@ class TeamView implements TeamViewInterface
             <?= HtmlSanitizer::trusted($this->renderRosterRegion($tableOutput)) ?>
         </div>
                 <?= HtmlSanitizer::trusted($this->renderCardsRow($isActualTeam, $team, $currentSeasonCard, $draftPicksTable, $awardsCard)) ?>
-        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard)) ?>
+        <?= HtmlSanitizer::trusted($this->renderFranchiseHistory($isActualTeam, $franchiseHistoryCard)) ?><?= HtmlSanitizer::trusted($this->renderRivalsCard($rivalsCard)) ?>
         <?= HtmlSanitizer::trusted($this->renderRafters($isActualTeam, $rafters)) ?>
     </div>
 </div>
@@ -143,6 +144,14 @@ class TeamView implements TeamViewInterface
     }
 
     /**
+     * @param string $rivalsCard Pre-built HTML from TeamService::getTeamPageData() (RivalsCardBuilder); '' when absent
+     */
+    private function renderRivalsCard(string $rivalsCard): string
+    {
+        return $rivalsCard === '' ? '' : '<div class="team-rivals-wrapper">' . $rivalsCard . '</div>';
+    }
+
+    /**
      * @param string $rafters Pre-built HTML from TeamService::getTeamPageData() (TeamCardRenderer)
      */
     private function renderRafters(bool $isActualTeam, string $rafters): string
@@ -167,7 +176,7 @@ class TeamView implements TeamViewInterface
     <?= HtmlSanitizer::trusted($this->renderTradeButton($userTeamName, $isOwnTeam, $team, $imagesPath)) ?>
     <a href="modules.php?name=Schedule&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($this->renderActionLinkInner('Schedule', 'schedule-icon.svg', $imagesPath)) ?></a>
     <div class="team-banner-logo">
-        <h1><img src="./<?= HtmlSanitizer::e($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?>"></h1>
+        <h1 class="team-banner-box"><img src="./<?= HtmlSanitizer::e($imagesPath) ?>logo/<?= HtmlSanitizer::e($teamid) ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?>"></h1>
     </div>
     <a href="modules.php?name=DraftInfo&amp;tab=history&amp;teamid=<?= HtmlSanitizer::e($teamid) ?>" class="team-action-link"><?= HtmlSanitizer::trusted($this->renderActionLinkInner('Draft History', 'draft-history-icon.svg', $imagesPath)) ?></a>
     <?= HtmlSanitizer::trusted($this->renderDiscordButton($userTeamName, $isOwnTeam, $team, $imagesPath)) ?>

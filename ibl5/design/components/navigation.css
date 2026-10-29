@@ -86,15 +86,37 @@
 }
 
 .team-banner-logo h1 {
-    margin: 0;
+    margin: 0 18px;
     padding: 0;
     line-height: 0;
     border: 0;
 }
 
-.team-banner-logo img {
+/* A banner-sized box in the team color (--team-color-primary) behind a team
+   banner image. A real 415x50 banner covers it. A team with a small square
+   logo in its place still fills a banner's space, framed like the banner art:
+   a 4px team-color frame around a darker middle. The inset shadow draws the
+   frame, so it takes no room from the image the way a border would. */
+.team-banner-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 415px;
+    max-width: 100%;
+    aspect-ratio: 415 / 50;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--team-color-primary, var(--navy-900)) 55%, black);
+    box-shadow: inset 0 0 0 4px var(--team-color-primary, var(--navy-900));
+}
+
+/* The height cap shrinks a square logo to banner height; width: auto keeps
+   it square. */
+.team-banner-box > img {
     display: block;
-    margin: 0 18px;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 100%;
 }
 
 .team-action-link {
@@ -131,12 +153,15 @@
         flex-wrap: wrap;
     }
 
+    /* min-width: 0 lets the banner box shrink to the row. Otherwise the
+       415px banner sets the item's minimum width and hangs off both edges. */
     .team-banner-row > .team-banner-logo {
         order: -1;
         flex-basis: 100%;
+        min-width: 0;
     }
 
-    .team-banner-row > .team-banner-logo img {
+    .team-banner-row > .team-banner-logo h1 {
         margin: 0 auto;
     }
 

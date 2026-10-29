@@ -37,10 +37,67 @@
     margin: 0 auto;
 }
 
-/* Franchise history card wrapper — constrains width and centers */
-.franchise-history-wrapper {
+/* Franchise history and Top Rivals card wrappers — constrain width and center */
+.franchise-history-wrapper,
+.team-rivals-wrapper {
     max-width: 1115px;
     margin: 0 auto;
+}
+
+/* Team and GM rivals sit side by side on every screen. min-width: 0 lets a
+   long rival name wrap so two columns fit on a phone. */
+.team-rivals-grid {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+}
+
+.team-rivals-section + .team-rivals-section {
+    border-left: 1px solid var(--gray-100);
+}
+
+/* Both columns share five rows: label, three rivals, "See all". Subgrid hands
+   those rows down through the body and the list, so a rival that wraps in one
+   column makes the same row taller in the other. */
+.team-rivals-section {
+    display: grid;
+    grid-row: span 5;
+    grid-template-rows: subgrid;
+}
+
+.team-rivals-section > .team-card__body:last-child {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+}
+
+.team-rivals-section .team-awards-list {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+}
+
+.team-rivals-section .team-awards-list li {
+    align-content: center;
+}
+
+.team-rivals-section .team-rivals-more {
+    justify-self: center;
+}
+
+/* On a phone the narrow columns wrap names mid-line, so the record gets its
+   own line above the rival. */
+@media (max-width: 768px) {
+    .team-rivals-grid .award-year {
+        display: block;
+    }
+}
+
+/* "See all GM rivals" sits on its own line under the list. */
+.team-rivals-more {
+    display: inline-block;
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
 }
 
 

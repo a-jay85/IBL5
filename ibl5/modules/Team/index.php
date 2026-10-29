@@ -18,8 +18,10 @@ $teamid = is_numeric($teamidInput) ? (int) $teamidInput : 0;
 
 $pagetitle = "- Team Pages";
 
+$docRoot = is_string($_SERVER['DOCUMENT_ROOT'] ?? null) ? $_SERVER['DOCUMENT_ROOT'] : '';
+
 $factory = \Module\ModuleServices::current()->factory(\Module\Factories\TeamFactory::class);
-$controller = $factory->controller();
+$controller = $factory->controller($docRoot . '/ibl5/images/logo');
 
 switch ($op) {
     case "team":

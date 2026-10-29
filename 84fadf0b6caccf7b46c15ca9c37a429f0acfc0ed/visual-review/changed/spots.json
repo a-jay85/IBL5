@@ -1,0 +1,15 @@
+[
+  {
+    "module": "franchise-history",
+    "viewport": "desktop",
+    "title": "franchise-history",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 173-347 px",
+    "beforeFile": "changed/franchise-history.1.before.png",
+    "afterFile": "changed/franchise-history.1.after.png",
+    "sideFile": "changed/franchise-history.1.side.png",
+    "stackFile": "changed/franchise-history.1.stack.png"
+  }
+]

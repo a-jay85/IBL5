@@ -93,13 +93,13 @@ class SeasonHighsViewTest extends TestCase
     public function testRenderLinksDateToBoxScore(): void
     {
         $data = [
-            'playerHighs' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 3])]],
+            'playerHighs' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 3, 'gameTeamid' => 5])]],
             'teamHighs' => [],
         ];
 
         $html = $this->view->render('Regular Season', $data);
 
-        $this->assertStringContainsString('modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=3', $html);
+        $this->assertStringContainsString('<a href="modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=3&amp;team=5">2024-12-15</a>', $html);
     }
 
     public function testRenderHandlesEmptyData(): void
@@ -142,12 +142,12 @@ class SeasonHighsViewTest extends TestCase
     public function testRenderHomeAwayHighsShowsDateLink(): void
     {
         $data = [
-            'home' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 2])]],
+            'home' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 2, 'gameTeamid' => 6])]],
             'away' => [],
         ];
         $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
 
-        $this->assertStringContainsString('modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=2', $html);
+        $this->assertStringContainsString('<a href="modules.php?name=GameBoxscore&amp;date=2024-12-15&amp;game=2&amp;team=6">2024-12-15</a>', $html);
     }
 
     public function testRenderHomeAwayHighsHidesDiscrepanciesWhenEmpty(): void
@@ -265,11 +265,11 @@ class SeasonHighsViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int}
+     * @return array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int, gameTeamid?: int}
      */
     private static function createHighEntry(array $overrides = []): array
     {
-        /** @var array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int} */
+        /** @var array{name: string, date: string, value: int, pid?: int, teamid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int, gameTeamid?: int} */
         return array_merge([
             'name' => 'Test Player',
             'date' => '2024-12-15',

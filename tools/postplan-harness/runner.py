@@ -2025,12 +2025,17 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            merged = _pr_merged_now(gh, pr, log, "during")
+            if merged is not None:
+                _raise_merged_mid_fix(log, merged, attempt, "during",
+                                      "ci-fix edits left uncommitted in the worktree; "
+                                      "not committed and not shipped")
             stage = "commit"
             new = _commit_with_gate_fix(git, worktree,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7",
                     llm=llm, res=res)
         except HarnessError as e:
-            if e.kind == "remote-head-diverged":
+            if e.kind in ("remote-head-diverged", _PR_MERGED_MID_FIX):
                 raise
             last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break

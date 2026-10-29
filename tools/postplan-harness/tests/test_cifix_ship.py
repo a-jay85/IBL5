@@ -900,3 +900,37 @@ def test_merged_number_unparseable_keeps_cifix(monkeypatch, tmp_path):
     _run(monkeypatch, tmp_path, CiFixGit(), MergedGh(merged={"number": "abc"}),
          llm, **_FIX_ARGS)
     assert len(llm.calls) == 1
+
+
+def test_merged_during_llm_call_skips_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", {"number": 4242, "url": "u"})])
+    git = CiFixGit()
+    with pytest.raises(HarnessError) as ei:
+        _run(monkeypatch, tmp_path, git, gh, llm, failed=["PHPUnit"],
+             commit=(AssertionError("commit ran after merge"),),
+             rewatch=(CiOutcome(0, [], "green"),))
+    assert ei.value.kind == "pr-merged-mid-fix"
+    assert "during" in ei.value.merged["why"]
+    assert len(llm.calls) == 1
+    assert gh.probes == 2
+    assert git.pushes == 0
+
+
+def test_merged_probe_error_after_llm_keeps_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", RuntimeError("gh down"))])
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+    assert r.out[0] == "b" * 40
+    assert gh.probes == 2
+
+
+def test_merged_after_llm_other_pr_keeps_commit(monkeypatch, tmp_path):
+    gh = MergedGh(merged=None)
+    llm = ScriptedLlm(side_effects=[
+        lambda kw: setattr(gh, "merged", {"number": 999, "url": "u"})])
+    r = _run(monkeypatch, tmp_path, CiFixGit(), gh, llm, **_FIX_ARGS)
+    assert r.out[0] == "b" * 40

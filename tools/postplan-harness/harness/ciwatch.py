@@ -490,6 +490,45 @@ def read_outcome(out_dir: str, sha: str) -> CiOutcome | None:
                      + (data.get("evidence") or status))
 
 
+def watch_duration(out_dir: str, sha: str) -> float | None:
+    """Seconds the recorded watch for this head ran (finished - started), or None
+    when the outcome file is missing, unreadable, keyed to another SHA, or lacks
+    numeric timestamps. None means unknown: callers keep today's behavior."""
+    if not out_dir or not sha:
+        return None
+    try:
+        with open(outcome_path(out_dir, sha)) as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("sha") != sha:
+        return None
+    started, finished = data.get("started"), data.get("finished")
+    if isinstance(started, bool) or isinstance(finished, bool):
+        return None
+    if not isinstance(started, (int, float)) or not isinstance(finished, (int, float)):
+        return None
+    span = float(finished) - float(started)
+    return span if span >= 0 else None
+
+
+def regrace_verdict(rows: "list[dict] | None") -> str:
+    """Verdict for a stale-red re-probe snapshot: "pending" (any check queued or
+    running), "red" (a failed or cancelled check and nothing pending), "green"
+    (every check passed or skipped), else "unknown" (no snapshot, no checks, or a
+    bucket this function does not know)."""
+    if not rows:
+        return "unknown"
+    buckets = [str(r.get("bucket") or "").lower() for r in rows]
+    if any(b == "pending" for b in buckets):
+        return "pending"
+    if any(b in ("fail", "cancel") for b in buckets):
+        return "red"
+    if all(b in ("pass", "skipping") for b in buckets):
+        return "green"
+    return "unknown"
+
+
 def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
                    bg: "BackgroundWatch | None" = None, timeout: int = 5400,
                    settle_tries: int = 10, settle_wait: int = 30, *,

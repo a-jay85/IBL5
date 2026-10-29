@@ -1035,13 +1035,14 @@ td.ibl-team-cell--colored {
     flex-shrink: 0;
 }
 
-/* Starter Indicator - orange glow on photo + accent name (matches nav basketball icon) */
+/* Starter Indicator - orange glow on photo + accent name (matches nav basketball icon).
+   Name uses accent-800: accent-500 fails AA contrast on light row tints. */
 .is-starter .ibl-player-photo {
     box-shadow: 0 0 8px 2px rgb(249 115 22 / 0.4);
 }
 
 .is-starter a {
-    color: var(--accent-500);
+    color: var(--accent-800);
 }
 
 /* ==========================================================================

@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * ApiKeys Module - Self-service API key management
+ * ApiKeys Module - Player Export page
  *
- * Lets logged-in users generate, view, and revoke their own API keys
- * for use with the Player Export CSV endpoint and Google Sheets IMPORTDATA.
+ * Shows logged-in users the Google Sheets Sync card and the Player Export
+ * column guide. The API key card is hidden; its generate/revoke ops remain.
  *
  * @see ApiKeys\ApiKeysService For key generation logic
  * @see ApiKeys\ApiKeysView For HTML rendering

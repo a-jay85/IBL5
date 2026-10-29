@@ -44,7 +44,7 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotSame('', $output);
     }
 
-    public function testMainRendersExportGuideAfterKeyState(): void
+    public function testMainRendersExportGuideAfterGoogleCardWithoutKeyCard(): void
     {
         $this->authenticateWithUserId('testgm', 1);
         $this->mockDb->setMockData([]);
@@ -53,11 +53,12 @@ class ApiKeysEntryPointTest extends ModuleEntryPointTestCase
             'user' => $GLOBALS['user'],
         ]));
 
-        $this->assertStringContainsString('Quick Start', $output);
-        // Key-state card ("Generate API Key") must appear before the guide ("Quick Start").
+        $this->assertStringContainsString('Column Reference', $output);
+        $this->assertStringNotContainsString('Generate API Key', $output);
+        // The Google Sheets card must appear before the guide.
         $this->assertGreaterThan(
-            strpos($output, 'Generate API Key'),
-            strpos($output, 'Quick Start'),
+            strpos($output, 'Google Sheets Sync'),
+            strpos($output, 'Column Reference'),
         );
     }
 

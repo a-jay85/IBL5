@@ -101,6 +101,15 @@ def test_fingerprint_match_and_mismatch(tmp_path):
     assert holdrepeat.human_only_names(d, SLUG, current_fp=None) == names
 
 
+def test_empty_fingerprint_never_matches(tmp_path):
+    # `fingerprint()` returns "" on failure; "" == "" must not count as unchanged.
+    d = str(tmp_path)
+    _seed(d, [1, 7], fp="")
+    assert holdrepeat.human_only_names(d, SLUG, current_fp="") is None
+    _seed(d, [1, 7], fp="fp-a")
+    assert holdrepeat.human_only_names(d, SLUG, current_fp="") is None
+
+
 def _run_cli(d, slug):
     env = dict(os.environ, PYTHONPATH=HARNESS_ROOT)
     return subprocess.run(

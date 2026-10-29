@@ -551,7 +551,7 @@ def human_only_names(state_dir, slug, current_fp=None):
     nums = _hold_numbers(rec)
     if not nums or not nums <= HUMAN_ONLY_CONDITIONS:
         return None
-    if current_fp is not None and current_fp != rec.get("fingerprint"):
+    if current_fp is not None and (not current_fp or current_fp != rec.get("fingerprint")):
         return None
     return ", ".join(f"{n} {CONDITION_NAMES[n]}" for n in sorted(nums))
 

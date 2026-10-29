@@ -121,23 +121,6 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNull($builder->getMyTeamMenu());
     }
 
-    public function testMyTeamMenuLinksTeamRivalriesPage(): void
-    {
-        $builder = new NavigationMenuBuilder($this->createConfig(teamId: 5));
-        $menu = $builder->getMyTeamMenu();
-        $this->assertNotNull($menu);
-
-        $rivalryLinks = array_values(array_filter(
-            $menu['links'],
-            static fn (array $link): bool => ($link['label'] ?? '') === 'Rivalries'
-        ));
-
-        $this->assertSame(
-            [['label' => 'Rivalries', 'url' => 'modules.php?name=Rivalries&op=team&team=5']],
-            $rivalryLinks
-        );
-    }
-
     public function testMyTeamMenuNullWhenNoTeam(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(isLoggedIn: true, teamId: null));

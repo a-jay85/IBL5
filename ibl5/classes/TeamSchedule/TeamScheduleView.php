@@ -211,7 +211,6 @@ class TeamScheduleView implements TeamScheduleViewInterface
     {
         $game = $row['game'];
         $isUserHome = ($game->home_teamid === $userTeamId);
-        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID);
 
         [
             'visitorName' => $visitorName,
@@ -223,7 +222,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         return $this->renderGameRowOpenTag($row)
             . $this->renderTeamSide($game->visitor_teamid, $visitorName, $visitorRecord, $vWinClass, logoFirst: false)
-            . $this->renderScoreCells($row, $boxScoreUrl, $vWinClass, $hWinClass)
+            . $this->renderScoreCells($row, $vWinClass, $hWinClass)
             . $this->renderTeamSide($game->home_teamid, $homeName, $homeRecord, $hWinClass, logoFirst: true)
             . $this->renderStreakColumn($row)
             . '</div>';
@@ -328,11 +327,12 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Visitor score, "@", home score: dashes when unplayed, box-score links when a URL exists, plain spans otherwise
+     * Visitor score, "@", home score: dashes when unplayed, box-score links when a URL exists, plain spans otherwise.
+     * Each score links to its own team's box score tab, matching League Schedule.
      *
      * @param ScheduleGameRow $row
      */
-    private function renderScoreCells(array $row, string $boxScoreUrl, string $vWinClass, string $hWinClass): string
+    private function renderScoreCells(array $row, string $vWinClass, string $hWinClass): string
     {
         if ($row['isUnplayed']) {
             return '<span class="schedule-game__score-link">–</span>'
@@ -341,10 +341,14 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
 
         $game = $row['game'];
+        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID);
         if ($boxScoreUrl !== '') {
-            return '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</a>'
+            $visitorBoxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID, $game->visitor_teamid);
+            $homeBoxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID, $game->home_teamid);
+
+            return '<a href="' . $visitorBoxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</a>'
                 . '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>'
-                . '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . $game->homeScore . '</a>';
+                . '<a href="' . $homeBoxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . $game->homeScore . '</a>';
         }
 
         return '<span class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</span>'

@@ -256,6 +256,91 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertStringContainsString('Knicks', $result[0]);
     }
 
+    // --- Absolute box score links with team tab ---
+
+    public function testPlayerRecordBoxScoreLinkIsAbsoluteWithTeam(): void
+    {
+        $newRecord = $this->makePlayerRecord(['name' => 'New Star', 'teamid' => 2, 'date' => '2007-01-15', 'value' => 85, 'game_of_that_day' => 4]);
+        $previousRecord = $this->makePlayerRecord(['name' => 'Bob Pettit', 'date' => '1996-01-16', 'value' => 80]);
+
+        $batchResult = $this->buildPlayerBatchResult([]);
+        $batchResult['points'] = [$newRecord, $previousRecord];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($batchResult);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildTeamBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-01-15']);
+
+        $this->assertSame(
+            "**NEW IBL RECORD!**\n"
+            . '[New Star](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=100) (Heat) '
+            . 'just recorded [**85 points**](https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2007-01-15&game=4&team=2) in a regular season game, '
+            . "breaking Bob Pettit's all-time record of 80 points!",
+            $result[0]
+        );
+    }
+
+    public function testQuadrupleDoubleBoxScoreLinkIsAbsoluteWithTeam(): void
+    {
+        $qd = [
+            'pid' => 3282,
+            'name' => 'Brandon Tomyoy',
+            'teamid' => 5,
+            'team_name' => 'Magic',
+            'date' => '2007-02-21',
+            'box_id' => 0,
+            'game_of_that_day' => 2,
+            'oppTid' => 3,
+            'opp_team_name' => 'Knicks',
+            'points' => 18,
+            'rebounds' => 10,
+            'assists' => 10,
+            'steals' => 10,
+            'blocks' => 1,
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildPlayerBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([$qd]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-02-21']);
+
+        $this->assertSame(
+            "**NEW QUADRUPLE DOUBLE!**\n"
+            . '[Brandon Tomyoy](https://iblhoops.net/modules.php?name=Player&pa=showpage&pid=3282) (Magic) '
+            . 'recorded a quadruple double ([**18pts/10reb/10ast/10stl**](https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2007-02-21&game=2&team=5)) '
+            . 'in a regular season game!',
+            $result[0]
+        );
+    }
+
+    public function testQuadrupleDoubleLegacyBoxScoreLinkIsAbsoluteWithoutDotSlash(): void
+    {
+        $qd = [
+            'pid' => 3282,
+            'name' => 'Brandon Tomyoy',
+            'teamid' => 5,
+            'team_name' => 'Magic',
+            'date' => '2007-02-21',
+            'box_id' => 545,
+            'game_of_that_day' => 0,
+            'oppTid' => 3,
+            'opp_team_name' => 'Knicks',
+            'points' => 18,
+            'rebounds' => 10,
+            'assists' => 10,
+            'steals' => 10,
+            'blocks' => 1,
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildPlayerBatchResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([$qd]);
+
+        $result = $this->detector->detectAndAnnounce(['2007-02-21']);
+
+        $this->assertStringContainsString('([**18pts/10reb/10ast/10stl**](https://iblhoops.net/ibl5/ibl/IBL/box545.htm))', $result[0]);
+    }
+
     // --- Quadruple double tests ---
 
     public function testDetectsNewQuadrupleDouble(): void

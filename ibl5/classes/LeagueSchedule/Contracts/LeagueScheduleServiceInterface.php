@@ -23,6 +23,8 @@ use Season\Season;
  *     boxid: int,
  *     gameOfThatDay: int,
  *     boxScoreUrl: string,
+ *     visitorBoxScoreUrl: string,
+ *     homeBoxScoreUrl: string,
  *     isUnplayed: bool,
  *     isUpcoming: bool,
  *     visitorWon: bool,

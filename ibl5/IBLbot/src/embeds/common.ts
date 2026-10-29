@@ -114,12 +114,14 @@ export function teamYearUrl(teamId: number, year: number): string {
 
 /**
  * Build a URL to a box score page on the PHP site.
+ * When teamId > 0, appends `&team=` so the page opens on that team's tab.
  */
-export function boxScoreUrl(date: string, gameOfThatDay: number): string {
+export function boxScoreUrl(date: string, gameOfThatDay: number, teamId = 0): string {
     if (gameOfThatDay <= 0) {
         return '';
     }
-    return `${siteBase}/modules.php?name=GameBoxscore&date=${date}&game=${gameOfThatDay}`;
+    const base = `${siteBase}/modules.php?name=GameBoxscore&date=${date}&game=${gameOfThatDay}`;
+    return teamId > 0 ? `${base}&team=${teamId}` : base;
 }
 
 /**

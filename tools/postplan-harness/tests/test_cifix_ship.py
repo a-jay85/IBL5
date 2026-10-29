@@ -839,3 +839,64 @@ def test_gh_without_merged_probe_runs_cifix_and_commits(monkeypatch, tmp_path):
     assert len(llm.calls) == 1
     assert r.out[0] == "b" * 40
     assert r.out[1].exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# Merged-state probe: stop before and after the ci-fix LLM call
+# ---------------------------------------------------------------------------
+
+class MergedGh(CiFixGh):
+    """CiFixGh with a scripted merged_pr probe. `merged` is a dict, None, or an exception
+    to raise. `script` (a list) overrides it per call, the last entry repeating."""
+
+    def __init__(self, merged=None, script=None, **kw):
+        super().__init__(**kw)
+        self.merged = merged
+        self.script = list(script) if script is not None else None
+        self.probes = 0
+
+    def merged_pr(self):
+        self.probes += 1
+        val = self.merged
+        if self.script is not None:
+            val = self.script[min(self.probes, len(self.script)) - 1]
+        if isinstance(val, BaseException):
+            raise val
+        return val
+
+
+_FIX_ARGS = dict(failed=["PHPUnit"], commit=("b" * 40,),
+                 rewatch=(CiOutcome(0, [], "green"),))
+
+
+def test_merged_before_attempt_raises_without_llm_call(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    with pytest.raises(HarnessError) as ei:
+        _run(monkeypatch, tmp_path, CiFixGit(),
+             MergedGh(merged={"number": 4242, "url": "u"}), llm, **_FIX_ARGS)
+    assert ei.value.kind == "pr-merged-mid-fix"
+    assert ei.value.merged["number"] == 4242
+    assert llm.calls == []
+    assert not (tmp_path / "ci-fix-1").exists()
+
+
+def test_merged_probe_error_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    r = _run(monkeypatch, tmp_path, CiFixGit(),
+             MergedGh(merged=RuntimeError("gh down")), llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+    assert r.out[1].exit_code == 0
+
+
+def test_merged_other_pr_number_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    _run(monkeypatch, tmp_path, CiFixGit(), MergedGh(merged={"number": 999, "url": "u"}),
+         llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1
+
+
+def test_merged_number_unparseable_keeps_cifix(monkeypatch, tmp_path):
+    llm = ScriptedLlm()
+    _run(monkeypatch, tmp_path, CiFixGit(), MergedGh(merged={"number": "abc"}),
+         llm, **_FIX_ARGS)
+    assert len(llm.calls) == 1

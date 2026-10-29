@@ -1255,7 +1255,10 @@ def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
     - a deleted remote branch whose merged PR head equals this run's lease. GitHub
       merged exactly what this run pushed (auto-merge landed mid-run), so any local
       commit past the lease is this run's own post-merge work, e.g. a moot CI fix.
+    - phase7 saw this run's own PR MERGED before or during a ci-fix attempt.
     A foreign tip, a different merged head or an unprovable probe keeps the failure."""
+    if e.kind == _PR_MERGED_MID_FIX:
+        return getattr(e, "merged", None)
     lease = getattr(e, "deleted_lease", "")
     if e.kind == "remote-head-diverged" and lease:
         try:
@@ -1710,6 +1713,36 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
     return last
 
 
+_PR_MERGED_MID_FIX = "pr-merged-mid-fix"
+
+
+def _pr_merged_now(gh, pr, log, where: str) -> dict | None:
+    """{"number", "url"} when this run's own PR is MERGED right now, else None.
+    A probe error, a missing probe, or a merged PR with another number is unknown,
+    and unknown is never merged: the caller keeps today's ci-fix flow."""
+    try:
+        merged = gh.merged_pr()
+    except Exception as exc:  # noqa: BLE001 - unknown means keep current behavior
+        log(f"phase7 ci-fix: merged probe {where} attempt failed ({exc!r}); continuing")
+        return None
+    try:
+        same = bool(merged) and int(merged.get("number") or 0) == int(pr)
+    except (TypeError, ValueError, AttributeError):
+        same = False
+    if not same:
+        return None  # unknown: never merged
+    return {"number": int(pr), "url": merged.get("url") or ""}
+
+
+def _raise_merged_mid_fix(log, merged: dict, attempt: int, where: str, note: str):
+    """End Phase 7 as already-shipped: GitHub merged this PR, so a fix is moot."""
+    log(f"phase7 ci-fix: PR #{merged['number']} merged {where} attempt {attempt}; {note}")
+    err = HarnessError(_PR_MERGED_MID_FIX,
+                       f"PR #{merged['number']} merged {where} ci-fix attempt {attempt}")
+    err.merged = {**merged, "why": f"PR merged {where} phase7 ci-fix attempt {attempt}"}
+    raise err
+
+
 def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
     """Re-watch CI on a freshly pushed Phase 7 head. Returns (outcome, sha). Too little
     budget left skips the watch and hands back an indeterminate outcome."""
@@ -1909,6 +1942,12 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         if remaining < _CI_FIX_MIN_ITER_SECS:
             log(f"phase7 ci-fix: wall-clock budget exhausted ({int(remaining)}s left)")
             break
+
+        # Merged mid-run: GitHub already merged this PR, so a fix attempt is moot.
+        merged = _pr_merged_now(gh, pr, log, "before")
+        if merged is not None:
+            _raise_merged_mid_fix(log, merged, attempt + 1, "before",
+                                  "no ci-fix LLM call spent")
 
         # Sync to remote head (live only)
         if mode != "replay":

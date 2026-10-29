@@ -59,9 +59,14 @@
 #                            bucket AND a /pr-ready READY verdict over the head's current
 #                            tree. Default: 1 (enabled)
 #   PR_CYCLE_SKIP_HELD_UNCHANGED
-#                            0 disables the held-unchanged skip. When 1, PRs whose last
-#                            post-plan run held for conditions {3,7} only and whose diff
-#                            matches the sticky **Reviewed diff:** are skipped.
+#                            0 disables the held-unchanged skip. When 1, a PR whose last
+#                            post-plan run held only for conditions a human clears (1
+#                            manual-testing-clearance, 3 unresolved-MISSING-items, 7
+#                            plan-auto-merge-hold, 8 feat-commit-type-floor), whose hold
+#                            record is readable and current, and whose diff matches the
+#                            sticky **Reviewed diff:** is skipped until the head or the
+#                            plan changes. Skipped PRs are listed in the your-turn DM
+#                            with those condition names.
 #                            A PR whose live bucket is DIRTY or BLOCKED-CHECK is exempt
 #                            from this skip and from the holdrepeat skip: a new conflict
 #                            or red check is a state change those fingerprints miss.

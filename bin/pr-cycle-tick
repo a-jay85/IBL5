@@ -612,6 +612,12 @@ while IFS=$'\t' read -r pr branch sha mstate base human; do
         fi
         continue
     fi
+    # No human-only-hold filter here. kind=red is a real non-sign-off CI failure (pcw_check_verdict
+    # drops human-signoff, so a sign-off-only PR reads green and was skipped above) and kind=DIRTY
+    # is a conflict; bin/pr-cycle Stage 1 exempts both from its held-unchanged skip because the hold
+    # fingerprint cannot see either. A second launch on an unchanged diff is already capped by
+    # pcw_attempted_head (retry cap) above, so a rescue that held for a human re-enters only on a
+    # changed patch-id.
     # These three skips send no DM: reconcile already sent the one that matters.
     if pcw_pending_has "$STATE" "$pr"; then
         skip "$pr" "rescue pending"; continue

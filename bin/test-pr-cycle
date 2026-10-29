@@ -500,6 +500,12 @@ grep -qF 'PRs fill the cap first, then DIRTY rescues' <<< "$OUT" \
     && fail "--help still carries the old ordered-first --max-ready wording"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
+grep -qF 'feat-commit-type-floor' <<< "$OUT" \
+    || fail "--help omits the widened held-unchanged condition names"
+grep -qF 'manual-testing-clearance' <<< "$OUT" \
+    || fail "--help omits condition 1's name in the held-unchanged text"
+grep -qF 'conditions {3,7} only' <<< "$OUT" \
+    && fail "--help still carries the old {3,7}-only held-unchanged wording"
 grep -qF 'judged-empty form' <<< "$OUT" \
     || fail "--help omits the gate-nominee handling note"
 for bad in "--nope" "--max-ready 0" "--max-ready -1" "--max-ready abc" "--max-ready" \

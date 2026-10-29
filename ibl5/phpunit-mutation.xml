@@ -97,6 +97,9 @@
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
         </testsuite>
+        <testsuite name="Legal Module Tests">
+            <directory>tests/Legal</directory>
+        </testsuite>
         <testsuite name="Boxscore Module Tests">
             <directory>tests/Boxscore</directory>
         </testsuite>

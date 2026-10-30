@@ -454,6 +454,11 @@ ROWS
 # Case 26: a live burndown-loop, shown only when asked for.
 [ -z "\${STUB_BURNDOWN:-}" ] || printf -- '7007\t0\tcom.ibl5.burndown-loop\n'
 # Case 19: space-separated epochs, one loaded-but-idle one-shot label each.
+# Case 27: one date-pinned one-shot and one recurring job, both idle.
+if [ -n "\${STUB_SCHEDULED:-}" ]; then
+    printf -- '-\t0\tcom.ibl5.fire-demo-oneshot\n'
+    printf -- '-\t0\tcom.ibl5.demo-recurring\n'
+fi
 for e in \${STUB_ONESHOT_EPOCHS:-}; do
     printf -- '-\t0\tcom.ibl5.automouse-oneshot-%s\n' "\$e"
 done
@@ -1022,7 +1027,7 @@ assert_has "queue: a sooner one-shot beats the daily fire" \
 assert_has "queue: a later one-shot loses to the daily fire" \
     "$OUTPUT_ONESHOT_LATE" "AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9-]{10} $(printf '%02d' "$FAR_HOUR"):30"
 assert_lacks "queue: a losing one-shot is not labelled" \
-    "$OUTPUT_ONESHOT_LATE" 'one-shot'
+    "$OUTPUT_ONESHOT_LATE" 'AUTOMOUSE QUEUE.*one-shot'
 assert_has "queue: a one-shot shows with the daily job unloaded" \
     "$OUTPUT_ONESHOT_ONLY" "AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9-]{10} $ONESHOT_SOON_HM \\(one-shot\\)"
 assert_lacks "queue: a past one-shot is not a next run" \
@@ -1371,6 +1376,66 @@ assert_has "burndown: awake shows the last log line" \
     "$OUT_BD_AWAKE" 'decision=launch go'
 assert_lacks "burndown: a sleep that already ended shows no next run" \
     "$OUT_BD_PAST" 'asleep \('
+
+# Case 27 — SCHEDULED JOBS lists idle one-shots: a plist that pins Month and Day,
+# plus an automouse one-shot label. A recurring plist (Hour/Minute only) stays
+# out. Dec 25 is always ahead: a date already past rolls to next year.
+LA="$TMP/launch-agents"; mkdir -p "$LA"
+cat > "$LA/com.ibl5.fire-demo-oneshot.plist" <<'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ibl5.fire-demo-oneshot</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>exec /bin/bash /opt/demo/fire-demo.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Month</key>
+        <integer>12</integer>
+        <key>Day</key>
+        <integer>25</integer>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+</dict>
+</plist>
+PLIST_EOF
+cp "$PLIST" "$LA/com.ibl5.demo-recurring.plist"
+SCHED="$(run_fleet STUB_SCHEDULED=1 STUB_ONESHOT_EPOCHS="$ONESHOT_SOON" \
+    FLEET_STATUS_LAUNCH_AGENTS_DIR="$LA" \
+    | sed -n '/SCHEDULED JOBS/,/PAUSED JOBS/p')"
+SCHED_NONE="$(run_fleet FLEET_STATUS_LAUNCH_AGENTS_DIR="$LA" \
+    | sed -n '/SCHEDULED JOBS/,/PAUSED JOBS/p')"
+assert_has "scheduled: date-pinned one-shot is listed" \
+    "$SCHED" '◷ fire-demo-oneshot'
+assert_has "scheduled: fire time is the pinned date" \
+    "$SCHED" 'fires [A-Z][a-z]{2} [0-9]{4}-12-25 09:15  ·  in '
+assert_has "scheduled: program is the script path" \
+    "$SCHED" '/opt/demo/fire-demo.sh'
+assert_has "scheduled: automouse one-shot label is listed" \
+    "$SCHED" "◷ automouse one-shot"
+assert_has "scheduled: automouse one-shot fire time" \
+    "$SCHED" "fires [A-Z][a-z]{2} [0-9-]{10} $ONESHOT_SOON_HM"
+assert_lacks "scheduled: recurring job stays out" \
+    "$SCHED" 'demo-recurring'
+assert_has "scheduled: no one-shots reads none" \
+    "$SCHED_NONE" 'none'
+assert_has "scheduled: section sits above PAUSED JOBS" \
+    "$OUTPUT" 'SCHEDULED JOBS'
+SCHED_LINE="$(grep -n 'SCHEDULED JOBS' <<< "$OUTPUT" | cut -d: -f1)"
+PAUSED_LINE="$(grep -n 'PAUSED JOBS' <<< "$OUTPUT" | cut -d: -f1)"
+if [ -n "$SCHED_LINE" ] && [ -n "$PAUSED_LINE" ] && [ "$SCHED_LINE" -lt "$PAUSED_LINE" ]; then
+    pass "scheduled: section order"
+else
+    fail "scheduled: section order (scheduled=$SCHED_LINE paused=$PAUSED_LINE)"
+fi
 
 # Case 23 — unknown option: exit 2, one-line complaint on stderr, no page rendered.
 # stderr is captured apart from stdout so the message is pinned to the right stream.

@@ -212,6 +212,18 @@ final class RivalriesControllerTest extends TestCase
         self::assertSame(['Mover Gm' => '112233', 'Rival Gm' => 'e9eaeb'], $this->view->gmSideColors);
     }
 
+    public function testIndexPassesTeamAndGmColorMaps(): void
+    {
+        $this->repo->colorFranchises = ['Mover Gm' => 3];
+        $this->service->franchiseRivals = [self::rivalry('3', '7')];
+        $this->service->gmRivals = [self::rivalry('Mover Gm', 'Rival Gm')];
+
+        self::assertSame('INDEX', $this->controller->handle([], null, null));
+
+        self::assertSame(['3' => '112233', '7' => 'D4AF37'], $this->view->indexTeamSideColors);
+        self::assertSame(['Mover Gm' => '112233', 'Rival Gm' => 'e9eaeb'], $this->view->indexGmSideColors);
+    }
+
     #[DataProvider('invalidTeamIdProvider')]
     public function testInvalidTeamPageIdsRenderEmptyState(mixed $raw): void
     {
@@ -364,7 +376,7 @@ final class ControllerFakeService implements RivalriesServiceInterface
 
     public function getLeagueTop(int $limit): array
     {
-        return ['franchises' => [], 'gms' => []];
+        return ['franchises' => $this->franchiseRivals, 'gms' => $this->gmRivals];
     }
 
     public function getTopFranchiseRivals(int $teamId, int $limit): array
@@ -400,8 +412,16 @@ final class ControllerFakeView implements RivalriesViewInterface
     public array $gmSideColors = [];
     public ?string $gmUserGm = 'renderGm not called';
 
-    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm): string
+    /** @var array<array-key, string> */
+    public array $indexTeamSideColors = [];
+    /** @var array<array-key, string> */
+    public array $indexGmSideColors = [];
+
+    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm, array $teamSideColors = [], array $gmSideColors = []): string
     {
+        $this->indexTeamSideColors = $teamSideColors;
+        $this->indexGmSideColors = $gmSideColors;
+
         return 'INDEX';
     }
 

@@ -133,7 +133,8 @@ final class RivalriesController
                 return $this->view->renderGm($name, $rivals, true, $highlightGm, $this->gmSideColors($rivals));
 
             default:
-                return $this->view->renderIndex($this->service->getLeagueTop(self::TOP_LIMIT), $userTeamKey, $userGm);
+                $league = $this->service->getLeagueTop(self::TOP_LIMIT);
+                return $this->view->renderIndex($league, $userTeamKey, $userGm, $this->teamSideColors($league['franchises']), $this->gmSideColors($league['gms']));
         }
     }
 

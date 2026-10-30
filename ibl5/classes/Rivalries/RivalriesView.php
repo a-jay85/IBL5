@@ -41,13 +41,13 @@ final class RivalriesView implements RivalriesViewInterface
     /**
      * @see RivalriesViewInterface::renderIndex()
      */
-    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm): string
+    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm, array $teamSideColors = [], array $gmSideColors = []): string
     {
+        // These tables span the whole league, so their strips take the site's
+        // card header in place of a team color.
         return '<h1 class="ibl-title">Rivalries</h1>'
-            . '<div class="ibl-grid ibl-grid--2col">'
-            . $this->renderRankTable($league['franchises'], 'teams', $userTeamKey, 'No pair has met 10 times yet.', 'Top franchise rivalries')
-            . $this->renderRankTable($league['gms'], 'gms', $userGm, 'No pair has met 10 times yet.', 'Top GM rivalries')
-            . '</div>';
+            . $this->renderRankTable($league['franchises'], 'teams', $userTeamKey, 'No pair has met 10 times yet.', 'Top franchise rivalries', $teamSideColors, 'ibl-card__header')
+            . $this->renderRankTable($league['gms'], 'gms', $userGm, 'No pair has met 10 times yet.', 'Top GM rivalries', $gmSideColors, 'ibl-card__header');
     }
 
     /**
@@ -215,7 +215,7 @@ final class RivalriesView implements RivalriesViewInterface
      * @param 'teams'|'gms' $kind
      * @param array<array-key, string> $sideColors Primary team color hex keyed by side key
      */
-    private function renderRankTable(array $rows, string $kind, ?string $highlightKey, string $emptyMessage, ?string $title = null, array $sideColors = []): string
+    private function renderRankTable(array $rows, string $kind, ?string $highlightKey, string $emptyMessage, ?string $title = null, array $sideColors = [], string $captionClass = 'rivalries-caption'): string
     {
         if ($rows === [] && $title === null) {
             return $this->renderEmpty($emptyMessage);
@@ -236,7 +236,7 @@ final class RivalriesView implements RivalriesViewInterface
                 . '</tr>';
         }
 
-        return $this->table(['Rank', 'Rivalry', 'Record', 'Games'], $body, $title, $emptyMessage);
+        return $this->table(['Rank', 'Rivalry', 'Record', 'Games'], $body, $title, $emptyMessage, $captionClass);
     }
 
     /**
@@ -383,7 +383,7 @@ final class RivalriesView implements RivalriesViewInterface
      *
      * @param list<string> $headers
      */
-    private function table(array $headers, string $rows, ?string $title = null, string $emptyMessage = ''): string
+    private function table(array $headers, string $rows, ?string $title = null, string $emptyMessage = '', string $captionClass = 'rivalries-caption'): string
     {
         $head = '';
         foreach ($headers as $h) {
@@ -401,7 +401,7 @@ final class RivalriesView implements RivalriesViewInterface
             return $table;
         }
 
-        return '<section class="rivalries-section"><h2 class="rivalries-caption">' . HtmlSanitizer::e($title) . '</h2>'
+        return '<section class="rivalries-section"><h2 class="' . $captionClass . '">' . HtmlSanitizer::e($title) . '</h2>'
             . $table . '</section>';
     }
 

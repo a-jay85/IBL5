@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "module": "head-to-head-records",
+    "viewport": "mobile",
+    "title": "head-to-head-records-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "uncropped",
+    "reason": "no-pixel-mask",
+    "region": "",
+    "beforeFile": "changed/head-to-head-records-mobile.1.before.png",
+    "afterFile": "changed/head-to-head-records-mobile.1.after.png",
+    "sideFile": "changed/head-to-head-records-mobile.1.side.png",
+    "stackFile": "changed/head-to-head-records-mobile.1.stack.png"
+  }
+]

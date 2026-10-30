@@ -24,12 +24,11 @@ final class RivalsViewTest extends TestCase
         self::assertStringContainsString('Top Rivals', $html);
         self::assertStringContainsString('op=teams&amp;a=3&amp;b=7', $html);
         self::assertStringContainsString('op=gms&amp;a=Rival+Gm', $html);
-        self::assertStringContainsString('op=gm&amp;gm=Rival+Gm', $html);
         self::assertStringContainsString('>Team</strong>', $html);
         self::assertStringContainsString('>GM</strong>', $html);
-        self::assertStringContainsString('>See all GM rivals</a>', $html);
-        self::assertStringContainsString('op=team&amp;team=3"', $html);
-        self::assertStringContainsString('>See all team rivals</a>', $html);
+        self::assertStringNotContainsString('op=gm&amp;gm=', $html);
+        self::assertSame(1, substr_count($html, '>See all rivalries</a>'));
+        self::assertStringContainsString('<div class="team-card__body team-rivals-footer"><a class="team-rivals-more" href="modules.php?name=Rivalries&amp;op=team&amp;team=3">', $html);
         self::assertStringContainsString('<span class="award-year">7-5</span>', $html);
         self::assertStringNotContainsString('ibl-badge', $html);
     }
@@ -46,6 +45,21 @@ final class RivalsViewTest extends TestCase
     public function testRendersEmptyStringWhenNoRivals(): void
     {
         self::assertSame('', (new RivalsView())->render([], 'Rival Gm', [], ''));
+    }
+
+    public function testGmOnlyCardLinksToGmRivalries(): void
+    {
+        $html = (new RivalsView())->render([], 'Rival Gm', [self::rivalry('Rival Gm', 'Mover Gm')], '');
+
+        self::assertStringContainsString('href="modules.php?name=Rivalries&amp;op=gm&amp;gm=Rival+Gm">See all rivalries</a>', $html);
+    }
+
+    public function testFranchiseOnlyCardWithoutGmLinksToFranchiseRivalries(): void
+    {
+        $html = (new RivalsView())->render([self::rivalry('3', '7')], null, [self::rivalry('Rival Gm', 'Mover Gm')], '');
+
+        self::assertStringNotContainsString('>GM</strong>', $html);
+        self::assertStringContainsString('op=team&amp;team=3">See all rivalries</a>', $html);
     }
 
     public function testEscapesHostileGmNameInCard(): void

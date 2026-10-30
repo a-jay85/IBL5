@@ -331,7 +331,12 @@
             <group>discord-live</group>
         </exclude>
     </groups>
-    <source baseline="phpunit-baseline.xml">
+    <!-- ignoreIndirectDeprecations hides deprecations raised inside vendor code
+         (delight-im/auth and delight-im/db, PHP 8.4 implicit-nullable params).
+         A path baseline can't do this: worktrees symlink vendor/ to the main
+         checkout, so baseline paths never match there. Our own code's
+         deprecations still report. -->
+    <source ignoreIndirectDeprecations="true">
         <include>
             <directory>classes</directory>
         </include>

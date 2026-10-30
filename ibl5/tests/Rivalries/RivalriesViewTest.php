@@ -154,11 +154,22 @@ final class RivalriesViewTest extends TestCase
         self::assertMatchesRegularExpression('/<td>1<\/td><td><a href=/', $html);
     }
 
-    public function testIndexHasNoGradientCells(): void
+    public function testIndexStacksCardsWithGradientCellsAndSiteHeaders(): void
     {
-        $html = $this->view->renderIndex(['franchises' => [self::rivalry('3', '7')], 'gms' => [self::rivalry('Amy', 'Zed')]], null, null);
+        $html = $this->view->renderIndex(
+            ['franchises' => [self::rivalry('3', '7')], 'gms' => [self::rivalry('Amy', 'Zed')]],
+            null,
+            null,
+            ['3' => '112233', '7' => 'e9eaeb'],
+            ['Amy' => '445566', 'Zed' => 'e9eaeb'],
+        );
 
-        self::assertStringNotContainsString('rivalries-gradient', $html);
+        self::assertSame(2, substr_count($html, '<td class="rivalries-gradient"'));
+        self::assertStringContainsString('--rivalry-color-a: #112233; --rivalry-color-b: #e9eaeb;', $html);
+        self::assertStringContainsString('--rivalry-color-a: #445566; --rivalry-color-b: #e9eaeb;', $html);
+        self::assertSame(2, substr_count($html, '<h2 class="ibl-card__header">'));
+        self::assertStringNotContainsString('rivalries-caption', $html);
+        self::assertStringNotContainsString('ibl-grid', $html);
     }
 
     public function testNullPairRendersEmptyState(): void

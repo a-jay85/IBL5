@@ -85,8 +85,10 @@
 /* Title strip joined to the navy header like the Team page's view dropdown.
    It sits above the scroll box, so it stays put when a phone scrolls the
    table sideways. A neutral navy tint stands in for the team color, since
-   these tables belong to no one team. */
-.rivalries-caption {
+   these tables belong to no one team. The league-wide index uses the site's
+   card header in the same shape. */
+.rivalries-caption,
+.rivalries-section > .ibl-card__header {
     margin: 0;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: var(--space-2) var(--space-3);
@@ -96,6 +98,9 @@
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
+}
+
+.rivalries-caption {
     color: var(--navy-800);
     background: color-mix(in srgb, var(--navy-800) 10%, white);
 }

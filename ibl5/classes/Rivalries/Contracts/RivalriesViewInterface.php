@@ -10,8 +10,13 @@ namespace Rivalries\Contracts;
  */
 interface RivalriesViewInterface
 {
-    /** @param array{franchises: list<ScoredRivalry>, gms: list<ScoredRivalry>} $league */
-    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm): string;
+    /**
+     * @param array{franchises: list<ScoredRivalry>, gms: list<ScoredRivalry>} $league
+     * @param array<array-key, string> $teamSideColors Primary team color hex keyed by teamid
+     * @param array<array-key, string> $gmSideColors Primary team color hex keyed by GM name. A row whose
+     *        sides both have a color gets a gradient Rivalry cell.
+     */
+    public function renderIndex(array $league, ?string $userTeamKey, ?string $userGm, array $teamSideColors = [], array $gmSideColors = []): string;
 
     /**
      * @param PairPage|null $page

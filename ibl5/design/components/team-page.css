@@ -81,8 +81,9 @@
     align-content: center;
 }
 
-/* "See all rivalries" sits centered under both columns. */
-.team-rivals-footer {
+/* "See all rivalries" sits centered under both columns. The doubled class
+   beats .team-card__body's padding, which cards.css sets later in the bundle. */
+.team-card__body.team-rivals-footer {
     padding-top: 0;
     text-align: center;
 }

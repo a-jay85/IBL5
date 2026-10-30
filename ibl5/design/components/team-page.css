@@ -56,18 +56,18 @@
     border-left: 1px solid var(--gray-100);
 }
 
-/* Both columns share five rows: label, three rivals, "See all". Subgrid hands
-   those rows down through the body and the list, so a rival that wraps in one
+/* Both columns share four rows: label and three rivals. Subgrid hands those
+   rows down through the body and the list, so a rival that wraps in one
    column makes the same row taller in the other. */
 .team-rivals-section {
     display: grid;
-    grid-row: span 5;
+    grid-row: span 4;
     grid-template-rows: subgrid;
 }
 
 .team-rivals-section > .team-card__body:last-child {
     display: grid;
-    grid-row: span 4;
+    grid-row: span 3;
     grid-template-rows: subgrid;
 }
 
@@ -81,8 +81,10 @@
     align-content: center;
 }
 
-.team-rivals-section .team-rivals-more {
-    justify-self: center;
+/* "See all rivalries" sits centered under both columns. */
+.team-rivals-footer {
+    padding-top: 0;
+    text-align: center;
 }
 
 /* On a phone the narrow columns wrap names mid-line, so the record gets its

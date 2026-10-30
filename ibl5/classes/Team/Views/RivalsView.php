@@ -37,18 +37,31 @@ class RivalsView
         if ($franchiseRivals !== []) {
             $html .= '<div class="team-rivals-section"><div class="team-card__body team-card__body--tight">'
                 . '<strong class="team-card__section-label">Team</strong></div>'
-                . '<div class="team-card__body">' . $this->renderList(array_slice($franchiseRivals, 0, 3), 'teams')
-                . '<a class="team-rivals-more" href="' . HtmlSanitizer::e(self::BASE . '&op=team&team=' . urlencode($franchiseRivals[0]['a'])) . '">See all team rivals</a></div></div>';
+                . '<div class="team-card__body">' . $this->renderList(array_slice($franchiseRivals, 0, 3), 'teams') . '</div></div>';
         }
 
-        if ($gmName !== null && $gmRivals !== []) {
+        $hasGmSection = $gmName !== null && $gmRivals !== [];
+        if ($hasGmSection) {
             $html .= '<div class="team-rivals-section"><div class="team-card__body team-card__body--tight">'
                 . '<strong class="team-card__section-label">GM</strong></div>'
-                . '<div class="team-card__body">' . $this->renderList(array_slice($gmRivals, 0, 3), 'gms')
-                . '<a class="team-rivals-more" href="' . HtmlSanitizer::e(self::BASE . '&op=gm&gm=' . urlencode($gmName)) . '">See all GM rivals</a></div></div>';
+                . '<div class="team-card__body">' . $this->renderList(array_slice($gmRivals, 0, 3), 'gms') . '</div></div>';
         }
 
-        return $html . '</div></div>';
+        $html .= '</div>';
+
+        // One centered link under both columns. The franchise page already stacks
+        // the team's rivals and its current GM's rivals.
+        $moreHref = match (true) {
+            $franchiseRivals !== [] => self::BASE . '&op=team&team=' . urlencode($franchiseRivals[0]['a']),
+            $hasGmSection => self::BASE . '&op=gm&gm=' . urlencode((string) $gmName),
+            default => null,
+        };
+        if ($moreHref !== null) {
+            $html .= '<div class="team-card__body team-rivals-footer">'
+                . '<a class="team-rivals-more" href="' . HtmlSanitizer::e($moreHref) . '">See all rivalries</a></div>';
+        }
+
+        return $html . '</div>';
     }
 
     /**

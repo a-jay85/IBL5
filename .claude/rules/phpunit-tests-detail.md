@@ -1,6 +1,6 @@
 ---
 description: Golden snapshot rules for PHPUnit tests. Covers creation and regeneration with GoldenSnapshotTrait and UPDATE_SNAPSHOTS=1, and the switches of the five golden helpers that do not use the trait. Companion to phpunit-tests.md, which sits at its byte cap.
-last_verified: 2026-10-23
+last_verified: 2026-10-30
 paths: ibl5/tests/**/*.php
 ---
 
@@ -26,3 +26,13 @@ Five other golden helpers do not use the trait. Each already fails on a missing 
 | `ibl5/tests/Trading/TradingViewGoldenMasterTest.php` | `IBL_GOLDEN_CAPTURE=1` |
 | `ibl5/tests/Trading/TradeOfferFormViewTest.php` | `IBL_GOLDEN_CAPTURE=1` |
 | `ibl5/tests/DatabaseIntegration/TeamServicePageDataCharacterizationTest.php` | `CAPTURE_GOLDENS=1` |
+
+## Mutation Testing (Infection)
+
+1. **Per-PR diff.** Every PR touching `classes/**/*.php`; scopes to changed lines (`--git-diff-filter=AM --git-diff-lines`), ~minutes, posts a PR comment.
+2. **Weekly full.** Mon 03:00 UTC.
+3. **On-demand full.** Apply the `mutation-test` label.
+
+Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
+
+**Local run.** `bin/mutation-diff <base-ref>`; details in `.claude/rules/phpstan-invocation.md`.

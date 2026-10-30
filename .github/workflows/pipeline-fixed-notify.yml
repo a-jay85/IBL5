@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Join tailnet (ephemeral)
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0
         with:
           # PRIMARY auth path: OAuth client pair. The node is ephemeral and is
           # torn down when the job ends; `tags:` scopes it to least privilege.

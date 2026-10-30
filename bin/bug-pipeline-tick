@@ -150,7 +150,9 @@ file_and_close_row() { # row_json
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-5-5 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
+# Opus only by default: a Sonnet tier that returns a plausible but incomplete "fixed" never
+# escalates, so Opus never sees it (bug 4 / PR #3628). An override may list several models cheap→dear.
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-opus-5-5}"
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -1105,7 +1107,7 @@ render_hunter_prompt() { # claimed wt_appdir
     printf '%s' "$t"
 }
 
-# Climb the tiered ladder (Sonnet→Opus, Opus last). Sets LADDER_STATE to one of
+# Climb the ladder in $HUNT_MODELS (default Opus only; an override may list cheaper tiers first). Sets LADDER_STATE to one of
 # fixed | escalate | blocked. A usage limit at ANY tier parks the whole hunt (blocked).
 LADDER_STATE="escalate"
 run_hunt_ladder() { # claimed hunt_id wt_appdir
@@ -1146,7 +1148,7 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
         fi
         # terminal:true is the hunter's own "a retry by a stronger tier would be pointless"
         # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to opus
-        # anyway spends 1 of 2 tiers — the dearest — to re-derive the same answer.
+        # anyway spends the dearest tier to re-derive the same answer.
         # Stop here; drive_hunt_row re-reads the same flag and routes to needs_human.
         if [ "$(printf '%s' "$result" | jq -r '.terminal // false' 2>/dev/null)" = "true" ]; then
             log "hunt $hunt_id: $model returned terminal — skipping remaining tiers"

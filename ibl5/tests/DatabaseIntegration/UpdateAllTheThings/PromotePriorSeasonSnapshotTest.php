@@ -377,14 +377,21 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertSame(402, (int) $row['pts']);
     }
 
-    public function testPreseasonOnlyPlayerStillGetsAnIblHistRow(): void
+    public function testPreseasonOnlyPlayerGetsNoIblHistRow(): void
     {
-        $this->seedSnapshot(202099904, 2009, 'preseason', ['stats_gm' => 9, 'stats_pts' => 100]);
+        // Preseason games are never regular-season games. A player whose mid-season row has
+        // stats_gm = 0 (dropped by the stats_gm > 0 filter) must not fall back to preseason.
+        $this->seedSnapshot(202099904, 2009, 'preseason',  ['stats_gm' => 16, 'stats_pts' => 100]);
+        $this->seedSnapshot(202099904, 2009, 'mid-season', ['stats_gm' => 0]);
 
-        $row = $this->rankedIblHistRowFor(202099904);
+        self::assertNull($this->rankedIblHistRowFor(202099904), 'A preseason-only player must get no ibl_hist row.');
+    }
 
-        self::assertNotNull($row);
-        self::assertSame(9, (int) $row['games']);
+    public function testPreseasonSnapshotAloneProducesNoIblHistRow(): void
+    {
+        $this->seedSnapshot(202099910, 2009, 'preseason', ['stats_gm' => 9, 'stats_pts' => 100]);
+
+        self::assertNull($this->rankedIblHistRowFor(202099910));
     }
 
     /**

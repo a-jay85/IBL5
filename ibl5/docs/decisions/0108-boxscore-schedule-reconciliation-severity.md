@@ -1,6 +1,6 @@
 ---
 description: Boxscore/schedule reconciliation treats orphan boxscores and duplicate triples as errors but missing boxscores as warnings, because a missing boxscore is the normal mid-sim state and a strict check would be muted within a week.
-last_verified: 2026-08-29
+last_verified: 2026-10-29
 ---
 
 # ADR-0108: Asymmetric Severity for Boxscore/Schedule Reconciliation

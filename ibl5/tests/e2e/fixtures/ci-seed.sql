@@ -2184,8 +2184,7 @@ SELECT
 FROM (
   SELECT s.*, ROW_NUMBER() OVER (
     PARTITION BY s.pid, s.season_year
-    ORDER BY CASE WHEN s.snapshot_phase = 'preseason' THEN 1 ELSE 0 END ASC,
-      s.stats_gm DESC,
+    ORDER BY s.stats_gm DESC,
       CASE s.snapshot_phase
         WHEN 'playoffs' THEN 0 WHEN 'end-of-season' THEN 1 WHEN 'finals' THEN 2
         WHEN 'post-heat' THEN 3 WHEN 'heat-finals' THEN 4 WHEN 'heat-end' THEN 5
@@ -2194,7 +2193,7 @@ FROM (
         WHEN 'playoffs-rd1-gm4-7' THEN 10 WHEN 'playoffs-rd1-gm1-3' THEN 11
         WHEN 'heat-wb' THEN 12 WHEN 'heat-lb' THEN 13 ELSE 99
       END ASC, s.id DESC
-  ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0
+  ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0 AND s.snapshot_phase <> 'preseason'
 ) snap
 LEFT JOIN ibl_franchise_seasons fs
   ON snap.teamid = fs.franchise_id AND snap.season_year = fs.season_ending_year

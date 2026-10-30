@@ -2184,7 +2184,8 @@ SELECT
 FROM (
   SELECT s.*, ROW_NUMBER() OVER (
     PARTITION BY s.pid, s.season_year
-    ORDER BY s.stats_gm DESC,
+    ORDER BY CASE WHEN s.snapshot_phase = 'preseason' THEN 1 ELSE 0 END ASC,
+      s.stats_gm DESC,
       CASE s.snapshot_phase
         WHEN 'playoffs' THEN 0 WHEN 'end-of-season' THEN 1 WHEN 'finals' THEN 2
         WHEN 'post-heat' THEN 3 WHEN 'heat-finals' THEN 4 WHEN 'heat-end' THEN 5

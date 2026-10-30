@@ -64,7 +64,30 @@ class RefreshIblHistStepTest extends TestCase
     }
 
     /**
-     * Pins stats_gm DESC as the first ORDER BY key. Mutation: move or remove
+     * Pins the preseason demotion ahead of stats_gm DESC. Mutation: remove it or
+     * move it after stats_gm DESC and a stale preseason row with more games wins again.
+     */
+    public function testPreseasonDemotionPrecedesStatsGmDescInRefreshQuery(): void
+    {
+        $mockDb = new MockDatabase();
+        (new RefreshIblHistStep($mockDb))->execute();
+
+        $queries = implode("\n", $mockDb->getExecutedQueries());
+
+        $demotionPos = strpos($queries, "s.snapshot_phase = 'preseason'");
+        $statsGmPos  = strpos($queries, 'stats_gm DESC');
+
+        $this->assertNotFalse($demotionPos, 'Preseason demotion must be in the refresh query');
+        $this->assertNotFalse($statsGmPos, 'stats_gm DESC must be in the refresh query');
+        $this->assertLessThan(
+            $statsGmPos,
+            $demotionPos,
+            'The preseason demotion must appear before stats_gm DESC in the ORDER BY',
+        );
+    }
+
+    /**
+     * Pins stats_gm DESC ahead of the phase-rank CASE. Mutation: move or remove
      * stats_gm DESC and this positional assertion fails.
      */
     public function testStatsGmDescPrecedesPhaseRankInRefreshQuery(): void

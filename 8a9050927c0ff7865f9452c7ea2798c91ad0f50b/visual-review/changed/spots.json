@@ -1,0 +1,15 @@
+[
+  {
+    "module": "rivalries-teams-pair",
+    "viewport": "mobile",
+    "title": "rivalries-teams-pair-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 24-148 px",
+    "beforeFile": "changed/rivalries-teams-pair-mobile.1.before.png",
+    "afterFile": "changed/rivalries-teams-pair-mobile.1.after.png",
+    "sideFile": "changed/rivalries-teams-pair-mobile.1.side.png",
+    "stackFile": "changed/rivalries-teams-pair-mobile.1.stack.png"
+  }
+]

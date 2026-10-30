@@ -106,17 +106,20 @@ prune_attachment_cache() {
 file_issues_only() { [ "${BUG_PIPELINE_FILE_ISSUES_ONLY:-}" = "1" ]; }
 
 # ── §3g file-issues-only terminal path ───────────────────────────────────────
-# Best-effort: file a GitHub Issue (or surface the existing one), reply to the
-# GM's original message with the issue URL, then transition the row to 'filed'.
+# Best-effort: file a GitHub Issue (or surface the existing one), post the issue
+# URL in the report's thread (opening one on the GM's message if the row has none),
+# then transition the row to 'filed'. The thread keeps the bug channel itself free
+# of bot replies; a channel reply is only the fallback when create-thread fails.
 # Never fails the caller — all exits are load-bearing (reply is cosmetic).
 # issue_title / severity must be exported in the caller's scope if known;
 # bpgh_ensure_issue falls back to truncated original_text + severity:low if not.
 # shellcheck disable=SC2086
 file_and_close_row() { # row_json
     local row="$1"
-    local id msg_id blocked clear_opt existing_issue
+    local id msg_id blocked clear_opt existing_issue tid thread_opt=""
     id="$(printf '%s' "$row" | jq -r '.id')"
     msg_id="$(printf '%s' "$row" | jq -r '.original_message_id // empty')"
+    tid="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
     blocked="$(printf '%s' "$row" | jq -r '.blocked_until // empty')"
     existing_issue="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
     clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
@@ -128,16 +131,28 @@ file_and_close_row() { # row_json
 
     if [ -z "$existing_issue" ]; then
         local reply="Thanks for the report! I've filed a GitHub Issue so it doesn't get lost.${url_part}"
-        bot_reply_to_message "$msg_id" "$reply" >/dev/null \
-            || log "file_and_close_row $id: reply failed (continuing)"
+        if [ -z "$tid" ] && [ -n "$msg_id" ]; then
+            tid="$(bot_create_thread "$msg_id" "Issue #$n: ${issue_title:-report}")"
+            [ -n "$tid" ] && thread_opt="--thread-id=$tid"
+        fi
+        if [ -n "$tid" ]; then
+            bot_post_to_thread "$tid" "$reply" >/dev/null \
+                || log "file_and_close_row $id: post-to-thread failed (continuing)"
+        else
+            log "file_and_close_row $id: create-thread failed — replying in-channel instead"
+            bot_reply_to_message "$msg_id" "$reply" >/dev/null \
+                || log "file_and_close_row $id: reply failed (continuing)"
+        fi
     fi
-    cli transition "$id" filed --issue="$n" $clear_opt >/dev/null \
+    cli transition "$id" filed --issue="$n" $clear_opt $thread_opt >/dev/null \
         && log "file_and_close_row $id: → filed (issue $n)"
 }
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-5-5 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
+# Opus only by default: a Sonnet tier that returns a plausible but incomplete "fixed" never
+# escalates, so Opus never sees it (bug 4 / PR #3628). An override may list several models cheap→dear.
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-opus-5-5}"
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -1092,7 +1107,7 @@ render_hunter_prompt() { # claimed wt_appdir
     printf '%s' "$t"
 }
 
-# Climb the tiered ladder (Sonnet→Opus, Opus last). Sets LADDER_STATE to one of
+# Climb the ladder in $HUNT_MODELS (default Opus only; an override may list cheaper tiers first). Sets LADDER_STATE to one of
 # fixed | escalate | blocked. A usage limit at ANY tier parks the whole hunt (blocked).
 LADDER_STATE="escalate"
 run_hunt_ladder() { # claimed hunt_id wt_appdir
@@ -1133,7 +1148,7 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
         fi
         # terminal:true is the hunter's own "a retry by a stronger tier would be pointless"
         # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to opus
-        # anyway spends 1 of 2 tiers — the dearest — to re-derive the same answer.
+        # anyway spends the dearest tier to re-derive the same answer.
         # Stop here; drive_hunt_row re-reads the same flag and routes to needs_human.
         if [ "$(printf '%s' "$result" | jq -r '.terminal // false' 2>/dev/null)" = "true" ]; then
             log "hunt $hunt_id: $model returned terminal — skipping remaining tiers"

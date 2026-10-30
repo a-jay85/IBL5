@@ -20,6 +20,9 @@ PROMPT="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-hunter-prompt"
 
 bpt_setup
 export STUB_HUNT_MODE=1   # claude stub impersonates the hunter agent
+# The driver default is Opus-only; the ladder rows below test multi-tier climbing, so pin the
+# cheap→dear override here. Row 11b unsets it to assert the default.
+export BUG_PIPELINE_HUNT_MODELS="claude-sonnet-5-5 claude-opus-5-5"
 
 # A classified, claimed bug row (snowflakes as strings; hunt_attempts is an int).
 CLAIM='{"id":"7","status":"hunting","class":"bug","thread_id":"880000000000000001","issue_number":"4242","original_text":"the trade button is broken","hunt_attempts":0}'
@@ -106,6 +109,19 @@ bpt_count "r11: full ladder = 2 tiers" 2 "$STUB/hunt-models.log"
 order="$(tr '\n' ' ' < "$STUB/hunt-models.log")"
 bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-sonnet-5-5 claude-opus-5-5 " "$order"
 bpt_log_lacks "$STUB" hunt-models.log "haiku" "r11: no Haiku tier in the ladder"
+
+# ── Row 11b — default (no override) = Opus only: one tier, no Sonnet ──
+unset BUG_PIPELINE_HUNT_MODELS
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result_for claude-opus-5-5 '{"verdict":"fixed"}'
+bpt_hunt_dirty
+bpt_run
+export BUG_PIPELINE_HUNT_MODELS="claude-sonnet-5-5 claude-opus-5-5"
+bpt_count "r11b: default ladder = 1 tier" 1 "$STUB/hunt-models.log"
+order="$(tr '\n' ' ' < "$STUB/hunt-models.log")"
+bpt_expect_eq "r11b: default tier is Opus" "claude-opus-5-5 " "$order"
+bpt_log_lacks "$STUB" hunt-models.log "sonnet" "r11b: no Sonnet tier by default"
 
 # ── Row 12 — hunter-success ships; worktree is DIRTY (uncommitted) at handoff ──
 bpt_reset

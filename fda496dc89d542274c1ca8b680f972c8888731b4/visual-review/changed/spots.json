@@ -1,0 +1,41 @@
+[
+  {
+    "module": "rivalries",
+    "viewport": "desktop",
+    "title": "rivalries",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "middle, y 89-551 px",
+    "beforeFile": "changed/rivalries.1.before.png",
+    "afterFile": "changed/rivalries.1.after.png",
+    "sideFile": "changed/rivalries.1.side.png",
+    "stackFile": "changed/rivalries.1.stack.png"
+  },
+  {
+    "module": "rivalries",
+    "viewport": "mobile",
+    "title": "rivalries-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "middle, y 89-576 px",
+    "beforeFile": "changed/rivalries-mobile.1.before.png",
+    "afterFile": "changed/rivalries-mobile.1.after.png",
+    "sideFile": "changed/rivalries-mobile.1.side.png",
+    "stackFile": "changed/rivalries-mobile.1.stack.png"
+  },
+  {
+    "module": "rivalries-teams-pair",
+    "viewport": "mobile",
+    "title": "rivalries-teams-pair-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 24-148 px",
+    "beforeFile": "changed/rivalries-teams-pair-mobile.1.before.png",
+    "afterFile": "changed/rivalries-teams-pair-mobile.1.after.png",
+    "sideFile": "changed/rivalries-teams-pair-mobile.1.side.png",
+    "stackFile": "changed/rivalries-teams-pair-mobile.1.stack.png"
+  }
+]

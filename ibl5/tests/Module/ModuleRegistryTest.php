@@ -76,6 +76,12 @@ final class ModuleRegistryTest extends TestCase
         self::assertFalse(ModuleRegistry::isValid('records'));
     }
 
+    public function testRivalriesIsRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('Rivalries'));
+        self::assertContains('Rivalries', ModuleRegistry::getAllModules());
+    }
+
     public function testLeaderboardsAndRetiredLeaderboardStubsAreRegistered(): void
     {
         self::assertTrue(ModuleRegistry::isValid('Leaderboards'));

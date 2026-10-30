@@ -109,6 +109,9 @@
         <testsuite name="HeadToHeadRecords Module Tests">
             <directory>tests/HeadToHeadRecords</directory>
         </testsuite>
+        <testsuite name="Rivalries Module Tests">
+            <directory>tests/Rivalries</directory>
+        </testsuite>
         <testsuite name="OneOnOneGame Module Tests">
             <directory>tests/OneOnOneGame</directory>
         </testsuite>

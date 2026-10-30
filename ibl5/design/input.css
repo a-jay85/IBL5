@@ -215,6 +215,7 @@
 @import './components/tables/leaderboards.css';
 @import './components/tables/standings-rows.css';
 @import './components/tables/api-keys.css';
+@import './components/tables/rivalries.css';
 @import './components/cards.css';
 @import './components/forms.css';
 @import './components/navigation.css';

@@ -16,12 +16,20 @@ final class TeamFactory implements ModuleFactoryInterface
     {
     }
 
-    public function controller(): \Team\TeamController
+    public function controller(string $logoDir): \Team\TeamController
     {
         $db = $this->services->db();
+        $leagueContext = $this->services->leagueContext();
         $commonRepo = $this->services->teamIdentity();
         $teamRepository = new \Team\TeamRepository($db);
-        $service = new \Team\TeamService($db, $teamRepository, $this->services->leagueContext());
+        // Rivalries reads IBL tables only, so the Olympics Team page gets no rivals card.
+        $rivalsCardBuilder = $leagueContext->isOlympics()
+            ? null
+            : new \Team\RivalsCardBuilder(
+                \Rivalries\RivalriesServiceFactory::create($db, \Season\SharedSeason::get($db, $leagueContext), $logoDir),
+                fn (int $tid): ?string => $commonRepo->getOwnerName($tid),
+            );
+        $service = new \Team\TeamService($db, $teamRepository, $leagueContext, rivalsCardBuilder: $rivalsCardBuilder);
         $view = new \Team\TeamView();
 
         return new \Team\TeamController(

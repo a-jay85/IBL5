@@ -119,6 +119,7 @@ JQ_BIN="${FLEET_STATUS_JQ:-jq}"
 GH_BIN="${FLEET_STATUS_GH:-gh}"
 BURNDOWN_LOG="${FLEET_STATUS_BURNDOWN_LOG:-$HOME/.claude/burndown-loop/loop.log}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
+LAUNCH_AGENTS_DIR="${FLEET_STATUS_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
 # Same default and override as usage_state_dir in bin/lib/usage-fetch.sh.
@@ -1387,7 +1388,117 @@ EOF
     return 0
 }
 
-# ── section 4: paused jobs ─────────────────────────────────────────────────────
+# ── section 4: scheduled one-shots ─────────────────────────────────────────────
+#
+# Loaded com.ibl5.* jobs that have not fired yet. The launchd section hides them
+# because they have no PID. Most idle labels are recurring jobs (wt-gc, the
+# nightly db sync), so a job only counts as a one-shot when its plist pins a
+# date: StartCalendarInterval with Month, Day, Hour, and Minute all set. The
+# automouse one-shots carry their fire epoch in the label instead
+# (automouse_oneshot_next), so they need no plist.
+#
+# Parsed with sed for the same reason as automouse_daily_next: CI has no plutil.
+# A date already past this year rolls to next year, because launchd fires a
+# pinned date every year until the plist goes away.
+
+# "<Y>-<MM>-<DD> <HH>:<MI>" local wall-clock to an epoch. BSD first, GNU second.
+wallclock_epoch() {
+    date -j -f '%Y-%m-%d %H:%M' "$1" +%s 2>/dev/null \
+        || date -d "$1" +%s 2>/dev/null
+}
+
+# One plist's pinned fire epoch and program, tab-separated, or nothing.
+plist_oneshot() {
+    local f=$1 flat sci mo d h m y epoch now prog
+    [ -f "$f" ] || return 0
+    flat="$(tr -d '\r\n' < "$f" 2>/dev/null | sed 's/>[[:space:]]*</></g')"
+    sci="${flat#*<key>StartCalendarInterval</key><dict>}"
+    [ "$sci" = "$flat" ] && return 0
+    sci="${sci%%</dict>*}"
+
+    mo="$(sed -n 's|.*<key>Month</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    d="$(sed -n 's|.*<key>Day</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    h="$(sed -n 's|.*<key>Hour</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    m="$(sed -n 's|.*<key>Minute</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    case "$mo" in ''|*[!0-9]*) return 0 ;; esac
+    case "$d"  in ''|*[!0-9]*) return 0 ;; esac
+    case "$h"  in ''|*[!0-9]*) return 0 ;; esac
+    case "$m"  in ''|*[!0-9]*) return 0 ;; esac
+
+    now="$(date +%s)"
+    y="$(date +%Y)"
+    epoch="$(wallclock_epoch "$(printf '%04d-%02d-%02d %02d:%02d' \
+        "$y" "$(( 10#$mo ))" "$(( 10#$d ))" "$(( 10#$h ))" "$(( 10#$m ))")")"
+    case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$epoch" -le "$now" ]; then
+        epoch="$(wallclock_epoch "$(printf '%04d-%02d-%02d %02d:%02d' \
+            "$(( y + 1 ))" "$(( 10#$mo ))" "$(( 10#$d ))" "$(( 10#$h ))" "$(( 10#$m ))")")"
+        case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
+    fi
+
+    # The program is the last word of the last ProgramArguments string, which
+    # covers both `/bin/bash script.sh` and `bash -lc "exec ... script.sh"`.
+    prog="${flat#*<key>ProgramArguments</key><array>}"
+    if [ "$prog" != "$flat" ]; then
+        prog="${prog%%</array>*}"
+        prog="${prog%</string>}"
+        prog="${prog##*<string>}"
+        prog="${prog##* }"
+        case "$prog" in "$HOME"/*) prog="~${prog#"$HOME"}" ;; esac
+    else
+        prog=''
+    fi
+    printf '%s\t%s' "$epoch" "$prog"
+}
+
+render_scheduled() {
+    local listing rows='' line pid label suffix epoch prog now count=0 found
+
+    section "SCHEDULED JOBS  (one-shot launchd jobs waiting to fire)"
+
+    listing="$(launchctl list 2>/dev/null | grep 'com\.ibl5\.')"
+    now="$(date +%s)"
+    while IFS= read -r line; do
+        pid="$(awk '{print $1}' <<< "$line")"
+        label="$(awk '{print $3}' <<< "$line")"
+        [ -n "$label" ] || continue
+        # A numeric PID is running, so the launchd section already shows it.
+        [ "$pid" = "-" ] || continue
+        suffix="${label#com.ibl5.}"
+
+        case "$suffix" in
+            automouse-oneshot-*)
+                epoch="${suffix#automouse-oneshot-}"
+                case "$epoch" in ''|*[!0-9]*) continue ;; esac
+                [ "$epoch" -gt "$now" ] || continue
+                rows="$rows$epoch	automouse one-shot	bin/automouse/run
+"
+                ;;
+            *)
+                found="$(plist_oneshot "$LAUNCH_AGENTS_DIR/$label.plist")"
+                [ -n "$found" ] || continue
+                epoch="${found%%	*}"
+                prog="${found#*	}"
+                rows="$rows$epoch	$suffix	$prog
+"
+                ;;
+        esac
+    done <<< "$listing"
+
+    while IFS='	' read -r epoch suffix prog; do
+        [ -n "$epoch" ] || continue
+        count=$(( count + 1 ))
+        printf '  %s◷%s %s%s%s\n' "$YEL" "$R" "$B" "$suffix" "$R"
+        printf '      fires %s  ·  in %s\n' "$(epoch_clock "$epoch")" \
+            "$(human_age $(( epoch - now )))"
+        [ -n "$prog" ] && printf '      %s%s%s\n' "$DIM" "$(clip_field "$prog" 64 left)" "$R"
+    done < <(printf '%s' "$rows" | sort -n)
+
+    [ "$count" -eq 0 ] && note "none"
+    return 0
+}
+
+# ── section 5: paused jobs ─────────────────────────────────────────────────────
 #
 # Runs the usage gate stopped at the usage limit. A paused run has no process, so
 # no section above lists it (an automouse plan's queue row only says "paused").
@@ -1513,6 +1624,7 @@ render_all() {
     render_queue
     render_icebox
     render_loose
+    render_scheduled
     render_paused
     printf '\n'
 }

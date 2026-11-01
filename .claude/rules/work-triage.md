@@ -1,6 +1,6 @@
 ---
 description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
-last_verified: 2026-10-26
+last_verified: 2026-11-01
 ---
 
 # Work Triage Rule
@@ -45,14 +45,7 @@ The plan-vs-ad-hoc verdict decides *whether to plan*. Who executes the edits is 
 
 A single sweep stays with one agent. For independent chunks, spawn one agent per chunk, all in the same message. A chunk of 5 or more files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 
-**Trial review by 2026-11-23.** Baseline: `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. `SPLIT` is `git log --format=%cs -S 'Inline-edit trial' -- .claude/rules/work-triage.md | tail -1`, then run:
-
-```bash
-bin/lib/automouse-pricer --index --since SPLIT |
-  jq -s --arg from SPLIT --arg to 2026-11-23 -f bin/lib/opus-trial-cost.jq
-```
-
-Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label. Limits: `work-triage-inline-trial.md`.
+**Trial review due 2026-11-23.** Command, keep-or-restore criteria, and limits: `work-triage-inline-trial.md` § Review.
 
 ### The hard trigger: ≥5 distinct files in one turn
 

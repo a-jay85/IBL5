@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-10-12
+last_verified: 2026-11-02
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -106,3 +106,15 @@ Phase 9 in `tools/postplan-harness/runner.py` now catches `UsagePause` around th
 A pause in any earlier phase, ci-fix included, still ends `failed` with `usage-pause` and exit 75, and resumes as before. `tools/postplan-harness/tests/test_usage_pause_swallow_sites.py` now counts three `UsagePause` handlers in `runner.py`. A fourth site needs the same review.
 
 Correction (2026-10-12): the 18-run count comes from `grep -l 'usage-pause: retrospective' tools/postplan-harness/out/*/result.json` in the main checkout. The spot-check of 10 and the `bin/pr-cycle` pause count above were not re-verified. An exit 75 never sent a failure DM, because `FAILDM_SEG` in `bin/post-plan-now` skips rc 75. Those runs were reported as paused instead.
+
+## Addendum (2026-11-02): the gate reads only the weekly window
+
+The usage endpoint now returns `"five_hour": null`. A reading on 2026-11-01 showed a null `five_hour` and a `seven_day` utilization of 4.0. [PR #3640](https://github.com/a-jay85/IBL5/pull/3640) changed `bin/lib/usage-gate.sh` and `bin/lib/usage-fetch.sh` to read only `.seven_day`. Two sentences in the 2026-10-01 addendum above describe the old two-window logic. They stay as written, and this addendum supersedes them.
+
+1. `bad-body` now means a response without `.seven_day.utilization`. A body that carries only `five_hour` is `bad-body`. A body with `"five_hour": null` and a weekly figure is valid.
+
+2. The blind-trust check in `usage_blind_trust` reads `resets_at` from the `seven_day` window only. The zone comes from the weekly figure against the same 93 and 98 thresholds. The gate no longer takes a maximum across windows, and `usage_limiting_window` was removed.
+
+Pause markers, the blind-trust check and the limit-hit marker always name window `seven_day`. `usage_delta_log` writes only `week` and `d_week`, and `last/<sid>` keeps the weekly figure as its last field. An old `last/<sid>` file in the two-field form still reads correctly. A `last/<sid>` file whose last field is not a number counts as unchanged, so that session logs no deltas until the file is replaced. `bin/usage-gate-coordinator` gives the `WEEKLY` DM prefix only to `seven_day` markers. An old marker with `window: five_hour` still resumes by its `resets_at`, and `bin/fleet-status` shows a generic `reset` for it.
+
+The Context section's mention of the 5-hour and weekly plan limits is history. It stays true for the period it describes.

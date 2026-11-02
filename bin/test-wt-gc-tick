@@ -19,7 +19,8 @@
 #
 # Env: WT_GC_TICK_UNDER_TEST  path of the tick to test (default: bin/wt-gc-tick)
 #
-# Run: bin/test-wt-gc-tick  (exit 0 = all pass, 1 = a case failed)
+# Run: bin/test-wt-gc-tick [--case NAME]...  (exit 0 = all pass, 1 = a case failed)
+# --case runs only the named cases (repeatable); an unknown name fails the run.
 
 set -u
 # shellcheck source=bin/lib/harness.sh
@@ -28,6 +29,34 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TICK="${WT_GC_TICK_UNDER_TEST:-$SCRIPT_DIR/wt-gc-tick}"
 CRON_SETUP="$SCRIPT_DIR/wt-gc-cron-setup"
+
+# --case NAME (repeatable): run only the named cases. Shared fixtures and helpers between
+# cases still run. A mutation-matrix row uses this to fit one case inside its 30s timeout.
+# A name that matches no case fails the run, so a typo cannot pass as a green baseline.
+ONLY_CASES=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --case)
+            [ $# -ge 2 ] && [ -n "$2" ] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
+            ONLY_CASES+=("$2"); shift 2 ;;
+        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+    esac
+done
+RAN_CASES=$'\n'
+should_run() {  # $1 = case name; true when no --case was given or $1 was named
+    [ ${#ONLY_CASES[@]} -eq 0 ] && return 0
+    local c
+    for c in "${ONLY_CASES[@]}"; do
+        if [ "$c" = "$1" ]; then RAN_CASES+="$1"$'\n'; return 0; fi
+    done
+    return 1
+}
+check_only_cases() {  # fail every --case name that matched no case
+    local c
+    for c in ${ONLY_CASES[@]+"${ONLY_CASES[@]}"}; do
+        [[ "$RAN_CASES" == *$'\n'"$c"$'\n'* ]] || h_fail "unknown --case name: $c (no case ran)"
+    done
+}
 
 # A literal docker path in the tick or its library would bypass the PATH stub
 # and reach the real CLI, so refuse to run at all.
@@ -537,6 +566,7 @@ pushed_branch() {
 # ══════════════════════════════════════════════════════════════════════════════
 # G1 — rejected flags
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G1-rejected-flags; then
 begin_case G1-rejected-flags
 for bad in --bogus --dry-run=1 extra; do
     fresh
@@ -546,10 +576,12 @@ for bad in --bogus --dry-run=1 extra; do
     argv_exists && note_err "'$bad': cleanup stub ran"
 done
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G2 — kill switch
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G2-kill-switch; then
 begin_case G2-kill-switch
 fresh
 run_tick WT_GC_ENABLED=0 -- --force
@@ -566,10 +598,12 @@ run_tick -- --force
 chk_rc "ENABLED unset" 0
 argv_exists || note_err "ENABLED unset: sweep not reached"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G3 — idle gate fails closed
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G3-idle-fail-closed; then
 begin_case G3-idle-fail-closed
 fresh
 run_tick WT_GC_IOREG="$ROOT/missing" --
@@ -596,10 +630,12 @@ run_tick WT_GC_IOREG= WT_GC_IDLE_SECS=999999999 --
 chk_rc "empty IOREG seam" 0
 argv_exists && note_err "empty IOREG seam: swept"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G4 — idle gate passes; --force bypasses it
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G4-idle-pass-and-force; then
 begin_case G4-idle-pass-and-force
 fresh
 run_tick STUB_IDLE=7200 --
@@ -614,10 +650,12 @@ run_tick WT_GC_IOREG="$ROOT/missing" -- --force
 chk_rc "force, missing reader" 0
 argv_exists || note_err "force, missing reader: sweep not reached"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G5 — single-flight lock
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G5-lock; then
 begin_case G5-lock
 fresh
 mkdir -p "$CD/state"
@@ -645,10 +683,12 @@ fresh
 run_tick -- --force
 [ -e "$CD/state/wt-gc.lock" ] && note_err "plain run: lock file left behind"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G6 — minimum-interval stamp
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G6-min-interval; then
 begin_case G6-min-interval
 now="$(date +%s)"
 fresh
@@ -693,11 +733,13 @@ run_tick --
 chk_rc "garbage stamp" 0
 argv_exists || note_err "garbage stamp: did not sweep"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G7 — cleanup argv is a literal (final verdict printed at the end, once every
 # case's argv has been archived to $ROOT/all-argv)
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G7-cleanup-argv; then
 begin_case G7-cleanup-argv
 fresh
 run_tick -- --force
@@ -710,10 +752,12 @@ chk_rc "dry run" 0
 printf -- '--all\n--dry-run\n' > "$CD/expect"
 cmp -s "$CD/expect" "$CD/argv" || note_err "dry-run argv is not exactly '--all' then '--dry-run'"
 G7_ERRS="$CASE_ERRS"
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G8 — summary parsing and failure propagation
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G8-summary-and-failure; then
 begin_case G8-summary-and-failure
 fresh
 run_tick STUB_CLEANED=2 STUB_SKIPPED=5 -- --force
@@ -732,10 +776,12 @@ chk_rc "cleanup rc 4" 1
 log_has 'rc=4' || note_err "cleanup rc 4: no 'rc=4'"
 [ -e "$CD/state/last-sweep" ] && note_err "cleanup rc 4: wrote the stamp"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G9 — surface counts from wt-status
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G9-surface-counts; then
 begin_case G9-surface-counts
 fresh
 run_tick -- --force
@@ -744,10 +790,12 @@ final_line | grep -qE 'stalled=2 unpushed=1 empty=3 open_pr=1 merged=1' || note_
 [ "$(grep -c 'SURFACE STALLED' "$(LOG)" 2>/dev/null)" = 2 ] || note_err "expected two 'SURFACE STALLED' lines"
 [ "$(grep -c 'SURFACE UNPUSHED' "$(LOG)" 2>/dev/null)" = 1 ] || note_err "expected one 'SURFACE UNPUSHED' line"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G10 — survivors: real cleanup + real wt-status through the tick
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G10-survivors; then
 begin_case G10-survivors
 new_env "$CD"
 G10_MAIN="$ENV_MAIN"
@@ -796,10 +844,12 @@ done
 [ -f "$WTP/wt-unpushed/work.txt" ] || note_err "wt-unpushed work file lost"
 final_line | grep -qE 'cleaned=1( |$)' || note_err "final line lacks 'cleaned=1' (got: $(final_line))"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G11 — every write lands outside the repo, at the documented default paths
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G11-writes-outside-repo; then
 begin_case G11-writes-outside-repo
 [ -z "$(git -C "$G10_MAIN" status --porcelain 2>/dev/null)" ] || note_err "main clone is dirty after the tick"
 [ -f "$G10_STATE/wt-gc.log" ] || note_err "wt-gc.log missing under WT_GC_LOCK_DIR"
@@ -826,10 +876,12 @@ if [ -z "$expected_root" ] || [ "$recorded_cwd" != "$expected_root" ]; then
     note_err "derived cwd '$recorded_cwd' != first worktree '$expected_root'"
 fi
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G12 — empty environment (env -i): no unbound variable, still runs
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G12-empty-env; then
 begin_case G12-empty-env
 fresh
 mkdir -p "$CD/state"
@@ -850,6 +902,7 @@ RC=$?
 chk_rc "env -i --help" 0
 grep -q 'unbound variable' "$CD/help.out" && note_err "env -i --help: unbound variable"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G13 — plist emitter output
@@ -862,6 +915,7 @@ chmod +x "$EMIT/bin/wt-gc-cron-setup"
 mkdir -p "$EMIT/bin/lib"
 cp "$SCRIPT_DIR/lib/launchd-sched.sh" "$SCRIPT_DIR/lib/launchd-job.sh" "$EMIT/bin/lib/"
 
+if should_run G13-plist; then
 begin_case G13-plist
 LOGDIR="$ROOT/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc"
 PLIST_OUT="$CD/plist.xml"
@@ -887,10 +941,12 @@ else
 fi
 [ -e "$ROOT/home/Library" ] && note_err "print-schedule wrote under HOME/Library"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G14 — emitter rejects bad input; install refuses without the tick
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G14-emitter-rejects; then
 begin_case G14-emitter-rejects
 # Earlier tick cases log `launchctl list` from the live-post-plan-run guard
 # (bin/lib/wt-guards.sh); start clean so only this case's calls count.
@@ -910,10 +966,12 @@ err_has 'Refusing to install' || note_err "install without tick: no 'Refusing to
 [ -e "$ROOT/launchctl.calls" ] && note_err "install without tick: launchctl was called"
 [ -e "$ROOT/home/Library" ] && note_err "install without tick: wrote under HOME/Library"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G15 — emitter under an empty environment
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G15-emitter-empty-env; then
 begin_case G15-emitter-empty-env
 RC=0
 env -i PATH=/usr/bin:/bin bash -euo pipefail "$EMIT/bin/wt-gc-cron-setup" --print-schedule > "$CD/out" 2>&1 || RC=$?
@@ -924,6 +982,7 @@ grep -qE '<string>/[^<$]+/\.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc
 grep -qE ':/[^<$:]+/\.local/bin</string>' "$CD/out" || note_err "PATH lacks an absolute home .local/bin"
 [ "$(grep -c '\$' "$CD/out")" = 0 ] || note_err "output contains a '\$'"
 finish_case
+fi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -956,6 +1015,7 @@ ALL_ON=(WT_GC_REAP_EMPTY=1 WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_REFS=1
     WT_GC_REAP_TMP_PACK=1 WT_GC_DOCKER_PRUNE=1 WT_GC_STALE_LIST=1)
 
 # H0 — the tick with every reap step off is inert on the fixture env.
+if should_run H0-fixture-env; then
 fx H0-fixture-env
 mk_wt empty-old e-old age_days=10
 mk_wt ahead-old a-old ahead=2 age_days=10
@@ -972,8 +1032,10 @@ grep -qE 'done dry_run=0 cleaned=[0-9]+ skipped=[0-9]+ stalled=0 unpushed=0 empt
 CT="$(git -C "$ENV_MAIN" log -1 --format=%ct refs/tmp/x)"
 [ $(( $(date +%s) - CT )) -ge $(( 14 * 86400 )) ] || note_err "refs/tmp/x committer date not backdated"
 finish_case
+fi
 
 # H1 — each kill switch at 0 disables only its own step.
+if should_run H1-switch-isolation; then
 fx H1-switch-isolation
 SW_VARS=(WT_GC_REAP_EMPTY WT_GC_REAP_DIRTY_MERGED WT_GC_REAP_REFS WT_GC_REAP_TMP_PACK WT_GC_DOCKER_PRUNE WT_GC_STALE_LIST)
 SW_NAMES=(empty dirty-merged refs tmp-pack docker stale-list)
@@ -991,9 +1053,11 @@ for i in 0 1 2 3 4 5; do
     done
 done
 finish_case
+fi
 
 # H2 — numeric seams: unset = default (legal); empty = invalid, rc 1 (illegal).
 # Mutation check: rewriting a seam as ${VAR:-7} (empty -> default) fails this case.
+if should_run H2-numeric-seams; then
 fx H2-numeric-seams
 N_VARS=(WT_GC_EMPTY_DAYS WT_GC_BACKUP_DAYS WT_GC_REF_DAYS WT_GC_TMP_PACK_DAYS WT_GC_STALE_DAYS WT_GC_DOCKER_UNTIL)
 N_ON=(WT_GC_REAP_EMPTY=1 WT_GC_REAP_REFS=1 WT_GC_REAP_REFS=1 WT_GC_REAP_TMP_PACK=1 WT_GC_STALE_LIST=1 WT_GC_DOCKER_PRUNE=1)
@@ -1014,9 +1078,11 @@ chk_rc "DOCKER_UNTIL=168" 1
 log_has "invalid WT_GC_DOCKER_UNTIL '168'" || note_err "168 without h accepted"
 grep -q prune "$CD/docker-argv" 2>/dev/null && note_err "168 without h: prune ran"
 finish_case
+fi
 
 # H2b — switch and path seams: empty means default, never an error. (An empty
 # binary seam means "not found", not default: case P3.)
+if should_run H2b-path-seams; then
 fx H2b-path-seams
 rt WT_GC_REAP_EMPTY= WT_GC_REAP_DIRTY_MERGED= WT_GC_REAP_REFS= WT_GC_REAP_TMP_PACK= \
     WT_GC_DOCKER_PRUNE= WT_GC_STALE_LIST= WT_GC_TIPS_DIR= WT_GC_STALE_FILE= \
@@ -1027,8 +1093,10 @@ err_has 'unbound' && note_err "unbound variable"
 [ -f "$CD/state/stale-worktrees.tsv" ] || note_err "WT_GC_STALE_FILE= did not default under the lock dir"
 log_has 'step docker threshold=168h' || note_err "WT_GC_DOCKER_PRUNE= did not mean enabled"
 finish_case
+fi
 
 # H3 — a failing step logs, later steps still run, rc 1, no stamp.
+if should_run H3-failure-isolation; then
 fx H3-failure-isolation
 mk_ref refs/tmp/old 20
 rt "${ALL_ON[@]}" WT_GC_TIPS_DIR=/dev/null/x -- --force
@@ -1040,11 +1108,13 @@ log_has 'reap done steps_failed=1' || note_err "steps_failed not 1"
 [ -f "$CD/state/last-sweep" ] && note_err "stamp written after a failed step"
 has_ref refs/tmp/old || note_err "ref deleted without a tips line"
 finish_case
+fi
 
 # H3b — errexit holds inside a step: a failing command stops the step before
 # a later delete; the tick logs the failure and exits 1. The refs step's
 # `now="$(date +%s)"` fails via a date wrapper; past it, the foreign-remote
 # ref would be deleted (that class has no age test).
+if should_run H3b-step-errexit; then
 fx H3b-step-errexit
 mk_ref refs/remotes/prh/1 1
 mkdir -p "$CD/datewrap"
@@ -1060,8 +1130,10 @@ log_has 'step refs failed \(rc=' || note_err "no 'step refs failed'"
 log_has 'step tmp-pack threshold=' || note_err "later step did not run"
 has_ref refs/remotes/prh/1 || note_err "step ran past the failed command and deleted a ref"
 finish_case
+fi
 
 # H4 — _gc_tips_record writes and re-reads; an unwritable dir returns 1.
+if should_run H4-tips-record; then
 fx H4-tips-record
 touch "$CD/afile"
 H4_SHA="$(git -C "$ENV_MAIN" rev-parse HEAD)"
@@ -1080,8 +1152,10 @@ grep -qxF "$H4_SHA refs/tmp/x" "$CD/tips/tips-$(date +%F).txt" 2>/dev/null || no
 arch_has 1700000001/tmp/x || note_err "H4 keep-ref missing"
 [ -e "$CD/afile/x" ] && note_err "unwritable dir produced a file"
 finish_case
+fi
 
 # L1 — the library sources under env -i (no HOME, minimal PATH).
+if should_run L1-library-env-i; then
 begin_case L1-library-env-i
 RC=0
 env -i PATH=/usr/bin:/bin bash -euo pipefail -c \
@@ -1090,10 +1164,12 @@ env -i PATH=/usr/bin:/bin bash -euo pipefail -c \
 chk_rc "env -i source" 0
 grep -qx OK "$CD/out" || note_err "functions not defined"
 finish_case
+fi
 
 # ── EMPTY worktree reap ───────────────────────────────────────────────────────
 E_ON=(WT_GC_REAP_EMPTY=1)
 
+if should_run E1-ahead-kept; then
 fx E1-ahead-kept
 mk_wt ahead-old a-old ahead=2 age_days=10; row EMPTY ahead-old
 rt "${E_ON[@]}" -- --force
@@ -1101,14 +1177,18 @@ chk_rc E1 0
 log_has 'empty keep ahead-old: ahead=2' || note_err "no ahead keep"
 [ -d "$(wt_dir ahead-old)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E2-pool-kept; then
 fx E2-pool-kept
 mk_wt _pool-1 wt-pool/1 age_days=10; row EMPTY _pool-1
 rt "${E_ON[@]}" -- --force
 log_has 'empty keep _pool-1: pool' || note_err "no pool keep"
 [ -d "$(wt_dir _pool-1)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E3-queued-kept; then
 fx E3-queued-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 mk_queue "$CD/queue" e-old.md.lock
@@ -1116,7 +1196,9 @@ rt "${E_ON[@]}" -- --force
 log_has 'live-work e-old: queued' || note_err "no queued reason"
 [ -d "$(wt_dir e-old)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E4-launchd-kept; then
 fx E4-launchd-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 printf '123\t0\tcom.ibl5.postplan-now-e-old-1-2\n' > "$CD/labels1"
@@ -1127,7 +1209,9 @@ rt "${E_ON[@]}" STUB_LAUNCHCTL_LIST="$CD/labels2" -- --force
 log_has 'unattributable live job com.ibl5.pr-cycle-1-2' || note_err "slug-less label not deferring"
 [ -d "$(wt_dir e-old)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E5-session-kept; then
 fx E5-session-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 mk_registry "$CD/registry.json" other e-old
@@ -1135,7 +1219,9 @@ rt "${E_ON[@]}" -- --force
 log_has 'live-work e-old: live Claude session' || note_err "session not seen"
 [ -d "$(wt_dir e-old)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E6-probe-error-kept; then
 fx E6-probe-error-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 rt "${E_ON[@]}" WT_GC_SESSION_REGISTRY="$CD/missing.json" -- --force
@@ -1148,7 +1234,9 @@ rt "${E_ON[@]}" WT_GC_LAUNCHCTL=/nonexistent/launchctl -- --force
 log_has 'launchctl list failed' || note_err "launchctl failure not a probe error"
 [ -d "$(wt_dir e-old)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E7-empty-reaped; then
 fx E7-empty-reaped
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/e-old)"
@@ -1160,14 +1248,18 @@ log_has 'empty reaped e-old branch=e-old age=10d' || note_err "no reaped line"
 has_branch e-old && note_err "branch still present"
 tips_has "$SHA refs/heads/e-old" || note_err "tips lacks sha"
 finish_case
+fi
 
+if should_run E8-young-kept; then
 fx E8-young-kept
 mk_wt e-young e-young age_days=3; row EMPTY e-young
 rt "${E_ON[@]}" -- --force
 log_has 'empty keep e-young: age=3d' || note_err "no age keep"
 [ -d "$(wt_dir e-young)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run E9-empty-dry-run; then
 fx E9-empty-dry-run
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
@@ -1177,9 +1269,11 @@ chk_rc E9 0
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would: .*wt-remove e-old --volumes' || note_err "no DRY-RUN wt-remove line"
 finish_case
+fi
 
 # E10 — an old worktree whose only work is a new, never-added file in a
 # subdirectory is kept (the root dir mtime and branch tip stay old).
+if should_run E10-untracked-kept; then
 fx E10-untracked-kept
 mk_wt e-old e-old age_days=10; row EMPTY e-old
 mkdir -p "$(wt_dir e-old)/notes"
@@ -1191,6 +1285,7 @@ log_has 'empty keep e-old: dirty' || note_err "untracked-only worktree not kept 
 [ -f "$(wt_dir e-old)/notes/new.md" ] || note_err "untracked file lost"
 has_branch e-old || note_err "branch deleted"
 finish_case
+fi
 
 # ── Merged-but-dirty worktree reap ────────────────────────────────────────────
 D_ON=(WT_GC_REAP_DIRTY_MERGED=1)
@@ -1204,6 +1299,7 @@ d_wt() {
     printf 'MERGED\t7\t%s\n' "${3:-$tip}" > "$CD/gh/by-head/$1.json"
 }
 
+if should_run D1-differs-kept; then
 fx D1-differs-kept
 d_wt d1 diff
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
@@ -1211,7 +1307,9 @@ chk_rc D1 0
 log_has 'dirty keep d1: path README.md differs' || note_err "no differs keep"
 [ -d "$(wt_dir d1)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run D2-match-reaped; then
 fx D2-match-reaped
 d_wt d2 match
 SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/d2)"
@@ -1223,14 +1321,18 @@ log_has 'dirty reaped d2 paths=1' || note_err "not reaped"
 has_branch d2 && note_err "branch still present"
 tips_has "$SHA refs/heads/d2" || note_err "tips lacks sha"
 finish_case
+fi
 
+if should_run D3-deleted-kept; then
 fx D3-deleted-kept
 d_wt d3 deleted
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep d3: path README.md deleted but present on master' || note_err "no deleted keep"
 [ -d "$(wt_dir d3)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run D4-untracked; then
 fx D4-untracked
 d_wt d4a untracked-diff
 d_wt d4b untracked-match
@@ -1240,16 +1342,20 @@ log_has 'dirty keep d4a: path new.txt absent on master' || note_err "untracked-d
 log_has 'dirty reaped d4b' || note_err "untracked-match not reaped"
 [ -d "$(wt_dir d4b)" ] && note_err "d4b still present"
 finish_case
+fi
 
+if should_run D5-symlink-kept; then
 fx D5-symlink-kept
 d_wt d5 symlink
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep d5: path README.md' || note_err "symlink not kept"
 [ -d "$(wt_dir d5)" ] || note_err "removed"
 finish_case
+fi
 
 # D5b — MM: the index holds an edit, the working copy matches master. The
 # staged blob is never in the tips file, so reaping would lose it.
+if should_run D5b-staged-diff-kept; then
 fx D5b-staged-diff-kept
 d_wt d5b staged-diff
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
@@ -1259,7 +1365,9 @@ log_has 'dirty keep d5b: path README.md status MM' || note_err "MM not kept"
 [ "$(git -C "$(wt_dir d5b)" show :README.md 2>/dev/null)" = staged ] || note_err "staged content lost"
 has_branch d5b || note_err "branch deleted"
 finish_case
+fi
 
+if should_run D6-merge-unproven-kept; then
 fx D6-merge-unproven-kept
 d_wt d6 match
 rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" STUB_GH_FAIL=1 -- --force
@@ -1269,14 +1377,18 @@ rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep d6: merge not proven' || note_err "OID mismatch not kept"
 [ -d "$(wt_dir d6)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run D7-no-skip-line-kept; then
 fx D7-no-skip-line-kept
 d_wt d7 match
 rt "${D_ON[@]}" -- --force
 log_has 'dirty keep d7: not dirty-skipped by cleanup' || note_err "no skip-line keep"
 [ -d "$(wt_dir d7)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run D8-dirty-dry-run; then
 fx D8-dirty-dry-run
 d_wt d8 match
 B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
@@ -1285,11 +1397,13 @@ rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would: .*wt-remove d8 --volumes' || note_err "no DRY-RUN line"
 finish_case
+fi
 
 # ── Merged-dirty archive reap (WT_GC_REAP_DIRTY_ARCHIVE=1) ────────────────────
 DA_ON=(WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1 WT_GC_ARCHIVE_STAMP=1700000000)
 DA_SHA40=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
 
+if should_run DA1-diff-archived; then
 fx DA1-diff-archived
 d_wt da1 diff
 DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da1)"
@@ -1304,7 +1418,9 @@ arch_has 1700000000/heads/da1 || note_err "no heads archive ref"
 [ "$(git -C "$ENV_MAIN" rev-parse refs/wt-gc-archive/1700000000/wt/da1^ 2>/dev/null)" = "$DA_TIP" ] || note_err "snapshot parent is not the tip"
 [ "$(git -C "$ENV_MAIN" show refs/wt-gc-archive/1700000000/wt/da1:README.md 2>/dev/null)" = different ] || note_err "dirt bytes not in archive"
 finish_case
+fi
 
+if should_run DA2-untracked-and-deleted-archived; then
 fx DA2-untracked-and-deleted-archived
 d_wt da2a untracked-diff
 d_wt da2b deleted
@@ -1316,7 +1432,9 @@ log_has 'dirty archived-reaped da2b' || note_err "da2b not reaped"
 git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/da2a:new.txt 2>/dev/null || note_err "untracked file missing from archive"
 git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/da2b:README.md 2>/dev/null && note_err "deleted path still in archive tree"
 finish_case
+fi
 
+if should_run DA3-under-floor-keeps; then
 fx DA3-under-floor-keeps
 d_wt da3 diff
 epoch_ago 2 > "$CD/gh/7.json"
@@ -1325,7 +1443,9 @@ log_has 'dirty keep da3: merged <3d ago' || note_err "no floor keep"
 [ -d "$(wt_dir da3)" ] || note_err "removed"
 [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written"
 finish_case
+fi
 
+if should_run DA4-ancestor-proven; then
 fx DA4-ancestor-proven
 d_wt da4 diff
 DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da4)"
@@ -1336,7 +1456,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty archived-reaped da4' || note_err "ancestor case not reaped"
 [ -d "$(wt_dir da4)" ] && note_err "worktree still present"
 finish_case
+fi
 
+if should_run DA5-content-contained-proven; then
 fx DA5-content-contained-proven
 d_wt da5 diff "$DA_SHA40"
 DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da5)"
@@ -1347,7 +1469,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty archived-reaped da5' || note_err "squash-contained case not reaped"
 [ -d "$(wt_dir da5)" ] && note_err "worktree still present"
 finish_case
+fi
 
+if should_run DA6-not-proven-keeps; then
 fx DA6-not-proven-keeps
 d_wt da6 diff "$DA_SHA40"
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1355,7 +1479,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep da6: merge not proven \(state=MERGED oid=deadbeef' || note_err "no unproven keep"
 [ -d "$(wt_dir da6)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA7-merge-age-garbage-keeps; then
 fx DA7-merge-age-garbage-keeps
 d_wt da7 diff
 printf 'notanumber\n' > "$CD/gh/7.json"
@@ -1363,7 +1489,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep da7: merge age unknown' || note_err "no age-unknown keep"
 [ -d "$(wt_dir da7)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA8-gh-fail-keeps; then
 fx DA8-gh-fail-keeps
 d_wt da8 diff
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1371,7 +1499,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" STUB_GH_FAIL=1 -- --force
 log_has 'dirty keep da8: merge not proven' || note_err "gh failure not kept"
 [ -d "$(wt_dir da8)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA9-open-pr-keeps; then
 fx DA9-open-pr-keeps
 d_wt da9 diff
 DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da9)"
@@ -1381,7 +1511,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep da9: merge not proven \(state=OPEN' || note_err "open PR not kept"
 [ -d "$(wt_dir da9)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA10-live-work-keeps; then
 fx DA10-live-work-keeps
 d_wt da10 diff
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1390,7 +1522,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep da10: live work' || note_err "live work not kept"
 [ -d "$(wt_dir da10)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA11-archive-fail-keeps; then
 fx DA11-archive-fail-keeps
 d_wt da11 diff
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1400,7 +1534,9 @@ log_has 'archive failed' || note_err "no archive-failed log"
 [ -d "$(wt_dir da11)" ] || note_err "worktree removed"
 has_branch da11 || note_err "branch deleted"
 finish_case
+fi
 
+if should_run DA12-dry-run; then
 fx DA12-dry-run
 d_wt da12 diff
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1410,7 +1546,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would: archive' || note_err "no DRY-RUN archive line"
 finish_case
+fi
 
+if should_run DA13-structural-keeps; then
 fx DA13-structural-keeps
 d_wt da13 symlink
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1418,7 +1556,9 @@ rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'dirty keep da13: path README.md (is a symlink|rename/copy/conflict/type)' || note_err "symlink not kept"
 [ -d "$(wt_dir da13)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DA14-empty-floor-invalid; then
 fx DA14-empty-floor-invalid
 d_wt da14 diff
 epoch_ago 5 > "$CD/gh/7.json"
@@ -1427,10 +1567,12 @@ chk_rc DA14 1
 log_has "invalid WT_GC_DIRTY_ARCHIVE_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir da14)" ] || note_err "removed"
 finish_case
+fi
 
 # ── Detached master-snapshot reap ─────────────────────────────────────────────
 DT_ON=(WT_GC_REAP_DETACHED=1 WT_GC_ARCHIVE_STAMP=1700000000)
 
+if should_run DT1-snapshot-reaped; then
 fx DT1-snapshot-reaped
 mk_detached dt1 age_days=5
 rt "${DT_ON[@]}" -- --force
@@ -1440,21 +1582,27 @@ log_has 'detached reaped dt1 sha=' || note_err "not reaped"
 [ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'dt1\n--volumes')" ] || note_err "wt-remove argv"
 arch_has 1700000000/wt/dt1 || note_err "no archive ref"
 finish_case
+fi
 
+if should_run DT2-under-floor-keeps; then
 fx DT2-under-floor-keeps
 mk_detached dt2 age_days=2
 rt "${DT_ON[@]}" -- --force
 log_has 'detached keep dt2: age=2d' || note_err "no floor keep"
 [ -d "$(wt_dir dt2)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT3-dirty-keeps; then
 fx DT3-dirty-keeps
 mk_detached dt3 age_days=5 dirt=untracked
 rt "${DT_ON[@]}" -- --force
 log_has 'detached keep dt3: dirty' || note_err "dirty not kept"
 [ -d "$(wt_dir dt3)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT4-not-on-master-keeps; then
 fx DT4-not-on-master-keeps
 DT_OFF="$(git -C "$ENV_MAIN" commit-tree -p origin/master -m off 'origin/master^{tree}')"
 mk_detached dt4 age_days=5 "rev=$DT_OFF"
@@ -1462,7 +1610,9 @@ rt "${DT_ON[@]}" -- --force
 log_has 'detached keep dt4: not on master' || note_err "off-master not kept"
 [ -d "$(wt_dir dt4)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT5-queued-keeps; then
 fx DT5-queued-keeps
 mk_detached dt5 age_days=5
 mk_queue "$CD/queue" dt5
@@ -1470,14 +1620,18 @@ rt "${DT_ON[@]}" -- --force
 log_has 'detached keep dt5: live work' || note_err "queued not kept"
 [ -d "$(wt_dir dt5)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT6-pool-keeps; then
 fx DT6-pool-keeps
 mk_detached _pool-9 age_days=5
 rt "${DT_ON[@]}" -- --force
 log_has 'detached keep _pool-9: pool worktree' || note_err "pool not kept"
 [ -d "$(wt_dir _pool-9)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT7-branch-worktree-ignored; then
 fx DT7-branch-worktree-ignored
 mk_wt w7 w7
 mk_detached dt7 age_days=5
@@ -1486,14 +1640,18 @@ log_has 'detached reaped dt7' || note_err "dt7 not reaped"
 log_has 'detached (keep|reaped) w7' && note_err "branch worktree was touched"
 [ -d "$(wt_dir w7)" ] || note_err "branch worktree removed"
 finish_case
+fi
 
+if should_run DT8-launchctl-error-keeps; then
 fx DT8-launchctl-error-keeps
 mk_detached dt8 age_days=5
 rt "${DT_ON[@]}" WT_GC_LAUNCHCTL=/usr/bin/false -- --force
 log_has 'detached keep dt8: probe error' || note_err "probe error not kept"
 [ -d "$(wt_dir dt8)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT9-archive-fail-keeps; then
 fx DT9-archive-fail-keeps
 mk_detached dt9 age_days=5
 git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/wt/dt9 "$(git -C "$ENV_MAIN" rev-parse HEAD)"
@@ -1501,7 +1659,9 @@ rt "${DT_ON[@]}" -- --force
 log_has 'detached keep dt9: archive failed' || note_err "archive failure not kept"
 [ -d "$(wt_dir dt9)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run DT10-dry-run; then
 fx DT10-dry-run
 mk_detached dt10 age_days=5
 B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
@@ -1510,7 +1670,9 @@ rt "${DT_ON[@]}" -- --dry-run --force
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would:' || note_err "no DRY-RUN line"
 finish_case
+fi
 
+if should_run DT11-empty-floor-invalid; then
 fx DT11-empty-floor-invalid
 mk_detached dt11 age_days=5
 rt "${DT_ON[@]}" WT_GC_DETACHED_DAYS= -- --force
@@ -1518,6 +1680,7 @@ chk_rc DT11 1
 log_has "invalid WT_GC_DETACHED_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir dt11)" ] || note_err "removed"
 finish_case
+fi
 
 # ── Closed-PR worktree reap ───────────────────────────────────────────────────
 CL_ON=(WT_GC_REAP_CLOSED=1 WT_GC_ARCHIVE_STAMP=1700000000)
@@ -1532,12 +1695,15 @@ c_wt() {
     printf 'CLOSED\t9\t%s\n' "${3:-$tip}" > "$CD/gh/by-head/$1.json"
 }
 
+if should_run CL0-cleanup-skip-literal; then
 fx CL0-cleanup-skip-literal
 # The closed step finds candidates by this literal in the real bin/cleanup.
 CL0_N="$(grep -c 'PR closed but remote gone' "$SCRIPT_DIR/cleanup")"
 [ "${CL0_N:-0}" -ge 1 ] || note_err "bin/cleanup no longer prints 'PR closed but remote gone'"
 finish_case
+fi
 
+if should_run CL1-closed-reaped; then
 fx CL1-closed-reaped
 c_wt cl1 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1549,7 +1715,9 @@ has_branch cl1 && note_err "branch still present"
 arch_has 1700000000/wt/cl1 || note_err "no wt archive ref"
 arch_has 1700000000/heads/cl1 || note_err "no heads archive ref"
 finish_case
+fi
 
+if should_run CL2-closed-dirt-archived; then
 fx CL2-closed-dirt-archived
 c_wt cl2 untracked-diff
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1557,7 +1725,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed reaped cl2' || note_err "not reaped"
 git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/cl2:new.txt 2>/dev/null || note_err "untracked file missing from archive"
 finish_case
+fi
 
+if should_run CL3-under-floor-keeps; then
 fx CL3-under-floor-keeps
 c_wt cl3 none
 epoch_ago 5 > "$CD/gh/9.json"
@@ -1565,7 +1735,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl3: closed <7d ago' || note_err "no floor keep"
 [ -d "$(wt_dir cl3)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL4-remote-present-keeps; then
 fx CL4-remote-present-keeps
 c_wt cl4 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1574,7 +1746,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl4: remote branch present' || note_err "remote branch not kept"
 [ -d "$(wt_dir cl4)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL5-local-commits-keeps; then
 fx CL5-local-commits-keeps
 c_wt cl5 none "" 2
 printf 'CLOSED\t9\t%s\n' "$(git -C "$ENV_MAIN" rev-parse refs/heads/cl5^)" > "$CD/gh/by-head/cl5.json"
@@ -1583,7 +1757,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl5: local commits beyond PR head' || note_err "unpushed commits not kept"
 [ -d "$(wt_dir cl5)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL6-state-merged-keeps; then
 fx CL6-state-merged-keeps
 c_wt cl6 none
 printf 'MERGED\t9\t%s\n' "$(git -C "$ENV_MAIN" rev-parse refs/heads/cl6)" > "$CD/gh/by-head/cl6.json"
@@ -1592,7 +1768,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl6: state=MERGED' || note_err "merged state not kept"
 [ -d "$(wt_dir cl6)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL7-open-pr-row-keeps; then
 fx CL7-open-pr-row-keeps
 c_wt cl7 none
 : > "$CD/rows"
@@ -1602,7 +1780,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl7: wt-status class OPEN-PR' || note_err "OPEN-PR row not kept"
 [ -d "$(wt_dir cl7)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL8-gh-fail-keeps; then
 fx CL8-gh-fail-keeps
 c_wt cl8 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1611,7 +1791,9 @@ log_has 'closed keep cl8: state=' || note_err "gh failure not kept"
 [ -d "$(wt_dir cl8)" ] || note_err "worktree removed"
 has_branch cl8 || note_err "branch deleted"
 finish_case
+fi
 
+if should_run CL9-close-age-garbage-keeps; then
 fx CL9-close-age-garbage-keeps
 c_wt cl9 none
 printf 'x\n' > "$CD/gh/9.json"
@@ -1619,7 +1801,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl9: close age unknown' || note_err "no close-age keep"
 [ -d "$(wt_dir cl9)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL10-live-work-keeps; then
 fx CL10-live-work-keeps
 c_wt cl10 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1628,7 +1812,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed keep cl10: live work' || note_err "live work not kept"
 [ -d "$(wt_dir cl10)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL11-not-closed-skip-ignored; then
 fx CL11-not-closed-skip-ignored
 mk_wt cl11 cl11 ahead=1 age_days=10
 row STALLED cl11
@@ -1638,7 +1824,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
 log_has 'closed (keep|reaped) cl11' && note_err "unrelated skip line was picked up"
 [ -d "$(wt_dir cl11)" ] || note_err "removed"
 finish_case
+fi
 
+if should_run CL12-archive-fail-keeps; then
 fx CL12-archive-fail-keeps
 c_wt cl12 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1648,7 +1836,9 @@ log_has 'archive failed' || note_err "no archive-failed log"
 [ -d "$(wt_dir cl12)" ] || note_err "worktree removed"
 has_branch cl12 || note_err "branch deleted"
 finish_case
+fi
 
+if should_run CL13-dry-run; then
 fx CL13-dry-run
 c_wt cl13 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1658,7 +1848,9 @@ rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would:' || note_err "no DRY-RUN line"
 finish_case
+fi
 
+if should_run CL14-empty-floor-invalid; then
 fx CL14-empty-floor-invalid
 c_wt cl14 none
 epoch_ago 10 > "$CD/gh/9.json"
@@ -1667,6 +1859,7 @@ chk_rc CL14 1
 log_has "invalid WT_GC_CLOSED_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir cl14)" ] || note_err "removed"
 finish_case
+fi
 
 # ── Orphan stash drop ─────────────────────────────────────────────────────────
 ST_ON=(WT_GC_DROP_STASHES=1 WT_GC_ARCHIVE_STAMP=1700000000)
@@ -1690,6 +1883,7 @@ mk_stash() {
     printf '%s\n' "$sha"
 }
 
+if should_run ST1-branch-gone-dropped; then
 fx ST1-branch-gone-dropped
 SHA="$(mk_stash gone-a 10)"
 rt "${ST_ON[@]}" -- --force
@@ -1698,21 +1892,27 @@ stash_has "$SHA" && note_err "stash still listed"
 arch_has "1700000000/stash/$SHA" || note_err "no stash archive ref"
 log_has "stash dropped ${SHA:0:10} \(branch gone\)" || note_err "no dropped log"
 finish_case
+fi
 
+if should_run ST2-under-floor-keeps; then
 fx ST2-under-floor-keeps
 SHA="$(mk_stash gone-b 3)"
 rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" || note_err "young stash dropped"
 log_has "stash keep ${SHA:0:10}: age=3d" || note_err "no floor keep"
 finish_case
+fi
 
+if should_run ST3-live-branch-not-candidate; then
 fx ST3-live-branch-not-candidate
 SHA="$(mk_stash master 10)"
 rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" || note_err "live-branch stash dropped"
 log_has "${SHA:0:10}" && note_err "non-candidate was logged"
 finish_case
+fi
 
+if should_run ST4-provably-in-master-dropped; then
 fx ST4-provably-in-master-dropped
 SHA="$(mk_stash master 10)"
 git -C "$ENV_MAIN" update-ref refs/remotes/origin/master \
@@ -1721,7 +1921,9 @@ rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" && note_err "stash still listed"
 log_has "stash dropped ${SHA:0:10} \(provably in master\)" || note_err "no dropped log"
 finish_case
+fi
 
+if should_run ST5-nightly-autostash-keeps; then
 fx ST5-nightly-autostash-keeps
 SHA="$(mk_stash gone-c 10)"
 git -C "$ENV_MAIN" stash drop -q
@@ -1730,7 +1932,9 @@ rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" || note_err "nightly-autostash dropped"
 log_has "stash keep ${SHA:0:10}: nightly-autostash" || note_err "no nightly keep"
 finish_case
+fi
 
+if should_run ST6-untracked-archived-survives-gc; then
 fx ST6-untracked-archived-survives-gc
 SHA="$(mk_stash gone-d 10 untracked)"
 rt "${ST_ON[@]}" -- --force
@@ -1741,7 +1945,9 @@ git -C "$ENV_MAIN" rev-parse -q --verify "refs/wt-gc-archive/1700000000/stash/$S
 git -C "$ENV_MAIN" stash store -m restored "refs/wt-gc-archive/1700000000/stash/$SHA" 2>/dev/null
 stash_has "$SHA" || note_err "archive did not restore into the stash list"
 finish_case
+fi
 
+if should_run ST7-index-shift-order; then
 fx ST7-index-shift-order
 SHA_E="$(mk_stash gone-e 10)"
 SHA_F="$(mk_stash gone-f 10)"
@@ -1752,7 +1958,9 @@ stash_has "$SHA_F" && note_err "f still listed"
 stash_has "$SHA_G" || note_err "young stash dropped"
 log_has 'stash moved' && note_err "index shifted under the drop"
 finish_case
+fi
 
+if should_run ST8-unparseable-keeps; then
 fx ST8-unparseable-keeps
 SHA="$(mk_stash gone-h 10)"
 git -C "$ENV_MAIN" stash drop -q
@@ -1761,7 +1969,9 @@ rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" || note_err "unparseable stash dropped"
 log_has "stash keep ${SHA:0:10}: unparseable subject" || note_err "no unparseable keep"
 finish_case
+fi
 
+if should_run ST9-archive-fail-keeps; then
 fx ST9-archive-fail-keeps
 SHA="$(mk_stash gone-i 10)"
 git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/1700000000/stash/$SHA" "$(git -C "$ENV_MAIN" rev-parse HEAD)"
@@ -1769,14 +1979,18 @@ rt "${ST_ON[@]}" -- --force
 stash_has "$SHA" || note_err "stash dropped without an archive"
 log_has 'archive failed' || note_err "no archive-failed log"
 finish_case
+fi
 
+if should_run ST10-dry-run; then
 fx ST10-dry-run
 SHA="$(mk_stash gone-j 10)"
 rt "${ST_ON[@]}" -- --dry-run --force
 stash_has "$SHA" || note_err "stash dropped in dry-run"
 [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written in dry-run"
 finish_case
+fi
 
+if should_run ST11-empty-floor-invalid; then
 fx ST11-empty-floor-invalid
 SHA="$(mk_stash gone-k 10)"
 rt "${ST_ON[@]}" WT_GC_STASH_DAYS= -- --force
@@ -1784,10 +1998,12 @@ chk_rc ST11 1
 log_has "invalid WT_GC_STASH_DAYS ''" || note_err "no invalid-floor log"
 stash_has "$SHA" || note_err "stash dropped"
 finish_case
+fi
 
 # ── Backup-branch name grammar and no-PR age fallback ─────────────────────────
 RF_ON=(WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1 WT_GC_ARCHIVE_STAMP=1700000000)
 
+if should_run RS1-stem-table; then
 fx RS1-stem-table
 RS_BAD="$(
     log() { :; }
@@ -1821,7 +2037,9 @@ RS_BAD="$(
 )"
 [ -z "$RS_BAD" ] || note_err "grammar: $RS_BAD"
 finish_case
+fi
 
+if should_run RS2-unshaped-never-touched; then
 fx RS2-unshaped-never-touched
 mk_ref refs/heads/feature-prep-20261026 30
 mk_ref refs/heads/my-backup-plan 30
@@ -1830,7 +2048,9 @@ has_ref refs/heads/feature-prep-20261026 || note_err "feature-prep deleted"
 has_ref refs/heads/my-backup-plan || note_err "my-backup-plan deleted"
 log_has 'feature-prep-20261026|my-backup-plan' && note_err "unshaped name was logged"
 finish_case
+fi
 
+if should_run RF1-fallback-reaps; then
 fx RF1-fallback-reaps
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 rt "${RF_ON[@]}" -- --force
@@ -1839,14 +2059,18 @@ has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 && note_err "ref st
 arch_has 1700000000/heads/backup/lighten-navy-palette-prep-20261026 || note_err "no archive ref"
 log_has 'ref fallback' || note_err "no fallback log"
 finish_case
+fi
 
+if should_run RF2-fallback-under-floor-keeps; then
 fx RF2-fallback-under-floor-keeps
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 10
 rt "${RF_ON[@]}" -- --force
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "young backup deleted"
 log_has 'gh found no merged PR' || note_err "no keep log"
 finish_case
+fi
 
+if should_run RF12-open-pr-keeps; then
 fx RF12-open-pr-keeps
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 printf 'open\n' > "$CD/gh/by-head/lighten-navy-palette.json"
@@ -1855,14 +2079,18 @@ has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "backup
 log_has 'not merged or is ambiguous' || note_err "no open-PR keep log"
 log_has 'ref fallback' && note_err "fallback fired for an open PR"
 finish_case
+fi
 
+if should_run RF3-gh-outage-no-fallback; then
 fx RF3-gh-outage-no-fallback
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 rt "${RF_ON[@]}" STUB_GH_FAIL=1 -- --force
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "backup deleted during gh outage"
 log_has 'gh probe error' || note_err "no probe-error log"
 finish_case
+fi
 
+if should_run RF4-pnnnn-pr-number; then
 fx RF4-pnnnn-pr-number
 mk_ref refs/heads/backup/p2897-pre-squash 1
 epoch_ago 8 > "$CD/gh/2897.json"
@@ -1871,7 +2099,9 @@ has_ref refs/heads/backup/p2897-pre-squash && note_err "ref still present"
 log_has 'ref fallback' && note_err "reaped through the fallback, not the PR"
 grep -qF 'pr view 2897' "$CD/gh-argv" 2>/dev/null || note_err "gh not asked for PR 2897"
 finish_case
+fi
 
+if should_run RF5-slash-date-stem; then
 fx RF5-slash-date-stem
 mk_ref refs/heads/backup/vr-rollup-splicebody-1362/20261027-143303-pre-rebase 1
 epoch_ago 8 > "$CD/gh/by-head/vr-rollup-splicebody-1362.json"
@@ -1879,25 +2109,33 @@ rt "${RF_ON[@]}" -- --force
 has_ref refs/heads/backup/vr-rollup-splicebody-1362/20261027-143303-pre-rebase && note_err "ref still present"
 grep -qF -- '--head vr-rollup-splicebody-1362' "$CD/gh-argv" 2>/dev/null || note_err "gh not asked for the head stem"
 finish_case
+fi
 
+if should_run RF6-presquash-backup-fallback; then
 fx RF6-presquash-backup-fallback
 mk_ref refs/heads/pphfp-presquash-backup 20
 rt "${RF_ON[@]}" -- --force
 has_ref refs/heads/pphfp-presquash-backup && note_err "ref still present"
 finish_case
+fi
 
+if should_run RF7-fallback-off-keeps; then
 fx RF7-fallback-off-keeps
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 rt "${RF_ON[@]}" WT_GC_REF_FALLBACK=0 -- --force
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "deleted with fallback off"
 finish_case
+fi
 
+if should_run RF8-checked-out-keeps; then
 fx RF8-checked-out-keeps
 mk_wt rf8 backup/rf8-prep-20261001 ahead=1 age_days=20
 rt "${RF_ON[@]}" -- --force
 has_branch backup/rf8-prep-20261001 || note_err "checked-out backup branch deleted"
 finish_case
+fi
 
+if should_run RF9-matched-young-pr-keeps; then
 fx RF9-matched-young-pr-keeps
 mk_ref refs/heads/backup/p3000-prep-20261001 20
 epoch_ago 3 > "$CD/gh/3000.json"
@@ -1905,14 +2143,18 @@ rt "${RF_ON[@]}" -- --force
 has_ref refs/heads/backup/p3000-prep-20261001 || note_err "young-PR backup deleted"
 log_has 'PR merged <7d ago' || note_err "no young-PR keep log"
 finish_case
+fi
 
+if should_run RF10-dry-run; then
 fx RF10-dry-run
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 rt "${RF_ON[@]}" -- --dry-run --force
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "deleted in dry-run"
 [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written in dry-run"
 finish_case
+fi
 
+if should_run RF11-empty-floor-invalid; then
 fx RF11-empty-floor-invalid
 mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
 rt "${RF_ON[@]}" WT_GC_BACKUP_FALLBACK_DAYS= -- --force
@@ -1920,10 +2162,12 @@ chk_rc RF11 1
 log_has "invalid WT_GC_BACKUP_FALLBACK_DAYS ''" || note_err "no invalid-floor log"
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "ref deleted"
 finish_case
+fi
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────
 R_ON=(WT_GC_REAP_REFS=1)
 
+if should_run R1-R5-backup-branches; then
 fx R1-R5-backup-branches
 mk_ref refs/heads/backup/3267-pre-rebase 1
 mk_ref refs/heads/backup/p2625-pre-rebase 1
@@ -1945,7 +2189,9 @@ has_ref refs/heads/backup/contracts-hub-pre-rebase-20261021 && note_err "R4 date
 has_ref refs/heads/backup/records-hub-unpushed-bfb8c24 || note_err "R5 unmatched backup deleted"
 grep -q -- '--head records-hub-unpushed' "$CD/gh-argv" || note_err "R5 stem not hash-stripped"
 finish_case
+fi
 
+if should_run R5b-gh-outage-kept; then
 fx R5b-gh-outage-kept
 mk_ref refs/heads/backup/3382-pre-rebase 1
 epoch_ago 8 > "$CD/gh/3382.json"
@@ -1957,7 +2203,9 @@ has_ref refs/heads/backup/3382-pre-rebase || note_err "gh outage deleted a backu
 rt "${R_ON[@]}" -- --force
 has_ref refs/heads/backup/amb-pre-rebase || note_err "non-numeric gh output deleted a backup"
 finish_case
+fi
 
+if should_run R6-checkpoint-refs-untouched; then
 fx R6-checkpoint-refs-untouched
 mk_ref refs/t3/ckpt 30
 mk_ref refs/remotes/origin/feat 30
@@ -1967,7 +2215,9 @@ chk_rc R6 0
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 [ -e "$CD/tips" ] && note_err "tips written for untouched refs"
 finish_case
+fi
 
+if should_run R7-foreign-remote; then
 fx R7-foreign-remote
 mk_ref refs/remotes/prh/1 1
 mk_ref refs/remotes/origin/x 30
@@ -1975,8 +2225,10 @@ rt "${R_ON[@]}" -- --force
 has_ref refs/remotes/prh/1 && note_err "foreign remote ref kept"
 has_ref refs/remotes/origin/x || note_err "origin ref deleted"
 finish_case
+fi
 
 # R7b — a configured remote whose name holds a '/' keeps its refs.
+if should_run R7b-slash-remote; then
 fx R7b-slash-remote
 git -C "$ENV_MAIN" remote add a/b "$CD/env/origin.git"
 git -C "$ENV_MAIN" remote | grep -qxF a/b || note_err "fixture: remote a/b not configured"
@@ -1987,7 +2239,9 @@ chk_rc R7b 0
 has_ref refs/remotes/a/b/x || note_err "ref of configured remote a/b deleted"
 has_ref refs/remotes/a/c/y && note_err "ref of unconfigured remote a/c kept"
 finish_case
+fi
 
+if should_run R8-age-boundary; then
 fx R8-age-boundary
 mk_ref refs/tmp/a 15
 mk_ref refs/tmp/b 13
@@ -2001,7 +2255,9 @@ has_ref refs/wt-sync-backup/c && note_err "15d wt-sync-backup kept"
 has_ref refs/backup/d && note_err "15d refs/backup kept"
 log_has 'ref deleted refs/tmp/a ' || note_err "no deleted log line"
 finish_case
+fi
 
+if should_run R9-delete-fails-after-tips; then
 fx R9-delete-fails-after-tips
 mk_ref refs/tmp/a 15
 SHA="$(git -C "$ENV_MAIN" rev-parse refs/tmp/a)"
@@ -2030,7 +2286,9 @@ tips_has "$SHA refs/tmp/a" || note_err "tips lacks sha"
 has_ref refs/tmp/a || note_err "ref gone"
 log_has 'ref delete failed refs/tmp/a' || note_err "no delete-failed line"
 finish_case
+fi
 
+if should_run R10-tips-unwritable; then
 fx R10-tips-unwritable
 mk_ref refs/tmp/a 15
 touch "$CD/afile"
@@ -2040,7 +2298,9 @@ chk_rc R10 1
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 log_has 'tips write failed — no refs deleted' || note_err "no tips-failed line"
 finish_case
+fi
 
+if should_run R11-refs-dry-run; then
 fx R11-refs-dry-run
 mk_ref refs/tmp/a 15
 mk_ref refs/heads/backup/3382-pre-rebase 1
@@ -2051,8 +2311,10 @@ chk_rc R11 0
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 log_has 'DRY-RUN would: git -C .* update-ref -d refs/tmp/a' || note_err "no DRY-RUN update-ref line"
 finish_case
+fi
 
 # ── tmp_pack cleanup ──────────────────────────────────────────────────────────
+if should_run T1-T4-tmp-pack; then
 fx T1-T4-tmp-pack
 PACK="$ENV_MAIN/.git/objects/pack"
 mkdir -p "$PACK"
@@ -2076,8 +2338,10 @@ chk_rc T4 0
 [ -f "$PACK/pack-abc.pack" ] || note_err "T4 pack-* sibling deleted"
 [ -f "$PACK/tmp_pack_new" ] || note_err "T4 fresh pack deleted"
 finish_case
+fi
 
 # ── Docker prune ──────────────────────────────────────────────────────────────
+if should_run K1-K4-docker; then
 fx K1-K4-docker
 rt WT_GC_DOCKER_PRUNE=1 -- --force
 chk_rc K1 0
@@ -2098,10 +2362,12 @@ chk_rc K4 0
 [ "$(cat "$CD/docker-argv" 2>/dev/null)" = info ] || note_err "K4 dry run pruned"
 [ "$(grep -c 'DRY-RUN would: .*docker .*prune' "$(LOG)")" = 2 ] || note_err "K4 not two DRY-RUN prune lines"
 finish_case
+fi
 
 # ── Stopped ibl5-* containers ─────────────────────────────────────────────────
 DK_ON=(WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1 WT_GC_ARCHIVE_STAMP=1700000000)
 
+if should_run DK1-old-removed-after-archive; then
 fx DK1-old-removed-after-archive
 dk_container aaa111 ibl5-old exited "$(iso_ago 20)"
 rt "${DK_ON[@]}" -- --force
@@ -2115,7 +2381,9 @@ grep -qE '^rm .*-[vf]' "$CD/docker-argv" 2>/dev/null && note_err "DK1 rm used -v
 grep -qF '"Id":"aaa111"' "$CD/tips/containers-1700000000-ibl5-old.json" 2>/dev/null || note_err "DK1 archive has wrong content"
 log_has 'container removed ibl5-old exited=20d' || note_err "DK1 no removed line"
 finish_case
+fi
 
+if should_run DK2-young-kept; then
 fx DK2-young-kept
 dk_container bbb222 ibl5-young exited "$(iso_ago 5)"
 rt "${DK_ON[@]}" -- --force
@@ -2124,7 +2392,9 @@ grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK2 young container re
 log_has 'container keep ibl5-young: exited 5d ago' || note_err "DK2 no keep line"
 ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "DK2 archived a kept container"
 finish_case
+fi
 
+if should_run DK3-foreign-name-ignored; then
 fx DK3-foreign-name-ignored
 dk_container ccc333 other-thing exited "$(iso_ago 30)"
 dk_container ccc334 postgres-1 exited "$(iso_ago 30)"
@@ -2136,7 +2406,9 @@ grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container
 grep -qE 'ccc33[3-6]' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container inspected"
 log_has 'container (keep|removed) (postgres-1|xibl5-foo|ibl5|other-thing)' && note_err "DK3 foreign name reached the keep/remove logic"
 finish_case
+fi
 
+if should_run DK4-not-exited-kept; then
 fx DK4-not-exited-kept
 dk_container ddd444 ibl5-running running "$(iso_ago 30)"
 rt "${DK_ON[@]}" -- --force
@@ -2144,7 +2416,9 @@ chk_rc DK4 0
 grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK4 running container removed"
 log_has 'container keep ibl5-running: not exited' || note_err "DK4 no keep line"
 finish_case
+fi
 
+if should_run DK5-unknown-exit-time-kept; then
 fx DK5-unknown-exit-time-kept
 dk_container eee555 ibl5-never exited "0001-01-01T00:00:00Z"
 dk_container eee556 ibl5-junk exited "garbage"
@@ -2154,7 +2428,9 @@ grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK5 removed with unkno
 log_has 'container keep ibl5-never: exit time unknown' || note_err "DK5 sentinel not kept"
 log_has 'container keep ibl5-junk: exit time unknown' || note_err "DK5 garbage not kept"
 finish_case
+fi
 
+if should_run DK6-inspect-fails-kept; then
 fx DK6-inspect-fails-kept
 printf '%s\t%s\n' fff666 ibl5-noinspect > "$CD/ps"
 rt "${DK_ON[@]}" -- --force
@@ -2162,7 +2438,9 @@ chk_rc DK6 0
 grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK6 removed without inspect"
 log_has 'container keep ibl5-noinspect: inspect failed' || note_err "DK6 no keep line"
 finish_case
+fi
 
+if should_run DK7-ps-fails; then
 fx DK7-ps-fails
 dk_container ggg777 ibl5-old exited "$(iso_ago 20)"
 rt "${DK_ON[@]}" STUB_DOCKER_PS_RC=1 -- --force
@@ -2171,7 +2449,9 @@ grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK7 removed after ps f
 log_has 'docker ps failed — no containers removed' || note_err "DK7 no ps-failed line"
 grep -q '^image prune' "$CD/docker-argv" 2>/dev/null || note_err "DK7 image prune did not still run"
 finish_case
+fi
 
+if should_run DK8-rm-fails; then
 fx DK8-rm-fails
 dk_container hhh888 ibl5-old exited "$(iso_ago 20)"
 rt "${DK_ON[@]}" STUB_DOCKER_RM_RC=1 -- --force
@@ -2179,7 +2459,9 @@ chk_rc DK8 1
 log_has 'container rm failed ibl5-old' || note_err "DK8 no rm-failed line"
 [ -s "$CD/tips/containers-1700000000-ibl5-old.json" ] || note_err "DK8 archive missing"
 finish_case
+fi
 
+if should_run DK9-archive-fails-keeps; then
 fx DK9-archive-fails-keeps
 dk_container iii999 ibl5-old exited "$(iso_ago 20)"
 rm -rf "$CD/tips"
@@ -2189,7 +2471,9 @@ chk_rc DK9 0
 grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK9 removed without an archive"
 log_has 'container keep ibl5-old: archive failed' || note_err "DK9 no archive-failed line"
 finish_case
+fi
 
+if should_run DK10-dry-run; then
 fx DK10-dry-run
 dk_container jjj000 ibl5-old exited "$(iso_ago 20)"
 rt "${DK_ON[@]}" -- --force --dry-run
@@ -2199,7 +2483,9 @@ ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "DK10 dry run wrote an ar
 log_has 'DRY-RUN would: archive ibl5-old to' || note_err "DK10 no archive dry-run line"
 log_has 'DRY-RUN would: .*docker .*rm jjj000' || note_err "DK10 no rm dry-run line"
 finish_case
+fi
 
+if should_run DK11-switch-off; then
 fx DK11-switch-off
 dk_container kkk111 ibl5-old exited "$(iso_ago 20)"
 rt WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=0 -- --force
@@ -2207,7 +2493,9 @@ chk_rc DK11 0
 grep -q '^ps ' "$CD/docker-argv" 2>/dev/null && note_err "DK11 listed containers while off"
 grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK11 removed while off"
 finish_case
+fi
 
+if should_run DK12-empty-age-fails-closed; then
 fx DK12-empty-age-fails-closed
 dk_container lll222 ibl5-old exited "$(iso_ago 20)"
 rt "${DK_ON[@]}" WT_GC_CONTAINER_DAYS= -- --force
@@ -2215,7 +2503,9 @@ chk_rc DK12 1
 log_has "invalid WT_GC_CONTAINER_DAYS '' — step skipped" || note_err "DK12 no invalid line"
 [ -e "$CD/docker-argv" ] && note_err "DK12 docker ran with an invalid age"
 finish_case
+fi
 
+if should_run DK13-offset-and-fraction-less-times; then
 fx DK13-offset-and-fraction-less-times
 dk_container mmm333 ibl5-offset exited "2020-01-01T10:00:00+02:00"
 dk_container mmm334 ibl5-plain exited "2020-01-01T10:00:00Z"
@@ -2224,7 +2514,9 @@ chk_rc DK13 0
 grep -qxF 'rm mmm333' "$CD/docker-argv" 2>/dev/null || note_err "DK13 offset time not parsed"
 grep -qxF 'rm mmm334' "$CD/docker-argv" 2>/dev/null || note_err "DK13 plain time not parsed"
 finish_case
+fi
 
+if should_run A6-container-archive-retention; then
 fx A6-container-archive-retention
 mkdir -p "$CD/tips"
 printf '{}\n' > "$CD/tips/containers-$(epoch_ago 91)-ibl5-old.json"
@@ -2237,8 +2529,10 @@ ls "$CD"/tips/containers-*-ibl5-new.json >/dev/null 2>&1 || note_err "A6 89d con
 [ -e "$CD/tips/containers-notanumber-ibl5-x.json" ] || note_err "A6 malformed container archive pruned"
 log_has 'archive keep .*containers-notanumber-ibl5-x.json: malformed stamp' || note_err "A6 no malformed line"
 finish_case
+fi
 
 # ── Stale-worktree list for the digest ────────────────────────────────────────
+if should_run S1-S3-stale-list; then
 fx S1-S3-stale-list
 mk_wt stalled-old s-old age_days=10 dirt=diff
 mk_wt unpushed-new u-new ahead=1 age_days=2
@@ -2258,6 +2552,7 @@ rt WT_GC_STALE_LIST=0 -- --force
 [ -e "$CD/stale.tsv" ] && note_err "S3 switch off wrote the list"
 log_has 'step stale-list disabled \(WT_GC_STALE_LIST=0\)' || note_err "S3 no disabled line"
 finish_case
+fi
 
 # ── Binary resolution (lsof / gh / docker) ────────────────────────────────────
 # A launchd-style PATH: one dir of symlinks to every tool on this PATH except
@@ -2295,6 +2590,7 @@ p_fixture() {
 }
 
 # P1 — found in WT_GC_BIN_DIRS under a PATH that lacks them: each is used.
+if should_run P1-bins-resolved; then
 fx P1-bins-resolved
 p_fixture
 rt "${ALL_ON[@]}" "${P_RES[@]}" WT_GC_BIN_DIRS="$ROOT/seam" STUB_SKIP_LINES="$CD/skips" -- --force
@@ -2307,8 +2603,10 @@ log_has 'empty reaped e-old' || note_err "EMPTY worktree not reaped (resolved ls
 log_has 'dirty reaped d2' || note_err "dirty-merged worktree not reaped"
 has_ref refs/heads/backup/3382-pre-rebase && note_err "merged backup kept"
 finish_case
+fi
 
 # P2 — absent from PATH and WT_GC_BIN_DIRS: nothing is deleted, each is named.
+if should_run P2-bins-missing; then
 fx P2-bins-missing
 p_fixture
 B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
@@ -2324,8 +2622,10 @@ log_has "ref keep refs/heads/backup/3382-pre-rebase: gh not found" || note_err "
 log_has "tmp_pack keep .*tmp_pack_old: lsof not found" || note_err "no lsof-not-found line (tmp_pack)"
 log_has "live-work probe error e-old: lsof not found" || note_err "no lsof-not-found line (live work)"
 finish_case
+fi
 
 # P2b — only lsof found: the dirty-merged reap reaches its gh check and keeps.
+if should_run P2b-gh-missing; then
 fx P2b-gh-missing
 d_wt d2 match
 rt WT_GC_REAP_DIRTY_MERGED=1 "${P_RES[@]}" WT_GC_BIN_DIRS="$ROOT/seam-lsof" STUB_SKIP_LINES="$CD/skips" -- --force
@@ -2334,9 +2634,11 @@ log_has "dirty keep d2: gh not found \(''\)" || note_err "no gh-not-found line (
 [ -d "$(wt_dir d2)" ] || note_err "removed"
 has_branch d2 || note_err "branch deleted"
 finish_case
+fi
 
 # P3 — a binary seam set to "" means not found: never resolved, even with the
 # stubs first on PATH.
+if should_run P3-empty-bin-seams; then
 fx P3-empty-bin-seams
 p_fixture
 B_REFS="$(refs_snapshot)"
@@ -2347,8 +2649,10 @@ chk_rc P3 1
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 log_has "docker not found \(''\)" || note_err "no docker-not-found line"
 finish_case
+fi
 
 # P4 — _gc_resolve_bin: PATH wins over WT_GC_BIN_DIRS; absent prints nothing.
+if should_run P4-resolve-bin; then
 begin_case P4-resolve-bin
 mkdir -p "$CD/a" "$CD/b" "$CD/none"
 printf '#!/bin/sh\n' > "$CD/a/tool"; cp "$CD/a/tool" "$CD/b/tool"; chmod +x "$CD/a/tool" "$CD/b/tool"
@@ -2362,10 +2666,12 @@ P4_OUT="$(
 )"
 [ "$P4_OUT" = "$(printf '1=%s\n2=%s\n3=\n4=' "$CD/b/tool" "$CD/a/tool")" ] || note_err "resolver output: $P4_OUT"
 finish_case
+fi
 
 # ── Archive cases (Phase 1): keep-refs under refs/wt-gc-archive/ ──────────────
 A_STAMP=WT_GC_ARCHIVE_STAMP=1700000000
 
+if should_run A1-archive-survives-gc; then
 fx A1-archive-survives-gc
 mk_ref refs/tmp/a1 20
 A1_SHA="$(git -C "$ENV_MAIN" rev-parse refs/tmp/a1)"
@@ -2379,7 +2685,9 @@ chk "A1 commit survives gc" git -C "$ENV_MAIN" cat-file -e "$A1_SHA^{commit}"
 git -C "$ENV_MAIN" branch a1-restored refs/wt-gc-archive/1700000000/tmp/a1 >/dev/null 2>&1
 [ "$(git -C "$ENV_MAIN" rev-parse a1-restored 2>/dev/null)" = "$A1_SHA" ] || note_err "A1 restore does not resolve to the sha"
 finish_case
+fi
 
+if should_run A2-archive-write-fails-keeps; then
 fx A2-archive-write-fails-keeps
 mk_ref refs/tmp/a2 20
 git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/tmp/a2 "$(git -C "$ENV_MAIN" rev-parse origin/master)"
@@ -2388,7 +2696,9 @@ chk_rc A2 1
 has_ref refs/tmp/a2 || note_err "A2 ref deleted despite archive failure"
 log_has 'archive failed' || note_err "A2 no 'archive failed' line"
 finish_case
+fi
 
+if should_run A3-bad-stamp-keeps; then
 fx A3-bad-stamp-keeps
 mk_ref refs/tmp/a3 20
 rt "${R_ON[@]}" WT_GC_ARCHIVE_STAMP=abc -- --force
@@ -2396,7 +2706,9 @@ chk_rc A3 1
 has_ref refs/tmp/a3 || note_err "A3 ref deleted with a bad stamp"
 log_has "invalid WT_GC_ARCHIVE_STAMP 'abc'" || note_err "A3 no invalid-stamp line"
 finish_case
+fi
 
+if should_run A4-retention; then
 fx A4-retention
 git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/$(epoch_ago 91)/tmp/old" "$(git -C "$ENV_MAIN" rev-parse origin/master)"
 git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/$(epoch_ago 89)/tmp/new" "$(git -C "$ENV_MAIN" rev-parse origin/master)"
@@ -2410,7 +2722,9 @@ has_ref "$A4_NEW" || note_err "A4 89d keep-ref pruned"
 has_ref refs/wt-gc-archive/notanumber/tmp/x || note_err "A4 malformed keep-ref pruned"
 log_has 'archive keep refs/wt-gc-archive/notanumber/tmp/x: malformed stamp' || note_err "A4 no malformed-stamp line"
 finish_case
+fi
 
+if should_run A5-archive-dry-run; then
 fx A5-archive-dry-run
 mk_ref refs/tmp/a5 20
 rt "${R_ON[@]}" "$A_STAMP" -- --force --dry-run
@@ -2420,6 +2734,7 @@ has_ref refs/tmp/a5 || note_err "A5 ref deleted in dry-run"
 ls "$CD"/tips/tips-*.txt >/dev/null 2>&1 && note_err "A5 dry-run wrote a tips file"
 log_has 'DRY-RUN would: archive' || note_err "A5 no dry-run archive line"
 finish_case
+fi
 
 # ── Env contract: switches, ages, stamp seam, help text ───────────────────────
 # A token "-VAR" in rt's env list leaves VAR truly unset (run_tick drops it).
@@ -2430,6 +2745,7 @@ EC_STEPS=(WT_GC_ARCHIVE_PRUNE:archive-prune WT_GC_REAP_DETACHED:detached
     WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes)
 
 for ec_var in "${EC_SWITCHES[@]}"; do
+    if should_run "EC-switch-$ec_var"; then
     fx "EC-switch-$ec_var"
     rt "-$ec_var" -- --force --dry-run
     log_has "config (.* )?$ec_var=1( |\$)" || note_err "unset $ec_var did not default to 1"
@@ -2444,6 +2760,7 @@ for ec_var in "${EC_SWITCHES[@]}"; do
         log_has "step $ec_step threshold" && note_err "step $ec_step ran with $ec_var=0"
     done
     finish_case
+    fi
 done
 
 # "VAR|default|extra env to switch the owning step on"
@@ -2461,6 +2778,7 @@ for ec_row in "${EC_AGES[@]}"; do
     ec_rest="${ec_row#*|}"
     ec_def="${ec_rest%%|*}"
     ec_on="${ec_rest#*|}"
+    if should_run "EC-age-$ec_var"; then
     fx "EC-age-$ec_var"
     # shellcheck disable=SC2086
     rt $ec_on "-$ec_var" -- --force
@@ -2474,8 +2792,10 @@ for ec_row in "${EC_AGES[@]}"; do
     log_has 'reap done steps_failed=[1-9]' || note_err "empty $ec_var: no failed step counted"
     [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "empty $ec_var wrote an archive"
     finish_case
+    fi
 done
 
+if should_run EC-stamp-seam; then
 fx EC-stamp-seam
 for ec_mode in unset empty; do
     : > "$CD/rows"; : > "$CD/skips"
@@ -2491,7 +2811,9 @@ for ec_mode in unset empty; do
     grep -qF 'refs/wt-gc-archive//' <<< "$ec_refs" && note_err "$ec_mode stamp: empty stamp component"
 done
 finish_case
+fi
 
+if should_run H2-help-lists-new-vars; then
 fx H2-help-lists-new-vars
 env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
 chk_rc H2-help 0
@@ -2502,6 +2824,7 @@ done
 grep -qF 'Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]' "$CD/help.out" || note_err "--help lost the Usage line"
 grep -qF -- '--help            Print this header comment.' "$CD/help.out" || note_err "--help cut before the last Usage line"
 finish_case
+fi
 
 # One fixture per class, all builders from the sections above.
 ALL_CLASSES_ON=(WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1 WT_GC_REAP_DETACHED=1
@@ -2520,6 +2843,7 @@ all_fixtures() {
     dk_container ccc999 ibl5-all exited "$(iso_ago 20)"
 }
 
+if should_run ALL1-dry-run-every-class; then
 fx ALL1-dry-run-every-class
 all_fixtures
 ALL_REFS0="$(refs_snapshot)"; ALL_WT0="$(wt_snapshot)"; ALL_ST0="$(git -C "$ENV_MAIN" stash list --format=%H)"
@@ -2534,7 +2858,9 @@ for ec_name in all1d all1t all1c "${ALL_STASH:0:10}" lighten-navy-palette ibl5-a
     grep -E 'DRY-RUN would:' "$(LOG)" | grep -qF -- "$ec_name" || note_err "ALL1 no DRY-RUN line for $ec_name"
 done
 finish_case
+fi
 
+if should_run ALL2-live-every-class; then
 fx ALL2-live-every-class
 all_fixtures
 rt "${ALL_CLASSES_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
@@ -2554,10 +2880,12 @@ done
 grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$CD/argv" >/dev/null 2>&1 \
     && note_err "ALL2 cleanup got a destructive flag"
 finish_case
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # G7 verdict: no run, in any case, ever passed a destructive flag to cleanup
 # ══════════════════════════════════════════════════════════════════════════════
+if should_run G7-cleanup-argv; then
 CASE=G7-cleanup-argv
 CASE_ERRS="$G7_ERRS"   # exact-argv findings from the G7 section above
 if [ ! -s "$ROOT/all-argv" ]; then note_err "no cleanup argv was ever captured"; fi
@@ -2565,5 +2893,7 @@ if grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$ROO
     note_err "a run passed a destructive flag to cleanup"
 fi
 finish_case
+fi
 
+check_only_cases
 h_done

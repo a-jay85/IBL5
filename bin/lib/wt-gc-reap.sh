@@ -15,8 +15,12 @@
 #     on any probe error (.claude/rules/shell-fail-open-probe.md);
 #   - every branch/ref delete is preceded by a verified tips-file line and
 #     done with `git update-ref -d <ref> <sha>` (compare-and-delete);
-#   - every delete is preceded by a keep-ref under refs/wt-gc-archive/ (git gc
-#     cannot collect it); a failed archive write keeps the item.
+#   - the refs, stash, dirty-merged, detached and closed steps write a
+#     keep-ref under refs/wt-gc-archive/ (git gc cannot collect it) before
+#     each delete; a failed archive write keeps the item. The container step
+#     archives a JSON file in the tips dir instead. The empty-worktree reap
+#     (tip already in master), the tmp-pack reap, the docker image and
+#     builder prunes, and prune_archives itself write no archive.
 
 # _gc_do <argv...> — single choke point for every destructive command.
 _gc_do() {

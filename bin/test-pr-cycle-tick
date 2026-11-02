@@ -2786,5 +2786,53 @@ run_tick
 no_file "$STATE_DIR/dm-stuck/101" || fail "stuck-launch-none: ledger written"
 end_case stuck-launch-none
 
+# settle-conflict-fix-gave-up-holds: a conflict-fix that gave up leaves the conflict unresolved,
+# so it records the conflict hold and an attempt, and spends no strike.
+reset; begin_case
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_tip e0001
+set_result "101\tfired\tconflict-fix-gave-up\t-"
+run_tick
+run_tick
+[[ -n "$(conflict_hold 101)" ]] || fail "settle-conflict-fix-gave-up-holds: no conflict-hold/101 recorded"
+[[ -n "$(attempt 101)" ]] || fail "settle-conflict-fix-gave-up-holds: no attempt recorded"
+no_file "$STATE_DIR/strikes/101" || fail "settle-conflict-fix-gave-up-holds: gave-up earned a strike: $(strikes 101)"
+out_has 'rescue ran (conflict-fix-gave-up)' || fail "settle-conflict-fix-gave-up-holds: no 'rescue ran' log line: $OUT"
+end_case settle-conflict-fix-gave-up-holds
+
+# settle-conflict-fixed-records-attempt: a fixed conflict clears any hold and records an attempt.
+reset; begin_case
+mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
+set_prs '101|branch-one|aaa1111|DIRTY|false'
+set_result "101\tfired\tconflict-fixed\t-"
+run_tick
+run_tick
+[[ -n "$(attempt 101)" ]] || fail "settle-conflict-fixed-records-attempt: no attempt recorded"
+[[ -z "$(conflict_hold 101)" ]] || fail "settle-conflict-fixed-records-attempt: hold not cleared: '$(conflict_hold 101)'"
+no_file "$STATE_DIR/strikes/101" || fail "settle-conflict-fixed-records-attempt: fixed earned a strike: $(strikes 101)"
+out_has 'rescue ran (conflict-fixed)' || fail "settle-conflict-fixed-records-attempt: no 'rescue ran' log line: $OUT"
+end_case settle-conflict-fixed-records-attempt
+
+# retry-cap-dm-names-conflict-fix: with a recorded bot conflict fix on this head the cap DM says so,
+# and keeps the paste line. The twin run without the seed has no such sentence.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+mkdir -p "$STATE_DIR/conflict-fix"; echo "aaa1111 1" > "$STATE_DIR/conflict-fix/101"
+run_tick
+grep -qF 'already ran on head' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-names-conflict-fix: DM lacks 'already ran on head': $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+grep -qF 'Or paste this to have Claude fix it:' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-names-conflict-fix: DM lost the paste line"
+reset
+set_prs "$RED101"; set_checks aaa1111 red
+mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
+run_tick
+grep -qF 'Or paste this to have Claude fix it:' "$SCRATCH/dm.log" 2>/dev/null \
+    || fail "retry-cap-dm-names-conflict-fix: twin run sent no DM"
+grep -qF 'already ran on head' "$SCRATCH/dm.log" 2>/dev/null \
+    && fail "retry-cap-dm-names-conflict-fix: twin run without the seed names a conflict fix"
+end_case retry-cap-dm-names-conflict-fix
+
 # --- summary -------------------------------------------------------------------------------
 h_done

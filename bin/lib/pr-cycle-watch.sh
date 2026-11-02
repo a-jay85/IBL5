@@ -33,6 +33,9 @@ PCW_CONFLICT_RETRY_DAILY_CAP=2
 # Gate-timeout reruns per (PR, head SHA). Kept in gate-reruns/, apart from strikes/, so a
 # rerun never spends the no-op rescue cap.
 PCW_GATE_RERUN_CAP=2
+# shellcheck disable=SC2034  # read by bin/post-plan-fleet
+# Bot conflict-fix attempts per (PR, head SHA). A new head SHA resets the count.
+PCW_CONFLICT_FIX_CAP=1
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
 PCW_GATE_CHECK="All checks green"         # job name of .github/workflows/all-checks-green.yml
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
@@ -397,6 +400,14 @@ pcw_add_gate_rerun() {  # <dir> <pr> <sha>: writes "<sha> <count+1>", prints the
     local n
     n=$(( $(pcw_gate_rerun_count "$1" "$2" "$3") + 1 ))
     _pcw_write "$1/gate-reruns/$2" "$3 $n" && printf '%s\n' "$n"
+}
+# conflict-fix/<pr> holds "<head-sha> <n>": bot conflict-fix attempts made for that head. A new
+# head SHA resets the count. Read by bin/post-plan-fleet's runner.
+pcw_conflict_fix_count() { _pcw_keyed_count "$1/conflict-fix/$2" "$3"; }   # <dir> <pr> <sha>
+pcw_add_conflict_fix() {  # <dir> <pr> <sha>: writes "<sha> <count+1>", prints the new count
+    local n
+    n=$(( $(pcw_conflict_fix_count "$1" "$2" "$3") + 1 ))
+    _pcw_write "$1/conflict-fix/$2" "$3 $n" && printf '%s\n' "$n"
 }
 # Per-kind DM ledger, same shape as dm-sent/: dm-<kind>/<pr> holds the key last DM'd about.
 # Kinds: declined, strikes, patchid, stuck. The patchid ledger stores the head SHA, because it

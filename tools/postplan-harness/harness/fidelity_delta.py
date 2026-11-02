@@ -43,7 +43,14 @@ PURPOSE = "plan-fidelity-delta-review"
 PACKET_NAME = "fidelity-packet-delta"
 DELTA_ANCHOR_RE = re.compile(r"^DELTA-ANCHOR:[ \t]*(\S+)[ \t]*$", re.M)
 ANCHOR_BLOCKING_RE = re.compile(r"^.*\[BLOCKING\]", re.M)
-RESTATEMENT_RE = re.compile(r"\b(?:UN)?RESOLVED\b")
+# One restatement line per anchor blocker: optional bullet, the bracketed key (optionally
+# bold), an optional ":" / "-" / en or em dash separator, then the status word right after.
+# Anything looser (bare `B1`, status not adjacent to the key, key mid-line) is no match,
+# so the reply declines and the full review runs.
+_REPLY_KEY_RE = re.compile(
+    r"^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:\*\*)?\[B(\d+)\](?:\*\*)?"
+    r"[ \t]*(?:[:–—-][ \t]*)?(UNRESOLVED|RESOLVED)\b",
+    re.M)
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -312,6 +319,47 @@ def plan_excerpt(plan_text: str, titles) -> str:
     return pre + block
 
 
+def keyed_anchor_findings(findings):
+    """Return (text, n): the anchor findings with `[B<k>] ` prefixed to the k-th line that
+    ANCHOR_BLOCKING_RE matches, and n, the number of keyed lines.
+
+    Splits on "\\n" only, the same line boundary ANCHOR_BLOCKING_RE's re.M `^` uses, so n
+    always equals len(ANCHOR_BLOCKING_RE.findall(findings)). str.splitlines() would also
+    split on "\\r" and other separators and could overcount.
+    """
+    out, n = [], 0
+    for line in (findings or "").split("\n"):
+        if ANCHOR_BLOCKING_RE.match(line):
+            n += 1
+            line = f"[B{n}] {line}"
+        out.append(line)
+    return "\n".join(out), n
+
+
+def anchor_blocker_count(findings):
+    """Number of anchor blockers; the same keys build_delta_packet hands the reviewer."""
+    return keyed_anchor_findings(findings)[1]
+
+
+def match_restatements(reply, blockers):
+    """Map each key 1..blockers to its status ("RESOLVED" / "UNRESOLVED").
+
+    Returns None (caller declines, fail closed) when any key is missing, a key is outside
+    1..blockers, or one key is restated both ways. A repeat with the same status is fine.
+    With blockers == 0 and no key lines the result is {} (empty, not None).
+    """
+    seen = {}
+    for m in _REPLY_KEY_RE.finditer(reply or ""):
+        key, status = int(m.group(1)), m.group(2)
+        if key < 1 or key > blockers:
+            return None
+        if seen.setdefault(key, status) != status:
+            return None
+    if set(seen) != set(range(1, blockers + 1)):
+        return None
+    return seen
+
+
 def _pointer_prompt(packet_dir: str, full_packet_dir: str, pr_number, anchor_run_id: str) -> str:
     return (
         f"Perform a DELTA plan-intent fidelity review (sections 6b-6e of procedure.md) "
@@ -330,8 +378,13 @@ def _pointer_prompt(packet_dir: str, full_packet_dir: str, pr_number, anchor_run
         f"  1. diff.patch holds ONLY the hunks changed since the last full review (run "
         f"{anchor_run_id}); plan.md is an excerpt of the plan sections those hunks touch; "
         "apply checks 6b-6e to the delta hunks against those sections.\n"
-        "  2. For every [BLOCKING] bullet in anchor-findings.md, write RESOLVED with the "
-        "hunk that resolves it, or UNRESOLVED. Any UNRESOLVED => NOT READY.\n"
+        "  2. anchor-findings.md prefixes each [BLOCKING] line with a key: [B1], [B2], ... "
+        "For every key, write one line in section 6d that starts with the key followed "
+        "directly by the status word: `[B<n>] RESOLVED by <hunk>` or `[B<n>] UNRESOLVED`. "
+        "Put nothing between the key and the status word. Write every key line above the "
+        "verdict word. These key lines sit alongside the 6d [BLOCKING] bullets the "
+        "procedure requires and never replace them. If anchor-findings.md has no key, "
+        "write no key line. Any UNRESOLVED => NOT READY.\n"
         "  3. Any hunk that removes or weakens a planned behavior, un-realises a "
         "Verification Matrix row, contradicts pr-body.md, or introduces a defect => "
         "NOT READY. A delta verdict must never be weaker than the full review would give "
@@ -365,7 +418,7 @@ def build_delta_packet(out_dir, master_sha, reviewed_tree, plan_text, ctx, pr_bo
         pr_number, phase4b_ran, worktree=worktree, packet_name=PACKET_NAME,
         review_findings=review_findings, extra_context=extra)
     with open(os.path.join(packet, "anchor-findings.md"), "w") as fh:
-        fh.write(anchor["findings"])
+        fh.write(keyed_anchor_findings(anchor["findings"])[0])
     with open(os.path.join(packet, "delta-paths.txt"), "w") as fh:
         fh.write("".join(f"{p}\n" for p in ctx["delta_paths"]))
     return packet
@@ -439,13 +492,19 @@ def attempt(llm, out_dir, worktree, gh, plan, diff, pr_body, pr_number, master_s
     echo = DELTA_ANCHOR_RE.search(reviewed_part)
     if verdict is None or echo is None or echo.group(1) != anchor["run_id"]:
         return _decline("verdict-unparsed")
-    # Every anchor [BLOCKING] bullet needs a RESOLVED/UNRESOLVED restatement, else the
-    # reviewer may have ignored the old blocker and the delta cannot stand in for a full review.
-    blocking = len(ANCHOR_BLOCKING_RE.findall(anchor.get("findings") or ""))
+    # anchor-findings.md keys every anchor [BLOCKING] line as [B<n>]. The reply must restate
+    # each key on its own line, else the reviewer may have skipped an old blocker and the
+    # delta cannot stand in for a full review.
+    blocking = anchor_blocker_count(anchor.get("findings"))
     # A NOT READY anchor with no countable blocker is a parse miss, so fail closed.
     if anchor.get("verdict") == "NOT READY" and blocking == 0:
         return _decline("verdict-unparsed")
-    if len(RESTATEMENT_RE.findall(reviewed_part)) < blocking:
+    restated = match_restatements(reviewed_part, blocking)
+    if restated is None:
+        return _decline("verdict-unparsed")
+    # Scope contract item 2: any UNRESOLVED forces NOT READY. A lighter verdict contradicts
+    # the reply's own restatement, so fail closed.
+    if "UNRESOLVED" in restated.values() and verdict != "NOT READY":
         return _decline("verdict-unparsed")
     path = fidelity.verdict_path(pr_number)
     try:

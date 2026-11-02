@@ -2,6 +2,7 @@
 description: VR PRs get a change-driven before/after gallery and a sticky review comment grouped by module, with a coverage-gap section. The update-baselines label commits only strict-pass-flagged views. A refresh workflow republishes stale galleries; retention keeps linked galleries. Changed cells and agent shots also get cropped before/after pairs in the PR body.
 paths:
   - ".github/workflows/e2e-tests.yml"
+  - ".github/workflows/update-baselines.yml"
   - ".github/workflows/pages-deploy.yml"
   - "ibl5/tests/e2e/vr-manifest.ts"
   - "ibl5/tests/e2e/vr-coverage-map.ts"
@@ -17,7 +18,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 ---
 
 # Visual-review PRs
@@ -120,6 +121,8 @@ unflagged cells stay byte-identical. That commit is the approval record; no flag
 commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
 VR job (ADR-0214).
 
+The label starts `update-baselines.yml`, which calls `e2e-tests.yml`. Its checks report as `Update baselines / <job>`.
+
 ## When the comment is missing
 
 - Fork PR: the read-only token has no secrets, so the publish/comment steps no-op (expected).
@@ -205,12 +208,4 @@ the `<picture>` composite (`--compose-manual`); otherwise it stays after-only.
 
 ## One-time deployment prerequisite
 
-GitHub Pages must use source = **GitHub Actions** (`build_type: workflow`). The owner sets it once
-in Repo Settings → Pages → Build and deployment → Source, or:
-
-```bash
-gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
-```
-
-Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
-once via the workflow's `workflow_dispatch`.
+See `.claude/rules/visual-review-prs-detail.md` § One-time deployment prerequisite.

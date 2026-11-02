@@ -33,6 +33,7 @@ on:
       - Python tests (post-plan harness)
       - Sim recap
       - Tests and Analysis
+      - VR Baseline Regen
       - VR Refresh
     types: [completed]
   workflow_dispatch:

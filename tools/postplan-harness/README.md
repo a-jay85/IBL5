@@ -143,12 +143,14 @@ intent log — without touching GitHub.
 ### Delta re-review (Phase 5.5)
 
 - **When it fires.** A prior full review of the same branch, plan hash and harness `version` ended `READY`, `READY WITH NOTES` or `NOT READY` with no remediation commit. That run left an anchor record at `<state-dir>/<slug>.fidelity-delta.json`. The delta path runs when the sticky's `**Reviewed diff:**` matches the record's last reviewed diff id and the per-file patch-id delta since the anchor passes every limit: at most 200 changed lines, at most 8 files, at most 0.5 of the full diff's changed lines. It also needs no new or removed file, no path outside the plan (lockfiles and the phpstan baseline are exempt), and no gate-surface path (`fidelity.LOCAL_GATE_PATH_PREFIXES`).
-- **What the reviewer sees.** Only the delta hunks, the anchor's findings excerpt, and the plan sections that name the touched files plus `## Critical Files`. The reviewer restates each anchor `[BLOCKING]` finding as RESOLVED or UNRESOLVED and echoes `DELTA-ANCHOR: <run_id>`. A reply without them is discarded and the harness runs the full review.
+- **What the reviewer sees.** Only the delta hunks, the anchor's findings excerpt, and the plan sections that name the touched files plus `## Critical Files`. The packet keys each anchor `[BLOCKING]` line as `[B1]`, `[B2]` and so on. The reviewer writes one line per key, `[B<n>] RESOLVED by <hunk>` or `[B<n>] UNRESOLVED`, and echoes `DELTA-ANCHOR: <run_id>`. The harness discards the reply and runs the full review when a key is missing, out of range or restated both ways, or when an UNRESOLVED key comes with a verdict lighter than `NOT READY`.
 - **Chaining.** At most 2 consecutive deltas, each cumulative against the last full anchor. The third run is full. A delta run never becomes an anchor, never seeds carry-forward (log reason `prior-review-delta`), and never enters the review cache (`vet_fidelity`).
 - **Verdict handling.** Unchanged. A delta `NOT READY` lands in `verdict_1` and blocks arming through condition (12) like a full one.
 - **Fail-closed.** Every decline reason in `fidelity_delta.DECLINE_REASONS` logs `phase5.5 fidelity: delta declined (<reason>)` and runs the full reviewer. Nothing is skipped. To force a full review by hand, delete the record file.
 - **Audit trail.** The sticky comment gains `**Review kind:** delta (anchor <run_id>; N file(s), x/y changed lines since the last full review)`. The run log line gains `review_kind=delta`.
 - **Measured basis (2026-10-25).** Across 311 plan-unchanged consecutive packet pairs, 13 % of re-reviews qualify. Eligible packets are 5.3 KB at p50 against a 64 KB median plan.
+
+A bot-resolved merge from `postplan-fix --headless` follows the same rules as a ladder resolution. It is proven against the branch as it stood before the fix, and it holds on condition 14 until `CONFLICT-REVIEW=CLEAN` exists for the merge commit. `bin/postplan-fix` never pushes and never runs the proof.
 
 ## Installation (executed 2026-07-16 with explicit approval)
 
@@ -191,6 +193,8 @@ call. It also regenerates a conflicted golden snapshot that both sides modified 
 headless `claude -p` session capped at $5, 20 minutes and 80 turns. The harness re-runs the
 unchanged proof after every rung, and `result.json` records the outcome in `conflict_rung`.
 Rung 4 runs one headless Sonnet 5.5 session capped at $5, 25 minutes and 100 turns on the same merge commit (`harness/conflict_fix.py`). It may edit the conflicted files, the branch's own files, and test files master added under `ibl5/tests/`, `bin/test-*` or `tools/postplan-harness/tests/`. The harness amends the merge commit and re-runs the proof. It runs at most once per branch head and master tip. The marker is a `<key>.sonnet-fix.json` file in the harness state dir, `tools/postplan-harness/out/state/`. The session cannot push, commit, fetch, run gh, or move any ref, and a moved ref or HEAD fails the rung. When it ran and the proof still failed, `blocked-ship.txt` adds a `Headless Sonnet fix:` line and the session's summary labelled as untrusted text.
+
+**Pre-merged heads.** `bin/postplan-fix --headless` can commit a local merge of `origin/master` before the harness runs. When it does, it writes `/tmp/postplan-premerged-<key>.json` through `python3 -m harness.premerge record` and records the condition-14 flag for the merge commit. The harness's own merge is then a no-op. When the manifest's SHA equals HEAD, `_rebase_onto` writes the lost-work PRE patch from the pre-fix head, runs the strict `_prove_tree_equivalent`, and runs the conflict review on the manifest's files. A failed proof raises `rebase-conflict` before any push. If a newer `origin/master` conflicts with the pre-merged head, the run stops without entering the ladder.
 
 ## Held-unchanged skip
 
@@ -297,6 +301,8 @@ One JSON object per line: `v, ts, pr, findingId, agent, score, outcome, source, 
 The schema version stays 1; `origin` is additive and readers ignore keys they do not name.
 
 The sweep never reads who resolved a thread. A finding is logged once, and the first observation wins in the log. `report` keeps the last event per `(pr, findingId)`.
+
+`agent` comes from the `<!-- agent: X -->` marker on the thread's first comment. The harness writes it on line 3 of every inline comment body (`render_body` in `harness/labels.py`) when the finding's agent matches `^[A-Za-z0-9_-]{1,32}$`. The skill poster (`bin/lib/post-review-findings.sh`) writes it when a finding carries `.agent`. A thread without the marker logs `unknown`. Harness comments posted before the marker existed carry none, so their rows stay `unknown`, and `report` prints a stderr note with their count. The text table lists every id in `REVIEW_AGENTS` (`harness/labels.py`) first, including those with no outcomes yet, then legacy ids seen in the log, then `unknown`.
 
 ```bash
 bin/review-outcomes record --pr=12 --verdicts=/tmp/done.jsonl --threads=/tmp/all.jsonl

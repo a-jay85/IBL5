@@ -1,6 +1,6 @@
 ---
 description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-10-22
+last_verified: 2026-11-01
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - "tools/postplan-harness/**"
@@ -65,3 +65,7 @@ When the stacked `--onto` fallback (`gitad.py` `_autoresolve_stacked_rebase`) fi
 
 No path spawns a skill session *because of* a conflict. Engine split and exit codes:
 `.claude/rules/workflow-continuity-detail.md`, ADR-0092.
+
+## Harness
+
+The fleet's conflict autofix leaves a local merge commit from `bin/postplan-fix --headless` on the PR branch. That is a merge commit on a PR branch, which this rule allows. `master` still lands squash-only. The harness pushes it with its usual `--force-with-lease`.

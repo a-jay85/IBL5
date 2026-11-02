@@ -248,12 +248,20 @@ THREAD3="$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID'")"
 if [ -z "$WAKE_BASE" ] || [ -z "$WAKE_KEY" ]; then
     echo 'SKIP 8.2-8.6: BUG_PIPELINE_API_BASE_URL and API_KEY must be exported to reach the wake endpoint'
 else
-    # 8.2 — a non-operator author is rejected and nothing is written
+    # 8.2 — a non-operator author is rejected by the AUTHOR check and nothing is written.
+    # WakeController returns 403 for both the tier check and the author check; only
+    # .error.message tells them apart. A standard-tier API_KEY is rejected by the tier
+    # check first, so this case must fail on it instead of passing on the status alone.
+    # BPE-W82-BEGIN (bin/test-bug-pipeline-e2e W-cases extract and run this block)
     expect 'non-operator wake 403' 403 "$(wake_post 1 1234567890123456797 'not the operator')"
+    expect 'non-operator wake rejected by the author check' \
+        'Only the pipeline operator can wake a report.' \
+        "$(jq -r '.error.message' "$WAKE_OUT" 2>/dev/null || true)"
     expect 'rejected wake writes nothing' 0 \
         "$(q "SELECT COUNT(*) FROM ibl_bug_report_operator_context WHERE bug_report_id='$ID3'")"
     expect 'rejected wake leaves status dormant' 'dormant' \
         "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID3'")"
+    # BPE-W82-END
 
     # 8.3 — the accepted wake: dormant -> queued, thread_id and context persisted
     PHP_OP="$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php -r 'require "scripts/bug-pipeline/_bootstrap.php"; echo Discord\Discord::getBugPipelineApproverDiscordId();')"

@@ -84,10 +84,41 @@ def test_report_text_table_header_and_total_row(capsys):
     rc, out = _report(capsys)
     lines = out.splitlines()
     assert rc == 0
-    assert lines[0] == "agent  total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
-    assert [ln.split()[0] for ln in lines[1:]] == ["A", "B", "unknown", "TOTAL"]
+    assert lines[0] == "agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
+    assert [ln.split()[0] for ln in lines[1:]] == ["A", "D", "security", "B", "unknown", "TOTAL"]
     assert lines[-1].startswith("TOTAL")
     assert lines[-1].split()[-1] == "50.0"
+
+
+def test_report_text_lists_live_agents_with_zero_rows(capsys):
+    rc, out = _report(capsys)
+    assert rc == 0
+    rows = {ln.split()[0]: ln.split() for ln in out.splitlines()[1:]}
+    for agent in ("D", "security"):
+        assert rows[agent][1] == "0"
+        assert rows[agent][-1] == "-"
+
+
+def test_report_notes_unknown_rows_on_stderr(capsys):
+    rc = ol.main(["report", f"--log={FIXTURE}"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert 'outcome(s) under "unknown"' in captured.err
+    assert "note: 1 outcome(s)" in captured.err
+    assert "note:" not in captured.out
+
+
+def test_report_no_unknown_note_when_all_attributed(tmp_path, capsys):
+    log = tmp_path / "outcomes.jsonl"
+    events = [ol.build_event(pr=7, finding_id=i, agent="A", score=80, outcome="fixed",
+                             source="phase4.5", basis="fix-verdict", pipeline="harness")
+              for i in (1, 2)]
+    assert ol.append_events(str(log), events, lambda msg: None) == 2
+    rc = ol.main(["report", f"--log={log}"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "note:" not in captured.err
+    assert not any(ln.startswith("unknown") for ln in captured.out.splitlines())
 
 
 def test_report_wrapper_runs_under_empty_env():

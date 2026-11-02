@@ -94,6 +94,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0223](0223-hotfix-merge-lane.md) | A hotfix lane at the front of the merge line | Accepted | A `hotfix`-labeled armed PR sorts first in `bin/merge-line-select`, and `.github/workflows/hotfix-dispatch.yml` starts an `update-behind-prs.yml` pass when an armed PR carries the label; gates and the armed filter are unchanged. |
 | [0222](0222-plan-tier-hint-opus-judge.md) | Opus 5.5 judge for bin/plan-tier-hint | Accepted | `bin/plan-tier-hint` makes one `claude-opus-5-5` call that reads /plan Step 3's check list and prints `xhigh` on any failure; it supersedes ADR-0122's regex word lists. |
 | [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
+| [0225](0225-update-baselines-caller-workflow.md) | Update-baselines regen runs from a caller workflow | Accepted | `.github/workflows/update-baselines.yml` calls `e2e-tests.yml`, which no longer triggers on `labeled`, so a label event cannot re-post the required `E2E Tests` check; `bin/check-composite-contracts` L1 and L2 pin it. |
 
 ## When an ADR is Required
 

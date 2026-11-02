@@ -78,6 +78,8 @@ done
 source "$SCRIPT_DIR/lib/pr-cycle-watch.sh"
 # shellcheck source=bin/lib/dm.sh
 source "$SCRIPT_DIR/lib/dm.sh"
+# shellcheck source=bin/lib/pr-armable.sh
+source "$SCRIPT_DIR/lib/pr-armable.sh"
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
 
@@ -334,7 +336,7 @@ settle_row() {
     # A paused rescue never ran, so it keeps any hold. Every other fired or holdrepeat
     # outcome is a determinate result and drops the hold back to the plain retry cap.
     case "$status:$outcome" in
-        fired:conflict)
+        fired:conflict|fired:conflict-fix-gave-up)
             # Record the merge-tree path set at the launch tip, so a later tick can tell
             # whether master's move touched the conflict. No set recorded = today's rule.
             prc=2; pout="no master tip at launch"
@@ -356,7 +358,7 @@ settle_row() {
         fired:*|holdrepeat:*) pcw_clear_conflict_hold "$STATE" "$pr" ;;
     esac
     case "$status:$outcome" in
-        fired:shipped|fired:held|fired:conflict|fired:timed-out)
+        fired:shipped|fired:held|fired:conflict|fired:timed-out|fired:conflict-fixed|fired:conflict-fix-gave-up)
             pcw_record_attempt "$STATE" "$pr" "$key"
             log "PR $pr: rescue ran ($outcome); attempt recorded (head ${sha:0:7})" ;;
         fired:failed)
@@ -601,6 +603,9 @@ while IFS=$'\t' read -r pr branch sha mstate base human; do
             elif [[ -n "${run_dir:-}" ]]; then
                 msg+=" Last rescue run: $run_dir"
             fi
+            if [[ "$(pcw_conflict_fix_count "$STATE" "$pr" "$sha")" -ge 1 ]]; then
+                msg+=$'\nA bot conflict fix (postplan-fix --headless) already ran on head '"${sha:0:7}"$' and gave up.'
+            fi
             # End with the one-command fix entry point, on its own line so it copies cleanly.
             msg+=$'\nOr paste this to have Claude fix it:\n'"$ROOT/bin/postplan-fix $pr"
             if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -634,7 +639,7 @@ done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not)
                    (if any(.labels[]?; .name == "needs-a-human") then "1" else "0" end)] | @tsv' <<< "$PRS_JSON")
 
 # ── (d2) Stuck set ───────────────────────────────────────────────────────────
-# Open, non-draft, unarmed PRs whose newest post-plan run failed or that sit in conflict-hold.
+# Open, non-draft PRs that are unarmed with a failed newest post-plan run or a conflict-hold, or armed with an open review thread.
 # A green one is skipped as "checks green" every tick and nothing else names it.
 # STUCK_ROWS: "<pr>\t<sha>\t<reason>" for each PR whose dm-stuck ledger is due.
 STUCK_ROWS=()
@@ -651,6 +656,25 @@ while IFS=$'\t' read -r pr branch sha; do
     log "stuck PR $pr: $reason (head ${sha:0:7})"
     STUCK_ROWS+=("$pr"$'\t'"$sha"$'\t'"$reason")
 done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not) | select(.autoMergeRequest == null)
+                | [.number, .headRefName, .headRefOid] | @tsv' <<< "$PRS_JSON")
+
+# Armed PRs with an open review thread: auto-merge waits on GitHub's conversation-resolution
+# rule and the PR reads BLOCKED, like one waiting on checks. Nothing else names it between
+# pr-cycle runs. A failed thread query is logged and retried next tick (a notice, not a gate).
+while IFS=$'\t' read -r pr branch sha; do
+    [[ -n "$pr" ]] || continue
+    ! pcw_inflight "$pr" "$branch" "$SNAP" || continue
+    threads="$(pr_open_review_threads "$pr")"
+    case "$threads" in
+        *open-threads-api-error*) log "stuck check PR $pr: thread query failed; retrying next tick"; continue ;;
+        *open-threads-cap*) reason="armed, stalled on 100+ open review threads" ;;
+        "") continue ;;
+        *) reason="armed, stalled on $(grep -c '^open-thread:' <<< "$threads") open review thread(s)" ;;
+    esac
+    pcw_kind_dm_due "$STATE" stuck "$pr" "$reason@$sha" || continue
+    log "stuck PR $pr: $reason (head ${sha:0:7})"
+    STUCK_ROWS+=("$pr"$'\t'"$sha"$'\t'"$reason")
+done < <(jq -r 'sort_by(.number) | .[] | select(.isDraft | not) | select(.autoMergeRequest != null)
                 | [.number, .headRefName, .headRefOid] | @tsv' <<< "$PRS_JSON")
 
 # mark_stuck_rows: record the STUCK_ROWS entries the DM listed in dm-stuck/ as DM'd for their
@@ -674,7 +698,7 @@ send_stuck_dm() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
         log "would DM: $DM_CMD --ping $block"; return 0
     fi
-    if ! dm_ping "pr-cycle-watch: these unarmed PRs are stuck and need you."$'\n'"$block"; then
+    if ! dm_ping "pr-cycle-watch: these PRs are stuck and need you."$'\n'"$block"; then
         log "stuck DM failed; retrying next tick"; return 0
     fi
     mark_stuck_rows

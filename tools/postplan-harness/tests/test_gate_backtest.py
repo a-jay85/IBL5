@@ -313,6 +313,15 @@ def test_verdict_cleared_below_threshold():
     assert v.per_gate["bin/check-foo"].false_flags == [10]
 
 
+def test_verdict_flagged_clean_prs_count_as_matured():
+    res = (_results("bin/check-foo", _passes(1, 4))
+           + [ReplayResult(5, "bin/check-foo", "flag", "d", base_outcome="pass")])
+    v = compute_verdict([_g()], res, _truth(clean=range(1, 6)))
+    assert v.state == "CLEARED"
+    assert v.per_gate["bin/check-foo"].matured == 5
+    assert v.per_gate["bin/check-foo"].false_flags == [5]
+
+
 def test_head_flag_without_base_outcome_counts_as_false_flag():
     res = _results("bin/check-foo", _passes(1, 6) + [(10, "flag"), (11, "flag")])
     v = compute_verdict([_g()], res, _truth(clean=range(1, 12)))
@@ -438,6 +447,73 @@ def test_render_shows_pre_existing_line_and_count():
     assert ("- Pre-existing flags (base gate also flags, excluded from the threshold): "
             "#10, #11") in block
     assert "- False flags:" not in block
+
+
+def _fixed(gate, rows):
+    """rows: list of (pr, outcome, base_outcome, fix_outcome)"""
+    return [ReplayResult(pr, gate, outcome, "", base_outcome=base, fix_outcome=fix)
+            for pr, outcome, base, fix in rows]
+
+
+def _fixed_verdict(rows, truth=None):
+    res = _results("bin/check-foo", _passes(1, 6)) + _fixed("bin/check-foo", rows)
+    t = truth if truth is not None else _truth(clean=range(1, 12))
+    return res, t, compute_verdict([_g()], res, t)
+
+
+def test_tally_head_flag_fix_pass_is_fixed_by_pr():
+    _, _, v = _fixed_verdict([(10, "flag", "pass", "pass")])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.fixed_by_pr == [10]
+    assert tally.false_flags == []
+
+
+def test_tally_fix_pass_on_repaired_pr_stays_catch():
+    t = _truth(clean=range(1, 10), repaired=(10,))
+    _, _, v = _fixed_verdict([(10, "flag", "pass", "pass")], t)
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.catches == [10]
+    assert tally.fixed_by_pr == []
+
+
+def test_tally_fix_not_pass_stays_false_flag():
+    for fix in ("no-apply", "flag", "error", "timeout", ""):
+        _, _, v = _fixed_verdict([(10, "flag", "pass", fix)])
+        tally = v.per_gate["bin/check-foo"]
+        assert tally.false_flags == [10], fix
+        assert tally.fixed_by_pr == [], fix
+
+
+def test_tally_base_flag_wins_over_fix_pass():
+    _, _, v = _fixed_verdict([(10, "flag", "flag", "pass")])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.pre_existing == [10]
+    assert tally.fixed_by_pr == []
+    assert tally.false_flags == []
+
+
+def test_verdict_all_rescued_is_cleared():
+    res = _fixed("bin/check-foo", [(n, "flag", "absent", "pass") for n in range(1, 6)])
+    v = compute_verdict([_g()], res, _truth(clean=range(1, 6)))
+    tally = v.per_gate["bin/check-foo"]
+    assert v.state == "CLEARED"
+    assert tally.matured == 5
+    assert len(tally.fixed_by_pr) == 5
+    assert tally.false_flags == []
+
+
+def test_render_fixed_by_pr_line_and_state_line():
+    res, t, v = _fixed_verdict([(10, "flag", "pass", "pass"), (11, "flag", "absent", "pass")])
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    fixed = [ln for ln in block.splitlines() if ln.startswith("- Fixed by the candidate PR")]
+    assert len(fixed) == 1
+    assert "#10, #11" in fixed[0]
+    assert parse_gate_backtest_state(block) == "CLEARED"
+    assert ("| Gate | Replayed | Catches | False flags | Pre-existing flags | Unsettled flags "
+            "| Skipped | Errors |") in block.splitlines()
+    res, t, v = _fixed_verdict([(10, "flag", "pass", "no-apply")])
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    assert "Fixed by the candidate PR" not in block
 
 
 def test_render_empty_for_non_gate_pr():

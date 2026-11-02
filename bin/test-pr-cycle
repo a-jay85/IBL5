@@ -734,7 +734,7 @@ echo 'post-plan-fleet: outcome=held'    > "$SCRATCH/fleetlogs/post-plan-fleet-10
 # 103 has no log at all: it counts as failed.
 run --worker
 [[ $RC -eq 0 ]] || fail "case 11b: exit $RC, want 0"
-_want11b='fired 3 (shipped 1, held 1, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0)'
+_want11b='fired 3 (shipped 1, held 1, rebased 0, declined 0, paused 0, conflict 0, conflict fixed 0, conflict fix gave up 0, failed 1, timed out 0)'
 grep -qF "$_want11b" <<< "$OUT" || fail "case 11b: finish line lacks '$_want11b'"
 grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
 grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
@@ -774,7 +774,7 @@ _fl11c 107 outcome=blocked
 _fl11c 109 outcome=timed-out reason=timeout
 run --worker --max-ready 9
 [[ $RC -eq 0 ]] || fail "case 11c: exit $RC, want 0"
-_want11c='fired 9 (shipped 1, held 1, rebased 0, declined 1, paused 1, conflict 1, failed 3, timed out 1)'
+_want11c='fired 9 (shipped 1, held 1, rebased 0, declined 1, paused 1, conflict 1, conflict fixed 0, conflict fix gave up 0, failed 3, timed out 1)'
 grep -qF "$_want11c" <<< "$OUT" || fail "case 11c: finish line lacks '$_want11c' (out: $OUT)"
 grep -qF "$_want11c" "$SCRATCH/dm.argv" || fail "case 11c: DM lacks '$_want11c'"
 for _l in '#101 shipped PR #101' '#102 held PR #102' '#103 declined holdrepeat' \
@@ -802,7 +802,7 @@ echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-10
 PR_CYCLE_RESULT_FILE="$SCRATCH/res/result.tsv" run --worker
 [[ $RC -eq 0 ]] || fail "fleet-skip-baseline: exit $RC, want 0"
 grep -qxF '#3478 skipped bot' <<< "$OUT" || fail "fleet-skip-baseline: '#3478 skipped bot' missing (out: $OUT)"
-_want_fsb='fired 1 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 0, timed out 0), skipped 1'
+_want_fsb='fired 1 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, conflict fixed 0, conflict fix gave up 0, failed 0, timed out 0), skipped 1'
 grep -qF "$_want_fsb" <<< "$OUT" || fail "fleet-skip-baseline: finish line lacks '$_want_fsb' (out: $OUT)"
 grep -qF "$_want_fsb" "$SCRATCH/dm.argv" || fail "fleet-skip-baseline: DM lacks '$_want_fsb'"
 _full_fsb="pr-cycle finished — $_want_fsb, armed 0, your turn 2 — done"
@@ -832,7 +832,7 @@ fleet_skip_row 3478 'bot- or other-authored — skipped' > "$SCRATCH/ready-out"
 run --worker
 [[ $RC -eq 0 ]] || fail "fleet-skip-real-failure: exit $RC, want 0"
 grep -qxF '#103 failed no-log' <<< "$OUT" || fail "fleet-skip-real-failure: '#103 failed no-log' missing (out: $OUT)"
-grep -qF 'fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, failed 1, timed out 0), skipped 1' <<< "$OUT" \
+grep -qF 'fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, conflict fixed 0, conflict fix gave up 0, failed 1, timed out 0), skipped 1' <<< "$OUT" \
     || fail "fleet-skip-real-failure: summary wrong (out: $OUT)"
 end_case "fleet-skip-real-failure"
 
@@ -1420,7 +1420,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 102
 [[ $RC -eq 0 ]] || fail "--only run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--only 102 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=102" ]] \
     || fail "--only 102 readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF 'done' <<< "$OUT" || fail "--only run did not finish normally"
 grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
@@ -1435,7 +1435,7 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 run --worker --only '#102'
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=102" ]] \
     || fail "--only '#102' readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 
 # Two of three, in pr-attack's order — the filter drops rows, it never reorders them.
@@ -1446,7 +1446,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 103,101
 [[ "$(calls ready)" == "1" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 1"
 _a27a="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=101,103" ]] \
     || fail "--only 103,101 argv: $_a27a"
 end_case "case 27a --only selects and preserves order"
 
@@ -1459,7 +1459,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --skip 101,103
 [[ $RC -eq 0 ]] || fail "--skip run exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "--skip 101,103 made $(calls ready) ready calls, want 1"
-[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr-list 102 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=102" ]] \
     || fail "--skip readied: $(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF -- '--skip 101,103' <<< "$OUT" || fail "worker did not announce its --skip scope"
 # No flag at all is the unfiltered baseline — the predicate must be a no-op by default.
@@ -1470,7 +1470,7 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "unfiltered run made $(calls ready) ready calls, want 1"
 _a27b="$(sed -n 1p "$SCRATCH/ready.argv")"
-[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=101,102,103" ]] \
     || fail "unfiltered batch argv: $_a27b"
 end_case "case 27b --skip and the unfiltered baseline"
 
@@ -2089,14 +2089,14 @@ triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" "2103 NEEDS-WORK
 run --worker
 [[ $RC -eq 0 ]] || fail "case 30 exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "case 30: want 1 fleet call, got $(calls ready)"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=2101,2102,2103,2104" ]] \
     || fail "case 30: argv line 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
 
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --jobs 2
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait --allow-test-only --conflict-fix-prs=2101,2102,2103,2104" ]] \
     || fail "case 30 --jobs 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 30 stage-1 batch argv"
 
@@ -2132,7 +2132,7 @@ printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" "2102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 2
 [[ $RC -eq 0 ]] || fail "case 32 exit $RC, want 0"
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=2101,2102" ]] \
     || fail "case 32 cap 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 run --dry-run --max-ready 2
 grep -qF '2103' <<< "$OUT" && grep -qF 'max-ready cap' <<< "$OUT" \
@@ -2145,7 +2145,7 @@ reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
 triage_report "2101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 run --worker --max-ready 10
-[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only" ]] \
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=2101,2102,2103,2104" ]] \
     || fail "case 32 no-cap: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 32 max-ready cap"
 
@@ -4033,6 +4033,78 @@ triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 DIRTYRES=999999 run --dry-run --max-ready 4
 [[ $RC -eq 0 ]] || fail "case 43 999999: exit $RC, want 0 (six digits is legal)"
 end_case "case 43 dirty reserve validation"
+
+# ==========================================================================================
+# Conflict auto-fix route: every Stage-1 PR is passed to the fleet as --conflict-fix-prs=
+# unless PR_CYCLE_CONFLICT_AUTOFIX=0. Only the literal 0 turns it off.
+# ==========================================================================================
+cf_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --dry-run
+grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
+    || fail "conflict-autofix-default-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
+end_case "conflict-autofix-default-on"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+PR_CYCLE_CONFLICT_AUTOFIX="" run --dry-run
+grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
+    || fail "conflict-autofix-empty-is-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
+end_case "conflict-autofix-empty-is-on"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+PR_CYCLE_CONFLICT_AUTOFIX=0 run --dry-run
+grep -qE '^would run: post-plan-fleet ' <<< "$OUT" || fail "conflict-autofix-off: no would-run line (out: $OUT)"
+grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs' \
+    && fail "conflict-autofix-off: would-run line still carries --conflict-fix-prs (out: $OUT)"
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+PR_CYCLE_CONFLICT_AUTOFIX=0 run --worker
+[[ "$(calls ready)" == "1" ]] || fail "conflict-autofix-off: ready calls $(calls ready), want 1"
+grep -qF -- '--conflict-fix-prs' <<< "$(cf_argv)" && fail "conflict-autofix-off: fleet argv carries --conflict-fix-prs: $(cf_argv)"
+end_case "conflict-autofix-off"
+
+# 101 is routed to the holdrepeat fix, so it must not also join the conflict-fix list.
+begin_case
+hf_setup "3"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+HRHARNESS="$HRH" run --worker
+[[ $RC -eq 0 ]] || fail "conflict-autofix-excludes-holdrepeat: exit $RC, want 0"
+grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(cf_argv)" \
+    || fail "conflict-autofix-excludes-holdrepeat: argv lacks --holdrepeat-fix-prs=101: $(cf_argv)"
+grep -qF -- '--conflict-fix-prs=102' <<< "$(cf_argv)" \
+    || fail "conflict-autofix-excludes-holdrepeat: argv lacks --conflict-fix-prs=102: $(cf_argv)"
+grep -qE -- '--conflict-fix-prs=[0-9,]*101' <<< "$(cf_argv)" \
+    && fail "conflict-autofix-excludes-holdrepeat: 101 reached --conflict-fix-prs: $(cf_argv)"
+hr_cleanup
+end_case "conflict-autofix-excludes-holdrepeat"
+
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+rm -rf "$SCRATCH/fleetlogs"; mkdir -p "$SCRATCH/fleetlogs"
+echo 'post-plan-fleet: outcome=conflict-fixed'       > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
+echo 'post-plan-fleet: outcome=conflict-fix-gave-up' > "$SCRATCH/fleetlogs/post-plan-fleet-102.log"
+echo 'post-plan-fleet: outcome=shipped'              > "$SCRATCH/fleetlogs/post-plan-fleet-103.log"
+run --worker
+[[ $RC -eq 0 ]] || fail "outcome-summary-conflict-fix-words: exit $RC, want 0"
+_want_cf='fired 3 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, conflict fixed 1, conflict fix gave up 1, failed 0, timed out 0)'
+grep -qF "$_want_cf" <<< "$OUT" || fail "outcome-summary-conflict-fix-words: finish line lacks '$_want_cf' (out: $OUT)"
+grep -qF 'conflict fixed 1, conflict fix gave up 1' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: buckets missing"
+grep -qF 'failed 0' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: failed is not 0"
+end_case "outcome-summary-conflict-fix-words"
 
 # --- summary --------------------------------------------------------------------------------
 h_done

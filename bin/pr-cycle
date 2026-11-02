@@ -103,6 +103,10 @@
 #                            1 (default) routes a fix-eligible repeat-hold skip to
 #                            post-plan-fleet --holdrepeat-fix-prs=; 0 keeps the plain skip.
 #                            Unset and empty both mean 1.
+#   PR_CYCLE_CONFLICT_AUTOFIX
+#                            1 (default) lets post-plan-fleet run one bin/postplan-fix --headless
+#                            per (PR, head SHA) on a rebase conflict and re-fire post-plan; 0 keeps
+#                            today's conflict stop. Unset and empty both mean 1.
 #   PR_CYCLE_RESULT_FILE     Unset or empty writes nothing. Otherwise the worker atomically
 #                            writes the `# pr-cycle-result v1` TSV (one `<pr> <status> <outcome>
 #                            <reason>` row per in-scope PR) when it finishes, even after a HALT.
@@ -200,6 +204,7 @@ PR_CYCLE_REBASE_ONLY_HELD="${PR_CYCLE_REBASE_ONLY_HELD:-1}"
 PR_CYCLE_HOLDREPEAT_HARNESS="${PR_CYCLE_HOLDREPEAT_HARNESS:-$PR_CYCLE_MAIN_CHECKOUT/tools/postplan-harness}"
 PR_CYCLE_HOLDREPEAT_STATE_DIR="${PR_CYCLE_HOLDREPEAT_STATE_DIR:-$PR_CYCLE_HOLDREPEAT_HARNESS/out/state}"
 PR_CYCLE_HOLDREPEAT_AUTOFIX="${PR_CYCLE_HOLDREPEAT_AUTOFIX:-1}"
+PR_CYCLE_CONFLICT_AUTOFIX="${PR_CYCLE_CONFLICT_AUTOFIX:-1}"
 # Forwarded to the launchd worker so `harness.heldmarker check` can find the plan under a test
 # plans dir. Unset and empty both mean the default (~/claude-plans); the eval forward needs a value.
 PLANS_DIR="${PLANS_DIR:-}"
@@ -1220,7 +1225,7 @@ _fleet_outcome() {
     _fo_r=$(grep -m1 '^post-plan-fleet: reason=' "$_fo_log" 2>/dev/null \
         | sed 's/^post-plan-fleet: reason=//' || true)
     case "$_fo_o" in
-        shipped|held|rebased|declined|paused|conflict|failed|timed-out) ;;
+        shipped|held|rebased|declined|paused|conflict|conflict-fixed|conflict-fix-gave-up|failed|timed-out) ;;
         *) _fo_o=failed ;;   # legacy `blocked`, a missing line, or an unknown word
     esac
     printf '%s\t%s\n' "$_fo_o" "$_fo_r"
@@ -1244,13 +1249,26 @@ _stage1_skip_count() {
         "$RUNDIR/fleet-skips.tsv" "$RUNDIR/stage1.txt"
 }
 
+# _conflict_fix_csv — csv of the Stage-1 PRs handed to post-plan-fleet --conflict-fix-prs=:
+# every Stage-1 PR except those routed to the holdrepeat fix. Empty when
+# PR_CYCLE_CONFLICT_AUTOFIX is the literal 0. The -s branch matters: grep -f on a missing
+# file errors, and the || true would silently empty the list and turn the route off.
+_conflict_fix_csv() {
+    [ "${PR_CYCLE_CONFLICT_AUTOFIX:-1}" != 0 ] || return 0
+    if [ -s "$RUNDIR/stage1-holdrepeat-fix.txt" ]; then
+        grep -vxFf "$RUNDIR/stage1-holdrepeat-fix.txt" "$RUNDIR/stage1.txt" | paste -sd, - || true
+    else
+        paste -sd, - < "$RUNDIR/stage1.txt"
+    fi
+}
+
 # _stage1_outcome_summary — read per-PR outcome lines from post-plan-fleet logs and
 # return a summary, e.g. "shipped 1, held 2, rebased 0, declined 0, paused 0, conflict 1,
-# failed 3, timed out 1". A PR with no outcome line counts as failed.
+# conflict fixed 0, conflict fix gave up 0, failed 3, timed out 1". A PR with no outcome line counts as failed.
 # Reads $PR_CYCLE_FLEET_LOG_DIR/post-plan-fleet-<PR>.log.
 _stage1_outcome_summary() {
     [ -s "$RUNDIR/stage1.txt" ] || return 0
-    local _s_shipped=0 _s_held=0 _s_rebased=0 _s_declined=0 _s_paused=0 _s_conflict=0 _s_failed=0 _s_timed=0
+    local _s_shipped=0 _s_held=0 _s_rebased=0 _s_declined=0 _s_paused=0 _s_conflict=0 _s_cfixed=0 _s_cgaveup=0 _s_failed=0 _s_timed=0
     local _s_pr _s_outcome _s_reason
     while IFS= read -r _s_pr; do
         IFS=$'\t' read -r _s_outcome _s_reason <<< "$(_stage1_outcome "$_s_pr")"
@@ -1261,13 +1279,15 @@ _stage1_outcome_summary() {
             declined)  _s_declined=$(( _s_declined + 1 )) ;;
             paused)    _s_paused=$(( _s_paused + 1 )) ;;
             conflict)  _s_conflict=$(( _s_conflict + 1 )) ;;
+            conflict-fixed)        _s_cfixed=$(( _s_cfixed + 1 )) ;;
+            conflict-fix-gave-up)  _s_cgaveup=$(( _s_cgaveup + 1 )) ;;
             timed-out) _s_timed=$(( _s_timed + 1 )) ;;
             skipped)   continue ;;
             *)         _s_failed=$(( _s_failed + 1 )) ;;
         esac
     done < "$RUNDIR/stage1.txt"
-    printf 'shipped %d, held %d, rebased %d, declined %d, paused %d, conflict %d, failed %d, timed out %d' \
-        "$_s_shipped" "$_s_held" "$_s_rebased" "$_s_declined" "$_s_paused" "$_s_conflict" "$_s_failed" "$_s_timed"
+    printf 'shipped %d, held %d, rebased %d, declined %d, paused %d, conflict %d, conflict fixed %d, conflict fix gave up %d, failed %d, timed out %d' \
+        "$_s_shipped" "$_s_held" "$_s_rebased" "$_s_declined" "$_s_paused" "$_s_conflict" "$_s_cfixed" "$_s_cgaveup" "$_s_failed" "$_s_timed"
 }
 
 # _stage1_result_lines — one "#N <outcome>[ <reason>]" line per fired PR, then one
@@ -1359,11 +1379,12 @@ _stage1_fire() {
     _sc_csv="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-state-changed.txt" 2>/dev/null | paste -sd, - || true)"
     _ro_csv="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-rebase-only.txt" 2>/dev/null | paste -sd, - || true)"
     _hf_csv="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-holdrepeat-fix.txt" 2>/dev/null | paste -sd, - || true)"
+    _cf_csv="$(_conflict_fix_csv)"
     set +e
     # pr-cycle's own auth probe already passed — bypass the duplicate probe in post-plan-fleet.
     STAGE1_FIRED=1
     env POST_PLAN_FLEET_AUTH_PROBE_CMD=true \
-        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait --allow-test-only ${_sc_csv:+"--state-changed-prs=$_sc_csv"} ${_ro_csv:+"--rebase-only-prs=$_ro_csv"} ${_hf_csv:+"--holdrepeat-fix-prs=$_hf_csv"} \
+        "$PR_CYCLE_READY_CMD" --pr-list "$_csv" --jobs "$JOBS" --go --wait --allow-test-only ${_sc_csv:+"--state-changed-prs=$_sc_csv"} ${_ro_csv:+"--rebase-only-prs=$_ro_csv"} ${_hf_csv:+"--holdrepeat-fix-prs=$_hf_csv"} ${_cf_csv:+"--conflict-fix-prs=$_cf_csv"} \
         > "$RUNDIR/ready.out" 2> "$RUNDIR/ready.err"
     _rc=$?
     set -e
@@ -1738,7 +1759,8 @@ _report_dry_run() {
         _s1_sc="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-state-changed.txt" 2>/dev/null | paste -sd, - || true)"
         _s1_ro="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-rebase-only.txt" 2>/dev/null | paste -sd, - || true)"
         _s1_hf="$(grep -xFf "$RUNDIR/stage1.txt" "$RUNDIR/stage1-holdrepeat-fix.txt" 2>/dev/null | paste -sd, - || true)"
-        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait --allow-test-only${_s1_sc:+ --state-changed-prs=$_s1_sc}${_s1_ro:+ --rebase-only-prs=$_s1_ro}${_s1_hf:+ --holdrepeat-fix-prs=$_s1_hf}"
+        _s1_cf="$(_conflict_fix_csv)"
+        echo "would run: post-plan-fleet --pr-list $_s1_csv --jobs $JOBS --go --wait --allow-test-only${_s1_sc:+ --state-changed-prs=$_s1_sc}${_s1_ro:+ --rebase-only-prs=$_s1_ro}${_s1_hf:+ --holdrepeat-fix-prs=$_s1_hf}${_s1_cf:+ --conflict-fix-prs=$_s1_cf}"
     fi
     if [ "$PR_CYCLE_RESCUE" = "0" ]; then
         echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
@@ -1804,7 +1826,7 @@ _launch() {
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_RESCUE PR_CYCLE_DIRTY_RESERVE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_SKIP_HELD_UNCHANGED PR_CYCLE_REBASE_ONLY_HELD PR_CYCLE_HARNESS_OUT PR_CYCLE_FLEET_LOG_DIR \
-                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR PR_CYCLE_HOLDREPEAT_AUTOFIX PLANS_DIR \
+                  PR_CYCLE_HOLDREPEAT_HARNESS PR_CYCLE_HOLDREPEAT_STATE_DIR PR_CYCLE_HOLDREPEAT_AUTOFIX PR_CYCLE_CONFLICT_AUTOFIX PLANS_DIR \
                   PR_CYCLE_AUTH_PROBE_CMD PR_CYCLE_PATCH_ID_CMD \
                   PR_CYCLE_STOP_FILE PR_CYCLE_RESULT_FILE PR_CYCLE_SKIP_NOTES; do
             eval "_val=\${$_v}"

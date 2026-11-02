@@ -241,7 +241,10 @@ class LiveGit:
                                timeout=EMERGENCY_GIT_TIMEOUT, errors="replace")
         except HarnessError as e:
             if e.kind == SUBPROCESS_TIMEOUT:
-                self._clear_stale_index_lock()
+                try:
+                    self._clear_stale_index_lock()
+                except Exception:  # signal handler: never raise (e.g. PermissionError)
+                    pass
             return None
         except Exception:  # signal handler: never raise (e.g. OSError)
             return None

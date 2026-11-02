@@ -166,9 +166,13 @@ The three tiers:
   copy, so writing the plan is mechanical composition.
 
 Decide xhigh with one open question. Is Opus likely to get this plan
-wrong, and would a wrong plan be expensive? Expensive means hard to notice
-before merge, hard to undo after merge, or harmful to league data,
-credentials, or access control. Answer xhigh only when both halves hold.
+wrong, and would a wrong plan be expensive? A plan is wrong when it does
+what the task literally asks but misses what the change exposes or breaks.
+A short task statement does not make that miss unlikely. Expensive means
+hard to notice before merge, hard to undo after merge, or harmful to league
+data, credentials, or access control. When a wrong plan could cause that
+harm and the task states no mitigation, a miss is likely enough to count.
+Answer xhigh only when both halves hold.
 
 Weigh the task as a whole. Security, authorization, and destructive data
 changes are good reasons to consider xhigh. None of them decides the tier

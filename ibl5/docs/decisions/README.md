@@ -92,6 +92,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0219](0219-default-branch-resolver.md) | One shared resolver for the remote default branch name | Accepted | `bin/lib/default-branch` resolves the default branch offline from `origin/HEAD`, then `main`, then `master`; bash sources it, Python and PHP exec it, with no env override, and a caller fails closed on nonzero exit. |
 | [0221](0221-runner-opus-judge-for-manual-rows.md) | A runner-side Opus judge for Truly-manual rows | Accepted | `manual_judge: opus` lets a Sonnet impl run carry Truly-manual rows; `bin/automouse/run` then spawns a read-only `claude-opus-5-5` judge that rules on `opus-judge:` rows and holds the plan to `skipped/` on any non-pass outcome. |
 | [0223](0223-hotfix-merge-lane.md) | A hotfix lane at the front of the merge line | Accepted | A `hotfix`-labeled armed PR sorts first in `bin/merge-line-select`, and `.github/workflows/hotfix-dispatch.yml` starts an `update-behind-prs.yml` pass when an armed PR carries the label; gates and the armed filter are unchanged. |
+| [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
 
 ## When an ADR is Required
 

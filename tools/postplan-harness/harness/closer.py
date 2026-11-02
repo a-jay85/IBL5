@@ -50,10 +50,11 @@ def should_run(*, terminal: str, error_kind: str | None, blocked_numbers,
         return True, "rebase-conflict"
     if error_kind:
         return False, f"error:{error_kind}"
-    if ci_red:
-        return True, "ci-red"
+    # Armed first: a closer push to an armed PR would auto-merge unreviewed once CI is green.
     if terminal == "armed":
         return False, "armed"
+    if ci_red:
+        return True, "ci-red"
     blocked = set(blocked_numbers or ())
     hit = blocked & HEURISTIC_CONDITIONS
     if hit:

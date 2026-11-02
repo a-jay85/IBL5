@@ -1532,6 +1532,12 @@ c_wt() {
     printf 'CLOSED\t9\t%s\n' "${3:-$tip}" > "$CD/gh/by-head/$1.json"
 }
 
+fx CL0-cleanup-skip-literal
+# The closed step finds candidates by this literal in the real bin/cleanup.
+CL0_N="$(grep -c 'PR closed but remote gone' "$SCRIPT_DIR/cleanup")"
+[ "${CL0_N:-0}" -ge 1 ] || note_err "bin/cleanup no longer prints 'PR closed but remote gone'"
+finish_case
+
 fx CL1-closed-reaped
 c_wt cl1 none
 epoch_ago 10 > "$CD/gh/9.json"

@@ -278,6 +278,7 @@ final class SmokeProdCliTest extends TestCase
 
     public function testMalformedStatusFieldFallsBackToHttp000(): void
     {
+        // Mutation guard: loosening the status regex ^[0-9]{3}$ to ^[0-9a-z]{3}$ lets `20x` through and turns this red.
         $result = $this->runSmoke(scope: 'ibl5', extraEnv: $this->curlShimEnv('20x 0.10', 0));
 
         self::assertSame(1, $result['exit'], "Output: {$result['output']}");
@@ -368,6 +369,7 @@ final class SmokeProdCliTest extends TestCase
 
     public function testEmptyMaxSecondsFallsBackToDefault(): void
     {
+        // Mutation guard: ${SMOKE_MAX_SECONDS:-8} becoming ${SMOKE_MAX_SECONDS-8} makes the empty value exit 2 and turns this red.
         $result = $this->runSmoke(
             scope: 'ibl5',
             extraEnv: ['SMOKE_MAX_SECONDS' => ''] + $this->curlShimEnv('200 7.90', 0),

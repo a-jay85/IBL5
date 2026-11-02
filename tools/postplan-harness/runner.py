@@ -2550,17 +2550,30 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
             rec["status"] = "push-failed"
     replies = _closer_post_replies(gh, log, pr, co) if rec["status"] != "push-failed" else 0
     rec["replies_posted"] = replies
-    cur_tree = git.head_tree()
+    try:
+        cur_tree = git.head_tree()
+    except Exception as e:  # noqa: BLE001 - unknown tree: defer the re-check, keep the decision
+        log(f"closer: head tree read failed ({e!r}); arming re-check deferred")
+        cur_tree = None
     if not live and (fixture or {}).get("current_tree"):
         cur_tree = fixture["current_tree"]
     if rec["status"] in ("edited", "no-change") and cur_tree != inputs.current_tree:
         rec["recheck"] = "deferred-tree-moved"
         log("closer: tree moved; arming re-check deferred to the next run")
     elif rec["status"] in ("edited", "no-change"):
-        decision = _rearm_after_closer(git, gh, llm, log, res, state, inputs, decision,
-                                       outcome, pr=pr, live=live, cur_tree=cur_tree,
-                                       post_sticky=post_sticky)
-        rec["recheck"] = "armed" if decision.armed else "held"
+        prior = decision
+        try:
+            decision = _rearm_after_closer(git, gh, llm, log, res, state, inputs, decision,
+                                           outcome, pr=pr, live=live, cur_tree=cur_tree,
+                                           post_sticky=post_sticky)
+            rec["recheck"] = "armed" if decision.armed else "held"
+        except Exception as e:  # noqa: BLE001 - keep the original decision; never change the exit code
+            if isinstance(e, HarnessError) and e.kind == "remote-head-diverged":
+                raise
+            decision = prior
+            res.arm = prior
+            rec["recheck"] = "error"
+            log(f"closer re-check failed ({e!r}); keeping the original arming decision")
     _closer_note(out_dir, f"closer: {rec['status']} verdict={co.verdict} "
                           f"recheck={rec['recheck']}\n\n{note}")
     if callable(post_sticky) and rec["recheck"] != "armed":

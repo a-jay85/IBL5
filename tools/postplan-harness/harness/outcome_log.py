@@ -12,6 +12,8 @@ import os
 import subprocess
 import sys
 
+from .labels import REVIEW_AGENTS
+
 SCHEMA_VERSION = 1
 LOG_BASENAME = "review-outcomes.jsonl"
 ENV_OVERRIDE = "IBL_REVIEW_OUTCOMES_LOG"
@@ -269,7 +271,7 @@ def _cli_sweep(flags, log) -> None:
 
 
 _REPORT_KEYS = ("total",) + OUTCOMES + ("wrong_or_didnt_matter_share",)
-_REPORT_HEADER = "agent  total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
+_REPORT_HEADER = "agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
 
 
 def _parse_report_flags(args):
@@ -329,12 +331,17 @@ def format_report(report) -> str:
     def line(name, row):
         share = row["wrong_or_didnt_matter_share"]
         pct = "-" if share is None else f"{share * 100:.1f}"
-        return (f"{name:<7}{row['total']:>5}  {row['fixed']:>5}  {row['declined-wrong']:>5}  "
+        return (f"{name:<9}{row['total']:>5}  {row['fixed']:>5}  {row['declined-wrong']:>5}  "
                 f"{row['intentional']:>12}  {row['didnt-matter']:>12}  {pct:>9}")
 
-    names = sorted(report["agents"], key=lambda a: (a == "unknown", a))
+    agents = dict(report["agents"])
+    for a in REVIEW_AGENTS:
+        agents.setdefault(a, _agent_row({}))
+    live = list(REVIEW_AGENTS)
+    legacy = sorted(a for a in agents if a not in REVIEW_AGENTS and a != "unknown")
+    names = live + legacy + (["unknown"] if "unknown" in agents else [])
     lines = [_REPORT_HEADER]
-    lines += [line(a, report["agents"][a]) for a in names]
+    lines += [line(a, agents[a]) for a in names]
     lines.append(line("TOTAL", report["total"]))
     return "\n".join(lines)
 
@@ -350,6 +357,11 @@ def _cli_report(flags) -> int:
         print(json.dumps(report, sort_keys=True))
     else:
         print(format_report(report))
+    unknown = report["agents"].get("unknown")
+    if unknown:
+        print(f'note: {unknown["total"]} outcome(s) under "unknown" were logged before harness '
+              "review comments carried an agent marker; their agent cannot be recovered "
+              "from the comment or the cache.", file=sys.stderr)
     return 0
 
 

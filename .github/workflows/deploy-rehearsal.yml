@@ -34,7 +34,12 @@ on:
       - '.github/workflows/deploy-rehearsal.yml'
       - '.github/workflows/main.yml'
   workflow_call: {}
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      simulate_clone_connection_failure:
+        description: 'Dry run: fake an ERROR 1203 from the prod dump so the real classifier routes to the cached-dump fallback. Skips no check.'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -124,6 +129,8 @@ jobs:
       # See ADR-0059. Prod MySQL is not reachable from the runner, so we dump
       # server-side over SSH (the db-backup.yml pattern), reusing the deploy key — no
       # new secrets.
+      # Connection-class clone failures fall back to the encrypted cached dump
+      # (bin/rehearsal-clone-fallback); see ADR-0224.
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
         with:
@@ -133,15 +140,96 @@ jobs:
           username: ${{ secrets.USERNAME }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Clone filtered production data into CI MariaDB
+      - name: Dump filtered production data over SSH (classified on failure)
+        id: dump
+        env:
+          SIMULATE_CONN_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_clone_connection_failure }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           # Stream the committed, shellcheck-verified dump script to prod via `bash -s`.
           # Server-side socket auth; read-only (mariadb-dump --single-transaction only).
           # Season-sampling tradeoff + blind spot documented in ADR-0059.
-          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "REMOTE_DATABASE='iblhoops_ibl5' bash -s" < bin/rehearsal-prod-dump > prod-clone.sql
+          echo "clone_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+          echo "cache_day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          rc=0
+          if [ "${SIMULATE_CONN_FAILURE:-false}" = "true" ]; then
+            echo "dry run: simulating a connection-class dump failure; the real classifier still decides" >&2
+            echo "ERROR 1203 (42000): User rehearsal_dry_run already has more than 'max_user_connections' active connections" > dump-stderr.txt
+            : > prod-clone.sql
+            rc=1
+          else
+            ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+              ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+              "REMOTE_DATABASE='iblhoops_ibl5' bash -s" < bin/rehearsal-prod-dump \
+              > prod-clone.sql 2> dump-stderr.txt || rc=$?
+          fi
+          cat dump-stderr.txt >&2
+          if [ "$rc" -eq 0 ]; then
+            echo "source=fresh" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Only the REMOTE dump's stderr is classified. A local mysql failure in the
+          # load step below never reaches this classifier (ADR-0224).
+          if verdict="$(bin/rehearsal-clone-fallback classify dump-stderr.txt)"; then
+            echo "$verdict"
+            rm -f prod-clone.sql   # discard any partial dump from a mid-dump 2013
+            echo "source=fallback-needed" >> "$GITHUB_OUTPUT"
+            echo "fallback_code=${verdict#fallback: }" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$verdict"
+          echo "::error::prod clone failed (exit $rc) without a connection-class MySQL error; no fallback"
+          exit "$rc"
+
+      - name: Restore cached prod dump (connection-class fallback)
+        id: restore
+        if: steps.dump.outputs.source == 'fallback-needed'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: rehearsal-dump-cache
+          # Never saved, so it never matches exactly; the prefix takes the newest entry.
+          key: rehearsal-prod-dump-v1-${{ steps.dump.outputs.cache_day }}-restore-probe
+          restore-keys: rehearsal-prod-dump-v1-
+
+      - name: Decrypt + age-check cached prod dump
+        id: fallback
+        if: steps.dump.outputs.source == 'fallback-needed'
+        env:
+          REHEARSAL_KEY_SOURCE: ${{ secrets.PRIVATE_KEY }}
+          MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+          FALLBACK_CODE: ${{ steps.dump.outputs.fallback_code }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MATCHED_KEY" ]; then
+            echo "::error::prod clone hit MySQL $FALLBACK_CODE and no cached dump exists; failing as before"
+            exit 1
+          fi
+          if ! age_out="$(bin/rehearsal-clone-fallback check-age rehearsal-dump-cache/meta.txt)"; then
+            echo "$age_out"
+            echo "::error::cached dump $MATCHED_KEY is older than 7 days or has bad metadata; failing as before"
+            exit 1
+          fi
+          bin/rehearsal-clone-fallback decrypt rehearsal-dump-cache/prod-clone.sql.enc prod-clone.sql.gz
+          gunzip -c prod-clone.sql.gz > prod-clone.sql
+          rm -f prod-clone.sql.gz
+          age_hours="$(sed -n 's/^age_hours=//p' <<< "$age_out")"
+          src_url="$(sed -n 's/^source_run_url=//p' <<< "$age_out")"
+          src_sha="$(sed -n 's/^source_sha=//p' <<< "$age_out")"
+          echo "::warning title=Rehearsal used cached prod dump::Prod clone failed with MySQL $FALLBACK_CODE. Rehearsing against the cached dump cloned ${age_hours}h ago by $src_url (sha $src_sha). Every downstream check still runs."
+          {
+            echo "### Deploy rehearsal used the cached prod dump"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| Clone failure | MySQL $FALLBACK_CODE |"
+            echo "| Dump age | ${age_hours}h (limit 168h) |"
+            echo "| Source run | $src_url |"
+            echo "| Source SHA | $src_sha |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Load prod clone into CI MariaDB
+        run: |
+          set -euo pipefail
           {
             echo "SET FOREIGN_KEY_CHECKS=0;"
             sed 's/DEFINER=`[^`]*`@`[^`]*`//g' prod-clone.sql
@@ -168,6 +256,34 @@ jobs:
           # Log the pending set for the run record (may legitimately be empty when a PR
           # touches bin/migrate or composer without adding a migration).
           php ibl5/bin/migrate --status
+
+      # Fallback cache: saved only from a fresh clone that just passed the bound check,
+      # never from a fallback restore (that would reset the age clock), never on a PR.
+      # On any failure the trap wipes the staging dir, so the upload step below can
+      # never cache a plaintext dump.
+      - name: Save encrypted prod dump for connection-class fallback
+        if: steps.dump.outputs.source == 'fresh' && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          REHEARSAL_KEY_SOURCE: ${{ secrets.PRIVATE_KEY }}
+          CLONE_EPOCH: ${{ steps.dump.outputs.clone_epoch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          trap '[ $? -eq 0 ] || rm -rf rehearsal-dump-cache' EXIT
+          mkdir -p rehearsal-dump-cache
+          gzip -c prod-clone.sql > rehearsal-dump-cache/prod-clone.sql.gz
+          bin/rehearsal-clone-fallback encrypt rehearsal-dump-cache/prod-clone.sql.gz rehearsal-dump-cache/prod-clone.sql.enc
+          rm -f rehearsal-dump-cache/prod-clone.sql.gz
+          bin/rehearsal-clone-fallback write-meta rehearsal-dump-cache/meta.txt "$CLONE_EPOCH" "$RUN_URL" "$GITHUB_SHA"
+
+      - name: Upload encrypted prod dump to the Actions cache
+        if: steps.dump.outputs.source == 'fresh' && github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: rehearsal-dump-cache
+          key: rehearsal-prod-dump-v1-${{ steps.dump.outputs.cache_day }}
 
       # Mirror main.yml "Run database migrations" exactly
       - name: php bin/migrate (mirrors main.yml)

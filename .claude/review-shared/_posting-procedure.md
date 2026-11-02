@@ -1,6 +1,6 @@
 ---
 description: Shared posting procedure — re-check eligibility, the never-hand-write rule, dispositioning open threads, remediating trusted threads, and link format rules — used by /pr-review and /security-audit.
-last_verified: 2026-10-25
+last_verified: 2026-11-01
 ---
 
 # Review Posting Procedure (shared)
@@ -54,7 +54,7 @@ A run that posts findings also inherits the threads already open on the PR. `lis
 
 The compiled harness's Phase 4.5 pass also lists outdated trusted threads (`list_trusted_open_threads "$PR_NUMBER" --include-outdated`) and fixes or declines at most 12 of them per run, oldest first, with `already-fixed` as the usual decline; the skill path and Phase 4.5b keep the live-hunk rule.
 
-Each verdict line also carries a `category` for a DECLINE: `wrong`, `intentional`, `already-fixed` or `not-worth-it`. A FIX ignores it. Each resolved thread's outcome is appended to the main checkout's `tools/postplan-harness/out/state/review-outcomes.jsonl`. A deterministic sweep also logs findings that went outdated or were resolved without a reply. A logging failure never fails the run. Each event also records `origin`, `pre-existing` or `same-run`. `bin/review-outcomes report` does not group by it yet.
+Each verdict line also carries a `category` for a DECLINE: `wrong`, `intentional`, `already-fixed` or `not-worth-it`. A FIX ignores it. Each resolved thread's outcome is appended to the main checkout's `tools/postplan-harness/out/state/review-outcomes.jsonl`. A deterministic sweep also logs findings that went outdated or were resolved without a reply. A logging failure never fails the run. Each event also records `origin`, `pre-existing` or `same-run`. `bin/review-outcomes report` does not group by it yet. The event's `agent` is read from the `<!-- agent: X -->` marker on the thread's first comment. A comment without the marker logs `unknown`.
 
 "Pre-existing" in this heading means a thread posted before the current run. It is unrelated to the `Pre-existing` severity label; labeled Nit and Pre-existing threads are excluded from remediation (`fetch_trusted_threads` in the harness and the 4.5 work list in the skill skip them).
 

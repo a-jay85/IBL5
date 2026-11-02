@@ -30,10 +30,11 @@
 #   Pre-flight tier gate (all dispositions): compares the declared tier in the prompt
 #   against bin/plan-tier-hint. Exits 4 when the declared and hinted tiers differ AND
 #   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
-#   The hint is fed the prompt's /plan task statement line only — the whole file
-#   false-positives on security words sitting inside negations. Gate skips silently
-#   when: the hint is not executable, no `MUST route to` directive, the hint exits
-#   non-zero, or it returns an unknown value.
+#   The hint is one Opus 5.5 judge call (bin/plan-tier-hint) fed the prompt's /plan
+#   task statement line only, so directive and negation lines never reach the judge.
+#   The hint prints xhigh on any judge failure, so a broken judge raises this gate
+#   instead of skipping it. Gate skips silently when: the hint is not executable, no
+#   `MUST route to` directive, the hint exits non-zero, or it returns an unknown value.
 #   Exit codes: 0 ok, 1 internal error, 2 bad flag, missing file, or a --resume that
 #   was refused, 3 declined by dup gate, 4 declined by tier gate.
 # ---

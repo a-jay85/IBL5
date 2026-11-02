@@ -1022,6 +1022,16 @@ def test_regen_rung_takes_master_png_via_glob(tmp_path, key):
     assert f"{_VR_PNG}: master copy only ({_VR_WHY})" in attempt.note
 
 
+def test_ladder_accepts_master_png_via_regen_rung(tmp_path, key):
+    # Runs the whole ladder so post_rung_guard's _is_master_bytes exemption sees master's bytes.
+    d, pre, master = _png_repo(tmp_path, _VR_PNG)
+    ctx = _ctx(d, key, pre, master, (_VR_PNG,), lambda: (True, "TREE-EQUIVALENT\n"),
+               stage_sets={_VR_PNG: frozenset({1, 2, 3})})
+    out = run_ladder(ctx, "", (make_regen_rung(),))
+    assert out.rung == "regen"
+    assert (Path(d) / _VR_PNG).read_bytes() == _PNG_MASTER
+
+
 @pytest.mark.parametrize("stages", [frozenset({1, 2}), frozenset({1, 3}), None])
 def test_regen_rung_skips_vr_png_unless_both_modified(tmp_path, key, stages):
     # Modify/delete ({1,2} or {1,3}) went to the resolver on purpose; no stage set means

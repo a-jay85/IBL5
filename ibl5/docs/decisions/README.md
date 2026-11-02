@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-10-28
+last_verified: 2026-11-02
 ---
 
 # IBL5 Architecture Decision Records
@@ -91,6 +91,8 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0214](0214-vr-update-baselines-targeted-rewrite.md) | Targeted update-baselines rewrite from the in-job strict pass | Accepted | The label run rebuilds the gallery against branch HEAD and `bin/vr-apply-baselines` commits only the changed and new cells' renders; flake cells and unflagged baselines stay untouched. |
 | [0219](0219-default-branch-resolver.md) | One shared resolver for the remote default branch name | Accepted | `bin/lib/default-branch` resolves the default branch offline from `origin/HEAD`, then `main`, then `master`; bash sources it, Python and PHP exec it, with no env override, and a caller fails closed on nonzero exit. |
 | [0221](0221-runner-opus-judge-for-manual-rows.md) | A runner-side Opus judge for Truly-manual rows | Accepted | `manual_judge: opus` lets a Sonnet impl run carry Truly-manual rows; `bin/automouse/run` then spawns a read-only `claude-opus-5-5` judge that rules on `opus-judge:` rows and holds the plan to `skipped/` on any non-pass outcome. |
+| [0222](0222-plan-tier-hint-opus-judge.md) | Opus 5.5 judge for bin/plan-tier-hint | Accepted | `bin/plan-tier-hint` makes one `claude-opus-5-5` call that reads /plan Step 3's check list and prints `xhigh` on any failure; it supersedes ADR-0122's regex word lists. |
+| [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
 
 ## When an ADR is Required
 

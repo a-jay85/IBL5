@@ -3197,6 +3197,7 @@ fi
 
 # settle-conflict-fix-gave-up-holds: a conflict-fix that gave up leaves the conflict unresolved,
 # so it records the conflict hold and an attempt, and spends no strike.
+if should_run "settle-conflict-fix-gave-up-holds"; then
 reset; begin_case
 set_prs '101|branch-one|aaa1111|DIRTY|false'
 set_tip e0001
@@ -3208,8 +3209,10 @@ run_tick
 no_file "$STATE_DIR/strikes/101" || fail "settle-conflict-fix-gave-up-holds: gave-up earned a strike: $(strikes 101)"
 out_has 'rescue ran (conflict-fix-gave-up)' || fail "settle-conflict-fix-gave-up-holds: no 'rescue ran' log line: $OUT"
 end_case settle-conflict-fix-gave-up-holds
+fi
 
 # settle-conflict-fixed-records-attempt: a fixed conflict clears any hold and records an attempt.
+if should_run "settle-conflict-fixed-records-attempt"; then
 reset; begin_case
 mkdir -p "$STATE_DIR/conflict-hold"; key_of e0009 > "$STATE_DIR/conflict-hold/101"
 set_prs '101|branch-one|aaa1111|DIRTY|false'
@@ -3221,9 +3224,11 @@ run_tick
 no_file "$STATE_DIR/strikes/101" || fail "settle-conflict-fixed-records-attempt: fixed earned a strike: $(strikes 101)"
 out_has 'rescue ran (conflict-fixed)' || fail "settle-conflict-fixed-records-attempt: no 'rescue ran' log line: $OUT"
 end_case settle-conflict-fixed-records-attempt
+fi
 
 # retry-cap-dm-names-conflict-fix: with a recorded bot conflict fix on this head the cap DM says so,
 # and keeps the paste line. The twin run without the seed has no such sentence.
+if should_run "retry-cap-dm-names-conflict-fix"; then
 reset; begin_case
 set_prs "$RED101"; set_checks aaa1111 red
 mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"
@@ -3242,6 +3247,7 @@ grep -qF 'Or paste this to have Claude fix it:' "$SCRATCH/dm.log" 2>/dev/null \
 grep -qF 'already ran on head' "$SCRATCH/dm.log" 2>/dev/null \
     && fail "retry-cap-dm-names-conflict-fix: twin run without the seed names a conflict fix"
 end_case retry-cap-dm-names-conflict-fix
+fi
 
 # --- summary -------------------------------------------------------------------------------
 check_only_cases

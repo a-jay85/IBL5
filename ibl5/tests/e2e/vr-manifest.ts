@@ -67,6 +67,8 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.totals-row', viewports: ['desktop', 'mobile'] },
   { name: 'draft-history', auth: 'public', url: 'modules.php?name=DraftInfo&tab=history',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
+  { name: 'draft-history-my-team-anon', auth: 'public', url: 'modules.php?name=DraftInfo&tab=history&view=team',
+    anchor: '.ibl-tab-card', viewports: ['desktop', 'mobile'] },
   { name: 'draft-pick-locator', auth: 'public', url: 'modules.php?name=DraftInfo&tab=picks',
     anchor: '.draft-pick-locator-container', viewports: ['desktop', 'mobile'] },
   { name: 'franchise-history', auth: 'public', url: 'modules.php?name=FranchiseHistory&teamid=1',

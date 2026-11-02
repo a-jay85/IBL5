@@ -99,7 +99,7 @@ class HistorySubTabStateTest extends TestCase
     {
         $result = HistorySubTabState::resolveViewerTeamId(
             'someone',
-            static fn (string $u): ?string => League::FREE_AGENTS_TEAM_NAME,
+            static fn (string $u): ?string => $u === 'someone' ? League::FREE_AGENTS_TEAM_NAME : null,
             static function (string $name): never {
                 self::fail('tid lookup must not run for Free Agents');
             }
@@ -112,8 +112,8 @@ class HistorySubTabStateTest extends TestCase
     {
         $result = HistorySubTabState::resolveViewerTeamId(
             'someone',
-            static fn (string $u): ?string => 'Bulls',
-            static fn (string $name): ?int => 0
+            static fn (string $u): ?string => $u === 'someone' ? 'Bulls' : null,
+            static fn (string $name): ?int => $name === 'Bulls' ? 0 : null
         );
 
         $this->assertNull($result);
@@ -123,8 +123,8 @@ class HistorySubTabStateTest extends TestCase
     {
         $result = HistorySubTabState::resolveViewerTeamId(
             'someone',
-            static fn (string $u): ?string => 'Bulls',
-            static fn (string $name): ?int => 5
+            static fn (string $u): ?string => $u === 'someone' ? 'Bulls' : null,
+            static fn (string $name): ?int => $name === 'Bulls' ? 5 : null
         );
 
         $this->assertSame(5, $result);

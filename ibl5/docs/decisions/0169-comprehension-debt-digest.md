@@ -9,7 +9,7 @@ last_verified: 2026-11-01
 **Date:** 2026-10-03
 **Deciders:** ajaynicolas
 
-**Amended 2026-11-01 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly comprehension digest", which fires Sundays at 09:05 local time. The task runs `bin/automouse/comprehension-digest` unchanged. The `com.ibl5.automouse-comprehension-digest` launchd job is unloaded and removed from `bin/lib/launchd-expected-jobs.sh`. `bin/automouse/comprehension-digest-cron-setup` still exists, but it is no longer the live trigger. The task runs without `--at-reset`. 09:05 Pacific lands after the 16:00 UTC usage reset in both PST and PDT.
+**Amended 2026-11-01 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly comprehension digest", which fires Sundays at 09:05 local time. The task runs `bin/automouse/comprehension-digest` unchanged. The `com.ibl5.automouse-comprehension-digest` launchd job is unloaded and moved from the expected list to the exempt list in `bin/lib/launchd-expected-jobs.sh`. `bin/automouse/comprehension-digest-cron-setup` still exists, but it is no longer the live trigger. The task runs without `--at-reset`. 09:05 Pacific lands after the 16:00 UTC usage reset in both PST and PDT.
 
 ## Context
 

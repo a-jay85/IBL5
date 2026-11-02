@@ -8,7 +8,7 @@ last_verified: 2026-11-01
 **Status:** Accepted
 **Date:** 2026-10-20
 
-**Amended 2026-11-01 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly finding-class scan", which fires Sundays at 09:15 local time. The task runs `bin/finding-class-scan` unchanged. The `com.ibl5.finding-class-scan` launchd job is unloaded and removed from `bin/lib/launchd-expected-jobs.sh`. `--install-schedule` and `--uninstall-schedule` still exist, but they are no longer the live trigger.
+**Amended 2026-11-01 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly finding-class scan", which fires Sundays at 09:15 local time. The task runs `bin/finding-class-scan` unchanged. The `com.ibl5.finding-class-scan` launchd job is unloaded and moved from the expected list to the exempt list in `bin/lib/launchd-expected-jobs.sh`. `--install-schedule` and `--uninstall-schedule` still exist, but they are no longer the live trigger.
 
 ## Context
 

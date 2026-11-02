@@ -1117,7 +1117,7 @@ run_dm_driver() {
         POST_PLAN_FLEET_GH="${POST_PLAN_FLEET_GH:-$SCRATCH/.local/bin/gh-fail}" \
         POST_PLAN_FLEET_GH_USER=a-jay85 \
         POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." \
-        POST_PLAN_FLEET_WTL="$WTL_FIXTURE" \
+        POST_PLAN_FLEET_WTL="${POST_PLAN_FLEET_WTL-$WTL_FIXTURE}" \
         POST_PLAN_FLEET_AUTH_PROBE_CMD="${POST_PLAN_FLEET_AUTH_PROBE_CMD:-true}" \
         "$DRIVER" "$@"
 }
@@ -3026,16 +3026,18 @@ end_case wait-timeout-exits-nonzero
 # holdrepeat fix, and the fix timeout must cover postplan-fix's session plus one re-fire.
 # The runner must read the same values from its header, so the two cannot drift.
 begin_case
-_ceil="$(env -u POST_PLAN_FLEET_CEILING bash -c 'eval "$(sed -n "/^PPN_TIMEOUT_SECS=/,/^CEILING_SECS=/p" "$1")"; printf "%s %s %s\n" "${PPN_TIMEOUT_SECS:-}" "${HR_FIX_TIMEOUT_SECS:-}" "${CEILING_SECS:-}"' _ "$DRIVER")"
-read -r _c_ppn _c_hr _c_ceil <<< "$_ceil"
+_ceil="$(env -u POST_PLAN_FLEET_CEILING bash -c 'eval "$(sed -n "/^PPN_TIMEOUT_SECS=/,/^CEILING_SECS=/p" "$1")"; printf "%s %s %s %s %s\n" "${PPN_TIMEOUT_SECS:-}" "${HR_FIX_TIMEOUT_SECS:-}" "${CEILING_SECS:-}" "${CF_FIX_TIMEOUT_SECS:-}" "${CEILING_MARGIN_SECS:-}"' _ "$DRIVER")"
+read -r _c_ppn _c_hr _c_ceil _c_cf _c_margin <<< "$_ceil"
 _c_sess="$(sed -n 's/.*readonly HR_TIMEOUT_SECS=\([0-9]*\).*/\1/p' "$SCRIPT_DIR/postplan-fix")"
-if [[ -z "$_c_ppn" || -z "$_c_hr" || -z "$_c_ceil" || -z "$_c_sess" ]]; then
+if [[ -z "$_c_ppn" || -z "$_c_hr" || -z "$_c_ceil" || -z "$_c_sess" || -z "$_c_cf" || -z "$_c_margin" ]]; then
     fail "ceiling-covers-holdrepeat-fix: could not read the timeouts (got '$_ceil', session '$_c_sess')"
 else
     [[ $_c_ceil -ge $((_c_ppn + _c_hr)) ]] \
         || fail "ceiling-covers-holdrepeat-fix: CEILING_SECS $_c_ceil < first pass $_c_ppn + fix $_c_hr"
     [[ $_c_hr -ge $((_c_sess + _c_ppn)) ]] \
         || fail "ceiling-covers-holdrepeat-fix: fix timeout $_c_hr < session $_c_sess + re-fire $_c_ppn"
+    [[ $_c_ceil -ge $((_c_ppn + _c_cf + _c_ppn + _c_margin)) ]] \
+        || fail "ceiling-covers-holdrepeat-fix: CEILING_SECS $_c_ceil < first pass $_c_ppn + conflict fix $_c_cf + re-fire $_c_ppn + margin $_c_margin"
 fi
 clean_slots
 rm -f /tmp/post-plan-fleet-runner-1901.sh
@@ -3499,6 +3501,187 @@ grep -qF "DRY(invocation) PR #${_DM_PR}: /x/stub-fix --holdrepeat ${_DM_PR}" <<<
     || fail "holdrepeat-fix-bin-empty-env: set env not honoured (out: $_hr_out)"
 clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
 end_case holdrepeat-fix-bin-empty-env
+
+# --- conflict autofix cases -------------------------------------------------------------
+# When the first post-plan pass ends in a rebase conflict, a PR listed in --conflict-fix-prs=
+# gets one bounded `postplan-fix --headless <PR>` per (PR, head SHA); on committed/clean the
+# runner re-fires post-plan once. Every other path restores the worktree and DMs the human.
+# Each case needs a real worktree: a temp repo with a bare origin and the PR branch pushed.
+export GIT_AUTHOR_NAME=cf-test GIT_AUTHOR_EMAIL=cf-test@example.invalid
+export GIT_COMMITTER_NAME=cf-test GIT_COMMITTER_EMAIL=cf-test@example.invalid
+_CF_DIR="$SCRATCH/cf"
+_CF_WT="$_CF_DIR/wt"; _CF_ORIGIN="$_CF_DIR/origin.git"
+_CF_WTL="$_CF_DIR/wtl.txt"; _CF_STATE="$_CF_DIR/state"
+_CF_PPREC="$_CF_DIR/pp-calls.txt"; _CF_FIXREC="$_CF_DIR/fix-calls.txt"
+_CF_PPSTUB="$SCRATCH/.local/bin/cf-pp-stub"
+_CF_FIXSTUB="$SCRATCH/.local/bin/cf-fix-stub"
+_CF_CONFLICT_LINE='RESULT: post-plan BLOCKED: rebase-conflict: tree proof failed: LOST: f.txt: +x'
+TMP_LOGS+=("$_DM_LOG.conflict" "$_DM_LOG.conflict-refire" "$_DM_LOG.conflict-fix")
+cat > "$_CF_PPSTUB" <<'CFSTUB'
+#!/usr/bin/env bash
+echo "argv=$*" >> "$CF_PPREC"
+if [ "$(wc -l < "$CF_PPREC" | tr -d ' ')" = 1 ]; then
+    echo 'RESULT: post-plan BLOCKED: rebase-conflict: tree proof failed: LOST: f.txt: +x'
+else
+    echo "$CF_PP2_RESULT"
+fi
+exit 0
+CFSTUB
+cat > "$_CF_FIXSTUB" <<'CFSTUB'
+#!/usr/bin/env bash
+echo "argv=$*" >> "$CF_FIXREC"
+echo "postplan-fix: headless head0=$(git -C "$CF_WT" rev-parse HEAD) wt=$CF_WT"
+if [ "${CF_FIX_COMMIT:-0}" = 1 ]; then
+    echo fix >> "$CF_WT/f.txt"
+    git -C "$CF_WT" add f.txt
+    git -C "$CF_WT" commit -q -m cf-fix
+fi
+[ -z "${CF_FIX_WORD:-}" ] || echo "postplan-fix: headless result=$CF_FIX_WORD"
+exit "${CF_FIX_RC:-0}"
+CFSTUB
+chmod +x "$_CF_PPSTUB" "$_CF_FIXSTUB"
+_cf_setup() {  # fresh worktree + bare origin + empty attempt record; sets _CF_HEAD0, _CF_ORIGIN_REF
+    clean_slots
+    rm -f "$_DM_LOG" "$_DM_LOG.declined" "$_DM_LOG.conflict" "$_DM_LOG.conflict-refire" \
+        "$_DM_LOG.conflict-fix" "$_DM_CAPTURE" "$_CF_PPREC" "$_CF_FIXREC"
+    rm -rf "$_CF_DIR"; mkdir -p "$_CF_DIR" "$_CF_STATE"
+    git init -q --bare "$_CF_ORIGIN"
+    git init -q "$_CF_WT"
+    echo base > "$_CF_WT/f.txt"
+    git -C "$_CF_WT" add f.txt
+    git -C "$_CF_WT" commit -q -m base
+    git -C "$_CF_WT" checkout -q -b branch-live
+    git -C "$_CF_WT" remote add origin "$_CF_ORIGIN"
+    git -C "$_CF_WT" push -q -u origin branch-live >/dev/null 2>&1
+    _CF_HEAD0="$(git -C "$_CF_WT" rev-parse HEAD)"
+    _CF_ORIGIN_REF="$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)"
+    printf '%s  %s [branch-live]\n' "$_CF_WT" "${_CF_HEAD0:0:7}" > "$_CF_WTL"
+}
+_cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_CF_PPSTUB" \
+        POST_PLAN_FLEET_POSTPLAN_FIX="$_CF_FIXSTUB" POST_PLAN_FLEET_WTL="$_CF_WTL" \
+        PR_CYCLE_WATCH_STATE_DIR="$_CF_STATE" \
+        run_dm_driver --go "$@" >/dev/null 2>&1
+    HOME="$SCRATCH" CF_PPREC="$_CF_PPREC" CF_FIXREC="$_CF_FIXREC" CF_WT="$_CF_WT" \
+        CF_PP2_RESULT="${CF_PP2_RESULT:-RESULT: terminal=shipped-held}" \
+        CF_FIX_WORD="${CF_FIX_WORD:-}" CF_FIX_COMMIT="${CF_FIX_COMMIT:-0}" CF_FIX_RC="${CF_FIX_RC:-0}" \
+        bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+}
+_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT; }
+
+# --- case: conflict-fix-refires ---------------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RESULT='RESULT: terminal=shipped-held' _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(_hr_calls "$_CF_FIXREC")" == 1 ]] \
+    || fail "conflict-fix-refires: want exactly one fix call, got $(_hr_calls "$_CF_FIXREC")"
+grep -qF -- "argv=--headless ${_DM_PR}" "$_CF_FIXREC" 2>/dev/null \
+    || fail "conflict-fix-refires: fix argv is not '--headless ${_DM_PR}' ($(cat "$_CF_FIXREC" 2>/dev/null))"
+[[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
+    || fail "conflict-fix-refires: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
+grep -qF 'post-plan-fleet: conflict-fix=committed' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-refires: log lacks conflict-fix=committed"
+[[ "$(_outcome_of)" == conflict-fixed ]] || fail "conflict-fix-refires: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == held ]] || fail "conflict-fix-refires: reason '$(_reason_of)'"
+[[ "$(cat "$_CF_STATE/conflict-fix/${_DM_PR}" 2>/dev/null)" == "$_CF_HEAD0 1" ]] \
+    || fail "conflict-fix-refires: attempt record is '$(cat "$_CF_STATE/conflict-fix/${_DM_PR}" 2>/dev/null)', want '$_CF_HEAD0 1'"
+end_case conflict-fix-refires
+
+# --- case: conflict-fix-gave-up-dm ------------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_RC=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(_hr_calls "$_CF_PPREC")" == 1 ]] \
+    || fail "conflict-fix-gave-up-dm: want one post-plan call, got $(_hr_calls "$_CF_PPREC")"
+[[ "$(_outcome_of)" == conflict-fix-gave-up ]] || fail "conflict-fix-gave-up-dm: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == no-result-rc=1 ]] || fail "conflict-fix-gave-up-dm: reason '$(_reason_of)'"
+grep -qF 'Bot conflict fix gave up (no-result-rc=1)' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "conflict-fix-gave-up-dm: DM lacks the gave-up line ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -qF 'Or paste this to have Claude fix it:' "$_DM_CAPTURE" 2>/dev/null \
+    || fail "conflict-fix-gave-up-dm: DM lacks the paste lead-in"
+grep -qE "bin/postplan-fix ${_DM_PR}\$" "$_DM_CAPTURE" 2>/dev/null \
+    || fail "conflict-fix-gave-up-dm: DM lacks the paste line"
+end_case conflict-fix-gave-up-dm
+
+# --- case: conflict-fix-once-per-head ---------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+mkdir -p "$_CF_STATE/conflict-fix"; printf '%s 1\n' "$_CF_HEAD0" > "$_CF_STATE/conflict-fix/${_DM_PR}"
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(_hr_calls "$_CF_FIXREC")" == 0 ]] \
+    || fail "conflict-fix-once-per-head: fix ran for an already-attempted head ($(cat "$_CF_FIXREC" 2>/dev/null))"
+[[ "$(_outcome_of)" == conflict ]] || fail "conflict-fix-once-per-head: outcome '$(_outcome_of)'"
+grep -qF 'post-plan-fleet: conflict-fix=skip-attempted' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-once-per-head: log lacks conflict-fix=skip-attempted"
+end_case conflict-fix-once-per-head
+
+# --- case: conflict-fix-new-head-retries ------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+mkdir -p "$_CF_STATE/conflict-fix"; printf '%s 1\n' "0000000000000000000000000000000000000000" > "$_CF_STATE/conflict-fix/${_DM_PR}"
+CF_FIX_WORD=gave-up-record _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(_hr_calls "$_CF_FIXREC")" == 1 ]] \
+    || fail "conflict-fix-new-head-retries: want one fix call for a new head, got $(_hr_calls "$_CF_FIXREC")"
+[[ "$(cat "$_CF_STATE/conflict-fix/${_DM_PR}" 2>/dev/null)" == "$_CF_HEAD0 1" ]] \
+    || fail "conflict-fix-new-head-retries: record is '$(cat "$_CF_STATE/conflict-fix/${_DM_PR}" 2>/dev/null)', want '$_CF_HEAD0 1'"
+end_case conflict-fix-new-head-retries
+
+# --- case: conflict-fix-not-listed ------------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 _cf_run
+[[ "$(_hr_calls "$_CF_FIXREC")" == 0 ]] \
+    || fail "conflict-fix-not-listed: fix ran for an unlisted PR ($(cat "$_CF_FIXREC" 2>/dev/null))"
+! grep -qF 'conflict-fix=' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-not-listed: log has a conflict-fix= line"
+[[ "$(_outcome_of)" == conflict ]] || fail "conflict-fix-not-listed: outcome '$(_outcome_of)'"
+end_case conflict-fix-not-listed
+
+# --- case: conflict-fix-timeout-restores ------------------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_COMMIT=1 CF_FIX_RC=124 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" == "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-timeout-restores: HEAD is not the pre-fix SHA"
+! git -C "$_CF_WT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 \
+    || fail "conflict-fix-timeout-restores: MERGE_HEAD still present"
+[[ "$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)" == "$_CF_ORIGIN_REF" ]] \
+    || fail "conflict-fix-timeout-restores: the origin ref moved"
+[[ "$(_reason_of)" == timeout ]] || fail "conflict-fix-timeout-restores: reason '$(_reason_of)'"
+[[ "$(_hr_calls "$_CF_PPREC")" == 1 ]] \
+    || fail "conflict-fix-timeout-restores: want one post-plan call, got $(_hr_calls "$_CF_PPREC")"
+grep -qF "post-plan-fleet: conflict-fix-restored=${_CF_HEAD0:0:7}" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-timeout-restores: log lacks the conflict-fix-restored line"
+end_case conflict-fix-timeout-restores
+
+# --- case: conflict-fix-refire-conflict-restores ----------------------------------------
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RESULT="$_CF_CONFLICT_LINE" _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" == "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-refire-conflict-restores: HEAD is not the pre-fix SHA"
+[[ "$(_outcome_of)" == conflict-fix-gave-up ]] \
+    || fail "conflict-fix-refire-conflict-restores: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == gave-up-refire-conflict ]] \
+    || fail "conflict-fix-refire-conflict-restores: reason '$(_reason_of)'"
+[[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
+    || fail "conflict-fix-refire-conflict-restores: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
+end_case conflict-fix-refire-conflict-restores
+
+# --- case: conflict-fix-reject-forms ----------------------------------------------------
+begin_case
+_cf_e="$(run_driver --conflict-fix-prs 12 2>&1)"; _cf_rc=$?
+[[ $_cf_rc -ne 0 ]] || fail "conflict-fix-reject-forms: space form exited 0"
+grep -qF 'unknown flag: --conflict-fix-prs' <<< "$_cf_e" \
+    || fail "conflict-fix-reject-forms: space form not rejected as unknown flag (out: $_cf_e)"
+_cf_e="$(run_driver --conflict-fix-prs=abc 2>&1)"; _cf_rc=$?
+[[ $_cf_rc -ne 0 ]] || fail "conflict-fix-reject-forms: =abc exited 0"
+grep -qF -- "--conflict-fix-prs= needs a comma list of PR numbers, got: 'abc'" <<< "$_cf_e" \
+    || fail "conflict-fix-reject-forms: =abc wrong message (out: $_cf_e)"
+end_case conflict-fix-reject-forms
+_cf_reset_knobs
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE" "$_DM_RUNNER"
 
 # --- case 23: usage-gate-paused ----------------------------------------------------------
 # ADR-0143: a worktree holding a post-plan run paused by the usage gate is skipped (no

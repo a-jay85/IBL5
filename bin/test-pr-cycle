@@ -4326,6 +4326,7 @@ fi
 # ==========================================================================================
 cf_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
 
+if should_run "conflict-autofix-default-on"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4334,7 +4335,9 @@ run --dry-run
 grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
     || fail "conflict-autofix-default-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
 end_case "conflict-autofix-default-on"
+fi
 
+if should_run "conflict-autofix-empty-is-on"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4343,7 +4346,9 @@ PR_CYCLE_CONFLICT_AUTOFIX="" run --dry-run
 grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
     || fail "conflict-autofix-empty-is-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
 end_case "conflict-autofix-empty-is-on"
+fi
 
+if should_run "conflict-autofix-off"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4359,8 +4364,10 @@ PR_CYCLE_CONFLICT_AUTOFIX=0 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "conflict-autofix-off: ready calls $(calls ready), want 1"
 grep -qF -- '--conflict-fix-prs' <<< "$(cf_argv)" && fail "conflict-autofix-off: fleet argv carries --conflict-fix-prs: $(cf_argv)"
 end_case "conflict-autofix-off"
+fi
 
 # 101 is routed to the holdrepeat fix, so it must not also join the conflict-fix list.
+if should_run "conflict-autofix-excludes-holdrepeat"; then
 begin_case
 hf_setup "3"
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4375,7 +4382,9 @@ grep -qE -- '--conflict-fix-prs=[0-9,]*101' <<< "$(cf_argv)" \
     && fail "conflict-autofix-excludes-holdrepeat: 101 reached --conflict-fix-prs: $(cf_argv)"
 hr_cleanup
 end_case "conflict-autofix-excludes-holdrepeat"
+fi
 
+if should_run "outcome-summary-conflict-fix-words"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4391,6 +4400,7 @@ grep -qF "$_want_cf" <<< "$OUT" || fail "outcome-summary-conflict-fix-words: fin
 grep -qF 'conflict fixed 1, conflict fix gave up 1' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: buckets missing"
 grep -qF 'failed 0' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: failed is not 0"
 end_case "outcome-summary-conflict-fix-words"
+fi
 
 # --- summary --------------------------------------------------------------------------------
 check_only_cases

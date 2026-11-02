@@ -12,7 +12,7 @@
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
 #
-# Run: bin/test-check-composite-contracts  (exit 0 = all pass, 1 = a case failed)
+# Run: bin/test-check-composite-contracts [--case NAME]...  (exit 0 = all pass, 1 = a case failed)
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -20,6 +20,36 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CHECK="$SCRIPT_DIR/check-composite-contracts"
 h_tmp TMP
+
+# --case NAME (repeatable): run only the named e2e-label (L1-L2) cases and skip every
+# other section. Shared fixtures still build. A mutation-matrix row uses this to fit one
+# case inside its 30s timeout. A name that matches no case fails the run, so a typo
+# cannot pass as a green baseline. Pattern copied from bin/test-pr-cycle.
+ONLY_CASES=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --case)
+      [[ $# -ge 2 && -n "$2" ]] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
+      ONLY_CASES+=("$2"); shift 2 ;;
+    *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+  esac
+done
+RAN_CASES=$'\n'
+unfiltered() { [[ ${#ONLY_CASES[@]} -eq 0 ]]; }
+should_run() {  # $1 = case name; true when no --case was given or $1 was named
+  unfiltered && return 0
+  local c
+  for c in "${ONLY_CASES[@]}"; do
+    if [[ "$c" == "$1" ]]; then RAN_CASES+="$1"$'\n'; return 0; fi
+  done
+  return 1
+}
+check_only_cases() {  # fail every --case name that matched no case
+  local c
+  for c in ${ONLY_CASES[@]+"${ONLY_CASES[@]}"}; do
+    [[ "$RAN_CASES" == *$'\n'"$c"$'\n'* ]] || h_fail "unknown --case name: $c" "no case ran"
+  done
+}
 
 # fresh_actions → echoes a new empty actions dir. Uses mktemp (not a counter): this
 # runs in a $(...) subshell at the call site, so a counter increment would not
@@ -281,6 +311,7 @@ expect() { # name want got
   fi
 }
 
+if unfiltered; then  # --case skips this section (closes before the promote fixtures)
 # --- both absent → pass, both skipped (visibly) --------------------------------
 d="$(fresh_actions)"
 out="$("$CHECK" "$d" 2>&1)"; rc=$?
@@ -316,6 +347,7 @@ d="$(fresh_actions)"; put_nd "$d" true lead
 # --- same shape but fail-on-delivery=false with a leading true default → fail ---
 d="$(fresh_actions)"; put_nd "$d" false lead
 "$CHECK" "$d" >/dev/null 2>&1; expect "nd-reads-correct-block-false" 1 $?
+fi  # unfiltered
 
 # ---------------------------------------------------------------------------
 # promote-to-production invariants (P1-P8) — 18 cases
@@ -330,6 +362,8 @@ printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
 chmod +x "$FORCE_PROMOTE"
 CLEAN_MERGE="$TMP/merge-clean"
 put_merge "$CLEAN_MERGE" "Promote master to production,Auto-promotion paused"
+
+if unfiltered; then  # --case skips this section (closes before the e2e-label section)
 
 # pp-good: all invariants satisfied → exit 0
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
@@ -544,6 +578,7 @@ if cmp -s "$d_wf/tests.yml" "$REAL_WF/tests.yml"; then
 fi
 "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "r1-real-tests-yml-mutant-fails" 1 $?
+fi  # unfiltered
 
 # ---------------------------------------------------------------------------
 # e2e-label invariants (L1-L2, backlog#1707)
@@ -570,6 +605,7 @@ put_update_baselines() {
 # run_l_case <case-name> <want-exit> <want-text> <stream: out|err> <dir>
 run_l_case() {
   local name="$1" want="$2" text="$3" stream="$4" d_wf="$5" d_a out rc
+  should_run "$name" || return 0
   d_a="$(fresh_actions)"
   if [ "$stream" = "err" ]; then
     out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1 >/dev/null)"; rc=$?
@@ -596,7 +632,10 @@ run_l_case "l1-blocklist-fails" 1 'e2e-label (L1)' err "$d_wf"
 d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened, synchronize]\n    # No labeled: see backlog\n'
 run_l_case "l1-comment-passes" 0 'lists no label event type (L1)' out "$d_wf"
 
-d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened]\n    # relabeled_at is unrelated\n'
+# Near-miss keys live in real YAML, not a comment: comments are stripped before the
+# match, so a commented word never reaches the boundaries. `relabeled` probes the
+# left boundary and `labeled_at` the right one (backlog#1738).
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened]\n  workflow_dispatch:\n    inputs:\n      relabeled:\n        type: boolean\n      labeled_at:\n        type: string\n'
 run_l_case "l1-relabeled-word-passes" 0 'lists no label event type (L1)' out "$d_wf"
 
 d_wf="$(fresh_workflows)"; put_update_baselines "$d_wf" 'E2E Tests'
@@ -607,6 +646,8 @@ run_l_case "l2-near-miss-passes" 0 'names no required check (L2)' out "$d_wf"
 
 d_wf="$(fresh_workflows)"
 run_l_case "l2-absent-skips" 0 'update-baselines.yml absent — L2 skipped' out "$d_wf"
+
+if unfiltered; then  # --case skips every section below (closes before h_done)
 
 # ---------------------------------------------------------------------------
 # mutation-pr invariants (M1-M4)
@@ -1111,5 +1152,7 @@ d_wf="$(fresh_workflows)"; d1_trio "$d_wf"
 out="$(d1_run "$d_bad" "$d_wf")"; rc=$?
 expect "d1-unparseable-composite-fails" 1 "$rc"
 d1_has "d1-unparseable-composite-named" "expected exactly one \${DB_PASS:-default}" "$out"
+fi  # unfiltered
 
+check_only_cases
 h_done

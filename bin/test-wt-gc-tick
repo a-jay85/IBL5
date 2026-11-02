@@ -2109,12 +2109,16 @@ log_has 'container keep ibl5-young: exited 5d ago' || note_err "DK2 no keep line
 ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "DK2 archived a kept container"
 finish_case
 
-fx DK3-foreign-name-skipped
+fx DK3-foreign-name-ignored
 dk_container ccc333 other-thing exited "$(iso_ago 30)"
+dk_container ccc334 postgres-1 exited "$(iso_ago 30)"
+dk_container ccc335 xibl5-foo exited "$(iso_ago 30)"
+dk_container ccc336 ibl5 exited "$(iso_ago 30)"
 rt "${DK_ON[@]}" -- --force
 chk_rc DK3 0
 grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container removed"
-grep -q 'ccc333' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container inspected"
+grep -qE 'ccc33[3-6]' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container inspected"
+log_has 'container (keep|removed) (postgres-1|xibl5-foo|ibl5|other-thing)' && note_err "DK3 foreign name reached the keep/remove logic"
 finish_case
 
 fx DK4-not-exited-kept

@@ -1,6 +1,6 @@
 ---
 description: Gate judgment on CI-modifying PRs is an input to the Kahn merge-order sort, not a post-hoc annotation — enforced by the two-invocation design of bin/pr-attack.
-last_verified: 2026-09-01
+last_verified: 2026-11-01
 ---
 
 # ADR-0113: Gate judgment is a sort input, not a post-hoc annotation

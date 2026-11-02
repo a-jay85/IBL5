@@ -42,7 +42,7 @@ class LeagueConfigView
         $shortEndingYear = substr((string) $seasonEndingYear, 2);
         $teamsStored = $result['teams_stored'];
 
-        return '<div role="alert" class="d-alert d-alert-success mb-4">'
+        return '<div role="status" class="d-alert d-alert-success mb-4">'
             . '.lge imported: ' . $beginningYear . '-' . $shortEndingYear
             . ' season, ' . $teamsStored . ' teams stored.'
             . '</div>';

@@ -29,6 +29,8 @@ def _enroll_file(state_dir):
 
 
 def test_hash_arm_stable_across_processes():
+    # Guards against hash(slug): Python salts str hashes per process, so a swap to it makes
+    # the two PYTHONHASHSEED runs below disagree.
     pinned = {"alpha-slug": "harness", "beta-slug": "closer"}
     code = ("import sys; sys.path.insert(0, %r); from harness.ab_arm import hash_arm; "
             "print(hash_arm('alpha-slug'), hash_arm('beta-slug'))" % HARNESS_DIR)

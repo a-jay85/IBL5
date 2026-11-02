@@ -32,7 +32,8 @@ fail() { h_fail "$*"; }
 # A name that matches no case fails the run, so a typo cannot pass as a green baseline.
 # Two cases read state an earlier case built, so name the earlier case too: plist-shape
 # needs path-uniqueness, and push-zero-lease-not-a-wildcard needs the four push-* cases
-# before it.
+# before it. runner-line-hand-started and dm-unknown-flag-rejected build their own
+# runner and helper, so they run alone. Case names with spaces need quoting after --case.
 ONLY_CASES=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -192,8 +193,6 @@ end_case help
 fi
 
 # --- case 2: flag validation -------------------------------------------------------------
-if should_run "flag-validation"; then
-begin_case
 check_reject() {  # $1 = expected stderr substring, rest = argv
     local want="$1"; shift
     local e o r
@@ -204,6 +203,8 @@ check_reject() {  # $1 = expected stderr substring, rest = argv
     grep -q "$want" "$e" || fail "'$*' stderr lacks '$want' (got: $(tr '\n' ' ' < "$e"))"
     rm -f "$e"
 }
+if should_run "flag-validation"; then
+begin_case
 check_reject 'positive integer'  --jobs foo
 check_reject 'positive integer'  --jobs 0
 check_reject 'positive integers' --pr 0
@@ -298,6 +299,8 @@ fi
 # expands it to zero words.
 if should_run "runner-line-hand-started"; then
 begin_case
+clean_slots
+POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 3 >/dev/null 2>&1
 if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
     grep -qxF 'POSTPLAN_FIRED_BY="$POSTPLAN_FIRED_BY" timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
         /tmp/post-plan-fleet-runner-1901.sh \

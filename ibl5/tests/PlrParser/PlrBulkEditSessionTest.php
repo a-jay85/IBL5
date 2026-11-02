@@ -259,6 +259,10 @@ final class PlrBulkEditSessionTest extends TestCase
 
     public function testLiveRunOnReadOnlyFileAbortsWithoutBackup(): void
     {
+        if (posix_geteuid() === 0) {
+            self::markTestSkipped('Root ignores file mode bits, so chmod 0444 cannot make the file read-only.');
+        }
+
         chmod($this->plrPath, 0444);
         $session = $this->session([]);
 

@@ -1,7 +1,7 @@
 ---
 name: fix-and-prevent
 description: "Fix a reported bug/breakage AND land the prevention for its whole defect class in one pass — use whenever the user says something is broken, wrong, failing, or asks to fix a bug; the fix alone is never the finished unit of work."
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 ---
 
 # /fix-and-prevent — Fix it, then make it not happen again
@@ -81,6 +81,14 @@ It carries the whole of what used to live here: the backlog-file selection rule,
 the five-rung prevention ladder, the artifact-destination call, and the
 "no gate warranted" escape. Steps 1 and 2 above feed it — do not redo them.
 
+Its step 2a names the review layer that should have caught this bug, from a
+fixed list of the layers that exist today. When that layer is `phase-4-review`
+and the introducing PR carries a `## Code review` comment, the backlog item
+carries a pending reviewer-eval corpus case. A later run appends it to
+`tools/postplan-harness/fixtures/reviewer-eval/corpus.json` once this fix's
+squash commit is on master, because `bin/reviewer-eval validate` needs that
+commit. Every other outcome records in the item why no case was written.
+
 Two framing rules survive the relocation and are restated here because they
 govern *what you write into the ladder analysis*, not how you write it:
 
@@ -119,6 +127,7 @@ Every line must be true (this is what a `/goal` condition should check):
 - [ ] Defect class named in one sentence.
 - [ ] Occurrence scan run, per-occurrence status table produced; overflow filed as backlog/follow-up if any.
 - [ ] Backlog item filed with the full analysis (defect class, occurrence table, ladder rung + why cheaper rungs were insufficient, artifact destination, provenance) — **or** an explicit, reasoned "no gate warranted" verdict, filed the same way.
+- [ ] Review layer named per `_remediation.md` step 2a, and the backlog item carries its `corpus case:` line: a pending case, `n/a`, or `skipped` with the reason.
 - [ ] Any out-of-repo prevention artifact called out by path.
 - [ ] Full verification clean, then `bin/post-plan-now --auto` fired on a dirty tree.
 

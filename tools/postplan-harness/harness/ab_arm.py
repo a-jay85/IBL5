@@ -74,15 +74,16 @@ def assign(slug: str, *, pr: int | None, fired_by: str, state_dir: str,
         log(f"ab-arm: ignoring invalid {ENV_VAR}={v!r}; using harness")
         return ArmAssignment("harness", "env-invalid")
     key = safe_slug(slug)
-    if fired_by != ENROLL_FIRED_BY or key == "unknown":
+    if key == "unknown":
         return ArmAssignment("harness", "not-queued")
+    can_enroll = fired_by == ENROLL_FIRED_BY
     path = enrollment_path(state_dir)
     try:
         os.makedirs(state_dir, exist_ok=True)
         with open(os.path.join(state_dir, LOCK_BASENAME), "a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)  # assign: cap check and write share one lock
             try:
-                return _assign_locked(key, pr, path, log, now)
+                return _assign_locked(key, pr, path, log, now, can_enroll)
             finally:
                 fcntl.flock(lock, fcntl.LOCK_UN)
     except OSError as e:
@@ -90,7 +91,8 @@ def assign(slug: str, *, pr: int | None, fired_by: str, state_dir: str,
         return ArmAssignment("harness", "state-unreadable")
 
 
-def _assign_locked(key: str, pr: int | None, path: str, log, now) -> ArmAssignment:
+def _assign_locked(key: str, pr: int | None, path: str, log, now,
+                   can_enroll: bool = True) -> ArmAssignment:
     if os.path.exists(path):
         try:
             with open(path, encoding="utf-8") as fh:
@@ -107,6 +109,8 @@ def _assign_locked(key: str, pr: int | None, path: str, log, now) -> ArmAssignme
     entry = enrolled.get(key)
     if isinstance(entry, dict) and entry.get("arm") in ARMS:
         return ArmAssignment(entry["arm"], "enrolled")
+    if not can_enroll:
+        return ArmAssignment("harness", "not-queued")
     if len(enrolled) >= ENROLL_CAP:
         return ArmAssignment("harness", "cap-reached")
     arm = hash_arm(key)

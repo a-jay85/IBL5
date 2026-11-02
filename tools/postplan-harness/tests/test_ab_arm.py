@@ -124,3 +124,12 @@ def test_forced_run_session_cap_counts_without_enrollment(tmp_path):
     for i in range(1, ab_arm.MAX_CLOSER_SESSIONS + 1):
         assert ab_arm.record_closer_session(d, "forced-slug") == i
     assert ab_arm.closer_sessions(d, "forced-slug") == ab_arm.MAX_CLOSER_SESSIONS
+
+
+@pytest.mark.parametrize("fired_by", ["pr-cycle-tick", "post-plan-now"])
+def test_enrolled_slug_keeps_arm_on_non_automouse_rerun(tmp_path, fired_by):
+    first = _assign("slug-1", tmp_path)
+    again = _assign("slug-1", tmp_path, fired_by=fired_by)
+    assert again.arm == first.arm
+    assert again.source == "enrolled"
+    assert _assign("slug-new", tmp_path, fired_by=fired_by).source == "not-queued"

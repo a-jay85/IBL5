@@ -2642,6 +2642,13 @@ def _run_closer_for_conflict(git, gh, llm, log, res, err, *, worktree, live, mod
         pr=pr, plan_path=(res.plan.path if (res.plan and res.plan.found) else ""),
         trigger_reason=why, base_ref="origin/master", error_kind=err.kind,
         error_detail=_redact((err.detail or "")[:4000]))
+    proof_key = _retry_key(git.branch(), 0) + "-closer" if hasattr(git, "prove_lostwork") else ""
+    proof_armed = False
+    if proof_key and hasattr(git, "capture_lostwork_pre"):
+        try:
+            proof_armed = bool(git.capture_lostwork_pre(proof_key))
+        except Exception as e:  # noqa: BLE001 - no pre-patch means no proof; fail closed below
+            log(f"closer: lost-work pre-capture failed ({e!r})")
     log("closer: running one session for the rebase conflict")
     co = closer.run_session(llm, worktree=worktree, base_ref="origin/master", pr=pr,
                             plan_path=ctx.plan_path, context=ctx, log=log)
@@ -2654,6 +2661,23 @@ def _run_closer_for_conflict(git, gh, llm, log, res, err, *, worktree, live, mod
         rec["pushed"] = False
         log("closer: session left a dirty tree; reset to pre-session head; exit 3 stands")
     elif co.status in ("edited", "no-change") and git.head() != co.pre_head:
+        if proof_key:
+            ok, evidence = (False, "no lost-work pre-patch captured")
+            if proof_armed:
+                try:
+                    ok, evidence = git.prove_lostwork(proof_key)
+                except Exception as e:  # noqa: BLE001 - unproved means do not push
+                    ok, evidence = False, repr(e)
+            if not ok:
+                _closer_reset(git, co.pre_head)
+                rec["pushed"] = False
+                rec["proof"] = "failed"
+                log("closer: lost-work proof failed after conflict resolution; reset to "
+                    f"pre-session head; exit 3 stands ({str(evidence)[:200]})")
+                _closer_note(out_dir, f"closer (rebase-conflict): {rec['status']} "
+                                      f"pushed=False (lostwork-unproved)\n\n{co.note}")
+                return
+            rec["proof"] = "passed"
         try:
             _push_with_gate_fix(git, log, "closer", llm=llm, worktree=worktree,
                                 out_dir=out_dir, res=res, gh=gh, pr=pr)

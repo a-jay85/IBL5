@@ -10,7 +10,7 @@
 # Driven entirely through bin/pr-cycle's documented PR_CYCLE_* env seams plus a scratch
 # HOME and a scratch git repo standing in for the main checkout.
 #
-# Usage: bin/test-pr-cycle
+# Usage: bin/test-pr-cycle [--case NAME]...
 
 set -uo pipefail
 
@@ -40,6 +40,33 @@ trap _cleanup EXIT
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SCRATCH/usage"
 
 CASE_BASE=0
+# --case NAME (repeatable): run only the named cases. Shared fixtures and helpers between
+# cases still run. A mutation-matrix row uses this to fit one case inside its 30s timeout.
+# A name that matches no case fails the run, so a typo cannot pass as a green baseline.
+ONLY_CASES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --case)
+            [[ $# -ge 2 && -n "$2" ]] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
+            ONLY_CASES+=("$2"); shift 2 ;;
+        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+    esac
+done
+RAN_CASES=$'\n'
+should_run() {  # $1 = case name; true when no --case was given or $1 was named
+    [[ ${#ONLY_CASES[@]} -eq 0 ]] && return 0
+    local c
+    for c in "${ONLY_CASES[@]}"; do
+        if [[ "$c" == "$1" ]]; then RAN_CASES+="$1"$'\n'; return 0; fi
+    done
+    return 1
+}
+check_only_cases() {  # fail every --case name that matched no case
+    local c
+    for c in ${ONLY_CASES[@]+"${ONLY_CASES[@]}"}; do
+        [[ "$RAN_CASES" == *$'\n'"$c"$'\n'* ]] || fail "unknown --case name: $c (no case ran)"
+    done
+}
 fail() { h_fail "$*"; }
 begin_case() { CASE_BASE=$H_FAIL; }
 end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
@@ -482,6 +509,7 @@ prlist() { sed -nE '1s/.*--pr-list ([0-9,]+).*/\1/p' "$SCRATCH/ready.argv"; }
 # ==========================================================================================
 # 1 — flag validation
 # ==========================================================================================
+if should_run "case 1 flag validation"; then
 begin_case
 reset_state
 run --help
@@ -533,10 +561,12 @@ done
 run --only '#101,#102' --help
 [[ $RC -eq 0 ]] || fail "'--only #101,#102' exit $RC, want 0"
 end_case "case 1 flag validation"
+fi
 
 # ==========================================================================================
 # 2 — main-checkout-only guard
 # ==========================================================================================
+if should_run "case 2 main-checkout guard"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -557,10 +587,12 @@ else
 fi
 unset MAIN_OVERRIDE
 end_case "case 2 main-checkout guard"
+fi
 
 # ==========================================================================================
 # 3 — live-session guard (SIGPIPE regression)
 # ==========================================================================================
+if should_run "case 3 live-session guard"; then
 begin_case
 reset_state
 set_live_labels "-	0	com.ibl5.post-plan-fleet-20260101-000000"
@@ -579,10 +611,12 @@ clear_live_labels
 run --help
 [[ $RC -eq 0 ]] || fail "no live label should not block"
 end_case "case 3 live-session guard"
+fi
 
 # ==========================================================================================
 # 4 — --stop
 # ==========================================================================================
+if should_run "case 4 stop"; then
 begin_case
 reset_state
 echo 3 > "$SCRATCH/ready-rc"
@@ -591,11 +625,13 @@ run --stop
 [[ -e "$SCRATCH/.ibl5-pr-cycle.stop" ]] || fail "--stop left no stop file after a failing --stop-all"
 grep -qx -- '--stop-all' "$SCRATCH/ready.argv" || fail "--stop did not call the ready tool with --stop-all"
 end_case "case 4 stop"
+fi
 
 
 # ==========================================================================================
 # 6 — gate nominees force a second, exactly-shaped pr-attack call
 # ==========================================================================================
+if should_run "case 6 gate nominees"; then
 begin_case
 reset_state
 cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
@@ -624,8 +660,10 @@ grep -qxF '  gate nominees (ordered, judged-empty): #999 #998' <<< "$OUT" \
 _a6="$(sed -n '1p' "$SCRATCH/ready.argv")"
 [[ "$_a6" == *'101'*'102'*'103'* ]] || fail "case 6: all 3 PRs not in --pr-list: $_a6"
 end_case "case 6 gate nominees"
+fi
 
 # 6b — stale-WORK retry re-enters _attack_plan; the nominee line still prints once
+if should_run "case 6b nominee line once on retry"; then
 begin_case
 reset_state
 cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
@@ -645,10 +683,12 @@ run --worker
 [[ "$(calls attack)" == "4" ]] || fail "case 6b: want 4 attack calls, got $(calls attack)"
 [[ "$(calls ready)" == "1" ]] || fail "case 6b: want 1 fleet call, got $(calls ready)"
 end_case "case 6b nominee line once on retry"
+fi
 
 # ==========================================================================================
 # 7 — pr-attack failure handling
 # ==========================================================================================
+if should_run "case 7 attack failures"; then
 begin_case
 reset_state
 echo 1 > "$SCRATCH/attack-rc"
@@ -669,11 +709,13 @@ run --worker
 [[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls (retried once), got $(calls attack)"
 grep -qF 'stale' <<< "$OUT" || fail "stale retry was not reported"
 end_case "case 7 attack failures"
+fi
 
 
 # ==========================================================================================
 # 10 — a stop file created during readying blocks the arm in that same iteration
 # ==========================================================================================
+if should_run "case 10 stop during readying"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -691,10 +733,12 @@ run --worker
 [[ $RC -eq 0 ]] || fail "stop-before-fire: want 0, got $RC"
 [[ "$(calls ready)" == "0" ]] || fail "stop-before-fire: fleet called despite stop, got $(calls ready)"
 end_case "case 10 stop during readying"
+fi
 
 # ==========================================================================================
 # 11 — non-ARMABLE and absent buckets skip polling; the separator is never an armed PR
 # ==========================================================================================
+if should_run "case 11 non-armable and absent"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -720,10 +764,12 @@ grep -qF -- '--ping' <<< "$(cat "$SCRATCH/dm.argv")" \
 grep -q '^--ping pr-cycle finished' "$SCRATCH/dm.argv" \
     || fail "case 11: end-of-run DM argv is not '--ping <msg>'"
 end_case "case 11 non-armable and absent"
+fi
 
 # ==========================================================================================
 # 11b — the finish line counts each fired PR's outcome from its post-plan-fleet log
 # ==========================================================================================
+if should_run "case 11b outcome counts"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -740,10 +786,12 @@ grep -qF "$_want11b" "$SCRATCH/dm.argv" || fail "case 11b: DM lacks '$_want11b'"
 grep -qF 'readied' <<< "$OUT" && fail "case 11b: finish line still says readied"
 grep -qxF '#103 failed no-log' <<< "$OUT" || fail "case 11b: per-PR line '#103 failed no-log' missing"
 end_case "case 11b outcome counts"
+fi
 
 # ==========================================================================================
 # 11c — every outcome bucket, per-PR result lines, legacy `blocked` and a missing log
 # ==========================================================================================
+if should_run "case 11c all outcome buckets"; then
 begin_case
 reset_state
 _atk11c='# Plan of attack
@@ -788,10 +836,12 @@ _ln_fin="$(grep -n 'pr-cycle finished' <<< "$OUT" | head -1 | cut -d: -f1)"
 [[ -n "$_ln_pr" && -n "$_ln_fin" && "$_ln_pr" -lt "$_ln_fin" ]] \
     || fail "case 11c: per-PR lines do not precede the finish line ($_ln_pr vs $_ln_fin)"
 end_case "case 11c all outcome buckets"
+fi
 
 # ==========================================================================================
 # fleet-skip-* — a fleet-skipped PR writes no log; the report shows it as skipped, not failed
 # ==========================================================================================
+if should_run "fleet-skip-baseline"; then
 begin_case
 fsk_setup 101 3478
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
@@ -811,8 +861,10 @@ grep -qF "$_full_fsb" "$SCRATCH/dm.argv" || fail "fleet-skip-baseline: DM body l
 [[ "$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)" == "$(printf '3478\tfired\tfailed\tno-log')" ]] \
     || fail "fleet-skip-baseline: result row is '$(grep -F '3478' "$SCRATCH/res/result.tsv" 2>/dev/null)'"
 end_case "fleet-skip-baseline"
+fi
 
 # A stale log from an earlier run loses to this run's SKIP row.
+if should_run "fleet-skip-stale-log"; then
 begin_case
 fsk_setup 101 3478
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
@@ -823,8 +875,10 @@ run --worker
 grep -qxF '#3478 skipped bot' <<< "$OUT" || fail "fleet-skip-stale-log: '#3478 skipped bot' missing (out: $OUT)"
 grep -qF 'fired 1 (shipped 1,' <<< "$OUT" || fail "fleet-skip-stale-log: want shipped 1 (101 only) (out: $OUT)"
 end_case "fleet-skip-stale-log"
+fi
 
 # A fired PR with no log and no SKIP row is still a real failure.
+if should_run "fleet-skip-real-failure"; then
 begin_case
 fsk_setup 101 103 3478
 echo 'post-plan-fleet: outcome=shipped' > "$SCRATCH/fleetlogs/post-plan-fleet-101.log"
@@ -835,8 +889,10 @@ grep -qxF '#103 failed no-log' <<< "$OUT" || fail "fleet-skip-real-failure: '#10
 grep -qF 'fired 2 (shipped 1, held 0, rebased 0, declined 0, paused 0, conflict 0, conflict fixed 0, conflict fix gave up 0, failed 1, timed out 0), skipped 1' <<< "$OUT" \
     || fail "fleet-skip-real-failure: summary wrong (out: $OUT)"
 end_case "fleet-skip-real-failure"
+fi
 
 # Non-bot SKIP reasons keep their text.
+if should_run "fleet-skip-other-reason"; then
 begin_case
 fsk_setup 104 105
 {   fleet_skip_row 104 'no worktree'
@@ -847,8 +903,10 @@ run --worker
 grep -qxF '#104 skipped no worktree' <<< "$OUT" || fail "fleet-skip-other-reason: '#104 skipped no worktree' missing (out: $OUT)"
 grep -qxF '#105 skipped already running' <<< "$OUT" || fail "fleet-skip-other-reason: '#105 skipped already running' missing (out: $OUT)"
 end_case "fleet-skip-other-reason"
+fi
 
 # The parser keys on a numeric first field and a trailing SKIP (...); a note line and a fired row are out.
+if should_run "fleet-skip-parse-filter"; then
 begin_case
 fsk_setup 101 3478
 {   printf 'note: see SKIP (bot- or other-authored — skipped)\n'
@@ -860,10 +918,12 @@ run --worker
 [[ "$(cat "$(rundir)/fleet-skips.tsv" 2>/dev/null)" == "$(printf '3478\tbot')" ]] \
     || fail "fleet-skip-parse-filter: fleet-skips.tsv is '$(cat "$(rundir)/fleet-skips.tsv" 2>/dev/null)'"
 end_case "fleet-skip-parse-filter"
+fi
 
 # ==========================================================================================
 # unknown-warmup-* — bounded pre-arm re-poll of UNKNOWN merge states
 # ==========================================================================================
+if should_run "unknown-warmup-resolves"; then
 begin_case
 unk_setup 101
 printf 'UNKNOWN\nCLEAN\n' > "$SCRATCH/mss-101"
@@ -875,7 +935,9 @@ run --worker
 grep -q '^101' "$(rundir)/your-turn.txt" && fail "unknown-warmup-resolves: #101 still listed in your-turn.txt"
 remove_sleep_shim
 end_case "unknown-warmup-resolves"
+fi
 
+if should_run "unknown-warmup-bounded"; then
 begin_case
 unk_setup 101 102 103
 for _n in 101 102 103; do printf 'UNKNOWN\n' > "$SCRATCH/mss-$_n"; done
@@ -889,7 +951,9 @@ done
 [[ "$(arm_calls)" == 1 ]] || fail "unknown-warmup-bounded: arm_calls $(arm_calls), want 1"
 remove_sleep_shim
 end_case "unknown-warmup-bounded"
+fi
 
+if should_run "unknown-warmup-defaults-unset"; then
 begin_case
 unk_setup 101
 printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
@@ -899,7 +963,9 @@ run --worker
     || fail "unknown-warmup-defaults-unset: sleeps $(sleeps) / '$(sort -u "$SCRATCH/sleep.argv")'"
 remove_sleep_shim
 end_case "unknown-warmup-defaults-unset"
+fi
 
+if should_run "unknown-warmup-defaults-empty"; then
 begin_case
 unk_setup 101
 printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
@@ -910,7 +976,9 @@ unset UPOLLS USLEEP
     || fail "unknown-warmup-defaults-empty: sleeps $(sleeps) / '$(sort -u "$SCRATCH/sleep.argv")'"
 remove_sleep_shim
 end_case "unknown-warmup-defaults-empty"
+fi
 
+if should_run "unknown-warmup-off"; then
 begin_case
 unk_setup 101
 printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
@@ -920,7 +988,9 @@ unset UPOLLS
 [[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-off: sleeps $(sleeps), want 0"
 remove_sleep_shim
 end_case "unknown-warmup-off"
+fi
 
+if should_run "unknown-warmup-precheck-source"; then
 begin_case
 unk_setup 101
 {   triage_report "101 NEEDS-WORK rebase"
@@ -933,7 +1003,9 @@ run --worker --only 101
 [[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-precheck-source: sleeps $(sleeps), want 0"
 remove_sleep_shim
 end_case "unknown-warmup-precheck-source"
+fi
 
+if should_run "unknown-warmup-none"; then
 begin_case
 unk_setup 101
 run --worker
@@ -941,7 +1013,9 @@ run --worker
 [[ "$(sleeps)" == 0 ]] || fail "unknown-warmup-none: sleeps $(sleeps), want 0"
 remove_sleep_shim
 end_case "unknown-warmup-none"
+fi
 
+if should_run "unknown-warmup-gh-fail"; then
 begin_case
 unk_setup 101
 touch "$SCRATCH/gh-fail-view"
@@ -953,7 +1027,9 @@ unset UPOLLS
 grep -qF ' — done' <<< "$OUT" || fail "unknown-warmup-gh-fail: finished line does not end '— done' (out: $OUT)"
 remove_sleep_shim
 end_case "unknown-warmup-gh-fail"
+fi
 
+if should_run "unknown-env-reject"; then
 begin_case
 unk_setup 101
 UPOLLS=abc run --worker
@@ -971,7 +1047,9 @@ grep -qF 'pr-cycle: UNKNOWN warm-up would wait over 120s' "$ERR" \
 unset UPOLLS USLEEP
 remove_sleep_shim
 end_case "unknown-env-reject"
+fi
 
+if should_run "unknown-warmup-dry-run"; then
 begin_case
 unk_setup 101
 printf 'UNKNOWN\n' > "$SCRATCH/mss-101"
@@ -979,10 +1057,12 @@ run --dry-run
 [[ "$(view_calls 101)" == 0 ]] || fail "unknown-warmup-dry-run: views $(view_calls 101), want 0"
 remove_sleep_shim
 end_case "unknown-warmup-dry-run"
+fi
 
 # ==========================================================================================
 # your-turn-unknown-* — still-UNKNOWN NOT-MERGEABLE rows collapse into one line
 # ==========================================================================================
+if should_run "your-turn-unknown-baseline"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1008,7 +1088,9 @@ _pc="$(_posu "$_cl")"; _ph="$(_posu '**Conflicts (1)**')"
 [[ "$_pc" -ge 0 && "$_pc" -lt "$_ph" ]] || fail "your-turn-unknown-baseline: computing line not before Conflicts ($_pc vs $_ph)"
 grep -qF 'your turn 3' <<< "$OUT" || fail "your-turn-unknown-baseline: finished line lacks 'your turn 3' (out: $OUT)"
 end_case "your-turn-unknown-baseline"
+fi
 
+if should_run "your-turn-unknown-single"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1018,7 +1100,9 @@ unset UPOLLS
 grep -qF -- '- 1 PR still computing (GitHub merge state UNKNOWN): #201' "$SCRATCH/dm.argv" \
     || fail "your-turn-unknown-single: line missing (dm: $(cat "$SCRATCH/dm.argv"))"
 end_case "your-turn-unknown-single"
+fi
 
+if should_run "your-turn-unknown-padded"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1030,7 +1114,9 @@ unset UPOLLS
 grep -qF -- '- 2 PRs still computing (GitHub merge state UNKNOWN): #201, #202' "$SCRATCH/dm.argv" \
     || fail "your-turn-unknown-padded: trailing space broke the collapse (dm: $(cat "$SCRATCH/dm.argv"))"
 end_case "your-turn-unknown-padded"
+fi
 
+if should_run "your-turn-unknown-only"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1044,10 +1130,12 @@ grep -qF -- '- 2 PRs still computing (GitHub merge state UNKNOWN): #201, #202' "
 grep -qF '**Conflicts' "$SCRATCH/dm.argv" && fail "your-turn-unknown-only: Conflicts header printed"
 grep -qF '…and' "$SCRATCH/dm.argv" && fail "your-turn-unknown-only: overflow line printed"
 end_case "your-turn-unknown-only"
+fi
 
 # --- rescue: baseline characterization -----------------------------------------------------
 # Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it
 # exists (the kill switch is honored). That dual property is what makes it a characterization.
+if should_run "case 11a rescue off leaves excluded PRs untouched"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
@@ -1062,10 +1150,12 @@ for n in 201 202 203 204 205; do
 done
 [[ "$(state_calls)" == "0" ]] || fail "polled with no ARMABLE row: $(state_calls) state calls"
 end_case "case 11a rescue off leaves excluded PRs untouched"
+fi
 
 # ==========================================================================================
 # 33 — DIRTY PRs join the stage-1 batch; rescue honours scope and slot guard
 # ==========================================================================================
+if should_run "case 33 DIRTY joins the batch"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_2PR_EXCLUDED" > "$SCRATCH/attack-out"
@@ -1120,8 +1210,10 @@ DIRTYRES=0 run --worker --max-ready 2
 [[ "$(prlist)" == "2101,2102" ]] \
     || fail "case 33 cap reserve-0: want 2101,2102 (ordered-first), got $(prlist)"
 end_case "case 33 DIRTY joins the batch"
+fi
 
 # --- 11e: only DIRTY is eligible; unset and empty seam values BOTH mean enabled ---------------
+if should_run "case 11e DIRTY-only; unset and empty seam both enable"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
@@ -1139,8 +1231,10 @@ RESCUE="" run --worker                         # seam PRESENT but EMPTY
 [[ "$(cat "$SCRATCH/ready.argv")" == "$UNSET_ARGV" ]] \
     || fail "an empty PR_CYCLE_RESCUE behaved differently from an unset one"
 end_case "case 11e DIRTY-only; unset and empty seam both enable"
+fi
 
 # --- 11f: a live launchd slot blocks that PR only; and the dry run reports, never fires -------
+if should_run "case 11f slot guard and dry-run report"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
@@ -1170,11 +1264,13 @@ grep -qF '#204' <<< "$OUT" && fail "dry run listed the out-of-section decoy as a
 RESCUE=0 run --dry-run
 grep -qF 'DIRTY rescue: disabled' <<< "$OUT" || fail "dry run did not report the kill switch"
 end_case "case 11f slot guard and dry-run report"
+fi
 
 
 # ==========================================================================================
 # 12 — triage exit codes
 # ==========================================================================================
+if should_run "case 12 triage exit codes"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -1197,11 +1293,13 @@ grep -qE 'your turn [1-9]' <<< "$OUT" || fail "triage exit 1: your-turn count sh
 grep -qx '101' "$(rundir)/armed.txt" \
     || fail "triage exit 1: ARMABLE 101 should be in armed.txt"
 end_case "case 12 triage exit codes"
+fi
 
 
 # ==========================================================================================
 # 35 — your-turn DM links armed and non-armed PRs correctly
 # ==========================================================================================
+if should_run "case 35 your-turn DM links"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -1248,10 +1346,43 @@ run --worker --no-dm
 [[ "$(calls dm)" == "0" ]] || fail "case 35: --no-dm still sent $(calls dm) DMs"
 [[ ! -s "$SCRATCH/dm.argv" ]] || fail "case 35: --no-dm left a dm argv record"
 end_case "case 35 your-turn DM links"
+fi
+
+# ==========================================================================================
+# your-turn-open-thread-ranks-first — OPEN-THREAD ranks in group 1 (before FEAT-AWAITING-SIGNOFF), carries 💬
+# ==========================================================================================
+if should_run "your-turn-open-thread-ranks-first"; then
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2101  ARMABLE  arm\n'
+    printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+    printf '#2103  OPEN-THREAD  armed, stalled on 1 open review thread(s): reply and resolve each, or gh pr merge --admin\n'
+} > "$SCRATCH/triage-out"
+{   printf '2102\thttps://github.com/a-jay85/IBL5/pull/2102\tAlpha PR title\n'
+    printf '2103\thttps://github.com/a-jay85/IBL5/pull/2103\tBeta PR title\n'
+} > "$SCRATCH/prlist.tsv"
+run --worker
+[[ $RC -eq 0 ]] || fail "open-thread-ranks-first: exit $RC, want 0"
+[[ "$(calls dm)" == "1" ]] || fail "open-thread-ranks-first: want 1 DM, got $(calls dm)"
+grep -qF '[#2103: Beta PR title](<https://github.com/a-jay85/IBL5/pull/2103>) — OPEN-THREAD — armed, stalled on 1 open review thread(s)' \
+    "$SCRATCH/dm.argv" || fail "open-thread-ranks-first: #2103 entry lacks the OPEN-THREAD action text: $(cat "$SCRATCH/dm.argv")"
+grep -qF -- '- 💬 [#2103:' "$SCRATCH/dm.argv" \
+    || fail "open-thread-ranks-first: #2103 entry lacks the 💬 emoji after the bullet"
+# The DM text is one argv record, so compare byte offsets of the two entries.
+off_ot=$(grep -boF '[#2103:' "$SCRATCH/dm.argv" | head -1 | cut -d: -f1)
+off_fa=$(grep -boF '[#2102:' "$SCRATCH/dm.argv" | head -1 | cut -d: -f1)
+[[ -n "$off_ot" && -n "$off_fa" && "$off_ot" -lt "$off_fa" ]] \
+    || fail "open-thread-ranks-first: #2103 (offset '$off_ot') must precede #2102 (offset '$off_fa')"
+grep -qx '2101' "$(rundir)/armed.txt" || fail "open-thread-ranks-first: 2101 missing from armed.txt"
+grep -qx '2103' "$(rundir)/armed.txt" && fail "open-thread-ranks-first: 2103 must not be in armed.txt"
+end_case "your-turn-open-thread-ranks-first"
+fi
 
 # ==========================================================================================
 # 36 — your-turn DM degrades gracefully
 # ==========================================================================================
+if should_run "case 36 your-turn DM degrades"; then
 begin_case
 # (a) gh-fail-prlist: bare lines, no links
 reset_state
@@ -1301,10 +1432,12 @@ run --worker
 [[ $RC -eq 1 ]] || fail "case 36e: fleet failure should exit 1, got $RC"
 grep -qF 'stage 2 did not run' "$SCRATCH/dm.argv" || fail "case 36e: DM did not say stage 2 did not run"
 end_case "case 36 your-turn DM degrades"
+fi
 
 # ==========================================================================================
 # 20 — the dry-run default fires nothing
 # ==========================================================================================
+if should_run "case 20 dry-run default"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1326,10 +1459,12 @@ triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
 run --dry-run
 [[ "$OUT" == "$BARE" ]] || fail "--dry-run output differs from the bare form"
 end_case "case 20 dry-run default"
+fi
 
 # ==========================================================================================
 # 21 / 22 / 23 — artifact generation under --go
 # ==========================================================================================
+if should_run "case 21/22/23 artifacts"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}1"
@@ -1394,16 +1529,19 @@ PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 rm -f "$SCRATCH/.ibl5-pr-cycle.stop" "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "case 21/22/23 artifacts"
+fi
 
 # ==========================================================================================
 # 24 — an empty seam behaves exactly like an unset one
 # ==========================================================================================
+if should_run "case 24 empty seams"; then
 begin_case
 reset_state
 MAIN_OVERRIDE="" run --worker   # empty checkout seam falls back to the real hardcoded path
 [[ $RC -eq 1 ]] || fail "empty PR_CYCLE_MAIN_CHECKOUT did not fall back to the pinned default"
 unset MAIN_OVERRIDE
 end_case "case 24 empty seams"
+fi
 
 # ==========================================================================================
 # 27 — --only / --skip scope the WORK, and only the work
@@ -1412,6 +1550,7 @@ end_case "case 24 empty seams"
 # which PRs get a pr-ready-now session — never that the order among the kept PRs changed.
 
 # --- 27a: --only readies exactly the named PR, then drains -------------------------------
+if should_run "case 27a --only selects and preserves order"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -1449,8 +1588,10 @@ _a27a="$(sed -n 1p "$SCRATCH/ready.argv")"
 [[ "$_a27a" == "--pr-list 101,103 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=101,103" ]] \
     || fail "--only 103,101 argv: $_a27a"
 end_case "case 27a --only selects and preserves order"
+fi
 
 # --- 27b: --skip is the inverse ----------------------------------------------------------
+if should_run "case 27b --skip and the unfiltered baseline"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -1473,10 +1614,12 @@ _a27b="$(sed -n 1p "$SCRATCH/ready.argv")"
 [[ "$_a27b" == "--pr-list 101,102,103 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=101,102,103" ]] \
     || fail "unfiltered batch argv: $_a27b"
 end_case "case 27b --skip and the unfiltered baseline"
+fi
 
 # --- 27c: an --only PR the plan never mentions is announced, not silently drained --------
 # Without the warning this run is indistinguishable from success: nothing is orderable, so
 # DRAINED=1 and the log reads "queue drained" — which a human reads as "already clean".
+if should_run "case 27c unmatched --only is announced"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -1494,10 +1637,12 @@ triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK re
 run --worker --only 101,102
 grep -qF 'absent from the plan of attack' <<< "$OUT" && fail "false-positive absent warning"
 end_case "case 27c unmatched --only is announced"
+fi
 
 # --- 27d: the DIRTY-rescue path honours the scope ----------------------------------------
 # Without this, --only 101 would still spend an hour-long pr-ready-now session rebasing an
 # out-of-set DIRTY PR, which is the exact cost the flag exists to avoid.
+if should_run "case 27d rescue honours the scope"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
@@ -1516,8 +1661,10 @@ run --worker --only 101,201
 _a27d="$(sed -n 1p "$SCRATCH/ready.argv")"
 grep -qF '201' <<< "$_a27d" || fail "in-scope DIRTY #201 was not in --pr-list: $_a27d"
 end_case "case 27d rescue honours the scope"
+fi
 
 # --- 27e: the dry run reports the scope, including the rescues it would skip -------------
+if should_run "case 27e dry run reports the scope"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
@@ -1538,10 +1685,12 @@ grep -qF '#102' <<< "$OUT" || fail "dry run stage 1 list ignored --skip"
 run
 grep -qF 'would use scope:      every orderable PR' <<< "$OUT" || fail "unfiltered dry run mislabels its scope"
 end_case "case 27e dry run reports the scope"
+fi
 
 # --- 27f: --go threads the scope into the detached worker --------------------------------
 # --go re-invokes this script as --worker through an emitted runner. A flag not propagated
 # there is silently dropped: the dry run reports the scope and the real run ignores it.
+if should_run "case 27f --go propagates the scope"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}2"
@@ -1572,6 +1721,7 @@ grep -qF -- '${SKIP:+--skip $SKIP}' "$RUNNER" || fail "runner does not pass --sk
 rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "case 27f --go propagates the scope"
+fi
 
 # ==========================================================================================
 # 25 / 26 — static guards over the driver source, and their vacuity check
@@ -1605,7 +1755,7 @@ g_no_bucket_cond() {
     # grouping awk is the second exempt span: it sorts rows into display groups and decides
     # nothing about arming (it starts at the yt-g cleanup line and ends at its print redirect).
     ! noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-5\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
         | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
 # Sibling of g_no_bucket_cond: both of its awk skip spans must open AND close. If the closing
@@ -1613,7 +1763,7 @@ g_no_bucket_cond() {
 # EOF and g_no_bucket_cond silently stops checking the rest of the file.
 g_bucket_spans_close() {
     noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-5\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
 }
 # The only sleep bin/pr-cycle may contain sits between the two unknown-warmup markers.
 g_no_sleep() {
@@ -1672,11 +1822,11 @@ bucket_emoji_src() {
 # Every bucket the map names, plus the fallback. Row = "<bucket>|<emoji>"; "|❓" is the empty string.
 # PAUSED is a real pr-triage bucket with no arm today, so it pins to the fallback.
 BUCKET_EMOJI_TABLE=(
-    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'BLOCKED-DEP|🔗'
+    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'OPEN-THREAD|💬' 'BLOCKED-DEP|🔗'
     'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️'
     'PAUSED|❓' 'NO-SUCH-BUCKET|❓' '|❓'
 )
-BUCKET_EMOJI_ARMS=8   # named (non-*) arms the table above covers
+BUCKET_EMOJI_ARMS=9  # named (non-*) arms the table above covers
 # $1 = driver file. Prints one line per mismatch; returns 1 on any mismatch or a missing function.
 bucket_emoji_check() {
     local src arms
@@ -1719,6 +1869,7 @@ g_bucket_emoji_pure_map() {
 }
 # end bucket_emoji helpers
 
+if should_run "case 25 static guards"; then
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond g_bucket_spans_close \
          g_no_sleep g_no_poll g_one_ready g_no_timeout_grep \
@@ -1732,7 +1883,9 @@ for f in "$DRIVER" "$SCRIPT_DIR/test-pr-cycle"; do
     bash -n "$f" 2>/dev/null || fail "$f does not parse under bash -n"
 done
 end_case "case 25 static guards"
+fi
 
+if should_run "case 26 guards are not vacuous"; then
 begin_case
 mutant() { cp "$DRIVER" "$SCRATCH/mutant"; }
 mutant; echo 'gh pr merge 101 --squash --auto' >> "$SCRATCH/mutant"
@@ -1820,6 +1973,7 @@ grep -qE "DIRTY\)[[:space:]]+printf 'X'" "$SCRATCH/mutant" || fail "mutant did n
 bucket_emoji_check "$SCRATCH/mutant" > /dev/null \
     && fail "vacuous: bucket_emoji_check passed a wrong DIRTY emoji"
 end_case "case 26 guards are not vacuous"
+fi
 
 # ==========================================================================================
 # 27 — the pr-ready skip needs BOTH ARMABLE and a current READY verdict
@@ -1828,6 +1982,7 @@ end_case "case 26 guards are not vacuous"
 # reviewed tree still equals the head's tree and whose verdict line reads READY. The
 # readying session is declined and the PR still proceeds through arming, polling and the
 # merge count.
+if should_run "case 27 skip requires ARMABLE and a current READY verdict"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1894,6 +2049,7 @@ grep -qE 'armed 3[^0-9]' <<< "$OUT" || fail "three skips: want armed count 3 in 
 [[ "$(calls triage)" == "2" ]] \
     || fail "three skips: want 2 triage calls (1 cached precheck + 1 arm), got $(calls triage)"
 end_case "case 27 skip requires ARMABLE and a current READY verdict"
+fi
 
 # ==========================================================================================
 # 28 — the skip's opt-out and its fail-toward-running-pr-ready paths
@@ -1903,6 +2059,7 @@ end_case "case 27 skip requires ARMABLE and a current READY verdict"
 # because no verdict exists rather than because of the fault under test.
 #
 # 28a — the rejected form: PR_CYCLE_SKIP_READY_WHEN_ARMABLE=0 restores the old behaviour.
+if should_run "case 28 skip opt-out and fail-toward-running paths"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2063,10 +2220,12 @@ run --worker
 [[ "$(calls ready)" == "0" ]] \
     || fail "a narrated NOT READY finding blocked a READY verdict: $(calls ready) ready call(s), want 0"
 end_case "case 28 skip opt-out and fail-toward-running paths"
+fi
 
 # ==========================================================================================
 # 29 — CI actually runs this harness
 # ==========================================================================================
+if should_run "case 29 CI wiring"; then
 begin_case
 WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
 if [[ -f "$WF" ]]; then
@@ -2077,10 +2236,12 @@ else
     fail "workflow file not found at $WF"
 fi
 end_case "case 29 CI wiring"
+fi
 
 # ==========================================================================================
 # 30 — stage-1 batch argv
 # ==========================================================================================
+if should_run "case 30 stage-1 batch argv"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -2099,10 +2260,12 @@ run --worker --jobs 2
 [[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 2 --go --wait --allow-test-only --conflict-fix-prs=2101,2102,2103,2104" ]] \
     || fail "case 30 --jobs 2: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 30 stage-1 batch argv"
+fi
 
 # ==========================================================================================
 # 31 — stage-1 halts on fleet failure; text grep gone
 # ==========================================================================================
+if should_run "case 31 stage-1 halts on fleet failure"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -2122,10 +2285,12 @@ run --worker
 [[ $RC -eq 0 ]] || fail "case 31 negative twin: TIMED OUT text with rc 0 should not halt, got $RC"
 [[ "$(arm_calls)" == "1" ]] || fail "case 31 negative twin: arm did not run"
 end_case "case 31 stage-1 halts on fleet failure"
+fi
 
 # ==========================================================================================
 # 32 — --max-ready cap
 # ==========================================================================================
+if should_run "case 32 max-ready cap"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -2148,10 +2313,12 @@ run --worker --max-ready 10
 [[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr-list 2101,2102,2103,2104 --jobs 3 --go --wait --allow-test-only --conflict-fix-prs=2101,2102,2103,2104" ]] \
     || fail "case 32 no-cap: argv: $(sed -n '1p' "$SCRATCH/ready.argv")"
 end_case "case 32 max-ready cap"
+fi
 
 # ==========================================================================================
 # 34 — single arm, no poll
 # ==========================================================================================
+if should_run "case 34 single arm, no poll"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -2163,10 +2330,12 @@ _state_cnt="$(grep -c -- '--json state' "$SCRATCH/gh.argv" 2>/dev/null)"
 [[ "${_state_cnt:-0}" == "0" ]] || fail "case 34: state poll found; $_state_cnt calls"
 [[ $RC -eq 0 ]] || fail "case 34: want RC 0, got $RC"
 end_case "case 34 single arm, no poll"
+fi
 
 # ==========================================================================================
 # 37 — empty stage 1 still arms
 # ==========================================================================================
+if should_run "case 37 empty stage 1 still arms"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2177,10 +2346,12 @@ run --worker
 [[ "$(calls ready)" == "0" ]] || fail "case 37: fleet called despite empty stage 1, got $(calls ready)"
 [[ "$(arm_calls)" == "1" ]] || fail "case 37: arm did not run, got $(arm_calls)"
 end_case "case 37 empty stage 1 still arms"
+fi
 
 # ==========================================================================================
 # 38 — your-turn DM length cap
 # ==========================================================================================
+if should_run "case 38 your-turn DM length cap"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
@@ -2211,10 +2382,12 @@ _dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
 [[ "$_dm_len" -le 2000 ]] || fail "case 38: DM exceeds 2000 chars ($_dm_len)"
 grep -qF 'more:' "$SCRATCH/dm.argv" || fail "case 38: DM did not use the overflow line"
 end_case "case 38 your-turn DM length cap"
+fi
 
 # ==========================================================================================
 # your-turn grouped — rows sit under typed headers with full counts; empty groups vanish
 # ==========================================================================================
+if should_run "your-turn grouped"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2252,10 +2425,12 @@ for _n in 101 102 103 104 105 106; do
     esac
 done
 end_case "your-turn grouped"
+fi
 
 # ==========================================================================================
 # your-turn grouped cap — the header keeps the full count while the rows truncate
 # ==========================================================================================
+if should_run "your-turn grouped cap"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2275,10 +2450,12 @@ _blk="$(sed -n 's/.*\(Your turn:.*\)/\1/p' "$SCRATCH/dm.argv")"
 # Row cap is 1700 chars (the plan said 1800; case 38's 2000-char DM limit needs the lower cap).
 [[ "${#_blk}" -le 2000 ]] || fail "your-turn grouped cap: your-turn block is ${#_blk} chars, want <= 2000"
 end_case "your-turn grouped cap"
+fi
 
 # ==========================================================================================
 # 39 — PR-number pattern in _arm_and_classify: accepts #12, rejects #12abc
 # ==========================================================================================
+if should_run "case 39 PR-number pattern rejects #12abc, accepts #12"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2293,6 +2470,7 @@ _rd39="$(rundir)"
 [[ "$(cat "$_rd39/armed.txt" 2>/dev/null)" == "12" ]] \
     || fail "case 39: armed.txt should be exactly '12', got: $(cat "$_rd39/armed.txt" 2>/dev/null)"
 end_case "case 39 PR-number pattern rejects #12abc, accepts #12"
+fi
 
 # ==========================================================================================
 # 40 — _precheck_bucket cache: triage plain call happens exactly once per run
@@ -2302,6 +2480,7 @@ end_case "case 39 PR-number pattern rejects #12abc, accepts #12"
 # and subsequent calls read from the cached precheck.txt. If the cache were removed,
 # each PR would trigger its own triage call and the assertion below would see 4 calls
 # (3 plain + 1 arm) rather than 2 (1 plain + 1 arm).
+if should_run "case 40 precheck-bucket cache fires triage exactly once"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -2314,15 +2493,18 @@ _plain40="$(( $(calls triage) - $(arm_calls) ))"
 [[ "$_plain40" == "1" ]] \
     || fail "case 40: want 1 plain triage call (cache hit for PR 2+3), got $_plain40 ($(calls triage) total, $(arm_calls) arm)"
 end_case "case 40 precheck-bucket cache fires triage exactly once"
+fi
 
 # ==========================================================================================
 # 41 — _bucket_emoji maps every bucket it names, and unknown/empty/PAUSED fall back to ❓
 # ==========================================================================================
 # Case 35 only sees two emojis end to end. This case evals the extracted function and checks
 # all eight arms plus the fallback, so a swapped or deleted arm fails here.
+if should_run "case 41 bucket emoji map covers every arm and the fallback"; then
 begin_case
 _out41="$(bucket_emoji_check "$DRIVER")" || fail "case 41: $_out41"
 end_case "case 41 bucket emoji map covers every arm and the fallback"
+fi
 
 # ==========================================================================================
 # Helpers for Fix 3/4 harness fixtures
@@ -2432,6 +2614,7 @@ install_harness_result() {
 # ==========================================================================================
 # Fix 1 — armed-skip
 # ==========================================================================================
+if should_run "case fix1 armed-skip"; then
 begin_case
 reset_state
 # armed+CLEAN (not DIRTY), not BLOCKED-CHECK → should be skipped
@@ -2488,10 +2671,12 @@ run --worker
 [[ "$(calls ready)" == "1" ]] || fail "fix1 triage-rc-1: fleet should have run (empty bucket = fail open), got $(calls ready) calls"
 grep -qF 'auto-merge already armed' <<< "$OUT" && fail "fix1 triage-rc-1: armed-skip fired despite empty bucket"
 end_case "case fix1 armed-skip"
+fi
 
 # ==========================================================================================
 # Fix 2 — auth probe
 # ==========================================================================================
+if should_run "case fix2 auth probe false halts before fleet"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2501,6 +2686,7 @@ AUTHPROBE=false run --worker
 [[ "$(calls ready)" == "0" ]] || fail "fix2 probe false: fleet ran $(calls ready) time(s), want 0"
 grep -qi 'auth' <<< "$OUT" || fail "fix2 probe false: no auth message in output (got: $OUT)"
 end_case "case fix2 auth probe false halts before fleet"
+fi
 
 # ==========================================================================================
 # Fix 3 — harness-format sticky verdict (Reviewed diff path)
@@ -2509,6 +2695,7 @@ end_case "case fix2 auth probe false halts before fleet"
 DIFF_A="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 DIFF_B="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+if should_run "case fix3 harness-format sticky verdict"; then
 begin_case
 # Case A: harness sticky with matching diff → skip pr-ready
 reset_state
@@ -2545,6 +2732,7 @@ run --worker
 [[ "$(calls ready)" == "0" ]] || fail "fix3 legacy tree: fleet ran $(calls ready) time(s), want 0"
 grep -qF 'skipping pr-ready' <<< "$OUT" || fail "fix3 legacy tree: skip line missing"
 end_case "case fix3 harness-format sticky verdict"
+fi
 
 # A real copy of the harness, so the fingerprint's harness hash is stable and the copy owns
 # its own out/state. Seed and check both load this copy, so they hash the same bytes.
@@ -2607,6 +2795,7 @@ hr_cleanup() {
 # ==========================================================================================
 # Fix 4 — held-unchanged skip
 # ==========================================================================================
+if should_run "case fix4 held-unchanged skip"; then
 begin_case
 # Case A: held for {3}, diff unchanged → skip
 reset_state
@@ -2667,6 +2856,7 @@ SKIPHELD=0 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "fix4 SKIPHELD=0: fleet skipped despite kill switch; want 1 ready call"
 unset SKIPHELD
 end_case "case fix4 held-unchanged skip"
+fi
 
 # hu_prep <conds> [actual-diff] — one NEEDS-WORK PR whose last hold blocked <conds>, a sticky
 # whose **Reviewed diff:** is $DIFF_A, a current patch-id of [actual-diff] (default $DIFF_A),
@@ -2679,6 +2869,7 @@ hu_prep() {
     hr_fixture 101 first-slug "$1"
 }
 
+if should_run "case fix4 human-only held-unchanged skip"; then
 begin_case
 # A hold on {1,7,8} with an unchanged head is skipped and the skip names every condition.
 hu_prep "1,7,8"
@@ -2772,6 +2963,7 @@ grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
 unset SKIPHELD
 hr_cleanup
 end_case "case fix4 human-only held-unchanged skip"
+fi
 
 # ==========================================================================================
 # Pre-fire holdrepeat skip
@@ -2793,6 +2985,7 @@ hr_skip_case() {
     return 0
 }
 
+if should_run "case holdrepeat pre-fire skip"; then
 begin_case
 hr_skip_case "A held {7,8} (#2648 shape)" first-slug "7,8"
 hr_cleanup
@@ -2880,6 +3073,7 @@ grep -qF '#102 skipped' <<< "$OUT" && fail "holdrepeat I: 102 reported as skippe
 hr_cleanup
 unset HRHARNESS HRSTATE
 end_case "case holdrepeat pre-fire skip"
+fi
 
 # ==========================================================================================
 # Rebase-only mode: a DIRTY PR whose last hold was human-only and whose diff is unchanged
@@ -2908,6 +3102,7 @@ ro_setup() {
 }
 ro_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
 
+if should_run "rebase-only-selected"; then
 begin_case
 ro_setup 101 first-slug DIRTY
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2918,7 +3113,9 @@ grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-sele
 grep -qF '#101 — DIRTY, last hold was human-only and the diff is unchanged: rebase-only' <<< "$OUT" \
     || fail "rebase-only-selected: stdout lacks the rebase-only line (out: $OUT)"
 end_case "rebase-only-selected"
+fi
 
+if should_run "rebase-only-not-eligible"; then
 begin_case
 ro_setup 101 first-slug DIRTY
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2926,9 +3123,11 @@ RO_STUB_RC=0 HRHARNESS="$RO_STUB" run --worker
 grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-not-eligible: argv carries --rebase-only-prs: $(ro_argv)"
 grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-not-eligible: argv lacks --state-changed-prs=101: $(ro_argv)"
 end_case "rebase-only-not-eligible"
+fi
 
 # A DIRTY PR held on {1,7} is outside the rebase-only set {3,7,8}: the widened skip must not
 # swallow it. It is routed state-changed so the harness can review the rebased tree.
+if should_run "case dirty-1-7-not-skipped-not-rebase-only"; then
 begin_case
 ro_setup 101 first-slug DIRTY
 install_harness_result 101 first-slug shipped-held "1,7" DIRTY
@@ -2943,7 +3142,9 @@ grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" \
 grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
     && fail "dirty-1-7-not-skipped-not-rebase-only: skip line written for a DIRTY PR"
 end_case "case dirty-1-7-not-skipped-not-rebase-only"
+fi
 
+if should_run "rebase-only-patch-id-moved"; then
 begin_case
 ro_setup 101 first-slug DIRTY "$DIFF_B"
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2951,7 +3152,9 @@ RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
 [[ "$(calls ready)" == "1" ]] || fail "rebase-only-patch-id-moved: ready calls $(calls ready), want 1"
 grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-patch-id-moved: argv carries --rebase-only-prs: $(ro_argv)"
 end_case "rebase-only-patch-id-moved"
+fi
 
+if should_run "rebase-only-blocked-check-stays"; then
 begin_case
 ro_setup 101 first-slug BLOCKED-CHECK
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2959,8 +3162,10 @@ RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
 grep -qF -- '--state-changed-prs=101' <<< "$(ro_argv)" || fail "rebase-only-blocked-check-stays: argv lacks --state-changed-prs=101: $(ro_argv)"
 grep -qF -- '--rebase-only-prs' <<< "$(ro_argv)" && fail "rebase-only-blocked-check-stays: argv carries --rebase-only-prs: $(ro_argv)"
 end_case "rebase-only-blocked-check-stays"
+fi
 
 # The PR reaches Stage 1 only through the excluded-DIRTY rescue loop.
+if should_run "rebase-only-rescue-path"; then
 begin_case
 ro_setup 201 dirty-slug DIRTY
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
@@ -2968,10 +3173,12 @@ RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --worker
 grep -qF '201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: 201 was not rescued: $(ro_argv)"
 grep -qF -- '--rebase-only-prs=201' <<< "$(ro_argv)" || fail "rebase-only-rescue-path: argv lacks --rebase-only-prs=201: $(ro_argv)"
 end_case "rebase-only-rescue-path"
+fi
 
 # Unset and empty both mean enabled; only 0 disables. The seam default is `${VAR:-1}`. Under
 # `${VAR-1}` an empty value stays empty, so the empty run pins that the `!= "0"` check still
 # selects it; a `= "1"` check fails that run.
+if should_run "rebase-only-env-seam"; then
 begin_case
 for _ro_mode in unset empty zero; do
     ro_setup 101 first-slug DIRTY
@@ -2989,7 +3196,9 @@ for _ro_mode in unset empty zero; do
     fi
 done
 end_case "rebase-only-env-seam"
+fi
 
+if should_run "rebase-only-dry-run-echo"; then
 begin_case
 ro_setup 101 first-slug DIRTY
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -2998,8 +3207,10 @@ RO_STUB_RC=10 HRHARNESS="$RO_STUB" run --dry-run
 grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--rebase-only-prs=101' \
     || fail "rebase-only-dry-run-echo: would-run line lacks --rebase-only-prs=101 (out: $OUT)"
 end_case "rebase-only-dry-run-echo"
+fi
 
 # A newer rebased-held run keeps the earlier hold, so the held-unchanged skip still applies.
+if should_run "held-unchanged-survives-rebased-held"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3015,7 +3226,9 @@ grep -qF 'held it for' <<< "$OUT" || fail "held-unchanged-survives-rebased-held:
 rm -rf "$SCRATCH/harness-out/live-first-slug-20260902-120000-99999"
 hr_cleanup
 end_case "held-unchanged-survives-rebased-held"
+fi
 
+if should_run "rebased-outcome-accounting"; then
 begin_case
 reset_state
 rm -rf "$SCRATCH/res"
@@ -3032,6 +3245,7 @@ grep -qxF '#101 rebased rebase-only' <<< "$OUT" || fail "rebased-outcome-account
     || fail "rebased-outcome-accounting: TSV row is '$(sed -n 2p "$SCRATCH/res/result.tsv" 2>/dev/null)'"
 rm -rf "$SCRATCH/res" "$SCRATCH/fleetlogs"
 end_case "rebased-outcome-accounting"
+fi
 
 # ==========================================================================================
 # Pre-fire held-unfixable marker skip
@@ -3078,6 +3292,7 @@ hm_fires() {  # <label>: the PR fired once and is in stage1.txt
     return 0
 }
 
+if should_run "case held-unfixable marker pre-fire skip"; then
 begin_case
 
 # M-A: an active marker suppresses the PR with no worktree.
@@ -3249,6 +3464,7 @@ PY
 done
 echo "PASS: heldmarker unrealised head mismatch proceeds"
 end_case "case held-unfixable marker pre-fire skip"
+fi
 
 # ==========================================================================================
 # Holdrepeat auto-fix route: a skip that is fix-eligible joins the fleet call instead
@@ -3285,6 +3501,7 @@ hf_setup() {
 }
 hf_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
 
+if should_run "holdrepeat-skip-routes-fix"; then
 begin_case
 hf_setup "3"
 HRHARNESS="$HRH" run --worker
@@ -3297,7 +3514,9 @@ grep -qxF 101 "$(rundir)/stage1-holdrepeat-fix.txt" 2>/dev/null || fail "holdrep
 grep -qF '#101 — holdrepeat would decline' <<< "$OUT" && fail "holdrepeat-skip-routes-fix: the plain skip line still printed"
 hr_cleanup
 end_case "holdrepeat-skip-routes-fix"
+fi
 
+if should_run "holdrepeat-skip-other-condition-stays"; then
 begin_case
 hf_setup "3,14"
 HRHARNESS="$HRH" run --worker
@@ -3308,9 +3527,11 @@ grep -qF -- '--holdrepeat-fix-prs' <<< "$(hf_argv)" && fail "holdrepeat-skip-oth
 grep -qF '#101 — holdrepeat would decline' <<< "$OUT" || fail "holdrepeat-skip-other-condition-stays: skip line missing (out: $OUT)"
 hr_cleanup
 end_case "holdrepeat-skip-other-condition-stays"
+fi
 
 # The ledger already holds this fingerprint, so fix-eligible answers give-up (rc 11) and the
 # PR stays skipped. --no-mark must leave giveup_dm empty: the DM belongs to bin/postplan-fix.
+if should_run "holdrepeat-skip-attempted-stays"; then
 begin_case
 hf_setup "3"
 _hf_fp="$(env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 -c \
@@ -3329,9 +3550,11 @@ jq -e '.giveup_dm == []' "$SCRATCH/hrstate/first-slug.holdrepeat-fix.json" > /de
     || fail "holdrepeat-skip-attempted-stays: giveup_dm is not empty (--no-mark not honoured)"
 hr_cleanup
 end_case "holdrepeat-skip-attempted-stays"
+fi
 
 # The same route through the held-unfixable marker branch. The record has no dm_sent_key, so
 # the older holdrepeat skip fails open and only the marker skip is under test.
+if should_run "heldmarker-skip-routes-fix"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3346,8 +3569,10 @@ grep -qF 'held-unfixable marker active' <<< "$OUT" && fail "heldmarker-skip-rout
 grep -qF 'holdrepeat would decline' <<< "$OUT" && fail "heldmarker-skip-routes-fix: the older holdrepeat skip fired; the case proves nothing"
 hm_cleanup
 end_case "heldmarker-skip-routes-fix"
+fi
 
 # Kill switch: 0 keeps the plain skip; empty means the default (1) and routes.
+if should_run "holdrepeat-autofix-kill-switch"; then
 begin_case
 hf_setup "3"
 PR_CYCLE_HOLDREPEAT_AUTOFIX=0 HRHARNESS="$HRH" run --worker
@@ -3359,6 +3584,7 @@ PR_CYCLE_HOLDREPEAT_AUTOFIX="" HRHARNESS="$HRH" run --worker
 grep -qF -- '--holdrepeat-fix-prs=101' <<< "$(hf_argv)" || fail "holdrepeat-autofix-kill-switch: empty did not route: $(hf_argv)"
 hr_cleanup
 end_case "holdrepeat-autofix-kill-switch"
+fi
 
 # A stub harness: `check` answers DECLINE and, as the PR was already in the state-changed and
 # rebase-only lists, seeds both lists with 101; `fix-eligible` and `rebase-eligible` answer 10.
@@ -3381,6 +3607,7 @@ if cmd in ("fix-eligible", "rebase-eligible"):
 sys.exit(0)
 PY
 
+if should_run "holdrepeat-route-no-overlap"; then
 begin_case
 hf_setup "3"
 HF_STUB_RUNDIR="$(rundir)" HRHARNESS="$HF_STUB" run --worker
@@ -3392,6 +3619,7 @@ grep -qxF 101 "$(rundir)/stage1-state-changed.txt" 2>/dev/null && fail "holdrepe
 grep -qxF 101 "$(rundir)/stage1-rebase-only.txt" 2>/dev/null && fail "holdrepeat-route-no-overlap: 101 left in stage1-rebase-only.txt"
 hr_cleanup
 end_case "holdrepeat-route-no-overlap"
+fi
 
 # ==========================================================================================
 # State-change exemption (DIRTY / BLOCKED-CHECK) and stacked-PR skip
@@ -3416,6 +3644,7 @@ JSON_EOF
 }
 
 # 1: a DIRTY feat PR whose holdrepeat record would decline it still fires, with --state-changed.
+if should_run "case dirty-feat-pr-rescued-unarmed"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3443,8 +3672,10 @@ grep -qF -- '--state-changed-prs=2201' <<< "$(cat "$SCRATCH/ready.argv")" \
 grep -qxF 2201 "$(rundir)/armed.txt" 2>/dev/null && fail "dirty-feat-pr-rescued-unarmed rescue loop: 2201 was armed"
 hr_cleanup
 end_case "case dirty-feat-pr-rescued-unarmed"
+fi
 
 # 2: a red check (BLOCKED-CHECK) on a PR held for {3,7} with an unchanged diff still fires.
+if should_run "case red-held-37-unchanged-still-fires"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3460,8 +3691,10 @@ grep -qF 'diff is unchanged' "$(rundir)/stage1-skipped.txt" \
 grep -qF -- '--state-changed-prs=101' <<< "$(cat "$SCRATCH/ready.argv")" \
     || fail "red-held-37-unchanged-still-fires: ready argv lacks --state-changed-prs=101"
 end_case "case red-held-37-unchanged-still-fires"
+fi
 
 # 3: a green PR waiting on human sign-off keeps both pre-fire skips and gets no flag.
+if should_run "case feat-awaiting-signoff-no-bypass"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3477,8 +3710,10 @@ grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
     && fail "feat-awaiting-signoff-no-bypass: --state-changed-prs passed"
 hr_cleanup
 end_case "case feat-awaiting-signoff-no-bypass"
+fi
 
 # 4: a stacked PR is skipped on both paths, even when red and held; the flag never names it.
+if should_run "case stacked-pr-skipped-pr-cycle"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_DIRTY_RESCUE" > "$SCRATCH/attack-out"
@@ -3499,8 +3734,10 @@ grep -qxF 2990 "$(rundir)/stage1-state-changed.txt" && fail "stacked-pr-skipped-
 grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
     && fail "stacked-pr-skipped-pr-cycle: --state-changed-prs passed"
 end_case "case stacked-pr-skipped-pr-cycle"
+fi
 
 # 5: a base no open PR has as its head (a deleted branch) is not stacked.
+if should_run "case stacked-on-closed-branch-fires"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3513,8 +3750,10 @@ run --worker
 grep -qxF 101 "$(rundir)/stage1.txt" || fail "stacked-on-closed-branch-fires: 101 missing from stage1.txt"
 grep -qF 'stacked on' "$(rundir)/stage1-skipped.txt" && fail "stacked-on-closed-branch-fires: stacked-on line written"
 end_case "case stacked-on-closed-branch-fires"
+fi
 
 # 6: when the open-PR list cannot be fetched, stackedness is unknown and the PR fires (fail open).
+if should_run "case armed-state-failed-fails-open"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3525,8 +3764,10 @@ run --worker
 grep -qxF 101 "$(rundir)/stage1.txt" || fail "armed-state-failed-fails-open: 101 missing from stage1.txt"
 grep -qF 'stacked on' "$(rundir)/stage1-skipped.txt" && fail "armed-state-failed-fails-open: stacked-on line written"
 end_case "case armed-state-failed-fails-open"
+fi
 
 # 7: --max-ready trims stage1.txt first; the flag names only survivors, in one fleet call.
+if should_run "case state-changed-cap-intersection"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -3541,6 +3782,7 @@ grep -qF -- '102' <<< "$(sed -n '1p' "$SCRATCH/ready.argv")" \
 grep -qF '#102 — over --max-ready cap' "$(rundir)/stage1-skipped.txt" \
     || fail "state-changed-cap-intersection: 102 over-cap line missing"
 end_case "case state-changed-cap-intersection"
+fi
 
 # ==========================================================================================
 # Skip reasons in the your-turn DM (PR_CYCLE_SKIP_NOTES)
@@ -3549,6 +3791,7 @@ SKIPIN="$SCRATCH/skip-notes-in.tsv"
 # dm.argv joins the DM's lines with spaces, so row order is checked with an ordered glob.
 
 # 1: tick notes become a Skipped block, ordered stacked, over-cap, then low-value.
+if should_run "case skip-notes-listed-in-dm"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3561,9 +3804,11 @@ grep -qF '**Skipped (3)**' <<< "$_dm" || fail "skip-notes-listed-in-dm: header m
 [[ "$_dm" == *'- #2989 — stacked on #2950'*'- #2990 — over the 3-per-run cap; next tick'*'- #3001 — checks green'* ]] \
     || fail "skip-notes-listed-in-dm: rows out of order: $_dm"
 end_case "case skip-notes-listed-in-dm"
+fi
 
 # 2: a your-turn row carries its own reason and is not repeated under Skipped; the row of a PR
 # pr-cycle never fired has no rescue suffix.
+if should_run "case skip-note-suffix-on-your-turn-row"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3579,8 +3824,10 @@ grep -qF '(skipped: stacked on #50)' <<< "$_dm" || fail "skip-note-suffix-on-you
 grep -qF '**Skipped' <<< "$_dm" && fail "skip-note-suffix-on-your-turn-row: row repeated under Skipped: $_dm"
 grep -qF '(rescue:' <<< "$_dm" && fail "unfired-row-no-suffix: an unfired row carries a rescue suffix: $_dm"
 end_case "case skip-note-suffix-on-your-turn-row"
+fi
 
 # 3: armed and fired PRs never appear under Skipped; a PR nothing else mentions does.
+if should_run "case skip-notes-drop-armed-and-fired"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -3600,8 +3847,10 @@ grep -qF '#777' <<< "$_sk" || fail "skip-notes-drop-armed-and-fired: 777 missing
 grep -qF '#101' <<< "$_sk" && fail "skip-notes-drop-armed-and-fired: armed 101 listed: $_sk"
 grep -qF '#102' <<< "$_sk" && fail "skip-notes-drop-armed-and-fired: fired 102 listed: $_sk"
 end_case "case skip-notes-drop-armed-and-fired"
+fi
 
 # 4: the env seam may be unset, empty, or name a missing file. One stage1 reason still shows.
+if should_run "case skip-notes-env-unset-empty-missing"; then
 begin_case
 for _mode in skip-notes-env-unset skip-notes-env-empty skip-notes-env-missing; do
     reset_state
@@ -3625,8 +3874,10 @@ for _mode in skip-notes-env-unset skip-notes-env-empty skip-notes-env-missing; d
     grep -qF 'No such file' "$ERR" && fail "$_mode: 'No such file' on stderr"
 done
 end_case "case skip-notes-env-unset-empty-missing"
+fi
 
 # 5: lines that do not start with a PR number and a tab are ignored.
+if should_run "case skip-notes-malformed-lines-ignored"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3639,9 +3890,11 @@ grep -qF '**Skipped (1)**' <<< "$_dm" || fail "skip-notes-malformed-lines-ignore
 grep -qF '#2989 — stacked on #2950' <<< "$_dm" || fail "skip-notes-malformed-lines-ignored: 2989 row missing: $_dm"
 grep -qF 'abc' <<< "$_dm" && fail "skip-notes-malformed-lines-ignored: malformed line listed: $_dm"
 end_case "case skip-notes-malformed-lines-ignored"
+fi
 
 # 6: 80 notes under a short your-turn list: every your-turn row stays, the Skipped block is
 # cut with a pointer line, and the DM stays inside case 38's length bound.
+if should_run "case skip-notes-cap-order"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3678,8 +3931,10 @@ grep -qF '**Skipped' "$SCRATCH/dm.argv" && fail "skip-notes-cap-order overflow: 
 _dm_len="$(wc -m < "$SCRATCH/dm.argv" | tr -d ' ')"
 [[ "$_dm_len" -le 2000 ]] || fail "skip-notes-cap-order overflow: DM exceeds 2000 chars ($_dm_len)"
 end_case "case skip-notes-cap-order"
+fi
 
 # 7: the launcher bakes the seam into the runner header.
+if should_run "case launcher-exports-skip-notes"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}4"
@@ -3698,8 +3953,10 @@ grep -qxF "export PR_CYCLE_SKIP_NOTES=''" "$RUNNER" || fail "launcher-exports-sk
 rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
 unset TSPIN
 end_case "case launcher-exports-skip-notes"
+fi
 
 # 8: nothing left for the human, one tick note: "Your turn: nothing" then the Skipped block.
+if should_run "case your-turn-nothing-with-skips"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3713,8 +3970,10 @@ _dm="$(cat "$SCRATCH/dm.argv")"
 [[ "$_dm" == *'Your turn: nothing'*'**Skipped (1)**'*'- #777 — draft'* ]] \
     || fail "your-turn-nothing-with-skips: wrong DM: $_dm"
 end_case "case your-turn-nothing-with-skips"
+fi
 
 # 9: a halted run builds no notes and keeps its stage-2 line.
+if should_run "case halt-no-skip-block"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3726,8 +3985,10 @@ grep -qF 'Your turn: unknown — stage 2 did not run' <<< "$_dm" || fail "halt-n
 grep -qF '**Skipped' <<< "$_dm" && fail "halt-no-skip-block: Skipped block on a halted run: $_dm"
 [[ -e "$(rundir)/skip-notes.tsv" ]] && fail "halt-no-skip-block: skip-notes.tsv built on a halted run"
 end_case "case halt-no-skip-block"
+fi
 
 # 10: a fired PR left in your-turn shows what the rescue did.
+if should_run "case fired-pr-rescue-outcome-suffix"; then
 begin_case
 reset_state
 mkdir -p "$SCRATCH/fleetlogs"
@@ -3744,10 +4005,12 @@ triage_report "101 BLOCKED-CHECK fix-ci" > "$SCRATCH/triage-out"
 run --worker
 grep -qF '(rescue: failed)' "$SCRATCH/dm.argv" || fail "fired-pr-rescue-outcome-suffix: (rescue: failed) missing: $(cat "$SCRATCH/dm.argv")"
 end_case "case fired-pr-rescue-outcome-suffix"
+fi
 
 # --- result file: PR_CYCLE_RESULT_FILE holds one TSV row per PR in scope ---------------------
 # 101 is skipped by holdrepeat, 102 fires, 103 is over the --max-ready cap.
 RES="$SCRATCH/res/result.tsv"
+if should_run "result-file-rows"; then
 begin_case
 hr_cleanup
 reset_state
@@ -3772,8 +4035,10 @@ PR_CYCLE_RESULT_FILE="$RES" HRHARNESS="$HRH" run --worker --only 101,102,103 --m
 ls "$SCRATCH/res"/*.tmp.* >/dev/null 2>&1 && fail "result-file-rows: temp file left behind"
 hr_cleanup
 end_case "result-file-rows"
+fi
 
 # A HALT before Stage 1 fires leaves every PR in scope not-fired with reason halt.
+if should_run "result-file-halt"; then
 begin_case
 reset_state
 rm -rf "$SCRATCH/res"
@@ -3787,8 +4052,10 @@ PR_CYCLE_RESULT_FILE="$RES" run --worker --only 101,102
 [[ "$(sed -n 3p "$RES" 2>/dev/null)" == "$(printf '102\tnot-fired\t-\thalt')" ]] \
     || fail "result-file-halt: row 102 is '$(sed -n 3p "$RES" 2>/dev/null)'"
 end_case "result-file-halt"
+fi
 
 # A fired PR whose fleet log is missing reads failed/no-log.
+if should_run "result-file-fleet-no-log"; then
 begin_case
 reset_state
 rm -rf "$SCRATCH/res" "$SCRATCH/fleetlogs"
@@ -3799,8 +4066,10 @@ PR_CYCLE_RESULT_FILE="$RES" run --worker --only 101
 [[ "$(sed -n 2p "$RES" 2>/dev/null)" == "$(printf '101\tfired\tfailed\tno-log')" ]] \
     || fail "result-file-fleet-no-log: row 101 is '$(sed -n 2p "$RES" 2>/dev/null)'"
 end_case "result-file-fleet-no-log"
+fi
 
 # An unset seam and an empty seam both write nothing.
+if should_run "result-file-unset and result-file-empty"; then
 begin_case
 reset_state
 rm -rf "$SCRATCH/res"
@@ -3818,8 +4087,10 @@ PR_CYCLE_RESULT_FILE="" run --worker --only 101
 [[ -e "$SCRATCH/res" ]] && fail "result-file-empty: a result directory appeared"
 grep -qF 'WARN result file' "$ERR" && fail "result-file-empty: warned about a file nobody asked for"
 end_case "result-file-unset and result-file-empty"
+fi
 
 # --go bakes the seam into the runner header, %q-quoted, so it survives launchd.
+if should_run "launch-passes-result-file-seam"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}3"
@@ -3836,7 +4107,9 @@ _seam="$(bash -c "$(grep -m1 '^export PR_CYCLE_RESULT_FILE=' "$RUNNER"); printf 
 rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
 unset TSPIN
 end_case "launch-passes-result-file-seam"
+fi
 
+if should_run "case fix5 details-shaped harness sticky"; then
 begin_case
 # Case A: details-shaped sticky, matching diff -> skip pr-ready
 reset_state
@@ -3870,6 +4143,7 @@ run --worker
 _fix5_bare="$(calls ready)"
 [[ "$_fix5_legacy" == "$_fix5_bare" ]] || fail "fix5 READY WITH NOTES: suffix form ran fleet $_fix5_legacy time(s), bare form $_fix5_bare"
 end_case "case fix5 details-shaped harness sticky"
+fi
 
 # pr3267 dual-layout: the same sticky rendered in the old (v1) and new (v2) layout must
 # classify identically through _precheck_verdict. Fixture diff sha is DIFF_A.
@@ -3885,6 +4159,7 @@ install_fixture_verdict() {  # $1 = PR number, $2 = body, $3 = patch-id
 PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_FIX_DIR/post-plan-sticky-pr3267-v1.json")"
 PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_FIX_DIR/post-plan-sticky-pr3267-v2.json")"
 
+if should_run "pr3267-v1-precheck-ready"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3894,7 +4169,9 @@ run --worker
 [[ "$(calls ready)" == "0" ]] || fail "pr3267-v1-precheck-ready: fleet ran $(calls ready) time(s), want 0 (READY)"
 grep -qF 'skipping pr-ready' <<< "$OUT" || fail "pr3267-v1-precheck-ready: skip line missing"
 end_case "pr3267-v1-precheck-ready"
+fi
 
+if should_run "pr3267-v2-precheck-ready"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3904,7 +4181,9 @@ run --worker
 [[ "$(calls ready)" == "0" ]] || fail "pr3267-v2-precheck-ready: fleet ran $(calls ready) time(s), want 0 (READY)"
 grep -qF 'skipping pr-ready' <<< "$OUT" || fail "pr3267-v2-precheck-ready: skip line missing"
 end_case "pr3267-v2-precheck-ready"
+fi
 
+if should_run "pr3267-v2-not-ready-terminal"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3913,10 +4192,12 @@ install_fixture_verdict 101 "$(printf '%s\n' "$PR3267_V2" | sed 's/^READY WITH N
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "pr3267-v2-not-ready-terminal: fleet ran $(calls ready) time(s), want 1 (empty precheck)"
 end_case "pr3267-v2-not-ready-terminal"
+fi
 
 # bin/pr-cycle-tick hands bin/pr-cycle the exact argv shape `--go --only <csv> --max-ready <n>`.
 # Pin the dry-run form of it here, so a _normalize_prs change that drops comma input fails
 # this case before the tick breaks silently.
+if should_run "tick-argv-contract"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -3926,10 +4207,12 @@ reset_state
 run --dry-run --only 101,abc --max-ready 2
 [[ $RC -eq 2 ]] || fail "tick argv contract: '--only 101,abc' exit $RC, want 2"
 end_case "tick-argv-contract"
+fi
 
 # ==========================================================================================
 # 42 — DIRTY rescues get reserved --max-ready slots (PR_CYCLE_DIRTY_RESERVE)
 # ==========================================================================================
+if should_run "case 42 dirty reserve"; then
 begin_case
 unset DIRTYRES RESCUE
 reset_state
@@ -4009,10 +4292,12 @@ grep -qF -- '--rebase-only-prs=7901' <<< "$(ro_argv)" \
     || fail "case 42 rebase-only: argv lacks --rebase-only-prs=7901: $(ro_argv)"
 unset -f res_case
 end_case "case 42 dirty reserve"
+fi
 
 # ==========================================================================================
 # 43 — PR_CYCLE_DIRTY_RESERVE validation
 # ==========================================================================================
+if should_run "case 43 dirty reserve validation"; then
 begin_case
 for _bad in abc -1 1234567; do
     for _mode in --dry-run --worker; do
@@ -4033,6 +4318,7 @@ triage_report "7001 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
 DIRTYRES=999999 run --dry-run --max-ready 4
 [[ $RC -eq 0 ]] || fail "case 43 999999: exit $RC, want 0 (six digits is legal)"
 end_case "case 43 dirty reserve validation"
+fi
 
 # ==========================================================================================
 # Conflict auto-fix route: every Stage-1 PR is passed to the fleet as --conflict-fix-prs=
@@ -4040,6 +4326,7 @@ end_case "case 43 dirty reserve validation"
 # ==========================================================================================
 cf_argv() { sed -n 1p "$SCRATCH/ready.argv"; }
 
+if should_run "conflict-autofix-default-on"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4048,7 +4335,9 @@ run --dry-run
 grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
     || fail "conflict-autofix-default-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
 end_case "conflict-autofix-default-on"
+fi
 
+if should_run "conflict-autofix-empty-is-on"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4057,7 +4346,9 @@ PR_CYCLE_CONFLICT_AUTOFIX="" run --dry-run
 grep -E '^would run: post-plan-fleet ' <<< "$OUT" | grep -qF -- '--conflict-fix-prs=101,102,103' \
     || fail "conflict-autofix-empty-is-on: would-run line lacks --conflict-fix-prs=101,102,103 (out: $OUT)"
 end_case "conflict-autofix-empty-is-on"
+fi
 
+if should_run "conflict-autofix-off"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4073,8 +4364,10 @@ PR_CYCLE_CONFLICT_AUTOFIX=0 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "conflict-autofix-off: ready calls $(calls ready), want 1"
 grep -qF -- '--conflict-fix-prs' <<< "$(cf_argv)" && fail "conflict-autofix-off: fleet argv carries --conflict-fix-prs: $(cf_argv)"
 end_case "conflict-autofix-off"
+fi
 
 # 101 is routed to the holdrepeat fix, so it must not also join the conflict-fix list.
+if should_run "conflict-autofix-excludes-holdrepeat"; then
 begin_case
 hf_setup "3"
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4089,7 +4382,9 @@ grep -qE -- '--conflict-fix-prs=[0-9,]*101' <<< "$(cf_argv)" \
     && fail "conflict-autofix-excludes-holdrepeat: 101 reached --conflict-fix-prs: $(cf_argv)"
 hr_cleanup
 end_case "conflict-autofix-excludes-holdrepeat"
+fi
 
+if should_run "outcome-summary-conflict-fix-words"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
@@ -4105,6 +4400,8 @@ grep -qF "$_want_cf" <<< "$OUT" || fail "outcome-summary-conflict-fix-words: fin
 grep -qF 'conflict fixed 1, conflict fix gave up 1' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: buckets missing"
 grep -qF 'failed 0' <<< "$OUT" || fail "outcome-summary-conflict-fix-words: failed is not 0"
 end_case "outcome-summary-conflict-fix-words"
+fi
 
 # --- summary --------------------------------------------------------------------------------
+check_only_cases
 h_done

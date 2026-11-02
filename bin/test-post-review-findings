@@ -1308,4 +1308,80 @@ else
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
+# ── pr_open_review_threads: GitHub's conversation-resolution view ─────────────
+# ── open-threads-lists-every-unresolved: every isResolved==false thread, any label/author/outdated ──
+fixOT="$BASE_TMP/threads-open-all.json"
+cat > "$fixOT" <<'THREADS'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":false,
+   "comments":{"nodes":[{"databaseId":801,"body":"Nit\n\n<!-- score: 40 -->","author":{"login":"a-jay85","__typename":"User"}}]}},
+  {"isResolved":false,"isOutdated":false,
+   "comments":{"nodes":[{"databaseId":802,"body":"Bug\n\n<!-- score: 90 -->","author":{"login":"stranger","__typename":"User"}}]}},
+  {"isResolved":false,"isOutdated":true,
+   "comments":{"nodes":[{"databaseId":803,"body":"Old","author":null}]}},
+  {"isResolved":true,"isOutdated":false,
+   "comments":{"nodes":[{"databaseId":804,"body":"Bug\n\n<!-- score: 85 -->","author":{"login":"a-jay85","__typename":"User"}}]}}
+]}}}}}
+THREADS
+GH_THREADS_FIXTURE="$fixOT"
+OT_OUT="$BASE_TMP/open-threads-all.txt"
+pr_open_review_threads 42 > "$OT_OUT"; rcOT=$?
+if [ "$rcOT" -eq 0 ] && [ "$(cat "$OT_OUT")" = "$(printf 'open-thread:801\nopen-thread:802\nopen-thread:803')" ]; then
+    ok "open-threads-lists-every-unresolved: exactly 801/802/803, resolved 804 omitted, rc 0"
+else
+    fail "open-threads-lists-every-unresolved: rc $rcOT, got: $(tr '\n' ' ' < "$OT_OUT")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── open-threads-api-error: gh exits non-zero → fail closed, rc 0 ────────────
+SAVED_GH_CMD="$GH_CMD"
+GH_CMD="/bin/false"
+OT_ERR_OUT="$BASE_TMP/open-threads-apierr.txt"
+pr_open_review_threads 42 > "$OT_ERR_OUT"; rcOTE=$?
+GH_CMD="$SAVED_GH_CMD"
+if [ "$rcOTE" -eq 0 ] && [ "$(cat "$OT_ERR_OUT")" = "open-threads-api-error" ]; then
+    ok "open-threads-api-error: gh failure → open-threads-api-error, rc 0"
+else
+    fail "open-threads-api-error: rc $rcOTE, got: $(cat "$OT_ERR_OUT")"
+fi
+
+# ── open-threads-graphql-errors: top-level errors array → api-error ──────────
+fixOTG="$BASE_TMP/threads-open-gqlerr.json"
+printf '{"errors":[{"message":"Bad credentials"}]}' > "$fixOTG"
+GH_THREADS_FIXTURE="$fixOTG"
+OT_GQL_OUT="$BASE_TMP/open-threads-gqlerr.txt"
+pr_open_review_threads 42 > "$OT_GQL_OUT"; rcOTG=$?
+if [ "$rcOTG" -eq 0 ] && [ "$(cat "$OT_GQL_OUT")" = "open-threads-api-error" ]; then
+    ok "open-threads-graphql-errors: errors array → open-threads-api-error, rc 0"
+else
+    fail "open-threads-graphql-errors: rc $rcOTG, got: $(cat "$OT_GQL_OUT")"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── open-threads-cap: a full 100-node page → cap marker, no thread lines ─────
+fixOTC="$BASE_TMP/threads-open-cap.json"
+jq -n '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":
+  [range(100) | {"isResolved":false,"comments":{"nodes":[{"databaseId":(900+.),"body":"x"}]}}]
+}}}}}' > "$fixOTC"
+GH_THREADS_FIXTURE="$fixOTC"
+OT_CAP_OUT="$BASE_TMP/open-threads-cap.txt"
+pr_open_review_threads 42 > "$OT_CAP_OUT"; rcOTC=$?
+if [ "$rcOTC" -eq 0 ] && [ "$(cat "$OT_CAP_OUT")" = "open-threads-cap" ]; then
+    ok "open-threads-cap: 100 nodes → open-threads-cap only, rc 0"
+else
+    fail "open-threads-cap: rc $rcOTC, got: $(head -3 "$OT_CAP_OUT" | tr '\n' ' ')"
+fi
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+
+# ── open-threads-clear-under-pipefail: all resolved → empty stdout, rc 0 under strict mode ──
+fixOTR="$BASE_TMP/threads-open-resolved.json"
+printf '%s' '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"isResolved":true,"comments":{"nodes":[{"databaseId":1,"body":"x"}]}}]}}}}}' > "$fixOTR"
+OT_CLR_OUT="$BASE_TMP/open-threads-clear.txt"
+( set -euo pipefail; GH_THREADS_FIXTURE="$fixOTR"; source "$LIB_ARM"; pr_open_review_threads 42 ) > "$OT_CLR_OUT"; rcOTR=$?
+if [ "$rcOTR" -eq 0 ] && [ ! -s "$OT_CLR_OUT" ]; then
+    ok "open-threads-clear-under-pipefail: all resolved → empty stdout, rc 0 under strict mode"
+else
+    fail "open-threads-clear-under-pipefail: rc $rcOTR, got: $(cat "$OT_CLR_OUT")"
+fi
+
 h_done

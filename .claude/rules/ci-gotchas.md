@@ -1,6 +1,6 @@
 ---
-description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow.
-last_verified: 2026-10-26
+description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow, conversation resolution.
+last_verified: 2026-11-02
 paths: ".github/workflows/**"
 ---
 
@@ -42,6 +42,18 @@ A new protection context is a separate decision (ADR-0120, ADR-0145). The workfl
 
 `All checks settled` (`.github/workflows/all-checks-settled.yml`, ADR-0149 addendum) is the required cross-workflow aggregator. It is a commit status on the PR head, posted from master each time a PR workflow completes, and it never waits. A red check anywhere on the head turns it `failure`, and a pending one keeps it `pending` until the last check finishes. A re-run of one flaky job re-settles it when that job completes. If the status is stuck, settle it by hand: `gh workflow run all-checks-settled.yml -f pr_number=N`. The excluded names live in that workflow's `--ignore=`. To make a new job advisory, add its name there. A new workflow with a `pull_request` trigger must also join its `workflow_run.workflows:` list, or its completion never settles the status (`bin/check-composite-contracts` A6). Never delete a check to get a merge through. On a PR whose base is not master or develop (a stacked PR), the status goes `failure` with `FAIL: stacked on <base>`, because the master-only workflows never report there. After the parent merges and GitHub retargets the PR, push (merge or rebase onto `origin/master`) to start CI. The polling `All checks green` waiter is retired (ADR-0149 addendum).
 
+### Conversation resolution
+
+The protection toggle `required_conversation_resolution` makes GitHub refuse any merge, auto-merge included, while a review thread on the PR is unresolved. It counts every thread: any label, any author, outdated ones too. It adds no status context. The owner flips it by hand. Read its live value with `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_conversation_resolution.enabled'`.
+
+Master is meant to run with it on because arming condition (11) in `bin/lib/pr-armable.sh` reads threads only at arm time. A thread posted after arming by a standalone `/pr-review`, a `/security-audit`, or a burndown pass would otherwise merge unanswered once checks go green. Auto-merge has no bypass for the toggle, so the tooling keeps open threads near zero and names any that remain:
+
+- Post-plan Phase 4.5 and 4.5b (`tools/postplan-harness/harness/thread_ingestion.py`) reply to and resolve every trusted thread they can: Important, nit, and pre-existing alike. A reply reads `Fixed in <sha> - <reason>` or `Declined: <reason>`. A nit or pre-existing decline closes the thread only for a category in `WONT_FIX_CATEGORIES`. A gate-path decline, a failed fixer call, and an untrusted author's thread stay open for a human.
+- `bin/pr-triage` puts an armed PR with any open thread, and an unarmed PR held only by an open nit or pre-existing thread, in the `OPEN-THREAD` bucket, which `--arm` never arms. GitHub shows such a PR as `BLOCKED`, the same state as one waiting on checks, so the bucket is where it gets named.
+- `bin/pr-cycle-tick` lists armed PRs with open threads in its stuck DM every tick. `bin/pr-cycle` ranks `OPEN-THREAD` first in its your-turn DM.
+
+`enforce_admins` stays `false` (`ibl5/docs/decisions/0062-human-signoff-gate-for-feature-prs.md`), so a hand merge with `gh pr merge --admin <N>` still lands a PR with an open thread. Read the thread before using it. On an armed PR, resolving the last open thread lets auto-merge proceed with no other step.
+
 ## Mutation testing: per-PR diff job required, full suite label-gated
 
 `.github/workflows/mutation-pr.yml` runs `Infection PHP (per-PR diff)` on every PR at `--min-msi=100` on changed lines. There is no waive label. It is a required context and blocks merge, so a surviving mutant on a changed line needs a test that kills it. `.github/workflows/mutation.yml` runs the full suite only on the `mutation-test` label, Monday's cron, or `workflow_dispatch`, and never blocks merge. Keep `labeled` out of `mutation-pr.yml`: a label run in the same concurrency group cancels the real run. `bin/check-composite-contracts` (M1 to M5) enforces the trigger, name, `if:`, threshold, and diff resolution. Never set `git config diff.relative` in that workflow. With it, Infection joins `classes/X.php` to the repo root, prints `No source file found`, and exits 0 with zero mutants, so class changes passed the required check unmutated ([#3443](https://github.com/a-jay85/IBL5/pull/3443)). The Infection step tees its output to a log and then runs `ibl5/bin/check-infection-ran`, which exits 5 when Infection matched no source but a changed class sits outside `source.excludes`. A diff that touches only excluded classes still passes.
@@ -52,13 +64,13 @@ Bare `ssh-keyscan host >> ~/.ssh/known_hosts` can exit non-zero on transient net
 
 ## Update-baselines label flow
 
-The `update-baselines` label in `.github/workflows/e2e-tests.yml` rewrites only the baselines the gallery's strict pass flags, then commits them back to the PR branch. Three fixed bugs to avoid re-learning:
+The `update-baselines` label starts `.github/workflows/update-baselines.yml`, which calls the `Visual Regression` job of `.github/workflows/e2e-tests.yml` through `workflow_call`. That run rewrites only the baselines the gallery's strict pass flags, then commits them back to the PR branch. Three fixed bugs to avoid re-learning:
 
 1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. The regen step must read `steps.visual-regression.outcome`, which keeps the real result. It runs on `success` or `failure`, because a sub-gate drift that the strict pass flags leaves VR green (ADR-0214).
 2. **Missing `always()` on Commit step**: when Regenerate fails, GitHub Actions skips later steps. The Commit step's `if:` must include `always()`, plus `steps.regen-baselines.outcome != 'skipped'` so a skipped regen commits nothing.
 3. **Premature label removal**: "Remove update-baselines label" must be gated on `steps.regen-baselines.outcome != 'skipped'`; otherwise a label event where regen is skipped still removes the label, preventing retry. It must also run before "Commit and push updated baselines". The push's synchronize event snapshots the labels, so a push made while the label is still on starts a second regen run and a second bot commit (`bin/test-vr-apply-baselines` pins the order).
 
-**CI-storm fix:** label events no longer rerun the full E2E suite. `src` dropped `action == 'labeled'`; a new `baseline` output (`github.event.action == 'labeled' && github.event.label.name == 'update-baselines'`) gates only the Visual Regression job. Skipped shards are safe for auto-merge — the required `E2E Tests` gate (`if: always()`, fails only on `failure`/`cancelled`) treats skipped as passing.
+**No label trigger on the required workflow.** `e2e-tests.yml` lists no `labeled` type. The required `E2E Tests` gate fails only on `failure` or `cancelled` needs, so a label-only run that skipped every job re-posted the check as success and turned a red gate green ([backlog#1707](https://github.com/a-jay85/IBL5-backlog/issues/1707)). `bin/check-composite-contracts` L1 rejects a `labeled` or `unlabeled` type in that `on:` block. Inside the called workflow, `github.event.action == 'labeled'` marks regen mode: the `baseline` output gates only the Visual Regression job, and the `gate` job skips. Regen checks report as `Update baselines / <job>`.
 
 ## Dependabot `@rebase` is unreliable
 

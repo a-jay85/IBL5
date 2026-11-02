@@ -49,6 +49,15 @@ class TransactionHistoryViewTest extends TestCase
         $this->assertStringContainsString('class="d-btn d-btn-ghost d-btn-sm txn-reset">Reset</a>', $html);
     }
 
+    public function testFilterFormAndResetLinkUseRealModuleName(): void
+    {
+        $html = $this->view->render(self::createRenderData());
+
+        $this->assertStringContainsString('<input type="hidden" name="name" value="TransactionHistory">', $html);
+        $this->assertStringContainsString('href="modules.php?name=TransactionHistory"', $html);
+        $this->assertStringNotContainsString('Transaction_History', $html);
+    }
+
     public function testRenderShowsCategoryOptions(): void
     {
         $html = $this->view->render(self::createRenderData());

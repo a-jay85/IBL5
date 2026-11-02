@@ -394,13 +394,13 @@ def test_out_of_range_n_is_ignored(tmp_path):
     assert len(surviving) == 1 and len(phase.last_votes) == 1
 
 
-def test_verifiers_use_sonnet_tooled_readonly_tools_in_worktree(tmp_path):
+def test_verifiers_use_opus_tooled_readonly_tools_in_worktree(tmp_path):
     _result, llm, _gh = _run(tmp_path)
     assert sorted(c["purpose"] for c in llm.tooled_calls) == sorted(VERIFIER_PURPOSES)
     assert len(llm.tooled_calls) == VERIFIER_COUNT
-    assert VERIFIER_MODEL == "sonnet"
+    assert VERIFIER_MODEL == "opus"
     for call in llm.tooled_calls:
-        assert call["model"] == "sonnet"
+        assert call["model"] == "opus"
         assert call["cwd"] == str(tmp_path)
         assert call["allowed_tools"] == ("Read","Grep","Glob") == VERIFIER_ALLOWED_TOOLS  # matrix row 38 literal
         assert not {"Bash", "Write", "Edit"} & set(call["allowed_tools"])

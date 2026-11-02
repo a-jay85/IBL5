@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow, conversation resolution.
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 paths: ".github/workflows/**"
 ---
 
@@ -64,13 +64,13 @@ Bare `ssh-keyscan host >> ~/.ssh/known_hosts` can exit non-zero on transient net
 
 ## Update-baselines label flow
 
-The `update-baselines` label in `.github/workflows/e2e-tests.yml` rewrites only the baselines the gallery's strict pass flags, then commits them back to the PR branch. Three fixed bugs to avoid re-learning:
+The `update-baselines` label starts `.github/workflows/update-baselines.yml`, which calls the `Visual Regression` job of `.github/workflows/e2e-tests.yml` through `workflow_call`. That run rewrites only the baselines the gallery's strict pass flags, then commits them back to the PR branch. Three fixed bugs to avoid re-learning:
 
 1. **`conclusion` vs `outcome`**: with `continue-on-error: true`, `conclusion` becomes `'success'` even when the step fails. The regen step must read `steps.visual-regression.outcome`, which keeps the real result. It runs on `success` or `failure`, because a sub-gate drift that the strict pass flags leaves VR green (ADR-0214).
 2. **Missing `always()` on Commit step**: when Regenerate fails, GitHub Actions skips later steps. The Commit step's `if:` must include `always()`, plus `steps.regen-baselines.outcome != 'skipped'` so a skipped regen commits nothing.
 3. **Premature label removal**: "Remove update-baselines label" must be gated on `steps.regen-baselines.outcome != 'skipped'`; otherwise a label event where regen is skipped still removes the label, preventing retry. It must also run before "Commit and push updated baselines". The push's synchronize event snapshots the labels, so a push made while the label is still on starts a second regen run and a second bot commit (`bin/test-vr-apply-baselines` pins the order).
 
-**CI-storm fix:** label events no longer rerun the full E2E suite. `src` dropped `action == 'labeled'`; a new `baseline` output (`github.event.action == 'labeled' && github.event.label.name == 'update-baselines'`) gates only the Visual Regression job. Skipped shards are safe for auto-merge — the required `E2E Tests` gate (`if: always()`, fails only on `failure`/`cancelled`) treats skipped as passing.
+**No label trigger on the required workflow.** `e2e-tests.yml` lists no `labeled` type. The required `E2E Tests` gate fails only on `failure` or `cancelled` needs, so a label-only run that skipped every job re-posted the check as success and turned a red gate green ([backlog#1707](https://github.com/a-jay85/IBL5-backlog/issues/1707)). `bin/check-composite-contracts` L1 rejects a `labeled` or `unlabeled` type in that `on:` block. Inside the called workflow, `github.event.action == 'labeled'` marks regen mode: the `baseline` output gates only the Visual Regression job, and the `gate` job skips. Regen checks report as `Update baselines / <job>`.
 
 ## Dependabot `@rebase` is unreliable
 

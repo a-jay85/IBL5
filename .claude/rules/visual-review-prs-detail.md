@@ -1,8 +1,9 @@
 ---
-description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, and publishing agent shots.
-last_verified: 2026-10-27
+description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, publishing agent shots, how an `update-baselines` label run treats an in-flight E2E run, and the one-time Pages source setting.
+last_verified: 2026-11-02
 paths:
   - ".github/workflows/e2e-tests.yml"
+  - ".github/workflows/update-baselines.yml"
   - ".github/workflows/pages-deploy.yml"
   - "ibl5/tests/e2e/vr-manifest.ts"
   - "ibl5/tests/e2e/vr-coverage-map.ts"
@@ -36,6 +37,12 @@ infra-vs-pixel-diff labeling this reuses.
 
 A second, review-only strict pass (ADR-0180) runs after this triage. It uses per-pixel threshold `STRICT_PIXEL_THRESHOLD` (0.065) and an absolute floor `STRICT_MIN_CHANGED_PIXELS` (25), both in `ibl5/tests/e2e/vr-gallery.ts`. It can only upgrade an `unchanged` cell to `changed`, and only when the reload render exists and A and B agree under the strict threshold. It never creates a flake cell and never touches the VR check, whose 0.2 threshold and 0.005 ratio are unchanged. Rows that set `extraMaxDiffPixelRatio` skip it.
 
+## The update-baselines label and in-flight runs
+
+A label applied while an `E2E Tests` run is in flight no longer cancels it. The label run starts from
+`.github/workflows/update-baselines.yml` in its own concurrency group, so the PR's required `E2E Tests`
+run keeps going and keeps its result (ADR-0225).
+
 ## Changed screens in the PR body
 
 Changed cells get cropped before/after pairs in the same block (ADR-0181). `--crop-changed` runs
@@ -61,3 +68,15 @@ JSON: 1 to 20 of `{"label": "nav-bar", "before": "a.png", "after": "b.png"}` (`b
 PNG under 5 MB). Files go to `<head-sha>/visual-review/agent-shots/` on `gh-pages`, then an
 agent-shot sub-block is upserted, which the CI refresh keeps. Never put a local file path in a PR
 body. Labels are sanitized to `[a-z0-9-]`. `bin/prune-vr-galleries` prunes the per-SHA tree.
+
+## One-time deployment prerequisite
+
+GitHub Pages must use source = **GitHub Actions** (`build_type: workflow`). The owner sets it once
+in Repo Settings → Pages → Build and deployment → Source, or:
+
+```bash
+gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
+```
+
+Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
+once via the workflow's `workflow_dispatch`.

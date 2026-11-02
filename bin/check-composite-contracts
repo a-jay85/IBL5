@@ -28,6 +28,10 @@
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
 #                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
+#   e2e-label:      two invariants (L1-L2) that keep label events off the required
+#                   E2E Tests check: L1 e2e-tests.yml on: lists no labeled or
+#                   unlabeled type; L2 update-baselines.yml names no job or workflow
+#                   E2E Tests or Visual Regression.
 #   all-checks-settled: seven invariants (A1-A7) that keep the event-driven
 #                   aggregator `All checks settled` (ADR-0149 addendum) safe and
 #                   complete: A1 only workflow_run (completed) and workflow_dispatch
@@ -420,6 +424,59 @@ for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml muta
       ;;
   esac
 done
+
+# e2e-label invariants (L1-L2, backlog#1707). `E2E Tests` is a required check
+# whose `gate` job passes when every need is `skipped`, so a label-only run that
+# re-posts it turns a red gate green (run 41094364054). The update-baselines
+# regen therefore runs from update-baselines.yml, never from e2e-tests.yml.
+#
+# L1: e2e-tests.yml `on:` lists no label event type. Comments inside `on:` may
+# mention the word, so they are stripped before matching. `unlabeled` re-posts
+# the check the same way and is rejected too.
+e2e_file="$WORKFLOWS/e2e-tests.yml"
+if [ ! -f "$e2e_file" ]; then
+  echo "composite-contracts: e2e-tests.yml absent — L1 skipped"
+else
+  _l1_on="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$e2e_file")"
+  _l1_on="$(sed -E 's/[[:space:]]*#.*$//' <<< "$_l1_on")"
+  if grep -Eq '(^|[^a-z_])(un)?labeled([^a-z_]|$)' <<< "$_l1_on"; then
+    echo "composite-contracts: e2e-label (L1) — e2e-tests.yml on: lists a label event type; a label-only run re-posts the required E2E Tests check and its gate passes on all-skipped needs ($e2e_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: e2e-tests.yml on: lists no label event type (L1)"
+  fi
+fi
+
+# L2: the regen caller posts no required-check name. A skipped job or workflow
+# named E2E Tests or Visual Regression would post that required context as
+# skipped-success.
+ub_file="$WORKFLOWS/update-baselines.yml"
+if [ ! -f "$ub_file" ]; then
+  echo "composite-contracts: update-baselines.yml absent — L2 skipped"
+else
+  _l2_names="$(awk '
+    { sub(/\r$/, "") }
+    /^[[:space:]]*name:/ { v=$0; sub(/^[[:space:]]*name:[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); print v }
+  ' "$ub_file")"
+  _l2_hit=""
+  while IFS= read -r _l2_v; do
+    if [ "$_l2_v" = "E2E Tests" ] || [ "$_l2_v" = "Visual Regression" ]; then
+      _l2_hit="$_l2_v"
+      break
+    fi
+  done <<< "$_l2_names"
+  if [ -n "$_l2_hit" ]; then
+    echo "composite-contracts: e2e-label (L2) — update-baselines.yml names a job or workflow '$_l2_hit'; a skipped label run would post that required check name as skipped-success ($ub_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: update-baselines.yml names no required check (L2)"
+  fi
+fi
 
 mp_file="$WORKFLOWS/mutation-pr.yml"
 if [ ! -f "$mp_file" ]; then

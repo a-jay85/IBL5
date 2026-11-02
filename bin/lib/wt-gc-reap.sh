@@ -647,6 +647,95 @@ _gc_backup_merged_epoch() {
     printf '%s\n' "$out"
 }
 
+# _gc_pr_closed_epoch <num> — close epoch of a CLOSED (never merged) PR.
+# Prints only digits on success. 1 = not closed / no date, 2 = gh failed.
+_gc_pr_closed_epoch() {
+    local out
+    out="$("$WT_GC_GH" pr view "$1" --repo a-jay85/IBL5 --json state,closedAt \
+        --jq 'select(.state=="CLOSED") | .closedAt | fromdateiso8601' 2>/dev/null)" || return 2
+    [[ "$out" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "$out"
+}
+
+# ── Step: closed-PR worktrees ─────────────────────────────────────────────────
+# Candidates: cleanup skip lines "PR closed but remote gone". The tick never
+# passes --discard-closed to cleanup; this step re-proves, archives, removes.
+reap_closed_worktrees() {
+    _gc_valid_days WT_GC_CLOSED_DAYS || return 1
+    log "step closed threshold=${WT_GC_CLOSED_DAYS}d"
+    local names parent name cls rc=0
+    names="$(awk 'index($0, "  SKIP ") == 1 && index($0, ": PR closed but remote gone") > 0 {
+        s = substr($0, 8); sub(/: PR closed but remote gone.*/, "", s); print s }' "$TMP_OUT")"
+    [ -n "$names" ] || return 0
+    parent="$(_gc_wt_parent)" || return 1
+    while IFS= read -r name <&3; do
+        [ -n "$name" ] || continue
+        [ -d "$parent/$name" ] || continue
+        cls="$(awk -v n="$name" '$2==n {print $1}' "$TMP_STATUS")"
+        if [ -z "$cls" ]; then log "closed keep $name: no wt-status row"; continue; fi
+        if [ "$cls" = OPEN-PR ]; then log "closed keep $name: wt-status class OPEN-PR"; continue; fi
+        _gc_reap_closed_one "$name" "$parent/$name" || rc=1
+    done 3<<< "$names"
+    return "$rc"
+}
+
+_gc_reap_closed_one() {
+    local name="$1" wt="$2" branch tip rl arc=0 cerr=0 closed now days snap
+    _gc_wt_guard closed "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
+        log "closed keep $name: branch unresolved"; return 0
+    fi
+    if ! _gc_have "$WT_GC_GH"; then
+        log "closed keep $name: gh not found ('$WT_GC_GH')"
+        return 1
+    fi
+    GH_CMD="$WT_GC_GH" pr_info "$branch" "$wt" || true
+    if [ "${PR_STATE:-}" != CLOSED ]; then
+        log "closed keep $name: state=${PR_STATE:-?}"; return 0
+    fi
+    if ! [[ "${PR_NUM:-}" =~ ^[0-9]+$ ]]; then
+        log "closed keep $name: pr number unknown"; return 0
+    fi
+    if ! rl="$(git -C "$WT_GC_REPO_ROOT" for-each-ref --format='%(refname)' "refs/remotes/origin/$branch")"; then
+        log "closed keep $name: remote probe error"; return 0
+    fi
+    if grep -qxF -- "refs/remotes/origin/$branch" <<< "$rl"; then
+        log "closed keep $name: remote branch present"; return 0
+    fi
+    if [ "$tip" != "${PR_OID:-}" ]; then
+        if [ -n "${PR_OID:-}" ] && git -C "$WT_GC_REPO_ROOT" cat-file -e "$PR_OID^{commit}" 2>/dev/null; then
+            git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$tip" "$PR_OID" 2>/dev/null || arc=$?
+        else
+            arc=1
+        fi
+        case "$arc" in
+            0) ;;
+            1) log "closed keep $name: local commits beyond PR head"; return 0 ;;
+            *) log "closed keep $name: ancestry probe error"; return 0 ;;
+        esac
+    fi
+    closed="$(_gc_pr_closed_epoch "$PR_NUM")" || cerr=$?
+    if [ "$cerr" != 0 ]; then
+        log "closed keep $name: close age unknown"; return 0
+    fi
+    now="$(date +%s)"
+    if [ $(( now - closed )) -lt $(( WT_GC_CLOSED_DAYS * 86400 )) ]; then
+        log "closed keep $name: closed <${WT_GC_CLOSED_DAYS}d ago"; return 0
+    fi
+    days=$(( (now - closed) / 86400 ))
+    if ! snap="$(_gc_snapshot_dirt "$wt" "$tip" "wt/$name")"; then
+        log "closed keep $name: snapshot failed"; return 0
+    fi
+    if ! _gc_tips_record "$snap" "refs/wt/$name"; then
+        log "closed keep $name: archive failed"; return 0
+    fi
+    _gc_remove_wt_and_branch closed "$name" "$branch" "$tip" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
+    log "closed reaped $name pr=#$PR_NUM closed=${days}d"
+}
+
+# ── Step: stale refs (reap) ───────────────────────────────────────────────────
 reap_stale_refs() {
     _gc_valid_days WT_GC_BACKUP_DAYS || return 1
     _gc_valid_days WT_GC_REF_DAYS || return 1

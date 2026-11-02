@@ -298,6 +298,7 @@ run_tick() {
         WT_GC_REAP_DIRTY_MERGED=0
         WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_DETACHED=0
+        WT_GC_REAP_CLOSED=0
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
@@ -1483,6 +1484,149 @@ rt "${DT_ON[@]}" WT_GC_DETACHED_DAYS= -- --force
 chk_rc DT11 1
 log_has "invalid WT_GC_DETACHED_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir dt11)" ] || note_err "removed"
+finish_case
+
+# ── Closed-PR worktree reap ───────────────────────────────────────────────────
+CL_ON=(WT_GC_REAP_CLOSED=1 WT_GC_ARCHIVE_STAMP=1700000000)
+# c_wt <name> <dirt> [oid] [ahead] — STALLED row, cleanup closed-skip line,
+# CLOSED PR 9 for the head. The close epoch goes in $CD/gh/9.json.
+c_wt() {
+    local tip
+    mk_wt "$1" "$1" "ahead=${4:-1}" age_days=10 "dirt=$2"
+    row STALLED "$1"
+    printf '  SKIP %s: PR closed but remote gone (pass --discard-closed to remove)\n' "$1" >> "$CD/skips"
+    tip="$(git -C "$ENV_MAIN" rev-parse "refs/heads/$1")"
+    printf 'CLOSED\t9\t%s\n' "${3:-$tip}" > "$CD/gh/by-head/$1.json"
+}
+
+fx CL1-closed-reaped
+c_wt cl1 none
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc CL1 0
+log_has 'closed reaped cl1 pr=#9' || note_err "not reaped"
+[ -d "$(wt_dir cl1)" ] && note_err "worktree still present"
+has_branch cl1 && note_err "branch still present"
+arch_has 1700000000/wt/cl1 || note_err "no wt archive ref"
+arch_has 1700000000/heads/cl1 || note_err "no heads archive ref"
+finish_case
+
+fx CL2-closed-dirt-archived
+c_wt cl2 untracked-diff
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed reaped cl2' || note_err "not reaped"
+git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/cl2:new.txt 2>/dev/null || note_err "untracked file missing from archive"
+finish_case
+
+fx CL3-under-floor-keeps
+c_wt cl3 none
+epoch_ago 5 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl3: closed <7d ago' || note_err "no floor keep"
+[ -d "$(wt_dir cl3)" ] || note_err "removed"
+finish_case
+
+fx CL4-remote-present-keeps
+c_wt cl4 none
+epoch_ago 10 > "$CD/gh/9.json"
+git -C "$ENV_MAIN" update-ref refs/remotes/origin/cl4 "$(git -C "$ENV_MAIN" rev-parse refs/heads/cl4)"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl4: remote branch present' || note_err "remote branch not kept"
+[ -d "$(wt_dir cl4)" ] || note_err "removed"
+finish_case
+
+fx CL5-local-commits-keeps
+c_wt cl5 none "" 2
+printf 'CLOSED\t9\t%s\n' "$(git -C "$ENV_MAIN" rev-parse refs/heads/cl5^)" > "$CD/gh/by-head/cl5.json"
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl5: local commits beyond PR head' || note_err "unpushed commits not kept"
+[ -d "$(wt_dir cl5)" ] || note_err "removed"
+finish_case
+
+fx CL6-state-merged-keeps
+c_wt cl6 none
+printf 'MERGED\t9\t%s\n' "$(git -C "$ENV_MAIN" rev-parse refs/heads/cl6)" > "$CD/gh/by-head/cl6.json"
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl6: state=MERGED' || note_err "merged state not kept"
+[ -d "$(wt_dir cl6)" ] || note_err "removed"
+finish_case
+
+fx CL7-open-pr-row-keeps
+c_wt cl7 none
+: > "$CD/rows"
+row OPEN-PR cl7
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl7: wt-status class OPEN-PR' || note_err "OPEN-PR row not kept"
+[ -d "$(wt_dir cl7)" ] || note_err "removed"
+finish_case
+
+fx CL8-gh-fail-keeps
+c_wt cl8 none
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" STUB_GH_FAIL=1 -- --force
+log_has 'closed keep cl8: state=' || note_err "gh failure not kept"
+[ -d "$(wt_dir cl8)" ] || note_err "worktree removed"
+has_branch cl8 || note_err "branch deleted"
+finish_case
+
+fx CL9-close-age-garbage-keeps
+c_wt cl9 none
+printf 'x\n' > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl9: close age unknown' || note_err "no close-age keep"
+[ -d "$(wt_dir cl9)" ] || note_err "removed"
+finish_case
+
+fx CL10-live-work-keeps
+c_wt cl10 none
+epoch_ago 10 > "$CD/gh/9.json"
+mk_registry "$CD/registry.json" cl10
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl10: live work' || note_err "live work not kept"
+[ -d "$(wt_dir cl10)" ] || note_err "removed"
+finish_case
+
+fx CL11-not-closed-skip-ignored
+mk_wt cl11 cl11 ahead=1 age_days=10
+row STALLED cl11
+printf '  SKIP cl11: PR #9 still open\n' > "$CD/skips"
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed (keep|reaped) cl11' && note_err "unrelated skip line was picked up"
+[ -d "$(wt_dir cl11)" ] || note_err "removed"
+finish_case
+
+fx CL12-archive-fail-keeps
+c_wt cl12 none
+epoch_ago 10 > "$CD/gh/9.json"
+git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/wt/cl12 "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'archive failed' || note_err "no archive-failed log"
+[ -d "$(wt_dir cl12)" ] || note_err "worktree removed"
+has_branch cl12 || note_err "branch deleted"
+finish_case
+
+fx CL13-dry-run
+c_wt cl13 none
+epoch_ago 10 > "$CD/gh/9.json"
+B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+log_has 'DRY-RUN would:' || note_err "no DRY-RUN line"
+finish_case
+
+fx CL14-empty-floor-invalid
+c_wt cl14 none
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" WT_GC_CLOSED_DAYS= STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc CL14 1
+log_has "invalid WT_GC_CLOSED_DAYS ''" || note_err "no invalid-floor log"
+[ -d "$(wt_dir cl14)" ] || note_err "removed"
 finish_case
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────

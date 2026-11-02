@@ -33,7 +33,7 @@
 #   --state-changed-prs=N[,N...]  Pass --state-changed to the listed PRs' bin/post-plan-now sessions only (skips only the repeat-hold decline, exit 8). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #   --rebase-only-prs=N[,N...]  Pass --rebase-only to the listed PRs' bin/post-plan-now sessions (merge master, push, stop before review; the harness re-checks the hold). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #   --holdrepeat-fix-prs=N[,N...]  Run bin/postplan-fix --holdrepeat for the listed PRs instead of a first post-plan-now pass (pr-cycle routes repeat-hold skips here). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
-#   --conflict-fix-prs=N[,N...]  After a first pass that ends in a rebase conflict, run one bounded bin/postplan-fix --headless per (PR, head SHA) for the listed PRs and re-fire post-plan once on committed or clean; any other result restores the worktree and DMs the paste line. Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
+#   --conflict-fix-prs=N[,N...]  After a first pass that ends in a rebase conflict, run one bounded bin/postplan-fix --headless per (PR, head SHA) for the listed PRs and re-fire post-plan once on committed; any other result restores the worktree and DMs the paste line. Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #
 # Examples:
 #   bin/post-plan-fleet                       # report what would run
@@ -838,7 +838,7 @@ if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
                 > "$LOG.conflict-fix" 2>&1 || _cf_rc=$?
             _cf_word=$(grep '^postplan-fix: headless result=' "$LOG.conflict-fix" | tail -n 1 | sed 's/.*result=//' || true)
             _cf_head0=$(grep -m1 '^postplan-fix: headless head0=' "$LOG.conflict-fix" | sed 's/.*head0=//; s/ wt=.*//' || true)
-            if [ "$_cf_rc" = 0 ] && { [ "$_cf_word" = committed ] || [ "$_cf_word" = clean ]; }; then
+            if [ "$_cf_rc" = 0 ] && [ "$_cf_word" = committed ]; then
                 cp "$LOG" "$LOG.conflict"
                 _cf_refire_rc=0
                 POSTPLAN_FIRED_BY="$POSTPLAN_FIRED_BY" timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG.conflict-refire" 2>&1 || _cf_refire_rc=$?
@@ -849,9 +849,20 @@ if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
                 if grep -qE 'rebase conflict|rebase-conflict:' <<< "$_cf_first"; then
                     _cf_word=gave-up-refire-conflict
                     _cf_restore
+                elif [ "$RC" = 124 ]; then
+                    _cf_word=gave-up-refire-timeout
+                    _cf_restore
+                elif [ -z "$_cf_first" ]; then
+                    _cf_word=gave-up-refire-no-result
+                    _cf_restore
                 else
                     _cf_fixed=1
                 fi
+            elif [ "$_cf_rc" = 0 ] && [ "$_cf_word" = clean ]; then
+                # A clean merge writes no pre-merge manifest, so the harness would run no
+                # proof or review on it. Do not re-fire; leave it to a human.
+                _cf_word=gave-up-clean-unproven
+                _cf_restore
             elif [ "$_cf_rc" = 124 ]; then
                 _cf_word=timeout
                 _cf_restore

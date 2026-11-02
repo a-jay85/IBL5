@@ -1,6 +1,6 @@
 ---
 description: Provides the repositories backing the Discord bug report ingestion pipeline, including the dormant status and the operator wake and context log.
-last_verified: 2026-10-23
+last_verified: 2026-11-02
 ---
 
 # BugPipeline
@@ -24,5 +24,7 @@ Enqueue writes status `dormant`. A dormant row is never actionable: `listActiveC
 - `duplicate`: this Discord message was already recorded. Nothing changes.
 
 An unknown source message returns `unknown` and writes nothing.
+
+The wake route runs two authorization checks before `wakeByOperator()`, in this order (`ibl5/classes/Api/Controller/WakeController.php`). First, the API key must be a service key, meaning any `rate_limit_tier` other than `standard`. A standard-tier key gets 403 `forbidden` with the message "Only the pipeline bot can wake a report." Second, `author_id` must equal `Discord::getBugPipelineApproverDiscordId()`. Any other author, or an empty configured id, gets 403 `forbidden` with the message "Only the pipeline operator can wake a report." Both rejections share the status and the error code, so only `error.message` tells them apart. Case 8.2 in `bin/bug-pipeline-e2e` asserts the second message, so a standard-tier test key fails that case.
 
 `BugReportOperatorContextRepository` owns the `ibl_bug_report_operator_context` child table. Each operator mention is one row, with content capped at 4000 characters. The `uq_operator_message` unique key on the Discord message id makes a replayed wake a no-op, because the insert uses `ON DUPLICATE KEY UPDATE`. `listForReportIds()` returns message ids as strings so snowflakes keep their precision.

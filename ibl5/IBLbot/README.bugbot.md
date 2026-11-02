@@ -26,6 +26,7 @@ Two I/O directions:
      (NOT a worktree slug, torn down on merge; NOT prod)
    - `API_KEY` — a valid `ibl_api_keys` key; **must be a high/unlimited rate-limit
      tier** so startup backfill isn't 429-throttled into silently dropping reports
+     The wake route also rejects a `standard`-tier key with a 403, so a standard key breaks every operator wake.
    - `BUG_OPERATOR_DISCORD_ID`: the league operator's Discord user snowflake. Unset and
      empty both abort startup. The test bot's `.env.bugbot.test` needs it too.
    - `BUG_CHANNEL_ID` — the dedicated bug-report channel snowflake

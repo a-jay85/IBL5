@@ -1,6 +1,6 @@
 ---
 description: The Discord bug pipeline parks every new report as dormant and wakes it only when the league operator @mentions the bot; the operator's text rides in a trusted prompt block above the untrusted GM text.
-last_verified: 2026-10-22
+last_verified: 2026-11-02
 ---
 
 # ADR-0213: Bug pipeline wakes only on an operator mention
@@ -47,3 +47,7 @@ Supersedes nothing. Extends ADR-0080 (topology unchanged) and ADR-0081 (hunter t
 - `bin/bug-pipeline-tick`
 - `ibl5/docs/decisions/0080-mac-local-discord-bug-pipeline-cron-topology.md`
 - `ibl5/docs/decisions/0081-hunter-trust-split-starved-env-sandbox.md`
+
+## Addendum 2026-11-02: the wake route checks the key tier before the author
+
+Decision 2 names the author ID as the authorization. The wake controller enforces one more check, and it runs first: the calling API key must have a `rate_limit_tier` other than `standard`. A standard-tier key gets 403 `forbidden` with "Only the pipeline bot can wake a report." Only a service key reaches the author check, whose rejection is 403 `forbidden` with "Only the pipeline operator can wake a report." The two rejections differ only in `error.message`. `bin/bug-pipeline-e2e` case 8.2 asserts the author message, so a mis-provisioned standard-tier test key fails the E2E run instead of passing it. Code: `ibl5/classes/Api/Controller/WakeController.php`. Tests: `ibl5/tests/Api/Controller/WakeControllerTest.php`.

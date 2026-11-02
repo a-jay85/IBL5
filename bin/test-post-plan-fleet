@@ -3563,12 +3563,15 @@ _cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX
         POST_PLAN_FLEET_POSTPLAN_FIX="$_CF_FIXSTUB" POST_PLAN_FLEET_WTL="$_CF_WTL" \
         PR_CYCLE_WATCH_STATE_DIR="$_CF_STATE" \
         run_dm_driver --go "$@" >/dev/null 2>&1
+    if [ -n "${CF_PCW_LIB:-}" ]; then  # point the baked runner at a stub pr-cycle-watch lib
+        sed -i '' "s|^PCW_LIB=.*|PCW_LIB=$CF_PCW_LIB|" "$_DM_RUNNER"
+    fi
     HOME="$SCRATCH" CF_PPREC="$_CF_PPREC" CF_FIXREC="$_CF_FIXREC" CF_WT="$_CF_WT" \
         CF_PP2_RESULT="${CF_PP2_RESULT:-RESULT: terminal=shipped-held}" \
         CF_FIX_WORD="${CF_FIX_WORD:-}" CF_FIX_COMMIT="${CF_FIX_COMMIT:-0}" CF_FIX_RC="${CF_FIX_RC:-0}" \
         bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 }
-_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT; }
+_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PCW_LIB; }
 
 # --- case: conflict-fix-refires ---------------------------------------------------------
 begin_case
@@ -3668,6 +3671,37 @@ CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RESULT="$_CF_CONFLICT_LINE" _cf_run
 [[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
     || fail "conflict-fix-refire-conflict-restores: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
 end_case conflict-fix-refire-conflict-restores
+
+# --- case: conflict-fix-restore-probe-error ---------------------------------------------
+# The is-ancestor probe cannot answer (the remote-tracking ref is gone, rc 128). It must never
+# trigger the reset: HEAD stays on the bot commit and the log names the skipped restore.
+begin_case
+_cf_reset_knobs; _cf_setup
+git -C "$_CF_WT" update-ref -d refs/remotes/origin/branch-live
+CF_FIX_COMMIT=1 CF_FIX_RC=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" != "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-restore-probe-error: HEAD was reset although the probe could not answer"
+grep -qF "post-plan-fleet: conflict-fix-restore-skipped=probe-rc-128" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-restore-probe-error: log lacks conflict-fix-restore-skipped=probe-rc-128"
+end_case conflict-fix-restore-probe-error
+
+# --- case: conflict-fix-record-failed ---------------------------------------------------
+# An attempt that cannot be recorded could repeat on every run, so the fix is never called.
+begin_case
+_cf_reset_knobs; _cf_setup
+_CF_BADLIB="$_CF_DIR/bad-pcw-lib.sh"
+cat > "$_CF_BADLIB" <<'BADLIB'
+pcw_conflict_fix_count() { printf '0\n'; }
+pcw_add_conflict_fix() { return 1; }
+BADLIB
+CF_PCW_LIB="$_CF_BADLIB" CF_FIX_WORD=committed CF_FIX_COMMIT=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ ! -s "$_CF_FIXREC" ]] \
+    || fail "conflict-fix-record-failed: the fix ran although the record write failed ($(cat "$_CF_FIXREC" 2>/dev/null))"
+grep -qF "post-plan-fleet: conflict-fix=skip-record-failed" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-record-failed: log lacks conflict-fix=skip-record-failed"
+[[ "$(_hr_calls "$_CF_PPREC")" == 1 ]] \
+    || fail "conflict-fix-record-failed: want one post-plan call, got $(_hr_calls "$_CF_PPREC")"
+end_case conflict-fix-record-failed
 
 # --- case: conflict-fix-reject-forms ----------------------------------------------------
 begin_case

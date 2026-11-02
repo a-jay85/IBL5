@@ -2648,8 +2648,12 @@ def _run_closer_for_conflict(git, gh, llm, log, res, err, *, worktree, live, mod
     rec = {"ran": True, "status": co.status, "verdict": co.verdict, "cost_usd": co.cost_usd,
            "recheck": "not-run", "stop_reason": co.stop_reason, "trigger": why}
     res.closer = rec
-    if co.status in ("edited", "no-change") and not git.is_dirty() \
-            and git.head() != co.pre_head:
+    if co.status in ("edited", "no-change") and git.is_dirty():
+        # Unfinished resolution: discard it so the next run starts from the pre-session head.
+        _closer_reset(git, co.pre_head)
+        rec["pushed"] = False
+        log("closer: session left a dirty tree; reset to pre-session head; exit 3 stands")
+    elif co.status in ("edited", "no-change") and git.head() != co.pre_head:
         try:
             _push_with_gate_fix(git, log, "closer", llm=llm, worktree=worktree,
                                 out_dir=out_dir, res=res, gh=gh, pr=pr)

@@ -61,7 +61,7 @@ if [ ! -r "$CONFIG" ]; then
   exit 1
 fi
 allowlist_line=$(awk '
-  /testMatch:/ { block = ""; collecting = 1 }
+  /testMatch:[[:space:]]*\[/ { block = ""; collecting = 1 }
   collecting   { block = block $0 "\n" }
   collecting && /\]/ {
     collecting = 0

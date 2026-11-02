@@ -220,7 +220,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'negotiate', 'pid' => '1']);
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert d-alert-error', $output);
         $this->assertStringContainsString('You do not have a team assigned.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);
@@ -232,7 +232,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'rookieoption', 'pid' => '1']);
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert d-alert-error', $output);
         $this->assertStringContainsString('You do not have a team assigned.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);
@@ -260,7 +260,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'rookieoption', 'pid' => '1']);
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert d-alert-error', $output);
         $this->assertStringContainsString('is not on your team.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);
@@ -274,7 +274,7 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
 
         $output = $this->runModule('Player', ['pa' => 'rookieoption', 'pid' => '1']);
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert d-alert-error', $output);
         $this->assertStringContainsString('is not eligible for a rookie option.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);

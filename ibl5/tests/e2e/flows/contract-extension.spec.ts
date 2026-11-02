@@ -27,7 +27,7 @@ test.describe('Contract Extension flow', () => {
       // page produced a meaningful render rather than over-pinning the form.
       // .ibl-card__title was removed: it renders on every page in the site chrome and
       // satisfied the OR even when the negotiate page rendered neither form nor message.
-      const formOrMessage = page.locator('input[name^="offerYear"], .d-alert, .ibl-alert').first(); // e2e-hygiene-allow: form-or-message is the asserted contract, eligibility varies per run
+      const formOrMessage = page.locator('input[name^="offerYear"], .d-alert').first(); // e2e-hygiene-allow: form-or-message is the asserted contract, eligibility varies per run
       await expect(formOrMessage).toBeVisible();
     });
 

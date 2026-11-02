@@ -19,11 +19,18 @@ import re
 
 from .state import Classification, Finding, HarnessError, PlanInfo
 from . import labels, schemas, verdictcache
+from .labels import REVIEW_AGENTS
 from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
 
-CODE_THRESHOLD = 80      # drop findings scored below (rubric Thresholds table)
+# The fan-out below keeps the purpose strings as literals, because
+# test_model_pins_match_source greps them. This keeps them in step with the one registry.
+_FANOUT_PURPOSES = {"A": "review-agent-a", "D": "review-agent-d", "security": "security-audit"}
+if _FANOUT_PURPOSES != REVIEW_AGENTS:
+    raise ImportError("review fan-out purposes drifted from labels.REVIEW_AGENTS")
+
+CODE_THRESHOLD = 80     # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
 
 VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful

@@ -19,6 +19,24 @@ NIT_CAP = 5           # nits posted per PR, highest score first
 SEVERITY_ORDER = {LABEL_IMPORTANT: 0, LABEL_NIT: 1, LABEL_PREEXISTING: 2}
 LABEL_MARKER_RE = re.compile(r"\A<!-- label: (important|nit|pre-existing) -->")
 
+# Live reviewer ids -> the purpose string each one runs under. The one source for
+# the agent marker, the outcome report's agent column, and statefile's review gates.
+REVIEW_AGENTS = {
+    "A": "review-agent-a",
+    "D": "review-agent-d",
+    "security": "security-audit",
+}
+# Mirrors the allowlist in bin/lib/post-review-findings.sh, so a hostile id can
+# never write an HTML-comment terminator into a posted body.
+AGENT_ID_RE = re.compile(r"\A[A-Za-z0-9_-]{1,32}\Z")
+
+
+def agent_marker(agent) -> str:
+    """`<!-- agent: X -->` plus a newline for an allowlisted id, else the empty string."""
+    if isinstance(agent, str) and AGENT_ID_RE.match(agent):
+        return f"<!-- agent: {agent} -->\n"
+    return ""
+
 _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 _FILE_RE = re.compile(r"^\+\+\+ b/(.*)$")
 _LABEL_TITLES = {LABEL_IMPORTANT: "Important", LABEL_NIT: "Nit",
@@ -117,6 +135,7 @@ def parse_label(body) -> Optional[str]:
 def render_body(f, limit=1000) -> str:
     """Marker + score + bold label header, then the body cut to fit `limit` in total."""
     header = (f"{marker(f.label or LABEL_IMPORTANT)}\n<!-- score: {f.score or 0} -->\n"
+              f"{agent_marker(getattr(f, 'agent', None))}"
               f"**{_LABEL_TITLES.get(f.label, 'Important')}**")
     if f.bug_class:
         header += f" · bug class: `{f.bug_class}`"

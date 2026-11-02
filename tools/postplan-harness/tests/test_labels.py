@@ -156,7 +156,7 @@ def test_render_body_caps_header_with_many_other_instances():
            other_instances=[f"ibl5/classes/Some/Long/Path{i}.php:{i}" for i in range(20)])
     out = labels.render_body(f)
     assert len(out) <= 1000
-    assert out.startswith("<!-- label: important -->\n<!-- score: 91 -->\n**Important**")
+    assert out.startswith("<!-- label: important -->\n<!-- score: 91 -->\n<!-- agent: A -->\n**Important**")
     assert "yyyy" in out
     assert labels.parse_label(out) == "important"
 

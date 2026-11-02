@@ -260,6 +260,7 @@ final class PlrBulkEditSessionTest extends TestCase
     public function testLiveRunOnReadOnlyFileAbortsWithoutBackup(): void
     {
         if (posix_geteuid() === 0) {
+            // phpunit-hygiene-allow: root ignores file mode bits, so chmod 0444 cannot block writes
             self::markTestSkipped('Root ignores file mode bits, so chmod 0444 cannot make the file read-only.');
         }
 

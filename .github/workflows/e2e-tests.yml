@@ -1412,7 +1412,7 @@ jobs:
                 --deleted-list "$RUNNER_TEMP/vr-deleted.txt" \
                 > "$RUNNER_TEMP/vr-refs.txt" 2> "$RUNNER_TEMP/vr-refs.err"; then
               cat "$RUNNER_TEMP/vr-refs.txt" "$RUNNER_TEMP/vr-refs.err"
-              echo "::error::Gallery reference(s) to files this run deleted in the tree to push; gh-pages left unchanged. The next master push recomputes."
+              echo "::error::Gallery reference(s) to files this run deleted in the tree to push; gh-pages left unchanged. A later master push will not clear this: republish or prune the dangling gallery reference(s) on gh-pages (see the list above), then re-run."
               exit 1
             fi
             sed -n 's/^WARN /::warning::/p' "$RUNNER_TEMP/vr-refs.err"

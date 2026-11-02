@@ -563,6 +563,38 @@ wantnot "no raw @here" "$OUT" '@here'
 wantnot "no raw user mention" "$OUT" '<@123>'
 want "text survives with a zero-width space" "$OUT" "@$(printf '\342\200\213')everyone"
 
+begin_case "am-mention-text-what-watch"
+# Zero counts and no ping: no top block, so only the WHAT/WATCH substitution can neutralize
+# the mentions typed into the digest body. The `am` helper pins stdin to f1, so call the driver.
+{
+    printf '### Merge digest\n'
+    printf '**What changed:** hello @everyone and <@123> in what\n'
+    printf '**Why:** y\n'
+    printf '**Watch:** careful @here and @everyone in watch\n'
+    printf '**Touches:** t\n'
+    printf '**Machine-authored fixes:** none\n'
+} > "$SCRATCH/f-mention"
+rm -f "$PING_FILE"
+OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --ping-out "$PING_FILE" \
+        --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
+        --comment-url "$AM_CMT" --run-url "$AM_RUN" \
+        --job-result after-merge-checklist=success < "$SCRATCH/f-mention" 2>/dev/null)"
+RC=$?
+PING="<none>"
+if [ -f "$PING_FILE" ]; then PING="$(cat "$PING_FILE")"; fi
+_zw="$(printf '\342\200\213')"
+_what_line="$(grep -F -- '**What changed:**' <<< "$OUT" || true)"
+_watch_line="$(grep -F -- '**Watch:**' <<< "$OUT" || true)"
+eq "exit 0" "$RC" "0"
+eq "no ping" "$PING" "false"
+wantnot "no raw @everyone" "$OUT" '@everyone'
+wantnot "no raw @here" "$OUT" '@here'
+wantnot "no raw user mention" "$OUT" '<@123>'
+want "What line keeps @everyone behind a zero-width space" "$_what_line" "@${_zw}everyone"
+want "What line keeps the user mention behind a zero-width space" "$_what_line" "<@${_zw}123>"
+want "Watch line keeps @here behind a zero-width space" "$_watch_line" "@${_zw}here"
+want "Watch line keeps @everyone behind a zero-width space" "$_watch_line" "@${_zw}everyone"
+
 begin_case "am-bad-comment-url"
 am T --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --comment-url 'https://evil.example/x> @everyone <https://y' --run-url "$AM_RUN" \

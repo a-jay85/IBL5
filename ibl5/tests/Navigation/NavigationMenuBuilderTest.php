@@ -48,6 +48,25 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertArrayHasKey('Community', $menus);
     }
 
+    public function testDebugAdminMenuKeepsDebugMenuFirstAlongsideStandardMenus(): void
+    {
+        $config = new NavigationConfig(
+            isLoggedIn: true,
+            username: 'TestUser',
+            currentLeague: 'ibl',
+            teamId: 1,
+            seasonPhase: 'Regular Season',
+            allowWaivers: 'No',
+            showDraftLink: 'Off',
+            isDraftOrderFinalized: false,
+            isAdmin: false,
+            isDebugAdmin: true,
+        );
+        $menus = (new NavigationMenuBuilder($config))->getMenuStructure();
+
+        $this->assertSame(['Debug', 'Season', 'Stats', 'History', 'Community'], array_keys($menus));
+    }
+
     public function testStatsMenuLinksToHeadToHeadRecords(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig());

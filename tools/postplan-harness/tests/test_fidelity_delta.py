@@ -592,7 +592,7 @@ def test_plan_excerpt_sections():
 
 
 @pytest.mark.usefixtures("git_shim")
-def test_build_delta_packet_contents(tmp_path):
+def test_delta_packet_holds_only_delta_hunks_and_touched_sections(tmp_path):
     anchor = _record({"a.py": _fid("a"), "b.py": _fid("b")},
                      findings="- [BLOCKING] a.py: x\n\nno trailing newline")["anchor"]
     ctx = {"anchor": anchor, "delta_paths": ["a.py"],
@@ -884,6 +884,14 @@ def _delta_text(tmp_path, *, ready=True):
     return text
 
 
+def test_delta_text_not_ready_variant_yields_unresolved_key(tmp_path):
+    """`_delta_text(ready=False)` still gives an UNRESOLVED key line plus a NOT READY verdict."""
+    text = _delta_text(tmp_path, ready=False)
+    reviewed = text.split(fidelity.DIGEST_CUT, 1)[0]
+    assert fidelity_delta.match_restatements(reviewed, 1) == {1: "UNRESOLVED"}
+    assert text.endswith("\nNOT READY\n")
+
+
 def _run1(tmp_path, *, diff=DIFF, plan_body=PLAN):
     """Run 1: a full NOT READY review. Asserts it spawned only the full reviewer and wrote the anchor."""
     purposes = []
@@ -1173,9 +1181,11 @@ def test_keyed_anchor_findings_keys_every_blocking_line_in_order():
     "", None,
 ])
 def test_keyed_anchor_findings_count_matches_anchor_blocking_regex(text):
+    ANCHOR_BLOCKING_RE = fidelity_delta.ANCHOR_BLOCKING_RE
     keyed, n = fidelity_delta.keyed_anchor_findings(text)
-    assert n == len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(text or ""))
-    assert len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(keyed)) == n
+    text = text or ""
+    assert n == len(ANCHOR_BLOCKING_RE.findall(text))
+    assert len(ANCHOR_BLOCKING_RE.findall(keyed)) == n
     if text == "x [BLOCKING] a\ry [BLOCKING] b\n":
         assert n == 1
 

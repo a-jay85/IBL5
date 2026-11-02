@@ -172,6 +172,29 @@ expect_eq "26d pinned split that adds escaping stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and escape the raw team names')"
 expect_eq "26e pinned split that HTML-escapes new output stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and HTML-escape the raw team names')"
+# 26f — NEGATED_DEFENSE_RE: a past-participle defense word followed by a removal or missing word
+expect_eq "26f escaped output was dropped stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output was dropped')"
+expect_eq "26g sanitized input is not applied stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; sanitized input is not applied')"
+expect_eq "26h escaped output is no longer applied stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output is no longer applied')"
+expect_eq "26i escaped value got lost stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped value got lost')"
+expect_eq "26j sanitized input was removed stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; sanitized input was removed')"
+expect_eq "26k escaped output was stripped stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output was stripped')"
+expect_eq "26l sanitized input was skipped stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; sanitized input was skipped')"
+expect_eq "26m escaped output was omitted stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output was omitted')"
+expect_eq "26n escaped output was missing stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output was missing')"
+expect_eq "26o escaped output is gone stays xhigh" "xhigh" \
+    "$("$HINT" --desc 'pinning: extract helper; escaped output is gone')"
+expect_eq "26p pinned split of plain escaped output stays default" "default" \
+    "$("$HINT" --desc 'pinning: extract helper; the escaped output')"
 # 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
 expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
     "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"

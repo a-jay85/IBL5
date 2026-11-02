@@ -152,6 +152,47 @@ def test_session_passes_opus_caps_and_deny_list(repo):
     assert kw["extra_env"]["GH_CONFIG_DIR"]
 
 
+_CRED_PARENT_ENV = {
+    "PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", ""),
+    "GH_TOKEN": "t", "GITHUB_TOKEN": "t", "GH_ENTERPRISE_TOKEN": "t",
+    "SSH_AUTH_SOCK": "/tmp/agent.sock", "GIT_ASKPASS": "/bin/askpass",
+    "SSH_ASKPASS": "/bin/askpass", "GIT_SSH": "/usr/bin/ssh",
+}
+
+
+def _session_child_env(repo):
+    """The env the closer's claude child gets: the session's extra_env over a parent env
+    that carries every credential path."""
+    from harness.adapters.llm import _apply_extra_env
+    llm = FakeLlm()
+    _session(repo, llm)
+    return _apply_extra_env(dict(_CRED_PARENT_ENV), llm.kw["extra_env"])
+
+
+def test_session_env_strips_git_credential_paths(repo):
+    env = _session_child_env(repo)
+    for key in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "SSH_AUTH_SOCK",
+                "GIT_ASKPASS", "SSH_ASKPASS", "GIT_SSH"):
+        assert key not in env, key
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+    assert env["GIT_SSH_COMMAND"] == "false"
+    assert (env["GIT_CONFIG_COUNT"], env["GIT_CONFIG_KEY_0"], env["GIT_CONFIG_VALUE_0"]) \
+        == ("1", "credential.helper", "")
+
+
+def test_session_env_resets_git_credential_helper(repo):
+    """git run with the session env sees an empty helper last, which clears osxkeychain."""
+    env = _session_child_env(repo)
+    subprocess.run(["git", "-C", str(repo), "config", "credential.helper", "osxkeychain"],
+                   check=True)
+    out = subprocess.run(["git", "-C", str(repo), "config", "--get-all", "credential.helper"],
+                         env=env, capture_output=True, text=True, check=True).stdout
+    assert out.splitlines()[-1] == ""
+    ssh = subprocess.run(["git", "-C", str(repo), "ls-remote", "ssh://git@example.invalid/x"],
+                         env=env, capture_output=True, text=True, timeout=20)
+    assert ssh.returncode != 0
+
+
 def test_wall_timeout_ends_session_without_raise(repo):
     def touch(cwd):
         _write(cwd, "half.txt", "partial\n")

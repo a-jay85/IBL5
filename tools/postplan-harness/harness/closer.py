@@ -4,9 +4,9 @@ Three parts: a pure trigger predicate, one tooled session, and a reply parser.
 
 The module never imports `harness.armable`, never holds a `gh` handle, and never commits or
 pushes. It only edits the worktree. The runner commits, pushes, posts thread replies and
-re-runs the unchanged `evaluate()` at most once. The no-arm guarantee is structural: the
-session env has GitHub auth stripped, its deny list names `gh`, and a test pins that this
-module has no arm, label, sticky or verdict path.
+re-runs the unchanged `evaluate()` at most once. The no-arm guarantee is structural. The
+session env has no gh token and no git credential path (`session_env`), its deny list names
+`gh`, and a test pins that this module has no arm, label, sticky or verdict path.
 """
 from __future__ import annotations
 
@@ -34,6 +34,25 @@ CLOSER_ALLOWED_TOOLS = cifix.CI_FIX_ALLOWED_TOOLS
 CLOSER_DENIED_TOOLS = cifix.CI_FIX_DENIED_TOOLS + (
     "Bash(git commit:*)", "Bash(git push:*)", "Bash(gh:*)", "Bash(env gh:*)",
     "Bash(command gh:*)", "Agent", "WebFetch", "WebSearch")
+
+# Git credential paths the session must not reach. A `None` value removes the variable.
+GIT_CRED_STRIP = ("SSH_AUTH_SOCK", "GIT_ASKPASS", "SSH_ASKPASS", "GIT_SSH")
+
+
+def session_env(gh_config_dir: str) -> dict:
+    """The `extra_env` overlay for the closer session. It carries no GitHub or git credentials.
+
+    gh gets no token and an empty config dir. git gets an empty `credential.helper`, which
+    resets the helper list, so osxkeychain never runs. It also gets no askpass, no prompt, and
+    an ssh command that always fails, so neither an ssh agent nor a key on disk can push."""
+    env: dict = {"GH_TOKEN": None, "GITHUB_TOKEN": None, "GH_ENTERPRISE_TOKEN": None,
+                 "GH_CONFIG_DIR": gh_config_dir}
+    env.update({k: None for k in GIT_CRED_STRIP})
+    env.update({"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper",
+                "GIT_CONFIG_VALUE_0": "", "GIT_TERMINAL_PROMPT": "0",
+                "GIT_SSH_COMMAND": "false"})
+    return env
+
 
 VERDICTS = ("fixed", "false-positive", "not-fixable")
 UNPARSEABLE_NOTE = "closer reply unparseable; no thread replies posted"
@@ -192,8 +211,7 @@ def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContex
     n0 = len(getattr(getattr(llm, "ledger", None), "calls", ()) or ())
     prompt = build_prompt(context)
     gh_cfg = tempfile.mkdtemp(prefix="closer-gh-")
-    extra_env = {"GH_TOKEN": None, "GITHUB_TOKEN": None, "GH_ENTERPRISE_TOKEN": None,
-                 "GH_CONFIG_DIR": gh_cfg}
+    extra_env = session_env(gh_cfg)
     status, stop_reason, reply = "", "", ""
     try:
         reply = llm.call_tooled(

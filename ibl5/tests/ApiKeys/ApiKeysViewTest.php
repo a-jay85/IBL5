@@ -87,6 +87,43 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('2026-03-20 14:00:00', $html);
     }
 
+    public function testActiveKeyStateRowLabelsAreScopedRows(): void
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $keyStatus = [
+            'key_prefix' => 'ibl_test',
+            'permission_level' => 'public',
+            'rate_limit_tier' => 'standard',
+            'is_active' => 1,
+            'created_at' => '2026-01-15 10:30:00',
+            'last_used_at' => '2026-03-20 14:00:00',
+        ];
+
+        $html = $this->view->renderActiveKeyState($keyStatus);
+
+        $this->assertSame(5, substr_count($html, '<th scope="row" class="text-left">'));
+        $this->assertSame(0, substr_count($html, '<th class="text-left">'));
+    }
+
+    public function testGoogleCardActiveRowLabelsAreScopedRows(): void
+    {
+        $html = $this->view->renderGoogleSheetCard(self::googleSummary(), true);
+
+        $this->assertSame(3, substr_count($html, '<th scope="row" class="text-left">'));
+        $this->assertSame(0, substr_count($html, '<th class="text-left">'));
+    }
+
+    public function testGoogleCardBrokenStateRendersNoRowLabels(): void
+    {
+        $html = $this->view->renderGoogleSheetCard(self::googleSummary('broken', 'invalid_grant'), true);
+
+        $this->assertStringContainsString('ibl-alert--warning', $html);
+        $this->assertStringNotContainsString('scope="row"', $html);
+    }
+
     public function testRenderActiveKeyStateShowsNeverWhenNotUsed(): void
     {
         if (session_status() === PHP_SESSION_NONE) {

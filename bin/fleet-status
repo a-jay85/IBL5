@@ -64,7 +64,7 @@
 #
 # THEY OPEN IN VS CODE. Every path URI is vscode://file<abs path>, so a plan or a
 # log lands in an editor, not the OS's .md/.log app. The one other link, `reorder`
-# on the queue header, opens an applet that starts the reorder UI. CMD-click.
+# on the queue header, is a URL that starts the reorder UI. Allow it once.
 #
 # UNDER TMUX, TWO THINGS HAVE TO BE TRUE or the click dies silently and the page
 # looks like plain text. tmux forwards OSC 8 only when the OUTER terminal is
@@ -122,6 +122,10 @@ AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.
 LAUNCH_AGENTS_DIR="${FLEET_STATUS_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
+PLISTBUDDY_BIN="${FLEET_STATUS_PLISTBUDDY:-/usr/libexec/PlistBuddy}"
+CODESIGN_BIN="${FLEET_STATUS_CODESIGN:-codesign}"
+LSREGISTER_BIN="${FLEET_STATUS_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
+REORDER_URL_SCHEME="${FLEET_STATUS_REORDER_SCHEME:-ibl5-queue-reorder}"
 # Same default and override as usage_state_dir in bin/lib/usage-fetch.sh.
 USAGE_STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
 # shellcheck source=bin/lib/session-id.sh
@@ -236,46 +240,72 @@ log_word() {
 # bin/automouse/queue-reorder-ui, or nothing at all.
 #
 # A LINK CANNOT RUN A COMMAND. OSC 8 carries a URI and the terminal hands it to
-# the OS, which only opens things. What it CAN open is an app bundle, and
-# launching one runs it. So the link is file://<a tiny AppleScript applet> whose
+# the OS, which only opens things. So the link is <scheme>://open, a URL scheme
+# owned by a tiny AppleScript applet. Opening the URL launches the applet, whose
 # only statement is a `do shell script` that starts the launcher detached. The
 # launcher then picks a port, starts its server and opens the browser itself. No
-# Terminal window, no URL-scheme registration.
+# Terminal window.
+#
+# WHY A SCHEME AND NOT file://<applet>. Ghostty 1.4 hard-blocks any local link
+# target that could execute code, and an app bundle is one. No setting allows
+# it. Ghostty treats a custom scheme like vscode://: it asks once, then opens.
+# The applet ignores the URL's contents, so the worst any link can do, a web
+# page's included, is open the reorder page.
 #
 # The applet is built here with osacompile on first need and cached outside the
-# repo. It is rebuilt only when the command it would carry changes, which is
-# tracked by a stamp file holding that command. The target is the MAIN
-# checkout's launcher, because a worktree path dies with the worktree while the
-# cached applet lives on.
+# repo. PlistBuddy adds the scheme to its Info.plist. codesign re-signs it,
+# because an edited plist breaks the ad-hoc signature and LaunchServices then
+# ignores the scheme. lsregister registers it. The stamp file holds the scheme
+# and the command, and the applet is rebuilt only when that changes. The target
+# is the MAIN checkout's launcher, because a worktree path dies with the
+# worktree while the cached applet lives on.
 #
 # do shell script runs with a bare /usr/bin:/bin PATH, and the launcher needs
 # php, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
 #
 # FAIL-SOFT: no link when links are off (a pipe or a capture has nothing to
-# click), when osacompile is missing (Linux CI), when a path would break the
-# AppleScript string, or when the build fails.
+# click), when a build tool is missing (Linux CI), when a path would break the
+# AppleScript string, or when any build step fails.
 reorder_link() {
     [ "$LINKS" -eq 1 ] || return 0
     local target="$MAIN_CHECKOUT/bin/automouse/queue-reorder-ui"
     local app="$REORDER_APP_DIR/ibl5-queue-reorder.app"
     local stamp="$REORDER_APP_DIR/ibl5-queue-reorder.cmd"
-    local cmd tmp
+    local scheme="$REORDER_URL_SCHEME"
+    local cmd tmp tool plist
     case "$target$REORDER_APP_DIR" in *\'*|*\"*|*\\*) return 0 ;; esac
     cmd="PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-queue-reorder-ui.log 2>&1 &"
-    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$cmd" ]; then
-        command -v "$OSACOMPILE_BIN" >/dev/null 2>&1 || return 0
+    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$scheme $cmd" ]; then
+        for tool in "$OSACOMPILE_BIN" "$PLISTBUDDY_BIN" "$CODESIGN_BIN" "$LSREGISTER_BIN"; do
+            command -v "$tool" >/dev/null 2>&1 || return 0
+        done
         mkdir -p "$REORDER_APP_DIR" 2>/dev/null || return 0
         tmp="$REORDER_APP_DIR/.build-$$.app"
+        plist="$tmp/Contents/Info.plist"
         rm -rf "$tmp"
-        "$OSACOMPILE_BIN" -o "$tmp" -e "do shell script \"$cmd\"" >/dev/null 2>&1 \
+        "$OSACOMPILE_BIN" -o "$tmp" \
+            -e 'on run' -e "do shell script \"$cmd\"" -e 'end run' \
+            -e 'on open location u' -e "do shell script \"$cmd\"" \
+            -e 'end open location' >/dev/null 2>&1 \
             || { rm -rf "$tmp"; return 0; }
+        # osacompile may or may not write a bundle id, so drop any and add ours.
+        "$PLISTBUDDY_BIN" -c 'Delete :CFBundleIdentifier' "$plist" >/dev/null 2>&1
+        if ! { "$PLISTBUDDY_BIN" \
+            -c 'Add :CFBundleIdentifier string com.ibl5.queue-reorder' \
+            -c 'Add :CFBundleURLTypes array' \
+            -c 'Add :CFBundleURLTypes:0 dict' \
+            -c 'Add :CFBundleURLTypes:0:CFBundleURLName string com.ibl5.queue-reorder' \
+            -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' \
+            -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $scheme" \
+            "$plist" && "$CODESIGN_BIN" -f -s - "$tmp"; } >/dev/null 2>&1; then
+            rm -rf "$tmp"; return 0
+        fi
         { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
-        printf '%s' "$cmd" > "$stamp"
+        "$LSREGISTER_BIN" -f "$app" >/dev/null 2>&1 || return 0
+        printf '%s' "$scheme $cmd" > "$stamp"
     fi
-    # Trailing slash: an .app is a directory, and file:// directory URIs end in one.
     # shellcheck disable=SC1003  # '\033\\' is the OSC ST, as in link_file.
-    printf '\033]8;;file://%s/\033\\%s\033]8;;\033\\' \
-        "$(printf '%s' "$app" | sed 's/ /%20/g')" 'reorder'
+    printf '\033]8;;%s://open\033\\%s\033]8;;\033\\' "$scheme" 'reorder'
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.

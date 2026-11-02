@@ -86,3 +86,9 @@ The corpus table above ran with a prompt that told the judge to decide check 1 f
 ## Addendum (2026-11-02): corpus rerun on the shipping prompt
 
 The 14-row corpus was rerun on the prompt that ships, with the judge argv carrying `--tools ''` and `--strict-mcp-config`. Rows 1 to 11, 13 and 14 passed. Row 12 (`Add a helper method to the standings renderer`) failed: the judge answered xhigh where default was expected, reasoning that a new rendering helper is a security surface with no pinned output. This is the failure the plan's Phase 6 names. Verification has not passed, and the prompt is not loosened again. The `fail-count` is 1. A human decides whether to accept the false xhigh on row 12 or change the rule text.
+
+## Addendum (2026-11-02): replaced by an open Opus judgment
+
+**Superseded by:** ADR-0226 (`0226-plan-tier-hint-open-judgment.md`).
+
+The check-list extraction and the xhigh failsafe this ADR chose were replaced by one open Opus 5.5 question with no trigger list. Any judge failure now prints default, and every verdict is logged. The CLI, the stub seam, and the `bin/plan-now` exit-4 wiring above still hold.

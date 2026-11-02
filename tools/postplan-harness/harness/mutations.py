@@ -4,6 +4,7 @@ No grammar lives here. The lib parses the plan's `## Executable Mutations` secti
 applies each literal edit, requires the row's check to fail, reverts, and verifies
 the tree byte-for-byte. This module only runs it under `run_bounded`, reads its
 closed result vocabulary, and fails closed on every path the lib cannot finish.
+The lib runs under a budget-based outer bound that does not grow with the row count.
 """
 from __future__ import annotations
 
@@ -21,6 +22,11 @@ RESULT_RE = re.compile(
     r"^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ([0-9A-Za-z_-]+) — (.*)$"
 )
 NO_TIMEOUT_PREFIX = "NO-TIMEOUT"
+DEFAULT_PER_CHECK_TIMEOUT = 30   # floor; the pre-2026-11 fixed bound
+DEFAULT_MAX_TIMEOUT = 300        # baseline bound and mutated-run ceiling
+DEFAULT_SCALE = 2
+DEFAULT_BUDGET = 1800            # total wall clock across rows
+OUTER_SLACK = 60
 
 
 @dataclass(frozen=True)
@@ -56,7 +62,9 @@ def _recover(lib: Path, cwd: Path) -> bool:
 
 
 def run_executable_mutations(plan: Path, cwd: Path, *, lib: Path = DEFAULT_LIB,
-                             per_check_timeout: int = 30,
+                             per_check_timeout: int = DEFAULT_PER_CHECK_TIMEOUT,
+                             max_timeout: int = DEFAULT_MAX_TIMEOUT,
+                             scale: int = DEFAULT_SCALE, budget: int = DEFAULT_BUDGET,
                              outer_timeout: Optional[int] = None) -> MutationReport:
     """Parse, then run every executable mutation in `plan` against `cwd`."""
     try:
@@ -74,10 +82,15 @@ def run_executable_mutations(plan: Path, cwd: Path, *, lib: Path = DEFAULT_LIB,
     if n_records == 0:
         return MutationReport(True, (), (), False)
 
-    bound = outer_timeout if outer_timeout is not None else 2 * per_check_timeout * n_records + 60
+    max_timeout = max(max_timeout, per_check_timeout)   # the lib rejects a ceiling below the floor
+    bound = outer_timeout if outer_timeout is not None else budget + 2 * max_timeout + OUTER_SLACK
     try:
-        proc = run_bounded([str(lib), "run", "--root", str(cwd), "--timeout",
-                            str(per_check_timeout), str(plan)],
+        proc = run_bounded([str(lib), "run", "--root", str(cwd),
+                            "--timeout", str(per_check_timeout),
+                            "--max-timeout", str(max_timeout),
+                            "--scale", str(scale),
+                            "--budget", str(budget),
+                            str(plan)],
                            step="exec-mutations", timeout=bound, cwd=str(cwd),
                            errors="surrogateescape")
     except HarnessError:

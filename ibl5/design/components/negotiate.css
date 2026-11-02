@@ -49,6 +49,23 @@
     width: 4.5rem;
 }
 
+/* Phone width: three salary inputs per row, label stacked above input */
+@media (max-width: 480px) {
+    .offer-salary-row--inputs {
+        display: grid;
+        grid-template-columns: repeat(3, auto);
+        justify-content: center;
+        justify-items: center;
+    }
+
+    .offer-salary-row--inputs .offer-salary-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+    }
+}
+
 /* Quick offer button row — label + row of buttons */
 .offer-button-row {
     margin-bottom: 0.75rem;

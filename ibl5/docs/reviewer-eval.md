@@ -83,7 +83,7 @@ One run is a sample. LLM output varies between runs. Pass `--runs N` to `run` or
 
 ## Opus verifier (2026-10-27)
 
-The Phase 4D verifier moved from Sonnet to Opus at both review depths. The seat count stayed at 3. Each side was scored once.
+At both review depths, the Phase 4D verifier now runs on Opus. It ran on Sonnet before. The seat count stayed at 3. Each side was scored once.
 
 ```
 Reviewer eval before: reviewer-eval v=aa296140577f c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0

@@ -134,6 +134,18 @@ if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/docke
 case "${1:-}" in
     info)  exit "${STUB_DOCKER_INFO_RC:-0}" ;;
     image) exit "${STUB_DOCKER_IMAGE_RC:-${STUB_DOCKER_RC:-0}}" ;;
+    ps)
+        if [ -n "${STUB_DOCKER_PS:-}" ] && [ -f "$STUB_DOCKER_PS" ]; then cat "$STUB_DOCKER_PS"; fi
+        exit "${STUB_DOCKER_PS_RC:-0}" ;;
+    inspect)
+        last="${*: -1}"
+        case " $* " in
+            *" --format "*) f="${STUB_DOCKER_INSPECT_DIR:-/nonexistent}/$last.fmt" ;;
+            *) f="${STUB_DOCKER_INSPECT_DIR:-/nonexistent}/$last.json" ;;
+        esac
+        [ -f "$f" ] || exit 1
+        cat "$f"; exit 0 ;;
+    rm) exit "${STUB_DOCKER_RM_RC:-0}" ;;
 esac
 exit "${STUB_DOCKER_RC:-0}"
 SH
@@ -304,6 +316,9 @@ run_tick() {
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
+        WT_GC_DOCKER_CONTAINERS=0
+        STUB_DOCKER_PS="$CD/ps"
+        STUB_DOCKER_INSPECT_DIR="$CD/insp"
         WT_GC_STALE_LIST=0
         WT_GC_ARCHIVE_PRUNE=0
         WT_GC_WT_REMOVE=/usr/bin/false
@@ -375,6 +390,21 @@ SH
 
 # ── Fixture builders for the reap steps (operate on $ENV_MAIN) ────────────────
 epoch_ago() { printf '%s\n' "$(( $(date +%s) - $1 * 86400 ))"; }
+# iso_ago <days> — a Docker-style FinishedAt that many days (plus 1h) back.
+iso_ago() {
+    python3 -I -c '
+import sys, time
+t = time.time() - int(sys.argv[1]) * 86400 - 3600
+print(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".123456789Z")
+' "$1"
+}
+# dk_container <id> <name> <state> <finished> — one ps row plus its inspect files.
+dk_container() {
+    mkdir -p "$CD/insp"
+    printf '%s\t%s\n' "$1" "$2" >> "$CD/ps"
+    printf '%s\t%s\n' "$3" "$4" > "$CD/insp/$1.fmt"
+    printf '{"Id":"%s","Name":"/%s","State":{"Status":"%s"}}\n' "$1" "$2" "$3" > "$CD/insp/$1.json"
+}
 
 # epoch_to_touch <epoch> — the `touch -t` stamp (BSD date -r / GNU date -d @).
 epoch_to_touch() {
@@ -2051,6 +2081,141 @@ rt WT_GC_DOCKER_PRUNE=1 -- --dry-run --force
 chk_rc K4 0
 [ "$(cat "$CD/docker-argv" 2>/dev/null)" = info ] || note_err "K4 dry run pruned"
 [ "$(grep -c 'DRY-RUN would: .*docker .*prune' "$(LOG)")" = 2 ] || note_err "K4 not two DRY-RUN prune lines"
+finish_case
+
+# ── Stopped ibl5-* containers ─────────────────────────────────────────────────
+DK_ON=(WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1 WT_GC_ARCHIVE_STAMP=1700000000)
+
+fx DK1-old-removed-after-archive
+dk_container aaa111 ibl5-old exited "$(iso_ago 20)"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK1 0
+grep -qxF 'rm aaa111' "$CD/docker-argv" 2>/dev/null || note_err "DK1 no exact 'rm aaa111'"
+grep -qF 'ps -a --no-trunc --filter status=exited --filter name=ibl5- --format' "$CD/docker-argv" 2>/dev/null \
+    || note_err "DK1 ps argv not exact"
+grep -qE '^(volume|system|container)' "$CD/docker-argv" 2>/dev/null && note_err "DK1 volume/system/container call"
+grep -qE '^rm .*-[vf]' "$CD/docker-argv" 2>/dev/null && note_err "DK1 rm used -v or -f"
+[ -s "$CD/tips/containers-1700000000-ibl5-old.json" ] || note_err "DK1 inspect JSON not archived"
+grep -qF '"Id":"aaa111"' "$CD/tips/containers-1700000000-ibl5-old.json" 2>/dev/null || note_err "DK1 archive has wrong content"
+log_has 'container removed ibl5-old exited=20d' || note_err "DK1 no removed line"
+finish_case
+
+fx DK2-young-kept
+dk_container bbb222 ibl5-young exited "$(iso_ago 5)"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK2 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK2 young container removed"
+log_has 'container keep ibl5-young: exited 5d ago' || note_err "DK2 no keep line"
+ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "DK2 archived a kept container"
+finish_case
+
+fx DK3-foreign-name-skipped
+dk_container ccc333 other-thing exited "$(iso_ago 30)"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK3 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container removed"
+grep -q 'ccc333' "$CD/docker-argv" 2>/dev/null && note_err "DK3 non-ibl5 container inspected"
+finish_case
+
+fx DK4-not-exited-kept
+dk_container ddd444 ibl5-running running "$(iso_ago 30)"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK4 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK4 running container removed"
+log_has 'container keep ibl5-running: not exited' || note_err "DK4 no keep line"
+finish_case
+
+fx DK5-unknown-exit-time-kept
+dk_container eee555 ibl5-never exited "0001-01-01T00:00:00Z"
+dk_container eee556 ibl5-junk exited "garbage"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK5 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK5 removed with unknown exit time"
+log_has 'container keep ibl5-never: exit time unknown' || note_err "DK5 sentinel not kept"
+log_has 'container keep ibl5-junk: exit time unknown' || note_err "DK5 garbage not kept"
+finish_case
+
+fx DK6-inspect-fails-kept
+printf '%s\t%s\n' fff666 ibl5-noinspect > "$CD/ps"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK6 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK6 removed without inspect"
+log_has 'container keep ibl5-noinspect: inspect failed' || note_err "DK6 no keep line"
+finish_case
+
+fx DK7-ps-fails
+dk_container ggg777 ibl5-old exited "$(iso_ago 20)"
+rt "${DK_ON[@]}" STUB_DOCKER_PS_RC=1 -- --force
+chk_rc DK7 1
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK7 removed after ps failure"
+log_has 'docker ps failed — no containers removed' || note_err "DK7 no ps-failed line"
+grep -q '^image prune' "$CD/docker-argv" 2>/dev/null || note_err "DK7 image prune did not still run"
+finish_case
+
+fx DK8-rm-fails
+dk_container hhh888 ibl5-old exited "$(iso_ago 20)"
+rt "${DK_ON[@]}" STUB_DOCKER_RM_RC=1 -- --force
+chk_rc DK8 1
+log_has 'container rm failed ibl5-old' || note_err "DK8 no rm-failed line"
+[ -s "$CD/tips/containers-1700000000-ibl5-old.json" ] || note_err "DK8 archive missing"
+finish_case
+
+fx DK9-archive-fails-keeps
+dk_container iii999 ibl5-old exited "$(iso_ago 20)"
+rm -rf "$CD/tips"
+: > "$CD/tips"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK9 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK9 removed without an archive"
+log_has 'container keep ibl5-old: archive failed' || note_err "DK9 no archive-failed line"
+finish_case
+
+fx DK10-dry-run
+dk_container jjj000 ibl5-old exited "$(iso_ago 20)"
+rt "${DK_ON[@]}" -- --force --dry-run
+chk_rc DK10 0
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK10 dry run removed"
+ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "DK10 dry run wrote an archive"
+log_has 'DRY-RUN would: archive ibl5-old to' || note_err "DK10 no archive dry-run line"
+log_has 'DRY-RUN would: .*docker .*rm jjj000' || note_err "DK10 no rm dry-run line"
+finish_case
+
+fx DK11-switch-off
+dk_container kkk111 ibl5-old exited "$(iso_ago 20)"
+rt WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=0 -- --force
+chk_rc DK11 0
+grep -q '^ps ' "$CD/docker-argv" 2>/dev/null && note_err "DK11 listed containers while off"
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "DK11 removed while off"
+finish_case
+
+fx DK12-empty-age-fails-closed
+dk_container lll222 ibl5-old exited "$(iso_ago 20)"
+rt "${DK_ON[@]}" WT_GC_CONTAINER_DAYS= -- --force
+chk_rc DK12 1
+log_has "invalid WT_GC_CONTAINER_DAYS '' — step skipped" || note_err "DK12 no invalid line"
+[ -e "$CD/docker-argv" ] && note_err "DK12 docker ran with an invalid age"
+finish_case
+
+fx DK13-offset-and-fraction-less-times
+dk_container mmm333 ibl5-offset exited "2020-01-01T10:00:00+02:00"
+dk_container mmm334 ibl5-plain exited "2020-01-01T10:00:00Z"
+rt "${DK_ON[@]}" -- --force
+chk_rc DK13 0
+grep -qxF 'rm mmm333' "$CD/docker-argv" 2>/dev/null || note_err "DK13 offset time not parsed"
+grep -qxF 'rm mmm334' "$CD/docker-argv" 2>/dev/null || note_err "DK13 plain time not parsed"
+finish_case
+
+fx A6-container-archive-retention
+mkdir -p "$CD/tips"
+printf '{}\n' > "$CD/tips/containers-$(epoch_ago 91)-ibl5-old.json"
+printf '{}\n' > "$CD/tips/containers-$(epoch_ago 89)-ibl5-new.json"
+printf '{}\n' > "$CD/tips/containers-notanumber-ibl5-x.json"
+rt WT_GC_ARCHIVE_PRUNE=1 -- --force
+chk_rc A6 0
+ls "$CD"/tips/containers-*-ibl5-old.json >/dev/null 2>&1 && note_err "A6 91d container archive survived"
+ls "$CD"/tips/containers-*-ibl5-new.json >/dev/null 2>&1 || note_err "A6 89d container archive pruned"
+[ -e "$CD/tips/containers-notanumber-ibl5-x.json" ] || note_err "A6 malformed container archive pruned"
+log_has 'archive keep .*containers-notanumber-ibl5-x.json: malformed stamp' || note_err "A6 no malformed line"
 finish_case
 
 # ── Stale-worktree list for the digest ────────────────────────────────────────

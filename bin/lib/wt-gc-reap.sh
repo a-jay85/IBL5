@@ -1015,12 +1015,90 @@ reap_tmp_packs() {
     return 0
 }
 
+# _gc_iso_epoch <rfc3339> — epoch seconds of a Docker timestamp such as
+# 2026-10-01T12:34:56.123456789Z. Prints digits; returns 1 on any mismatch or
+# a pre-1970 value (Docker's never-finished 0001-01-01 sentinel).
+_gc_iso_epoch() {
+    command -v python3 >/dev/null 2>&1 || return 1
+    python3 -I -c '
+import re, sys, datetime
+m = re.match(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)$", sys.argv[1])
+if not m:
+    sys.exit(1)
+try:
+    dt = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")
+except ValueError:
+    sys.exit(1)
+tz = m.group(3)
+off = 0
+if tz != "Z":
+    sign = 1 if tz[0] == "+" else -1
+    off = sign * (int(tz[1:3]) * 3600 + int(tz[4:6]) * 60)
+epoch = int((dt - datetime.datetime(1970, 1, 1)).total_seconds()) - off
+if epoch <= 0:
+    sys.exit(1)
+print(epoch)
+' "$1" 2>/dev/null
+}
+
+# _gc_docker_containers — remove exited ibl5-* containers past the floor.
+# `docker rm <id>` only: no -v, no -f, so volumes survive and a container that
+# restarted since the listing is refused. The full inspect JSON is archived
+# first under $WT_GC_TIPS_DIR.
+_gc_docker_containers() {
+    log "docker containers threshold=${WT_GC_CONTAINER_DAYS}d"
+    local rows id cname fmt status finished exited now d f rc=0
+    if ! rows="$("$WT_GC_DOCKER" ps -a --no-trunc --filter status=exited --filter name=ibl5- \
+        --format '{{.ID}}{{"\t"}}{{.Names}}')"; then
+        log "docker ps failed — no containers removed"
+        return 1
+    fi
+    [ -n "$rows" ] || return 0
+    now="$(date +%s)"
+    while IFS=$'\t' read -r id cname <&3; do
+        [ -n "$id" ] || continue
+        case "$cname" in ibl5-*) ;; *) continue ;; esac
+        if ! fmt="$("$WT_GC_DOCKER" inspect --format '{{.State.Status}}{{"\t"}}{{.State.FinishedAt}}' "$id" 2>/dev/null)"; then
+            log "container keep $cname: inspect failed"; continue
+        fi
+        IFS=$'\t' read -r status finished <<< "$fmt"
+        if [ "$status" != exited ]; then log "container keep $cname: not exited"; continue; fi
+        if ! exited="$(_gc_iso_epoch "$finished")" || [[ ! "$exited" =~ ^[0-9]+$ ]]; then
+            log "container keep $cname: exit time unknown"; continue
+        fi
+        d=$(( (now - exited) / 86400 ))
+        if [ $(( now - exited )) -lt $(( WT_GC_CONTAINER_DAYS * 86400 )) ]; then
+            log "container keep $cname: exited ${d}d ago"; continue
+        fi
+        if ! _gc_archive_stamp; then log "container keep $cname: archive failed"; continue; fi
+        f="$WT_GC_TIPS_DIR/containers-${GC_ARCHIVE_STAMP}-${cname}.json"
+        if [ "${DRY_RUN:-0}" = 1 ]; then
+            log "DRY-RUN would: archive $cname to $f"
+        else
+            if ! mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null \
+                || ! "$WT_GC_DOCKER" inspect "$id" > "$f.tmp" 2>/dev/null \
+                || [ ! -s "$f.tmp" ] \
+                || ! mv -f "$f.tmp" "$f"; then
+                rm -f "$f.tmp"
+                log "container keep $cname: archive failed"; continue
+            fi
+        fi
+        if _gc_do "$WT_GC_DOCKER" rm "$id"; then
+            log "container removed $cname exited=${d}d"
+        else
+            log "container rm failed $cname"; rc=1
+        fi
+    done 3<<< "$rows"
+    return "$rc"
+}
+
 # ── Step: Docker image and build-cache prune (never volumes) ──────────────────
 docker_prune() {
     if [[ ! "$WT_GC_DOCKER_UNTIL" =~ ^[0-9]+h$ ]]; then
         log "invalid WT_GC_DOCKER_UNTIL '$WT_GC_DOCKER_UNTIL' — step skipped (fail-closed)"
         return 1
     fi
+    if [ "${WT_GC_DOCKER_CONTAINERS:-1}" != 0 ]; then _gc_valid_days WT_GC_CONTAINER_DAYS || return 1; fi
     log "step docker threshold=$WT_GC_DOCKER_UNTIL"
     if ! _gc_have "$WT_GC_DOCKER"; then
         log "docker not found ('$WT_GC_DOCKER') — nothing pruned"
@@ -1031,6 +1109,7 @@ docker_prune() {
         return 0
     fi
     local rc=0 prc=0
+    if [ "${WT_GC_DOCKER_CONTAINERS:-1}" != 0 ]; then _gc_docker_containers || rc=1; fi
     _gc_do "$WT_GC_DOCKER" image prune -af --filter "until=$WT_GC_DOCKER_UNTIL" || prc=$?
     if [ "$prc" -ne 0 ]; then log "docker image prune failed (rc=$prc)"; rc=1; fi
     prc=0
@@ -1065,6 +1144,30 @@ prune_archives() {
             fi
         fi
     done 3<<< "$listing"
+    # Container inspect archives: the stamp in the file name is the clock.
+    if [ -d "$WT_GC_TIPS_DIR" ]; then
+        local files f
+        if ! files="$(find "$WT_GC_TIPS_DIR" -maxdepth 1 -type f -name 'containers-*.json')"; then
+            log "archive list of container files failed"
+            return 1
+        fi
+        while IFS= read -r f <&3; do
+            [ -n "$f" ] || continue
+            if [[ ! "$(basename "$f")" =~ ^containers-([0-9]+)- ]]; then
+                log "archive keep $f: malformed stamp"
+                continue
+            fi
+            stamp="${BASH_REMATCH[1]}"
+            if [ "$stamp" -lt "$cutoff" ]; then
+                if _gc_do rm -f -- "$f"; then
+                    [ "${DRY_RUN:-0}" = 1 ] || log "archive pruned $f"
+                else
+                    log "archive prune failed $f"
+                    rc=1
+                fi
+            fi
+        done 3<<< "$files"
+    fi
     return "$rc"
 }
 

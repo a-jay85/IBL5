@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+#
+# bin/rehearsal-clone-fallback — every decision the deploy rehearsal makes about
+# falling back to the last good cached prod dump when the live clone hits a
+# connection-class MySQL error. .github/workflows/deploy-rehearsal.yml only calls
+# this script; bin/test-rehearsal-clone-fallback covers it on every PR.
+#
+# Usage:
+#   bin/rehearsal-clone-fallback classify <stderr-file>
+#       Reads the captured stderr of the remote dump call. Prints "fallback: <code>"
+#       and exits 0 for MySQL 1203, 1040, 2002, 2003, or 2013 (mysql client,
+#       mariadb-dump connect, or mariadb-dump mid-dump format). Otherwise prints
+#       "no-fallback: <reason>" and exits 1.
+#   bin/rehearsal-clone-fallback write-meta <meta-file> <clone-epoch> <run-url> <sha>
+#       Writes the three-line cache metadata file. Bad input exits 2, writes nothing.
+#   bin/rehearsal-clone-fallback check-age <meta-file> [now-epoch]
+#       Accepts a dump at most 7 days old. Prints the dump age in hours, the
+#       source run URL, and the source SHA as key=value lines for GITHUB_OUTPUT.
+#       A stale, future-dated, or malformed metadata file prints
+#       "stale-or-invalid: <reason>" and exits 1. The file is never sourced.
+#   bin/rehearsal-clone-fallback encrypt <in> <out>
+#   bin/rehearsal-clone-fallback decrypt <in> <out>
+#       AES-256-CBC with a key derived from env REHEARSAL_KEY_SOURCE (required).
+#       Any openssl failure deletes <out> and exits 1.
+#   bin/rehearsal-clone-fallback --help
+# ---
+#   Exit codes: 0 yes/ok, 1 no/reject, 2 usage error.
+#
+set -euo pipefail
+
+MAX_AGE_SECONDS=604800
+EPOCH_RE='^[0-9]{1,11}$'
+URL_RE='^https://github\.com/[^[:space:]]+/actions/runs/[0-9]+$'
+SHA_RE='^[0-9a-f]{40}$'
+KEY_LABEL='ibl5-rehearsal-dump-cache-v1'
+
+help_text() { sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+usage_err() {
+    printf 'rehearsal-clone-fallback: %s\n' "$1" >&2
+    help_text >&2
+    exit 2
+}
+
+no_flags() {
+    local a
+    for a in "$@"; do
+        case "$a" in -*) usage_err "unknown flag: $a" ;; esac
+    done
+}
+
+classify() {
+    local f="$1" re m code
+    if [ ! -f "$f" ] || [ ! -r "$f" ]; then
+        usage_err "cannot read stderr file: $f"
+    fi
+    if [ ! -s "$f" ]; then
+        echo "no-fallback: empty stderr"
+        exit 1
+    fi
+    for re in \
+        '(^|[^0-9A-Za-z])ERROR (1203|1040|2002|2003|2013) \([0-9A-Z]{5}\)' \
+        'Got error: (1203|1040|2002|2003|2013): ' \
+        ': Error (1203|1040|2002|2003|2013): '; do
+        m=$(command grep -a -E -o -m1 "$re" "$f") || continue
+        m=${m%%$'\n'*}
+        code=unknown
+        if [[ $m =~ (1203|1040|2002|2003|2013) ]]; then
+            code=${BASH_REMATCH[1]}
+        fi
+        printf 'fallback: %s\n' "$code"
+        exit 0
+    done
+    echo "no-fallback: no connection-class MySQL error"
+    exit 1
+}
+
+write_meta() {
+    local meta="$1" epoch="$2" url="$3" sha="$4"
+    [[ $epoch =~ $EPOCH_RE ]] || usage_err "clone epoch is not an integer: $epoch"
+    [[ $url =~ $URL_RE ]] || usage_err "source run URL is not a GitHub Actions run URL: $url"
+    [[ $sha =~ $SHA_RE ]] || usage_err "source SHA is not 40 lowercase hex chars: $sha"
+    printf 'clone_epoch=%s\nsource_run_url=%s\nsource_sha=%s\n' \
+        "$epoch" "$url" "$sha" > "$meta"
+}
+
+reject() {
+    printf 'stale-or-invalid: %s\n' "$1"
+    exit 1
+}
+
+check_age() {
+    local meta="$1" now="${2:-}" line epoch="" url="" sha="" age
+    if [ -z "$now" ]; then
+        now=$(date +%s)
+    fi
+    [[ $now =~ $EPOCH_RE ]] || usage_err "now-epoch is not an integer: $now"
+    if [ ! -f "$meta" ] || [ ! -r "$meta" ]; then
+        reject "metadata file missing: $meta"
+    fi
+    # Line-by-line parse: cache content is untrusted, so never source or eval it.
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            clone_epoch=*) epoch=${line#clone_epoch=} ;;
+            source_run_url=*) url=${line#source_run_url=} ;;
+            source_sha=*) sha=${line#source_sha=} ;;
+            *) reject "unexpected metadata line" ;;
+        esac
+    done < "$meta"
+    [[ $epoch =~ $EPOCH_RE ]] || reject "clone_epoch missing or not an integer"
+    [[ $url =~ $URL_RE ]] || reject "source_run_url missing or malformed"
+    [[ $sha =~ $SHA_RE ]] || reject "source_sha missing or malformed"
+    age=$(( 10#$now - 10#$epoch ))
+    if [ "$age" -lt 0 ]; then
+        reject "clone epoch is in the future"
+    fi
+    if [ "$age" -gt "$MAX_AGE_SECONDS" ]; then
+        reject "dump is $(( age / 3600 ))h old (limit $(( MAX_AGE_SECONDS / 3600 ))h)"
+    fi
+    printf 'age_hours=%s\nsource_run_url=%s\nsource_sha=%s\n' \
+        "$(( age / 3600 ))" "$url" "$sha"
+}
+
+crypt() {
+    local mode="$1" in="$2" out="$3" key rc=0
+    if [ -z "${REHEARSAL_KEY_SOURCE:-}" ]; then
+        echo "rehearsal-clone-fallback: REHEARSAL_KEY_SOURCE is unset or empty" >&2
+        exit 1
+    fi
+    # One-way derivation with a fixed public label; the secret goes in on stdin.
+    key="$(printf '%s' "$REHEARSAL_KEY_SOURCE" \
+        | openssl dgst -sha256 -hmac "$KEY_LABEL" -r \
+        | cut -d' ' -f1)"
+    if [[ ! $key =~ ^[0-9a-f]{64}$ ]]; then
+        echo "rehearsal-clone-fallback: key derivation failed" >&2
+        exit 1
+    fi
+    if [ "$mode" = decrypt ]; then
+        REHEARSAL_DUMP_KEY="$key" openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+            -pass env:REHEARSAL_DUMP_KEY -in "$in" -out "$out" || rc=$?
+    else
+        REHEARSAL_DUMP_KEY="$key" openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt \
+            -pass env:REHEARSAL_DUMP_KEY -in "$in" -out "$out" || rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$out"
+        echo "rehearsal-clone-fallback: openssl $mode failed (exit $rc)" >&2
+        exit 1
+    fi
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+    -h|--help) help_text; exit 0 ;;
+    classify)
+        no_flags "$@"
+        [ $# -eq 1 ] || usage_err "classify takes exactly one argument"
+        classify "$1" ;;
+    write-meta)
+        no_flags "$@"
+        [ $# -eq 4 ] || usage_err "write-meta takes exactly four arguments"
+        write_meta "$@" ;;
+    check-age)
+        no_flags "$@"
+        [ $# -eq 1 ] || [ $# -eq 2 ] || usage_err "check-age takes one or two arguments"
+        check_age "$@" ;;
+    encrypt|decrypt)
+        no_flags "$@"
+        [ $# -eq 2 ] || usage_err "$cmd takes exactly two arguments"
+        crypt "$cmd" "$1" "$2" ;;
+    '') usage_err "missing subcommand" ;;
+    *) usage_err "unknown subcommand: $cmd" ;;
+esac

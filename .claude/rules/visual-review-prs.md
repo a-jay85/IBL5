@@ -121,7 +121,7 @@ unflagged cells stay byte-identical. That commit is the approval record; no flag
 commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
 VR job (ADR-0214).
 
-The label starts `.github/workflows/update-baselines.yml`, which calls `e2e-tests.yml`. Its checks report as `Update baselines / <job>`, so the required `E2E Tests` check stays untouched.
+The label starts `update-baselines.yml`, which calls `e2e-tests.yml`. Its checks report as `Update baselines / <job>`.
 
 ## When the comment is missing
 
@@ -166,7 +166,7 @@ unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `vr-coverage-map.test.ts`,
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
 a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body publishing surface (`--copy-new-screens`/`--update-pr-body` on
 `bin/vr-review-comment`, `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is
-covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
+likewise a mechanical-enforcement surface, covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
 `ibl5/tests/e2e/vr-crop-png.ts`), `--crop-changed` and `--publish-agent-shots` are covered by
 **ADR-0076** and **ADR-0181**.
 

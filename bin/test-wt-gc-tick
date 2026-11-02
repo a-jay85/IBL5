@@ -299,6 +299,7 @@ run_tick() {
         WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_DETACHED=0
         WT_GC_REAP_CLOSED=0
+        WT_GC_DROP_STASHES=0
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
@@ -1627,6 +1628,123 @@ rt "${CL_ON[@]}" WT_GC_CLOSED_DAYS= STUB_SKIP_LINES="$CD/skips" -- --force
 chk_rc CL14 1
 log_has "invalid WT_GC_CLOSED_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir cl14)" ] || note_err "removed"
+finish_case
+
+# ── Orphan stash drop ─────────────────────────────────────────────────────────
+ST_ON=(WT_GC_DROP_STASHES=1 WT_GC_ARCHIVE_STAMP=1700000000)
+stash_has() { git -C "$ENV_MAIN" stash list --format=%H | grep -qxF -- "$1"; }
+# mk_stash <subject-branch> <age_days> [untracked] — stash a tracked edit
+# (plus an untracked file when asked), dated N days ago, with the subject
+# "On <branch>: fixture". Prints the stash sha.
+mk_stash() {
+    local ep sha
+    ep="$(epoch_ago "$2")"
+    printf 'stashed-%s-%s\n' "$1" "$RANDOM" > "$ENV_MAIN/README.md"
+    if [ "${3:-}" = untracked ]; then
+        printf 'u\n' > "$ENV_MAIN/stash-untracked-$1.txt"
+        GIT_AUTHOR_DATE="@$ep" GIT_COMMITTER_DATE="@$ep" git -C "$ENV_MAIN" stash push -q -u -m fixture >/dev/null 2>&1
+    else
+        GIT_AUTHOR_DATE="@$ep" GIT_COMMITTER_DATE="@$ep" git -C "$ENV_MAIN" stash push -q -m fixture >/dev/null 2>&1
+    fi
+    sha="$(git -C "$ENV_MAIN" rev-parse 'stash@{0}')"
+    git -C "$ENV_MAIN" stash drop -q >/dev/null 2>&1
+    git -C "$ENV_MAIN" stash store -m "On $1: fixture" "$sha" >/dev/null 2>&1
+    printf '%s\n' "$sha"
+}
+
+fx ST1-branch-gone-dropped
+SHA="$(mk_stash gone-a 10)"
+rt "${ST_ON[@]}" -- --force
+chk_rc ST1 0
+stash_has "$SHA" && note_err "stash still listed"
+arch_has "1700000000/stash/$SHA" || note_err "no stash archive ref"
+log_has "stash dropped ${SHA:0:10} \(branch gone\)" || note_err "no dropped log"
+finish_case
+
+fx ST2-under-floor-keeps
+SHA="$(mk_stash gone-b 3)"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" || note_err "young stash dropped"
+log_has "stash keep ${SHA:0:10}: age=3d" || note_err "no floor keep"
+finish_case
+
+fx ST3-live-branch-not-candidate
+SHA="$(mk_stash master 10)"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" || note_err "live-branch stash dropped"
+log_has "${SHA:0:10}" && note_err "non-candidate was logged"
+finish_case
+
+fx ST4-provably-in-master-dropped
+SHA="$(mk_stash master 10)"
+git -C "$ENV_MAIN" update-ref refs/remotes/origin/master \
+    "$(git -C "$ENV_MAIN" commit-tree -p origin/master -m landed "$SHA^{tree}")"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" && note_err "stash still listed"
+log_has "stash dropped ${SHA:0:10} \(provably in master\)" || note_err "no dropped log"
+finish_case
+
+fx ST5-nightly-autostash-keeps
+SHA="$(mk_stash gone-c 10)"
+git -C "$ENV_MAIN" stash drop -q
+git -C "$ENV_MAIN" stash store -m "On gone-c: nightly-autostash-20261020" "$SHA"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" || note_err "nightly-autostash dropped"
+log_has "stash keep ${SHA:0:10}: nightly-autostash" || note_err "no nightly keep"
+finish_case
+
+fx ST6-untracked-archived-survives-gc
+SHA="$(mk_stash gone-d 10 untracked)"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" && note_err "stash still listed"
+git -C "$ENV_MAIN" reflog expire --expire=now --all
+git -C "$ENV_MAIN" gc --prune=now --quiet
+git -C "$ENV_MAIN" rev-parse -q --verify "refs/wt-gc-archive/1700000000/stash/$SHA^3" >/dev/null || note_err "untracked part lost after gc"
+git -C "$ENV_MAIN" stash store -m restored "refs/wt-gc-archive/1700000000/stash/$SHA" 2>/dev/null
+stash_has "$SHA" || note_err "archive did not restore into the stash list"
+finish_case
+
+fx ST7-index-shift-order
+SHA_E="$(mk_stash gone-e 10)"
+SHA_F="$(mk_stash gone-f 10)"
+SHA_G="$(mk_stash gone-g 1)"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA_E" && note_err "e still listed"
+stash_has "$SHA_F" && note_err "f still listed"
+stash_has "$SHA_G" || note_err "young stash dropped"
+log_has 'stash moved' && note_err "index shifted under the drop"
+finish_case
+
+fx ST8-unparseable-keeps
+SHA="$(mk_stash gone-h 10)"
+git -C "$ENV_MAIN" stash drop -q
+git -C "$ENV_MAIN" stash store -m "custom message" "$SHA"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" || note_err "unparseable stash dropped"
+log_has "stash keep ${SHA:0:10}: unparseable subject" || note_err "no unparseable keep"
+finish_case
+
+fx ST9-archive-fail-keeps
+SHA="$(mk_stash gone-i 10)"
+git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/1700000000/stash/$SHA" "$(git -C "$ENV_MAIN" rev-parse HEAD)"
+rt "${ST_ON[@]}" -- --force
+stash_has "$SHA" || note_err "stash dropped without an archive"
+log_has 'archive failed' || note_err "no archive-failed log"
+finish_case
+
+fx ST10-dry-run
+SHA="$(mk_stash gone-j 10)"
+rt "${ST_ON[@]}" -- --dry-run --force
+stash_has "$SHA" || note_err "stash dropped in dry-run"
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written in dry-run"
+finish_case
+
+fx ST11-empty-floor-invalid
+SHA="$(mk_stash gone-k 10)"
+rt "${ST_ON[@]}" WT_GC_STASH_DAYS= -- --force
+chk_rc ST11 1
+log_has "invalid WT_GC_STASH_DAYS ''" || note_err "no invalid-floor log"
+stash_has "$SHA" || note_err "stash dropped"
 finish_case
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────

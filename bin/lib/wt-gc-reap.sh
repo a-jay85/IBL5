@@ -735,6 +735,91 @@ _gc_reap_closed_one() {
     log "closed reaped $name pr=#$PR_NUM closed=${days}d"
 }
 
+# ── Step: orphan stashes ──────────────────────────────────────────────────────
+# Matches bin/cleanup's "Stash candidate" rule, plus branch-gone stashes and
+# stashes with an untracked part: the keep-ref holds both before the drop.
+
+# _gc_stash_in_master <sha> — 0 = the stash patch reverse-applies cleanly to
+# origin/master (so master already has it), 1 = not provable. A temp index
+# keeps the main checkout's working tree out of the verdict.
+_gc_stash_in_master() {
+    local sha="$1" d rc=1
+    d="$(mktemp -d "${TMPDIR:-/tmp}/wt-gc-stash.XXXXXX")" || return 1
+    if git -C "$WT_GC_REPO_ROOT" stash show -p "$sha" > "$d/patch" 2>/dev/null \
+        && [ -s "$d/patch" ] \
+        && GIT_INDEX_FILE="$d/index" git -C "$WT_GC_REPO_ROOT" read-tree origin/master 2>/dev/null \
+        && GIT_INDEX_FILE="$d/index" git -C "$WT_GC_REPO_ROOT" apply --cached --check -R "$d/patch" 2>/dev/null; then
+        rc=0
+    fi
+    rm -rf "$d"
+    return "$rc"
+}
+
+drop_orphan_stashes() {
+    _gc_valid_days WT_GC_STASH_DAYS || return 1
+    log "step stashes threshold=${WT_GC_STASH_DAYS}d"
+    local rows doomed="" relist pairs sha ct subj s now age sbranch bl why meta N cur rc=0
+    local re='^(WIP on|On) ([^:]+):'
+    if ! rows="$(git -C "$WT_GC_REPO_ROOT" stash list --format='%H%x09%ct%x09%gs')"; then
+        log "stash list failed — none dropped"; return 1
+    fi
+    [ -n "$rows" ] || return 0
+    now="$(date +%s)"
+    while IFS=$'\t' read -r sha ct subj <&3; do
+        [ -n "$sha" ] || continue
+        s="${sha:0:10}"
+        case "$subj" in *nightly-autostash*) log "stash keep $s: nightly-autostash"; continue ;; esac
+        case "$ct" in ''|*[!0-9]*) log "stash keep $s: no commit time"; continue ;; esac
+        if ! [[ "$subj" =~ $re ]]; then log "stash keep $s: unparseable subject"; continue; fi
+        sbranch="${BASH_REMATCH[2]}"
+        if ! bl="$(git -C "$WT_GC_REPO_ROOT" for-each-ref --format='%(refname)' "refs/heads/$sbranch")"; then
+            log "stash keep $s: branch probe error"; continue
+        fi
+        if grep -qxF -- "refs/heads/$sbranch" <<< "$bl"; then
+            _gc_stash_in_master "$sha" || continue
+            why="provably in master"
+        else
+            why="branch gone"
+        fi
+        age=$(( (now - ct) / 86400 ))
+        if [ $(( now - ct )) -lt $(( WT_GC_STASH_DAYS * 86400 )) ]; then
+            log "stash keep $s: age=${age}d"; continue
+        fi
+        if ! _gc_tips_record "$sha" "refs/stash/$sha"; then
+            log "stash keep $s: archive failed"; continue
+        fi
+        doomed="${doomed}${sha}"$'\t'"${why}"$'\t'"${sbranch}"$'\t'"${age}"$'\n'
+    done 3<<< "$rows"
+    [ -n "$doomed" ] || return 0
+    if ! relist="$(git -C "$WT_GC_REPO_ROOT" stash list --format='%gd%x09%H')"; then
+        log "stash relist failed — none dropped"; return 1
+    fi
+    pairs=""
+    while IFS=$'\t' read -r cur sha <&3; do
+        [ -n "$sha" ] || continue
+        grep -qF -- "$sha" <<< "$doomed" || continue
+        N="${cur#stash@\{}"; N="${N%\}}"
+        pairs="${pairs}${N}"$'\t'"${sha}"$'\n'
+    done 3<<< "$relist"
+    [ -n "$pairs" ] || return 0
+    pairs="$(sort -t "$(printf '\t')" -k1,1nr <<< "${pairs%$'\n'}")"
+    while IFS=$'\t' read -r N sha <&3; do
+        [ -n "$sha" ] || continue
+        s="${sha:0:10}"
+        if [ "$(git -C "$WT_GC_REPO_ROOT" rev-parse -q --verify "stash@{$N}" 2>/dev/null)" != "$sha" ]; then
+            log "stash keep $s: stash moved"; continue
+        fi
+        meta="$(awk -F'\t' -v s="$sha" '$1==s {print $2 "\t" $3 "\t" $4}' <<< "$doomed")"
+        IFS=$'\t' read -r why sbranch age <<< "$meta"
+        if _gc_do git -C "$WT_GC_REPO_ROOT" stash drop -q "stash@{$N}"; then
+            log "stash dropped $s ($why) branch=$sbranch age=${age}d"
+        else
+            log "stash drop failed $s"; rc=1
+        fi
+    done 3<<< "$pairs"
+    return "$rc"
+}
+
 # ── Step: stale refs (reap) ───────────────────────────────────────────────────
 reap_stale_refs() {
     _gc_valid_days WT_GC_BACKUP_DAYS || return 1

@@ -71,6 +71,7 @@ WT_GC_REAP_EMPTY="${WT_GC_REAP_EMPTY:-1}"
 WT_GC_REAP_DIRTY_MERGED="${WT_GC_REAP_DIRTY_MERGED:-1}"
 WT_GC_REAP_DETACHED="${WT_GC_REAP_DETACHED:-1}"
 WT_GC_REAP_CLOSED="${WT_GC_REAP_CLOSED:-1}"
+WT_GC_DROP_STASHES="${WT_GC_DROP_STASHES:-1}"
 WT_GC_REAP_DIRTY_ARCHIVE="${WT_GC_REAP_DIRTY_ARCHIVE:-1}"   # sub-switch: 0 = byte-identical dirt only
 WT_GC_REAP_REFS="${WT_GC_REAP_REFS:-1}"
 WT_GC_REAP_TMP_PACK="${WT_GC_REAP_TMP_PACK:-1}"
@@ -82,6 +83,7 @@ WT_GC_EMPTY_DAYS="${WT_GC_EMPTY_DAYS-7}"
 WT_GC_DIRTY_ARCHIVE_DAYS="${WT_GC_DIRTY_ARCHIVE_DAYS-3}"
 WT_GC_DETACHED_DAYS="${WT_GC_DETACHED_DAYS-3}"
 WT_GC_CLOSED_DAYS="${WT_GC_CLOSED_DAYS-7}"
+WT_GC_STASH_DAYS="${WT_GC_STASH_DAYS-7}"
 WT_GC_BACKUP_DAYS="${WT_GC_BACKUP_DAYS-7}"
 WT_GC_REF_DAYS="${WT_GC_REF_DAYS-14}"
 WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"
@@ -289,6 +291,7 @@ run_step empty        "$WT_GC_REAP_EMPTY"        WT_GC_REAP_EMPTY        reap_em
 run_step dirty-merged "$WT_GC_REAP_DIRTY_MERGED" WT_GC_REAP_DIRTY_MERGED reap_dirty_merged_worktrees
 run_step detached     "$WT_GC_REAP_DETACHED"     WT_GC_REAP_DETACHED     reap_detached_snapshots
 run_step closed       "$WT_GC_REAP_CLOSED"       WT_GC_REAP_CLOSED       reap_closed_worktrees
+run_step stashes      "$WT_GC_DROP_STASHES"      WT_GC_DROP_STASHES      drop_orphan_stashes
 run_step refs         "$WT_GC_REAP_REFS"         WT_GC_REAP_REFS         reap_stale_refs
 run_step tmp-pack     "$WT_GC_REAP_TMP_PACK"     WT_GC_REAP_TMP_PACK     reap_tmp_packs
 run_step docker       "$WT_GC_DOCKER_PRUNE"      WT_GC_DOCKER_PRUNE      docker_prune

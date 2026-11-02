@@ -44,6 +44,14 @@ PACKET_NAME = "fidelity-packet-delta"
 DELTA_ANCHOR_RE = re.compile(r"^DELTA-ANCHOR:[ \t]*(\S+)[ \t]*$", re.M)
 ANCHOR_BLOCKING_RE = re.compile(r"^.*\[BLOCKING\]", re.M)
 RESTATEMENT_RE = re.compile(r"\b(?:UN)?RESOLVED\b")
+# One restatement line per anchor blocker: optional bullet, the bracketed key (optionally
+# bold), an optional ":" / "-" / en or em dash separator, then the status word right after.
+# Anything looser (bare `B1`, status not adjacent to the key, key mid-line) is no match,
+# so the reply declines and the full review runs.
+_REPLY_KEY_RE = re.compile(
+    r"^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:\*\*)?\[B(\d+)\](?:\*\*)?"
+    r"[ \t]*(?:[:–—-][ \t]*)?(UNRESOLVED|RESOLVED)\b",
+    re.M)
 
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -310,6 +318,47 @@ def plan_excerpt(plan_text: str, titles) -> str:
     if pre and not pre.endswith("\n"):
         pre += "\n"
     return pre + block
+
+
+def keyed_anchor_findings(findings):
+    """Return (text, n): the anchor findings with `[B<k>] ` prefixed to the k-th line that
+    ANCHOR_BLOCKING_RE matches, and n, the number of keyed lines.
+
+    Splits on "\\n" only, the same line boundary ANCHOR_BLOCKING_RE's re.M `^` uses, so n
+    always equals len(ANCHOR_BLOCKING_RE.findall(findings)). str.splitlines() would also
+    split on "\\r" and other separators and could overcount.
+    """
+    out, n = [], 0
+    for line in (findings or "").split("\n"):
+        if ANCHOR_BLOCKING_RE.match(line):
+            n += 1
+            line = f"[B{n}] {line}"
+        out.append(line)
+    return "\n".join(out), n
+
+
+def anchor_blocker_count(findings):
+    """Number of anchor blockers; the same keys build_delta_packet hands the reviewer."""
+    return keyed_anchor_findings(findings)[1]
+
+
+def match_restatements(reply, blockers):
+    """Map each key 1..blockers to its status ("RESOLVED" / "UNRESOLVED").
+
+    Returns None (caller declines, fail closed) when any key is missing, a key is outside
+    1..blockers, or one key is restated both ways. A repeat with the same status is fine.
+    With blockers == 0 and no key lines the result is {} (empty, not None).
+    """
+    seen = {}
+    for m in _REPLY_KEY_RE.finditer(reply or ""):
+        key, status = int(m.group(1)), m.group(2)
+        if key < 1 or key > blockers:
+            return None
+        if seen.setdefault(key, status) != status:
+            return None
+    if set(seen) != set(range(1, blockers + 1)):
+        return None
+    return seen
 
 
 def _pointer_prompt(packet_dir: str, full_packet_dir: str, pr_number, anchor_run_id: str) -> str:

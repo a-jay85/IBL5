@@ -1090,3 +1090,91 @@ def test_ids_failure_falls_back_to_full(tmp_path, monkeypatch):
 def test_anchor_blocking_regex_counts_every_bullet_shape(line):
     """Catches a narrow marker regex that counts 0 and lets a delta skip the restatement check."""
     assert len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(line + "\n")) == 1
+
+
+_KEYED_INPUT = (
+    "## 6d\n"
+    "- [BLOCKING] a.py: phase 2 helper missing\n"
+    "  - [BLOCKING] nested continuation\n"
+    "1. [BLOCKING] b.py: row 3 unrealised\n"
+    "- [NOTE] c.py: style\n"
+    "prose that mentions [BLOCKING] once\n"
+)
+_KEYED_EXPECTED = (
+    "## 6d\n"
+    "[B1] - [BLOCKING] a.py: phase 2 helper missing\n"
+    "[B2]   - [BLOCKING] nested continuation\n"
+    "[B3] 1. [BLOCKING] b.py: row 3 unrealised\n"
+    "- [NOTE] c.py: style\n"
+    "[B4] prose that mentions [BLOCKING] once\n"
+)
+
+
+def test_keyed_anchor_findings_keys_every_blocking_line_in_order():
+    text, n = fidelity_delta.keyed_anchor_findings(_KEYED_INPUT)
+    assert text == _KEYED_EXPECTED
+    assert n == 4
+
+
+@pytest.mark.parametrize("text", [
+    "- [BLOCKING] a.py: x\n", "* [BLOCKING] a.py: x\n", "1. [BLOCKING] a.py: x\n",
+    "- **[BLOCKING]** a.py: x\n", "  - [BLOCKING] nested\n",
+    "x [BLOCKING] a\ry [BLOCKING] b\n",
+    "- [BLOCKING] a\n- [BLOCKING] b\n",
+    "", None,
+])
+def test_keyed_anchor_findings_count_matches_anchor_blocking_regex(text):
+    keyed, n = fidelity_delta.keyed_anchor_findings(text)
+    assert n == len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(text or ""))
+    assert len(fidelity_delta.ANCHOR_BLOCKING_RE.findall(keyed)) == n
+    if text == "x [BLOCKING] a\ry [BLOCKING] b\n":
+        assert n == 1
+
+
+def test_keyed_anchor_findings_preserves_non_blocker_bytes():
+    text, _ = fidelity_delta.keyed_anchor_findings("a\n- [BLOCKING] x\nb\n")
+    assert text == "a\n[B1] - [BLOCKING] x\nb\n"
+
+
+@pytest.mark.parametrize("reply,expected", [
+    ("[B1] RESOLVED by hunk 2", {1: "RESOLVED"}),
+    ("- [B1] RESOLVED", {1: "RESOLVED"}),
+    ("1. [B1]: RESOLVED", {1: "RESOLVED"}),
+    ("**[B1]** RESOLVED", {1: "RESOLVED"}),
+    ("  * [B1] - RESOLVED", {1: "RESOLVED"}),
+    ("[B1] — RESOLVED by hunk 2", {1: "RESOLVED"}),
+    ("[B1] – UNRESOLVED", {1: "UNRESOLVED"}),
+])
+def test_match_restatements_accepts_envelope_variants(reply, expected):
+    assert fidelity_delta.match_restatements(reply, 1) == expected
+
+
+@pytest.mark.parametrize("reply,blockers", [
+    ("- [BLOCKING] a.py — RESOLVED, RESOLVED, RESOLVED", 3),
+    ("All three blockers are RESOLVED.", 3),
+    ("[B1] RESOLVED\n[B2] RESOLVED", 3),
+    ("[B0] RESOLVED\n[B1] RESOLVED", 1),
+    ("[B1] RESOLVED\n[B2] RESOLVED", 1),
+    ("[B1] RESOLVED\n[B1] UNRESOLVED", 1),
+    ("B1: RESOLVED", 1),
+    ("[B1] **RESOLVED**", 1),
+    ("[B1]\nRESOLVED", 1),
+    ("All of [B1] RESOLVED", 1),
+    ("**[B1]:** RESOLVED", 1),
+    ("None of [B1]-[B2] are RESOLVED", 2),
+    ("[B10] RESOLVED\n[B11] RESOLVED\n[B12] RESOLVED", 12),
+])
+def test_match_restatements_declines_malformed_replies(reply, blockers):
+    assert fidelity_delta.match_restatements(reply, blockers) is None
+
+
+def test_match_restatements_same_status_repeat_accepted():
+    reply = "[B1] RESOLVED\n- [B1] RESOLVED by hunk 2"
+    assert fidelity_delta.match_restatements(reply, 1) == {1: "RESOLVED"}
+
+
+def test_match_restatements_zero_blockers():
+    result = fidelity_delta.match_restatements("READY\n", 0)
+    assert result == {}
+    assert result is not None
+    assert fidelity_delta.match_restatements("[B1] RESOLVED\nREADY\n", 0) is None

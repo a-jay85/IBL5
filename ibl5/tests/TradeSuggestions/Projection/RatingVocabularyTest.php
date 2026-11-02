@@ -64,6 +64,7 @@ final class RatingVocabularyTest extends TestCase
         self::assertSame(0.0, $set->get('r_blk'));
     }
 
+    /** Pins RatingScale::clamp: dropping its min() lets 120.0 through. */
     public function testRatingScaleClampsAboveObservedMaxAndBelowZero(): void
     {
         $scale = RatingScale::fromRows([['r_fga' => 80], ['r_fga' => 95], ['r_fga' => 60]]);

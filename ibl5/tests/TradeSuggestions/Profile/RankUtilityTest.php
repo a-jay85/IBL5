@@ -19,6 +19,7 @@ final class RankUtilityTest extends TestCase
         self::assertSame(1.0, RankUtility::marginal(28));
     }
 
+    /** 22->18 passes ranks 22, 21, 20, 19 = 1.0 * 3 + 0.6; marginal(after) times places would give 2.4. */
     public function testGainSumsMarginalsAcrossTierBoundary(): void
     {
         self::assertEqualsWithDelta(3.6, RankUtility::gain(22, 18), 1e-9);

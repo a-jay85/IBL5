@@ -72,6 +72,7 @@ final class AgeCurveTest extends TestCase
         self::assertSame(-0.5, AgeCurve::stepDelta('r_fgp', 31, 100));
     }
 
+    /** Sums stepDelta over ages age..age+offset-1, so a shifted range changes the 23 and 27 totals. */
     public function testCumulativeDeltaOffsetZeroIsZeroAndSumsSteps(): void
     {
         self::assertSame(4.0, AgeCurve::cumulativeDelta('r_stl', 23, 50, 3));

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-26
+last_verified: 2026-11-02
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -224,11 +224,14 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 | `READY` | step 4 skipped | `READY` |
 | `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>, not the post-remediation head` |
 | `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
+| `READY WITH NOTES` | a PR-body note fix was attempted and nothing landed (reverted, skipped as a human decision, or unconfirmed) | `READY WITH NOTES — <unremediated notes, named>` |
 | `NOT READY` | all fixed; step 4b re-review returned `READY` | `READY (re-review) — findings remediated in <sha> and re-reviewed clean on tree <tree>; condition (12) arms on the next /post-plan Phase 6.5 run` |
 | `NOT READY` | all fixed; step 4b re-review returned `READY WITH NOTES` | `READY WITH NOTES (re-review) — findings remediated in <sha>; the re-review on tree <tree> left non-blocking notes open` |
 | `NOT READY` | all fixed; step 4b re-review returned `NOT READY` | `NOT READY (re-review) — <what the re-review still blocks on, named>; remediate and re-run /post-plan` |
 | `NOT READY` | all fixed; step 4b skipped (`auto_merge: false`) | `NOT READY — held for your final review` |
 | `NOT READY` | something left unfixed | `NOT READY — <what remains, named>` |
+
+For a body-only fix the compiled harness renders `<sha>` as "the PR body"; the skill fallback does not run the body-notes fix and emits the bare `READY WITH NOTES` row.
 
 A `(re-review)` terminal line never carries forward. Step 1's exact match on `READY` and `READY WITH NOTES` already rejects both re-review rows, and the harness guard `_RE_REVIEW_TERMINAL_RE` in `tools/postplan-harness/harness/fidelity.py` does the same on the harness path.
 

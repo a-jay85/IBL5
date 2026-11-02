@@ -486,6 +486,57 @@ pr_unresolved_findings_hold() {
     return 0
 }
 
+# pr_open_review_threads <pr_number>
+#   GitHub's conversation-resolution view of a PR: echoes one `open-thread:<databaseId>`
+#   line per review thread with isResolved == false, whatever its label, author, or
+#   outdated state. It holds nothing by itself. bin/pr-triage reads it for the
+#   OPEN-THREAD bucket. Condition (11) stays in pr_unresolved_findings_hold.
+#   FAIL-CLOSED: echoes `open-threads-api-error` on any gh, GraphQL, or jq failure and
+#   `open-threads-cap` on a full 100-thread page. Returns 0 on every path.
+pr_open_review_threads() {
+    local pr="$1"
+    local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
+    local raw rc=0
+    raw=$("$GH_CMD" api graphql \
+        -F owner="$owner" -F repo="$repo" -F pr="$pr" \
+        -f query='
+        query($owner:String!, $repo:String!, $pr:Int!) {
+          repository(owner:$owner, name:$repo) {
+            pullRequest(number:$pr) {
+              reviewThreads(first:100) {
+                nodes {
+                  isResolved
+                  comments(first:1) { nodes { databaseId body author { login __typename } } }
+                }
+              }
+            }
+          }
+        }' 2>/dev/null) || rc=$?
+    if [ "$rc" -ne 0 ]; then echo "open-threads-api-error"; return 0; fi
+    if printf '%s' "$raw" | jq -e '.errors' >/dev/null 2>&1; then
+        echo "open-threads-api-error"; return 0
+    fi
+    if ! printf '%s' "$raw" \
+            | jq -e '.data.repository.pullRequest.reviewThreads.nodes != null' \
+            >/dev/null 2>&1; then
+        echo "open-threads-api-error"; return 0
+    fi
+    local count
+    count=$(printf '%s' "$raw" \
+        | jq '.data.repository.pullRequest.reviewThreads.nodes | length' 2>/dev/null) \
+        || { echo "open-threads-api-error"; return 0; }
+    # first:100 is unpaginated: a full page means threads 101+ are invisible.
+    if [ "$count" -eq 100 ]; then echo "open-threads-cap"; return 0; fi
+    local open
+    open=$(printf '%s' "$raw" | jq -r '
+        .data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved == false)
+        | "open-thread:" + ((.comments.nodes[0].databaseId // "-") | tostring)
+    ' 2>/dev/null) || { echo "open-threads-api-error"; return 0; }
+    if [ -n "$open" ]; then printf '%s\n' "$open"; fi
+    return 0
+}
+
 # pr_red_check_hold <pr_number>
 #   Phase 6.5 condition (15), already-red CI check floor. Echoes the name of each
 #   check that is already in gh's `fail` bucket on the PR's current head, minus

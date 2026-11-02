@@ -414,6 +414,8 @@ pr_pipeline_authored_hold() {
 #   author is trusted (a-jay85, a GitHub Bot, or a `[bot]` login) never holds. The
 #   marker is written only by the posting code; an untrusted author, a marker not on
 #   line 1, or any other label word holds as before. Skipped threads go to stderr.
+#   Post-plan Phase 4.5 / 4.5b now disposition trusted nit / pre-existing threads too, so
+#   this exemption covers only their residue. bin/pr-triage's OPEN-THREAD bucket names it.
 pr_unresolved_findings_hold() {
     local pr="$1"
     local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"

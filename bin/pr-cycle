@@ -1473,6 +1473,7 @@ _bucket_emoji() {
         NOT-MERGEABLE)          printf '🚫' ;;
         BLOCKED-CHECK)          printf '❌' ;;
         HELD)                   printf '⏸' ;;
+        OPEN-THREAD)            printf '💬' ;;
         BLOCKED-DEP)            printf '🔗' ;;
         PIPELINE-HELD)          printf '🤖' ;;
         FEAT-AWAITING-SIGNOFF)  printf '✍️' ;;
@@ -1566,7 +1567,7 @@ _your_turn_lines() {
     awk -F'\t' -v d="$RUNDIR" 'NF {
         b = $2; a = $3; sub(/ +$/, "", a)
         if (b == "NOT-MERGEABLE" && a == "re-check (state unknown)") { print > (d "/yt-computing.txt"); next }
-        g = (b == "DIRTY" || b == "NOT-MERGEABLE") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
+        g = (b == "DIRTY" || b == "NOT-MERGEABLE" || b == "OPEN-THREAD") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
         print > (d "/yt-g" g ".txt") }' "$RUNDIR/your-turn.txt" || true
 
     _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"

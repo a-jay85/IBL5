@@ -68,6 +68,11 @@ if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
     fi
     exit 0
 fi
+if [[ "\${1:-}" == "api" && "\${2:-}" == "graphql" ]]; then
+    if [[ -f "$SCRATCH/threads.json" ]]; then cat "$SCRATCH/threads.json"
+    else echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'; fi
+    exit 0
+fi
 if [[ "\${1:-}" == "api" ]]; then
     # The endpoint is the first repos/ argument: a DELETE puts --method before it.
     ep=""
@@ -244,7 +249,7 @@ E_PATCHID="$SCRATCH/patchid-identity"
 E_MASTERTIP="$SCRATCH/mastertip-file"
 
 reset() {
-    rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned"
+    rm -f "$SCRATCH"/*.log "$SCRATCH/prs.json" "$SCRATCH"/checks-*.json "$SCRATCH/result-canned" "$SCRATCH/threads.json"
     rm -f "$SCRATCH/pr-cycle-skip-notes-env" "$SCRATCH/pr-cycle-skip-notes-copy"
     rm -f "$SCRATCH"/key-*
     rm -f "$SCRATCH"/runs-*.json "$SCRATCH"/runlog-*.txt "$SCRATCH/runs-fail" "$SCRATCH/runlog-fail" "$SCRATCH/rerun-fail"
@@ -280,6 +285,9 @@ set_prs() {
     done
     printf '%s\n' "$out" > "$SCRATCH/prs.json"
 }
+
+# set_threads <json>: the reviewThreads GraphQL reply the gh stub serves for every PR.
+set_threads() { printf '%s\n' "$1" > "$SCRATCH/threads.json"; }
 
 # set_checks <sha> green|pending|red|none|signoff|signoff-red|gate-timeout|gate-anchor-failed
 set_checks() {
@@ -2587,6 +2595,52 @@ _stuck_run "$REPO" branch-one "$FAILED_JSON" 60
 run_tick --dry-run
 ! out_has 'stuck PR 101' || fail "stuck-failed-armed: armed PR listed: $OUT"
 end_case stuck-failed-armed
+
+# One unresolved trusted nit thread, as the GraphQL reviewThreads reply carries it.
+OPEN_THREAD_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[{"isResolved":false,"comments":{"nodes":[{"databaseId":9001,"body":"nit: rename this","author":{"login":"reviewer","__typename":"User"}}]}}]}}}}}'
+ARMED101='101|branch-one|aaa1111|BLOCKED|false|master|true'
+
+# stuck-armed-open-thread: an armed PR stalled on an open review thread is named, and the row
+# reaches the DM path.
+reset; begin_case; set_out_root
+set_prs "$ARMED101"; set_checks aaa1111 green
+set_threads "$OPEN_THREAD_JSON"
+run_tick --dry-run
+out_has 'stuck PR 101: armed, stalled on 1 open review thread(s) (head aaa1111)' \
+    || fail "stuck-armed-open-thread: no stuck line: $OUT"
+out_has 'would DM:' || fail "stuck-armed-open-thread: no would-DM line: $OUT"
+out_has 'Stuck (1)' || fail "stuck-armed-open-thread: row missing from the DM block: $OUT"
+[[ "$RC" == 0 ]] || fail "stuck-armed-open-thread: rc=$RC"
+end_case stuck-armed-open-thread
+
+# stuck-armed-no-threads (negative): the same armed PR with no open thread is not stuck.
+reset; begin_case; set_out_root
+set_prs "$ARMED101"; set_checks aaa1111 green
+run_tick --dry-run
+! out_has 'stuck PR 101' || fail "stuck-armed-no-threads: listed: $OUT"
+end_case stuck-armed-no-threads
+
+# stuck-armed-thread-api-error (failure path): a failed thread query logs and skips the PR.
+reset; begin_case; set_out_root
+set_prs "$ARMED101"; set_checks aaa1111 green
+set_threads '{"errors":[{"message":"boom"}]}'
+run_tick --dry-run
+out_has 'stuck check PR 101: thread query failed' || fail "stuck-armed-thread-api-error: no notice: $OUT"
+! out_has 'stuck PR 101:' || fail "stuck-armed-thread-api-error: listed as stuck: $OUT"
+[[ "$RC" == 0 ]] || fail "stuck-armed-thread-api-error: rc=$RC"
+end_case stuck-armed-thread-api-error
+
+# stuck-armed-thread-dm-once: two ticks on the same head send one DM naming #101.
+reset; begin_case; set_out_root
+set_prs "$ARMED101"; set_checks aaa1111 green
+set_threads "$OPEN_THREAD_JSON"
+run_tick
+[[ "$(dm_count)" == 1 ]] || fail "stuck-armed-thread-dm-once: dm_count $(dm_count) after tick 1"
+grep -qF '#101' "$SCRATCH/dm.log" || fail "stuck-armed-thread-dm-once: DM does not name #101"
+grep -qF 'these PRs are stuck and need you.' "$SCRATCH/dm.log" || fail "stuck-armed-thread-dm-once: DM header"
+run_tick
+[[ "$(dm_count)" == 1 ]] || fail "stuck-armed-thread-dm-once: tick 2 re-DM'd (count $(dm_count))"
+end_case stuck-armed-thread-dm-once
 
 # stuck-draft (negative): a draft PR is not stuck.
 reset; begin_case; set_out_root

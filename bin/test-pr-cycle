@@ -1250,6 +1250,35 @@ run --worker --no-dm
 end_case "case 35 your-turn DM links"
 
 # ==========================================================================================
+# your-turn-open-thread-ranks-first — OPEN-THREAD ranks in group 1 (before FEAT-AWAITING-SIGNOFF), carries 💬
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_4PR" > "$SCRATCH/attack-out"
+{   printf '#2101  ARMABLE  arm\n'
+    printf '#2102  FEAT-AWAITING-SIGNOFF  human sign-off\n'
+    printf '#2103  OPEN-THREAD  armed, stalled on 1 open review thread(s): reply and resolve each, or gh pr merge --admin\n'
+} > "$SCRATCH/triage-out"
+{   printf '2102\thttps://github.com/a-jay85/IBL5/pull/2102\tAlpha PR title\n'
+    printf '2103\thttps://github.com/a-jay85/IBL5/pull/2103\tBeta PR title\n'
+} > "$SCRATCH/prlist.tsv"
+run --worker
+[[ $RC -eq 0 ]] || fail "open-thread-ranks-first: exit $RC, want 0"
+[[ "$(calls dm)" == "1" ]] || fail "open-thread-ranks-first: want 1 DM, got $(calls dm)"
+grep -qF '[#2103: Beta PR title](<https://github.com/a-jay85/IBL5/pull/2103>) — OPEN-THREAD — armed, stalled on 1 open review thread(s)' \
+    "$SCRATCH/dm.argv" || fail "open-thread-ranks-first: #2103 entry lacks the OPEN-THREAD action text: $(cat "$SCRATCH/dm.argv")"
+grep -qF -- '- 💬 [#2103:' "$SCRATCH/dm.argv" \
+    || fail "open-thread-ranks-first: #2103 entry lacks the 💬 emoji after the bullet"
+# The DM text is one argv record, so compare byte offsets of the two entries.
+off_ot=$(grep -boF '[#2103:' "$SCRATCH/dm.argv" | head -1 | cut -d: -f1)
+off_fa=$(grep -boF '[#2102:' "$SCRATCH/dm.argv" | head -1 | cut -d: -f1)
+[[ -n "$off_ot" && -n "$off_fa" && "$off_ot" -lt "$off_fa" ]] \
+    || fail "open-thread-ranks-first: #2103 (offset '$off_ot') must precede #2102 (offset '$off_fa')"
+grep -qx '2101' "$(rundir)/armed.txt" || fail "open-thread-ranks-first: 2101 missing from armed.txt"
+grep -qx '2103' "$(rundir)/armed.txt" && fail "open-thread-ranks-first: 2103 must not be in armed.txt"
+end_case "your-turn-open-thread-ranks-first"
+
+# ==========================================================================================
 # 36 — your-turn DM degrades gracefully
 # ==========================================================================================
 begin_case
@@ -1672,11 +1701,11 @@ bucket_emoji_src() {
 # Every bucket the map names, plus the fallback. Row = "<bucket>|<emoji>"; "|❓" is the empty string.
 # PAUSED is a real pr-triage bucket with no arm today, so it pins to the fallback.
 BUCKET_EMOJI_TABLE=(
-    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'BLOCKED-DEP|🔗'
+    'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'OPEN-THREAD|💬' 'BLOCKED-DEP|🔗'
     'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️'
     'PAUSED|❓' 'NO-SUCH-BUCKET|❓' '|❓'
 )
-BUCKET_EMOJI_ARMS=8   # named (non-*) arms the table above covers
+BUCKET_EMOJI_ARMS=9  # named (non-*) arms the table above covers
 # $1 = driver file. Prints one line per mismatch; returns 1 on any mismatch or a missing function.
 bucket_emoji_check() {
     local src arms

@@ -269,6 +269,19 @@
     width: 100%;
 }
 
+/* Nested sub-tabs inside a hub panel (DraftInfo History: League / My team).
+   Reuses .ibl-tabs / .ibl-tab; this modifier only shrinks and indents them. */
+.ibl-tabs.ibl-tabs--sub {
+    margin: 0 0 0.75rem;
+}
+.ibl-tabs--sub .ibl-tab {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+}
+.ibl-subtab-login-prompt {
+    padding: 1rem 0;
+}
+
 .ibl-tab-card .sticky-scroll-wrapper {
     max-width: 100%;
 }

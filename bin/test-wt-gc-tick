@@ -167,7 +167,7 @@ cat > "$STUBBIN/gh-stub" <<'SH'
 if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/gh-argv"; fi
 [ "${STUB_GH_FAIL:-}" = 1 ] && exit 1
 d="${STUB_GH_DIR:-/nonexistent}"
-key=""
+key=""; sub="${2:-}"
 if [ "${1:-}" = pr ] && [ "${2:-}" = view ]; then
     key="${3:-}"
     if [ -f "$d/$key.json" ]; then cat "$d/$key.json"; exit 0; fi
@@ -180,7 +180,7 @@ else
     exit 1
 fi
 if [ -n "$key" ] && [ -f "$d/by-head/$key.json" ]; then cat "$d/by-head/$key.json"; exit 0; fi
-if [ "${2:-}" = list ]; then echo none; exit 0; fi
+if [ "$sub" = list ]; then echo none; exit 0; fi
 echo '[]'
 SH
 

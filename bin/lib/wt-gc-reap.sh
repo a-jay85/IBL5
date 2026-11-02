@@ -856,13 +856,45 @@ _gc_backup_stem() {
     printf '%s\n' "$s"
 }
 
+# _gc_backup_stems <branch-name> — every stem _gc_backup_stem could land on,
+# one per line, least stripped first (the last line equals _gc_backup_stem).
+# A head branch whose own name ends in -backup, -prep or -<8 digits> is found
+# before the strip loop eats its tail. Pure, no I/O.
+_gc_backup_stems() {
+    local s="${1#backup/}" pass=0 last=""
+    local re_a='^(.+)/[0-9]{8}-[0-9]{6}(-.+)?$'
+    local re_b='^(.+)-(pre-prep|pre-squash|pre-reset|pre-rebase)(-[0-9]{8})?$'
+    local re_c='^(.+)-(presquash|prep|backup|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$'
+    local re_d='^(.+)-[0-9]{8}$'
+    local re_sha='^(.*)-[0-9a-f]{7,40}$'
+    printf '%s\n' "$s"; last="$s"
+    while [ "$pass" -lt 4 ]; do
+        pass=$((pass + 1))
+        # Date-only strip first, so "x-backup-20261020" yields "x-backup"
+        # before the combined tail rule yields "x".
+        if [[ "$s" =~ $re_d ]] && [ "${BASH_REMATCH[1]}" != "$last" ]; then
+            last="${BASH_REMATCH[1]}"; printf '%s\n' "$last"
+        fi
+        if [[ "$s" =~ $re_a ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_b ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_c ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_d ]]; then s="${BASH_REMATCH[1]}"
+        else break
+        fi
+        if [ "$s" != "$last" ]; then printf '%s\n' "$s"; last="$s"; fi
+    done
+    if [[ "$s" =~ $re_sha ]] && [ "${BASH_REMATCH[1]}" != "$last" ]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
+}
+
 # ── Step: stale refs (reap) ───────────────────────────────────────────────────
 reap_stale_refs() {
     _gc_valid_days WT_GC_BACKUP_DAYS || return 1
     _gc_valid_days WT_GC_REF_DAYS || return 1
     if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ]; then _gc_valid_days WT_GC_BACKUP_FALLBACK_DAYS || return 1; fi
     log "refs threshold backup=${WT_GC_BACKUP_DAYS}d other=${WT_GC_REF_DAYS}d"
-    local listing remotes remotes_ok=1 now line ref sha ct name stem rname merged mrc ct_ok
+    local cand listing remotes remotes_ok=1 now line ref sha ct name stem rname merged mrc ct_ok
     local doomed="" rc=0 checked_out branches_ok=1 known
     now="$(date +%s)"
     listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
@@ -892,8 +924,16 @@ reap_stale_refs() {
                         rc=1
                         continue
                     fi
-                    mrc=0
-                    merged="$(_gc_backup_merged_epoch "$stem")" || mrc=$?
+                    # Try the least-stripped stem first; the first one gh
+                    # knows a PR for wins. Only "no PR under any stem" falls
+                    # through to the age fallback.
+                    mrc=3
+                    while IFS= read -r cand <&4; do
+                        [ -n "$cand" ] || continue
+                        mrc=0
+                        merged="$(_gc_backup_merged_epoch "$cand")" || mrc=$?
+                        if [ "$mrc" != 3 ]; then stem="$cand"; break; fi
+                    done 4< <(_gc_backup_stems "$name")
                     if [ "$mrc" = 2 ]; then
                         log "ref keep $ref: gh probe error for '$stem'"
                         continue

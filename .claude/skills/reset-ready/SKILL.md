@@ -1,7 +1,7 @@
 ---
 name: reset-ready
 description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs and stale docs, open PRs, prod logs, slow queries, Lighthouse a11y scores, code health (PHPStan baseline, mutation, orphan CSS), unshipped plans and branches, GM bug reports and #dev alerts on Discord, master CI failures and green-run warnings, deferred PR follow-ups, dangling doc pointers, session tool errors, ungated bug classes and parked picks whose blocker merged in parallel, plus weekly data-integrity, dead-code and slow-test sweeps, prefer chore, fix, refactor, test and docs picks over feat, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
-last_verified: 2026-11-01
+last_verified: 2026-11-02
 ---
 
 # /reset-ready
@@ -27,8 +27,8 @@ request, run every step.
   fixed or duplicated in the report, and leave closing them to the user.
 - A recurring cause beats a one-off. A pipeline fix that unblocks many runs beats a single
   code cleanup.
-- A SQL, auth or destructive-migration item may go in, but its prompt routes to
-  `plan-architect-xhigh`.
+- A SQL, auth or destructive-migration item may go in. Weigh it for
+  `plan-architect-xhigh` with the hint below. The tier is an Opus judgment.
 - Prefer work whose honest PR title type is `chore`, `fix`, `refactor`, `test` or
   `docs`. A `feat:` PR waits for the user's sign-off, so it ships last. Classify the type
   with the GM-notice test in `.claude/rules/auto-commit.md`.
@@ -161,6 +161,8 @@ for f in "$D"/prompts/*.md; do
   bin/plan-tier-hint --desc "$(head -1 "$f" | sed 's#^/plan ##')"
 done
 ```
+
+A judge failure prints `default`. When a `default` surprises you, rerun that prompt with `--explain` and read the reason.
 
 When the hint says `xhigh`, use `plan-architect-xhigh`. When you pick xhigh and the hint
 says `default` (the judge's reason says why it disagrees), plan-now exits 4

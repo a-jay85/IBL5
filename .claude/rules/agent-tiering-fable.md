@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, the xhigh human overrule. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
-last_verified: 2026-10-26
+description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
+last_verified: 2026-11-02
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
 
@@ -53,9 +53,9 @@ Reproduce: `python3 -m harness.tier_measure run --repo-root ../.. --out <path> -
 
 ## Pinned agent defs
 
-A def whose frontmatter pins `model: fable` always runs on Fable. Today that is `plan-architect-xhigh` at high effort, selected by `/plan` Step 3 check 1.
+A def whose frontmatter pins `model: fable` always runs on Fable. Today that is `plan-architect-xhigh` at high effort. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes with the test above. The orchestrator owns the final call (`/plan` Step 3).
 
-A human may overrule check 1 and route an xhigh-triggered task to `plan-architect`. The overrule applies only when the prompt names the trigger risks and names an empirical backstop that would catch a wrong plan: shadow mode, a replay corpus, or the `feat:` signoff hold. It is never automatic. Headless and automouse runs follow check 1 and the `bin/plan-now` tier cross-check unchanged, and an overruled run records the reason in its plan's Approach. Aligning the cross-check is backlog follow-up F1 ([backlog#1667](https://github.com/a-jay85/IBL5-backlog/issues/1667)).
+A human may route any task to either architect. When `bin/plan-now` sees a declared tier that disagrees with the hint and one side is xhigh, it exits 4, and `--tier-ok "<reason>"` records the override. Every verdict lands in `~/.claude/logs/plan-tier-hint.log` with its reason, so a tier pick that went wrong can be traced.
 
 ## Asm-level static RE (JSB engine): Fable is the default
 

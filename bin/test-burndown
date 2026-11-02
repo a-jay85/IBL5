@@ -35,6 +35,7 @@ JUDGE_EOF
 printf '#!/usr/bin/env bash\nexit 3\n' > "$PTJ_DIR/judge-fail"
 chmod +x "$PTJ_DIR/judge-default" "$PTJ_DIR/judge-fail"
 export PLAN_TIER_HINT_CLAUDE="$PTJ_DIR/judge-default"
+export PLAN_TIER_HINT_LOG="$PTJ_DIR/plan-tier-hint.log"
 
 mkdir -p "$T/home" "$T/fx"
 
@@ -2120,9 +2121,9 @@ else
         || fail "C42: BURNDOWN_TIER_HINT empty: no ledger found"
 fi
 
-# ── C42a: judge failure tiers every item xhigh, none error ───────────────────
-# The hint's fail-safe answers xhigh (cost 2) where a failing hint used to give
-# error (cost 1).
+# ── C42a: judge failure tiers every item default, none error ─────────────────
+# The hint's fail-safe answers default, the Opus architect. It used to answer
+# xhigh (cost 2); a failing hint before the judge gave error (cost 1).
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(env -u BURNDOWN_TIER_HINT PLAN_TIER_HINT_CLAUDE="$PTJ_DIR/judge-fail" \
     GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
@@ -2132,11 +2133,11 @@ C42A_LEDGER_LINE="$(grep '^LEDGER: ' <<< "$OUT" | tail -1)"
 C42A_LEDGER="${C42A_LEDGER_LINE#LEDGER: }"
 if [ -n "$C42A_LEDGER" ] && [ -f "$C42A_LEDGER" ]; then
     C42A_TIERS="$(jq -r '.items[].tier' "$C42A_LEDGER")"
-    C42A_BAD="$(grep -vx xhigh <<< "$C42A_TIERS" || true)"
+    C42A_BAD="$(grep -vx default <<< "$C42A_TIERS" || true)"
     if [ -n "$C42A_TIERS" ] && [ -z "$C42A_BAD" ]; then
-        ok "C42a: judge failure: every item tiers xhigh, none error"
+        ok "C42a: judge failure: every item tiers default, none error"
     else
-        fail "C42a: judge failure: every item tiers xhigh, none error (tiers: $(tr '\n' ' ' <<< "$C42A_TIERS"))"
+        fail "C42a: judge failure: every item tiers default, none error (tiers: $(tr '\n' ' ' <<< "$C42A_TIERS"))"
     fi
 else
     [ "$RC" -ne 0 ] && fail "C42a: judge failure: rc=$RC out=$OUT" \

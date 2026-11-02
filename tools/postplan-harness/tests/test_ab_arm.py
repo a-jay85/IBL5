@@ -30,12 +30,13 @@ def _enroll_file(state_dir):
 
 def test_hash_arm_stable_across_processes():
     # Guards against hash(slug): Python salts str hashes per process, so a swap to it makes
-    # the two PYTHONHASHSEED runs below disagree.
+    # the PYTHONHASHSEED runs below disagree. Two seeds can agree by chance (about 1 in 16),
+    # so the test uses 16 fixed seeds and the mutation fails every time.
     pinned = {"alpha-slug": "harness", "beta-slug": "closer"}
     code = ("import sys; sys.path.insert(0, %r); from harness.ab_arm import hash_arm; "
             "print(hash_arm('alpha-slug'), hash_arm('beta-slug'))" % HARNESS_DIR)
     seen = set()
-    for seed in ("1", "424242"):
+    for seed in [str(n) for n in range(1, 17)]:
         env = dict(os.environ, PYTHONHASHSEED=seed)
         out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True,
                              text=True, check=True).stdout.split()

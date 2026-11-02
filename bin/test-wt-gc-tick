@@ -1877,7 +1877,7 @@ has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "delete
 finish_case
 
 fx RF8-checked-out-keeps
-mk_wt rf8 backup/rf8-prep-20261001 age_days=20
+mk_wt rf8 backup/rf8-prep-20261001 ahead=1 age_days=20
 rt "${RF_ON[@]}" -- --force
 has_branch backup/rf8-prep-20261001 || note_err "checked-out backup branch deleted"
 finish_case
@@ -2399,6 +2399,140 @@ has_ref refs/tmp/a5 || note_err "A5 ref deleted in dry-run"
 [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "A5 dry-run wrote a keep-ref"
 ls "$CD"/tips/tips-*.txt >/dev/null 2>&1 && note_err "A5 dry-run wrote a tips file"
 log_has 'DRY-RUN would: archive' || note_err "A5 no dry-run archive line"
+finish_case
+
+# ── Env contract: switches, ages, stamp seam, help text ───────────────────────
+# A token "-VAR" in rt's env list leaves VAR truly unset (run_tick drops it).
+EC_SWITCHES=(WT_GC_ARCHIVE_PRUNE WT_GC_REAP_DIRTY_ARCHIVE WT_GC_REAP_DETACHED
+    WT_GC_REAP_CLOSED WT_GC_DROP_STASHES WT_GC_REF_FALLBACK WT_GC_DOCKER_CONTAINERS)
+# The switches that own a run_step, as "VAR:step".
+EC_STEPS=(WT_GC_ARCHIVE_PRUNE:archive-prune WT_GC_REAP_DETACHED:detached
+    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes)
+
+for ec_var in "${EC_SWITCHES[@]}"; do
+    fx "EC-switch-$ec_var"
+    rt "-$ec_var" -- --force --dry-run
+    log_has "config (.* )?$ec_var=1( |\$)" || note_err "unset $ec_var did not default to 1"
+    rt "$ec_var=" -- --force --dry-run
+    log_has "config (.* )?$ec_var=1( |\$)" || note_err "empty $ec_var did not default to 1"
+    rt "$ec_var=0" -- --force --dry-run
+    log_has "config (.* )?$ec_var=0( |\$)" || note_err "$ec_var=0 not logged"
+    for ec_pair in "${EC_STEPS[@]}"; do
+        [ "${ec_pair%%:*}" = "$ec_var" ] || continue
+        ec_step="${ec_pair##*:}"
+        log_has "step $ec_step disabled \($ec_var=0\)" || note_err "$ec_var=0 did not disable step $ec_step"
+        log_has "step $ec_step threshold" && note_err "step $ec_step ran with $ec_var=0"
+    done
+    finish_case
+done
+
+# "VAR|default|extra env to switch the owning step on"
+EC_AGES=(
+    'WT_GC_ARCHIVE_DAYS|90|WT_GC_ARCHIVE_PRUNE=1'
+    'WT_GC_DIRTY_ARCHIVE_DAYS|3|WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1'
+    'WT_GC_DETACHED_DAYS|3|WT_GC_REAP_DETACHED=1'
+    'WT_GC_CLOSED_DAYS|7|WT_GC_REAP_CLOSED=1'
+    'WT_GC_STASH_DAYS|7|WT_GC_DROP_STASHES=1'
+    'WT_GC_BACKUP_FALLBACK_DAYS|14|WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1'
+    'WT_GC_CONTAINER_DAYS|14|WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1'
+)
+for ec_row in "${EC_AGES[@]}"; do
+    ec_var="${ec_row%%|*}"
+    ec_rest="${ec_row#*|}"
+    ec_def="${ec_rest%%|*}"
+    ec_on="${ec_rest#*|}"
+    fx "EC-age-$ec_var"
+    # shellcheck disable=SC2086
+    rt $ec_on "-$ec_var" -- --force
+    chk_rc "EC-age $ec_var unset" 0
+    log_has "config (.* )?$ec_var=$ec_def( |\$)" || note_err "unset $ec_var did not default to $ec_def"
+    log_has "invalid $ec_var" && note_err "unset $ec_var logged invalid"
+    log_has 'reap done steps_failed=0' || note_err "unset $ec_var: steps failed"
+    # shellcheck disable=SC2086
+    rt $ec_on "$ec_var=" -- --force
+    log_has "invalid $ec_var '' — step skipped \(fail-closed\)" || note_err "empty $ec_var not fail-closed"
+    log_has 'reap done steps_failed=[1-9]' || note_err "empty $ec_var: no failed step counted"
+    [ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "empty $ec_var wrote an archive"
+    finish_case
+done
+
+fx EC-stamp-seam
+for ec_mode in unset empty; do
+    : > "$CD/rows"; : > "$CD/skips"
+    d_wt "ecs-$ec_mode" diff
+    epoch_ago 5 > "$CD/gh/7.json"
+    if [ "$ec_mode" = unset ]; then ec_tok=-WT_GC_ARCHIVE_STAMP; else ec_tok=WT_GC_ARCHIVE_STAMP=; fi
+    rt WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1 "$ec_tok" STUB_SKIP_LINES="$CD/skips" -- --force
+    chk_rc "EC-stamp $ec_mode" 0
+    ec_refs="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname)' refs/wt-gc-archive/)"
+    [ -n "$ec_refs" ] || note_err "$ec_mode stamp: no archive written"
+    ec_bad="$(grep -vE '^refs/wt-gc-archive/[0-9]{10}/' <<< "$ec_refs" || true)"
+    [ -z "$ec_bad" ] || note_err "$ec_mode stamp: bad refname: $ec_bad"
+    grep -qF 'refs/wt-gc-archive//' <<< "$ec_refs" && note_err "$ec_mode stamp: empty stamp component"
+done
+finish_case
+
+fx H2-help-lists-new-vars
+env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
+chk_rc H2-help 0
+for ec_var in "${EC_SWITCHES[@]}" WT_GC_ARCHIVE_DAYS WT_GC_DIRTY_ARCHIVE_DAYS WT_GC_DETACHED_DAYS \
+    WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP; do
+    grep -qF -- "$ec_var" "$CD/help.out" || note_err "--help does not list $ec_var"
+done
+grep -qF 'Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]' "$CD/help.out" || note_err "--help lost the Usage line"
+grep -qF -- '--help            Print this header comment.' "$CD/help.out" || note_err "--help cut before the last Usage line"
+finish_case
+
+# One fixture per class, all builders from the sections above.
+ALL_CLASSES_ON=(WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1 WT_GC_REAP_DETACHED=1
+    WT_GC_REAP_CLOSED=1 WT_GC_DROP_STASHES=1 WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1
+    WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1 WT_GC_ARCHIVE_STAMP=1700000000)
+ALL_BACKUP=refs/heads/backup/lighten-navy-palette-prep-20261026
+all_fixtures() {
+    : > "$CD/skips"
+    d_wt all1d diff
+    epoch_ago 5 > "$CD/gh/7.json"
+    mk_detached all1t age_days=5
+    c_wt all1c none
+    epoch_ago 10 > "$CD/gh/9.json"
+    ALL_STASH="$(mk_stash gone-all 10)"
+    mk_ref "$ALL_BACKUP" 20
+    dk_container ccc999 ibl5-all exited "$(iso_ago 20)"
+}
+
+fx ALL1-dry-run-every-class
+all_fixtures
+ALL_REFS0="$(refs_snapshot)"; ALL_WT0="$(wt_snapshot)"; ALL_ST0="$(git -C "$ENV_MAIN" stash list --format=%H)"
+rt "${ALL_CLASSES_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force --dry-run
+chk_rc ALL1 0
+[ "$(refs_snapshot)" = "$ALL_REFS0" ] || note_err "ALL1 dry run changed refs"
+[ "$(wt_snapshot)" = "$ALL_WT0" ] || note_err "ALL1 dry run changed worktrees"
+[ "$(git -C "$ENV_MAIN" stash list --format=%H)" = "$ALL_ST0" ] || note_err "ALL1 dry run changed stashes"
+ls "$CD"/tips/containers-* >/dev/null 2>&1 && note_err "ALL1 dry run wrote a container archive"
+grep -q '^rm ' "$CD/docker-argv" 2>/dev/null && note_err "ALL1 dry run ran docker rm"
+for ec_name in all1d all1t all1c "${ALL_STASH:0:10}" lighten-navy-palette ibl5-all; do
+    grep -E 'DRY-RUN would:' "$(LOG)" | grep -qF -- "$ec_name" || note_err "ALL1 no DRY-RUN line for $ec_name"
+done
+finish_case
+
+fx ALL2-live-every-class
+all_fixtures
+rt "${ALL_CLASSES_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc ALL2 0
+for ec_name in wt/all1d wt/all1t wt/all1c "stash/$ALL_STASH" heads/all1d heads/all1c \
+    "heads/backup/lighten-navy-palette-prep-20261026"; do
+    arch_has "1700000000/$ec_name" || note_err "ALL2 no archive ref $ec_name"
+done
+[ -s "$CD/tips/containers-1700000000-ibl5-all.json" ] || note_err "ALL2 no container archive"
+grep -qxF 'rm ccc999' "$CD/docker-argv" 2>/dev/null || note_err "ALL2 container not removed"
+stash_has "$ALL_STASH" && note_err "ALL2 stash still listed"
+has_ref "$ALL_BACKUP" && note_err "ALL2 backup ref still present"
+for ec_name in all1d all1t all1c; do
+    [ -d "$(wt_dir "$ec_name")" ] && note_err "ALL2 worktree $ec_name still present"
+done
+[ -z "$(git -C "$ENV_MAIN" status --porcelain)" ] || note_err "ALL2 main work tree is dirty: $(git -C "$ENV_MAIN" status --porcelain)"
+grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$CD/argv" >/dev/null 2>&1 \
+    && note_err "ALL2 cleanup got a destructive flag"
 finish_case
 
 # ══════════════════════════════════════════════════════════════════════════════

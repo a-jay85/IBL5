@@ -1,9 +1,11 @@
 ---
 description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and DMs recommendations to the owner. Raw URIs, user agents and identities never leave the database.
-last_verified: 2026-10-27
+last_verified: 2026-11-01
 ---
 
 # 0168. Weekly product-analytics review from ibl_events
+
+**Amended 2026-11-01 (trigger).** The weekly schedule now lives in a T3 scheduled task on the owner's Mac, titled "Weekly events review", which fires Sundays at 09:25 local time. The task runs `bin/events-review` unchanged. The `com.ibl5.events-review` launchd job is unloaded and removed from `bin/lib/launchd-expected-jobs.sh`. `--install-schedule` and `--uninstall-schedule` still exist, but they are no longer the live trigger. The task runs without `--at-reset`. 09:25 Pacific lands after the 16:00 UTC usage reset in both PST and PDT.
 
 ## Status
 

@@ -20,7 +20,6 @@
 #                 as something else. Unknown phase => not exempt.
 #                 No job uses this mode now (sim-recap-poll was retired).
 LEJ_EXPECTED_JOBS='com.ibl5.automouse standard
-com.ibl5.automouse-comprehension-digest standard
 com.ibl5.automouse-morning-digest standard
 com.ibl5.backups-sync standard
 com.ibl5.bug-bot keepalive
@@ -28,8 +27,6 @@ com.ibl5.bug-pipeline-cron standard
 com.ibl5.db-backups-pull standard
 com.ibl5.db-sync-nightly standard
 com.ibl5.docfix-poll standard
-com.ibl5.events-review standard
-com.ibl5.finding-class-scan standard
 com.ibl5.sim-recap-poll standard
 com.ibl5.usage-gate-coordinator standard
 com.ibl5.watch-pr-cycle standard
@@ -59,7 +56,9 @@ com.ibl5.postplan-now-'
 # entry here has no reason, or when an entry here names no installed label.
 LEJ_EXEMPT_JOBS='com.ibl5.launchd-health-daily the health checker itself; it cannot report its own absence
 com.ibl5.launchd-health-login the health checker itself; it cannot report its own absence
-com.ibl5.usage-gate-keychain-probe one-shot probe loaded and removed inside the install run'
+com.ibl5.usage-gate-keychain-probe one-shot probe loaded and removed inside the install run
+com.ibl5.automouse-comprehension-digest moved to a T3 scheduled task; the setup script is no longer the live trigger
+com.ibl5.finding-class-scan moved to a T3 scheduled task; --install-schedule is no longer the live trigger'
 
 # Main-stack containers that must be running (`docker ps --format '{{.Names}}'`).
 LEJ_REQUIRED_CONTAINERS='ibl5-mariadb

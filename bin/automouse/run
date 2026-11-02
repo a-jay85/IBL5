@@ -1450,6 +1450,23 @@ should_impl_env_stop() {
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
+# Rename a handoff the impl agent saved as <slug>.json (dropping the .md) to the
+# <slug>.md.json name the runner reads. Without this, a finished impl scores as a
+# genuine failure and the next attempt's 12s Step-2 stop scores as an env-stop
+# (wt-gc-reap-safe-classes, 2026-11-01). Adopts only the exact <slug>.json name,
+# and only when its plan_file field names this plan. Logs one line on adoption.
+adopt_misnamed_handoff() {
+    local dir=$1 plan=$2 want misnamed pf
+    want="$dir/${plan}.json"
+    misnamed="$dir/${plan%.md}.json"
+    [ -f "$want" ] && return 0
+    [ -f "$misnamed" ] || return 0
+    pf=$(jq -r '.plan_file // empty' "$misnamed" 2>/dev/null) || return 0
+    [ "$pf" = "$plan" ] || return 0
+    mv "$misnamed" "$want" || return 0
+    echo "Handoff adopted: renamed ${plan%.md}.json to ${plan}.json (impl saved it under the slug name)." >> "${LOG:-/dev/null}"
+}
+
 # Resolve a branch's PR state, fail-closed.
 # Echoes "<STATE> <URL>" (STATE = OPEN or MERGED) and returns 0 only on a positive
 # answer. Every other outcome — gh non-zero (auth/network/rate limit), no PR for the
@@ -2578,6 +2595,7 @@ while true; do
     # --- Phase 1: Implementation ---
     # Skip if handoff file exists (resume: impl done, postplan pending)
     HANDOFF_FILE="$HANDOFF_DIR/${PLAN_NAME}.json"
+    adopt_misnamed_handoff "$HANDOFF_DIR" "$PLAN_NAME"
 
     if [ -f "$HANDOFF_FILE" ]; then
         echo "Handoff exists — skipping impl, proceeding to post-plan." >> "$LOG"
@@ -2801,6 +2819,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # EXCEPTION, handled just below: a slow failure that was the wall-clock
         # cap itself is refunded by the bounded cap-timeout breaker, up to
         # CAP_REFUND_LIMIT times per plan.
+        adopt_misnamed_handoff "$HANDOFF_DIR" "$PLAN_NAME"
         IMPL_HANDOFF=0;  [ -f "$HANDOFF_FILE" ] && IMPL_HANDOFF=1
         IMPL_IN_QUEUE=0; if plan_still_queued; then IMPL_IN_QUEUE=1; fi
         # Usage-gate pause: a marker on disk, a pre-start pause, or a limit-hit in this

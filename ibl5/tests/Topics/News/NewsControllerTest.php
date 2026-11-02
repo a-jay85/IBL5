@@ -24,10 +24,14 @@ class NewsControllerTest extends ModuleEntryPointTestCase
     private \LastSimRecap\Contracts\LastSimRecapViewInterface $recapViewStub;
     private \Topics\News\Contracts\NewsServiceInterface $newsServiceStub;
     private \Topics\News\Contracts\NewsViewInterface $newsViewStub;
+    private \Monolog\Handler\TestHandler $logHandler;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->logHandler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($this->logHandler);
 
         $this->config = $this->config();
 
@@ -53,6 +57,12 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         if (!defined('_SEARCH')) {
             define('_SEARCH', 'Search');
         }
+    }
+
+    protected function tearDown(): void
+    {
+        \Logging\LoggerFactory::reset();
+        parent::tearDown();
     }
 
     public function testAnonymousHomeRenderUsesStoryHomeAndSkipsRecap(): void
@@ -197,6 +207,34 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $html = $this->runMain($controller);
 
         $this->assertStringContainsString('<section data-test="recap-card"></section>', $html);
+        $errors = array_values(array_filter(
+            $this->logHandler->getRecords(),
+            static fn (\Monolog\LogRecord $record): bool => $record->message === 'Trade suggestions panel failed',
+        ));
+        $this->assertCount(1, $errors);
+        $this->assertSame(['tid' => 5, 'error' => 'db down'], $errors[0]->context);
+    }
+
+    public function testSkipsTradeSuggestionsWhenViewOrServiceMissing(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $noView = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $noView->expects($this->never())->method('buildForTeam');
+        $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: $noView,
+        ));
+
+        $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+        ));
+
+        $this->assertFalse($this->logHandler->hasErrorRecords());
     }
 
     public function testSkipsTradeSuggestionsForAnonymousAndFreeAgents(): void
@@ -215,6 +253,9 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             suggestions: $faSuggestions,
             suggestionsView: $suggestionsView,
         ));
+
+        // A skipped panel must return early, not reach buildForTeam(null) and log the TypeError.
+        $this->assertFalse($this->logHandler->hasErrorRecords());
     }
 
     public function testTopicWithNullTopicTextRendersNoInfoBranch(): void

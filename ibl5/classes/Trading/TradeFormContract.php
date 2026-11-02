@@ -29,8 +29,9 @@ final class TradeFormContract
             $contractYear = 1;
         }
 
+        // Rows carry salary_yr1..salary_yr6 only, so a year past six misses and reads as 0.
         /** @var int $contractAmount */
-        $contractAmount = ($contractYear < 7) ? ($row["salary_yr{$contractYear}"] ?? 0) : 0;
+        $contractAmount = $row["salary_yr{$contractYear}"] ?? 0;
 
         return $contractAmount;
     }

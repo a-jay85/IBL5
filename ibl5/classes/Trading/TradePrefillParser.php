@@ -15,7 +15,8 @@ namespace Trading;
  */
 final class TradePrefillParser
 {
-    public const MAX_LENGTH = 200;
+    /** Eight keys of at most 12 chars (`1:` plus a 10-digit id) and seven commas. */
+    public const MAX_LENGTH = 103;
     public const MAX_ITEMS = 8;
 
     /**
@@ -39,16 +40,14 @@ final class TradePrefillParser
         }
 
         $allowed = self::buildAllowedKeys($pageData);
-        $keys = array_values(array_unique(explode(',', $raw)));
+        $checkedItems = [];
 
-        foreach ($keys as $key) {
+        foreach (explode(',', $raw) as $key) {
             if (!isset($allowed[$key])) {
                 return null;
             }
+            $checkedItems[$key] = $allowed[$key];
         }
-
-        /** @var array<string, true> $checkedItems */
-        $checkedItems = array_fill_keys($keys, true);
 
         return [
             'checkedItems' => $checkedItems,

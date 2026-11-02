@@ -133,6 +133,12 @@ class ScratchTree:
                 fh.write(data)
             os.chmod(dest, 0o755 if mode == 0o100755 or mode & 0o111 else 0o644)
 
+    def apply_patch(self, patch: bytes) -> bool:
+        """Apply a binary diff to the tree. git apply is all-or-nothing, so False leaves it untouched."""
+        proc = subprocess.run(["git", *_GIT_QUIET, "-C", self.dir, "apply", "--binary",
+                               "--whitespace=nowarn", "-"], input=patch, capture_output=True)
+        return proc.returncode == 0
+
     def remove(self, files) -> None:
         """Delete each path from the tree. A path that is already absent is fine."""
         for rel in files:
@@ -188,13 +194,17 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  plans_dir: str, *, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                  total_cap: int = TOTAL_CAP, clock=time.monotonic,
                  bodies: dict[int, str] | None = None,
-                 base_overlay: dict[str, tuple[bytes, int] | None] | None = None
+                 base_overlay: dict[str, tuple[bytes, int] | None] | None = None,
+                 fix_patch: bytes | None = None
                  ) -> list[ReplayResult]:
     """Replay every replayable gate against every historical PR's tree, newest first.
 
     With `base_overlay` (the same keys as `overlay_files`, `None` marking a path absent at the
     base ref), a head `flag` is followed by one replay of the base-ref gate on the same checkout.
     The result rides on the head row as `base_outcome`/`base_detail` and never changes `outcome`.
+    With `fix_patch`, a head `flag` the base gate did not also flag is followed by one head-gate
+    replay on the same checkout with the candidate's own non-gate diff applied; the result rides
+    on `fix_outcome`/`fix_detail` and never changes `outcome`.
     """
     replayable = [g for g in gates if g.state == "replayable" and g.spec is not None]
     results: list[ReplayResult] = []
@@ -314,8 +324,26 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 base_detail = re.sub(r"\s+", " ", f"base-overlay: {exc}")[:160]
                             finally:
                                 scratch.overlay(overlay_files)
+                    fix_outcome = fix_detail = ""
+                    if outcome == "flag" and base_outcome != "flag" and fix_patch is not None:
+                        if clock() - start >= total_cap:
+                            fix_outcome, fix_detail = "timeout", "total-cap"
+                        else:
+                            try:
+                                if scratch.apply_patch(fix_patch):
+                                    scratch.overlay(overlay_files)
+                                    fix_outcome, fix_detail = execute(spec, ctx, gate.path)
+                                else:
+                                    fix_outcome = "no-apply"
+                            except OSError as exc:
+                                fix_outcome = "error"
+                                fix_detail = re.sub(r"\s+", " ", f"fix-overlay: {exc}")[:160]
+                            finally:
+                                scratch.checkout(pr.merge_sha)
+                                scratch.overlay(overlay_files)
                     results.append(ReplayResult(pr.number, gate.path, outcome, detail,
-                                                base_outcome, base_detail))
+                                                base_outcome, base_detail,
+                                                fix_outcome, fix_detail))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results
@@ -379,6 +407,23 @@ def _base_overlay(repo: str, base: str, head: str,
         except subprocess.CalledProcessError:
             out[path] = None
     return out
+
+
+def _fix_patch(repo: str, base: str, head: str, exclude) -> bytes | None:
+    """The candidate's diff from merge-base(base, head) to head minus gate paths and bin/test-*.
+
+    Empty or unreadable returns None, so no fix-overlay rerun runs and every head flag counts.
+    """
+    try:
+        rev = make_git(repo)(["merge-base", base, head]).strip()
+        if not rev:
+            return None
+        argv = ["diff", "--binary", rev, head, "--", ".", ":(exclude,glob)bin/test-*"]
+        argv += [f":(exclude){p}" for p in sorted(exclude)]
+        data = _git_bytes(repo, argv)
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    return data or None
 
 
 def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
@@ -456,9 +501,12 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             history = [p for p in fetched if truth[p.number].state != "unsettled"][:limit]
             window = len(history)
             base_overlay = _base_overlay(repo, base, head, overlay_files)
+            fix_patch = None if forced_gate is not None else _fix_patch(
+                repo, base, head, overlay_files)
             results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
                                    per_replay_timeout=per_replay_timeout, total_cap=total_cap,
-                                   bodies=bodies, base_overlay=base_overlay)
+                                   bodies=bodies, base_overlay=base_overlay,
+                                   fix_patch=fix_patch)
         except Exception:
             results = None
             truth = {}

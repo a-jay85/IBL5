@@ -41,7 +41,7 @@ The plan-vs-ad-hoc verdict decides *whether to plan*. Who executes the edits is 
 - **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
 - **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
-**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline. At 5 or more files, **hand off by default**, without pausing for permission, and spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). State the routing call in one line either way. Design and final diff review stay on Opus.
+**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline, then runs the chunk's check itself. At 5 or more files, **hand off by default**, without pausing for permission, and spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). State the routing call in one line either way. Design and final diff review stay on Opus.
 
 A single sweep stays with one agent. For independent chunks, spawn one agent per chunk, all in the same message. A chunk of 5 or more files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 

@@ -79,6 +79,6 @@ One live run against the real judge, 14 rows in two passes, 14 calls at a time. 
 - Repo-cwd single call: $0.170.
 - Per-burndown estimate: $0.095 times 20 items, about $1.90.
 
-## Addendum — judge prompt reverted to the plan wording (2026-11-02)
+## Addendum (2026-11-02): judge prompt reverted to the plan wording
 
 The corpus table above ran with a prompt that told the judge to decide check 1 from what the task text says and not to assume risks the text gives no sign of. The fidelity review found that wording looser than SKILL.md, which says any doubt keeps the task at xhigh. The prompt now says only: apply the check list as written, and answer xhigh when unsure whether check 1 applies. The table above was not rerun on that prompt. Rows 12 and 13 are the ones to watch on the next live run. If either fails, hand off per the plan rather than loosening the prompt again.

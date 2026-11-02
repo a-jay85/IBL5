@@ -170,6 +170,61 @@ run_hist() {
     run_gb "--repo=$H" "--base=master" "--head=$head" "--fixture-history=$J" "--now=$NOW" "$@"
 }
 
+# --- fx history: the #3493 shape, a new gate whose own PR adds the file every older tree lacks --
+FX="$T/fx"
+FXJ="$T/fx.json"
+
+NEEDS_REQUIRED_GATE="${HEADER_GATE_HEAD}"'if [ ! -f config/required.txt ]; then
+    echo "missing config/required.txt"
+    exit 1
+fi
+exit 0
+'
+NEEDS_MARKER_GATE="${HEADER_GATE_HEAD}"'if ! grep -q "^candidate marker$" src/fx6.txt 2>/dev/null; then
+    echo "missing marker in src/fx6.txt"
+    exit 1
+fi
+exit 0
+'
+
+# Six settled clean PRs, each touching only its own src/fx<N>.txt; none creates
+# config/required.txt.
+setup_fx() {
+    [ -d "$FX" ] && return 0
+    local e="$T/fx.entries" n
+    new_repo "$FX"
+    commit_in "$FX" "root" README "root
+"
+    for n in 1 2 3 4 5 6; do
+        commit_in "$FX" "chore: fx $n (#$n)" "src/fx$n.txt" "$n
+"; record "$FX" "$e" "$n" "chore: fx $n" "2026-09-0${n}T12:00:00Z" "fx-branch-$n"
+    done
+    entries_to_json "$e" "$FXJ"
+
+    fx_candidate cand-fix
+    commit_in "$FX" "chore: add required config" config/required.txt "required
+"
+    commit_in "$FX" "chore: gate needs required" bin/check-needs-required "$NEEDS_REQUIRED_GATE" 755
+
+    fx_candidate cand-fix-conflict
+    commit_in "$FX" "chore: mark fx6" src/fx6.txt "6
+candidate marker
+"
+    commit_in "$FX" "chore: gate needs marker" bin/check-needs-marker "$NEEDS_MARKER_GATE" 755
+    git -C "$FX" checkout -q master
+}
+
+# fx_candidate <branch> — start a candidate branch at the master tip.
+fx_candidate() {
+    git -C "$FX" checkout -q -b "$1" master
+}
+
+# run_fx <head-branch> [extra args...]
+run_fx() {
+    local head="$1"; shift
+    run_gb "--repo=$FX" "--base=master" "--head=$head" "--fixture-history=$FXJ" "--now=$NOW" "$@"
+}
+
 # --- pma history: six clean PRs whose matrix rows use notations #2520 stopped flagging -------
 P="$T/pma"
 PJ="$T/pma.json"
@@ -367,6 +422,45 @@ case_noisy_gate_holds() {
         ok "noisy-gate-holds"
     else
         fail "noisy-gate-holds (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_fixed_by_pr_base_predates_fix() {
+    setup_fx
+    run_fx cand-fix
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#1" && has "$OUT" "#6" \
+        && ! has "$OUT" "- False flags:"; then
+        ok "fixed-by-pr-base-predates-fix"
+    else
+        fail "fixed-by-pr-base-predates-fix (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+# The patch applies only on #6's tree (its own base), so #1-#5 stay false flags.
+case_fixed_by_pr_patch_conflict_holds() {
+    setup_fx
+    run_fx cand-fix-conflict
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
+        && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6"; then
+        ok "fixed-by-pr-patch-conflict-holds"
+    else
+        fail "fixed-by-pr-patch-conflict-holds (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+case_fixed_by_pr_armable_mirror() {
+    setup_fx
+    local cleared held m1 m2
+    run_fx cand-fix; cleared=$OUT
+    run_fx cand-fix-conflict; held=$OUT
+    m1=$( . "$REPO_ROOT/bin/lib/pr-armable.sh"; pr_gate_backtest_hold "$cleared" )
+    m2=$( . "$REPO_ROOT/bin/lib/pr-armable.sh"; pr_gate_backtest_hold "$held" )
+    if [ -z "$m1" ] && [ "$m2" = "gate-backtest:HELD" ]; then
+        ok "fixed-by-pr-armable-mirror"
+    else
+        fail "fixed-by-pr-armable-mirror (m1=$m1, m2=$m2)"
     fi
 }
 
@@ -596,11 +690,14 @@ case_destructive_bypass_body_replay() {
     fi
 }
 
-CASES="noisy-gate-holds quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
+CASES="noisy-gate-holds fixed-by-pr-base-predates-fix fixed-by-pr-patch-conflict-holds fixed-by-pr-armable-mirror quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
 
 run_case() {
     case "$1" in
         noisy-gate-holds) case_noisy_gate_holds ;;
+        fixed-by-pr-base-predates-fix) case_fixed_by_pr_base_predates_fix ;;
+        fixed-by-pr-patch-conflict-holds) case_fixed_by_pr_patch_conflict_holds ;;
+        fixed-by-pr-armable-mirror) case_fixed_by_pr_armable_mirror ;;
         quiet-gate-clears) case_quiet_gate_clears ;;
         non-gate-zero-cost) case_non_gate_zero_cost ;;
         timeout-unknown) case_timeout_unknown ;;

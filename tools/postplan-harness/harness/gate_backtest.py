@@ -68,6 +68,8 @@ class ReplayResult:
     detail: str      # first flagged stdout line, rc, or skip reason, max 160 chars
     base_outcome: str = ""   # "", flag, pass, absent, error, timeout
     base_detail: str = ""
+    fix_outcome: str = ""    # "", pass, flag, no-apply, error, timeout
+    fix_detail: str = ""
 
 
 # --- Replay-spec registry --------------------------------------------------------------------
@@ -417,6 +419,7 @@ class GateTally:
     false_flags: list[int] | None = None
     unsettled_flags: list[int] | None = None
     pre_existing: list[int] | None = None
+    fixed_by_pr: list[int] | None = None
     skipped: int = 0
     errors: int = 0
     first_error: str = ""
@@ -426,6 +429,7 @@ class GateTally:
         self.false_flags = self.false_flags if self.false_flags is not None else []
         self.unsettled_flags = self.unsettled_flags if self.unsettled_flags is not None else []
         self.pre_existing = self.pre_existing if self.pre_existing is not None else []
+        self.fixed_by_pr = self.fixed_by_pr if self.fixed_by_pr is not None else []
 
 
 @dataclass(frozen=True)
@@ -458,6 +462,8 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             elif state == "clean":
                 if r.base_outcome == "flag":
                     tally.pre_existing.append(r.pr)
+                elif r.fix_outcome == "pass":
+                    tally.fixed_by_pr.append(r.pr)
                 else:
                     tally.false_flags.append(r.pr)
             else:
@@ -534,6 +540,7 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     false_flags: list[int] = []
     unsettled: list[int] = []
     pre_existing: list[int] = []
+    fixed_by_pr: list[int] = []
     if verdict.per_gate:
         lines += ["| Gate | Replayed | Catches | False flags | Pre-existing flags | Unsettled flags "
                   "| Skipped | Errors |",
@@ -546,6 +553,7 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
             catches += t.catches
             false_flags += t.false_flags
             pre_existing += t.pre_existing
+            fixed_by_pr += t.fixed_by_pr
             unsettled += t.unsettled_flags
         lines.append("")
     if catches:
@@ -555,6 +563,9 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     if pre_existing:
         lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
                      + _numbers(pre_existing))
+    if fixed_by_pr:
+        lines.append("- Fixed by the candidate PR (head gate passes once this PR's own change "
+                     "is applied, excluded from the threshold): " + _numbers(fixed_by_pr))
     if unsettled:
         lines.append("- Unsettled flags: " + _numbers(unsettled))
     for label, state in (("Not replayable", "not-replayable"), ("Unspecified", "unspecified"),

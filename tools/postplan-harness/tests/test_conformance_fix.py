@@ -556,3 +556,14 @@ def test_classify_cli_refuses_existing_non_test_critical_file(tmp_path):
     assert proc.stdout.splitlines() == [f"UNFIXABLE existing-non-test-file {item}"]
     absent = _cli(["classify", "--plan", str(plan_path), "--worktree", str(tmp_path)], item + "\n")
     assert absent.stdout.splitlines() == [f"FIXABLE promised-file {item}"]
+
+
+def test_classify_cli_drops_no_prefix_lines_but_keeps_prefixed_unknown_class(tmp_path):
+    plan_path = tmp_path / "plan.md"
+    plan_path.write_text(PLAN_TEXT)
+    noise = "some stray log line without a class prefix"
+    lower = "missing: lower-case prefix is noise too"
+    unknown = "BOGUS-CLASS: something unrecognised"
+    proc = _cli(["classify", "--plan", str(plan_path)], f"{noise}\n{lower}\n{unknown}\n")
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.splitlines() == [f"UNFIXABLE unknown-class {unknown}"]

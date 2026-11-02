@@ -529,7 +529,6 @@
 
 /* Table header - gold gradient */
 .player-stats-card .stats-table-header,
-.player-stats-card .player-view-table td.player-view-table__title,
 .player-stats-card > .player-view-table__title,
 .player-stats-card td.stats-table-header {
     background: linear-gradient(135deg, var(--card-border) 0%, var(--card-accent) 100%);

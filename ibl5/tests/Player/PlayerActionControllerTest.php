@@ -17,7 +17,7 @@ use Tests\WideUnit\WideUnitTestCase;
  */
 class PlayerActionControllerTest extends WideUnitTestCase
 {
-    private const NO_TEAM_ERROR_HTML = '<div class="ibl-alert ibl-alert--error">You do not have a team assigned.</div>'
+    private const NO_TEAM_ERROR_HTML = '<div role="alert" class="d-alert d-alert-error mb-4">You do not have a team assigned.</div>'
         . '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary ibl-btn--spaced-inline">Go Back</a>';
 
     /**
@@ -174,7 +174,7 @@ class PlayerActionControllerTest extends WideUnitTestCase
 
         $output = $controller->renderRookieOption(1, 'testgm', null, null, null);
 
-        $this->assertStringContainsString('ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert-error', $output);
         $this->assertStringContainsString('Sorry, PG Test Player is not on your team.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);
@@ -187,7 +187,7 @@ class PlayerActionControllerTest extends WideUnitTestCase
 
         $output = $controller->renderRookieOption(1, 'testgm', null, null, null);
 
-        $this->assertStringContainsString('ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert-error', $output);
         $this->assertStringContainsString('is not eligible for a rookie option.', $output);
         $this->assertStringContainsString('Go Back', $output);
         $this->assertStringNotContainsString('<form', $output);

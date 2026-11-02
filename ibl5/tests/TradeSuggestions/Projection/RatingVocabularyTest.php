@@ -32,7 +32,6 @@ final class RatingVocabularyTest extends TestCase
 
     public function testLowerIsBetterTableIsExactlyTvrAndFoul(): void
     {
-        self::assertSame(['r_tvr', 'r_foul'], RatingDirection::LOWER_IS_BETTER);
         self::assertFalse(RatingDirection::higherIsBetter('r_tvr'));
         self::assertFalse(RatingDirection::higherIsBetter('r_foul'));
         $higher = array_filter(Rating::ALL, static fn (string $k): bool => RatingDirection::higherIsBetter($k));

@@ -42,7 +42,7 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
                     salary_yr1, salary_yr2, salary_yr3, salary_yr4, salary_yr5, salary_yr6
              FROM `ibl_plr`
              WHERE retired = 0 AND ordinal <= 960 AND teamid > 0
-             ORDER BY teamid, ordinal"
+             ORDER BY teamid, ordinal, pid"
         );
 
         $histByPid = $this->getLastSeasonLines($lastSeasonYear);
@@ -62,14 +62,19 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
      */
     public function getRatingScale(): RatingScale
     {
-        // Column names come from the Rating::ALL class constant, never from input.
-        $columns = implode(', ', array_map(
-            static fn (string $key): string => "MAX(`{$key}`) AS `{$key}`",
-            Rating::ALL
-        ));
-        $rows = $this->fetchAll("SELECT {$columns} FROM `ibl_plr` WHERE retired = 0");
+        // One MAX per Rating::ALL key; ProjectionPlayerRepositoryTest checks the list stays complete.
+        $rows = $this->fetchAll(
+            "SELECT MAX(`r_drive_off`) AS `r_drive_off`, MAX(`r_trans_off`) AS `r_trans_off`,
+                    MAX(`dd`) AS `dd`, MAX(`td`) AS `td`, MAX(`r_stl`) AS `r_stl`, MAX(`r_blk`) AS `r_blk`,
+                    MAX(`r_orb`) AS `r_orb`, MAX(`r_drb`) AS `r_drb`,
+                    MAX(`oo`) AS `oo`, MAX(`od`) AS `od`, MAX(`po`) AS `po`, MAX(`pd`) AS `pd`,
+                    MAX(`r_fga`) AS `r_fga`, MAX(`r_fgp`) AS `r_fgp`, MAX(`r_fta`) AS `r_fta`, MAX(`r_ftp`) AS `r_ftp`,
+                    MAX(`r_3ga`) AS `r_3ga`, MAX(`r_3gp`) AS `r_3gp`, MAX(`r_ast`) AS `r_ast`,
+                    MAX(`r_tvr`) AS `r_tvr`, MAX(`r_foul`) AS `r_foul`
+             FROM `ibl_plr` WHERE retired = 0"
+        );
 
-        return RatingScale::fromRows($rows);
+        return RatingScale::fromRows(array_values($rows));
     }
 
     /**

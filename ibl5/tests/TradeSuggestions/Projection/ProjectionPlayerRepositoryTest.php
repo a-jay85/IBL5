@@ -118,6 +118,10 @@ final class ProjectionPlayerRepositoryTest extends TestCase
 
         self::assertSame(95.0, $scale->max('r_fga'));
         self::assertSame(80.0, $scale->max('oo'));
+        $sql = implode("\n", $this->db->getPreparedQueries());
+        foreach (Rating::ALL as $key) {
+            self::assertMatchesRegularExpression('/MAX\(`?' . $key . '`?\)/', $sql, $key);
+        }
     }
 
     private function plrSelect(): string

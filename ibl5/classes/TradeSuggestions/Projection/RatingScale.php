@@ -32,7 +32,7 @@ final readonly class RatingScale
             foreach (Rating::ALL as $key) {
                 $raw = $row[$key] ?? 0;
                 $value = is_numeric($raw) ? (float) $raw : 0.0;
-                if ($value > $maxima[$key]) {
+                if ($value > ($maxima[$key] ?? 0.0)) {
                     $maxima[$key] = $value;
                 }
             }

@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges.
-last_verified: 2026-10-23
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once.
+last_verified: 2026-11-02
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -204,3 +204,8 @@ Two changes close the gap.
 ## Addendum - PR Fast-Canary retired (2026-10-22)
 
 The Decision bullet saying `pr-canary.yml` covers the armed line via `bin/merge-line-select --list` no longer holds. The workflow, `bin/pr-canary-check` (example), and its test were removed. Its jobs always exited 0 and only posted an advisory sticky comment that nothing read, while `update-behind-prs.yml` already brings the head PR up to date and its full required CI runs. `--list` stays in the selector but has no caller now.
+
+## Addendum: hotfix lane (2026-10-26)
+
+
+A PR labeled `hotfix` now sorts ahead of every other armed PR in the merge line. The 2026-09-29 addendum's order by arm time, oldest first, now holds within the hotfix group and within the group behind it. The decision, the dispatch workflow, and the label audit are recorded in ADR-0223, `ibl5/docs/decisions/0223-hotfix-merge-lane.md`.

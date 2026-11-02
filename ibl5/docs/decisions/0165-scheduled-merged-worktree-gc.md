@@ -1,6 +1,6 @@
 ---
-description: Scheduled launchd sweep that reaps merged worktrees via bin/cleanup --all and only surfaces stalled, unpushed and empty ones. The EMPTY rejection is superseded in part by ADR-0212.
-last_verified: 2026-10-22
+description: Scheduled launchd sweep that reaps merged worktrees via bin/cleanup --all and only surfaces stalled, unpushed and empty ones. The EMPTY rejection is superseded in part by ADR-0212. Safe-class reaping with archive-first restore added 2026-11-01.
+last_verified: 2026-11-01
 ---
 
 # ADR-0165: Scheduled merged-worktree GC
@@ -65,3 +65,29 @@ label is registered in `bin/lib/launchd-expected-jobs.sh`, so
 The Alternatives Considered entry that rejected reaping EMPTY worktrees is superseded for worktrees older than 7 days. ADR-0212 reaps them only after re-proving at reap time that they have no own commits, a clean tracked tree, and no live-work signal. EMPTY worktrees younger than 7 days are still only surfaced.
 
 **Superseded by:** `ibl5/docs/decisions/0212-wt-gc-reap-stale-junk.md`
+
+## Addendum 2026-11-01: Archive-first reaping of safe classes
+
+The tick now removes six more classes of leftover state. Each removal is preceded by an archive, and each class has its own switch and age floor. ADR-0212 still governs the empty-worktree and stale-ref steps. This addendum extends them.
+
+| Class | Switch | Age var (default) | Archive |
+|---|---|---|---|
+| Merged worktree with dirt | `WT_GC_REAP_DIRTY_ARCHIVE` | `WT_GC_DIRTY_ARCHIVE_DAYS` (3, days since merge) | `refs/wt-gc-archive/<stamp>/wt/<name>` (dirt commit on the tip) |
+| Detached master snapshot | `WT_GC_REAP_DETACHED` | `WT_GC_DETACHED_DAYS` (3) | `refs/wt-gc-archive/<stamp>/wt/<name>` |
+| Closed-PR worktree, remote gone | `WT_GC_REAP_CLOSED` | `WT_GC_CLOSED_DAYS` (7, days since close) | `wt/<name>` plus `heads/<branch>` |
+| Stash on a gone branch or provably in master | `WT_GC_DROP_STASHES` | `WT_GC_STASH_DAYS` (7) | `refs/wt-gc-archive/<stamp>/stash/<sha>` |
+| Backup ref with no matching PR | `WT_GC_REF_FALLBACK` | `WT_GC_BACKUP_FALLBACK_DAYS` (14) | `refs/wt-gc-archive/<stamp>/heads/<branch>` |
+| Stopped `ibl5-*` container | `WT_GC_DOCKER_CONTAINERS` | `WT_GC_CONTAINER_DAYS` (14, days since exit) | `$WT_GC_TIPS_DIR/containers-<stamp>-<name>.json` |
+
+`<stamp>` is the tick's start time in epoch seconds. `WT_GC_ARCHIVE_PRUNE` drops archive refs and container JSON files older than `WT_GC_ARCHIVE_DAYS` (90). A stamp that does not parse is kept. The tips-*.txt files stay as the human-readable index.
+
+Restore:
+
+- List archives: `git for-each-ref refs/wt-gc-archive/ --format='%(refname) %(objectname)'`
+- Branch: `git branch <b> refs/wt-gc-archive/<stamp>/heads/<b>`
+- Other ref: `git update-ref refs/<rest> refs/wt-gc-archive/<stamp>/<rest>`
+- Worktree: `git worktree add ../<name>-restored refs/wt-gc-archive/<stamp>/wt/<name>`. If `git log -1 --format=%an` there prints `wt-gc`, the top commit holds the dirt, and `git reset --soft HEAD~1` returns it to the index.
+- Stash: `git stash store -m restored refs/wt-gc-archive/<stamp>/stash/<sha>`
+- Container: `bin/wt-up` recreates it. The JSON file records its config and mounts.
+
+Never removed: open-PR worktrees, nightly autostashes, protected names, and anything a live-work probe reports in use. A probe error is a keep. The stopped-container step and the image prune never touch docker volumes. The dirty, detached and closed-PR worktree reaps call `wt-remove <name> --volumes`, so they do drop that worktree's own docker volumes. The closed-PR reap skips only OPEN-PR rows. An UNPUSHED or STALLED worktree whose PR was closed is archived and removed once it passes the closed-PR checks. Other UNPUSHED and STALLED worktrees stay. Every switch accepts `0` to disable its class without touching the others.

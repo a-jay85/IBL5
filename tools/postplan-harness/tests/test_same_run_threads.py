@@ -149,6 +149,25 @@ def test_decline_resolves_with_reason_and_category_no_commit(tmp_path):
     assert lines[0]["basis"] == "already-fixed"
 
 
+def test_same_run_nit_thread_is_dispositioned(tmp_path):
+    finding = Finding(source="code-review", agent="A", path=PATH, line=41, body=BODY, score=85,
+                      label=LABEL_NIT)
+    nit = dict(_thread(222), body=render_body(finding, 1000))
+    gh = _gh(tmp_path, {"thread_ids": [111, 222], "trusted_threads": [nit]}, seed=())
+    gh.post_review_findings(PR, "deadbeef", "Code review", [finding])
+
+    def _no_commit(msg):
+        raise AssertionError("commit must not be called for a DECLINE")
+
+    result = _run(tmp_path, gh, _llm(DECLINE), commit=_no_commit)
+
+    assert result["found"] == 1
+    assert result["declined"] == 1
+    assert [t["commentId"] for t in result["threads"]] == [222]
+    assert result["threads"][0]["outcome"] == "declined"
+    assert len(_resolves(gh)) == 1
+
+
 def test_pre_existing_thread_is_not_a_same_run_candidate(tmp_path):
     gh = _gh(tmp_path, {"thread_ids": [111, 222], "trusted_threads": [_thread(111)]})
     llm = _llm(FIX)

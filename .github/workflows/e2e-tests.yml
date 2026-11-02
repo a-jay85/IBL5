@@ -3,7 +3,9 @@ name: E2E Tests
 on:
   pull_request:
     branches: [master]
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    # No `labeled`: a label run re-posted the required `E2E Tests` check and its gate
+    # passed on all-skipped needs (backlog#1707). update-baselines.yml owns the label.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [master]
     paths:
@@ -20,32 +22,42 @@ on:
       - '.github/workflows/e2e-tests.yml'
       - '.github/actions/setup-docker-e2e/**'
       - '.github/scripts/**'
-  # Refresh mode (see the VR refresh ADR): .github/workflows/vr-refresh.yml calls this
-  # workflow once per stale open visual PR. Only the `e2e` job does work in this mode.
+  # Two callers. Refresh mode (see the VR refresh ADR): .github/workflows/vr-refresh.yml
+  # calls this workflow once per stale open visual PR with all three inputs set. Only the
+  # `e2e` job does work in this mode. Regen mode: .github/workflows/update-baselines.yml
+  # calls it with no inputs on a `labeled` event for `update-baselines`. The caller's
+  # github context carries the label, so `github.event.action == 'labeled'` marks regen
+  # mode, and the `e2e` job's existing label expressions run the regen unchanged.
   workflow_call:
     inputs:
       refresh_pr:
         type: string
-        required: true
+        required: false
+        default: ''
       refresh_head_sha:
         type: string
-        required: true
+        required: false
+        default: ''
       refresh_base_sha:
         type: string
-        required: true
+        required: false
+        default: ''
 
 permissions:
   contents: read
   packages: read
 
 concurrency:
-  # A `labeled` event for any label other than `update-baselines` gets its own group so it
-  # can never cancel the real E2E run. post-plan adds the `post-plan-running` label right
-  # after its push; with one shared group, that label event would cancel the in-flight E2E
-  # run, and the labeled run itself skips the full suite.
+  # A label event must never cancel the real E2E run. post-plan adds the
+  # `post-plan-running` label right after its push; with one shared group, that label
+  # event would cancel the in-flight E2E run. This workflow no longer triggers on
+  # `labeled`, so no label event reaches this group directly. The update-baselines
+  # regen arrives through update-baselines.yml, where github.workflow is the caller's
+  # name, so its group can never match this workflow's real run. The per-label run_id
+  # suffix that kept other labels from cancelling the regen now lives in that caller.
   # Refresh mode appends a per-PR suffix: in a called workflow github.workflow and github.ref
   # are the caller's, so without it every matrix leg would share one group and cancel the rest.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id) || '' }}${{ inputs.refresh_pr && format('-vr-refresh-{0}', inputs.refresh_pr) || '' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ inputs.refresh_pr && format('-vr-refresh-{0}', inputs.refresh_pr) || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -1262,7 +1274,9 @@ jobs:
 
   gate:
     name: E2E Tests
-    if: always() && !inputs.refresh_pr
+    # Skipped in regen mode (a labeled event can only arrive via update-baselines.yml):
+    # the regen run must not write the CI memo, and its prefixed gate check adds nothing.
+    if: always() && !inputs.refresh_pr && github.event.action != 'labeled'
     needs: [changes, ci-memo-check, mirror-ready, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
     # The memo is written only here: after a clean aggregate, on a run that was a miss.

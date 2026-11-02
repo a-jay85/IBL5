@@ -1,0 +1,41 @@
+name: VR Baseline Regen
+
+# Runs the update-baselines regen (ADR-0214) when a human applies the
+# `update-baselines` label. It calls e2e-tests.yml as a reusable workflow, so the
+# regen and publish steps, their continue-on-error guards, and the CI_PAT push all
+# stay in one file, where ibl5/tests/ts-unit/vr-workflow-guard.test.ts guards them.
+# e2e-tests.yml must not trigger on `labeled`: a label run there re-posts the
+# required `E2E Tests` check, and its gate passes when every need is skipped, so
+# any label turned a red gate green (backlog#1707). Called jobs report as
+# `Update baselines / <job>`, so no check here can overwrite `E2E Tests` or
+# `Visual Regression`.
+on:
+  pull_request:
+    branches: [master]
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Any other label gets its own per-run group, so it can never cancel an in-flight
+  # regen. post-plan adds `post-plan-running` right after its push; with one shared
+  # group, that label event would cancel the regen. A re-applied update-baselines
+  # label does cancel the older regen. The prefix differs from the called workflow's
+  # group (github.workflow + github.ref), so caller and callee never share a group.
+  group: update-baselines-label-${{ github.ref }}${{ github.event.label.name != 'update-baselines' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  regen:
+    name: Update baselines
+    if: github.event.label.name == 'update-baselines'
+    # Union of every job-level permissions block in e2e-tests.yml (same reason as
+    # vr-refresh.yml): a missing scope fails the whole call at startup.
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      packages: write
+    uses: ./.github/workflows/e2e-tests.yml
+    secrets: inherit

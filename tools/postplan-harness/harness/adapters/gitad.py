@@ -1070,6 +1070,8 @@ class LiveGit:
         )
         from ..conflict_ladder import RUNG_REGEN, ladder_failure_reason
 
+        from .. import premerge
+
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
@@ -1082,7 +1084,14 @@ class LiveGit:
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
         self._pre_rebase_sha = pre_rebase_sha  # arm SIGTERM handler
-        pre_patch = self._run_bytes("diff", f"{master_sha}...HEAD")
+        # A SHA-bound manifest from bin/postplan-fix --headless marks HEAD as a merge the
+        # bot already committed. It applies only to that exact HEAD; any later commit
+        # drops it (the condition-(14) flag still holds the PR).
+        premerged = premerge.load(key)
+        if premerged is not None and premerged.sha != pre_rebase_sha:
+            premerged = None
+        pre_ref = premerged.pre_sha if premerged is not None else "HEAD"
+        pre_patch = self._run_bytes("diff", f"{master_sha}...{pre_ref}")
         if pre_patch.strip():
             Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
@@ -1090,6 +1099,26 @@ class LiveGit:
         purge_verdict_artifacts(key)
 
         proc = self._bounded((*_NO_RERERE, "merge", "--no-edit", base), errors="replace")
+        if premerged is not None:
+            # The ladder's review would cover only its own files and its --onto replay can
+            # drop the merge commit, so a pre-merged head never enters it. Fail closed.
+            if proc.returncode != 0:  # premerged-newer-master
+                self._bounded(("merge", "--abort"), errors="replace")
+                raise HarnessError(
+                    "rebase-conflict",
+                    "premerged head conflicts with a newer origin/master; "
+                    "rerun bin/postplan-fix --headless")
+            lostwork_path = self._load_lostwork(master_sha, key)
+            if lostwork_path is None:  # premerged-lostwork-missing
+                raise HarnessError(
+                    "rebase-conflict",
+                    "tree proof failed: lostwork.sh missing at origin/master")
+            ok, out = self._prove_tree_equivalent(lostwork_path, key)
+            if not ok:
+                raise HarnessError("rebase-conflict", out)
+            self._record_resolution(
+                key, branch, master_sha, premerged.files, proof_out=out)
+            return
         if proc.returncode != 0:
             conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
 

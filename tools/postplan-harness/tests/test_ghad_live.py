@@ -204,6 +204,17 @@ def test_summary_comment_renders_label_bug_class_and_instances(shim, tmp_path, d
     assert "bug class: `unbounded-fetch`" in prc[0]
     assert "`b.php:7`" in prc[0]
     assert "**Pre-existing**" in prc[0]
+    assert "<!-- label: pre-existing -->" in prc[0]
+    assert "<!-- score: 85 -->" in prc[0]
+
+
+def test_summary_lines_label_marker_defaults_to_important():
+    from harness.adapters.ghad import _summary_lines
+    lines = _summary_lines([
+        Finding("code-review", "A", "a.php", 1, "unset label", 90),
+        Finding("code-review", "A", "b.php", 2, "nit label", 70, label="nit")])
+    assert "<!-- label: important -->\n<!-- score: 90 -->" in lines[0]
+    assert "<!-- label: nit -->\n<!-- score: 70 -->" in lines[1]
 
 
 def test_recording_gh_records_label_and_rendered_body(tmp_path):

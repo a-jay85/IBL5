@@ -631,17 +631,18 @@ _gc_reap_detached_one() {
 
 # ── Step: stale refs ──────────────────────────────────────────────────────────
 # _gc_backup_merged_epoch <stem> — merge epoch of the PR the stem names.
-# Prints only digits on success; anything else is a keep.
+# Prints only digits on success; anything else is a keep. Returns 2 when gh
+# itself failed and 1 when gh answered with no merged PR.
 _gc_backup_merged_epoch() {
     local stem="$1" out
     if [[ "$stem" =~ ^p?[0-9]+$ ]]; then
         out="$("$WT_GC_GH" pr view "${stem#p}" --repo a-jay85/IBL5 --json state,mergedAt \
-            --jq 'select(.state=="MERGED") | .mergedAt | fromdateiso8601' 2>/dev/null)" || return 1
+            --jq 'select(.state=="MERGED") | .mergedAt | fromdateiso8601' 2>/dev/null)" || return 2
     else
         out="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$stem" --state all --limit 5 \
             --json state,mergedAt \
             --jq 'if length==1 then (.[0] | select(.state=="MERGED") | .mergedAt | fromdateiso8601) else empty end' \
-            2>/dev/null)" || return 1
+            2>/dev/null)" || return 2
     fi
     [[ "$out" =~ ^[0-9]+$ ]] || return 1
     printf '%s\n' "$out"
@@ -820,12 +821,45 @@ drop_orphan_stashes() {
     return "$rc"
 }
 
+# _gc_backup_shaped <branch-name> — 0 when the name looks like a backup: under
+# backup/, or ending in a pre-rebase / presquash style tail. Pure, no I/O.
+_gc_backup_shaped() {
+    local name="$1"
+    local re='-(pre-rebase|presquash|pre-squash|local-[0-9]{8}|backup-[0-9]{8})(-backup)?(-[0-9]{8})?$'
+    [[ "$name" == backup/* ]] && return 0
+    [[ "$name" =~ $re ]]
+}
+
+# _gc_backup_stem <branch-name> — the PR number or head-branch stem a backup
+# name points at. Pure, no I/O. Strips backup/, then up to 4 passes of the
+# first matching tail rule, then a trailing short sha.
+_gc_backup_stem() {
+    local s="${1#backup/}" pass=0
+    local re_a='^(.+)/[0-9]{8}-[0-9]{6}(-.+)?$'
+    local re_b='^(.+)-(pre-prep|pre-squash|pre-reset|pre-rebase)(-[0-9]{8})?$'
+    local re_c='^(.+)-(presquash|prep|backup|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$'
+    local re_d='^(.+)-[0-9]{8}$'
+    local re_sha='^(.*)-[0-9a-f]{7,40}$'
+    while [ "$pass" -lt 4 ]; do
+        pass=$((pass + 1))
+        if [[ "$s" =~ $re_a ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_b ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_c ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_d ]]; then s="${BASH_REMATCH[1]}"
+        else break
+        fi
+    done
+    if [[ "$s" =~ $re_sha ]]; then s="${BASH_REMATCH[1]}"; fi
+    printf '%s\n' "$s"
+}
+
 # ── Step: stale refs (reap) ───────────────────────────────────────────────────
 reap_stale_refs() {
     _gc_valid_days WT_GC_BACKUP_DAYS || return 1
     _gc_valid_days WT_GC_REF_DAYS || return 1
+    if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ]; then _gc_valid_days WT_GC_BACKUP_FALLBACK_DAYS || return 1; fi
     log "refs threshold backup=${WT_GC_BACKUP_DAYS}d other=${WT_GC_REF_DAYS}d"
-    local listing remotes remotes_ok=1 now line ref sha ct name stem rname merged
+    local listing remotes remotes_ok=1 now line ref sha ct name stem rname merged mrc ct_ok
     local doomed="" rc=0 checked_out branches_ok=1 known
     now="$(date +%s)"
     listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
@@ -848,21 +882,30 @@ reap_stale_refs() {
         case "$ref" in
             refs/heads/*)
                 name="${ref#refs/heads/}"
-                if [[ "$name" == backup/* ]] || [[ "$name" =~ -(pre-rebase|presquash|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$ ]]; then
-                    stem="${name#backup/}"
-                    if [[ "$stem" =~ ^(.*)-(pre-rebase|presquash|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$ ]]; then
-                        stem="${BASH_REMATCH[1]}"
-                    fi
-                    if [[ "$stem" =~ ^(.*)-[0-9a-f]{7,40}$ ]]; then
-                        stem="${BASH_REMATCH[1]}"
-                    fi
+                if _gc_backup_shaped "$name"; then
+                    stem="$(_gc_backup_stem "$name")"
                     if ! _gc_have "$WT_GC_GH"; then
                         log "ref keep $ref: gh not found ('$WT_GC_GH')"
                         rc=1
                         continue
                     fi
-                    if ! merged="$(_gc_backup_merged_epoch "$stem")"; then
-                        log "ref keep $ref: gh found no merged PR for '$stem'"
+                    mrc=0
+                    merged="$(_gc_backup_merged_epoch "$stem")" || mrc=$?
+                    if [ "$mrc" = 2 ]; then
+                        log "ref keep $ref: gh probe error for '$stem'"
+                        continue
+                    fi
+                    if [ "$mrc" = 1 ]; then
+                        # gh answered: no merged PR carries this name. An old
+                        # enough backup is still archived and reaped.
+                        case "$ct" in ''|*[!0-9]*) ct_ok=0 ;; *) ct_ok=1 ;; esac
+                        if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ] && [ "$ct_ok" = 1 ] \
+                            && [ $(( now - ct )) -ge $(( WT_GC_BACKUP_FALLBACK_DAYS * 86400 )) ]; then
+                            log "ref fallback $ref: no merged PR for '$stem', newest commit $(( (now - ct) / 86400 ))d old"
+                            doomed="${doomed}${sha} ${ref}"$'\n'
+                        else
+                            log "ref keep $ref: gh found no merged PR for '$stem'"
+                        fi
                         continue
                     fi
                     if [ $(( now - merged )) -lt $(( WT_GC_BACKUP_DAYS * 86400 )) ]; then

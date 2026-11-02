@@ -300,6 +300,7 @@ run_tick() {
         WT_GC_REAP_DETACHED=0
         WT_GC_REAP_CLOSED=0
         WT_GC_DROP_STASHES=0
+        WT_GC_REF_FALLBACK=0
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
@@ -1745,6 +1746,133 @@ rt "${ST_ON[@]}" WT_GC_STASH_DAYS= -- --force
 chk_rc ST11 1
 log_has "invalid WT_GC_STASH_DAYS ''" || note_err "no invalid-floor log"
 stash_has "$SHA" || note_err "stash dropped"
+finish_case
+
+# ── Backup-branch name grammar and no-PR age fallback ─────────────────────────
+RF_ON=(WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1 WT_GC_ARCHIVE_STAMP=1700000000)
+
+fx RS1-stem-table
+RS_BAD="$(
+    log() { :; }
+    # shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
+    source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
+    for pair in \
+        'backup/p2897-pre-squash|p2897' \
+        'backup/p3352-pre-squash-20261023|p3352' \
+        'backup/p2950-prep-20261026|p2950' \
+        'backup/p3367-prep-20261026|p3367' \
+        'backup/lighten-navy-palette-prep-20261026|lighten-navy-palette' \
+        'backup/snapshot-helpers-fail-on-missing-pre-prep-20261026|snapshot-helpers-fail-on-missing' \
+        'backup/vr-gallery-pages-artifact-size-prep-20261026|vr-gallery-pages-artifact-size' \
+        'backup/vr-rollup-splicebody-1362/20261027-143303-pre-rebase|vr-rollup-splicebody-1362' \
+        'jsb-native-docs-repo-local-backup-20260927|jsb-native-docs-repo-local' \
+        'pphfp-presquash-backup|pphfp' \
+        'rivalries-backup-20261029|rivalries' \
+        'backup/3267-pre-rebase|3267' \
+        'backup/prep|prep' \
+        'backup/p12x-pre-squash|p12x' \
+        'backup/20261027-143303-pre-rebase|20261027-143303'; do
+        got="$(_gc_backup_stem "${pair%%|*}")"
+        [ "$got" = "${pair##*|}" ] || printf 'stem %s -> %s (want %s)\n' "${pair%%|*}" "$got" "${pair##*|}"
+    done
+    for n in jsb-native-docs-repo-local-backup-20260927 pphfp-presquash-backup rivalries-backup-20261029 backup/x; do
+        _gc_backup_shaped "$n" || printf 'shaped %s should be 0\n' "$n"
+    done
+    for n in feature-prep-20261026 my-backup-plan presquash; do
+        if _gc_backup_shaped "$n"; then printf 'shaped %s should be 1\n' "$n"; fi
+    done
+)"
+[ -z "$RS_BAD" ] || note_err "grammar: $RS_BAD"
+finish_case
+
+fx RS2-unshaped-never-touched
+mk_ref refs/heads/feature-prep-20261026 30
+mk_ref refs/heads/my-backup-plan 30
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/feature-prep-20261026 || note_err "feature-prep deleted"
+has_ref refs/heads/my-backup-plan || note_err "my-backup-plan deleted"
+log_has 'feature-prep-20261026|my-backup-plan' && note_err "unshaped name was logged"
+finish_case
+
+fx RF1-fallback-reaps
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+rt "${RF_ON[@]}" -- --force
+chk_rc RF1 0
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 && note_err "ref still present"
+arch_has 1700000000/heads/backup/lighten-navy-palette-prep-20261026 || note_err "no archive ref"
+log_has 'ref fallback' || note_err "no fallback log"
+finish_case
+
+fx RF2-fallback-under-floor-keeps
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 10
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "young backup deleted"
+log_has 'gh found no merged PR' || note_err "no keep log"
+finish_case
+
+fx RF3-gh-outage-no-fallback
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+rt "${RF_ON[@]}" STUB_GH_FAIL=1 -- --force
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "backup deleted during gh outage"
+log_has 'gh probe error' || note_err "no probe-error log"
+finish_case
+
+fx RF4-pnnnn-pr-number
+mk_ref refs/heads/backup/p2897-pre-squash 1
+epoch_ago 8 > "$CD/gh/2897.json"
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/backup/p2897-pre-squash && note_err "ref still present"
+log_has 'ref fallback' && note_err "reaped through the fallback, not the PR"
+grep -qF 'pr view 2897' "$CD/gh-argv" 2>/dev/null || note_err "gh not asked for PR 2897"
+finish_case
+
+fx RF5-slash-date-stem
+mk_ref refs/heads/backup/vr-rollup-splicebody-1362/20261027-143303-pre-rebase 1
+epoch_ago 8 > "$CD/gh/by-head/vr-rollup-splicebody-1362.json"
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/backup/vr-rollup-splicebody-1362/20261027-143303-pre-rebase && note_err "ref still present"
+grep -qF -- '--head vr-rollup-splicebody-1362' "$CD/gh-argv" 2>/dev/null || note_err "gh not asked for the head stem"
+finish_case
+
+fx RF6-presquash-backup-fallback
+mk_ref refs/heads/pphfp-presquash-backup 20
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/pphfp-presquash-backup && note_err "ref still present"
+finish_case
+
+fx RF7-fallback-off-keeps
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+rt "${RF_ON[@]}" WT_GC_REF_FALLBACK=0 -- --force
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "deleted with fallback off"
+finish_case
+
+fx RF8-checked-out-keeps
+mk_wt rf8 backup/rf8-prep-20261001 age_days=20
+rt "${RF_ON[@]}" -- --force
+has_branch backup/rf8-prep-20261001 || note_err "checked-out backup branch deleted"
+finish_case
+
+fx RF9-matched-young-pr-keeps
+mk_ref refs/heads/backup/p3000-prep-20261001 20
+epoch_ago 3 > "$CD/gh/3000.json"
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/backup/p3000-prep-20261001 || note_err "young-PR backup deleted"
+log_has 'PR merged <7d ago' || note_err "no young-PR keep log"
+finish_case
+
+fx RF10-dry-run
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+rt "${RF_ON[@]}" -- --dry-run --force
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "deleted in dry-run"
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written in dry-run"
+finish_case
+
+fx RF11-empty-floor-invalid
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+rt "${RF_ON[@]}" WT_GC_BACKUP_FALLBACK_DAYS= -- --force
+chk_rc RF11 1
+log_has "invalid WT_GC_BACKUP_FALLBACK_DAYS ''" || note_err "no invalid-floor log"
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "ref deleted"
 finish_case
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────

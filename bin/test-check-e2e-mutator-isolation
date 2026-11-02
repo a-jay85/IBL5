@@ -125,4 +125,43 @@ put_spec "$dir" 'schedule-leaker.spec.ts' "await runUpdater(page);"
 run_check "$CFG_ML" "$dir"
 expect "multi-line allowlist: unlisted firing spec fails" 1 "$RC"
 
+
+# Cases 9-10: a bracket-less `testMatch: /x\.setup\.ts$/,` (the setup project)
+# precedes the arrays. It must not start a collection that runs into chromium's
+# testIgnore (which also names updater-awards + an extra spec), so the real
+# mutators allowlist is still found and the extra spec is NOT allowlisted.
+CFG_BL="$TMP/playwright.bracketless.config.ts"
+cat > "$CFG_BL" <<'EOF'
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /auth(-regular)?\.setup\.ts$/,
+    },
+    {
+      name: 'chromium',
+      testIgnore: [
+        /updater-awards\.spec\.ts$/,
+        /admin-pages\.spec\.ts$/,
+        /extra-leaker\.spec\.ts$/,
+      ],
+    },
+    {
+      name: 'mutators',
+      testMatch: [
+        /updater-awards\.spec\.ts$/,
+        /admin-pages\.spec\.ts$/,
+      ],
+    },
+  ],
+EOF
+dir=$(fresh_specs)
+put_spec "$dir" 'admin-pages.spec.ts' "await triggerUpdater(request);"
+run_check "$CFG_BL" "$dir"
+expect "bracket-less testMatch: listed firing spec passes" 0 "$RC"
+
+dir=$(fresh_specs)
+put_spec "$dir" 'extra-leaker.spec.ts' "await runUpdater(page);"
+run_check "$CFG_BL" "$dir"
+expect "bracket-less testMatch: testIgnore-only spec still fails" 1 "$RC"
+
 h_done

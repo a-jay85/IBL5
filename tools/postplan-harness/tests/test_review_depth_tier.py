@@ -151,6 +151,8 @@ def test_deep_models():
 
 @pytest.mark.parametrize("depth", ["standard", "deep"])
 def test_verifier_runs_on_opus_at_both_depths(depth):
+    """Runs as test_verifier_runs_on_opus_at_both_depths[standard] and
+    test_verifier_runs_on_opus_at_both_depths[deep]; every verifier seat must run on opus."""
     models = _models_for(depth)
     assert set(VERIFIER_PURPOSES) <= set(models)
     assert {models[p] for p in VERIFIER_PURPOSES} == {"opus"}

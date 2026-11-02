@@ -375,7 +375,7 @@ checks_json success success success > "$FIX/checks-$(printf '%040d' 17).json"
 { pr_json 16 CLEAN "$BODY_CLEAR"; pr_json 17 CLEAN "$BODY_CLEAR"; } | jq -s . > "$FIX/prs.json"
 run_triage "$FIX" --arm
 assert_match  "C16 paused worktree -> PAUSED"       "^PAUSED$"                                  "$(row_bucket "$OUT" 16)"
-assert_match  "C16 action names the usage gate"     "none . post-plan paused by usage gate"     "$(row_action "$OUT" 16)"
+assert_match  "C16 action names the usage gate"     "none — post-plan paused by usage gate"     "$(row_action "$OUT" 16)"
 assert_absent "C16 --arm never merges the paused PR" "^pr merge 16 "                            "$(cat "$FIX/calls.log")"
 assert_match  "C17 other worktree stays ARMABLE"    "^ARMABLE$"                                 "$(row_bucket "$OUT" 17)"
 assert_match  "C17 the unpaused PR is armed"        "^pr merge 17 --squash --auto$"             "$(cat "$FIX/calls.log")"

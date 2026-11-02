@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# test-plan-tier-hint — behavioural harness for the advisory architect-tier
-# pre-check, plus the static drift assertions that keep the five copies of the
-# /plan Step 3 check-1 trigger in agreement.
+# test-plan-tier-hint — behavioural harness for the judge-backed architect-tier
+# hint, plus the static drift assertions that keep the copies of the /plan
+# Step 3 check-1 trigger in agreement.
 #
-# The fixture table pins the decision procedure: a gate path alone never
-# escalates, a gate path plus a weakening verb does, and directory membership is
-# never the trigger. The negative/boundary rows are the ones that go red if the
-# implementation regresses to directory-led matching — do not drop them.
+# Every behavioural case drives a stub judge through PLAN_TIER_HINT_CLAUDE (or
+# a fake `claude` on PATH). The harness never calls a real model: CI is exported
+# so a case that forgets the seam hits the hint's CI guard instead.
 #
 # Run: bin/test-plan-tier-hint  (exit 0 = all pass, 1 = a case failed)
 
@@ -21,10 +20,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # PLAN_TIER_HINT overrides the script under test (mutation check runs master's copy).
 HINT="${PLAN_TIER_HINT:-$SCRIPT_DIR/plan-tier-hint}"
+# Any case that forgets the stub seam hits the CI guard instead of a paid model
+# call. Cases that need CI unset use `env -u CI` and a fake claude on PATH.
+export CI=1
 h_tmp BASE_TMP
 
 OUT="$BASE_TMP/out"
 ERR="$BASE_TMP/err"
+TAB="$(printf '\t')"
 
 expect_eq() { h_eq "$1" "$2" "$3"; } # name want got
 
@@ -62,136 +65,299 @@ assert_absent() { # name file literal
     fi
 }
 
-echo "== fixture table =="
+expect_absent_file() { # name path
+    if [ -e "$2" ]; then
+        h_fail "$1" "$2 exists (the judge was invoked)"
+    else
+        h_pass "$1"
+    fi
+}
 
-# 1 — prose-only skill edit does not escalate
-expect_eq "1 prose-only skill edit" "default" \
-    "$("$HINT" --desc 'prose-only edit to .claude/skills/plan/SKILL.md — rewording the authoring guidance, decision procedure preserved')"
+expect_present_file() { # name path
+    if [ -e "$2" ]; then
+        h_pass "$1"
+    else
+        h_fail "$1" "$2 is missing (the judge was never invoked)"
+    fi
+}
 
-# 2 — gate-condition removal, described in prose only
-expect_eq "2 gate-condition removal in prose" "xhigh" \
-    "$("$HINT" --desc 'remove the bin/check-plan gate condition that rejects plans over 500 lines')"
+# env_json <result-text> [jq-update] — a judge envelope, JSON-escaped by jq.
+env_json() {
+    jq -cn --arg r "$1" '{type:"result",is_error:false,result:$r}' | jq -c "${2:-.}"
+}
 
-# 3 — security surface unchanged
-expect_eq "3 security surface" "xhigh" \
-    "$("$HINT" --desc 'add authorization checks to the admin trade-approval endpoint')"
+# mk_judge <name> <exit-code> <stdout-text> — writes $BASE_TMP/judge-<name>.
+mk_judge() {
+    local f="$BASE_TMP/judge-$1"
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf 'printf "%%s\\n" %q\n' "$3"
+        printf 'exit %s\n' "$2"
+    } >"$f"
+    chmod +x "$f"
+}
 
-# 4 — destructive migration unchanged
-expect_eq "4 destructive migration" "xhigh" \
-    "$("$HINT" --desc 'migration that will drop column retired and backfill it')"
+# mk_recorder — a judge that records it ran, its argv, and its cwd, then
+# answers a valid default envelope.
+mk_recorder() {
+    local f="$BASE_TMP/judge-rec"
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf ': >%q\n' "$BASE_TMP/called"
+        printf 'printf "%%s\\n" "$@" >%q\n' "$BASE_TMP/argv"
+        printf 'pwd >%q\n' "$BASE_TMP/cwd"
+        printf 'printf "%%s\\n" %q\n' "$(env_json "$(printf 'default\nrecorded')")"
+    } >"$f"
+    chmod +x "$f"
+}
 
-# 5 — bootstrap hazard
-expect_eq "5 bootstrap hazard" "xhigh" \
-    "$("$HINT" --desc 'change the Phase 6.5 arming condition so digest-bearing PRs auto-merge')"
+reset_recorder() { rm -f "$BASE_TMP/called" "$BASE_TMP/argv" "$BASE_TMP/cwd"; }
 
-# 6 — recipe-backed downgrade
-expect_eq "6 recipe-backed downgrade" "sonnet" \
-    "$("$HINT" --desc 'recipe-backed marker swap: apply the explicit recipe, copying the existing pattern in the same file')"
+# run_hint <judge-path> [hint args...] — sets RC; output in $OUT, stderr in $ERR.
+run_hint() {
+    local j="$1"; shift
+    PLAN_TIER_HINT_CLAUDE="$j" "$HINT" "$@" </dev/null >"$OUT" 2>"$ERR"
+    RC=$?
+}
 
-# 7 — precedence: check 1 outranks check 2
-expect_eq "7 check 1 outranks check 2" "xhigh" \
-    "$("$HINT" --desc 'recipe-backed: remove the bin/check-plan gate condition, copying the existing pattern')"
+# arg_after <flag> — the argv line after <flag> in the recorder log, bracketed
+# so an empty value reads as [] and a missing one as nothing.
+arg_after() {
+    awk -v k="$1" 'f == 1 { printf "[%s]", $0; f = 2 } f == 0 && $0 == k { f = 1 }' "$BASE_TMP/argv"
+}
 
-# 8 — additive gate: a gate path with no weakening verb is NOT a trigger
-expect_eq "8 additive gate" "default" \
-    "$("$HINT" --desc 'add a new bin/check-actions-pinned gate that rejects unpinned actions')"
+mk_recorder
 
-# 9 — directory alone is never the trigger
-expect_eq "9 rules path, no weakening" "default" \
-    "$("$HINT" --files .claude/rules/core-coding.md --desc 'reword a rule for clarity')"
-
-# 10 — --files and --desc share one haystack
-expect_eq "10 files and desc share one haystack" "xhigh" \
-    "$("$HINT" --files bin/check-plan --desc 'relax the phase-count limit')"
-
-# 11 — a non-gate bin/ path does not escalate
-expect_eq "11 non-gate bin path" "default" \
-    "$("$HINT" --files bin/wt-new --desc 'add a --base flag')"
-
-# 12 — bare-auth regression guard
-expect_eq "12 authoring is not an auth keyword" "default" \
-    "$("$HINT" --desc 'authoring a new ADR about plan authorship')"
-
-# 13 — stdin is equivalent to --desc
-expect_eq "13 description on stdin" "xhigh" \
-    "$(printf 'remove the bin/check-plan gate condition' | "$HINT")"
-
-# 14 — --explain names a non-empty reason after a TAB
-TAB="$(printf '\t')"
-"$HINT" --desc 'remove the bin/check-plan gate condition' --explain > "$OUT" 2>"$ERR"
-expect_match "14 explain emits tier TAB reason" "^xhigh${TAB}.+" "$OUT"
-
-# 15 — empty input fails loudly, never silently defaults
-"$HINT" > "$OUT" 2>"$ERR" </dev/null
-expect_exit "15 empty input exits 2" 2 "$?"
-expect_eq "15 empty input prints nothing on stdout" "" "$(cat "$OUT")"
-expect_match "15 empty input prints usage on stderr" '^Usage:' "$ERR"
-
-echo
-echo "== audited task lines, 2026-10-18..24 xhigh routing audit =="
-
-# 16 — class H1 (audit row 13): additive gate, 'deleted' is an adjective
-expect_eq "16 audit row 13 additive gate with deleted symbol" "default" \
-    "$("$HINT" --desc 'Add a /plan rule and an additive bin/check-plan gate requiring Verification Matrix rows that assert a deleted symbol stays absent to point at an in-repo test or CI-wired bin/check-* script instead of a plan-only CLI command')"
-
-# 17 — class H2 (audit row 02): escape names an existing defense on a pinned split
-expect_eq "17 audit row 02 pinned split with escaped output" "default" \
-    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into a cash-collection helper and one table-driven row builder, after pinning its HTML-escaped label output.')"
-
-# 18 — class D1 (audit row 01): already default; pins that it stays there
-expect_eq "18 audit row 01 byte-pinned rendering split" "default" \
-    "$("$HINT" --desc 'Split TeamTableService::getTableOutput into roster, starters and view-wrapper helpers after pinning its tab and dropdown wrapper output byte-for-byte.')"
-
-# 19 — class D1 (audit row 29): already default; pins that it stays there
-expect_eq "19 audit row 29 characterization-pinned table-drive" "default" \
-    "$("$HINT" --desc 'Pin FreeAgencyProcessor::parseOfferData for every offer type with characterization tests, then table-drive its offer1-6 ladder.')"
-
-# 20-24 — boundary: the H1/H2 carve-outs must not swallow a real trigger
-expect_eq "20 additive gate plus a real removal stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Add an additive bin/check-plan gate and remove the 500-line condition')"
-expect_eq "21 additive gate plus relax on a deleted row stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Add an additive bin/check-plan gate and relax the deleted-row check')"
-expect_eq "22 row 02 line plus authorization stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into helpers after pinning its HTML-escaped label output, and add an authorization check')"
-expect_eq "23 escape fix with no pin stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'fix the missing HTML escape on the player bio output')"
-expect_eq "24 pinned split that fixes unescaped output stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split PlayerBioRenderer::render after pinning its output byte-for-byte, and fix the unescaped player names')"
-
-# 25-26 — audited true triggers keep firing
-expect_eq "25 audit row 15 auth-gated POST stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Tighten authorization on the auth-gated draft selection POST endpoint so only the team owning the on-the-clock pick can submit, and rename the misnamed `wildCards` in ProjectedDraftOrder.')"
-expect_eq "26 audit row 22 gate weakening stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Weaken the required All checks settled merge gate (bin/check-pr-checks-green V4 condition) so a ghost workflow run whose jobs all completed no longer holds it')"
-
-expect_eq "26b pinned split that drops the escaping stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split TradeRosterPreviewCashRowBuilder::buildCashRows into helpers after pinning its output, and drop the HTML escape on labels')"
-expect_eq "26c pinned split rendering without escaping stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split PlayerBioRenderer::render after pinning its output, and render names without escaping')"
-expect_eq "26d pinned split that adds escaping stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and escape the raw team names')"
-expect_eq "26e pinned split that HTML-escapes new output stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split PlayerBioRenderer::render into helpers after pinning its output byte-for-byte, and HTML-escape the raw team names')"
-# 27 — PIN_RE conjunct: escape on a split with no pin stays xhigh
-expect_eq "27 escape on an unpinned split stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split the player bio renderer into helpers and escape the team name')"
-# 27b — NEGATED_PIN_RE: "unpinned" and "without characterization" are no pin
-expect_eq "27b unpinned split with escaped output stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split the unpinned PlayerBioRenderer::render, whose output is HTML-escaped, into helpers')"
-expect_eq "27c split without characterization tests stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Split X into helpers without characterization tests; its labels are escaped')"
-# 28 — RESTRUCTURE_RE conjunct: pinned escape change with no restructure stays xhigh
-expect_eq "28 pinned escape change with no restructure stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Escape the team name in the player bio output after pinning its current output')"
-# 29b — passive-voice removal is a real weakening, not an adjective
-expect_eq "29b additive gate plus passive removal stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'Add an additive bin/check-plan gate; the 500-line condition gets removed')"
-# 29 — ADDITIVE_RE conjunct: a participle weakening without the additive marker stays xhigh
-expect_eq "29 participle weakening without additive stays xhigh" "xhigh" \
-    "$("$HINT" --desc 'make bin/check-plan stop failing plans whose rows cite removed files')"
+echo "== J1 verdict passthrough =="
+for v in xhigh default sonnet; do
+    mk_judge "pass-$v" 0 "$(env_json "$(printf '%s\nreason for %s' "$v" "$v")")"
+    run_hint "$BASE_TMP/judge-pass-$v" --desc 'some task'
+    expect_eq "J1 $v passes through" "$v" "$(cat "$OUT")"
+    expect_exit "J1 $v exits 0" 0 "$RC"
+done
 
 echo
-echo "== static drift assertions (five copies of the trigger) =="
+echo "== J2 --explain format =="
+mk_judge explain 0 "$(env_json "$(printf 'default\nadditive gate, check 3')")"
+run_hint "$BASE_TMP/judge-explain" --explain --desc 'some task'
+expect_eq "J2 explain prints verdict TAB reason" "default${TAB}additive gate, check 3" "$(cat "$OUT")"
+expect_eq "J2 explain is one line" "1" "$(awk 'END { print NR }' "$OUT")"
+mk_judge explain-tab 0 "$(env_json "$(printf 'default\nleft\tright')")"
+run_hint "$BASE_TMP/judge-explain-tab" --explain --desc 'some task'
+expect_eq "J2 TAB in reason becomes a space" "default${TAB}left right" "$(cat "$OUT")"
+expect_eq "J2 explain line holds exactly one TAB" "2" "$(awk -F'\t' '{ print NF }' "$OUT")"
+
+echo
+echo "== J3 no input and usage errors never call the judge =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec"
+expect_exit "J3 no input exits 2" 2 "$RC"
+expect_absent_file "J3 no input: judge not called" "$BASE_TMP/called"
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --bogus
+expect_exit "J3 --bogus exits 2" 2 "$RC"
+expect_absent_file "J3 --bogus: judge not called" "$BASE_TMP/called"
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --files
+expect_exit "J3 bare --files exits 2" 2 "$RC"
+expect_absent_file "J3 bare --files: judge not called" "$BASE_TMP/called"
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --help
+expect_exit "J3 --help exits 0" 0 "$RC"
+expect_absent_file "J3 --help: judge not called" "$BASE_TMP/called"
+
+echo
+echo "== J4 timeout =="
+printf '#!/usr/bin/env bash\nexec sleep 30\n' >"$BASE_TMP/judge-slow"
+chmod +x "$BASE_TMP/judge-slow"
+T0=$SECONDS
+PLAN_TIER_HINT_TIMEOUT=1 run_hint "$BASE_TMP/judge-slow" --explain --desc 'some task'
+ELAPSED=$((SECONDS - T0))
+expect_exit "J4 timeout exits 0" 0 "$RC"
+expect_match "J4 timeout gives xhigh naming the timeout" \
+    "^xhigh${TAB}judge-failsafe: judge timed out after 1s" "$OUT"
+if [ "$ELAPSED" -lt 10 ]; then
+    h_pass "J4 timeout returns in under 10s (${ELAPSED}s)"
+else
+    h_fail "J4 timeout returns in under 10s" "took ${ELAPSED}s"
+fi
+
+echo
+echo "== J5 timeout env fallback =="
+{
+    printf '#!/usr/bin/env bash\nsleep 2\n'
+    printf 'printf "%%s\\n" %q\n' "$(env_json "$(printf 'default\nslow but fine')")"
+} >"$BASE_TMP/judge-2s"
+chmod +x "$BASE_TMP/judge-2s"
+for t in 0 abc ''; do
+    PLAN_TIER_HINT_TIMEOUT="$t" run_hint "$BASE_TMP/judge-2s" --desc 'some task'
+    expect_eq "J5 PLAN_TIER_HINT_TIMEOUT=[$t] falls back to 120s" "default" "$(cat "$OUT")"
+done
+
+echo
+echo "== J6 strict parse rejects near misses =="
+J6_I=0
+for txt in \
+    "$(printf '**default**\nreason')" \
+    "$(printf 'Default\nreason')" \
+    "$(printf 'default sonnet\nreason')" \
+    "$(printf 'default.\nreason')" \
+    "$(printf 'The verdict is default\nreason')" \
+    "default" \
+    "$(printf 'default\nreason\na third line')" \
+    "$(printf '\ndefault\nreason')"; do
+    J6_I=$((J6_I + 1))
+    mk_judge "near-$J6_I" 0 "$(env_json "$txt")"
+    run_hint "$BASE_TMP/judge-near-$J6_I" --explain --desc 'some task'
+    expect_match "J6.$J6_I near miss [$(printf '%s' "$txt" | tr '\n' '|')] gives xhigh unparseable" \
+        "^xhigh${TAB}judge-failsafe: judge output unparseable" "$OUT"
+done
+
+echo
+echo "== J7 strict parse tolerates whitespace =="
+# $(...) strips trailing newlines, so jq appends the two blank lines itself.
+mk_judge trail 0 "$(env_json "$(printf 'default\nreason')" '.result += "\n\n\n"')"
+run_hint "$BASE_TMP/judge-trail" --desc 'some task'
+expect_eq "J7 trailing blank lines still give default" "default" "$(cat "$OUT")"
+mk_judge cr 0 "$(env_json "$(printf '  default  \r\nreason')")"
+run_hint "$BASE_TMP/judge-cr" --desc 'some task'
+expect_eq "J7 CR-terminated padded default gives default" "default" "$(cat "$OUT")"
+
+echo
+echo "== J8 envelope failures =="
+GOOD="$(printf 'default\nreason')"
+mk_judge env-nonjson 0 "this is not json"
+mk_judge env-iserror 0 "$(env_json "$GOOD" '.is_error = true')"
+mk_judge env-maxtok 0 "$(env_json "$GOOD" '.stop_reason = "max_tokens"')"
+mk_judge env-noresult 0 "$(env_json "$GOOD" 'del(.result)')"
+for k in nonjson iserror maxtok noresult; do
+    run_hint "$BASE_TMP/judge-env-$k" --explain --desc 'some task'
+    expect_match "J8 $k envelope gives xhigh unusable" \
+        "^xhigh${TAB}judge-failsafe: judge envelope unusable" "$OUT"
+done
+
+echo
+echo "== J9 non-zero judge exit =="
+mk_judge exit3 3 "$(env_json "$GOOD")"
+run_hint "$BASE_TMP/judge-exit3" --explain --desc 'some task'
+expect_exit "J9 hint still exits 0" 0 "$RC"
+expect_match "J9 exit 3 gives xhigh naming the exit" \
+    "^xhigh${TAB}judge-failsafe: judge exited 3" "$OUT"
+
+echo
+echo "== J10 CI guard =="
+mkdir -p "$BASE_TMP/fakebin"
+{
+    printf '#!/usr/bin/env bash\n'
+    printf ': >%q\n' "$BASE_TMP/fake-called"
+    printf 'printf "%%s\\n" %q\n' "$(env_json "$GOOD")"
+} >"$BASE_TMP/fakebin/claude"
+chmod +x "$BASE_TMP/fakebin/claude"
+FAKEPATH="$BASE_TMP/fakebin:$PATH"
+
+rm -f "$BASE_TMP/fake-called"
+env -u PLAN_TIER_HINT_CLAUDE CI=1 PATH="$FAKEPATH" \
+    "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+expect_match "J10a CI=1, seam unset: xhigh naming the CI guard" "^xhigh${TAB}judge-failsafe: CI guard" "$OUT"
+expect_absent_file "J10a fake claude never ran" "$BASE_TMP/fake-called"
+
+rm -f "$BASE_TMP/fake-called"
+env CI=1 PLAN_TIER_HINT_CLAUDE= PATH="$FAKEPATH" \
+    "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+expect_match "J10b CI=1, empty seam counts as unset" "^xhigh${TAB}judge-failsafe: CI guard" "$OUT"
+expect_absent_file "J10b fake claude never ran" "$BASE_TMP/fake-called"
+
+rm -f "$BASE_TMP/fake-called"
+env -u CI -u PLAN_TIER_HINT_CLAUDE PATH="$FAKEPATH" \
+    "$HINT" --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+expect_eq "J10c CI unset reaches the real-binary path" "default" "$(cat "$OUT")"
+expect_present_file "J10c fake claude ran" "$BASE_TMP/fake-called"
+
+rm -f "$BASE_TMP/fake-called"
+env -u PLAN_TIER_HINT_CLAUDE CI= PATH="$FAKEPATH" \
+    "$HINT" --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+expect_eq "J10d empty CI counts as unset" "default" "$(cat "$OUT")"
+expect_present_file "J10d fake claude ran" "$BASE_TMP/fake-called"
+
+echo
+echo "== J11 claude missing =="
+if [ -e /usr/bin/claude ] || [ -e /bin/claude ]; then
+    echo "SKIP: J11 needs a PATH with no claude, but /usr/bin or /bin holds one"
+    h_skip "J11 claude missing"
+else
+    mkdir -p "$BASE_TMP/emptybin"
+    env -u CI -u PLAN_TIER_HINT_CLAUDE PATH="$BASE_TMP/emptybin:/usr/bin:/bin" \
+        "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+    expect_match "J11 no claude on PATH: xhigh naming the missing CLI" \
+        "^xhigh${TAB}judge-failsafe: claude CLI not found" "$OUT"
+fi
+
+echo
+echo "== J12 SKILL.md anchors =="
+REAL_SKILL="$ROOT/.claude/skills/plan/SKILL.md"
+grep -vF '1. **`plan-architect-xhigh`' "$REAL_SKILL" >"$BASE_TMP/skill-nostart.md"
+grep -vF 'For **every** tier,' "$REAL_SKILL" >"$BASE_TMP/skill-noend.md"
+for c in a:nostart b:noend; do
+    reset_recorder
+    PLAN_TIER_HINT_SKILL="$BASE_TMP/skill-${c#*:}.md" run_hint "$BASE_TMP/judge-rec" --explain --desc 'some task'
+    expect_match "J12${c%%:*} skill without the ${c#*:} anchor: xhigh naming the anchors" \
+        "^xhigh${TAB}judge-failsafe: Step 3 check-list anchors not found" "$OUT"
+    expect_absent_file "J12${c%%:*} judge not called" "$BASE_TMP/called"
+done
+reset_recorder
+PLAN_TIER_HINT_SKILL="$BASE_TMP/missing.md" run_hint "$BASE_TMP/judge-rec" --explain --desc 'some task'
+expect_match "J12c unreadable SKILL.md: xhigh naming the read failure" \
+    "^xhigh${TAB}judge-failsafe: cannot read SKILL.md" "$OUT"
+expect_absent_file "J12c judge not called" "$BASE_TMP/called"
+reset_recorder
+PLAN_TIER_HINT_SKILL='' run_hint "$BASE_TMP/judge-rec" --desc 'some task'
+expect_eq "J12d empty PLAN_TIER_HINT_SKILL uses the repo SKILL.md" "default" "$(cat "$OUT")"
+expect_present_file "J12d judge called" "$BASE_TMP/called"
+
+echo
+echo "== J13 judge call contract =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --desc 'Drop the human signoff floor' --files 'bin/a,bin/b'
+expect_eq "J13 --model is claude-opus-5-5" "[claude-opus-5-5]" "$(arg_after --model)"
+expect_eq "J13 --effort is high" "[high]" "$(arg_after --effort)"
+expect_eq "J13 --output-format is json" "[json]" "$(arg_after --output-format)"
+expect_eq "J13 --allowedTools carries an empty value" "[]" "$(arg_after --allowedTools)"
+if grep -qxF -- '--dangerously-skip-permissions' "$BASE_TMP/argv"; then
+    h_fail "J13 no --dangerously-skip-permissions" "the judge argv carries it"
+else
+    h_pass "J13 no --dangerously-skip-permissions"
+fi
+for t in 'previously rejected now passes' 'plan-architect-sonnet'; do
+    if grep -qF -- "$t" "$BASE_TMP/argv"; then
+        h_pass "J13 prompt carries the check text [$t]"
+    else
+        h_fail "J13 prompt carries the check text [$t]" "extraction did not reach the judge"
+    fi
+done
+for t in 'Never delegate' 'last_verified:'; do
+    if grep -qF -- "$t" "$BASE_TMP/argv"; then
+        h_fail "J13 prompt lacks text outside the anchors [$t]" "extraction ran past the end anchor"
+    else
+        h_pass "J13 prompt lacks text outside the anchors [$t]"
+    fi
+done
+TASK_HITS="$(awk '
+    /^<task-/ { inside = 1; next }
+    /^<\/task-/ { inside = 0; next }
+    inside && /Drop the human signoff floor/ { d = 1 }
+    inside && $0 == "bin/a" { a = 1 }
+    inside && $0 == "bin/b" { b = 1 }
+    END { printf "%d%d%d", d, a, b }
+' "$BASE_TMP/argv")"
+expect_eq "J13 description and one-per-line paths sit inside the task tags" "111" "$TASK_HITS"
+JUDGE_CWD="$(cat "$BASE_TMP/cwd" 2>/dev/null)"
+case "$JUDGE_CWD" in
+    "$ROOT"*|'') h_fail "J13 judge runs outside the repo root" "cwd was [$JUDGE_CWD]" ;;
+    *) h_pass "J13 judge runs outside the repo root" ;;
+esac
+
+echo
+echo "== static drift assertions =="
 
 assert_contains "canonical states the behavioural test" \
     '.claude/skills/plan/SKILL.md' 'previously rejected now passes'
@@ -205,12 +371,28 @@ assert_contains "plan-prompt points at the canonical check" \
     '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
 assert_contains "agent def carries the directory clause" \
     '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
-# Bash 3.2 guard (macOS /bin/bash): the hint lowercases with tr, never with ${HAY,,}.
-assert_absent "hint avoids the Bash-4 lowercase expansion" \
-    'bin/plan-tier-hint' '${HAY,,}'
+# Bash 3.2 guard (macOS /bin/bash): no case-modification expansion in the hint.
+assert_absent "hint avoids Bash-4 lowercase expansion" \
+    'bin/plan-tier-hint' ',,}'
+assert_absent "hint avoids Bash-4 uppercase expansion" \
+    'bin/plan-tier-hint' '^^}'
 assert_contains "canonical carries the pinned-restructure carve-out" \
     '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
 assert_contains "plan-prompt points at the pinned-restructure carve-out" \
     '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
+
+# The hint extracts the judge's check list between these anchors. A SKILL.md
+# edit that moves one fails here before it can empty the judge prompt.
+assert_contains "SKILL.md keeps the check-1 start anchor" \
+    '.claude/skills/plan/SKILL.md' '1. **`plan-architect-xhigh`'
+assert_contains "SKILL.md keeps the check-2 anchor" \
+    '.claude/skills/plan/SKILL.md' '2. **`plan-architect-sonnet`'
+assert_contains "SKILL.md keeps the end anchor" \
+    '.claude/skills/plan/SKILL.md' 'For **every** tier,'
+
+# No regex survives as a vote of any kind.
+for re in WEAKEN_RE GATE_RE SECURITY_RE; do
+    assert_absent "hint holds no regex vote ($re)" 'bin/plan-tier-hint' "$re"
+done
 
 h_done

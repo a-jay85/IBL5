@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-28
+last_verified: 2026-11-02
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -34,7 +34,7 @@ branch; it survives you closing Claude Code. Engine selection:
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
   refusal), a **usage limit** (`llm-usage-limit`),
   an **expired login** (`llm-auth-expired`), and a **hung step**: `subprocess-timeout` (a
-  bounded step, including every harness `git` call, past its timeout) or `precommit-hang`
+  bounded step, including every git call made through `_run`, `_run_out` and `_run_bytes`, past its timeout) or `precommit-hang`
   (`bin/pre-commit-hook` past 300 s). The `RESULT:` line names the step. When
   `bin/post-plan-fleet`'s 90-minute timeout fires, its DM names the last step started.
   A skill re-run would hit the same wall, so the run stops for a human. After a usage limit,

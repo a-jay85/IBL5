@@ -495,7 +495,7 @@ usage_fetch() {
             reason="rate-limited"
         elif [ -n "$status" ] && [ "$status" != 200 ]; then
             reason="http-$status"
-        elif ! printf '%s' "$body" | jq -e '.five_hour.utilization' >/dev/null 2>&1; then
+        elif ! printf '%s' "$body" | jq -e '.seven_day.utilization' >/dev/null 2>&1; then
             if [ "$crc" -ne 0 ] && [ -z "$status" ]; then reason="curl-exit-$crc"; else reason="bad-body"; fi
         fi
     fi

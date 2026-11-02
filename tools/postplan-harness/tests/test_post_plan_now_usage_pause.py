@@ -27,8 +27,8 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 # A normal-zone usage reading (same shape as bin/test-usage-gate's usage_json).
 NORMAL_USAGE = {
-    "five_hour": {"utilization": 41.0, "resets_at": "2026-09-28T20:00:00.123+00:00"},
-    "seven_day": {"utilization": 12.0, "resets_at": "2026-10-02T00:00:00+00:00"},
+    "five_hour": None,
+    "seven_day": {"utilization": 41.0, "resets_at": "2026-10-02T00:00:00+00:00"},
 }
 
 

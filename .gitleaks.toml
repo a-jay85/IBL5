@@ -47,6 +47,10 @@ regexes = [
   # fragment, not a credential; the VKEY name trips generic-api-key).
   '''VKEY="cond14-fixture"''',
 
+  # actions/cache restore-keys prefix in .github/workflows/deploy-rehearsal.yml
+  # (a cache-key name, not a credential; "restore-keys:" trips generic-api-key).
+  '''restore-keys: rehearsal-prod-dump-v1-''',
+
   # Sequential placeholder Discord snowflake IDs in test fixtures
   # (tests/Discord/*, tests/Team/TeamViewTest.php).
   '''123456789012345678''',

@@ -855,8 +855,7 @@ if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
                 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
                 _cf_first=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
                 if grep -qE 'rebase conflict|rebase-conflict:' <<< "$_cf_first"; then
-                    _cf_word=gave-up-refire-conflict
-                    _cf_restore
+                    _cf_word=gave-up-refire-conflict; _cf_restore
                 elif [ "$RC" = 124 ]; then
                     _cf_word=gave-up-refire-timeout
                     _cf_restore
@@ -872,8 +871,7 @@ if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
                 _cf_word=gave-up-clean-unproven
                 _cf_restore
             elif [ "$_cf_rc" = 124 ]; then
-                _cf_word=timeout
-                _cf_restore
+                _cf_word=timeout; _cf_restore
             else
                 _cf_word="${_cf_word:-no-result-rc=$_cf_rc}"
                 _cf_restore

@@ -158,8 +158,10 @@ def test_premerged_clean_resolution_passes_and_flags(make_repo):
     r = make_repo()
     merge_sha = r.merge_by_hand(CLEAN)
     r.record()
-    LiveGit(r.d, llm=None).rebase_onto("origin/master")
     flag = conflict_flag_path(r.branch)
+    # premerge.record writes the flag itself; the harness's later write must not mask a skip.
+    assert merge_sha in open(flag).read()
+    LiveGit(r.d, llm=None).rebase_onto("origin/master")
     state, _ = classify_conflict_flag(
         flag, "/nonexistent-notes",
         lambda sha: _git(r.d, "merge-base", "--is-ancestor", sha, "HEAD",

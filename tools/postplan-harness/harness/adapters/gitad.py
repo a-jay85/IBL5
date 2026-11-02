@@ -1102,14 +1102,14 @@ class LiveGit:
         if premerged is not None:
             # The ladder's review would cover only its own files and its --onto replay can
             # drop the merge commit, so a pre-merged head never enters it. Fail closed.
-            if proc.returncode != 0:
+            if proc.returncode != 0:  # premerged-newer-master
                 self._bounded(("merge", "--abort"), errors="replace")
                 raise HarnessError(
                     "rebase-conflict",
                     "premerged head conflicts with a newer origin/master; "
                     "rerun bin/postplan-fix --headless")
             lostwork_path = self._load_lostwork(master_sha, key)
-            if lostwork_path is None:
+            if lostwork_path is None:  # premerged-lostwork-missing
                 raise HarnessError(
                     "rebase-conflict",
                     "tree proof failed: lostwork.sh missing at origin/master")

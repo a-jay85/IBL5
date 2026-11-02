@@ -321,7 +321,7 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
                             s.id DESC
                     ) AS rn
                 FROM ibl_plr_snapshots s
-                WHERE s.stats_gm > 0
+                WHERE s.stats_gm > 0 AND s.snapshot_phase <> 'preseason'
                   AND s.pid = ?
                   AND s.season_year = ?
             ) snap

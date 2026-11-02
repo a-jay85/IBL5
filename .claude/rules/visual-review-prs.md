@@ -55,7 +55,8 @@ Under that label the publish steps still run (ADR-0181): gallery build, crop, de
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
    not started yet, since that run checks out `gh-pages` *after* this push and already serves it. The
-   status filter is a **denylist** (neither `completed` nor `in_progress`). A missed status spelling then over-suppresses one push. It never skips a deploy silently. The debounce never fires on an
+   status filter is a **denylist** (neither `completed` nor `in_progress`), so a missed spelling
+   over-suppresses one push instead of silently no-opping. The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
    out of the count, so one stuck run cannot block every later deploy. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
@@ -98,7 +99,7 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
   is true in both states and never says the check "stays red until then."
 - Diffing views are grouped per module in `<details>` blocks; each link points into the static
   side-by-side gallery (the `<title>` anchor) where the master-vs-PR before/after shows desktop +
-  mobile.
+  mobile. The Playwright report (traces) is preserved under `…/playwright-report/`.
 - A **"🆕 New views (no prior baseline — review the render)"** section lists cells whose baseline was
   never committed (a brand-new VR row). These have no before — the link shows the first render;
   sanity-check it, then `update-baselines` commits it as the baseline. NEW cells are excluded from the
@@ -120,7 +121,7 @@ unflagged cells stay byte-identical. That commit is the approval record; no flag
 commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
 VR job (ADR-0214).
 
-The label starts `.github/workflows/update-baselines.yml`, which calls the VR job of `e2e-tests.yml` with no inputs. Its checks report as `Update baselines / <job>` and never touch the required `E2E Tests` check. A label applied while an `E2E Tests` run is in flight no longer cancels it.
+The label starts `.github/workflows/update-baselines.yml`, which calls `e2e-tests.yml`. Its checks report as `Update baselines / <job>`, so the required `E2E Tests` check stays untouched.
 
 ## When the comment is missing
 
@@ -159,11 +160,12 @@ See `.claude/rules/visual-review-prs-detail.md` (ADR-0181).
 Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-gallery.ts`
 (`triageCell`, `buildGalleryHtml`); changed-files → coverage (banner only) lives in
 `ibl5/tests/e2e/vr-coverage-map.ts` (`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`); the
-comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). Each pure module has
-a matching test under `ibl5/tests/ts-unit/`, run via `bun run test:unit` from `ibl5/`. Per-row
+comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). The pure modules are
+unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `vr-coverage-map.test.ts`,
+`vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body
-publishing surface (`--copy-new-screens`/`--update-pr-body`, `ibl5/tests/e2e/vr-pr-body.ts`) is
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body publishing surface (`--copy-new-screens`/`--update-pr-body` on
+`bin/vr-review-comment`, `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is
 covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
 `ibl5/tests/e2e/vr-crop-png.ts`), `--crop-changed` and `--publish-agent-shots` are covered by
 **ADR-0076** and **ADR-0181**.

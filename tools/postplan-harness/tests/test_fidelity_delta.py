@@ -248,7 +248,7 @@ PLAN_TEXT = ("---\ntitle: p\n---\nPreamble.\n\n"
              "## Phase 3 — Y\ny body\n\n"
              "## Critical Files\n- a.py\n")
 DELTA_READY_TEXT = ("## 6c\nDELTA-ANCHOR: live-prior\nREVIEW-COVERAGE: NONE\n\n## 6d\n"
-                    "- [BLOCKING] a.py: phase 2 helper missing — RESOLVED by hunk 2\n\nREADY\n")
+                    "[B1] RESOLVED by hunk 2 (a.py: phase 2 helper missing)\n\nREADY\n")
 
 
 def _fid(seed):
@@ -610,7 +610,7 @@ def test_build_delta_packet_contents(tmp_path):
     assert "x body touches" in plan
     assert "y body" not in plan and "w body" not in plan
     assert "## Omitted sections (delta review)" in plan
-    assert read("anchor-findings.md") == anchor["findings"]
+    assert read("anchor-findings.md") == "[B1] - [BLOCKING] a.py: x\n\nno trailing newline"
     ctx_md = read("context.md")
     assert "REVIEW_KIND: delta" in ctx_md
     assert "DELTA_ANCHOR_RUN: live-prior" in ctx_md
@@ -620,7 +620,7 @@ def test_build_delta_packet_contents(tmp_path):
     assert read("pr-body.md") == "pr body"
 
 
-def _run_attempt(tmp_path, monkeypatch, *, text=None, llm=None):
+def _run_attempt(tmp_path, monkeypatch, *, text=None, llm=None, findings=None):
     """attempt() against a real on-disk anchor record; DIFF is the anchor, DIFF_MOVED moves a.py."""
     tmp_path = pathlib.Path(tmp_path)
     plan_bytes = PLAN_TEXT.encode()
@@ -629,8 +629,9 @@ def _run_attempt(tmp_path, monkeypatch, *, text=None, llm=None):
     plan_hash = hashlib.sha256(plan_bytes).hexdigest()
     state = str(tmp_path / "state")
     anchor_diff_id = fidelity.diff_patch_id(DIFF)
+    over = {} if findings is None else {"findings": findings}
     rec = _record(reviewcache.per_file_patch_ids(DIFF), plan_hash=plan_hash,
-                  diff_id=anchor_diff_id)
+                  diff_id=anchor_diff_id, **over)
     assert rec is not None
     assert fidelity_delta.save_record(state, "s", rec)
     vpath = str(tmp_path / "verdict-99.md")
@@ -657,8 +658,17 @@ _NO_ECHO = DELTA_READY_TEXT.replace("DELTA-ANCHOR: live-prior\n", "")
     _NO_ECHO,
     DELTA_READY_TEXT.replace("live-prior", "some-other-run"),
     DELTA_READY_TEXT.replace("\nREADY\n", "\nPROBABLY FINE\n"),
-    DELTA_READY_TEXT.replace(" — RESOLVED by hunk 2", ""),
-], ids=["no-echo", "wrong-echo", "unknown-verdict-word", "blocker-not-restated"])
+    DELTA_READY_TEXT.replace("[B1] RESOLVED by hunk 2",
+                             "a.py: phase 2 helper missing, now RESOLVED by hunk 2"),
+    DELTA_READY_TEXT.replace("[B1] RESOLVED by hunk 2 (a.py: phase 2 helper missing)",
+                             "- [BLOCKING] a.py: phase 2 helper missing — RESOLVED by hunk 2"),
+    DELTA_READY_TEXT.replace("[B1] RESOLVED", "[B1] UNRESOLVED"),
+    DELTA_READY_TEXT.replace("[B1] RESOLVED", "[B2] RESOLVED"),
+    (DELTA_READY_TEXT.replace("[B1] RESOLVED by hunk 2 (a.py: phase 2 helper missing)\n", "")
+     + fidelity.DIGEST_CUT + "\n[B1] RESOLVED by hunk 2\n"),
+], ids=["no-echo", "wrong-echo", "unknown-verdict-word", "blocker-not-restated",
+        "old-unkeyed-shape", "unresolved-but-ready", "out-of-range-key",
+        "key-after-digest-cut"])
 def test_attempt_rejects_candidate_without_anchor_echo(tmp_path, monkeypatch, text):
     out, logs, _, vpath = _run_attempt(tmp_path, monkeypatch, text=text)
     assert out is None
@@ -691,6 +701,45 @@ def test_attempt_writes_verdict_file_with_reviewed_tree(tmp_path, monkeypatch):
     assert pathlib.Path(vpath).read_text().startswith(DELTA_READY_TEXT)
     assert {c.purpose for c in llm.ledger.calls} == {fidelity_delta.PURPOSE}
     assert any(l.startswith("phase5.5 fidelity: review: delta (anchor live-prior") for l in logs)
+
+
+def test_pointer_prompt_states_key_line_shape():
+    prompt = fidelity_delta._pointer_prompt("/p", "/f", 7, "run-x")
+    assert "[B<n>] RESOLVED by <hunk>" in prompt
+    assert "[B<n>] UNRESOLVED" in prompt
+    assert "never replace them" in prompt
+    assert "write RESOLVED with the hunk" not in prompt
+
+
+def test_pointer_prompt_example_lines_parse():
+    text = "[B1] RESOLVED by hunk 3\n[B2] UNRESOLVED\n"
+    assert fidelity_delta.match_restatements(text, 2) == {1: "RESOLVED", 2: "UNRESOLVED"}
+
+
+_THREE_FINDINGS = ("- [BLOCKING] a.py: one\n- [BLOCKING] b.py: two\n"
+                   "- [BLOCKING] c.py: three\n")
+_THREE_PREFIX = "## 6c\nDELTA-ANCHOR: live-prior\nREVIEW-COVERAGE: NONE\n\n## 6d\n"
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_attempt_accepts_keyed_restatement_for_each_blocker(tmp_path, monkeypatch):
+    text = (_THREE_PREFIX + "[B1] RESOLVED by hunk 1\n[B2] RESOLVED by hunk 2\n"
+            "[B3] RESOLVED by hunk 3\n\nREADY\n")
+    out, logs, _, vpath = _run_attempt(tmp_path, monkeypatch, text=text,
+                                       findings=_THREE_FINDINGS)
+    assert out is not None, logs
+    assert out[0] == "READY"
+    assert os.path.exists(vpath)
+
+
+@pytest.mark.usefixtures("git_shim")
+def test_attempt_declines_one_line_forgery_for_three_blockers(tmp_path, monkeypatch):
+    text = _THREE_PREFIX + "- [BLOCKING] a.py — RESOLVED, RESOLVED, RESOLVED\n\nREADY\n"
+    out, logs, _, vpath = _run_attempt(tmp_path, monkeypatch, text=text,
+                                       findings=_THREE_FINDINGS)
+    assert out is None
+    assert "phase5.5 fidelity: delta declined (verdict-unparsed)" in logs
+    assert not os.path.exists(vpath)
 
 
 # --- Phase 4: runner wiring and anchor recording ---------------------------------

@@ -229,3 +229,52 @@ def test_closer_not_run_on_hard_only_or_armed(monkeypatch, tmp_path):
         sub = tmp_path / name
         sub.mkdir()
         fn(monkeypatch, sub)
+
+
+def _threads_then(monkeypatch, later):
+    """Phase 4.5 sees thread 11 only; every later read returns `later()`."""
+    from harness.adapters import ghad
+    old = {"commentId": 11, "isResolved": False, "path": "a.php", "line": 3, "body": "old"}
+    calls = []
+
+    def fake_threads(self, pr):
+        calls.append(pr)
+        return [old] if len(calls) == 1 else later(old)
+
+    monkeypatch.setattr(ghad.RecordingGh, "review_threads_all", fake_threads)
+    return calls
+
+
+def test_closer_sees_threads_posted_after_phase45_snapshot(monkeypatch, tmp_path):
+    """The closer re-reads threads at its decision point. A thread this run's own review
+    posts after the Phase 4.5 snapshot reaches the prompt, and a reply to it survives."""
+    _arm(monkeypatch)
+    fx = _closer_fixture(monkeypatch, tmp_path)
+    new = {"commentId": 22, "isResolved": False, "path": "b.php", "line": 9, "body": "same-run"}
+    calls = _threads_then(monkeypatch, lambda old: [old, new])
+    rec = Recorder()
+    _install(monkeypatch, rec)
+    _go(monkeypatch, tmp_path, fx, git_cls=_TrackedGit)
+    assert len(rec.calls) == 1
+    assert len(calls) >= 2
+    ctx = rec.calls[0]["context"]
+    assert [t["comment_id"] for t in ctx.threads] == [11, 22]
+    reply = json.dumps({"verdict": "fixed", "summary": "", "hold_note": "",
+                        "thread_replies": [{"comment_id": 22, "body": "done", "resolve": True}]})
+    _v, _n, replies, _d = closer.parse_reply(reply, ctx.open_thread_ids)
+    assert [r["comment_id"] for r in replies] == [22]
+
+
+def test_closer_keeps_phase45_snapshot_when_refresh_fails(monkeypatch, tmp_path):
+    _arm(monkeypatch)
+    fx = _closer_fixture(monkeypatch, tmp_path)
+
+    def boom(_old):
+        raise RuntimeError("gh down")
+
+    _threads_then(monkeypatch, boom)
+    rec = Recorder()
+    _install(monkeypatch, rec)
+    _go(monkeypatch, tmp_path, fx, git_cls=_TrackedGit)
+    assert len(rec.calls) == 1
+    assert [t["comment_id"] for t in rec.calls[0]["context"].threads] == [11]

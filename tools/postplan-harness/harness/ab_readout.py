@@ -276,7 +276,7 @@ def parse_args(argv):
         elif a == "--offline":
             opts["offline"] = True
         else:
-            return None
+            return None  # unknown flag
         i += 1
     return opts
 

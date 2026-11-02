@@ -80,7 +80,7 @@ def assign(slug: str, *, pr: int | None, fired_by: str, state_dir: str,
     try:
         os.makedirs(state_dir, exist_ok=True)
         with open(os.path.join(state_dir, LOCK_BASENAME), "a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+            fcntl.flock(lock, fcntl.LOCK_EX)  # assign: cap check and write share one lock
             try:
                 return _assign_locked(key, pr, path, log, now)
             finally:

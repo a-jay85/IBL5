@@ -2190,7 +2190,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 continue
 
         # Fix attempt
-        if _narrow_fixers_off(res):
+        if _narrow_fixers_off(res):  # closer arm: no ci-fix session
             log("phase7 ci-fix: skipped (closer arm)")
             break
         attempt += 1
@@ -2519,6 +2519,14 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         return decision
     ab_arm.record_closer_session(state_dir, slug)
     rows = list(getattr(res, "closer_threads", None) or [])
+    # Re-read at the decision point: the Phase 4.5 snapshot predates this run's own
+    # review threads, and the closer arm skips the Phase 4.5b pass that would answer them.
+    try:
+        fresh = gh.review_threads_all(pr)
+        if fresh is not None:
+            rows = list(fresh)
+    except Exception as e:  # noqa: BLE001 - keep the Phase 4.5 snapshot
+        log(f"closer: thread refresh failed ({e!r}); using the Phase 4.5 snapshot")
     ctx = closer.CloserContext(
         pr=pr, plan_path=(res.plan.path if (res.plan and res.plan.found) else ""),
         trigger_reason=why, base_ref="origin/master",
@@ -2589,7 +2597,7 @@ def _rearm_after_closer(git, gh, llm, log, res, state, inputs, decision, outcome
     if callable(post_sticky):
         post_sticky(nd, "closer: threads answered; arming re-evaluated on the reviewed tree",
                     "closer re-check")
-    if nd.armed:
+    if nd.armed:  # closer re-check: unchanged evaluate() decides
         gh.pr_merge_auto(pr)          # AFTER the sticky re-post, like _rearm_after_ci_fix
     return nd
 

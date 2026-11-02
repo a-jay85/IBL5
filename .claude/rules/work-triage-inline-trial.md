@@ -34,4 +34,4 @@ bin/lib/automouse-pricer --index --since SPLIT |
   jq -s --arg from SPLIT --arg to 2026-11-23 -f bin/lib/opus-trial-cost.jq
 ```
 
-Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label from `work-triage.md` either way.
+Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Either way, drop the trial label from `work-triage.md` in the same PR.

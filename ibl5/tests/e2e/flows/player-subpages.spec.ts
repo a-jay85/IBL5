@@ -76,7 +76,7 @@ test.describe('Player rookie option sub-page', () => {
     // pid=1 is ineligible: the alert must render AND no rookie-option form may.
     // RookieOptionView.php:50 renders the form action with processrookieoption,
     // and the hidden rookieOptionValue input sits inside that form.
-    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(page.locator('.d-alert-error')).toBeVisible();
     await expect(
       page.locator('form[action*="processrookieoption"]'),
     ).toHaveCount(0);
@@ -86,7 +86,7 @@ test.describe('Player rookie option sub-page', () => {
     page,
   }) => {
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=1');
-    const alert = page.locator('.ibl-alert--error');
+    const alert = page.locator('.d-alert-error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent();
     // Could be ownership error ("not on your team") or eligibility error

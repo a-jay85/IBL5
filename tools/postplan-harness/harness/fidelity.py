@@ -1830,10 +1830,13 @@ def _status_sections(fid: dict, final_word: str | None) -> list[str]:
                 seen_titles.add(title)
                 cite = _fixed_citation(items[k + 1].get("remediation_sha"), k + 1)
                 fixed.append(f"- [x] {linkify_refs(title)} ({cite})")
+    body_fixed = fid.get("body_fixed_notes") or []
+    if passing:
+        fixed += [f"- [x] {linkify_refs(t)} (fixed in the PR body)" for t in body_fixed]
     if fixed:
         out.extend(["### Fixed in this PR", *fixed, ""])
 
-    notes = final.get("notes") or []
+    notes = [t for t in final.get("notes") or [] if t not in body_fixed]
     filed = fid.get("filed_notes") or []
     if not passing:
         open_lines = [f"- [ ] {linkify_refs(t)}" for t in final.get("blocking") or []]

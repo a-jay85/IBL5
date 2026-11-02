@@ -1,14 +1,20 @@
 """Fixing PR-body notes on a READY WITH NOTES verdict: pure helpers.
 
 Detector, protected-region edit applier, fix-call validator/normalizer, prompt builder.
-No I/O, no LLM, no gh. This module must never import `runner`.
+Pure helpers, plus `fix_body_notes`, the one bounded orchestrator (llm and gh arrive as
+parameters). This module must never import `runner`.
 """
 from __future__ import annotations
 
 import functools
+import json
+import os
 import re
 
 from .state import HarnessError
+from . import fidelity
+from . import llm_calls
+from . import schemas
 
 # Same literal as runner.BODY_ONLY_SHA; the core module must not import the runner.
 BODY_ONLY_SHA = "body-only"
@@ -256,3 +262,185 @@ Rules:
 Return ONLY JSON, exactly this shape, with one entry in "notes" per note id above:
 {_FIX_SCHEMA}
 """
+
+
+_REMAINING_SUFFIX = {
+    "left-for-human": " (left for the human)",
+    "needs-code": " (needs a code change)",
+    "not-body": " (not a PR-body fix)",
+}
+
+
+def _write_audit(path: str, data) -> None:
+    try:
+        with open(path, "w") as fh:
+            json.dump(data, fh, indent=2)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def _short(title: str) -> str:
+    """First sentence of a note title, without its period, capped at 100 characters."""
+    return title.split(". ", 1)[0].rstrip(". ")[:100]
+
+
+def _noop_log(_msg: str) -> None:
+    pass
+
+
+def fix_body_notes(llm, gh, git, out_dir: str, pr, verdict_path: str, fid: dict,
+                   name_status: str, *, signature, log=None) -> None:
+    """Mutates fid in place: may set fid["remediation_sha"] = BODY_ONLY_SHA,
+    fid["body_notes"], and fid["body_fixed_notes"]. Never touches verdict_1,
+    verdict_2, verdict_path, reviewed_tree, reviewed_tree_2, rounds,
+    rounds_completed. Never raises HarnessError: both llm.call sites catch it.
+    Uses no bare except and no except BaseException, so a UsagePause escapes.
+
+    At most one fix call and one recheck call. No loop, no retry.
+    """
+    log = log or _noop_log
+    # 1. Path guard.
+    if (fid.get("verdict_1") != "READY WITH NOTES" or fid.get("rounds")
+            or fid.get("remediation_sha")):
+        return
+    # 2. Gate.
+    titles = fidelity.verdict_items(verdict_path)["notes"]
+    if not titles or not body_citing(titles):
+        log("phase5.5 body-notes: no body-citing notes; 0 fix calls")
+        return
+    # 3. Snapshot.
+    raw_before = gh.pr_body_fresh() or ""
+    if not raw_before:
+        log("phase5.5 body-notes: body-fetch-failed before fix")
+        return
+    sig_before = signature(raw_before)
+    # 4. Fix call (call 1 of at most 2).
+    ids = [f"N{i}" for i in range(1, len(titles) + 1)]
+    title_of = dict(zip(ids, titles))
+    evidence = llm_calls.diff_sections_for(
+        git.diff_vs_base(), fidelity.cited_diff_paths(name_status, titles, []))
+    fix_audit = os.path.join(out_dir, "body-notes-fix.json")
+    try:
+        data = llm.call("plan-fidelity-body-notes-fix", "sonnet",
+                        fix_prompt(list(zip(ids, titles)),
+                                   fidelity.findings_excerpt(verdict_path, True),
+                                   raw_before, name_status, evidence),
+                        fix_validator(ids), normalizer=unwrap_fix_envelope)
+    except HarnessError as exc:  # fix call
+        _write_audit(fix_audit, {"error": exc.kind, "detail": str(exc.detail or "")[:2000]})
+        fid["body_notes"] = {"outcome": "fix-call-failed", "fixed": [], "remaining": []}
+        log(f"phase5.5 body-notes: fix call failed ({exc.kind})")
+        return
+    _write_audit(fix_audit, data)
+    # 5. Apply.
+    disposition = {n["id"]: n["disposition"] for n in data["notes"]}
+    fixable = {i for i, d in disposition.items() if d in ("fixed", "shape-b")}
+    new_body, applied_ids, rejected = apply_edits(raw_before, data.get("edits", []), fixable)
+    applied_set = set(applied_ids)
+    applied = [title_of[i] for i in ids if i in applied_set]
+    remaining = []
+    for i in ids:
+        if i in applied_set:
+            continue
+        if i in rejected:
+            remaining.append(f"{_short(title_of[i])} (body fix rejected: {rejected[i]})")
+        else:
+            remaining.append(_short(title_of[i]) + _REMAINING_SUFFIX.get(
+                disposition.get(i), " (body fix rejected: not-applied)"))
+    # 6. Nothing applied.
+    if not applied:
+        fid["body_notes"] = {"outcome": "nothing-applied", "fixed": [],
+                             "remaining": remaining}
+        log(f"phase5.5 body-notes: nothing applied, {len(remaining)} remaining")
+        return
+    # 7. Write and read back.
+    gh.pr_edit_body(pr, new_body)
+    raw_after = gh.pr_body_fresh() or ""
+    if not raw_after:
+        gh.pr_edit_body(pr, raw_before)
+        fid["remediation_sha"] = BODY_ONLY_SHA  # unconfirmed write
+        fid["body_notes"] = {
+            "outcome": "body-fetch-failed", "fixed": [],
+            "remaining": remaining + [_short(t) + " (body fix unconfirmed: body-fetch-failed)"
+                                      for t in applied]}
+        log("phase5.5 body-notes: body-fetch-failed after write")
+        return
+    if signature(raw_after) == sig_before:
+        fid["body_notes"] = {
+            "outcome": "write-not-applied", "fixed": [],
+            "remaining": remaining + [_short(t) + " (body fix did not land)" for t in applied]}
+        log("phase5.5 body-notes: write-not-applied")
+        return
+    # 8. Recheck (call 2 of at most 2). Not fidelity.body_recheck: its eligibility
+    # declines a non-NOT READY prior verdict and a pass would overwrite the notes.
+    findings = [f"[NOTE] {t}" for t in applied]
+    fids = [f"F{i}" for i in range(1, len(findings) + 1)]
+    hunks = llm_calls.body_hunks(raw_before, raw_after)
+    hids = [h["id"] for h in hunks]
+    evidence2 = llm_calls.diff_sections_for(
+        git.diff_vs_base(), fidelity.cited_diff_paths(name_status, findings, hunks))
+    recheck_audit = os.path.join(out_dir, "body-notes-recheck.json")
+    reason = None
+    try:
+        data2 = llm.call("plan-fidelity-body-notes-recheck", "sonnet",
+                         llm_calls.pr_body_recheck_prompt(
+                             findings, hunks, raw_before, raw_after, name_status, evidence2),
+                         schemas.body_recheck_validator(fids, hids),
+                         normalizer=schemas.unwrap_body_recheck_envelope)
+    except HarnessError as exc:  # recheck call
+        _write_audit(recheck_audit,
+                     {"error": exc.kind, "detail": str(exc.detail or "")[:2000]})
+        reason = f"recheck-{exc.kind}"
+    else:
+        _write_audit(recheck_audit, data2)
+        if not schemas.body_recheck_passed(data2):
+            reason = "recheck-unresolved"
+    # 9. Pass.
+    if reason is None:
+        fid["remediation_sha"] = BODY_ONLY_SHA
+        fid["body_notes"] = {"outcome": "fixed", "fixed": list(applied),
+                             "remaining": remaining}
+        fid["body_fixed_notes"] = list(applied)
+        log(f"phase5.5 body-notes: {len(applied)} fixed, {len(remaining)} remaining, "
+            "recheck passed")
+        return
+    # 10. Fail: restore the pre-fix body.
+    gh.pr_edit_body(pr, raw_before)
+    restored = gh.pr_body_fresh() or ""
+    if signature(restored) == sig_before:
+        fid["body_notes"] = {
+            "outcome": "reverted", "fixed": [],
+            "remaining": remaining + [f"{_short(t)} (body fix reverted: {reason})" for t in applied]}
+        log(f"phase5.5 body-notes: body fix reverted ({reason})")
+    else:
+        fid["remediation_sha"] = BODY_ONLY_SHA
+        fid["body_notes"] = {
+            "outcome": "revert-unconfirmed", "fixed": [],
+            "remaining": remaining + [_short(t) + " (body fix revert unconfirmed)" for t in applied]}
+        log(f"phase5.5 body-notes: body fix revert unconfirmed ({reason})")
+
+
+_MAX_NAMED = 3
+
+
+def _names(remaining: list[str]) -> str:
+    shown = remaining[:_MAX_NAMED]
+    extra = len(remaining) - len(shown)
+    return "; ".join(shown) + (f"; +{extra} more" if extra > 0 else "")
+
+
+def terminal_line(fid: dict) -> str | None:
+    """Body-notes terminal row, or None to defer to fidelity.terminal_line."""
+    bn = fid.get("body_notes")
+    if fid.get("verdict_1") != "READY WITH NOTES" or not bn:
+        return None
+    fixed, remaining = bn.get("fixed") or [], bn.get("remaining") or []
+    if fixed and not remaining:
+        return ("READY WITH NOTES — all notes remediated in the PR body; reviewer verdict "
+                f"covers tree {fid.get('reviewed_tree') or 'unrecorded'}, "
+                "not the post-remediation head")
+    if fixed:
+        return f"READY WITH NOTES — {_names(remaining)}; remediated the rest in the PR body"
+    if remaining:
+        return f"READY WITH NOTES — {_names(remaining)}"
+    return None

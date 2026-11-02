@@ -297,6 +297,7 @@ run_tick() {
         WT_GC_REAP_EMPTY=0
         WT_GC_REAP_DIRTY_MERGED=0
         WT_GC_REAP_DIRTY_ARCHIVE=0
+        WT_GC_REAP_DETACHED=0
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
@@ -428,6 +429,31 @@ mk_wt() {
         deleted) rm -f "$wt/README.md" ;;
         symlink) rm -f "$wt/README.md"; ln -s /etc/hosts "$wt/README.md" ;;
     esac
+    touch -t "$(epoch_to_touch "$ep")" "$wt"
+}
+
+# mk_detached <name> [age_days=N] [dirt=untracked] [rev=<sha>] — a detached
+# worktree. Without rev=, origin/master moves forward to a commit dated N days
+# ago and the worktree is detached at it, so the HEAD is on master.
+mk_detached() {
+    local name="$1" age=0 dirt=none rev="" kv ep wt
+    shift
+    for kv in "$@"; do
+        case "$kv" in
+            age_days=*) age="${kv#age_days=}" ;;
+            dirt=*)     dirt="${kv#dirt=}" ;;
+            rev=*)      rev="${kv#rev=}" ;;
+        esac
+    done
+    ep="$(epoch_ago "$age")"
+    if [ -z "$rev" ]; then
+        rev="$(GIT_AUTHOR_DATE="@$ep" GIT_COMMITTER_DATE="@$ep" \
+            git -C "$ENV_MAIN" commit-tree -p origin/master -m "snap $name" 'origin/master^{tree}')"
+        git -C "$ENV_MAIN" update-ref refs/remotes/origin/master "$rev"
+    fi
+    wt="$(wt_dir "$name")"
+    git -C "$ENV_MAIN" worktree add -q --detach "$wt" "$rev" >/dev/null 2>&1
+    if [ "$dirt" = untracked ]; then printf 'u\n' > "$wt/untracked.txt"; fi
     touch -t "$(epoch_to_touch "$ep")" "$wt"
 }
 
@@ -1366,6 +1392,97 @@ rt "${DA_ON[@]}" WT_GC_DIRTY_ARCHIVE_DAYS= STUB_SKIP_LINES="$CD/skips" -- --forc
 chk_rc DA14 1
 log_has "invalid WT_GC_DIRTY_ARCHIVE_DAYS ''" || note_err "no invalid-floor log"
 [ -d "$(wt_dir da14)" ] || note_err "removed"
+finish_case
+
+# ── Detached master-snapshot reap ─────────────────────────────────────────────
+DT_ON=(WT_GC_REAP_DETACHED=1 WT_GC_ARCHIVE_STAMP=1700000000)
+
+fx DT1-snapshot-reaped
+mk_detached dt1 age_days=5
+rt "${DT_ON[@]}" -- --force
+chk_rc DT1 0
+log_has 'detached reaped dt1 sha=' || note_err "not reaped"
+[ -d "$(wt_dir dt1)" ] && note_err "worktree still present"
+[ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'dt1\n--volumes')" ] || note_err "wt-remove argv"
+arch_has 1700000000/wt/dt1 || note_err "no archive ref"
+finish_case
+
+fx DT2-under-floor-keeps
+mk_detached dt2 age_days=2
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep dt2: age=2d' || note_err "no floor keep"
+[ -d "$(wt_dir dt2)" ] || note_err "removed"
+finish_case
+
+fx DT3-dirty-keeps
+mk_detached dt3 age_days=5 dirt=untracked
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep dt3: dirty' || note_err "dirty not kept"
+[ -d "$(wt_dir dt3)" ] || note_err "removed"
+finish_case
+
+fx DT4-not-on-master-keeps
+DT_OFF="$(git -C "$ENV_MAIN" commit-tree -p origin/master -m off 'origin/master^{tree}')"
+mk_detached dt4 age_days=5 "rev=$DT_OFF"
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep dt4: not on master' || note_err "off-master not kept"
+[ -d "$(wt_dir dt4)" ] || note_err "removed"
+finish_case
+
+fx DT5-queued-keeps
+mk_detached dt5 age_days=5
+mk_queue "$CD/queue" dt5
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep dt5: live work' || note_err "queued not kept"
+[ -d "$(wt_dir dt5)" ] || note_err "removed"
+finish_case
+
+fx DT6-pool-keeps
+mk_detached _pool-9 age_days=5
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep _pool-9: pool worktree' || note_err "pool not kept"
+[ -d "$(wt_dir _pool-9)" ] || note_err "removed"
+finish_case
+
+fx DT7-branch-worktree-ignored
+mk_wt w7 w7
+mk_detached dt7 age_days=5
+rt "${DT_ON[@]}" -- --force
+log_has 'detached reaped dt7' || note_err "dt7 not reaped"
+log_has 'detached (keep|reaped) w7' && note_err "branch worktree was touched"
+[ -d "$(wt_dir w7)" ] || note_err "branch worktree removed"
+finish_case
+
+fx DT8-launchctl-error-keeps
+mk_detached dt8 age_days=5
+rt "${DT_ON[@]}" WT_GC_LAUNCHCTL=/usr/bin/false -- --force
+log_has 'detached keep dt8: probe error' || note_err "probe error not kept"
+[ -d "$(wt_dir dt8)" ] || note_err "removed"
+finish_case
+
+fx DT9-archive-fail-keeps
+mk_detached dt9 age_days=5
+git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/wt/dt9 "$(git -C "$ENV_MAIN" rev-parse HEAD)"
+rt "${DT_ON[@]}" -- --force
+log_has 'detached keep dt9: archive failed' || note_err "archive failure not kept"
+[ -d "$(wt_dir dt9)" ] || note_err "removed"
+finish_case
+
+fx DT10-dry-run
+mk_detached dt10 age_days=5
+B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
+rt "${DT_ON[@]}" -- --dry-run --force
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+log_has 'DRY-RUN would:' || note_err "no DRY-RUN line"
+finish_case
+
+fx DT11-empty-floor-invalid
+mk_detached dt11 age_days=5
+rt "${DT_ON[@]}" WT_GC_DETACHED_DAYS= -- --force
+chk_rc DT11 1
+log_has "invalid WT_GC_DETACHED_DAYS ''" || note_err "no invalid-floor log"
+[ -d "$(wt_dir dt11)" ] || note_err "removed"
 finish_case
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────

@@ -287,8 +287,13 @@ with open(sys.argv[1]) as fh:
 # branch tip's commit time and the worktree dir mtime. Prints nothing and
 # returns 1 when either source fails.
 _gc_wt_age_days() {
-    local wt="$1" branch="$2" ct mt newest
-    ct="$(git -C "$WT_GC_REPO_ROOT" log -1 --format=%ct "refs/heads/$branch" 2>/dev/null)" || return 1
+    _gc_rev_age_days "$1" "refs/heads/$2"
+}
+
+# _gc_rev_age_days <wt_path> <rev> — as _gc_wt_age_days, for any rev.
+_gc_rev_age_days() {
+    local wt="$1" rev="$2" ct mt newest
+    ct="$(git -C "$WT_GC_REPO_ROOT" log -1 --format=%ct "$rev" 2>/dev/null)" || return 1
     case "$ct" in ''|*[!0-9]*) return 1 ;; esac
     mt="$(_gc_mtime "$wt")" || return 1
     case "$mt" in ''|*[!0-9]*) return 1 ;; esac
@@ -559,6 +564,69 @@ _gc_reap_dirty_one() {
     else
         log "dirty archived-reaped $name paths=$GC_DIRT_PATHS merged=${days}d archive=refs/wt-gc-archive/$GC_ARCHIVE_STAMP/wt/$name"
     fi
+}
+
+# ── Step: detached master snapshots ───────────────────────────────────────────
+# bin/wt-status lists no row for a detached worktree, so this step reads
+# `git worktree list --porcelain` itself. A snapshot whose HEAD is already on
+# origin/master, clean and old enough, holds nothing that master lacks.
+reap_detached_snapshots() {
+    _gc_valid_days WT_GC_DETACHED_DAYS || return 1
+    log "step detached threshold=${WT_GC_DETACHED_DAYS}d"
+    local parent pphys listing rows sha path rc=0
+    parent="$(_gc_wt_parent)" || return 1
+    pphys="$(cd "$parent" 2>/dev/null && pwd -P)" || pphys="$parent"
+    listing="$(git -C "$WT_GC_REPO_ROOT" worktree list --porcelain)" || return 1
+    rows="$(awk '/^worktree /{p=substr($0,10); h=""} /^HEAD /{h=$2} /^detached$/{print h "\t" p}' <<< "$listing")"
+    [ -n "$rows" ] || return 0
+    while IFS=$'\t' read -r sha path <&3; do
+        [ -n "$path" ] || continue
+        case "$(dirname "$path")" in
+            "$parent"|"$pphys") ;;
+            *) continue ;;
+        esac
+        _gc_reap_detached_one "$(basename "$path")" "$path" "$sha" || rc=1
+    done 3<<< "$rows"
+    return "$rc"
+}
+
+_gc_reap_detached_one() {
+    local name="$1" wt="$2" sha="$3" arc age dirt lw=0
+    case "$name" in
+        _pool-*) log "detached keep $name: pool worktree"; return 0 ;;
+    esac
+    if [ ! -d "$wt" ]; then log "detached keep $name: no such worktree"; return 0; fi
+    if git -C "$wt" symbolic-ref -q HEAD >/dev/null 2>&1 \
+        || [ "$(git -C "$wt" rev-parse --verify -q HEAD 2>/dev/null)" != "$sha" ]; then
+        log "detached keep $name: HEAD moved"; return 0
+    fi
+    arc=0
+    git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$sha" origin/master 2>/dev/null || arc=$?
+    case "$arc" in
+        0) ;;
+        1) log "detached keep $name: not on master"; return 0 ;;
+        *) log "detached keep $name: ancestry probe error"; return 0 ;;
+    esac
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
+        log "detached keep $name: status error"; return 0
+    fi
+    if [ -n "$dirt" ]; then log "detached keep $name: dirty"; return 0; fi
+    age="$(_gc_rev_age_days "$wt" "$sha")" || age=""
+    if [ -z "$age" ]; then log "detached keep $name: age unknown"; return 0; fi
+    if [ "$age" -lt "$WT_GC_DETACHED_DAYS" ]; then log "detached keep $name: age=${age}d"; return 0; fi
+    _gc_live_work "$name" "" "$wt" || lw=$?
+    case "$lw" in
+        0) log "detached keep $name: live work"; return 0 ;;
+        1) ;;
+        *) log "detached keep $name: probe error"; return 0 ;;
+    esac
+    if ! _gc_tips_record "$sha" "refs/wt/$name"; then
+        log "detached keep $name: archive failed"; return 0
+    fi
+    if ! _gc_do "$WT_GC_WT_REMOVE" "$name" --volumes; then
+        log "detached keep $name: wt-remove refused"; return 0
+    fi
+    log "detached reaped $name sha=${sha:0:10} age=${age}d"
 }
 
 # ── Step: stale refs ──────────────────────────────────────────────────────────

@@ -1861,6 +1861,18 @@ log_has "invalid WT_GC_CLOSED_DAYS ''" || note_err "no invalid-floor log"
 finish_case
 fi
 
+if should_run CL15-structural-keeps; then
+fx CL15-structural-keeps
+c_wt cl15 symlink
+epoch_ago 10 > "$CD/gh/9.json"
+rt "${CL_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'closed keep cl15: path README.md' || note_err "structural dirt not kept"
+log_has 'closed reaped cl15' && note_err "structural dirt was reaped"
+[ -d "$(wt_dir cl15)" ] || note_err "worktree removed"
+has_branch cl15 || note_err "branch deleted"
+finish_case
+fi
+
 # ── Orphan stash drop ─────────────────────────────────────────────────────────
 ST_ON=(WT_GC_DROP_STASHES=1 WT_GC_ARCHIVE_STAMP=1700000000)
 stash_has() { git -C "$ENV_MAIN" stash list --format=%H | grep -qxF -- "$1"; }

@@ -19,8 +19,9 @@
 #     keep-ref under refs/wt-gc-archive/ (git gc cannot collect it) before
 #     each delete; a failed archive write keeps the item. The container step
 #     archives a JSON file in the tips dir instead. The empty-worktree reap
-#     (tip already in master), the tmp-pack reap, the docker image and
-#     builder prunes, and prune_archives itself write no archive.
+#     (tip already in master) also writes a heads/<branch> keep-ref via
+#     the tips record; the tmp-pack reap, the docker image and builder
+#     prunes, and prune_archives itself write no archive.
 
 # _gc_do <argv...> — single choke point for every destructive command.
 _gc_do() {
@@ -688,7 +689,7 @@ reap_closed_worktrees() {
 }
 
 _gc_reap_closed_one() {
-    local name="$1" wt="$2" branch tip rl arc=0 cerr=0 closed now days snap
+    local name="$1" wt="$2" branch tip rl arc=0 cerr=0 closed now days snap dirc
     _gc_wt_guard closed "$name" "$wt" || return 0
     branch="$GC_BRANCH"
     if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
@@ -732,6 +733,11 @@ _gc_reap_closed_one() {
         log "closed keep $name: closed <${WT_GC_CLOSED_DAYS}d ago"; return 0
     fi
     days=$(( (now - closed) / 86400 ))
+    dirc=0
+    _gc_dirt_identical "$wt" || dirc=$?
+    if [ "$dirc" = 2 ]; then
+        log "closed keep $name: $GC_DIRT_REASON"; return 0
+    fi
     if ! snap="$(_gc_snapshot_dirt "$wt" "$tip" "wt/$name")"; then
         log "closed keep $name: snapshot failed"; return 0
     fi

@@ -3564,7 +3564,8 @@ _cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX
         PR_CYCLE_WATCH_STATE_DIR="$_CF_STATE" \
         run_dm_driver --go "$@" >/dev/null 2>&1
     if [ -n "${CF_PCW_LIB:-}" ]; then  # point the baked runner at a stub pr-cycle-watch lib
-        sed -i '' "s|^PCW_LIB=.*|PCW_LIB=$CF_PCW_LIB|" "$_DM_RUNNER"
+        # -i.bak works on both BSD (macOS) and GNU (Linux CI) sed; a bare -i '' is BSD-only.
+        sed -i.bak "s|^PCW_LIB=.*|PCW_LIB=$CF_PCW_LIB|" "$_DM_RUNNER" && rm -f "$_DM_RUNNER.bak"
     fi
     HOME="$SCRATCH" CF_PPREC="$_CF_PPREC" CF_FIXREC="$_CF_FIXREC" CF_WT="$_CF_WT" \
         CF_PP2_RESULT="${CF_PP2_RESULT:-RESULT: terminal=shipped-held}" \

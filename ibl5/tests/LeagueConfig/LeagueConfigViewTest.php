@@ -36,7 +36,7 @@ final class LeagueConfigViewTest extends TestCase
             'messages' => [],
         ]);
 
-        $this->assertStringStartsWith('<div role="alert" class="d-alert d-alert-success mb-4">.lge imported: ', $output);
+        $this->assertStringStartsWith('<div role="status" class="d-alert d-alert-success mb-4">.lge imported: ', $output);
         $this->assertStringContainsString('.lge imported: 2024-25 season, 28 teams stored.', $output);
     }
 

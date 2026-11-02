@@ -533,7 +533,7 @@ class DepthChartControllerTest extends WideUnitTestCase
 
         $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
 
-        $alert = '<div class="ibl-alert ibl-alert--error"><ul><li>Bad lineup</li></ul></div>';
+        $alert = '<div role="alert" class="d-alert d-alert-error mb-4"><div class="[&_ul]:list-disc [&_ul]:pl-5"><ul><li>Bad lineup</li></ul></div></div>';
         $title = '<h1 class="ibl-title">Depth Chart Entry</h1>';
         self::assertStringContainsString($alert, $output);
         self::assertStringContainsString($title, $output);
@@ -555,7 +555,7 @@ class DepthChartControllerTest extends WideUnitTestCase
 
         $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
 
-        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertStringNotContainsString('d-alert-error', $output);
         self::assertSame(['pid' => 7, 'name' => 'Seven', 'dc_pg_depth' => 1, 'quality_score' => 12.5], $calls[5][1][0]);
     }
 
@@ -565,7 +565,7 @@ class DepthChartControllerTest extends WideUnitTestCase
 
         $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
 
-        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertStringNotContainsString('d-alert-error', $output);
         self::assertSame('not-an-array', $_SESSION['_ibl_depth_chart_flash']);
     }
 
@@ -578,7 +578,7 @@ class DepthChartControllerTest extends WideUnitTestCase
 
         $output = $this->runDisplayFormToCompletion($this->buildDceController($this->buildPassThroughTeamTableService()));
 
-        self::assertStringNotContainsString('ibl-alert--error', $output);
+        self::assertStringNotContainsString('d-alert-error', $output);
         self::assertFalse(isset($_SESSION['_ibl_depth_chart_flash']));
     }
 

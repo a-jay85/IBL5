@@ -42,7 +42,7 @@ foreach ($xmlGlob as $xmlPath) {
 
     $rootEl = $doc->documentElement;
     if ($rootEl === null || $rootEl->nodeName !== 'phpunit') {
-        // Not a phpunit configuration file (e.g. phpunit-baseline.xml has <files> root)
+        // Not a phpunit configuration file (e.g. a PHPUnit baseline has a <files> root)
         continue;
     }
 

@@ -4,7 +4,9 @@ import { fileURLToPath } from 'url';
 import { test } from './fixtures/base';
 import {
   manualShotFile,
+  setupStepsFor,
   type ManualRowResult,
+  type ManualShotSide,
   type ManualRowStatus,
   type ManualVrRow,
   type VrRole,
@@ -20,6 +22,10 @@ import {
  *         merged onto every row. That merged file is what
  *         `bin/vr-review-comment --manual-gallery=…` reads to build the
  *         sticky PR comment.
+ *         With VR_MANUAL_SIDE=before (the base-SHA pass) it writes
+ *         <label>.before.png and merges `beforeStatus` (and `beforeError`)
+ *         instead, leaving the after pass's fields intact. It skips `setup`:
+ *         the after pass already applied it to the shared DB (setupStepsFor).
  *
  * These screenshots are one-shot review aids, never a gate: nothing is compared
  * against a baseline, and the workflow step runs under `continue-on-error`.
@@ -57,6 +63,18 @@ function loadRows(): { file: RowsFile; rows: ManualVrRow[] } {
   }
 }
 
+// VR_MANUAL_SIDE=before is the base-SHA pass: it writes <label>.before.png and
+// merges `beforeStatus` onto rows the after pass already recorded. Unset or
+// empty means `after` (today's CI path); anything else fails at load.
+function readSide(): ManualShotSide {
+  const raw = process.env.VR_MANUAL_SIDE ?? '';
+  if (raw === '' || raw === 'after') return 'after';
+  if (raw === 'before') return 'before';
+  throw new Error(`VR_MANUAL_SIDE must be before|after (got "${raw}")`);
+}
+
+const SIDE = readSide();
+
 const { file: rowsFile, rows } = loadRows();
 
 // Statuses accumulate across tests; afterAll merges them back into the file.
@@ -68,9 +86,24 @@ function record(label: string, status: ManualRowStatus, error?: string): void {
 
 if (rows.length > 0) {
   test.afterAll(() => {
-    const merged: ManualRowResult[] = rows.map((r) => {
+    const merged = rows.map((r) => {
       const s = statuses.get(r.label) ?? { status: 'failed' as ManualRowStatus, error: 'not captured' };
-      return { label: r.label, row: r.row, status: s.status, ...(s.error ? { error: s.error } : {}) };
+      if (SIDE === 'before') {
+        // Keep the after pass's fields; only the before outcome is ours.
+        const prior = r as ManualVrRow & Partial<ManualRowResult>;
+        return {
+          ...prior,
+          beforeStatus: s.status,
+          ...(s.error ? { beforeError: s.error } : {}),
+        };
+      }
+      // Spread the input row so the before pass can re-read url/role/anchor.
+      const result: ManualVrRow & ManualRowResult = {
+        ...r,
+        status: s.status,
+        ...(s.error ? { error: s.error } : {}),
+      };
+      return result;
     });
     writeFileSync(ROWS_JSON, JSON.stringify({ ...rowsFile, rows: merged }, null, 2) + '\n');
   });
@@ -99,7 +132,7 @@ if (rows.length > 0) {
         }
 
         try {
-          for (const s of row.setup) {
+          for (const s of setupStepsFor(row, SIDE)) {
             const method = s.method.toUpperCase();
             const resp =
               method === 'POST'
@@ -117,7 +150,7 @@ if (rows.length > 0) {
           await page.goto(row.url);
           await page.locator(row.anchor).first().waitFor({ state: 'visible' });
           await page.screenshot({
-            path: resolve(SHOTS_DIR, manualShotFile(row.label)),
+            path: resolve(SHOTS_DIR, manualShotFile(row.label, SIDE)),
             fullPage: true,
           });
           record(row.label, 'ok');

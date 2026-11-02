@@ -22,6 +22,7 @@ namespace SeasonHighs\Contracts;
  *     teamid?: int,
  *     boxId?: int,
  *     gameOfThatDay?: int,
+ *     gameTeamid?: int,
  *     sortId?: int
  * }
  *

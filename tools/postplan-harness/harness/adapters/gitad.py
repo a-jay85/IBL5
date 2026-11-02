@@ -241,7 +241,10 @@ class LiveGit:
                                timeout=EMERGENCY_GIT_TIMEOUT, errors="replace")
         except HarnessError as e:
             if e.kind == SUBPROCESS_TIMEOUT:
-                self._clear_stale_index_lock()
+                try:
+                    self._clear_stale_index_lock()
+                except Exception:  # signal handler: never raise (e.g. PermissionError)
+                    pass
             return None
         except Exception:  # signal handler: never raise (e.g. OSError)
             return None
@@ -402,6 +405,11 @@ class LiveGit:
         # stage_all) untracked. `base...HEAD` alone drops the dirty tree, which
         # turns every post-plan-now invocation into a false "nothing to ship".
         return self._run("diff", self._merge_base(base))
+
+    def own_change_diff(self, base: str = "origin/master") -> str:
+        # Same range as diff_vs_base, one context line. Feeds the own-change id,
+        # which must not move when master edits a line next to a PR hunk.
+        return self._run("diff", "-U1", self._merge_base(base))
 
     def working_diff(self) -> str:
         # staged + unstaged, vs HEAD (what Phase 2 would commit)
@@ -1794,6 +1802,9 @@ class ReplayGit:
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""
+
+    def own_change_diff(self, base: str = "origin/master") -> str:
+        return self.fx.get("own_change_diff", "")
 
     def working_diff(self) -> str:
         return self.fx.get("worktree_diff") or self.fx.get("diff") or ""

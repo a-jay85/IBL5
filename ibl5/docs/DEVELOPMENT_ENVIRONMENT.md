@@ -1,6 +1,6 @@
 ---
 description: Docker setup, dependency management, testing commands, and database connection details.
-last_verified: 2026-08-29
+last_verified: 2026-10-29
 ---
 
 # IBL5 Development Environment Setup
@@ -31,7 +31,7 @@ Install with `composer install` from the `ibl5/` directory. In CI, `.github/work
 ```bash
 vendor/bin/phpunit                                    # Run all tests (from ibl5/)
 vendor/bin/phpunit --filter testRenderPlayerHeader    # Run specific test
-vendor/bin/phpunit --testsuite "Player"               # Run specific suite
+vendor/bin/phpunit --testsuite "Player Module Tests"  # Run specific suite
 composer run analyse                                  # PHPStan
 ```
 

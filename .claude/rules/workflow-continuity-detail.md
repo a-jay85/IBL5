@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -120,20 +120,9 @@ run that holds on the same reason keeps it. Automouse treats exit **8** as termi
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
-**Rebase-only mode.** `bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the
-PR's last hold record names only conditions (3), (7) and (8) and its patch-id still equals the
-sticky `**Reviewed diff:**`. `PR_CYCLE_REBASE_ONLY_HELD=0` turns this off. The flag reaches the
-harness as `--rebase-only` through `bin/post-plan-fleet` and `bin/post-plan-now`, where it also
-implies `--state-changed`. The harness re-checks the record with
-`python3 -m harness.holdrepeat rebase-eligible` and runs the full path when the record is
-absent or names any other condition. An eligible run merges `origin/master` with the usual
-conflict resolver and lost-work proof, pushes, and ends with terminal `rebased-held` and exit
-**0**. It runs no review, fidelity or manual-test call, never posts the sticky verdict and never
-arms. A failed proof stops before the push. When the patch-id is unchanged, the run refreshes
-the hold record's fingerprint so the next cycle still declines. A changed patch-id leaves the
-record alone, and the next cycle reviews the new tree. A failed rebase-only run never falls
-back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
-without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove. When a PR's only failure is the `All checks green` gate timing out on anchors that have since gone green on the same head, the tick runs `gh run rerun <id> --failed` in place of a rescue, at most `PCW_GATE_RERUN_CAP` (2) times per head SHA, and the gate's fail-closed check is unchanged (ADR-0167, addendum `gate-timeout reruns`).
+**PR-cycle skips.** `bin/pr-cycle` skips a PR held only on human conditions, and fires a DIRTY
+one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
+§ Rebase-only mode.
 
 ## What `--auto` adds
 

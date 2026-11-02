@@ -66,6 +66,28 @@ class BoxScoreUrlBuilderTest extends TestCase
         $this->assertStringStartsWith('modules.php?name=GameBoxscore', $url);
     }
 
+    public function testBuildUrlAppendsTeamWhenPositive(): void
+    {
+        $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', 3, 0, 7);
+
+        $this->assertSame('modules.php?name=GameBoxscore&date=2025-01-15&game=3&team=7', $url);
+    }
+
+    public function testBuildUrlOmitsTeamWhenZero(): void
+    {
+        $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', 3, 0, 0);
+
+        $this->assertSame('modules.php?name=GameBoxscore&date=2025-01-15&game=3', $url);
+        $this->assertStringNotContainsString('team=', $url);
+    }
+
+    public function testBuildUrlLegacyPathIgnoresTeam(): void
+    {
+        $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', 0, 545, 7);
+
+        $this->assertSame('./ibl/IBL/box545.htm', $url);
+    }
+
     public function testBuildUrlWithDifferentGameNumbers(): void
     {
         $url1 = BoxScoreUrlBuilder::buildUrl('2025-01-15', 1);

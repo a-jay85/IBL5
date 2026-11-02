@@ -26,7 +26,10 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build
+# --renew-anon-volumes: without it a recreated tailwind container keeps the old
+# container's node_modules volume, so a package added to package.json never
+# reaches the watcher. The DB volume is named and unaffected.
+docker compose -f "$REPO_ROOT/docker-compose.yml" up -d --build --renew-anon-volumes
 
 echo "Waiting for ibl5-mariadb to be ready..."
 RETRIES=0

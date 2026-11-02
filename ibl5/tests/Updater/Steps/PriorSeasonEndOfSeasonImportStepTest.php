@@ -242,6 +242,33 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         self::assertContains('RET: skipped, source is not the 2008 archive', $result->messages);
     }
 
+    /**
+     * An import error keeps its text, so the updater page shows it under the
+     * file's summary line instead of a bare count.
+     */
+    public function testSurfacesImportErrorTextInMessages(): void
+    {
+        $hofResult = new JsbImportResult();
+        $hofResult->addError('HOF parse failed: bad data');
+
+        $service = self::createStub(JsbImportService::class);
+        $service->method('processDraData')->willReturn(new JsbImportResult());
+        $service->method('processRetData')->willReturn(new JsbImportResult());
+        $service->method('processHofData')->willReturn($hofResult);
+        $service->method('processAwaData')->willReturn(new JsbImportResult());
+
+        $result = $this->buildStep(
+            repo: $this->championRepo(),
+            service: $service,
+            resolver: $this->archiveResolver(2008),
+        )->execute();
+
+        $hofLine = array_search('HOF: 1 errors', $result->messages, true);
+        self::assertIsInt($hofLine);
+        self::assertSame('ERROR: HOF parse failed: bad data', $result->messages[$hofLine + 1]);
+        self::assertSame(1, $result->messageErrorCount);
+    }
+
     private function buildStep(
         ?JsbImportRepositoryInterface $repo = null,
         ?JsbImportService $service = null,
@@ -316,7 +343,7 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
     {
         $dra = "***** 2005 rookie draft *****\nRound 1 Pick 1\nLakers: SF John Doe\n"
             . "***** 2006 rookie draft *****\nRound 1 Pick 1\nCeltics: PG Jim Roe\n";
-        $hof = str_pad("SF Grant Hill 614 2005 \r\n C Arvydas Sabonis 327 2007 \r\n", 7000);
+        $hof = str_pad("SF Grant Hill 614 2005 \r\n C Arvydas Sabonis 327 2007 \r\n", 8000);
 
         return ['dra' => $dra, 'ret' => 'ret-data', 'hof' => $hof, 'awa' => 'awa-data', 'car' => 'car-data'];
     }

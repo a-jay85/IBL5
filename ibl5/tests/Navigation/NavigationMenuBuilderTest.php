@@ -292,6 +292,44 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotContains('Trading', $labels);
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function seasonPhaseProvider(): array
+    {
+        return [
+            'Preseason' => ['Preseason'],
+            'HEAT' => ['HEAT'],
+            'Regular Season' => ['Regular Season'],
+            'Playoffs' => ['Playoffs'],
+            'Draft' => ['Draft'],
+            'Free Agency' => ['Free Agency'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('seasonPhaseProvider')]
+    public function testIblTeamMenuLinksRivalriesInEveryPhase(string $phase): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(teamId: 7, seasonPhase: $phase));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $this->assertContains(
+            ['label' => 'Rivalries', 'url' => 'modules.php?name=Rivalries&op=team&team=7'],
+            $menu['links']
+        );
+    }
+
+    public function testOlympicsTeamMenuOmitsRivalries(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $labels = array_map(static fn (array $link): string => $link['label'] ?? '', $menu['links']);
+        $this->assertNotContains('Rivalries', $labels);
+    }
+
     public function testIblModeMenuStructureContainsAllSeasonLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));

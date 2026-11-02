@@ -359,4 +359,33 @@ class SeasonArchiveRepositoryTest extends DatabaseTestCase
             self::assertContains($conference, ['Eastern', 'Western']);
         }
     }
+
+    public function testGetTeamColorsByYearGivesRetiredEraItsEraColors(): void
+    {
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Era City', 'team_name' => 'EraArchiveTeam',
+        ]);
+        $this->insertRow('ibl_franchise_era_branding', [
+            'franchise_id' => 1, 'team_city' => 'Era City', 'team_name' => 'EraArchiveTeam',
+            'color1' => '112233', 'color2' => '445566',
+        ]);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2096, 'season_ending_year' => 2097,
+            'team_city' => 'Current City', 'team_name' => 'CurrentArchiveTeam',
+        ]);
+
+        $byYear = $this->repo->getTeamColorsByYear();
+
+        self::assertSame(
+            ['color1' => '112233', 'color2' => '445566', 'teamid' => 1],
+            $byYear[2096]['EraArchiveTeam'],
+        );
+        $res = $this->db->query('SELECT color1 FROM ibl_team_info WHERE teamid = 1');
+        self::assertInstanceOf(\mysqli_result::class, $res);
+        $current = $res->fetch_assoc();
+        self::assertIsArray($current);
+        self::assertSame($current['color1'], $byYear[2097]['CurrentArchiveTeam']['color1']);
+        self::assertSame(1, $byYear[2097]['CurrentArchiveTeam']['teamid']);
+    }
 }

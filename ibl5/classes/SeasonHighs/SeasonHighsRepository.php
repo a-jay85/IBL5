@@ -72,6 +72,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
                 $branches[] = "(SELECT ? AS stat_category, p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                     t.`team_city`, t.`color1`, t.`color2`,
                     bs.`game_date` AS `date`, sch.`box_id`, bs.`id` AS sort_id,
+                    bs.`teamid` AS game_teamid,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores` bs
@@ -84,6 +85,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
             } else {
                 $branches[] = "(SELECT ? AS stat_category, t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
                     bs.`name`, bs.`game_date` AS `date`, sch.`box_id`, bs.`id` AS sort_id,
+                    t.`teamid` AS game_teamid,
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores_teams` bs
@@ -160,6 +162,9 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
         }
         if (isset($row['game_of_that_day'])) {
             $entry['gameOfThatDay'] = (int) $row['game_of_that_day'];
+        }
+        if (isset($row['game_teamid'])) {
+            $entry['gameTeamid'] = (int) $row['game_teamid'];
         }
         if (isset($row['sort_id'])) {
             $entry['sortId'] = (int) $row['sort_id'];

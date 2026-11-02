@@ -87,7 +87,7 @@ final class RecapPanelRenderer
         $oppLogo = 'images/logo/new' . $g->oppTid . '.png';
         $yourTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $slate->teamTid;
         $oppTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $g->oppTid;
-        $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId);
+        $boxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId, $slate->teamTid);
 
         $h  = '<div class="last-sim-recap__cell">';
         $h .= '  <div class="last-sim-recap__cell-head-row">';
@@ -111,15 +111,18 @@ final class RecapPanelRenderer
         $awayRowMod = ($awayScore > $homeScore) ? ' last-sim-recap__final-row--win' : '';
         $homeRowMod = ($homeScore > $awayScore) ? ' last-sim-recap__final-row--win' : '';
 
-        $boxLink = $boxUrl !== '' ? $boxUrl : '';
+        $awayTid = $g->home ? $g->oppTid : $slate->teamTid;
+        $homeTid = $g->home ? $slate->teamTid : $g->oppTid;
+        $awayBoxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId, $awayTid);
+        $homeBoxUrl = BoxScoreUrlBuilder::buildUrl($g->date, $g->gameOfThatDay, $g->boxId, $homeTid);
 
         $h .= '    <div class="last-sim-recap__final-row' . $awayRowMod . '">';
         $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__team-link" aria-label="' . HtmlSanitizer::e($awayName) . '"><img src="' . HtmlSanitizer::e($awayLogo) . '" alt="" class="last-sim-recap__team-mark" width="50" height="50" loading="lazy"></a>';
         $h .= '      <a href="' . $awayUrl . '" class="last-sim-recap__final-name">' . RecapTeamNameHelper::responsive($awayName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($awayRec) . '</span>';
         $h .= '      </a>';
-        if ($boxLink !== '') {
-            $h .= '      <a href="' . HtmlSanitizer::e($boxLink) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $awayScore) . '</a>';
+        if ($awayBoxUrl !== '') {
+            $h .= '      <a href="' . HtmlSanitizer::e($awayBoxUrl) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $awayScore) . '</a>';
         } else {
             $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $awayScore) . '</span>';
         }
@@ -130,8 +133,8 @@ final class RecapPanelRenderer
         $h .= '      <a href="' . $homeUrl . '" class="last-sim-recap__final-name">' . RecapTeamNameHelper::responsive($homeName);
         $h .= '        <span class="last-sim-recap__final-rec">' . HtmlSanitizer::e($homeRec) . '</span>';
         $h .= '      </a>';
-        if ($boxLink !== '') {
-            $h .= '      <a href="' . HtmlSanitizer::e($boxLink) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $homeScore) . '</a>';
+        if ($homeBoxUrl !== '') {
+            $h .= '      <a href="' . HtmlSanitizer::e($homeBoxUrl) . '" class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $homeScore) . '</a>';
         } else {
             $h .= '      <span class="last-sim-recap__final-pts">' . HtmlSanitizer::e((string) $homeScore) . '</span>';
         }

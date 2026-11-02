@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-10-23
+last_verified: 2026-10-24
 ---
 
 # IBL5 Operations Runbook
@@ -475,6 +475,10 @@ The Mac poller runs as an active second host (ADR-0196). It claims rows handed t
 ### Mac poller (second host)
 
 The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
+
+### Google Sheets refresh cron
+
+The Google Sheets player export has its own prod crontab worker, `ibl5/scripts/googleSheetRefreshTick.php`, separate from the sim recap LaunchAgent. Install, verify, exit codes, key rotation, and the `broken` reasons are in `ibl5/docs/GOOGLE_SHEETS_SETUP.md` section 5. `php ibl5/scripts/googleSheetRefreshTick.php --dry-run` shows the pending queue without calling Google.
 
 ### Phase gate: the poller stays loaded
 

@@ -107,6 +107,13 @@ if ($dbtype == 'MySQL') {
     if ($mysqli_db->connect_errno) {
         die("<br><br><div style=\"text-align:center\"><img src=\"images/logo.gif\" alt=\"IBL\"><br><br><strong>There seems to be a problem with the $dbtype server, sorry for the inconvenience.<br><br>We should be back shortly.</strong></div>");
     }
+
+    // Cap each statement on web requests so a runaway query cannot hold a
+    // connection for hours (incident 2026-10-27). CLI keeps no cap. The SAPI
+    // check stays here too: some CLI callers include db.php with no autoloader.
+    if (PHP_SAPI !== 'cli') {
+        \Database\StatementTimeout::apply($mysqli_db, $dbStatementTimeoutSeconds ?? null);
+    }
 } else if ($dbtype == 'sqlite') {
     $db = new SQLite($dbhost);
 } else {

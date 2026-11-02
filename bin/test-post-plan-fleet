@@ -256,9 +256,11 @@ end_case plist-shape
 # expands it to zero words.
 begin_case
 if [[ -f /tmp/post-plan-fleet-runner-1901.sh ]]; then
-    grep -qxF 'timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
+    grep -qxF 'POSTPLAN_FIRED_BY="$POSTPLAN_FIRED_BY" timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?' \
         /tmp/post-plan-fleet-runner-1901.sh \
         || fail "runner-line-hand-started: runner lacks the post-plan-now line"
+    grep -qxF "POSTPLAN_FIRED_BY=post-plan-fleet" /tmp/post-plan-fleet-runner-1901.sh \
+        || fail "runner-line-hand-started: header lacks POSTPLAN_FIRED_BY=post-plan-fleet"
     grep -qxF "ALLOW_TEST_ONLY_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
         || fail "runner-line-hand-started: header lacks ALLOW_TEST_ONLY_ARG=''"
     grep -qxF "STATE_CHANGED_ARG=''" /tmp/post-plan-fleet-runner-1901.sh \
@@ -299,7 +301,7 @@ _allow_stub_run() {  # $1 = runner path, $2 = stub argv output file
     chmod +x "$stub"
     ( ROOT=/tmp PR=1901 LOG=/dev/null RC=0 POST_PLAN_NOW_BIN="$stub"
       eval "$(grep -E '^(ALLOW_TEST_ONLY_ARG|STATE_CHANGED_ARG|REBASE_ONLY_ARG)=' "$runner")"
-      eval "$(grep -E '^timeout "\$PPN_TIMEOUT_SECS" ' "$runner" | sed 's/^timeout "\$PPN_TIMEOUT_SECS" //')" ) 2>/dev/null
+      eval "$(grep -E '^POSTPLAN_FIRED_BY="\$POSTPLAN_FIRED_BY" timeout "\$PPN_TIMEOUT_SECS" ' "$runner" | sed 's/^POSTPLAN_FIRED_BY="\$POSTPLAN_FIRED_BY" timeout "\$PPN_TIMEOUT_SECS" //')" ) 2>/dev/null
 }
 begin_case
 clean_slots

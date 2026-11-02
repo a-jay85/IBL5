@@ -449,7 +449,7 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     // Module-scoped error flash (_ibl_depth_chart_flash) is safe from the
     // parallel-worker race; its presence means server-side validation rejected
     // the live config — a real failure we must catch.
-    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
+    await expect(page.locator('.d-alert-error')).not.toBeVisible();
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
     // Read-back: navigate away and back to prove the mutated depth chart was
     // persisted to the DB, not merely that the form reloaded without an error.
@@ -488,7 +488,7 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
     // A rejected restore would leave the roster drifted and re-arm the flake for
     // the next run, so it has to be asserted just as hard as the mutation submit.
-    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
+    await expect(page.locator('.d-alert-error')).not.toBeVisible();
   });
 
   isolatedTest.afterAll(async ({ request }) => {

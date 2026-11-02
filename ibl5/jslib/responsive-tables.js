@@ -43,6 +43,9 @@
         // Skip tables inside sticky-scroll-wrapper — they handle their own scrolling
         if (table.closest(".sticky-scroll-wrapper")) return;
 
+        // Skip gold player stats cards: the card themes and scrolls its own tables
+        if (table.closest(".player-stats-card")) return;
+
         // Skip hidden tables (e.g. collapsed ballot sections) — they measure
         // 0 wide, which would strip their responsive state and zero out widths
         if (isHidden(table)) return;

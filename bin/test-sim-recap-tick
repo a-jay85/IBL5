@@ -1404,10 +1404,12 @@ srt_log_has "$STUB" prompt.out "em-dash"               "anti_tell_list_present �
 srt_log_has "$STUB" prompt.out "and here's the thing"  "anti_tell_list_present — and here's the thing"
 
 # ── standings_placement_singular ─────────────────────────────────────────────
-srt_log_has  "$STUB" prompt.out "before any per-game recaps" \
-    "standings_placement_singular — exemplar-authoritative ordering present"
-srt_log_lacks "$STUB" prompt.out "paragraph at the end" \
-    "standings_placement_singular — superseded 'at the end' phrasing absent"
+srt_log_has  "$STUB" prompt.out "after the last per-game recap" \
+    "standings_placement_singular — closing placement present"
+srt_log_lacks "$STUB" prompt.out "before any per-game recaps" \
+    "standings_placement_singular — superseded top placement absent"
+srt_log_lacks "$STUB" prompt.out "at the TOP" \
+    "standings_placement_singular — superseded exemplar-header top placement absent"
 
 # ── mentions_render_as_strings ────────────────────────────────────────────────
 # Snowflake digit-for-digit in output (same run, but rerun for clarity).

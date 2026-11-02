@@ -36,7 +36,7 @@ class ExtensionViewTest extends TestCase
     public function testErrorResultRendersErrorAlert(): void
     {
         self::assertSame(
-            '<div class="ibl-alert ibl-alert--error">Over the cap.' . self::ERROR_SUFFIX . '</div>',
+            '<div role="alert" class="d-alert d-alert-error mb-4">Over the cap.' . self::ERROR_SUFFIX . '</div>',
             $this->view->renderResultBanner('extension_error', 'Over the cap.')
         );
     }
@@ -46,7 +46,7 @@ class ExtensionViewTest extends TestCase
         $output = $this->view->renderResultBanner('extension_accepted', 'Deal done.');
 
         self::assertSame(
-            '<div class="ibl-alert ibl-alert--success"><strong>Player response:</strong> Deal done.' . self::ACCEPTED_NOTE . '</div>',
+            '<div role="alert" class="d-alert d-alert-success mb-4"><strong>Player response:</strong> Deal done.' . self::ACCEPTED_NOTE . '</div>',
             $output
         );
         self::assertStringContainsString("commissioner's office", $output);
@@ -55,7 +55,7 @@ class ExtensionViewTest extends TestCase
     public function testRejectedResultRendersInfoAlert(): void
     {
         self::assertSame(
-            '<div class="ibl-alert ibl-alert--info"><strong>Player response:</strong> Not enough.' . self::REJECTED_NOTE . '</div>',
+            '<div role="alert" class="d-alert d-alert-info mb-4"><strong>Player response:</strong> Not enough.' . self::REJECTED_NOTE . '</div>',
             $this->view->renderResultBanner('extension_rejected', 'Not enough.')
         );
     }
@@ -88,7 +88,7 @@ class ExtensionViewTest extends TestCase
         self::assertStringContainsString(HtmlSanitizer::e($payload), $output);
 
         self::assertSame(
-            '<div class="ibl-alert ibl-alert--error">' . self::ERROR_SUFFIX . '</div>',
+            '<div role="alert" class="d-alert d-alert-error mb-4">' . self::ERROR_SUFFIX . '</div>',
             $this->view->renderResultBanner('extension_error', null)
         );
     }
@@ -104,7 +104,7 @@ class ExtensionViewTest extends TestCase
             self::assertStringContainsString($expected, $teamView->render($this->createPageData($result, $msg)));
         }
 
-        self::assertStringNotContainsString('ibl-alert', $teamView->render($this->createPageData(null, $msg)));
+        self::assertStringNotContainsString('d-alert', $teamView->render($this->createPageData(null, $msg)));
     }
 
     #[DataProvider('markupPayloadProvider')]
@@ -125,9 +125,9 @@ class ExtensionViewTest extends TestCase
     public static function markupPayloadProvider(): array
     {
         return [
-            'error' => ['extension_error', '<div class="ibl-alert ibl-alert--error">', self::ERROR_SUFFIX . '</div>'],
-            'accepted' => ['extension_accepted', '<div class="ibl-alert ibl-alert--success"><strong>Player response:</strong> ', self::ACCEPTED_NOTE . '</div>'],
-            'rejected' => ['extension_rejected', '<div class="ibl-alert ibl-alert--info"><strong>Player response:</strong> ', self::REJECTED_NOTE . '</div>'],
+            'error' => ['extension_error', '<div role="alert" class="d-alert d-alert-error mb-4">', self::ERROR_SUFFIX . '</div>'],
+            'accepted' => ['extension_accepted', '<div role="alert" class="d-alert d-alert-success mb-4"><strong>Player response:</strong> ', self::ACCEPTED_NOTE . '</div>'],
+            'rejected' => ['extension_rejected', '<div role="alert" class="d-alert d-alert-info mb-4"><strong>Player response:</strong> ', self::REJECTED_NOTE . '</div>'],
         ];
     }
 
@@ -139,7 +139,7 @@ class ExtensionViewTest extends TestCase
 
         try {
             self::assertSame(
-                '<div class="ibl-alert ibl-alert--info"><strong>Player response:</strong> Not enough.' . self::REJECTED_NOTE . '</div>',
+                '<div role="alert" class="d-alert d-alert-info mb-4"><strong>Player response:</strong> Not enough.' . self::REJECTED_NOTE . '</div>',
                 $this->view->renderResultBanner('extension_rejected', 'Not enough.')
             );
             self::assertSame('', $this->view->renderResultBanner(null, null));

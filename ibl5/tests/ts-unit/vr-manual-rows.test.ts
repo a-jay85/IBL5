@@ -5,8 +5,11 @@ import {
   manualShotFile,
   manualShotUrl,
   buildManualSection,
+  setupStepsFor,
   type ManualRowResult,
 } from '../e2e/vr-manual-rows';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const PAGES_URL = 'https://a-jay85.github.io/IBL5/deadbeef/visual-review/';
 
@@ -252,5 +255,97 @@ describe('buildManualSection', () => {
 
   it('buildManualSection returns empty for zero rows', () => {
     expect(buildManualSection([], PAGES_URL)).toBe('');
+  });
+});
+
+describe('manual-row before/after', () => {
+  const PINNED_AFTER_ONLY = [
+    '### 📸 Manual-row screenshots',
+    '',
+    '**Row 23 — `team-page`**',
+    '',
+    `![team-page](${PAGES_URL}manual-rows/team-page.png)`,
+    '',
+    '_Review aids only — never a gate. See ADR-0126._',
+  ].join('\n');
+
+  it('11a buildManualSection without beforeStatus matches the pinned after-only output', () => {
+    const md = buildManualSection([{ label: 'team-page', row: '23', status: 'ok' }], PAGES_URL);
+    expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+
+  it('11b beforeStatus ok places the before image above the after image', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'ok' }],
+      PAGES_URL
+    );
+    const before = md.indexOf(`${PAGES_URL}manual-rows/team-page.before.png`);
+    const after = md.indexOf(`${PAGES_URL}manual-rows/team-page.png`);
+    expect(before).toBeGreaterThan(-1);
+    expect(after).toBeGreaterThan(before);
+    expect(md.indexOf('**Before (base)**')).toBeLessThan(md.indexOf('**After (PR)**'));
+  });
+
+  it('11c beforeStatus failed renders byte-identical to the after-only output', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'failed' }],
+      PAGES_URL
+    );
+    expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+
+  it('11d manualShotFile maps the before side to <label>.before.png', () => {
+    expect(manualShotFile('x', 'before')).toBe('x.before.png');
+    expect(manualShotFile('x')).toBe('x.png');
+    expect(manualShotUrl(PAGES_URL, 'x', 'before')).toBe(`${PAGES_URL}manual-rows/x.before.png`);
+    expect(manualShotUrl(PAGES_URL, 'x', 'side')).toBe(`${PAGES_URL}manual-rows/x.side.png`);
+    expect(manualShotUrl(PAGES_URL, 'x', 'stack')).toBe(`${PAGES_URL}manual-rows/x.stack.png`);
+  });
+
+  it('11e composed renders one side/stack <picture> instead of two images', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'ok', composed: true }],
+      PAGES_URL
+    );
+    expect(md).toContain(
+      `<a href="${PAGES_URL}manual-rows/team-page.side.png">` +
+        '<picture><source media="(min-width: 768px)" ' +
+        `srcset="${PAGES_URL}manual-rows/team-page.side.png">` +
+        `<img src="${PAGES_URL}manual-rows/team-page.stack.png" alt="team-page before and after"></picture></a>`
+    );
+    expect(md).not.toContain('team-page.before.png');
+    expect(md).not.toContain(`(${PAGES_URL}manual-rows/team-page.png)`);
+    expect(md).not.toContain('**Before (base)**');
+  });
+
+  it('11f composed without an ok before renders the after-only output', () => {
+    const md = buildManualSection(
+      [{ label: 'team-page', row: '23', status: 'ok', beforeStatus: 'failed', composed: true }],
+      PAGES_URL
+    );
+    expect(md).toBe(PINNED_AFTER_ONLY);
+  });
+});
+
+// The after pass runs first and the before pass reuses its DB, so a `setup=`
+// mutation re-sent on the before pass would fail or apply twice.
+describe('manual-row setup runs on the after pass only', () => {
+  const setup = [
+    { method: 'POST', path: 'test-state.php?action=toggle-x' },
+    { method: 'DELETE', path: 'test-state.php?action=reset-y' },
+  ];
+
+  it('12a the after pass gets every setup step', () => {
+    expect(setupStepsFor({ setup }, 'after')).toEqual(setup);
+  });
+
+  it('12b the before pass gets no setup steps', () => {
+    expect(setupStepsFor({ setup }, 'before')).toEqual([]);
+  });
+
+  it('12c the capture spec sends setup only through setupStepsFor', () => {
+    const spec = readFileSync(resolve(__dirname, '../e2e/manual-rows.spec.ts'), 'utf-8');
+    expect(spec).toContain('setupStepsFor(row, SIDE)');
+    expect(spec).not.toMatch(/\brow\.setup\b/);
   });
 });

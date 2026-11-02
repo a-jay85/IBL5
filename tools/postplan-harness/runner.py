@@ -42,6 +42,7 @@ HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
+from harness import fidelity_delta
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
@@ -329,6 +330,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     ledger=ledger, audit=audit)
     global _active_audit
     _active_audit = audit
+    res.fired_by = _fired_by()
+    log(f"postplan: fired-by={res.fired_by}")
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"auto_merge_value={getattr(plan, 'auto_merge_value', None)!r} "
@@ -709,6 +712,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                       scored_findings=res.scored_findings,
                       cache_rec=cache_rec, cache_version=cache_key["version"],
                       conflict_only=conflict_only,
+                      state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
                       body_hash=reviewcache.body_hash_of(copy["summary_md"]))
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
@@ -951,6 +955,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                            fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                            fid.get("rounds_completed", 0)),
                     diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                    own_id=fid.get("own_id", ""),
                     reused_from=res.reused_from,
                     posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
                 try:
@@ -1102,8 +1107,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.terminal = TerminalState.ALREADY_SHIPPED
             res.pr_number = int(merged["number"])
             res.final_pr_state = "MERGED"
-            log(f"already-shipped: diff vs origin/master is empty and PR "
-                f"#{res.pr_number} is MERGED; suppressing {e.kind} ({(e.detail or '')[:120]})")
+            why = merged.get("why") or "diff vs origin/master is empty"
+            log(f"already-shipped: {why} and PR #{res.pr_number} is MERGED; "
+                f"suppressing {e.kind} ({(e.detail or '')[:120]})")
         else:
             res.terminal = TerminalState.FAILED
             res.error = f"{e.kind}: {e.detail}"
@@ -1243,9 +1249,26 @@ _EMPTY_DIFF_MARKERS = ("diff vs origin/master is empty", "nothing was compared",
 
 
 def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
-    """{"number", "url"} of the merged PR when `e` is an empty-diff failure on a branch
-    whose PR already merged, else None. Never relaxes the proof for a non-empty diff:
-    the live diff vs origin/master must itself be empty, and a merged PR must exist."""
+    """{"number", "url", "why"} of the merged PR when the branch's PR already merged
+    what this run shipped, else None. Two proofs, each needing a merged PR:
+    - an empty-diff failure whose live diff vs origin/master is itself empty;
+    - a deleted remote branch whose merged PR head equals this run's lease. GitHub
+      merged exactly what this run pushed (auto-merge landed mid-run), so any local
+      commit past the lease is this run's own post-merge work, e.g. a moot CI fix.
+    - phase7 saw this run's own PR MERGED before or during a ci-fix attempt.
+    A foreign tip, a different merged head or an unprovable probe keeps the failure."""
+    if e.kind == _PR_MERGED_MID_FIX:
+        return getattr(e, "merged", None)
+    lease = getattr(e, "deleted_lease", "")
+    if e.kind == "remote-head-diverged" and lease:
+        try:
+            merged = gh.merged_pr()
+        except Exception as exc:  # noqa: BLE001 - unknown means keep the original failure
+            log(f"already-shipped: probe failed ({exc!r}); keeping {e.kind}")
+            return None
+        if merged and merged.get("head") == lease:
+            return {**merged, "why": f"PR merged at lease {lease[:8]} before the run ended"}
+        return None
     if e.kind not in ("lostwork-unproved", "gh"):
         return None
     if not any(m in (e.detail or "") for m in _EMPTY_DIFF_MARKERS):
@@ -1304,7 +1327,7 @@ def _reclaim_stale_lease(git, log, phase: str, snap, *, run_git=None) -> None:
         _fail_closed_on_divergence(
             None, log, None, phase,
             f"{remote}/{branch} was deleted (lease {lease[:8]}); refusing to recreate it",
-            disarm=False)
+            disarm=False, deleted_lease=lease)
     why = gitutil.owned_remote_tip(lease, pre_head, tip, git.worktree, run_git=run_git)
     if not why:
         # the ownership helpers' `git fetch origin` may have moved the tracking ref to
@@ -1572,12 +1595,16 @@ def _push_with_gate_fix(git, log, phase, *, llm, worktree, out_dir, res, pr=None
 
 
 def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
-                               disarm: bool) -> None:
-    """Remote PR head was rewritten with different content. Never push over it."""
+                               disarm: bool, deleted_lease: str = "") -> None:
+    """Remote PR head was rewritten with different content. Never push over it.
+    `deleted_lease`: the branch is gone from the remote; the full lease SHA rides on
+    the error so `_already_shipped` can check whether GitHub merged exactly it."""
     if disarm and pr:
         gh.pr_disable_auto_merge(pr)
     log(f"{phase}: ERROR {evidence}; failing closed (remote-head-diverged)")
-    raise HarnessError("remote-head-diverged", f"{phase}: {evidence}")
+    err = HarnessError("remote-head-diverged", f"{phase}: {evidence}")
+    err.deleted_lease = deleted_lease
+    raise err
 
 
 def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
@@ -1666,6 +1693,8 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
 _CI_FIX_WALL_BUDGET_SECS = 4800
 _CI_FIX_MIN_ITER_SECS = 1200   # one Opus fix plus one CI cycle; less than this, stop
 _CI_FIX_REWATCH_FLOOR_SECS = 300   # less than this after a push: record the head, skip the watch
+_STALE_RED_FAST_WATCH_SECS = 30   # a recorded watch shorter than this saw an already-settled red
+_STALE_RED_GRACE_SECS = 90        # wait before re-reading checks; a superseding run registers in seconds
 
 
 def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
@@ -1684,6 +1713,73 @@ def _phase7_stop(log, trail: list[str], attempt: int, sha, stage: str,
             "the next bin/post-plan-now run ships it"
             + (f" ({str(local_sha)[:12]})" if local_sha else ""))
     return last
+
+
+_PR_MERGED_MID_FIX = "pr-merged-mid-fix"
+
+
+def _pr_merged_now(gh, pr, log, where: str) -> dict | None:
+    """{"number", "url"} when this run's own PR is MERGED right now, else None.
+    A probe error, a missing probe, or a merged PR with another number is unknown,
+    and unknown is never merged: the caller keeps today's ci-fix flow."""
+    try:
+        merged = gh.merged_pr()
+    except Exception as exc:  # noqa: BLE001 - unknown means keep current behavior
+        log(f"phase7 ci-fix: merged probe {where} attempt failed ({exc!r}); continuing")
+        return None
+    try:
+        same = bool(merged) and int(merged.get("number") or 0) == int(pr)
+    except (TypeError, ValueError, AttributeError):
+        same = False
+    if not same:
+        return None  # unknown: never merged
+    return {"number": int(pr), "url": merged.get("url") or ""}
+
+
+def _raise_merged_mid_fix(log, merged: dict, attempt: int, where: str, note: str):
+    """End Phase 7 as already-shipped: GitHub merged this PR, so a fix is moot."""
+    log(f"phase7 ci-fix: PR #{merged['number']} merged {where} attempt {attempt}; {note}")
+    err = HarnessError(_PR_MERGED_MID_FIX,
+                       f"PR #{merged['number']} merged {where} ci-fix attempt {attempt}")
+    err.merged = {**merged, "why": f"PR merged {where} phase7 ci-fix attempt {attempt}"}
+    raise err
+
+
+def _stale_red_wait(secs: float) -> None:
+    """The stale-red grace wait; a seam so tests never sleep."""
+    time.sleep(secs)
+
+
+def _stale_red_regrace(log, worktree, pr, sha, outcome, out_dir, run_started):
+    """Re-read checks once when the recorded red came from a watch that finished
+    within seconds. Such a watch saw a settled red that a new run may already have
+    superseded. Returns the outcome to act on; any unknown keeps the original red."""
+    took = ciwatch.watch_duration(out_dir, sha)
+    if took is None or took >= _STALE_RED_FAST_WATCH_SECS:
+        return outcome
+    remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+    if remaining - _STALE_RED_GRACE_SECS < _CI_FIX_MIN_ITER_SECS:
+        log(f"phase7 ci-fix: stale-red re-probe skipped ({int(remaining)}s budget left)")
+        return outcome
+    log(f"phase7 ci-fix: recorded watch took {took:.0f}s; re-probing checks in "
+        f"{_STALE_RED_GRACE_SECS}s before spending a fix attempt")
+    _stale_red_wait(_STALE_RED_GRACE_SECS)
+    rows = ciwatch.snapshot_checks(worktree, pr)
+    verdict = ciwatch.regrace_verdict(rows)
+    log(f"phase7 ci-fix stale-red re-probe: verdict={verdict} sha={str(sha)[:8]}")
+    if verdict == "green":
+        return ciwatch.CiOutcome(0, [], outcome.evidence + " (stale red: re-probe green)")
+    if verdict == "pending":
+        remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+        fresh = ciwatch.watch_live(worktree, pr, timeout=max(300, int(remaining - 120)))
+        log(f"phase7 ci-fix stale-red re-watch: exit={fresh.exit_code} failed={fresh.failed}")
+        return fresh if fresh.exit_code in (0, 8) else outcome
+    if verdict == "red":
+        failed = sorted({str(r.get("name")) for r in rows if r.get("name")
+                         and str(r.get("bucket") or "").lower() in ("fail", "cancel")})
+        return ciwatch.CiOutcome(8, failed or list(outcome.failed),
+                                 outcome.evidence + " (stale-red re-probe: still red)")
+    return outcome
 
 
 def _phase7_rewatch(gh, log, res, worktree, pr, sha, out_dir, run_started):
@@ -1767,6 +1863,10 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         except (HarnessError, OSError, subprocess.SubprocessError):
             log("phase7 ci-fix: survivor comment not posted")
         return sha, outcome
+
+    # 3b. Stale-red guard: a red from a seconds-long watch may already be superseded.
+    if mode != "replay":
+        outcome = _stale_red_regrace(log, worktree, pr, sha, outcome, out_dir, run_started)
 
     # 4. Replay rewatch queue
     queue = list((fixture or {}).get("ci_fix_rewatch") or []) if mode == "replay" else []
@@ -1886,6 +1986,12 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             log(f"phase7 ci-fix: wall-clock budget exhausted ({int(remaining)}s left)")
             break
 
+        # Merged mid-run: GitHub already merged this PR, so a fix attempt is moot.
+        merged = _pr_merged_now(gh, pr, log, "before")
+        if merged is not None:
+            _raise_merged_mid_fix(log, merged, attempt + 1, "before",
+                                  "no ci-fix LLM call spent")
+
         # Sync to remote head (live only)
         if mode != "replay":
             r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
@@ -1962,12 +2068,17 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                             denied_tools=cifix.CI_FIX_DENIED_TOOLS, add_dirs=(fix_dir,),
                             timeout=int(min(TOOLED_TIMEOUT, remaining / 2)))
             remaining = _CI_FIX_WALL_BUDGET_SECS - (time.time() - run_started)
+            merged = _pr_merged_now(gh, pr, log, "during")
+            if merged is not None:
+                _raise_merged_mid_fix(log, merged, attempt, "during",
+                                      "ci-fix edits left uncommitted in the worktree; "
+                                      "not committed and not shipped")
             stage = "commit"
             new = _commit_with_gate_fix(git, worktree,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7",
                     llm=llm, res=res)
         except HarnessError as e:
-            if e.kind == "remote-head-diverged":
+            if e.kind in ("remote-head-diverged", _PR_MERGED_MID_FIX):
                 raise
             last = _phase7_stop(log, trail, attempt, sha, stage, e)
             break
@@ -2974,7 +3085,11 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
                    else reviewcache.vet_fidelity(res.fidelity, this_run))
         if fid_arm and "fidelity" not in res.reused_from and body_hash:
             fid_arm = dict(fid_arm, body_hash=body_hash)   # the prose check 4 graded
-        if "fidelity" in res.reused_from and fid_arm:
+        if fid_arm and "fidelity" not in res.reused_from:
+            fid_arm = dict(fid_arm, own_id=((getattr(res, "fidelity", None) or {})
+                                            .get("own_id", "") or ""))
+        if ("fidelity" in res.reused_from and fid_arm
+                and (getattr(res, "fidelity", None) or {}).get("carry_reason") != "own-change"):
             fid_arm = dict(fid_arm, diff_id=cache_key["diff_id"])   # conflict-only: valid for the current diff
         doc = reviewcache.build_record(slug=slug, pr_number=int(res.pr_number), run_id=this_run,
                                        key=cache_key, per_file_ids=cache_files, review=rev_arm,
@@ -3000,6 +3115,16 @@ def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root,
     return key, per_file
 
 
+_FIRED_BY_RE = re.compile(r"[a-z][a-z0-9-]{0,39}")
+
+
+def _fired_by() -> str:
+    """Caller label from POSTPLAN_FIRED_BY, or "unknown". Attribution only: the value
+    never reaches a decision, so any unset, empty, or malformed value is "unknown"."""
+    v = os.environ.get("POSTPLAN_FIRED_BY", "")
+    return v if _FIRED_BY_RE.fullmatch(v) else "unknown"
+
+
 def _plan_hash(plan) -> str:
     """sha256 of the plan file's BYTES, or "" when there is no readable plan.
 
@@ -3020,7 +3145,8 @@ def _plan_hash(plan) -> str:
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
-                  cache_rec=None, cache_version="", conflict_only=False, body_hash=""):
+                  cache_rec=None, cache_version="", conflict_only=False, body_hash="",
+                  state_dir=None, slug=""):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
@@ -3032,6 +3158,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     """
     plan_hash = _plan_hash(plan)
     diff_id = fidelity.diff_patch_id(diff)
+    _own_diff = getattr(git, "own_change_diff", None)
+    try:
+        own_id = fidelity.own_change_id(_own_diff()) if callable(_own_diff) else ""
+    except Exception:
+        own_id = ""   # fail closed: an unreadable own-change diff never carries
     canned = getattr(llm, "canned", None)
     if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
         log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
@@ -3044,7 +3175,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
+                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": []}
         return "READY", ""
     # Carry-forward: when the branch diff under review (by patch-id, so a clean rebase
     # onto a moved master still matches) and the plan behind it are both unchanged from
@@ -3072,6 +3203,21 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         carried, decline_reason = fidelity.carry_forward_predicate(
             prior_sticky, reuse_diff, plan_hash)
         carry_reason = "conflict-only-delta" if carried else ""
+    # Own-change arm: the full-context patch-id moved, but the branch's own changed lines
+    # are byte-identical to the diff the reviewer judged (a master edit landed inside a
+    # hunk's context window). Re-checks every strict arm against the reviewed diff.
+    own_reason = ""
+    if not carried and decline_reason == "diff-changed" and own_id:
+        prior_diff, own_reason = fidelity.own_change_carry_diff(prior_sticky, own_id)
+        if prior_diff:
+            inner, inner_reason = fidelity.carry_forward_predicate(
+                prior_sticky, prior_diff, plan_hash)
+            if inner:
+                carried, reuse_diff, carry_reason = inner, prior_diff, "own-change"
+            else:
+                own_reason = inner_reason
+    elif not carried and decline_reason == "diff-changed":
+        own_reason = "no-own-id"
     if carried:
         reuse_run = reviewcache.fidelity_reusable(cache_rec, cache_version, reuse_diff, plan_hash,
                                                  body_hash)
@@ -3084,6 +3230,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                               else "body-changed" if body_hash
                               and (cache_rec.get("fidelity") or {}).get("body_hash") != body_hash
                               else "cache-arm-unusable")
+    if carry_reason == "own-change":
+        cached_own = (((cache_rec or {}).get("fidelity") or {}).get("own_id", "") or "")
+        if carried and cached_own != own_id:
+            carried, decline_reason = None, "cache-own-id-mismatch"
+        if not carried:
+            own_reason, decline_reason, carry_reason = decline_reason, "diff-changed", ""
     # The sticky composed after a carry still quotes verdict_path(pr). If /tmp lost it,
     # carrying would overwrite the prior sticky's real excerpt and digest with
     # placeholders, so decline and let the full review regenerate the file.
@@ -3092,7 +3244,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     if carried:
         res.reused_from["fidelity"] = reuse_run
         log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})"
-            + (" (conflict-only delta)" if carry_reason else ""))
+            + {"conflict-only-delta": " (conflict-only delta)",
+               "own-change": f" (own-change match, reviewed {reuse_diff[:12]})"}
+            .get(carry_reason, ""))
         res.fidelity = {"verdict_1": carried, "error_kind": None,
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
@@ -3101,13 +3255,15 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
+                        "diff_id": reuse_diff if carry_reason == "own-change" else diff_id,
+                        "own_id": own_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True,
                         "shadow": fidelity.carried_shadow(
                             ((cache_rec or {}).get("fidelity") or {}).get("shadow"), reuse_run),
                         **({"carry_reason": carry_reason} if carry_reason else {})}
         return carried, ""
-    log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
+    log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})"
+        f" diff-id={diff_id or '-'} own-id={own_id or '-'} own-arm={own_reason or '-'}")
     # Join Phase 4 before building the fidelity packet so phase4b_ran is truthful.
     if before_remediation is not None:
         before_remediation()
@@ -3136,12 +3292,22 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
+                        "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
-    verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
-                                   reviewed_tree=reviewed_tree)
+    delta_hit = fidelity_delta.attempt(
+        llm, out_dir, worktree or ".", gh, plan, diff, body, pr, master_sha,
+        reviewed_tree, live, log, state_dir=state_dir, slug=slug, plan_hash=plan_hash,
+        diff_id=diff_id, cache_version=cache_version, phase4b_ran=phase4b_ran,
+        review_findings=review_findings)
+    if delta_hit is None:
+        verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
+                                       reviewed_tree=reviewed_tree)
+        delta_info = {}
+    else:
+        verdict, err, delta_info = delta_hit
     log(f"phase5.5 fidelity: verdict={verdict or 'INDETERMINATE'}"
-        + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}")
+        + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}"
+        + (" review_kind=delta" if delta_info else ""))
     res.fidelity = {"verdict_1": verdict, "error_kind": err or None,
                     "reviewed_tree": reviewed_tree,
                     "verdict_path": fidelity.verdict_path(pr),
@@ -3150,7 +3316,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "findings_round": 0,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
-                    "diff_id": diff_id, "plan_hash": plan_hash}
+                    "diff_id": diff_id, "own_id": own_id, "plan_hash": plan_hash, **delta_info}
     # Shadow-mode arming record (procedure 6f). Set after the wholesale replacement above;
     # nothing on the verdict, remediation or arming path reads it.
     res.fidelity["shadow"] = (
@@ -3398,6 +3564,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
+    fidelity_delta.record_outcome(state_dir, slug, res.fidelity, pr_number=pr,
+                                  run_id=os.path.basename(os.path.normpath(out_dir)),
+                                  version=cache_version, diff=diff,
+                                  final_tree=git.head_tree(), log=log)
     return final_verdict, final_err
 
 
@@ -4288,7 +4458,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                 f"{_flat(res.error) or 'no detail'}{pr}")
     if res.terminal == TerminalState.ALREADY_SHIPPED:
         return (f"RESULT: post-plan complete — terminal=already-shipped{pr} "
-                "(PR already merged; branch diff vs master is empty); no action needed.")
+                "(PR already merged); no action needed.")
     if res.terminal == TerminalState.NOTHING_TO_SHIP:
         return ("RESULT: post-plan complete — nothing to ship "
                 "(clean tree, empty diff vs master); no PR opened.")

@@ -35,7 +35,7 @@ test.describe('Admin phase-gate notice', () => {
     });
     await gotoWithRetry(page, 'modules.php?name=Draft');
 
-    const notice = page.locator('.ibl-alert--warning');
+    const notice = page.locator('.d-alert-warning');
     await expect(notice).toBeVisible();
     await expect(notice).toContainText(
       'Admin mode: You can view this module, but it is currently closed to non-admin GMs.',
@@ -73,7 +73,7 @@ test.describe('Admin phase-gate notice', () => {
     await expect(page.getByText('Unsigned Free Agents').first()).toBeVisible();
     await expect(page.getByText('All Other Free Agents').first()).toBeVisible();
 
-    const notice = page.locator('.ibl-alert--warning');
+    const notice = page.locator('.d-alert-warning');
     await expect(notice).toBeVisible();
     await expect(notice).toContainText(
       'Admin mode: You can view this module, but it is currently closed to non-admin GMs.',

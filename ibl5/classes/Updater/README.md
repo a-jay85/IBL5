@@ -1,6 +1,6 @@
 ---
 description: Updater pipeline web entry point (scripts/updateAllTheThings.php, run from the League Control Panel's "Update All The Things" button) and notes on its report-only steps.
-last_verified: 2026-10-23
+last_verified: 2026-10-28
 ---
 
 # Updater
@@ -25,6 +25,8 @@ Triggered by the **"Update All The Things"** button in the League Control Panel 
 - **Progressive HTML output** — streams progress via `flush()` as each Step completes.
 
 See the security comment block at the top of `scripts/updateAllTheThings.php` for the full rationale.
+
+The updater runs past the 10-second web statement cap, so it calls `Database\StatementTimeout::disable($mysqli_db)` right after `set_time_limit(300)`. See the Statement Time Cap section of `ibl5/docs/DATABASE_GUIDE.md`.
 
 ## Steps
 

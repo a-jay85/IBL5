@@ -29,7 +29,7 @@
 .ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd),
 .ibl-data-table tbody tr.player-fa-expiring-row:nth-child(even) {
     background-color: var(--gray-100);
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 .ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd):hover,
@@ -38,11 +38,11 @@
 }
 
 .ibl-data-table tbody tr.player-fa-expiring-row td {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 .ibl-data-table tbody tr.player-fa-expiring-row a {
-    color: var(--gray-400);
+    color: var(--gray-600);
 }
 
 .ibl-data-table tbody tr.player-fa-expiring-row img {
@@ -60,7 +60,7 @@
        in step with the faded row instead of retaining its stripe colour. */
     .responsive-table tbody tr.player-fa-expiring-row td[class*="sticky-col"] {
         background-color: var(--gray-100);
-        color: var(--gray-400);
+        color: var(--gray-600);
     }
 
     .responsive-table tbody tr.player-fa-expiring-row:hover td[class*="sticky-col"] {

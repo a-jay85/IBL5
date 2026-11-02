@@ -364,10 +364,9 @@ test.describe('Team Schedule — month header card primitive', () => {
     await page.goto(TEAM_SCHEDULE_URL);
   });
 
-  test('schedule-month__header carries ibl-card__header class', async ({ page }) => {
-    await expect(
-      page.locator('.ibl-card__header.schedule-month__header').first(),
-    ).toBeVisible();
+  test('schedule-month__header renders without the legacy card-header class', async ({ page }) => {
+    await expect(page.locator('.schedule-month__header').first()).toBeVisible();
+    await expect(page.locator('.schedule-month .ibl-card__header')).toHaveCount(0);
   });
 });
 

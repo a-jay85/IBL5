@@ -793,18 +793,21 @@ if [ "${STATE_CHANGED:-0}" -eq 1 ]; then
 else
     HARNESS_STATE_CHANGED_ENV="POSTPLAN_STATE_CHANGED=0 "
 fi
+# Fire source for the rerun report (runner.py _fired_by). An outer caller
+# (post-plan-fleet, automouse/run) exports its label; a direct run is post-plan-now.
+HARNESS_FIRED_BY_ENV="POSTPLAN_FIRED_BY=$(shq "${POSTPLAN_FIRED_BY:-post-plan-now}") "
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_STARTED:-0}" != 1 ]; then
     FALLBACK_FN="$(declare -f should_fallback blocked_ship_block); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     REBASE_ONLY_ARG="$(rebase_only_harness_arg "$REBASE_ONLY")"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_CONFIX_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
+    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
     # Foreground has no launchd job, so nothing points stdout at $LOG. Without the tee, $LOG
     # never exists: the RESULT capture below comes back empty and the Log line in the
     # rc=3 message points at a missing file. Foreground only:
     # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
     [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_CONFIX_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && ! postplan_killed \"\$rc\" 0 $(shq "$LOG") && should_fallback \"\$rc\" $REBASE_ONLY && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
     # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. The capture now feeds only

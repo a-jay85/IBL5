@@ -811,6 +811,21 @@ INSERT INTO ibl_box_scores (
    3, 5, 3, 2, 1, 2, 2,
    '00000000-0000-0000-0000-000000000002');
 
+-- On this day: precomputed past-season moments for the homepage card.
+-- CI sim 689 ends 2026-03-07, so the window centers on 03-07 and season 2026 is excluded.
+-- Facts match the #3351 box-score rows (52-point game, 20/12/11 triple-double).
+INSERT INTO ibl_on_this_day_moments (
+  moment_key, kind, game_date, month_day, season_year,
+  pid, player_name, teamid, team_name, opponent_teamid, opponent_name,
+  facts_json, stat_label, game_of_that_day
+) VALUES
+  ('fifty_point:2024-03-07:1', 'fifty_point', '2024-03-07', '03-07', 2024,
+   1, 'Test Player', 1, 'Metros', 2, 'Stars',
+   '{"points":52,"rebounds":6,"assists":4,"steals":1,"blocks":0}', NULL, 1),
+  ('triple_double:2021-03-07:2', 'triple_double', '2021-03-07', '03-07', 2021,
+   2, 'Test Player Two', 1, 'Metros', 2, 'Stars',
+   '{"points":20,"rebounds":12,"assists":11,"steals":1,"blocks":1}', NULL, 1);
+
 -- Boxscore coverage: player-level rows for 2026-02-20 game 1 (Metros@Stars)
 -- 4 Metros (visitor, tid=1) + 3 Stars (home, tid=2) = 7 rows
 -- calc_points, calc_rebounds, calc_fg_made are generated columns
@@ -1600,6 +1615,57 @@ ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
   home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
+-- Rivalries fixture: 5 HEAT 1-vs-2 games in October 2003 (season 2004) lift the
+-- Metros/Stars franchise pair to exactly 10 meetings so it qualifies as a rivalry. The
+-- dates predate every ibl_gm_tenures row (2020), so the GM TestUser/GM Stars pair stays at 5.
+-- HEAT (game_type 3), because ibl_team_win_loss counts only regular-season games: a partial
+-- 2004 regular season there trips the Update Tradition 82-game anomaly check.
+-- Team rows only (no ibl_box_scores player rows). Stat values copy the 2026-02-20 1-vs-2 pair.
+INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+  game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+  ('2003-10-05', 1, 2, 1, 'Metros',
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-05', 1, 2, 1, 'Stars',
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-10', 2, 1, 1, 'Metros',
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-10', 2, 1, 1, 'Stars',
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-15', 1, 2, 1, 'Metros',
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-15', 1, 2, 1, 'Stars',
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-20', 2, 1, 1, 'Metros',
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-20', 2, 1, 1, 'Stars',
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-25', 1, 2, 1, 'Metros',
+   28, 55, 18, 22, 10, 25, 9, 28, 22, 7, 11, 4, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2003-10-25', 1, 2, 1, 'Stars',
+   25, 58, 15, 20, 8, 22, 7, 25, 19, 6, 13, 3, 18,
+   28, 26, 27, 24, 24, 25, 24, 25)
+ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
+  game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
+  game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
+  game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
+
 -- Regular-season rows materialized from the box scores above by RefreshTeamSeasonRecordsStep. vw_franchise_summary reads them. Regenerate with the refresher SQL whenever the box-score rows above change.
 INSERT INTO ibl_team_season_records (team_id, year, game_type, currentname, namethatyear, wins, losses) VALUES
   (1, 2026, 1, 'Metros', 'Metros', 3, 1),
@@ -2127,7 +2193,7 @@ FROM (
         WHEN 'playoffs-rd1-gm4-7' THEN 10 WHEN 'playoffs-rd1-gm1-3' THEN 11
         WHEN 'heat-wb' THEN 12 WHEN 'heat-lb' THEN 13 ELSE 99
       END ASC, s.id DESC
-  ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0
+  ) AS rn FROM ibl_plr_snapshots s WHERE s.stats_gm > 0 AND s.snapshot_phase <> 'preseason'
 ) snap
 LEFT JOIN ibl_franchise_seasons fs
   ON snap.teamid = fs.franchise_id AND snap.season_year = fs.season_ending_year

@@ -1,6 +1,6 @@
 ---
 description: The league rules the site must enforce, owned by the league owner. Claude checks changes against this list; the weekly digest flags PRs that seem to change a rule.
-last_verified: 2026-10-21
+last_verified: 2026-10-28
 ---
 
 # League Rules

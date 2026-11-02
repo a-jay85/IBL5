@@ -1603,6 +1603,32 @@ grep -qF "PR #101 is still red on head aaa1111 after one rescue. Skipping it unt
     || fail "rebase-keeps-cap: retry-cap DM wording: $(cat "$SCRATCH/dm.log")"
 end_case rebase-keeps-cap
 
+# A rescue that held for a human is capped on an unchanged diff by the retry cap; a changed
+# patch-id re-enters. Pins why the tick needs no human-only-hold filter.
+reset; begin_case
+E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
+set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"
+set_result "101\tfired\theld"
+run_tick
+run_tick
+out_has 'rescue ran (held)' || fail "held-red-no-second-rescue: no 'rescue ran (held)' reconcile line on run 2: $OUT"
+[[ "$(launch_count)" == "1" ]] || fail "held-red-no-second-rescue: want 1 launch on an unchanged diff, got $(launch_count)"
+out_has 'skip PR 101: retry cap (head aaa1111)' || fail "held-red-no-second-rescue: no retry-cap skip line: $OUT"
+[[ "$(attempt 101)" == "$K1" ]] || fail "held-red-no-second-rescue: attempts/101 is '$(attempt 101)', want $K1"
+set_prs '101|branch-one|ccc3333|BLOCKED|false'; set_checks ccc3333 red; set_key 101 "$K2"
+run_tick
+[[ "$(launch_count)" == "2" ]] || fail "held-red-no-second-rescue: a changed diff must re-enter, launches $(launch_count)"
+end_case held-red-no-second-rescue-unchanged-diff
+
+# A PR whose only failing check is the human sign-off reads green (pcw_check_verdict drops it),
+# so the tick never reaches the rescue launch. "signoff" is the sign-off-only mode of set_checks.
+reset; begin_case
+set_prs "$RED101"; set_checks aaa1111 signoff
+run_tick
+out_has 'checks green' || fail "signoff-only-red: no 'checks green' skip: $OUT"
+no_file "$SCRATCH/pr-cycle.log" || fail "signoff-only-red: launched for a sign-off-only red"
+end_case signoff-only-red-never-rescued
+
 reset; begin_case
 E_PATCHID="$SCRATCH/patchid-file"; K1="$(key_of 1111111)"; K2="$(key_of 2222222)"
 set_prs "$RED101"; set_checks aaa1111 red; set_key 101 "$K1"

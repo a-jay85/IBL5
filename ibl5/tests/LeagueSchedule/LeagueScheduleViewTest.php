@@ -99,6 +99,8 @@ class LeagueScheduleViewTest extends TestCase
                             'boxid' => 101,
                             'gameOfThatDay' => 1,
                             'boxScoreUrl' => 'boxscore.php?id=101',
+                            'visitorBoxScoreUrl' => 'boxscore.php?id=101&team=1',
+                            'homeBoxScoreUrl' => 'boxscore.php?id=101&team=2',
                             'isUnplayed' => false,
                             'isUpcoming' => false,
                             'visitorWon' => true,
@@ -113,6 +115,9 @@ class LeagueScheduleViewTest extends TestCase
 
         $html = $this->view->render($pageData);
 
+        $this->assertStringContainsString('<a href="boxscore.php?id=101&amp;team=1" class="schedule-game__score-link schedule-game__team--win">100</a>', $html);
+        $this->assertStringContainsString('<a href="boxscore.php?id=101" class="schedule-game__vs">@</a>', $html);
+        $this->assertStringContainsString('<a href="boxscore.php?id=101&amp;team=2" class="schedule-game__score-link">95</a>', $html);
         $this->assertStringContainsString('Team A', $html);
         $this->assertStringContainsString('Team B', $html);
         $this->assertStringContainsString('25-10', $html);
@@ -141,6 +146,8 @@ class LeagueScheduleViewTest extends TestCase
                             'boxid' => 101,
                             'gameOfThatDay' => 0,
                             'boxScoreUrl' => '',
+                            'visitorBoxScoreUrl' => '',
+                            'homeBoxScoreUrl' => '',
                             'isUnplayed' => true,
                             'isUpcoming' => true,
                             'visitorWon' => false,
@@ -250,7 +257,7 @@ class LeagueScheduleViewTest extends TestCase
         $regular = $this->view->render($this->createPageData(gamesByMonth: [
             '2025-11' => ['label' => 'November', 'dates' => []],
         ]));
-        $this->assertStringContainsString('class="ibl-card__header schedule-month__header"', $regular);
+        $this->assertStringContainsString('class="schedule-month__header"', $regular);
 
         $playoffs = $this->view->render($this->createPageData(
             gamesByMonth: [
@@ -260,7 +267,7 @@ class LeagueScheduleViewTest extends TestCase
             playoffMonthKey: '2026-06',
         ));
         $this->assertStringContainsString(
-            'class="ibl-card__header schedule-month__header schedule-month__header--playoffs"',
+            'class="schedule-month__header schedule-month__header--playoffs"',
             $playoffs
         );
     }
@@ -285,6 +292,8 @@ class LeagueScheduleViewTest extends TestCase
                             'boxid' => 101,
                             'gameOfThatDay' => 0,
                             'boxScoreUrl' => 'boxscore.php?id=101',
+                            'visitorBoxScoreUrl' => 'boxscore.php?id=101&team=1',
+                            'homeBoxScoreUrl' => 'boxscore.php?id=101&team=2',
                             'isUnplayed' => true,
                             'isUpcoming' => false,
                             'visitorWon' => false,

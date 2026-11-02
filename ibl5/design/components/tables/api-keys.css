@@ -1,0 +1,19 @@
+@layer components {
+
+/* ==========================================================================
+   API Keys Detail Tables
+
+   Overrides for .ibl-data-table on the API Keys page (API Key card and the
+   Google Sheets Sync card). These tables put a <th> label at the start of
+   each tbody row. The shared .ibl-data-table th rule paints every th white
+   for the navy thead, so on a white tbody row the labels vanished.
+   Specificity (0,2,1) beats .ibl-data-table th (0,1,1).
+   Source: class="ibl-data-table api-keys-table"
+   ========================================================================== */
+
+.api-keys-table tbody th {
+    color: var(--navy-800);
+    padding-inline: var(--space-3);
+}
+
+}

@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-10-22
+last_verified: 2026-10-28
 paths: "bin/automouse/**"
 ---
 
@@ -18,6 +18,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Show queue | `bin/automouse/queue` (no args) |
 | Triage skipped/failed/paused/held/forced plans | `bin/automouse/queue status` |
 | Remove a plan from queue | `bin/automouse/queue remove <slug>` |
+| Reorder / dispose | `queue reorder <slug>…` · `queue dispose <slug> <done\|skipped>` |
 | Check morning results | `ls ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/reports/` |
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
 | Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning; date defaults to today, or tomorrow if that time has passed; TZ to local) |
@@ -42,18 +43,15 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
-  queue/    symlinks to ~/claude-plans/*.md (oldest mtime runs first; queuing and
-            requeuing stamp the new entry to the BACK — only `queue reorder`
-            changes relative order)
-  done/     symlinks moved here after successful execution, or when the impl agent
-            detects the plan is already merged (its work shipped under a prior PR)
+  queue/    NNN-<slug>.md symlinks to ~/claude-plans/ (run order below)
+  done/     symlinks moved here after success, or when the impl agent finds the plan
+            already merged under a prior PR
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
   reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md
-            and YYYY-MM-DD-canary-park.md — no -<slug> suffix, written at plan boundaries when the
-            master health check fails; there is no current plan at a boundary so no slug applies);
-            plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by bin/automouse/run
+            and YYYY-MM-DD-canary-park.md, slug-less, written at a plan boundary when the
+            master health check fails); plus YYYY-MM-DD-costs.md (per-phase cost roll-up)
   logs/     claude -p output logs + launchd stdout/stderr
   force-overrides.log  one line per `queue --force` add
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
@@ -64,19 +62,19 @@ Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm laun
 
 Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.md` and in a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). `bin/automouse/run` writes one JSON object per priced phase; `bin/automouse/backfill-costs` fills history. The weekly aggregate reads the sidecar. A phase the usage gate paused before it started writes no row in either file. A phase that ran without cost data keeps its `?` row. The weekly aggregate drops a null-cost `unknown` row when a priced row shares its date, plan and phase, so sidecars written before the skip still count right.
 
-**Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits, because subagent transcripts are still flushing when `result` fires.
-
-**Prov column:** `recomputed` (no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's `result.json` usage ledger; harness-only runs exiting 0 or 3).
-
-**`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed(-anomalous) rows with a compaction, else an em-dash (—).
+Recomputed vs. harness cost, the Prov column, and `peak_ctx`: `.claude/rules/automouse-workflow-detail.md` § Cost ledger columns.
 
 ### Startup archival
 
 At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged by their *own* mtime and still resolve after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
 
-**Run order is the queue symlink's mtime** (lstat, via `queue_entries_ordered` in
-`bin/automouse/lib-queue-order`) on macOS and Linux. Editing the plan file does not
-move it. `queue`/`queue reorder` stamp the link (`touch -h`).
+Archival never affects run order.
+
+**Run order is the entry's `NNN-` prefix** (`queue_entries`, `bin/lib/automouse-queue-order.sh`).
+Editing a plan never moves it. Enqueue appends +10; `reorder`/`renumber` rename to 010,
+020, …. `normalize_queue` prefixes legacy bare entries once (old mtime order). Move
+entries only via `queue dispose` (drops the prefix): `done/`, `skipped/`, locks and
+sidecars use `<slug>.md`.
 
 ### Self-heal
 
@@ -105,7 +103,8 @@ scans `skipped/`:
 1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`. It refuses a plan failing `bin/check-plan`; `--force` skips it (`<plan>.md.force-override`, logged). `impl_model` gates still apply.
 2. **On schedule:** `launchd` fires `bin/automouse/run`
 3. **Loop:** For each queued plan (oldest first), `bin/automouse/run` fires two `claude -p` invocations sequentially:
-   - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), a rubric self-review plus deleted-guard check (Step 6.8), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-5-5` (legacy `claude-haiku-4-5`) → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
+   - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, runs a pre-handoff conformance check (Step 6.6), a rubric self-review plus deleted-guard check (Step 6.8), writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-5-5` → Sonnet (legacy: `claude-sonnet-4-6`), `haiku`/`claude-haiku-5-5` (legacy `claude-haiku-4-5`) → Haiku, `opus`/`claude-opus-5-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` when the design is resolved and every behavior-changing step has a machine-checkable row. A plan whose only Opus reason is Truly-manual rows may also run on `sonnet` when it declares `manual_judge: opus`. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
+   - **Opus judge** (`bin/automouse/prompt-judge`; runs for a plan declaring `manual_judge: opus`, and for a non-Opus plan carrying a Truly-manual row): the runner spawns a read-only `claude -p --model claude-opus-5-5` in the worktree. It rules on rows tagged `opus-judge:` and reviews the final diff. A pass lets post-plan fire. Any other outcome, including a crash or a missing marker, moves the plan to `skipped/` with a `skipped-<slug>` report. The judge never ticks a row and never releases a merge hold. Decision: ADR 0221.
    - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report.
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills. Post-plan starts only when at least 40 minutes (`MIN_PP_SECS`) of that budget remain; otherwise the run defers it to the next run with the handoff kept, and the deferral does not count as a failed attempt.
    - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. One dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. A plan defect at impl Step 6.7 (matrix rows that cannot be realised) ends the plan after one attempt. The agent writes `<plan>.plan-defect` (line 1 a fixed marker, then the failing rows) only when no test or lint run is red and the stop is not the time budget. The loop then moves the plan to `skipped/` with a `skipped-<slug>` report naming the rows. A garbled or absent marker keeps the normal retries. A `cannot resume into worktree` refusal retries once with the worktree path; a second counts and defers. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker`, `bin/test-automouse-impl-cap-timeout` and `bin/test-automouse-repeat-failure`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.

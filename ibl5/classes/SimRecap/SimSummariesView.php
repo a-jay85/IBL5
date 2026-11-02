@@ -24,7 +24,7 @@ class SimSummariesView
     /**
      * @param list<array<string, mixed>> $rows          From SimSummaryRepository::listAll()
      * @param array<string, mixed>|null  $recap         From SimSummaryRepository::find(), or null
-     * @param list<array<string, mixed>> $gameRecaps    From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
+     * @param list<array<string, mixed>> $gameRecaps    From RecapBox::gameRecaps(): every game row for the sim, sorted by sort_order
      * @param string|null                $error         'malformed' | 'notfound' | null
      * @param int|null                   $requestedSim  The validated sim behind a 'notfound' notice
      * @param list<array<string, mixed>> $orphanedGames From SimSummaryRepository::findOrphanedGameRecaps()
@@ -117,7 +117,6 @@ class SimSummariesView
     <section class="ibl-card" id="recap-panel">
         <h2 class="ibl-title">Sim <?= HtmlSanitizer::e($recap['sim'] ?? '') ?></h2>
         <p>Status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?> · Attempts: <?= HtmlSanitizer::e($recap['attempts'] ?? '') ?> · Generated: <?= HtmlSanitizer::e($recap['generated_at'] ?? '—') ?></p>
-        <p id="recap-themes">Themes: <?= HtmlSanitizer::e($this->themeSummary($recap)) ?></p>
 <?php if ($orphanedGames !== []): ?>
 <?php $this->renderOrphanWarning($orphanedGames); ?>
 <?php endif; ?>
@@ -125,30 +124,23 @@ class SimSummariesView
 <?php if (!is_string($body)): ?>
         <p id="recap-missing">No recap text stored yet — status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?>.</p>
 <?php else: ?>
-<?php $intro = $recap['intro_text'] ?? null; ?>
-<?php if (is_string($intro) && $intro !== ''): ?>
-        <p id="recap-intro" class="whitespace-pre-line"><?= HtmlSanitizer::e($intro) ?></p>
-<?php endif; ?>
-<?php if ($gameRecaps !== []): ?>
-<?php $this->renderGameRecaps($gameRecaps); ?>
-<?php endif; ?>
-<?php $outro = $recap['outro_text'] ?? null; ?>
-<?php if (is_string($outro) && $outro !== ''): ?>
-        <p id="recap-outro" class="whitespace-pre-line"><?= HtmlSanitizer::e($outro) ?></p>
-<?php endif; ?>
 <?php
-        // recap_text is usually a ~220-char teaser; the postable document only exists as
-        // intro + per-game rows + outro. postableText() falls back to the stored text
-        // when there is nothing to assemble or the parts lost their GM mention lines,
-        // so Copy is never empty and never silently drops a tag.
+        $intro = $recap['intro_text'] ?? null;
+        $outro = $recap['outro_text'] ?? null;
+        // recap_text is usually a ~220-char teaser; the postable document is intro +
+        // every game row + outro. The teaser shows only for legacy rows with no parts.
         $document = RecapDocument::postableText(
             is_string($intro) ? $intro : null,
             $gameRecaps,
             is_string($outro) ? $outro : null,
             $body
         );
+        $untagged = RecapDocument::gamesMissingMentionLines($gameRecaps);
 ?>
-        <textarea id="recap-body" readonly rows="24" cols="100"><?= HtmlSanitizer::e($document) ?></textarea>
+<?php if ($untagged !== []): ?>
+<?php $this->renderMentionWarning($untagged); ?>
+<?php endif; ?>
+        <textarea id="recap-body" class="ibl-input ibl-input--sm" readonly rows="24"><?= HtmlSanitizer::e($document) ?></textarea>
         <p>
             <button type="button" id="recap-copy">Copy</button>
             <span id="recap-copied" hidden>Copied</span>
@@ -172,7 +164,7 @@ class SimSummariesView
     {
         ?>
         <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
-            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score and <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'is' : 'are') ?> omitted from the postable document. Unresolvable keys:</p>
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score. <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'It is' : 'They are') ?> still in the box below. Unresolvable keys:</p>
             <ul>
 <?php foreach ($orphanedGames as $orphan): ?>
 <?php
@@ -189,24 +181,19 @@ class SimSummariesView
     }
 
     /**
-     * @param list<array<string, mixed>> $gameRecaps
+     * @param list<string> $untagged Labels from RecapDocument::gamesMissingMentionLines()
      */
-    private function renderGameRecaps(array $gameRecaps): void
+    private function renderMentionWarning(array $untagged): void
     {
         ?>
-        <ol id="recap-games">
-<?php foreach ($gameRecaps as $game): ?>
-<?php
-            $gDate = $game['game_date'] ?? null;
-            $gVid  = $game['visitor_teamid'] ?? null;
-            $gHid  = $game['home_teamid'] ?? null;
-?>
-            <li class="recap-game">
-                <span class="recap-game__meta"><?= HtmlSanitizer::e(is_string($gDate) ? $gDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($gVid) ? (string) $gVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($gHid) ? (string) $gHid : '') ?></span>
-                <p class="recap-game__text whitespace-pre-line"><?= HtmlSanitizer::e($game['recap_text'] ?? '') ?></p>
-            </li>
+        <div id="recap-mention-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($untagged)) ?> <?= HtmlSanitizer::e(count($untagged) === 1 ? 'game' : 'games') ?> in the box below <?= HtmlSanitizer::e(count($untagged) === 1 ? 'has' : 'have') ?> no GM mention line, so <?= HtmlSanitizer::e(count($untagged) === 1 ? 'its GMs' : 'their GMs') ?> will not be tagged. Add the tags before posting:</p>
+            <ul>
+<?php foreach ($untagged as $label): ?>
+            <li class="recap-untagged"><?= HtmlSanitizer::e($label) ?></li>
 <?php endforeach; ?>
-        </ol>
+            </ul>
+        </div>
 <?php
     }
 
@@ -231,41 +218,5 @@ class SimSummariesView
         $length = $row['recap_length'] ?? null;
 
         return is_numeric($length) ? ((string) (int) $length) . ' bytes' : '—';
-    }
-
-    /**
-     * `themes_used` is a JSON column and is never rendered raw. The return value
-     * is plain text that the caller escapes — nothing here is pre-rendered HTML,
-     * so `trusted()` never touches a recap value. A payload that does not decode
-     * to a non-empty array renders as a literal em dash; unit 1's
-     * `recentThemesToleratesMalformedJson()` proves such rows exist.
-     *
-     * @param array<string, mixed> $recap
-     */
-    private function themeSummary(array $recap): string
-    {
-        $raw = $recap['themes_used'] ?? null;
-        if (!is_string($raw) || $raw === '') {
-            return '—';
-        }
-
-        try {
-            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return '—';
-        }
-
-        if (!is_array($decoded)) {
-            return '—';
-        }
-
-        $parts = [];
-        foreach ($decoded as $theme) {
-            if (is_scalar($theme)) {
-                $parts[] = (string) $theme;
-            }
-        }
-
-        return $parts === [] ? '—' : implode(', ', $parts);
     }
 }

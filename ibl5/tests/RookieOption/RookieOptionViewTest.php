@@ -52,7 +52,7 @@ class RookieOptionViewTest extends TestCase
         $this->assertStringContainsString('Test Team', $output);
         // Regression: the option value, warning card, and form survive the card swap.
         $this->assertStringContainsString('Rookie Option Value', $output);
-        $this->assertStringContainsString('ibl-alert ibl-alert--warning', $output);
+        $this->assertStringContainsString('d-alert d-alert-warning', $output);
         $this->assertStringContainsString('name="teamname"', $output);
         $this->assertStringContainsString('name="playerID"', $output);
         $this->assertStringContainsString('name="rookieOptionValue"', $output);
@@ -91,7 +91,7 @@ class RookieOptionViewTest extends TestCase
     {
         $output = $this->view->renderForm($this->createPlayerMock(), 'Test Team', 500);
 
-        $this->assertSame(1, preg_match('/Rookie Option<\/h1>\s*<div class="ibl-card">/', $output));
+        $this->assertSame(1, preg_match('/Rookie Option<\/h1>\s*<div class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden">/', $output));
         $this->assertSame(1, substr_count($output, '<div class="ibl-form-container">'));
     }
 
@@ -104,11 +104,11 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
-        $this->assertStringContainsString('ibl-card', $output);
-        $this->assertStringContainsString('ibl-card__header', $output);
-        $this->assertStringContainsString('ibl-card__title', $output);
-        $this->assertStringContainsString('ibl-card__body', $output);
-        $this->assertStringContainsString('ibl-btn ibl-btn--danger', $output);
+        $this->assertStringContainsString('d-card', $output);
+        $this->assertStringContainsString('bg-(image:--gradient-navy-header)', $output);
+        $this->assertStringContainsString('d-card-title', $output);
+        $this->assertStringContainsString('d-card-body', $output);
+        $this->assertStringContainsString('d-btn d-btn-error', $output);
     }
 
     /**
@@ -159,7 +159,7 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--warning', $output);
+        $this->assertStringContainsString('d-alert d-alert-warning', $output);
         $this->assertStringContainsString('contract extension', $output);
         $this->assertStringContainsString('free agent', $output);
     }
@@ -173,8 +173,21 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, 'Something went wrong');
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--error', $output);
+        $this->assertStringContainsString('d-alert d-alert-error', $output);
         $this->assertStringContainsString('Something went wrong', $output);
+    }
+
+    /**
+     * Error banner wins when both an error and a known result code are passed
+     */
+    public function testRenderFormErrorBannerWinsOverResult(): void
+    {
+        $mockPlayer = $this->createPlayerMock();
+
+        $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, 'Boom', 'rookie_option_success');
+
+        $this->assertStringContainsString('<div role="alert" class="d-alert d-alert-error mb-4">Boom</div>', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
     }
 
     /**
@@ -199,7 +212,7 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'rookie_option_success');
 
-        $this->assertStringContainsString('ibl-alert ibl-alert--success', $output);
+        $this->assertStringContainsString('d-alert d-alert-success', $output);
         $this->assertStringContainsString('exercised successfully', $output);
     }
 
@@ -212,7 +225,7 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'email_failed');
 
-        $this->assertStringContainsString('ibl-alert--warning', $output);
+        $this->assertStringContainsString('d-alert-warning', $output);
         $this->assertStringContainsString('notification email failed', $output);
     }
 
@@ -225,9 +238,9 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
-        $this->assertStringNotContainsString('ibl-alert--error', $output);
-        $this->assertStringNotContainsString('ibl-alert--success', $output);
-        // Note: ibl-alert--warning is expected (the exercise consequences warning card)
+        $this->assertStringNotContainsString('d-alert-error', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
+        // Note: d-alert-warning is expected (the exercise consequences warning card)
     }
 
     /**
@@ -239,9 +252,9 @@ class RookieOptionViewTest extends TestCase
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'unknown_result');
 
-        $this->assertStringNotContainsString('ibl-alert--success', $output);
+        $this->assertStringNotContainsString('d-alert-success', $output);
         // The warning alert for exercise consequences should still be present
-        $this->assertStringContainsString('ibl-alert--warning', $output);
+        $this->assertStringContainsString('d-alert-warning', $output);
     }
 
     /**

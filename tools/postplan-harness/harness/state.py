@@ -23,7 +23,7 @@ class TerminalState(str, Enum):
     SHIPPED_HELD = "shipped-held"            # PR open, auto-merge deliberately NOT armed
     DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
-    ALREADY_SHIPPED = "already-shipped"      # diff vs master went empty AND the branch's PR is already MERGED
+    ALREADY_SHIPPED = "already-shipped"      # branch PR already MERGED: diff vs master went empty, or it merged at the lease
     HOLD_REPEAT_DECLINED = "hold-repeat-declined"  # condition-3 MISSING set equals the prior hold's; stopped before any LLM call
     REBASED_HELD = "rebased-held"            # rebase-only mode: prior hold is human-only {3,7,8}; merged master, pushed, no review, never armed
     FAILED = "failed"                        # typed failure aborted the run
@@ -332,6 +332,7 @@ class RunResult:
     rearm: dict | None = None  # RunResult.rearm: Phase 7 re-arm outcome after the fix loop; None = never ran
     hold_repeat: dict | None = None  # Phase 6.5 advisory record (action, key, repeat_count, reasons, dm); arming never reads it
     rebase_only: dict | None = None  # rebase-only mode record (eligible, hold, pre/post patch-id, pushed, noop, record_refreshed); omitted from result.json when unset
+    fired_by: str = "unknown"  # POSTPLAN_FIRED_BY caller label (attribution only; never read by a decision)
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
     audit: list[str] = field(default_factory=list)
 

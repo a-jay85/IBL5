@@ -1066,6 +1066,21 @@ CREATE TABLE `ibl_bug_report_attachments` (
   CONSTRAINT `fk_bug_attachment_report` FOREIGN KEY (`report_id`) REFERENCES `ibl_bug_reports` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_bug_report_operator_context`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_bug_report_operator_context` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `bug_report_id` int(10) unsigned NOT NULL,
+  `discord_message_id` bigint(20) unsigned NOT NULL,
+  `discord_author_id` bigint(20) unsigned NOT NULL,
+  `content` text NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_operator_message` (`discord_message_id`),
+  KEY `idx_report` (`bug_report_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_bug_reporter_profile`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -1088,7 +1103,7 @@ CREATE TABLE `ibl_bug_reports` (
   `original_text` text NOT NULL,
   `thread_id` bigint(20) unsigned DEFAULT NULL,
   `class` enum('bug','feature','not_a_thing','roster_error') DEFAULT NULL,
-  `status` enum('queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human','parked_idle','gathering','awaiting_ajay','planned','dropped','filed') NOT NULL DEFAULT 'queued',
+  `status` enum('queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human','parked_idle','gathering','awaiting_ajay','planned','dropped','filed','dormant') NOT NULL DEFAULT 'queued',
   `lease_owner` varchar(64) DEFAULT NULL,
   `lease_expires` datetime DEFAULT NULL,
   `hunt_attempts` tinyint(3) unsigned NOT NULL DEFAULT 0,
@@ -1391,6 +1406,28 @@ CREATE TABLE `ibl_gm_tenures` (
   KEY `idx_franchise` (`franchise_id`),
   CONSTRAINT `fk_gt_franchise` FOREIGN KEY (`franchise_id`) REFERENCES `ibl_team_info` (`teamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_google_sheet_connections`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_google_sheet_connections` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `refresh_token_enc` text NOT NULL,
+  `spreadsheet_id` varchar(128) NOT NULL,
+  `spreadsheet_url` varchar(255) NOT NULL,
+  `status` enum('active','broken') NOT NULL DEFAULT 'active',
+  `broken_reason` varchar(64) DEFAULT NULL,
+  `refresh_pending` tinyint(1) NOT NULL DEFAULT 0,
+  `last_refresh_at` datetime DEFAULT NULL,
+  `last_refresh_status` varchar(32) DEFAULT NULL,
+  `last_error` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_gsc_user` (`user_id`),
+  KEY `idx_gsc_pending` (`status`,`refresh_pending`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_heat_career_avgs`;
 /*!50001 DROP VIEW IF EXISTS `ibl_heat_career_avgs`*/;
@@ -2722,6 +2759,45 @@ CREATE TABLE `ibl_olympics_win_loss` (
   KEY `idx_currentname` (`currentname`),
   KEY `idx_year_team` (`year`,`currentname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Historical Olympics win/loss records and medal counts';
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_on_this_day_moments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_on_this_day_moments` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `moment_key` varchar(96) NOT NULL,
+  `kind` varchar(32) NOT NULL,
+  `game_date` date NOT NULL,
+  `month_day` char(5) NOT NULL,
+  `season_year` smallint(5) unsigned NOT NULL,
+  `pid` int(11) NOT NULL DEFAULT 0,
+  `player_name` varchar(64) NOT NULL DEFAULT '',
+  `teamid` int(11) NOT NULL DEFAULT 0,
+  `team_name` varchar(64) NOT NULL DEFAULT '',
+  `opponent_teamid` int(11) NOT NULL DEFAULT 0,
+  `opponent_name` varchar(64) NOT NULL DEFAULT '',
+  `game_of_that_day` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `facts_json` text NOT NULL,
+  `stat_label` varchar(32) DEFAULT NULL,
+  `built_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_otd_moment_key` (`moment_key`),
+  KEY `idx_otd_month_day_season` (`month_day`,`season_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_on_this_day_shown`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_on_this_day_shown` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `moment_key` varchar(96) NOT NULL,
+  `sim` int(10) unsigned NOT NULL,
+  `season_year` smallint(5) unsigned NOT NULL,
+  `shown_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_otd_shown_key_sim` (`moment_key`,`sim`),
+  KEY `idx_otd_shown_sim` (`sim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_one_on_one`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

@@ -43,13 +43,13 @@ final class RecapDocument
 
     /**
      * `**Boston Celtics 100 @ Miami Heat 114**` — the bold score header that opens every
-     * game block in `bin/lib/sim-recap-exemplar.txt`. Counting these in the stored text
-     * is how this class learns how many games the generator actually wrote.
+     * game block in `bin/lib/sim-recap-exemplar.txt`. Used to label a game that lacks
+     * its mention line.
      */
     private const SCORE_HEADER = '/^\*\*.+\s\d+\s@\s.+\s\d+\*\*$/m';
 
     /**
-     * @param list<array<string, mixed>> $gameRecaps From SimSummaryRepository::findDisplayableGameRecaps(), already in sort order
+     * @param list<array<string, mixed>> $gameRecaps Game rows, already in sort order
      */
     public static function assemble(?string $intro, array $gameRecaps, ?string $outro): string
     {
@@ -74,79 +74,42 @@ final class RecapDocument
     }
 
     /**
-     * What the GM actually pastes — the assembled document when the stored parts carry
-     * the format, the stored `recap_text` when they don't.
+     * What the commissioner pastes: the assembled document, with every game row and the
+     * outro last. The stored `recap_text` is only used when there is nothing at all to
+     * assemble (legacy rows with no intro, no game rows and no outro).
      *
-     * The generator is not guaranteed to have written the shape `bin/sim-recap-prompt`
-     * asks for. Sim 722 (2026-07-26) stored 56 per-game parts that were bare prose: no
-     * `**Away 110 @ Home 104**` score header and no `<@id> · <@id>` mention line, while
-     * its `recap_text` held the complete 25K document including all 112 mentions.
-     * Assembling those parts produces a document that reads fine and silently drops
-     * every GM's Discord tag — worse than what the league had before this class existed.
-     * So when the parts are degraded, fall back to the stored text.
+     * This used to fall back to the stored text when the parts looked degraded or short.
+     * That stored text is usually a ~220-char teaser, so the fallback swapped a whole
+     * sim's games for one paragraph. Owner decision on PR #3592 (2026-10-28): every game
+     * goes in the box, and the closing story goes at the end. Games that lack their GM
+     * mention line are flagged by gamesMissingMentionLines() so the page can warn.
      *
-     * Sim 725 (2026-08-02) failed the other way: the parts were well formed but there
-     * were only 7 of them, because all 49 rows had been stored with `game_of_that_day`
-     * = 1 and the displayable filter matched one game per date. Shape alone said
-     * "assemble". So the count of score headers in the stored text is a second,
-     * independent floor on how many games the assembly must contain.
-     *
-     * `assemble()` deliberately stays shape-tolerant (it is a pure formatter and cannot
-     * see the stored text), which is why the choice lives here instead.
-     *
-     * @param list<array<string, mixed>> $gameRecaps From SimSummaryRepository::findDisplayableGameRecaps(), already in sort order
+     * @param list<array<string, mixed>> $gameRecaps Every game row for the sim, in sort order (RecapBox::gameRecaps())
      */
     public static function postableText(?string $intro, array $gameRecaps, ?string $outro, ?string $storedText): string
     {
         $document = self::assemble($intro, $gameRecaps, $outro);
-        $stored   = is_string($storedText) ? $storedText : '';
-
-        // Nothing to fall back to — the assembled document is all there is, even if degraded.
-        if (trim($stored) === '') {
+        if ($document !== '') {
             return $document;
         }
 
-        // No parts at all: the stored text, returned verbatim. Trimming would change the
-        // exported bytes, so the emptiness test above is the only place `trim()` is used.
-        if ($document === '') {
-            return $stored;
-        }
-
-        // Shape is not completeness. The parts are only the games that survived
-        // SimSummaryRepository::findDisplayableGameRecaps(); a bad `game_of_that_day`
-        // index makes that filter drop games silently. Sim 725 (2026-08-02) stored 49
-        // games, 7 survived the filter, and all 7 were well formed — so the shape guard
-        // below voted to assemble and would have posted 7 games in place of 49.
-        //
-        // The stored text is the generator's own record of how many games it wrote, so
-        // any shortfall against it means the assembly is missing games. Sibling of
-        // gamesCarryTheirMentionLines(), not a replacement: that guard catches degraded
-        // parts, this one catches absent ones. Either firing prefers the stored text.
-        if (self::renderedGameCount($gameRecaps) < self::countScoreHeaders($stored)) {
-            return $stored;
-        }
-
-        return self::gamesCarryTheirMentionLines($gameRecaps) ? $document : $stored;
+        // Returned verbatim: trimming would change the exported bytes.
+        return is_string($storedText) && trim($storedText) !== '' ? $storedText : '';
     }
 
     /**
-     * All-or-nothing per sim, not per game: a run where only some games carry their
-     * mentions means the generator was inconsistent, and assembling it would leave
-     * exactly the GMs of the malformed games un-notified — the silent failure this
-     * guard exists to prevent.
+     * A label for each game whose text has no `<@id>` mention line under its header, in
+     * the order given. Those games still go in the document; without the line the GMs
+     * are not tagged when it is posted, so the page names them for the commissioner.
      *
-     * At least one non-empty part is required. A sim with a full stored document and no
-     * usable parts would otherwise assemble an intro+outro that looks like a complete
-     * recap with every game missing.
+     * The label is the game's score header when it has one, else its date and team ids.
      *
-     * The mention line is checked at index 1 alone, independently of what follows, so a
-     * part already in the exemplar's header/mentions/blank/prose shape still counts.
-     *
-     * @param list<array<string, mixed>> $gameRecaps
+     * @param  list<array<string, mixed>> $gameRecaps
+     * @return list<string>
      */
-    private static function gamesCarryTheirMentionLines(array $gameRecaps): bool
+    public static function gamesMissingMentionLines(array $gameRecaps): array
     {
-        $sawAGame = false;
+        $missing = [];
 
         foreach ($gameRecaps as $game) {
             $text = self::clean($game['recap_text'] ?? null);
@@ -154,48 +117,32 @@ final class RecapDocument
                 continue;
             }
 
-            $sawAGame = true;
-            $lines    = explode("\n", str_replace("\r\n", "\n", $text));
-
-            if (!isset($lines[1]) || preg_match(self::MENTION_LINE, $lines[1]) !== 1) {
-                return false;
+            $lines = explode("\n", str_replace("\r\n", "\n", $text));
+            if (isset($lines[1]) && preg_match(self::MENTION_LINE, $lines[1]) === 1) {
+                continue;
             }
+
+            $missing[] = self::gameLabel($game, trim($lines[0]));
         }
 
-        return $sawAGame;
+        return $missing;
     }
 
     /**
-     * How many games `assemble()` will actually render. groupByDate() drops rows whose
-     * text cleans to empty, so a raw count($gameRecaps) would overstate the document and
-     * let a shortfall through — the count must use the same basis assembly does.
-     *
-     * @param list<array<string, mixed>> $gameRecaps
+     * @param array<string, mixed> $game
      */
-    private static function renderedGameCount(array $gameRecaps): int
+    private static function gameLabel(array $game, string $firstLine): string
     {
-        $rendered = 0;
-
-        foreach ($gameRecaps as $game) {
-            if (self::clean($game['recap_text'] ?? null) !== '') {
-                $rendered++;
-            }
+        if (preg_match(self::SCORE_HEADER, $firstLine) === 1) {
+            return trim($firstLine, '*');
         }
 
-        return $rendered;
-    }
+        $visitor = $game['visitor_teamid'] ?? null;
+        $home    = $game['home_teamid'] ?? null;
 
-    /**
-     * Score headers in the stored document. CRLF is normalized first because the `m`
-     * anchor would otherwise leave a `\r` before the line end and match nothing. A
-     * teaser-shaped `recap_text` has no headers and yields 0, which is what makes the
-     * completeness guard inert for sims that never stored a full document.
-     */
-    private static function countScoreHeaders(string $text): int
-    {
-        $count = preg_match_all(self::SCORE_HEADER, str_replace("\r\n", "\n", $text));
-
-        return $count === false ? 0 : $count;
+        return self::clean($game['game_date'] ?? null)
+            . ' · team ' . (is_scalar($visitor) ? (string) $visitor : '')
+            . ' at team ' . (is_scalar($home) ? (string) $home : '');
     }
 
     /**

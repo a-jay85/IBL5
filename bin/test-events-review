@@ -372,7 +372,7 @@ group_digest() {
     local digest
     digest="$(digest_of <<< "$ER_OUT")"
     local tok
-    for tok in 'ignore_previous' '@everyone' '<@' '?tid=' 'xxxxxxxxxxxxxxxx'; do
+    for tok in 'ignore_previous' '@everyone' '<@' '?tid=' 'xxxxxxxxxxxxxxxx' 'wp_login' 'Wp-Login' 'zz_gm_typo'; do
         expect_lacks "row8: digest lacks '$tok'" "$digest" "$tok"
     done
     local ctl
@@ -387,8 +387,16 @@ group_digest() {
     expect_has_exact "row9: action trade_offer_submitted renders" "$digest" "  14  trade_offer_submitted"
     expect_has_exact "row9: folded anonymous count lands in other" "$digest" "  43  other"
     expect_has_exact "row9: folded action count lands in other" "$digest" "  3  other"
+    expect_has_exact "row9: one-GM route says (1 GM)" "$digest" "  40  trade (1 GM)"
+    expect_has_exact "row9: multi-GM route says (N GMs)" "$digest" "  140  team (9 GMs)"
+    expect_lacks "row9: route with no routegms row has no suffix" "$digest" "free_agency ("
+    expect_lacks "row9: anonymous route lines carry no GM suffix" "$digest" "  20  team ("
+    expect_has_exact "row9: 4xx status split" "$digest" "4xx by status (anonymous-human): 404 7, 403 2, other4xx 1"
+    expect_has_exact "row9: 4xx header carries distinct-name count" "$digest" "Top 4xx routes (anonymous-human, 3 distinct names):"
+    expect_has_exact "row9: GM route drawing 4xx renders" "$digest" "  2  player"
+    expect_has_exact "row9: folded anonymous 4xx lands in other" "$digest" "  6  other"
 
-    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 3"
+    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 4"
     expect_eq "row10: dry-run over malformed rows exits 0" 0 "$ER_RC"
 
     # Row 11: 2000 routes and 400 actions force the byte cap.
@@ -919,8 +927,13 @@ SH
     expect_has_exact "row31: seeded authenticated route depth_chart count" "$digest" "  7  depth_chart"
     expect_has_exact "row31: active GMs: 3" "$digest" "active GMs: 3"
     expect_has_exact "row31: NULL-class rows show as unclassified 4" "$digest" "unclassified 4"
+    expect_has_exact "row31: seeded one-GM route says (1 GM)" "$digest" "  4  schedule (1 GM)"
+    expect_has_exact "row31: seeded team shows 3 GMs" "$digest" "  6  team (3 GMs)"
+    expect_has_exact "row31: seeded 4xx status split" "$digest" "4xx by status (anonymous-human): 404 4"
+    expect_has_exact "row31: seeded 4xx GM route renders" "$digest" "Top 4xx routes (anonymous-human, 2 distinct names):"
+    expect_has_exact "row31: seeded probe 4xx folds to other" "$digest" "  3  other"
     local tok
-    for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous'; do
+    for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous' 'wp_login'; do
         expect_lacks "row32: output lacks '$tok'" "$ER_OUT" "$tok"
     done
 

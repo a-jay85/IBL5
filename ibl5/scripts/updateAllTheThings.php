@@ -48,7 +48,12 @@ if (!\Security\CsrfGuard::validateToken($csrfToken, 'lcp_update_all')) {
 // Allow up to 5 minutes for the full update (production shared hosting has 30s default)
 set_time_limit(300);
 
-// Wall-clock start of this updater run; RefreshRecordHoldersStep skips its rebuild when too much of the 300 s is gone
+// The updater runs multi-minute statements; lift the web statement-time cap
+// set in db/db.php (Database\StatementTimeout). Reached only after is_admin + POST + CSRF.
+/** @var \mysqli $mysqli_db */
+\Database\StatementTimeout::disable($mysqli_db);
+
+// Wall-clock start of this updater run; RebuildOnThisDayMomentsStep and RefreshRecordHoldersStep skip when too much of the 300 s is gone
 $updaterClock = new Clock\SystemClock();
 $updaterStartedAt = $updaterClock->microtime();
 
@@ -342,6 +347,12 @@ try {
             new \Season\SeasonQueryRepository($mysqli_db),
             \SimRecap\GitHubDispatchClient::fromConfig(),
         ));
+        $updaterService->addStep(new Updater\Steps\QueueGoogleSheetRefreshStep(
+            new GoogleSheets\GoogleSheetConnectionRepository($mysqli_db)
+        ));
+        $updaterService->addStep(Updater\Steps\RebuildOnThisDayMomentsStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createRecordShownStep($mysqli_db));
+        $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
         // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.
         $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));

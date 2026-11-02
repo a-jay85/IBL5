@@ -161,7 +161,7 @@ test.describe('Team page: error and banner states', () => {
     await page.goto(
       'modules.php?name=Team&op=team&teamid=1&result=extension_accepted&msg=Player+agreed',
     );
-    const successBanner = page.locator('.ibl-alert--success');
+    const successBanner = page.locator('.d-alert-success');
     await expect(successBanner).toBeVisible();
     await expect(successBanner).toContainText('Player response:');
   });

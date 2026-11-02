@@ -13,7 +13,7 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 // exactly 12 active players with proper depth coverage (seeded in ci-seed.sql)
 // and is not referenced by any other spec, so parallel workers cannot pollute it.
 //
-// Why we do NOT assert the ".ibl-alert--success / depth chart saved" flash here:
+// Why we do NOT assert the ".d-alert-success / depth chart saved" flash here:
 // the success flash lives in $_SESSION['flash_success'] and is single-use — the
 // FIRST PageLayout::header() render for that session consumes (unset)s it. All
 // authenticated E2E workers share ONE pinned server-side PHPSESSID (see
@@ -24,7 +24,7 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 // flash render + single-use consumption is already unit-covered by
 // tests/Unit/PageLayout/PageLayoutTest.php, so here we assert the DURABLE proof
 // of success instead — the submitted depth value persisted to the DB (readable
-// back on the redirected form). The ".ibl-alert--error" validation-failure tests
+// back on the redirected form). The ".d-alert-error" validation-failure tests
 // below rely on the same kind of single-use flash (`_ibl_depth_chart_flash`), and
 // many other specs render DepthChartEntry. In the parallel chromium project one of
 // them could consume that flash first, so this whole file runs in the `mutators`
@@ -241,8 +241,8 @@ test.describe('Depth Chart submission', () => {
     await expect(page).toHaveURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/);
 
     // Validator error banner.
-    await expect(page.locator('.ibl-alert--error')).toBeVisible();
-    await expect(page.locator('.ibl-alert--error')).toContainText(
+    await expect(page.locator('.d-alert-error')).toBeVisible();
+    await expect(page.locator('.d-alert-error')).toContainText(
       /at least 12 active players/i,
     );
 
@@ -287,7 +287,7 @@ test.describe('Depth Chart submission', () => {
       }
     }
     await page.locator('.depth-chart-buttons .depth-chart-submit-btn').click();
-    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(page.locator('.d-alert-error')).toBeVisible();
 
     // Recheck the first unchecked active box to restore the valid count.
     const reloadedCheckboxes = page.locator('input[type="checkbox"].dc-active-cb[name^="canPlayInGame"]');
@@ -308,7 +308,7 @@ test.describe('Depth Chart submission', () => {
     // (shared-session steal — see the note at the top of this file); the error flash
     // key is module-scoped, so its absence here is not racy.
     await page.waitForURL(/modules\.php\?name=DepthChartEntry(?!.*op=submit)/, { timeout: 15_000 });
-    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
+    await expect(page.locator('.d-alert-error')).not.toBeVisible();
   });
 
   test('CSRF failure shows inline error without redirecting', async ({ page }) => {

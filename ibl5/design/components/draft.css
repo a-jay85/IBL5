@@ -77,7 +77,9 @@
    ========================================================================== */
 
 .draft-year-select {
-    padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+    /* em, not rem: the select inherits the h1 font size, and so does the
+       1.25em chevron. A rem gap stays small while the digits grow into it. */
+    padding: 0.25rem 1.75em 0.25rem 0.5rem;
     font-size: inherit;
     font-weight: inherit;
     color: inherit;

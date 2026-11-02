@@ -59,9 +59,14 @@
 #                            bucket AND a /pr-ready READY verdict over the head's current
 #                            tree. Default: 1 (enabled)
 #   PR_CYCLE_SKIP_HELD_UNCHANGED
-#                            0 disables the held-unchanged skip. When 1, PRs whose last
-#                            post-plan run held for conditions {3,7} only and whose diff
-#                            matches the sticky **Reviewed diff:** are skipped.
+#                            0 disables the held-unchanged skip. When 1, a PR whose last
+#                            post-plan run held only for conditions a human clears (1
+#                            manual-testing-clearance, 3 unresolved-MISSING-items, 7
+#                            plan-auto-merge-hold, 8 feat-commit-type-floor), whose hold
+#                            record is readable and current, and whose diff matches the
+#                            sticky **Reviewed diff:** is skipped until the head or the
+#                            plan changes. Skipped PRs are listed in the your-turn DM
+#                            with those condition names.
 #                            A PR whose live bucket is DIRTY or BLOCKED-CHECK is exempt
 #                            from this skip and from the holdrepeat skip: a new conflict
 #                            or red check is a state change those fingerprints miss.
@@ -664,8 +669,8 @@ _sticky_body() {
 # _check_held_unchanged N — echo the blocked condition numbers (e.g. "3" or "3,7") when PR N
 # should be skipped by Fix 4, or echo "" when it should not. Fails open on any error.
 # Skip only when ALL hold: last harness run terminal=shipped-held; blocked conditions are a
-# non-empty subset of {3,7}; mergeStateStatus != DIRTY; sticky **Reviewed diff:** matches
-# the current patch-id.
+# non-empty subset of {1,3,7,8}; mergeStateStatus != DIRTY; sticky **Reviewed diff:** matches
+# the current patch-id; the hold record is readable, human-only and current.
 # _sticky_diff_matches N — exit 0 only when PR N's sticky **Reviewed diff:** patch-id equals
 # the PR's current patch-id (_pr_patch_id). Any missing piece returns 1.
 _sticky_diff_matches() {
@@ -676,6 +681,41 @@ _sticky_diff_matches() {
     [ -n "$_sd_diff" ] || return 1
     _sd_pid="$(_pr_patch_id "$_sd_n")"
     [ -n "$_sd_pid" ] && [ "$_sd_pid" = "$_sd_diff" ]
+}
+
+# _human_only_names N — echo the condition names (e.g. "1 manual-testing-clearance, 7 plan-auto-merge-hold")
+# and return 0 only when `harness.holdrepeat human-only-eligible` exits 10 for PR N's head
+# branch. Passes --worktree when the PR's worktree exists at the PR head, so a plan or
+# harness edit (a changed fingerprint) re-enters the PR; without a usable worktree the
+# call is slug-keyed only. An unreadable or missing record, a missing harness dir, or any
+# other exit returns 1, so the caller runs the PR.
+_human_only_names() {
+    local _hn_n="$1" _hn_ref _hn_oid _hn_wt="" _hn_h="$PR_CYCLE_HOLDREPEAT_HARNESS" _hn_out _hn_rc
+    local -a _hn_wtarg=()
+    _ensure_armed_state
+    [ -f "$RUNDIR/armed-state.json" ] || return 1
+    _hn_ref="$(jq -r --argjson n "$_hn_n" '.[] | select(.number == $n) | .headRefName // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    _hn_oid="$(jq -r --argjson n "$_hn_n" '.[] | select(.number == $n) | .headRefOid // ""' \
+        "$RUNDIR/armed-state.json" 2>/dev/null || true)"
+    [ -n "$_hn_ref" ] || return 1
+    [ -d "$_hn_h/harness" ] || return 1
+    if [ -n "$_hn_oid" ]; then
+        _hn_wt="$(git -C "$PR_CYCLE_MAIN_CHECKOUT" worktree list --porcelain 2>/dev/null \
+            | awk -v b="branch refs/heads/$_hn_ref" '/^worktree /{w=substr($0,10)} $0==b && !f {print w; f=1}' \
+            || true)"
+        if [ -n "$_hn_wt" ] && [ "$(git -C "$_hn_wt" rev-parse HEAD 2>/dev/null || true)" = "$_hn_oid" ]; then
+            _hn_wtarg=(--worktree "$_hn_wt")
+        fi
+    fi
+    set +e
+    _hn_out="$(PYTHONPATH="$_hn_h" python3 -m harness.holdrepeat human-only-eligible \
+        --state-dir "$PR_CYCLE_HOLDREPEAT_STATE_DIR" --slug "$_hn_ref" ${_hn_wtarg[@]+"${_hn_wtarg[@]}"} \
+        2> "$RUNDIR/human-only-$_hn_n.err")"
+    _hn_rc=$?
+    set -e
+    [ "$_hn_rc" -eq 10 ] && [ -n "$_hn_out" ] || return 1
+    printf '%s\n' "$_hn_out"
 }
 
 _check_held_unchanged() {
@@ -728,18 +768,24 @@ _check_held_unchanged() {
     _ch_term="$(jq -r '.terminal // ""' "$_ch_best_json" 2>/dev/null || true)"
     [ "$_ch_term" = "shipped-held" ] || { echo ""; return 0; }
 
-    # Blocked conditions must be a non-empty subset of {3, 7}.
+    # Blocked conditions must be a non-empty subset of {1, 3, 7, 8} (human-only holds).
     _ch_blocked="$(jq -r \
         '[.arm.conditions[]? | select(.blocked == true) | .number] | sort | join(",")' \
         "$_ch_best_json" 2>/dev/null || true)"
     [ -n "$_ch_blocked" ] || { echo ""; return 0; }
-    case "$_ch_blocked" in
-        "3"|"7"|"3,7") ;;
-        *) echo ""; return 0 ;;
-    esac
+    for _ch_c in ${_ch_blocked//,/ }; do
+        case "$_ch_c" in
+            1|3|7|8) ;;
+            *) echo ""; return 0 ;;
+        esac
+    done
 
     # Sticky body **Reviewed diff:** must match current patch-id.
     _sticky_diff_matches "$_chn" || { echo ""; return 0; }
+
+    # The hold record must be readable, human-only and current (plan, diff, harness).
+    _ch_names="$(_human_only_names "$_chn")" || { echo ""; return 0; }
+    printf '%s\n' "$_ch_names" > "$RUNDIR/held-names-$_chn.txt"
 
     echo "$_ch_blocked"
     return 0
@@ -1062,12 +1108,13 @@ _stage1_list() {
                 continue ;;
         esac
 
-        # Fix 4: skip PRs held for conditions {3,7} with unchanged diff — re-running would
+        # Fix 4: skip PRs held for conditions {1,3,7,8} with unchanged diff — re-running would
         # produce the same hold. Seam PR_CYCLE_SKIP_HELD_UNCHANGED=0 disables this.
         if [ "${PR_CYCLE_SKIP_HELD_UNCHANGED:-1}" != "0" ]; then
             _sl_held="$(_check_held_unchanged "$_sl_n")"
             if [ -n "$_sl_held" ]; then
-                echo "#$_sl_n — last post-plan run held it for ($_sl_held) and the diff is unchanged, skipping (needs a human or a new commit)" >> "$RUNDIR/stage1-skipped.txt"
+                _sl_names="$(cat "$RUNDIR/held-names-$_sl_n.txt" 2>/dev/null || true)"
+                echo "#$_sl_n — last post-plan run held it for ($_sl_held) and the diff is unchanged, skipping (needs a human or a new commit)${_sl_names:+; waiting on: $_sl_names}" >> "$RUNDIR/stage1-skipped.txt"
                 continue
             fi
         fi

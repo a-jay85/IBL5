@@ -97,6 +97,9 @@
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
         </testsuite>
+        <testsuite name="Legal Module Tests">
+            <directory>tests/Legal</directory>
+        </testsuite>
         <testsuite name="Boxscore Module Tests">
             <directory>tests/Boxscore</directory>
         </testsuite>
@@ -114,6 +117,9 @@
         </testsuite>
         <testsuite name="HeadToHeadRecords Module Tests">
             <directory>tests/HeadToHeadRecords</directory>
+        </testsuite>
+        <testsuite name="Rivalries Module Tests">
+            <directory>tests/Rivalries</directory>
         </testsuite>
         <testsuite name="OneOnOneGame Module Tests">
             <directory>tests/OneOnOneGame</directory>

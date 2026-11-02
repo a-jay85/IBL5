@@ -46,7 +46,7 @@ test.describe('Player negotiate sub-page', () => {
     await expect(
       page.locator('h1.ibl-title').filter({ hasText: 'Contract Extension' }),
     ).toBeVisible();
-    await expect(page.locator('.ibl-alert--error').first()).toBeVisible();
+    await expect(page.locator('.d-alert-error').first()).toBeVisible();
   });
 
   test('negotiate with invalid PID shows no PHP errors', async ({

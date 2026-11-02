@@ -147,7 +147,7 @@ test.describe('CSS shared primitives', () => {
     const actual = await probe(
       page,
       'body',
-      '<div class="schedule-month"><div data-probe class="ibl-card__header schedule-month__header schedule-month__header--playoffs">P</div></div>',
+      '<div class="schedule-month"><div data-probe class="schedule-month__header schedule-month__header--playoffs">P</div></div>',
       ['backgroundImage', 'backgroundColor'],
     );
     expect(actual.backgroundImage).toBe('none');
@@ -158,12 +158,35 @@ test.describe('CSS shared primitives', () => {
     const actual = await probe(
       page,
       'body',
-      '<div class="schedule-month"><div data-probe class="ibl-card__header schedule-month__header">M</div></div>',
+      '<div class="schedule-month"><div data-probe class="schedule-month__header">M</div></div>',
       ['backgroundImage', 'paddingTop', 'paddingLeft'],
     );
     expect(actual.backgroundImage).toContain('linear-gradient');
     expect(actual.paddingTop).toBe('4px');
     expect(actual.paddingLeft).toBe('8px');
+  });
+
+  test('last-sim-recap head keeps the navy gradient and white text', async ({ page }) => {
+    const actual = await probe(
+      page,
+      'body',
+      '<section class="last-sim-recap"><header data-probe class="last-sim-recap__head">H</header></section>',
+      ['backgroundImage', 'color', 'paddingTop'],
+    );
+    expect(actual.backgroundImage).toContain('linear-gradient');
+    expect(actual.color).toBe('rgb(255, 255, 255)');
+    expect(actual.paddingTop).toBe('11.7px');
+  });
+
+  test('built CSS emits .d-alert-info for the LeagueConfig info alert', async ({ page }) => {
+    const plain = await probe(page, 'body', '<div data-probe class="d-alert">A</div>', ['backgroundColor']);
+    const info = await probe(
+      page,
+      'body',
+      '<div data-probe role="alert" class="d-alert d-alert-info mb-4">A</div>',
+      ['backgroundColor'],
+    );
+    expect(info.backgroundColor).not.toBe(plain.backgroundColor);
   });
 
   test('nav section label matches its utility string', async ({ page }) => {

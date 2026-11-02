@@ -86,7 +86,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 
         $draResult = $this->jsbService->processDraData($data);
         $result->merge($draResult);
-        $messages[] = 'DRA: ' . $draResult->summary();
+        array_push($messages, 'DRA: ' . $draResult->summary(), ...$draResult->messages);
 
         return false;
     }
@@ -108,7 +108,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 
         $retResult = $this->jsbService->processRetData($data, $this->priorYear);
         $result->merge($retResult);
-        $messages[] = 'RET: ' . $retResult->summary();
+        array_push($messages, 'RET: ' . $retResult->summary(), ...$retResult->messages);
 
         return false;
     }
@@ -140,7 +140,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 
         $hofResult = $this->jsbService->processHofData($data);
         $result->merge($hofResult);
-        $messages[] = 'HOF: ' . $hofResult->summary();
+        array_push($messages, 'HOF: ' . $hofResult->summary(), ...$hofResult->messages);
 
         return false;
     }
@@ -163,7 +163,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 
         $awaResult = $this->jsbService->processAwaData($awaData, $carData, $this->priorYear);
         $result->merge($awaResult);
-        $messages[] = 'AWA: ' . $awaResult->summary();
+        array_push($messages, 'AWA: ' . $awaResult->summary(), ...$awaResult->messages);
 
         return false;
     }

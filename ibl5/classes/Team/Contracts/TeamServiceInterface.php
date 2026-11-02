@@ -29,6 +29,7 @@ use Team\Team;
  *     awardsCard: string,
  *     franchiseHistoryCard: string,
  *     rafters: string,
+ *     rivalsCard?: string,
  *     userTeamName: string,
  *     isOwnTeam: bool,
  *     extensionResult: ?string,

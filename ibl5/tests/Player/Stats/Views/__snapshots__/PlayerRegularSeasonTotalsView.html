@@ -1,6 +1,7 @@
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=15 class="player-table-header">Regular Season Totals</td>
+        <td colspan=15 class="player-view-table__title">Regular Season Totals</td>
     </tr>
     <tr>
         <th>year</th>
@@ -19,14 +20,16 @@
         <th>pf</th>
         <th>pts</th>
     </tr>
+</thead>
+<tbody>
             <tr>
         <td>2029</td>
         <td><a href="modules.php?name=Team&op=team&teamid=3&yr=2029">ATL</a></td>
         <td>41</td>
         <td>1230</td>
-        <td>300-640</td>
-        <td>150-190</td>
-        <td>60-175</td>
+        <td sorttable_customkey="300">300-640</td>
+        <td sorttable_customkey="150">150-190</td>
+        <td sorttable_customkey="60">60-175</td>
         <td>55</td>
         <td>210</td>
         <td>130</td>
@@ -41,9 +44,9 @@
         <td><a href="modules.php?name=Team&op=team&teamid=7&yr=2030">BOS</a></td>
         <td>58</td>
         <td>1885</td>
-        <td>412-903</td>
-        <td>221-268</td>
-        <td>97-259</td>
+        <td sorttable_customkey="412">412-903</td>
+        <td sorttable_customkey="221">221-268</td>
+        <td sorttable_customkey="97">97-259</td>
         <td>83</td>
         <td>347</td>
         <td>196</td>
@@ -58,9 +61,9 @@
         <td><a href="modules.php?name=Team&op=team&teamid=9&yr=2031">DEN</a></td>
         <td>33</td>
         <td>921</td>
-        <td>187-403</td>
-        <td>94-118</td>
-        <td>41-112</td>
+        <td sorttable_customkey="187">187-403</td>
+        <td sorttable_customkey="94">94-118</td>
+        <td sorttable_customkey="41">41-112</td>
         <td>36</td>
         <td>148</td>
         <td>87</td>
@@ -70,7 +73,9 @@
         <td>66</td>
         <td>509</td>
     </tr>
-                <tr class="player-table-row-bold">
+            </tbody>
+<tfoot>
+    <tr class="career-row">
         <td colspan=2>Career</td>
         <td>132</td>
         <td>4036</td>
@@ -86,5 +91,6 @@
         <td>303</td>
         <td>2461</td>
     </tr>
+</tfoot>
 </table>
         

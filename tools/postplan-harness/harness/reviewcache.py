@@ -338,6 +338,8 @@ def vet_fidelity(fid, run_id):
     verdict = fid.get("verdict_1")
     if verdict not in FIDELITY_REUSABLE_VERDICTS or fid.get("error_kind"):
         return None
+    if fid.get("review_kind") == "delta":   # a partial-scope verdict never stands in for a full one
+        return None
     # The sticky's **Re-reviewed tree:** line derives from verdict_2; any remediation
     # round means the verdict judged a tree this run changed, so it is never cached.
     if fid.get("verdict_2") is not None or fid.get("remediation_sha") \

@@ -1,6 +1,6 @@
 ---
 description: Prevent duplicate ADR and migration numbers at allocation time and detect them at PR time, rather than renumbering the legacy duplicates.
-last_verified: 2026-08-29
+last_verified: 2026-10-29
 ---
 
 # ADR-0110: ADR and migration numbering collision prevention

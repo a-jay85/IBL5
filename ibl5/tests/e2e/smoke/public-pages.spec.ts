@@ -52,6 +52,8 @@ const PAGES: PageRow[] = [
     rowCount: { selector: '.ibl-data-table tbody tr', minimum: 1 } },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords', anchor: '.h2h-matrix',
     rowCount: { selector: '.h2h-matrix tbody tr', minimum: 1 } },
+  { name: 'rivalries', url: 'modules.php?name=Rivalries', anchor: '.ibl-data-table' },
+  { name: 'rivalries pair', url: 'modules.php?name=Rivalries&op=teams&a=1&b=2', anchor: '.rivalries-banner-title' },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', anchor: '.ibl-data-table',
     rowCount: { selector: 'tr[data-team-id]', minimum: 28 } },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', anchor: '.ibl-data-table',

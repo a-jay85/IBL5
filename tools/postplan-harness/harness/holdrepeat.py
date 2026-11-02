@@ -38,6 +38,16 @@ STRUCTURAL_CONDITIONS = frozenset({3, 7, 8, 13})
 # auto_merge: false, 8 = feat signoff floor). A DIRTY PR whose last hold is
 # a non-empty subset of these only needs a rebase, never a fresh review.
 REBASE_ONLY_CONDITIONS = frozenset({3, 7, 8})
+# Conditions only a human can clear, as the Stage 1 held-unchanged skip sees them
+# (1 manual-testing-clearance, 3 unresolved-MISSING-items, 7 plan-auto-merge-hold,
+# 8 feat-commit-type-floor). A re-run cannot change any of them.
+HUMAN_ONLY_CONDITIONS = frozenset({1, 3, 7, 8})
+CONDITION_NAMES = {
+    1: "manual-testing-clearance",
+    3: "unresolved-MISSING-items",
+    7: "plan-auto-merge-hold",
+    8: "feat-commit-type-floor",
+}
 ELIGIBLE_EXIT = 10
 FIX_ELIGIBLE_EXIT = 10
 FIX_GIVEUP_EXIT = 11
@@ -169,7 +179,25 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
     key = structural_key(conditions)
     structural = _structural(conditions)
     if armed or key == "":
-        clear_record(state_dir, slug)
+        nums = {t[0] for t in hold_set(conditions)}
+        if not armed and nums and nums <= HUMAN_ONLY_CONDITIONS:
+            # A hold with no structural condition (1 alone) still needs a record so
+            # `human_only_names` can skip it. Empty dm_sent_key/structural_key keep
+            # `should_decline` and the repeat DM off.
+            _save_record(state_dir, slug, {
+                "schema_version": SCHEMA_VERSION,
+                "slug": slug,
+                "structural_key": "",
+                "hold_set": hold_set(conditions),
+                "structural": [],
+                "repeat_count": 1,
+                "dm_sent_key": None,
+                "fingerprint": fingerprint,
+                "pr": pr,
+                "updated_at": now,
+            })
+        else:
+            clear_record(state_dir, slug)
         return Observation("cleared", key, 0, [])
 
     record = load_record(state_dir, slug)
@@ -493,6 +521,25 @@ def should_decline(state_dir, slug, current_fp: str):
     return True, f"unchanged plan+diff+harness; held again on {key} (DM already sent)"
 
 
+def _hold_numbers(rec):
+    """Return the set of condition numbers in the record's `hold_set`, or None.
+
+    None means a missing, empty or malformed `hold_set`: a non-list entry, an
+    empty entry, or a first element that is not an int. A bool first element is
+    rejected too, since `True == 1` would otherwise pass as condition 1.
+    """
+    entries = rec.get("hold_set")
+    if not isinstance(entries, list) or not entries:
+        return None
+    nums = set()
+    for e in entries:
+        if (not isinstance(e, list) or not e
+                or not isinstance(e[0], int) or isinstance(e[0], bool)):
+            return None
+        nums.add(e[0])
+    return nums
+
+
 def rebase_only_eligible(state_dir, slug) -> bool:
     """True when the stored hold set is non-empty and every number is in {3,7,8}.
 
@@ -504,15 +551,27 @@ def rebase_only_eligible(state_dir, slug) -> bool:
     rec = load_record(state_dir, slug)
     if not rec:
         return False
-    entries = rec.get("hold_set")
-    if not isinstance(entries, list) or not entries:
+    nums = _hold_numbers(rec)
+    if not nums:
         return False
-    nums = set()
-    for e in entries:
-        if not isinstance(e, list) or not e or not isinstance(e[0], int):
-            return False
-        nums.add(e[0])
     return nums <= REBASE_ONLY_CONDITIONS
+
+
+def human_only_names(state_dir, slug, current_fp=None):
+    """Return "1 manual-testing-clearance, 7 plan-auto-merge-hold" style text when the
+    stored hold set is a non-empty subset of {1,3,7,8}, else None. When current_fp is
+    given it must equal the record's fingerprint (plan, diff and harness unchanged).
+    Any absent, unreadable, malformed or stale record returns None (fail toward running).
+    """
+    rec = load_record(state_dir, slug)
+    if not rec:
+        return None
+    nums = _hold_numbers(rec)
+    if not nums or not nums <= HUMAN_ONLY_CONDITIONS:
+        return None
+    if current_fp is not None and (not current_fp or current_fp != rec.get("fingerprint")):
+        return None
+    return ", ".join(f"{n} {CONDITION_NAMES[n]}" for n in sorted(nums))
 
 
 def hold_fingerprint(reason: str) -> str:
@@ -659,6 +718,12 @@ def _build_parser() -> argparse.ArgumentParser:
                           help="exit 10 when the last hold is a subset of {3,7,8}")
     elig.add_argument("--state-dir", required=True)
     elig.add_argument("--slug", required=True)
+    ho = sub.add_parser("human-only-eligible",
+                        help="exit 10 and print names when the last hold is a subset of {1,3,7,8}")
+    ho.add_argument("--state-dir", required=True)
+    ho.add_argument("--slug", required=True)
+    ho.add_argument("--plan", default="")  # explicit override path only; "" = resolve via locate_plan
+    ho.add_argument("--worktree", default="")
     fe = sub.add_parser("fix-eligible",
                         help="exit 10 when the last hold is a fixable condition-3 hold")
     fe.add_argument("--state-dir", required=True)
@@ -732,6 +797,22 @@ def main(argv=None) -> int:
             return 0
         if ok:
             print("holdrepeat: REBASE-ONLY eligible")
+            return ELIGIBLE_EXIT
+        return 0
+    if args.cmd == "human-only-eligible":
+        fp = None
+        try:
+            if args.worktree:
+                from harness.planfile import locate_plan
+                plan_info = locate_plan(args.slug, explicit_path=args.plan or None)
+                fp = fingerprint(plan_info.path or "", args.worktree)
+            names = human_only_names(args.state_dir, args.slug, fp)
+        except Exception as e:  # noqa: BLE001 - fail open to "not eligible"
+            print(f"holdrepeat: human-only-eligible failed ({e}); not eligible",
+                  file=sys.stderr)
+            return 0
+        if names:
+            print(names)
             return ELIGIBLE_EXIT
         return 0
     try:

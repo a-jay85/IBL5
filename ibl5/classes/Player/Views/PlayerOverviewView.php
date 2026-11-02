@@ -79,9 +79,10 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 
         ob_start();
         ?>
-<table class="sortable player-table">
+<table class="sortable ibl-data-table player-view-table">
+<thead>
     <tr>
-        <td colspan=22 class="player-table-header">Game Log</td>
+        <td colspan=22 class="player-view-table__title">Game Log</td>
     </tr>
     <tr>
         <th>Date</th>
@@ -107,9 +108,11 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <th>PF</th>
         <th>PTS</th>
     </tr>
+</thead>
+<tbody>
         <?php
         foreach ($boxScores as $row) {
-            /** @var array{game_date: string, home_teamid: int, visitor_teamid: int, game_of_that_day: int, box_id: int, game_min: int, game_2gm: int, game_2ga: int, game_3gm: int, game_3ga: int, game_ftm: int, game_fta: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int} $row */
+            /** @var array{game_date: string, home_teamid: int, visitor_teamid: int, teamid: int, game_of_that_day: int, box_id: int, game_min: int, game_2gm: int, game_2ga: int, game_3gm: int, game_3ga: int, game_ftm: int, game_fta: int, game_orb: int, game_drb: int, game_ast: int, game_stl: int, game_tov: int, game_blk: int, game_pf: int} $row */
             $fgm = $row['game_2gm'] + $row['game_3gm'];
             $fga = $row['game_2ga'] + $row['game_3ga'];
             $pts = (2 * $row['game_2gm']) + (3 * $row['game_3gm']) + $row['game_ftm'];
@@ -117,7 +120,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 
             $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['home_teamid']);
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitor_teamid']);
-            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['game_date'], (int) ($row['game_of_that_day'] ?? 0), (int) ($row['box_id'] ?? 0));
+            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['game_date'], (int) ($row['game_of_that_day'] ?? 0), (int) ($row['box_id'] ?? 0), (int) ($row['teamid'] ?? 0));
             ?>
     <tr>
         <td class="gamelog"><?php if ($boxScoreUrl !== ''): ?><a href="<?= HtmlSanitizer::e($boxScoreUrl) ?>"><?= HtmlSanitizer::e($row['game_date']) ?></a><?php else: ?><?= HtmlSanitizer::e($row['game_date']) ?><?php endif; ?></td>
@@ -146,6 +149,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             <?php
         }
         ?>
+</tbody>
 </table>
         <?php
         return (string) ob_get_clean();

@@ -64,6 +64,24 @@ class RefreshIblHistStepTest extends TestCase
     }
 
     /**
+     * Pins the preseason exclusion in the inner WHERE. Mutation: remove it and
+     * preseason-only players get a fake ibl_hist row again.
+     */
+    public function testPreseasonSnapshotsAreExcludedInRefreshQuery(): void
+    {
+        $mockDb = new MockDatabase();
+        (new RefreshIblHistStep($mockDb))->execute();
+
+        $queries = implode("\n", $mockDb->getExecutedQueries());
+
+        $this->assertStringContainsString(
+            "WHERE s.stats_gm > 0 AND s.snapshot_phase <> 'preseason'",
+            $queries,
+            'Preseason snapshots must be excluded from the ibl_hist refresh query',
+        );
+    }
+
+    /**
      * Pins stats_gm DESC as the first ORDER BY key. Mutation: move or remove
      * stats_gm DESC and this positional assertion fails.
      */

@@ -125,6 +125,35 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertSame(5, $result['teamIds']['Clippers']);
     }
 
+    public function testGetSeasonDetailPrefersEraTeamColorsForThatSeason(): void
+    {
+        $this->mockRepository->method('getAwardsByYear')->willReturn([
+            ['year' => 1995, 'award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_id' => 1],
+        ]);
+        $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
+        $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamColors')->willReturn([
+            'Nets' => ['color1' => 'AAAAAA', 'color2' => 'BBBBBB', 'teamid' => 4],
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+        ]);
+        $this->mockRepository->method('getTeamColorsByYear')->willReturn([
+            1995 => [
+                'Nets' => ['color1' => '000000', 'color2' => 'FFFFFF', 'teamid' => 4],
+                'Supersonics' => ['color1' => '00653A', 'color2' => 'FFC200', 'teamid' => 22],
+            ],
+        ]);
+
+        $result = $this->service->getSeasonDetail(1995);
+
+        $this->assertNotNull($result);
+        $this->assertSame('000000', $result['teamColors']['Nets']['color1']);
+        $this->assertSame(22, $result['teamIds']['Supersonics']);
+        $this->assertSame('C8102E', $result['teamColors']['Clippers']['color1']);
+    }
+
     public function testGetSeasonDetailUsesHeatYearMinusOne(): void
     {
         $this->mockRepository->method('getAwardsByYear')->willReturn([

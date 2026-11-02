@@ -28,12 +28,14 @@ class SeasonArchiveIndexView implements SeasonArchiveIndexViewInterface
      * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
      * @param array<string, int> $playerIds
      * @param array<string, int> $teamIds
+     * @param array<int, array<string, array{color1: string, color2: string, teamid: int}>> $teamColorsByYear Era colors per season; override $teamColors for that row
      */
     public function renderIndex(
         array $seasons,
         array $teamColors = [],
         array $playerIds = [],
-        array $teamIds = []
+        array $teamIds = [],
+        array $teamColorsByYear = []
     ): string {
         $html = '';
         $html .= '<h1 class="ibl-title">IBL Season Archive</h1>';
@@ -45,11 +47,12 @@ class SeasonArchiveIndexView implements SeasonArchiveIndexViewInterface
             /** @var array{year: int, label: string, iblChampion: string, heatChampion: string, mvp: string} $season */
             $year = $season['year'];
             $label = self::esc($season['label']);
+            $yearColors = ($teamColorsByYear[$year] ?? []) + $teamColors;
 
             $html .= '<tr>';
             $html .= '<td><a href="modules.php?name=SeasonArchive&amp;year=' . $year . '">' . $label . '</a></td>';
-            $html .= self::renderTeamCell($season['heatChampion'], $teamColors, $year);
-            $html .= self::renderTeamCell($season['iblChampion'], $teamColors, $year);
+            $html .= self::renderTeamCell($season['heatChampion'], $yearColors, $year);
+            $html .= self::renderTeamCell($season['iblChampion'], $yearColors, $year);
             $html .= '<td>' . self::renderPlayerName($season['mvp'], $playerIds) . '</td>';
             $html .= '</tr>';
         }

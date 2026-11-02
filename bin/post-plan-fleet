@@ -661,6 +661,7 @@ fire_pr() {
         printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" POST_PLAN_FLEET_DISCORD_DM)"
         printf 'GH_BIN=%q\n'     "${POST_PLAN_FLEET_GH:-gh}"
         printf 'POST_PLAN_NOW_BIN=%q\n' "${POST_PLAN_FLEET_CLAUDE:-$ROOT/bin/post-plan-now}"
+        printf 'POSTPLAN_FIRED_BY=%q\n' "${POSTPLAN_FIRED_BY:-post-plan-fleet}"
         printf 'ALLOW_TEST_ONLY_ARG=%q\n' "$ALLOW_TEST_ONLY_ARG"
         _sc_arg=""
         [[ ",$STATE_CHANGED_PRS," == *",$PR,"* ]] && _sc_arg=--state-changed
@@ -681,7 +682,7 @@ cd "$ROOT" || exit 1
 RC=0
 # The timeout line stays flush-left: bin/test-post-plan-fleet greps it as a whole line.
 if [ -z "$HOLDREPEAT_FIX_ARG" ]; then
-timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
+POSTPLAN_FIRED_BY="$POSTPLAN_FIRED_BY" timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG" 2>&1 || RC=$?
 else
     : > "$LOG"
 fi

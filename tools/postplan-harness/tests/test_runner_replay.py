@@ -1418,7 +1418,8 @@ def test_audit_log_is_populated_mid_run(tmp_path, sticky_tmp):
     assert llm.snapshot is not None, "the run made no LLM call, so nothing was sampled"
     assert "phase1 plan:" in llm.snapshot, llm.snapshot
     # The sampled text must match the format bin/fleet-status greps for: `[HH:MM:SS] phase…`
-    first = llm.snapshot.splitlines()[0]
+    # The leading `postplan: fired-by=` attribution line is not a phase line; skip it.
+    first = next(ln for ln in llm.snapshot.splitlines() if "postplan: fired-by=" not in ln)
     assert re.match(r"^\[\d{2}:\d{2}:\d{2}\] phase", first), first
 
 
@@ -1917,6 +1918,22 @@ def test_phase7_ci_fix_usage_pause_still_fails_run(monkeypatch, tmp_path):
     audit = _audit(out)
     assert "PAUSED: usage-pause: ci-fix" in audit
     assert "phase9: retrospective skipped" not in audit
+
+
+def test_replay_pr_merged_before_cifix_ends_already_shipped(monkeypatch, tmp_path):
+    """The PR merged before attempt 1: no ci-fix call, ALREADY_SHIPPED, exit 0."""
+    out = str(tmp_path / "out")
+    fx = _red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}])
+    fx["merged_pr"] = {"number": fx["pr_number"], "url": "https://example.invalid/pr"}
+    res, llm = _run_live_shaped_with(
+        monkeypatch, out, git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]}, fixture=fx)
+    assert res.terminal == TerminalState.ALREADY_SHIPPED
+    assert res.final_pr_state == "MERGED"
+    assert res.pr_number == fx["pr_number"]
+    assert runner.exit_code_for(res) == 0
+    assert not os.path.exists(os.path.join(out, "ci-fix-1"))
+    assert "merged before attempt 1" in _audit(out)
 
 
 def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):

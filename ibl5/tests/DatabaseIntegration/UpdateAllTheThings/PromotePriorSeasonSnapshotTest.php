@@ -363,6 +363,37 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertSame(222, (int) $row['pts'], 'stats_gm DESC must outrank the end-of-season phase bonus.');
     }
 
+    public function testStalePreseasonSnapshotWithMoreGamesLosesToLaterSnapshot(): void
+    {
+        // A preseason snapshot is a baseline taken before any regular-season game, so a
+        // preseason row with more games than a later snapshot is stale (e.g. a rolled-back sim).
+        $this->seedSnapshot(202099903, 2009, 'preseason',  ['stats_gm' => 19, 'stats_pts' => 443]);
+        $this->seedSnapshot(202099903, 2009, 'mid-season', ['stats_gm' => 18, 'stats_pts' => 402]);
+
+        $row = $this->rankedIblHistRowFor(202099903);
+
+        self::assertNotNull($row);
+        self::assertSame(18, (int) $row['games'], 'A stale preseason snapshot must not outrank the mid-season snapshot.');
+        self::assertSame(402, (int) $row['pts']);
+    }
+
+    public function testPreseasonOnlyPlayerGetsNoIblHistRow(): void
+    {
+        // Preseason games are never regular-season games. A player whose mid-season row has
+        // stats_gm = 0 (dropped by the stats_gm > 0 filter) must not fall back to preseason.
+        $this->seedSnapshot(202099904, 2009, 'preseason',  ['stats_gm' => 16, 'stats_pts' => 100]);
+        $this->seedSnapshot(202099904, 2009, 'mid-season', ['stats_gm' => 0]);
+
+        self::assertNull($this->rankedIblHistRowFor(202099904), 'A preseason-only player must get no ibl_hist row.');
+    }
+
+    public function testPreseasonSnapshotAloneProducesNoIblHistRow(): void
+    {
+        $this->seedSnapshot(202099910, 2009, 'preseason', ['stats_gm' => 9, 'stats_pts' => 100]);
+
+        self::assertNull($this->rankedIblHistRowFor(202099910));
+    }
+
     /**
      * Offseason runs rewrite 'mid-season', and PromotePriorSeasonSnapshotStep copies it
      * into 'end-of-season', so both can carry post-playoffs ratings. The 'playoffs' row

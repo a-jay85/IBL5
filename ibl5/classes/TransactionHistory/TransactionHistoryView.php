@@ -10,7 +10,7 @@ use Security\HtmlSanitizer;
 /**
  * View class for rendering the Transaction History page.
  *
- * Uses the IBL design system (.ibl-data-table, .ibl-filter-form, etc.)
+ * Uses the IBL design system (.ibl-data-table, a daisyUI .d-card filter form, etc.)
  * with category-specific badge colors for transaction types.
  *
  * @phpstan-import-type PageData from TransactionHistoryViewInterface
@@ -63,38 +63,38 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
 
         ob_start();
         ?>
-<form method="get" action="modules.php" class="ibl-filter-form">
+<form method="get" action="modules.php" class="d-card d-card-border bg-base-200 p-4 mb-6">
     <input type="hidden" name="name" value="Transaction_History">
-    <div class="ibl-filter-form__row">
-        <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label" for="txn-cat">Category:</label>
-            <select id="txn-cat" name="cat">
+    <div class="flex flex-wrap items-center justify-center gap-4">
+        <div class="flex items-center gap-2">
+            <label class="d-label" for="txn-cat">Category:</label>
+            <select id="txn-cat" name="cat" class="d-select d-select-sm w-auto">
                 <option value="0">All Categories</option>
                 <?php foreach ($categories as $catId => $catName): ?>
                     <option value="<?= (int) $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?= HtmlSanitizer::e($catName) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label" for="txn-year">Year:</label>
-            <select id="txn-year" name="year">
+        <div class="flex items-center gap-2">
+            <label class="d-label" for="txn-year">Year:</label>
+            <select id="txn-year" name="year" class="d-select d-select-sm w-auto">
                 <option value="0">All Years</option>
                 <?php foreach ($availableYears as $year): ?>
                     <option value="<?= (int) $year ?>"<?= $selectedYear === $year ? ' selected' : '' ?>><?= (int) $year ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label" for="txn-month">Month:</label>
-            <select id="txn-month" name="month">
+        <div class="flex items-center gap-2">
+            <label class="d-label" for="txn-month">Month:</label>
+            <select id="txn-month" name="month" class="d-select d-select-sm w-auto">
                 <option value="0">All Months</option>
                 <?php foreach ($monthNames as $num => $name): ?>
                     <option value="<?= (int) $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?= HtmlSanitizer::e($name) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <button type="submit" class="ibl-filter-form__submit">Filter</button>
-        <a href="modules.php?name=TransactionHistory" class="ibl-btn ibl-btn--ghost ibl-btn--sm txn-reset">Reset</a>
+        <button type="submit" class="d-btn d-btn-primary d-btn-sm">Filter</button>
+        <a href="modules.php?name=TransactionHistory" class="d-btn d-btn-ghost d-btn-sm txn-reset">Reset</a>
     </div>
 </form>
         <?php

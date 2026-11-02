@@ -7,7 +7,7 @@ namespace JsbParser\Contracts;
 /**
  * Interface for parsing JSB .hof (Hall of Fame) fixed-size files.
  *
- * The .hof format is exactly 7000 bytes, organized as 14 × 500-byte year blocks.
+ * The .hof format is a run of 500-byte blocks that grows each season.
  * Each entry contains position, player name, JSB PID, and induction year.
  */
 interface HofFileParserInterface

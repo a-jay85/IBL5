@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand only (no auto-attach trigger). The inline-edit trial to 2026-11-23, its routing change for chunks under 5 files, how `bin/lib/opus-trial-cost.jq` measures it, and the measurement limits. Parent work-triage.md carries the resident rule and review command; work-triage-detail.md links here.
-last_verified: 2026-10-26
+description: Read-on-demand only (no auto-attach trigger). The inline-edit trial to 2026-11-23, its routing change for chunks under 5 files, how `bin/lib/opus-trial-cost.jq` measures it, the measurement limits, and the 2026-11-23 review command and criteria. Parent work-triage.md carries the resident rule; work-triage-detail.md links here.
+last_verified: 2026-11-01
 paths: ".claude/rules/work-triage-inline-trial.md"
 ---
 
@@ -16,7 +16,7 @@ For a chunk of 5 or more files, the entangled and trivial criteria in `work-tria
 
 ## Measurement
 
-`bin/lib/opus-trial-cost.jq` sums the `cost` field of `bin/lib/automouse-pricer --index` per worktree transcript dir and reports `n`, median, mean, and p90 for a half-open window `[from, to)`. Under 20 tasks it sets `note: "insufficient-sample"`, the floor in `bin/measure-delegate-cost`. `cost` is recomputed from transcripts and includes subagents, unlike `logged_cost` (`bin/automouse/backfill-costs`). Transcripts age out after 30 days, so the before-window stats were saved to `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. The review compares that file with a fresh run. The command is in `work-triage.md` § Execution routing.
+`bin/lib/opus-trial-cost.jq` sums the `cost` field of `bin/lib/automouse-pricer --index` per worktree transcript dir and reports `n`, median, mean, and p90 for a half-open window `[from, to)`. Under 20 tasks it sets `note: "insufficient-sample"`, the floor in `bin/measure-delegate-cost`. `cost` is recomputed from transcripts and includes subagents, unlike `logged_cost` (`bin/automouse/backfill-costs`). Transcripts age out after 30 days, so the before-window stats were saved to `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. The review compares that file with a fresh run (§ Review).
 
 Known limits:
 
@@ -24,3 +24,14 @@ Known limits:
 - **The headless ledgers cannot see the trial.** `work-triage.md` § Calibration makes this rule a no-op under headless/automouse, so the sidecar `*.costs.jsonl` files price only sessions the trial never changes.
 - **Boundary tasks.** A worktree that spans `from` is priced only for sessions on or after it.
 - **Observational evidence.** Task mix differs between windows. Treat a median shift as one signal next to redo rate and review findings.
+
+## Review
+
+Due 2026-11-23. Baseline: `~/claude-plans/_reports/2026-10-26-opus-inline-trial-baseline.json`. `SPLIT` is `git log --format=%cs -S 'Inline-edit trial' -- .claude/rules/work-triage.md | tail -1`, then run:
+
+```bash
+bin/lib/automouse-pricer --index --since SPLIT |
+  jq -s --arg from SPLIT --arg to 2026-11-23 -f bin/lib/opus-trial-cost.jq
+```
+
+Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Drop the trial label from `work-triage.md` either way.

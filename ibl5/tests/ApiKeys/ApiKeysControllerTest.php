@@ -220,4 +220,46 @@ class ApiKeysControllerTest extends WideUnitTestCase
         $output = $this->runHandle($this->buildController($service), 'revoke');
         self::assertSame('', $output);
     }
+
+    public function testMainPageShowsGoogleCardAndGuideButNoKeyCard(): void
+    {
+        $service = self::createMock(ApiKeysServiceInterface::class);
+        $service->expects(self::once())->method('getUserKeyStatus')->with(5)->willReturn(null);
+
+        $view = self::createMock(ApiKeysViewInterface::class);
+        $view->expects(self::never())->method('renderNoKeyState');
+        $view->expects(self::never())->method('renderActiveKeyState');
+        $view->expects(self::once())->method('renderGoogleSheetCard')->willReturn('GOOGLE-CARD');
+        $view->expects(self::once())->method('renderExportGuide')->willReturn('EXPORT-GUIDE');
+
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        $output = $this->runHandle($this->buildController($service, null, null, $view), 'main');
+        self::assertLessThan(strpos($output, 'EXPORT-GUIDE'), strpos($output, 'GOOGLE-CARD'));
+    }
+
+    public function testMainPageShowsActiveKeyCardForExistingKeyHolder(): void
+    {
+        $keyStatus = [
+            'key_prefix' => 'ibl_abcd',
+            'permission_level' => 'read',
+            'rate_limit_tier' => 'standard',
+            'is_active' => 1,
+            'created_at' => '2026-01-01 00:00:00',
+            'last_used_at' => null,
+        ];
+        $service = self::createMock(ApiKeysServiceInterface::class);
+        $service->expects(self::once())->method('getUserKeyStatus')->with(5)->willReturn($keyStatus);
+
+        $view = self::createMock(ApiKeysViewInterface::class);
+        $view->expects(self::never())->method('renderNoKeyState');
+        $view->expects(self::once())->method('renderActiveKeyState')->with($keyStatus)->willReturn('ACTIVE-KEY');
+        $view->expects(self::once())->method('renderGoogleSheetCard')->willReturn('GOOGLE-CARD');
+        $view->expects(self::once())->method('renderExportGuide')->willReturn('EXPORT-GUIDE');
+
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        $output = $this->runHandle($this->buildController($service, null, null, $view), 'main');
+        self::assertLessThan(strpos($output, 'GOOGLE-CARD'), strpos($output, 'ACTIVE-KEY'));
+    }
 }

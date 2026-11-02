@@ -241,7 +241,7 @@ R15="$(awk '
     END {
         n = 0; miss = 0
         for (i = 1; i <= NR; i++) {
-            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"/) {
+            if (line[i] ~ /mv .*"\$NIGHTLY_DIR\/skipped\/"|dispose_entry .* skipped/) {
                 n++; hit = 0
                 for (j = i + 1; j <= i + 15 && j <= NR; j++)
                     if (index(line[j], "reap_empty_worktree ") || index(line[j], "reap-exempt:")) hit = 1
@@ -250,7 +250,7 @@ R15="$(awk '
         }
         printf "sites=%d missing=%d\n", n, miss
     }' "$SCRIPT_DIR/automouse/run")"
-h_contains "case 15: 5 sites, 0 missing" "$R15" "sites=5 missing=0"
+h_contains "case 15: 6 sites, 0 missing" "$R15" "sites=6 missing=0"
 h_eq "case 15: only the pre-attempt impl_model skip is reap-exempt" 1 "$(grep -c 'reap-exempt:' "$SCRIPT_DIR/automouse/run")"
 
 echo "== case 15b: the impl-agent-moved-it-to-skipped branch reaps"

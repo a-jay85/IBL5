@@ -282,7 +282,16 @@ abstract class BaseMysqliRepository
         }
 
         // Execute statement
-        if ($stmt->execute() === false) {
+        try {
+            $executed = $stmt->execute();
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() === StatementTimeout::ER_STATEMENT_TIMEOUT) {
+                $this->logError('Statement timed out (max_statement_time): ' . $e->getMessage(), $query);
+                $stmt->close();
+            }
+            throw $e;
+        }
+        if ($executed === false) {
             /** @var string $stmtError */
             $stmtError = $stmt->error;
             $message = 'Failed to execute query: ' . $stmtError;
@@ -327,7 +336,7 @@ abstract class BaseMysqliRepository
     protected function fetchOne(string $query, string $types = '', mixed ...$params): ?array
     {
         $stmt = $this->executeQuery($query, $types, ...$params);
-        $result = $stmt->get_result();
+        $result = $this->getResultLoggingTimeout($stmt, $query);
 
         if ($result === false) {
             $message = 'Failed to get result: ' . $stmt->error;
@@ -365,7 +374,7 @@ abstract class BaseMysqliRepository
     protected function fetchAll(string $query, string $types = '', mixed ...$params): array
     {
         $stmt = $this->executeQuery($query, $types, ...$params);
-        $result = $stmt->get_result();
+        $result = $this->getResultLoggingTimeout($stmt, $query);
 
         if ($result === false) {
             $message = 'Failed to get result: ' . $stmt->error;
@@ -605,6 +614,31 @@ abstract class BaseMysqliRepository
         $row = $result->fetch_assoc();
         $result->free();
         return $row !== null && $row['in_tx'] === 1;
+    }
+
+    /**
+     * Buffer a prepared statement's result set, logging a max_statement_time abort.
+     *
+     * MariaDB reports a SELECT that exceeds max_statement_time when the result is
+     * fetched, not at execute(), so fetchOne()/fetchAll() need this as well as
+     * executeQuery(). Only code 1969 is logged; the original exception is always
+     * rethrown.
+     *
+     * @param \mysqli_stmt $stmt
+     * @return \mysqli_result|false
+     */
+    private function getResultLoggingTimeout(object $stmt, string $query): mixed
+    {
+        /** @var \mysqli_stmt $stmt */
+        try {
+            return $stmt->get_result();
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() === StatementTimeout::ER_STATEMENT_TIMEOUT) {
+                $this->logError('Statement timed out (max_statement_time): ' . $e->getMessage(), $query);
+                $stmt->close();
+            }
+            throw $e;
+        }
     }
 
     /**

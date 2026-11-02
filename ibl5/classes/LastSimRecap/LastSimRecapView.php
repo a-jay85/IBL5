@@ -34,7 +34,7 @@ class LastSimRecapView implements LastSimRecapViewInterface
     {
         $games = $slate->games;
 
-        $html = '<section class="ibl-card last-sim-recap" data-component="last-sim-recap">';
+        $html = '<section class="d-card d-card-border bg-base-100 shadow-sm mb-4 overflow-hidden last-sim-recap" data-component="last-sim-recap">';
         $html .= $this->headerRenderer->render($slate);
 
         if ($games === []) {

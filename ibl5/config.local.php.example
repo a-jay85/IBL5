@@ -19,3 +19,8 @@ $dbhost = 'mariadb';
 $dbuname = 'root';
 $dbpass = 'root';
 $dbname = 'iblhoops_ibl5';
+
+// Optional. Seconds a single SQL statement may run on a web request
+// (MariaDB max_statement_time). Int from 0 to 3600; 0 turns the cap off.
+// Leave unset for the default of 10. CLI runs are never capped.
+// $dbStatementTimeoutSeconds = 10;

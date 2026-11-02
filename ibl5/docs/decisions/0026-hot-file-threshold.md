@@ -1,6 +1,6 @@
 ---
 description: ADR for advisory 500-LOC hot-file threshold rule and bin/check-hot-files script
-last_verified: 2026-09-02
+last_verified: 2026-11-01
 ---
 
 # ADR-0026: Hot-File Threshold Rule
@@ -25,6 +25,10 @@ A codebase audit (2026-05-14) found 23 files in `ibl5/classes/` exceeding 500 li
 ## Addendum — current hotspot sizes (2026-09-02)
 
 The 995-LOC `RecordHoldersRepository` figure in the Threshold Rationale is the baseline as captured on 2026-05-16, when this ADR was written, and is left as the historical basis for the 500-LOC threshold. The hotspot landscape has since shifted: `RecordHoldersRepository` was subsequently extracted into the collaborators now in `classes/RecordHolders/` and is down to 195 LOC, and as of 2026-09-02 the largest hotspot is `BoxscoreRepository` at 678 LOC. The threshold itself (500 LOC) and the growth trigger (> 100 LOC) are unchanged.
+
+## Addendum — hotspot sizes again (2026-11-01) <!-- slop-ok -->
+
+The earlier addendum names `BoxscoreRepository` at 678 LOC as the largest hotspot on 2026-09-02. As of 2026-11-01 that class lives at `ibl5/classes/Boxscore/BoxscoreRepository.php` and is 379 LOC. The largest file under `ibl5/classes/` is now `ibl5/classes/Database/BaseMysqliRepository.php` at 672 LOC, and 18 files exceed 500 LOC. The class was split and a different file now leads.
 
 ## Alternatives Considered
 

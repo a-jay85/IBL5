@@ -1,6 +1,6 @@
 ---
 description: Serve the accumulated per-SHA visual-review gh-pages tree via a workflow_run-triggered GitHub Actions Pages deploy (build_type: workflow), replacing the stuck legacy Jekyll branch-build that 404'd.
-last_verified: 2026-09-02
+last_verified: 2026-11-01
 ---
 
 # ADR-0078: Serve the VR gallery via Actions (workflow_run → deploy-pages), not legacy Jekyll
@@ -28,6 +28,10 @@ Set the Pages source to **GitHub Actions** (`build_type: workflow`) and serve th
 `<sha>/visual-review/` is served at once. The `gh-pages` branch stays the durable per-SHA
 accumulator; the `peaceiris` push and the `vr-pages-cleanup` prune job are unchanged; the per-SHA
 URL scheme (`https://a-jay85.github.io/IBL5/<sha>/visual-review/`) is unchanged.
+
+## Addendum — deploy trigger (2026-11-01) <!-- slop-ok -->
+
+The Decision says `.github/workflows/pages-deploy.yml` is triggered by `workflow_run` on the `E2E Tests` workflow completing (plus `workflow_dispatch`). As of 2026-11-01 the workflow's only trigger is `workflow_dispatch`. The `e2e` job and `vr-pages-cleanup` in `.github/workflows/e2e-tests.yml` fire it with `gh workflow run` after they push to `gh-pages`, so a deploy happens once per real content change. The artifact is still the whole `gh-pages` tree.
 
 ## Alternatives Considered
 

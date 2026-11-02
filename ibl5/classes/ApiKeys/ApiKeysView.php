@@ -156,15 +156,15 @@ class ApiKeysView implements ApiKeysViewInterface
         <table class="ibl-data-table api-keys-table mb-4">
             <tbody>
                 <tr>
-                    <th class="text-left">Status</th>
+                    <th scope="row" class="text-left">Status</th>
                     <td>Connected</td>
                 </tr>
                 <tr>
-                    <th class="text-left">Last refreshed</th>
+                    <th scope="row" class="text-left">Last refreshed</th>
                     <td><?= $summary['last_refresh_at'] !== null ? HtmlSanitizer::e($summary['last_refresh_at']) : 'Never' ?></td>
                 </tr>
                 <tr>
-                    <th class="text-left">Last result</th>
+                    <th scope="row" class="text-left">Last result</th>
                     <td><?= HtmlSanitizer::e($summary['last_refresh_status'] ?? 'None yet') ?></td>
                 </tr>
             </tbody>
@@ -215,23 +215,23 @@ class ApiKeysView implements ApiKeysViewInterface
         <table class="ibl-data-table api-keys-table mb-6">
             <tbody>
                 <tr>
-                    <th class="text-left">Key</th>
+                    <th scope="row" class="text-left">Key</th>
                     <td><code><?= HtmlSanitizer::e($keyStatus['key_prefix']) ?>...</code></td>
                 </tr>
                 <tr>
-                    <th class="text-left">Permission</th>
+                    <th scope="row" class="text-left">Permission</th>
                     <td><?= HtmlSanitizer::e($keyStatus['permission_level']) ?></td>
                 </tr>
                 <tr>
-                    <th class="text-left">Rate Limit</th>
+                    <th scope="row" class="text-left">Rate Limit</th>
                     <td><?= HtmlSanitizer::e($keyStatus['rate_limit_tier']) ?> (60 requests/min)</td>
                 </tr>
                 <tr>
-                    <th class="text-left">Created</th>
+                    <th scope="row" class="text-left">Created</th>
                     <td><?= HtmlSanitizer::e($keyStatus['created_at']) ?></td>
                 </tr>
                 <tr>
-                    <th class="text-left">Last Used</th>
+                    <th scope="row" class="text-left">Last Used</th>
                     <td><?= $keyStatus['last_used_at'] !== null ? HtmlSanitizer::e($keyStatus['last_used_at']) : 'Never' ?></td>
                 </tr>
             </tbody>

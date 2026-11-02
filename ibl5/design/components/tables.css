@@ -118,6 +118,18 @@
     border-bottom: 1px solid var(--gray-100);
 }
 
+/* Row labels: a <th scope="row"> inside <tbody> labels its row and sits on
+   the white/gray zebra fill, so the white header text color above would
+   vanish. Opt-in by scope="row" so header cells that land in an implicit
+   <tbody> (PlayerSearch, TeamOffDefStats build <tr><th> with no <thead>)
+   keep the header styling. :where() holds specificity at (0,1,1), equal to
+   .ibl-data-table th, so this wins by source order only. Page files loaded
+   later at (0,1,1) or higher (head-to-head-records.css, rivalries.css, ...)
+   still override it. */
+.ibl-data-table :where(tbody) th:where([scope="row"]) {
+    color: var(--gray-800);
+}
+
 /* Row styling */
 .ibl-data-table tbody tr {
     transition: background-color var(--transition-fast);

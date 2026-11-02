@@ -1241,14 +1241,97 @@ def test_non_hold_decline_posts_no_marker(tmp_path):
     assert len(_resolves(gh)) == 1
 
 
-def test_fetch_trusted_threads_skips_nit_and_preexisting_labeled_bodies(tmp_path):
-    """Mutation: delete the label `continue` in fetch_trusted_threads => 3 returned."""
+def test_fetch_trusted_threads_keeps_nit_and_preexisting_with_label(tmp_path):
+    """Mutation: restore the label `continue` in fetch_trusted_threads => only [3] returned."""
     nit = dict(THREAD_2340, commentId=1, body="<!-- label: nit -->\n<!-- score: 70 -->\n**Nit** x")
     pre = dict(THREAD_2340, commentId=2, body="<!-- label: pre-existing -->\n**Pre-existing** y")
     plain = dict(THREAD_2340, commentId=3, body="plain finding <!-- score: 85 -->")
     gh = _gh(tmp_path, {"trusted_threads": [nit, pre, plain]})
     result = fetch_trusted_threads(gh, PR, pre_posting_ids={1, 2, 3})
-    assert [t["commentId"] for t in result] == [3]
+    assert [t["commentId"] for t in result] == [1, 2, 3]
+    assert [t["label"] for t in result] == ["nit", "pre-existing", None]
+
+
+# ---------------------------------------------------------------------------
+# Label x outcome policy (nit / pre-existing dispositioned under an allowlist)
+# ---------------------------------------------------------------------------
+
+IMPORTANT_THREAD = dict(THREAD_2340, body="<!-- label: important -->\n**Important** z", label="important")
+NIT_THREAD = dict(THREAD_2340, body="<!-- label: nit -->\n**Nit** x", label="nit")
+PRE_THREAD = dict(THREAD_2340, body="<!-- label: pre-existing -->\n**Pre-existing** y", label="pre-existing")
+
+
+def _dispose(tmp_path, thread, answer, commit=None, llm=None):
+    gh = _gh(tmp_path)
+    outcome = disposition_thread(thread, llm or _llm({PURPOSE: answer}), ReplayGit({}), str(tmp_path),
+                                 PR, gh, lambda m: None, commit=commit or (lambda m: "abc123"),
+                                 push=lambda: "def456")
+    return outcome, gh
+
+
+def test_important_decline_without_category_still_resolves(tmp_path):
+    outcome, gh = _dispose(tmp_path, IMPORTANT_THREAD,
+                           '{"verdict": "DECLINE", "reason": "Already handles this case"}')
+    assert outcome == "declined"
+    resolves = _resolves(gh)
+    assert len(resolves) == 1
+    assert resolves[0]["body"] == "Declined: Already handles this case"
+
+
+def test_important_thread_without_fix_stays_unresolved(tmp_path):
+    outcome, gh = _dispose(tmp_path, IMPORTANT_THREAD, '{"verdict": "FIX", "reason": "r"}',
+                           commit=lambda m: "")
+    assert outcome == "skipped"
+    assert _resolves(gh) == []
+
+
+def test_nit_thread_fix_replies_with_sha_and_resolves(tmp_path):
+    outcome, gh = _dispose(tmp_path, NIT_THREAD,
+                           '{"verdict": "FIX", "reason": "Renamed the helper"}')
+    assert outcome == "fixed"
+    resolves = _resolves(gh)
+    assert len(resolves) == 1
+    assert resolves[0]["body"].startswith("Fixed in ")
+    assert "def456" in resolves[0]["body"]
+    assert "Renamed the helper" in resolves[0]["body"]
+
+
+def test_preexisting_thread_allowlisted_decline_resolves(tmp_path):
+    outcome, gh = _dispose(
+        tmp_path, PRE_THREAD,
+        '{"verdict": "DECLINE", "reason": "Predates this PR and is out of scope", "category": "not-worth-it"}')
+    assert outcome == "declined"
+    resolves = _resolves(gh)
+    assert len(resolves) == 1
+    assert resolves[0]["body"] == "Declined: Predates this PR and is out of scope"
+
+
+@pytest.mark.parametrize("category", [None, "bogus", "gate-path", "already fixed"])
+def test_nonholding_decline_outside_allowlist_stays_open(tmp_path, category):
+    answer = {"verdict": "DECLINE", "reason": "r"}
+    if category is not None:
+        answer["category"] = category
+    outcome, gh = _dispose(tmp_path, NIT_THREAD, json.dumps(answer))
+    assert outcome == "skipped"
+    assert _resolves(gh) == []
+
+
+def test_nit_thread_llm_error_stays_open(tmp_path):
+    class _RaisingLlm:
+        def call_tooled(self, *a, **kw):
+            raise HarnessError("llm-invalid-output", "boom")
+
+    outcome, gh = _dispose(tmp_path, NIT_THREAD, "", llm=_RaisingLlm())
+    assert outcome == "skipped"
+    assert _resolves(gh) == []
+
+
+def test_wrapped_nit_decline_envelope_does_not_resolve(tmp_path):
+    outcome, gh = _dispose(
+        tmp_path, NIT_THREAD,
+        '{"result": {"verdict": "DECLINE", "reason": "r", "category": "not-worth-it"}}')
+    assert outcome == "skipped"
+    assert _resolves(gh) == []
 
 
 def test_fetch_trusted_threads_keeps_important_marker_and_late_marker(tmp_path):
@@ -1314,10 +1397,11 @@ def test_fetch_include_outdated_still_drops_resolved():
     assert [r["commentId"] for r in kept] == [605]
 
 
-def test_fetch_include_outdated_still_drops_non_holding_labels():
+def test_fetch_include_outdated_keeps_non_holding_labels():
     gh = _FlagGh([_row(607, body="<!-- label: nit -->\nOld nit"), _row(605)])
     kept = fetch_trusted_threads(gh, 42, {607, 605}, include_outdated=True)
-    assert [r["commentId"] for r in kept] == [605]
+    assert [r["commentId"] for r in kept] == [607, 605]
+    assert [r["label"] for r in kept] == ["nit", None]
 
 
 def test_cap_outdated_defers_thirteenth():

@@ -271,7 +271,7 @@ if ($csrfField === '') {
 <?php endif; ?>
 
 <?php if ($view === 'imported'): ?>
-    <div role="alert" class="d-alert d-alert-success mb-4">
+    <div role="status" class="d-alert d-alert-success mb-4">
         Imported <?= $importedCount ?> player<?= $importedCount === 1 ? '' : 's' ?>.
     </div>
     <p><a href="modules.php?name=Draft">Go to the Draft module</a></p>

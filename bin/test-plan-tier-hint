@@ -191,7 +191,7 @@ echo "== J5 timeout env fallback =="
 chmod +x "$BASE_TMP/judge-2s"
 for t in 0 abc ''; do
     PLAN_TIER_HINT_TIMEOUT="$t" run_hint "$BASE_TMP/judge-2s" --desc 'some task'
-    expect_eq "J5 PLAN_TIER_HINT_TIMEOUT=[$t] falls back to 120s" "default" "$(cat "$OUT")"
+    expect_eq "J5 PLAN_TIER_HINT_TIMEOUT=[$t] falls back to 180s" "default" "$(cat "$OUT")"
 done
 
 echo

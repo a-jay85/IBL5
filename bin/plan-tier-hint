@@ -19,7 +19,7 @@
 # Env seams:
 #   PLAN_TIER_HINT_CLAUDE   judge binary (empty or unset = the real claude)
 #   PLAN_TIER_HINT_SKILL    SKILL.md path to extract the check list from
-#   PLAN_TIER_HINT_TIMEOUT  judge timeout in seconds (default 120)
+#   PLAN_TIER_HINT_TIMEOUT  judge timeout in seconds (default 180)
 #
 # Deliberately no `set -e`: a failed probe must reach its failsafe branch.
 # Bash 3.2 compatible: no associative arrays, no mapfile, and no
@@ -91,9 +91,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 JUDGE_MODEL=claude-opus-5-5
 SKILL_FILE="${PLAN_TIER_HINT_SKILL:-$ROOT/.claude/skills/plan/SKILL.md}"
 JUDGE_BIN="${PLAN_TIER_HINT_CLAUDE:-}"
-TIMEOUT="${PLAN_TIER_HINT_TIMEOUT:-120}"
+TIMEOUT="${PLAN_TIER_HINT_TIMEOUT:-180}"
 case "$TIMEOUT" in
-    ''|*[!0-9]*|0*) TIMEOUT=120 ;;
+    ''|*[!0-9]*|0*) TIMEOUT=180 ;;
 esac
 
 TIER=""
@@ -148,8 +148,16 @@ You route a /plan task to an architect tier. The rules are the check list
 below, copied verbatim from .claude/skills/plan/SKILL.md (Step 3).
 
 Check 1 maps to the verdict xhigh. Check 2 maps to sonnet. Check 3 maps to
-default. Apply the checks in order. When you are unsure whether check 1
-applies, answer xhigh.
+default. Apply the checks in order.
+
+Decide check 1 from what the task text says the change does. Do not assume
+risks the text gives no sign of. Touching a file that sits on a security
+surface is not enough by itself. The task must add or change something on
+the carve-out's irreducible list, change a rendered or queried result, or
+weaken a gate. A split or extraction whose task says it pins today's output
+first meets the pinned-restructure carve-out unless the text says the output
+changes. When the text does give a sign that check 1 applies and you cannot
+rule it out, answer xhigh.
 INTRO
 )"
 PROMPT_OUTRO="$(cat <<'OUTRO'

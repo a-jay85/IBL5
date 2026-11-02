@@ -1,6 +1,6 @@
 ---
 description: Changed ship-pipeline gates are replayed against recent merged PRs, and Phase 6.5 condition (17) holds auto-merge when the replay flags clean PRs.
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 ---
 
 # ADR-0161: Backtest changed gates before they merge
@@ -47,3 +47,19 @@ The backtest now replays the gate at `merge-base(<base>, <head>)` on the same ch
 Fail-closed rules: a gate absent at base, a base error, a base timeout, a base spec that is not replayable, or an unresolvable base all leave the flag counted. A head timeout still makes the gate UNKNOWN.
 
 The threshold (2), the 30-PR window, and the 48-hour settle time are unchanged. `TOTAL_CAP` rose from 900 to 1200 seconds because base replays share the clock; one `bin/check-plan` replay measured 45 s at plan time.
+
+## Addendum 2026-11-02: candidate-fix overlay
+
+A gate PR that also fixes the condition its gate checks used to be held by its own fix. PR #3493 added check M5 to `bin/check-composite-contracts` and fixed `.github/workflows/mutation-pr.yml` in the same diff. Every settled PR older than #3493 lacked that fix, so the new M5 flagged them all as false flags. The base-gate rerun added by PR #3582 did not help: M5 was new, so the base gate passed.
+
+After a head-gate `flag` on a replay where the base gate did not also flag, the replay now applies the candidate PR's own diff to the historical tree and reruns the head gate once. The diff runs from `merge-base(base, head)` to `head` and excludes the overlaid gate paths and `bin/test-*`. A pass on a `clean` PR is counted as "fixed by the candidate PR" and kept out of the false-flag threshold. It still counts toward the matured-replay minimum, because the replay ran and the gate passed on a tree that carries the fix.
+
+Fail-safe rules:
+
+- A patch that does not apply cleanly (`git apply`, no three-way merge, no fuzz) leaves the flag a false flag.
+- Repaired PRs stay catches and unsettled PRs stay unsettled.
+- A rerun that errors, times out, or crosses the total cap leaves the flag a false flag.
+- The scratch tree is reset to the historical PR's merge commit after every rerun.
+- A forced `--gate=<path>@<rev>` replay gets no overlay.
+
+The rendered block gains one list line for these PRs. The table columns and the `gate-backtest-state` line are unchanged, so `bin/lib/pr-armable.sh` reads the block as before.

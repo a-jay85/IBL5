@@ -8,8 +8,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.gate_backtest import GateChange, ReplaySpec, classify_exit
-from harness.gate_backtest_replay import (ScratchTree, fetch_history, make_git, resolve_plan,
-                                          run_backtest)
+from harness.gate_backtest_replay import (ScratchTree, _fix_patch, fetch_history, make_git,
+                                          resolve_plan, run_backtest)
 
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
 ENV = dict(os.environ, GIT_AUTHOR_NAME="T", GIT_AUTHOR_EMAIL="t@t.com",
@@ -253,6 +253,114 @@ def test_base_replay_total_cap_fails_closed(tmp_path):
     assert results[0].base_outcome == "timeout" and results[0].base_detail == "total-cap"
 
 
+# Flags every tree without config/required.txt; build_repo's history never adds it.
+NEEDS_FILE_GATE = ("#!/bin/sh\n# gate-backtest-argv:\n"
+                   "if [ ! -f config/required.txt ]; then\n"
+                   "    echo 'missing config/required.txt'\n    exit 1\nfi\nexit 0\n")
+
+
+def _patch_from_master(repo, rel, content):
+    """The binary diff of one commit on a side branch off master; the repo is left on master."""
+    sh(repo, "checkout", "-q", "-b", "patch-src", "master")
+    commit_file(repo, rel, content, "candidate fix")
+    data = subprocess.run(["git", "-C", str(repo), "diff", "--binary", "master", "patch-src"],
+                          capture_output=True, check=True).stdout
+    sh(repo, "checkout", "-q", "master")
+    return data
+
+
+def test_fix_overlay_rescues_flag_when_patch_fixes(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch)
+    assert len(results) == 1
+    assert results[0].outcome == "flag"
+    assert results[0].fix_outcome == "pass"
+
+
+def test_fix_overlay_patch_conflict_is_no_apply(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "src/f6.txt", "v6\nconfig/required.txt\n")
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch)
+    assert len(results) == 1
+    assert results[0].outcome == "flag"
+    assert results[0].fix_outcome == "no-apply"
+
+
+def test_fix_overlay_skipped_when_base_flags(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch,
+                  base_overlay=base(NEEDS_FILE_GATE))
+    assert results[0].outcome == "flag"
+    assert results[0].base_outcome == "flag"
+    assert results[0].fix_outcome == ""
+
+
+def test_fix_overlay_skipped_without_patch(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE)
+    assert results[0].outcome == "flag"
+    assert results[0].fix_outcome == ""
+
+
+def test_fix_overlay_reset_before_next_gate(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    twin = "bin/check-twin"
+    head = {"bin/check-fake": (NEEDS_FILE_GATE.encode(), 0o100755),
+            twin: (NEEDS_FILE_GATE.encode(), 0o100755)}
+    history = fetch_history(fake_gh([shas[0]]), make_git(str(repo)))
+    results = run_backtest(str(repo), "HEAD", [gate(), gate(path=twin)], history, head,
+                           str(tmp_path / "plans"), fix_patch=patch)
+    assert [r.gate for r in results] == ["bin/check-fake", twin]
+    for r in results:
+        assert r.outcome == "flag" and r.fix_outcome == "pass", r.gate
+
+
+def test_fix_overlay_total_cap_fails_closed(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    ticks = iter([0, 0, 5000])
+
+    def clock():
+        return next(ticks, 5000)
+
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch,
+                  total_cap=900, clock=clock)
+    assert len(results) == 1
+    assert results[0].outcome == "flag"
+    assert results[0].fix_outcome == "timeout" and results[0].fix_detail == "total-cap"
+
+
+def _fix_repo(tmp_path):
+    """build_repo, then `feature` changes the gate, a bin/test-* sibling, and a config file."""
+    repo, shas = build_repo(tmp_path)
+    sh(repo, "checkout", "-q", "-b", "feature")
+    commit_file(repo, "bin/check-fake", HEADER_FAIL_GATE, "feature gate", mode=0o755)
+    commit_file(repo, "bin/test-fake", "#!/bin/sh\nexit 0\n", "feature test", mode=0o755)
+    commit_file(repo, "config/required.txt", "required\n", "feature config")
+    sh(repo, "checkout", "-q", "master")
+    return repo, shas
+
+
+def test_fix_patch_excludes_gate_paths_and_test_siblings(tmp_path):
+    repo, _ = _fix_repo(tmp_path)
+    data = _fix_patch(str(repo), "master", "feature",
+                      {"bin/check-fake": (HEADER_FAIL_GATE.encode(), 0o100755)})
+    assert data is not None
+    assert b"config/required.txt" in data
+    assert b"bin/check-fake" not in data
+    assert b"bin/test-fake" not in data
+
+
+def test_fix_patch_empty_or_unresolvable_is_none(tmp_path):
+    repo, _ = _feature_repo(tmp_path)
+    gate_only = {"bin/check-fake": (HEADER_FAIL_GATE.encode(), 0o100755)}
+    assert _fix_patch(str(repo), "master", "feature", gate_only) is None
+    assert _fix_patch(str(repo), "no-such-ref", "feature", gate_only) is None
+
+
 def test_non_squash_skipped(tmp_path):
     repo, shas = build_repo(tmp_path, with_merge=True)
     results = run(repo, shas, tmp_path)
@@ -420,6 +528,22 @@ def test_forced_gate_new_at_base_is_absent(monkeypatch, tmp_path):
                          base="master", now=T0 + timedelta(days=30),
                          forced_gate=("bin/check-new", "feature"))
     assert seen["base_overlay"] == {"bin/check-new": None}
+
+
+def test_backtest_changes_passes_fix_patch_to_run_backtest(monkeypatch, tmp_path):
+    repo, shas = _fix_repo(tmp_path)
+    gbr, seen = _record_run_backtest(monkeypatch)
+    changes = [("M", "bin/check-fake"), ("A", "bin/test-fake"), ("A", "config/required.txt")]
+    gbr.backtest_changes(str(repo), "feature", changes, gh_json=fake_gh(shas), fetch=False,
+                         base="master", now=T0 + timedelta(days=30))
+    assert isinstance(seen["fix_patch"], bytes)
+    assert b"config/required.txt" in seen["fix_patch"]
+    seen.clear()
+    gbr.backtest_changes(str(repo), "feature", [], gh_json=fake_gh(shas), fetch=False,
+                         base="master", now=T0 + timedelta(days=30),
+                         forced_gate=("bin/check-fake", "feature"))
+    assert "fix_patch" in seen
+    assert seen["fix_patch"] is None
 
 
 def test_total_cap_default_is_1200():

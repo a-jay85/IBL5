@@ -1,6 +1,6 @@
 ---
-description: How the reviewer eval corpus scores the post-plan code reviewer, and the before/after rule for review-surface PRs.
-last_verified: 2026-10-25
+description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, and the before/after rule for review-surface PRs.
+last_verified: 2026-11-02
 ---
 
 # Reviewer eval
@@ -47,6 +47,10 @@ Each run ends with one line of this shape: `reviewer-eval v=<12 hex> c=<12 hex> 
    A pair that fails one test goes in as `unconfirmed`, with the failed test named in its description.
 3. When the defect also shows on added lines more than 5 lines from the fix, add an `also_accept` list with those ranges, in the same `{path, start, end}` shape as `expected`. Each range must lie inside lines the introducing commit added. Blame corroboration runs on `expected` only. Leave the key out when there is no second site, since validate rejects an empty list.
 4. Strip every `_*` key, write a one-sentence description with no names or emails, and run `bin/reviewer-eval validate`. Validate checks that blame on the fix's removed lines lands inside an expected range, and that every expected and also_accept range lies inside lines the introducing commit added. CI runs it on every PR.
+
+New bug cases come from `/fix-and-prevent`. Its review-layer step, step 2a of `.claude/skills/fix-and-prevent/_remediation.md`, names the layer that should have caught the bug. When that layer is `phase-4-review` and the introducing PR carries a `## Code review` comment, the prevention backlog item carries a pending case with the introducing PR, its commit, the expected range, and a description. Append it after the fix PR merges, following steps 2 to 4 above. Validate needs the fix's squash commit on master, so the fix PR itself cannot carry the case. The miner in step 1 stays the way to backfill older pairs.
+
+Each new confirmed case also changes `test_real_corpus_expected_ranges_pinned` in `tools/postplan-harness/tests/test_reviewer_eval.py`. Update its confirmed-case count and its `PINNED_EXPECTED` map in the same change.
 
 ## The review surface
 
@@ -95,6 +99,8 @@ Reviewer eval after: reviewer-eval v=f44dd1a41403 c=98210c961f08 recall=2/6 fals
 ## Baseline
 
 Recorded 2026-10-21 on review surface `v=2f6c48d10056`, after the Phase 4D verifier replaced the Haiku scorer. The recall is above 0, so `bin/check-reviewer-eval` blocks. Rescored offline on 2026-10-23 after case `trade-preview-unbounded-cash-years` gained an `also_accept` range at line 63. The reviewer did not run again, so every findings count below is the 2026-10-21 count.
+
+Cases added to the corpus after 2026-10-21 are not in this baseline. The reviewer is not rerun when a case lands, so the `c=` digest and the `/6` denominator below describe the corpus as it was on that date. `bin/check-reviewer-eval` reads only the recall hits from the score line, so a new case does not change what it enforces.
 
 ```
 case depth-chart-log-after-commit bug MISS findings=0 file_only=0

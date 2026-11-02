@@ -10,13 +10,9 @@ import os
 import re
 import time
 
-SCHEMA_VERSION = 1
+from .labels import REVIEW_AGENTS  # noqa: F401  (re-exported; defined in labels.py)
 
-REVIEW_AGENTS = {
-    "A": "review-agent-a",
-    "D": "review-agent-d",
-    "security": "security-audit",
-}
+SCHEMA_VERSION = 1
 
 STATE_KEYS = (
     "schema_version",

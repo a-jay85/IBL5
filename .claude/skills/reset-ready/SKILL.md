@@ -152,7 +152,7 @@ from `.claude/skills/plan-prompt/SKILL.md` Steps 3 and 4. The first line is
 - `## Step 3 architect tier`, holding a `Step 3 MUST route to <def>` directive
 - `## Sequencing`, naming the slug and base `master`
 
-Pick the tier, then check it against the hint, which reads the task line only:
+Pick the tier, then check it against the hint. It reads the task line only and makes one paid Opus judge call per prompt in the loop below:
 
 ```bash
 D=/tmp/reset-ready; mkdir -p "$D/prompts"
@@ -163,7 +163,7 @@ done
 ```
 
 When the hint says `xhigh`, use `plan-architect-xhigh`. When you pick xhigh and the hint
-says `default` (a gate narrowing or a SQL rewrite the hint cannot see), plan-now exits 4
+says `default` (the judge's reason says why it disagrees), plan-now exits 4
 unless you pass `--tier-ok "<reason>"`. Then fire each prompt:
 
 ```bash

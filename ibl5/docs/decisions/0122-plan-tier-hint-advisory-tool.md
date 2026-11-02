@@ -1,6 +1,6 @@
 ---
 description: bin/plan-tier-hint is an advisory architect-tier pre-check for /plan Step 3; bin/test-plan-tier-hint is its test harness plus static drift assertions across the five trigger copies.
-last_verified: 2026-09-07
+last_verified: 2026-11-01
 owner: ajaynicolas
 ---
 
@@ -40,3 +40,11 @@ Add `bin/test-plan-tier-hint` as the test harness, covering 15 fixture cases tha
 - `.claude/rules/work-triage.md` — safety mirror, behaviour-led gate trigger wording
 - `.claude/skills/plan-prompt/SKILL.md` — plan-prompt tier-routing section
 - `.claude/agents/plan-architect-xhigh.md` — agent def description
+
+## Addendum — superseded by an Opus judge (2026-11-01) <!-- slop-ok -->
+
+**Superseded by:** ADR-0222 (`0222-plan-tier-hint-opus-judge.md`).
+
+The regex word lists this ADR chose were replaced by one Opus 5.5 judge call
+that reads /plan Step 3's check list at run time and prints xhigh on any
+failure. The advisory framing and the CLI contract above still hold.

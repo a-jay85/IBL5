@@ -36,6 +36,7 @@ bd_init() {
     BD_REPORTS_DIR="$BD_PLANS_DIR/_reports"
     BD_QUEUE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
     BD_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    # One paid Opus judge call per item; a judge failure prints xhigh (cost 2), never error.
     BD_TIER_HINT="${BURNDOWN_TIER_HINT:-$BD_REPO_ROOT/bin/plan-tier-hint}"
     BD_GIT="${BURNDOWN_GIT:-git}"
     BD_TMP="$(mktemp -d)" || bd_die 3 "mktemp failed"

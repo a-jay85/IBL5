@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-10-27
+last_verified: 2026-11-01
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -251,7 +251,7 @@ Launch a **single Plan agent** with a prompt containing ALL of the items listed 
    - **Bootstrap hazard** — the diff edits the arming, escalation, or auto-merge rule that governs **its own merge**: a Phase 6.5 arming condition, the `feat:` human-signoff floor, or `auto_merge` handling in `/post-plan`. Rewriting routing that will govern some *later, unrelated* plan is **not** a bootstrap hazard.
    - **Pinned restructure of a security surface.** A split, extraction, table-drive, or dedupe of existing SQL, POST-handling, or rendering code goes to the default `plan-architect` (check 3) when the task pins today's output with characterization tests first. The change must also be a pure-function move or state-free extraction. It may add nothing to the irreducible list: actor identity, a new POST/form endpoint, a new SQL construction site, or new user-facing output rendering. A changed rendered or queried result, or any doubt, keeps it at xhigh.
 
-   For a mechanical second opinion before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It prints `xhigh`, `default`, or `sonnet` and exits 0; `--explain` prints the matching reason. **The hint is advisory — this checklist is authoritative and you own the final call.**
+   For a second opinion from an Opus 5.5 judge before you decide (one paid model call that reads this check list), run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It prints `xhigh`, `default`, or `sonnet` and exits 0; `--explain` prints the matching reason. A reason starting `judge-failsafe:` means the judge failed and the hint defaulted to `xhigh`; decide from this checklist alone. **The hint is advisory — this checklist is authoritative and you own the final call.** <!-- slop-ok -->
 
    If any trigger applies, stop here: the high-stakes escalation OUTRANKS the recipe-backed downgrade below, so a plan that is both high-stakes and recipe-backed goes to xhigh, never to Sonnet.
 2. **`plan-architect-sonnet` (`model: claude-sonnet-5-5`):** otherwise, when **no** check-1 trigger applies **AND** the source task/backlog entry is *recipe-backed*: it carries an explicit recipe **plus** a named existing pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, not novel design, so the cheaper Sonnet architect suffices. Pass `subagent_type: "plan-architect-sonnet"` (exactly; it must byte-match the def's `name:`).

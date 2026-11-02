@@ -313,6 +313,15 @@ def test_verdict_cleared_below_threshold():
     assert v.per_gate["bin/check-foo"].false_flags == [10]
 
 
+def test_verdict_flagged_clean_prs_count_as_matured():
+    res = (_results("bin/check-foo", _passes(1, 4))
+           + [ReplayResult(5, "bin/check-foo", "flag", "d", base_outcome="pass")])
+    v = compute_verdict([_g()], res, _truth(clean=range(1, 6)))
+    assert v.state == "CLEARED"
+    assert v.per_gate["bin/check-foo"].matured == 5
+    assert v.per_gate["bin/check-foo"].false_flags == [5]
+
+
 def test_head_flag_without_base_outcome_counts_as_false_flag():
     res = _results("bin/check-foo", _passes(1, 6) + [(10, "flag"), (11, "flag")])
     v = compute_verdict([_g()], res, _truth(clean=range(1, 12)))

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('cli')]
@@ -241,6 +242,17 @@ final class SmokeProdCliTest extends TestCase
         self::assertStringContainsString('SMOKE_REHEARSAL_MODE', $result['output']);
     }
 
+    public function testHelpDocumentsMaxSeconds(): void
+    {
+        $result = $this->runRaw('--help');
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString(
+            'SMOKE_MAX_SECONDS       Max seconds per check before it fails (default: 8)',
+            $result['output'],
+        );
+    }
+
     // =========================================================================
     // Characterization: exit 3 and HTTP 000 fallback
     // =========================================================================
@@ -270,6 +282,145 @@ final class SmokeProdCliTest extends TestCase
 
         self::assertSame(1, $result['exit'], "Output: {$result['output']}");
         self::assertStringContainsString('FAIL: Homepage — HTTP 000', $result['output']);
+    }
+
+    // =========================================================================
+    // Post-impl: latency limit and curl timeout
+    // =========================================================================
+
+    public function testFastChecksPrintElapsedOnOkLines(): void
+    {
+        $this->startServer('ibl5', healthy: true);
+
+        $result = $this->runSmoke(scope: 'ibl5');
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertMatchesRegularExpression('/OK: Homepage \(\d+\.\d{2}s\)/', $result['output']);
+    }
+
+    public function testSlowOnceThenFastRetryPasses(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathDelays: ['/ibl5/index.php' => [1.0, 0.0]]);
+
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: ['SMOKE_MAX_SECONDS' => '0.5']);
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('RETRY: Homepage — slow: ', $result['output']);
+        self::assertStringContainsString('(limit 0.5s), waiting 0s...', $result['output']);
+        self::assertStringContainsString('OK: Homepage (', $result['output']);
+        self::assertStringNotContainsString('FAIL:', $result['output']);
+    }
+
+    public function testSlowTwiceFailsNamingPage(): void
+    {
+        $this->startServer('ibl5', healthy: true, pathDelays: ['/ibl5/index.php' => [1.0]]);
+
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: ['SMOKE_MAX_SECONDS' => '0.5']);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('FAIL: Homepage — slow: ', $result['output']);
+        self::assertStringContainsString('(limit 0.5s)', $result['output']);
+        self::assertStringContainsString('OK: Standings (', $result['output']);
+    }
+
+    public function testSlowCheckAmongWafStatusesExitsOneNotThree(): void
+    {
+        $this->startServer(
+            'ibl5',
+            healthy: true,
+            pathStatusOverrides: ['modules.php' => 403, 'api/v1' => 403, 'style.css' => 403],
+            pathDelays: ['/ibl5/index.php' => [1.0]],
+        );
+
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: ['SMOKE_MAX_SECONDS' => '0.5']);
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('FAIL: Homepage — slow: ', $result['output']);
+        self::assertStringNotContainsString('INCONCLUSIVE', $result['output']);
+    }
+
+    public function testCurlTimeoutWithCapturedStatusFails(): void
+    {
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: $this->curlShimEnv('200 0.10', 28));
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('RETRY: Homepage — curl timeout after 30s', $result['output']);
+        self::assertStringContainsString('FAIL: Homepage — curl timeout after 30s', $result['output']);
+        self::assertStringNotContainsString('OK: Homepage', $result['output']);
+        self::assertStringNotContainsString('INCONCLUSIVE', $result['output']);
+    }
+
+    public function testDefaultLimitIsEightSecondsWhenUnset(): void
+    {
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: $this->curlShimEnv('200 8.50', 0));
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('FAIL: Homepage — slow: 8.50s (limit 8s)', $result['output']);
+    }
+
+    public function testTimeExactlyAtLimitPasses(): void
+    {
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: $this->curlShimEnv('200 8.000000', 0));
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('OK: Homepage (8.00s)', $result['output']);
+    }
+
+    public function testEmptyMaxSecondsFallsBackToDefault(): void
+    {
+        $result = $this->runSmoke(
+            scope: 'ibl5',
+            extraEnv: ['SMOKE_MAX_SECONDS' => ''] + $this->curlShimEnv('200 7.90', 0),
+        );
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('OK: Homepage (7.90s)', $result['output']);
+    }
+
+    #[DataProvider('invalidMaxSecondsProvider')]
+    public function testInvalidMaxSecondsExitsTwo(string $value): void
+    {
+        $result = $this->runSmoke(
+            scope: 'ibl5',
+            extraEnv: ['SMOKE_MAX_SECONDS' => $value] + $this->curlShimEnv('200 0.10', 0),
+        );
+
+        self::assertSame(2, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('SMOKE_MAX_SECONDS must be a positive number', $result['output']);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function invalidMaxSecondsProvider(): array
+    {
+        return [
+            'non-numeric' => ['abc'],
+            'unit suffix' => ['8s'],
+            'negative' => ['-1'],
+            'zero' => ['0'],
+        ];
+    }
+
+    public function testCommaDecimalTimeIsNormalized(): void
+    {
+        $result = $this->runSmoke(scope: 'ibl5', extraEnv: $this->curlShimEnv('200 9,50', 0));
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('slow: 9.50s (limit 8s)', $result['output']);
+    }
+
+    public function testRehearsalModeAppliesLatencyLimit(): void
+    {
+        $result = $this->runSmoke(
+            scope: 'ibl5',
+            rehearsalMode: true,
+            extraEnv: $this->curlShimEnv('200 9.00', 0),
+        );
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('FAIL: API routing — slow: 9.00s', $result['output']);
+        self::assertStringContainsString('SKIP: CSS asset (rehearsal mode)', $result['output']);
     }
 
     // =========================================================================

@@ -9,10 +9,11 @@
 #   - HTTP 200 status (retries once on any unexpected status)
 #   - Expected content in response body
 #   - Absence of PHP error messages
+#   - Response time at most SMOKE_MAX_SECONDS and no curl timeout (retries once)
 #
 # Exit code:
 #   0 — all in-scope checks passed
-#   1 — one or more in-scope checks failed (real failure: heterogeneous, 5xx, or bad body)
+#   1 — one or more in-scope checks failed (real failure: heterogeneous, 5xx, bad body, slow, or curl timeout)
 #   2 — usage error (bad arguments)
 #   3 — inconclusive: every in-scope check failed with an identical WAF-class
 #       status (403/415/429). The prober was almost certainly blocked (e.g.
@@ -23,6 +24,7 @@
 #   SMOKE_INTERCHECK_DELAY  Seconds between checks (default: 1)
 #   SMOKE_RETRY_DELAY       Seconds to wait before retry on unexpected status (default: 10)
 #   SMOKE_REHEARSAL_MODE    If "1", broaden API accept-list to 200|401|404 and skip CSS check
+#   SMOKE_MAX_SECONDS       Per-check time limit in seconds, decimals allowed (default: 8; empty = 8)
 
 set -euo pipefail
 
@@ -48,6 +50,7 @@ for arg in "$@"; do
             echo "  SMOKE_INTERCHECK_DELAY  Seconds between checks (default: 1)"
             echo "  SMOKE_RETRY_DELAY       Seconds before retry (default: 10)"
             echo "  SMOKE_REHEARSAL_MODE    Set to 1 to broaden API accept-list and skip CSS check"
+            echo "  SMOKE_MAX_SECONDS       Max seconds per check before it fails (default: 8)"
             exit 0
             ;;
         --*)

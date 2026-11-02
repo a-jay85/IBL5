@@ -851,12 +851,11 @@ fi
 # W8: a hotfix (or any unrelated) label event never cancels an in-flight labeled run.
 MUTATION_WF="${MUTATION_WF:-$REPO_ROOT/.github/workflows/mutation.yml}"
 W8_MUT=$(count_lines "github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id)" "$MUTATION_WF")
-W8_E2E=$(count_lines "github.event.label.name != 'update-baselines') && format('-label-{0}', github.run_id)" "$REPO_ROOT/.github/workflows/e2e-tests.yml")
 W8_MUTIF=$(count_lines "github.event.label.name == 'mutation-test')" "$MUTATION_WF")
-if [ "$W8_MUT" = 1 ] && [ "$W8_E2E" = 1 ] && [ "$W8_MUTIF" = 2 ]; then
+if [ "$W8_MUT" = 1 ] && [ "$W8_MUTIF" = 2 ]; then
     pass "W8-label-events-own-group"
 else
-    failcase "W8-label-events-own-group — mutation=$W8_MUT e2e=$W8_E2E mutation-job-ifs=$W8_MUTIF"
+    failcase "W8-label-events-own-group — mutation=$W8_MUT mutation-job-ifs=$W8_MUTIF"
 fi
 
 

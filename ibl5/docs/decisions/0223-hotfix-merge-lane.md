@@ -35,7 +35,7 @@ The hotfix pass runs in the `update-behind-prs-hotfix` concurrency group, so it 
 - Positive: an urgent fix reaches the head of the line and gets refreshed within one workflow run.
 - Positive: no gate is weakened. A hotfix PR still needs green required checks and, for `feat:`, human signoff.
 - Negative: the label audit found that `mutation.yml` put every label event in the same concurrency group as a real `mutation-test` run, so any other label cancelled that run. Other label events now get a per-run group, and `bin/test-merge-line-select` case W8 pins it.
-- Negative: on a `feat:` PR a `hotfix` label event cancels the in-flight `human-signoff` run and starts a new one that reaches the same verdict. `human-signoff.yml` stays as it is, because splitting its group would touch the `feat:` floor. `e2e-tests.yml` and `auto-mergeable-label.yml` already give unrelated labels their own group.
+- Negative: on a `feat:` PR a `hotfix` label event cancels the in-flight `human-signoff` run and starts a new one that reaches the same verdict. `human-signoff.yml` stays as it is, because splitting its group would touch the `feat:` floor. `auto-mergeable-label.yml` already gives unrelated labels their own group, and `e2e-tests.yml` no longer runs on label events at all (ADR-0225).
 
 The label was created with `gh label create hotfix --force --color D73A4A --description "Jumps to the front of the merge line"`. Only collaborators can apply a label.
 

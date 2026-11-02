@@ -2,6 +2,7 @@
 description: VR PRs get a change-driven before/after gallery and a sticky review comment grouped by module, with a coverage-gap section. The update-baselines label commits only strict-pass-flagged views. A refresh workflow republishes stale galleries; retention keeps linked galleries. Changed cells and agent shots also get cropped before/after pairs in the PR body.
 paths:
   - ".github/workflows/e2e-tests.yml"
+  - ".github/workflows/update-baselines.yml"
   - ".github/workflows/pages-deploy.yml"
   - "ibl5/tests/e2e/vr-manifest.ts"
   - "ibl5/tests/e2e/vr-coverage-map.ts"
@@ -17,7 +18,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 ---
 
 # Visual-review PRs
@@ -54,14 +55,13 @@ Under that label the publish steps still run (ADR-0181): gallery build, crop, de
    gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. That dispatch is **debounced**: it is skipped when a `pages-deploy` run exists that has
    not started yet, since that run checks out `gh-pages` *after* this push and already serves it. The
-   status filter is a **denylist** (neither `completed` nor `in_progress`), so a missed spelling
-   over-suppresses one push instead of silently no-opping. The debounce never fires on an
+   status filter is a **denylist** (neither `completed` nor `in_progress`). The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
    out of the count, so one stuck run cannot block every later deploy. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
    collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
    `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
-   fail. The retries absorb contention and never soften the gate. The per-cell before/after/diff PNGs
+   fail. The per-cell before/after/diff PNGs
    are published once each to the shared `_vr-blobs/` store at the `gh-pages` root by
    `bin/vr-dedupe-gallery`, and the gallery's `index.html` refers to them there (ADR-0211).
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
@@ -119,6 +119,8 @@ changed and new cells' `.a.png` over their baselines and commits only those. Fla
 unflagged cells stay byte-identical. That commit is the approval record; no flagged view, no
 commit. The label is removed once the VR step ran, before the bot pushes. A leftover flake cell keeps VR red: re-run the
 VR job (ADR-0214).
+
+The label starts `.github/workflows/update-baselines.yml`, which calls the VR job of `e2e-tests.yml`. Its checks report as `Update baselines / <job>` and never touch the required `E2E Tests` check.
 
 ## When the comment is missing
 

@@ -546,6 +546,69 @@ fi
 expect "r1-real-tests-yml-mutant-fails" 1 $?
 
 # ---------------------------------------------------------------------------
+# e2e-label invariants (L1-L2, backlog#1707)
+# ---------------------------------------------------------------------------
+
+# put_e2e_on <dir> <on-body>
+# Writes <dir>/e2e-tests.yml whose pull_request trigger body is <on-body> (printf
+# format, already indented). It has no paths or branches filter, so R1 passes.
+put_e2e_on() {
+  {
+    printf 'name: E2E Tests\non:\n  pull_request:\n'
+    # shellcheck disable=SC2059
+    printf "$2"
+    printf 'jobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n'
+  } > "$1/e2e-tests.yml"
+}
+
+# put_update_baselines <dir> <job-name>
+# Writes <dir>/update-baselines.yml with a workflow name and one job named <job-name>.
+put_update_baselines() {
+  printf 'name: VR Baseline Regen\non:\n  pull_request:\n    types: [labeled]\njobs:\n  regen:\n    name: %s\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n' "$2" > "$1/update-baselines.yml"
+}
+
+# run_l_case <case-name> <want-exit> <want-text> <stream: out|err> <dir>
+run_l_case() {
+  local name="$1" want="$2" text="$3" stream="$4" d_wf="$5" d_a out rc
+  d_a="$(fresh_actions)"
+  if [ "$stream" = "err" ]; then
+    out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1 >/dev/null)"; rc=$?
+  else
+    out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>/dev/null)"; rc=$?
+  fi
+  expect "$name" "$want" "$rc"
+  if grep -qF -- "$text" <<< "$out"; then
+    h_pass "$name-text"
+  else
+    h_fail "$name-text" "no '$text' on $stream; output: $out"
+  fi
+}
+
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened, synchronize, labeled]\n'
+run_l_case "l1-labeled-fails" 1 'e2e-label (L1)' err "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened, unlabeled]\n'
+run_l_case "l1-unlabeled-fails" 1 'e2e-label (L1)' err "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types:\n      - opened\n      - labeled\n'
+run_l_case "l1-blocklist-fails" 1 'e2e-label (L1)' err "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened, synchronize]\n    # No labeled: see backlog\n'
+run_l_case "l1-comment-passes" 0 'lists no label event type (L1)' out "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_e2e_on "$d_wf" '    types: [opened]\n    # relabeled_at is unrelated\n'
+run_l_case "l1-relabeled-word-passes" 0 'lists no label event type (L1)' out "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_update_baselines "$d_wf" 'E2E Tests'
+run_l_case "l2-collision-fails" 1 'e2e-label (L2)' err "$d_wf"
+
+d_wf="$(fresh_workflows)"; put_update_baselines "$d_wf" 'E2E Tests (regen)'
+run_l_case "l2-near-miss-passes" 0 'names no required check (L2)' out "$d_wf"
+
+d_wf="$(fresh_workflows)"
+run_l_case "l2-absent-skips" 0 'update-baselines.yml absent — L2 skipped' out "$d_wf"
+
+# ---------------------------------------------------------------------------
 # mutation-pr invariants (M1-M4)
 # ---------------------------------------------------------------------------
 

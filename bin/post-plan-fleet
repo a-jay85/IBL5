@@ -1155,7 +1155,12 @@ else
     esac
 fi
 if [ "$_cf_fixed" = 1 ]; then
-    _ppf_reason="$_ppf_outcome"; _ppf_outcome=conflict-fixed
+    # Only a re-fire that shipped, held or rebased counts as fixed. Any other outcome
+    # (failed, declined, paused, conflict) stays as the re-fire's own, so it earns its strike.
+    case "$_ppf_outcome" in
+        shipped|held|rebased) _ppf_reason="$_ppf_outcome"; _ppf_outcome=conflict-fixed ;;
+        *) : ;;
+    esac
 elif [ "$_cf_ran" = 1 ]; then
     _ppf_outcome=conflict-fix-gave-up; _ppf_reason="$_cf_word"
 fi

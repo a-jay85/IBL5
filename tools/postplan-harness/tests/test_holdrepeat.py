@@ -60,6 +60,20 @@ def test_normalize_sorts_semicolon_parts():
     assert hr.normalize_reason("a;;  ; b") == "a; b"
 
 
+def test_normalize_strips_conformance_fix_note():
+    base = "UNREALISED-ASSERTION: row 15; MISSING-PHASE: 8"
+    note_a = " [conformance-fix: fixed 2 files; committed abc1234def]"
+    note_b = " [conformance-fix: fixed 5 files; committed 9f8e7d6c5b]"
+    assert hr.normalize_reason(base + note_a) == hr.normalize_reason(base + note_b)
+    assert hr.normalize_reason(base + note_a) == hr.normalize_reason(base)
+    assert hr.normalize_reason(base + note_a) == "MISSING-PHASE: 8; UNREALISED-ASSERTION: row 15"
+    # the repeat-hold key is identical whether or not the note is present
+    with_a = hr.structural_key(_conds({3: base + note_a}))
+    with_b = hr.structural_key(_conds({3: base + note_b}))
+    without = hr.structural_key(_conds({3: base}))
+    assert with_a == with_b == without != ""
+
+
 # --------------------------------------------------------------------------- structural key
 
 

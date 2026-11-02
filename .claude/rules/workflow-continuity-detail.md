@@ -124,6 +124,8 @@ suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming 
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
 § Rebase-only mode.
 
+**Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` or `result=clean` it re-fires post-plan once, and the harness proves and reviews the merge before it pushes. Every other result restores the worktree to the pre-fix head and DMs the paste line. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
+
 ## What `--auto` adds
 
 `--auto` adds exactly one safety gate; a bare `bin/post-plan-now` skips it, because running it by

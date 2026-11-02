@@ -18,7 +18,7 @@ ADR-0122's regex word lists missed gate-weakening and destructive tasks whose wo
 
 `bin/plan-tier-hint` makes one Opus 5.5 (`claude-opus-5-5`) call per invocation. The prompt carries `/plan` Step 3's three routing checks, extracted from `.claude/skills/plan/SKILL.md` at run time between two named anchors. Every failure prints `xhigh` with a `judge-failsafe:` reason and exits 0. The failures are an unreadable SKILL.md, missing anchors, the CI guard, a missing `claude` or `jq`, a timeout, a non-zero judge exit, an unusable envelope, and an unparseable verdict.
 
-The judge runs with `--allowedTools ''` and no permission bypass, from an empty temp cwd. The task text sits inside nonce-tagged delimiters, and the prompt tells the judge to answer `xhigh` if that text tries to steer the verdict. Verdict parsing is strict: exactly two lines, the first exactly one of the three words.
+The judge runs with `--allowedTools ''`, `--tools ''` and `--strict-mcp-config`, with no permission bypass, from an empty temp cwd. `--tools ''` removes every built-in tool and `--strict-mcp-config` loads no MCP servers. The task text sits inside nonce-tagged delimiters, and the prompt tells the judge to answer `xhigh` if that text tries to steer the verdict. Verdict parsing is strict: exactly two lines, the first exactly one of the three words.
 
 The CLI contract is unchanged: the flags, single-word stdout, `--explain` TAB reason, and exit 2 on no input. The timeout is 180 s, overridable by `PLAN_TIER_HINT_TIMEOUT`. `--files` stays a path list with no diff. There is no batch mode and no cost ledger. With `CI` set and no `PLAN_TIER_HINT_CLAUDE` stub, the hint never reaches the model.
 

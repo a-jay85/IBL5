@@ -244,7 +244,7 @@ test.describe('Trivia-mode hidden modules: non-admin sees notice', () => {
 // DepthChartEntry legitimately emits a second `.ibl-title` (the `h2` "Next
 // Sim" heading); the count assertion is scoped to `h1.ibl-title` for the same
 // reason. Player negotiate is deliberately different: it renders no title for
-// a no-team user and asserts `.ibl-alert--error` instead.
+// a no-team user and asserts `.d-alert-error` instead.
 //
 // Assertions below were grounded against the running stack.
 // IBL_TEST_USER_REGULAR must be set to run.
@@ -296,7 +296,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Player negotiate as non-admin');
     await expect(
-      page.locator('.ibl-alert--error').first(),
+      page.locator('.d-alert-error').first(),
       'Player negotiate must show the no-team error message for a user with no team assignment',
     ).toBeVisible();
   });

@@ -1,0 +1,348 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-rehearsal-clone-fallback — offline harness for bin/rehearsal-clone-fallback.
+# Each case prints `ok: <label>` once when every sub-check passes, or one FAIL line.
+set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/rehearsal-clone-fallback"
+
+h_tmp T
+
+URL='https://github.com/a-jay85/IBL5/actions/runs/40439627733'
+SHA=$(printf 'a%.0s' $(seq 1 40))
+
+# --- case plumbing -----------------------------------------------------------
+CASE_LABEL=""
+CASE_ERR=""
+RC=0
+OUT=""
+ERR=""
+
+case_begin() { CASE_LABEL="$1"; CASE_ERR=""; }
+
+case_end() {
+    if [ -z "$CASE_ERR" ]; then
+        h_pass "$CASE_LABEL"
+    else
+        h_fail "$CASE_LABEL" "$CASE_ERR"
+    fi
+}
+
+# run <args...>: invoke the shipped script; sets RC, OUT (stdout), ERR (stderr).
+run() {
+    RC=0
+    "$SCRIPT" "$@" > "$T/stdout" 2> "$T/stderr" || RC=$?
+    OUT=$(cat "$T/stdout")
+    ERR=$(cat "$T/stderr")
+}
+
+chk_eq() {
+    if [ "$2" != "$3" ]; then
+        CASE_ERR="${CASE_ERR}$1: want [$2] got [$3]; "
+    fi
+}
+
+chk_has() {
+    case "$2" in
+        *"$3"*) ;;
+        *) CASE_ERR="${CASE_ERR}$1: missing [$3] in [$2]; " ;;
+    esac
+}
+
+chk_absent_file() {
+    if [ -e "$2" ]; then
+        CASE_ERR="${CASE_ERR}$1: path exists [$2]; "
+    fi
+}
+
+# fixture <name> <line>: write a one-line stderr fixture, print its path.
+fixture() {
+    printf '%s\n' "$2" > "$T/$1"
+    printf '%s' "$T/$1"
+}
+
+# expect_fallback <name> <line> <code>
+expect_fallback() {
+    local f
+    f=$(fixture "fx-$1" "$2")
+    run classify "$f"
+    chk_eq "$1 exit" 0 "$RC"
+    chk_has "$1 stdout" "$OUT" "fallback: $3"
+}
+
+# expect_no_fallback <name> <line>
+expect_no_fallback() {
+    local f
+    f=$(fixture "fx-$1" "$2")
+    run classify "$f"
+    chk_eq "$1 exit" 1 "$RC"
+    chk_has "$1 stdout" "$OUT" "no-fallback:"
+}
+
+write_good_meta() { # <path> <epoch>
+    run write-meta "$1" "$2" "$URL" "$SHA"
+    chk_eq "write-meta exit" 0 "$RC"
+}
+
+# --- classify ----------------------------------------------------------------
+case_begin classify-mysql-1203-verbatim
+expect_fallback verbatim "ERROR 1203 (42000): User ***_jordan already has more than 'max_user_connections' active connections" 1203
+case_end
+
+case_begin classify-mysql-format-each-code
+for code in 1040 2002 2003 2013; do
+    expect_fallback "mysql-$code" "ERROR $code (HY000): x" "$code"
+done
+case_end
+
+case_begin classify-dump-connect-format-each-code
+for code in 1203 1040 2002 2003 2013; do
+    expect_fallback "dump-$code" "mariadb-dump: Got error: $code: \"x\" when trying to connect" "$code"
+done
+case_end
+
+case_begin classify-dump-middump-2013
+# shellcheck disable=SC2016  # backticks are literal in the fixture line
+expect_fallback middump 'mariadb-dump: Error 2013: Lost connection to server during query when dumping table `ibl_box_scores` at row: 512' 2013
+case_end
+
+case_begin classify-rejects-1064-and-1045
+expect_no_fallback e1064 "ERROR 1064 (42000): You have an error in your SQL syntax"
+expect_no_fallback e1045 "ERROR 1045 (28000): Access denied for user"
+case_end
+
+case_begin classify-rejects-empty-stderr
+: > "$T/fx-empty"
+run classify "$T/fx-empty"
+chk_eq "empty exit" 1 "$RC"
+chk_has "empty stdout" "$OUT" "no-fallback: empty stderr"
+case_end
+
+case_begin classify-rejects-ssh-only-failure
+expect_no_fallback ssh "ssh: connect to host example.net port 22: Connection refused"
+case_end
+
+case_begin classify-rejects-near-misses
+expect_no_fallback nm-12030 "ERROR 12030 (HY000): x"
+expect_no_fallback nm-retried "note: retried 1203 times before success"
+expect_no_fallback nm-rowcount "FAIL: ibl_box_scores row count 50 outside 1000..200000"
+case_end
+
+case_begin classify-missing-file-usage
+run classify "$T/does-not-exist"
+chk_eq "missing exit" 2 "$RC"
+case_end
+
+# --- check-age / write-meta ---------------------------------------------------
+case_begin age-fresh-ok
+write_good_meta "$T/meta-fresh" 1000000
+run check-age "$T/meta-fresh" 1000000
+chk_eq "fresh exit" 0 "$RC"
+chk_has "fresh age_hours" "$OUT" "age_hours=0"
+chk_has "fresh source_run_url" "$OUT" "source_run_url=$URL"
+chk_has "fresh source_sha" "$OUT" "source_sha=$SHA"
+case_end
+
+case_begin age-boundary-7d
+write_good_meta "$T/meta-edge" 1000000
+run check-age "$T/meta-edge" 1604800
+chk_eq "7d exact exit" 0 "$RC"
+run check-age "$T/meta-edge" 1604801
+chk_eq "7d+1s exit" 1 "$RC"
+chk_has "7d+1s stdout" "$OUT" "stale-or-invalid:"
+case_end
+
+case_begin age-rejects-future-epoch
+write_good_meta "$T/meta-future" 1000000
+run check-age "$T/meta-future" 999999
+chk_eq "future exit" 1 "$RC"
+chk_has "future stdout" "$OUT" "stale-or-invalid:"
+case_end
+
+case_begin age-rejects-malformed-meta
+printf 'clone_epoch=1000000\nsource_run_url=%s\n' "$URL" > "$T/meta-nosha"
+run check-age "$T/meta-nosha" 1000000
+chk_eq "no source_sha exit" 1 "$RC"
+chk_has "no source_sha stdout" "$OUT" "stale-or-invalid:"
+printf 'clone_epoch=abc\nsource_run_url=%s\nsource_sha=%s\n' "$URL" "$SHA" > "$T/meta-abc"
+run check-age "$T/meta-abc" 1000000
+chk_eq "epoch abc exit" 1 "$RC"
+chk_has "epoch abc stdout" "$OUT" "stale-or-invalid:"
+SHA39=${SHA%a}
+printf 'clone_epoch=1000000\nsource_run_url=%s\nsource_sha=%s\n' "$URL" "$SHA39" > "$T/meta-sha39"
+run check-age "$T/meta-sha39" 1000000
+chk_eq "sha39 exit" 1 "$RC"
+chk_has "sha39 stdout" "$OUT" "stale-or-invalid:"
+# The command substitution must stay literal in the meta file.
+# shellcheck disable=SC2016
+printf 'clone_epoch=$(touch %s/pwned)\nsource_run_url=%s\nsource_sha=%s\n' "$T" "$URL" "$SHA" > "$T/meta-inject"
+run check-age "$T/meta-inject" 1000000
+chk_eq "inject exit" 1 "$RC"
+chk_has "inject stdout" "$OUT" "stale-or-invalid:"
+chk_absent_file "inject not executed" "$T/pwned"
+case_end
+
+case_begin write-meta-rejects-bad-sha
+run write-meta "$T/meta-badsha" 1000000 "$URL" notasha
+chk_eq "bad sha exit" 2 "$RC"
+chk_absent_file "bad sha writes nothing" "$T/meta-badsha"
+case_end
+
+# --- crypto -------------------------------------------------------------------
+: > "$T/plain"
+for _i in $(seq 1 50); do
+    printf "INSERT INTO ibl_plr VALUES (1,'x');\n" >> "$T/plain"
+done
+
+crypt_with_key() { # <key> <args...>
+    local key="$1"
+    shift
+    RC=0
+    REHEARSAL_KEY_SOURCE="$key" "$SCRIPT" "$@" > "$T/stdout" 2> "$T/stderr" || RC=$?
+    OUT=$(cat "$T/stdout")
+    ERR=$(cat "$T/stderr")
+}
+
+case_begin crypto-round-trip
+crypt_with_key test-key encrypt "$T/plain" "$T/cipher"
+chk_eq "encrypt exit" 0 "$RC"
+crypt_with_key test-key decrypt "$T/cipher" "$T/decrypted"
+chk_eq "decrypt exit" 0 "$RC"
+cmp -s "$T/plain" "$T/decrypted"
+chk_eq "cmp plaintext vs decrypted" 0 "$?"
+case_end
+
+case_begin crypto-ciphertext-opaque
+magic=$(head -c 8 "$T/cipher")
+chk_eq "Salted__ magic" "Salted__" "$magic"
+hits=$(command grep -c 'INSERT INTO' "$T/cipher" || true)
+chk_eq "no plaintext in ciphertext" 0 "$hits"
+case_end
+
+case_begin crypto-key-unset-and-empty
+rm -f "$T/out-unset" "$T/out-empty"
+RC=0
+env -u REHEARSAL_KEY_SOURCE "$SCRIPT" encrypt "$T/plain" "$T/out-unset" > "$T/stdout" 2> "$T/stderr" || RC=$?
+ERR=$(cat "$T/stderr")
+chk_eq "unset exit" 1 "$RC"
+chk_absent_file "unset output" "$T/out-unset"
+chk_has "unset stderr" "$ERR" "REHEARSAL_KEY_SOURCE is unset or empty"
+crypt_with_key "" encrypt "$T/plain" "$T/out-empty"
+chk_eq "empty exit" 1 "$RC"
+chk_absent_file "empty output" "$T/out-empty"
+chk_has "empty stderr" "$ERR" "REHEARSAL_KEY_SOURCE is unset or empty"
+case_end
+
+# AES-CBC wrong-key decrypt passes the PKCS7 padding check by chance about 1 in 256,
+# so retry with a fresh salt (re-encrypt) until a rejecting attempt is observed.
+case_begin crypto-wrong-key-decrypt
+cipher_n="$T/cipher"
+rejected=0
+for attempt in 1 2 3 4 5 6 7 8; do
+    rm -f "$T/wrong-out"
+    crypt_with_key other-key decrypt "$cipher_n" "$T/wrong-out"
+    if [ "$RC" -eq 1 ]; then
+        rejected=1
+        chk_absent_file "wrong-key output (attempt $attempt)" "$T/wrong-out"
+        break
+    fi
+    rm -f "$T/wrong-out"
+    crypt_with_key test-key encrypt "$T/plain" "$T/cipher-retry"
+    chk_eq "re-encrypt exit (attempt $attempt)" 0 "$RC"
+    cipher_n="$T/cipher-retry"
+done
+chk_eq "wrong key rejected within 8 attempts" 1 "$rejected"
+case_end
+
+# --- CLI ----------------------------------------------------------------------
+case_begin cli-help-and-unknown
+run --help
+chk_eq "--help exit" 0 "$RC"
+chk_has "--help stdout" "$OUT" "Usage"
+run bogus
+chk_eq "bogus exit" 2 "$RC"
+run classify --nope
+chk_eq "classify --nope exit" 2 "$RC"
+case_end
+
+# --- workflow wiring ---------------------------------------------------------
+WF="$(cd "$(dirname "$SCRIPT")/.." && pwd)/.github/workflows/deploy-rehearsal.yml"
+
+# step_block <exact step name>: print that step from its `      - name:` line up to
+# the next `      - name:` line. The anchors are full step-name lines.
+step_block() {
+    awk -v want="      - name: $1" '
+        $0 == want { on = 1; print; next }
+        on && /^      - name: / { exit }
+        on { print }
+    ' "$WF"
+}
+
+# step_line <exact step name>: line number of that step's name line (0 if absent).
+step_line() {
+    awk -v want="      - name: $1" '$0 == want { print NR; f = 1 } END { if (!f) print 0 }' "$WF"
+}
+
+DUMP_STEP='Dump filtered production data over SSH (classified on failure)'
+LOAD_STEP='Load prod clone into CI MariaDB'
+SAVE_STEP='Save encrypted prod dump for connection-class fallback'
+UPLOAD_STEP='Upload encrypted prod dump to the Actions cache'
+ASSERT_STEP='Assert clone bounded + migration tracking seeded (false-green guard)'
+MIGRATE_STEP='php bin/migrate (mirrors main.yml)'
+SAVE_IF="        if: steps.dump.outputs.source == 'fresh' && github.event_name != 'pull_request'"
+
+case_begin workflow-classify-only-in-dump-step
+dump_block=$(step_block "$DUMP_STEP")
+load_block=$(step_block "$LOAD_STEP")
+chk_has "dump step calls classify" "$dump_block" "rehearsal-clone-fallback classify dump-stderr.txt"
+chk_eq "classify call count in workflow" 1 "$(grep -c 'rehearsal-clone-fallback classify' "$WF")"
+if [ -z "$load_block" ]; then
+    CASE_ERR="${CASE_ERR}load step not found; "
+fi
+case "$load_block" in
+    *rehearsal-clone-fallback*) CASE_ERR="${CASE_ERR}load step calls the helper; " ;;
+esac
+case "$load_block" in
+    *'|| rc='*) CASE_ERR="${CASE_ERR}load step captures an exit code; " ;;
+esac
+case_end
+
+case_begin workflow-save-gated-fresh-non-pr
+for s in "$SAVE_STEP" "$UPLOAD_STEP"; do
+    blk=$(step_block "$s")
+    if ! grep -qxF -- "$SAVE_IF" <<< "$blk"; then
+        CASE_ERR="${CASE_ERR}[$s] lacks the fresh + non-PR if: line; "
+    fi
+done
+case_end
+
+case_begin workflow-save-after-assert
+save_n=$(step_line "$SAVE_STEP")
+assert_n=$(step_line "$ASSERT_STEP")
+migrate_n=$(step_line "$MIGRATE_STEP")
+if [ "$save_n" -eq 0 ] || [ "$assert_n" -eq 0 ] || [ "$migrate_n" -eq 0 ]; then
+    CASE_ERR="${CASE_ERR}step missing (save=$save_n assert=$assert_n migrate=$migrate_n); "
+elif [ "$save_n" -le "$assert_n" ] || [ "$save_n" -ge "$migrate_n" ]; then
+    CASE_ERR="${CASE_ERR}save step at $save_n not between assert $assert_n and migrate $migrate_n; "
+fi
+case_end
+
+case_begin workflow-injection-dispatch-only
+dump_block=$(step_block "$DUMP_STEP")
+# shellcheck disable=SC2016
+chk_has "injection env" "$dump_block" \
+    "SIMULATE_CONN_FAILURE: \${{ github.event_name == 'workflow_dispatch' && inputs.simulate_clone_connection_failure }}"
+# shellcheck disable=SC2016
+chk_has "injection test" "$dump_block" '[ "${SIMULATE_CONN_FAILURE:-false}" = "true" ]'
+case_end
+
+case_begin workflow-no-artifact-upload
+chk_eq "upload-artifact count" 0 "$(grep -c 'upload-artifact' "$WF")"
+chk_has "plaintext gzip removed" "$(step_block "$SAVE_STEP")" "rm -f rehearsal-dump-cache/prod-clone.sql.gz"
+case_end
+
+# New cases go above this line.
+h_done

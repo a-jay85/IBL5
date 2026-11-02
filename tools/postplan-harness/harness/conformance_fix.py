@@ -490,6 +490,9 @@ def _default_root() -> str:
     return root or os.getcwd()
 
 
+_CLASS_PREFIX = re.compile(r"[A-Z][A-Z-]*:")
+
+
 def _cli_classify(plan_path: str, stdin, root: str) -> int:
     from .planfile import locate_plan  # local import keeps module-level cycle-free
     if not os.path.isfile(plan_path):
@@ -499,7 +502,8 @@ def _cli_classify(plan_path: str, stdin, root: str) -> int:
     if not plan.found:
         print(f"conformance_fix: plan not readable: {plan_path}", file=sys.stderr)
         return 1
-    items = [ln.strip() for ln in stdin.read().splitlines() if ln.strip()]
+    # Lines without an upper-case `CLASS:` prefix are noise; a prefixed unknown class still reaches classify().
+    items = [ln.strip() for ln in stdin.read().splitlines() if _CLASS_PREFIX.match(ln.strip())]
     # Same `exists` as remediate_missing, so the CLI refuses what the runtime refuses.
     cls = classify(items, plan_test_paths(plan), plan_critical_paths(plan),
                    exists=lambda p: os.path.exists(os.path.join(root, p)))

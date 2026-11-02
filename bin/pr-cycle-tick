@@ -336,7 +336,7 @@ settle_row() {
     # A paused rescue never ran, so it keeps any hold. Every other fired or holdrepeat
     # outcome is a determinate result and drops the hold back to the plain retry cap.
     case "$status:$outcome" in
-        fired:conflict)
+        fired:conflict|fired:conflict-fix-gave-up)
             # Record the merge-tree path set at the launch tip, so a later tick can tell
             # whether master's move touched the conflict. No set recorded = today's rule.
             prc=2; pout="no master tip at launch"
@@ -358,7 +358,7 @@ settle_row() {
         fired:*|holdrepeat:*) pcw_clear_conflict_hold "$STATE" "$pr" ;;
     esac
     case "$status:$outcome" in
-        fired:shipped|fired:held|fired:conflict|fired:timed-out)
+        fired:shipped|fired:held|fired:conflict|fired:timed-out|fired:conflict-fixed|fired:conflict-fix-gave-up)
             pcw_record_attempt "$STATE" "$pr" "$key"
             log "PR $pr: rescue ran ($outcome); attempt recorded (head ${sha:0:7})" ;;
         fired:failed)
@@ -602,6 +602,9 @@ while IFS=$'\t' read -r pr branch sha mstate base human; do
                 msg+=" Why: $why Fix steps: $run_dir/blocked-ship.txt"
             elif [[ -n "${run_dir:-}" ]]; then
                 msg+=" Last rescue run: $run_dir"
+            fi
+            if [[ "$(pcw_conflict_fix_count "$STATE" "$pr" "$sha")" -ge 1 ]]; then
+                msg+=$'\nA bot conflict fix (postplan-fix --headless) already ran on head '"${sha:0:7}"$' and gave up.'
             fi
             # End with the one-command fix entry point, on its own line so it copies cleanly.
             msg+=$'\nOr paste this to have Claude fix it:\n'"$ROOT/bin/postplan-fix $pr"

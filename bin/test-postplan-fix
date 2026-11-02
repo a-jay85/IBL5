@@ -412,7 +412,8 @@ need "merge commit parents" test "$(git -C "$WTC" log -1 --format=%P)" = "$TIP $
 need "origin branch unchanged" test "$(origin_branch)" = "$ORIGIN_BR0"
 need "stub cwd is the worktree" test "$(cat "$TMP/claude.cwd" 2>/dev/null)" = "$(cd "$WTC" && pwd -P)"
 need "stdout says nothing pushed" has_s "$STDOUT" "nothing pushed"
-need "stdout ends with the ship line" ends_s "$STDOUT" "cd $WTP && bin/post-plan-now"
+need "stdout carries the ship line" has_s "$STDOUT" "cd $WTP && bin/post-plan-now"
+need "stdout ends with the result word" ends_s "$STDOUT" "postplan-fix: headless result=committed"
 need "a.txt resolved" test "$(cat "$WTC/a.txt")" = "$(printf 'feature\nmaster')"
 case_end headless-resolves-and-commits
 
@@ -546,6 +547,62 @@ need "rc 0" test "$RC" = 0
 need "stdout says merges cleanly" has_s "$STDOUT" "merges cleanly"
 need "no stub call" no_args
 case_end headless-clean-merge
+
+# 22b-d: machine-readable result words and the pre-merge manifest the harness reads.
+PM_MANIFEST="/tmp/postplan-premerged-$B_CONFLICT.json"
+PM_FLAG="/tmp/postplan-conflict-resolved-$B_CONFLICT"
+pm_clean() {
+    rm -f "$PM_MANIFEST" "$PM_FLAG" \
+        "/tmp/postplan-premerged-$B_CLEAN.json" "/tmp/postplan-conflict-resolved-$B_CLEAN"
+}
+trap 'pm_clean; rm -rf "$TMP"' EXIT
+last_line() { printf '%s\n' "$1" | tail -n 1; }
+first_line() { printf '%s\n' "$1" | head -n 1; }
+
+hl_reset; pm_clean
+ORIGIN_BR0=$(origin_branch)
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+NEW_HEAD=$(git -C "$WTC" rev-parse HEAD)
+PM_JSON=$(cat "$PM_MANIFEST" 2>/dev/null || true)
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "head0 line comes first" test "$(first_line "$STDOUT")" = "postplan-fix: headless head0=$TIP wt=$WTP"
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=committed"
+need "manifest exists" test -f "$PM_MANIFEST"
+need "manifest sha is the new HEAD" has_s "$PM_JSON" "\"sha\": \"$NEW_HEAD\""
+need "manifest pre_sha is head0" has_s "$PM_JSON" "\"pre_sha\": \"$TIP\""
+need "manifest lists the conflicted file" has_s "$PM_JSON" "\"files\": [\"a.txt\"]"
+need "flag holds the new HEAD" has_s "$(cat "$PM_FLAG" 2>/dev/null || true)" "$NEW_HEAD"
+need "nothing pushed" test "$(origin_branch)" = "$ORIGIN_BR0"
+case_end headless-result-committed
+
+hl_reset; pm_clean
+run_fix "$SUT" --headless "$B_CLEAN"
+need "rc 0" test "$RC" = 0
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=clean"
+need "no manifest" test ! -e "/tmp/postplan-premerged-$B_CLEAN.json"
+need "no flag" test ! -e "/tmp/postplan-conflict-resolved-$B_CLEAN"
+case_end headless-result-clean
+
+hl_reset; pm_clean
+mkdir -p "$TMP/pystub"
+REAL_PY=$(command -v python3)
+cat > "$TMP/pystub/python3" <<PYEOF
+#!/bin/bash
+case " \$* " in *" -m harness.premerge "*) exit 3 ;; esac
+exec "$REAL_PY" "\$@"
+PYEOF
+chmod +x "$TMP/pystub/python3"
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+PATH="$TMP/pystub:$PATH" run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 1" test "$RC" = 1
+need "result word" has_s "$STDOUT" "postplan-fix: headless result=gave-up-record"
+need "stderr names the reset" has_s "$ERR" "could not record the resolution manifest; reset to $TIP"
+need "HEAD is head0" test "$(git -C "$WTC" rev-parse HEAD)" = "$TIP"
+need "no MERGE_HEAD" no_merge
+need "no manifest" test ! -e "$PM_MANIFEST"
+case_end headless-record-failure-resets
+pm_clean
 
 # 23
 hl_reset

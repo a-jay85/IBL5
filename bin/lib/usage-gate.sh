@@ -37,7 +37,7 @@ usage_thresholds() {
 # ------------------------------------------------------------ 2b zone math
 
 usage_zone_pct() {  # <json>
-    printf '%s' "${1:-}" | jq -r '[.five_hour.utilization // 0, .seven_day.utilization // 0] | max'
+    printf '%s' "${1:-}" | jq -r '.seven_day.utilization // 0'
 }
 
 usage_zone() {  # <json>
@@ -46,15 +46,8 @@ usage_zone() {  # <json>
     d=${th%% *}
     s=${th##* }
     printf '%s' "${1:-}" | jq -r --argjson d "$d" --argjson s "$s" \
-        '([.five_hour.utilization // 0, .seven_day.utilization // 0] | max) as $p
+        '(.seven_day.utilization // 0) as $p
          | if $p >= $s then "stop" elif $p >= $d then "drain" else "normal" end'
-}
-
-# usage_limiting_window <json>: five_hour or seven_day, whichever is larger.
-# A tie returns seven_day (the later reset, so resume never fires early).
-usage_limiting_window() {
-    printf '%s' "${1:-}" | jq -r \
-        'if (.five_hour.utilization // 0) > (.seven_day.utilization // 0) then "five_hour" else "seven_day" end'
 }
 
 # usage_resets_epoch <json> <window>: epoch seconds, or nothing when null/unparseable.
@@ -112,15 +105,14 @@ usage_pace_verdict() {
 # usage_blind_trust <json> <age> [log-suffix]
 # Called when the gate is blind: the live fetch failed and the cache is stale.
 # rc 0: trust this last reading as if fresh. Its zone is drain or stop and the
-# limiting window's resets_at is still in the future. Logs blind-trust.
+# weekly window's resets_at is still in the future. Logs blind-trust.
 # rc 1: fail open. The zone is normal, or resets_at is passed, missing, or
 # unparseable, so the reset boundary cannot be shown to lie ahead.
 usage_blind_trust() {
-    local body="${1:-}" age="${2:-}" zone w resets now
+    local body="${1:-}" age="${2:-}" zone resets now
     zone=$(usage_zone "$body")
     case "$zone" in drain|stop) ;; *) return 1 ;; esac
-    w=$(usage_limiting_window "$body")
-    resets=$(usage_resets_epoch "$body" "$w")
+    resets=$(usage_resets_epoch "$body" seven_day)
     case "$resets" in ''|*[!0-9]*) return 1 ;; esac
     now=$(date +%s)
     [ "$resets" -gt "$now" ] || return 1
@@ -527,31 +519,30 @@ usage_token_clear() {
 # ------------------------------------------------------------ 2e delta log
 
 # usage_delta_log <sid> <runner> <model> <json>
-# One JSONL line per real change in (five, week) versus last/<sid>.
+# One JSONL line per real change in week versus last/<sid>. last/<sid> holds the
+# weekly figure as its last field, so an old "five week" file still reads correctly.
 usage_delta_log() {
     local sid="${1:-}" runner="${2:-}" model="${3:-}" json="${4:-}"
     usage_valid_sid "$sid" || return 1
-    local dir five week last_f pf pw
+    local dir week last_f pw
     dir=$(usage_state_dir)
     mkdir -p "$dir/last" 2>/dev/null
-    five=$(printf '%s' "$json" | jq -r '.five_hour.utilization // 0')
     week=$(printf '%s' "$json" | jq -r '.seven_day.utilization // 0')
     last_f="$dir/last/$sid"
     if [ -s "$last_f" ]; then
-        read -r pf pw < "$last_f"
-        if [ "$pf" = "$five" ] && [ "$pw" = "$week" ]; then
+        pw=$(awk '{print $NF}' "$last_f")
+        case "$pw" in ''|*[!0-9.]*) pw=$week ;; esac
+        if [ "$pw" = "$week" ]; then
             return 0
         fi
     else
-        pf=$five
         pw=$week
     fi
     jq -n -c --argjson ts "$(date +%s)" --arg sid "$sid" --arg runner "$runner" \
-        --arg model "${model:-unknown}" --argjson five "$five" --argjson week "$week" \
-        --argjson pf "$pf" --argjson pw "$pw" \
-        '{ts:$ts, session_id:$sid, runner:$runner, model:$model, five:$five, week:$week,
-          d_five:($five-$pf), d_week:($week-$pw)}' >> "$dir/deltas.jsonl" 2>/dev/null
-    printf '%s %s\n' "$five" "$week" > "$last_f"
+        --arg model "${model:-unknown}" --argjson week "$week" --argjson pw "$pw" \
+        '{ts:$ts, session_id:$sid, runner:$runner, model:$model, week:$week,
+          d_week:($week-$pw)}' >> "$dir/deltas.jsonl" 2>/dev/null
+    printf '%s\n' "$week" > "$last_f"
     return 0
 }
 
@@ -606,7 +597,7 @@ usage_session_started() {
 # rc 0: start. rc 10: paused before start (marker written).
 # No usable usage data fails open.
 usage_prestart_gate() {
-    local runner="${1:-}" sid="${2:-}" rbin="${3:-}" body rc zone w blind=0
+    local runner="${1:-}" sid="${2:-}" rbin="${3:-}" body rc zone blind=0
     body=$(usage_fetch 45); rc=$?
     if [ "$rc" -eq 1 ] || [ -z "$body" ]; then
         usage_log "prestart-fail-open reason=no-usage runner=$runner"
@@ -629,9 +620,8 @@ usage_prestart_gate() {
     zone=$(usage_zone "$body")
     [ "$zone" = "normal" ] && return 0
     [ "$(usage_token_holder)" = "$sid" ] && return 0
-    w=$(usage_limiting_window "$body")
     if usage_marker_write "$sid" "$runner" "$rbin" usage-pause "$zone" \
-        "$(usage_zone_pct "$body")" "$w" "$(usage_resets_epoch "$body" "$w")"; then
+        "$(usage_zone_pct "$body")" seven_day "$(usage_resets_epoch "$body" seven_day)"; then
         usage_log "prestart-pause runner=$runner sid=$sid zone=$zone"
         return 10
     fi
@@ -646,11 +636,10 @@ usage_prestart_gate() {
 # first.
 usage_limit_hit_marker() {
     local runner="${1:-}" sid="${2:-}" rbin="${3:-}"
-    local body zone="unknown" pct=0 w="five_hour" resets=""
+    local body zone="unknown" pct=0 w="seven_day" resets=""
     if body=$(usage_fetch 300) && [ -n "$body" ]; then
         zone=$(usage_zone "$body")
         pct=$(usage_zone_pct "$body")
-        w=$(usage_limiting_window "$body")
         resets=$(usage_resets_epoch "$body" "$w")
     fi
     usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets"
@@ -809,10 +798,8 @@ usage_gate_decide() {
         *) return 0 ;;
     esac
 
-    local w
-    w=$(usage_limiting_window "$body")
     if usage_marker_write "$sid" "$runner" "$rbin" usage-pause "$zone" \
-        "$(usage_zone_pct "$body")" "$w" "$(usage_resets_epoch "$body" "$w")"; then
+        "$(usage_zone_pct "$body")" seven_day "$(usage_resets_epoch "$body" seven_day)"; then
         printf '%s\n' '{"continue":false,"stopReason":"usage-pause"}'
         usage_log "pause sid=$sid zone=$zone"
     else

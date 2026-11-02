@@ -631,7 +631,7 @@ echo "# P4b: --resume-paused of pre-start pause uses --session-id; resume_count 
 reset_e2
 write_e2_plan "pausey"
 # Seed a drain-zone usage cache so the prestart gate fires on the first run
-printf '{"five_hour":{"utilization":95,"resets_at":null},"seven_day":{"utilization":30,"resets_at":null},"fetched_at":%s}\n' \
+printf '{"five_hour":null,"seven_day":{"utilization":95,"resets_at":null},"fetched_at":%s}\n' \
     "$(date +%s)" > "$E2_GATE/cache.json"
 run_e2
 P4B_SID="$(cat "$E2_NDIR/queue/pausey.md.lock/paused-held" 2>/dev/null)"

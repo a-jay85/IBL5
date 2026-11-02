@@ -617,8 +617,8 @@ hr.observe(state, slug, armed=False, conditions=conds, fingerprint="fp", pr=77,
            now="2026-10-23T12:00:00Z")
 PYEOF
 hr_seed() { PYTHONPATH="$ROOT/tools/postplan-harness" python3 "$TMP/hr-seed.py" "$1" "$B_HR" "$2" "${3:-}"; }
-printf '{"five_hour":{"utilization":10},"seven_day":{"utilization":10}}\n' > "$TMP/usage-ok.json"
-printf '{"five_hour":{"utilization":99},"seven_day":{"utilization":10}}\n' > "$TMP/usage-stop.json"
+printf '{"five_hour":null,"seven_day":{"utilization":10}}\n' > "$TMP/usage-ok.json"
+printf '{"five_hour":null,"seven_day":{"utilization":99}}\n' > "$TMP/usage-stop.json"
 cat > "$TMP/dm-stub" <<STUBEOF
 #!/bin/bash
 { printf 'ARGS:%s\n' "\$*"; cat; printf '\n@@DM@@\n'; } >> "$TMP/dm.log"

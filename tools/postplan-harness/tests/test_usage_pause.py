@@ -730,8 +730,8 @@ def test_real_lib_prespawn_decide_keys_run_sid(tmp_path, monkeypatch):
     """The Phase 4 call shape against the real usage_gate_decide, stop zone."""
     state = tmp_path / "state"
     (state / "markers").mkdir(parents=True)
-    body = {"five_hour": {"utilization": 99.0, "resets_at": "2026-09-28T20:00:00+00:00"},
-            "seven_day": {"utilization": 10.0, "resets_at": "2026-10-02T00:00:00+00:00"},
+    body = {"five_hour": None,
+            "seven_day": {"utilization": 99.0, "resets_at": "2026-10-02T00:00:00+00:00"},
             "fetched_at": int(time.time())}
     (state / "cache.json").write_text(json.dumps(body))
     monkeypatch.setenv("IBL5_USAGE_GATE_STATE_DIR", str(state))

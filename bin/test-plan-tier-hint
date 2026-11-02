@@ -228,6 +228,7 @@ echo "== J8 envelope failures =="
 GOOD="$(printf 'default\nreason')"
 mk_judge env-nonjson 0 "this is not json"
 mk_judge env-iserror 0 "$(env_json "$GOOD" '.is_error = true')"
+# stop_reason:max_tokens marks a cut-off reply, unusable even when .result parses.
 mk_judge env-maxtok 0 "$(env_json "$GOOD" '.stop_reason = "max_tokens"')"
 mk_judge env-noresult 0 "$(env_json "$GOOD" 'del(.result)')"
 for k in nonjson iserror maxtok noresult; do
@@ -261,6 +262,8 @@ env -u PLAN_TIER_HINT_CLAUDE CI=1 PATH="$FAKEPATH" \
 expect_match "J10a CI=1, seam unset: xhigh naming the CI guard" "^xhigh${TAB}judge-failsafe: CI guard" "$OUT"
 expect_absent_file "J10a fake claude never ran" "$BASE_TMP/fake-called"
 
+# The hint reads the seam with :-, so an empty value counts as unset. A read
+# like ${PLAN_TIER_HINT_CLAUDE+set} would treat it as set and skip the guard.
 rm -f "$BASE_TMP/fake-called"
 env CI=1 PLAN_TIER_HINT_CLAUDE= PATH="$FAKEPATH" \
     "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
@@ -380,6 +383,8 @@ assert_contains "canonical carries the pinned-restructure carve-out" \
     '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
 assert_contains "plan-prompt points at the pinned-restructure carve-out" \
     '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
+assert_absent "canonical no longer calls the hint mechanical" \
+    '.claude/skills/plan/SKILL.md' 'mechanical second opinion'
 
 # The hint extracts the judge's check list between these anchors. A SKILL.md
 # edit that moves one fails here before it can empty the judge prompt.

@@ -202,7 +202,8 @@ def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContex
             max_budget_usd=CLOSER_BUDGET_USD, max_retries=0, extra_env=extra_env)
     except HarnessError as e:
         stop_reason = e.kind
-        status = "cap-wall" if e.kind == "subprocess-timeout" else "session-error"
+        timed_out = e.kind == "subprocess-timeout" or "wall clock" in (e.detail or "")
+        status = "cap-wall" if timed_out else "session-error"
         log(f"closer: session ended early ({e.kind}); edits discarded")
     finally:
         shutil.rmtree(gh_cfg, ignore_errors=True)

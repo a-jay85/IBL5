@@ -341,7 +341,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         now=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
     if _ab.source in ("env", "enrolled", "new-enrollment"):
         res.ab_arm, res.ab_source = _ab.arm, _ab.source
-    log(f"postplan: ab-arm={_ab.arm} source={_ab.source}")
+        log(f"postplan: ab-arm={_ab.arm} source={_ab.source}")
     if _ab.arm == "closer" and mode != "replay":
         git.llm_conflict_rungs_off = True
     state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
@@ -1256,11 +1256,18 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             res.error = f"{e.kind}: {e.detail}"
             res.error_kind = e.kind
             if e.kind == "rebase-conflict" and _narrow_fixers_off(res):
-                _run_closer_for_conflict(git, gh, llm, log, res, e, worktree=worktree,
-                                         live=live, mode=mode, fixture=fixture,
-                                         out_dir=out_dir,
-                                         state_dir=_state_dir(out_dir, live, state_dir),
-                                         slug=slug)
+                try:
+                    _run_closer_for_conflict(git, gh, llm, log, res, e, worktree=worktree,
+                                             live=live, mode=mode, fixture=fixture,
+                                             out_dir=out_dir,
+                                             state_dir=_state_dir(out_dir, live, state_dir),
+                                             slug=slug)
+                except HarnessError as ce:
+                    log(f"closer: conflict hook error {ce.kind}; keeping the failed terminal")
+                except usage_pause.UsagePause as p:
+                    res.error_kind = _classify_pause(p, llm, res, log)
+                    res.error = f"{res.error_kind}: {p.purpose}"
+                    log(f"PAUSED: {res.error}")
             res.block_cause = getattr(e, "block_cause", None)
             _record_failure_context(res, e)
             log(f"FAILED: {res.error}")

@@ -173,7 +173,7 @@ def outcome_row(res, *, run_started: str, run_finished: str) -> dict:
     calls = list(getattr(getattr(res, "ledger", None), "calls", []) or [])
     closer = getattr(res, "closer", None) or {}
     return {
-        "schema": OUTCOME_SCHEMA, "slug": res.slug, "pr": res.pr_number,
+        "schema": OUTCOME_SCHEMA, "slug": safe_slug(res.slug), "pr": res.pr_number,
         "ab_arm": res.ab_arm, "ab_source": res.ab_source,
         "fired_by": getattr(res, "fired_by", None),
         "run_started": run_started, "run_finished": run_finished,

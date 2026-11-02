@@ -72,12 +72,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                             . ' / <a href="modules.php?name=Contracts&amp;tab=players"' . self::HTMX_BOOST_ATTRS . '>Contracts</a>',
                         'url' => 'modules.php?name=Contracts',
                     ],
-                    $this->config->isDraftOrderFinalized
-                        ? ($this->config->seasonPhase === 'Draft'
-                            ? ['label' => 'Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order', 'badge' => 'FINAL']
-                            : ['label' => 'Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order'])
-                        : ['label' => 'Projected Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order'],
-                    ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftInfo&tab=picks'],
+                    ['label' => 'Draft Info', 'url' => 'modules.php?name=DraftInfo&tab=order'],
                     ['label' => 'Training Camp Ratings Diff', 'url' => 'modules.php?name=TrainingCampRatingsDiff'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=SeasonRosterChanges'],

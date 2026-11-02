@@ -64,7 +64,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
         ob_start();
         ?>
 <form method="get" action="modules.php" class="d-card d-card-border bg-base-200 p-4 mb-6">
-    <input type="hidden" name="name" value="Transaction_History">
+    <input type="hidden" name="name" value="TransactionHistory">
     <div class="flex flex-wrap items-center justify-center gap-4">
         <div class="flex items-center gap-2">
             <label class="d-label" for="txn-cat">Category:</label>

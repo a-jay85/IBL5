@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Post-plan closer A/B readout. Logic: tools/postplan-harness/harness/ab_readout.py
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PYTHONPATH="$ROOT/tools/postplan-harness" exec python3 -m harness.ab_readout "$@"

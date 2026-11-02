@@ -126,6 +126,24 @@ final class PageTabsTest extends TestCase
         $this->assertStringContainsString('data-tab="2025" aria-current="page"', $html);
     }
 
+    public function testRenderTabBarGoldenMarkupIsStable(): void
+    {
+        $tabs = new PageTabs(['a' => 'Alpha', 'b' => 'B & C'], 'a');
+        $this->assertSame(
+            '<div class="ibl-tabs"><a class="ibl-tab ibl-tab--active" href="modules.php?name=X&amp;tab=a" data-tab="a" aria-current="page">Alpha</a><a class="ibl-tab" href="modules.php?name=X&amp;tab=b" data-tab="b">B &amp; C</a></div>',
+            $tabs->renderTabBar('a', 'modules.php?name=X')
+        );
+    }
+
+    public function testWrapPanelGoldenMarkupIsStable(): void
+    {
+        $tabs = new PageTabs(['a' => 'A'], 'a');
+        $this->assertSame(
+            '<div class="ibl-tab-panel" data-tab="a"><p>x</p></div>',
+            $tabs->wrapPanel('<p>x</p>', 'a')
+        );
+    }
+
     public function testRenderTabBarActiveTabHasActiveClass(): void
     {
         $tabs = $this->makeTabs();

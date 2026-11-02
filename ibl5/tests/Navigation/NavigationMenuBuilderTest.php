@@ -389,6 +389,32 @@ class NavigationMenuBuilderTest extends TestCase
         }
     }
 
+    public function testIblSeasonMenuLabelOrderIsPinned(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
+        $menus = $builder->getMenuStructure();
+
+        $labels = array_map(
+            static fn (array $link): string => $link['label'] ?? strip_tags($link['rawHtml'] ?? ''),
+            $menus['Season']['links']
+        );
+
+        $this->assertSame([
+            'Standings',
+            'Schedule',
+            'Injuries',
+            'Player Database',
+            'Player Export',
+            'Cap Space / Contracts',
+            'Projected Draft Order',
+            'Draft Pick Locator',
+            'Training Camp Ratings Diff',
+            'Free Agency Preview',
+            'Player Movement',
+            'JSB Export',
+        ], $labels);
+    }
+
     public function testIblSeasonMenuHasSplitCapSpaceContractsLinkAndNoLegacyLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
@@ -430,7 +456,7 @@ class NavigationMenuBuilderTest extends TestCase
         $allLabels = [];
         foreach ($menus as $menu) {
             foreach ($menu['links'] as $link) {
-                $allLabels[] = $link['label'] ?? ($link['rawHtml'] ?? '');
+                $allLabels[] = $link['label'] ?? strip_tags($link['rawHtml'] ?? '');
             }
         }
 

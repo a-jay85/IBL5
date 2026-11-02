@@ -58,8 +58,8 @@ chmod +x "$BINSTUB/gh" "$BINSTUB/discord-dm" "$BINSTUB/claude" "$BINSTUB/gate"
 USAGE_DIR="$T/usage-state"
 seed_usage() {  # <utilization pct>
   mkdir -p "$USAGE_DIR/markers"
-  printf '{"five_hour":{"utilization":%s},"seven_day":{"utilization":%s},"fetched_at":%s}\n' \
-    "$1" "$1" "$(date +%s)" > "$USAGE_DIR/cache.json"
+  printf '{"five_hour":null,"seven_day":{"utilization":%s},"fetched_at":%s}\n' \
+    "$1" "$(date +%s)" > "$USAGE_DIR/cache.json"
 }
 seed_usage 1
 export IBL5_USAGE_GATE_STATE_DIR="$USAGE_DIR"

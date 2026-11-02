@@ -1542,7 +1542,6 @@ paused_resume_text() {
     fi
     case "$resets" in ''|*[!0-9]*) ;; *) est=$(( resets + 60 )) ;; esac
     case "$window" in
-        five_hour) when='5h reset' ;;
         seven_day) when='weekly reset' ;;
         *)         when='reset' ;;
     esac

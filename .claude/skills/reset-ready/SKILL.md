@@ -1,7 +1,7 @@
 ---
 name: reset-ready
 description: "Refill the headless pipeline before a usage reset or when automouse runs dry: scout pipeline logs and stale docs, open PRs, prod logs, slow queries, Lighthouse a11y scores, code health (PHPStan baseline, mutation, orphan CSS), unshipped plans and branches, GM bug reports and #dev alerts on Discord, master CI failures and green-run warnings, deferred PR follow-ups, dangling doc pointers, session tool errors, ungated bug classes and parked picks whose blocker merged in parallel, plus weekly data-integrity, dead-code and slow-test sweeps, prefer chore, fix, refactor, test and docs picks over feat, fire each pick through bin/plan-now, and confirm automouse, the burndown loop and the usage-gate coordinator will restart after each limit reset."
-last_verified: 2026-10-22
+last_verified: 2026-11-01
 ---
 
 # /reset-ready
@@ -47,8 +47,8 @@ bin/burndown-loop status
 launchctl list | grep -E 'automouse|usage-gate-coordinator'
 ```
 
-Read plan usage from the UserPromptSubmit hook line (5-hour and weekly percent, reset
-times). When weekly use is at 95% or more and the reset is over 6 hours away, plan fewer
+Read plan usage from the UserPromptSubmit hook line (weekly percent and reset
+time). When weekly use is at 95% or more and the reset is over 6 hours away, plan fewer
 items. Each plan-now run plus its automouse implementation costs real budget.
 
 ## Step 2: Build the dedupe context
@@ -183,8 +183,8 @@ security plan goes to the report for the user instead.
 ## Step 6: Keep the runners alive across resets
 
 - **Automouse.** The daily 3 AM launchd job runs it once. For the hours between now and
-  the weekly reset, schedule one-shots about 5 hours apart, the first a few minutes after
-  the next 5-hour reset: `bin/automouse/run schedule "YYYY-MM-DD HH:MM"`. Check
+  the weekly reset, schedule one-shots about 5 hours apart, the first a few minutes from
+  now: `bin/automouse/run schedule "YYYY-MM-DD HH:MM"`. Check
   `launchctl list | grep automouse-oneshot` first and skip times already covered.
 - **Burndown loop.** When `bin/burndown-loop status` shows it stopped, or stuck on a
   paused marker, run `bin/burndown-loop stop` then `bin/burndown-loop start`.

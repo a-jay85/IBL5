@@ -249,6 +249,18 @@ def thread_context(threads) -> str:
     return "\n\n".join(parts)
 
 
+def thread_rows(rows) -> tuple:
+    """Open review-thread rows (prf_review_threads shape) -> the dicts `CloserContext.threads`
+    carries. Resolved threads and threads with no root comment id are dropped."""
+    out = []
+    for r in rows or ():
+        if not isinstance(r, dict) or r.get("isResolved") or r.get("commentId") is None:
+            continue
+        out.append({"comment_id": r.get("commentId"), "path": r.get("path") or "",
+                    "line": r.get("line") or "", "body": r.get("body") or ""})
+    return tuple(out)
+
+
 def build_prompt(ctx: CloserContext) -> str:
     forbidden = "\n".join(f"- {p}" for p in fidelity.LOCAL_GATE_PATH_PREFIXES)
     blocked = "\n".join(f"- ({n}) {name}: {reason}" for n, name, reason in ctx.blocked) \

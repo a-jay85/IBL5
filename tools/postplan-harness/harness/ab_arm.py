@@ -113,3 +113,52 @@ def _assign_locked(key: str, pr: int | None, path: str, log, now) -> ArmAssignme
     enrolled[key] = {"arm": arm, "pr": pr, "enrolled_at": now()}
     _write_atomic(path, data)
     return ArmAssignment(arm, "new-enrollment")
+
+
+MAX_CLOSER_SESSIONS = 3
+
+
+def _locked_update(state_dir: str, fn) -> int:
+    """Run `fn(data)` on the enrollment data under the shared lock; returns its int result.
+    Any OS or shape problem returns 0 (a counter that cannot be read counts as zero)."""
+    path = enrollment_path(state_dir)
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(os.path.join(state_dir, LOCK_BASENAME), "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                if not os.path.exists(path):
+                    return 0
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if not isinstance(data, dict) or data.get("v") != SCHEMA_VERSION \
+                        or not isinstance(data.get("enrolled"), dict):
+                    return 0
+                return fn(data, path)
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+    except (OSError, ValueError):
+        return 0
+
+
+def closer_sessions(state_dir: str, slug: str) -> int:
+    """Closer sessions already spent on this PR (0 for an unenrolled slug)."""
+    entry = read_enrollment(state_dir).get(safe_slug(slug))
+    n = entry.get("closer_sessions", 0) if isinstance(entry, dict) else 0
+    return n if isinstance(n, int) and n > 0 else 0
+
+
+def record_closer_session(state_dir: str, slug: str) -> int:
+    """Count one more closer session for an enrolled slug. Returns the new count, or 0
+    for a slug with no enrollment entry (an env-forced run enrolls nothing)."""
+    key = safe_slug(slug)
+
+    def bump(data, path):
+        entry = data["enrolled"].get(key)
+        if not isinstance(entry, dict):
+            return 0
+        n = entry.get("closer_sessions", 0)
+        entry["closer_sessions"] = (n if isinstance(n, int) and n > 0 else 0) + 1
+        _write_atomic(path, data)
+        return entry["closer_sessions"]
+    return _locked_update(state_dir, bump)

@@ -68,7 +68,7 @@ def test_fold_rows_per_pr():
     assert rec["cost_usd"] == 2.5
     assert rec["first_start"] == _ts("2026-10-20T10:00:00Z")
     assert rec["pr"] == 102
-    assert rec["last_terminal"] == "armed"
+    assert rec["last_terminal"] == "shipped-armed"
     assert len(rec["windows"]) == 3
     assert rec["windows"][0] == (_ts("2026-10-20T10:00:00Z"), _ts("2026-10-20T10:22:00Z"))
 
@@ -149,7 +149,7 @@ def test_armed_without_human_requires_last_row_armed():
     result = _readout(fetch_pr=fetch)
     assert _rec(result, "c-two")["human_touches"] == 0
     assert _rec(result, "c-two")["armed_without_human"] is True
-    # c-three never merges in the fixture. Give it a merge: last row is "held".
+    # c-three never merges in the fixture. Give it a merge: last row is "shipped-held".
     MERGED[103] = "2026-10-22T20:00:00Z"
     try:
         held = _readout(fetch_pr=fetch)

@@ -19,6 +19,7 @@ import subprocess
 import sys
 
 from harness import ab_arm
+from harness.state import TerminalState
 
 REPO = "a-jay85/IBL5"
 WINDOW_PAD_S = 120
@@ -155,7 +156,7 @@ def enrich(rec: dict, *, fetch_pr, git_log, now: dt.datetime) -> dict:
     if rec["first_start"]:
         rec["time_to_merge_h"] = round(
             (merged_at - rec["first_start"]).total_seconds() / 3600, 3)
-    rec["armed_without_human"] = (rec["last_terminal"] == "armed"
+    rec["armed_without_human"] = (rec["last_terminal"] == TerminalState.SHIPPED_ARMED.value
                                   and rec["human_touches"] == 0)
     until = merged_at + dt.timedelta(days=REVERT_DAYS)
     needles = [((data.get("mergeCommit") or {}).get("oid") or ""),

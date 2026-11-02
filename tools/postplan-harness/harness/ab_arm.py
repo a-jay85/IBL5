@@ -141,27 +141,64 @@ def _locked_update(state_dir: str, fn) -> int:
         return 0
 
 
+SESSIONS_BASENAME = "ab-closer-sessions.json"
+
+
+def _sessions_path(state_dir: str) -> str:
+    return os.path.join(state_dir, SESSIONS_BASENAME)
+
+
+def _read_sessions(state_dir: str) -> dict:
+    try:
+        with open(_sessions_path(state_dir), encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def closer_sessions(state_dir: str, slug: str) -> int:
-    """Closer sessions already spent on this PR (0 for an unenrolled slug)."""
-    entry = read_enrollment(state_dir).get(safe_slug(slug))
-    n = entry.get("closer_sessions", 0) if isinstance(entry, dict) else 0
+    """Closer sessions already spent on this PR. An enrolled slug counts in its enrollment
+    entry; an env-forced (unenrolled) slug counts in the per-slug sessions file."""
+    key = safe_slug(slug)
+    entry = read_enrollment(state_dir).get(key)
+    if isinstance(entry, dict):
+        n = entry.get("closer_sessions", 0)
+    else:
+        n = _read_sessions(state_dir).get(key, 0)
     return n if isinstance(n, int) and n > 0 else 0
 
 
 def record_closer_session(state_dir: str, slug: str) -> int:
-    """Count one more closer session for an enrolled slug. Returns the new count, or 0
-    for a slug with no enrollment entry (an env-forced run enrolls nothing)."""
+    """Count one more closer session. Returns the new count (0 when state is unwritable)."""
     key = safe_slug(slug)
 
     def bump(data, path):
         entry = data["enrolled"].get(key)
         if not isinstance(entry, dict):
-            return 0
+            return -1
         n = entry.get("closer_sessions", 0)
         entry["closer_sessions"] = (n if isinstance(n, int) and n > 0 else 0) + 1
         _write_atomic(path, data)
         return entry["closer_sessions"]
-    return _locked_update(state_dir, bump)
+    n = _locked_update(state_dir, bump)
+    if n != -1 and not (n == 0 and not os.path.exists(enrollment_path(state_dir))):
+        return n
+    # No enrollment entry (env-forced run): count in the per-slug sessions file.
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(os.path.join(state_dir, LOCK_BASENAME), "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                data = _read_sessions(state_dir)
+                cur = data.get(key, 0)
+                data[key] = (cur if isinstance(cur, int) and cur > 0 else 0) + 1
+                _write_atomic(_sessions_path(state_dir), data)
+                return data[key]
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
+    except OSError:
+        return 0
 
 
 OUTCOME_BASENAME = "ab-outcomes.jsonl"

@@ -220,3 +220,12 @@ def test_closer_not_run_on_hard_only_hold(monkeypatch, tmp_path):
     assert res.closer["ran"] is False
     assert res.closer["reason"].startswith("hard-only:")
     assert _merge_count(out) == 0
+
+
+def test_closer_not_run_on_hard_only_or_armed(monkeypatch, tmp_path):
+    """Plan-named umbrella: neither an armed run nor a hard-only hold starts a session."""
+    for name, fn in (("armed", test_closer_not_run_on_armed),
+                     ("hard", test_closer_not_run_on_hard_only_hold)):
+        sub = tmp_path / name
+        sub.mkdir()
+        fn(monkeypatch, sub)

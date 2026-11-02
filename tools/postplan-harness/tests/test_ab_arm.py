@@ -115,3 +115,12 @@ def test_concurrent_assign_never_exceeds_cap(tmp_path):
     assert sources.count("new-enrollment") == 1
     assert sources.count("cap-reached") == 3
     assert len(_enroll_file(tmp_path)["enrolled"]) == ENROLL_CAP
+
+
+def test_forced_run_session_cap_counts_without_enrollment(tmp_path):
+    from harness import ab_arm
+    d = str(tmp_path)
+    assert ab_arm.closer_sessions(d, "forced-slug") == 0
+    for i in range(1, ab_arm.MAX_CLOSER_SESSIONS + 1):
+        assert ab_arm.record_closer_session(d, "forced-slug") == i
+    assert ab_arm.closer_sessions(d, "forced-slug") == ab_arm.MAX_CLOSER_SESSIONS

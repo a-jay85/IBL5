@@ -1545,8 +1545,8 @@ EOF
 }
 
 # _your_turn_lines — print the your-turn.txt rows under typed group headers, linked via gh pr list.
-# Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Awaiting
-# feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
+# Groups, in order, empty ones omitted: Conflicts holds DIRTY and NOT-MERGEABLE rows, Open review
+# threads the OPEN-THREAD rows (file group 5, printed second), Awaiting feat sign-off its namesake bucket, Failed the BLOCKED-CHECK rows, Other held everything else
 # (unknown buckets included).
 # Each header carries the group's full row count even when the cap truncates the rows shown.
 # Called only from inside the DM block; never sets HALT, never returns non-zero.
@@ -1563,11 +1563,11 @@ _your_turn_lines() {
     [ "$_yl_rc" -ne 0 ] && : > "$RUNDIR/prlist.tsv"
 
     rm -f "$RUNDIR/yt-computing.txt"
-    rm -f "$RUNDIR"/yt-g[1-4].txt
+    rm -f "$RUNDIR"/yt-g[1-5].txt
     awk -F'\t' -v d="$RUNDIR" 'NF {
         b = $2; a = $3; sub(/ +$/, "", a)
         if (b == "NOT-MERGEABLE" && a == "re-check (state unknown)") { print > (d "/yt-computing.txt"); next }
-        g = (b == "DIRTY" || b == "NOT-MERGEABLE" || b == "OPEN-THREAD") ? 1 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
+        g = (b == "DIRTY" || b == "NOT-MERGEABLE") ? 1 : (b == "OPEN-THREAD") ? 5 : (b == "FEAT-AWAITING-SIGNOFF") ? 2 : (b == "BLOCKED-CHECK") ? 3 : 4
         print > (d "/yt-g" g ".txt") }' "$RUNDIR/your-turn.txt" || true
 
     _yt_total="$(wc -l < "$RUNDIR/your-turn.txt" | tr -d ' ')"
@@ -1582,10 +1582,11 @@ _your_turn_lines() {
         _yt_running=$((_yt_running + ${#_yc_line} + 1))
         _yt_shown=$((_yt_shown + _yc_n))
     fi
-    for _yg in 1 2 3 4; do
+    for _yg in 1 5 2 3 4; do
         [ -s "$RUNDIR/yt-g$_yg.txt" ] || continue
         case "$_yg" in
             1) _ygt="Conflicts" ;;
+            5) _ygt="Open review threads" ;;
             2) _ygt="Awaiting feat sign-off" ;;
             3) _ygt="Failed" ;;
             *) _ygt="Other held" ;;

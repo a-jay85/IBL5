@@ -1755,7 +1755,7 @@ g_no_bucket_cond() {
     # grouping awk is the second exempt span: it sorts rows into display groups and decides
     # nothing about arming (it starts at the yt-g cleanup line and ends at its print redirect).
     ! noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-5\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} {print}' \
         | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z_]HELD[^-A-Z_]'
 }
 # Sibling of g_no_bucket_cond: both of its awk skip spans must open AND close. If the closing
@@ -1763,7 +1763,7 @@ g_no_bucket_cond() {
 # EOF and g_no_bucket_cond silently stops checking the rest of the file.
 g_bucket_spans_close() {
     noncomment "$1" \
-        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-4\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
+        | awk '/^_bucket_emoji\(\)[[:space:]]*\{/{skip=1; next} skip && /^\}[[:space:]]*$/{skip=0; next} skip{next} /rm -f .*yt-g\[1-5\]/{gskip=1; next} gskip && /print > \(d "\/yt-g"/{gskip=0; next} gskip{next} END{exit (skip || gskip) ? 1 : 0}'
 }
 # The only sleep bin/pr-cycle may contain sits between the two unknown-warmup markers.
 g_no_sleep() {

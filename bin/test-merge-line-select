@@ -329,6 +329,69 @@ assert_match "L6-running-summary-wording running" \
     'Skipped #1: post-plan run in progress \(post-plan-running label\)' "$L6_SUMMARY"
 assert_absent "L6-running-summary-wording no conflict" 'merge conflict' "$L6_SUMMARY"
 
+# --- H: hotfix label sorts first ---
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)")"
+assert_match "H1-hotfix-jumps-line head" '^head=2$' "$OUT"
+assert_match "H1-hotfix-jumps-line action" '^action=update$' "$OUT"
+assert_match "H1-hotfix-jumps-line clear" '^clear=2 1$' "$OUT"
+assert_absent "H1-hotfix-jumps-line not head 1" '^head=1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 5 false master "$T7" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(labeled "$(pr_node 6 false master "$T6" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H2-hotfix-fifo-between head" '^head=6$' "$OUT"
+assert_match "H2-hotfix-fifo-between clear" '^clear=6 5 1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$RUN_RED")" hotfix)" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H3-red-hotfix-skipped head" '^head=2$' "$OUT"
+assert_match "H3-red-hotfix-skipped skipped" '^skipped=1:red$' "$OUT"
+assert_match "H3-red-hotfix-skipped clear" '^clear=2 3$' "$OUT"
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$RUN_RED")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H3-red-hotfix-skipped falls to arm order" '^head=3$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" DIRTY CONFLICTING "$NOCTX")" hotfix)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H4-dirty-hotfix-skipped head" '^head=3$' "$OUT"
+assert_match "H4-dirty-hotfix-skipped skipped" '^skipped=1:dirty$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$NOCTX")" \
+    "$(pr_node 3 false master "$T7" BEHIND MERGEABLE "$NOCTX" | jq -c '. + {labels: null}')" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix)")"
+assert_eq "H5-unlabeled-reads-non-hotfix exit" "$RC" "0"
+assert_match "H5-unlabeled-reads-non-hotfix head" '^head=2$' "$OUT"
+assert_match "H5-unlabeled-reads-non-hotfix clear" '^clear=2 1 3$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master null BEHIND MERGEABLE "$NOCTX")" hotfix)" \
+    "$(pr_node 2 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H6-unarmed-hotfix-out-of-line queue_len" '^queue_len=1$' "$OUT"
+assert_match "H6-unarmed-hotfix-out-of-line head" '^head=2$' "$OUT"
+assert_absent "H6-unarmed-hotfix-out-of-line not head 1" '^head=1$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$NOCTX")" hotfix post-plan-running)" \
+    "$(pr_node 2 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H7-running-hotfix-skipped head" '^head=2$' "$OUT"
+assert_match "H7-running-hotfix-skipped skipped" '^skipped=1:running$' "$OUT"
+
+run_sel "$(snapshot \
+    "$(labeled "$(pr_node 1 false master "$T7" BEHIND MERGEABLE "$NOCTX")" HOTFIX)" \
+    "$(labeled "$(pr_node 2 false master "$T8" BEHIND MERGEABLE "$NOCTX")" hotfix-candidate)" \
+    "$(pr_node 3 false master "$T6" BEHIND MERGEABLE "$NOCTX")")"
+assert_match "H8-near-miss-label head" '^head=3$' "$OUT"
+assert_match "H8-near-miss-label clear" '^clear=3 1 2$' "$OUT"
+
 # --- L: --list and --summary ---
 
 run_sel "$C5_SNAP" --list
@@ -744,6 +807,57 @@ if grep -qE 'running\)' <<< "$W4_BLOCK" && grep -qF '::notice::' <<< "$W4_ARM" \
 else
     failcase "W4-notice-running-arm — arm missing or malformed in the notice step"
 fi
+
+# W6: the hotfix dispatch path. Own concurrency group, bot wait kept, coalesce sleep skipped.
+W6_WF="${W6_WF:-$UPDATE_WF}"
+W6_GROUP=$(grep -cE "^  group: update-behind-prs.*'-dryrun'.*'-pr'.*inputs\.hotfix == true && '-hotfix'" "$W6_WF" || true)
+W6_INPUT=$(awk '/^      hotfix:/{f=1} f&&/type:/{print; exit}' "$W6_WF")
+W6_COALESCE=$(awk '/- name: Coalesce a burst of master merges/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
+W6_BOTWAIT=$(awk '/- name: Wait for master CI that can push a bot commit/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
+W6_ATTEMPTS=$(count_lines '[ "$HOTFIX" = "true" ]; then UNKNOWN_ATTEMPTS=20' "$W6_WF")
+if [ "$W6_GROUP" = 1 ] && grep -qF 'type: boolean' <<< "$W6_INPUT" \
+    && [ "$W6_COALESCE" = "        if: github.event_name == 'push'" ] \
+    && [ "$W6_BOTWAIT" = "        if: github.event_name == 'push' || inputs.hotfix == true" ] \
+    && [ "$W6_ATTEMPTS" = 1 ]; then
+    pass "W6-hotfix-dispatch-path"
+else
+    failcase "W6-hotfix-dispatch-path — group=$W6_GROUP input=[$W6_INPUT] coalesce=[$W6_COALESCE] botwait=[$W6_BOTWAIT] attempts=$W6_ATTEMPTS"
+fi
+# W7: hotfix-dispatch.yml is a pull_request_target workflow with a write token. Pin the
+# defence: no checkout or uses:, actions: write is the only permission, no ${{ }} in run:,
+# label and armed state compared in if:, and the only command is the dispatch.
+DISPATCH_WF="${DISPATCH_WF:-$REPO_ROOT/.github/workflows/hotfix-dispatch.yml}"
+W7_USES=$(grep -cE '^[[:space:]]*(-[[:space:]]*)?uses:' "$DISPATCH_WF" || true)
+W7_PERMKEYS=$(grep -cE '^[[:space:]]*permissions:' "$DISPATCH_WF" || true)
+W7_PERMS=$(awk '/^permissions:/{f=1;next} f&&/^[^[:space:]#]/{f=0} f&&/^[[:space:]]+[a-z-]+:/{sub(/[[:space:]]*#.*$/,""); print}' "$DISPATCH_WF")
+W7_RUNS=$(grep -cE '^[[:space:]]+run:' "$DISPATCH_WF" || true)
+W7_RUNEXPR=$(grep -cE '^[[:space:]]+run:.*(\$\{\{|[|>][[:space:]]*$)' "$DISPATCH_WF" || true)
+W7_CMD=$(count_lines 'run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true' "$DISPATCH_WF")
+W7_TRIGGER=$(count_lines 'types: [labeled, auto_merge_enabled]' "$DISPATCH_WF")
+W7_PLAINPR=$(grep -cE '^[[:space:]]+pull_request:' "$DISPATCH_WF" || true)
+W7_LABEL=$(count_lines "github.event.label.name == 'hotfix'" "$DISPATCH_WF")
+W7_ARMED=$(count_lines 'github.event.pull_request.auto_merge != null' "$DISPATCH_WF")
+W7_ARMEVT=$(count_lines "contains(github.event.pull_request.labels.*.name, 'hotfix')" "$DISPATCH_WF")
+W7_HEAD=$(grep -cE 'head\.(sha|ref|repo)|github\.head_ref' "$DISPATCH_WF" || true)
+if [ "$W7_USES" = 0 ] && [ "$W7_PERMKEYS" = 1 ] && [ "$W7_PERMS" = "  actions: write" ] \
+    && [ "$W7_RUNS" = 1 ] && [ "$W7_RUNEXPR" = 0 ] && [ "$W7_CMD" = 1 ] \
+    && [ "$W7_TRIGGER" = 1 ] && [ "$W7_PLAINPR" = 0 ] && [ "$W7_LABEL" = 1 ] \
+    && [ "$W7_ARMED" = 1 ] && [ "$W7_ARMEVT" = 1 ] && [ "$W7_HEAD" = 0 ]; then
+    pass "W7-hotfix-dispatcher-defence"
+else
+    failcase "W7-hotfix-dispatcher-defence — uses=$W7_USES permkeys=$W7_PERMKEYS perms=[$W7_PERMS] runs=$W7_RUNS runexpr=$W7_RUNEXPR cmd=$W7_CMD trigger=$W7_TRIGGER plainpr=$W7_PLAINPR label=$W7_LABEL armed=$W7_ARMED armevt=$W7_ARMEVT head=$W7_HEAD"
+fi
+
+# W8: a hotfix (or any unrelated) label event never cancels an in-flight labeled run.
+MUTATION_WF="${MUTATION_WF:-$REPO_ROOT/.github/workflows/mutation.yml}"
+W8_MUT=$(count_lines "github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id)" "$MUTATION_WF")
+W8_MUTIF=$(count_lines "github.event.label.name == 'mutation-test')" "$MUTATION_WF")
+if [ "$W8_MUT" = 1 ] && [ "$W8_MUTIF" = 2 ]; then
+    pass "W8-label-events-own-group"
+else
+    failcase "W8-label-events-own-group — mutation=$W8_MUT mutation-job-ifs=$W8_MUTIF"
+fi
+
 
 W5_LABELS=$(count_lines 'labels(first:20) { nodes { name } }' "$SEL")
 if [ "$W5_LABELS" = 1 ]; then

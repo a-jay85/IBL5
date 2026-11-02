@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from .. import followcap, netretry
-from ..labels import render_body, visible_right_lines
+from ..labels import LABEL_IMPORTANT, marker, render_body, visible_right_lines
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -78,7 +78,8 @@ def _summary_lines(fs: list) -> list[str]:
             line += f" (bug class: `{f.bug_class}`)"
         if f.other_instances:
             line += " other instances: " + ", ".join(f"`{x}`" for x in f.other_instances)
-        out.append(line + f" — {f.body}\n\n<!-- score: {f.score} -->")
+        out.append(line + f" — {f.body}\n\n{marker(f.label or LABEL_IMPORTANT)}\n"
+                   f"<!-- score: {f.score} -->")
     return out
 
 

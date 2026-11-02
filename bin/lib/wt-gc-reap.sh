@@ -14,7 +14,14 @@
 #   - every predicate that gates a delete is re-proven at reap time and KEEPS
 #     on any probe error (.claude/rules/shell-fail-open-probe.md);
 #   - every branch/ref delete is preceded by a verified tips-file line and
-#     done with `git update-ref -d <ref> <sha>` (compare-and-delete).
+#     done with `git update-ref -d <ref> <sha>` (compare-and-delete);
+#   - the refs, stash, dirty-merged, detached and closed steps write a
+#     keep-ref under refs/wt-gc-archive/ (git gc cannot collect it) before
+#     each delete; a failed archive write keeps the item. The container step
+#     archives a JSON file in the tips dir instead. The empty-worktree reap
+#     (tip already in master) also writes a heads/<branch> keep-ref via
+#     the tips record; the tmp-pack reap, the docker image and builder
+#     prunes, and prune_archives itself write no archive.
 
 # _gc_do <argv...> — single choke point for every destructive command.
 _gc_do() {
@@ -69,17 +76,110 @@ _gc_valid_days() {
     return 0
 }
 
-# _gc_tips_record <sha> <ref> — append "<sha> <ref>" to the dated tips file
-# and re-read it. Returns 1 if the mkdir, the append or the re-read fails;
-# callers never delete when it does.
+# _gc_archive_stamp — sets GC_ARCHIVE_STAMP once per tick. WT_GC_ARCHIVE_STAMP
+# (test seam) pins it; unset or empty means now.
+_gc_archive_stamp() {
+    [ -z "${GC_ARCHIVE_STAMP:-}" ] || return 0
+    if [ -n "${WT_GC_ARCHIVE_STAMP:-}" ]; then
+        if [[ ! "$WT_GC_ARCHIVE_STAMP" =~ ^[0-9]+$ ]]; then
+            log "invalid WT_GC_ARCHIVE_STAMP '$WT_GC_ARCHIVE_STAMP' — archive refused (fail-closed)"
+            return 1
+        fi
+        GC_ARCHIVE_STAMP="$WT_GC_ARCHIVE_STAMP"
+    else
+        GC_ARCHIVE_STAMP="$(date +%s)"
+    fi
+    return 0
+}
+
+# _gc_tips_record <sha> <ref> — write a gc-proof keep-ref
+# refs/wt-gc-archive/<stamp>/<ref minus refs/>, then append "<sha> <ref>" to
+# the dated tips file and re-read it. Returns 1 if the keep-ref, the mkdir,
+# the append or the re-read fails; callers never delete when it does.
 _gc_tips_record() {
-    local sha="$1" ref="$2" file
-    if [ "${DRY_RUN:-0}" = 1 ]; then return 0; fi
+    local sha="$1" ref="$2" file aref
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        log "DRY-RUN would: archive $sha as refs/wt-gc-archive/<stamp>/${ref#refs/}"
+        return 0
+    fi
+    _gc_archive_stamp || return 1
+    aref="refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/}"
+    if ! git -C "$WT_GC_REPO_ROOT" update-ref "$aref" "$sha" "" 2>/dev/null; then
+        if [ "$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "$aref" 2>/dev/null)" != "$sha" ]; then
+            log "archive failed $ref -> $aref"
+            return 1
+        fi
+    fi
     file="$WT_GC_TIPS_DIR/tips-$(date +%F).txt"
     mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null || return 1
     printf '%s %s\n' "$sha" "$ref" >> "$file" 2>/dev/null || return 1
     grep -qxF -- "$sha $ref" "$file" 2>/dev/null || return 1
     return 0
+}
+
+# _gc_archive_batch <doomed> — keep-refs for a "<sha> <ref>" list in one
+# update-ref transaction, then the tips lines. Returns 1 on any failure and the
+# transaction leaves no keep-ref behind.
+_gc_archive_batch() {
+    local doomed="$1" sha ref n=0 batch="" file
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] && n=$((n + 1))
+        done <<< "$doomed"
+        log "DRY-RUN would: archive $n refs"
+        return 0
+    fi
+    _gc_archive_stamp || return 1
+    while IFS=' ' read -r sha ref; do
+        [ -n "$ref" ] || continue
+        batch="${batch}create refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/} $sha"$'\n'
+    done <<< "$doomed"
+    [ -n "$batch" ] || return 0
+    if ! git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "${batch%$'\n'}" 2>/dev/null; then
+        log "archive failed (batch) — no refs deleted"
+        return 1
+    fi
+    file="$WT_GC_TIPS_DIR/tips-$(date +%F).txt"
+    if mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null; then
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] || continue
+            printf '%s %s\n' "$sha" "$ref" >> "$file" 2>/dev/null || { n=1; break; }
+            grep -qxF -- "$sha $ref" "$file" 2>/dev/null || { n=1; break; }
+        done <<< "$doomed"
+    else
+        n=1
+    fi
+    if [ "$n" = 1 ]; then
+        # The tips index failed: take the keep-refs back so nothing is half-written.
+        local undo=""
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] || continue
+            undo="${undo}delete refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/} $sha"$'\n'
+        done <<< "$doomed"
+        git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "${undo%$'\n'}" >/dev/null 2>&1 || true
+        return 1
+    fi
+    return 0
+}
+
+# _gc_snapshot_dirt <wt> <tip> <label> — prints a commit sha whose tree is the
+# worktree's full content (tracked edits + untracked, non-ignored files) and
+# whose parent is <tip>. Dry-run prints <tip> and writes no object.
+_gc_snapshot_dirt() {
+    local wt="$1" tip="$2" label="$3" idx tree snap
+    if [ "${DRY_RUN:-0}" = 1 ]; then printf '%s\n' "$tip"; return 0; fi
+    idx="$(mktemp "${TMPDIR:-/tmp}/wt-gc-idx.XXXXXX")" || return 1
+    rm -f "$idx"
+    if ! GIT_INDEX_FILE="$idx" git -C "$wt" read-tree "$tip" 2>/dev/null; then rm -f "$idx"; return 1; fi
+    if ! GIT_INDEX_FILE="$idx" git -C "$wt" add -A -- . >/dev/null 2>&1; then rm -f "$idx"; return 1; fi
+    if ! tree="$(GIT_INDEX_FILE="$idx" git -C "$wt" write-tree 2>/dev/null)"; then rm -f "$idx"; return 1; fi
+    if ! snap="$(git -C "$wt" -c user.name=wt-gc -c user.email=wt-gc@localhost \
+            commit-tree "$tree" -p "$tip" -m "wt-gc archive: $label" 2>/dev/null)"; then
+        rm -f "$idx"; return 1
+    fi
+    rm -f "$idx"
+    [[ "$snap" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\n' "$snap"
 }
 
 # _gc_protected_name <refname> — 0 (deny) for refs no step may ever delete.
@@ -192,8 +292,13 @@ with open(sys.argv[1]) as fh:
 # branch tip's commit time and the worktree dir mtime. Prints nothing and
 # returns 1 when either source fails.
 _gc_wt_age_days() {
-    local wt="$1" branch="$2" ct mt newest
-    ct="$(git -C "$WT_GC_REPO_ROOT" log -1 --format=%ct "refs/heads/$branch" 2>/dev/null)" || return 1
+    _gc_rev_age_days "$1" "refs/heads/$2"
+}
+
+# _gc_rev_age_days <wt_path> <rev> — as _gc_wt_age_days, for any rev.
+_gc_rev_age_days() {
+    local wt="$1" rev="$2" ct mt newest
+    ct="$(git -C "$WT_GC_REPO_ROOT" log -1 --format=%ct "$rev" 2>/dev/null)" || return 1
     case "$ct" in ''|*[!0-9]*) return 1 ;; esac
     mt="$(_gc_mtime "$wt")" || return 1
     case "$mt" in ''|*[!0-9]*) return 1 ;; esac
@@ -299,6 +404,7 @@ _gc_reap_empty_one() {
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────
 # Candidates: MERGED rows that bin/cleanup skipped as dirty this sweep.
 reap_dirty_merged_worktrees() {
+    if [ "${WT_GC_REAP_DIRTY_ARCHIVE:-1}" != 0 ]; then _gc_valid_days WT_GC_DIRTY_ARCHIVE_DAYS || return 1; fi
     log "step dirty-merged"
     local names parent name rc=0
     names="$(awk '$1=="MERGED" {print $2}' "$TMP_STATUS")"
@@ -320,8 +426,89 @@ reap_dirty_merged_worktrees() {
     return "$rc"
 }
 
+# _gc_dirt_identical <wt> — compare every dirty path with origin/master. Logs
+# nothing. Sets GC_DIRT_REASON (the text after "dirty keep <name>: ") and
+# GC_DIRT_PATHS. 0 = every path byte-identical to master; 1 = a content
+# difference (archivable); 2 = a structural keep (never archived and reaped).
+_gc_dirt_identical() {
+    local wt="$1" porcelain line xy p n=0 drc=0
+    GC_DIRT_REASON=""
+    GC_DIRT_PATHS=0
+    if ! porcelain="$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)"; then
+        GC_DIRT_REASON="status error"; return 2
+    fi
+    while IFS= read -r line <&4; do
+        [ -n "$line" ] || continue
+        xy="${line:0:2}"
+        p="${line:3}"
+        case "$xy" in *R*|*C*|*U*|*T*) GC_DIRT_REASON="path $p rename/copy/conflict/type"; return 2 ;; esac
+        case "$p" in '"'*) GC_DIRT_REASON="quoted path"; return 2 ;; esac
+        if [ -L "$wt/$p" ]; then GC_DIRT_REASON="path $p is a symlink"; return 2; fi
+        case "$(git -C "$wt" ls-files -s -- "$p" 2>/dev/null)" in
+            160000*) GC_DIRT_REASON="path $p is a submodule"; return 2 ;;
+        esac
+        case "$xy" in
+            '??'|' M'|'M '|'A ')
+                if ! git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p absent on master"
+                    drc=1
+                elif ! git -C "$wt" show "origin/master:$p" 2>/dev/null | cmp -s - "$wt/$p"; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p differs"
+                    drc=1
+                fi ;;
+            ' D'|'D ')
+                if git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p deleted but present on master"
+                    drc=1
+                fi ;;
+            *) GC_DIRT_REASON="path $p status $xy"; return 2 ;;
+        esac
+        n=$((n + 1))
+    done 4<<< "$porcelain"
+    GC_DIRT_PATHS="$n"
+    return "$drc"
+}
+
+# _gc_merge_proven <tip> <pr_oid> — 0 = every local commit reached master,
+# 1 = not proven (GC_PROOF_REASON set), 2 = probe error. Proven when the tip is
+# the PR head or an ancestor of it, or every path the branch changed matches
+# origin/master byte for byte.
+_gc_merge_proven() {
+    local tip="$1" oid="$2" base paths p a b rc
+    GC_PROOF_REASON=""
+    [ "$tip" = "$oid" ] && return 0
+    if [ -n "$oid" ] && git -C "$WT_GC_REPO_ROOT" cat-file -e "$oid^{commit}" 2>/dev/null; then
+        rc=0
+        git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$tip" "$oid" 2>/dev/null || rc=$?
+        case "$rc" in
+            0) return 0 ;;
+            1) ;;
+            *) return 2 ;;
+        esac
+    fi
+    base="$(git -C "$WT_GC_REPO_ROOT" merge-base origin/master "$tip" 2>/dev/null)" || return 2
+    # A temp file, not a variable: command substitution drops the NUL separators.
+    paths="$(mktemp "${TMPDIR:-/tmp}/wt-gc-paths.XXXXXX")" || return 2
+    if ! git -C "$WT_GC_REPO_ROOT" diff --name-only -z --no-renames "$base" "$tip" > "$paths" 2>/dev/null; then
+        rm -f "$paths"; return 2
+    fi
+    rc=0
+    while IFS= read -r -d '' p <&5; do
+        if ! a="$(git -C "$WT_GC_REPO_ROOT" ls-tree "$tip" -- "$p" 2>/dev/null)" \
+            || ! b="$(git -C "$WT_GC_REPO_ROOT" ls-tree origin/master -- "$p" 2>/dev/null)"; then
+            rc=2; break
+        fi
+        if [ "$a" != "$b" ]; then
+            GC_PROOF_REASON="path $p not in master"
+            rc=1; break
+        fi
+    done 5< "$paths"
+    rm -f "$paths"
+    return "$rc"
+}
+
 _gc_reap_dirty_one() {
-    local name="$1" wt="$2" branch tip porcelain line xy p n=0
+    local name="$1" wt="$2" branch tip drc=0 prc now merged days snap
     _gc_wt_guard dirty "$name" "$wt" || return 0
     branch="$GC_BRANCH"
     if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
@@ -332,67 +519,392 @@ _gc_reap_dirty_one() {
         return 1
     fi
     GH_CMD="$WT_GC_GH" pr_info "$branch" "$wt" || true
-    if [ "${PR_STATE:-}" != MERGED ] || [ -z "${PR_OID:-}" ] || [ "$PR_OID" != "$tip" ]; then
+    if [ "${PR_STATE:-}" != MERGED ]; then
         log "dirty keep $name: merge not proven (state=${PR_STATE:-?} oid=${PR_OID:-?})"
         return 0
     fi
-    if ! porcelain="$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)"; then
-        log "dirty keep $name: status error"; return 0
+    _gc_dirt_identical "$wt" || drc=$?
+    if [ "${PR_OID:-}" = "$tip" ] && [ "$drc" = 0 ]; then
+        _gc_remove_wt_and_branch dirty "$name" "$branch" "$tip" || return 1
+        [ "$GC_REMOVED" = 1 ] || return 0
+        log "dirty reaped $name paths=$GC_DIRT_PATHS"
+        return 0
     fi
-    while IFS= read -r line <&3; do
-        [ -n "$line" ] || continue
-        xy="${line:0:2}"
-        p="${line:3}"
-        case "$xy" in *R*|*C*|*U*|*T*) log "dirty keep $name: path $p rename/copy/conflict/type"; return 0 ;; esac
-        case "$p" in '"'*) log "dirty keep $name: quoted path"; return 0 ;; esac
-        if [ -L "$wt/$p" ]; then log "dirty keep $name: path $p is a symlink"; return 0; fi
-        case "$(git -C "$wt" ls-files -s -- "$p" 2>/dev/null)" in
-            160000*) log "dirty keep $name: path $p is a submodule"; return 0 ;;
-        esac
-        case "$xy" in
-            '??'|' M'|'M '|'A ')
-                if ! git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
-                    log "dirty keep $name: path $p absent on master"; return 0
-                fi
-                if ! git -C "$wt" show "origin/master:$p" 2>/dev/null | cmp -s - "$wt/$p"; then
-                    log "dirty keep $name: path $p differs"; return 0
-                fi ;;
-            ' D'|'D ')
-                if git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
-                    log "dirty keep $name: path $p deleted but present on master"; return 0
-                fi ;;
-            *) log "dirty keep $name: path $p status $xy"; return 0 ;;
-        esac
-        n=$((n + 1))
-    done 3<<< "$porcelain"
+    if [ "$drc" = 2 ]; then
+        log "dirty keep $name: $GC_DIRT_REASON"; return 0
+    fi
+    if [ "${WT_GC_REAP_DIRTY_ARCHIVE:-1}" = 0 ]; then
+        if [ "${PR_OID:-}" != "$tip" ]; then
+            log "dirty keep $name: merge not proven (state=${PR_STATE:-?} oid=${PR_OID:-?})"
+        else
+            log "dirty keep $name: $GC_DIRT_REASON"
+        fi
+        return 0
+    fi
+    prc=0
+    _gc_merge_proven "$tip" "${PR_OID:-}" || prc=$?
+    case "$prc" in
+        0) ;;
+        1) log "dirty keep $name: merge not proven (state=MERGED oid=${PR_OID:-?}: $GC_PROOF_REASON)"; return 0 ;;
+        *) log "dirty keep $name: merge proof probe error"; return 0 ;;
+    esac
+    if ! [[ "${PR_NUM:-}" =~ ^[0-9]+$ ]] || ! merged="$(_gc_backup_merged_epoch "$PR_NUM")"; then
+        log "dirty keep $name: merge age unknown"; return 0
+    fi
+    now="$(date +%s)"
+    if [ $(( now - merged )) -lt $(( WT_GC_DIRTY_ARCHIVE_DAYS * 86400 )) ]; then
+        log "dirty keep $name: merged <${WT_GC_DIRTY_ARCHIVE_DAYS}d ago"; return 0
+    fi
+    days=$(( (now - merged) / 86400 ))
+    if ! snap="$(_gc_snapshot_dirt "$wt" "$tip" "wt/$name")"; then
+        log "dirty keep $name: snapshot failed"; return 0
+    fi
+    if ! _gc_tips_record "$snap" "refs/wt/$name"; then
+        log "dirty keep $name: archive failed"; return 0
+    fi
     _gc_remove_wt_and_branch dirty "$name" "$branch" "$tip" || return 1
     [ "$GC_REMOVED" = 1 ] || return 0
-    log "dirty reaped $name paths=$n"
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        log "dirty archived-reaped $name paths=$GC_DIRT_PATHS merged=${days}d archive=dry-run"
+    else
+        log "dirty archived-reaped $name paths=$GC_DIRT_PATHS merged=${days}d archive=refs/wt-gc-archive/$GC_ARCHIVE_STAMP/wt/$name"
+    fi
+}
+
+# ── Step: detached master snapshots ───────────────────────────────────────────
+# bin/wt-status lists no row for a detached worktree, so this step reads
+# `git worktree list --porcelain` itself. A snapshot whose HEAD is already on
+# origin/master, clean and old enough, holds nothing that master lacks.
+reap_detached_snapshots() {
+    _gc_valid_days WT_GC_DETACHED_DAYS || return 1
+    log "step detached threshold=${WT_GC_DETACHED_DAYS}d"
+    local parent pphys listing rows sha path rc=0
+    parent="$(_gc_wt_parent)" || return 1
+    pphys="$(cd "$parent" 2>/dev/null && pwd -P)" || pphys="$parent"
+    listing="$(git -C "$WT_GC_REPO_ROOT" worktree list --porcelain)" || return 1
+    rows="$(awk '/^worktree /{p=substr($0,10); h=""} /^HEAD /{h=$2} /^detached$/{print h "\t" p}' <<< "$listing")"
+    [ -n "$rows" ] || return 0
+    while IFS=$'\t' read -r sha path <&3; do
+        [ -n "$path" ] || continue
+        case "$(dirname "$path")" in
+            "$parent"|"$pphys") ;;
+            *) continue ;;
+        esac
+        _gc_reap_detached_one "$(basename "$path")" "$path" "$sha" || rc=1
+    done 3<<< "$rows"
+    return "$rc"
+}
+
+_gc_reap_detached_one() {
+    local name="$1" wt="$2" sha="$3" arc age dirt lw=0
+    case "$name" in
+        _pool-*) log "detached keep $name: pool worktree"; return 0 ;;
+    esac
+    if [ ! -d "$wt" ]; then log "detached keep $name: no such worktree"; return 0; fi
+    if git -C "$wt" symbolic-ref -q HEAD >/dev/null 2>&1 \
+        || [ "$(git -C "$wt" rev-parse --verify -q HEAD 2>/dev/null)" != "$sha" ]; then
+        log "detached keep $name: HEAD moved"; return 0
+    fi
+    arc=0
+    git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$sha" origin/master 2>/dev/null || arc=$?
+    case "$arc" in
+        0) ;;
+        1) log "detached keep $name: not on master"; return 0 ;;
+        *) log "detached keep $name: ancestry probe error"; return 0 ;;
+    esac
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
+        log "detached keep $name: status error"; return 0
+    fi
+    if [ -n "$dirt" ]; then log "detached keep $name: dirty"; return 0; fi
+    age="$(_gc_rev_age_days "$wt" "$sha")" || age=""
+    if [ -z "$age" ]; then log "detached keep $name: age unknown"; return 0; fi
+    if [ "$age" -lt "$WT_GC_DETACHED_DAYS" ]; then log "detached keep $name: age=${age}d"; return 0; fi
+    _gc_live_work "$name" "" "$wt" || lw=$?
+    case "$lw" in
+        0) log "detached keep $name: live work"; return 0 ;;
+        1) ;;
+        *) log "detached keep $name: probe error"; return 0 ;;
+    esac
+    if ! _gc_tips_record "$sha" "refs/wt/$name"; then
+        log "detached keep $name: archive failed"; return 0
+    fi
+    if ! _gc_do "$WT_GC_WT_REMOVE" "$name" --volumes; then
+        log "detached keep $name: wt-remove refused"; return 0
+    fi
+    log "detached reaped $name sha=${sha:0:10} age=${age}d"
 }
 
 # ── Step: stale refs ──────────────────────────────────────────────────────────
 # _gc_backup_merged_epoch <stem> — merge epoch of the PR the stem names.
-# Prints only digits on success; anything else is a keep.
+# Prints only digits on success; anything else is a keep. Returns 2 when gh
+# itself failed, 3 when gh answered and no PR carries the name (the only case
+# the commit-age fallback may reap), and 1 when gh answered with a PR that is
+# not MERGED or with more than one row (always a keep).
 _gc_backup_merged_epoch() {
     local stem="$1" out
     if [[ "$stem" =~ ^p?[0-9]+$ ]]; then
         out="$("$WT_GC_GH" pr view "${stem#p}" --repo a-jay85/IBL5 --json state,mergedAt \
-            --jq 'select(.state=="MERGED") | .mergedAt | fromdateiso8601' 2>/dev/null)" || return 1
+            --jq 'if .state=="MERGED" then (.mergedAt | fromdateiso8601) else "open" end' 2>/dev/null)" || return 2
     else
         out="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$stem" --state all --limit 5 \
             --json state,mergedAt \
-            --jq 'if length==1 then (.[0] | select(.state=="MERGED") | .mergedAt | fromdateiso8601) else empty end' \
-            2>/dev/null)" || return 1
+            --jq 'if length==0 then "none" elif length==1 then (.[0] | if .state=="MERGED" then (.mergedAt | fromdateiso8601) else "open" end) else "many" end' \
+            2>/dev/null)" || return 2
     fi
+    [ "$out" != none ] || return 3
     [[ "$out" =~ ^[0-9]+$ ]] || return 1
     printf '%s\n' "$out"
 }
 
+# _gc_pr_closed_epoch <num> — close epoch of a CLOSED (never merged) PR.
+# Prints only digits on success. 1 = not closed / no date, 2 = gh failed.
+_gc_pr_closed_epoch() {
+    local out
+    out="$("$WT_GC_GH" pr view "$1" --repo a-jay85/IBL5 --json state,closedAt \
+        --jq 'select(.state=="CLOSED") | .closedAt | fromdateiso8601' 2>/dev/null)" || return 2
+    [[ "$out" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "$out"
+}
+
+# ── Step: closed-PR worktrees ─────────────────────────────────────────────────
+# Candidates: cleanup skip lines "PR closed but remote gone". The tick never
+# passes --discard-closed to cleanup; this step re-proves, archives, removes.
+reap_closed_worktrees() {
+    _gc_valid_days WT_GC_CLOSED_DAYS || return 1
+    log "step closed threshold=${WT_GC_CLOSED_DAYS}d"
+    local names parent name cls rc=0
+    names="$(awk 'index($0, "  SKIP ") == 1 && index($0, ": PR closed but remote gone") > 0 {
+        s = substr($0, 8); sub(/: PR closed but remote gone.*/, "", s); print s }' "$TMP_OUT")"
+    [ -n "$names" ] || return 0
+    parent="$(_gc_wt_parent)" || return 1
+    while IFS= read -r name <&3; do
+        [ -n "$name" ] || continue
+        [ -d "$parent/$name" ] || continue
+        cls="$(awk -v n="$name" '$2==n {print $1}' "$TMP_STATUS")"
+        if [ -z "$cls" ]; then log "closed keep $name: no wt-status row"; continue; fi
+        if [ "$cls" = OPEN-PR ]; then log "closed keep $name: wt-status class OPEN-PR"; continue; fi
+        _gc_reap_closed_one "$name" "$parent/$name" || rc=1
+    done 3<<< "$names"
+    return "$rc"
+}
+
+_gc_reap_closed_one() {
+    local name="$1" wt="$2" branch tip rl arc=0 cerr=0 closed now days snap dirc
+    _gc_wt_guard closed "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
+        log "closed keep $name: branch unresolved"; return 0
+    fi
+    if ! _gc_have "$WT_GC_GH"; then
+        log "closed keep $name: gh not found ('$WT_GC_GH')"
+        return 1
+    fi
+    GH_CMD="$WT_GC_GH" pr_info "$branch" "$wt" || true
+    if [ "${PR_STATE:-}" != CLOSED ]; then
+        log "closed keep $name: state=${PR_STATE:-?}"; return 0
+    fi
+    if ! [[ "${PR_NUM:-}" =~ ^[0-9]+$ ]]; then
+        log "closed keep $name: pr number unknown"; return 0
+    fi
+    if ! rl="$(git -C "$WT_GC_REPO_ROOT" for-each-ref --format='%(refname)' "refs/remotes/origin/$branch")"; then
+        log "closed keep $name: remote probe error"; return 0
+    fi
+    if grep -qxF -- "refs/remotes/origin/$branch" <<< "$rl"; then
+        log "closed keep $name: remote branch present"; return 0
+    fi
+    if [ "$tip" != "${PR_OID:-}" ]; then
+        if [ -n "${PR_OID:-}" ] && git -C "$WT_GC_REPO_ROOT" cat-file -e "$PR_OID^{commit}" 2>/dev/null; then
+            git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$tip" "$PR_OID" 2>/dev/null || arc=$?
+        else
+            arc=1
+        fi
+        case "$arc" in
+            0) ;;
+            1) log "closed keep $name: local commits beyond PR head"; return 0 ;;
+            *) log "closed keep $name: ancestry probe error"; return 0 ;;
+        esac
+    fi
+    closed="$(_gc_pr_closed_epoch "$PR_NUM")" || cerr=$?
+    if [ "$cerr" != 0 ]; then
+        log "closed keep $name: close age unknown"; return 0
+    fi
+    now="$(date +%s)"
+    if [ $(( now - closed )) -lt $(( WT_GC_CLOSED_DAYS * 86400 )) ]; then
+        log "closed keep $name: closed <${WT_GC_CLOSED_DAYS}d ago"; return 0
+    fi
+    days=$(( (now - closed) / 86400 ))
+    dirc=0
+    _gc_dirt_identical "$wt" || dirc=$?
+    if [ "$dirc" = 2 ]; then
+        log "closed keep $name: $GC_DIRT_REASON"; return 0
+    fi
+    if ! snap="$(_gc_snapshot_dirt "$wt" "$tip" "wt/$name")"; then
+        log "closed keep $name: snapshot failed"; return 0
+    fi
+    if ! _gc_tips_record "$snap" "refs/wt/$name"; then
+        log "closed keep $name: archive failed"; return 0
+    fi
+    _gc_remove_wt_and_branch closed "$name" "$branch" "$tip" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
+    log "closed reaped $name pr=#$PR_NUM closed=${days}d"
+}
+
+# ── Step: orphan stashes ──────────────────────────────────────────────────────
+# Matches bin/cleanup's "Stash candidate" rule, plus branch-gone stashes and
+# stashes with an untracked part: the keep-ref holds both before the drop.
+
+# _gc_stash_in_master <sha> — 0 = the stash patch reverse-applies cleanly to
+# origin/master (so master already has it), 1 = not provable. A temp index
+# keeps the main checkout's working tree out of the verdict.
+_gc_stash_in_master() {
+    local sha="$1" d rc=1
+    d="$(mktemp -d "${TMPDIR:-/tmp}/wt-gc-stash.XXXXXX")" || return 1
+    if git -C "$WT_GC_REPO_ROOT" stash show -p "$sha" > "$d/patch" 2>/dev/null \
+        && [ -s "$d/patch" ] \
+        && GIT_INDEX_FILE="$d/index" git -C "$WT_GC_REPO_ROOT" read-tree origin/master 2>/dev/null \
+        && GIT_INDEX_FILE="$d/index" git -C "$WT_GC_REPO_ROOT" apply --cached --check -R "$d/patch" 2>/dev/null; then
+        rc=0
+    fi
+    rm -rf "$d"
+    return "$rc"
+}
+
+drop_orphan_stashes() {
+    _gc_valid_days WT_GC_STASH_DAYS || return 1
+    log "step stashes threshold=${WT_GC_STASH_DAYS}d"
+    local rows doomed="" relist pairs sha ct subj s now age sbranch bl why meta N cur rc=0
+    local re='^(WIP on|On) ([^:]+):'
+    if ! rows="$(git -C "$WT_GC_REPO_ROOT" stash list --format='%H%x09%ct%x09%gs')"; then
+        log "stash list failed — none dropped"; return 1
+    fi
+    [ -n "$rows" ] || return 0
+    now="$(date +%s)"
+    while IFS=$'\t' read -r sha ct subj <&3; do
+        [ -n "$sha" ] || continue
+        s="${sha:0:10}"
+        case "$subj" in *nightly-autostash*) log "stash keep $s: nightly-autostash"; continue ;; esac
+        case "$ct" in ''|*[!0-9]*) log "stash keep $s: no commit time"; continue ;; esac
+        if ! [[ "$subj" =~ $re ]]; then log "stash keep $s: unparseable subject"; continue; fi
+        sbranch="${BASH_REMATCH[2]}"
+        if ! bl="$(git -C "$WT_GC_REPO_ROOT" for-each-ref --format='%(refname)' "refs/heads/$sbranch")"; then
+            log "stash keep $s: branch probe error"; continue
+        fi
+        if grep -qxF -- "refs/heads/$sbranch" <<< "$bl"; then
+            _gc_stash_in_master "$sha" || continue
+            why="provably in master"
+        else
+            why="branch gone"
+        fi
+        age=$(( (now - ct) / 86400 ))
+        if [ $(( now - ct )) -lt $(( WT_GC_STASH_DAYS * 86400 )) ]; then
+            log "stash keep $s: age=${age}d"; continue
+        fi
+        if ! _gc_tips_record "$sha" "refs/stash/$sha"; then
+            log "stash keep $s: archive failed"; continue
+        fi
+        doomed="${doomed}${sha}"$'\t'"${why}"$'\t'"${sbranch}"$'\t'"${age}"$'\n'
+    done 3<<< "$rows"
+    [ -n "$doomed" ] || return 0
+    if ! relist="$(git -C "$WT_GC_REPO_ROOT" stash list --format='%gd%x09%H')"; then
+        log "stash relist failed — none dropped"; return 1
+    fi
+    pairs=""
+    while IFS=$'\t' read -r cur sha <&3; do
+        [ -n "$sha" ] || continue
+        grep -qF -- "$sha" <<< "$doomed" || continue
+        N="${cur#stash@\{}"; N="${N%\}}"
+        pairs="${pairs}${N}"$'\t'"${sha}"$'\n'
+    done 3<<< "$relist"
+    [ -n "$pairs" ] || return 0
+    pairs="$(sort -t "$(printf '\t')" -k1,1nr <<< "${pairs%$'\n'}")"
+    while IFS=$'\t' read -r N sha <&3; do
+        [ -n "$sha" ] || continue
+        s="${sha:0:10}"
+        if [ "$(git -C "$WT_GC_REPO_ROOT" rev-parse -q --verify "stash@{$N}" 2>/dev/null)" != "$sha" ]; then
+            log "stash keep $s: stash moved"; continue
+        fi
+        meta="$(awk -F'\t' -v s="$sha" '$1==s {print $2 "\t" $3 "\t" $4}' <<< "$doomed")"
+        IFS=$'\t' read -r why sbranch age <<< "$meta"
+        if _gc_do git -C "$WT_GC_REPO_ROOT" stash drop -q "stash@{$N}"; then
+            log "stash dropped $s ($why) branch=$sbranch age=${age}d"
+        else
+            log "stash drop failed $s"; rc=1
+        fi
+    done 3<<< "$pairs"
+    return "$rc"
+}
+
+# _gc_backup_shaped <branch-name> — 0 when the name looks like a backup: under
+# backup/, or ending in a pre-rebase / presquash style tail. Pure, no I/O.
+_gc_backup_shaped() {
+    local name="$1"
+    local re='-(pre-rebase|presquash|pre-squash|local-[0-9]{8}|backup-[0-9]{8})(-backup)?(-[0-9]{8})?$'
+    [[ "$name" == backup/* ]] && return 0
+    [[ "$name" =~ $re ]]
+}
+
+# _gc_backup_stem <branch-name> — the PR number or head-branch stem a backup
+# name points at. Pure, no I/O. Strips backup/, then up to 4 passes of the
+# first matching tail rule, then a trailing short sha.
+_gc_backup_stem() {
+    local s="${1#backup/}" pass=0
+    local re_a='^(.+)/[0-9]{8}-[0-9]{6}(-.+)?$'
+    local re_b='^(.+)-(pre-prep|pre-squash|pre-reset|pre-rebase)(-[0-9]{8})?$'
+    local re_c='^(.+)-(presquash|prep|backup|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$'
+    local re_d='^(.+)-[0-9]{8}$'
+    local re_sha='^(.*)-[0-9a-f]{7,40}$'
+    while [ "$pass" -lt 4 ]; do
+        pass=$((pass + 1))
+        if [[ "$s" =~ $re_a ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_b ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_c ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_d ]]; then s="${BASH_REMATCH[1]}"
+        else break
+        fi
+    done
+    if [[ "$s" =~ $re_sha ]]; then s="${BASH_REMATCH[1]}"; fi
+    printf '%s\n' "$s"
+}
+
+# _gc_backup_stems <branch-name> — every stem _gc_backup_stem could land on,
+# one per line, least stripped first (the last line equals _gc_backup_stem).
+# A head branch whose own name ends in -backup, -prep or -<8 digits> is found
+# before the strip loop eats its tail. Pure, no I/O.
+_gc_backup_stems() {
+    local s="${1#backup/}" pass=0 last=""
+    local re_a='^(.+)/[0-9]{8}-[0-9]{6}(-.+)?$'
+    local re_b='^(.+)-(pre-prep|pre-squash|pre-reset|pre-rebase)(-[0-9]{8})?$'
+    local re_c='^(.+)-(presquash|prep|backup|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$'
+    local re_d='^(.+)-[0-9]{8}$'
+    local re_sha='^(.*)-[0-9a-f]{7,40}$'
+    printf '%s\n' "$s"; last="$s"
+    while [ "$pass" -lt 4 ]; do
+        pass=$((pass + 1))
+        # Date-only strip first, so "x-backup-20261020" yields "x-backup"
+        # before the combined tail rule yields "x".
+        if [[ "$s" =~ $re_d ]] && [ "${BASH_REMATCH[1]}" != "$last" ]; then
+            last="${BASH_REMATCH[1]}"; printf '%s\n' "$last"
+        fi
+        if [[ "$s" =~ $re_a ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_b ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_c ]]; then s="${BASH_REMATCH[1]}"
+        elif [[ "$s" =~ $re_d ]]; then s="${BASH_REMATCH[1]}"
+        else break
+        fi
+        if [ "$s" != "$last" ]; then printf '%s\n' "$s"; last="$s"; fi
+    done
+    if [[ "$s" =~ $re_sha ]] && [ "${BASH_REMATCH[1]}" != "$last" ]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
+}
+
+# ── Step: stale refs (reap) ───────────────────────────────────────────────────
 reap_stale_refs() {
     _gc_valid_days WT_GC_BACKUP_DAYS || return 1
     _gc_valid_days WT_GC_REF_DAYS || return 1
+    if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ]; then _gc_valid_days WT_GC_BACKUP_FALLBACK_DAYS || return 1; fi
     log "refs threshold backup=${WT_GC_BACKUP_DAYS}d other=${WT_GC_REF_DAYS}d"
-    local listing remotes remotes_ok=1 now line ref sha ct name stem rname merged
+    local cand listing remotes remotes_ok=1 now line ref sha ct name stem rname merged mrc ct_ok
     local doomed="" rc=0 checked_out branches_ok=1 known
     now="$(date +%s)"
     listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
@@ -415,21 +927,42 @@ reap_stale_refs() {
         case "$ref" in
             refs/heads/*)
                 name="${ref#refs/heads/}"
-                if [[ "$name" == backup/* ]] || [[ "$name" =~ -(pre-rebase|presquash|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$ ]]; then
-                    stem="${name#backup/}"
-                    if [[ "$stem" =~ ^(.*)-(pre-rebase|presquash|local-[0-9]{8}|backup-[0-9]{8})(-[0-9]{8})?$ ]]; then
-                        stem="${BASH_REMATCH[1]}"
-                    fi
-                    if [[ "$stem" =~ ^(.*)-[0-9a-f]{7,40}$ ]]; then
-                        stem="${BASH_REMATCH[1]}"
-                    fi
+                if _gc_backup_shaped "$name"; then
+                    stem="$(_gc_backup_stem "$name")"
                     if ! _gc_have "$WT_GC_GH"; then
                         log "ref keep $ref: gh not found ('$WT_GC_GH')"
                         rc=1
                         continue
                     fi
-                    if ! merged="$(_gc_backup_merged_epoch "$stem")"; then
-                        log "ref keep $ref: gh found no merged PR for '$stem'"
+                    # Try the least-stripped stem first; the first one gh
+                    # knows a PR for wins. Only "no PR under any stem" falls
+                    # through to the age fallback.
+                    mrc=3
+                    while IFS= read -r cand <&4; do
+                        [ -n "$cand" ] || continue
+                        mrc=0
+                        merged="$(_gc_backup_merged_epoch "$cand")" || mrc=$?
+                        if [ "$mrc" != 3 ]; then stem="$cand"; break; fi
+                    done 4< <(_gc_backup_stems "$name")
+                    if [ "$mrc" = 2 ]; then
+                        log "ref keep $ref: gh probe error for '$stem'"
+                        continue
+                    fi
+                    if [ "$mrc" = 1 ]; then
+                        log "ref keep $ref: PR for '$stem' is not merged or is ambiguous"
+                        continue
+                    fi
+                    if [ "$mrc" = 3 ]; then
+                        # gh answered: no PR carries this name. An old
+                        # enough backup is still archived and reaped.
+                        case "$ct" in ''|*[!0-9]*) ct_ok=0 ;; *) ct_ok=1 ;; esac
+                        if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ] && [ "$ct_ok" = 1 ] \
+                            && [ $(( now - ct )) -ge $(( WT_GC_BACKUP_FALLBACK_DAYS * 86400 )) ]; then
+                            log "ref fallback $ref: no merged PR for '$stem', newest commit $(( (now - ct) / 86400 ))d old"
+                            doomed="${doomed}${sha} ${ref}"$'\n'
+                        else
+                            log "ref keep $ref: gh found no merged PR for '$stem'"
+                        fi
                         continue
                     fi
                     if [ $(( now - merged )) -lt $(( WT_GC_BACKUP_DAYS * 86400 )) ]; then
@@ -465,13 +998,10 @@ reap_stale_refs() {
     done 3<<< "$listing"
     [ -n "$doomed" ] || return "$rc"
     # Tips first: one failure deletes nothing.
-    while IFS=' ' read -r sha ref; do
-        [ -n "$ref" ] || continue
-        if ! _gc_tips_record "$sha" "$ref"; then
-            log "tips write failed — no refs deleted"
-            return 1
-        fi
-    done <<< "$doomed"
+    if ! _gc_archive_batch "$doomed"; then
+        log "tips write failed — no refs deleted"
+        return 1
+    fi
     # One compare-and-delete transaction for the whole set (thousands of refs
     # under a dead remote). If it fails nothing was deleted, so the per-ref
     # loop below retries one at a time and isolates the bad ref.
@@ -542,12 +1072,90 @@ reap_tmp_packs() {
     return 0
 }
 
+# _gc_iso_epoch <rfc3339> — epoch seconds of a Docker timestamp such as
+# 2026-10-01T12:34:56.123456789Z. Prints digits; returns 1 on any mismatch or
+# a pre-1970 value (Docker's never-finished 0001-01-01 sentinel).
+_gc_iso_epoch() {
+    command -v python3 >/dev/null 2>&1 || return 1
+    python3 -I -c '
+import re, sys, datetime
+m = re.match(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)$", sys.argv[1])
+if not m:
+    sys.exit(1)
+try:
+    dt = datetime.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")
+except ValueError:
+    sys.exit(1)
+tz = m.group(3)
+off = 0
+if tz != "Z":
+    sign = 1 if tz[0] == "+" else -1
+    off = sign * (int(tz[1:3]) * 3600 + int(tz[4:6]) * 60)
+epoch = int((dt - datetime.datetime(1970, 1, 1)).total_seconds()) - off
+if epoch <= 0:
+    sys.exit(1)
+print(epoch)
+' "$1" 2>/dev/null
+}
+
+# _gc_docker_containers — remove exited ibl5-* containers past the floor.
+# `docker rm <id>` only: no -v, no -f, so volumes survive and a container that
+# restarted since the listing is refused. The full inspect JSON is archived
+# first under $WT_GC_TIPS_DIR.
+_gc_docker_containers() {
+    log "docker containers threshold=${WT_GC_CONTAINER_DAYS}d"
+    local rows id cname fmt status finished exited now d f rc=0
+    if ! rows="$("$WT_GC_DOCKER" ps -a --no-trunc --filter status=exited --filter name=ibl5- \
+        --format '{{.ID}}{{"\t"}}{{.Names}}')"; then
+        log "docker ps failed — no containers removed"
+        return 1
+    fi
+    [ -n "$rows" ] || return 0
+    now="$(date +%s)"
+    while IFS=$'\t' read -r id cname <&3; do
+        [ -n "$id" ] || continue
+        case "$cname" in ibl5-*) ;; *) continue ;; esac
+        if ! fmt="$("$WT_GC_DOCKER" inspect --format '{{.State.Status}}{{"\t"}}{{.State.FinishedAt}}' "$id" 2>/dev/null)"; then
+            log "container keep $cname: inspect failed"; continue
+        fi
+        IFS=$'\t' read -r status finished <<< "$fmt"
+        if [ "$status" != exited ]; then log "container keep $cname: not exited"; continue; fi
+        if ! exited="$(_gc_iso_epoch "$finished")" || [[ ! "$exited" =~ ^[0-9]+$ ]]; then
+            log "container keep $cname: exit time unknown"; continue
+        fi
+        d=$(( (now - exited) / 86400 ))
+        if [ $(( now - exited )) -lt $(( WT_GC_CONTAINER_DAYS * 86400 )) ]; then
+            log "container keep $cname: exited ${d}d ago"; continue
+        fi
+        if ! _gc_archive_stamp; then log "container keep $cname: archive failed"; continue; fi
+        f="$WT_GC_TIPS_DIR/containers-${GC_ARCHIVE_STAMP}-${cname}.json"
+        if [ "${DRY_RUN:-0}" = 1 ]; then
+            log "DRY-RUN would: archive $cname to $f"
+        else
+            if ! mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null \
+                || ! "$WT_GC_DOCKER" inspect "$id" > "$f.tmp" 2>/dev/null \
+                || [ ! -s "$f.tmp" ] \
+                || ! mv -f "$f.tmp" "$f"; then
+                rm -f "$f.tmp"
+                log "container keep $cname: archive failed"; continue
+            fi
+        fi
+        if _gc_do "$WT_GC_DOCKER" rm "$id"; then
+            log "container removed $cname exited=${d}d"
+        else
+            log "container rm failed $cname"; rc=1
+        fi
+    done 3<<< "$rows"
+    return "$rc"
+}
+
 # ── Step: Docker image and build-cache prune (never volumes) ──────────────────
 docker_prune() {
     if [[ ! "$WT_GC_DOCKER_UNTIL" =~ ^[0-9]+h$ ]]; then
         log "invalid WT_GC_DOCKER_UNTIL '$WT_GC_DOCKER_UNTIL' — step skipped (fail-closed)"
         return 1
     fi
+    if [ "${WT_GC_DOCKER_CONTAINERS:-1}" != 0 ]; then _gc_valid_days WT_GC_CONTAINER_DAYS || return 1; fi
     log "step docker threshold=$WT_GC_DOCKER_UNTIL"
     if ! _gc_have "$WT_GC_DOCKER"; then
         log "docker not found ('$WT_GC_DOCKER') — nothing pruned"
@@ -558,11 +1166,65 @@ docker_prune() {
         return 0
     fi
     local rc=0 prc=0
+    if [ "${WT_GC_DOCKER_CONTAINERS:-1}" != 0 ]; then _gc_docker_containers || rc=1; fi
     _gc_do "$WT_GC_DOCKER" image prune -af --filter "until=$WT_GC_DOCKER_UNTIL" || prc=$?
     if [ "$prc" -ne 0 ]; then log "docker image prune failed (rc=$prc)"; rc=1; fi
     prc=0
     _gc_do "$WT_GC_DOCKER" builder prune -f --filter "until=$WT_GC_DOCKER_UNTIL" || prc=$?
     if [ "$prc" -ne 0 ]; then log "docker builder prune failed (rc=$prc)"; rc=1; fi
+    return "$rc"
+}
+
+# ── Step: archive retention ───────────────────────────────────────────────────
+# Keep-refs under refs/wt-gc-archive/<stamp>/ older than WT_GC_ARCHIVE_DAYS go.
+# The stamp in the refname is the only clock; a malformed stamp keeps.
+prune_archives() {
+    _gc_valid_days WT_GC_ARCHIVE_DAYS || return 1
+    log "step archive-prune threshold=${WT_GC_ARCHIVE_DAYS}d"
+    local listing ref sha cutoff stamp rc=0
+    listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
+        --format='%(refname) %(objectname)' refs/wt-gc-archive/)" || return 1
+    cutoff=$(( $(date +%s) - WT_GC_ARCHIVE_DAYS * 86400 ))
+    while IFS=' ' read -r ref sha <&3; do
+        [ -n "$ref" ] || continue
+        if [[ ! "$ref" =~ ^refs/wt-gc-archive/([0-9]+)/ ]]; then
+            log "archive keep $ref: malformed stamp"
+            continue
+        fi
+        stamp="${BASH_REMATCH[1]}"
+        if [ "$stamp" -lt "$cutoff" ]; then
+            if _gc_do git -C "$WT_GC_REPO_ROOT" update-ref -d "$ref" "$sha"; then
+                [ "${DRY_RUN:-0}" = 1 ] || log "archive pruned $ref"
+            else
+                log "archive prune failed $ref"
+                rc=1
+            fi
+        fi
+    done 3<<< "$listing"
+    # Container inspect archives: the stamp in the file name is the clock.
+    if [ -d "$WT_GC_TIPS_DIR" ]; then
+        local files f
+        if ! files="$(find "$WT_GC_TIPS_DIR" -maxdepth 1 -type f -name 'containers-*.json')"; then
+            log "archive list of container files failed"
+            return 1
+        fi
+        while IFS= read -r f <&3; do
+            [ -n "$f" ] || continue
+            if [[ ! "$(basename "$f")" =~ ^containers-([0-9]+)- ]]; then
+                log "archive keep $f: malformed stamp"
+                continue
+            fi
+            stamp="${BASH_REMATCH[1]}"
+            if [ "$stamp" -lt "$cutoff" ]; then
+                if _gc_do rm -f -- "$f"; then
+                    [ "${DRY_RUN:-0}" = 1 ] || log "archive pruned $f"
+                else
+                    log "archive prune failed $f"
+                    rc=1
+                fi
+            fi
+        done 3<<< "$files"
+    fi
     return "$rc"
 }
 

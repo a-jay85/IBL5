@@ -30,17 +30,33 @@ final class PageTabs implements PageTabsInterface
 
     public function renderTabBar(string $activeTab, string $baseUrl): string
     {
-        $html = '<div class="ibl-tabs">';
+        $items = [];
         foreach ($this->tabs as $tabKey => $label) {
             $key = (string) $tabKey;
-            $isActive = $key === $activeTab;
+            $items[] = ['key' => $key, 'label' => $label, 'href' => $baseUrl . '&tab=' . rawurlencode($key)];
+        }
+        return self::renderLinkStrip($items, $activeTab);
+    }
+
+    /**
+     * Render a tab-styled link strip with caller-supplied hrefs.
+     * Same markup and aria-current pattern as renderTabBar(); used for nested sub-tabs.
+     *
+     * @param list<array{key: string, label: string, href: string}> $items in render order
+     * @param string $modifierClass extra class appended to "ibl-tabs" (e.g. "ibl-tabs--sub"); '' for none
+     */
+    public static function renderLinkStrip(array $items, string $activeKey, string $modifierClass = ''): string
+    {
+        $wrapperClass = $modifierClass === '' ? 'ibl-tabs' : 'ibl-tabs ' . $modifierClass;
+        $html = '<div class="' . HtmlSanitizer::safeHtmlOutput($wrapperClass) . '">';
+        foreach ($items as $item) {
+            $isActive = $item['key'] === $activeKey;
             $class = $isActive ? 'ibl-tab ibl-tab--active' : 'ibl-tab';
-            $href = $baseUrl . '&tab=' . rawurlencode($key);
             $html .= '<a class="' . $class . '"'
-                . ' href="' . HtmlSanitizer::safeHtmlOutput($href) . '"'
-                . ' data-tab="' . HtmlSanitizer::safeHtmlOutput($key) . '"'
+                . ' href="' . HtmlSanitizer::safeHtmlOutput($item['href']) . '"'
+                . ' data-tab="' . HtmlSanitizer::safeHtmlOutput($item['key']) . '"'
                 . ($isActive ? ' aria-current="page"' : '')
-                . '>' . HtmlSanitizer::safeHtmlOutput($label) . '</a>';
+                . '>' . HtmlSanitizer::safeHtmlOutput($item['label']) . '</a>';
         }
         return $html . '</div>';
     }

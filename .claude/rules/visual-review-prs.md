@@ -161,12 +161,13 @@ Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-ga
 (`triageCell`, `buildGalleryHtml`); changed-files → coverage (banner only) lives in
 `ibl5/tests/e2e/vr-coverage-map.ts` (`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`); the
 comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). The pure modules are
-unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `vr-coverage-map.test.ts`,
-`vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
+unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
+`ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
-a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body publishing surface (`--copy-new-screens`/`--update-pr-body` on
-`bin/vr-review-comment`, `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is
-likewise a mechanical-enforcement surface, covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
+a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
+publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
+`ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
+mechanical-enforcement surface, covered by **ADR-0076**. The crop modules (`ibl5/tests/e2e/vr-crop.ts`,
 `ibl5/tests/e2e/vr-crop-png.ts`), `--crop-changed` and `--publish-agent-shots` are covered by
 **ADR-0076** and **ADR-0181**.
 
@@ -207,12 +208,4 @@ the `<picture>` composite (`--compose-manual`); otherwise it stays after-only.
 
 ## One-time deployment prerequisite
 
-GitHub Pages must use source = **GitHub Actions** (`build_type: workflow`). The owner sets it once
-in Repo Settings → Pages → Build and deployment → Source, or:
-
-```bash
-gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
-```
-
-Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
-once via the workflow's `workflow_dispatch`.
+See `.claude/rules/visual-review-prs-detail.md` § One-time deployment prerequisite.

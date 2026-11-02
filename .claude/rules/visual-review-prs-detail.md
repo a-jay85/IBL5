@@ -1,5 +1,5 @@
 ---
-description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, publishing agent shots, and how an `update-baselines` label run treats an in-flight E2E run.
+description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, publishing agent shots, how an `update-baselines` label run treats an in-flight E2E run, and the one-time Pages source setting.
 last_verified: 2026-11-02
 paths:
   - ".github/workflows/e2e-tests.yml"
@@ -68,3 +68,15 @@ JSON: 1 to 20 of `{"label": "nav-bar", "before": "a.png", "after": "b.png"}` (`b
 PNG under 5 MB). Files go to `<head-sha>/visual-review/agent-shots/` on `gh-pages`, then an
 agent-shot sub-block is upserted, which the CI refresh keeps. Never put a local file path in a PR
 body. Labels are sanitized to `[a-z0-9-]`. `bin/prune-vr-galleries` prunes the per-SHA tree.
+
+## One-time deployment prerequisite
+
+GitHub Pages must use source = **GitHub Actions** (`build_type: workflow`). The owner sets it once
+in Repo Settings → Pages → Build and deployment → Source, or:
+
+```bash
+gh api --method PUT repos/a-jay85/IBL5/pages -f build_type=workflow
+```
+
+Until then, `Deploy VR gallery to Pages` runs fail at the deploy step (expected, self-clears once flipped). After the flip, re-serve
+once via the workflow's `workflow_dispatch`.

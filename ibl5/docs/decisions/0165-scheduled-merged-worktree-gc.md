@@ -90,4 +90,4 @@ Restore:
 - Stash: `git stash store -m restored refs/wt-gc-archive/<stamp>/stash/<sha>`
 - Container: `bin/wt-up` recreates it. The JSON file records its config and mounts.
 
-Never removed: docker volumes, UNPUSHED and STALLED worktrees, open-PR worktrees, nightly autostashes, protected names, and anything a live-work probe reports in use. A probe error is a keep. Every switch accepts `0` to disable its class without touching the others.
+Never removed: open-PR worktrees, nightly autostashes, protected names, and anything a live-work probe reports in use. A probe error is a keep. The stopped-container step and the image prune never touch docker volumes. The dirty, detached and closed-PR worktree reaps call `wt-remove <name> --volumes`, so they do drop that worktree's own docker volumes. The closed-PR reap skips only OPEN-PR rows. An UNPUSHED or STALLED worktree whose PR was closed is archived and removed once it passes the closed-PR checks. Other UNPUSHED and STALLED worktrees stay. Every switch accepts `0` to disable its class without touching the others.

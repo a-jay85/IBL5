@@ -143,7 +143,7 @@ final class PlayerActionController
 
     private function renderErrorWithGoBack(string $message): string
     {
-        return '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput($message) . '</div>'
+        return '<div role="alert" class="d-alert d-alert-error mb-4">' . \Security\HtmlSanitizer::safeHtmlOutput($message) . '</div>'
             . '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary ibl-btn--spaced-inline">Go Back</a>';
     }
 }

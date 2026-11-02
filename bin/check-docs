@@ -179,7 +179,8 @@ Options:
                      changed vs <ref> must also bump last_verified. Each
                      changed file is also run through the full-scan checks
                      (future-date, staleness, dead-ref). Pure base-vs-head
-                     value comparison — never date-equality-to-today.
+                     value comparison — never date-equality-to-today. A
+                     last_verified earlier than its merge-base value also fails.
   --exclude-from=<file>
                      Requires --since=<ref>. Drops every path listed in
                      <file> (one repo-relative path per line, as git diff
@@ -895,7 +896,9 @@ function editCommitDate(string $repoRoot, string $base, string $rel): ?string
  * equal AND lv predates the edit), date-bumped passes (values differ), same-day
  * re-edit passes (value == commit date), rebased-onto-today passes (value > commit
  * date), newly-added-with-date passes (base null != date), added-without-date
- * fails (null === null, null !< commit date).
+ * fails (null === null, null !< commit date). A separate rule fails a value EARLIER
+ * than the merge-base's (moved backward; a re-verify bumps to today, never earlier);
+ * forward bumps, equal values, and newly-added docs never trip it.
  *
  * @return list<string> diagnostic lines, each prefixed with the repo-relative path.
  */
@@ -909,6 +912,15 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
                 $doc['rel'],
                 $doc['headLv'] ?? '(none)',
                 $base
+            );
+        }
+
+        if ($doc['movedBackward']) {
+            $issues[] = sprintf(
+                '%s: last_verified moved backward (%s -> %s); a re-verify bumps it to today, never earlier',
+                $doc['rel'],
+                $doc['mergeBaseLv'] ?? '(none)',
+                $doc['headLv'] ?? '(none)'
             );
         }
 
@@ -1040,7 +1052,13 @@ function hasUncommittedChange(string $escapedRoot, string $rel): bool
  * committed" was false). The narrowness is unchanged: a date older than today
  * still fails.
  *
- * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, needsBump: bool}>
+ * `movedBackward` compares headLv with the MERGE-BASE value (not the base tip the
+ * needsBump compare reads): a branch behind master whose own commits never touched
+ * the date has headLv == merge-base value, so master bumping the date after the
+ * branch point cannot trip it. Both values must be ISO dates (unparseable head is
+ * checkFile()'s to report); a null merge-base value (new doc) never trips it.
+ *
+ * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, mergeBaseLv: ?string, needsBump: bool, movedBackward: bool}>
  */
 function iterChangedDocs(string $base, string $repoRoot): array
 {
@@ -1048,6 +1066,11 @@ function iterChangedDocs(string $base, string $repoRoot): array
     $escapedBase = escapeshellarg($base);
 
     $changedRel = changedDocPaths($base, $escapedRoot, $escapedBase);
+
+    $mbOut = [];
+    $mbCode = 0;
+    exec(sprintf('git -C %s merge-base %s HEAD 2>/dev/null', $escapedRoot, $escapedBase), $mbOut, $mbCode);
+    $mergeBase = $mbCode === 0 && isset($mbOut[0]) && trim($mbOut[0]) !== '' ? trim($mbOut[0]) : null;
 
     // Intersect with the in-scope set so scoping/exclusions are reused, not
     // re-implemented.
@@ -1078,6 +1101,16 @@ function iterChangedDocs(string $base, string $repoRoot): array
         exec($showCmd, $baseOut, $baseCode);
         $baseFm = $baseCode === 0 ? parseFrontmatter(implode("\n", $baseOut)) : null;
 
+        // Merge-base blob for the backward-move rule (null: new doc / no merge-base).
+        $mergeBaseLv = null;
+        if ($mergeBase !== null) {
+            $mbShow = [];
+            $mbShowCode = 0;
+            exec(sprintf('git -C %s show %s:%s 2>/dev/null', $escapedRoot, escapeshellarg($mergeBase), escapeshellarg($rel)), $mbShow, $mbShowCode);
+            $mergeBaseFm = $mbShowCode === 0 ? parseFrontmatter(implode("\n", $mbShow)) : null;
+            $mergeBaseLv = $mergeBaseFm['last_verified'] ?? null;
+        }
+
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
         // An uncommitted edit (staged or unstaged) will be committed today, so its
@@ -1095,7 +1128,12 @@ function iterChangedDocs(string $base, string $repoRoot): array
             'abs' => $abs,
             'headLv' => $headLv,
             'baseLv' => $baseLv,
+            'mergeBaseLv' => $mergeBaseLv,
             'needsBump' => $headLv === $baseLv && !$verifiedAtEdit,
+            'movedBackward' => $headLv !== null && $mergeBaseLv !== null
+                && preg_match('/^\d{4}-\d{2}-\d{2}$/', $headLv) === 1
+                && preg_match('/^\d{4}-\d{2}-\d{2}$/', $mergeBaseLv) === 1
+                && $headLv < $mergeBaseLv,
         ];
     }
 

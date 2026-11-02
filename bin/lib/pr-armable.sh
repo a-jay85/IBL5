@@ -414,6 +414,8 @@ pr_pipeline_authored_hold() {
 #   author is trusted (a-jay85, a GitHub Bot, or a `[bot]` login) never holds. The
 #   marker is written only by the posting code; an untrusted author, a marker not on
 #   line 1, or any other label word holds as before. Skipped threads go to stderr.
+#   Post-plan Phase 4.5 / 4.5b now disposition trusted nit / pre-existing threads too, so
+#   this exemption covers only their residue. bin/pr-triage's OPEN-THREAD bucket names it.
 pr_unresolved_findings_hold() {
     local pr="$1"
     local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
@@ -483,6 +485,57 @@ pr_unresolved_findings_hold() {
     # (set -euo pipefail) on the first clear PR. Every predicate in this file must
     # return 0 on its clear path; pr_dep_holds violated that until 2026-08-22, so
     # treat a trailing bare `[ ... ] && cmd` in any predicate here as a live bug.
+    return 0
+}
+
+# pr_open_review_threads <pr_number>
+#   GitHub's conversation-resolution view of a PR: echoes one `open-thread:<databaseId>`
+#   line per review thread with isResolved == false, whatever its label, author, or
+#   outdated state. It holds nothing by itself. bin/pr-triage reads it for the
+#   OPEN-THREAD bucket. Condition (11) stays in pr_unresolved_findings_hold.
+#   FAIL-CLOSED: echoes `open-threads-api-error` on any gh, GraphQL, or jq failure and
+#   `open-threads-cap` on a full 100-thread page. Returns 0 on every path.
+pr_open_review_threads() {
+    local pr="$1"
+    local owner="${REPO_SLUG%%/*}" repo="${REPO_SLUG##*/}"
+    local raw rc=0
+    raw=$("$GH_CMD" api graphql \
+        -F owner="$owner" -F repo="$repo" -F pr="$pr" \
+        -f query='
+        query($owner:String!, $repo:String!, $pr:Int!) {
+          repository(owner:$owner, name:$repo) {
+            pullRequest(number:$pr) {
+              reviewThreads(first:100) {
+                nodes {
+                  isResolved
+                  comments(first:1) { nodes { databaseId body author { login __typename } } }
+                }
+              }
+            }
+          }
+        }' 2>/dev/null) || rc=$?
+    if [ "$rc" -ne 0 ]; then echo "open-threads-api-error"; return 0; fi
+    if printf '%s' "$raw" | jq -e '.errors' >/dev/null 2>&1; then
+        echo "open-threads-api-error"; return 0
+    fi
+    if ! printf '%s' "$raw" \
+            | jq -e '.data.repository.pullRequest.reviewThreads.nodes != null' \
+            >/dev/null 2>&1; then
+        echo "open-threads-api-error"; return 0
+    fi
+    local count
+    count=$(printf '%s' "$raw" \
+        | jq '.data.repository.pullRequest.reviewThreads.nodes | length' 2>/dev/null) \
+        || { echo "open-threads-api-error"; return 0; }
+    # first:100 is unpaginated: a full page means threads 101+ are invisible.
+    if [ "$count" -eq 100 ]; then echo "open-threads-cap"; return 0; fi
+    local open
+    open=$(printf '%s' "$raw" | jq -r '
+        .data.repository.pullRequest.reviewThreads.nodes[]
+        | select(.isResolved == false)
+        | "open-thread:" + ((.comments.nodes[0].databaseId // "-") | tostring)
+    ' 2>/dev/null) || { echo "open-threads-api-error"; return 0; }
+    if [ -n "$open" ]; then printf '%s\n' "$open"; fi
     return 0
 }
 

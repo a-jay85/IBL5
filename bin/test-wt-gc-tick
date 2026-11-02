@@ -296,6 +296,7 @@ run_tick() {
         # Reap steps: off unless a case turns them on; every binary stubbed.
         WT_GC_REAP_EMPTY=0
         WT_GC_REAP_DIRTY_MERGED=0
+        WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_REFS=0
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
@@ -1223,6 +1224,148 @@ rt "${D_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 log_has 'DRY-RUN would: .*wt-remove d8 --volumes' || note_err "no DRY-RUN line"
+finish_case
+
+# ── Merged-dirty archive reap (WT_GC_REAP_DIRTY_ARCHIVE=1) ────────────────────
+DA_ON=(WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_DIRTY_ARCHIVE=1 WT_GC_ARCHIVE_STAMP=1700000000)
+DA_SHA40=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+
+fx DA1-diff-archived
+d_wt da1 diff
+DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da1)"
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc DA1 0
+log_has 'dirty archived-reaped da1 paths=1' || note_err "not archived-reaped"
+[ -d "$(wt_dir da1)" ] && note_err "worktree still present"
+has_branch da1 && note_err "branch still present"
+arch_has 1700000000/wt/da1 || note_err "no wt archive ref"
+arch_has 1700000000/heads/da1 || note_err "no heads archive ref"
+[ "$(git -C "$ENV_MAIN" rev-parse refs/wt-gc-archive/1700000000/wt/da1^ 2>/dev/null)" = "$DA_TIP" ] || note_err "snapshot parent is not the tip"
+[ "$(git -C "$ENV_MAIN" show refs/wt-gc-archive/1700000000/wt/da1:README.md 2>/dev/null)" = different ] || note_err "dirt bytes not in archive"
+finish_case
+
+fx DA2-untracked-and-deleted-archived
+d_wt da2a untracked-diff
+d_wt da2b deleted
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc DA2 0
+log_has 'dirty archived-reaped da2a' || note_err "da2a not reaped"
+log_has 'dirty archived-reaped da2b' || note_err "da2b not reaped"
+git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/da2a:new.txt 2>/dev/null || note_err "untracked file missing from archive"
+git -C "$ENV_MAIN" cat-file -e refs/wt-gc-archive/1700000000/wt/da2b:README.md 2>/dev/null && note_err "deleted path still in archive tree"
+finish_case
+
+fx DA3-under-floor-keeps
+d_wt da3 diff
+epoch_ago 2 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da3: merged <3d ago' || note_err "no floor keep"
+[ -d "$(wt_dir da3)" ] || note_err "removed"
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "archive ref written"
+finish_case
+
+fx DA4-ancestor-proven
+d_wt da4 diff
+DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da4)"
+DA_CHILD="$(git -C "$ENV_MAIN" commit-tree -p "$DA_TIP" -m child "$DA_TIP^{tree}")"
+printf 'MERGED\t7\t%s\n' "$DA_CHILD" > "$CD/gh/by-head/da4.json"
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty archived-reaped da4' || note_err "ancestor case not reaped"
+[ -d "$(wt_dir da4)" ] && note_err "worktree still present"
+finish_case
+
+fx DA5-content-contained-proven
+d_wt da5 diff "$DA_SHA40"
+DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da5)"
+DA_SQ="$(git -C "$ENV_MAIN" commit-tree -p origin/master -m squash "$DA_TIP^{tree}")"
+git -C "$ENV_MAIN" update-ref refs/remotes/origin/master "$DA_SQ"
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty archived-reaped da5' || note_err "squash-contained case not reaped"
+[ -d "$(wt_dir da5)" ] && note_err "worktree still present"
+finish_case
+
+fx DA6-not-proven-keeps
+d_wt da6 diff "$DA_SHA40"
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da6: merge not proven \(state=MERGED oid=deadbeef' || note_err "no unproven keep"
+[ -d "$(wt_dir da6)" ] || note_err "removed"
+finish_case
+
+fx DA7-merge-age-garbage-keeps
+d_wt da7 diff
+printf 'notanumber\n' > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da7: merge age unknown' || note_err "no age-unknown keep"
+[ -d "$(wt_dir da7)" ] || note_err "removed"
+finish_case
+
+fx DA8-gh-fail-keeps
+d_wt da8 diff
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" STUB_GH_FAIL=1 -- --force
+log_has 'dirty keep da8: merge not proven' || note_err "gh failure not kept"
+[ -d "$(wt_dir da8)" ] || note_err "removed"
+finish_case
+
+fx DA9-open-pr-keeps
+d_wt da9 diff
+DA_TIP="$(git -C "$ENV_MAIN" rev-parse refs/heads/da9)"
+printf 'OPEN\t7\t%s\n' "$DA_TIP" > "$CD/gh/by-head/da9.json"
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da9: merge not proven \(state=OPEN' || note_err "open PR not kept"
+[ -d "$(wt_dir da9)" ] || note_err "removed"
+finish_case
+
+fx DA10-live-work-keeps
+d_wt da10 diff
+epoch_ago 5 > "$CD/gh/7.json"
+mk_registry "$CD/registry.json" da10
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da10: live work' || note_err "live work not kept"
+[ -d "$(wt_dir da10)" ] || note_err "removed"
+finish_case
+
+fx DA11-archive-fail-keeps
+d_wt da11 diff
+epoch_ago 5 > "$CD/gh/7.json"
+git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/wt/da11 "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'archive failed' || note_err "no archive-failed log"
+[ -d "$(wt_dir da11)" ] || note_err "worktree removed"
+has_branch da11 || note_err "branch deleted"
+finish_case
+
+fx DA12-dry-run
+d_wt da12 diff
+epoch_ago 5 > "$CD/gh/7.json"
+B_REFS="$(refs_snapshot)"; B_WT="$(wt_snapshot)"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --dry-run --force
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+log_has 'DRY-RUN would: archive' || note_err "no DRY-RUN archive line"
+finish_case
+
+fx DA13-structural-keeps
+d_wt da13 symlink
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+log_has 'dirty keep da13: path README.md (is a symlink|rename/copy/conflict/type)' || note_err "symlink not kept"
+[ -d "$(wt_dir da13)" ] || note_err "removed"
+finish_case
+
+fx DA14-empty-floor-invalid
+d_wt da14 diff
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" WT_GC_DIRTY_ARCHIVE_DAYS= STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc DA14 1
+log_has "invalid WT_GC_DIRTY_ARCHIVE_DAYS ''" || note_err "no invalid-floor log"
+[ -d "$(wt_dir da14)" ] || note_err "removed"
 finish_case
 
 # ── Ref aging ─────────────────────────────────────────────────────────────────

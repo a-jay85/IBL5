@@ -69,6 +69,7 @@ WT_GC_WT_STATUS="${WT_GC_WT_STATUS:-$SCRIPT_DIR/wt-status}"  # test seam: fixtur
 # Per-step kill switches: "0" disables that step only; unset/empty = enabled.
 WT_GC_REAP_EMPTY="${WT_GC_REAP_EMPTY:-1}"
 WT_GC_REAP_DIRTY_MERGED="${WT_GC_REAP_DIRTY_MERGED:-1}"
+WT_GC_REAP_DIRTY_ARCHIVE="${WT_GC_REAP_DIRTY_ARCHIVE:-1}"   # sub-switch: 0 = byte-identical dirt only
 WT_GC_REAP_REFS="${WT_GC_REAP_REFS:-1}"
 WT_GC_REAP_TMP_PACK="${WT_GC_REAP_TMP_PACK:-1}"
 WT_GC_DOCKER_PRUNE="${WT_GC_DOCKER_PRUNE:-1}"
@@ -76,6 +77,7 @@ WT_GC_STALE_LIST="${WT_GC_STALE_LIST:-1}"
 WT_GC_ARCHIVE_PRUNE="${WT_GC_ARCHIVE_PRUNE:-1}"
 # Ages (days) / Docker until-filter. Non-numeric or empty = that step skipped, rc=1.
 WT_GC_EMPTY_DAYS="${WT_GC_EMPTY_DAYS-7}"
+WT_GC_DIRTY_ARCHIVE_DAYS="${WT_GC_DIRTY_ARCHIVE_DAYS-3}"
 WT_GC_BACKUP_DAYS="${WT_GC_BACKUP_DAYS-7}"
 WT_GC_REF_DAYS="${WT_GC_REF_DAYS-14}"
 WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"

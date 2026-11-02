@@ -394,6 +394,7 @@ _gc_reap_empty_one() {
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────
 # Candidates: MERGED rows that bin/cleanup skipped as dirty this sweep.
 reap_dirty_merged_worktrees() {
+    if [ "${WT_GC_REAP_DIRTY_ARCHIVE:-1}" != 0 ]; then _gc_valid_days WT_GC_DIRTY_ARCHIVE_DAYS || return 1; fi
     log "step dirty-merged"
     local names parent name rc=0
     names="$(awk '$1=="MERGED" {print $2}' "$TMP_STATUS")"
@@ -415,8 +416,89 @@ reap_dirty_merged_worktrees() {
     return "$rc"
 }
 
+# _gc_dirt_identical <wt> — compare every dirty path with origin/master. Logs
+# nothing. Sets GC_DIRT_REASON (the text after "dirty keep <name>: ") and
+# GC_DIRT_PATHS. 0 = every path byte-identical to master; 1 = a content
+# difference (archivable); 2 = a structural keep (never archived and reaped).
+_gc_dirt_identical() {
+    local wt="$1" porcelain line xy p n=0 drc=0
+    GC_DIRT_REASON=""
+    GC_DIRT_PATHS=0
+    if ! porcelain="$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)"; then
+        GC_DIRT_REASON="status error"; return 2
+    fi
+    while IFS= read -r line <&4; do
+        [ -n "$line" ] || continue
+        xy="${line:0:2}"
+        p="${line:3}"
+        case "$xy" in *R*|*C*|*U*|*T*) GC_DIRT_REASON="path $p rename/copy/conflict/type"; return 2 ;; esac
+        case "$p" in '"'*) GC_DIRT_REASON="quoted path"; return 2 ;; esac
+        if [ -L "$wt/$p" ]; then GC_DIRT_REASON="path $p is a symlink"; return 2; fi
+        case "$(git -C "$wt" ls-files -s -- "$p" 2>/dev/null)" in
+            160000*) GC_DIRT_REASON="path $p is a submodule"; return 2 ;;
+        esac
+        case "$xy" in
+            '??'|' M'|'M '|'A ')
+                if ! git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p absent on master"
+                    drc=1
+                elif ! git -C "$wt" show "origin/master:$p" 2>/dev/null | cmp -s - "$wt/$p"; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p differs"
+                    drc=1
+                fi ;;
+            ' D'|'D ')
+                if git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
+                    [ "$drc" = 1 ] || GC_DIRT_REASON="path $p deleted but present on master"
+                    drc=1
+                fi ;;
+            *) GC_DIRT_REASON="path $p status $xy"; return 2 ;;
+        esac
+        n=$((n + 1))
+    done 4<<< "$porcelain"
+    GC_DIRT_PATHS="$n"
+    return "$drc"
+}
+
+# _gc_merge_proven <tip> <pr_oid> — 0 = every local commit reached master,
+# 1 = not proven (GC_PROOF_REASON set), 2 = probe error. Proven when the tip is
+# the PR head or an ancestor of it, or every path the branch changed matches
+# origin/master byte for byte.
+_gc_merge_proven() {
+    local tip="$1" oid="$2" base paths p a b rc
+    GC_PROOF_REASON=""
+    [ "$tip" = "$oid" ] && return 0
+    if [ -n "$oid" ] && git -C "$WT_GC_REPO_ROOT" cat-file -e "$oid^{commit}" 2>/dev/null; then
+        rc=0
+        git -C "$WT_GC_REPO_ROOT" merge-base --is-ancestor "$tip" "$oid" 2>/dev/null || rc=$?
+        case "$rc" in
+            0) return 0 ;;
+            1) ;;
+            *) return 2 ;;
+        esac
+    fi
+    base="$(git -C "$WT_GC_REPO_ROOT" merge-base origin/master "$tip" 2>/dev/null)" || return 2
+    # A temp file, not a variable: command substitution drops the NUL separators.
+    paths="$(mktemp "${TMPDIR:-/tmp}/wt-gc-paths.XXXXXX")" || return 2
+    if ! git -C "$WT_GC_REPO_ROOT" diff --name-only -z --no-renames "$base" "$tip" > "$paths" 2>/dev/null; then
+        rm -f "$paths"; return 2
+    fi
+    rc=0
+    while IFS= read -r -d '' p <&5; do
+        if ! a="$(git -C "$WT_GC_REPO_ROOT" ls-tree "$tip" -- "$p" 2>/dev/null)" \
+            || ! b="$(git -C "$WT_GC_REPO_ROOT" ls-tree origin/master -- "$p" 2>/dev/null)"; then
+            rc=2; break
+        fi
+        if [ "$a" != "$b" ]; then
+            GC_PROOF_REASON="path $p not in master"
+            rc=1; break
+        fi
+    done 5< "$paths"
+    rm -f "$paths"
+    return "$rc"
+}
+
 _gc_reap_dirty_one() {
-    local name="$1" wt="$2" branch tip porcelain line xy p n=0
+    local name="$1" wt="$2" branch tip drc=0 prc now merged days snap
     _gc_wt_guard dirty "$name" "$wt" || return 0
     branch="$GC_BRANCH"
     if ! tip="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
@@ -427,42 +509,56 @@ _gc_reap_dirty_one() {
         return 1
     fi
     GH_CMD="$WT_GC_GH" pr_info "$branch" "$wt" || true
-    if [ "${PR_STATE:-}" != MERGED ] || [ -z "${PR_OID:-}" ] || [ "$PR_OID" != "$tip" ]; then
+    if [ "${PR_STATE:-}" != MERGED ]; then
         log "dirty keep $name: merge not proven (state=${PR_STATE:-?} oid=${PR_OID:-?})"
         return 0
     fi
-    if ! porcelain="$(git -C "$wt" status --porcelain=v1 --untracked-files=all 2>/dev/null)"; then
-        log "dirty keep $name: status error"; return 0
+    _gc_dirt_identical "$wt" || drc=$?
+    if [ "${PR_OID:-}" = "$tip" ] && [ "$drc" = 0 ]; then
+        _gc_remove_wt_and_branch dirty "$name" "$branch" "$tip" || return 1
+        [ "$GC_REMOVED" = 1 ] || return 0
+        log "dirty reaped $name paths=$GC_DIRT_PATHS"
+        return 0
     fi
-    while IFS= read -r line <&3; do
-        [ -n "$line" ] || continue
-        xy="${line:0:2}"
-        p="${line:3}"
-        case "$xy" in *R*|*C*|*U*|*T*) log "dirty keep $name: path $p rename/copy/conflict/type"; return 0 ;; esac
-        case "$p" in '"'*) log "dirty keep $name: quoted path"; return 0 ;; esac
-        if [ -L "$wt/$p" ]; then log "dirty keep $name: path $p is a symlink"; return 0; fi
-        case "$(git -C "$wt" ls-files -s -- "$p" 2>/dev/null)" in
-            160000*) log "dirty keep $name: path $p is a submodule"; return 0 ;;
-        esac
-        case "$xy" in
-            '??'|' M'|'M '|'A ')
-                if ! git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
-                    log "dirty keep $name: path $p absent on master"; return 0
-                fi
-                if ! git -C "$wt" show "origin/master:$p" 2>/dev/null | cmp -s - "$wt/$p"; then
-                    log "dirty keep $name: path $p differs"; return 0
-                fi ;;
-            ' D'|'D ')
-                if git -C "$wt" cat-file -e "origin/master:$p" 2>/dev/null; then
-                    log "dirty keep $name: path $p deleted but present on master"; return 0
-                fi ;;
-            *) log "dirty keep $name: path $p status $xy"; return 0 ;;
-        esac
-        n=$((n + 1))
-    done 3<<< "$porcelain"
+    if [ "$drc" = 2 ]; then
+        log "dirty keep $name: $GC_DIRT_REASON"; return 0
+    fi
+    if [ "${WT_GC_REAP_DIRTY_ARCHIVE:-1}" = 0 ]; then
+        if [ "${PR_OID:-}" != "$tip" ]; then
+            log "dirty keep $name: merge not proven (state=${PR_STATE:-?} oid=${PR_OID:-?})"
+        else
+            log "dirty keep $name: $GC_DIRT_REASON"
+        fi
+        return 0
+    fi
+    prc=0
+    _gc_merge_proven "$tip" "${PR_OID:-}" || prc=$?
+    case "$prc" in
+        0) ;;
+        1) log "dirty keep $name: merge not proven (state=MERGED oid=${PR_OID:-?}: $GC_PROOF_REASON)"; return 0 ;;
+        *) log "dirty keep $name: merge proof probe error"; return 0 ;;
+    esac
+    if ! [[ "${PR_NUM:-}" =~ ^[0-9]+$ ]] || ! merged="$(_gc_backup_merged_epoch "$PR_NUM")"; then
+        log "dirty keep $name: merge age unknown"; return 0
+    fi
+    now="$(date +%s)"
+    if [ $(( now - merged )) -lt $(( WT_GC_DIRTY_ARCHIVE_DAYS * 86400 )) ]; then
+        log "dirty keep $name: merged <${WT_GC_DIRTY_ARCHIVE_DAYS}d ago"; return 0
+    fi
+    days=$(( (now - merged) / 86400 ))
+    if ! snap="$(_gc_snapshot_dirt "$wt" "$tip" "wt/$name")"; then
+        log "dirty keep $name: snapshot failed"; return 0
+    fi
+    if ! _gc_tips_record "$snap" "refs/wt/$name"; then
+        log "dirty keep $name: archive failed"; return 0
+    fi
     _gc_remove_wt_and_branch dirty "$name" "$branch" "$tip" || return 1
     [ "$GC_REMOVED" = 1 ] || return 0
-    log "dirty reaped $name paths=$n"
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        log "dirty archived-reaped $name paths=$GC_DIRT_PATHS merged=${days}d archive=dry-run"
+    else
+        log "dirty archived-reaped $name paths=$GC_DIRT_PATHS merged=${days}d archive=refs/wt-gc-archive/$GC_ARCHIVE_STAMP/wt/$name"
+    fi
 }
 
 # ── Step: stale refs ──────────────────────────────────────────────────────────

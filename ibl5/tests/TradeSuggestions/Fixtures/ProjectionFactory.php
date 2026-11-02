@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions\Fixtures;
 
 use TradeSuggestions\ProductionLine;
+use TradeSuggestions\Profile\SeasonLineup;
+use TradeSuggestions\Projection\PlayerProjection;
 use TradeSuggestions\Projection\ProjectionPlayer;
 use TradeSuggestions\Projection\Rating;
 use TradeSuggestions\Projection\RatingScale;
@@ -116,5 +118,57 @@ final class ProjectionFactory
             tradeable: $tradeable,
             productionFouls: $productionFouls,
         );
+    }
+
+    /**
+     * Projects each player against `scale()` and builds the lineup at `$offset`.
+     *
+     * @param list<ProjectionPlayer> $players
+     */
+    public static function lineupFor(int $tid, int $offset, array $players): SeasonLineup
+    {
+        $projected = [];
+        foreach ($players as $player) {
+            $projected[$player->pid] = [
+                'player' => $player,
+                'season' => PlayerProjection::project($player, self::scale())[$offset],
+            ];
+        }
+
+        return SeasonLineup::build($tid, $offset, $projected);
+    }
+
+    /**
+     * Offset-0 lineups for tids 1..$teams. `$rowBuilder(int $tid)` returns that team's players.
+     *
+     * @param callable(int): list<ProjectionPlayer> $rowBuilder
+     * @return array<int, SeasonLineup>
+     */
+    public static function leagueOf(int $teams, callable $rowBuilder): array
+    {
+        $lineups = [];
+        for ($tid = 1; $tid <= $teams; $tid++) {
+            $lineups[$tid] = self::lineupFor($tid, 0, $rowBuilder($tid));
+        }
+
+        return $lineups;
+    }
+
+    /**
+     * Every rostered player's base ratings, keyed by pid.
+     *
+     * @param array<int, SeasonLineup> $lineups
+     * @return array<int, RatingSet>
+     */
+    public static function ratingsOf(array $lineups): array
+    {
+        $ratings = [];
+        foreach ($lineups as $lineup) {
+            foreach ($lineup->players as $pid => $player) {
+                $ratings[$pid] = $player->ratings;
+            }
+        }
+
+        return $ratings;
     }
 }

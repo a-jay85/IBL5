@@ -325,6 +325,12 @@ expect_eq "J13 --model is claude-opus-5-5" "[claude-opus-5-5]" "$(arg_after --mo
 expect_eq "J13 --effort is high" "[high]" "$(arg_after --effort)"
 expect_eq "J13 --output-format is json" "[json]" "$(arg_after --output-format)"
 expect_eq "J13 --allowedTools carries an empty value" "[]" "$(arg_after --allowedTools)"
+expect_eq "J13 --tools carries an empty value" "[]" "$(arg_after --tools)"
+if grep -qxF -- '--strict-mcp-config' "$BASE_TMP/argv"; then
+    h_pass "J13 --strict-mcp-config is passed"
+else
+    h_fail "J13 --strict-mcp-config is passed" "the judge argv lacks it"
+fi
 if grep -qxF -- '--dangerously-skip-permissions' "$BASE_TMP/argv"; then
     h_fail "J13 no --dangerously-skip-permissions" "the judge argv carries it"
 else

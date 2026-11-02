@@ -82,3 +82,7 @@ One live run against the real judge, 14 rows in two passes, 14 calls at a time. 
 ## Addendum (2026-11-02): judge prompt reverted to the plan wording
 
 The corpus table above ran with a prompt that told the judge to decide check 1 from what the task text says and not to assume risks the text gives no sign of. The fidelity review found that wording looser than SKILL.md, which says any doubt keeps the task at xhigh. The prompt now says only: apply the check list as written, and answer xhigh when unsure whether check 1 applies. The table above was not rerun on that prompt. Rows 12 and 13 are the ones to watch on the next live run. If either fails, hand off per the plan rather than loosening the prompt again.
+
+## Addendum (2026-11-02): corpus rerun on the shipping prompt
+
+The 14-row corpus was rerun on the prompt that ships, with the judge argv carrying `--tools ''` and `--strict-mcp-config`. Rows 1 to 11, 13 and 14 passed. Row 12 (`Add a helper method to the standings renderer`) failed: the judge answered xhigh where default was expected, reasoning that a new rendering helper is a security surface with no pinned output. This is the failure the plan's Phase 6 names. Verification has not passed, and the prompt is not loosened again. The `fail-count` is 1. A human decides whether to accept the false xhigh on row 12 or change the rule text.

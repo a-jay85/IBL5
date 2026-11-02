@@ -189,7 +189,8 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir "$WORK/cwd" || failsafe "mktemp failed"
 
 ( cd "$WORK/cwd" && exec "$JUDGE_BIN" -p "$PROMPT" --model "$JUDGE_MODEL" \
-    --effort high --output-format json --allowedTools '' ) \
+    --effort high --output-format json --allowedTools '' \
+    --tools '' --strict-mcp-config ) \
     </dev/null >"$WORK/out" 2>"$WORK/err" &
 JPID=$!
 

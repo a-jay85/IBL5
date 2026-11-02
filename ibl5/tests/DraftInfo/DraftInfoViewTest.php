@@ -150,8 +150,10 @@ class DraftInfoViewTest extends TestCase
     {
         $html = $this->view->renderTeamLoginPrompt();
 
-        $this->assertStringContainsString('href="modules.php?name=YourAccount"', $html);
-        $this->assertStringContainsString('draft history', $html);
-        $this->assertStringNotContainsString('<table', $html);
+        $this->assertSame(
+            '<p class="ibl-subtab-login-prompt"><a href="modules.php?name=YourAccount">Log in</a>'
+            . ' to see your team&#039;s draft history.</p>',
+            $html
+        );
     }
 }

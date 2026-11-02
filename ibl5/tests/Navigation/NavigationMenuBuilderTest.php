@@ -56,7 +56,6 @@ class NavigationMenuBuilderTest extends TestCase
             seasonPhase: 'Regular Season',
             allowWaivers: 'No',
             showDraftLink: 'Off',
-            isDraftOrderFinalized: false,
             isAdmin: false,
             isDebugAdmin: true,
         );

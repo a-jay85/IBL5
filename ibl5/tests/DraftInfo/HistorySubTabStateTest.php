@@ -77,6 +77,15 @@ class HistorySubTabStateTest extends TestCase
         $this->assertSame(7, $state->otherTeamId);
     }
 
+    public function testResolveUnknownTeamidFallsBackToLeague(): void
+    {
+        $state = HistorySubTabState::resolve(99, null, '', 5);
+
+        $this->assertSame('league', $state->activeSubTab);
+        $this->assertNull($state->teamIdToRender);
+        $this->assertNull($state->otherTeamId);
+    }
+
     public function testResolveTeamidWinsOverViewLeague(): void
     {
         $state = HistorySubTabState::resolve(7, 'Celtics', 'league', 5);

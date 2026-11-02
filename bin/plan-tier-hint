@@ -150,14 +150,8 @@ below, copied verbatim from .claude/skills/plan/SKILL.md (Step 3).
 Check 1 maps to the verdict xhigh. Check 2 maps to sonnet. Check 3 maps to
 default. Apply the checks in order.
 
-Decide check 1 from what the task text says the change does. Do not assume
-risks the text gives no sign of. Touching a file that sits on a security
-surface is not enough by itself. The task must add or change something on
-the carve-out's irreducible list, change a rendered or queried result, or
-weaken a gate. A split or extraction whose task says it pins today's output
-first meets the pinned-restructure carve-out unless the text says the output
-changes. When the text does give a sign that check 1 applies and you cannot
-rule it out, answer xhigh.
+Apply the check list as written. When you are unsure whether check 1
+applies, answer xhigh.
 INTRO
 )"
 PROMPT_OUTRO="$(cat <<'OUTRO'

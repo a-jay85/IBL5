@@ -788,9 +788,10 @@ if [ "$_hr_run" = 1 ]; then
 fi
 # _cf_restore: put the PR's worktree back at the pre-fix head after a gave-up conflict fix.
 # postplan-fix prints head0= before it touches the worktree, so an empty _cf_head0 means
-# nothing changed. The worktree is fleet-owned and its head0 equals the remote PR head the
-# attempt record keys on, so the reset discards only the bot's unpushed merge. Nothing on a
-# gave-up path pushes; the is-ancestor guard only protects against a surprise.
+# nothing changed. The worktree is fleet-owned, and head0 is its HEAD before the fix (the
+# attempt record keys on the same SHA). Nothing checks that head0 matches the remote PR head.
+# The gave-up-refire-* paths ran post-plan-now, which can push, so the is-ancestor guard is
+# what keeps the reset from discarding a published commit.
 _cf_restored=""
 _cf_restore() {
     [ -n "$_cf_head0" ] || return 0
@@ -808,12 +809,12 @@ _cf_restore() {
         if [ "$_cf_cur" != "$_cf_head0" ]; then
             git -C "$CF_WT" reset --hard "$_cf_head0" >/dev/null 2>&1 || true
             _cf_restored=$(printf '%.7s' "$_cf_head0")
+            echo "post-plan-fleet: conflict-fix-restored=$_cf_restored" >> "$LOG"
         fi
     elif [ "$_cf_prc" != 0 ]; then
         echo "post-plan-fleet: conflict-fix-restore-skipped=probe-rc-$_cf_prc" >> "$LOG"
     fi
     rm -f "/tmp/postplan-premerged-$(printf '%s' "$_cf_br" | tr '/' '-').json"
-    echo "post-plan-fleet: conflict-fix-restored=$(printf '%.7s' "$_cf_head0")" >> "$LOG"
 }
 # Conflict autofix: one bounded postplan-fix --headless per (PR, head SHA), then one re-fire.
 # Gated on _hr_run = 0, so a runner takes at most one follow-up (the ceiling relies on it).
@@ -824,9 +825,16 @@ if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
     if [ -z "$CF_WT" ]; then
         _cf_word=skip-no-worktree
     else
-        _cf_head=$(git -C "$CF_WT" rev-parse HEAD)
-        _cf_n=$( . "$PCW_LIB" && pcw_conflict_fix_count "$CF_STATE_DIR" "$PR" "$_cf_head" )
-        if [ "${_cf_n:-0}" -ge 1 ]; then
+        # The worktree can be gone or stale by now; with no head there is no attempt key.
+        _cf_head=$(git -C "$CF_WT" rev-parse HEAD 2>/dev/null || true)
+        _cf_n=0 _cf_cap=1
+        if [ -n "$_cf_head" ]; then
+            _cf_n=$( . "$PCW_LIB" && pcw_conflict_fix_count "$CF_STATE_DIR" "$PR" "$_cf_head" )
+            _cf_cap=$( . "$PCW_LIB" && printf '%s' "${PCW_CONFLICT_FIX_CAP:-1}" )
+        fi
+        if [ -z "$_cf_head" ]; then
+            _cf_word=skip-no-head
+        elif [ "${_cf_n:-0}" -ge "${_cf_cap:-1}" ]; then
             _cf_word=skip-attempted
         else
             # An attempt that cannot be recorded could repeat on every run: do not call the fix.

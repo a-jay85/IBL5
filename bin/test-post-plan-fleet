@@ -3505,7 +3505,7 @@ end_case holdrepeat-fix-bin-empty-env
 # --- conflict autofix cases -------------------------------------------------------------
 # When the first post-plan pass ends in a rebase conflict, a PR listed in --conflict-fix-prs=
 # gets one bounded `postplan-fix --headless <PR>` per (PR, head SHA); on committed/clean the
-# runner re-fires post-plan once. Every other path restores the worktree and DMs the human.
+# runner re-fires post-plan once. A gave-up path restores an unpublished worktree and DMs the human.
 # Each case needs a real worktree: a temp repo with a bare origin and the PR branch pushed.
 export GIT_AUTHOR_NAME=cf-test GIT_AUTHOR_EMAIL=cf-test@example.invalid
 export GIT_COMMITTER_NAME=cf-test GIT_COMMITTER_EMAIL=cf-test@example.invalid
@@ -3521,6 +3521,8 @@ cat > "$_CF_PPSTUB" <<'CFSTUB'
 #!/usr/bin/env bash
 echo "argv=$*" >> "$CF_PPREC"
 if [ "$(wc -l < "$CF_PPREC" | tr -d ' ')" = 1 ]; then
+    # CF_PP1_BREAK=1: the first pass leaves the worktree gone (pruned or removed).
+    [ "${CF_PP1_BREAK:-0}" = 1 ] && rm -rf "$CF_WT/.git"
     echo 'RESULT: post-plan BLOCKED: rebase-conflict: tree proof failed: LOST: f.txt: +x'
 else
     echo "$CF_PP2_RESULT"
@@ -3570,9 +3572,10 @@ _cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX
     HOME="$SCRATCH" CF_PPREC="$_CF_PPREC" CF_FIXREC="$_CF_FIXREC" CF_WT="$_CF_WT" \
         CF_PP2_RESULT="${CF_PP2_RESULT:-RESULT: terminal=shipped-held}" \
         CF_FIX_WORD="${CF_FIX_WORD:-}" CF_FIX_COMMIT="${CF_FIX_COMMIT:-0}" CF_FIX_RC="${CF_FIX_RC:-0}" \
+        CF_PP1_BREAK="${CF_PP1_BREAK:-0}" \
         bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 }
-_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PCW_LIB; }
+_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PCW_LIB CF_PP1_BREAK; }
 
 # --- case: conflict-fix-refires ---------------------------------------------------------
 begin_case
@@ -3684,7 +3687,41 @@ CF_FIX_COMMIT=1 CF_FIX_RC=1 _cf_run --conflict-fix-prs="${_DM_PR}"
     || fail "conflict-fix-restore-probe-error: HEAD was reset although the probe could not answer"
 grep -qF "post-plan-fleet: conflict-fix-restore-skipped=probe-rc-128" "$_DM_LOG" 2>/dev/null \
     || fail "conflict-fix-restore-probe-error: log lacks conflict-fix-restore-skipped=probe-rc-128"
+! grep -qF "post-plan-fleet: conflict-fix-restored=" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-restore-probe-error: log claims a restore although no reset ran"
 end_case conflict-fix-restore-probe-error
+
+# --- case: conflict-fix-no-head ---------------------------------------------------------
+# The worktree is gone by the time the fix would run, so HEAD cannot be read. With no head
+# there is no attempt key: skip the fix and write no record keyed on an empty SHA.
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_PP1_BREAK=1 CF_FIX_WORD=committed CF_FIX_COMMIT=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ ! -s "$_CF_FIXREC" ]] \
+    || fail "conflict-fix-no-head: the fix ran with no readable head ($(cat "$_CF_FIXREC" 2>/dev/null))"
+grep -qF "post-plan-fleet: conflict-fix=skip-no-head" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-no-head: log lacks conflict-fix=skip-no-head"
+[[ ! -e "$_CF_STATE/conflict-fix/${_DM_PR}" ]] \
+    || fail "conflict-fix-no-head: an attempt was recorded ('$(cat "$_CF_STATE/conflict-fix/${_DM_PR}" 2>/dev/null)')"
+end_case conflict-fix-no-head
+
+# --- case: conflict-fix-cap-from-lib ----------------------------------------------------
+# The attempt cap comes from PCW_CONFLICT_FIX_CAP in the pr-cycle-watch lib. With cap 2 and
+# one prior attempt on this head, the fix still runs.
+begin_case
+_cf_reset_knobs; _cf_setup
+_CF_CAPLIB="$_CF_DIR/cap2-pcw-lib.sh"
+cat > "$_CF_CAPLIB" <<'CAPLIB'
+PCW_CONFLICT_FIX_CAP=2
+pcw_conflict_fix_count() { printf '1\n'; }
+pcw_add_conflict_fix() { return 0; }
+CAPLIB
+CF_PCW_LIB="$_CF_CAPLIB" CF_FIX_RC=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+[[ "$(_hr_calls "$_CF_FIXREC")" == 1 ]] \
+    || fail "conflict-fix-cap-from-lib: want one fix call under cap 2, got $(_hr_calls "$_CF_FIXREC")"
+! grep -qF "post-plan-fleet: conflict-fix=skip-attempted" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-cap-from-lib: skipped as attempted although the cap allows a second try"
+end_case conflict-fix-cap-from-lib
 
 # --- case: conflict-fix-record-failed ---------------------------------------------------
 # An attempt that cannot be recorded could repeat on every run, so the fix is never called.

@@ -3,7 +3,7 @@
 # bin/test-bug-pipeline-e2e — regression harness for the guards in
 # bin/bug-pipeline-e2e (opt-in gate, argv, production-contact guard, stub wiring)
 # and the lsof port guard in bin/bug-pipeline-test-env. L0-L7, E0-E6, G1-G21,
-# S-cases, C1-C3.
+# S-cases, C1-C3, W0-W4 (wake case 8.2 region).
 #
 # Usage: bin/test-bug-pipeline-e2e [--mutation-check]
 #   (no arg)          run every case
@@ -150,6 +150,9 @@ if [ "$MODE" = mutation ]; then
     mut m-stub-prefix e2e "fail \"\$v='\$p' is not a stub\""       'true'
     mut m-stub-exec   e2e "fail \"\$v='\$p' is not executable\""   'true'
     mut m-envelope    e2e "|| fail 'CLAUDE_BIN does not emit"      "|| true 'CLAUDE_BIN does not emit"
+    # W: wake case 8.2 region
+    mut m-w82-read   e2e "\"\$(jq -r '.error.message' \"\$WAKE_OUT\" 2>/dev/null || true)\"" "'Only the pipeline operator can wake a report.'"
+    mut m-w82-anchor e2e '# BPE-W82-END' '# BPE-W82-GONE'
 
     echo "passed=$H_PASS failed=$H_FAIL"
     [ "$H_FAIL" -eq 0 ] || exit 1
@@ -380,5 +383,76 @@ else
     bpe_guard "C3: non-JSON output" "$ENV_MSG"
     claude_stub '{"is_error":false,"result":{}}'
 fi
+
+# ═══ W0-W4: wake case 8.2 region (expect + wake_post + BPE-W82 block, stub curl) ═
+# Phase 8 needs a live DB and app, so this runs only the 8.2 block. The block, the
+# expect helper, and wake_post are copied verbatim from $E2E_BIN; curl and q are stubs.
+W82_TIER_MSG='Only the pipeline bot can wake a report.'
+W82_AUTHOR_MSG='Only the pipeline operator can wake a report.'
+w82_extract() {   # <source> <out>; returns 1 with a message when an anchor is missing, duplicated, or off-target
+    local src="$1" out="$2" n
+    n=$(grep -cE '^[[:space:]]*# BPE-W82-BEGIN( |$)' "$src"); [ "$n" -eq 1 ] || { echo "W82 anchor BPE-W82-BEGIN count $n (want 1)" >&2; return 1; }
+    n=$(grep -cE '^[[:space:]]*# BPE-W82-END$' "$src");      [ "$n" -eq 1 ] || { echo "W82 anchor BPE-W82-END count $n (want 1)" >&2; return 1; }
+    n=$(grep -cE '^expect\(\) \{' "$src");                    [ "$n" -eq 1 ] || { echo "W82 anchor expect() count $n (want 1)" >&2; return 1; }
+    n=$(grep -cxF 'wake_post() {' "$src");                    [ "$n" -eq 1 ] || { echo "W82 anchor wake_post() count $n (want 1)" >&2; return 1; }
+    {
+        printf '%s\n' 'set -euo pipefail' 'RC=0' 'ID3=990001' 'THREAD3=1234567890123456792' \
+            'SOURCE3=1234567890123456796' 'WAKE_BASE=http://127.0.0.1:9' 'WAKE_KEY=bpe-w82-key' \
+            'WAKE_OUT="$BPE_W82_OUT"' \
+            'q() { case "$1" in *COUNT*) echo 0 ;; *status*) echo dormant ;; *) echo UNEXPECTED_Q ;; esac; }'
+        grep -E '^expect\(\) \{' "$src"
+        awk '/^wake_post\(\) \{$/{f=1} f{print} f&&/^\}$/{f=0}' "$src"
+        awk '/^[[:space:]]*# BPE-W82-BEGIN( |$)/{f=1} f{print} /^[[:space:]]*# BPE-W82-END$/{f=0}' "$src"
+        printf '%s\n' 'exit "$RC"'
+    } > "$out"
+    for n in 'wake_post 1 ' '.error.message' 'curl -s -o "$WAKE_OUT"'; do
+        grep -qF -- "$n" "$out" || { echo "W82 region off-target: missing [$n]" >&2; return 1; }
+    done
+}
+mkdir -p "$T/w82stub"
+cat > "$T/w82stub/curl" <<'EOF_CURL'
+#!/bin/sh
+out=''
+while [ "$#" -gt 0 ]; do case "$1" in -o) out="$2"; shift 2 ;; *) shift ;; esac; done
+printf '%s' "$BPE_W82_BODY" > "$out"
+printf '%s' "$BPE_W82_CODE"
+EOF_CURL
+chmod 755 "$T/w82stub/curl"
+w82_run() {   # <http code> <body>; sets RC OUT ERR
+    OUT=$(env -i PATH="$T/w82stub:$BASE_PATH" BPE_W82_OUT="$T/w82.out" \
+        BPE_W82_CODE="$1" BPE_W82_BODY="$2" bash "$T/w82.sh" 2>"$T/w82.err")
+    RC=$?; ERR=$(cat "$T/w82.err")
+}
+w82_body() { printf '{"status":"error","error":{"code":"forbidden","message":"%s"},"meta":{}}' "$1"; }
+
+if w82_extract "$E2E_BIN" "$T/w82.sh" 2>"$T/w82.xerr"; then
+    bpt_ok "W0: 8.2 region extracted (anchors unique and on-target)"
+    w82_run 403 "$(w82_body "$W82_AUTHOR_MSG")"
+    bpt_expect_eq "W1: author-check 403 passes 8.2 rc" "0" "$RC"
+    bpt_expect_contains "W1: status assert ok" "ok: non-operator wake 403" "$OUT"
+    bpt_expect_contains "W1: author message assert ok" "ok: non-operator wake rejected by the author check" "$OUT"
+    bpt_expect_contains "W1: no-write assert ok" "ok: rejected wake writes nothing" "$OUT"
+    bpt_expect_contains "W1: dormant assert ok" "ok: rejected wake leaves status dormant" "$OUT"
+    w82_run 403 "$(w82_body "$W82_TIER_MSG")"
+    bpt_expect_eq "W2: tier-check 403 fails 8.2 rc" "1" "$RC"
+    bpt_expect_contains "W2: status alone still passes" "ok: non-operator wake 403" "$OUT"
+    bpt_expect_contains "W2: FAIL names the author assert" "FAIL: non-operator wake rejected by the author check" "$ERR"
+    bpt_expect_contains "W2: FAIL shows the tier message" "got [$W82_TIER_MSG]" "$ERR"
+    w82_run 403 '<html>oops</html>'
+    bpt_expect_eq "W3: non-JSON 403 body fails 8.2 rc" "1" "$RC"
+    bpt_expect_contains "W3: FAIL shows an empty message" "got []" "$ERR"
+    bpt_expect_contains "W3: later asserts still run" "ok: rejected wake leaves status dormant" "$OUT"
+else
+    bpt_fail "W0: 8.2 region extracted ($(cat "$T/w82.xerr"))"
+fi
+# W4: the extractor itself fails loudly on a duplicated or deleted anchor.
+BPE_O='# BPE-W82-BEGIN' awk '{print} index($0,ENVIRON["BPE_O"]){print}' "$E2E_BIN" > "$T/w82.dup"
+w82_extract "$T/w82.dup" "$T/w82.dup.sh" 2>"$T/w82.dup.err"; RC=$?
+bpt_expect_eq "W4: duplicated BEGIN anchor rc" "1" "$RC"
+bpt_expect_contains "W4: duplicated BEGIN anchor message" "W82 anchor BPE-W82-BEGIN count 2" "$(cat "$T/w82.dup.err")"
+grep -v '# BPE-W82-END' "$E2E_BIN" > "$T/w82.noend"
+w82_extract "$T/w82.noend" "$T/w82.noend.sh" 2>"$T/w82.noend.err"; RC=$?
+bpt_expect_eq "W4: deleted END anchor rc" "1" "$RC"
+bpt_expect_contains "W4: deleted END anchor message" "W82 anchor BPE-W82-END count 0" "$(cat "$T/w82.noend.err")"
 
 h_done

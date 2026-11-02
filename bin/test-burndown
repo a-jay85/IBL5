@@ -23,6 +23,19 @@ SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
 h_tmp T
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
+# Every real bin/plan-tier-hint call in this file goes through a stub judge
+# (PLAN_TIER_HINT_CLAUDE); no test spends tokens. The stubs live under the
+# h_tmp dir, so harness.sh's own EXIT trap removes them.
+PTJ_DIR="$T/judge"
+mkdir -p "$PTJ_DIR"
+cat > "$PTJ_DIR/judge-default" <<'JUDGE_EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: check 3"}'
+JUDGE_EOF
+printf '#!/usr/bin/env bash\nexit 3\n' > "$PTJ_DIR/judge-fail"
+chmod +x "$PTJ_DIR/judge-default" "$PTJ_DIR/judge-fail"
+export PLAN_TIER_HINT_CLAUDE="$PTJ_DIR/judge-default"
+
 mkdir -p "$T/home" "$T/fx"
 
 # gh stub: dispatches by args
@@ -2073,7 +2086,7 @@ JSON
 echo '[]' > "$T/fx/prs-open.json"
 touch "$T/fx/worktrees.txt"
 
-# ── C41: BURNDOWN_TIER_HINT unset — real bin/plan-tier-hint runs ──────────────
+# ── C41: BURNDOWN_TIER_HINT unset — real bin/plan-tier-hint runs (stub judge) ─
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(env -u BURNDOWN_TIER_HINT GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
     BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" \
@@ -2090,7 +2103,7 @@ else
         || fail "C41: BURNDOWN_TIER_HINT unset: no ledger found"
 fi
 
-# ── C42: BURNDOWN_TIER_HINT="" — empty string falls back to real hint ──────────
+# ── C42: BURNDOWN_TIER_HINT="" — empty string falls back to real hint (stub judge)
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
     BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" BURNDOWN_TIER_HINT="" \
@@ -2105,6 +2118,29 @@ if [ -n "$C42_LEDGER" ] && [ -f "$C42_LEDGER" ]; then
 else
     [ "$RC" -ne 0 ] && fail "C42: BURNDOWN_TIER_HINT empty: rc=$RC out=$OUT" \
         || fail "C42: BURNDOWN_TIER_HINT empty: no ledger found"
+fi
+
+# ── C42a: judge failure tiers every item xhigh, none error ───────────────────
+# The hint's fail-safe answers xhigh (cost 2) where a failing hint used to give
+# error (cost 1).
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(env -u BURNDOWN_TIER_HINT PLAN_TIER_HINT_CLAUDE="$PTJ_DIR/judge-fail" \
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+C42A_LEDGER_LINE="$(grep '^LEDGER: ' <<< "$OUT" | tail -1)"
+C42A_LEDGER="${C42A_LEDGER_LINE#LEDGER: }"
+if [ -n "$C42A_LEDGER" ] && [ -f "$C42A_LEDGER" ]; then
+    C42A_TIERS="$(jq -r '.items[].tier' "$C42A_LEDGER")"
+    C42A_BAD="$(grep -vx xhigh <<< "$C42A_TIERS" || true)"
+    if [ -n "$C42A_TIERS" ] && [ -z "$C42A_BAD" ]; then
+        ok "C42a: judge failure: every item tiers xhigh, none error"
+    else
+        fail "C42a: judge failure: every item tiers xhigh, none error (tiers: $(tr '\n' ' ' <<< "$C42A_TIERS"))"
+    fi
+else
+    [ "$RC" -ne 0 ] && fail "C42a: judge failure: rc=$RC out=$OUT" \
+        || fail "C42a: judge failure: no ledger found"
 fi
 
 # ── C43: BURNDOWN_GIT unset — real git worktree list runs ────────────────────

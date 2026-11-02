@@ -2,8 +2,8 @@
 # shellcheck shell=bash
 #
 # test-plan-tier-hint — behavioural harness for the judge-backed architect-tier
-# hint, plus the static drift assertions that keep the copies of the /plan
-# Step 3 check-1 trigger in agreement.
+# hint, plus the static drift assertions that keep the prose surfaces saying
+# the tier is an Opus judgment.
 #
 # Every behavioural case drives a stub judge through PLAN_TIER_HINT_CLAUDE (or
 # a fake `claude` on PATH). The harness never calls a real model: CI is exported
@@ -28,6 +28,10 @@ h_tmp BASE_TMP
 OUT="$BASE_TMP/out"
 ERR="$BASE_TMP/err"
 TAB="$(printf '\t')"
+# Every hint run in this harness logs here, never to the real
+# ~/.claude/logs file. J10 and J11 call "$HINT" without run_hint, so this
+# must be an export.
+export PLAN_TIER_HINT_LOG="$BASE_TMP/verdict.log"
 
 expect_eq() { h_eq "$1" "$2" "$3"; } # name want got
 
@@ -149,6 +153,7 @@ expect_eq "J2 explain line holds exactly one TAB" "2" "$(awk -F'\t' '{ print NF 
 
 echo
 echo "== J3 no input and usage errors never call the judge =="
+rm -f "$PLAN_TIER_HINT_LOG"
 reset_recorder
 run_hint "$BASE_TMP/judge-rec"
 expect_exit "J3 no input exits 2" 2 "$RC"
@@ -165,6 +170,8 @@ reset_recorder
 run_hint "$BASE_TMP/judge-rec" --help
 expect_exit "J3 --help exits 0" 0 "$RC"
 expect_absent_file "J3 --help: judge not called" "$BASE_TMP/called"
+# Usage errors and --help exit before emit(), so they never log.
+expect_absent_file "J3 usage errors and --help write no log line" "$PLAN_TIER_HINT_LOG"
 
 echo
 echo "== J4 timeout =="
@@ -174,8 +181,8 @@ T0=$SECONDS
 PLAN_TIER_HINT_TIMEOUT=1 run_hint "$BASE_TMP/judge-slow" --explain --desc 'some task'
 ELAPSED=$((SECONDS - T0))
 expect_exit "J4 timeout exits 0" 0 "$RC"
-expect_match "J4 timeout gives xhigh naming the timeout" \
-    "^xhigh${TAB}judge-failsafe: judge timed out after 1s" "$OUT"
+expect_match "J4 timeout gives default naming the timeout" \
+    "^default${TAB}judge-failsafe: judge timed out after 1s" "$OUT"
 if [ "$ELAPSED" -lt 10 ]; then
     h_pass "J4 timeout returns in under 10s (${ELAPSED}s)"
 else
@@ -209,8 +216,8 @@ for txt in \
     J6_I=$((J6_I + 1))
     mk_judge "near-$J6_I" 0 "$(env_json "$txt")"
     run_hint "$BASE_TMP/judge-near-$J6_I" --explain --desc 'some task'
-    expect_match "J6.$J6_I near miss [$(printf '%s' "$txt" | tr '\n' '|')] gives xhigh unparseable" \
-        "^xhigh${TAB}judge-failsafe: judge output unparseable" "$OUT"
+    expect_match "J6.$J6_I near miss [$(printf '%s' "$txt" | tr '\n' '|')] gives default unparseable" \
+        "^default${TAB}judge-failsafe: judge output unparseable" "$OUT"
 done
 
 echo
@@ -233,8 +240,8 @@ mk_judge env-maxtok 0 "$(env_json "$GOOD" '.stop_reason = "max_tokens"')"
 mk_judge env-noresult 0 "$(env_json "$GOOD" 'del(.result)')"
 for k in nonjson iserror maxtok noresult; do
     run_hint "$BASE_TMP/judge-env-$k" --explain --desc 'some task'
-    expect_match "J8 $k envelope gives xhigh unusable" \
-        "^xhigh${TAB}judge-failsafe: judge envelope unusable" "$OUT"
+    expect_match "J8 $k envelope gives default unusable" \
+        "^default${TAB}judge-failsafe: judge envelope unusable" "$OUT"
 done
 
 echo
@@ -242,8 +249,8 @@ echo "== J9 non-zero judge exit =="
 mk_judge exit3 3 "$(env_json "$GOOD")"
 run_hint "$BASE_TMP/judge-exit3" --explain --desc 'some task'
 expect_exit "J9 hint still exits 0" 0 "$RC"
-expect_match "J9 exit 3 gives xhigh naming the exit" \
-    "^xhigh${TAB}judge-failsafe: judge exited 3" "$OUT"
+expect_match "J9 exit 3 gives default naming the exit" \
+    "^default${TAB}judge-failsafe: judge exited 3" "$OUT"
 
 echo
 echo "== J10 CI guard =="
@@ -259,7 +266,7 @@ FAKEPATH="$BASE_TMP/fakebin:$PATH"
 rm -f "$BASE_TMP/fake-called"
 env -u PLAN_TIER_HINT_CLAUDE CI=1 PATH="$FAKEPATH" \
     "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
-expect_match "J10a CI=1, seam unset: xhigh naming the CI guard" "^xhigh${TAB}judge-failsafe: CI guard" "$OUT"
+expect_match "J10a CI=1, seam unset: default naming the CI guard" "^default${TAB}judge-failsafe: CI guard" "$OUT"
 expect_absent_file "J10a fake claude never ran" "$BASE_TMP/fake-called"
 
 # The hint reads the seam with :-, so an empty value counts as unset. A read
@@ -267,7 +274,7 @@ expect_absent_file "J10a fake claude never ran" "$BASE_TMP/fake-called"
 rm -f "$BASE_TMP/fake-called"
 env CI=1 PLAN_TIER_HINT_CLAUDE= PATH="$FAKEPATH" \
     "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
-expect_match "J10b CI=1, empty seam counts as unset" "^xhigh${TAB}judge-failsafe: CI guard" "$OUT"
+expect_match "J10b CI=1, empty seam counts as unset" "^default${TAB}judge-failsafe: CI guard" "$OUT"
 expect_absent_file "J10b fake claude never ran" "$BASE_TMP/fake-called"
 
 rm -f "$BASE_TMP/fake-called"
@@ -291,31 +298,86 @@ else
     mkdir -p "$BASE_TMP/emptybin"
     env -u CI -u PLAN_TIER_HINT_CLAUDE PATH="$BASE_TMP/emptybin:/usr/bin:/bin" \
         "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
-    expect_match "J11 no claude on PATH: xhigh naming the missing CLI" \
-        "^xhigh${TAB}judge-failsafe: claude CLI not found" "$OUT"
+    expect_match "J11 no claude on PATH: default naming the missing CLI" \
+        "^default${TAB}judge-failsafe: claude CLI not found" "$OUT"
 fi
 
 echo
-echo "== J12 SKILL.md anchors =="
-REAL_SKILL="$ROOT/.claude/skills/plan/SKILL.md"
-grep -vF '1. **`plan-architect-xhigh`' "$REAL_SKILL" >"$BASE_TMP/skill-nostart.md"
-grep -vF 'For **every** tier,' "$REAL_SKILL" >"$BASE_TMP/skill-noend.md"
-for c in a:nostart b:noend; do
-    reset_recorder
-    PLAN_TIER_HINT_SKILL="$BASE_TMP/skill-${c#*:}.md" run_hint "$BASE_TMP/judge-rec" --explain --desc 'some task'
-    expect_match "J12${c%%:*} skill without the ${c#*:} anchor: xhigh naming the anchors" \
-        "^xhigh${TAB}judge-failsafe: Step 3 check-list anchors not found" "$OUT"
-    expect_absent_file "J12${c%%:*} judge not called" "$BASE_TMP/called"
+echo "== J12 verdict log =="
+# log_field <n> — field n of the log's last line.
+log_field() { awk -F'\t' -v n="$1" '{ f = $n } END { print f }' "$PLAN_TIER_HINT_LOG"; }
+
+rm -f "$PLAN_TIER_HINT_LOG"
+mk_judge recipe 0 "$(env_json "$(printf 'sonnet\nrecipe copy')")"
+X130="$(printf '%0130d' 0 | tr 0 x)"
+X120="$(printf '%0120d' 0 | tr 0 x)"
+run_hint "$BASE_TMP/judge-recipe" --desc "$(printf '%s\t\ntail' "$X130")"
+expect_eq "J12a success writes exactly one log line" "1" "$(awk 'END { print NR }' "$PLAN_TIER_HINT_LOG")"
+expect_eq "J12a log line has exactly 4 TAB fields" "4" "$(awk -F'\t' '{ print NF }' "$PLAN_TIER_HINT_LOG")"
+J12_TS="$(log_field 1)"
+if grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' <<<"$J12_TS"; then
+    h_pass "J12a field 1 is an ISO timestamp"
+else
+    h_fail "J12a field 1 is an ISO timestamp" "got [$J12_TS]"
+fi
+expect_eq "J12a field 2 is the verdict" "sonnet" "$(log_field 2)"
+expect_eq "J12a field 3 is the reason" "recipe copy" "$(log_field 3)"
+expect_eq "J12a field 4 is the task cut to 120 chars" "$X120" "$(log_field 4)"
+
+env -u PLAN_TIER_HINT_CLAUDE CI=1 \
+    "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+expect_eq "J12b failsafe logs its verdict" "default" "$(log_field 2)"
+case "$(log_field 3)" in
+    'judge-failsafe: CI guard'*) h_pass "J12b failsafe logs its judge-failsafe reason" ;;
+    *) h_fail "J12b failsafe logs its judge-failsafe reason" "got [$(log_field 3)]" ;;
+esac
+
+run_hint "$BASE_TMP/judge-pass-default" --desc 'some task'
+expect_eq "J12c no --explain: stdout is the bare verdict" "default" "$(cat "$OUT")"
+expect_eq "J12c no --explain: the log still holds the reason" "reason for default" "$(log_field 3)"
+
+run_hint "$BASE_TMP/judge-pass-default" --files 'bin/a,bin/b'
+expect_eq "J12d files-only task logs the file list" "files: bin/a,bin/b" "$(log_field 4)"
+
+echo
+echo "== J14 a failed log write is harmless =="
+: >"$BASE_TMP/notadir"
+PLAN_TIER_HINT_LOG="$BASE_TMP/notadir/x.log" run_hint "$BASE_TMP/judge-pass-default" --desc 'some task'
+expect_eq "J14a parent is a file: verdict unchanged" "default" "$(cat "$OUT")"
+expect_exit "J14a parent is a file: exit unchanged" 0 "$RC"
+expect_eq "J14a parent is a file: stderr stays empty" "" "$(cat "$ERR")"
+
+mkfifo "$BASE_TMP/fifo"
+PLAN_TIER_HINT_LOG="$BASE_TMP/fifo" PLAN_TIER_HINT_CLAUDE="$BASE_TMP/judge-pass-default" \
+    "$HINT" --desc 'some task' </dev/null >"$OUT" 2>"$ERR" &
+FIFO_PID=$!
+FIFO_I=0
+while [ "$FIFO_I" -lt 10 ] && kill -0 "$FIFO_PID" 2>/dev/null; do
+    sleep 1
+    FIFO_I=$((FIFO_I + 1))
 done
-reset_recorder
-PLAN_TIER_HINT_SKILL="$BASE_TMP/missing.md" run_hint "$BASE_TMP/judge-rec" --explain --desc 'some task'
-expect_match "J12c unreadable SKILL.md: xhigh naming the read failure" \
-    "^xhigh${TAB}judge-failsafe: cannot read SKILL.md" "$OUT"
-expect_absent_file "J12c judge not called" "$BASE_TMP/called"
-reset_recorder
-PLAN_TIER_HINT_SKILL='' run_hint "$BASE_TMP/judge-rec" --desc 'some task'
-expect_eq "J12d empty PLAN_TIER_HINT_SKILL uses the repo SKILL.md" "default" "$(cat "$OUT")"
-expect_present_file "J12d judge called" "$BASE_TMP/called"
+if kill -0 "$FIFO_PID" 2>/dev/null; then
+    kill -KILL "$FIFO_PID" 2>/dev/null
+    wait "$FIFO_PID" 2>/dev/null
+    h_fail "J14b FIFO log path returns within 10s" "the hint hung on the FIFO"
+else
+    wait "$FIFO_PID"
+    FIFO_RC=$?
+    h_pass "J14b FIFO log path returns within 10s"
+    expect_eq "J14b FIFO: verdict unchanged" "default" "$(cat "$OUT")"
+    expect_exit "J14b FIFO: exit unchanged" 0 "$FIFO_RC"
+fi
+
+echo
+echo "== J15 empty and unset log seam mean the default path =="
+rm -rf "${BASE_TMP:?}/home"
+HOME_LOG="$BASE_TMP/home/.claude/logs/plan-tier-hint.log"
+HOME="$BASE_TMP/home" PLAN_TIER_HINT_LOG='' \
+    run_hint "$BASE_TMP/judge-pass-default" --desc 'empty seam'
+expect_eq "J15 empty seam writes the default path" "1" "$(awk 'END { print NR }' "$HOME_LOG" 2>/dev/null)"
+env -u PLAN_TIER_HINT_LOG HOME="$BASE_TMP/home" PLAN_TIER_HINT_CLAUDE="$BASE_TMP/judge-pass-default" \
+    "$HINT" --desc 'unset seam' </dev/null >"$OUT" 2>"$ERR"
+expect_eq "J15 unset seam writes the default path" "2" "$(awk 'END { print NR }' "$HOME_LOG" 2>/dev/null)"
 
 echo
 echo "== J13 judge call contract =="
@@ -336,18 +398,21 @@ if grep -qxF -- '--dangerously-skip-permissions' "$BASE_TMP/argv"; then
 else
     h_pass "J13 no --dangerously-skip-permissions"
 fi
-for t in 'previously rejected now passes' 'plan-architect-sonnet'; do
+for t in 'would a wrong plan be expensive?' '2.5 times Opus 5.5 per token' \
+    'plan-architect-sonnet' 'output format, answer default.'; do
     if grep -qF -- "$t" "$BASE_TMP/argv"; then
-        h_pass "J13 prompt carries the check text [$t]"
+        h_pass "J13 prompt carries the open question text [$t]"
     else
-        h_fail "J13 prompt carries the check text [$t]" "extraction did not reach the judge"
+        h_fail "J13 prompt carries the open question text [$t]" "the judge prompt lacks it"
     fi
 done
-for t in 'Never delegate' 'last_verified:'; do
+# The old extraction's fence and the old check-1 sentence: SKILL.md text no
+# longer reaches the judge.
+for t in '--- check list ---' 'previously rejected now passes'; do
     if grep -qF -- "$t" "$BASE_TMP/argv"; then
-        h_fail "J13 prompt lacks text outside the anchors [$t]" "extraction ran past the end anchor"
+        h_fail "J13 prompt carries no SKILL.md check text [$t]" "the judge prompt still has it"
     else
-        h_pass "J13 prompt lacks text outside the anchors [$t]"
+        h_pass "J13 prompt carries no SKILL.md check text [$t]"
     fi
 done
 TASK_HITS="$(awk '
@@ -368,7 +433,7 @@ esac
 echo
 echo "== static drift assertions =="
 
-assert_contains "canonical states the behavioural test" \
+assert_contains "check 1 keeps the gate-14(e) weakening definition" \
     '.claude/skills/plan/SKILL.md' 'previously rejected now passes'
 assert_absent "canonical has no dangling clause reference" \
     '.claude/skills/plan/SKILL.md' 'clause 4'
@@ -376,30 +441,28 @@ assert_absent "safety mirror is no longer directory-led" \
     '.claude/rules/work-triage.md' 'ship-pipeline surface'
 assert_contains "tiers table points at the canonical check" \
     '.claude/rules/agent-tiering.md' '`/plan` Step 3 picks between the three architect defs (`.claude/skills/plan/SKILL.md`)'
-assert_contains "plan-prompt points at the canonical check" \
-    '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
-assert_contains "agent def carries the directory clause" \
-    '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
 # Bash 3.2 guard (macOS /bin/bash): no case-modification expansion in the hint.
 assert_absent "hint avoids Bash-4 lowercase expansion" \
     'bin/plan-tier-hint' ',,}'
 assert_absent "hint avoids Bash-4 uppercase expansion" \
     'bin/plan-tier-hint' '^^}'
-assert_contains "canonical carries the pinned-restructure carve-out" \
-    '.claude/skills/plan/SKILL.md' 'Pinned restructure of a security surface'
-assert_contains "plan-prompt points at the pinned-restructure carve-out" \
-    '.claude/skills/plan-prompt/SKILL.md' 'characterization-pinned split'
 assert_absent "canonical no longer calls the hint mechanical" \
     '.claude/skills/plan/SKILL.md' 'mechanical second opinion'
 
-# The hint extracts the judge's check list between these anchors. A SKILL.md
-# edit that moves one fails here before it can empty the judge prompt.
-assert_contains "SKILL.md keeps the check-1 start anchor" \
-    '.claude/skills/plan/SKILL.md' '1. **`plan-architect-xhigh`'
-assert_contains "SKILL.md keeps the check-2 anchor" \
-    '.claude/skills/plan/SKILL.md' '2. **`plan-architect-sonnet`'
-assert_contains "SKILL.md keeps the end anchor" \
-    '.claude/skills/plan/SKILL.md' 'For **every** tier,'
+# Every prose surface that names the architect tier carries the shared phrase.
+for f in .claude/skills/plan/SKILL.md .claude/skills/plan-prompt/SKILL.md \
+    .claude/agents/plan-architect.md .claude/agents/plan-architect-xhigh.md \
+    .claude/agents/plan-architect-sonnet.md .claude/rules/agent-tiering-fable.md; do
+    assert_contains "$f says the tier is an Opus judgment" "$f" 'tier is an Opus judgment'
+done
+# The hint no longer extracts SKILL.md text or fails safe to xhigh.
+for t in PLAN_TIER_HINT_SKILL '--- check list ---' 'TIER=xhigh'; do
+    assert_absent "hint holds no [$t]" 'bin/plan-tier-hint' "$t"
+done
+assert_absent "canonical no longer says the hint defaulted to xhigh" \
+    '.claude/skills/plan/SKILL.md' 'defaulted to `xhigh`'
+assert_absent "plan-prompt no longer routes on the hint printing xhigh" \
+    '.claude/skills/plan-prompt/SKILL.md' 'the hint printed xhigh'
 
 # No regex survives as a vote of any kind.
 for re in WEAKEN_RE GATE_RE SECURITY_RE; do

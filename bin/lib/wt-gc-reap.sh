@@ -14,7 +14,9 @@
 #   - every predicate that gates a delete is re-proven at reap time and KEEPS
 #     on any probe error (.claude/rules/shell-fail-open-probe.md);
 #   - every branch/ref delete is preceded by a verified tips-file line and
-#     done with `git update-ref -d <ref> <sha>` (compare-and-delete).
+#     done with `git update-ref -d <ref> <sha>` (compare-and-delete);
+#   - every delete is preceded by a keep-ref under refs/wt-gc-archive/ (git gc
+#     cannot collect it); a failed archive write keeps the item.
 
 # _gc_do <argv...> — single choke point for every destructive command.
 _gc_do() {
@@ -69,17 +71,110 @@ _gc_valid_days() {
     return 0
 }
 
-# _gc_tips_record <sha> <ref> — append "<sha> <ref>" to the dated tips file
-# and re-read it. Returns 1 if the mkdir, the append or the re-read fails;
-# callers never delete when it does.
+# _gc_archive_stamp — sets GC_ARCHIVE_STAMP once per tick. WT_GC_ARCHIVE_STAMP
+# (test seam) pins it; unset or empty means now.
+_gc_archive_stamp() {
+    [ -z "${GC_ARCHIVE_STAMP:-}" ] || return 0
+    if [ -n "${WT_GC_ARCHIVE_STAMP:-}" ]; then
+        if [[ ! "$WT_GC_ARCHIVE_STAMP" =~ ^[0-9]+$ ]]; then
+            log "invalid WT_GC_ARCHIVE_STAMP '$WT_GC_ARCHIVE_STAMP' — archive refused (fail-closed)"
+            return 1
+        fi
+        GC_ARCHIVE_STAMP="$WT_GC_ARCHIVE_STAMP"
+    else
+        GC_ARCHIVE_STAMP="$(date +%s)"
+    fi
+    return 0
+}
+
+# _gc_tips_record <sha> <ref> — write a gc-proof keep-ref
+# refs/wt-gc-archive/<stamp>/<ref minus refs/>, then append "<sha> <ref>" to
+# the dated tips file and re-read it. Returns 1 if the keep-ref, the mkdir,
+# the append or the re-read fails; callers never delete when it does.
 _gc_tips_record() {
-    local sha="$1" ref="$2" file
-    if [ "${DRY_RUN:-0}" = 1 ]; then return 0; fi
+    local sha="$1" ref="$2" file aref
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        log "DRY-RUN would: archive $sha as refs/wt-gc-archive/<stamp>/${ref#refs/}"
+        return 0
+    fi
+    _gc_archive_stamp || return 1
+    aref="refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/}"
+    if ! git -C "$WT_GC_REPO_ROOT" update-ref "$aref" "$sha" "" 2>/dev/null; then
+        if [ "$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "$aref" 2>/dev/null)" != "$sha" ]; then
+            log "archive failed $ref -> $aref"
+            return 1
+        fi
+    fi
     file="$WT_GC_TIPS_DIR/tips-$(date +%F).txt"
     mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null || return 1
     printf '%s %s\n' "$sha" "$ref" >> "$file" 2>/dev/null || return 1
     grep -qxF -- "$sha $ref" "$file" 2>/dev/null || return 1
     return 0
+}
+
+# _gc_archive_batch <doomed> — keep-refs for a "<sha> <ref>" list in one
+# update-ref transaction, then the tips lines. Returns 1 on any failure and the
+# transaction leaves no keep-ref behind.
+_gc_archive_batch() {
+    local doomed="$1" sha ref n=0 batch="" file
+    if [ "${DRY_RUN:-0}" = 1 ]; then
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] && n=$((n + 1))
+        done <<< "$doomed"
+        log "DRY-RUN would: archive $n refs"
+        return 0
+    fi
+    _gc_archive_stamp || return 1
+    while IFS=' ' read -r sha ref; do
+        [ -n "$ref" ] || continue
+        batch="${batch}create refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/} $sha"$'\n'
+    done <<< "$doomed"
+    [ -n "$batch" ] || return 0
+    if ! git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "${batch%$'\n'}" 2>/dev/null; then
+        log "archive failed (batch) — no refs deleted"
+        return 1
+    fi
+    file="$WT_GC_TIPS_DIR/tips-$(date +%F).txt"
+    if mkdir -p "$WT_GC_TIPS_DIR" 2>/dev/null; then
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] || continue
+            printf '%s %s\n' "$sha" "$ref" >> "$file" 2>/dev/null || { n=1; break; }
+            grep -qxF -- "$sha $ref" "$file" 2>/dev/null || { n=1; break; }
+        done <<< "$doomed"
+    else
+        n=1
+    fi
+    if [ "$n" = 1 ]; then
+        # The tips index failed: take the keep-refs back so nothing is half-written.
+        local undo=""
+        while IFS=' ' read -r sha ref; do
+            [ -n "$ref" ] || continue
+            undo="${undo}delete refs/wt-gc-archive/$GC_ARCHIVE_STAMP/${ref#refs/} $sha"$'\n'
+        done <<< "$doomed"
+        git -C "$WT_GC_REPO_ROOT" update-ref --stdin <<< "${undo%$'\n'}" >/dev/null 2>&1 || true
+        return 1
+    fi
+    return 0
+}
+
+# _gc_snapshot_dirt <wt> <tip> <label> — prints a commit sha whose tree is the
+# worktree's full content (tracked edits + untracked, non-ignored files) and
+# whose parent is <tip>. Dry-run prints <tip> and writes no object.
+_gc_snapshot_dirt() {
+    local wt="$1" tip="$2" label="$3" idx tree snap
+    if [ "${DRY_RUN:-0}" = 1 ]; then printf '%s\n' "$tip"; return 0; fi
+    idx="$(mktemp "${TMPDIR:-/tmp}/wt-gc-idx.XXXXXX")" || return 1
+    rm -f "$idx"
+    if ! GIT_INDEX_FILE="$idx" git -C "$wt" read-tree "$tip" 2>/dev/null; then rm -f "$idx"; return 1; fi
+    if ! GIT_INDEX_FILE="$idx" git -C "$wt" add -A -- . >/dev/null 2>&1; then rm -f "$idx"; return 1; fi
+    if ! tree="$(GIT_INDEX_FILE="$idx" git -C "$wt" write-tree 2>/dev/null)"; then rm -f "$idx"; return 1; fi
+    if ! snap="$(git -C "$wt" -c user.name=wt-gc -c user.email=wt-gc@localhost \
+            commit-tree "$tree" -p "$tip" -m "wt-gc archive: $label" 2>/dev/null)"; then
+        rm -f "$idx"; return 1
+    fi
+    rm -f "$idx"
+    [[ "$snap" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\n' "$snap"
 }
 
 # _gc_protected_name <refname> — 0 (deny) for refs no step may ever delete.
@@ -465,13 +560,10 @@ reap_stale_refs() {
     done 3<<< "$listing"
     [ -n "$doomed" ] || return "$rc"
     # Tips first: one failure deletes nothing.
-    while IFS=' ' read -r sha ref; do
-        [ -n "$ref" ] || continue
-        if ! _gc_tips_record "$sha" "$ref"; then
-            log "tips write failed — no refs deleted"
-            return 1
-        fi
-    done <<< "$doomed"
+    if ! _gc_archive_batch "$doomed"; then
+        log "tips write failed — no refs deleted"
+        return 1
+    fi
     # One compare-and-delete transaction for the whole set (thousands of refs
     # under a dead remote). If it fails nothing was deleted, so the per-ref
     # loop below retries one at a time and isolates the bad ref.
@@ -563,6 +655,35 @@ docker_prune() {
     prc=0
     _gc_do "$WT_GC_DOCKER" builder prune -f --filter "until=$WT_GC_DOCKER_UNTIL" || prc=$?
     if [ "$prc" -ne 0 ]; then log "docker builder prune failed (rc=$prc)"; rc=1; fi
+    return "$rc"
+}
+
+# ── Step: archive retention ───────────────────────────────────────────────────
+# Keep-refs under refs/wt-gc-archive/<stamp>/ older than WT_GC_ARCHIVE_DAYS go.
+# The stamp in the refname is the only clock; a malformed stamp keeps.
+prune_archives() {
+    _gc_valid_days WT_GC_ARCHIVE_DAYS || return 1
+    log "step archive-prune threshold=${WT_GC_ARCHIVE_DAYS}d"
+    local listing ref sha cutoff stamp rc=0
+    listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref \
+        --format='%(refname) %(objectname)' refs/wt-gc-archive/)" || return 1
+    cutoff=$(( $(date +%s) - WT_GC_ARCHIVE_DAYS * 86400 ))
+    while IFS=' ' read -r ref sha <&3; do
+        [ -n "$ref" ] || continue
+        if [[ ! "$ref" =~ ^refs/wt-gc-archive/([0-9]+)/ ]]; then
+            log "archive keep $ref: malformed stamp"
+            continue
+        fi
+        stamp="${BASH_REMATCH[1]}"
+        if [ "$stamp" -lt "$cutoff" ]; then
+            if _gc_do git -C "$WT_GC_REPO_ROOT" update-ref -d "$ref" "$sha"; then
+                [ "${DRY_RUN:-0}" = 1 ] || log "archive pruned $ref"
+            else
+                log "archive prune failed $ref"
+                rc=1
+            fi
+        fi
+    done 3<<< "$listing"
     return "$rc"
 }
 

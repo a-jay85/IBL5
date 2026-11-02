@@ -73,6 +73,7 @@ WT_GC_REAP_REFS="${WT_GC_REAP_REFS:-1}"
 WT_GC_REAP_TMP_PACK="${WT_GC_REAP_TMP_PACK:-1}"
 WT_GC_DOCKER_PRUNE="${WT_GC_DOCKER_PRUNE:-1}"
 WT_GC_STALE_LIST="${WT_GC_STALE_LIST:-1}"
+WT_GC_ARCHIVE_PRUNE="${WT_GC_ARCHIVE_PRUNE:-1}"
 # Ages (days) / Docker until-filter. Non-numeric or empty = that step skipped, rc=1.
 WT_GC_EMPTY_DAYS="${WT_GC_EMPTY_DAYS-7}"
 WT_GC_BACKUP_DAYS="${WT_GC_BACKUP_DAYS-7}"
@@ -80,6 +81,8 @@ WT_GC_REF_DAYS="${WT_GC_REF_DAYS-14}"
 WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"
 WT_GC_STALE_DAYS="${WT_GC_STALE_DAYS-7}"
 WT_GC_DOCKER_UNTIL="${WT_GC_DOCKER_UNTIL-168h}"
+WT_GC_ARCHIVE_DAYS="${WT_GC_ARCHIVE_DAYS-90}"
+WT_GC_ARCHIVE_STAMP="${WT_GC_ARCHIVE_STAMP:-}"   # test seam: pins keep-ref names; empty = now
 # Paths / binaries.
 WT_GC_TIPS_DIR="${WT_GC_TIPS_DIR:-$WT_GC_LOCK_DIR/tips}"
 WT_GC_STALE_FILE="${WT_GC_STALE_FILE:-$WT_GC_LOCK_DIR/stale-worktrees.tsv}"
@@ -282,6 +285,7 @@ run_step refs         "$WT_GC_REAP_REFS"         WT_GC_REAP_REFS         reap_st
 run_step tmp-pack     "$WT_GC_REAP_TMP_PACK"     WT_GC_REAP_TMP_PACK     reap_tmp_packs
 run_step docker       "$WT_GC_DOCKER_PRUNE"      WT_GC_DOCKER_PRUNE      docker_prune
 run_step stale-list   "$WT_GC_STALE_LIST"        WT_GC_STALE_LIST        write_stale_list
+run_step archive-prune "$WT_GC_ARCHIVE_PRUNE"    WT_GC_ARCHIVE_PRUNE     prune_archives
 log "reap done steps_failed=$STEPS_FAILED"
 
 log "done dry_run=$DRY_RUN cleaned=$cleaned skipped=$skipped stalled=$n_stalled unpushed=$n_unpushed empty=$n_empty open_pr=$n_open_pr merged=$n_merged rc=$EXIT_CODE"

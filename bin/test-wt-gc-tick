@@ -300,6 +300,7 @@ run_tick() {
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
         WT_GC_STALE_LIST=0
+        WT_GC_ARCHIVE_PRUNE=0
         WT_GC_WT_REMOVE=/usr/bin/false
         WT_GC_LAUNCHCTL="$STUBBIN/launchctl-stub"
         WT_GC_LSOF="$STUBBIN/lsof"
@@ -889,6 +890,7 @@ wt_dir()     { printf '%s/IBL5-worktrees/%s' "$(dirname "$ENV_MAIN")" "$1"; }
 has_branch() { git -C "$ENV_MAIN" show-ref -q --verify "refs/heads/$1"; }
 has_ref()    { git -C "$ENV_MAIN" show-ref -q --verify "$1"; }
 tips_has()   { cat "$CD"/tips/tips-*.txt 2>/dev/null | grep -qxF -- "$1"; }
+arch_has()   { git -C "$ENV_MAIN" show-ref -q --verify "refs/wt-gc-archive/$1"; }
 ALL_ON=(WT_GC_REAP_EMPTY=1 WT_GC_REAP_DIRTY_MERGED=1 WT_GC_REAP_REFS=1
     WT_GC_REAP_TMP_PACK=1 WT_GC_DOCKER_PRUNE=1 WT_GC_STALE_LIST=1)
 
@@ -999,19 +1001,22 @@ has_ref refs/remotes/prh/1 || note_err "step ran past the failed command and del
 finish_case
 
 # H4 — _gc_tips_record writes and re-reads; an unwritable dir returns 1.
-begin_case H4-tips-record
+fx H4-tips-record
 touch "$CD/afile"
+H4_SHA="$(git -C "$ENV_MAIN" rev-parse HEAD)"
 H4_RC=0
 (
     log() { :; }
     # shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
     source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
-    WT_GC_TIPS_DIR="$CD/tips" _gc_tips_record abc123 refs/tmp/x || exit 3
-    WT_GC_TIPS_DIR="$CD/afile/x" _gc_tips_record abc123 refs/tmp/x && exit 4
+    WT_GC_REPO_ROOT="$ENV_MAIN" WT_GC_ARCHIVE_STAMP=1700000001
+    WT_GC_TIPS_DIR="$CD/tips" _gc_tips_record "$H4_SHA" refs/tmp/x || exit 3
+    WT_GC_TIPS_DIR="$CD/afile/x" _gc_tips_record "$H4_SHA" refs/tmp/x && exit 4
     exit 0
 ) || H4_RC=$?
 [ "$H4_RC" = 0 ] || note_err "tips record rc path $H4_RC"
-grep -qxF 'abc123 refs/tmp/x' "$CD/tips/tips-$(date +%F).txt" 2>/dev/null || note_err "tips line missing"
+grep -qxF "$H4_SHA refs/tmp/x" "$CD/tips/tips-$(date +%F).txt" 2>/dev/null || note_err "tips line missing"
+arch_has 1700000001/tmp/x || note_err "H4 keep-ref missing"
 [ -e "$CD/afile/x" ] && note_err "unwritable dir produced a file"
 finish_case
 
@@ -1305,9 +1310,21 @@ fx R9-delete-fails-after-tips
 mk_ref refs/tmp/a 15
 SHA="$(git -C "$ENV_MAIN" rev-parse refs/tmp/a)"
 mkdir -p "$CD/gitwrap"
+# Fails every ref DELETE (-d, or a --stdin batch holding "delete"); the keep-ref
+# creates the archive step issues still pass through.
 cat > "$CD/gitwrap/git" <<SH
 #!/usr/bin/env bash
-for a in "\$@"; do [ "\$a" = update-ref ] && exit 1; done
+upd=0; std=0
+for a in "\$@"; do
+    [ "\$a" = update-ref ] && upd=1
+    [ "\$a" = -d ] && [ "\$upd" = 1 ] && exit 1
+    [ "\$a" = --stdin ] && std=1
+done
+if [ "\$upd" = 1 ] && [ "\$std" = 1 ]; then
+    in="\$(cat)"
+    case "\$in" in *delete*) exit 1 ;; esac
+    printf '%s\n' "\$in" | exec "$(command -v git)" "\$@"
+fi
 exec "$(command -v git)" "\$@"
 SH
 chmod +x "$CD/gitwrap/git"
@@ -1509,6 +1526,64 @@ P4_OUT="$(
     printf '4=%s\n' "$(PATH="$CD/none" WT_GC_BIN_DIRS='' _gc_resolve_bin tool)"
 )"
 [ "$P4_OUT" = "$(printf '1=%s\n2=%s\n3=\n4=' "$CD/b/tool" "$CD/a/tool")" ] || note_err "resolver output: $P4_OUT"
+finish_case
+
+# ── Archive cases (Phase 1): keep-refs under refs/wt-gc-archive/ ──────────────
+A_STAMP=WT_GC_ARCHIVE_STAMP=1700000000
+
+fx A1-archive-survives-gc
+mk_ref refs/tmp/a1 20
+A1_SHA="$(git -C "$ENV_MAIN" rev-parse refs/tmp/a1)"
+rt "${R_ON[@]}" "$A_STAMP" -- --force
+chk_rc A1 0
+has_ref refs/tmp/a1 && note_err "A1 ref not deleted"
+arch_has 1700000000/tmp/a1 || note_err "A1 keep-ref missing"
+git -C "$ENV_MAIN" reflog expire --expire=now --all
+git -C "$ENV_MAIN" gc --prune=now --quiet
+chk "A1 commit survives gc" git -C "$ENV_MAIN" cat-file -e "$A1_SHA^{commit}"
+git -C "$ENV_MAIN" branch a1-restored refs/wt-gc-archive/1700000000/tmp/a1 >/dev/null 2>&1
+[ "$(git -C "$ENV_MAIN" rev-parse a1-restored 2>/dev/null)" = "$A1_SHA" ] || note_err "A1 restore does not resolve to the sha"
+finish_case
+
+fx A2-archive-write-fails-keeps
+mk_ref refs/tmp/a2 20
+git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/1700000000/tmp/a2 "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+rt "${R_ON[@]}" "$A_STAMP" -- --force
+chk_rc A2 1
+has_ref refs/tmp/a2 || note_err "A2 ref deleted despite archive failure"
+log_has 'archive failed' || note_err "A2 no 'archive failed' line"
+finish_case
+
+fx A3-bad-stamp-keeps
+mk_ref refs/tmp/a3 20
+rt "${R_ON[@]}" WT_GC_ARCHIVE_STAMP=abc -- --force
+chk_rc A3 1
+has_ref refs/tmp/a3 || note_err "A3 ref deleted with a bad stamp"
+log_has "invalid WT_GC_ARCHIVE_STAMP 'abc'" || note_err "A3 no invalid-stamp line"
+finish_case
+
+fx A4-retention
+git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/$(epoch_ago 91)/tmp/old" "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+git -C "$ENV_MAIN" update-ref "refs/wt-gc-archive/$(epoch_ago 89)/tmp/new" "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+git -C "$ENV_MAIN" update-ref refs/wt-gc-archive/notanumber/tmp/x "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+A4_OLD="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname)' 'refs/wt-gc-archive/*/tmp/old')"
+A4_NEW="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname)' 'refs/wt-gc-archive/*/tmp/new')"
+rt WT_GC_ARCHIVE_PRUNE=1 -- --force
+chk_rc A4 0
+has_ref "$A4_OLD" && note_err "A4 91d keep-ref survived"
+has_ref "$A4_NEW" || note_err "A4 89d keep-ref pruned"
+has_ref refs/wt-gc-archive/notanumber/tmp/x || note_err "A4 malformed keep-ref pruned"
+log_has 'archive keep refs/wt-gc-archive/notanumber/tmp/x: malformed stamp' || note_err "A4 no malformed-stamp line"
+finish_case
+
+fx A5-archive-dry-run
+mk_ref refs/tmp/a5 20
+rt "${R_ON[@]}" "$A_STAMP" -- --force --dry-run
+chk_rc A5 0
+has_ref refs/tmp/a5 || note_err "A5 ref deleted in dry-run"
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "A5 dry-run wrote a keep-ref"
+ls "$CD"/tips/tips-*.txt >/dev/null 2>&1 && note_err "A5 dry-run wrote a tips file"
+log_has 'DRY-RUN would: archive' || note_err "A5 no dry-run archive line"
 finish_case
 
 # ══════════════════════════════════════════════════════════════════════════════

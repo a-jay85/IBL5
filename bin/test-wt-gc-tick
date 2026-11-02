@@ -180,6 +180,7 @@ else
     exit 1
 fi
 if [ -n "$key" ] && [ -f "$d/by-head/$key.json" ]; then cat "$d/by-head/$key.json"; exit 0; fi
+if [ "${2:-}" = list ]; then echo none; exit 0; fi
 echo '[]'
 SH
 
@@ -1838,6 +1839,15 @@ mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 10
 rt "${RF_ON[@]}" -- --force
 has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "young backup deleted"
 log_has 'gh found no merged PR' || note_err "no keep log"
+finish_case
+
+fx RF12-open-pr-keeps
+mk_ref refs/heads/backup/lighten-navy-palette-prep-20261026 20
+printf 'open\n' > "$CD/gh/by-head/lighten-navy-palette.json"
+rt "${RF_ON[@]}" -- --force
+has_ref refs/heads/backup/lighten-navy-palette-prep-20261026 || note_err "backup of an open PR deleted"
+log_has 'not merged or is ambiguous' || note_err "no open-PR keep log"
+log_has 'ref fallback' && note_err "fallback fired for an open PR"
 finish_case
 
 fx RF3-gh-outage-no-fallback

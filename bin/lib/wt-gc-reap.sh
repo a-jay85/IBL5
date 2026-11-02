@@ -632,18 +632,21 @@ _gc_reap_detached_one() {
 # ── Step: stale refs ──────────────────────────────────────────────────────────
 # _gc_backup_merged_epoch <stem> — merge epoch of the PR the stem names.
 # Prints only digits on success; anything else is a keep. Returns 2 when gh
-# itself failed and 1 when gh answered with no merged PR.
+# itself failed, 3 when gh answered and no PR carries the name (the only case
+# the commit-age fallback may reap), and 1 when gh answered with a PR that is
+# not MERGED or with more than one row (always a keep).
 _gc_backup_merged_epoch() {
     local stem="$1" out
     if [[ "$stem" =~ ^p?[0-9]+$ ]]; then
         out="$("$WT_GC_GH" pr view "${stem#p}" --repo a-jay85/IBL5 --json state,mergedAt \
-            --jq 'select(.state=="MERGED") | .mergedAt | fromdateiso8601' 2>/dev/null)" || return 2
+            --jq 'if .state=="MERGED" then (.mergedAt | fromdateiso8601) else "open" end' 2>/dev/null)" || return 2
     else
         out="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$stem" --state all --limit 5 \
             --json state,mergedAt \
-            --jq 'if length==1 then (.[0] | select(.state=="MERGED") | .mergedAt | fromdateiso8601) else empty end' \
+            --jq 'if length==0 then "none" elif length==1 then (.[0] | if .state=="MERGED" then (.mergedAt | fromdateiso8601) else "open" end) else "many" end' \
             2>/dev/null)" || return 2
     fi
+    [ "$out" != none ] || return 3
     [[ "$out" =~ ^[0-9]+$ ]] || return 1
     printf '%s\n' "$out"
 }
@@ -896,7 +899,11 @@ reap_stale_refs() {
                         continue
                     fi
                     if [ "$mrc" = 1 ]; then
-                        # gh answered: no merged PR carries this name. An old
+                        log "ref keep $ref: PR for '$stem' is not merged or is ambiguous"
+                        continue
+                    fi
+                    if [ "$mrc" = 3 ]; then
+                        # gh answered: no PR carries this name. An old
                         # enough backup is still archived and reaped.
                         case "$ct" in ''|*[!0-9]*) ct_ok=0 ;; *) ct_ok=1 ;; esac
                         if [ "${WT_GC_REF_FALLBACK:-1}" != 0 ] && [ "$ct_ok" = 1 ] \

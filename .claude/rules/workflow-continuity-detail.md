@@ -120,6 +120,8 @@ run that holds on the same reason keeps it. Automouse treats exit **8** as termi
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
+**In-run fix round.** When the first arming evaluation holds on condition (2), (3) or (11), the harness tries one bounded fix round before the sticky verdict posts: it fixes review threads, unthreaded findings and MISSING items, re-reviews the new head, and re-evaluates arming. A failed or doubtful round is discarded and the original hold stands. `POSTPLAN_FIX_ROUND=0` disables it. Detail: `tools/postplan-harness/README.md` § One fix round before the sticky verdict.
+
 **PR-cycle skips.** `bin/pr-cycle` skips a PR held only on human conditions, and fires a DIRTY
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
 § Rebase-only mode.

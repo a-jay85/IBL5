@@ -356,6 +356,16 @@ def conflict_verdict_for(branch: str, tmp_dir: str = "/tmp") -> Optional[str]:
         return None
 
 
+def holding_findings(findings) -> list:
+    """Findings that hold condition (2): score >= 80 and a label outside NON_HOLDING_LABELS.
+
+    A missing, empty or unknown label holds as Important (fail-closed).
+    """
+    return [f for f in findings
+            if (f.score or 0) >= 80
+            and getattr(f, "label", None) not in labels.NON_HOLDING_LABELS]
+
+
 def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
@@ -370,9 +380,7 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
 
     # Only labels.NON_HOLDING_LABELS (nit, pre-existing) clear. A missing, empty or unknown
     # label such as "blocker" or "Nit" holds as Important (fail-closed), like prf_label.
-    high = [f for f in inp.findings
-            if (f.score or 0) >= 80
-            and getattr(f, "label", None) not in labels.NON_HOLDING_LABELS]
+    high = holding_findings(inp.findings)
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),
                               "; ".join(f"{f.path}:{f.line} score={f.score}" for f in high)))
 

@@ -39,10 +39,11 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
+from harness import armable as _armable_mod
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              select_fidelity_verdict)
@@ -781,142 +782,255 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master_sha,
                                            body, pr, sha, res, log)
 
-        # ---- Phase 6.7: manual-testing execution ----------------------
-        # Runs after remediation so the probed tree is the tree that will merge,
-        # and before ArmInputs so a tick reaches condition (1) this run.
-        mt = manual_testing.run(
-            pr=pr, worktree=worktree, body=gh.pr_body() or body,
-            gh=gh, probe=probe, show_blob=manual_testing.show_blob_for(worktree),
-            master_sha=master_sha, head_tree=git.head_tree,
-            live=live, log=log,
-        )
-        if mt.ran:
-            res.manual_testing = mt.to_dict()
-        if not mt.ran:
-            log(f"phase6.7: skipped ({mt.skipped_reason})")
-        else:
-            log(f"phase6.7: bringup={mt.bringup} rows={len(mt.rows)} "
-                f"ticked={len(mt.ticked)} all_ticked={mt.all_ticked}"
-                + (f" errors={';'.join(mt.errors)}" if mt.errors else ""))
+        def _evaluate_arm(log_suffix=""):
+            # Phases 6.7..6.5 as one re-callable unit: the fix round re-runs it on the new head,
+            # so every arming input is re-read exactly as the first evaluation read it.
+            nonlocal sha, bg_ci
+            # ---- Phase 6.7: manual-testing execution ----------------------
+            # Runs after remediation so the probed tree is the tree that will merge,
+            # and before ArmInputs so a tick reaches condition (1) this run.
+            mt = manual_testing.run(
+                pr=pr, worktree=worktree, body=gh.pr_body() or body,
+                gh=gh, probe=probe, show_blob=manual_testing.show_blob_for(worktree),
+                master_sha=master_sha, head_tree=git.head_tree,
+                live=live, log=log,
+            )
+            if mt.ran:
+                res.manual_testing = mt.to_dict()
+            if not mt.ran:
+                log(f"phase6.7: skipped ({mt.skipped_reason})")
+            else:
+                log(f"phase6.7: bringup={mt.bringup} rows={len(mt.rows)} "
+                    f"ticked={len(mt.ticked)} all_ticked={mt.all_ticked}"
+                    + (f" errors={';'.join(mt.errors)}" if mt.errors else ""))
 
-        # ---- Phase 6.5: arming ----------------------------------------
-        # Condition (15): snapshot any checks already in the fail bucket before
-        # arming. Fail-open: any exception falls back to [] so the run continues.
-        # bg_ci.failed is only populated once _write_outcome fires (usually after
-        # Phase 7 has already started), so it is typically empty at arm time; the
-        # fresh probe is therefore always run in addition to the background result.
-        if live and pr and sha and worktree and os.path.isdir(worktree):
-            sha, bg_ci = _reconcile_before_arm(git, log, gh, worktree, pr, sha,
-                                               bg_ci, out_dir)
-        _failed_checks: list[str] = []
-        if live and pr:
-            try:
-                _bg_failed = (list(bg_ci.failed)
-                              if bg_ci is not None and bg_ci.done.is_set()
-                              and bg_ci.status == "failure"
-                              else [])
-                _probe_failed = ciwatch.probe_failed_checks(worktree, pr)
-                _failed_checks = sorted(set(_bg_failed + _probe_failed))
-            except Exception as _e:
-                log(f"phase6.5: red-ci-check probe error — {_e}")
-        # condition (16) inputs: pre-push flag and post-pr run
-        _mc_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
-        if live and pr:
-            _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
-                        "--stage", "post-pr", "--pr", str(pr)]
-            try:
-                _mc_proc = subprocess.run(_mc_argv, cwd=worktree, capture_output=True, text=True)
-                _mc_post_rc = _mc_proc.returncode
-            except OSError:
-                _mc_post_rc = 2
-        else:
-            _mc_post_rc = int((fixture or {}).get("meta_checks_post_rc", 0))
-        _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
-        _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
-                                   fixture=fixture, log=log)
-        mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
-        if live and pr and mutation_report is not None:
-            # A second body edit: the Phase 6 body write above runs before this step.
-            # Log-and-continue like the merge-digest write: a failed or empty read must never
-            # blank the body, and a failed edit must never abort the run.
-            try:
-                _xm_cur = gh.pr_body_fresh() or ""
-                if not _xm_cur:
-                    log("phase6.5: exec-mutations body write skipped (PR body read empty)")
-                else:
-                    _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
-                    if _xm_new != _xm_cur:
-                        gh.pr_edit_body(pr, _xm_new)
-            except (HarnessError, OSError, subprocess.SubprocessError) as e:
-                log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
-        _arm_body = gh.pr_body() or body
-        if live and pr:
-            _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
-                                            git.diff_vs_base(), log, res)
-        # Condition (20): rerun the detector on the realized diff so a body without the
-        # Removed guards block (or a hand-edited one) cannot release the hold.
-        _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
-        inputs = ArmInputs(
-            pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
-            pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
-            unresolved_conformance=unresolved, phase5_status=phase5,
-            exec_mutations_holding=(mutation_report.holding
-                                    if mutation_report is not None else None),
-            exec_mutations_tree_suspect=(mutation_report.tree_suspect
-                                         if mutation_report is not None else True),
-            conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
-            plan_auto_merge_false=plan.auto_merge_false, headless=headless,
-            plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
-            branch=git.branch(),
-            dep_state_lookup=lambda n: gh.pr_state(n),
-            # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
-            # degraded or was not run), which holds condition (12) — it is never
-            # silently promoted to a verdict word.
-            # verdict 1, deliberately NOT the collapsed return value: select_fidelity_verdict
-            # is what combines the two, and it tree-gates verdict 2. Passing the collapsed
-            # value here would let an untethered verdict 2 satisfy condition (12) on its own.
-            fidelity_verdict=res.fidelity.get("verdict_1"),
-            fidelity_verdict_2=res.fidelity.get("verdict_2"),
-            fidelity_tree_2=res.fidelity.get("reviewed_tree_2"),
-            current_tree=git.head_tree(),   # read here, after every commit this run makes
-            unresolved_findings=gh.unresolved_findings(pr) if live else [],
-            conflict_resolved=(os.path.exists(conflict_flag_path(git.branch())) if live
-                               else bool((fixture or {}).get("conflict_resolved", False))),
-            conflict_verdict=(conflict_verdict_for(git.branch()) if live
-                              else (fixture or {}).get("conflict_verdict")),
-            degraded_agents=res.degraded_agents,
-            plan_slug_drift=plan.slug_drift,
-            failed_checks=_failed_checks,
-            aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
-                                 else bool((fixture or {}).get("aggregator_required", False))),
-            meta_checks_status=_mc_status,
-            gate_backtest_status=_gb.status,
-            gate_backtest_reason=_gb.reason,
-            merge_danger_state=merge_danger.classify_body(_arm_body),
-            retried_stages=sorted(res.retries),
-            removed_guards_holds=_rg_holds,
-        )
-        if not live and (fixture or {}).get("current_tree"):
-            # replay-only seam, the checks_outcome pattern: live mode never reads it
-            inputs.current_tree = fixture["current_tree"]
-        if not live and (fixture or {}).get("red_ci_checks") is not None:
-            # replay-only seam for condition (15): live mode never reads this path
-            inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
-        preview = evaluate(inputs)
-        if not preview.holds:
-            # only spend the add-only safety verdict when deterministic checks pass
-            verdict = llm.call("safety-verdict", "haiku",
-                               llm_calls.safety_verdict_prompt(cls, inputs.pr_title, preview),
-                               schemas.validate_safety_verdict)
-            inputs.llm_safety_holds = verdict["holds"]
-        decision = evaluate(inputs)
-        res.arm = decision
-        for c in decision.conditions:
-            if c.warning:
-                log(f"phase6.5 WARNING ({c.name}): {c.warning}")
-        log("phase6.5: " + ("ARMED" if decision.armed else
-                            "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
-                                                  for c in decision.holds)))
+            # ---- Phase 6.5: arming ----------------------------------------
+            # Condition (15): snapshot any checks already in the fail bucket before
+            # arming. Fail-open: any exception falls back to [] so the run continues.
+            # bg_ci.failed is only populated once _write_outcome fires (usually after
+            # Phase 7 has already started), so it is typically empty at arm time; the
+            # fresh probe is therefore always run in addition to the background result.
+            if live and pr and sha and worktree and os.path.isdir(worktree):
+                sha, bg_ci = _reconcile_before_arm(git, log, gh, worktree, pr, sha,
+                                                   bg_ci, out_dir)
+            _failed_checks: list[str] = []
+            if live and pr:
+                try:
+                    _bg_failed = (list(bg_ci.failed)
+                                  if bg_ci is not None and bg_ci.done.is_set()
+                                  and bg_ci.status == "failure"
+                                  else [])
+                    _probe_failed = ciwatch.probe_failed_checks(worktree, pr)
+                    _failed_checks = sorted(set(_bg_failed + _probe_failed))
+                except Exception as _e:
+                    log(f"phase6.5: red-ci-check probe error — {_e}")
+            # condition (16) inputs: pre-push flag and post-pr run
+            _mc_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
+            if live and pr:
+                _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                            "--stage", "post-pr", "--pr", str(pr)]
+                try:
+                    _mc_proc = subprocess.run(_mc_argv, cwd=worktree, capture_output=True, text=True)
+                    _mc_post_rc = _mc_proc.returncode
+                except OSError:
+                    _mc_post_rc = 2
+            else:
+                _mc_post_rc = int((fixture or {}).get("meta_checks_post_rc", 0))
+            _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
+            _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
+                                       fixture=fixture, log=log)
+            mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
+            if live and pr and mutation_report is not None:
+                # A second body edit: the Phase 6 body write above runs before this step.
+                # Log-and-continue like the merge-digest write: a failed or empty read must never
+                # blank the body, and a failed edit must never abort the run.
+                try:
+                    _xm_cur = gh.pr_body_fresh() or ""
+                    if not _xm_cur:
+                        log("phase6.5: exec-mutations body write skipped (PR body read empty)")
+                    else:
+                        _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
+                        if _xm_new != _xm_cur:
+                            gh.pr_edit_body(pr, _xm_new)
+                except (HarnessError, OSError, subprocess.SubprocessError) as e:
+                    log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
+            _arm_body = gh.pr_body() or body
+            if live and pr:
+                _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
+                                                git.diff_vs_base(), log, res)
+            # Condition (20): rerun the detector on the realized diff so a body without the
+            # Removed guards block (or a hand-edited one) cannot release the hold.
+            _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
+            inputs = ArmInputs(
+                pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
+                pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
+                unresolved_conformance=unresolved, phase5_status=phase5,
+                exec_mutations_holding=(mutation_report.holding
+                                        if mutation_report is not None else None),
+                exec_mutations_tree_suspect=(mutation_report.tree_suspect
+                                             if mutation_report is not None else True),
+                conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
+                plan_auto_merge_false=plan.auto_merge_false, headless=headless,
+                plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+                branch=git.branch(),
+                dep_state_lookup=lambda n: gh.pr_state(n),
+                # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
+                # degraded or was not run), which holds condition (12) — it is never
+                # silently promoted to a verdict word.
+                # verdict 1, deliberately NOT the collapsed return value: select_fidelity_verdict
+                # is what combines the two, and it tree-gates verdict 2. Passing the collapsed
+                # value here would let an untethered verdict 2 satisfy condition (12) on its own.
+                fidelity_verdict=res.fidelity.get("verdict_1"),
+                fidelity_verdict_2=res.fidelity.get("verdict_2"),
+                fidelity_tree_2=res.fidelity.get("reviewed_tree_2"),
+                current_tree=git.head_tree(),   # read here, after every commit this run makes
+                unresolved_findings=gh.unresolved_findings(pr) if live else [],
+                conflict_resolved=(os.path.exists(conflict_flag_path(git.branch())) if live
+                                   else bool((fixture or {}).get("conflict_resolved", False))),
+                conflict_verdict=(conflict_verdict_for(git.branch()) if live
+                                  else (fixture or {}).get("conflict_verdict")),
+                degraded_agents=res.degraded_agents,
+                plan_slug_drift=plan.slug_drift,
+                failed_checks=_failed_checks,
+                aggregator_required=(gh.aggregator_required(AGGREGATOR_CONTEXT) if live
+                                     else bool((fixture or {}).get("aggregator_required", False))),
+                meta_checks_status=_mc_status,
+                gate_backtest_status=_gb.status,
+                gate_backtest_reason=_gb.reason,
+                merge_danger_state=merge_danger.classify_body(_arm_body),
+                retried_stages=sorted(res.retries),
+                removed_guards_holds=_rg_holds,
+            )
+            if not live and (fixture or {}).get("current_tree"):
+                # replay-only seam, the checks_outcome pattern: live mode never reads it
+                inputs.current_tree = fixture["current_tree"]
+            if not live and (fixture or {}).get("red_ci_checks") is not None:
+                # replay-only seam for condition (15): live mode never reads this path
+                inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
+            preview = evaluate(inputs)
+            if not preview.holds:
+                # only spend the add-only safety verdict when deterministic checks pass
+                verdict = llm.call("safety-verdict", "haiku",
+                                   llm_calls.safety_verdict_prompt(cls, inputs.pr_title, preview),
+                                   schemas.validate_safety_verdict)
+                inputs.llm_safety_holds = verdict["holds"]
+            decision = evaluate(inputs)
+            res.arm = decision
+            for c in decision.conditions:
+                if c.warning:
+                    log(f"phase6.5 WARNING ({c.name}): {c.warning}")
+            log("phase6.5: " + ("ARMED" if decision.armed else
+                                "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
+                                                      for c in decision.holds)) + log_suffix)
+            return {"inputs": inputs, "decision": decision, "mc_flag": _mc_flag}
+
+        _arm = _evaluate_arm()
+        inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
+        # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11} ----
+        # Runs between the first arming evaluation and everything that records or posts it.
+        # It edits code only; the unchanged _evaluate_arm judges the new head. A rejected
+        # round resets the tree and the original decision stands.
+        _fr_first_decision = decision
+        if pr:
+            _fr_sd = _state_dir(out_dir, live, state_dir)
+            _fr_targets = fix_round.targets(decision)
+            _fr_tried = bool((live or state_dir is not None)
+                             and holdrepeat.fix_round_tried(_fr_sd, slug, _fr_targets))
+            _fr_before = reviewcache.per_file_patch_ids(git.diff_vs_base())
+            _fr_ctx: dict = {}
+            _fr_posts = fix_round.DeferredPosts(gh)
+
+            def _fr_recheck(head_before):
+                pre = {same_run_threads._key(f.path, f.body)
+                       for f in _armable_mod.holding_findings(res.findings)}
+                pre_conf = set(res.unresolved_conformance)
+                degraded_before = len(res.degraded_agents)
+                degraded = False
+                delta = reviewcache.file_delta(
+                    _fr_before, reviewcache.per_file_patch_ids(git.diff_vs_base()))
+                if delta:
+                    # The fix commit is still local: hold the review's comments and post
+                    # them only after an accepted push (a rejected round posts nothing).
+                    _orig_gh = review_phase.gh
+                    review_phase.gh = _fr_posts
+                    try:
+                        n, c_, m_, ck_, cf_ = _same_run_delta_review(
+                            review_phase, meta, cls, plan, git, gh, res, delta, worktree,
+                            master_sha, log)
+                        _fr_ctx.update(cls=c_, meta=m_, cache_key=ck_, cache_files=cf_)
+                    except Exception as e:  # noqa: BLE001 - an unreviewed fix is never accepted
+                        log(f"phase6.5-fix: delta re-review failed ({e.__class__.__name__})")
+                        degraded = True
+                    finally:
+                        review_phase.gh = _orig_gh
+                if len(res.degraded_agents) > degraded_before:
+                    degraded = True
+                post = {same_run_threads._key(f.path, f.body)
+                        for f in _armable_mod.holding_findings(res.findings)}
+                after = conformance.check(plan, git.conformance_files(), git.diff_vs_base(),
+                                          phase5_status=phase5, resolutions={},
+                                          pr_body=gh.pr_body() or body,
+                                          read_file=git.read_worktree_file)
+                res.unresolved_conformance = after
+                return {"new_holding": sorted(post - pre),
+                        "conformance_added": sorted(set(after) - pre_conf),
+                        "degraded": degraded}
+
+            _fr_snap = fix_round.snapshot(res)
+            fr = fix_round.run_fix_round(
+                decision=decision, res=res, gh=gh, llm=llm, git=git, worktree=worktree or ".",
+                plan=plan, pr=pr, out_dir=out_dir, log=log,
+                commit=lambda msg: _commit_with_gate_fix(
+                    git, worktree, msg, log, phase="phase6.5-fix", llm=None, res=res),
+                recheck=_fr_recheck, already_tried=_fr_tried)
+            if (fr.get("status") != "skipped"
+                    or fr.get("reason") == "holdrepeat-same-holds"):
+                # Other skips leave result.json byte-identical; the already-tried skip
+                # is kept so the sticky can show its line.
+                res.fix_round = fr
+            if fr.get("status") != "skipped":
+                if git.is_dirty():
+                    fix_round.clean_tree(git)
+                    if git.is_dirty():
+                        raise HarnessError("fix-round-dirty-tree",
+                                           "the fix round left uncommitted edits it could not clear")
+            pushed = ""
+            if fr.get("status") == "accepted":
+                try:
+                    pushed = _push_with_gate_fix(
+                        git, log, "phase6.5-fix", llm=None, worktree=worktree,
+                        out_dir=out_dir, res=res, gh=gh,
+                        pr=(pr if isinstance(git, LiveGit) else None)) or fr["sha"]
+                except HarnessError as e:
+                    log(f"phase6.5-fix: push failed ({e.kind}); discarding the round")
+                    if git.drop_commit(fr["head_before"]) or git.head() != fr["head_before"]:
+                        raise HarnessError("fix-round-undo-failed",
+                                           "push failed and the undo did not land") from e
+                    fix_round.restore(res, _fr_snap)
+                    fr["status"], fr["reason"], fr["reevaluate"] = "rejected", "push-failed", False
+                    fr["defer"] = []
+                    fix_round._write(out_dir, fr)
+            if fr.get("status") == "accepted" or (fr.get("status") == "no-change"
+                                                  and fr.get("reevaluate")):
+                fix_round.flush(gh, pr, fr, pushed or git.head(), log)
+                if fr.get("status") == "accepted":
+                    _fr_posts.replay(pushed or git.head(), log)
+                res.findings, res.scored_findings = same_run_threads.prune_findings(
+                    res.findings, res.scored_findings, fix_round.prune_keys(fr))
+                if _fr_ctx:
+                    cls, meta = _fr_ctx["cls"], _fr_ctx["meta"]
+                    cache_key, cache_files = _fr_ctx["cache_key"], _fr_ctx["cache_files"]
+                unresolved = res.unresolved_conformance
+                _write_conformance_handoff(out_dir, unresolved)
+                if fr.get("status") == "accepted":
+                    sha = git.head()
+                    _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
+                                                   master_sha, body, pr, pushed or sha, res, log)
+                _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
+                inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
+            _fr_line = fix_round.summary_line(fr)
+            if _fr_line:
+                log(f"phase6.5-fix: {_fr_line}")
         # Review cache write: normal-completion path only, so a raised HarnessError
         # never persists arms from a run that failed mid-way.
         if cache_key is not None and res.pr_number:
@@ -926,6 +1040,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if (live or state_dir is not None) and res.hold_repeat is None:
             res.hold_repeat = _record_hold_repeat(res, decision, slug, worktree,
                                                   _state_dir(out_dir, live, state_dir), log)
+        if ((live or state_dir is not None)
+                and (res.fix_round or {}).get("status") in ("no-change", "accepted", "rejected")):
+            holdrepeat.record_fix_round(
+                _state_dir(out_dir, live, state_dir), slug,
+                target_numbers=fix_round.targets(_fr_first_decision),
+                status=res.fix_round["status"], sha=res.fix_round.get("sha", ""))
         fid = res.fidelity or {}
         fid["selected"], fid["selected_source"] = select_fidelity_verdict(
             inputs.fidelity_verdict, inputs.fidelity_verdict_2,
@@ -957,6 +1077,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
                     own_id=fid.get("own_id", ""),
                     reused_from=res.reused_from,
+                    fix_round_line=fix_round.summary_line(res.fix_round),
                     posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
                 try:
                     cid_ = gh.pr_sticky_verdict(pr, sticky_)

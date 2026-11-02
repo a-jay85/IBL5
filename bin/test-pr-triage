@@ -722,68 +722,68 @@ armed_pr() { pr_json "$1" "$2" "$3" | jq '. + {autoMergeRequest: {enabledAt: "20
 NIT_BODY=$'<!-- label: nit -->\n**Nit** y'
 IMP_BODY=$'<!-- label: important -->\n**Important** x'
 
-# OT1: unarmed Important thread stays HELD and is never armed
+# OT1 (unarmed-important-thread-holds): unarmed Important thread stays HELD and is never armed
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 90).json"
 threads_fixture "$FIX/threads.json" "$(thread_json false 9001 "$IMP_BODY")"
 pr_json 90 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX" --arm
-assert_match  "OT1 bucket=HELD"          '^HELD$'          "$(row_bucket "$OUT" 90)"
-assert_match  "OT1 action=human review"  '^human review$'  "$(row_action "$OUT" 90)"
-assert_absent "OT1 never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_match  "unarmed-important-thread-holds bucket=HELD"          '^HELD$'          "$(row_bucket "$OUT" 90)"
+assert_match  "unarmed-important-thread-holds action=human review"  '^human review$'  "$(row_action "$OUT" 90)"
+assert_absent "unarmed-important-thread-holds never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
 
-# OT2: armed + trusted nit thread is OPEN-THREAD, never ARMABLE
+# OT2 (armed-nit-thread-open-thread): armed + trusted nit thread is OPEN-THREAD, never ARMABLE
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 91).json"
 threads_fixture "$FIX/threads.json" "$(thread_json false 9002 "$NIT_BODY")"
 armed_pr 91 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX" --arm
-assert_match  "OT2 bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 91)"
-assert_match  "OT2 armed, stalled"       'armed, stalled on 1 open review thread\(s\)' "$(row_action "$OUT" 91)"
-assert_absent "OT2 never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_match  "armed-nit-thread-open-thread bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 91)"
+assert_match  "armed-nit-thread-open-thread armed, stalled"       'armed, stalled on 1 open review thread\(s\)' "$(row_action "$OUT" 91)"
+assert_absent "armed-nit-thread-open-thread never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
 
-# OT3: armed + nit thread + failing check is still OPEN-THREAD, not BLOCKED-CHECK
+# OT3 (armed-nit-thread-pending-check): armed + nit thread + pending check is still OPEN-THREAD, not BLOCKED-CHECK
 FIX="$(mktemp -d -p "$TMP")"
-checks_json failure success success > "$FIX/checks-$(printf '%040d' 92).json"
+checks_json success success success | jq '.check_runs[0] |= (.status="in_progress" | .conclusion=null | del(.completed_at))' > "$FIX/checks-$(printf '%040d' 92).json"
 threads_fixture "$FIX/threads.json" "$(thread_json false 9003 "$NIT_BODY")"
 armed_pr 92 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX"
-assert_match  "OT3 bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 92)"
+assert_match  "armed-nit-thread-pending-check bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 92)"
 
-# OT4: armed + Important thread is OPEN-THREAD, not HELD
+# OT4 (armed-important-thread-open-thread): armed + Important thread is OPEN-THREAD, not HELD
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 93).json"
 threads_fixture "$FIX/threads.json" "$(thread_json false 9004 "$IMP_BODY")"
 armed_pr 93 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX"
-assert_match  "OT4 bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 93)"
-assert_match  "OT4 armed, stalled"       'armed, stalled'  "$(row_action "$OUT" 93)"
+assert_match  "armed-important-thread-open-thread bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 93)"
+assert_match  "armed-important-thread-open-thread armed, stalled"       'armed, stalled'  "$(row_action "$OUT" 93)"
 
-# OT5: unarmed nit thread is OPEN-THREAD and --arm never arms it
+# OT5 (unarmed-nit-thread-not-armed): unarmed nit thread is OPEN-THREAD and --arm never arms it
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 94).json"
 threads_fixture "$FIX/threads.json" "$(thread_json false 9005 "$NIT_BODY")"
 pr_json 94 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX" --arm
-assert_match  "OT5 bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 94)"
-assert_match  "OT5 before arming"        'before arming'   "$(row_action "$OUT" 94)"
-assert_absent "OT5 never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_match  "unarmed-nit-thread-not-armed bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 94)"
+assert_match  "unarmed-nit-thread-not-armed before arming"        'before arming'   "$(row_action "$OUT" 94)"
+assert_absent "unarmed-nit-thread-not-armed never arms"           'pr merge'        "$(cat "$FIX/calls.log" 2>/dev/null)"
 
-# OT6: armed + thread API error is OPEN-THREAD (fail-closed), beats HELD
+# OT6 (armed-thread-api-error-open-thread): armed + thread API error is OPEN-THREAD (fail-closed), beats HELD
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 95).json"
 printf '{"errors":[{"message":"boom"}]}\n' > "$FIX/threads.json"
 armed_pr 95 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 THREADS_FIXTURE="$FIX/threads.json" run_triage "$FIX"
-assert_match  "OT6 bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 95)"
-assert_match  "OT6 thread check failed"  'thread check failed' "$(row_action "$OUT" 95)"
+assert_match  "armed-thread-api-error-open-thread bucket=OPEN-THREAD"   '^OPEN-THREAD$'   "$(row_bucket "$OUT" 95)"
+assert_match  "armed-thread-api-error-open-thread thread check failed"  'thread check failed' "$(row_action "$OUT" 95)"
 
-# OT7: armed + no threads stays ARMABLE
+# OT7 (armed-no-threads-armable): armed + no threads stays ARMABLE
 FIX="$(mktemp -d -p "$TMP")"
 checks_json success success success > "$FIX/checks-$(printf '%040d' 96).json"
 armed_pr 96 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 run_triage "$FIX"
-assert_match  "OT7 bucket=ARMABLE"       '^ARMABLE$'       "$(row_bucket "$OUT" 96)"
+assert_match  "armed-no-threads-armable bucket=ARMABLE"       '^ARMABLE$'       "$(row_bucket "$OUT" 96)"
 
 
 h_done

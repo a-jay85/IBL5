@@ -391,6 +391,14 @@ case "\${STUB_MODE:-}" in
         fi
         printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
         exit 0 ;;
+    slugname)
+        # Handoff saved as <slug>.json (no .md). plan_file is STUB_SLUGNAME_PF
+        # when set, else the real plan name.
+        plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+        printf '{"slug":"stub","worktree":"%s","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+            "$E2_PP_WT" "\${STUB_SLUGNAME_PF:-\$plan}" > "\$NDIR/handoff/\${plan%.md}.json"
+        printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+        exit 0 ;;
     marker)
         . "$GATE_LIB"
         usage_marker_write "\$sid" automouse "$E2_RUNNER" usage-pause drain 94 five_hour ""
@@ -531,6 +539,33 @@ assert_absent  "W3: stale sentinel cleared by 3b (rm before attempt)" \
 run_e2_mode() { # $1 = STUB_MODE
     STUB_MODE="$1" run_e2 > /dev/null 2>&1
 }
+
+# ── H1/H2: a handoff saved as <slug>.json (2026-11-01 wt-gc-reap-safe-classes) ──
+echo ""
+echo "# H1: slug-named handoff with matching plan_file is adopted as success"
+reset_e2
+write_e2_plan "slugho"
+run_e2_mode slugname
+H1_LOG="$(e2_logtxt)"
+want           "H1: adoption logged"                      "$H1_LOG" "Handoff adopted: renamed slugho.json to slugho.md.json"
+want           "H1: impl counted as success"              "$H1_LOG" "Handoff file created — impl succeeded."
+want_absent    "H1: no genuine-failure line"              "$H1_LOG" "Genuine impl failure"
+want_absent    "H1: no env-stop line"                     "$H1_LOG" "Environmental failure during impl"
+assert_absent  "H1: slug-named file gone"                 "$E2_NDIR/handoff/slugho.json"
+assert_absent  "H1: no failure file"                      "$E2_NDIR/queue/slugho.md.failure"
+rm -f "$E2_NDIR/handoff/slugho.md.json" "$E2_NDIR/handoff/slugho.md.judge"
+
+echo ""
+echo "# H2: slug-named handoff naming another plan is left alone"
+reset_e2
+write_e2_plan "slugbad"
+STUB_SLUGNAME_PF="other.md" run_e2_mode slugname
+H2_LOG="$(e2_logtxt)"
+want_absent    "H2: no adoption"                          "$H2_LOG" "Handoff adopted"
+want_absent    "H2: not counted as success"               "$H2_LOG" "Handoff file created — impl succeeded."
+assert_present "H2: mismatched file untouched"            "$E2_NDIR/handoff/slugbad.json"
+assert_absent  "H2: no .md.json created"                  "$E2_NDIR/handoff/slugbad.md.json"
+rm -f "$E2_NDIR/handoff/slugbad.json"
 stub_sid() { grep -oE -- '--session-id [0-9a-f-]{36}' "$E2_ARGS" | head -1 | awk '{print $2}'; }
 gate_marker_count() { find "$E2_GATE/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' '; }
 

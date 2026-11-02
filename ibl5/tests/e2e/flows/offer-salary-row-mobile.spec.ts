@@ -21,10 +21,6 @@ const FA_URL = 'modules.php?name=FreeAgency&pa=negotiate&pid=11';
 const EXTENSION_ROW = 'form[name="ExtensionOffer"] .offer-salary-row--inputs';
 // The quick-offer preset forms share the form name, so the :has filter is required.
 const FA_ROW = 'form[name="FAOffer"]:has(input.offer-salary-input) .offer-salary-row--inputs';
-// Six-button quick-offer preset rows (one button per contract length), from
-// FreeAgencyFormView::renderButtonRow(). The max-contract row and the MLE row both carry six.
-const PRESET_MLE_ROW = '.offer-button-row__buttons:has([data-testid="quick-offer-mle-yr1"])';
-const PRESET_BUTTON = 'button[type="submit"]';
 
 /**
  * Count the `.offer-salary-cell` boxes on each visual line, top to bottom.
@@ -100,17 +96,6 @@ test.describe('offer salary row at phone width', () => {
       // Pins the offer-salary-hints.js selector against a class or attribute rename.
       await expect(page.locator('.offer-salary-row--inputs[data-raise-percentage]')).toHaveCount(1);
     });
-
-    test('six-button preset rows wrap three then three', async ({ page }) => {
-      await gotoClean(page, FA_URL, 'on free agency offer page at phone width');
-      const sixRows = page.locator('.offer-button-row__buttons:has(form:nth-child(6))');
-      await expect(page.locator(PRESET_MLE_ROW)).toHaveCount(1);
-      // Max-contract row and MLE row.
-      await expect(sixRows).toHaveCount(2);
-      for (let i = 0; i < 2; i++) {
-        expect(await rowGroups(sixRows.nth(i), 6, PRESET_BUTTON)).toEqual([3, 3]);
-      }
-    });
   });
 });
 
@@ -130,11 +115,6 @@ test.describe('offer salary row at desktop width', () => {
     test('desktop rows stay single-line (free agency)', async ({ page }) => {
       await gotoClean(page, FA_URL, 'on free agency offer page at desktop width');
       expect(await rowGroups(page.locator(FA_ROW), 6)).toEqual([6]);
-    });
-
-    test('desktop six-button preset rows stay single-line', async ({ page }) => {
-      await gotoClean(page, FA_URL, 'on free agency offer page at desktop width');
-      expect(await rowGroups(page.locator(PRESET_MLE_ROW), 6, PRESET_BUTTON)).toEqual([6]);
     });
   });
 });

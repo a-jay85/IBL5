@@ -69,7 +69,6 @@
 /* Quick offer button row — label + row of buttons */
 .offer-button-row {
     margin-bottom: 0.75rem;
-    container-type: inline-size;
 }
 
 .offer-button-row__buttons {
@@ -78,16 +77,6 @@
     flex-wrap: wrap;
     justify-content: center;
     margin-top: 0.25rem;
-}
-
-/* Six buttons of d-btn-sm need about 22rem. Below that, a row of four or more
-   buttons goes three per row (three then three) instead of wrapping four then two. */
-@container (max-width: 22rem) {
-    .offer-button-row__buttons:has(> :nth-child(4)) {
-        display: grid;
-        grid-template-columns: repeat(3, auto);
-        justify-content: center;
-    }
 }
 
 /* Delete offer section */

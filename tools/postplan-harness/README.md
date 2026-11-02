@@ -298,6 +298,8 @@ The schema version stays 1; `origin` is additive and readers ignore keys they do
 
 The sweep never reads who resolved a thread. A finding is logged once, and the first observation wins in the log. `report` keeps the last event per `(pr, findingId)`.
 
+`agent` comes from the `<!-- agent: X -->` marker on the thread's first comment. The harness writes it on line 3 of every inline comment body (`render_body` in `harness/labels.py`) when the finding's agent matches `^[A-Za-z0-9_-]{1,32}$`. The skill poster (`bin/lib/post-review-findings.sh`) writes it when a finding carries `.agent`. A thread without the marker logs `unknown`. Harness comments posted before the marker existed carry none, so their rows stay `unknown`, and `report` prints a stderr note with their count. The text table lists every id in `REVIEW_AGENTS` (`harness/labels.py`) first, including those with no outcomes yet, then legacy ids seen in the log, then `unknown`.
+
 ```bash
 bin/review-outcomes record --pr=12 --verdicts=/tmp/done.jsonl --threads=/tmp/all.jsonl
 gh api graphql ... | bin/review-outcomes sweep --pr=12

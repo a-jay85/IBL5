@@ -102,3 +102,23 @@ def test_label_marker_stays_first_line():
     body = render_body(_finding(), 1000)
     assert body.splitlines()[0] == "<!-- label: important -->"
     assert parse_label(body) == "important"
+
+
+def test_report_on_new_rows_has_no_unknown_bucket(tmp_path):
+    events = []
+    for comment_id, agent in ((501, "A"), (502, "security")):
+        row = _read_row(tmp_path, render_body(_finding(agent=agent), 1000))
+        row["commentId"] = comment_id  # the fixture serves one comment id; findings need distinct ids
+        events.append(ol.event_from_verdict(pr=42, thread=row, verdict="FIX", category=None,
+                                            reason=None, sha=None, pipeline="harness"))
+    log = tmp_path / "outcomes.jsonl"
+    assert ol.append_events(str(log), events, lambda msg: None) == 2
+    wrapper = Path(__file__).resolve().parents[3] / "bin" / "review-outcomes"
+    proc = subprocess.run(["env", "-i", str(wrapper), "report", f"--log={log}"],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    rows = {ln.split()[0]: ln.split() for ln in proc.stdout.splitlines()[1:]}
+    assert rows["A"][1] == "1"
+    assert rows["security"][1] == "1"
+    assert "unknown" not in rows
+    assert "note:" not in proc.stderr

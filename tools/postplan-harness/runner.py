@@ -364,7 +364,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if not diff.strip():
             res.terminal = TerminalState.NOTHING_TO_SHIP
             log("phase2: empty diff vs base — nothing to ship")
-            return _finish(res, out_dir)
+            return _finish(res, out_dir, ab_state_dir=_state_dir(out_dir, live, state_dir),
+                           run_started=run_started, log=log)
         files = git.changed_files()
         # Rename sources included; read ONLY by the conformance check. classify(),
         # scope conformance and denied_gate_edits keep `files`, or an old path
@@ -417,7 +418,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         if _early_hold_repeat(res, plan, conf_files, slug, out_dir, live, state_dir, log,
                               diff_body=diff, worktree=worktree):
-            return _finish(res, out_dir)
+            return _finish(res, out_dir, ab_state_dir=_state_dir(out_dir, live, state_dir),
+                           run_started=run_started, log=log)
 
         phase2_merge_danger = None   # MergeDanger this run's Phase 2 injected; None on the clean-tree rerun
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
@@ -1279,7 +1281,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         state.checkpoint("terminal", res)
         _phase11_cleanup(llm, log)
         ciwatch.reap_background_watch(bg_ci)
-    return _finish(res, out_dir)
+    return _finish(res, out_dir, ab_state_dir=_state_dir(out_dir, live, state_dir),
+                   run_started=run_started, log=log)
 
 
 # Phase 5.0's two conformance signals, written into the run dir beside result.json.
@@ -3987,9 +3990,20 @@ def _state_dir(out_dir: str, live: bool, override) -> str:
     return os.path.join(out_dir, "state")
 
 
-def _finish(res: RunResult, out_dir: str) -> RunResult:
+def _finish(res: RunResult, out_dir: str, *, ab_state_dir: str | None = None,
+            run_started: float | None = None, log=None) -> RunResult:
     if res.ledger:
         res.ledger.finished_at = time.time()
+    if res.ab_arm and ab_state_dir:
+        # Closer A/B: one append-only line per enrolled run. Never raises, never moves the
+        # terminal. Runs before the audit is copied so an append failure shows in audit.log.
+        _utc = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).isoformat()  # noqa: E731
+        now = time.time()
+        outcome_log.append_events(
+            os.path.join(ab_state_dir, ab_arm.OUTCOME_BASENAME),
+            [ab_arm.outcome_row(res, run_started=_utc(run_started if run_started else now),
+                                run_finished=_utc(now))],
+            log or res.audit.append)
     # The shadow record is finalized on a copy, so the live `res` never changes. `_finish`
     # runs on every exit path, so a run that never reached Phase 5.5 records not-reached.
     fid = dict(res.fidelity or {})

@@ -162,3 +162,24 @@ def record_closer_session(state_dir: str, slug: str) -> int:
         _write_atomic(path, data)
         return entry["closer_sessions"]
     return _locked_update(state_dir, bump)
+
+
+OUTCOME_BASENAME = "ab-outcomes.jsonl"
+OUTCOME_SCHEMA = "ab-outcome/1"
+
+
+def outcome_row(res, *, run_started: str, run_finished: str) -> dict:
+    """One line per enrolled run. The readout folds the lines per PR."""
+    calls = list(getattr(getattr(res, "ledger", None), "calls", []) or [])
+    closer = getattr(res, "closer", None) or {}
+    return {
+        "schema": OUTCOME_SCHEMA, "slug": res.slug, "pr": res.pr_number,
+        "ab_arm": res.ab_arm, "ab_source": res.ab_source,
+        "fired_by": getattr(res, "fired_by", None),
+        "run_started": run_started, "run_finished": run_finished,
+        "terminal": getattr(res.terminal, "value", res.terminal),
+        "error_kind": res.error_kind,
+        "llm_cost_usd": round(sum(float(c.cost_usd or 0) for c in calls), 4),
+        "closer_ran": bool(closer.get("ran")), "closer_status": closer.get("status"),
+        "closer_cost_usd": closer.get("cost_usd"), "closer_recheck": closer.get("recheck"),
+    }

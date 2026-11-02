@@ -215,3 +215,18 @@ def test_emergency_abort_every_git_call_hanging_never_raises(monkeypatch):
         assert time.monotonic() - start < 15
     finally:
         _cleanup_full(key, branch, d)
+
+
+def test_emergency_git_timeout_with_unclearable_lock_does_not_raise(monkeypatch, tmp_path):
+    """A timed-out git call whose stale-lock cleanup raises OSError (PermissionError) must
+    not escape _emergency_git: it runs inside the SIGTERM handler and never raises."""
+    def _timeout(*_a, **_kw):
+        raise HarnessError(SUBPROCESS_TIMEOUT, "hung")
+
+    def _cleanup_fails():
+        raise PermissionError("cannot remove index.lock")
+
+    monkeypatch.setattr(gitad, "run_bounded", _timeout)
+    g = LiveGit(str(tmp_path))
+    monkeypatch.setattr(g, "_clear_stale_index_lock", _cleanup_fails)
+    assert g._emergency_git("reset", "--hard", "HEAD") is None

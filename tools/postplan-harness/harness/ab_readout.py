@@ -119,6 +119,10 @@ def _harness_body(body) -> bool:
 def count_human_touches(pr: dict, first_start, windows) -> int:
     n = 0
     for c in pr.get("commits") or []:
+        # The conflict autofix (`postplan-fix --headless`) commits a master merge under the
+        # operator's identity outside any run window. It is automation, not a human touch.
+        if (c.get("messageHeadline") or "").startswith("Merge "):
+            continue
         logins = [a.get("login") for a in (c.get("authors") or []) if isinstance(a, dict)]
         human = (not logins) or any(not is_bot(lg) for lg in logins)
         if human and _counts(parse_ts(c.get("committedDate")), first_start, windows):

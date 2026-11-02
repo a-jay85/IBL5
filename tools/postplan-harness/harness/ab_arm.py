@@ -186,9 +186,10 @@ def record_closer_session(state_dir: str, slug: str) -> int:
         _write_atomic(path, data)
         return entry["closer_sessions"]
     n = _locked_update(state_dir, bump)
-    if n != -1 and not (n == 0 and not os.path.exists(enrollment_path(state_dir))):
+    if n > 0:
         return n
-    # No enrollment entry (env-forced run): count in the per-slug sessions file.
+    # bump did not run (no entry, or enrollment file absent/corrupt/unreadable):
+    # count in the per-slug sessions file so the per-PR cap still fires.
     try:
         os.makedirs(state_dir, exist_ok=True)
         with open(os.path.join(state_dir, LOCK_BASENAME), "a") as lock:

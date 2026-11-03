@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+from harness import (adr_draft, body_notes, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
@@ -950,10 +950,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 sticky_ = fidelity.compose_sticky(
                     rebase_line, ci_line_, fid, decision_, digest,
                     fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
-                    fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
-                                           fid.get("remediation_sha"),
-                                           fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                           fid.get("rounds_completed", 0)),
+                    body_notes.terminal_line(fid)
+                    or fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
+                                              fid.get("remediation_sha"),
+                                              fid.get("verdict_2"), fid.get("reviewed_tree_2"),
+                                              fid.get("rounds_completed", 0)),
                     diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
                     own_id=fid.get("own_id", ""),
                     reused_from=res.reused_from,
@@ -3564,6 +3565,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["filed_notes"] = filed_notes
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
+        if pr:
+            body_notes.fix_body_notes(llm, gh, git, out_dir, pr, current_verdict_path,
+                                      res.fidelity, name_status_text(git.diff_vs_base()),
+                                      signature=_body_signature, log=log)
     fidelity_delta.record_outcome(state_dir, slug, res.fidelity, pr_number=pr,
                                   run_id=os.path.basename(os.path.normpath(out_dir)),
                                   version=cache_version, diff=diff,

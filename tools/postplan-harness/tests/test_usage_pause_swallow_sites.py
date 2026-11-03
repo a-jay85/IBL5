@@ -22,7 +22,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import adr_draft, conflict, fidelity, usage_pause
+from harness import adr_draft, body_notes, conflict, fidelity, usage_pause
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
@@ -34,6 +34,10 @@ from harness.usage_pause import UsagePause
 
 # Fixtures reused from the ADR-draft suite: a real throwaway repo, and the bin/* seam stub.
 from test_adr_draft_on_denial import fake_scripts, repo  # noqa: F401
+from test_body_notes import (NAME_STATUS as _BODY_NOTES_NAME_STATUS,
+                             PR_BODY as _BODY_NOTES_PR_BODY, _StubGh as _BodyNotesStubGh,
+                             _StubGit as _BodyNotesStubGit,
+                             _signature as _body_notes_signature)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -134,6 +138,22 @@ def test_fidelity_list_site_propagates_pause(tmp_path):
     with pytest.raises(UsagePause):
         fidelity.extract_notes(llm, str(verdict), _NOOP)
     assert llm.purposes == ["fidelity-notes"]
+
+
+def test_body_notes_fix_site_propagates_pause(tmp_path):
+    verdict = tmp_path / "verdict.md"
+    verdict.write_text("## FINDINGS\n\n- [NOTE] Add the output to the PR body\n\n"
+                       "READY WITH NOTES\n")
+    llm = PausingLlm(pause_on={"plan-fidelity-body-notes-fix"})
+    gh = _BodyNotesStubGh(_BODY_NOTES_PR_BODY)
+    fid = {"verdict_1": "READY WITH NOTES", "verdict_2": None, "rounds": [],
+           "rounds_completed": 0, "remediation_sha": None}
+    with pytest.raises(UsagePause):
+        body_notes.fix_body_notes(llm, gh, _BodyNotesStubGit(), str(tmp_path), 3679,
+                                  str(verdict), fid, _BODY_NOTES_NAME_STATUS,
+                                  signature=_body_notes_signature)
+    assert llm.purposes == ["plan-fidelity-body-notes-fix"]
+    assert gh.edits == []
 
 
 # --- harness/conflict.py ------------------------------------------------------

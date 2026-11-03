@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import statistics
 import subprocess
 import sys
 
@@ -272,6 +273,8 @@ def _cli_sweep(flags, log) -> None:
 
 _REPORT_KEYS = ("total",) + OUTCOMES + ("wrong_or_didnt_matter_share",)
 _REPORT_HEADER = "agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
+_CYCLE_GAP_SECONDS = 300
+_CYCLE_BUCKETS = ("1", "2", "3", "4+")
 
 
 def _parse_report_flags(args):
@@ -304,6 +307,46 @@ def _agent_row(counts) -> dict:
     return row
 
 
+def _parse_ts(ts):
+    try:
+        return datetime.datetime.strptime(str(ts), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+
+
+def build_cycles(events, since=None, until=None) -> dict:
+    """Review cycles per PR, derived from the raw phase4.5 events (never the last-wins dict).
+
+    A cycle is a batch of one PR's phase4.5 events; a new batch starts where two consecutive
+    events sit more than _CYCLE_GAP_SECONDS apart. A PR is in range when the UTC day of its
+    last phase4.5 event is. Blind spot: a review run that logged zero finding outcomes writes
+    no event, so a clean first pass on a PR with no findings is invisible.
+    """
+    per_pr = {}
+    for e in events:
+        if e.get("source") != "phase4.5" or e.get("pr") is None:
+            continue
+        t = _parse_ts(e.get("ts"))
+        if t is not None:
+            per_pr.setdefault(e.get("pr"), []).append(t)
+    counts = []
+    for times in per_pr.values():
+        times.sort()
+        day = times[-1].strftime("%Y-%m-%d")
+        if (since and day < since) or (until and day > until):
+            continue
+        counts.append(1 + sum(1 for a, b in zip(times, times[1:])
+                              if (b - a).total_seconds() > _CYCLE_GAP_SECONDS))
+    hist = {k: 0 for k in _CYCLE_BUCKETS}
+    for n in counts:
+        hist[str(n) if n < 4 else "4+"] += 1
+    return {"prs": len(counts),
+            "mean": round(sum(counts) / len(counts), 2) if counts else None,
+            "median": statistics.median(counts) if counts else None,
+            "max": max(counts) if counts else None,
+            "histogram": hist, "gap_seconds": _CYCLE_GAP_SECONDS}
+
+
 def build_report(events, since=None, until=None) -> dict:
     """Last event wins per (pr, findingId); the date filter applies to the winning event."""
     latest = {}
@@ -324,7 +367,19 @@ def build_report(events, since=None, until=None) -> dict:
         total[outcome] = total.get(outcome, 0) + 1
     return {"since": since, "until": until,
             "agents": {a: _agent_row(c) for a, c in per_agent.items()},
-            "total": _agent_row(total)}
+            "total": _agent_row(total),
+            "cycles": build_cycles(events, since, until)}
+
+
+def _format_cycles(c) -> list:
+    mean = "-" if c["mean"] is None else f"{c['mean']:.2f}"
+    median = "-" if c["median"] is None else f"{c['median']:g}"
+    mx = "-" if c["max"] is None else f"{c['max']:g}"
+    hist = "  ".join(f"{k}={c['histogram'][k]}" for k in _CYCLE_BUCKETS)
+    return [f"cycles-to-pass: {c['prs']} PRs  mean {mean}  median {median}  max {mx}",
+            f"cycles histogram: {hist}",
+            f"note: cycles = phase4.5 outcome batches per PR split at gaps over "
+            f"{c['gap_seconds']}s; review runs that logged zero findings are not counted"]
 
 
 def format_report(report) -> str:
@@ -343,6 +398,8 @@ def format_report(report) -> str:
     lines = [_REPORT_HEADER]
     lines += [line(a, agents[a]) for a in names]
     lines.append(line("TOTAL", report["total"]))
+    if "cycles" in report:
+        lines += [""] + _format_cycles(report["cycles"])
     return "\n".join(lines)
 
 

@@ -66,13 +66,28 @@ def test_parent_merge_not_flagged(stack):
     _git(seed, "push", "-q", "origin", "parent")
     _git(wt, "fetch", "-q", "origin")
     _git(wt, "merge", "--no-edit", "origin/parent")
+    # Parent work not yet pushed: on neither the base nor master, so only the
+    # master-ancestry test keeps it from being flagged.
+    _git(wt, "checkout", "-qb", "parent-local", "origin/parent")
+    _commit(wt, "parent3.txt", "p3\n", "unpushed parent work")
+    _git(wt, "checkout", "-q", "feature")
+    _git(wt, "merge", "--no-ff", "--no-edit", "parent-local")
     assert history_shape.stray_master_merges(str(wt), "origin/parent") == []
 
 
-def test_unstacked_base_returns_empty(stack):
+def test_unstacked_base_returns_empty(stack, monkeypatch):
     wt, _ = stack
     _git(wt, "merge", "--no-edit", "origin/master")
+    calls = []
+    real_git = history_shape._git
+
+    def spy(worktree, *args):
+        calls.append(args)
+        return real_git(worktree, *args)
+
+    monkeypatch.setattr(history_shape, "_git", spy)
     assert history_shape.stray_master_merges(str(wt), "origin/master") == []
+    assert calls == [], "an unstacked base must short-circuit before any git call"
 
 
 def test_master_merge_shared_with_parent_not_flagged(stack):
@@ -81,6 +96,9 @@ def test_master_merge_shared_with_parent_not_flagged(stack):
     _git(seed, "merge", "--no-edit", "master")
     _git(seed, "push", "-q", "origin", "parent")
     _git(wt, "fetch", "-q", "origin")
+    # Feature also merges the same master commit directly: its merged parent is on
+    # master, and only its presence on the base keeps it from being flagged.
+    _git(wt, "merge", "--no-ff", "--no-edit", "origin/master")
     _git(wt, "merge", "--no-edit", "origin/parent")
     assert history_shape.stray_master_merges(str(wt), "origin/parent") == []
 

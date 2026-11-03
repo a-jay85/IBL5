@@ -347,6 +347,26 @@ bl_window_sleep() {
     echo "$s"
 }
 
+# bl_endgame_on: rc 0 when endgame is in force now: a go pace verdict and the weekly
+# reset under ENDGAME_HOURS away (the test bl_decide uses). A failed or stale fetch
+# is rc 1, so the normal, longer values apply.
+bl_endgame_on() {
+    local body now v
+    [ "$ENDGAME_HOURS" -gt 0 ] || return 1
+    body=$(usage_fetch 45) || return 1
+    now=$(bl_now)
+    v=$(usage_pace_verdict "$body" "$now")
+    [ "${v%% *}" = go ] && [ "$(bl_endgame_left "$body" "$now")" = in ]
+}
+
+# bl_scout_cooldown_min / bl_empty_sleep_min: the minutes in force right now.
+bl_scout_cooldown_min() {
+    if bl_endgame_on; then echo "$ENDGAME_SCOUT_COOLDOWN_MIN"; else echo "$SCOUT_COOLDOWN_MIN"; fi
+}
+bl_empty_sleep_min() {
+    if bl_endgame_on; then echo "$ENDGAME_EMPTY_SLEEP_MIN"; else echo "$EMPTY_SLEEP_MIN"; fi
+}
+
 # bl_decide: prints exactly one line, the single pacing decision for both the live
 # loop and --dry-run. Fails closed on a missing or stale reading: the loop is
 # discretionary work, so a skipped batch costs time while an unpaced one costs the
@@ -596,7 +616,7 @@ bl_all_skipped() {
 }
 
 bl_on_launch() {
-    local class reason new units tail3 scout
+    local class reason new units tail3 scout es
     bl_run_batch
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."
@@ -627,8 +647,9 @@ bl_on_launch() {
                             bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
                             ;;
                         *)
-                            bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
-                            bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                            es=$(bl_empty_sleep_min)
+                            bl_log "every picked item skipped; re-check in ${es}m"
+                            bl_sleep $((es * 60)) all-skipped || bl_stopped
                             ;;
                     esac
                 else
@@ -642,9 +663,10 @@ bl_on_launch() {
                 bl_log "backlog empty (sentinel confirmed first round LEDGER: none); --once ends the run"
                 bl_finish exhausted 0
             fi
-            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${EMPTY_SLEEP_MIN}m streak=$((EMPTY_STREAK + 1))"
+            es=$(bl_empty_sleep_min)
+            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${es}m streak=$((EMPTY_STREAK + 1))"
             if [ "$EMPTY_STREAK" -eq 0 ]; then
-                bl_dm "burndown-loop: backlog empty; re-checking every ${EMPTY_SLEEP_MIN}m until work appears
+                bl_dm "burndown-loop: backlog empty; re-checking every ${es}m until work appears
 batches=$BATCHES items=$ITEMS
 log: $LOOP_LOG"
             fi
@@ -656,7 +678,7 @@ log: $LOOP_LOG"
                     bl_run_scout
                     bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
                     ;;
-                *) bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped ;;
+                *) bl_sleep $((es * 60)) backlog-empty || bl_stopped ;;
             esac
             ;;
         abort)
@@ -826,7 +848,7 @@ bl_on_unblock() {
 # the batch that just ended may have spent the budget.
 bl_scout_gate() {
     local left d
-    left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+    left=$(bl_cooldown_left "$STATE/scout.last" "$(bl_scout_cooldown_min)")
     if [ "$left" -gt 0 ]; then echo "scout-skip cooldown left=${left}s"; return 0; fi
     d=$(bl_decide)
     case "$d" in launch*) echo "scout $d" ;; *) echo "scout-skip pace $d" ;; esac
@@ -950,7 +972,7 @@ bl_maybe_reexec() {
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
-    local dry=0 a decision action rest secs reason max_fails timeout_secs work left s
+    local dry=0 a decision action rest secs reason max_fails timeout_secs work left s cdm
     for a in "$@"; do
         case "$a" in
             --once) ONCE=1 ;;
@@ -971,9 +993,12 @@ bl_cmd_run() {
     if [ "$dry" -eq 1 ]; then
         decision=$(bl_decide)
         echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
-        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m"
+        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m window=${WIN_START_HOUR}-${WIN_END_HOUR} endgame_hours=${ENDGAME_HOURS} endgame_scout_cooldown=${ENDGAME_SCOUT_COOLDOWN_MIN}m endgame_empty_sleep=${ENDGAME_EMPTY_SLEEP_MIN}m"
+        cdm=$(bl_scout_cooldown_min)
+        if bl_endgame_on; then s=on; else s=off; fi
+        echo "burndown-loop: DRY RUN endgame=$s scout_cooldown_now=${cdm}m empty_sleep_now=$(bl_empty_sleep_min)m"
         work=$(bl_work_gate)
-        left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+        left=$(bl_cooldown_left "$STATE/scout.last" "$cdm")
         if [ "$left" -gt 0 ]; then s="cooldown left=${left}s"; else s=ready; fi
         echo "burndown-loop: DRY RUN work=$work scout=$s"
         return 0

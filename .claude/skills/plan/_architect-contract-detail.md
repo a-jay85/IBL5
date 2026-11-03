@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-10-26
+last_verified: 2026-11-02
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -59,6 +59,7 @@ replace: <the same line with the mutation applied>
 - **Paths.** A leading `/`, a `..` segment, a `.git/` prefix, or a symlink is rejected. The file must exist in the tree or be named in `## Critical Files`.
 - **When prose stays.** A row whose mutation needs a DB, a browser, GitHub Actions, or a multi-line edit ends its "What to verify" cell with `(mutation-prose: <reason>)`. The reason is 15 or more characters. A `(one-time-check:)` row needs neither.
 - **Who runs it.** `bin/check-plan` gate `[XM]` checks the grammar and coverage at plan time. `/post-plan` Phase 5.0 runs `bin/lib/plan-exec-mutations`, which applies each entry, requires the check to exit non-zero, reverts, and verifies the tree byte-identical. Arming condition (19) holds on any result other than `TRIPPED`.
+- **Slow checks.** Each row's check runs at least twice, once as the baseline and once under mutation. `bin/lib/plan-exec-mutations` bounds each run with a 30 s floor and a 300 s ceiling, sets the mutated bound to twice the measured baseline, and stops starting rows once an 1800 s budget is spent. Whole suites measured on 2026-11-02 took 47 s (`bin/test-check-composite-contracts`), 142 s (`bash bin/test-wt-gc-tick`) and 191 s or more (`python3 -m pytest tools/postplan-harness/tests/ -q`). Rows that ran them held PRs [#3667](https://github.com/a-jay85/IBL5/pull/3667), [#3633](https://github.com/a-jay85/IBL5/pull/3633) and [#3673](https://github.com/a-jay85/IBL5/pull/3673) on exit 124. Point `check:` at the one test file the mutation touches, or add a `-k` or `--filter` expression.
 
 ### Critical Files parsing — counter-examples
 

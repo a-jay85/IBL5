@@ -2104,6 +2104,83 @@ else
         || fail "C41: BURNDOWN_TIER_HINT unset: no ledger found"
 fi
 
+# ── CB-1: bd_cost_for passes the issue title to the hint via --desc ─────────
+cat > "$T/tier-rec" <<'TREC_EOF'
+#!/usr/bin/env bash
+# One record per call: each argv element on its own line, a copy of any
+# --brief file's content, then a terminator line.
+{
+    prev=""
+    for a in "$@"; do
+        printf 'ARG %s\n' "$a"
+        if [ "$prev" = "--brief" ]; then
+            printf 'BRIEF-BEGIN\n'; cat "$a" 2>/dev/null; printf '\nBRIEF-END\n'
+        fi
+        prev="$a"
+    done
+    printf 'CALL-END\n'
+} >> "${BURNDOWN_TEST_TIER_LOG:?}"
+printf 'default\n'
+TREC_EOF
+chmod +x "$T/tier-rec"
+rm -f "$T/tier-rec.log"
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+OUT="$(BURNDOWN_TIER_HINT="$T/tier-rec" BURNDOWN_TEST_TIER_LOG="$T/tier-rec.log" \
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" \
+    HOME="$T/home" "$SCRIPT" burndown 2>&1)"; RC=$?
+CB1_HITS="$(grep -A1 -xF 'ARG --desc' "$T/tier-rec.log" 2>/dev/null | grep -cE '^ARG Hundred-')"
+[ "${CB1_HITS:-0}" -ge 1 ] && ok "CB-1: cost call passes --desc <issue title>" \
+    || fail "CB-1: cost call passes --desc <issue title> (hits=${CB1_HITS:-0} rc=$RC)"
+
+# ── CB-2: bd_cost_for passes the issue body to the hint via --brief ─────────
+CB2_BRIEF="$(grep -cxF 'ARG --brief' "$T/tier-rec.log" 2>/dev/null)"
+CB2_BODY="$(grep -cxF 'bin/b:1 stuff' "$T/tier-rec.log" 2>/dev/null)"
+[ "${CB2_BRIEF:-0}" -ge 1 ] && ok "CB-2: cost call passes --brief" \
+    || fail "CB-2: cost call passes --brief (hits=${CB2_BRIEF:-0})"
+[ "${CB2_BODY:-0}" -ge 1 ] && ok "CB-2: the brief file carries the issue body" \
+    || fail "CB-2: the brief file carries the issue body (hits=${CB2_BODY:-0})"
+
+# ── CB-3: an empty body sends no --brief; the brief file is removed ─────────
+mkdir -p "$T/cb3-tmp"; rm -f "$T/tier-rec-cb3.log"
+CB3_OUT="$(BURNDOWN_TEST_TIER_LOG="$T/tier-rec-cb3.log" bash -c '
+    . "$1"; BD_TIER_HINT="$2"; BD_TMP="$3"
+    bd_cost_for "Empty body item" ""; printf "%s %s\n" "$_bd_tier" "$_bd_cost"
+    bd_cost_for "Body item" "bin/x:1 fix"; printf "%s %s\n" "$_bd_tier" "$_bd_cost"
+' _ "$(cd "$(dirname "$0")" && pwd)/lib/burndown.sh" "$T/tier-rec" "$T/cb3-tmp")"
+[ "$CB3_OUT" = "$(printf 'default 1\ndefault 1')" ] \
+    && ok "CB-3: both calls return default 1" \
+    || fail "CB-3: both calls return default 1 (got: $CB3_OUT)"
+CB3_BRIEFS="$(grep -cxF 'ARG --brief' "$T/tier-rec-cb3.log" 2>/dev/null)"
+[ "${CB3_BRIEFS:-0}" = 1 ] && ok "CB-3: only the non-empty body sends --brief" \
+    || fail "CB-3: only the non-empty body sends --brief (count=${CB3_BRIEFS:-0})"
+CB3_NEXT="$(grep -A1 -xF 'ARG --brief' "$T/tier-rec-cb3.log" 2>/dev/null | tail -1)"
+case "$CB3_NEXT" in
+    "ARG $T/cb3-tmp/cost-brief."*) ok "CB-3: brief file lives under BD_TMP" ;;
+    *) fail "CB-3: brief file lives under BD_TMP (got: $CB3_NEXT)" ;;
+esac
+[ -z "$(ls -A "$T/cb3-tmp")" ] && ok "CB-3: brief file removed after the call" \
+    || fail "CB-3: brief file removed after the call"
+
+# ── CB-4: the pair partner's body reaches the hint ──────────────────────────
+cp "$T/fx/issues.json" "$T/fx/issues.json.cb4-saved"
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":50,"title":"Fifty","body":"bin/p1:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":51,"title":"Fifty-one","body":"bin/p2:1 pair test","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json "$T/tier-rec-cb4.log"
+OUT="$(BURNDOWN_TIER_HINT="$T/tier-rec" BURNDOWN_TEST_TIER_LOG="$T/tier-rec-cb4.log" \
+    GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \
+    BACKLOG_GH="$T/gh" BURNDOWN_GIT="$T/git" \
+    HOME="$T/home" "$SCRIPT" burndown --pair 50,51 2>&1)"; RC=$?
+CB4_HITS="$(grep -cxF 'bin/p2:1 pair test' "$T/tier-rec-cb4.log" 2>/dev/null)"
+[ "${CB4_HITS:-0}" -ge 1 ] && ok "CB-4: partner body reaches the hint" \
+    || fail "CB-4: partner body reaches the hint (hits=${CB4_HITS:-0} rc=$RC)"
+mv "$T/fx/issues.json.cb4-saved" "$T/fx/issues.json"
+rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
+
 # ── C42: BURNDOWN_TIER_HINT="" — empty string falls back to real hint (stub judge)
 rm -f "$T/home/claude-plans/_reports"/burndown-batch-[0-9]*.json
 OUT="$(GH_LOG="$T/gh.log" GH_FX_DIR="$T/fx" \

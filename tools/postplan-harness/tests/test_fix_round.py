@@ -390,3 +390,15 @@ def test_discard_cleans_tree_before_undo(tmp_path):
     assert git.clean_at_drop is True
     assert [c[0] for c in git.calls] == ["dirty_paths", "unstage_paths", "restore_paths"]
     assert git.head() == "head0"
+
+
+def test_closer_arm_skips_the_round(tmp_path):
+    res = RunResult(terminal="x")
+    res.findings = [_finding()]
+    res.ab_arm = "closer"
+    rec, res, gh, git, llm = _run(tmp_path, res=res)
+    assert rec["status"] == "skipped"
+    assert rec["reason"] == "closer-arm"
+    assert llm.calls == 0
+    assert git.n == 0
+    assert git.head() == "head0"

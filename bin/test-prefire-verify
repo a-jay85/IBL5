@@ -529,22 +529,22 @@ test_db_probe_does_not_read_callers_stdin
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi
 
-FAILED=0
 for name in $CASES; do
     if ! declare -F "$name" >/dev/null; then
         echo "FAIL $name: no such case"
-        FAILED=$((FAILED + 1))
+        H_FAIL=$((H_FAIL + 1))
         continue
     fi
     WHY=""
     "$name"
     if [ -z "$WHY" ]; then
         echo "PASS $name"
+        H_PASS=$((H_PASS + 1))
     else
         echo "FAIL $name: $WHY"
         printf '%s\n' "$OUT" | sed -n '1,15p' | sed 's/^/    | /'
-        FAILED=$((FAILED + 1))
+        H_FAIL=$((H_FAIL + 1))
     fi
 done
 
-[ "$FAILED" -eq 0 ]
+h_done

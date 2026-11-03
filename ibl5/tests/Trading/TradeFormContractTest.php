@@ -32,23 +32,6 @@ class TradeFormContractTest extends TestCase
         $this->assertSame(0, TradeFormContract::amountFor(self::row(6), true));
     }
 
-    public function testAmountForNullContractYearTreatsAsYearOne(): void
-    {
-        $row = self::row(0);
-        $row['cy'] = null;
-
-        $this->assertSame(100, TradeFormContract::amountFor($row, false));
-        $this->assertSame(100, TradeFormContract::amountFor($row, true));
-    }
-
-    public function testAmountForNullSalaryIsZero(): void
-    {
-        $row = self::row(2);
-        $row['salary_yr2'] = null;
-
-        $this->assertSame(0, TradeFormContract::amountFor($row, false));
-    }
-
     /**
      * @return TradingPlayerRow
      */

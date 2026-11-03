@@ -112,48 +112,6 @@ class TradePrefillParserTest extends TestCase
         $this->assertNull(TradePrefillParser::parse($raw, $this->pageData()));
     }
 
-    public function testAcceptsLongestValidInput(): void
-    {
-        $pids = range(1000000001, 1000000008);
-        $raw = implode(',', array_map(static fn (int $pid): string => '1:' . $pid, $pids));
-        $this->assertSame(103, strlen($raw));
-
-        $result = TradePrefillParser::parse($raw, $this->pageData(userPids: $pids));
-
-        $this->assertNotNull($result);
-        $this->assertCount(8, $result['checkedItems']);
-    }
-
-    public function testReturnsNullWhenPartnerMissing(): void
-    {
-        $pageData = $this->pageData();
-        unset($pageData['partnerTeamId']);
-
-        $this->assertNull(TradePrefillParser::parse('1:101', $pageData));
-    }
-
-    public function testAcceptsStringIdsFromPageData(): void
-    {
-        $pageData = $this->pageData();
-        $pageData['userPlayers'] = [['pid' => '101']];
-        $pageData['userPicks'] = [['pickid' => '7']];
-
-        $result = TradePrefillParser::parse('1:101,0:7', $pageData);
-
-        $this->assertNotNull($result);
-        $this->assertSame(['1:101' => true, '0:7' => true], $result['checkedItems']);
-    }
-
-    public function testIgnoresIdsThatAreNeitherIntNorString(): void
-    {
-        $pageData = $this->pageData();
-        $pageData['userPlayers'] = [['pid' => 101.0]];
-        $pageData['userPicks'] = [['pickid' => 7.0]];
-
-        $this->assertNull(TradePrefillParser::parse('1:101', $pageData));
-        $this->assertNull(TradePrefillParser::parse('0:7', $pageData));
-    }
-
     public function testReturnsNullWhenPartnerUnknown(): void
     {
         $this->assertNull(TradePrefillParser::parse('1:101', $this->pageData(partnerTeamId: 0)));

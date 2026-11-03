@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TradeSuggestions;
 
+use League\LeagueContext;
 use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
 
 /**
@@ -11,6 +12,11 @@ use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
  */
 class TeamModeRepository extends \Database\BaseMysqliRepository implements TeamModeRepositoryInterface
 {
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+    }
+
     /**
      * @see TeamModeRepositoryInterface::getStoredSetting()
      */

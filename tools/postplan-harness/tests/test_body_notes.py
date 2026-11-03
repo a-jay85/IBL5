@@ -105,6 +105,25 @@ def test_apply_edits_inserts_clause_outside_protected():
     assert rejected == {}
 
 
+_EDGE_BODY = "## Summary\nfoo bar\n\n## Manual Testing\n- [ ] x\n**Decision:** hold\n"
+
+
+def test_apply_edits_rejects_edit_that_merges_into_protected_heading():
+    # The find ends exactly where the protected section starts, so it never overlaps it.
+    _rejects("foo bar\n\n", "foo bar ", "protected-region", body=_EDGE_BODY)
+
+
+def test_apply_edits_rejects_edit_that_adds_second_protected_section():
+    _rejects("foo bar", "foo\n## Manual Testing\n- reworded", "protected-region",
+             body=_EDGE_BODY)
+
+
+def test_validate_fix_rejects_unhashable_note_field():
+    bad = _fix([{"note": ["N1"], "find": "a", "replace": "b"}], ["fixed"])
+    with pytest.raises(HarnessError):
+        body_notes.validate_fix(bad, note_ids=["N1"])
+
+
 def test_apply_edits_rejects_merge_digest_edit():
     _rejects("Merge digest row one", "Merge digest row two", "protected-region")
 

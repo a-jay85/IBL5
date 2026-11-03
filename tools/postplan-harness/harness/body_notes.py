@@ -101,6 +101,10 @@ def protected_spans(body: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _protected_texts(body: str) -> list[str]:
+    return [body[a:b] for a, b in sorted(protected_spans(body))]
+
+
 def _note_sort_key(note_id: str) -> tuple:
     return tuple(int(p) if p.isdigit() else p for p in re.split(r"(\d+)", note_id))
 
@@ -147,7 +151,13 @@ def apply_edits(body: str, edits: list[dict], fixable_ids: set[str]
             if _forbidden(find) or _forbidden(replace):
                 rejected[note_id] = "forbidden-token"
                 break
-            scratch = scratch[:start] + replace + scratch[end:]
+            candidate = scratch[:start] + replace + scratch[end:]
+            # An edit that ends at a protected span's edge can still merge into it or add
+            # a second protected region, so compare the protected text before and after.
+            if _protected_texts(candidate) != _protected_texts(scratch):
+                rejected[note_id] = "protected-region"
+                break
+            scratch = candidate
         if note_id not in rejected:
             body = scratch
             applied.append(note_id)
@@ -185,7 +195,8 @@ def validate_fix(data, *, note_ids: list[str]) -> None:
     for i, edit in enumerate(edits):
         if not isinstance(edit, dict):
             raise HarnessError("schema", f"body-notes fix edits[{i}] must be an object")
-        if disposition.get(edit.get("note")) not in _EDITING_DISPOSITIONS:
+        if (not isinstance(edit.get("note"), str)
+                or disposition.get(edit["note"]) not in _EDITING_DISPOSITIONS):
             raise HarnessError("schema", f"body-notes fix edits[{i}] names note "
                                          f"{edit.get('note')!r} that is not fixed or shape-b")
         if not isinstance(edit.get("find"), str) or not isinstance(edit.get("replace"), str):

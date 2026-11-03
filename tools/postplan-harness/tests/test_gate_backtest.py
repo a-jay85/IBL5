@@ -567,13 +567,17 @@ def test_render_partial_apply_lists_files():
 
 
 def test_render_partial_refused_names_reason():
-    block = _partial_block("partial-gate-read")
-    refused = [ln for ln in block.splitlines() if ln.startswith("  - Partial apply refused #7 (")]
-    assert refused == ["  - Partial apply refused #7 (`bin/check-x`, a skipped file is one the "
-                       "gate reads): applied `config/required.txt`; skipped `src/fx6.txt`"]
-    block = _partial_block("partial-no-reads")
-    assert ("  - Partial apply refused #7 (`bin/check-x`, gate declares no gate-backtest-reads): "
-            "applied `config/required.txt`; skipped `src/fx6.txt`") in block.splitlines()
+    gate_read = "a skipped file is one the gate reads"
+    no_reads = "gate declares no gate-backtest-reads"
+    # Each refused kind maps to its own reason, and never to the other kind's reason.
+    for kind, want, other in (("partial-gate-read", gate_read, no_reads),
+                              ("partial-no-reads", no_reads, gate_read)):
+        block = _partial_block(kind)
+        refused = [ln for ln in block.splitlines()
+                   if ln.startswith("  - Partial apply refused #7 (")]
+        assert refused == [f"  - Partial apply refused #7 (`bin/check-x`, {want}): "
+                           "applied `config/required.txt`; skipped `src/fx6.txt`"], kind
+        assert other not in block, kind
 
 
 def test_render_full_apply_adds_no_file_line():

@@ -55,14 +55,20 @@ kill_infra_processes() {
 
     # Kill any remaining node processes with CWD in this worktree. The path match
     # is exact (the worktree or a dir under it), so cleaning `foo` never touches
-    # a process in a sibling `foo-bar` worktree.
-    local pids
-    pids=$(lsof -d cwd 2>/dev/null \
-        | awk -v p="$wt_path" '$1 == "node" && ($NF == p || index($NF, p "/") == 1) { print $2 }' \
+    # a process in a sibling `foo-bar` worktree. On Linux, Node 24 names its main
+    # thread MainThread and lsof cuts that to 9 chars. Other programs can use that
+    # name, so such a row dies only when /proc says its binary is node.
+    local rows cmd pid exe
+    rows=$(lsof -d cwd 2>/dev/null \
+        | awk -v p="$wt_path" '($1 == "node" || $1 == "MainThrea") && ($NF == p || index($NF, p "/") == 1) { print $1, $2 }' \
         | sort -u || true)
-    if [ -n "$pids" ]; then
-        echo "$pids" | xargs kill -9 2>/dev/null || true
-    fi
+    while read -r cmd pid; do
+        if [ "$cmd" != "node" ]; then
+            exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
+            [ "${exe##*/}" = "node" ] || continue
+        fi
+        kill -9 "$pid" 2>/dev/null || true
+    done <<< "$rows"
 
     # No kill by command line. A `pgrep -f <worktree path>` sweep used to live here
     # for host CSS watchers, which wt-up no longer starts (Tailwind --watch runs in

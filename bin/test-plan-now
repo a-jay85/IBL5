@@ -1929,7 +1929,9 @@ preflight_cleanup "$RES_OUT"
 echo "── AR: early-exit auto-resume ──"
 AR_SLUG=demo-slug
 
-# AR-N1 normal PLAN_FILE exit: one call, no resume.
+# AR-N1 normal PLAN_FILE exit: one call, no resume. This is the only case that
+# guards the marker regex in the resume `if`: narrowing (PLAN_FILE|NO_PLAN) to
+# (NO_PLAN) makes the part-written draft resume despite the marker.
 OUTPUT=$(AR_PLAN_SRC="$GOOD_PLAN" run_case_resume plan "$AR_PARTIAL_DRAFT" "$AR_SLUG")
 [ "$(ar_calls)" = 1 ] && ok "AR-N1 PLAN_FILE exit: one call" || fail "AR-N1 PLAN_FILE exit: one call (got $(ar_calls))"
 [ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N1 no auto-resume line" || fail "AR-N1 no auto-resume line"
@@ -1937,7 +1939,8 @@ OUTPUT=$(AR_PLAN_SRC="$GOOD_PLAN" run_case_resume plan "$AR_PARTIAL_DRAFT" "$AR_
 [ "$(grep -cF 'auto-resumed once' "$DM_LOG")" = 0 ] && ok "AR-N1 no auto-resumed DM line" || fail "AR-N1 no auto-resumed DM line"
 want_no "AR-N1 no auto-resumed log line" "$OUTPUT" "this run was auto-resumed"
 
-# AR-N2 NO_PLAN halt with an unfinished draft.
+# AR-N2 NO_PLAN halt with an unfinished draft. Narrowing (PLAN_FILE|NO_PLAN) to
+# (PLAN_FILE) makes this halt resume, so this case goes red.
 OUTPUT=$(run_case_resume noplan "$AR_PARTIAL_DRAFT" "$AR_SLUG")
 [ "$(ar_calls)" = 1 ] && ok "AR-N2 NO_PLAN halt: one call" || fail "AR-N2 NO_PLAN halt: one call (got $(ar_calls))"
 [ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N2 no auto-resume line" || fail "AR-N2 no auto-resume line"

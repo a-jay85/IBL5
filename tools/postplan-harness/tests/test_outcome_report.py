@@ -12,6 +12,12 @@ from harness import outcome_log as ol
 
 REPO = Path(__file__).resolve().parents[3]
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "review_outcomes_sample.jsonl"
+_REAL_READER = ol.read_master_subjects
+
+
+@pytest.fixture(autouse=True)
+def _stub_master_subjects(monkeypatch):
+    monkeypatch.setattr(ol, "read_master_subjects", lambda *a, **k: [])
 
 
 _FIXTURE_TABLE = """agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%
@@ -193,3 +199,76 @@ def test_report_text_shows_cycles_section(capsys):
     block = out.split("\n\n")[1].splitlines()
     assert block[0].startswith("cycles-to-pass:")
     assert any(ln.startswith("note: cycles = phase4.5") for ln in block)
+
+
+def test_reverts_subject_rule_near_misses():
+    subjects = [("2026-10-01", x) for x in (
+        'Revert "feat: x"', 'Revert "Revert "fix: y""', 'Revert "chore: z" (#123)',
+        "revert: x", "Revert foo", 'Reverted "x"', 'fix: Revert "x" handling')]
+    r = ol.build_reverts(subjects)
+    assert r["months"]["2026-10"] == {"commits": 7, "reverts": 3}
+    assert r["total"] == 3
+
+
+def test_reverts_bucket_by_month_and_range():
+    subjects = [(d, 'Revert "x"') for d in ("2026-09-30", "2026-10-01", "2026-10-31", "2026-11-01")]
+    r = ol.build_reverts(subjects, since="2026-10-01", until="2026-10-31")
+    assert list(r["months"]) == ["2026-10"]
+    assert r["months"]["2026-10"]["reverts"] == 2
+
+
+def test_report_git_failure_degrades_loudly(monkeypatch, capsys):
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ol, "read_master_subjects", boom)
+    rc = ol.main(["report", f"--log={FIXTURE}", "--json"])
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert rc == 0
+    assert data["reverts"] is None
+    assert data["total"]["total"] == 6
+    assert "revert count unavailable (boom)" in captured.err
+    rc, out = _report(capsys)
+    assert rc == 0
+    assert "reverts: revert count unavailable" in out
+
+
+def test_report_unreadable_log_still_exits_one_with_git_stubbed(monkeypatch, tmp_path):
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(ol, "read_master_subjects", boom)
+    assert ol.main(["report", f"--log={tmp_path}"]) == 1
+
+
+def _raise(exc):
+    def fake(*a, **k):
+        raise exc
+
+    return fake
+
+
+@pytest.mark.parametrize("fake", [
+    _raise(FileNotFoundError("git")),
+    _raise(subprocess.TimeoutExpired(["git"], 20)),
+    lambda *a, **k: subprocess.CompletedProcess([], 128, "", "fatal: bad revision"),
+], ids=["missing-git", "timeout", "nonzero"])
+def test_read_master_subjects_failures_raise(monkeypatch, fake):
+    monkeypatch.setattr(ol.subprocess, "run", fake)
+    with pytest.raises(RuntimeError):
+        _REAL_READER()
+
+
+def test_read_master_subjects_parses_rows_utc(monkeypatch):
+    seen = {}
+
+    def fake(argv, **kwargs):
+        seen["argv"], seen["kwargs"] = argv, kwargs
+        return subprocess.CompletedProcess(
+            argv, 0, '2026-10-01\tRevert "x"\nno-tab-line\n2026-10-02\tfix: a\tb\n', "")
+
+    monkeypatch.setattr(ol.subprocess, "run", fake)
+    assert _REAL_READER() == [("2026-10-01", 'Revert "x"'), ("2026-10-02", "fix: a\tb")]
+    assert "--date=format-local:%Y-%m-%d" in seen["argv"]
+    assert seen["kwargs"]["env"]["TZ"] == "UTC"

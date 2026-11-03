@@ -275,6 +275,9 @@ _REPORT_KEYS = ("total",) + OUTCOMES + ("wrong_or_didnt_matter_share",)
 _REPORT_HEADER = "agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%"
 _CYCLE_GAP_SECONDS = 300
 _CYCLE_BUCKETS = ("1", "2", "3", "4+")
+_REVERT_PREFIX = 'Revert "'
+_GIT_TIMEOUT_SECONDS = 20
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
 
 def _parse_report_flags(args):
@@ -371,6 +374,55 @@ def build_report(events, since=None, until=None) -> dict:
             "cycles": build_cycles(events, since, until)}
 
 
+def read_master_subjects(repo_dir=_REPO_ROOT) -> list:
+    """The injectable git seam: (UTC commit day, subject) per origin/master commit.
+
+    Every failure is raised as RuntimeError so the caller can degrade loudly.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", repo_dir, "log", "origin/master", "--date=format-local:%Y-%m-%d",
+             "--format=%cd%x09%s"],
+            capture_output=True, text=True, timeout=_GIT_TIMEOUT_SECONDS,
+            env=dict(os.environ, TZ="UTC"))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise RuntimeError(f"git log failed ({e!r})") from e
+    if proc.returncode != 0:
+        raise RuntimeError(f"git log exit {proc.returncode}: {proc.stderr.strip()[:200]}")
+    rows = []
+    for line in proc.stdout.splitlines():
+        day, sep, subject = line.partition("\t")
+        if sep:
+            rows.append((day, subject))
+    return rows
+
+
+def build_reverts(subjects, since=None, until=None) -> dict:
+    """Count master commits whose subject starts with 'Revert "', bucketed by UTC month."""
+    months = {}
+    for day, subject in subjects:
+        if (since and day < since) or (until and day > until):
+            continue
+        m = months.setdefault(day[:7], {"commits": 0, "reverts": 0})
+        m["commits"] += 1
+        if subject.startswith(_REVERT_PREFIX):
+            m["reverts"] += 1
+    ordered = {k: months[k] for k in sorted(months)}
+    return {"months": ordered,
+            "commits": sum(m["commits"] for m in ordered.values()),
+            "total": sum(m["reverts"] for m in ordered.values())}
+
+
+def _format_reverts(r) -> list:
+    if r is None:
+        return ["reverts: revert count unavailable (git log origin/master failed, see stderr)"]
+    lines = [f"reverts on origin/master (subject starts 'Revert \"'): {r['total']} of {r['commits']} commits"]
+    for month, m in r["months"].items():
+        pct = f"{100 * m['reverts'] / m['commits']:.1f}"
+        lines.append(f"  {month}  {m['reverts']}/{m['commits']}  {pct}%")
+    return lines
+
+
 def _format_cycles(c) -> list:
     mean = "-" if c["mean"] is None else f"{c['mean']:.2f}"
     median = "-" if c["median"] is None else f"{c['median']:g}"
@@ -400,6 +452,8 @@ def format_report(report) -> str:
     lines.append(line("TOTAL", report["total"]))
     if "cycles" in report:
         lines += [""] + _format_cycles(report["cycles"])
+    if "reverts" in report:
+        lines += [""] + _format_reverts(report["reverts"])
     return "\n".join(lines)
 
 
@@ -410,6 +464,12 @@ def _cli_report(flags) -> int:
     except Exception as e:  # noqa: BLE001 - report is a human command; say what broke
         print(f"review-outcomes: report failed ({e!r})", file=sys.stderr)
         return 1
+    try:
+        report["reverts"] = build_reverts(read_master_subjects(), flags.get("since"),
+                                          flags.get("until"))
+    except RuntimeError as e:
+        report["reverts"] = None
+        print(f"review-outcomes: revert count unavailable ({e})", file=sys.stderr)
     if flags["json"]:
         print(json.dumps(report, sort_keys=True))
     else:

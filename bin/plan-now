@@ -479,6 +479,12 @@ conflicting default in the skill):**
   your turn, and expect to collect it afterwards. Under \`claude -p\` the turn you
   end is the run, so a background result has no next turn to land on and is
   discarded. If you have already started one, collect it before you finish.
+- **Wait for each architect section.** \`SendMessage\` returns before the
+  architect replies, and the turn you end is the run.
+  Never end your turn while a section you sent has not landed.
+  Poll the draft for its \`## <title>\` heading in foreground Bash loops of
+  under 500s each, about 20 minutes in total per section. Send the next section
+  only after the previous one lands.
 - $DISPOSITION_LINE
 CODA
 fi
@@ -830,6 +836,7 @@ newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep 
 
 echo "----------------------------------------------------------------"
 echo "plan-now: claude exited $rc after ${elapsed}s"
+[ "$AUTO_RESUMED" = 1 ] && echo "plan-now: this run was auto-resumed once after an early exit (session $SESSION_ID)."
 
 if [ "$LOGIN_PARKED" = 1 ]; then
     echo "plan-now: RESULT parked — Claude login expired; no model call was made."
@@ -1129,6 +1136,10 @@ ${elapsed}s · ${DM_NEXT:-read the log}"
     if [ -n "$DM_PLAN" ]; then
         msg="$msg
 ${DM_PLAN/#$HOME/~}"
+    fi
+    if [ "${AUTO_RESUMED:-0}" = 1 ]; then
+        msg="$msg
+auto-resumed once after an early exit"
     fi
     if [ -n "${TIER_OVERRIDE:-}" ]; then
         msg="$msg

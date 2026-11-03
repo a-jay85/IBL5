@@ -1934,6 +1934,8 @@ OUTPUT=$(AR_PLAN_SRC="$GOOD_PLAN" run_case_resume plan "$AR_PARTIAL_DRAFT" "$AR_
 [ "$(ar_calls)" = 1 ] && ok "AR-N1 PLAN_FILE exit: one call" || fail "AR-N1 PLAN_FILE exit: one call (got $(ar_calls))"
 [ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N1 no auto-resume line" || fail "AR-N1 no auto-resume line"
 [ "$(grep -c '^--call--$' "$AR_ARGV")" = 1 ] && ok "AR-N1 stub argv log has one call" || fail "AR-N1 stub argv log has one call"
+[ "$(grep -cF 'auto-resumed once' "$DM_LOG")" = 0 ] && ok "AR-N1 no auto-resumed DM line" || fail "AR-N1 no auto-resumed DM line"
+want_no "AR-N1 no auto-resumed log line" "$OUTPUT" "this run was auto-resumed"
 
 # AR-N2 NO_PLAN halt with an unfinished draft.
 OUTPUT=$(run_case_resume noplan "$AR_PARTIAL_DRAFT" "$AR_SLUG")
@@ -1978,6 +1980,10 @@ want "AR-1 resumed plan reaches RESULT ok" "$OUTPUT" "plan-now: RESULT ok — pl
 want "AR-1 resumed plan is queued" "$OUTPUT" "queued for automouse"
 [ "$(printf '%s\n' "$OUTPUT" | grep -cE '^plan-now: auto-resume — claude exited 0 with no PLAN_FILE:/NO_PLAN: line and draft sections 1/3; resuming session [^ ]+ once with [0-9]+s left\.$')" = 1 ] \
     && ok "AR-1 full auto-resume log line" || fail "AR-1 full auto-resume log line"
+[ "$(printf '%s\n' "$OUTPUT" | grep -cE '^plan-now: this run was auto-resumed once after an early exit \(session [^)]+\)\.$')" = 1 ] \
+    && ok "AR-1 log summary line" || fail "AR-1 log summary line"
+[ "$(grep -cxF 'auto-resumed once after an early exit' "$DM_LOG")" = 1 ] \
+    && ok "AR-1 finish DM line" || fail "AR-1 finish DM line"
 
 # AR-2 the resumed run also ends early: never a third call, recovery A runs after.
 OUTPUT=$(AR_R_TAIL="Still waiting on section 3." run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
@@ -1988,6 +1994,13 @@ AR2_RESUME_LN=$(printf '%s\n' "$OUTPUT" | grep -n '^plan-now: auto-resume' | hea
 AR2_REC_LN=$(printf '%s\n' "$OUTPUT" | grep -n '^plan-now: recovery A' | head -1 | cut -d: -f1)
 [ -n "$AR2_RESUME_LN" ] && [ -n "$AR2_REC_LN" ] && [ "$AR2_RESUME_LN" -lt "$AR2_REC_LN" ] \
     && ok "AR-2 auto-resume line precedes recovery A" || fail "AR-2 auto-resume line precedes recovery A ($AR2_RESUME_LN vs $AR2_REC_LN)"
+[ "$(printf '%s\n' "$OUTPUT" | grep -cE '^plan-now: auto-resume — claude exited 0 with no PLAN_FILE:/NO_PLAN: line and draft sections 1/3; resuming session [^ ]+ once with [0-9]+s left\.$')" = 1 ] \
+    && ok "AR-2 full auto-resume log line" || fail "AR-2 full auto-resume log line"
+# A recovery A verdict goes out on the review route, whose digest is one JSON
+# string with the lines joined by an escaped newline, so match the line as a
+# substring and pin the verdict it rode on.
+want "AR-2 finish DM line holds on the recovery A verdict" "$(dm)" 'RESULT degraded (recovery attempted)'
+want "AR-2 finish DM carries the auto-resumed line" "$(dm)" 'auto-resumed once after an early exit'
 
 # AR-3 fenced `## ` lines are not sections.
 OUTPUT=$(run_case_resume early "$FENCE_DRAFT" "$AR_SLUG")
@@ -2010,6 +2023,7 @@ OUTPUT=$(AR_RUNNER_EDIT='s/^RUN_TIMEOUT=.*/RUN_TIMEOUT=300/' run_case_resume ear
 [ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-B1 no auto-resume line" || fail "AR-B1 no auto-resume line"
 want "AR-B1 skip line says why" "$OUTPUT" "plan-now: no auto-resume — only"
 want "AR-B1 recovery A still runs" "$OUTPUT" "plan-now: recovery A"
+[ "$(grep -cF 'auto-resumed once' "$DM_LOG")" = 0 ] && ok "AR-B1 skip sends no auto-resumed DM line" || fail "AR-B1 skip sends no auto-resumed DM line"
 
 # AR-M1 a fresh (non-resume) runner carries the generalized CONTINUE_MSG.
 plans_reset
@@ -2020,6 +2034,17 @@ ARM1_RUNNER=$(printf '%s\n' "$ARM1_DRY" | sed -n 's/^  runner: //p')
 CNT=$(grep -c '^CONTINUE_MSG=.\{20,\}' "$ARM1_RUNNER" 2>/dev/null || printf '0')
 [ "$CNT" = 1 ] && ok "AR-M1 fresh runner CONTINUE_MSG is non-empty" || fail "AR-M1 fresh runner CONTINUE_MSG is non-empty (count=$CNT)"
 rm -f "$ARM1_RUNNER" "${ARM1_RUNNER%.sh}.session"
+
+# AR-P1 the headless wait-for-ack rule is pinned on both prompt surfaces.
+AR_RULE='Never end your turn while a section you sent has not landed.'
+AR_C1=$(grep -cF "$AR_RULE" "$ROOT/.claude/skills/plan/SKILL.md" || true)
+AR_C2=$(grep -cF "$AR_RULE" "$PLAN_NOW" || true)
+[ "$AR_C1" = 1 ] && [ "$AR_C2" = 1 ] && ok "AR-P1 headless wait rule pinned in SKILL.md and the coda" \
+    || fail "AR-P1 headless wait rule pinned (SKILL.md=$AR_C1 coda=$AR_C2)"
+AR_C3=$(grep -cF 'under 500s each' "$ROOT/.claude/skills/plan/SKILL.md" || true)
+AR_C4=$(grep -cF 'under 500s each' "$PLAN_NOW" || true)
+[ "$AR_C3" = 1 ] && [ "$AR_C4" = 1 ] && ok "AR-P1 poll bound pinned" \
+    || fail "AR-P1 poll bound pinned (SKILL.md=$AR_C3 coda=$AR_C4)"
 
 echo "── usage gate: a paused or limit-hit run is 'paused', never 'failed' ──"
 

@@ -480,23 +480,62 @@ def render_exec_mutations(report) -> str:
     """
     if report is None:
         return ""
-    lines: list[str] = []
+    problems: list[str] = []
+    caught: list[str] = []
     if not report.ran:
-        lines.append("- executor did not run — arming held")
+        problems.append("- The bug-planting check did not run, so arming is held.")
     for r in report.results:
-        lines.append(f"- row {r.row}: {r.kind}")
-        lines.extend(_neutralize_headings(r.detail))
+        line = f"**Row {r.row}**{_xm_check_suffix(r.detail)}"
+        if r.kind == "TRIPPED":
+            caught.append(f"- {line}")
+            continue
+        problems.append(f"- ❌ {line}: {_XM_PROBLEM_WORDS.get(r.kind, r.kind)}")
+        if not _XM_DETAIL_RE.match(r.detail):
+            problems.extend(_neutralize_headings(r.detail))
     for h in report.holding:
         if not any(h.startswith(f"row {r.row} {r.kind} ") for r in report.results):
-            lines.append("- executor:")
-            lines.extend(_neutralize_headings(h))
+            problems.append("- ❌ The bug-planting tool hit an error:")
+            problems.extend(_neutralize_headings(h))
     if report.tree_suspect:
-        lines.append("- tree could not be verified clean after mutation; "
-                     "inspect the worktree before merging")
-    if not lines:
+        problems.append("- ❌ After planting bugs, the tool could not confirm the code was "
+                        "put back. Check the worktree before merging.")
+    if not problems and not caught:
         return ""
-    return "\n".join([EXEC_MUTATIONS_BEGIN, "### Executable mutations", "", *lines,
-                      EXEC_MUTATIONS_END])
+    out = [EXEC_MUTATIONS_BEGIN, "### Bug-planting check on the tests", "",
+           "For each row of the plan's Verification Matrix, a tool planted a small bug "
+           "in the code and re-ran that row's test. A good test fails when the bug is there.",
+           ""]
+    if problems:
+        n = sum(1 for r in report.results if r.kind != "TRIPPED")
+        head = (f"**⚠️ {n} of {len(report.results)} rows need attention:**" if n
+                else "**⚠️ The check had a problem:**")
+        out += [head, "", *problems, ""]
+    else:
+        out += [f"**✅ All {len(caught)} rows caught the planted bug.**", ""]
+    if caught:
+        out += [f"<details><summary>✅ {len(caught)} rows caught the planted bug</summary>",
+                "", *caught, "", "</details>"]
+    return "\n".join([*out, EXEC_MUTATIONS_END])
+
+
+# Plain words for each non-TRIPPED kind bin/lib/plan-exec-mutations prints.
+_XM_PROBLEM_WORDS = {
+    "HELD": "the test still passed with the bug planted, so nothing guards this rule",
+    "UNDECIDED": "the test could not run with the bug planted, so we can't tell",
+    "BASELINE-FAILED": "the test already failed before any bug was planted",
+}
+# "<check> [still ]exited N ..." — the lib's fixed detail shapes; group 1 is the check.
+_XM_DETAIL_RE = re.compile(r"^(.+?) (?:still )?exited -?\d+\b")
+
+
+def _xm_check_suffix(detail: str) -> str:
+    """` (`check`)` when the detail has the lib's shape, else "". One line, no backticks,
+    so it never starts a line (ARMING-GATE DEFENSE, see _neutralize_headings)."""
+    m = _XM_DETAIL_RE.match(detail or "")
+    if not m:
+        return ""
+    check = " ".join(m.group(1).split()).replace("`", "'")
+    return f" (`{check}`)"
 
 
 def upsert_exec_mutations(body: str, report) -> str:

@@ -2206,6 +2206,13 @@ R21="$(run_docfix "$SB" "" "" "21" "probe.md")"
   && ok "(21e) successful launch: worktree kept (trap disarmed after submit)" \
   || bad "(21e) successful launch keeps the worktree ($R21)"
 
+# docfix_no_plist_helpers: docfix-run launches through ljob_submit only.
+if grep -qE 'ljob_write_runner_plist|ljob_bootstrap' "$REAL_DOCFIX"; then
+  bad "docfix_no_plist_helpers: $REAL_DOCFIX still calls ljob_write_runner_plist or ljob_bootstrap"
+else
+  ok "docfix_no_plist_helpers: $REAL_DOCFIX calls neither ljob_write_runner_plist nor ljob_bootstrap"
+fi
+
 REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
 if [ -n "$REAL_AGENTS_NEW" ]; then
     echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"

@@ -1504,6 +1504,12 @@ _cd_ln="$(grep -nF 'cd "$ROOT" || exit 1' "$RUNNER" | head -n 1 | cut -d: -f1)"
 grep -qF 'launchctl' "$RUNNER" && fail "prcycle_dry_submit_argv: runner still mentions launchctl"
 grep -qF 'PLIST' "$RUNNER" && fail "prcycle_dry_submit_argv: runner still mentions PLIST"
 end_case "prcycle_dry_submit_argv"
+begin_case
+[[ ! -e "$SCRATCH/Library/LaunchAgents" ]] \
+    || fail "prcycle_no_tmp_residue: $SCRATCH/Library/LaunchAgents exists after a dry launch"
+[[ -z "$(find "$SCRATCH" -name '*.plist' 2>/dev/null)" ]] \
+    || fail "prcycle_no_tmp_residue: a plist exists under the scratch HOME"
+end_case "prcycle_no_tmp_residue"
 CASE_BASE=$_outer_base
 grep -qF "log=/tmp/pr-cycle-$TSPIN.log" <<< "$OUT" || fail "--go did not print the log path"
 

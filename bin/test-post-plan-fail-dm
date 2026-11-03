@@ -312,6 +312,11 @@ FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     && ok "16 generic block DM ends with the postplan-fix paste line" \
     || fail "16 generic block DM tail: $(tail -n 3 "$DM_OUT" 2>/dev/null)"
 
+# no_plist_word: the launch path names no plist, no XML escaper, no plist dir seam.
+grep -qiE 'plist|xml_escape|FAILDM_PLIST_DIR' "$SUT" \
+    && fail "no_plist_word: $SUT still mentions plist/xml_escape/FAILDM_PLIST_DIR" \
+    || ok "no_plist_word: $SUT has no plist, xml_escape or FAILDM_PLIST_DIR"
+
 if [ -e "$TMP/launchctl.LEAK" ]; then
     echo "FAIL launchctl-leak: unseamed launchctl call: $(cat "$TMP/launchctl.LEAK")"
     exit 1

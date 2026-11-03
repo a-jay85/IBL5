@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, and the before/after rule for review-surface PRs.
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ---
 
 # Reviewer eval
@@ -86,8 +86,8 @@ One run is a sample. LLM output varies between runs. Pass `--runs N` to `run` or
 At both review depths, the Phase 4D verifier now runs on Opus. It ran on Sonnet before. The seat count stayed at 3. Each side was scored once.
 
 ```
-Reviewer eval before: reviewer-eval v=fd3712b46b2d c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
-Reviewer eval after: reviewer-eval v=67107f814bf7 c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+Reviewer eval before: reviewer-eval v=247f8fcb9b0f c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+Reviewer eval after: reviewer-eval v=05b22ea13c35 c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
 ```
 
 ## Fold B into A trial (2026-10-25)

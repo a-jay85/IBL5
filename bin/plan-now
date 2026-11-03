@@ -324,7 +324,12 @@ if [ -z "$RESUME_ID" ] && [ -x "$TIER_HINT" ]; then
                 esac
                 if [ -n "$DECLARED_TIER" ]; then
                     TIER_HINT_RC=0
-                    HINT_OUT=$("$TIER_HINT" --explain --desc "$TASK_LINE" 2>/dev/null) || TIER_HINT_RC=$?
+                    # The whole prompt file is the brief: bin/plan-tier-hint drops its
+                    # tier-routing lines and lifts its paths into Files. The headless coda
+                    # is appended to a copy later, so only the drafted brief reaches here.
+                    HINT_ARGS=(--explain --desc "$TASK_LINE" --brief "$PROMPT_SRC")
+                    [ "$DISPOSITION" != implement ] || HINT_ARGS+=(--signals implement)
+                    HINT_OUT=$("$TIER_HINT" "${HINT_ARGS[@]}" 2>/dev/null) || TIER_HINT_RC=$?
                     if [ "$TIER_HINT_RC" -eq 0 ]; then
                         HINTED_TIER=$(cut -f1 <<< "$HINT_OUT" || true)
                         HINT_EXPLAIN=$(cut -f2- <<< "$HINT_OUT" || true)

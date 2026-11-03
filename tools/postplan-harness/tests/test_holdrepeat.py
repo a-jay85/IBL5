@@ -362,3 +362,47 @@ def test_cli_check_exit_codes(tmp_path, capsys, monkeypatch):
         hr.main(argv + ["--bogus"])
     assert exc.value.code == 2
     assert "usage" in capsys.readouterr().err.lower()
+
+
+# ---------------------------------------------------------------------------
+# fix-round attempt record
+# ---------------------------------------------------------------------------
+
+def _seeded(tmp_path):
+    _observe(tmp_path, _conds({3: "m", 7: "p"}))
+    return str(tmp_path)
+
+
+def test_fix_round_tried_same_targets(tmp_path):
+    sd = _seeded(tmp_path)
+    hr.record_fix_round(sd, "slug", target_numbers=[11, 2], status="accepted", sha="abc")
+    assert hr.fix_round_tried(sd, "slug", [2, 11]) is True
+
+
+def test_fix_round_tried_smaller_set_false(tmp_path):
+    sd = _seeded(tmp_path)
+    hr.record_fix_round(sd, "slug", target_numbers=[2, 11], status="accepted", sha="abc")
+    assert hr.fix_round_tried(sd, "slug", [11]) is False
+
+
+def test_fix_round_ceiling(tmp_path):
+    sd = _seeded(tmp_path)
+    for tg in ([2], [11], [3]):
+        hr.record_fix_round(sd, "slug", target_numbers=tg, status="rejected", sha="")
+    assert hr.fix_round_tried(sd, "slug", [2, 3, 11]) is True
+
+
+def test_observe_keeps_fix_round_key(tmp_path):
+    sd = _seeded(tmp_path)
+    hr.record_fix_round(sd, "slug", target_numbers=[2], status="accepted", sha="abc")
+    _observe(tmp_path, _conds({3: "m", 7: "p"}), fp="fp2")
+    assert hr.load_record(sd, "slug")["fix_round"]["attempts"] == 1
+    _observe(tmp_path, _conds({3: "other", 7: "p"}), fp="fp3")   # hold set changed
+    assert hr.load_record(sd, "slug")["fix_round"]["attempts"] == 1
+
+
+def test_fix_round_no_record_not_tried(tmp_path):
+    sd = str(tmp_path)
+    assert hr.fix_round_tried(sd, "slug", [2]) is False
+    hr.record_fix_round(sd, "slug", target_numbers=[2], status="accepted", sha="abc")
+    assert not os.path.exists(hr.record_path(sd, "slug"))

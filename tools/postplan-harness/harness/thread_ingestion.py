@@ -173,11 +173,22 @@ def thread_prompt(thread: dict, file_excerpt: str) -> str:
     return "\n".join(lines)
 
 
+def declined_body(reason: str) -> str:
+    return f"Declined: {reason}"
+
+
+def fixed_body(sha: str, reason: str) -> str:
+    return f"Fixed in {sha} - {reason}"
+
+
 def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push, model="sonnet",
-                       info: dict | None = None) -> str:
+                       info: dict | None = None, defer: list | None = None,
+                       timeout: int | None = None) -> str:
     """Evaluate and action one review thread. Returns 'fixed', 'declined', or 'skipped'.
 
     A DECLINE with category gate-path returns 'skipped' and sets info["gate_hold"].
+    With `defer` set, the resolve reply is appended to `defer` as a dict instead of posted;
+    with `timeout` set, it bounds the fixer session.
     """
     cid = thread.get("commentId")
     path = thread.get("path") or ""
@@ -203,11 +214,13 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
 
     # Step 1: call the LLM
     try:
+        kw = {"timeout": timeout} if timeout is not None else {}
         text = llm.call_tooled(
             PURPOSE, model, prompt,
             cwd=worktree,
             allowed_tools=REMEDIATION_ALLOWED_TOOLS,
             denied_tools=REMEDIATION_DENIED_TOOLS,
+            **kw,
         )
     except HarnessError as e:
         log(f"thread {cid}: LLM error {e}")
@@ -246,7 +259,10 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
             log(f"thread {cid}: {thread.get('label')} decline with category {category!r} "
                 "is not an allowed won't-fix category; thread left open")
             return "skipped"
-        gh.resolve_review_thread(pr, cid, f"Declined: {reason}")
+        if defer is not None:
+            defer.append({"comment_id": cid, "kind": "declined", "reason": reason})
+        else:
+            gh.resolve_review_thread(pr, cid, declined_body(reason))
         return "declined"
 
     # Step 4: FIX
@@ -275,7 +291,10 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
     pushed = push()
     sha = pushed or sha
 
-    gh.resolve_review_thread(pr, cid, f"Fixed in {sha} - {reason}")
+    if defer is not None:
+        defer.append({"comment_id": cid, "kind": "fixed", "reason": reason, "local_sha": sha})
+    else:
+        gh.resolve_review_thread(pr, cid, fixed_body(sha, reason))
     return "fixed"
 
 

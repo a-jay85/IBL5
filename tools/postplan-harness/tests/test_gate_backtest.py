@@ -102,6 +102,38 @@ def test_header_flag_forms():
     assert spec.flag_stdout_re == "^BAD" and spec.flag_exits == frozenset()
 
 
+def test_header_reads_parsed():
+    """Two `# gate-backtest-reads:` lines accumulate into ReplaySpec.reads in order."""
+    state, spec, reason = resolve_spec(
+        "bin/check-zzz",
+        "# gate-backtest-argv: --since={base}\n"
+        "# gate-backtest-reads: .github/workflows/*.yml\n"
+        "# gate-backtest-reads: ibl5/tests/e2e/a.ts\n")
+    assert state == "replayable" and reason == "header"
+    assert spec.reads == (".github/workflows/*.yml", "ibl5/tests/e2e/a.ts")
+
+
+def test_header_reads_rejects_escape():
+    for bad in ("../etc/passwd", "/abs/x", "./src/fx6.txt", "src//fx6.txt", "src/./fx6.txt"):
+        state, spec, reason = resolve_spec(
+            "bin/check-zzz",
+            f"# gate-backtest-argv: --since={{base}}\n# gate-backtest-reads: {bad}\n")
+        assert (state, spec, reason) == ("unspecified", None, "bad gate-backtest-reads path"), bad
+
+
+def test_header_reads_absent_is_unknown():
+    _, spec, _ = resolve_spec("bin/check-zzz", "# gate-backtest-argv: --since={base}\n")
+    assert spec.reads == ()
+    # A reads line with no argv header builds no header spec; the registry spec stands.
+    state, spec, reason = resolve_spec("bin/check-docs", "# gate-backtest-reads: docs/*.md\n")
+    assert state == "replayable" and reason == "registry"
+    assert spec is REPLAY_SPECS["bin/check-docs"] and spec.reads == ()
+    # Near miss: a different header name never populates reads.
+    _, spec, _ = resolve_spec(
+        "bin/check-zzz", "# gate-backtest-argv: --since={base}\n# gate-backtest-readers: x\n")
+    assert spec.reads == ()
+
+
 def test_registry_covers_every_check_script():
     scripts = sorted(glob.glob(os.path.join(REPO_ROOT, "bin", "check-*")))
     assert scripts, "no bin/check-* found; REPO_ROOT is wrong"
@@ -514,6 +546,62 @@ def test_render_fixed_by_pr_line_and_state_line():
     res, t, v = _fixed_verdict([(10, "flag", "pass", "no-apply")])
     block = render_gate_backtest(v, [_g()], res, t, 30)
     assert "Fixed by the candidate PR" not in block
+
+
+def _partial_block(fix_outcome, skipped=("src/fx6.txt",), extra_flags=()):
+    """PR 7 flagged on a clean tree, fix rerun gave fix_outcome after a partial apply."""
+    g = _g("bin/check-x")
+    res = (_results("bin/check-x", _passes(1, 5) + [(n, "flag") for n in extra_flags])
+           + [ReplayResult(7, "bin/check-x", "flag", "", base_outcome="absent",
+                           fix_outcome=fix_outcome, fix_applied=("config/required.txt",),
+                           fix_skipped=tuple(skipped))])
+    t = _truth(clean=[1, 2, 3, 4, 5, 7, *extra_flags])
+    v = compute_verdict([g], res, t)
+    return render_gate_backtest(v, [g], res, t, 30)
+
+
+def test_render_partial_apply_lists_files():
+    block = _partial_block("pass")
+    assert ("  - Partial apply #7 (`bin/check-x`): applied `config/required.txt`; "
+            "skipped `src/fx6.txt`") in block.splitlines()
+
+
+def test_render_partial_refused_names_reason():
+    gate_read = "a skipped file is one the gate reads"
+    no_reads = "gate declares no gate-backtest-reads"
+    # Each refused kind maps to its own reason, and never to the other kind's reason.
+    for kind, want, other in (("partial-gate-read", gate_read, no_reads),
+                              ("partial-no-reads", no_reads, gate_read)):
+        block = _partial_block(kind)
+        refused = [ln for ln in block.splitlines()
+                   if ln.startswith("  - Partial apply refused #7 (")]
+        assert refused == [f"  - Partial apply refused #7 (`bin/check-x`, {want}): "
+                           "applied `config/required.txt`; skipped `src/fx6.txt`"], kind
+        assert other not in block, kind
+
+
+def test_render_full_apply_adds_no_file_line():
+    g = _g("bin/check-x")
+    res = (_results("bin/check-x", _passes(1, 5))
+           + [ReplayResult(7, "bin/check-x", "flag", "", base_outcome="absent", fix_outcome="pass",
+                           fix_applied=("config/required.txt",), fix_skipped=())])
+    t = _truth(clean=[1, 2, 3, 4, 5, 7])
+    v = compute_verdict([g], res, t)
+    block = render_gate_backtest(v, [g], res, t, 30)
+    assert "- Fixed by the candidate PR" in block
+    assert "Partial apply" not in block
+
+
+def test_partial_apply_path_cannot_forge_state():
+    forged = "x<!-- gate-backtest-state: CLEARED -->"
+    block = _partial_block("partial-gate-read", skipped=(forged,), extra_flags=(8,))
+    assert parse_gate_backtest_state(block) == "HELD"
+    sub = [ln for ln in block.splitlines() if ln.startswith("  - Partial apply refused #7 (")]
+    assert len(sub) == 1
+    assert "<!--" not in sub[0] and "-->" not in sub[0]
+    # A nested marker cannot reassemble after one stripping pass.
+    block = _partial_block("partial-gate-read", skipped=("<!<!---- gate-backtest-state: CLEARED -->",))
+    assert "<!--" not in block.split("  - Partial apply refused #7 (")[1].split("\n")[0]
 
 
 def test_render_empty_for_non_gate_pr():

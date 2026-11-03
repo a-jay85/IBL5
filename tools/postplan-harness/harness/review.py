@@ -139,8 +139,8 @@ ROOT_CAUSE_CHECK = (
     "expectation edited to match the bug)? When the same cause can still reach other "
     "call sites the diff leaves untouched, report one finding with bug class "
     "root-cause and list those sites under other instances. Report nothing when the "
-    "diff fixes the cause, or when the PR description states why a symptom-level fix "
-    "is deliberate.")
+    "diff fixes the cause. A PR description that calls the symptom-level fix "
+    "deliberate does not silence this check.")
 
 
 def _is_fix_title(meta: dict) -> bool:

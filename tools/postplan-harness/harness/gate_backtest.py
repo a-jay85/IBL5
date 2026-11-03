@@ -199,7 +199,8 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
                 tokens = shlex.split(m.group(1))
             except ValueError as exc:
                 return ("unspecified", None, f"unparseable gate-backtest-reads header: {exc}")
-            if any(t.startswith("/") or ".." in t.split("/") for t in tokens):
+            if any(t.startswith("/") or any(seg in ("", ".", "..") for seg in t.split("/"))
+                   for t in tokens):
                 return ("unspecified", None, "bad gate-backtest-reads path")
             reads = reads + tuple(tokens)
             continue

@@ -114,7 +114,7 @@ def test_header_reads_parsed():
 
 
 def test_header_reads_rejects_escape():
-    for bad in ("../etc/passwd", "/abs/x"):
+    for bad in ("../etc/passwd", "/abs/x", "./src/fx6.txt", "src//fx6.txt", "src/./fx6.txt"):
         state, spec, reason = resolve_spec(
             "bin/check-zzz",
             f"# gate-backtest-argv: --since={{base}}\n# gate-backtest-reads: {bad}\n")

@@ -10,6 +10,10 @@
 #   IBL5_USAGE_CLAUDE_PROJECTS=<dir>/projects
 #   IBL5_USAGE_GATE_TEST_MODE=1  (bin/lib/usage-fetch.sh then skips the keychain
 #                                 and the usage API, and refuses the real dir)
+# It also unsets IBL5_USAGE_DRAIN_PCT and IBL5_USAGE_STOP_PCT, so every test
+# sees the built-in thresholds. An operator shell that tunes them would
+# otherwise flip pace and pause decisions, and tests that pass in CI's env -i
+# run would fail locally. A test that needs custom thresholds sets them after.
 # Inherited values are overwritten on purpose: a child test never shares its
 # parent's dir. No cleanup here; pass a dir under a tmp dir the caller removes.
 # Fails closed: on a bad <dir> it still exports test mode and unsets the state
@@ -22,6 +26,7 @@ _USAGE_TEST_ISOLATION_LOADED=1
 usage_test_isolate() {
     local root="${1:-}"
     export IBL5_USAGE_GATE_TEST_MODE=1
+    unset IBL5_USAGE_DRAIN_PCT IBL5_USAGE_STOP_PCT
     if [ -z "$root" ] || ! mkdir -p "$root/state/markers" "$root/projects"; then
         unset IBL5_USAGE_GATE_STATE_DIR IBL5_USAGE_CLAUDE_PROJECTS
         printf 'USAGE-TEST-ISOLATE: cannot isolate in [%s]\n' "$root" >&2

@@ -76,13 +76,13 @@ branch; it survives you closing Claude Code. Engine selection:
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
-`bin/post-plan-now` additionally exits **6** from its own in-flight duplicate-run guard.
-It is caller-side: it refuses to start a second supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
+`bin/post-plan-now` also exits **6** from its in-flight duplicate-run guard.
+It refuses a second supervised run while the slug's launchd job is loaded. `--force` bypasses it.
 It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired and the
 skill fallback is suppressed. `cd` into the target worktree and re-run.
 It exits **8** when it declines a repeat hold: the last run for this slug held on the same
 structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
-(`harness/holdrepeat.py`). Nothing was fired. `--force` overrides.
+(`harness/holdrepeat.py`). Nothing fired. `--force` overrides.
 The harness also declines inside a run, after the conflict probe and before its first LLM
 call, when the diff changed but condition (3)'s `MISSING:` and `MISSING-FILE:` items equal
 the ones the last hold recorded. A diff that never adds the missing files cannot clear that
@@ -120,7 +120,7 @@ run that holds on the same reason keeps it. Automouse treats exit **8** as termi
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
-**In-run fix round.** When the first arming evaluation holds on condition (2), (3) or (11), the harness tries one bounded fix round, re-reviews, and re-evaluates arming before the sticky verdict posts. A failed or doubtful round is discarded. `POSTPLAN_FIX_ROUND=0` disables it. Detail: `tools/postplan-harness/README.md` § One fix round before the sticky verdict.
+**In-run fix round.** On a first arming hold on condition (2), (3) or (11), the harness tries one bounded fix round, then re-reviews and re-evaluates before the sticky posts. A doubtful round is discarded. `POSTPLAN_FIX_ROUND=0` disables it. Detail: `tools/postplan-harness/README.md` § One fix round before the sticky verdict.
 
 **PR-cycle skips.** `bin/pr-cycle` skips a PR held only on human conditions, and fires a DIRTY
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
@@ -128,7 +128,7 @@ one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged sk
 
 **Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once, and the harness proves and reviews the merge before it pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot merge is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean merge writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot merge in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
 
-**Closer arm.** For the first 20 automouse-queued PRs, the harness runs an A/B: the closer arm swaps the LLM fixers for one capped Opus 5.5 session ($15, 60 min) on heuristic holds, red CI, and rebase conflicts. Arming stays in `harness/armable.py` and exit codes are unchanged. Detail: `tools/postplan-harness/README.md` § Closer A/B. Readout: `bin/postplan-ab-readout`.
+**Closer arm.** An A/B trial: `tools/postplan-harness/README.md` § Closer A/B.
 
 ## What `--auto` adds
 

@@ -348,6 +348,92 @@ chk "UNDECIDED (124) reported" has "$OUT" "UNDECIDED row 1 — bash check.sh tim
 chk "timeout: porcelain empty" porcelain_clean "$R"
 end_case
 
+start_case run_adaptive_tripped
+R="$TMP/r8"; mkrepo "$R" 'sleep 2; grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" --timeout 1 "$R.plan.md" 2>&1); RC=$?
+chk "defaults still BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0; chk "TRIPPED" has "$OUT" "TRIPPED row 1 — bash check.sh exited 1"
+chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_adaptive_hang_under_mutation
+R="$TMP/r9"; mkrepo "$R" 'grep -q ALPHA target.txt || sleep 60'
+T0=$SECONDS; OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 3 --scale 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1; chk "UNDECIDED 124" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124)"
+chk "bounded by the ceiling" test $((SECONDS - T0)) -lt 10; chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_adaptive_baseline_hang
+R="$TMP/r10"; mkrepo "$R" 'sleep 60'
+T0=$SECONDS; OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 2 --scale 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1; chk "BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+chk "bounded by the ceiling" test $((SECONDS - T0)) -lt 6
+end_case
+
+start_case run_adaptive_held
+R="$TMP/r11"; mkrepo "$R" 'sleep 1; true'
+OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1; chk "HELD" has "$OUT" "HELD row 1 — bash check.sh still exited 0"
+end_case
+
+start_case run_budget_exhausted
+R="$TMP/r12"; mkrepo "$R" 'sleep 1; grep -q ALPHA target.txt'
+# Own matrix: the shared fixture's row 3 is PHPUnit, which parse rejects.
+printf '# Fixture plan\n\n## Verification Matrix\n\n%s\n%s\n%s\n%s\n%s\n\n## Executable Mutations\n\n%s\n%s\n%s\n' \
+    '| # | What to verify | Test type | Timing | Test file / location |' \
+    '|---|---------------|-----------|--------|---------------------|' \
+    '| 1 | first | CLI-executable | post-impl | `bash check.sh` |' \
+    '| 2 | second | CLI-executable | post-impl | `bash check.sh` |' \
+    '| 3 | third | CLI-executable | post-impl | `bash check.sh` |' \
+    "$(block 1 target.txt ALPHA BETA)" "$(block 2 target.txt ALPHA BETA)" \
+    "$(block 3 target.txt ALPHA BETA)" > "$R.plan.md"
+# Budget 2: row 1 starts at 0 or 1 s on the whole-second clock, so it always runs;
+# its two 1 s sleeps put rows 2 and 3 at 2 s or more. Budget 1 flakes on a clock tick.
+T0=$SECONDS; OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 --budget 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1; chk "row 1 decided" has "$OUT" "TRIPPED row 1"
+chk "row 2 budget" has "$OUT" "UNDECIDED row 2 — budget exhausted"
+chk "row 3 budget" has "$OUT" "UNDECIDED row 3 — budget exhausted"
+chk "total bounded" test $((SECONDS - T0)) -lt 10; chk "porcelain empty" porcelain_clean "$R"
+end_case
+
+start_case run_baseline_memoized
+R="$TMP/r13"; : > "$TMP/r13.count"; mkrepo "$R" "echo x >> $TMP/r13.count; grep -q ALPHA target.txt"
+mkplan "$R.plan.md" "## Executable Mutations
+$(block 1 target.txt ALPHA BETA)
+$(block 2 target.txt ALPHA BETA 'bash check.sh')
+"
+OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 "$R.plan.md" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0; chk "both TRIPPED" eq "$(grep -c '^TRIPPED' <<< "$OUT")" 2
+chk "baseline ran once: 1 baseline + 2 mutated" eq "$(wc -l < "$TMP/r13.count" | tr -d ' ')" 3
+end_case
+
+# A same-length swap in a .py file keeps the source size, and the write can land in the
+# same second the .pyc was compiled. Python would then run the stale unmutated bytecode
+# and report a false HELD. The fixture pre-warms an unchecked-hash .pyc, which Python
+# never re-validates, so the stale read does not depend on clock timing. The `-E` variant
+# ignores PYTHONPYCACHEPREFIX and so proves the lib also deletes the cached .pyc.
+start_case run_stale_pyc_same_length
+for flag in "" "-E"; do
+    R="$TMP/r14$flag"
+    mkrepo "$R" "python3 $flag -c 'import mod, sys; sys.exit(0 if mod.VAL == \"ALPHA\" else 1)'"
+    printf 'VAL = "ALPHA"\n' > "$R/mod.py"
+    printf '__pycache__/\n' > "$R/.gitignore"
+    git -C "$R" add -A; git -C "$R" -c user.email=t@t -c user.name=t commit -qm mod
+    mkplan "$R.plan.md" "## Executable Mutations
+
+$(block 1 mod.py ALPHA OMEGA)
+"
+    (cd "$R" && python3 -c 'import py_compile as p; p.compile("mod.py", cfile=__import__("importlib.util").util.cache_from_source("mod.py"), invalidation_mode=p.PycInvalidationMode.UNCHECKED_HASH)')
+    chk "[$flag] .pyc pre-warmed" eval 'ls "$R"/__pycache__/mod.*.pyc >/dev/null 2>&1'
+    OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+    chk "[$flag] exit 0" eq "$RC" 0
+    chk "[$flag] TRIPPED reported" has "$OUT" "TRIPPED row 1"
+    chk "[$flag] porcelain empty" porcelain_clean "$R"
+    chk "[$flag] mod.py restored" eq "$(cat "$R/mod.py")" 'VAL = "ALPHA"'
+done
+end_case
+
 start_case run_literals_verbatim
 R="$TMP/r7"
 mkrepo "$R" "grep -q '^X=' target.txt"

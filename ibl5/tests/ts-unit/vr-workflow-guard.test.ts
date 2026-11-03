@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest';
 // because its setup= DB mutations would corrupt the regenerated baselines.
 const WORKFLOW = resolve(__dirname, '../../../.github/workflows/e2e-tests.yml');
 const REAL = readFileSync(WORKFLOW, 'utf-8');
+const CALLER = resolve(__dirname, '../../../.github/workflows/update-baselines.yml');
+const CALLER_REAL = readFileSync(CALLER, 'utf-8');
 
 const LABEL_GUARD = "!contains(github.event.pull_request.labels.*.name, 'update-baselines')";
 const LABEL_COE = "${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}";
@@ -247,5 +249,78 @@ describe('publishStepViolations', () => {
   it('12l: removing the Stamp step is reported', () => {
     const [without] = cutStep(REAL, STAMP);
     expect(publishStepViolations(without)).toEqual([`missing: ${STAMP}`]);
+  });
+});
+
+// Regen wiring (backlog#1707): the update-baselines label starts update-baselines.yml,
+// which calls e2e-tests.yml through workflow_call. These properties keep that path
+// working without e2e-tests.yml listing `labeled`.
+const CALLER_IF = "if: github.event.label.name == 'update-baselines'";
+const GATE_NO_REGEN = "github.event.action != 'labeled'";
+
+function regenProblems(caller: string, e2e: string): string[] {
+  const problems: string[] = [];
+
+  if (!caller.includes('uses: ./.github/workflows/e2e-tests.yml') || !caller.includes('secrets: inherit')) {
+    problems.push('caller: does not call e2e-tests.yml with secrets: inherit');
+  }
+  if (!caller.includes(CALLER_IF)) {
+    problems.push('caller: job if: is not keyed to the update-baselines label');
+  }
+  const group = /^\s*group:.*$/m.exec(caller)?.[0] ?? '';
+  if (!group.includes("github.event.label.name != 'update-baselines'") || !group.includes('github.run_id')) {
+    problems.push('caller: concurrency group lacks the per-run suffix for other labels');
+  }
+
+  const gate = /\n {2}gate:\n([\s\S]*?)(?=\n {2}[A-Za-z0-9_-]+:\n|$)/.exec(e2e)?.[1] ?? '';
+  const gateIf = /^ {4}if:.*$/m.exec(gate)?.[0] ?? '';
+  if (!gateIf.includes(GATE_NO_REGEN)) {
+    problems.push('e2e: gate if: does not skip in regen mode');
+  }
+
+  const callInputs = /\n {2}workflow_call:\n([\s\S]*?)(?=\n {2}[A-Za-z_]+:|\n[A-Za-z]|$)/.exec(e2e)?.[1] ?? '';
+  if (/required:\s*true/.test(callInputs)) {
+    problems.push('e2e: workflow_call has a required input');
+  }
+
+  return problems;
+}
+
+describe('regen caller (backlog#1707)', () => {
+  it('14a: the real caller and e2e-tests.yml report no regen problems', () => {
+    expect(regenProblems(CALLER_REAL, REAL)).toEqual([]);
+  });
+
+  it('14b: a caller that stops calling e2e-tests.yml is reported', () => {
+    const mutant = CALLER_REAL.replace('secrets: inherit', '');
+    expect(mutant).not.toBe(CALLER_REAL);
+    expect(regenProblems(mutant, REAL)).toEqual(['caller: does not call e2e-tests.yml with secrets: inherit']);
+  });
+
+  it('14c: a caller job if: keyed to another label is reported', () => {
+    const mutant = CALLER_REAL.replace(CALLER_IF, "if: github.event.label.name == 'human-approved'");
+    expect(mutant).not.toBe(CALLER_REAL);
+    expect(regenProblems(mutant, REAL)).toEqual(['caller: job if: is not keyed to the update-baselines label']);
+  });
+
+  it('14d: a caller concurrency group without the per-run suffix is reported', () => {
+    const mutant = CALLER_REAL.replace(/\$\{\{ github\.event\.label\.name != .*?\}\}/, '');
+    expect(mutant).not.toBe(CALLER_REAL);
+    expect(regenProblems(mutant, REAL)).toEqual(['caller: concurrency group lacks the per-run suffix for other labels']);
+  });
+
+  it('14e: a gate if: that runs in regen mode is reported', () => {
+    const mutant = REAL.replace(
+      "if: always() && !inputs.refresh_pr && github.event.action != 'labeled'",
+      'if: always() && !inputs.refresh_pr',
+    );
+    expect(mutant).not.toBe(REAL);
+    expect(regenProblems(CALLER_REAL, mutant)).toEqual(['e2e: gate if: does not skip in regen mode']);
+  });
+
+  it('14f: a required workflow_call input is reported', () => {
+    const mutant = REAL.replace('required: false', 'required: true');
+    expect(mutant).not.toBe(REAL);
+    expect(regenProblems(CALLER_REAL, mutant)).toEqual(['e2e: workflow_call has a required input']);
   });
 });

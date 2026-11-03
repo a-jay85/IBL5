@@ -36,7 +36,7 @@ bd_init() {
     BD_REPORTS_DIR="$BD_PLANS_DIR/_reports"
     BD_QUEUE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
     BD_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-    # One paid Opus judge call per item; a judge failure prints xhigh (cost 2), never error.
+    # One paid Opus judge call per item; a judge failure prints default (cost 1), never error.
     BD_TIER_HINT="${BURNDOWN_TIER_HINT:-$BD_REPO_ROOT/bin/plan-tier-hint}"
     BD_GIT="${BURNDOWN_GIT:-git}"
     BD_TMP="$(mktemp -d)" || bd_die 3 "mktemp failed"
@@ -320,10 +320,22 @@ bd_inflight_reason() {
     return 1
 }
 
-# bd_cost_for <title> — sets _bd_cost and _bd_tier
+# bd_cost_for <title> [<body>] — sets _bd_cost and _bd_tier. A non-empty body
+# goes to the hint as --brief through a file under $BD_TMP (the EXIT trap
+# removes $BD_TMP; the file is also removed right after the call).
 bd_cost_for() {
-    local title="$1" tier rc=0
-    tier="$("$BD_TIER_HINT" --desc "$title" 2>/dev/null)" || rc=$?
+    local title="$1" body="${2:-}" tier rc=0 brief=""
+    if [ -n "$body" ] && brief="$(mktemp "$BD_TMP/cost-brief.XXXXXX" 2>/dev/null)"; then
+        printf '%s\n' "$body" > "$brief" || brief=""
+    else
+        brief=""
+    fi
+    if [ -n "$brief" ]; then
+        tier="$("$BD_TIER_HINT" --desc "$title" --brief "$brief" 2>/dev/null)" || rc=$?
+        rm -f "$brief"
+    else
+        tier="$("$BD_TIER_HINT" --desc "$title" 2>/dev/null)" || rc=$?
+    fi
     if [ "$rc" -ne 0 ] || { [ "$tier" != "xhigh" ] && [ "$tier" != "default" ] && [ "$tier" != "sonnet" ]; }; then
         _bd_tier="error"; _bd_cost=1
     elif [ "$tier" = "xhigh" ]; then
@@ -712,10 +724,10 @@ bd_cmd_burndown() {
         fi
 
         # Compute cost (pair = max of both costs)
-        bd_cost_for "$title"
+        bd_cost_for "$title" "$body"
         local cost="$_bd_cost" tier="$_bd_tier"
         if [ "$is_pair" -eq 1 ]; then
-            bd_cost_for "$p_title"
+            bd_cost_for "$p_title" "$p_body"
             [ "$_bd_cost" -le "$cost" ] || cost="$_bd_cost"
             [ "$_bd_cost" -le 1 ] || tier="$_bd_tier"
         fi

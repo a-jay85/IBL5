@@ -34,6 +34,9 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
         'Leaderboards',
     ];
 
+    /** Same hx-boost attributes the nav views put on a regular link. */
+    private const HTMX_BOOST_ATTRS = ' hx-boost="true" hx-target="#site-content" hx-swap="innerHTML show:window:top" hx-indicator="#site-content"';
+
     private NavigationConfig $config;
 
     public function __construct(NavigationConfig $config)
@@ -63,7 +66,12 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerSearch'],
                     ['label' => 'Player Export', 'url' => 'modules.php?name=ApiKeys'],
-                    ['label' => 'Contracts', 'url' => 'modules.php?name=Contracts'],
+                    // `url` is not rendered (rawHtml wins); it keeps the Olympics module filter working.
+                    [
+                        'rawHtml' => '<a href="modules.php?name=Contracts&amp;tab=teams"' . self::HTMX_BOOST_ATTRS . '>Cap Space</a>'
+                            . ' / <a href="modules.php?name=Contracts&amp;tab=players"' . self::HTMX_BOOST_ATTRS . '>Contracts</a>',
+                        'url' => 'modules.php?name=Contracts',
+                    ],
                     $this->config->isDraftOrderFinalized
                         ? ($this->config->seasonPhase === 'Draft'
                             ? ['label' => 'Draft Order', 'url' => 'modules.php?name=DraftInfo&tab=order', 'badge' => 'FINAL']

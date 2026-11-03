@@ -40,7 +40,7 @@
 
 .game-boxscore__matchup {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: .75rem;
     margin-top: .6rem;
@@ -50,6 +50,7 @@
     display: flex;
     align-items: center;
     gap: .6rem;
+    min-width: 0;
 }
 
 .game-boxscore__team--home {
@@ -68,6 +69,7 @@
     font-size: var(--text-lg);
     letter-spacing: .03em;
     text-transform: uppercase;
+    min-width: 0;
 }
 
 .game-boxscore__score {
@@ -81,6 +83,34 @@
     font-size: var(--text-sm);
     font-weight: var(--font-weight-bold);
     opacity: .75;
+}
+
+/* Phones: stack logo, name and score in each side's column so long
+   names and 3-digit scores fit at 320-640px (backlog#1706). */
+@media (max-width: 640px) {
+    .game-boxscore__matchup {
+        gap: .5rem;
+    }
+
+    .game-boxscore__team,
+    .game-boxscore__team--home {
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: .25rem;
+        text-align: center;
+    }
+
+    .game-boxscore__logo {
+        width: 36px;
+        height: 36px;
+    }
+
+    .game-boxscore__team-name {
+        max-width: 100%;
+        font-size: var(--text-sm);
+        line-height: 1.15;
+        overflow-wrap: break-word;
+    }
 }
 
 /* ------------------------------------------------------------

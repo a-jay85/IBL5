@@ -472,16 +472,36 @@ chmod +x "$STUBBIN/launchctl"
 # the applet would run.
 cat > "$STUBBIN/osacompile" <<'OSACOMPILE'
 #!/bin/sh
+src=''
 while [ $# -gt 0 ]; do
     case "$1" in
         -o) out="$2"; shift 2 ;;
-        -e) src="$2"; shift 2 ;;
+        -e) src="$src$2
+"; shift 2 ;;
         *) shift ;;
     esac
 done
-mkdir -p "$out" && printf '%s\n' "$src" > "$out/script.txt"
+mkdir -p "$out/Contents" && printf '%s' "$src" > "$out/script.txt"
 OSACOMPILE
 chmod +x "$STUBBIN/osacompile"
+
+# The three post-build steps, also macOS-only. PlistBuddy appends its -c
+# commands to the plist path it was given, so case 18 can check the scheme it
+# would register. codesign succeeds. lsregister drops a marker in the bundle.
+cat > "$STUBBIN/PlistBuddy" <<'PLISTBUDDY'
+#!/bin/sh
+for a in "$@"; do last="$a"; done
+while [ $# -gt 1 ]; do
+    [ "$1" = -c ] && printf '%s\n' "$2" >> "$last"
+    shift
+done
+PLISTBUDDY
+printf '#!/bin/sh\nexit 0\n' > "$STUBBIN/codesign"
+cat > "$STUBBIN/lsregister" <<'LSREGISTER'
+#!/bin/sh
+[ "$1" = -f ] && : > "$2/registered"
+LSREGISTER
+chmod +x "$STUBBIN/PlistBuddy" "$STUBBIN/codesign" "$STUBBIN/lsregister"
 
 # Fixture plist. 04:30 rather than the real 03:00 so a passing assertion cannot
 # be coming from the installed plist by accident.
@@ -618,6 +638,9 @@ run_fleet() {
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        FLEET_STATUS_PLISTBUDDY="$STUBBIN/PlistBuddy" \
+        FLEET_STATUS_CODESIGN="$STUBBIN/codesign" \
+        FLEET_STATUS_LSREGISTER="$STUBBIN/lsregister" \
         IBL5_USAGE_GATE_STATE_DIR="$USAGE_DIR" \
         "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
 }
@@ -648,7 +671,13 @@ OUTPUT_NOOSA="$(run_fleet FLEET_STATUS_FORCE_LINKS=1 \
     FLEET_STATUS_OSACOMPILE=/nonexistent/osacompile \
     FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-noosa")"
 
-# The same build with mv failing: the half-built .build-* applet must not be left behind.
+# The build with codesign failing: no link, and no half-built applet left behind.
+OUTPUT_NOSIGN="$(run_fleet FLEET_STATUS_FORCE_LINKS=1 \
+    FLEET_STATUS_CODESIGN=false \
+    FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-nosign")"
+LEFTOVER_NOSIGN="$(find "$TMP/apps-nosign" -mindepth 1 -maxdepth 1 2>/dev/null)"
+
+# The same build with mv failing:the half-built .build-* applet must not be left behind.
 MVFAIL="$TMP/mvfail-bin"; mkdir -p "$MVFAIL"
 printf '#!/bin/sh\nexit 1\n' > "$MVFAIL/mv"; chmod +x "$MVFAIL/mv"
 run_fleet FLEET_STATUS_FORCE_LINKS=1 PATH="$MVFAIL:$STUBBIN:$PATH" \
@@ -1125,17 +1154,32 @@ assert_has "links: queued (unlocked) row links too" \
 # association. One assertion covers every link at once.
 assert_lacks "links: no path is left on the file:// handler" \
     "$OUTPUT_LINKS" '8;;file://[^ ]*\.(md|log)'
-# The one deliberate file:// link: `reorder` closes the queue header and points
-# at the applet, because opening an app bundle is how a click runs a command.
-assert_has "links: queue header ends in a reorder link to the applet" \
-    "$OUTPUT_LINKS" 'AUTOMOUSE QUEUE.*next run .*8;;file://[^ ]*/ibl5-queue-reorder\.app/[^ ]*reorder'
+# `reorder` closes the queue header on the applet's own URL scheme. Ghostty 1.4
+# blocks a file:// link to an app bundle, so no file:// link may remain at all.
+assert_has "links: queue header ends in a reorder link on the applet's scheme" \
+    "$OUTPUT_LINKS" 'AUTOMOUSE QUEUE.*next run .*8;;ibl5-queue-reorder://open[^ ]*reorder'
+assert_lacks "links: no file:// link is left anywhere" "$OUTPUT_LINKS" '8;;file://'
 assert_has "links: the applet starts queue-reorder-ui detached" \
     "$(cat "$TMP/apps/ibl5-queue-reorder.app/script.txt" 2>/dev/null)" \
     "^do shell script \".*nohup '[^']*/bin/automouse/queue-reorder-ui' .*&\"$"
+assert_has "links: the applet handles a URL open, not just a launch" \
+    "$(cat "$TMP/apps/ibl5-queue-reorder.app/script.txt" 2>/dev/null)" \
+    '^on open location '
+assert_has "links: the applet's plist claims the scheme" \
+    "$(cat "$TMP/apps/ibl5-queue-reorder.app/Contents/Info.plist" 2>/dev/null)" \
+    'CFBundleURLSchemes:0 string ibl5-queue-reorder$'
+assert_has "links: the applet is registered with LaunchServices" \
+    "$(ls "$TMP/apps/ibl5-queue-reorder.app" 2>/dev/null)" '^registered$'
+assert_has "links: the stamp carries the scheme, so old applets rebuild" \
+    "$(cat "$TMP/apps/ibl5-queue-reorder.cmd" 2>/dev/null)" '^ibl5-queue-reorder PATH='
 assert_lacks "links: no reorder link in a non-tty capture" \
     "$OUTPUT" 'AUTOMOUSE QUEUE.*reorder'
 assert_lacks "links: no reorder link when osacompile is missing" \
     "$OUTPUT_NOOSA" 'AUTOMOUSE QUEUE.*reorder'
+assert_lacks "links: no reorder link when codesign fails" \
+    "$OUTPUT_NOSIGN" 'AUTOMOUSE QUEUE.*reorder'
+assert_lacks "links: failed codesign leaves no applet or stamp behind" \
+    "$LEFTOVER_NOSIGN" '.'
 assert_lacks "links: failed mv leaves no .build-* temp applet behind" \
     "$LEFTOVER_BUILD" '.build-'
 # The word is the link text; the path lives only in the URI.
@@ -1340,6 +1384,9 @@ if [ -n "$TIMEOUT_BIN" ]; then
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        FLEET_STATUS_PLISTBUDDY="$STUBBIN/PlistBuddy" \
+        FLEET_STATUS_CODESIGN="$STUBBIN/codesign" \
+        FLEET_STATUS_LSREGISTER="$STUBBIN/lsregister" \
         "$FLEET" --watch 999 2>&1 || true)"
     assert_has "watch: frame-swap clear-screen escape in first frame" \
         "$OUTPUT_WATCH" '\[2J'
@@ -1482,6 +1529,9 @@ if mc_git init -q -b main >/dev/null 2>&1 \
             FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
             FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-mc-$_mc" \
             FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+            FLEET_STATUS_PLISTBUDDY="$STUBBIN/PlistBuddy" \
+            FLEET_STATUS_CODESIGN="$STUBBIN/codesign" \
+            FLEET_STATUS_LSREGISTER="$STUBBIN/lsregister" \
             FLEET_STATUS_FORCE_LINKS=1 \
             "$_mc_dir/bin/fleet-status" >/dev/null 2>&1
         assert_has "MAIN_CHECKOUT: run from $_mc resolves to the main checkout" \
@@ -1561,6 +1611,9 @@ if [ "$PTY_OK" -eq 1 ]; then
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
         FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
         FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
+        FLEET_STATUS_PLISTBUDDY="$STUBBIN/PlistBuddy" \
+        FLEET_STATUS_CODESIGN="$STUBBIN/codesign" \
+        FLEET_STATUS_LSREGISTER="$STUBBIN/lsregister" \
         python3 -c "$PTY_WATCH_PY" "$FLEET" 2>/dev/null | LC_ALL=C tr -d '\000' || true)"
 fi
 if [ -n "$OUTPUT_PTY" ]; then

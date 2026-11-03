@@ -120,6 +120,34 @@ def test_executor_timeout_recovers(tmp_path, recover_rc, suspect):
     assert report.tree_suspect is suspect
 
 
+def test_run_passes_adaptive_flags(tmp_path):
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) printf "%s\\n" "$@" > "$S/run-argv"; echo "TRIPPED row 1 — ok"; exit 0 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    argv = (tmp_path / "run-argv").read_text().split("\n")
+    assert report.holding == ()
+    for flag, val in (("--timeout", "30"), ("--max-timeout", "300"), ("--scale", "2"), ("--budget", "1800")):
+        assert argv[argv.index(flag) + 1] == val
+
+
+def test_outer_bound_is_budget_based(tmp_path, monkeypatch):
+    import harness.mutations as m
+    seen = {}
+    real = m.run_bounded
+
+    def spy(argv, *, step, timeout, **kw):
+        if step == "exec-mutations":
+            seen["timeout"] = timeout
+        return real(argv, step=step, timeout=timeout, **kw)
+    monkeypatch.setattr(m, "run_bounded", spy)
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, 'parse) for i in $(seq 25); do printf "%s\\0target.txt\\0bash check.sh\\0ALPHA\\0BETA\\n" "$i"; done; exit 0 ;;\nrun) exit 0 ;;')
+    m.run_executable_mutations(plan, repo, lib=lib)
+    assert seen["timeout"] == 1800 + 2 * 300 + 60          # independent of the 25 records
+    m.run_executable_mutations(plan, repo, lib=lib, per_check_timeout=1, max_timeout=6, budget=4)
+    assert seen["timeout"] == 4 + 2 * 6 + 60
+
+
 def _pending(repo):
     jdir = repo / ".git" / JOURNAL_DIRNAME
     jdir.mkdir(exist_ok=True)

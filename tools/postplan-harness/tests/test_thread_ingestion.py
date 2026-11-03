@@ -1593,3 +1593,63 @@ def test_readme_and_posting_procedure_name_the_outdated_cap():
     assert f"`MAX_OUTDATED_PER_PASS` ({MAX_OUTDATED_PER_PASS})" in readme
     assert f"at most {MAX_OUTDATED_PER_PASS} of them per run" in proc
     assert "--include-outdated" in readme and "--include-outdated" in proc
+
+
+# ---------------------------------------------------------------------------
+# defer / timeout seams (fix round)
+# ---------------------------------------------------------------------------
+
+class _KwLlm:
+    """Minimal llm double that records the kwargs of each call_tooled."""
+
+    def __init__(self, text):
+        self.text = text
+        self.kwargs = []
+
+    def call_tooled(self, purpose, model, prompt, **kw):
+        self.kwargs.append(kw)
+        return self.text
+
+
+def _frd(tmp_path, text, **kw):
+    gh = _gh(tmp_path, {"trusted_threads": [THREAD_2340], "pr_number": PR})
+    llm = _KwLlm(text)
+    out = disposition_thread(
+        THREAD_2340, llm, ReplayGit({}), str(tmp_path), PR, gh, lambda m: None,
+        commit=lambda m: "abc123", push=lambda: "def456", **kw)
+    return out, gh, llm
+
+
+def test_disposition_defer_fix_appends_and_does_not_resolve(tmp_path):
+    defer = []
+    out, gh, _ = _frd(tmp_path, '{"verdict":"FIX","reason":"Cached it"}', defer=defer)
+    assert out == "fixed"
+    assert defer == [{"comment_id": 4074926171, "kind": "fixed", "reason": "Cached it",
+                      "local_sha": "def456"}]
+    assert [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"] == []
+
+
+def test_disposition_defer_decline_appends_and_does_not_resolve(tmp_path):
+    defer = []
+    out, gh, _ = _frd(tmp_path, '{"verdict":"DECLINE","reason":"Already handled"}',
+                              defer=defer)
+    assert out == "declined"
+    assert defer == [{"comment_id": 4074926171, "kind": "declined", "reason": "Already handled"}]
+    assert [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"] == []
+
+
+def test_disposition_without_defer_still_resolves(tmp_path):
+    out, gh, _ = _frd(tmp_path, '{"verdict":"FIX","reason":"Cached it"}')
+    assert out == "fixed"
+    resolves = [a for a in gh.actions() if a.get("action") == "pr_resolve_thread"]
+    assert len(resolves) == 1
+    # Pin the literal reply text: comparing against fixed_body() itself would pass
+    # whatever fixed_body() returns.
+    assert resolves[0]["body"] == "Fixed in def456 - Cached it"
+
+
+def test_disposition_forwards_timeout_only_when_set(tmp_path):
+    _, _, llm = _frd(tmp_path, '{"verdict":"DECLINE","reason":"ok"}', timeout=37)
+    assert llm.kwargs[0]["timeout"] == 37
+    _, _, llm2 = _frd(tmp_path, '{"verdict":"DECLINE","reason":"ok"}')
+    assert "timeout" not in llm2.kwargs[0]

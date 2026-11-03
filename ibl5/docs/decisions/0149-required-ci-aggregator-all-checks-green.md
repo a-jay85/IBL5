@@ -1,6 +1,6 @@
 ---
 description: A required aggregator blocks auto-merge on any red check on the PR head; the 2026-10-21 addendum replaces the polling All checks green job with the All checks settled commit status. Condition (15) demotes to a warning only while protection lists the aggregator. A 2026-10-22 addendum retries the settle job's API reads and closes an empty-body fail-open. A second 2026-10-22 addendum lets a frozen run whose latest-attempt jobs all finished green settle after a 600 s grace, and a 15-minute cron sweep re-dispatches stale pending statuses.
-last_verified: 2026-10-22
+last_verified: 2026-11-02
 owner: ajaynicolas
 ---
 
@@ -249,3 +249,17 @@ The job stays fail-closed. An exhausted read still exits 2 and writes no status.
 **Rejected.** Widening the aggregator job `if:` or adding `--wait` (A3 forbids both, and a waiter is the design this ADR replaced). A delayed self-redispatch from the aggregator (it would put `actions: write` on the workflow that holds `statuses: write`, and a run cannot know whether it is the last event). Dispatching only when the description reads `WAIT: workflow runs still active:` (a settle that exited 2 on an API error leaves the previous pending status in place with any description, so the sweep covers every stale pending status).
 
 **Bounds.** V1-V3 still apply on top: a red job's check-run fails the verdict before any jobs call. A run with zero jobs on the latest attempt, a pending job, a cancelled or null-conclusion job, or an age of 600 s or less keeps holding. The sweep may re-dispatch an honest long run; the aggregator then re-posts `pending` in seconds. The jobs read goes through `gh_retry_json` like the two reads beside it (addendum above).
+
+## Addendum 2026-11-02: stuck check-runs and stuck jobs
+
+**Observed.** On PR 3624, run 41126805683, the check-run `CI Memo Check` sat at `status: in_progress` with `conclusion: success` and a `completed_at` ten minutes in the past. V3 (`ccg_pending`) reads only `status`, so the aggregator posted `pending: WAIT: checks still running: CI Memo Check` and the 15-minute sweep re-dispatched the same WAIT until a manual `gh run rerun --job` cleared it. The 2026-10-22 ghost check did not apply: it runs after V3 and judges workflow runs, and a job in the same stuck shape would have held it as `job-pending`. Backlog issue a-jay85/IBL5-backlog#1712.
+
+**Decision.** `bin/check-pr-checks-green` normalizes a stuck check-run before V1. A check-run whose `status` is not `completed`, whose `conclusion` is a non-empty string, and whose `completed_at` parses and is strictly older than `GHOST_GRACE` (600 s, `--ghost-grace-seconds`) is read as `completed`. Its conclusion is left as reported, so it then passes through the unchanged V1 pass set {success, skipped, neutral}: a stuck `success` settles, a stuck `failure` fails. The jobs fed to the V4 ghost check go through the same filter, so a stuck job inside a still-active run no longer holds as `job-pending`. The decision is one pure jq function, `ccg_settle_stuck` in `bin/lib/ci-checks-green.sh`. A normalization is loud: one `STUCK:` line in the job log per run, and the PASS line, so the status description, opens with `stuck-settled: <names>`.
+
+**Fail-closed.** A null, missing, empty, or non-string conclusion, a missing or unparseable `completed_at`, or an age of 600 s or less leaves the run pending as before. Age is strictly greater than grace, the same rule as the ghost check.
+
+**Scope.** Only the PR aggregator applies the filter. `bin/check-master-ci-green`, `bin/lib/held-prs.sh`, and `bin/lib/pr-cycle-watch.sh` keep the strict `ccg_pending` reading. The master gate has no sweep behind it and a false settle there would release a deploy; those surfaces can adopt the filter in a later ADR if the stuck shape appears on master.
+
+**Evidence.** A scan on 2026-11-02 of the 30 most recently updated PR heads found zero check-runs with `status != completed` and a non-null conclusion, so the shape is rare and transient; the old and new verdict pipelines agree on every real head and differ only on the synthetic stuck fixtures. Cases K1-K12 and P42-P50 in `bin/test-ci-checks-green` pin the rule.
+
+**Rejected.** Changing `ccg_pending` itself (it would silently widen four callers, two of them deploy gates). A new grace flag (the stuck window and the ghost window describe the same frozen-API condition, and `bin/check-composite-contracts` A7 already pins the sweep interval against `GHOST_GRACE`). Settling on conclusion alone without the age test (a check-run can legitimately carry a conclusion for a few seconds before the status flips).

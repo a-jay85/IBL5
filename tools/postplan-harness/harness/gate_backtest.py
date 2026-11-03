@@ -32,6 +32,7 @@ class ReplaySpec:
     env: tuple[tuple[str, str], ...] = ()
     needs_plan: bool = False
     stdin: str = ""                       # placeholder-bearing file path fed as the gate's stdin; "" = DEVNULL
+    reads: tuple[str, ...] = ()           # fnmatch globs (repo-relative) for files the gate reads; () = unknown
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,7 @@ _ARMING_PATHS = (
 
 _HEADER_ARGV_RE = re.compile(r"^\s*#\s*gate-backtest-argv:(.*)$")
 _HEADER_FLAG_RE = re.compile(r"^\s*#\s*gate-backtest-flag:\s*(.*)$")
+_HEADER_READS_RE = re.compile(r"^\s*#\s*gate-backtest-reads:(.*)$")
 _HEADER_OPT_OUT_RE = re.compile(r"^\s*#\s*gate-backtest:\s*not-replayable\b\s*(.*)$")
 
 
@@ -176,6 +178,7 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
     argv_tokens: list[str] | None = None
     flag_exits = frozenset({1})
     flag_re = ""
+    reads: tuple[str, ...] = ()
     for line in text.splitlines()[:HEADER_SCAN_LINES]:
         m = _HEADER_OPT_OUT_RE.match(line)
         if m:
@@ -187,6 +190,16 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
                 argv_tokens = shlex.split(m.group(1))
             except ValueError as exc:
                 return ("unspecified", None, f"unparseable gate-backtest-argv header: {exc}")
+            continue
+        m = _HEADER_READS_RE.match(line)
+        if m:
+            try:
+                tokens = shlex.split(m.group(1))
+            except ValueError as exc:
+                return ("unspecified", None, f"unparseable gate-backtest-reads header: {exc}")
+            if any(t.startswith("/") or ".." in t.split("/") for t in tokens):
+                return ("unspecified", None, "bad gate-backtest-reads path")
+            reads = reads + tuple(tokens)
             continue
         m = _HEADER_FLAG_RE.match(line)
         if m:
@@ -209,7 +222,7 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
     if bad:
         return ("unspecified", None, "unknown placeholder in header argv: " + ", ".join(bad))
     spec = ReplaySpec(argv=tuple(argv_tokens), flag_exits=flag_exits, flag_stdout_re=flag_re,
-                      needs_plan=any("{plan_file}" in t for t in argv_tokens))
+                      needs_plan=any("{plan_file}" in t for t in argv_tokens), reads=reads)
     return ("replayable", spec, "header")
 
 

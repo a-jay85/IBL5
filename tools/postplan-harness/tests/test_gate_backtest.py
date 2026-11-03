@@ -102,6 +102,37 @@ def test_header_flag_forms():
     assert spec.flag_stdout_re == "^BAD" and spec.flag_exits == frozenset()
 
 
+def test_header_reads_parsed():
+    state, spec, reason = resolve_spec(
+        "bin/check-zzz",
+        "# gate-backtest-argv: --since={base}\n"
+        "# gate-backtest-reads: .github/workflows/*.yml\n"
+        "# gate-backtest-reads: ibl5/tests/e2e/a.ts\n")
+    assert state == "replayable" and reason == "header"
+    assert spec.reads == (".github/workflows/*.yml", "ibl5/tests/e2e/a.ts")
+
+
+def test_header_reads_rejects_escape():
+    for bad in ("../etc/passwd", "/abs/x"):
+        state, spec, reason = resolve_spec(
+            "bin/check-zzz",
+            f"# gate-backtest-argv: --since={{base}}\n# gate-backtest-reads: {bad}\n")
+        assert (state, spec, reason) == ("unspecified", None, "bad gate-backtest-reads path"), bad
+
+
+def test_header_reads_absent_is_unknown():
+    _, spec, _ = resolve_spec("bin/check-zzz", "# gate-backtest-argv: --since={base}\n")
+    assert spec.reads == ()
+    # A reads line with no argv header builds no header spec; the registry spec stands.
+    state, spec, reason = resolve_spec("bin/check-docs", "# gate-backtest-reads: docs/*.md\n")
+    assert state == "replayable" and reason == "registry"
+    assert spec is REPLAY_SPECS["bin/check-docs"] and spec.reads == ()
+    # Near miss: a different header name never populates reads.
+    _, spec, _ = resolve_spec(
+        "bin/check-zzz", "# gate-backtest-argv: --since={base}\n# gate-backtest-readers: x\n")
+    assert spec.reads == ()
+
+
 def test_registry_covers_every_check_script():
     scripts = sorted(glob.glob(os.path.join(REPO_ROOT, "bin", "check-*")))
     assert scripts, "no bin/check-* found; REPO_ROOT is wrong"

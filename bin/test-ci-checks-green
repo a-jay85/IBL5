@@ -7,8 +7,10 @@
 #        GH_API_CMD seam (a `gh` shim answers `auth status`; a throwaway git repo
 #        supplies the origin remote).
 # L1-L9  source the lib and call its functions directly.
-# P1-P41 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
+# K1-K12 call ccg_settle_stuck directly (stuck check-run normalization, backlog#1712).
+# P1-P50 run bin/check-pr-checks-green against a sequence shim on GH_API_CMD
 #        (the Nth poll serves the Nth fixture; every case uses --interval-seconds=0).
+# P42-P50 pin the stuck check-run and stuck job normalization in V1-V4.
 # P25-P29 pin the poll_once read retry; P30-P41 pin the ghost-aware V4
 #        (labels carry the plan's original id, e.g. "P30 (plan P25)").
 # S1-S10 run bin/settle-pr-status against a `gh` shim that dispatches on the API path
@@ -21,6 +23,7 @@
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+# shellcheck disable=SC2034  # read by bin/lib/harness.sh h_fail
 H_FAIL_FD=2  # FAIL: lines stay on stderr, as before migration
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -379,7 +382,46 @@ gcase G8d "missing run_attempt holds" "no-run-attempt" \
 gcase G9 "mixed: pending wins over red in the reason" "job-pending: b" \
     "$(ghost "$G_OLD" 600 "$G_RUN" "[$G_A_FAIL,$G_B_QUEUED]")"
 
-# --- P1-P41: bin/check-pr-checks-green (PR-head poller) ---------------------
+
+# --- K1-K12: ccg_settle_stuck (stuck check-run) ------------------------------
+K_DONE='"completed_at":"2026-10-22T17:36:22Z"'   # == G_UPD
+K_STUCK="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":\"success\",\"started_at\":\"2026-10-22T17:30:00Z\",$K_DONE}"
+K_RED="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":\"failure\",$K_DONE}"
+K_NULL="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":null,$K_DONE}"
+K_NOCONC="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",$K_DONE}"
+K_EMPTY="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":\"\",$K_DONE}"
+K_NODONE='{"name":"CI Memo Check","status":"in_progress","conclusion":"success"}'
+K_BADDONE='{"name":"CI Memo Check","status":"in_progress","conclusion":"success","completed_at":"2026-10-22T17:36:22"}'
+K_QUEUED="{\"name\":\"CI Memo Check\",\"status\":\"queued\",\"conclusion\":\"success\",$K_DONE}"
+K_OK='{"name":"A","status":"completed","conclusion":"success","completed_at":"2026-01-01T00:00:00Z"}'
+# stuck <now> <grace> <check-runs-json-array> <jq -r projection> -> stdout
+stuck() { printf '{"total_count":99,"check_runs":%s}' "$3" | ccg_settle_stuck "$1" "$2" | jq -r "$4"; }
+K_ST='.check_runs[0] | .status + "/" + (.ccg_stuck_from // "none")'
+gcase K1 "stuck green past grace reads completed and is tagged" "completed/in_progress" \
+    "$(stuck "$G_OLD" 600 "[$K_STUCK]" "$K_ST")"
+gcase K2 "age exactly grace holds (strict >)" "in_progress/none" \
+    "$(stuck $((G_UPD + 600)) 600 "[$K_STUCK]" "$K_ST")"
+gcase K3 "null conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NULL]" "$K_ST")"
+gcase K4 "missing conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NOCONC]" "$K_ST")"
+gcase K5 "empty-string conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_EMPTY]" "$K_ST")"
+# K5b: a non-string conclusion has a length too (a number's length is its value),
+# so only the type test keeps it pending.
+K_NUMCONC="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":1,$K_DONE}"
+gcase K5b "non-string conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NUMCONC]" "$K_ST")"
+gcase K6 "stuck red is normalized and ccg_failed names it" "CI Memo Check (failure)" \
+    "$(printf '{"check_runs":[%s]}' "$K_RED" | ccg_settle_stuck "$G_OLD" 600 | ccg_failed)"
+gcase K7 "stuck green leaves ccg_pending empty" "" \
+    "$(printf '{"check_runs":[%s]}' "$K_STUCK" | ccg_settle_stuck "$G_OLD" 600 | ccg_pending)"
+gcase K8 "missing completed_at holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NODONE]" "$K_ST")"
+gcase K9 "unparseable completed_at (no Z) holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_BADDONE]" "$K_ST")"
+gcase K10 "completed run is untouched and total_count is recomputed" "completed/none/2" \
+    "$(stuck "$G_OLD" 600 "[$K_OK,$K_STUCK]" '(.check_runs[0] | .status + "/" + (.ccg_stuck_from // "none")) + "/" + (.total_count | tostring)')"
+gcase K11 "queued with a conclusion past grace reads completed" "completed/queued" \
+    "$(stuck "$G_OLD" 600 "[$K_QUEUED]" "$K_ST")"
+gcase K12 "wider grace keeps the same fixture pending" "in_progress/none" \
+    "$(stuck "$G_OLD" 1200 "[$K_STUCK]" "$K_ST")"
+
+# --- P1-P50: bin/check-pr-checks-green (PR-head poller) ---------------------
 POLL="$SCRIPT_DIR/check-pr-checks-green"
 P_SHA="0123456789abcdef0123456789abcdef01234567"
 
@@ -864,6 +906,81 @@ if [ "$RC" -eq 3 ] && grep -qF 'ghost-check: run ? (E2E Tests): no-run-id; still
         && [ "$(jobs_calls)" = "0" ]; then
     ok "P41 (plan P36) run without an id holds with no jobs call"
 else fail "P41 (plan P36) run without an id holds with no jobs call (rc=$RC jobs=$(jobs_calls) err=$(cat "$ERR"))"; fi
+
+# P42-P50: stuck check-runs and stuck jobs (ADR-0149 addendum 2026-11-02, backlog#1712).
+K_A_STUCK="{\"name\":\"A\",\"status\":\"in_progress\",\"conclusion\":\"success\",$K_DONE}"
+K_A_RED="{\"name\":\"A\",\"status\":\"in_progress\",\"conclusion\":\"failure\",$K_DONE}"
+K_A_NULL="{\"name\":\"A\",\"status\":\"in_progress\",\"conclusion\":null,$K_DONE}"
+K_JOB_STUCK="{\"name\":\"build\",\"status\":\"in_progress\",\"conclusion\":\"success\",\"run_attempt\":1,$K_DONE}"
+K_JOB_RED="{\"name\":\"build\",\"status\":\"in_progress\",\"conclusion\":\"failure\",\"run_attempt\":1,$K_DONE}"
+K_JOB_NODONE='{"name":"build","status":"in_progress","conclusion":"success","run_attempt":1}'
+STUCK_LOG="STUCK: check-run A status=in_progress conclusion=success completed_at=2026-10-22T17:36:22Z age=601s > grace 600s; treating as completed"
+STUCK_PASS_PREFIX="PASS: stuck-settled: A; 1 check-run(s) settled green on $P_SHA"
+
+new_case p42
+cr 1 "[$K_A_STUCK]"; wr 1 "$RUNS_DONE"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$STUCK_PASS_PREFIX"* ]] && grep -qxF "$STUCK_LOG" "$ERR"; then
+    ok "P42 stuck green anchor past grace passes and is loud"
+else fail "P42 stuck green anchor past grace passes and is loud (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+new_case p43
+cr 1 "[$K_A_RED]"; wr 1 "$RUNS_DONE"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A --wait --timeout-seconds=5
+if [ "$RC" -eq 1 ] && [ "$(counter)" = "1" ] && grep -qF 'FAIL: checks failed: A (failure)' "$ERR"; then
+    ok "P43 stuck red past grace fails, never settles"
+else fail "P43 stuck red past grace fails, never settles (rc=$RC counter=$(counter) err=$(cat "$ERR"))"; fi
+
+new_case p44
+cr 1 "[$K_A_STUCK]"; wr 1 "$RUNS_DONE"
+# No --anchor here, so the run reaches V3 (an unsettled anchor would stop at V2).
+CCG_NOW_EPOCH=$((G_UPD + 600)) run_poll
+if [ "$RC" -eq 3 ] && grep -qxF 'WAIT: checks still running: A' "$ERR" && ! grep -q '^STUCK:' "$ERR"; then
+    ok "P44 stuck green at exactly grace still waits"
+else fail "P44 stuck green at exactly grace still waits (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p45
+cr 1 "[$K_A_NULL]"; wr 1 "$RUNS_DONE"
+CCG_NOW_EPOCH=$G_OLD run_poll
+if [ "$RC" -eq 3 ] && grep -qxF 'WAIT: checks still running: A' "$ERR"; then
+    ok "P45 in_progress with null conclusion and old completed_at waits"
+else fail "P45 in_progress with null conclusion and old completed_at waits (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p46
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$K_JOB_STUCK]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$GHOST_PASS_PREFIX"* ]] \
+        && grep -qF "STUCK: run $GHOST_ID (Dependabot Auto-Merge) job(s) read as completed (conclusion set, completed_at past grace): build" "$ERR"; then
+    ok "P46 stuck green job inside an active run settles the ghost"
+else fail "P46 stuck green job inside an active run settles the ghost (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+new_case p47
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$K_JOB_RED]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF "ghost-check: run $GHOST_ID (Dependabot Auto-Merge): job-red: build (failure); still holding" "$ERR"; then
+    ok "P47 stuck red job inside an active run holds as job-red"
+else fail "P47 stuck red job inside an active run holds as job-red (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p48
+cr 1 "[{\"name\":\"A\",$G}]"; wr 1 "$GHOST_RUN"; jr 1 "$GHOST_ID" "[$K_JOB_NODONE]"
+CCG_NOW_EPOCH=$G_OLD run_poll --anchor=A
+if [ "$RC" -eq 3 ] && grep -qF "ghost-check: run $GHOST_ID (Dependabot Auto-Merge): job-pending: build; still holding" "$ERR"; then
+    ok "P48 in_progress job with a conclusion but no completed_at holds"
+else fail "P48 in_progress job with a conclusion but no completed_at holds (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p49
+cr 1 "[$K_A_STUCK]"; wr 1 "$RUNS_DONE"
+CCG_NOW_EPOCH=$G_OLD run_poll --ghost-grace-seconds=1200
+if [ "$RC" -eq 3 ] && grep -qxF 'WAIT: checks still running: A' "$ERR"; then
+    ok "P49 --ghost-grace-seconds widens the stuck window too"
+else fail "P49 --ghost-grace-seconds widens the stuck window too (rc=$RC err=$(cat "$ERR"))"; fi
+
+new_case p50
+cr 1 "[$K_A_STUCK]"; wr 1 "$RUNS_DONE"
+CCG_NOW_EPOCH='' run_poll --anchor=A
+if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$STUCK_PASS_PREFIX"* ]] && grep -q '^STUCK: check-run A ' "$ERR"; then
+    ok "P50 empty CCG_NOW_EPOCH falls back to the clock (2026-10-22 fixture is past grace)"
+else fail "P50 empty CCG_NOW_EPOCH falls back to the clock (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
 
 # --- S1-S27: bin/settle-pr-status against a URL-dispatch gh shim ---------------
 SETTLE="$SCRIPT_DIR/settle-pr-status"

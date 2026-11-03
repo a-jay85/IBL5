@@ -44,3 +44,13 @@ On 2026-11-02 a backtest-tool fix that loosened a dev-tooling gate drew `xhigh` 
 - `.claude/skills/plan/SKILL.md`: /plan Step 3, where the orchestrator owns the final tier call.
 - `.claude/rules/agent-tiering-fable.md`: the Fable test the judge applies.
 - `ibl5/docs/decisions/0222-plan-tier-hint-opus-judge.md`: the superseded decision.
+
+## Addendum (2026-11-02): the judge sees the full brief
+
+The first version gave the judge a one-line task statement. A gate-race fix whose brief carried a resolved design, fail-closed hard constraints, and regression tests came back `xhigh`, because none of that reached the judge. The judge answered the input it had.
+
+`bin/plan-tier-hint` now also takes `--brief <file>` and `--signals <list>`. One filter drops every line that matches `MUST route to` or names `plan-architect` from each input, so a caller's declared tier never reaches the judge. Paths the brief names join the file list. The brief is capped at 16000 bytes on a line boundary and carries a truncation marker when cut. Signal lines record a `feat:` title, a stated `auto_merge: false`, and a `bin/plan-now --implement` run. The prompt counts a design the brief already resolves as a mitigation.
+
+`bin/plan-now` passes the whole prompt file. `bin/lib/burndown.sh` passes the backlog issue body. `/plan-prompt` Step 5 runs the hint on the written block. A `--desc`-only caller gets the old task block. The fence note, the fail-safe to `default`, and the log format are unchanged.
+
+Rejected: scanning the repo for existing tests of the touched files. It costs a tree walk per call and measures coverage the brief already states.

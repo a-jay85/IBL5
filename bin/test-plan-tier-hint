@@ -399,7 +399,8 @@ else
     h_pass "J13 no --dangerously-skip-permissions"
 fi
 for t in 'would a wrong plan be expensive?' '2.5 times Opus 5.5 per token' \
-    'plan-architect-sonnet' 'output format, answer default.'; do
+    'plan-architect-sonnet' 'output format, answer default.' \
+    'a design the brief already resolves'; do
     if grep -qF -- "$t" "$BASE_TMP/argv"; then
         h_pass "J13 prompt carries the open question text [$t]"
     else
@@ -429,6 +430,182 @@ case "$JUDGE_CWD" in
     "$ROOT"*|'') h_fail "J13 judge runs outside the repo root" "cwd was [$JUDGE_CWD]" ;;
     *) h_pass "J13 judge runs outside the repo root" ;;
 esac
+
+echo
+echo "== J16 --desc-only callers keep the old task block =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --desc 'Rename the standings cache key'
+J16_SHAPE="$(awk '
+    /^<task-/ { inside = 1; next }
+    /^<\/task-/ { inside = 0; next }
+    inside && $0 == "Description: Rename the standings cache key" { d = 1 }
+    inside && $0 == "Files:" { f = 1 }
+    inside && /^(Brief|Signals):/ { extra = 1 }
+    END { printf "%d%d%d", d, f, extra }
+' "$BASE_TMP/argv")"
+expect_eq "J16 --desc-only task block keeps Description and Files lines, no Brief or Signals" "110" "$J16_SHAPE"
+expect_eq "J16 --desc-only still prints default from the stub" "default" "$(cut -f1 "$OUT")"
+
+# fence_dump — every line inside the task fence of the last recorded prompt.
+fence_dump() {
+    awk '/^<task-/ { i = 1; next } /^<\/task-/ { i = 0; next } i' "$BASE_TMP/argv"
+}
+# fence_files — the Files: section lines, comma-joined.
+fence_files() {
+    fence_dump | awk '
+        /^(Brief|Signals):$/ { f = 0 }
+        f { printf "%s%s", (n++ ? "," : ""), $0 }
+        $0 == "Files:" { f = 1 }'
+}
+mkdir -p "$BASE_TMP/briefs"
+J17_BRIEF="$BASE_TMP/briefs/j17.md"
+cat > "$J17_BRIEF" <<'J17_EOF'
+/plan Tighten the cache key.
+- Step 3 MUST route to `plan-architect-xhigh`.
+Do NOT escalate to plan-architect-sonnet.
+step 3 must route to plan-architect
+The architect writes the plan once.
+Route to the queue after review.
+J17_EOF
+
+echo
+echo "== J17 directive lines never reach the judge =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --brief "$J17_BRIEF"
+J17_DUMP="$(fence_dump)"
+expect_eq "J17 no must-route-to line in the fence" "0" \
+    "$(printf '%s\n' "$J17_DUMP" | awk 'tolower($0) ~ /must route to/ { n++ } END { print n + 0 }')"
+expect_eq "J17 no plan-architect line in the fence" "0" \
+    "$(printf '%s\n' "$J17_DUMP" | awk '/plan-architect/ { n++ } END { print n + 0 }')"
+expect_eq "J17 the /plan line and both near-miss keepers survive" "111" \
+    "$(printf '%s\n' "$J17_DUMP" | awk '
+        $0 == "/plan Tighten the cache key." { a = 1 }
+        $0 == "The architect writes the plan once." { b = 1 }
+        $0 == "Route to the queue after review." { c = 1 }
+        END { printf "%d%d%d", a, b, c }')"
+
+echo
+echo "== J18 a directive passed as --desc is stripped, the log keeps it =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --desc 'Step 3 MUST route to plan-architect-xhigh' --files bin/a
+J18_DUMP="$(fence_dump)"
+expect_eq "J18 fence Description line is empty" "1" \
+    "$(printf '%s\n' "$J18_DUMP" | awk '$0 == "Description: " { n++ } END { print n + 0 }')"
+expect_eq "J18 fence still lists bin/a" "bin/a" "$(fence_files)"
+expect_eq "J18 log line keeps the raw --desc text" "1" \
+    "$(tail -n 1 "$PLAN_TIER_HINT_LOG" | awk '/MUST route to/ { n++ } END { print n + 0 }')"
+
+echo
+echo "== J19 brief paths join Files =="
+J19_BRIEF="$BASE_TMP/briefs/j19.md"
+cat > "$J19_BRIEF" <<'J19_EOF'
+The gate lives at `bin/plan-now:313`.
+Edit ibl5/classes/Foo.php. Then ibl5/classes/Foo.php. again.
+See .claude/agents/plan-architect.md for the def.
+J19_EOF
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --files bin/a --brief "$J19_BRIEF"
+expect_eq "J19 Files are --files first, then brief paths, trimmed and deduped" \
+    "bin/a,bin/plan-now,ibl5/classes/Foo.php" "$(fence_files)"
+
+echo
+echo "== J20 human-review signals =="
+J20_BRIEF="$BASE_TMP/briefs/j20.md"
+cat > "$J20_BRIEF" <<'J20_EOF'
+/plan Add a thing.
+- PR title type `feat:` for this change.
+- Frontmatter sets `auto_merge: false`.
+J20_EOF
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --signals implement --brief "$J20_BRIEF"
+J20_DUMP="$(fence_dump)"
+expect_eq "J20 Signals header and all three signal lines" "1111" \
+    "$(printf '%s\n' "$J20_DUMP" | awk '
+        $0 == "Signals:" { h = 1 }
+        $0 == "- title type feat: the PR is held for a human sign-off before merge" { a = 1 }
+        $0 == "- auto_merge false: an owner signs off before merge" { b = 1 }
+        $0 == "- plan-now --implement: the plan waits on disk for a human to read it before it is queued" { c = 1 }
+        END { printf "%d%d%d%d", h, a, b, c }')"
+J20_NEAR="$BASE_TMP/briefs/j20-near.md"
+cat > "$J20_NEAR" <<'J20N_EOF'
+/plan Add a thing.
+- PR title type `chore:` for this change.
+- Frontmatter sets `auto_merge: true`.
+J20N_EOF
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --brief "$J20_NEAR"
+expect_eq "J20 near-miss brief raises no Signals header" "0" \
+    "$(fence_dump | awk '$0 == "Signals:" { n++ } END { print n + 0 }')"
+
+echo
+echo "== J21 rejected forms exit 2 =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --signals bogus --desc 'Rename a key'
+expect_exit "J21 unknown signal" 2 "$RC"
+expect_match "J21 stderr names the unknown signal" 'unknown signal: bogus' "$ERR"
+run_hint "$BASE_TMP/judge-rec" --desc 'Rename a key' --signals
+expect_exit "J21 --signals with no value" 2 "$RC"
+run_hint "$BASE_TMP/judge-rec" --desc 'Rename a key' --brief
+expect_exit "J21 --brief with no value" 2 "$RC"
+run_hint "$BASE_TMP/judge-rec" --desc 'Rename a key' --brief "$BASE_TMP/briefs/missing.md"
+expect_exit "J21 unreadable brief file beside --desc" 2 "$RC"
+expect_match "J21 stderr says cannot read brief file" 'cannot read brief file' "$ERR"
+: > "$BASE_TMP/briefs/empty.md"
+run_hint "$BASE_TMP/judge-rec" --brief "$BASE_TMP/briefs/empty.md"
+expect_exit "J21 empty brief file with no other input" 2 "$RC"
+
+echo
+echo "== J22 the brief size cap =="
+# mk_brief <lines> <file>: <lines> lines of 99 bytes; first starts HEAD-SENTINEL,
+# last starts TAIL-SENTINEL.
+mk_brief() {
+    awk -v n="$1" 'BEGIN {
+        pad = sprintf("%99s", ""); gsub(/ /, "a", pad)
+        for (i = 1; i <= n; i++) {
+            l = pad
+            if (i == 1) l = substr("HEAD-SENTINEL" pad, 1, 99)
+            if (i == n) l = substr("TAIL-SENTINEL" pad, 1, 99)
+            print l
+        }
+    }' > "$2"
+}
+mk_brief 200 "$BASE_TMP/briefs/big.md"
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --brief "$BASE_TMP/briefs/big.md"
+J22_DUMP="$(fence_dump)"
+expect_eq "J22 long brief keeps head, loses tail" "10" \
+    "$(printf '%s\n' "$J22_DUMP" | awk '
+        /^HEAD-SENTINEL/ { h = 1 }
+        /^TAIL-SENTINEL/ { t = 1 }
+        END { printf "%d%d", h, t }')"
+expect_match "J22 long brief ends with the truncation marker" \
+    '^\[brief truncated: first 16000 of [0-9]+ bytes shown\]$' <(printf '%s\n' "$J22_DUMP" | tail -n 1)
+mk_brief 160 "$BASE_TMP/briefs/edge.md"
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --brief "$BASE_TMP/briefs/edge.md"
+J22_EDGE="$(fence_dump)"
+expect_eq "J22 15999-byte brief keeps its last line, no marker" "10" \
+    "$(printf '%s\n' "$J22_EDGE" | awk '
+        /^TAIL-SENTINEL/ { t = 1 }
+        /^\[brief truncated/ { m = 1 }
+        END { printf "%d%d", t, m }')"
+
+echo
+echo "== J23 a failing judge with a brief still prints default =="
+J23_BEFORE="$(awk 'END { print NR }' "$PLAN_TIER_HINT_LOG" 2>/dev/null)"
+run_hint "$BASE_TMP/judge-exit3" --brief "$J17_BRIEF"
+expect_exit "J23 hint exits 0" 0 "$RC"
+expect_eq "J23 prints default" "default" "$(cut -f1 "$OUT")"
+expect_eq "J23 logs exactly one new line" "$((J23_BEFORE + 1))" \
+    "$(awk 'END { print NR }' "$PLAN_TIER_HINT_LOG" 2>/dev/null)"
+
+echo
+echo "== J24 a --brief call never reads stdin =="
+reset_recorder
+printf 'STDIN-SENTINEL\n' | PLAN_TIER_HINT_CLAUDE="$BASE_TMP/judge-rec" \
+    "$HINT" --brief "$J17_BRIEF" >"$OUT" 2>"$ERR"
+expect_eq "J24 prompt lacks the stdin text" "0" \
+    "$(awk '/STDIN-SENTINEL/ { n++ } END { print n + 0 }' "$BASE_TMP/argv")"
 
 echo
 echo "== static drift assertions =="
@@ -463,6 +640,16 @@ assert_absent "canonical no longer says the hint defaulted to xhigh" \
     '.claude/skills/plan/SKILL.md' 'defaulted to `xhigh`'
 assert_absent "plan-prompt no longer routes on the hint printing xhigh" \
     '.claude/skills/plan-prompt/SKILL.md' 'the hint printed xhigh'
+assert_contains "plan-prompt runs the hint on the block file" \
+    '.claude/skills/plan-prompt/SKILL.md' 'bin/plan-tier-hint --explain --brief "$f"'
+assert_absent "plan-prompt no longer feeds the hint the task line only" \
+    '.claude/skills/plan-prompt/SKILL.md' 'bin/plan-tier-hint --explain --desc "<task-line>"'
+assert_contains "plan-now header names the brief input" \
+    'bin/plan-now' 'the whole prompt file as --brief'
+assert_contains "ADR-0226 records the full-brief update" \
+    'ibl5/docs/decisions/0226-plan-tier-hint-open-judgment.md' '): the judge sees the full brief'
+assert_contains "fable rule says what the judge reads" \
+    '.claude/rules/agent-tiering-fable.md' 'tier-routing lines removed'
 
 # No regex survives as a vote of any kind.
 for re in WEAKEN_RE GATE_RE SECURITY_RE; do

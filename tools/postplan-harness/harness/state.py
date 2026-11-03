@@ -314,6 +314,7 @@ class RunResult:
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on
     gate_fix: dict = field(default_factory=dict)  # local-gate fixer record (harness/gatefix.py); omitted from result.json when empty
     conformance_fix: dict = field(default_factory=dict)  # Phase 5.0-pre fixer record (harness/conformance_fix.py); omitted from result.json when empty
+    fix_round: dict = field(default_factory=dict)  # in-run fix-round record (harness/fix_round.py); omitted from result.json when empty
     # Phase 5.5 record: verdict_2 / reviewed_tree_2 / remediation_sha alias the last
     # remediation round; rounds (list of per-round dicts) / rounds_completed /
     # backlog_issue_numbers carry the full history.
@@ -334,12 +335,16 @@ class RunResult:
     rebase_only: dict | None = None  # rebase-only mode record (eligible, hold, pre/post patch-id, pushed, noop, record_refreshed); omitted from result.json when unset
     fired_by: str = "unknown"  # POSTPLAN_FIRED_BY caller label (attribution only; never read by a decision)
     pause_edit_sid: Optional[str] = None  # S of a recorded interrupted edit (ADR-0143 addendum 2026-10-10); omitted from result.json when unset
+    ab_arm: Optional[str] = None  # closer A/B arm ("harness" | "closer"); set only for env/enrolled runs, omitted from result.json when unset
+    ab_source: Optional[str] = None  # how the arm was chosen ("env" | "enrolled" | "new-enrollment"); omitted when unset
+    closer: Optional[dict] = None  # closer session record (ran, status, verdict, cost_usd, recheck, stop_reason); omitted when unset
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
-        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix", "conformance_fix",
-                    "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only"):   # unset → result.json byte-identical
+        for key in ("error_cmd", "error_output_tail", "block_cause", "gate_fix", "conformance_fix", "fix_round",
+                    "pause_edit_sid", "conflict_rung", "conflict_fix_summary", "rearm", "rebase_only",
+                    "ab_arm", "ab_source", "closer"):   # unset → result.json byte-identical
             if not d.get(key):
                 d.pop(key, None)
         if self.classification:

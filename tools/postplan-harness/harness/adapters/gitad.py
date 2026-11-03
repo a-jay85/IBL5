@@ -857,7 +857,7 @@ class LiveGit:
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
                              lostwork_path, conflicted, proof_out, regen_exempt=(),
                              stage_sets=None):
-        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        from ..conflict_ladder import LadderContext, default_rungs, make_regen_rung, run_ladder
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
@@ -867,7 +867,11 @@ class LiveGit:
             extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
                 key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
                 exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
-        return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
+        # Closer A/B arm: only the deterministic regen rung runs; an unresolved conflict then
+        # ends in rebase-conflict (exit 3), which is the closer's trigger.
+        rungs = ((make_regen_rung(),) if getattr(self, "llm_conflict_rungs_off", False)
+                 else default_rungs(branch))
+        return run_ladder(ctx, proof_out, rungs=rungs)
 
     def _run_stacked_lost_retry(self, *, key, master_sha, pre_rebase_sha,
                                 lostwork_path, conflicted, proof_out):

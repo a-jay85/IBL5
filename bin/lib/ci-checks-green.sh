@@ -13,6 +13,9 @@
 # run with a null conclusion used to print as "<name> ()" (jq concatenates a
 # string with null as the empty string); it is still a failure, and is now
 # reported as "<name> (unknown)".
+#
+# ccg_settle_stuck (2026-11-02) is applied only by bin/check-pr-checks-green;
+# bin/check-master-ci-green deliberately keeps the strict ccg_pending reading.
 
 # ccg_dedupe <skip-json-array> — drop exact-name matches in $1, keep the latest
 #   run per name (sort_by(.completed_at // .started_at) | last). Input/output:
@@ -90,3 +93,30 @@ ccg_ghost_reason() { jq -r --argjson now "$1" --argjson grace "$2" '
     elif ($now - $upd) <= $grace then
       "young: " + (($now - $upd) | tostring) + "s <= " + ($grace | tostring) + "s"
     else "settled" end'; }
+
+# ccg_settle_stuck <now-epoch> <grace-seconds> — normalize a stuck check-run
+#   (ADR-0149 addendum 2026-11-02, backlog#1712). GitHub occasionally leaves a
+#   check-run at status in_progress with a non-null conclusion and a completed_at
+#   that never advances; ccg_pending then holds the verdict forever. A run whose
+#   status is not "completed", whose conclusion is a non-empty string, and whose
+#   completed_at parses and is strictly older than grace seconds is rewritten to
+#   status "completed" and tagged ccg_stuck_from: "<original status>". The
+#   conclusion is left untouched so ccg_failed still fails a stuck red run: this
+#   filter settles the WAIT, never the verdict. Fail-closed on every unknown: a
+#   null, missing, empty or non-string conclusion, a null, missing or unparseable
+#   completed_at, or an age of grace seconds or less leaves the run as it was.
+#   Input/output: {check_runs:[...]} (total_count recomputed). Callers apply it
+#   right after ccg_dedupe, before ccg_failed and any anchor check, so a stuck
+#   anchor counts as reported and a stuck red conclusion fails. Only
+#   bin/check-pr-checks-green calls it today; bin/check-master-ci-green keeps the
+#   strict reading on purpose (master has no sweep to re-settle it).
+ccg_settle_stuck() { jq --argjson now "$1" --argjson grace "$2" '
+  .check_runs |= map(
+    (.completed_at | if type == "string" then (try fromdateiso8601 catch null) else null end) as $done
+    | if .status != "completed"
+         and (.conclusion | type) == "string" and (.conclusion | length) > 0
+         and $done != null
+         and ($now - $done) > $grace
+      then .ccg_stuck_from = .status | .status = "completed"
+      else . end)
+  | .total_count = (.check_runs | length)'; }

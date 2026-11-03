@@ -103,6 +103,7 @@ def test_header_flag_forms():
 
 
 def test_header_reads_parsed():
+    """Two `# gate-backtest-reads:` lines accumulate into ReplaySpec.reads in order."""
     state, spec, reason = resolve_spec(
         "bin/check-zzz",
         "# gate-backtest-argv: --since={base}\n"

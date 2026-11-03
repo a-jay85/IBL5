@@ -27,6 +27,8 @@ Usage: bin/check-pr-checks-green --repo=<owner/repo> --sha=<40-hex> [options]
                            {success, skipped, neutral} AND its updated_at is older than
                            this many seconds (default 600). Zero jobs, a pending job, a
                            red job, a jobs read error or a younger run all hold.
+                           Also the age past which a check-run or job stuck at in_progress
+                           with a conclusion is read as completed.
   --anchor=<csv>           Exact names that MUST exist and be completed before any
                            PASS verdict (the other required contexts).
   --wait                   Poll until settled or deadline. Without it: one shot.
@@ -191,6 +193,18 @@ poll_once() {
         VERDICT=apierr; LINE="workflow-runs read failed"; return 0
     fi
     checks="$(printf '%s' "$checks" | ccg_dedupe "$SKIP_JSON")"
+    # Stuck check-runs (ADR-0149 addendum 2026-11-02): a run GitHub left at
+    # in_progress with a conclusion already set and a completed_at frozen past
+    # GHOST_GRACE is read as completed. The conclusion still goes through
+    # ccg_failed below, so a stuck red check fails here rather than settling.
+    now="${CCG_NOW_EPOCH:-$(date +%s)}"
+    checks="$(printf '%s' "$checks" | ccg_settle_stuck "$now" "$GHOST_GRACE")"
+    stuck="$(printf '%s' "$checks" | jq -r '[.check_runs[] | select(.ccg_stuck_from != null) | .name] | join(", ")')"
+    if [ -n "$stuck" ]; then
+        printf '%s' "$checks" | jq -r --argjson now "$now" --argjson grace "$GHOST_GRACE" \
+            '.check_runs[] | select(.ccg_stuck_from != null)
+             | "STUCK: check-run \(.name) status=\(.ccg_stuck_from) conclusion=\(.conclusion) completed_at=\(.completed_at) age=\($now - (.completed_at | fromdateiso8601))s > grace \($grace)s; treating as completed"' >&2
+    fi
 
     failed="$(printf '%s' "$checks" | ccg_failed)"
     if [ -n "$failed" ]; then
@@ -211,7 +225,6 @@ poll_once() {
     # updated_at has sat unchanged for more than GHOST_GRACE seconds. Jobs are read only
     # here, after V1-V3, so a red or pending check-run never costs a jobs call. A run
     # without a numeric id gets an empty jobs list and holds (no-run-id).
-    now="${CCG_NOW_EPOCH:-$(date +%s)}"
     active=""; ghosts=""
     while IFS= read -r run; do
         [ -n "$run" ] || continue
@@ -220,9 +233,12 @@ poll_once() {
         jobs='[]'
         if [ -n "$id" ]; then
             if ! jobs_raw="$(gh_retry_json bash -c "$GH_API_CMD --paginate --slurp \"repos/$REPO/actions/runs/$id/jobs?filter=latest&per_page=100\"" 2>/dev/null)" \
-                || ! jobs="$(printf '%s' "$jobs_raw" | jq -ec '[.[].jobs[]]' 2>/dev/null)"; then
+                || ! jobs="$(printf '%s' "$jobs_raw" | jq -ec '{check_runs: [.[].jobs[]]}' 2>/dev/null \
+                        | ccg_settle_stuck "$now" "$GHOST_GRACE" | jq -ec '.check_runs' 2>/dev/null)"; then
                 VERDICT=apierr; LINE="jobs read failed for run $id ($name)"; return 0
             fi
+            stuck_jobs="$(jq -r '[.[] | select(.ccg_stuck_from != null) | .name] | join(", ")' <<< "$jobs")"
+            [ -z "$stuck_jobs" ] || echo "STUCK: run $id ($name) job(s) read as completed (conclusion set, completed_at past grace): $stuck_jobs" >&2
         fi
         reason="$(jq -nc --argjson r "$run" --argjson j "$jobs" '{run: $r, jobs: $j}' | ccg_ghost_reason "$now" "$GHOST_GRACE")"
         if [ "$reason" = "settled" ]; then
@@ -240,7 +256,7 @@ poll_once() {
     fi
     total="$(printf '%s' "$checks" | jq '.check_runs | length')"
     VERDICT=pass
-    LINE="PASS: ${ghosts:+ghost-settled by jobs: $ghosts; }$total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
+    LINE="PASS: ${stuck:+stuck-settled: $stuck; }${ghosts:+ghost-settled by jobs: $ghosts; }$total check-run(s) settled green on $SHA (anchors settled: ${ANCHOR_LIST:-<none>}) (ignored: ${IGNORED_LIST:-<none>})"
 }
 
 # Startup grace: give sibling workflows time to register their check-runs before

@@ -1335,6 +1335,24 @@ need "plan edit kept" test ! "$(cmp -s "$TMP/plan.orig" "$HR_PLAN_FILE" && echo 
 case_end holdrepeat-plan-only-fix-ships
 fi
 
+# 52b (a plan-only fix whose plan comment fails: HR_COMMITTED=0 takes _hr_reject, which
+# restores the plan and leaves origin and HEAD at HEAD0; no re-fire. Reuses the effect
+# script case 52 writes, so run it with 52, not alone)
+if should_run "holdrepeat-plan-only-comment-fails-reverts"; then
+hr_reset
+: > "$TMP/gh.commentfail"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planonly.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-plan-comment
+need "DM comes from the reject path" dm_has "rejected by plan-comment"
+need "plan restored" plan_is_orig
+need "origin unchanged" origin_is_tip
+need "HEAD unchanged" head_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-plan-only-comment-fails-reverts
+fi
+
 # 53 (the default STATE_DIR sits under the gitignored out/ dir: the launcher's own "started"
 # ledger write and a concurrent harness run writing to out/ are not tamper)
 HR_EXCL="$MAIN/.git/info/exclude"
@@ -1500,6 +1518,38 @@ need "final line" final_is "$STDOUT" gave-up-refs
 need "origin rewritten to HEAD0" origin_is_tip
 need "HEAD restored" head_is_tip
 case_end holdrepeat-session-push-reverted
+fi
+
+# 57b (item 2: an early guard, pr-state, rejects a session that also pushed its own commit;
+# _hr_reject's revert still rewrites origin back to HEAD0. Reuses the effect script case 57
+# writes, so run it with 57, not alone)
+if should_run "holdrepeat-early-reject-session-push-reverted"; then
+hr_reset
+{ cat "$TMP/effects/hr-sessionpush.sh"; printf 'printf "Other title\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-sessionpush-title.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-sessionpush-title.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "origin rewritten to HEAD0" origin_is_tip
+need "HEAD restored" head_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-early-reject-session-push-reverted
+fi
+
+# 57c (item 4: an early guard rejects while someone else pushed the PR branch; the revert
+# keeps that push and the DM names it. Reuses the effect script case 56 writes)
+if should_run "holdrepeat-early-reject-owner-push-kept"; then
+hr_reset
+rm -f "$TMP/owner.sha"
+{ cat "$TMP/effects/hr-ownerpush.sh"; printf 'printf "Other title\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-ownerpush-title.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-ownerpush-title.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "owner's push kept on origin" test "$(origin_hr)" = "$(cat "$TMP/owner.sha" 2>/dev/null)"
+need "DM says the remote was left as is" dm_has "left as is"
+need "worktree back at HEAD0" head_is_tip
+case_end holdrepeat-early-reject-owner-push-kept
 fi
 
 # 58 (--holdrepeat --dry-run is inert: no fetch, so an unreachable origin and a dirty tree

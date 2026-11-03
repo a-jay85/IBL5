@@ -1268,6 +1268,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     res.error_kind = _classify_pause(p, llm, res, log)
                     res.error = f"{res.error_kind}: {p.purpose}"
                     log(f"PAUSED: {res.error}")
+                except Exception as ce:  # noqa: BLE001 - the closer never changes the exit-3 terminal
+                    log(f"closer: conflict hook error {ce.__class__.__name__}: {ce!r}; "
+                        "keeping the failed terminal")
             res.block_cause = getattr(e, "block_cause", None)
             _record_failure_context(res, e)
             log(f"FAILED: {res.error}")

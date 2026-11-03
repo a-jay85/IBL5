@@ -278,3 +278,23 @@ def test_closer_keeps_phase45_snapshot_when_refresh_fails(monkeypatch, tmp_path)
     _go(monkeypatch, tmp_path, fx, git_cls=_TrackedGit)
     assert len(rec.calls) == 1
     assert [t["comment_id"] for t in rec.calls[0]["context"].threads] == [11]
+
+
+@pytest.mark.parametrize("exc", [OSError("disk gone"), KeyError("verdict")])
+def test_rebase_conflict_closer_plain_exception_keeps_exit_3(monkeypatch, tmp_path, exc):
+    """A non-HarnessError from the conflict hook is logged and swallowed: exit 3 stands."""
+    _arm(monkeypatch)
+    fx = _armable_fixture(monkeypatch, tmp_path, closer={})
+    calls = []
+
+    def boom(llm, **kw):
+        calls.append(kw)
+        raise exc
+
+    _install(monkeypatch, boom, git_cls=_TrackedConflictGit)
+    res, result, _out = _go(monkeypatch, tmp_path, fx, git_cls=_TrackedConflictGit)
+    assert len(calls) == 1
+    assert result["terminal"] == "failed"
+    assert result["error_kind"] == "rebase-conflict"
+    assert res.block_cause
+    assert runner.exit_code_for(res) == 3

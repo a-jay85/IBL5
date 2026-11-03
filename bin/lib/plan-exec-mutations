@@ -345,6 +345,22 @@ PY
     return 1
 }
 
+# purge_pyc <file>: delete the cached bytecode of a .py file. Python trusts a
+# .pyc whose recorded source mtime (whole seconds) and size still match, so a
+# same-length edit made within the same second would run the old code. run_check
+# already points Python at an empty cache dir; this covers checks that run
+# `python -E` or `-I`, which ignore that variable and still read __pycache__/.
+purge_pyc() {
+    case "$1" in *.py) : ;; *) return 0 ;; esac
+    _pd=$(dirname "$1")/__pycache__
+    _stem=$(basename "$1" .py)
+    [ -d "$_pd" ] || return 0
+    for _pyc in "$_pd/$_stem".*.pyc; do
+        [ -e "$_pyc" ] && rm -f "$_pyc"
+    done
+    return 0
+}
+
 # restore_entry <meta> — restore from .orig, verify; prints the failure reason.
 restore_entry() {
     _meta="$1"; _orig="${_meta%.meta}.orig"
@@ -354,6 +370,7 @@ restore_entry() {
         echo "journal entry incomplete"; return 1
     fi
     cat "$_orig" > "$_path" || { echo "restore write failed"; return 1; }
+    purge_pyc "$_path"
     if [ "$(sha256 "$_path")" != "$_want" ]; then
         echo "sha mismatch"; return 1
     fi
@@ -446,13 +463,18 @@ trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
 trap 'on_signal 129' HUP
 
-# run_check <sec> <cmd> — backgrounded so a signal interrupts the wait.
+# run_check <sec> <cmd>: runs in the background so a signal interrupts the wait. Each
+# run gets its own empty bytecode cache and writes no .pyc, so Python never
+# reuses bytecode compiled before a mutation (see purge_pyc).
 run_check() {
-    "$TO" "$1" bash -c "$2" </dev/null >/dev/null 2>&1 &
+    _pfx=$(mktemp -d "$BCACHE/pyc.XXXXXX") || _pfx="$BCACHE/pyc-none"
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$_pfx" \
+        "$TO" "$1" bash -c "$2" </dev/null >/dev/null 2>&1 &
     CHILD=$!
     wait "$CHILD"
     _crc=$?
     CHILD=""
+    rm -rf "$_pfx"
     return $_crc
 }
 
@@ -482,6 +504,8 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     fi
     # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
     # mutation side effect, so the revert check must compare against the tree as it stands here.
+    # Purge first, so the purges after apply and restore cannot change the porcelain.
+    purge_pyc "$file"
     snap_status
     n=$(lit count "$file" "$match" "$replace") || n="?"
     if [ "$n" != 1 ]; then
@@ -503,6 +527,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         printf 'NOT-APPLIED row %s — mutation write to %s failed\n' "$row" "$file"
         FINAL=1; continue
     fi
+    purge_pyc "$file"
     msec=$((SCALE * bsec))
     [ "$msec" -ge "$SEC" ] || msec=$SEC
     [ "$msec" -le "$MAXSEC" ] || msec=$MAXSEC

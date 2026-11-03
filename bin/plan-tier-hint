@@ -5,7 +5,9 @@
 # The verdict is one open Opus 5.5 judgment. The prompt states the facts
 # (what each architect def is for, what Fable costs) and asks the Fable test
 # from .claude/rules/agent-tiering-fable.md as an open question. It carries
-# no trigger list, and nothing here pre-filters the task text. Every way the
+# no trigger list. The one pre-filter drops tier-routing lines (any line
+# matching MUST route to, or naming plan-architect) from every input, so a
+# caller's own declared tier never reaches the judge. Every way the
 # judge can fail (timeout, non-zero exit, bad envelope, unparseable reply,
 # missing CLI, CI guard) prints default, the Opus architect, with a
 # judge-failsafe reason and still exits 0.
@@ -36,16 +38,25 @@ set -u
 
 usage() {
     cat <<'USAGE'
-Usage: bin/plan-tier-hint [--files <p>[,<p>...]] [--desc <text>] [--explain]
+Usage: bin/plan-tier-hint [--files <p>[,<p>...]] [--desc <text>]
+       [--brief <file>] [--signals <s>[,<s>...]] [--explain]
        <description> | bin/plan-tier-hint
 
   --files    comma-separated paths the change touches (optional)
-  --desc     task description text (optional; read from stdin if absent)
+  --desc     task description text (optional; read from stdin if absent
+             and --brief is absent)
+  --brief    file holding the full task brief (optional). Tier-routing lines
+             are dropped, paths it names join --files, and the rest is capped
+             at 16000 bytes
+  --signals  comma-separated human-review signals, any of:
+             feat-title, auto-merge-false, implement
   --explain  append a TAB and the judge's one-line reason (or the fail-safe cause)
   -h|--help  print usage, exit 0
 
 Prints exactly one of: xhigh | default | sonnet      exit 0
-No input at all (no --files, no --desc, empty/absent stdin): usage on stderr, exit 2.
+No input at all (no --files, no --desc, no non-empty --brief, empty/absent
+stdin): usage on stderr, exit 2. An unreadable --brief file or an unknown
+signal: message plus usage on stderr, exit 2.
 USAGE
 }
 
@@ -53,6 +64,10 @@ FILES=""
 DESC=""
 EXPLAIN=0
 HAVE_DESC=0
+BRIEF_FILE=""
+HAVE_BRIEF=0
+SIGNALS=""
+BRIEF_MAX=16000
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -66,6 +81,16 @@ while [ $# -gt 0 ]; do
             DESC="$2"; HAVE_DESC=1; shift 2 ;;
         --desc=*)
             DESC="${1#--desc=}"; HAVE_DESC=1; shift ;;
+        --brief)
+            if [ $# -lt 2 ]; then usage >&2; exit 2; fi
+            BRIEF_FILE="$2"; HAVE_BRIEF=1; shift 2 ;;
+        --brief=*)
+            BRIEF_FILE="${1#--brief=}"; HAVE_BRIEF=1; shift ;;
+        --signals)
+            if [ $# -lt 2 ]; then usage >&2; exit 2; fi
+            SIGNALS="$2"; shift 2 ;;
+        --signals=*)
+            SIGNALS="${1#--signals=}"; shift ;;
         --explain)
             EXPLAIN=1; shift ;;
         -h|--help)
@@ -80,14 +105,37 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Read the description from stdin only when --desc was absent and stdin is not a
-# terminal, so an interactive invocation with no arguments exits 2 rather than
-# hanging on a read that will never come.
-if [ "$HAVE_DESC" -eq 0 ] && [ ! -t 0 ]; then
+# Read the description from stdin only when both --desc and --brief were absent
+# and stdin is not a terminal, so an interactive invocation with no arguments
+# exits 2 rather than hanging on a read that will never come. A brief-only call
+# must never consume stdin: bin/lib/burndown.sh calls the hint inside a
+# `while ... done < "$tsv"` loop.
+if [ "$HAVE_DESC" -eq 0 ] && [ "$HAVE_BRIEF" -eq 0 ] && [ ! -t 0 ]; then
     DESC="$(cat)"
 fi
 
-if [ -z "$DESC" ] && [ -z "$FILES" ]; then
+BRIEF_RAW=""
+if [ "$HAVE_BRIEF" -eq 1 ]; then
+    if [ -z "$BRIEF_FILE" ] || [ ! -f "$BRIEF_FILE" ] || [ ! -r "$BRIEF_FILE" ]; then
+        printf 'plan-tier-hint: cannot read brief file: %s\n' "$BRIEF_FILE" >&2
+        usage >&2
+        exit 2
+    fi
+    BRIEF_RAW="$(cat "$BRIEF_FILE")"
+fi
+
+SIG_FEAT=0; SIG_AUTO=0; SIG_IMPL=0
+while IFS= read -r sig; do
+    case "$sig" in
+        '') ;;
+        feat-title) SIG_FEAT=1 ;;
+        auto-merge-false) SIG_AUTO=1 ;;
+        implement) SIG_IMPL=1 ;;
+        *) printf 'plan-tier-hint: unknown signal: %s\n' "$sig" >&2; usage >&2; exit 2 ;;
+    esac
+done <<< "$(printf '%s' "$SIGNALS" | tr ',' '\n')"
+
+if [ -z "$DESC" ] && [ -z "$FILES" ] && [ -z "$BRIEF_RAW" ]; then
     usage >&2
     exit 2
 fi
@@ -147,9 +195,57 @@ failsafe() {
 # Untrusted task block, fenced by a per-call random tag nobody can predict.
 NONCE="$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
 [ -n "$NONCE" ] || NONCE="$RANDOM$RANDOM$$"
-FILES_NL="$(printf '%s' "$FILES" | tr ',' '\n')"
-TASK_BLOCK="$(printf '<task-%s>\nDescription: %s\nFiles:\n%s\n</task-%s>' \
-    "$NONCE" "$DESC" "$FILES_NL" "$NONCE")"
+
+# Tier-routing filter. Every judge input passes through it: the description,
+# the brief, and the file list. Case-insensitive, whole-line drop.
+strip_directives() {
+    LC_ALL=C grep -viE 'must[[:space:]]+route[[:space:]]+to|plan-architect' || true
+}
+
+DESC_JUDGE="$(printf '%s\n' "$DESC" | strip_directives)"
+BRIEF_STRIPPED="$(printf '%s\n' "$BRIEF_RAW" | strip_directives)"
+[ -n "$BRIEF_RAW" ] || BRIEF_STRIPPED=""
+
+# Paths the brief names join --files: repo-rooted tokens, trailing :line and
+# punctuation dropped, first-seen order, at most 40.
+BRIEF_PATHS="$(printf '%s\n' "$BRIEF_STRIPPED" \
+    | LC_ALL=C grep -oE '(bin|ibl5|tools|\.claude|\.github)/[A-Za-z0-9._/-]*[A-Za-z0-9_]' \
+    | awk '!seen[$0]++' | head -n 40)"
+FILES_NL="$( { printf '%s' "$FILES" | tr ',' '\n'; printf '\n%s\n' "$BRIEF_PATHS"; } \
+    | awk 'NF && !seen[$0]++' | strip_directives)"
+
+# Signals the brief states. Explicit --signals and detected ones are unioned.
+if LC_ALL=C grep -qiE 'title type[^A-Za-z0-9]{0,4}feat[:(!]' <<< "$BRIEF_STRIPPED"; then
+    SIG_FEAT=1
+fi
+if LC_ALL=C grep -qiE 'auto_merge[^A-Za-z0-9]{0,3}false' <<< "$BRIEF_STRIPPED"; then
+    SIG_AUTO=1
+fi
+
+# Cap the brief at BRIEF_MAX bytes on a line boundary, then mark the cut.
+BRIEF_BYTES="$(printf '%s' "$BRIEF_STRIPPED" | LC_ALL=C wc -c | tr -d ' ')"
+if [ "$BRIEF_BYTES" -gt "$BRIEF_MAX" ]; then
+    BRIEF_STRIPPED="$(printf '%s\n' "$BRIEF_STRIPPED" | LC_ALL=C awk -v max="$BRIEF_MAX" '
+        done { next }
+        { n = length($0) + 1
+          if (used + n > max) { if (used == 0) print substr($0, 1, max); done = 1; next }
+          print; used += n }')"
+    BRIEF_STRIPPED="$(printf '%s\n[brief truncated: first %s of %s bytes shown]' \
+        "$BRIEF_STRIPPED" "$BRIEF_MAX" "$BRIEF_BYTES")"
+fi
+
+SIGNAL_LINES=""
+[ "$SIG_FEAT" -eq 0 ] || SIGNAL_LINES="${SIGNAL_LINES}- title type feat: the PR is held for a human sign-off before merge
+"
+[ "$SIG_AUTO" -eq 0 ] || SIGNAL_LINES="${SIGNAL_LINES}- auto_merge false: an owner signs off before merge
+"
+[ "$SIG_IMPL" -eq 0 ] || SIGNAL_LINES="${SIGNAL_LINES}- plan-now --implement: the plan waits on disk for a human to read it before it is queued
+"
+TASK_BLOCK="$(printf '<task-%s>\nDescription: %s\nFiles:\n%s' "$NONCE" "$DESC_JUDGE" "$FILES_NL")"
+[ -z "$BRIEF_STRIPPED" ] || TASK_BLOCK="$(printf '%s\nBrief:\n%s' "$TASK_BLOCK" "$BRIEF_STRIPPED")"
+[ -z "$SIGNAL_LINES" ] || TASK_BLOCK="$(printf '%s\nSignals:\n%s' "$TASK_BLOCK" "${SIGNAL_LINES%
+}")"
+TASK_BLOCK="$(printf '%s\n</task-%s>' "$TASK_BLOCK" "$NONCE")"
 
 PROMPT_INTRO="$(cat <<'INTRO'
 You pick the architect tier for one /plan task in the IBL5 repo. The
@@ -177,9 +273,16 @@ Answer xhigh only when both halves hold.
 Weigh the task as a whole. Security, authorization, and destructive data
 changes are good reasons to consider xhigh. None of them decides the tier
 by itself. Count the mitigations the task states: an owner sign-off before
-merge (auto_merge: false), a fail-closed hard constraint, characterization
-tests that pin the current behavior. Each one makes a wrong plan cheaper to
+merge (auto_merge: false, or a feat: title held for human sign-off), a
+fail-closed hard constraint, characterization tests that pin the current
+behavior, and a design the brief already resolves (explicit decisions,
+scope, and out-of-scope items). Each one makes a wrong plan cheaper to
 catch and to undo.
+
+The task block holds a one-line description and the touched files. When the
+caller has them, it also holds the brief with its tier-routing lines
+removed and signal lines the caller derived. A truncation marker means the
+brief ran past the size cap.
 INTRO
 )"
 PROMPT_OUTRO="$(cat <<'OUTRO'

@@ -13,6 +13,9 @@
 # run with a null conclusion used to print as "<name> ()" (jq concatenates a
 # string with null as the empty string); it is still a failure, and is now
 # reported as "<name> (unknown)".
+#
+# ccg_settle_stuck (2026-11-02) is applied only by bin/check-pr-checks-green;
+# bin/check-master-ci-green deliberately keeps the strict ccg_pending reading.
 
 # ccg_dedupe <skip-json-array> — drop exact-name matches in $1, keep the latest
 #   run per name (sort_by(.completed_at // .started_at) | last). Input/output:

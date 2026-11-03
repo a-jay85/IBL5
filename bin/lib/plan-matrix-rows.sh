@@ -48,10 +48,7 @@ plan_matrix_rows() {
         case "$MC_NUM" in ''|'#') continue ;; esac
         type_lc=$(printf '%s' "$MC_TYPE" | tr '[:upper:]' '[:lower:]')
         # whole-cell match, optional parenthesized annotation
-        case "$type_lc" in
-            'cli-executable'|'cli executable'|'cli-executable ('*')'|'cli executable ('*')') : ;;
-            *) continue ;;
-        esac
+        [[ "$type_lc" =~ ^cli[-\ ]executable(\ *\([^\)]*\))?$ ]] || continue
         case "$MC_TIME" in *post-impl*) : ;; *) continue ;; esac
         case "$MC_WHAT" in *'(one-time-check:'*) continue ;; esac
         case "$MC_LOC" in *'post-merge:'*) continue ;; esac

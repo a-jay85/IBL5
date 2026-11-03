@@ -21,6 +21,9 @@ DRIVER="$SCRIPT_DIR/post-plan-fleet"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
 
 SCRATCH="$(mktemp -d)"
+# Pre-fire verify gate stub: these harnesses assert other post-plan-now behavior, not the gate.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/prefire-pass"; chmod +x "$SCRATCH/prefire-pass"
+export PREFIRE_VERIFY_SCRIPT="$SCRATCH/prefire-pass"
 TMP_LOGS=()
 _cleanup() { rm -rf "$SCRATCH"; [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"; h_cleanup; }
 trap _cleanup EXIT

@@ -21,6 +21,7 @@
 #   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/
 #   PREFIRE_MUTATION_CMD   default bin/mutation-diff, run from the repo root
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
+#   PREFIRE_EXCLUDES_CMD   default bin/check-infection-excludes, run from ibl5/
 
 set -uo pipefail
 
@@ -45,7 +46,7 @@ while [ $# -gt 0 ]; do
         --stage)  [ $# -ge 2 ] || die 2 "--stage needs a value"; STAGE="$2"; shift 2 ;;
         --base)   [ $# -ge 2 ] || die 2 "--base needs a ref"; BASE_OPT="$2"; shift 2 ;;
         --bypass) [ $# -ge 2 ] || die 2 "--bypass needs a reason"; BYPASS_REASON="$2"; BYPASS_SET=1; shift 2 ;;
-        -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die 2 "unknown argument '$1'" ;;
     esac
 done
@@ -203,7 +204,7 @@ resolve_base() {
     if [ -n "$BASE_OPT" ]; then
         BASE_REF="$BASE_OPT"
     elif _b=$(branch_base_resolve "$ROOT" "$(git rev-parse --abbrev-ref HEAD)") && [ -n "$_b" ]; then
-        BASE_REF="origin/$_b"
+        BASE_REF="$_b"   # branch_base_resolve already prints "origin/<name>"
     else
         BASE_REF="origin/master"
     fi
@@ -220,13 +221,11 @@ stage_infection() {
     cache_hit infection "$BASE_SHA" && return 0
     log="$STATE_DIR/$TREE.infection.log"
 
-    if [ -z "${PREFIRE_MUTATION_CMD:-}" ]; then
-        (cd ibl5 && bin/check-infection-excludes) > "$log" 2>&1; rc=$?
-        if [ "$rc" -ne 0 ]; then
-            say "FAIL infection: check-infection-excludes red (exit $rc)" >&2
-            tail -n 20 "$log" >&2
-            return 1
-        fi
+    (cd ibl5 && bash -c "${PREFIRE_EXCLUDES_CMD:-bin/check-infection-excludes}") > "$log" 2>&1; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        say "FAIL infection: check-infection-excludes red (exit $rc)" >&2
+        tail -n 20 "$log" >&2
+        return 1
     fi
 
     bash -c "$cmd \"\$1\"" _ "$BASE_REF" > "$log" 2>&1; rc=$?

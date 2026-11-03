@@ -106,6 +106,39 @@ def test_report_text_table_header_and_total_row(capsys):
     assert table == _FIXTURE_TABLE.splitlines()
 
 
+_RANGE = ("--since=2026-09-05", "--until=2026-10-31")
+
+_FIXTURE_RANGE_TABLE = """agent    total  fixed  wrong  intentional  didnt-matter  wrong+dm%
+A            1      1      0             0             0        0.0
+D            0      0      0             0             0          -
+security     0      0      0             0             0          -
+B            1      0      1             0             0      100.0
+unknown      1      1      0             0             0        0.0
+TOTAL        3      2      1             0             0       33.3"""
+
+# Master-code `--json` output for the fixture, full and ranged, captured before the
+# cycles and reverts keys existed. The existing keys must stay byte-identical.
+_FIXTURE_JSON = '{"agents": {"A": {"declined-wrong": 1, "didnt-matter": 0, "fixed": 2, "intentional": 0, "total": 3, "wrong_or_didnt_matter_share": 0.333}, "B": {"declined-wrong": 1, "didnt-matter": 1, "fixed": 0, "intentional": 0, "total": 2, "wrong_or_didnt_matter_share": 1.0}, "unknown": {"declined-wrong": 0, "didnt-matter": 0, "fixed": 1, "intentional": 0, "total": 1, "wrong_or_didnt_matter_share": 0.0}}, "since": null, "total": {"declined-wrong": 2, "didnt-matter": 1, "fixed": 3, "intentional": 0, "total": 6, "wrong_or_didnt_matter_share": 0.5}, "until": null}'
+_FIXTURE_RANGE_JSON = '{"agents": {"A": {"declined-wrong": 0, "didnt-matter": 0, "fixed": 1, "intentional": 0, "total": 1, "wrong_or_didnt_matter_share": 0.0}, "B": {"declined-wrong": 1, "didnt-matter": 0, "fixed": 0, "intentional": 0, "total": 1, "wrong_or_didnt_matter_share": 1.0}, "unknown": {"declined-wrong": 0, "didnt-matter": 0, "fixed": 1, "intentional": 0, "total": 1, "wrong_or_didnt_matter_share": 0.0}}, "since": "2026-09-05", "total": {"declined-wrong": 1, "didnt-matter": 0, "fixed": 2, "intentional": 0, "total": 3, "wrong_or_didnt_matter_share": 0.333}, "until": "2026-10-31"}'
+
+
+@pytest.mark.parametrize("extra,table,old_json", [
+    ((), _FIXTURE_TABLE, _FIXTURE_JSON),
+    (_RANGE, _FIXTURE_RANGE_TABLE, _FIXTURE_RANGE_JSON),
+])
+def test_report_corpus_matches_master_baseline(extra, table, old_json, capsys):
+    rc, out = _report(capsys, *extra)
+    assert rc == 0
+    lines = out.split("\n")
+    n = len(table.splitlines())
+    assert lines[:n] == table.splitlines()
+    assert lines[n] == ""
+    new = _json(capsys, *extra)
+    new.pop("cycles")
+    new.pop("reverts")
+    assert json.dumps(new, sort_keys=True) == old_json
+
+
 def test_report_text_lists_live_agents_with_zero_rows(capsys):
     rc, out = _report(capsys)
     assert rc == 0
@@ -185,6 +218,13 @@ def test_cycles_histogram_and_stats():
     assert c["mean"] == 2.5
     assert c["median"] == 2
     assert c["max"] == 5
+    # A PR with exactly 4 cycles lands in the 4+ bucket and a 3-cycle PR in bucket 3.
+    # The 5-cycle PR above sits in 4+ under any bound from 4 to 5, so it cannot see the bound.
+    edge = []
+    for pr, n in ((5, 3), (6, 4)):
+        for i in range(n):
+            edge.append(_p45(pr, f"2026-10-01T{10 + i:02d}:00:00Z"))
+    assert ol.build_report(edge)["cycles"]["histogram"] == {"1": 0, "2": 0, "3": 1, "4+": 1}
 
 
 def test_cycles_skip_unparseable_ts():

@@ -8,7 +8,8 @@ here proves anything.
 
 CLI (used by bin/postplan-fix):
 
-    python3 -m harness.premerge record --worktree W --branch B --pre-sha S --files-from F
+    python3 -m harness.premerge record --worktree W --branch B --pre-sha S --files-from F \\
+        [--base origin/<parent>]
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from typing import Optional
 MANIFEST_SCHEMA = 1
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
+_BASE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
 
 
 class PremergeError(Exception):
@@ -87,12 +89,15 @@ def _git(worktree: str, *args: str) -> tuple[int, str]:
 
 
 def record(worktree: str, branch: str, pre_sha: str, files: tuple[str, ...],
-           tmp_dir: str = "/tmp") -> Premerged:
-    """Validate that HEAD is the bot's merge of origin/master onto pre_sha, then write the
-    manifest and, last, the condition-(14) flag. The flag goes last so a crash between the
+           tmp_dir: str = "/tmp", base: str = "origin/master") -> Premerged:
+    """Validate that HEAD is the bot's merge of `base` (origin/master, or a stacked PR's
+    declared parent) onto pre_sha, then write the manifest and, last, the condition-(14)
+    flag. The flag goes last so a crash between the
     two leaves a manifest with no flag, which the harness still proves and reviews."""
     from .armable import record_conflict_resolution
 
+    if not _BASE.fullmatch(base) or ".." in base:
+        raise PremergeError("base is not an origin/<branch> ref")
     rc, out = _git(worktree, "rev-list", "--parents", "-n", "1", "HEAD")
     parts = out.split()
     if rc != 0 or len(parts) != 3:
@@ -100,8 +105,8 @@ def record(worktree: str, branch: str, pre_sha: str, files: tuple[str, ...],
     head_sha, parent1, parent2 = parts
     if parent1 != pre_sha:
         raise PremergeError("first parent is not --pre-sha")
-    if _git(worktree, "merge-base", "--is-ancestor", parent2, "origin/master")[0] != 0:
-        raise PremergeError("second parent is not in origin/master")
+    if _git(worktree, "merge-base", "--is-ancestor", parent2, base)[0] != 0:
+        raise PremergeError(f"second parent is not in {base}")
     if not files:
         raise PremergeError("no conflicted files")
     if not _SHA.match(head_sha) or not _SHA.match(pre_sha):
@@ -121,11 +126,13 @@ def main(argv: list[str]) -> int:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--pre-sha", required=True)
     rec.add_argument("--files-from", required=True)
+    rec.add_argument("--base", default="origin/master")
     args = parser.parse_args(argv)
     try:
         with open(args.files_from) as fh:
             files = tuple(line.strip() for line in fh if line.strip())
-        premerged = record(args.worktree, args.branch, args.pre_sha, files)
+        premerged = record(args.worktree, args.branch, args.pre_sha, files,
+                           base=args.base)
     except (PremergeError, OSError) as exc:
         sys.stderr.write(f"premerge: {exc}\n")
         return 3

@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-10-25
+last_verified: 2026-11-02
 ---
 
 # Code Review Agents (shared definitions)
@@ -35,9 +35,11 @@ End every finding with one metadata line, exactly this shape:
 - `bug class`: a short name for the defect class (`unbounded-fetch`, `missing-null-guard`, `unescaped-output`). Reuse a class name from `ibl5/docs/retrospective-class-registry.md` when one fits.
 - `other instances`: every other place in the diff with the same bug class, plus any you can see in the diff's context windows of the touched files. One review round should fix all copies. Write `none` when there are none.
 
+**Root cause (Agent A, `fix:` PRs only).** When the PR title starts with `fix:`, `fix(<scope>):`, or `fix!:`, check whether the diff changes the code that produces the wrong behavior or only hides the symptom at one site. Symptom-only shapes include a special-case guard, a clamp, a catch that swallows the error, and a test expectation edited to match the bug. When the same cause can still reach call sites the diff leaves untouched, report one finding with `bug class: root-cause` and list those sites under `other instances`. Report nothing when the diff fixes the cause, or when the PR description states why a symptom-level fix is deliberate. Skip this check on every other title. The harness copy is `ROOT_CAUSE_CHECK` in `tools/postplan-harness/harness/review.py`; edit both together.
+
 ## Agent A: Architecture + Bug Detection + DB Performance + History + Code Comments (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
 
-You are a **Senior PHP Architect and Staff Engineer** reviewing for architectural fitness, correctness bugs, database performance, regression risk from git history, and compliance with in-code guidance. Complete every section the caller enables. Sections 1 to 3 run unless the caller skips them, and Sections 4 and 5 run only when the caller's launch gate turns them on. Return a numbered evidence summary for each enabled section, even if it finds no issues.
+You are a **Senior PHP Architect and Staff Engineer** reviewing for architectural fitness, correctness bugs, database performance, regression risk from git history, and compliance with in-code guidance. Complete every section the caller enables. Sections 1 to 3 run unless the caller skips them, and Sections 4 and 5 run only when the caller's launch gate turns them on. Return a numbered evidence summary for each enabled section, even if it finds no issues. On a `fix:` PR, also run the root-cause check under Per-finding fields.
 
 ### Section 1: Architectural fitness
 

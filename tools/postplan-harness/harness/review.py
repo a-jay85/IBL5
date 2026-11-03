@@ -23,6 +23,7 @@ from .labels import REVIEW_AGENTS
 from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
+from .gate_backtest import FIX_TITLE_RE
 
 # The fan-out below keeps the purpose strings as literals, because
 # test_model_pins_match_source greps them. This keeps them in step with the one registry.
@@ -129,6 +130,24 @@ OUTPUT_CONTRACT_HEAD = "OUTPUT CONTRACT (restated at the end of this prompt):\n"
 OUTPUT_CONTRACT = "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _CONTRACT_BODY
 
 
+# Root-cause check for bug-fix PRs. Mirrors "Root cause (fix: PRs only)" in
+# .claude/review-shared/_review-agents.md; keep the two in step.
+ROOT_CAUSE_CHECK = (
+    "This PR is a bug fix (fix: title). Check the root cause: does the diff change "
+    "the code that produces the wrong behavior, or does it only hide the symptom at "
+    "one site (a special-case guard, a clamp, a catch that swallows the error, a test "
+    "expectation edited to match the bug)? When the same cause can still reach other "
+    "call sites the diff leaves untouched, report one finding with bug class "
+    "root-cause and list those sites under other instances. Report nothing when the "
+    "diff fixes the cause, or when the PR description states why a symptom-level fix "
+    "is deliberate.")
+
+
+def _is_fix_title(meta: dict) -> bool:
+    title = meta.get("title") or ""
+    return bool(FIX_TITLE_RE.match(title.strip()))
+
+
 def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo, *,
                    run_core: bool = True, run_history: bool = False,
                    run_comments: bool = False, any_files: bool = False) -> str:
@@ -151,6 +170,8 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo, *,
                 "growing tables (ibl_box_scores, ibl_players, ibl_transactions); N+1 "
                 "query loops (fetch inside foreach/while); ORDER BY/WHERE on unindexed "
                 "columns; redundant repeat queries; unindexed JOINs.")
+    if run_core and _is_fix_title(meta):
+        sections.append(ROOT_CAUSE_CHECK)
     if run_history:
         sections.append("Look for regression risk: for the "
                         + ("" if any_files else "PHP ") + "files with the most "

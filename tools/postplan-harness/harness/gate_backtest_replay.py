@@ -6,6 +6,7 @@ names) is ever shell-parsed.
 """
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -96,6 +97,88 @@ def fetch_history(gh_json, git, limit: int = HISTORY_LIMIT, exclude: int | None 
     return out
 
 
+_UNKNOWN_PATH = "?"   # a chunk whose path we cannot read; never matches "safe"
+_CHUNK_START = b"diff --git "
+
+
+def _header_path(raw: str, prefix: str) -> str | None:
+    """One path from a chunk header field: None for /dev/null, _UNKNOWN_PATH when quoted."""
+    raw = raw.rstrip("\r").rstrip("\t")
+    if raw == "/dev/null":
+        return None
+    if not raw or raw.startswith('"'):
+        return _UNKNOWN_PATH
+    if prefix:
+        if not raw.startswith(prefix):
+            return _UNKNOWN_PATH
+        raw = raw[len(prefix):]
+    return raw or _UNKNOWN_PATH
+
+
+def _chunk_paths(chunk: bytes) -> list[str]:
+    """Paths one `diff --git` chunk touches, read from its extended header only."""
+    lines = chunk.decode("utf-8", errors="replace").split("\n")
+    found: list[str | None] = []
+    for line in lines[1:]:
+        if line.startswith("@@") or line.startswith("GIT binary patch"):
+            break
+        if line.startswith("--- "):
+            found.append(_header_path(line[4:], "a/"))
+        elif line.startswith("+++ "):
+            found.append(_header_path(line[4:], "b/"))
+        else:
+            for key in ("rename from ", "rename to ", "copy from ", "copy to "):
+                if line.startswith(key):
+                    found.append(_header_path(line[len(key):], ""))
+                    break
+    paths: list[str] = []
+    for p in found:
+        if p is not None and p not in paths:
+            paths.append(p)
+    if paths:
+        return paths
+    if found:
+        return [_UNKNOWN_PATH]
+    # Binary or mode-only chunk: only the `diff --git a/X b/X` line names the file.
+    rest = lines[0][len("diff --git "):].rstrip("\r")
+    n = (len(rest) - 5) // 2
+    name = rest[2:2 + n] if n > 0 else ""
+    if name and not rest.startswith('"') and rest == f"a/{name} b/{name}":
+        return [name]
+    return [_UNKNOWN_PATH]
+
+
+def _split_patch(patch: bytes) -> list[tuple[bytes, list[str]]]:
+    """Split a `git diff --binary` patch into per-file chunks, each with the paths it touches.
+
+    A chunk starts at a column-0 `diff --git ` line. Paths come from `--- a/`, `+++ b/`,
+    `rename from/to`, and `copy from/to` lines (`/dev/null` dropped, a trailing tab stripped).
+    A chunk with none of those (binary, mode-only) falls back to `diff --git a/X b/X` when
+    both halves are equal. A quoted path, or a chunk with no readable path, yields
+    _UNKNOWN_PATH so the fail-closed check can never treat it as unread.
+    """
+    lines = patch.split(b"\n")
+    starts = [i for i, line in enumerate(lines) if line.startswith(_CHUNK_START)]
+    if not starts:
+        return []
+    chunks: list[tuple[bytes, list[str]]] = []
+    for k, begin in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(lines)
+        body = b"\n".join(lines[begin:end])
+        if end < len(lines):
+            body += b"\n"
+        chunks.append((body, _chunk_paths(body)))
+    return chunks
+
+
+def partial_fix_allowed(reads: tuple[str, ...], skipped: list[str]) -> bool:
+    """True only when reads is declared and no skipped path is unknown or matches a reads glob."""
+    if not reads:
+        return False
+    return not any(p == _UNKNOWN_PATH or any(fnmatch.fnmatchcase(p, g) for g in reads)
+                   for p in skipped)
+
+
 class ScratchTree:
     """One detached worktree in system temp, reused across SHAs and removed on every exit."""
 
@@ -138,6 +221,24 @@ class ScratchTree:
         proc = subprocess.run(["git", *_GIT_QUIET, "-C", self.dir, "apply", "--binary",
                                "--whitespace=nowarn", "-"], input=patch, capture_output=True)
         return proc.returncode == 0
+
+    def apply_patch_per_file(self, patch: bytes) -> tuple[list[str], list[str]]:
+        """Apply the whole patch; if that fails, apply each file's chunk alone.
+
+        Returns (applied paths, skipped paths). A skipped chunk leaves its files untouched,
+        because each git apply call is all-or-nothing.
+        """
+        chunks = _split_patch(patch)
+        every = [p for _, paths in chunks for p in paths] or [_UNKNOWN_PATH]
+        if self.apply_patch(patch):
+            return every, []
+        if not chunks:
+            return [], [_UNKNOWN_PATH]
+        applied: list[str] = []
+        skipped: list[str] = []
+        for chunk, paths in chunks:
+            (applied if self.apply_patch(chunk) else skipped).extend(paths or [_UNKNOWN_PATH])
+        return applied, skipped
 
     def remove(self, files) -> None:
         """Delete each path from the tree. A path that is already absent is fine."""
@@ -325,16 +426,21 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                             finally:
                                 scratch.overlay(overlay_files)
                     fix_outcome = fix_detail = ""
+                    fix_applied: list[str] = []
+                    fix_skipped: list[str] = []
                     if outcome == "flag" and base_outcome != "flag" and fix_patch is not None:
                         if clock() - start >= total_cap:
                             fix_outcome, fix_detail = "timeout", "total-cap"
                         else:
                             try:
-                                if scratch.apply_patch(fix_patch):
+                                fix_applied, fix_skipped = scratch.apply_patch_per_file(fix_patch)
+                                if fix_skipped and not fix_applied:
+                                    fix_outcome = "no-apply"
+                                elif fix_skipped and not partial_fix_allowed(spec.reads, fix_skipped):
+                                    fix_outcome = "partial-no-reads" if not spec.reads else "partial-gate-read"
+                                else:
                                     scratch.overlay(overlay_files)
                                     fix_outcome, fix_detail = execute(spec, ctx, gate.path)
-                                else:
-                                    fix_outcome = "no-apply"
                             except OSError as exc:
                                 fix_outcome = "error"
                                 fix_detail = re.sub(r"\s+", " ", f"fix-overlay: {exc}")[:160]

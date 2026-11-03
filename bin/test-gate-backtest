@@ -186,6 +186,22 @@ NEEDS_MARKER_GATE="${HEADER_GATE_HEAD}"'if ! grep -q "^candidate marker$" src/fx
 fi
 exit 0
 '
+# Partial-apply gates: both pass once config/required.txt exists. The second declares
+# src/fx6.txt as read without checking it, so only the declaration decides its verdict.
+READS_CONFIG_GATE="${HEADER_GATE_HEAD}"'# gate-backtest-reads: config/*
+if [ ! -f config/required.txt ]; then
+    echo "missing config/required.txt"
+    exit 1
+fi
+exit 0
+'
+READS_CONFIG_AND_FX6_GATE="${HEADER_GATE_HEAD}"'# gate-backtest-reads: config/* src/fx6.txt
+if [ ! -f config/required.txt ]; then
+    echo "missing config/required.txt"
+    exit 1
+fi
+exit 0
+'
 
 # Six settled clean PRs, each touching only its own src/fx<N>.txt; none creates
 # config/required.txt.
@@ -211,7 +227,26 @@ setup_fx() {
 candidate marker
 "
     commit_in "$FX" "chore: gate needs marker" bin/check-needs-marker "$NEEDS_MARKER_GATE" 755
+
+    # Partial-apply candidates: config/required.txt applies on every old tree, the
+    # src/fx6.txt edit fails on #1-#5 (their trees lack the file).
+    fx_partial_candidate cand-fix-partial bin/check-reads-config "$READS_CONFIG_GATE"
+    fx_partial_candidate cand-fix-partial-read-skip bin/check-reads-config-fx6 \
+        "$READS_CONFIG_AND_FX6_GATE"
+    fx_partial_candidate cand-fix-partial-noreads bin/check-needs-required-noreads \
+        "$NEEDS_REQUIRED_GATE"
     git -C "$FX" checkout -q master
+}
+
+# fx_partial_candidate <branch> <gate path> <gate body>
+fx_partial_candidate() {
+    fx_candidate "$1"
+    commit_in "$FX" "chore: add required config" config/required.txt "required
+"
+    commit_in "$FX" "chore: mark fx6" src/fx6.txt "6
+candidate marker
+"
+    commit_in "$FX" "chore: add gate" "$2" "$3" 755
 }
 
 # fx_candidate <branch> — start a candidate branch at the master tip.
@@ -447,6 +482,50 @@ case_fixed_by_pr_patch_conflict_holds() {
         ok "fixed-by-pr-patch-conflict-holds"
     else
         fail "fixed-by-pr-patch-conflict-holds (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+# The whole patch fails on #1-#5, but the per-file apply lands config/required.txt (the
+# file the gate reads) and skips only src/fx6.txt, so every PR is fixed by the candidate.
+case_fixed_by_pr_partial_gate_file_applied() {
+    setup_fx
+    run_fx cand-fix-partial
+    local states
+    states=$(grep -c 'gate-backtest-state:' <<< "$OUT")
+    if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#1" && has "$OUT" "#6" \
+        && ! has "$OUT" "- False flags:" && [ "$states" -eq 1 ]; then
+        ok "fixed-by-pr-partial-gate-file-applied"
+    else
+        fail "fixed-by-pr-partial-gate-file-applied (rc=$RC, states=$states, out=$OUT, err=$ERR)"
+    fi
+}
+
+# The gate declares src/fx6.txt as read, and that file was skipped on #1-#5, so the
+# partial apply earns no credit there.
+case_fixed_by_pr_partial_gate_file_failed() {
+    setup_fx
+    run_fx cand-fix-partial-read-skip
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
+        && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6"; then
+        ok "fixed-by-pr-partial-gate-file-failed"
+    else
+        fail "fixed-by-pr-partial-gate-file-failed (rc=$RC, out=$OUT, err=$ERR)"
+    fi
+}
+
+# No reads declaration: the harness cannot tell which files the gate reads, so a partial
+# apply is never credited.
+case_fixed_by_pr_partial_no_reads_holds() {
+    setup_fx
+    run_fx cand-fix-partial-noreads
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
+        && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6"; then
+        ok "fixed-by-pr-partial-no-reads-holds"
+    else
+        fail "fixed-by-pr-partial-no-reads-holds (rc=$RC, out=$OUT, err=$ERR)"
     fi
 }
 
@@ -690,13 +769,16 @@ case_destructive_bypass_body_replay() {
     fi
 }
 
-CASES="noisy-gate-holds fixed-by-pr-base-predates-fix fixed-by-pr-patch-conflict-holds fixed-by-pr-armable-mirror quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
+CASES="noisy-gate-holds fixed-by-pr-base-predates-fix fixed-by-pr-patch-conflict-holds fixed-by-pr-partial-gate-file-applied fixed-by-pr-partial-gate-file-failed fixed-by-pr-partial-no-reads-holds fixed-by-pr-armable-mirror quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
 
 run_case() {
     case "$1" in
         noisy-gate-holds) case_noisy_gate_holds ;;
         fixed-by-pr-base-predates-fix) case_fixed_by_pr_base_predates_fix ;;
         fixed-by-pr-patch-conflict-holds) case_fixed_by_pr_patch_conflict_holds ;;
+        fixed-by-pr-partial-gate-file-applied) case_fixed_by_pr_partial_gate_file_applied ;;
+        fixed-by-pr-partial-gate-file-failed) case_fixed_by_pr_partial_gate_file_failed ;;
+        fixed-by-pr-partial-no-reads-holds) case_fixed_by_pr_partial_no_reads_holds ;;
         fixed-by-pr-armable-mirror) case_fixed_by_pr_armable_mirror ;;
         quiet-gate-clears) case_quiet_gate_clears ;;
         non-gate-zero-cost) case_non_gate_zero_cost ;;

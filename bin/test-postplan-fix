@@ -27,6 +27,9 @@
 #      that moves again before the restore is left as is (compare-and-swap); an own ref
 #      the session deleted is restored and one it created is removed. A sibling ref
 #      under the own remote ref's name does not abort the run.
+#      headless-stacked-base: a branch whose iblBase names a pushed parent merges that parent,
+#      not master. headless-stacked-unresolved: an iblBase no layer resolves prints
+#      result=gave-up-base, exits 1, and leaves HEAD alone.
 #      Each prints one "case ok headless-<name>" line.
 #
 # Run: bin/test-postplan-fix [--case NAME]...  (exit 0 = all pass, 1 = a case failed)
@@ -78,6 +81,8 @@ RUNLOG="$TMP/runlog"; mkdir -p "$RUNLOG"
 export POSTPLAN_LOG_DIR="$RUNLOG"   # read by bin/postplan-fix; keeps /tmp clean
 PNLOG="$RUNLOG/post-plan-now-$B_BLOCK-20261008-120001-9.log"
 trap 'rm -rf "$TMP"' EXIT
+# The unstacked cases resolve their merge target to origin/master with no real gh call.
+export BRANCH_BASE_OFFLINE=1
 
 has()   { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1" "missing '$3'" ;; esac; }
 hasnt() { case "$2" in *"$3"*) fail "$1" "unexpected '$3'" ;; *) ok "$1" ;; esac; }
@@ -123,6 +128,28 @@ git -C "$MAIN" push -q origin master
 git -C "$MAIN" worktree add -q -b "$B_CLEAN" "$TMP/wt-$B_CLEAN" master
 # A pre-existing remote-tracking ref for the moved-ref case to disturb.
 git -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$INIT_SHA"
+# Stacked fixture: stackparent is on origin, B_STACK is cut from it with iblBase recorded.
+# Then stackparent gains a conflicting a.txt commit and master gains an unrelated commit,
+# so a merge of the declared parent conflicts while a merge of master would not.
+B_STACK="pfx$$-stack"
+git -C "$MAIN" worktree add -q -b stackparent "$TMP/wt-stackparent" "$INIT_SHA"
+printf 'parent base\n' > "$TMP/wt-stackparent/p.txt"
+git -C "$TMP/wt-stackparent" add p.txt
+"${GITC[@]}" -C "$TMP/wt-stackparent" commit -qm parent-base
+git -C "$TMP/wt-stackparent" push -q origin stackparent
+git -C "$MAIN" worktree add -q -b "$B_STACK" "$TMP/wt-$B_STACK" stackparent
+git -C "$MAIN" config "branch.$B_STACK.iblBase" stackparent
+printf 'feature\n' > "$TMP/wt-$B_STACK/a.txt"
+git -C "$TMP/wt-$B_STACK" add a.txt
+"${GITC[@]}" -C "$TMP/wt-$B_STACK" commit -qm stack-feature
+printf 'parent\n' > "$TMP/wt-stackparent/a.txt"
+git -C "$TMP/wt-stackparent" add a.txt
+"${GITC[@]}" -C "$TMP/wt-stackparent" commit -qm parent-change
+git -C "$TMP/wt-stackparent" push -q origin stackparent
+printf 'other\n' > "$MAIN/m2.txt"
+git -C "$MAIN" add m2.txt
+"${GITC[@]}" -C "$MAIN" commit -qm master-unrelated
+git -C "$MAIN" push -q origin master
 
 OUT="$MAIN/tools/postplan-harness/out"
 JSON_OUT="$TMP/wt-$B_JSON/tools/postplan-harness/out"
@@ -649,6 +676,44 @@ need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fi
 need "no manifest" test ! -e "/tmp/postplan-premerged-$B_CLEAN.json"
 need "no flag" test ! -e "/tmp/postplan-conflict-resolved-$B_CLEAN"
 case_end headless-result-clean
+fi
+
+# Stacked branch: the rescue merges the declared parent and leaves master out.
+stack_reset() {
+    git -C "$WTS" merge --abort >/dev/null 2>&1 || true
+    git -C "$WTS" reset -q --hard "$STIP"
+    git -C "$WTS" clean -fdq
+    git -C "$MAIN" config "branch.$B_STACK.iblBase" "${1:-stackparent}"
+    rm -f "/tmp/postplan-premerged-$B_STACK.json" "/tmp/postplan-conflict-resolved-$B_STACK"
+    unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR
+}
+WTS="$TMP/wt-$B_STACK"
+STIP=$(git -C "$WTS" rev-parse HEAD)
+
+if should_run "headless-stacked-base"; then
+stack_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+run_fix "$SUT" --headless "$B_STACK"
+S_PARENT=$(git -C "$WTS" rev-parse refs/remotes/origin/stackparent)
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "merge commit parents" test "$(git -C "$WTS" log -1 --format='%P' HEAD)" = "$STIP $S_PARENT"
+need "master is not an ancestor" test ! "$(git -C "$WTS" merge-base --is-ancestor refs/remotes/origin/master HEAD && echo yes)" = yes
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=committed"
+stack_reset
+case_end headless-stacked-base
+fi
+
+if should_run "headless-stacked-unresolved"; then
+stack_reset gone
+run_fix "$SUT" --headless "$B_STACK"
+need "rc 1" test "$RC" = 1
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=gave-up-base"
+need "stderr names the fix" has_s "$ERR" "git config branch."
+need "HEAD unchanged" test "$(git -C "$WTS" rev-parse HEAD)" = "$STIP"
+need "no merge started" test ! -e "$WTS/.git" -o -z "$(git -C "$WTS" rev-parse -q --verify MERGE_HEAD 2>/dev/null)"
+need "no stub call" no_args
+stack_reset
+case_end headless-stacked-unresolved
 fi
 
 if should_run "headless-record-failure-resets"; then

@@ -37,6 +37,16 @@ TSBASE="tpc$$"
 
 _cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; h_cleanup; }
 trap _cleanup EXIT
+# Real-agents-dir leak guard (same idea as unit 1's guard in bin/test-plan-now,
+# scoped to the three launchers converted in this unit). Captured before any
+# HOME override; compared at the end of the file.
+REAL_AGENTS="$HOME/Library/LaunchAgents"
+real_agents_names() {
+    find "$REAL_AGENTS" -maxdepth 1 -type f \
+        \( -name 'com.ibl5.docfix-run-*' -o -name 'com.ibl5.pr-cycle-*' \
+           -o -name 'com.ibl5.postplan-faildm-*' \) 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$SCRATCH/usage"
 
 CASE_BASE=0
@@ -193,6 +203,9 @@ if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
         printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
         i=\$((i + 1))
     done
+fi
+if [[ "\${1:-}" == "submit" && -f "$SCRATCH/launchctl.submit_rc" ]]; then
+    exit "\$(cat "$SCRATCH/launchctl.submit_rc")"
 fi
 exit 0
 LC_EOF
@@ -434,7 +447,7 @@ reset_state() {
     rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
     rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
-    rm -f "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-cycle-*.plist 2>/dev/null
+    rm -f "$SCRATCH/launchctl.submit_rc"
     clear_live_labels
     : > "$SCRATCH/attack.argv"; : > "$SCRATCH/ready.argv"
     : > "$SCRATCH/triage.argv"; : > "$SCRATCH/dm.argv"
@@ -456,7 +469,7 @@ run_in() {
     [[ -n "${USLEEP+x}" ]]    && extra+=("PR_CYCLE_UNKNOWN_SLEEP=$USLEEP")
     [[ -n "${DIRTYRES+x}" ]]  && extra+=("PR_CYCLE_DIRTY_RESERVE=$DIRTYRES")
     ERR="$SCRATCH/last.err"
-    OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
+    OUT="$(cd "$cwd" && env -u LAUNCHCTL_CMD HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
         PR_CYCLE_TRIAGE_CMD="$BIN/triage" \
         PR_CYCLE_READY_CMD="$BIN/ready" \
@@ -1447,7 +1460,7 @@ run
 BARE="$OUT"
 [[ "$(calls ready)" == "0" ]] || fail "dry run made $(calls ready) ready calls, want 0"
 [[ "$(arm_calls)" == "0" ]] || fail "dry run made $(arm_calls) arm calls, want 0"
-grep -qF 'bootstrap' "$SCRATCH/launchctl.argv" && fail "dry run bootstrapped a job"
+grep -qE '^(submit|bootstrap) ' "$SCRATCH/launchctl.argv" && fail "dry run launched a job"
 grep -qF 'stage 1 would ready (1): #101' <<< "$BARE" \
     || fail "dry run did not report 'stage 1 would ready (1): #101'"
 grep -qF 'would run: post-plan-fleet --pr-list 101 --jobs 3 --go --wait' <<< "$BARE" \
@@ -1468,19 +1481,36 @@ if should_run "case 21/22/23 artifacts"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}1"
-PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
 RUNNER="/tmp/pr-cycle-$TSPIN.sh"
-rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$PLIST"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 [[ $RC -eq 0 ]] || fail "--go (dry launch) exit $RC, want 0"
-[[ -f "$PLIST" ]] || fail "no plist at $PLIST"
-grep -qF "<string>com.ibl5.pr-cycle-$TSPIN</string>" "$PLIST" || fail "plist Label wrong"
-grep -qF '<key>KeepAlive</key><false/>' "$PLIST" || fail "plist KeepAlive is not false"
-[[ "$(grep -c "<string>/tmp/pr-cycle-$TSPIN.log</string>" "$PLIST")" == "2" ]] \
-    || fail "plist stdout/stderr paths do not both point at the printed log"
-grep -qF '/usr/bin' "$PLIST" || fail "plist PATH lacks /usr/bin"
-grep -qF '${' "$PLIST" && fail "plist has an unexpanded \${...} sequence"
-grep -qF '<string></string>' "$PLIST" && fail "plist has an empty <string></string> value"
+_outer_base=$CASE_BASE
+begin_case
+grep -qF "DRY(submit) pr-cycle: runner=/tmp/pr-cycle-$TSPIN.sh log=/tmp/pr-cycle-$TSPIN.log" <<< "$OUT" \
+    || fail "prcycle_dry_submit_argv: no DRY(submit) line"
+_sub_line="$(grep -F "launchctl submit -l com.ibl5.pr-cycle-$TSPIN -o /tmp/pr-cycle-$TSPIN.log -e /tmp/pr-cycle-$TSPIN.log" <<< "$OUT" || true)"
+[[ -n "$_sub_line" ]] || fail "prcycle_dry_submit_argv: no printed launchctl submit argv"
+[[ "$_sub_line" == "launchctl submit -l "* ]] || fail "prcycle_dry_submit_argv: submit line does not start with launchctl submit -l"
+grep -qF "HOME=$SCRATCH" <<< "$_sub_line" || fail "prcycle_dry_submit_argv: submit line lacks HOME=$SCRATCH"
+grep -qF '/usr/bin' <<< "$_sub_line" || fail "prcycle_dry_submit_argv: submit line PATH lacks /usr/bin"
+grep -qF '${' <<< "$_sub_line" && fail "prcycle_dry_submit_argv: submit line has an unexpanded \${...} sequence"
+grep -qE '^submit ' "$SCRATCH/launchctl.argv" && fail "prcycle_dry_submit_argv: dry run really called launchctl submit"
+[[ -z "$(find "$SCRATCH" -name 'com.ibl5.pr-cycle-*.plist')" ]] || fail "prcycle_dry_submit_argv: a plist was written"
+_rm_ln="$(grep -nF 'rm -f "$RUNNER"' "$RUNNER" | head -n 1 | cut -d: -f1)"
+_cd_ln="$(grep -nF 'cd "$ROOT" || exit 1' "$RUNNER" | head -n 1 | cut -d: -f1)"
+[[ -n "$_rm_ln" && -n "$_cd_ln" && "$_rm_ln" -lt "$_cd_ln" ]] \
+    || fail "prcycle_dry_submit_argv: runner does not self-delete before the cd (rm line '$_rm_ln', cd line '$_cd_ln')"
+grep -qF 'launchctl' "$RUNNER" && fail "prcycle_dry_submit_argv: runner still mentions launchctl"
+grep -qF 'PLIST' "$RUNNER" && fail "prcycle_dry_submit_argv: runner still mentions PLIST"
+end_case "prcycle_dry_submit_argv"
+begin_case
+[[ ! -e "$SCRATCH/Library/LaunchAgents" ]] \
+    || fail "prcycle_no_tmp_residue: $SCRATCH/Library/LaunchAgents exists after a dry launch"
+[[ -z "$(find "$SCRATCH" -name '*.plist' 2>/dev/null)" ]] \
+    || fail "prcycle_no_tmp_residue: a plist exists under the scratch HOME"
+end_case "prcycle_no_tmp_residue"
+CASE_BASE=$_outer_base
 grep -qF "log=/tmp/pr-cycle-$TSPIN.log" <<< "$OUT" || fail "--go did not print the log path"
 
 [[ -x "$RUNNER" ]] || fail "runner not executable"
@@ -1503,32 +1533,89 @@ _rv_jobs="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
 [[ "$_rv_jobs" == "3" ]] || fail "runner JOBS='$_rv_jobs', want 3"
 ! grep -q 'PR_CYCLE_POLL_' "$RUNNER" || fail "runner still exports PR_CYCLE_POLL_ vars"
 
-rm -f "$RUNNER" "$PLIST"
+rm -f "$RUNNER"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --max-ready 4 --jobs 2
 _rv_mr4="$(bash -c "$(grep -m1 '^MAX_READY=' "$RUNNER"); printf '%s' \"\$MAX_READY\"")"
 _rv_j2="$(bash -c "$(grep -m1 '^JOBS=' "$RUNNER"); printf '%s' \"\$JOBS\"")"
 [[ "$_rv_mr4" == "4" ]] || fail "--max-ready 4: runner MAX_READY='$_rv_mr4', want 4"
 [[ "$_rv_j2" == "2" ]] || fail "--jobs 2: runner JOBS='$_rv_j2', want 2"
 
-rm -f "$RUNNER" "$PLIST"
+rm -f "$RUNNER"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --no-dm
 grep -qF "NO_DM=1" "$RUNNER" || fail "--no-dm did not reach the runner"
 
-# 23a — artifact collision refuses without writing a plist
-rm -f "$PLIST"
+# 23a — artifact collision refuses before reaching launch
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 [[ $RC -eq 1 ]] || fail "runner collision: exit $RC, want 1"
-[[ ! -e "$PLIST" ]] || fail "runner collision still wrote a plist"
+grep -qF 'DRY(submit)' <<< "$OUT" && fail "runner collision still reached launch"
 
 # 23b — a pre-existing stop file refuses
-rm -f "$RUNNER" "$PLIST"
+rm -f "$RUNNER"
 : > "$SCRATCH/.ibl5-pr-cycle.stop"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 [[ $RC -eq 1 ]] || fail "stop file present: exit $RC, want 1"
 [[ -e "$SCRATCH/.ibl5-pr-cycle.stop" ]] || fail "the driver removed the stop file"
-rm -f "$SCRATCH/.ibl5-pr-cycle.stop" "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+rm -f "$SCRATCH/.ibl5-pr-cycle.stop" "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "case 21/22/23 artifacts"
+fi
+
+# --- prcycle_submit_launch: a real (non-dry) --go submits exactly once ---------------------
+if should_run "prcycle_submit_launch"; then
+begin_case
+reset_state
+TSPIN="${TSBASE}5"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "prcycle_submit_launch: --go exit $RC, want 0"
+[[ "$(grep -c "^submit -l com.ibl5.pr-cycle-$TSPIN " "$SCRATCH/launchctl.argv")" == "1" ]] \
+    || fail "prcycle_submit_launch: want exactly one 'submit -l com.ibl5.pr-cycle-$TSPIN ' line in launchctl.argv"
+grep -qF "pr-cycle started: label=com.ibl5.pr-cycle-$TSPIN" <<< "$OUT" \
+    || fail "prcycle_submit_launch: no 'pr-cycle started' line"
+[[ -n "$(find "$RUNNER" -perm 700 2>/dev/null)" ]] || fail "prcycle_submit_launch: runner is missing or not mode 700"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+unset TSPIN
+end_case "prcycle_submit_launch"
+fi
+
+# --- prcycle_submit_fail_cleans: a failed submit removes the runner and exits 1 ------------
+if should_run "prcycle_submit_fail_cleans"; then
+begin_case
+reset_state
+TSPIN="${TSBASE}6"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+echo 7 > "$SCRATCH/launchctl.submit_rc"
+TSPIN="$TSPIN" run --go
+[[ $RC -eq 1 ]] || fail "prcycle_submit_fail_cleans: --go exit $RC, want 1"
+grep -qF 'launchctl submit failed (rc 7)' "$ERR" || fail "prcycle_submit_fail_cleans: stderr lacks 'launchctl submit failed (rc 7)'"
+[[ ! -e "/tmp/pr-cycle-$TSPIN.sh" ]] || fail "prcycle_submit_fail_cleans: runner left behind"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/launchctl.submit_rc"
+unset TSPIN
+end_case "prcycle_submit_fail_cleans"
+fi
+
+# --- prcycle_runner_selfdeletes: the runner deletes itself even when its cd fails ----------
+if should_run "prcycle_runner_selfdeletes"; then
+begin_case
+reset_state
+TSPIN="${TSBASE}7"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "prcycle_runner_selfdeletes: dry --go exit $RC, want 0"
+sed -E 's|^ROOT=.*|ROOT=/nonexistent-prcycle-dir|' "$RUNNER" > "$SCRATCH/runner-copy.sh"
+_argv_before="$(wc -l < "$SCRATCH/launchctl.argv" | tr -d ' ')"
+_rc_copy=0
+bash "$SCRATCH/runner-copy.sh" >/dev/null 2>&1 || _rc_copy=$?
+[[ "$_rc_copy" == "1" ]] || fail "prcycle_runner_selfdeletes: runner copy exit $_rc_copy, want 1"
+[[ ! -e "$RUNNER" ]] || fail "prcycle_runner_selfdeletes: original runner not deleted"
+[[ "$(wc -l < "$SCRATCH/launchctl.argv" | tr -d ' ')" == "$_argv_before" ]] \
+    || fail "prcycle_runner_selfdeletes: runner called launchctl"
+rm -f "$RUNNER" "$SCRATCH/runner-copy.sh" "/tmp/pr-cycle-$TSPIN.log"
+unset TSPIN
+end_case "prcycle_runner_selfdeletes"
 fi
 
 # ==========================================================================================
@@ -1694,16 +1781,15 @@ if should_run "case 27f --go propagates the scope"; then
 begin_case
 reset_state
 TSPIN="${TSBASE}2"
-PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
 RUNNER="/tmp/pr-cycle-$TSPIN.sh"
-rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$PLIST"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 [[ $RC -eq 0 ]] || fail "--go (no scope) exit $RC, want 0"
 grep -qF "ONLY=''" "$RUNNER" || fail "runner ONLY not empty by default"
 grep -qF "SKIP=''" "$RUNNER" || fail "runner SKIP not empty by default"
 
-rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --only '#101,#102'
 [[ $RC -eq 0 ]] || fail "--go --only exit $RC, want 0"
 bash -n "$RUNNER" || fail "runner does not parse after --only"
@@ -1714,11 +1800,11 @@ runner_var() {  # $1 = variable name; evaluate the runner's own %q-quoted assign
     || fail "runner ONLY is '$(runner_var ONLY)', want the normalized 101,102"
 grep -qF -- '${ONLY:+--only $ONLY}' "$RUNNER" || fail "runner does not pass --only to the worker"
 
-rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --skip 103
 [[ "$(runner_var SKIP)" == "103" ]] || fail "runner SKIP is '$(runner_var SKIP)', want 103"
 grep -qF -- '${SKIP:+--skip $SKIP}' "$RUNNER" || fail "runner does not pass --skip to the worker"
-rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "case 27f --go propagates the scope"
 fi
@@ -3946,11 +4032,11 @@ PR_CYCLE_SKIP_NOTES="$SCRATCH/notes dir/in.tsv" PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TS
 grep -qF 'export PR_CYCLE_SKIP_NOTES=' "$RUNNER" || fail "launcher-exports-skip-notes: runner lacks the export"
 _seam="$(bash -c "$(grep -m1 '^export PR_CYCLE_SKIP_NOTES=' "$RUNNER"); printf '%s' \"\$PR_CYCLE_SKIP_NOTES\"")"
 [[ "$_seam" == "$SCRATCH/notes dir/in.tsv" ]] || fail "launcher-exports-skip-notes: runner holds '$_seam'"
-rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
 [[ $RC -eq 0 ]] || fail "launcher-exports-skip-notes unset: --go exit $RC, want 0"
 grep -qxF "export PR_CYCLE_SKIP_NOTES=''" "$RUNNER" || fail "launcher-exports-skip-notes: unset var not baked as ''"
-rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "case launcher-exports-skip-notes"
 fi
@@ -4104,7 +4190,7 @@ grep -qF 'export PR_CYCLE_RESULT_FILE=' "$RUNNER" \
 _seam="$(bash -c "$(grep -m1 '^export PR_CYCLE_RESULT_FILE=' "$RUNNER"); printf '%s' \"\$PR_CYCLE_RESULT_FILE\"")"
 [[ "$_seam" == "$SCRATCH/res dir/out.tsv" ]] \
     || fail "launch-passes-result-file-seam: runner holds '$_seam'"
-rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log"
 unset TSPIN
 end_case "launch-passes-result-file-seam"
 fi
@@ -4404,4 +4490,11 @@ fi
 
 # --- summary --------------------------------------------------------------------------------
 check_only_cases
+REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
+if [ -n "$REAL_AGENTS_NEW" ]; then
+    echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"
+    exit 1
+fi
+echo "PASS real-agents-guard"
+
 h_done

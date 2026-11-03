@@ -1673,7 +1673,7 @@ runner_last=$(grep -v '^[[:space:]]*#' "$gen_runner" 2>/dev/null | grep -v '^[[:
     || fail "runner ends with notify (last code line: $runner_last)"
 cd_ln=$(grep -nF 'cd "$ROOT" || exit 1' "$gen_runner" | head -1 | cut -d: -f1)
 path_ln=$(grep -n 'export PATH=' "$gen_runner" | head -1 | cut -d: -f1)
-run_ln=$(grep -nF 'timeout "$RUN_TIMEOUT"' "$gen_runner" | head -1 | cut -d: -f1)
+run_ln=$(grep -nF 'claude_call "$RUN_TIMEOUT"' "$gen_runner" | head -1 | cut -d: -f1)
 if [ -n "$cd_ln" ] && [ -n "$path_ln" ] && [ -n "$run_ln" ] \
     && [ "$cd_ln" -gt "$path_ln" ] && [ "$cd_ln" -lt "$run_ln" ]; then
     ok "cd ROOT precedes the first repo command"
@@ -1842,7 +1842,7 @@ R10_RESUME_NEXT=$(grep -A1 -x -- '--resume' "$TMP/r10_argv.txt" 2>/dev/null | ta
 want_no "R-10 argv no --session-id"       "$R10_ARGV" "--session-id"
 # -p value contains the continue-msg phrase, not the fresh-run coda
 R10_P_LINE=$(grep -A1 -x -- '-p' "$TMP/r10_argv.txt" 2>/dev/null | tail -1)
-want    "R-10 -p has cut off before it finished" "$R10_P_LINE" "cut off before it finished"
+want    "R-10 -p says the turn ended before the plan was finished" "$R10_P_LINE" "ended before the plan was finished"
 want_no "R-10 -p no Headless run constraints"    "$R10_P_LINE" "Headless run constraints"
 want    "R-10 -p still offers the NO_PLAN: ending" "$R10_P_LINE" "exactly: NO_PLAN:"
 # runner stdout confirms session/run identity
@@ -1962,6 +1962,64 @@ OUTPUT=$(AR_RUNNER_EDIT='s/^RESUME_FROM=.*/RESUME_FROM=20261102-000000-1/' \
 OUTPUT=$(run_case_resume early "$NOOUTLINE_DRAFT" "$AR_SLUG")
 [ "$(ar_calls)" = 1 ] && ok "AR-N6 no outline: one call" || fail "AR-N6 no outline: one call (got $(ar_calls))"
 [ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N6 no auto-resume line" || fail "AR-N6 no auto-resume line"
+
+# AR-1 an early exit resumes once and the resumed run finishes the plan.
+OUTPUT=$(DISP=--queue AR_R_PLAN="$PLANS/$AR_SLUG.md" AR_R_TAIL="PLAN_FILE: $PLANS/$AR_SLUG.md" \
+    AR_PLAN_SRC="$GOOD_PLAN" run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 2 ] && ok "AR-1 two calls" || fail "AR-1 two calls (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 1 ] && ok "AR-1 one auto-resume line" || fail "AR-1 one auto-resume line"
+[ "$(grep -cx -- '--resume' "$AR_ARGV")" = 1 ] && ok "AR-1 only call 2 resumed" || fail "AR-1 only call 2 resumed"
+[ "$(grep -c 'Continue exactly where you stopped' "$AR_ARGV")" = 1 ] \
+    && ok "AR-1 call 2 prompt is CONTINUE_MSG" || fail "AR-1 call 2 prompt is CONTINUE_MSG"
+[ "$(grep -c 'request only the missing sections' "$AR_ARGV")" = 1 ] \
+    && ok "AR-1 CONTINUE_MSG carries the part-written-draft sentence" || fail "AR-1 CONTINUE_MSG carries the part-written-draft sentence"
+want_no "AR-1 no recovery A line" "$OUTPUT" "plan-now: recovery A"
+want "AR-1 resumed plan reaches RESULT ok" "$OUTPUT" "plan-now: RESULT ok — plan written and check-plan PASSED."
+want "AR-1 resumed plan is queued" "$OUTPUT" "queued for automouse"
+[ "$(printf '%s\n' "$OUTPUT" | grep -cE '^plan-now: auto-resume — claude exited 0 with no PLAN_FILE:/NO_PLAN: line and draft sections 1/3; resuming session [^ ]+ once with [0-9]+s left\.$')" = 1 ] \
+    && ok "AR-1 full auto-resume log line" || fail "AR-1 full auto-resume log line"
+
+# AR-2 the resumed run also ends early: never a third call, recovery A runs after.
+OUTPUT=$(AR_R_TAIL="Still waiting on section 3." run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 2 ] && ok "AR-2 two calls, never three" || fail "AR-2 two calls, never three (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 1 ] && ok "AR-2 one auto-resume line" || fail "AR-2 one auto-resume line"
+want "AR-2 recovery A still runs" "$OUTPUT" "plan-now: recovery A"
+AR2_RESUME_LN=$(printf '%s\n' "$OUTPUT" | grep -n '^plan-now: auto-resume' | head -1 | cut -d: -f1)
+AR2_REC_LN=$(printf '%s\n' "$OUTPUT" | grep -n '^plan-now: recovery A' | head -1 | cut -d: -f1)
+[ -n "$AR2_RESUME_LN" ] && [ -n "$AR2_REC_LN" ] && [ "$AR2_RESUME_LN" -lt "$AR2_REC_LN" ] \
+    && ok "AR-2 auto-resume line precedes recovery A" || fail "AR-2 auto-resume line precedes recovery A ($AR2_RESUME_LN vs $AR2_REC_LN)"
+
+# AR-3 fenced `## ` lines are not sections.
+OUTPUT=$(run_case_resume early "$FENCE_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 2 ] && ok "AR-3 fenced headings: two calls" || fail "AR-3 fenced headings: two calls (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 1 ] && ok "AR-3 one auto-resume line" || fail "AR-3 one auto-resume line"
+
+# AR-4 `## ` lines inside the outline comment are not sections.
+OUTPUT=$(run_case_resume early "$COMMENT_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 2 ] && ok "AR-4 commented headings: two calls" || fail "AR-4 commented headings: two calls (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 1 ] && ok "AR-4 one auto-resume line" || fail "AR-4 one auto-resume line"
+
+# AR-5 the resumed run crashes.
+OUTPUT=$(AR_R_RC=124 run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 2 ] && ok "AR-5 resumed crash: two calls" || fail "AR-5 resumed crash: two calls (got $(ar_calls))"
+want "AR-5 resumed crash reports RESULT failed" "$OUTPUT" "plan-now: RESULT failed"
+
+# AR-B1 budget floor: under 600s left, no resume, recovery A still runs.
+OUTPUT=$(AR_RUNNER_EDIT='s/^RUN_TIMEOUT=.*/RUN_TIMEOUT=300/' run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-B1 under the floor: one call" || fail "AR-B1 under the floor: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-B1 no auto-resume line" || fail "AR-B1 no auto-resume line"
+want "AR-B1 skip line says why" "$OUTPUT" "plan-now: no auto-resume — only"
+want "AR-B1 recovery A still runs" "$OUTPUT" "plan-now: recovery A"
+
+# AR-M1 a fresh (non-resume) runner carries the generalized CONTINUE_MSG.
+plans_reset
+ARM1_DRY=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$RECOVERY_PROMPT" 2>&1)
+ARM1_RUNNER=$(printf '%s\n' "$ARM1_DRY" | sed -n 's/^  runner: //p')
+CNT=$(grep -c '^CONTINUE_MSG=.\{20,\}' "$ARM1_RUNNER" 2>/dev/null || printf '0')
+[ "$CNT" = 1 ] && ok "AR-M1 fresh runner CONTINUE_MSG is non-empty" || fail "AR-M1 fresh runner CONTINUE_MSG is non-empty (count=$CNT)"
+rm -f "$ARM1_RUNNER" "${ARM1_RUNNER%.sh}.session"
 
 echo "── usage gate: a paused or limit-hit run is 'paused', never 'failed' ──"
 
@@ -2168,7 +2226,7 @@ preflight_cleanup "$l6_out"
 
 # L-7 the probe precedes the spawn in the generated runner.
 l7_probe=$(grep -nF 'if ! login_preflight "$LOGIN_NIGHTLY_DIR"' "$PLAN_NOW" | head -1 | cut -d: -f1)
-l7_spawn=$(grep -nF 'timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p' "$PLAN_NOW" | head -1 | cut -d: -f1)
+l7_spawn=$(grep -nF 'claude_call "$RUN_TIMEOUT" "$PROMPT_TEXT"' "$PLAN_NOW" | head -1 | cut -d: -f1)
 if [ -n "$l7_probe" ] && [ -n "$l7_spawn" ] && [ "$l7_probe" -lt "$l7_spawn" ]; then
     ok "L-7 probe precedes the spawn"
 else

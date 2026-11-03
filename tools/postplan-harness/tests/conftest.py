@@ -3,7 +3,7 @@
 Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")`.
 `stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
 exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
-defeat them. `standard_review_depth` is opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `_reset_netretry_latch`,
+defeat them. `standard_review_depth` is opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `stub_prefire_gate`, `_reset_netretry_latch`,
 `isolate_live_reviewcache`, and `_private_log_dir`.
 """
 from __future__ import annotations
@@ -62,6 +62,16 @@ def no_real_pr_review_now(monkeypatch):
     assert on the fire still set their own logging stub, which overrides this default.
     """
     monkeypatch.setenv("REVIEW_OWED_PR_REVIEW_NOW", "/usr/bin/true")
+
+
+@pytest.fixture(autouse=True)
+def stub_prefire_gate(monkeypatch):
+    """Keep every test that runs the real `bin/post-plan-now` away from the real pre-fire gate.
+
+    The gate runs PHPUnit and Infection and exits 9 on a tree without them. These suites
+    assert other post-plan-now behavior. `bin/test-prefire-verify` covers the gate itself.
+    """
+    monkeypatch.setenv("PREFIRE_VERIFY_SCRIPT", "/usr/bin/true")
 
 
 @pytest.fixture(autouse=True)

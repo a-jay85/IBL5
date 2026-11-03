@@ -56,9 +56,19 @@ kill_infra_processes() {
     # Kill any remaining node processes with CWD in this worktree. The path match
     # is exact (the worktree or a dir under it), so cleaning `foo` never touches
     # a process in a sibling `foo-bar` worktree.
+    #
+    # On Linux, Node 24+ names its main thread "MainThread", and lsof prints that
+    # as "MainThrea". Other programs can use that thread name too, so that name
+    # only counts when /proc says the binary really is node.
     local pids
     pids=$(lsof -d cwd 2>/dev/null \
-        | awk -v p="$wt_path" '$1 == "node" && ($NF == p || index($NF, p "/") == 1) { print $2 }' \
+        | awk -v p="$wt_path" '($1 == "node" || $1 ~ /^MainThre/) && ($NF == p || index($NF, p "/") == 1) { print $1, $2 }' \
+        | while read -r name pid; do
+            exe="$(readlink "/proc/$pid/exe" 2>/dev/null)"
+            if [ "$name" = "node" ] || [ "${exe##*/}" = "node" ]; then
+                echo "$pid"
+            fi
+        done \
         | sort -u || true)
     if [ -n "$pids" ]; then
         echo "$pids" | xargs kill -9 2>/dev/null || true

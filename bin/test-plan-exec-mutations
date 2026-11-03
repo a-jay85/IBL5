@@ -408,6 +408,32 @@ chk "exit 0" eq "$RC" 0; chk "both TRIPPED" eq "$(grep -c '^TRIPPED' <<< "$OUT")
 chk "baseline ran once: 1 baseline + 2 mutated" eq "$(wc -l < "$TMP/r13.count" | tr -d ' ')" 3
 end_case
 
+# A same-length swap in a .py file keeps the source size, and the write can land in the
+# same second the .pyc was compiled. Python would then run the stale unmutated bytecode
+# and report a false HELD. The fixture pre-warms an unchecked-hash .pyc, which Python
+# never re-validates, so the stale read does not depend on clock timing. The `-E` variant
+# ignores PYTHONPYCACHEPREFIX and so proves the lib also deletes the cached .pyc.
+start_case run_stale_pyc_same_length
+for flag in "" "-E"; do
+    R="$TMP/r14$flag"
+    mkrepo "$R" "python3 $flag -c 'import mod, sys; sys.exit(0 if mod.VAL == \"ALPHA\" else 1)'"
+    printf 'VAL = "ALPHA"\n' > "$R/mod.py"
+    printf '__pycache__/\n' > "$R/.gitignore"
+    git -C "$R" add -A; git -C "$R" -c user.email=t@t -c user.name=t commit -qm mod
+    mkplan "$R.plan.md" "## Executable Mutations
+
+$(block 1 mod.py ALPHA OMEGA)
+"
+    (cd "$R" && python3 -c 'import py_compile as p; p.compile("mod.py", cfile=__import__("importlib.util").util.cache_from_source("mod.py"), invalidation_mode=p.PycInvalidationMode.UNCHECKED_HASH)')
+    chk "[$flag] .pyc pre-warmed" eval 'ls "$R"/__pycache__/mod.*.pyc >/dev/null 2>&1'
+    OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+    chk "[$flag] exit 0" eq "$RC" 0
+    chk "[$flag] TRIPPED reported" has "$OUT" "TRIPPED row 1"
+    chk "[$flag] porcelain empty" porcelain_clean "$R"
+    chk "[$flag] mod.py restored" eq "$(cat "$R/mod.py")" 'VAL = "ALPHA"'
+done
+end_case
+
 start_case run_literals_verbatim
 R="$TMP/r7"
 mkrepo "$R" "grep -q '^X=' target.txt"

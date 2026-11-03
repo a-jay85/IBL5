@@ -292,3 +292,11 @@ def test_premerge_load_ignores_malformed_manifest(make_repo, capsys):
         fh.write('{"schema_version": 2}')
     assert premerge.load(r.key) is None
     assert "ignoring malformed manifest" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("base", ["--upload-pack=x", "master", "origin/..", "origin/a..b", ""])
+def test_record_rejects_non_origin_base(tmp_path, base):
+    """--base is an origin/<branch> ref only: no option-shaped or range-shaped value."""
+    with pytest.raises(premerge.PremergeError, match="origin/<branch>"):
+        premerge.record(str(tmp_path), "feat", "a" * 40, ("f.txt",),
+                        tmp_dir=str(tmp_path), base=base)

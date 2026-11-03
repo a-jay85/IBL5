@@ -24,6 +24,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+from typing import Mapping
 
 from .. import usage_pause
 from ..state import SUBPROCESS_TIMEOUT, HarnessError, LlmCallRecord, UsageLedger
@@ -177,6 +178,19 @@ def _tooled_env(allowed_tools, denied_tools) -> dict:
         # never inherit a skip from the parent onto a call that can write
         env.pop("PERSIST_GATE_SKIP", None)
     return env
+
+
+def _apply_extra_env(env: dict, extra_env) -> dict:
+    """Overlay `extra_env` on `env`. A `None` value deletes the key. `None` changes nothing."""
+    if not extra_env:
+        return env
+    out = dict(env)
+    for key, value in extra_env.items():
+        if value is None:
+            out.pop(key, None)
+        else:
+            out[key] = str(value)
+    return out
 
 
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
@@ -389,7 +403,8 @@ class ClaudeCli:
                     max_retries: int = 1,
                     max_budget_usd: float | None = None,
                     advisor: bool = True,
-                    minimal_context: bool = False) -> str:
+                    minimal_context: bool = False,
+                    extra_env: Mapping[str, str | None] | None = None) -> str:
         """Bounded, tool-enabled call. Returns the envelope's RAW `result` text.
 
         The verdict this exists to fetch is a prose document, so parsing belongs to the
@@ -421,8 +436,11 @@ class ClaudeCli:
                 pre = usage_pause.capture_prespawn(cwd) if (self.gate and can_write) else None
                 with self._write_call(can_write):
                     proc = _run_reaped(argv, prompt, timeout, cwd,
-                                       self._child_env(_tooled_env(allowed_tools, denied_tools),
-                                                       MODEL_MAP[model]))
+                                       self._child_env(
+                                           _apply_extra_env(
+                                               _tooled_env(allowed_tools, denied_tools),
+                                               extra_env),
+                                           MODEL_MAP[model]))
                 if self.gate is not None and usage_pause.marker_exists(self.gate):
                     self.paused.set()   # the hook paused this child (marker keyed on S)
                 if self.paused.is_set():
@@ -540,6 +558,7 @@ class FixtureLlm:
         self.ledger = ledger
         self.canned = canned
         self.tooled_argvs: list[tuple[str, list[str]]] = []
+        self.tooled_extra_envs: list[tuple[str, dict | None]] = []
 
     def call(self, purpose: str, model: str, prompt: str, validate,
              max_retries: int = 1, normalizer=None):
@@ -564,7 +583,8 @@ class FixtureLlm:
                     max_retries: int = 1,
                     max_budget_usd: float | None = None,
                     advisor: bool = True,
-                    minimal_context: bool = False) -> str:
+                    minimal_context: bool = False,
+                    extra_env: Mapping[str, str | None] | None = None) -> str:
         if not allowed_tools:
             raise HarnessError("llm-tooled-no-tools", purpose)
         self.tooled_argvs.append((purpose, _tooled_argv(
@@ -573,6 +593,7 @@ class FixtureLlm:
             setting_sources=setting_sources, max_turns=max_turns,
             max_budget_usd=max_budget_usd, advisor=advisor,
             minimal_context=minimal_context)))
+        self.tooled_extra_envs.append((purpose, dict(extra_env) if extra_env else None))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         val = self.canned[purpose]

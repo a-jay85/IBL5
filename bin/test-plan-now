@@ -210,6 +210,25 @@ STUB="$TMP/claude-stub"
 cat > "$STUB" <<'STUB_EOF'
 #!/usr/bin/env bash
 [ -n "${STUB_ARGV:-}" ] && printf '%s\n' "$@" > "$STUB_ARGV"
+# Multi-call seam for the early-exit auto-resume cases (AR-*). $STUB_CALLS gets
+# one line per invocation. $STUB_ARGV_LOG gets every call's argv after a
+# `--call--` separator line. On a call whose argv holds `--resume`,
+# STUB_ON_RESUME=1 swaps in the STUB_R_* behavior so call 2 can differ.
+[ -n "${STUB_CALLS:-}" ] && printf 'call\n' >> "$STUB_CALLS"
+if [ -n "${STUB_ARGV_LOG:-}" ]; then
+    printf '%s\n' '--call--' >> "$STUB_ARGV_LOG"
+    printf '%s\n' "$@" >> "$STUB_ARGV_LOG"
+fi
+_stub_is_resume=0
+for _stub_a in "$@"; do [ "$_stub_a" = --resume ] && _stub_is_resume=1; done
+if [ "$_stub_is_resume" = 1 ] && [ "${STUB_ON_RESUME:-0}" = 1 ]; then
+    STUB_DRAFT=""                      # call 1's draft stays exactly as written
+    STUB_TAIL="${STUB_R_TAIL:-}"
+    STUB_RC="${STUB_R_RC:-0}"
+    if [ -n "${STUB_R_PLAN:-}" ]; then
+        STUB_PLAN="$STUB_R_PLAN"; STUB_NO_PLAN=""
+    fi
+fi
 if [ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ]; then
     # $STUB_PLAN_SRC writes a plan that PASSES check-plan; the one-liner fails it.
     # Both are needed — the notify cases below turn on which side of the gate the
@@ -351,6 +370,45 @@ run_case_recovery() {
     fi
     rm -f "$runner"
 }
+
+# run_case_resume <mode> <draft-src-or-empty> <slug> → transcript
+# Multi-call variant of run_case_recovery for the early-exit auto-resume (AR-*)
+# cases. Call 1 behavior follows <mode>: early (rc 0, no marker), plan
+# (PLAN_FILE: printed), noplan (NO_PLAN: halt), crash (rc 124). Call 2, if the
+# runner makes one, is driven by AR_R_TAIL / AR_R_RC / AR_R_PLAN. AR_PLAN_SRC is
+# the passing-plan fixture. AR_RUNNER_EDIT is a sed script applied to the runner
+# (set RESUME_FROM= or RUN_TIMEOUT= without a second CLI path).
+AR_CALLS="$TMP/ar.calls"; AR_ARGV="$TMP/ar.argv"
+run_case_resume() {
+    local mode="$1" src="$2" slug="$3"
+    plans_reset
+    : > "$DM_LOG"; : > "$AR_CALLS"; : > "$AR_ARGV"
+    local dry runner draft="" no_plan="" plan="" tail="" rc=0
+    [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
+    case "$mode" in
+        early)  no_plan=1; tail="Section 2 is in progress. I'm waiting for the architect's note before I ask for section 3." ;;
+        plan)   plan="$PLANS/$slug.md"; tail="PLAN_FILE: $PLANS/$slug.md" ;;
+        noplan) no_plan=1; tail="NO_PLAN: the work already merged as PR 1" ;;
+        crash)  no_plan=1; tail=""; rc=124 ;;
+    esac
+    dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" "${DISP:---implement}" "$RECOVERY_PROMPT" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { printf 'no runner:\n%s\n' "$dry"; return 1; }
+    if [ -n "${AR_RUNNER_EDIT:-}" ]; then
+        sed "$AR_RUNNER_EDIT" "$runner" > "$runner.ed" && cat "$runner.ed" > "$runner"
+        rm -f "$runner.ed"
+    fi
+    STUB_NO_PLAN="$no_plan" STUB_PLAN="$plan" STUB_TAIL="$tail" STUB_RC="$rc" \
+        STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" STUB_PLAN_SRC="${AR_PLAN_SRC:-}" \
+        STUB_CALLS="$AR_CALLS" STUB_ARGV_LOG="$AR_ARGV" STUB_ON_RESUME=1 \
+        STUB_R_TAIL="${AR_R_TAIL:-}" STUB_R_RC="${AR_R_RC:-0}" STUB_R_PLAN="${AR_R_PLAN:-}" \
+        QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
+    rm -f "$runner"
+}
+ar_calls() { [ -f "$AR_CALLS" ] && wc -l < "$AR_CALLS" | tr -d ' ' || printf '0'; }
+ar_resume_lines() { printf '%s\n' "$1" | grep -c '^plan-now: auto-resume' || true; }
 
 # Remove any plist/runner that PLAN_NOW_DRY_RUN=1 wrote but the test did not
 # execute (e.g., the dup gate declined before the runner was launched). Without
@@ -495,6 +553,24 @@ FIXTURE_EOF
 
 PARTIAL_DRAFT="$TMP/partial.draft.md"
 printf '# stub\n' > "$PARTIAL_DRAFT"
+
+# Auto-resume fixtures. AR_PARTIAL_DRAFT = GOOD_DRAFT's outline comment + its
+# first `## ` section only, so the outline declares more titles than the body
+# has. (PARTIAL_DRAFT above is an older one-line stub with no outline.)
+AR_PARTIAL_DRAFT="$TMP/ar-partial.draft.md"
+awk '/^## /{n++} n<2' "$GOOD_DRAFT" > "$AR_PARTIAL_DRAFT"
+[ "$(grep -c '^## ' "$AR_PARTIAL_DRAFT")" = 1 ] \
+    || { echo "FATAL: AR_PARTIAL_DRAFT fixture must hold exactly one ## heading"; exit 1; }
+# Near-miss 1: `## ` lines inside a fenced block in a section body are not sections.
+FENCE_DRAFT="$TMP/fence.draft.md"
+{ cat "$AR_PARTIAL_DRAFT"; printf '\n```\n## Critical Files\n## Verification Matrix\n```\n\n### Sub-step\n'; } > "$FENCE_DRAFT"
+# Near-miss 2: a `## ` line inside the outline comment is not a body section.
+COMMENT_DRAFT="$TMP/comment.draft.md"
+awk '/<!-- PLAN OUTLINE/{print; print "## Critical Files"; print "## Verification Matrix"; next} {print}' \
+    "$AR_PARTIAL_DRAFT" > "$COMMENT_DRAFT"
+# No outline comment at all: the wrapper cannot tell finished from unfinished.
+NOOUTLINE_DRAFT="$TMP/nooutline.draft.md"
+printf '# draft\n\n## Phase 1: Only section\n\nbody\n' > "$NOOUTLINE_DRAFT"
 
 # Leg B needs a plan file that PASSES check-plan. Rather than author and maintain
 # a second ~50-line fixture in promoted form, case 1 hands us one: it promotes
@@ -1848,6 +1924,44 @@ R14_OUT2=$(STUB_PLAN="$P" STUB_TAIL="PLAN_FILE: $P" \
 want    "R-14 failing plan: RESULT degraded"   "$R14_OUT2" "RESULT degraded"
 want    "R-14 failing plan: NOT queued"        "$R14_OUT2" "NOT queued"
 preflight_cleanup "$RES_OUT"
+
+# --- AR: early-exit auto-resume ---
+echo "── AR: early-exit auto-resume ──"
+AR_SLUG=demo-slug
+
+# AR-N1 normal PLAN_FILE exit: one call, no resume.
+OUTPUT=$(AR_PLAN_SRC="$GOOD_PLAN" run_case_resume plan "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N1 PLAN_FILE exit: one call" || fail "AR-N1 PLAN_FILE exit: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N1 no auto-resume line" || fail "AR-N1 no auto-resume line"
+[ "$(grep -c '^--call--$' "$AR_ARGV")" = 1 ] && ok "AR-N1 stub argv log has one call" || fail "AR-N1 stub argv log has one call"
+
+# AR-N2 NO_PLAN halt with an unfinished draft.
+OUTPUT=$(run_case_resume noplan "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N2 NO_PLAN halt: one call" || fail "AR-N2 NO_PLAN halt: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N2 no auto-resume line" || fail "AR-N2 no auto-resume line"
+
+# AR-N3 crashed run (rc 124) with an unfinished draft.
+OUTPUT=$(run_case_resume crash "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N3 rc 124: one call" || fail "AR-N3 rc 124: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N3 no auto-resume line" || fail "AR-N3 no auto-resume line"
+want "AR-N3 still reports RESULT failed" "$OUTPUT" "plan-now: RESULT failed"
+
+# AR-N4 complete orphaned draft: recovery A's original case.
+OUTPUT=$(run_case_resume early "$GOOD_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N4 complete draft: one call" || fail "AR-N4 complete draft: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N4 no auto-resume line" || fail "AR-N4 no auto-resume line"
+want "AR-N4 recovery A promotes it" "$OUTPUT" "plan-now: recovery A — promoted"
+
+# AR-N5 manual --resume run: the runner is itself a resume, never stack on it.
+OUTPUT=$(AR_RUNNER_EDIT='s/^RESUME_FROM=.*/RESUME_FROM=20261102-000000-1/' \
+    run_case_resume early "$AR_PARTIAL_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N5 manual resume: one call" || fail "AR-N5 manual resume: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N5 no auto-resume line" || fail "AR-N5 no auto-resume line"
+
+# AR-N6 draft without an outline comment: finished by definition.
+OUTPUT=$(run_case_resume early "$NOOUTLINE_DRAFT" "$AR_SLUG")
+[ "$(ar_calls)" = 1 ] && ok "AR-N6 no outline: one call" || fail "AR-N6 no outline: one call (got $(ar_calls))"
+[ "$(ar_resume_lines "$OUTPUT")" = 0 ] && ok "AR-N6 no auto-resume line" || fail "AR-N6 no auto-resume line"
 
 echo "── usage gate: a paused or limit-hit run is 'paused', never 'failed' ──"
 

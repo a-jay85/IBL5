@@ -37,6 +37,24 @@ fail() { h_fail "$@"; }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
 STUBS=""
 trap 'kill $STUBS 2>/dev/null; rm -rf "$TMP"' EXIT
+# Real-agents-dir leak guard (same idea as unit 1's guard in bin/test-plan-now,
+# scoped to the three launchers converted in this unit). Captured before any
+# HOME override; compared at the end of the file.
+REAL_AGENTS="$HOME/Library/LaunchAgents"
+real_agents_names() {
+    find "$REAL_AGENTS" -maxdepth 1 -type f \
+        \( -name 'com.ibl5.docfix-run-*' -o -name 'com.ibl5.pr-cycle-*' \
+           -o -name 'com.ibl5.postplan-faildm-*' \) 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
+# Sandbox HOME, and a PATH launchctl that records any call that bypasses the
+# FAILDM_LAUNCHCTL seam. Submit writes no file, so the agents-dir guard alone
+# cannot see a real-launchctl leak; this file can.
+export HOME="$TMP/home"
+mkdir -p "$HOME/Library/LaunchAgents" "$TMP/leakbin"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexit 1\n' "$TMP/launchctl.LEAK" > "$TMP/leakbin/launchctl"
+chmod +x "$TMP/leakbin/launchctl"
+export PATH="$TMP/leakbin:$PATH"
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
@@ -233,5 +251,17 @@ FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     && ! grep -qF "Or open Claude in that folder" "$DM_OUT" \
     && ok "16 generic block DM ends with the postplan-fix paste line" \
     || fail "16 generic block DM tail: $(tail -n 3 "$DM_OUT" 2>/dev/null)"
+
+if [ -e "$TMP/launchctl.LEAK" ]; then
+    echo "FAIL launchctl-leak: unseamed launchctl call: $(cat "$TMP/launchctl.LEAK")"
+    exit 1
+fi
+echo "PASS launchctl-leak"
+REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
+if [ -n "$REAL_AGENTS_NEW" ]; then
+    echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"
+    exit 1
+fi
+echo "PASS real-agents-guard"
 
 h_done

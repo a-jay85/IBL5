@@ -219,6 +219,16 @@ plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
 # and removed at exit.
 RUNNERS_SEEN="$(mktemp)"
 trap 'xargs rm -f < "$RUNNERS_SEEN" 2>/dev/null; rm -f "$RUNNERS_SEEN"' EXIT
+# Real-agents-dir leak guard (same idea as unit 1's guard in bin/test-plan-now,
+# scoped to the three launchers converted in this unit). Captured before any
+# HOME override; compared at the end of the file.
+REAL_AGENTS="$HOME/Library/LaunchAgents"
+real_agents_names() {
+    find "$REAL_AGENTS" -maxdepth 1 -type f \
+        \( -name 'com.ibl5.docfix-run-*' -o -name 'com.ibl5.pr-cycle-*' \
+           -o -name 'com.ibl5.postplan-faildm-*' \) 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
 runner_of() {
     local P R
     P="$(plist_of "$1")"; [ -n "$P" ] || return 1
@@ -2198,5 +2208,12 @@ R21="$(run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" = "rc=0" ] && [ -d "$SB/wts/$DS" ]; } \
   && ok "(21e) successful launch: worktree kept (trap disarmed after bootstrap)" \
   || bad "(21e) successful launch keeps the worktree ($R21)"
+
+REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
+if [ -n "$REAL_AGENTS_NEW" ]; then
+    echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"
+    exit 1
+fi
+echo "PASS real-agents-guard"
 
 h_done

@@ -433,6 +433,51 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T12e: idle docfix-run, pr-cycle and postplan-faildm labels, no plist →
+# one INFO idle-oneshot line each, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture T12e
+printf -- '-\t0\tcom.ibl5.docfix-run-x-20261021-120000-77\n' >> "$CASE/launchctl.out"
+printf -- '-\t0\tcom.ibl5.pr-cycle-20261021-120000-77\n' >> "$CASE/launchctl.out"
+printf -- '-\t0\tcom.ibl5.postplan-faildm-x-20261021-120000-77\n' >> "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.docfix-run-x-20261021-120000-77' <<< "$OUT" \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.pr-cycle-20261021-120000-77' <<< "$OUT" \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.postplan-faildm-x-20261021-120000-77' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok T12e
+else
+    fail T12e "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# T12f: fixed tick label com.ibl5.watch-pr-cycle → never idle-oneshot
+# ---------------------------------------------------------------------------
+healthy_fixture T12f
+printf -- '-\t0\tcom.ibl5.watch-pr-cycle\n' >> "$CASE/launchctl.out"
+run_checker
+if ! grep -q 'idle-oneshot:com.ibl5.watch-pr-cycle' <<< "$OUT"; then
+    ok T12f
+else
+    fail T12f "fixed watch-pr-cycle label matched a submitted prefix, out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# T12g: leftover postplan-faildm plist, label absent → INFO stale-oneshot, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture T12g
+touch "$CASE/home/Library/LaunchAgents/com.ibl5.postplan-faildm-x-20261021-120000-77.plist"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*stale-oneshot:com.ibl5.postplan-faildm-x-20261021-120000-77' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok T12g
+else
+    fail T12g "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
 # T13: docker info fails → PROBLEM docker:daemon-down, no container: lines
 # ---------------------------------------------------------------------------
 healthy_fixture T13

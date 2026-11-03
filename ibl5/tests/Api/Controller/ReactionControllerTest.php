@@ -76,7 +76,7 @@ class ReactionControllerTest extends TestCase
 
     public function testStandardTierKeyWithMalformedBodyRejected403Not400(): void
     {
-        $bugRepo = $this->createStub(BugReportRepository::class);
+        $bugRepo = self::createStub(BugReportRepository::class);
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->once())

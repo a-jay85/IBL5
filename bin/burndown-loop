@@ -35,6 +35,11 @@
 #   IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN minimum gap between unblock sessions (120)
 #   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
 #   IBL5_BURNDOWN_EMPTY_SLEEP_MIN     minutes between re-checks while the backlog is empty (240)
+#   IBL5_BURNDOWN_WINDOW_START_HOUR   local hour (0-23) the night window opens (2)
+#   IBL5_BURNDOWN_WINDOW_END_HOUR     local hour (0-23) it closes, exclusive; below the start wraps past midnight (7)
+#   IBL5_BURNDOWN_ENDGAME_HOURS       hours before the weekly reset when a go verdict ignores the window (48; 0 = off)
+#   IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN  scout cooldown while in endgame (60)
+#   IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN     empty-backlog re-check while in endgame (30)
 #   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
@@ -43,6 +48,13 @@
 #   runs a no-arm unblock session on conflicting or red non-feat: PRs. A detected arm
 #   disarms the PR and writes $STATE/unblock-disabled; rm it to re-enable unblock. A
 #   failed gh count holds all new work (batches, scouts and unblock) until it recovers.
+#   Night window: batches, scouts and unblock sessions start only from the window start
+#   hour up to the end hour, local time. A batch still running at the end hour finishes
+#   normally. Outside the window the loop logs reason=night-window and sleeps at most
+#   30 minutes per check. Endgame (weekly reset under ENDGAME_HOURS away plus a go pace
+#   verdict) ignores the window and uses the endgame scout cooldown and empty sleep.
+#   The pace line and the drain and stop zones apply in every mode. Hours take no
+#   leading zero (07 exits 2), and equal start and end hours exit 2.
 #
 # Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
 #             1 consecutive-failure cap hit. Failed batches and /burndown exit-3

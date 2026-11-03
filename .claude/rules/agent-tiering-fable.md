@@ -57,6 +57,8 @@ A def whose frontmatter pins `model: fable` always runs on Fable. Today that is 
 
 A human may route any task to either architect. When `bin/plan-now` sees a declared tier that disagrees with the hint and one side is xhigh, it exits 4, and `--tier-ok "<reason>"` records the override. Every verdict lands in `~/.claude/logs/plan-tier-hint.log` with its reason, so a tier pick that went wrong can be traced.
 
+The judge reads the `/plan` task line, the full brief with its tier-routing lines removed, the paths the brief names, and signal lines for a `feat:` title, a stated `auto_merge: false`, and a `bin/plan-now --implement` run. Burndown passes the backlog issue body as the brief. A design the brief already resolves counts as a mitigation.
+
 ## Asm-level static RE (JSB engine): Fable is the default
 
 Asm-level static reverse-engineering always passes the test. This covers argument-binding derivations, NaN/FPU-flag paths, and encoded operands (pinning a `FUN_*`/`+0xNNN` operand, or a faithful-vs-divergent port verdict from `objdump` or decompile). Opus has shipped provably false conclusions here. On 2026-07-23 it misread J24 putback-3pt because Ghidra mis-numbered params (`param_6` was a `double` using two stack slots). Undoing that took an ADR, a golden regen, and test rebaselines. On 2026-07-07 a Fable session overturned an Opus-era "requires live debugging" premise on the foul divisor. The 2026-10 measurement corpus holds no RE cases, so it gives no basis to move this default.

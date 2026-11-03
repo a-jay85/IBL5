@@ -30,8 +30,10 @@
 #   Pre-flight tier gate (all dispositions): compares the declared tier in the prompt
 #   against bin/plan-tier-hint. Exits 4 when the declared and hinted tiers differ AND
 #   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
-#   The hint is one Opus 5.5 judge call (bin/plan-tier-hint) fed the prompt's /plan
-#   task statement line only, so directive and negation lines never reach the judge.
+#   The hint is one Opus 5.5 judge call (bin/plan-tier-hint) fed the /plan task line
+#   as --desc and the whole prompt file as --brief, plus --signals implement under
+#   --implement. The hint drops every MUST route to / plan-architect line from both
+#   before the judge reads them, so the declared tier never reaches the judge.
 #   The hint prints default on any judge failure, so a broken judge still runs the
 #   gate: a declared xhigh then exits 4 and needs --tier-ok to buy the Fable run.
 #   Gate skips silently when: the hint is not executable, no

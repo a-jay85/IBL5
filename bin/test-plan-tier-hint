@@ -640,6 +640,16 @@ assert_absent "canonical no longer says the hint defaulted to xhigh" \
     '.claude/skills/plan/SKILL.md' 'defaulted to `xhigh`'
 assert_absent "plan-prompt no longer routes on the hint printing xhigh" \
     '.claude/skills/plan-prompt/SKILL.md' 'the hint printed xhigh'
+assert_contains "plan-prompt runs the hint on the block file" \
+    '.claude/skills/plan-prompt/SKILL.md' 'bin/plan-tier-hint --explain --brief "$f"'
+assert_absent "plan-prompt no longer feeds the hint the task line only" \
+    '.claude/skills/plan-prompt/SKILL.md' 'bin/plan-tier-hint --explain --desc "<task-line>"'
+assert_contains "plan-now header names the brief input" \
+    'bin/plan-now' 'the whole prompt file as --brief'
+assert_contains "ADR-0226 records the full-brief update" \
+    'ibl5/docs/decisions/0226-plan-tier-hint-open-judgment.md' '): the judge sees the full brief'
+assert_contains "fable rule says what the judge reads" \
+    '.claude/rules/agent-tiering-fable.md' 'tier-routing lines removed'
 
 # No regex survives as a vote of any kind.
 for re in WEAKEN_RE GATE_RE SECURITY_RE; do

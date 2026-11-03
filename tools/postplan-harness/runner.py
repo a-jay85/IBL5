@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (ab_arm, adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+from harness import (ab_arm, adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, history_shape, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import closer
@@ -1440,14 +1440,23 @@ def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
         return None
 
 
+def _merge_target(git) -> str:
+    """The ref post-plan merges in: the PR's declared base (Phase 1 merge_target).
+    LiveGit and ReplayGit both define it (pinned by test_adapters_define_merge_target);
+    only hand-rolled test fakes lack it and keep today's origin/master."""
+    resolver = getattr(git, "merge_target", None)
+    return resolver() if resolver is not None else "origin/master"
+
+
 def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
     """Fetch remote tip, rebase, and re-prove no work was lost. Never pushes."""
     key = _retry_key(git.branch(), attempt)
     if not git.capture_lostwork_pre(key):
         raise HarnessError("lostwork-unproved",
                            f"{phase}: diff vs origin/master is empty before re-rebase")
-    git.fetch_base("origin/master")
-    git.rebase_onto("origin/master")
+    base = _merge_target(git)
+    git.fetch_base(base)
+    git.rebase_onto(base)
     ok, evidence = git.prove_lostwork(key)
     if not ok:
         raise HarnessError("lostwork-unproved",
@@ -3568,6 +3577,18 @@ def _plan_hash(plan) -> str:
         return ""
 
 
+def _stray_master_merges(git, log) -> tuple[str, list[str]]:
+    """(base, stray merge SHAs) for the Phase 5.5 history-shape stop. A base that no
+    longer resolves yields no stop: Phase 2 already resolved it, and raising here would
+    turn a held run into exit 3."""
+    try:
+        base = _merge_target(git)
+    except HarnessError as e:
+        log(f"phase5.5: history-shape check skipped ({e.kind})")
+        return "origin/master", []
+    return base, history_shape.stray_master_merges(getattr(git, "worktree", "") or "", base)
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
@@ -3764,6 +3785,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # handle on the first review's findings by compose time.
     verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
+    stray_base, stray = (_stray_master_merges(git, log) if final_verdict == "NOT READY"
+                         else ("origin/master", []))
     for round_num in range(1, (0 if _narrow_fixers_off(res) else fidelity.MAX_FIDELITY_ROUNDS) + 1):
         if final_verdict != "NOT READY":
             break
@@ -3778,6 +3801,17 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                "verdict": None, "reviewed_tree": None, "verdict_path": None,
                "review_kind": None, "recheck_fallback_reason": None}
         log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
+        if stray:
+            log(f"phase5.5 round {round_num}: history-shape stop -- stray origin/master "
+                f"merge(s) {', '.join(s[:12] for s in stray)} in {stray_base}..HEAD; "
+                "no remediation round can remove them")
+            rec["outcome"] = history_shape.HISTORY_SHAPE_REASON
+            res.fidelity["history_shape"] = {
+                "base": stray_base, "merges": stray,
+                "next_action": history_shape.next_action(git.branch(), stray_base, stray)}
+            rounds.append(rec)
+            res.fidelity["rounds"] = rounds
+            break
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
         # The retry lives INSIDE the iteration, so a retry can never advance round_num
@@ -4085,7 +4119,7 @@ def _finish(res: RunResult, out_dir: str, *, ab_state_dir: str | None = None,
 # subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "llm-usage-limit", "llm-auth-expired",
-                      "usage-pause-unconfirmed", "usage-pause-dirty",
+                      "usage-pause-unconfirmed", "usage-pause-dirty", "base-resolve",
                       SUBPROCESS_TIMEOUT, PRECOMMIT_HANG)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 
@@ -4444,9 +4478,19 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
     """
     pre_rebase = git.head()
     conflict_resolved = None
+    base = "origin/master"
     try:
         snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
-        git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+        base = _merge_target(git)
+        if base == "origin/master":
+            git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+        else:
+            # Stacked PR: merge the declared parent, never master (PR #3672 pulled ~355
+            # master files into a stack). bin/pre-push-adr-hook accepts origin/<parent>
+            # as an ancestor of HEAD. Merge, never rebase.
+            log(f"phase2: stacked base {base} -- merging it instead of origin/master")
+            git.fetch_base(base)
+            git.rebase_onto(base)
         # A plain merge the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
         for line in audit_lines_for_adaptations(
@@ -4475,6 +4519,10 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         log(f"phase2: plain-path decline -- {(e.detail or '')[:600]}")
         plain_conflicted = getattr(git, "last_conflict_files", ())
         log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
+        if base != "origin/master":
+            log(f"phase2: conflict against stacked base {base}; the --onto fallback "
+                "targets origin/master, so it is skipped")
+            raise
         conflict_resolved = git.autoresolve_stacked_rebase()
         if not conflict_resolved.resolved:
             log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
@@ -4733,6 +4781,17 @@ def _hold_repeat_note(res: RunResult) -> str:
 HOLD_REASONS_CAP = 300
 
 
+def _history_shape_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix carrying the Phase 5.5 history-shape next action."""
+    hs = (res.fidelity or {}).get("history_shape")
+    if not hs:
+        return ""
+    text = " ".join(_redact(hs["next_action"]).split())
+    if len(text) > HOLD_REASONS_CAP:
+        text = text[:HOLD_REASONS_CAP - 1] + "…"
+    return f" history-shape={text}"
+
+
 def _hold_reasons_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix ` hold=(7) reason; (8) reason` for a held run.
     Same text as the audit.log `phase6.5: HELD` line, flattened, redacted, capped."""
@@ -4929,6 +4988,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             pass
     tail += _prose_hold_note(res)
     tail += _hold_repeat_note(res)
+    tail += _history_shape_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
             f"{_hold_reasons_note(res)}")

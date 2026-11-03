@@ -110,6 +110,33 @@ printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: 
 JUDGE_EOF
 printf '#!/usr/bin/env bash\nexit 3\n' > "$TMP/judge-fail"
 chmod +x "$TMP/judge-default" "$TMP/judge-fail"
+# Recording judge: one argv element per line to $TMP/judge-argv, then a
+# default verdict. TB-* cases read the task block out of the captured prompt.
+cat > "$TMP/judge-rec" <<'JUDGE_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${PLAN_NOW_TEST_JUDGE_ARGV:?}"
+printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: recorder"}'
+JUDGE_EOF
+chmod +x "$TMP/judge-rec"
+# task_block_has <argv-file> <fixed-string>: 1 when a line inside the
+# <task-NONCE> fence contains the string, else 0.
+task_block_has() {
+    awk -v s="$2" '
+        /^<task-/ { inside = 1; next }
+        /^<\/task-/ { inside = 0; next }
+        inside && index($0, s) { hit = 1 }
+        END { print hit + 0 }
+    ' "$1"
+}
+# task_block_line <argv-file> <line>: 1 when a line inside the fence equals it.
+task_block_line() {
+    awk -v s="$2" '
+        /^<task-/ { inside = 1; next }
+        /^<\/task-/ { inside = 0; next }
+        inside && $0 == s { hit = 1 }
+        END { print hit + 0 }
+    ' "$1"
+}
 export PLAN_TIER_HINT_CLAUDE="$TMP/judge-default"
 export PLAN_TIER_HINT_LOG="$TMP/plan-tier-hint.log"
 
@@ -1180,6 +1207,92 @@ TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
     fail "T-5: no directive line: exits 0 (got $TPRE_RC)"
 want    "T-5: runner is written"              "$TPRE_OUT" "runner:"
 want_no "T-5: no tier warning"                "$TPRE_OUT" "TIER MISMATCH"
+preflight_cleanup "$TPRE_OUT"
+
+TIER_PROMPT_TB="$TMP/tier-prompt-tb.md"
+cat > "$TIER_PROMPT_TB" <<'TIER_TB_EOF'
+/plan Tighten the standings renderer cache key.
+
+- Branch slug: `standings-cache-key`. Base: `master`.
+- Step 3 MUST route to `plan-architect`.
+- Do NOT escalate to `plan-architect-xhigh`.
+
+## Exploration pointers
+- `ibl5/classes/Standings/StandingsRenderer.php:40`: builds the cache key.
+
+## Hard constraints
+- Keep rendered output byte-identical.
+TIER_TB_EOF
+
+# TB-1. The gate's judge prompt carries the /plan task line and no tier directive.
+TB_ARGV="$TMP/tb-judge-argv"
+rm -f "$TB_ARGV"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_TIER_HINT_CLAUDE="$TMP/judge-rec" PLAN_NOW_TEST_JUDGE_ARGV="$TB_ARGV" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_TB" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "TB-1: gate run exits 0" || fail "TB-1: gate run exits 0 (got $TPRE_RC)"
+[ "$(task_block_has "$TB_ARGV" 'Tighten the standings renderer cache key.')" = 1 ] \
+    && ok "TB-1: task line reaches the task block" \
+    || fail "TB-1: task line reaches the task block"
+[ "$(task_block_has "$TB_ARGV" 'MUST route to')" = 0 ] \
+    && ok "TB-1: no MUST route to line inside the task block" \
+    || fail "TB-1: no MUST route to line inside the task block"
+[ "$(task_block_has "$TB_ARGV" 'plan-architect')" = 0 ] \
+    && ok "TB-1: no plan-architect tier name inside the task block" \
+    || fail "TB-1: no plan-architect tier name inside the task block"
+preflight_cleanup "$TPRE_OUT"
+
+# tb_run <disposition-flag> <prompt-file> <argv-file>: run the gate with the recording judge.
+tb_run() {
+    rm -f "$3"
+    TPRE_RC=0
+    TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+        PLAN_TIER_HINT_CLAUDE="$TMP/judge-rec" PLAN_NOW_TEST_JUDGE_ARGV="$3" \
+        PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+        PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+        "$PLAN_NOW" "$1" "$2" 2>&1) || TPRE_RC=$?
+}
+
+# TB-2. --implement: the brief's constraint and Files line and the human-review signal reach the judge.
+TB2_ARGV="$TMP/tb2-judge-argv"
+tb_run --implement "$TIER_PROMPT_TB" "$TB2_ARGV"
+[ "$TPRE_RC" = 0 ] && ok "TB-2: gate run exits 0" || fail "TB-2: gate run exits 0 (got $TPRE_RC)"
+[ "$(task_block_has "$TB2_ARGV" 'Keep rendered output byte-identical.')" = 1 ] \
+    && ok "TB-2: hard constraint reaches the task block" \
+    || fail "TB-2: hard constraint reaches the task block"
+[ "$(task_block_line "$TB2_ARGV" 'ibl5/classes/Standings/StandingsRenderer.php')" = 1 ] \
+    && ok "TB-2: Files line reaches the task block" \
+    || fail "TB-2: Files line reaches the task block"
+[ "$(task_block_line "$TB2_ARGV" '- plan-now --implement: the plan waits on disk for a human to read it before it is queued')" = 1 ] \
+    && ok "TB-2: --implement signal reaches the task block" \
+    || fail "TB-2: --implement signal reaches the task block"
+preflight_cleanup "$TPRE_OUT"
+
+# TB-3. --queue: no --implement signal, and the headless coda's auto_merge never reaches the gate.
+TB3_ARGV="$TMP/tb3-judge-argv"
+tb_run --queue "$TIER_PROMPT_TB" "$TB3_ARGV"
+[ "$TPRE_RC" = 0 ] && ok "TB-3: gate run exits 0" || fail "TB-3: gate run exits 0 (got $TPRE_RC)"
+[ "$(task_block_has "$TB3_ARGV" 'plan-now --implement')" = 0 ] \
+    && ok "TB-3: no --implement signal under --queue" \
+    || fail "TB-3: no --implement signal under --queue"
+[ "$(task_block_has "$TB3_ARGV" 'auto_merge')" = 0 ] \
+    && ok "TB-3: coda auto_merge never reaches the task block" \
+    || fail "TB-3: coda auto_merge never reaches the task block"
+preflight_cleanup "$TPRE_OUT"
+
+# TB-4. --queue with an auto_merge hard constraint in the brief: the signal reaches the judge.
+TIER_PROMPT_TB4="$TMP/tier-prompt-tb4.md"
+cp "$TIER_PROMPT_TB" "$TIER_PROMPT_TB4"
+printf '%s\n' '- Keep `auto_merge: false` so an owner signs off before merge.' >> "$TIER_PROMPT_TB4"
+TB4_ARGV="$TMP/tb4-judge-argv"
+tb_run --queue "$TIER_PROMPT_TB4" "$TB4_ARGV"
+[ "$TPRE_RC" = 0 ] && ok "TB-4: gate run exits 0" || fail "TB-4: gate run exits 0 (got $TPRE_RC)"
+[ "$(task_block_line "$TB4_ARGV" '- auto_merge false: an owner signs off before merge')" = 1 ] \
+    && ok "TB-4: auto_merge signal reaches the task block" \
+    || fail "TB-4: auto_merge signal reaches the task block"
 preflight_cleanup "$TPRE_OUT"
 
 # T-6. PLAN_NOW_TIER_HINT unset → falls back to real bin/plan-tier-hint.

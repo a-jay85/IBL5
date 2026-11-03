@@ -157,14 +157,17 @@ isn't obvious:
   plan wrong, and would a wrong plan be expensive? A security surface, a trust
   boundary, a destructive migration, or a change to what a gate rejects is a
   thing to weigh. So are the mitigations the task carries (`auto_merge: false`,
-  a fail-closed hard constraint, characterization pins). When both halves hold
+  a fail-closed hard constraint, characterization pins, a design the brief already resolves). When both halves hold
   → **`plan-architect-xhigh`**.
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**
 
-Before writing the tier directive, run `bin/plan-tier-hint --explain --desc "<task-line>"` on
-the `/plan` task statement line and confirm the returned tier matches your call. `bin/plan-now`
+Write the tier directive, then let the hint check it. Step 5 item 1 runs
+`bin/plan-tier-hint` on the written block file with `--brief`, the way `bin/plan-now`
+will. The hint drops every `MUST route to` and `plan-architect` line before the judge
+reads the brief, so your directive cannot sway it. When the returned tier differs from
+your call, fix the directive in the file or keep it and pass --tier-ok. `bin/plan-now`
 cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
 The hint is one open Opus 5.5 judge call with no trigger list. When its reason starts with
 judge-failsafe:, the judge failed and the hint printed default. Apply the Fable test yourself,
@@ -214,6 +217,8 @@ step 3.
 
    ```bash
    f=$(mktemp -t plan-prompt); : > "$f"   # write the block into "$f" first
+   bin/plan-tier-hint --explain --brief "$f" \
+       --desc "$(grep -m1 '^/plan' "$f")"  # Step 4 check; add --signals implement for --implement
    pbcopy < "$f"
    ```
 

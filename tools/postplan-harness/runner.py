@@ -4119,7 +4119,7 @@ def _finish(res: RunResult, out_dir: str, *, ab_state_dir: str | None = None,
 # subprocess-timeout is one too: the skill re-run would hang on the same step.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "llm-usage-limit", "llm-auth-expired",
-                      "usage-pause-unconfirmed", "usage-pause-dirty",
+                      "usage-pause-unconfirmed", "usage-pause-dirty", "base-resolve",
                       SUBPROCESS_TIMEOUT, PRECOMMIT_HANG)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
 

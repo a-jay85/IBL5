@@ -114,3 +114,11 @@ def test_refresh_and_reprove_follows_stacked_base():
     runner._refresh_and_reprove(_Git(), lambda *_a, **_k: None, "push", 1)
     assert calls["fetch"] == ["origin/parent"]
     assert calls["rebase"] == ["origin/parent"]
+
+
+def test_base_resolve_failure_exits_fail_closed():
+    """exit 3 keeps bin/post-plan-now from re-running the /post-plan skill, which would
+    merge master into the stacked branch."""
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.error_kind = "base-resolve"
+    assert runner.exit_code_for(res) == 3

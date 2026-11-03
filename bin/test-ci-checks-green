@@ -404,6 +404,10 @@ gcase K2 "age exactly grace holds (strict >)" "in_progress/none" \
 gcase K3 "null conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NULL]" "$K_ST")"
 gcase K4 "missing conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NOCONC]" "$K_ST")"
 gcase K5 "empty-string conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_EMPTY]" "$K_ST")"
+# K5b: a non-string conclusion has a length too (a number's length is its value),
+# so only the type test keeps it pending.
+K_NUMCONC="{\"name\":\"CI Memo Check\",\"status\":\"in_progress\",\"conclusion\":1,$K_DONE}"
+gcase K5b "non-string conclusion holds" "in_progress/none" "$(stuck "$G_OLD" 600 "[$K_NUMCONC]" "$K_ST")"
 gcase K6 "stuck red is normalized and ccg_failed names it" "CI Memo Check (failure)" \
     "$(printf '{"check_runs":[%s]}' "$K_RED" | ccg_settle_stuck "$G_OLD" 600 | ccg_failed)"
 gcase K7 "stuck green leaves ccg_pending empty" "" \

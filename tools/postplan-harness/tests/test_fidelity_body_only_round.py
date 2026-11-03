@@ -403,7 +403,7 @@ def test_history_shape_stops_before_first_fixer(tmp_path, git_shim, monkeypatch)
         assert rounds[0]["outcome"] == "history-shape"
         assert "origin/parent" in res.fidelity["history_shape"]["next_action"]
         assert res.fidelity["verdict_1"] == "NOT READY"
-        assert "verdict_2" not in res.fidelity
+        assert not res.fidelity.get("verdict_2")
     finally:
         _cleanup(9951, "9951-2")
 

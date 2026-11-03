@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (ab_arm, adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, holdrepeat, how_to_revert, llm_calls,
+from harness import (ab_arm, adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, history_shape, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import closer
@@ -3577,6 +3577,18 @@ def _plan_hash(plan) -> str:
         return ""
 
 
+def _stray_master_merges(git, log) -> tuple[str, list[str]]:
+    """(base, stray merge SHAs) for the Phase 5.5 history-shape stop. A base that no
+    longer resolves yields no stop: Phase 2 already resolved it, and raising here would
+    turn a held run into exit 3."""
+    try:
+        base = _merge_target(git)
+    except HarnessError as e:
+        log(f"phase5.5: history-shape check skipped ({e.kind})")
+        return "origin/master", []
+    return base, history_shape.stray_master_merges(getattr(git, "worktree", "") or "", base)
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
@@ -3773,6 +3785,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # handle on the first review's findings by compose time.
     verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
+    stray_base, stray = (_stray_master_merges(git, log) if final_verdict == "NOT READY"
+                         else ("origin/master", []))
     for round_num in range(1, (0 if _narrow_fixers_off(res) else fidelity.MAX_FIDELITY_ROUNDS) + 1):
         if final_verdict != "NOT READY":
             break
@@ -3787,6 +3801,17 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                "verdict": None, "reviewed_tree": None, "verdict_path": None,
                "review_kind": None, "recheck_fallback_reason": None}
         log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
+        if stray:
+            log(f"phase5.5 round {round_num}: history-shape stop -- stray origin/master "
+                f"merge(s) {', '.join(s[:12] for s in stray)} in {stray_base}..HEAD; "
+                "no remediation round can remove them")
+            rec["outcome"] = history_shape.HISTORY_SHAPE_REASON
+            res.fidelity["history_shape"] = {
+                "base": stray_base, "merges": stray,
+                "next_action": history_shape.next_action(git.branch(), stray_base, stray)}
+            rounds.append(rec)
+            res.fidelity["rounds"] = rounds
+            break
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
         # The retry lives INSIDE the iteration, so a retry can never advance round_num
@@ -4756,6 +4781,17 @@ def _hold_repeat_note(res: RunResult) -> str:
 HOLD_REASONS_CAP = 300
 
 
+def _history_shape_note(res: RunResult) -> str:
+    """Display-only RESULT-line suffix carrying the Phase 5.5 history-shape next action."""
+    hs = (res.fidelity or {}).get("history_shape")
+    if not hs:
+        return ""
+    text = " ".join(_redact(hs["next_action"]).split())
+    if len(text) > HOLD_REASONS_CAP:
+        text = text[:HOLD_REASONS_CAP - 1] + "…"
+    return f" history-shape={text}"
+
+
 def _hold_reasons_note(res: RunResult) -> str:
     """Display-only RESULT-line suffix ` hold=(7) reason; (8) reason` for a held run.
     Same text as the audit.log `phase6.5: HELD` line, flattened, redacted, capped."""
@@ -4952,6 +4988,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             pass
     tail += _prose_hold_note(res)
     tail += _hold_repeat_note(res)
+    tail += _history_shape_note(res)
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}"
             f"{_hold_reasons_note(res)}")

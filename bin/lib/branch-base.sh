@@ -11,6 +11,7 @@
 # conclusion that it is not an escape hatch before reading further.
 
 BRANCH_BASE_GH_TIMEOUT_SECS=5
+BRANCH_BASE_LSREMOTE_TIMEOUT_SECS=10
 
 # _branch_base_valid_name <name>
 # Pure-case validation with no subprocess and no Bash =~ (quoting shifted around 3.2).
@@ -110,4 +111,41 @@ branch_base_resolve() {
     branch_base_from_config "$1" "$2" && return 0
     _branch_base_gh "$1" "$2" && return 0
     return 1
+}
+
+# branch_base_merge_target <repo_root> <branch>
+# The ref post-plan merges into a branch (tools/postplan-harness Phase 2, rebase-only,
+# the retry refresh, and bin/postplan-fix --headless). It is the PR's declared base with
+# NO ancestry check: the branch is merged precisely because it is behind that base.
+# Layer order matches branch_base_resolve: iblBase config first, then gh baseRefName.
+# A recorded name that origin no longer has (the parent merged and was deleted) falls
+# through to gh, which reports the retargeted base.
+# Prints "origin/<name>" and returns 0. With no iblBase key and no gh answer it prints
+# "origin/master" (an unstacked branch). Returns 1 and prints nothing when the iblBase key
+# is set but no layer resolves: a stacked branch never falls back to master.
+# Read-only: it never fetches. The caller fetches the printed ref before merging.
+branch_base_merge_target() {
+    local repo="$1" branch="$2" name recorded=0
+    name="$(git -C "$repo" config --get "branch.$branch.iblBase" 2>/dev/null)" || name=""
+    if [ -n "$name" ]; then
+        recorded=1
+        if _branch_base_valid_name "$name" \
+            && _branch_base_run_timed "$BRANCH_BASE_LSREMOTE_TIMEOUT_SECS" \
+                git -C "$repo" ls-remote --exit-code --heads origin "refs/heads/$name" \
+                >/dev/null; then
+            printf 'origin/%s\n' "$name"
+            return 0
+        fi
+    fi
+    if [ "${BRANCH_BASE_OFFLINE:-}" != "1" ] && command -v gh >/dev/null 2>&1; then
+        name="$(cd "$repo" && _branch_base_run_timed "$BRANCH_BASE_GH_TIMEOUT_SECS" \
+                  gh pr view "$branch" --json baseRefName --jq .baseRefName)" || name=""
+        if [ -n "$name" ] && _branch_base_valid_name "$name"; then
+            printf 'origin/%s\n' "$name"
+            return 0
+        fi
+    fi
+    [ "$recorded" = "1" ] && return 1
+    printf 'origin/master\n'
+    return 0
 }

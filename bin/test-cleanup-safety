@@ -936,12 +936,6 @@ if command -v node >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1; then
     (cd "$kw-2" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & sibling=$!
     (cd "$kw" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & infra=$!
 fi
-# Linux only: a non-node process that calls itself MainThread, as Node 24 does.
-imposter=""
-if [ -w /proc/self/comm ] && command -v lsof >/dev/null 2>&1; then
-    bash -c "cd '$kw' && printf MainThread > /proc/\$\$/comm; while :; do sleep 1; done" \
-        >/dev/null 2>&1 & imposter=$!
-fi
 # Linux only: a bash job that renames itself MainThread is not node and must live.
 impostor=""
 if [ -w /proc/self/comm ] && command -v lsof >/dev/null 2>&1; then
@@ -949,10 +943,6 @@ if [ -w /proc/self/comm ] && command -v lsof >/dev/null 2>&1; then
 fi
 _reap_kill_procs() {
     local p
-    for p in $victim $sibling $infra $imposter; do
-        pkill -9 -P "$p" 2>/dev/null || true
-        kill -9 "$p" 2>/dev/null || true
-    done
     for p in $victim $sibling $infra $impostor; do
         pkill -9 -P "$p" 2>/dev/null || true
         kill -9 "$p" 2>/dev/null || true
@@ -988,13 +978,6 @@ if [ -n "$infra" ]; then
 else
     echo "SKIP: kill-infra-spares-prefix-sibling-worktree (no node or lsof)"
     echo "SKIP: kill-infra-still-kills-node-in-worktree (no node or lsof)"
-fi
-if [ -z "$imposter" ]; then
-    echo "SKIP: kill-infra-spares-non-node-mainthread (needs Linux and lsof)"
-elif kill -0 "$imposter" 2>/dev/null; then
-    pass "kill-infra-spares-non-node-mainthread"
-else
-    failcase "kill-infra-spares-non-node-mainthread"
 fi
 if [ -z "$impostor" ]; then
     echo "SKIP: kill-infra-spares-non-node-mainthread (needs Linux and lsof)"

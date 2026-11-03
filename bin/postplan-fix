@@ -222,6 +222,17 @@ if [ "$HOLDREPEAT" = 1 ]; then
         python3 -I -B -c 'import runpy, sys; sys.path.insert(0, sys.argv[1]); sys.argv = ["holdrepeat"] + sys.argv[2:]; runpy.run_module("harness.holdrepeat", run_name="__main__", alter_sys=True)' \
             "$MAIN_ROOT/tools/postplan-harness" "$@"
     }
+    # The rc 11 give-up line carries no part: lines, so its DM reads the held items from the
+    # hold record. fix_eligibility only reads. A record whose fingerprint no longer matches the
+    # verdict's moved on in between, so its items are not this hold's: print none.
+    _hr_giveup_parts() {
+        python3 -I -B -c 'import sys
+sys.path.insert(0, sys.argv[1])
+from harness.holdrepeat import fix_eligibility
+word, fp, parts = fix_eligibility(sys.argv[2], sys.argv[3])
+if word == "eligible" and fp == sys.argv[4]:
+    print("\n".join(parts))' "$MAIN_ROOT/tools/postplan-harness" "$STATE_DIR" "$branch" "$HR_FP" 2>/dev/null
+    }
     # Final stdout line for every --holdrepeat exit; callers parse it with the exit code.
     _hr_finish() {  # <rc> <result word>
         HR_FINISHED=1
@@ -356,7 +367,10 @@ if [ "$HOLDREPEAT" = 1 ]; then
             if [[ "$HR_ELIG" == *"fingerprint="* ]]; then
                 HR_FP="${HR_ELIG#*fingerprint=}"; HR_FP="${HR_FP%%[[:space:]]*}"
             fi
-            if [[ "$HR_ELIG" == *"dm=yes"* ]]; then _hr_dm "gave up: $HR_WORD"; fi
+            if [[ "$HR_ELIG" == *"dm=yes"* ]]; then
+                HR_PARTS="$(_hr_giveup_parts)" || HR_PARTS=""
+                _hr_dm "gave up: $HR_WORD"
+            fi
             _hr_finish "$HR_RC_GAVEUP" "gave-up-$HR_WORD" ;;
         10)
             HR_FP="${HR_ELIG#*fingerprint=}"; HR_FP="${HR_FP%%[[:space:]]*}"

@@ -1115,6 +1115,27 @@ need "run 3: no new DM" test "$(dm_count)" = 2
 case_end holdrepeat-second-decline
 fi
 
+# 44b (the repeat give-up DM, sent from the rc 11 path with no session, lists the held items;
+# a later give-up with dm=no sends nothing)
+if should_run "holdrepeat-giveup-dm-lists-items"; then
+hr_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-nothing"
+hr_run
+rm -f "$TMP/dm.log"
+hr_run
+need "run 2: rc 21" test "$RC" = 21
+need "run 2: final line" final_is "$STDOUT" gave-up-repeat
+need "run 2: one give-up DM" test "$(dm_count)" = 1
+need "run 2: DM names the hold" dm_has "gave up: repeat"
+need "run 2: DM lists the MISSING item" dm_has "bin/test-widget"
+need "run 2: DM lists the MISSING-FILE item" dm_has "bin/widget-tool"
+need "run 2: each item listed once" test "$(grep -c 'bin/widget-tool' "$TMP/dm.log")" = 1
+hr_run
+need "run 3: final line" final_is "$STDOUT" gave-up-repeat
+need "run 3: dm=no sends nothing" test "$(dm_count)" = 1
+case_end holdrepeat-giveup-dm-lists-items
+fi
+
 # 45
 if should_run "holdrepeat-dirty-worktree"; then
 hr_reset

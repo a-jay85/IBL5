@@ -551,3 +551,82 @@ def test_total_cap_default_is_1200():
     from harness import gate_backtest_replay as gbr
     assert gbr.TOTAL_CAP == 1200
     assert inspect.signature(gbr.run_backtest).parameters["total_cap"].default == 1200
+
+
+# --- partial apply of the fix patch ---------------------------------------------------------
+
+from harness.gate_backtest_replay import (_UNKNOWN_PATH, _split_patch,  # noqa: E402
+                                          partial_fix_allowed)
+
+RENAME_BODY = "".join(f"line {i}\n" for i in range(1, 21))
+
+
+def _patch_repo(tmp_path):
+    repo = tmp_path / "prepo"
+    repo.mkdir()
+    sh(repo, "init", "-q", "-b", "master")
+    (repo / "m.txt").write_text("one\n")
+    (repo / "old.txt").write_text(RENAME_BODY)
+    sh(repo, "add", "-A")
+    sh(repo, "commit", "-q", "-m", "root")
+    return repo
+
+
+def test_split_patch_chunks_and_paths(tmp_path):
+    repo = _patch_repo(tmp_path)
+    # The modified file's added line is a near-miss chunk header; it must stay in its chunk.
+    (repo / "m.txt").write_text("one\ndiff --git a/x b/x\n")
+    sh(repo, "mv", "old.txt", "new.txt")
+    (repo / "new.txt").write_text(RENAME_BODY + "line 21\n")
+    (repo / "added.txt").write_text("fresh\n")
+    sh(repo, "add", "-A")
+    patch = subprocess.run(["git", "-C", str(repo), "diff", "--cached", "-M", "--binary"],
+                           capture_output=True, check=True, env=ENV).stdout
+    assert b"\n+diff --git a/x b/x\n" in patch
+    chunks = _split_patch(patch)
+    assert [paths for _, paths in chunks] == [["added.txt"], ["m.txt"], ["old.txt", "new.txt"]]
+    assert b"".join(c for c, _ in chunks) == patch
+
+
+def test_split_patch_quoted_path_is_unknown():
+    patch = (b'diff --git "a/sp ace\\tx" "b/sp ace\\tx"\n'
+             b'--- "a/sp ace\\tx"\n'
+             b'+++ "b/sp ace\\tx"\n'
+             b"@@ -1 +1 @@\n-a\n+b\n")
+    assert [paths for _, paths in _split_patch(patch)] == [[_UNKNOWN_PATH]]
+
+
+def test_partial_fix_allowed_fail_closed():
+    assert partial_fix_allowed((), ["docs/x.md"]) is False
+    assert partial_fix_allowed(("config/*",), ["config/a.txt"]) is False
+    assert partial_fix_allowed(("config/*",), ["?"]) is False
+    assert partial_fix_allowed(("config/*",), ["docs/x.md"]) is True
+
+
+def _two_file_tree(tmp_path):
+    repo = tmp_path / "trepo"
+    repo.mkdir()
+    sh(repo, "init", "-q", "-b", "master")
+    (repo / "a.txt").write_text("a1\n")
+    (repo / "b.txt").write_text("b1\n")
+    sh(repo, "add", "-A")
+    sh(repo, "commit", "-q", "-m", "root")
+    return repo, sh(repo, "rev-parse", "HEAD")
+
+
+def test_apply_patch_per_file_skips_failing_file(tmp_path):
+    repo, root = _two_file_tree(tmp_path)
+    patch = (b"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-a1\n+a2\n"
+             b"diff --git a/b.txt b/b.txt\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-bX\n+b2\n")
+    with ScratchTree(str(repo), root) as scratch:
+        before = open(os.path.join(scratch.dir, "b.txt"), "rb").read()
+        assert scratch.apply_patch_per_file(patch) == (["a.txt"], ["b.txt"])
+        assert open(os.path.join(scratch.dir, "a.txt"), "rb").read() == b"a2\n"
+        assert open(os.path.join(scratch.dir, "b.txt"), "rb").read() == before
+
+
+def test_apply_patch_per_file_unsplittable_is_no_apply(tmp_path):
+    repo, root = _two_file_tree(tmp_path)
+    patch = b"--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-zz\n+a2\n"
+    with ScratchTree(str(repo), root) as scratch:
+        assert scratch.apply_patch_per_file(patch) == ([], [_UNKNOWN_PATH])

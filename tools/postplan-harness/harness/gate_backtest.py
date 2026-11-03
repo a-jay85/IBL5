@@ -32,6 +32,7 @@ class ReplaySpec:
     env: tuple[tuple[str, str], ...] = ()
     needs_plan: bool = False
     stdin: str = ""                       # placeholder-bearing file path fed as the gate's stdin; "" = DEVNULL
+    reads: tuple[str, ...] = ()           # fnmatch globs (repo-relative) for files the gate reads; () = unknown
 
 
 @dataclass(frozen=True)
@@ -68,8 +69,10 @@ class ReplayResult:
     detail: str      # first flagged stdout line, rc, or skip reason, max 160 chars
     base_outcome: str = ""   # "", flag, pass, absent, error, timeout
     base_detail: str = ""
-    fix_outcome: str = ""    # "", pass, flag, no-apply, error, timeout
+    fix_outcome: str = ""    # "", pass, flag, no-apply, partial-no-reads, partial-gate-read, error, timeout
     fix_detail: str = ""
+    fix_applied: tuple[str, ...] = ()   # paths the fix patch changed (fix rerun only)
+    fix_skipped: tuple[str, ...] = ()   # paths whose chunk failed; non-empty = partial apply
 
 
 # --- Replay-spec registry --------------------------------------------------------------------
@@ -159,6 +162,7 @@ _ARMING_PATHS = (
 
 _HEADER_ARGV_RE = re.compile(r"^\s*#\s*gate-backtest-argv:(.*)$")
 _HEADER_FLAG_RE = re.compile(r"^\s*#\s*gate-backtest-flag:\s*(.*)$")
+_HEADER_READS_RE = re.compile(r"^\s*#\s*gate-backtest-reads:(.*)$")
 _HEADER_OPT_OUT_RE = re.compile(r"^\s*#\s*gate-backtest:\s*not-replayable\b\s*(.*)$")
 
 
@@ -176,6 +180,7 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
     argv_tokens: list[str] | None = None
     flag_exits = frozenset({1})
     flag_re = ""
+    reads: tuple[str, ...] = ()
     for line in text.splitlines()[:HEADER_SCAN_LINES]:
         m = _HEADER_OPT_OUT_RE.match(line)
         if m:
@@ -187,6 +192,17 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
                 argv_tokens = shlex.split(m.group(1))
             except ValueError as exc:
                 return ("unspecified", None, f"unparseable gate-backtest-argv header: {exc}")
+            continue
+        m = _HEADER_READS_RE.match(line)
+        if m:
+            try:
+                tokens = shlex.split(m.group(1))
+            except ValueError as exc:
+                return ("unspecified", None, f"unparseable gate-backtest-reads header: {exc}")
+            if any(t.startswith("/") or any(seg in ("", ".", "..") for seg in t.split("/"))
+                   for t in tokens):
+                return ("unspecified", None, "bad gate-backtest-reads path")
+            reads = reads + tuple(tokens)
             continue
         m = _HEADER_FLAG_RE.match(line)
         if m:
@@ -209,7 +225,7 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
     if bad:
         return ("unspecified", None, "unknown placeholder in header argv: " + ", ".join(bad))
     spec = ReplaySpec(argv=tuple(argv_tokens), flag_exits=flag_exits, flag_stdout_re=flag_re,
-                      needs_plan=any("{plan_file}" in t for t in argv_tokens))
+                      needs_plan=any("{plan_file}" in t for t in argv_tokens), reads=reads)
     return ("replayable", spec, "header")
 
 
@@ -524,11 +540,26 @@ def _numbers(nums, truth=None) -> str:
     return ", ".join(shown) + (f" (+{extra} more)" if extra > 0 else "")
 
 
+def _file_list(paths) -> str:
+    """Backticked, cleaned, comment-marker-free paths; at most 10, then '+N more'."""
+    shown = []
+    for p in list(paths)[:10]:
+        p, prev = _clean(p), None
+        while p != prev:   # repeat so a nested `<!<!---->` cannot reassemble a marker
+            prev, p = p, p.replace('<!--', '').replace('-->', '')
+        shown.append(f"`{p}`")
+    more = f" +{len(paths) - 10} more" if len(paths) > 10 else ""
+    return ", ".join(shown) + more
+
+
 def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Truth],
                          window_size: int) -> str:
     """Markdown block for the PR body. Only PR numbers are rendered, never historical titles."""
     if not gates:
         return ""
+    by_key = {(r.gate, r.pr): r for r in (results or [])}
+    partial_fixed: list = []
+    partial_refused: list = []
     lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
              "### Gate backtest", "",
              f"**State:** {verdict.state}. {verdict.reason}", "",
@@ -555,17 +586,34 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
             pre_existing += t.pre_existing
             fixed_by_pr += t.fixed_by_pr
             unsettled += t.unsettled_flags
+            for pr in t.fixed_by_pr:
+                r = by_key.get((path, pr))
+                if r is not None and r.fix_skipped:
+                    partial_fixed.append(r)
+            for pr in t.false_flags:
+                r = by_key.get((path, pr))
+                if r is not None and r.fix_skipped and r.fix_outcome.startswith("partial-"):
+                    partial_refused.append(r)
         lines.append("")
     if catches:
         lines.append("- Catches: " + _numbers(catches, truth))
     if false_flags:
         lines.append("- False flags: " + _numbers(false_flags))
+        for r in partial_refused:
+            why = ("gate declares no gate-backtest-reads" if r.fix_outcome == "partial-no-reads"
+                   else "a skipped file is one the gate reads")
+            lines.append(f"  - Partial apply refused #{r.pr} (`{_clean(r.gate)}`, {why}): "
+                         f"applied {_file_list(r.fix_applied) or 'none'}; "
+                         f"skipped {_file_list(r.fix_skipped)}")
     if pre_existing:
         lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
                      + _numbers(pre_existing))
     if fixed_by_pr:
         lines.append("- Fixed by the candidate PR (head gate passes once this PR's own change "
                      "is applied, excluded from the threshold): " + _numbers(fixed_by_pr))
+        for r in partial_fixed:
+            lines.append(f"  - Partial apply #{r.pr} (`{_clean(r.gate)}`): "
+                         f"applied {_file_list(r.fix_applied)}; skipped {_file_list(r.fix_skipped)}")
     if unsettled:
         lines.append("- Unsettled flags: " + _numbers(unsettled))
     for label, state in (("Not replayable", "not-replayable"), ("Unspecified", "unspecified"),

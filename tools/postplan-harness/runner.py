@@ -1440,14 +1440,23 @@ def _already_shipped(e: HarnessError, git, gh, log) -> dict | None:
         return None
 
 
+def _merge_target(git) -> str:
+    """The ref post-plan merges in: the PR's declared base (Phase 1 merge_target).
+    LiveGit and ReplayGit both define it (pinned by test_adapters_define_merge_target);
+    only hand-rolled test fakes lack it and keep today's origin/master."""
+    resolver = getattr(git, "merge_target", None)
+    return resolver() if resolver is not None else "origin/master"
+
+
 def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
     """Fetch remote tip, rebase, and re-prove no work was lost. Never pushes."""
     key = _retry_key(git.branch(), attempt)
     if not git.capture_lostwork_pre(key):
         raise HarnessError("lostwork-unproved",
                            f"{phase}: diff vs origin/master is empty before re-rebase")
-    git.fetch_base("origin/master")
-    git.rebase_onto("origin/master")
+    base = _merge_target(git)
+    git.fetch_base(base)
+    git.rebase_onto(base)
     ok, evidence = git.prove_lostwork(key)
     if not ok:
         raise HarnessError("lostwork-unproved",
@@ -4444,9 +4453,19 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
     """
     pre_rebase = git.head()
     conflict_resolved = None
+    base = "origin/master"
     try:
         snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
-        git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+        base = _merge_target(git)
+        if base == "origin/master":
+            git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+        else:
+            # Stacked PR: merge the declared parent, never master (PR #3672 pulled ~355
+            # master files into a stack). bin/pre-push-adr-hook accepts origin/<parent>
+            # as an ancestor of HEAD. Merge, never rebase.
+            log(f"phase2: stacked base {base} -- merging it instead of origin/master")
+            git.fetch_base(base)
+            git.rebase_onto(base)
         # A plain merge the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
         for line in audit_lines_for_adaptations(
@@ -4475,6 +4494,10 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         log(f"phase2: plain-path decline -- {(e.detail or '')[:600]}")
         plain_conflicted = getattr(git, "last_conflict_files", ())
         log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
+        if base != "origin/master":
+            log(f"phase2: conflict against stacked base {base}; the --onto fallback "
+                "targets origin/master, so it is skipped")
+            raise
         conflict_resolved = git.autoresolve_stacked_rebase()
         if not conflict_resolved.resolved:
             log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")

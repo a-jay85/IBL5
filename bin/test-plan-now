@@ -102,6 +102,17 @@ printf '#!/bin/sh\nexit 1\n' > "$SHIM/security"
 chmod +x "$SHIM/security"
 export PATH="$SHIM:$PATH"
 
+# Every real-hint call in this file goes through a stub judge
+# (PLAN_TIER_HINT_CLAUDE); no test spends tokens.
+cat > "$TMP/judge-default" <<'JUDGE_EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: check 3"}'
+JUDGE_EOF
+printf '#!/usr/bin/env bash\nexit 3\n' > "$TMP/judge-fail"
+chmod +x "$TMP/judge-default" "$TMP/judge-fail"
+export PLAN_TIER_HINT_CLAUDE="$TMP/judge-default"
+export PLAN_TIER_HINT_LOG="$TMP/plan-tier-hint.log"
+
 # ── The DM + queue stubs ─────────────────────────────────────────────────────
 # PLAN_NOW_DISCORD_DM and PLAN_NOW_AUTOMOUSE_QUEUE are seams in the same shape as
 # PLAN_NOW_CLAUDE. The queue one is not a convenience: the real bin/automouse/queue
@@ -1083,8 +1094,8 @@ echo "── pre-flight architect-tier gate ──"
 
 # Two fixtures for the tier gate tests.
 #
-# Fixture A: declares plan-architect-xhigh; task line hinted as default
-# by bin/plan-tier-hint (no security tokens in the task description).
+# Fixture A: declares plan-architect-xhigh; the stub judge (PLAN_TIER_HINT_CLAUDE)
+# answers default through the real bin/plan-tier-hint.
 TIER_PROMPT_A="$TMP/tier-prompt-a.md"
 cat > "$TIER_PROMPT_A" <<'TIER_A_EOF'
 /plan Add a helper method to the standings renderer.
@@ -1103,7 +1114,7 @@ Step 3 MUST route to `plan-architect`.
 Do NOT escalate to `plan-architect-xhigh`.
 TIER_B_EOF
 
-# T-1. Fixture A (declared xhigh, real hint returns default) → exit 4, no runner.
+# T-1. Fixture A (declared xhigh, real hint + stub judge returns default) → exit 4, no runner.
 TPRE_RC=0
 TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
     PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
@@ -1172,7 +1183,7 @@ want_no "T-5: no tier warning"                "$TPRE_OUT" "TIER MISMATCH"
 preflight_cleanup "$TPRE_OUT"
 
 # T-6. PLAN_NOW_TIER_HINT unset → falls back to real bin/plan-tier-hint.
-#      Fixture A declares xhigh; real hint returns default → gate fires (exit 4).
+#      Fixture A declares xhigh; real hint + stub judge returns default → gate fires (exit 4).
 TPRE_RC=0
 TPRE_OUT=$(unset PLAN_NOW_TIER_HINT; \
     PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
@@ -1192,6 +1203,49 @@ TPRE_OUT=$(PLAN_NOW_TIER_HINT='' \
 [ "$TPRE_RC" = 4 ] && ok "T-7: TIER_HINT empty string: same as unset, exits 4" || \
     fail "T-7: TIER_HINT empty string: same as unset (got $TPRE_RC)"
 want_no "T-7: no runner written"              "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-7a. A failing judge answers default, which matches a declared
+#       plan-architect. Fixture B → exit 0, runner written, no mismatch.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_TIER_HINT_CLAUDE="$TMP/judge-fail" \
+    PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-7a: judge failure under plan-architect: exits 0" || \
+    fail "T-7a: judge failure under plan-architect: exits 0 (got $TPRE_RC)"
+want    "T-7a: runner is written"             "$TPRE_OUT" "runner:"
+want_no "T-7a: no tier warning"               "$TPRE_OUT" "TIER MISMATCH"
+preflight_cleanup "$TPRE_OUT"
+want    "T-7a: hint logged to the seam" \
+    "$(cat "$TMP/plan-tier-hint.log" 2>/dev/null)" "judge-failsafe: judge exited 3"
+
+# T-7b. The default fail-safe disagrees with a declared xhigh. Fixture A → exit 4.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_TIER_HINT_CLAUDE="$TMP/judge-fail" \
+    PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-7b: judge failure under plan-architect-xhigh: exits 4" || \
+    fail "T-7b: judge failure under plan-architect-xhigh: exits 4 (got $TPRE_RC)"
+want    "T-7b: mismatch message printed"      "$TPRE_OUT" "TIER MISMATCH"
+want_no "T-7b: no runner written"             "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-7c. The same broken judge under a declared xhigh, with --tier-ok confirming
+#       the Fable spend → exit 0, runner written.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_TIER_HINT_CLAUDE="$TMP/judge-fail" \
+    PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" \
+    --tier-ok "judge down, Fable confirmed" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-7c: judge failure under xhigh + --tier-ok: exits 0" || \
+    fail "T-7c: judge failure under xhigh + --tier-ok: exits 0 (got $TPRE_RC)"
+want    "T-7c: runner is written"             "$TPRE_OUT" "runner:"
 preflight_cleanup "$TPRE_OUT"
 
 # T-8. Hint stub exits non-zero (exit 2 = usage error) → gate skips, exits 0, runner written.

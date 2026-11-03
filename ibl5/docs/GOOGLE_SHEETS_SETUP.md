@@ -1,13 +1,13 @@
 ---
 description: One-time Google Cloud, environment, key-rotation, and prod-cron setup for the Google Sheets player export, plus what each broken state means.
-last_verified: 2026-10-06
+last_verified: 2026-10-28
 ---
 
 # Google Sheets Export Setup
 
 ## 1. What this is
 
-The site writes the players export into a sheet in the GM's own Google Drive. The sheet holds no API key and no script. The `IMPORTDATA` `?key=` flow keeps working unchanged for GMs who prefer it.
+The site writes the players export into a sheet in the GM's own Google Drive. The sheet holds no API key and no script. This is the only setup path the page shows. The API key card is hidden, so GMs can no longer make or revoke a key there. Keys made earlier still work with the `IMPORTDATA` `?key=` flow.
 
 A GM connects from the ApiKeys page (`modules.php?name=ApiKeys`). After every sim, a cron worker rewrites the sheet. Design record: `ibl5/docs/decisions/0151-google-sheets-server-push.md`. Class layout: `ibl5/classes/GoogleSheets/README.md`.
 

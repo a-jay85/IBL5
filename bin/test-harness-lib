@@ -310,11 +310,11 @@ h_done"
 }
 
 # _usage_fake_home DIR PCT: a fake HOME whose default usage-gate dir holds a
-# fresh cache at PCT five-hour utilization. Prints the default dir.
+# fresh cache at PCT weekly utilization. Prints the default dir.
 _usage_fake_home() {
     local sd="$1/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate"
     mkdir -p "$sd/markers"
-    printf '{"five_hour":{"utilization":%s},"seven_day":{"utilization":10},"fetched_at":%s}\n' \
+    printf '{"five_hour":null,"seven_day":{"utilization":%s},"fetched_at":%s}\n' \
         "$2" "$(date +%s)" >"$sd/cache.json"
     printf '%s\n' "$sd"
 }

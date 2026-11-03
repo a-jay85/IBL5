@@ -1,13 +1,15 @@
 ---
-description: Manages API key generation and display for GM users, and hosts the Google Sheets connect, refresh, and disconnect operations.
-last_verified: 2026-09-30
+description: Serves the Player Export page (Google Sheets card plus the column guide) and keeps the dormant API key generate and revoke operations.
+last_verified: 2026-10-28
 ---
 
 # ApiKeys
 
-Manages API key generation and display for GM users. Follows the standard Repository/Service/View pattern. Entry point: `ibl5/modules/ApiKeys/index.php`.
+Serves the Player Export page. Follows the standard Repository/Service/View pattern. Entry point: `ibl5/modules/ApiKeys/index.php`.
 
-The same page hosts the Google Sheets card. The controller delegates to the `GoogleSheets` module (`ibl5/classes/GoogleSheets/README.md`).
+The main page shows the Google Sheets card, then the Player Export Guide (column reference and tips). The controller delegates the card to the `GoogleSheets` module (`ibl5/classes/GoogleSheets/README.md`).
+
+The API key card is hidden. Google Sheets Sync replaced it as the way GMs get a sheet. Existing keys still work for the `/api/v1` API. The `generate` and `revoke` ops and the key views stay in place so the card can come back later.
 
 ## Operations
 

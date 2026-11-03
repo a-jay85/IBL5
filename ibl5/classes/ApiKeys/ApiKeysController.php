@@ -122,10 +122,10 @@ class ApiKeysController implements ApiKeysControllerInterface
     {
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->view->renderFlash($this->takeFlash()));
+        // The new-key card is hidden: Google Sheets Sync replaced it as the way GMs get a sheet.
+        // GMs who already hold a key still see it, so they can revoke a leaked one.
         $keyStatus = $this->service->getUserKeyStatus($userId);
-        if ($keyStatus === null) {
-            $responder->html($this->view->renderNoKeyState());
-        } else {
+        if ($keyStatus !== null) {
             $responder->html($this->view->renderActiveKeyState($keyStatus));
         }
         $responder->html($this->view->renderGoogleSheetCard(

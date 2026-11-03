@@ -25,6 +25,10 @@ PURPOSE = "thread-remediation"
 VERDICTS = ("FIX", "DECLINE")
 GATE_HOLD_CATEGORY = "gate-path"
 GATE_HOLD_MARKER = "<!-- postplan-gate-hold -->"
+# Decline categories that may close a nit / pre-existing thread as won't-fix. A missing
+# or unknown category on those labels leaves the thread open; gate-path always holds.
+# Important threads are unaffected: their non-gate declines resolve as before.
+WONT_FIX_CATEGORIES = ("wrong", "intentional", "already-fixed", "not-worth-it")
 ORIGIN_PRE_EXISTING = "pre-existing"
 ORIGIN_SAME_RUN = "same-run"
 # Phase 4.5 (pre-existing origin) takes at most this many OUTDATED trusted threads
@@ -83,14 +87,12 @@ def fetch_trusted_threads(gh, pr, pre_posting_ids: set[int], *, keep=None, inclu
             continue
         if not _is_trusted(t.get("authorLogin") or "", t.get("authorType") or ""):
             continue
-        # Nit / Pre-existing threads never hold condition (11); leave them open.
-        if parse_label(t.get("body") or "") in NON_HOLDING_LABELS:
-            continue
         if keep is not None and not keep(t):
             continue
         row = {k: t.get(k) for k in ("commentId", "path", "line", "body", "score", "authorLogin", "agent",
                                       "lastBody", "lastAuthorLogin", "lastAuthorType")}
         row["outdated"] = bool(t.get("isOutdated"))
+        row["label"] = parse_label(t.get("body") or "")
         kept.append(row)
     return kept
 
@@ -238,6 +240,11 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
             if info is not None:
                 info["gate_hold"] = True
             log(f"thread {cid}: gate-path decline; thread held open for a human")
+            return "skipped"
+        category = verdict_obj.get("category")
+        if thread.get("label") in NON_HOLDING_LABELS and category not in WONT_FIX_CATEGORIES:
+            log(f"thread {cid}: {thread.get('label')} decline with category {category!r} "
+                "is not an allowed won't-fix category; thread left open")
             return "skipped"
         gh.resolve_review_thread(pr, cid, f"Declined: {reason}")
         return "declined"

@@ -46,6 +46,8 @@ class NewsController implements NewsControllerInterface
         private readonly \Topics\News\Contracts\NewsServiceInterface $newsService,
         private readonly \Topics\News\Contracts\NewsViewInterface $newsView,
         private readonly \Api\Contracts\HtmlResponderInterface $htmlResponder = new \Api\Response\HtmlResponder(),
+        private readonly ?\OnThisDay\Contracts\OnThisDayServiceInterface $onThisDayService = null,
+        private readonly ?\OnThisDay\Contracts\OnThisDayViewInterface $onThisDayView = null,
         private readonly ?\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface $tradeSuggestionsService = null,
         private readonly ?\TradeSuggestions\Contracts\TradeSuggestionsViewInterface $tradeSuggestionsView = null,
     ) {}
@@ -59,6 +61,7 @@ class NewsController implements NewsControllerInterface
         $new_topic = is_numeric($new_topic) ? (int) $new_topic : 0;
         $this->renderHeader();
         $this->renderSimRecap($userinfo);
+        $this->renderOnThisDay($new_topic);
         $this->renderTradeSuggestions($userinfo);
 
         if (defined('HOME_FILE')) {
@@ -165,6 +168,25 @@ class NewsController implements NewsControllerInterface
         }
 
         return null;
+    }
+
+    /**
+     * Homepage-only "On this day" card. A history query failure must never take the homepage down.
+     */
+    private function renderOnThisDay(int $newTopic): void
+    {
+        if ($this->onThisDayService === null || $this->onThisDayView === null || $newTopic !== 0) {
+            return;
+        }
+
+        try {
+            $html = $this->onThisDayView->renderHomepageBlock($this->onThisDayService->getMomentsForSim());
+            if ($html !== '') {
+                $this->htmlResponder->html($html);
+            }
+        } catch (\Throwable $e) {
+            error_log('[OnThisDay] homepage block skipped: ' . $e->getMessage());
+        }
     }
 
     /**

@@ -155,6 +155,8 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
 
         $gameId = 'game-' . $game['boxid'];
         $boxScoreUrl = HtmlSanitizer::safeHtmlOutput($game['boxScoreUrl']);
+        $visitorBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($game['visitorBoxScoreUrl']);
+        $homeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($game['homeBoxScoreUrl']);
         $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $game['visitor'];
         $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamid=' . $game['home'];
 
@@ -181,9 +183,9 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         // Scores + @
         $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
         if ($boxScoreUrl !== '') {
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : (string)$game['visitorScore']) . '</a>';
+            $html .= '<a href="' . $visitorBoxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : (string)$game['visitorScore']) . '</a>';
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : (string)$game['homeScore']) . '</a>';
+            $html .= '<a href="' . $homeBoxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : (string)$game['homeScore']) . '</a>';
         } else {
             $html .= '<span class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : (string)$game['visitorScore']) . '</span>';
             $html .= '<span class="schedule-game__vs">@</span>';

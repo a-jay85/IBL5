@@ -9,6 +9,7 @@
 # copy of the check and now trusts this script.
 #
 # Run: bin/test-check-plan  (exit 0 = all pass, 1 = a case failed)
+#      bin/test-check-plan gate13  (only the gate 13 block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # are literal markdown code spans, not command substitution — single quotes are
@@ -22,6 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
+# Case filter: empty runs every case; `gate13` skips the cases outside gate 13.
+TCP_ONLY="${1:-}"
 
 # Inline checks further below still set FAILED=1 directly; h_done reads it.
 
@@ -155,6 +158,7 @@ CF_MATRIX='
 | 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
 
+if [ "$TCP_ONLY" != gate13 ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -382,6 +386,7 @@ assert "reuse-constant-not-method" 0 "$FM"'
 
 **Reuse:** the `TotallyMadeUpClass::SOME_CONSTANT` value for the default.
 '
+fi
 
 # ---------------------------------------------------------------------------
 # Gate 8: decision-trigger ADR.
@@ -400,6 +405,7 @@ M='
 - `testStubMethodSatisfyingGateM`
 '
 
+if [ "$TCP_ONLY" != gate13 ]; then
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
 assert "gate8-bin-with-adr" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` to do the thing.
@@ -937,6 +943,7 @@ assert "gateC-many-phases-flags" 1 "$FM$M$PHASES12"
 assert "gateC-eleven-phases-ok" 0 "$FM$M$PHASES11
 sonnet-recipe: gate-C size fixture; recipe completeness not under test.
 "
+fi
 
 # ---------------------------------------------------------------------------
 # Gate 13: impl_model <-> Verification Matrix consistency.
@@ -1090,6 +1097,161 @@ if "$GUARD" "$_f" 2>&1 | grep -qF 'model must be a deliberate choice'; then
 else
     echo "FAIL: gate13-absent-clean-msg — expected 'model must be a deliberate choice'"; FAILED=1
 fi
+
+# (l) manual_judge: opus and the opus-judge: row token. Each fixture copies
+# M_MANUAL and edits only the Truly-manual row's location cell.
+CONSIST="$(dirname "$GUARD")/lib/plan-model-consistency"
+_g13_hdr='
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+M_JUDGE="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: the gate 13 paragraph states the manual_judge rule plainly |
+'
+M_JUDGE_VR="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: the page reads as a coherent new layout; vr: label=judge-vr; role=anon; url=/ibl5/index.php; anchor=body |
+'
+M_JUDGE_VR_TICKS="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | `opus-judge: the page reads as a coherent new layout`; `vr: label=judge-vr; role=anon; url=/ibl5/index.php; anchor=body` |
+'
+M_JUDGE_SHORT="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: short |
+'
+M_JUDGE_VERIFY_CELL="$_g13_hdr"'
+| 1 | opus-judge: does the prose read well? | Truly-manual | post-impl | `no-vr: subjective polish, no single screen to shoot` |
+'
+M_JUDGE_PROSE="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | manual (not opus-judge: reviewer walkthrough) |
+'
+M_JUDGE_MIXED="$_g13_hdr"'
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | opus-judge: the gate 13 paragraph states the manual_judge rule plainly |
+| 2 | HUMAN-ONLY-SENTINEL does the new page feel right? | Truly-manual | post-impl | manual (reviewer walkthrough) |
+'
+M_JUDGE_NONMANUAL="$_g13_hdr"'
+| 1 | cap rejects over-cap trade | CLI-executable | pre-impl | opus-judge: this should never be accepted on a CLI row |
+| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |
+
+## Required Test Methods
+- `testStubMethodSatisfyingGateM`
+'
+FM_SJ='---
+impl_model: sonnet
+manual_judge: opus
+---'
+
+# g13_judge_viol <label> <frontmatter> <fixture> <substring>: $GUARD exits
+# nonzero and its output carries the substring.
+g13_judge_viol() {
+    local _f="$TMP/$1.md" _out _ec
+    printf '%s\n' "$2$3" > "$_f"
+    _out="$("$GUARD" "$_f" 2>&1)"; _ec=$?
+    if [ "$_ec" -ne 0 ] && grep -qF -- "$4" <<< "$_out"; then
+        echo "ok: $1 (exit $_ec, substring confirmed)"
+    else
+        echo "FAIL: $1 — expected nonzero exit with '$4' (exit $_ec)"; FAILED=1
+    fi
+}
+
+# g13_judge_ok <label> <frontmatter> <fixture>: $CONSIST exits 0 with empty
+# stdout, and $GUARD reports no [13] violation.
+g13_judge_ok() {
+    local _f="$TMP/$1.md" _out _ec _gout
+    printf '%s\n' "$2$3" > "$_f"
+    _out="$("$CONSIST" "$_f")"; _ec=$?
+    _gout="$("$GUARD" "$_f" 2>&1)"
+    if [ "$_ec" -eq 0 ] && [ -z "$_out" ] && ! grep -qF '[13]' <<< "$_gout"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected consistency exit 0 with no output and no [13] (exit $_ec: $_out)"; FAILED=1
+    fi
+}
+
+g13_judge_ok "gate13-manual-sonnet-judge-ok" "$FM_SJ" "$M_JUDGE"
+g13_judge_viol "gate13-manual-sonnet-no-judge" '---
+impl_model: sonnet
+---' "$M_JUDGE" 'without `manual_judge: opus`'
+g13_judge_ok "gate13-humanonly-sonnet-judge-ok" "$FM_SJ" "$M_MANUAL"
+g13_judge_viol "gate13-manual-haiku-judge" '---
+impl_model: haiku
+manual_judge: opus
+---' "$M_JUDGE" 'Truly-manual row forbids impl_model: haiku'
+g13_judge_viol "gate13-judge-no-manual" "$FM_SJ" "$M" 'manual_judge: opus needs at least one Truly-manual row'
+g13_judge_viol "gate13-judge-bad-value" '---
+impl_model: sonnet
+manual_judge: sonnet
+---' "$M_JUDGE" 'manual_judge must be `opus`'
+g13_judge_viol "gate13-judge-with-vr" '---
+impl_model: opus
+---' "$M_JUDGE_VR" 'look-and-feel row stays human-only'
+# Backtick-wrapped tokens: the location cell's backticks are stripped before
+# the `(^|;)` anchor, so a wrapped `vr:` beside `opus-judge:` still fails.
+g13_judge_viol "gate13-judge-with-vr-backticked" '---
+impl_model: opus
+---' "$M_JUDGE_VR_TICKS" 'look-and-feel row stays human-only'
+g13_judge_viol "gate13-judge-short" '---
+impl_model: opus
+---' "$M_JUDGE_SHORT" 'at least 15 characters'
+g13_judge_viol "gate13-judge-nonmanual" '---
+impl_model: sonnet
+---' "$M_JUDGE_NONMANUAL" 'applies only to a Truly-manual row'
+
+# --judge-rows query mode (the runner's row source).
+_f="$TMP/judge-rows-positive.md"
+printf '%s\n' "$FM_SJ$M_JUDGE" > "$_f"
+_out="$("$CONSIST" --judge-rows "$_f")"; _ec=$?
+_rows=$(grep -c '^ROW:' <<< "$_out")
+_rowline=$(grep '^ROW:' <<< "$_out")
+if [ "$_ec" -eq 0 ] && grep -qx 'MANUAL_COUNT=1' <<< "$_out" && grep -qx 'MANUAL_JUDGE=opus' <<< "$_out" \
+    && [ "$_rows" = 1 ] && grep -qF 'opus-judge: the gate 13 paragraph' <<< "$_rowline"; then
+    echo "ok: judge-rows-positive"
+else
+    echo "FAIL: judge-rows-positive — got exit $_ec: $_out"; FAILED=1
+fi
+
+_f="$TMP/judge-rows-near-miss-verify-cell.md"
+printf '%s\n' "$FM_SJ$M_JUDGE_VERIFY_CELL" > "$_f"
+_out="$("$CONSIST" --judge-rows "$_f")"
+_rows=$(grep -c '^ROW:' <<< "$_out")
+"$CONSIST" "$_f" > /dev/null; _ec=$?
+if grep -qx 'MANUAL_COUNT=1' <<< "$_out" && [ "$_rows" = 0 ] && [ "$_ec" -eq 0 ]; then
+    echo "ok: judge-rows-near-miss-verify-cell"
+else
+    echo "FAIL: judge-rows-near-miss-verify-cell — rows=$_rows rules-exit=$_ec: $_out"; FAILED=1
+fi
+
+_f="$TMP/judge-rows-near-miss-prose.md"
+printf '%s\n' '---
+impl_model: opus
+---'"$M_JUDGE_PROSE" > "$_f"
+_out="$("$CONSIST" --judge-rows "$_f")"
+_rows=$(grep -c '^ROW:' <<< "$_out")
+"$CONSIST" "$_f" > /dev/null; _ec=$?
+if [ "$_rows" = 0 ] && [ "$_ec" -eq 0 ]; then
+    echo "ok: judge-rows-near-miss-prose"
+else
+    echo "FAIL: judge-rows-near-miss-prose — rows=$_rows rules-exit=$_ec: $_out"; FAILED=1
+fi
+
+_f="$TMP/judge-rows-mixed.md"
+printf '%s\n' "$FM_SJ$M_JUDGE_MIXED" > "$_f"
+_out="$("$CONSIST" --judge-rows "$_f")"
+_rows=$(grep -c '^ROW:' <<< "$_out")
+if grep -qx 'MANUAL_COUNT=2' <<< "$_out" && [ "$_rows" = 1 ] && ! grep -qF 'HUMAN-ONLY-SENTINEL' <<< "$_out"; then
+    echo "ok: judge-rows-mixed"
+else
+    echo "FAIL: judge-rows-mixed — rows=$_rows: $_out"; FAILED=1
+fi
+
+_f="$TMP/consistency-bad-flag.md"
+printf '%s\n' '---
+impl_model: opus
+---'"$M_JUDGE" > "$_f"
+"$CONSIST" --judge-row "$_f" > /dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 2 ]; then
+    echo "ok: consistency-bad-flag"
+else
+    echo "FAIL: consistency-bad-flag — expected exit 2, got $_ec"; FAILED=1
+fi
+[ "$TCP_ONLY" != gate13 ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels must bind to a packet or an inline marker.

@@ -17,11 +17,18 @@ class BoxScoreUrlBuilder
      *
      * Returns empty string only if neither gameOfThatDay nor boxId is available
      * (unplayed games).
+     *
+     * $teamId (optional) is appended as `&team=` on the internal module URL only, so the
+     * box score page opens on that team's tab. Ignored when 0 or for the legacy URL.
      */
-    public static function buildUrl(string $date, int $gameOfThatDay, int $boxId = 0): string
+    public static function buildUrl(string $date, int $gameOfThatDay, int $boxId = 0, int $teamId = 0): string
     {
         if ($gameOfThatDay > 0 && $date !== '' && $date !== '0000-00-00') {
-            return 'modules.php?name=GameBoxscore&date=' . rawurlencode($date) . '&game=' . $gameOfThatDay;
+            $url = 'modules.php?name=GameBoxscore&date=' . rawurlencode($date) . '&game=' . $gameOfThatDay;
+            if ($teamId > 0) {
+                $url .= '&team=' . $teamId;
+            }
+            return $url;
         }
 
         if ($boxId > 0) {

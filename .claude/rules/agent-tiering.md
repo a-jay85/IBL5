@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 5.5 def-pins and the effort setting per surface.
-last_verified: 2026-10-26
+last_verified: 2026-11-02
 ---
 
 # Agent Tiering
@@ -12,11 +12,11 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | Tier | Model param | Use for |
 |------|-------------|---------|
 | **Haiku** | `model: "haiku"` | Command output, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
-| **Sonnet** | `subagent_type: "sonnet-5-5"`, omit `model`. See § Sonnet 5.5 pins. | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, manual-test classification. |
+| **Sonnet** | `subagent_type: "sonnet-5-5"`, omit `model` (the def pins 5.5 and has no `Agent` tool, so it cannot spawn). | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, manual-test classification. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (Phase 6.5 bounded checklist: `agent-tiering-bounded-checklist.md`). Never delegate understanding. |
-| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3. Three defs by ONE ordered precedence: **`plan-architect-xhigh`** (Fable; security, destructive, executable-gate removal; full trigger: `/plan` Step 3 check 1); **`plan-architect-sonnet`** (recipe-backed); **`plan-architect`** (Opus, default). Do **not** pass inline `model`. |
-| **Fable** | `model: "fable"` | Rung above Opus (2.5× Opus 5.5 per token). Default to Opus; raise Opus effort before moving up (unmeasured: the Opus max and Fable cells were inconclusive, 2026-10 review-seat run). When Fable is justified over Opus (Opus likely wrong **and** a wrong answer is expensive), use it without asking; state the reason in one line. Asm-level static RE defaults to Fable. Full test: `agent-tiering-fable.md`. |
-| **Effort** | `--effort` flag or `effort:` frontmatter | `high` on every surface that takes the flag; `max` vs `high` is unmeasured (the 2026-10 Opus max cell hit the time cap after 3 calls). Flag-taking surfaces (`bin/pr-review-now`, `bin/plan-now`, `bin/post-plan-now`, the three architect defs) run `high`. Post-plan harness review seats take no flag and inherit `effortLevel: medium`, so no measured cell equals them. Per-surface detail: `agent-tiering-fable.md` § Effort. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only. `/plan` Step 3 picks between the three architect defs (`.claude/skills/plan/SKILL.md`). Do **not** pass inline `model`. |
+| **Fable** | `model: "fable"` | Rung above Opus (2.5× Opus 5.5 per token). Default to Opus; raise Opus effort before moving up. When Fable is justified over Opus (Opus likely wrong **and** a wrong answer is expensive), use it without asking; state the reason in one line. Asm-level static RE defaults to Fable. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes. Full test: `agent-tiering-fable.md`. |
+| **Effort** | `--effort` flag or `effort:` frontmatter | `high` on every surface that takes the flag. Per-surface detail and measurements: `agent-tiering-fable.md` § Effort. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
 
@@ -34,14 +34,7 @@ Single backlog item → **Sonnet** orchestrator; multiple items → **Opus**. De
 
 ## Sonnet 5.5 pins
 
-Sonnet surfaces are pinned to 5.5 via an agent def or skill frontmatter. The def-based pin wins only when `model` is omitted.
-
-| Surface | Def / File | Spawn / invoke with |
-|---------|-----------|---------------------|
-| **Explore** | `~/.claude/agents/Explore.md` (machine-local) | `subagent_type: "Explore"`, **omit `model`**. |
-| **General Sonnet tasks** (any Sonnet-tier spawn) | `.claude/agents/sonnet-5-5.md` (in-repo) | `subagent_type: "sonnet-5-5"`, **omit `model`**. The `Agent` tool is absent; it cannot spawn. |
-
-Also pinned (automouse delegates, `plan-architect-sonnet`, `/pr-review` and `/security-audit` runners): `agent-tiering-detail.md` § Sonnet 5.5 pins, other surfaces.
+Sonnet surfaces are pinned to 5.5 via an agent def or skill frontmatter. The def-based pin wins only when `model` is omitted. General Sonnet tasks use `sonnet-5-5` (tier table above). Explore uses `subagent_type: "Explore"` with `model` omitted (def: `~/.claude/agents/Explore.md`, machine-local). Other pinned surfaces: `agent-tiering-detail.md` § Sonnet 5.5 pins, other surfaces.
 
 ## Explore Agents
 

@@ -1920,6 +1920,22 @@ def test_phase7_ci_fix_usage_pause_still_fails_run(monkeypatch, tmp_path):
     assert "phase9: retrospective skipped" not in audit
 
 
+def test_replay_pr_merged_before_cifix_ends_already_shipped(monkeypatch, tmp_path):
+    """The PR merged before attempt 1: no ci-fix call, ALREADY_SHIPPED, exit 0."""
+    out = str(tmp_path / "out")
+    fx = _red_fixture(ci_fix_rewatch=[{"exit": 0, "failed": []}])
+    fx["merged_pr"] = {"number": fx["pr_number"], "url": "https://example.invalid/pr"}
+    res, llm = _run_live_shaped_with(
+        monkeypatch, out, git_cls=_TwoShaLiveGit,
+        canned_extra={"ci-fix": ["edits made"]}, fixture=fx)
+    assert res.terminal == TerminalState.ALREADY_SHIPPED
+    assert res.final_pr_state == "MERGED"
+    assert res.pr_number == fx["pr_number"]
+    assert runner.exit_code_for(res) == 0
+    assert not os.path.exists(os.path.join(out, "ci-fix-1"))
+    assert "merged before attempt 1" in _audit(out)
+
+
 def test_phase7_signoff_only_red_is_green(monkeypatch, tmp_path):
     monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
     out = str(tmp_path / "out")

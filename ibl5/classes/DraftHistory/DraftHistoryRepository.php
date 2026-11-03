@@ -52,12 +52,25 @@ class DraftHistoryRepository extends \Database\BaseMysqliRepository implements D
      */
     public function getDraftPicksByYear(int $year): array
     {
+        // The drafting identity is the franchise's name in the draft year (fs), so a retired
+        // name or a reused one ("Nets", "Thunder") gets its era franchise and colors; names
+        // with no fs row that year (pre-1989) fall back to the current team_name match.
         /** @var list<DraftPickByYearRow> */
         return $this->fetchAll(
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftedby, p.college,
-                    t.teamid, t.team_city, t.color1, t.color2
+                    t.teamid,
+                    COALESCE(fs.team_city, t.team_city) AS team_city,
+                    COALESCE(NULLIF(eb.color1, ''), t.color1) AS color1,
+                    COALESCE(NULLIF(eb.color2, ''), t.color2) AS color2
             FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.draftedby = t.team_name
+            LEFT JOIN `ibl_franchise_seasons` fs
+                   ON fs.team_name = p.draftedby AND fs.season_ending_year = p.draftyear
+            LEFT JOIN `ibl_team_info` cur ON p.draftedby = cur.team_name
+            LEFT JOIN `ibl_team_info` t ON t.teamid = COALESCE(fs.franchise_id, cur.teamid)
+            LEFT JOIN `ibl_franchise_era_branding` eb
+                   ON eb.franchise_id = fs.franchise_id
+                  AND eb.team_city COLLATE utf8mb4_unicode_ci = fs.team_city
+                  AND eb.team_name COLLATE utf8mb4_unicode_ci = fs.team_name
             WHERE p.draftyear = ? AND p.draftround > 0
             ORDER BY p.draftround ASC, p.draftpickno ASC, p.pid ASC",
             "i",

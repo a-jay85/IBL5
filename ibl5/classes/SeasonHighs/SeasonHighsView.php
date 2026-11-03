@@ -129,7 +129,8 @@ class SeasonHighsView implements SeasonHighsViewInterface
         $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl(
             $row['date'],
             $row['gameOfThatDay'] ?? 0,
-            $row['boxId'] ?? 0
+            $row['boxId'] ?? 0,
+            $row['gameTeamid'] ?? 0
         );
         if ($boxScoreUrl !== '') {
             /** @var string $safeUrl */

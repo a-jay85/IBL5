@@ -201,6 +201,7 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 | `tables/franchise-record-book.css` | `.record-book-section-title`, `.record-book-team-selector`, `.record-book-retired-cell` |
 | `tables/free-agency.css` | `.fa-table`, `.fa-table__title`, `.fa-*` selectors, including the mobile and desktop title-centering rules for `.fa-table` inside scroll containers |
 | `tables/standings-rows.css` | `.ibl-data-table tbody tr.clinch-league`, `.clinch-conference`, `.clinch-division`, `.clinch-playoffs`, `.bottom-locked` row variants; responsive sticky-col backgrounds for same rows — NEW |
+| `tables/rivalries.css` | `.rivalries-table` (on `.ibl-data-table`): 0.75rem side padding on every cell so short numeric columns don't run their headers together |
 | `head-to-head-records.css` | Head-to-Head Records matrix: corner-cell arrows, logo-only or rotated-text column headers, win/loss tints via `.series-record-cell`, hover crosshair, and the user row/column accent. Built on Pattern 3a (`.sticky-table`) with `.ibl-team-cell--colored` row labels. |
 
 ### When to add a new module file

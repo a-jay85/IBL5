@@ -72,7 +72,7 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
      *
      * @param GameBoxscoreViewModel $viewModel
      */
-    public function render(array $viewModel): string
+    public function render(array $viewModel, int $selectedTeamId = 0): string
     {
         if ($viewModel['found'] !== true) {
             return $this->renderNotFound();
@@ -81,7 +81,9 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
         $output = '<section class="game-boxscore">';
         $output .= '<h1 class="sr-only">Game Boxscore</h1>';
         $output .= $this->renderScoreHeader($viewModel);
-        $output .= $this->renderTeamSelector();
+        $awaySelected = $selectedTeamId > 0
+            && $selectedTeamId === (int) $viewModel['awayTeam']['teamId'];
+        $output .= $this->renderTeamSelector($awaySelected);
         $output .= $this->renderTeamPanel(
             $viewModel['awayTeam'],
             $viewModel['awayPlayers'],
@@ -161,17 +163,20 @@ class GameBoxscoreView implements GameBoxscoreViewInterface
     }
 
     /**
-     * Render the CSS-only team selector. Home is checked by default.
+     * Render the CSS-only team selector. Home is checked unless $awaySelected is true.
      *
      * The radios are siblings of the panels so the :checked ~ panel rules in
      * game-boxscore.css can reveal the matching side without JavaScript.
      */
-    private function renderTeamSelector(): string
+    private function renderTeamSelector(bool $awaySelected): string
     {
+        $awayChecked = $awaySelected ? ' checked' : '';
+        $homeChecked = $awaySelected ? '' : ' checked';
+
         $output = '<input class="game-boxscore__radio" type="radio" name="boxscore-team"'
-            . ' id="boxscore-team-away">';
+            . ' id="boxscore-team-away"' . $awayChecked . '>';
         $output .= '<input class="game-boxscore__radio" type="radio" name="boxscore-team"'
-            . ' id="boxscore-team-home" checked>';
+            . ' id="boxscore-team-home"' . $homeChecked . '>';
         $output .= '<div class="game-boxscore__tabs">';
         $output .= '<label class="game-boxscore__tab" for="boxscore-team-away">Away</label>';
         $output .= '<label class="game-boxscore__tab" for="boxscore-team-home">Home</label>';

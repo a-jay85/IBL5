@@ -15,6 +15,18 @@ describe('boxScoreUrl', () => {
         );
     });
 
+    it('appends &team= when a positive team id is given', () => {
+        expect(boxScoreUrl('2008-03-10', 7, 12)).toBe(
+            'https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-10&game=7&team=12',
+        );
+    });
+
+    it('omits team when the team id is 0', () => {
+        expect(boxScoreUrl('2008-03-10', 7, 0)).toBe(
+            'https://iblhoops.net/ibl5/modules.php?name=GameBoxscore&date=2008-03-10&game=7',
+        );
+    });
+
     it('derives its origin from siteBase like every other embed link', () => {
         expect(boxScoreUrl('2008-03-10', 7).startsWith(`${siteBase}/modules.php`)).toBe(true);
     });

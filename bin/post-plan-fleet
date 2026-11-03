@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-list N[,N...]] [--dry-run] [--wait] [--no-dm] [--allow-test-only] [--state-changed-prs=N[,N...]] [--rebase-only-prs=N[,N...]] [--holdrepeat-fix-prs=N[,N...]] [--stop N[,N...]] [--stop-all] [--help]
+#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-list N[,N...]] [--dry-run] [--wait] [--no-dm] [--allow-test-only] [--state-changed-prs=N[,N...]] [--rebase-only-prs=N[,N...]] [--holdrepeat-fix-prs=N[,N...]] [--conflict-fix-prs=N[,N...]] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
@@ -33,6 +33,7 @@
 #   --state-changed-prs=N[,N...]  Pass --state-changed to the listed PRs' bin/post-plan-now sessions only (skips only the repeat-hold decline, exit 8). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #   --rebase-only-prs=N[,N...]  Pass --rebase-only to the listed PRs' bin/post-plan-now sessions (merge master, push, stop before review; the harness re-checks the hold). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #   --holdrepeat-fix-prs=N[,N...]  Run bin/postplan-fix --holdrepeat for the listed PRs instead of a first post-plan-now pass (pr-cycle routes repeat-hold skips here). Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
+#   --conflict-fix-prs=N[,N...]  After a first pass that ends in a rebase conflict, run one bounded bin/postplan-fix --headless per (PR, head SHA) for the listed PRs and re-fire post-plan once on committed; any other result restores the worktree and DMs the paste line. Equals form only. Passed by bin/pr-cycle Stage 1; not for hand use.
 #
 # Examples:
 #   bin/post-plan-fleet                       # report what would run
@@ -86,7 +87,7 @@
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    sed -n '2,84p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,85p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 fi
 
@@ -131,7 +132,8 @@ ALLOW_TEST_ONLY_ARG=""
 STATE_CHANGED_PRS=""
 REBASE_ONLY_PRS=""
 HOLDREPEAT_FIX_PRS=""
-MODE=fire         # fire | stop | stop-all
+CONFLICT_FIX_PRS=""
+MODE=fire        # fire | stop | stop-all
 STOP_PRS=()
 SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
@@ -142,12 +144,21 @@ SAW_DRY_RUN=0
 PPN_TIMEOUT_SECS=5400        # one post-plan-now pass in the runner
 HR_FIX_TIMEOUT_SECS=7200     # bin/postplan-fix --holdrepeat: HR_TIMEOUT_SECS (1500) + one re-fire (5400) + 300 margin
 CEILING_MARGIN_SECS=1800     # launchd start, the DM, bootout
-CEILING_SECS="${POST_PLAN_FLEET_CEILING:-$((PPN_TIMEOUT_SECS + HR_FIX_TIMEOUT_SECS + CEILING_MARGIN_SECS))}"
+# bin/postplan-fix --headless: one restricted session (same 100-turn ceiling as --holdrepeat);
+# the re-fire after it is budgeted separately at PPN_TIMEOUT_SECS.
+CF_FIX_TIMEOUT_SECS=1800
+# A runner takes at most one follow-up (the conflict block is gated on _hr_run = 0), so the
+# ceiling covers the longer of the two.
+_ceiling_tail=$HR_FIX_TIMEOUT_SECS
+if [ $((CF_FIX_TIMEOUT_SECS + PPN_TIMEOUT_SECS)) -gt "$_ceiling_tail" ]; then
+    _ceiling_tail=$((CF_FIX_TIMEOUT_SECS + PPN_TIMEOUT_SECS))
+fi
+CEILING_SECS="${POST_PLAN_FLEET_CEILING:-$((PPN_TIMEOUT_SECS + _ceiling_tail + CEILING_MARGIN_SECS))}"
 # Poll interval of the --wait block. Seam exists so the harness can drive a timeout in seconds.
 WAIT_POLL_SECS="${POST_PLAN_FLEET_WAIT_POLL:-20}"
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,84p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,85p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -174,6 +185,11 @@ while [[ $# -gt 0 ]]; do
             HOLDREPEAT_FIX_PRS="${1#--holdrepeat-fix-prs=}"
             [[ "$HOLDREPEAT_FIX_PRS" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]] \
                 || { echo "ERROR: --holdrepeat-fix-prs= needs a comma list of PR numbers, got: '$HOLDREPEAT_FIX_PRS'" >&2; exit 2; }
+            shift ;;
+        --conflict-fix-prs=*)
+            CONFLICT_FIX_PRS="${1#--conflict-fix-prs=}"
+            [[ "$CONFLICT_FIX_PRS" =~ ^[1-9][0-9]*(,[1-9][0-9]*)*$ ]] \
+                || { echo "ERROR: --conflict-fix-prs= needs a comma list of PR numbers, got: '$CONFLICT_FIX_PRS'" >&2; exit 2; }
             shift ;;
         --pr|--pr-list)
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 1; }
@@ -673,6 +689,21 @@ fire_pr() {
         [[ ",$HOLDREPEAT_FIX_PRS," == *",$PR,"* ]] && _hf_arg=1
         printf 'HOLDREPEAT_FIX_ARG=%q\n' "$_hf_arg"
         printf 'POSTPLAN_FIX_BIN=%q\n' "${POST_PLAN_FLEET_POSTPLAN_FIX:-$ROOT/bin/postplan-fix}"
+        # Conflict autofix: the PR's worktree path comes from the same listing the pre-flight
+        # used (empty when none), and the state dir is resolved here so a launchd runner does
+        # not depend on its own environment.
+        _cf_arg=""; _cf_wt=""
+        if [[ ",$CONFLICT_FIX_PRS," == *",$PR,"* ]]; then
+            _cf_arg=1
+            for _cf_i in "${!FIRE_PRS[@]}"; do
+                [[ "${FIRE_PRS[$_cf_i]}" == "$PR" ]] && _cf_wt="$(wt_path_for_branch "${FIRE_BRANCHES[$_cf_i]}")"
+            done
+        fi
+        printf 'CONFLICT_FIX_ARG=%q\n' "$_cf_arg"
+        printf 'CF_FIX_TIMEOUT_SECS=%q\n' "$CF_FIX_TIMEOUT_SECS"
+        printf 'PCW_LIB=%q\n' "$ROOT/bin/lib/pr-cycle-watch.sh"
+        printf 'CF_STATE_DIR=%q\n' "${PR_CYCLE_WATCH_STATE_DIR:-$HOME/.ibl5-pr-cycle-watch}"
+        printf 'CF_WT=%q\n' "$_cf_wt"
         printf 'PPN_TIMEOUT_SECS=%q\n' "$PPN_TIMEOUT_SECS"
         printf 'HR_FIX_TIMEOUT_SECS=%q\n' "$HR_FIX_TIMEOUT_SECS"
         declare -f ljob_dm_ready ljob_dm_send
@@ -754,6 +785,101 @@ if [ "$_hr_run" = 1 ]; then
         echo "postplan-fix: TIMED OUT after ${HR_FIX_TIMEOUT_SECS}s (rc=124)" >> "$LOG"
     fi
     echo "post-plan-fleet: holdrepeat-fix=$_hr_word" >> "$LOG"
+fi
+# _cf_restore: put the PR's worktree back at the pre-fix head after a gave-up conflict fix.
+# postplan-fix prints head0= before it touches the worktree, so an empty _cf_head0 means
+# nothing changed. The worktree is fleet-owned, and head0 is its HEAD before the fix (the
+# attempt record keys on the same SHA). Nothing checks that head0 matches the remote PR head.
+# The gave-up-refire-* paths ran post-plan-now, which can push, so the is-ancestor guard is
+# what keeps the reset from discarding a published commit.
+_cf_restored=""
+_cf_restore() {
+    [ -n "$_cf_head0" ] || return 0
+    local _cf_cur _cf_br _cf_prc
+    if git -C "$CF_WT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+        git -C "$CF_WT" merge --abort >/dev/null 2>&1 || true
+    fi
+    _cf_cur=$(git -C "$CF_WT" rev-parse HEAD 2>/dev/null || true)
+    _cf_br=$(git -C "$CF_WT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+    # Fail closed: reset only when the probe answers exactly 1 (HEAD not published). 0 means
+    # published; any other status (missing ref, git error) cannot answer, so skip the reset.
+    _cf_prc=0
+    git -C "$CF_WT" merge-base --is-ancestor HEAD "refs/remotes/origin/$_cf_br" >/dev/null 2>&1 || _cf_prc=$?
+    if [ "$_cf_prc" = 1 ]; then
+        if [ "$_cf_cur" != "$_cf_head0" ]; then
+            git -C "$CF_WT" reset --hard "$_cf_head0" >/dev/null 2>&1 || true
+            _cf_restored=$(printf '%.7s' "$_cf_head0")
+            echo "post-plan-fleet: conflict-fix-restored=$_cf_restored" >> "$LOG"
+        fi
+    elif [ "$_cf_prc" != 0 ]; then
+        echo "post-plan-fleet: conflict-fix-restore-skipped=probe-rc-$_cf_prc" >> "$LOG"
+    fi
+    rm -f "/tmp/postplan-premerged-$(printf '%s' "$_cf_br" | tr '/' '-').json"
+}
+# Conflict autofix: one bounded postplan-fix --headless per (PR, head SHA), then one re-fire.
+# Gated on _hr_run = 0, so a runner takes at most one follow-up (the ceiling relies on it).
+_cf_ran=0 _cf_fixed=0 _cf_word="" _cf_rc=0 _cf_head0=""
+_cf_first=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
+if [ "$CONFLICT_FIX_ARG" = 1 ] && [ "$_hr_run" = 0 ] && [ "$RC" != 124 ] \
+   && grep -qE 'rebase conflict|rebase-conflict:' <<< "$_cf_first"; then
+    if [ -z "$CF_WT" ]; then
+        _cf_word=skip-no-worktree
+    else
+        # The worktree can be gone or stale by now; with no head there is no attempt key.
+        _cf_head=$(git -C "$CF_WT" rev-parse HEAD 2>/dev/null || true)
+        _cf_n=0 _cf_cap=1
+        if [ -n "$_cf_head" ]; then
+            _cf_n=$( . "$PCW_LIB" && pcw_conflict_fix_count "$CF_STATE_DIR" "$PR" "$_cf_head" )
+            _cf_cap=$( . "$PCW_LIB" && printf '%s' "${PCW_CONFLICT_FIX_CAP:-1}" )
+        fi
+        if [ -z "$_cf_head" ]; then
+            _cf_word=skip-no-head
+        elif [ "${_cf_n:-0}" -ge "${_cf_cap:-1}" ]; then
+            _cf_word=skip-attempted
+        else
+            # An attempt that cannot be recorded could repeat on every run: do not call the fix.
+            if ! ( . "$PCW_LIB" && pcw_add_conflict_fix "$CF_STATE_DIR" "$PR" "$_cf_head" ) >/dev/null; then
+                _cf_word=skip-record-failed
+            else
+            _cf_ran=1
+            timeout "$CF_FIX_TIMEOUT_SECS" "$POSTPLAN_FIX_BIN" --headless "$PR" \
+                > "$LOG.conflict-fix" 2>&1 || _cf_rc=$?
+            _cf_word=$(grep '^postplan-fix: headless result=' "$LOG.conflict-fix" | tail -n 1 | sed 's/.*result=//' || true)
+            _cf_head0=$(grep -m1 '^postplan-fix: headless head0=' "$LOG.conflict-fix" | sed 's/.*head0=//; s/ wt=.*//' || true)
+            if [ "$_cf_rc" = 0 ] && [ "$_cf_word" = committed ]; then
+                cp "$LOG" "$LOG.conflict"
+                _cf_refire_rc=0
+                POSTPLAN_FIRED_BY="$POSTPLAN_FIRED_BY" timeout "$PPN_TIMEOUT_SECS" "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground ${ALLOW_TEST_ONLY_ARG:+"$ALLOW_TEST_ONLY_ARG"} ${STATE_CHANGED_ARG:+"$STATE_CHANGED_ARG"} ${REBASE_ONLY_ARG:+"$REBASE_ONLY_ARG"} > "$LOG.conflict-refire" 2>&1 || _cf_refire_rc=$?
+                cp "$LOG.conflict-refire" "$LOG"
+                RC=$_cf_refire_rc
+                [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
+                _cf_first=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
+                if grep -qE 'rebase conflict|rebase-conflict:' <<< "$_cf_first"; then
+                    _cf_word=gave-up-refire-conflict; _cf_restore
+                elif [ "$RC" = 124 ]; then
+                    _cf_word=gave-up-refire-timeout
+                    _cf_restore
+                elif [ -z "$_cf_first" ]; then
+                    _cf_word=gave-up-refire-no-result
+                    _cf_restore
+                else
+                    _cf_fixed=1
+                fi
+            elif [ "$_cf_rc" = 0 ] && [ "$_cf_word" = clean ]; then
+                # A clean merge writes no pre-merge manifest, so the harness would run no
+                # proof or review on it. Do not re-fire; leave it to a human.
+                _cf_word=gave-up-clean-unproven
+                _cf_restore
+            elif [ "$_cf_rc" = 124 ]; then
+                _cf_word=timeout; _cf_restore
+            else
+                _cf_word="${_cf_word:-no-result-rc=$_cf_rc}"
+                _cf_restore
+            fi
+            fi
+        fi
+    fi
+    echo "post-plan-fleet: conflict-fix=$_cf_word" >> "$LOG"
 fi
 # A timed-out run's last step: the last "starting" line of the harness audit.log, found
 # through the hung stage's harness-run-dir= line. Empty (and no line written) when either
@@ -947,8 +1073,14 @@ ${DM_NEXT}" ;;
         *)                fix_block="
 Fix: ${DM_NEXT}" ;;
     esac
+    # A bot conflict fix that ran and gave up says so first; the paste line below is unchanged.
+    local cf_line=""
+    if [ "$_cf_ran" = 1 ] && [ "$_cf_fixed" = 0 ]; then
+        cf_line="Bot conflict fix gave up (${_cf_word}); worktree restored to ${_cf_restored:-unchanged}.
+"
+    fi
     msg="${DM_ICON} post-plan-fleet: ${head}${title_line}
-RESULT ${DM_VERDICT}${fix_block}
+${cf_line}RESULT ${DM_VERDICT}${fix_block}
 log: $LOG"
     # Failure verdicts end with the one-command fix entry point (bin/postplan-fix).
     # READY / HELD / READY WITH NOTES: nothing failed, so no paste line.
@@ -1027,6 +1159,16 @@ else
             fi
             ;;
     esac
+fi
+if [ "$_cf_fixed" = 1 ]; then
+    # Only a re-fire that shipped, held or rebased counts as fixed. Any other outcome
+    # (failed, declined, paused, conflict) stays as the re-fire's own, so it earns its strike.
+    case "$_ppf_outcome" in
+        shipped|held|rebased) _ppf_reason="$_ppf_outcome"; _ppf_outcome=conflict-fixed ;;
+        *) : ;;
+    esac
+elif [ "$_cf_ran" = 1 ]; then
+    _ppf_outcome=conflict-fix-gave-up; _ppf_reason="$_cf_word"
 fi
 echo "post-plan-fleet: outcome=$_ppf_outcome" >> "$LOG"
 [ -z "$_ppf_reason" ] || echo "post-plan-fleet: reason=$_ppf_reason" >> "$LOG"

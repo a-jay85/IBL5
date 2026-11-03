@@ -231,6 +231,105 @@ else
     echo "  output: $OUT_BUMPED"
 fi
 
+# ── Backward-moving last_verified ────────────────────────────────────────────
+#
+# A changed doc whose last_verified is EARLIER than its merge-base value fails.
+
+back_present() {   grep -qF 'last_verified moved backward' <<< "$1"; }
+LATER=$(php -r 'echo (new DateTimeImmutable("today"))->format("Y-m-d");')
+
+run_since() {   # run_since <repo> <base>
+    (cd "$1" && CHECK_DOCS_TODAY="$LATER" bin/check-docs --since="$2" --no-staleness 2>&1) || true
+}
+
+# (1) backward move fails with the new message
+REPO=$(make_repo)
+write_doc "$REPO" "$PINNED" "Original body."
+commit_doc "$REPO"
+BASE=$(git -C "$REPO" rev-parse HEAD)
+write_doc "$REPO" "$STALER" "Edited body."
+commit_doc "$REPO"
+OUT=$(run_since "$REPO" "$BASE")
+rm -rf "$REPO"
+if back_present "$OUT" && grep -qF "($PINNED -> $STALER)" <<< "$OUT"; then
+    pass "backward: last_verified moved earlier fails with the new message"
+else
+    fail "backward: moved-earlier last_verified should fail"
+    echo "  output: $OUT"
+fi
+
+# (2) forward bump still passes
+REPO=$(make_repo)
+write_doc "$REPO" "$STALER" "Original body."
+commit_doc "$REPO"
+BASE=$(git -C "$REPO" rev-parse HEAD)
+write_doc "$REPO" "$PINNED" "Edited body."
+commit_doc "$REPO"
+OUT=$(run_since "$REPO" "$BASE")
+rm -rf "$REPO"
+if ! back_present "$OUT" && bump_absent "$OUT"; then
+    pass "backward: forward bump still passes"
+else
+    fail "backward: forward bump should pass"
+    echo "  output: $OUT"
+fi
+
+# (3) equal values still follow the old rules (stale -> not-bumped; no backward report)
+REPO=$(make_repo)
+write_doc "$REPO" "$STALER" "Original body."
+commit_doc "$REPO"
+BASE=$(git -C "$REPO" rev-parse HEAD)
+write_doc "$REPO" "$STALER" "Edited body."
+commit_doc "$REPO"
+OUT=$(run_since "$REPO" "$BASE")
+rm -rf "$REPO"
+if ! back_present "$OUT" && bump_present "$OUT"; then
+    pass "backward: equal values keep the old not-bumped rule, no backward report"
+else
+    fail "backward: equal values should only follow the old rule"
+    echo "  output: $OUT"
+fi
+
+# (4) newly added doc with a date passes
+REPO=$(make_repo)
+write_doc "$REPO" "$PINNED" "Seed body."
+commit_doc "$REPO"
+BASE=$(git -C "$REPO" rev-parse HEAD)
+printf -- '---\ndescription: Test fixture\nlast_verified: %s\n---\n# New\n' "$STALER" > "$REPO/.claude/rules/added.md"
+commit_doc "$REPO"
+OUT=$(run_since "$REPO" "$BASE")
+rm -rf "$REPO"
+if ! back_present "$OUT"; then
+    pass "backward: newly added doc with a date does not trip the rule"
+else
+    fail "backward: newly added doc should not trip the rule"
+    echo "  output: $OUT"
+fi
+
+# (5) behind-master: master bumps the date after the branch point; branch never
+# touched the date, so the tip's newer value must not false-fail the branch.
+REPO=$(make_repo)
+write_doc "$REPO" "$STALER" "Original body."
+commit_doc "$REPO"
+MAIN=$(git -C "$REPO" rev-parse --abbrev-ref HEAD)
+git -C "$REPO" checkout -qb feature
+printf -- '---\ndescription: o\nlast_verified: %s\n---\n# O\n' "$STALER" > "$REPO/.claude/rules/other.md"
+commit_doc "$REPO"
+git -C "$REPO" checkout -q "$MAIN"
+write_doc "$REPO" "$PINNED" "Original body."
+commit_doc "$REPO"
+git -C "$REPO" checkout -q feature
+write_doc "$REPO" "$STALER" "Original body plus branch edit."
+commit_doc "$REPO"
+OUT=$(run_since "$REPO" "$MAIN")
+rm -rf "$REPO"
+if ! back_present "$OUT"; then
+    pass "backward: branch behind a master date bump is not flagged (merge-base compare)"
+else
+    fail "backward: behind-master branch must compare against the merge-base"
+    echo "  output: $OUT"
+fi
+
 # ── UTC freshness clock (checkFile / stalenessAgeDays) ───────────────────────
 #
 # The freshness verdict is pinned to UTC on BOTH sides: $today is built with an

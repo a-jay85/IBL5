@@ -27,4 +27,12 @@ interface GameBoxscoreServiceInterface
      * @return GameBoxscoreViewModel
      */
     public function getBoxscore(mixed $rawDate, mixed $rawGame): array;
+
+    /**
+     * Narrow a raw `team` request value to a positive team id.
+     *
+     * @param mixed $rawTeam Raw request value, e.g. $_GET['team'] ?? null
+     * @return int Positive team id, or 0 when the value is missing or malformed
+     */
+    public function parseSelectedTeamId(mixed $rawTeam): int;
 }

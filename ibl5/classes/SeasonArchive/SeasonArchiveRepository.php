@@ -220,6 +220,37 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     }
 
     /**
+     * @see SeasonArchiveRepositoryInterface::getTeamColorsByYear()
+     */
+    public function getTeamColorsByYear(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT fs.season_ending_year, fs.franchise_id AS teamid, fs.team_name,
+                    COALESCE(NULLIF(eb.color1, ''), ti.color1) AS color1,
+                    COALESCE(NULLIF(eb.color2, ''), ti.color2) AS color2
+            FROM `ibl_franchise_seasons` fs
+            JOIN `ibl_team_info` ti ON ti.teamid = fs.franchise_id
+            LEFT JOIN `ibl_franchise_era_branding` eb
+                   ON eb.franchise_id = fs.franchise_id
+                  AND eb.team_city COLLATE utf8mb4_unicode_ci = fs.team_city
+                  AND eb.team_name COLLATE utf8mb4_unicode_ci = fs.team_name
+            WHERE fs.franchise_id BETWEEN 1 AND " . League::MAX_REAL_TEAMID
+        );
+
+        $byYear = [];
+        foreach ($rows as $row) {
+            /** @var array{season_ending_year: int, teamid: int, team_name: string, color1: string, color2: string} $row */
+            $byYear[$row['season_ending_year']][$row['team_name']] = [
+                'color1' => $row['color1'],
+                'color2' => $row['color2'],
+                'teamid' => $row['teamid'],
+            ];
+        }
+
+        return $byYear;
+    }
+
+    /**
      * @see SeasonArchiveRepositoryInterface::getPlayerIdsByNames()
      */
     public function getPlayerIdsByNames(array $names): array

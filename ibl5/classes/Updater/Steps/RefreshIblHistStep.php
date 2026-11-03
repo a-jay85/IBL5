@@ -14,6 +14,9 @@ use Updater\StepResult;
  * error. Uses DELETE (not TRUNCATE) because TRUNCATE is DDL and causes an
  * implicit commit in MariaDB, breaking rollback safety.
  *
+ * Preseason snapshots never feed ibl_hist: their stats_gm holds games that are
+ * not regular-season games, so a preseason-only player gets no row for that season.
+ *
  * IBL-only — Olympics league does not use this step.
  */
 final class RefreshIblHistStep implements PipelineStepInterface
@@ -145,7 +148,7 @@ FROM (
         s.id DESC
     ) AS rn
   FROM `ibl_plr_snapshots` s
-  WHERE s.stats_gm > 0
+  WHERE s.stats_gm > 0 AND s.snapshot_phase <> 'preseason'
 ) snap
 LEFT JOIN `ibl_franchise_seasons` fs
   ON snap.teamid = fs.franchise_id

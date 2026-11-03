@@ -64,7 +64,7 @@
 #
 # THEY OPEN IN VS CODE. Every path URI is vscode://file<abs path>, so a plan or a
 # log lands in an editor, not the OS's .md/.log app. The one other link, `reorder`
-# on the queue header, opens an applet that starts the reorder UI. CMD-click.
+# on the queue header, is a URL that starts the reorder UI. Allow it once.
 #
 # UNDER TMUX, TWO THINGS HAVE TO BE TRUE or the click dies silently and the page
 # looks like plain text. tmux forwards OSC 8 only when the OUTER terminal is
@@ -119,8 +119,13 @@ JQ_BIN="${FLEET_STATUS_JQ:-jq}"
 GH_BIN="${FLEET_STATUS_GH:-gh}"
 BURNDOWN_LOG="${FLEET_STATUS_BURNDOWN_LOG:-$HOME/.claude/burndown-loop/loop.log}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
+LAUNCH_AGENTS_DIR="${FLEET_STATUS_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
 REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
 OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
+PLISTBUDDY_BIN="${FLEET_STATUS_PLISTBUDDY:-/usr/libexec/PlistBuddy}"
+CODESIGN_BIN="${FLEET_STATUS_CODESIGN:-codesign}"
+LSREGISTER_BIN="${FLEET_STATUS_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
+REORDER_URL_SCHEME="${FLEET_STATUS_REORDER_SCHEME:-ibl5-queue-reorder}"
 # Same default and override as usage_state_dir in bin/lib/usage-fetch.sh.
 USAGE_STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
 # shellcheck source=bin/lib/session-id.sh
@@ -235,46 +240,72 @@ log_word() {
 # bin/automouse/queue-reorder-ui, or nothing at all.
 #
 # A LINK CANNOT RUN A COMMAND. OSC 8 carries a URI and the terminal hands it to
-# the OS, which only opens things. What it CAN open is an app bundle, and
-# launching one runs it. So the link is file://<a tiny AppleScript applet> whose
+# the OS, which only opens things. So the link is <scheme>://open, a URL scheme
+# owned by a tiny AppleScript applet. Opening the URL launches the applet, whose
 # only statement is a `do shell script` that starts the launcher detached. The
 # launcher then picks a port, starts its server and opens the browser itself. No
-# Terminal window, no URL-scheme registration.
+# Terminal window.
+#
+# WHY A SCHEME AND NOT file://<applet>. Ghostty 1.4 hard-blocks any local link
+# target that could execute code, and an app bundle is one. No setting allows
+# it. Ghostty treats a custom scheme like vscode://: it asks once, then opens.
+# The applet ignores the URL's contents, so the worst any link can do, a web
+# page's included, is open the reorder page.
 #
 # The applet is built here with osacompile on first need and cached outside the
-# repo. It is rebuilt only when the command it would carry changes, which is
-# tracked by a stamp file holding that command. The target is the MAIN
-# checkout's launcher, because a worktree path dies with the worktree while the
-# cached applet lives on.
+# repo. PlistBuddy adds the scheme to its Info.plist. codesign re-signs it,
+# because an edited plist breaks the ad-hoc signature and LaunchServices then
+# ignores the scheme. lsregister registers it. The stamp file holds the scheme
+# and the command, and the applet is rebuilt only when that changes. The target
+# is the MAIN checkout's launcher, because a worktree path dies with the
+# worktree while the cached applet lives on.
 #
 # do shell script runs with a bare /usr/bin:/bin PATH, and the launcher needs
 # php, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
 #
 # FAIL-SOFT: no link when links are off (a pipe or a capture has nothing to
-# click), when osacompile is missing (Linux CI), when a path would break the
-# AppleScript string, or when the build fails.
+# click), when a build tool is missing (Linux CI), when a path would break the
+# AppleScript string, or when any build step fails.
 reorder_link() {
     [ "$LINKS" -eq 1 ] || return 0
     local target="$MAIN_CHECKOUT/bin/automouse/queue-reorder-ui"
     local app="$REORDER_APP_DIR/ibl5-queue-reorder.app"
     local stamp="$REORDER_APP_DIR/ibl5-queue-reorder.cmd"
-    local cmd tmp
+    local scheme="$REORDER_URL_SCHEME"
+    local cmd tmp tool plist
     case "$target$REORDER_APP_DIR" in *\'*|*\"*|*\\*) return 0 ;; esac
     cmd="PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-queue-reorder-ui.log 2>&1 &"
-    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$cmd" ]; then
-        command -v "$OSACOMPILE_BIN" >/dev/null 2>&1 || return 0
+    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$scheme $cmd" ]; then
+        for tool in "$OSACOMPILE_BIN" "$PLISTBUDDY_BIN" "$CODESIGN_BIN" "$LSREGISTER_BIN"; do
+            command -v "$tool" >/dev/null 2>&1 || return 0
+        done
         mkdir -p "$REORDER_APP_DIR" 2>/dev/null || return 0
         tmp="$REORDER_APP_DIR/.build-$$.app"
+        plist="$tmp/Contents/Info.plist"
         rm -rf "$tmp"
-        "$OSACOMPILE_BIN" -o "$tmp" -e "do shell script \"$cmd\"" >/dev/null 2>&1 \
+        "$OSACOMPILE_BIN" -o "$tmp" \
+            -e 'on run' -e "do shell script \"$cmd\"" -e 'end run' \
+            -e 'on open location u' -e "do shell script \"$cmd\"" \
+            -e 'end open location' >/dev/null 2>&1 \
             || { rm -rf "$tmp"; return 0; }
+        # osacompile may or may not write a bundle id, so drop any and add ours.
+        "$PLISTBUDDY_BIN" -c 'Delete :CFBundleIdentifier' "$plist" >/dev/null 2>&1
+        if ! { "$PLISTBUDDY_BIN" \
+            -c 'Add :CFBundleIdentifier string com.ibl5.queue-reorder' \
+            -c 'Add :CFBundleURLTypes array' \
+            -c 'Add :CFBundleURLTypes:0 dict' \
+            -c 'Add :CFBundleURLTypes:0:CFBundleURLName string com.ibl5.queue-reorder' \
+            -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' \
+            -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $scheme" \
+            "$plist" && "$CODESIGN_BIN" -f -s - "$tmp"; } >/dev/null 2>&1; then
+            rm -rf "$tmp"; return 0
+        fi
         { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
-        printf '%s' "$cmd" > "$stamp"
+        "$LSREGISTER_BIN" -f "$app" >/dev/null 2>&1 || return 0
+        printf '%s' "$scheme $cmd" > "$stamp"
     fi
-    # Trailing slash: an .app is a directory, and file:// directory URIs end in one.
     # shellcheck disable=SC1003  # '\033\\' is the OSC ST, as in link_file.
-    printf '\033]8;;file://%s/\033\\%s\033]8;;\033\\' \
-        "$(printf '%s' "$app" | sed 's/ /%20/g')" 'reorder'
+    printf '\033]8;;%s://open\033\\%s\033]8;;\033\\' "$scheme" 'reorder'
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.
@@ -1387,7 +1418,117 @@ EOF
     return 0
 }
 
-# ── section 4: paused jobs ─────────────────────────────────────────────────────
+# ── section 4: scheduled one-shots ─────────────────────────────────────────────
+#
+# Loaded com.ibl5.* jobs that have not fired yet. The launchd section hides them
+# because they have no PID. Most idle labels are recurring jobs (wt-gc, the
+# nightly db sync), so a job only counts as a one-shot when its plist pins a
+# date: StartCalendarInterval with Month, Day, Hour, and Minute all set. The
+# automouse one-shots carry their fire epoch in the label instead
+# (automouse_oneshot_next), so they need no plist.
+#
+# Parsed with sed for the same reason as automouse_daily_next: CI has no plutil.
+# A date already past this year rolls to next year, because launchd fires a
+# pinned date every year until the plist goes away.
+
+# "<Y>-<MM>-<DD> <HH>:<MI>" local wall-clock to an epoch. BSD first, GNU second.
+wallclock_epoch() {
+    date -j -f '%Y-%m-%d %H:%M' "$1" +%s 2>/dev/null \
+        || date -d "$1" +%s 2>/dev/null
+}
+
+# One plist's pinned fire epoch and program, tab-separated, or nothing.
+plist_oneshot() {
+    local f=$1 flat sci mo d h m y epoch now prog
+    [ -f "$f" ] || return 0
+    flat="$(tr -d '\r\n' < "$f" 2>/dev/null | sed 's/>[[:space:]]*</></g')"
+    sci="${flat#*<key>StartCalendarInterval</key><dict>}"
+    [ "$sci" = "$flat" ] && return 0
+    sci="${sci%%</dict>*}"
+
+    mo="$(sed -n 's|.*<key>Month</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    d="$(sed -n 's|.*<key>Day</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    h="$(sed -n 's|.*<key>Hour</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    m="$(sed -n 's|.*<key>Minute</key><integer>\([0-9]*\)</integer>.*|\1|p' <<< "$sci")"
+    case "$mo" in ''|*[!0-9]*) return 0 ;; esac
+    case "$d"  in ''|*[!0-9]*) return 0 ;; esac
+    case "$h"  in ''|*[!0-9]*) return 0 ;; esac
+    case "$m"  in ''|*[!0-9]*) return 0 ;; esac
+
+    now="$(date +%s)"
+    y="$(date +%Y)"
+    epoch="$(wallclock_epoch "$(printf '%04d-%02d-%02d %02d:%02d' \
+        "$y" "$(( 10#$mo ))" "$(( 10#$d ))" "$(( 10#$h ))" "$(( 10#$m ))")")"
+    case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$epoch" -le "$now" ]; then
+        epoch="$(wallclock_epoch "$(printf '%04d-%02d-%02d %02d:%02d' \
+            "$(( y + 1 ))" "$(( 10#$mo ))" "$(( 10#$d ))" "$(( 10#$h ))" "$(( 10#$m ))")")"
+        case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
+    fi
+
+    # The program is the last word of the last ProgramArguments string, which
+    # covers both `/bin/bash script.sh` and `bash -lc "exec ... script.sh"`.
+    prog="${flat#*<key>ProgramArguments</key><array>}"
+    if [ "$prog" != "$flat" ]; then
+        prog="${prog%%</array>*}"
+        prog="${prog%</string>}"
+        prog="${prog##*<string>}"
+        prog="${prog##* }"
+        case "$prog" in "$HOME"/*) prog="~${prog#"$HOME"}" ;; esac
+    else
+        prog=''
+    fi
+    printf '%s\t%s' "$epoch" "$prog"
+}
+
+render_scheduled() {
+    local listing rows='' line pid label suffix epoch prog now count=0 found
+
+    section "SCHEDULED JOBS  (one-shot launchd jobs waiting to fire)"
+
+    listing="$(launchctl list 2>/dev/null | grep 'com\.ibl5\.')"
+    now="$(date +%s)"
+    while IFS= read -r line; do
+        pid="$(awk '{print $1}' <<< "$line")"
+        label="$(awk '{print $3}' <<< "$line")"
+        [ -n "$label" ] || continue
+        # A numeric PID is running, so the launchd section already shows it.
+        [ "$pid" = "-" ] || continue
+        suffix="${label#com.ibl5.}"
+
+        case "$suffix" in
+            automouse-oneshot-*)
+                epoch="${suffix#automouse-oneshot-}"
+                case "$epoch" in ''|*[!0-9]*) continue ;; esac
+                [ "$epoch" -gt "$now" ] || continue
+                rows="$rows$epoch	automouse one-shot	bin/automouse/run
+"
+                ;;
+            *)
+                found="$(plist_oneshot "$LAUNCH_AGENTS_DIR/$label.plist")"
+                [ -n "$found" ] || continue
+                epoch="${found%%	*}"
+                prog="${found#*	}"
+                rows="$rows$epoch	$suffix	$prog
+"
+                ;;
+        esac
+    done <<< "$listing"
+
+    while IFS='	' read -r epoch suffix prog; do
+        [ -n "$epoch" ] || continue
+        count=$(( count + 1 ))
+        printf '  %s◷%s %s%s%s\n' "$YEL" "$R" "$B" "$suffix" "$R"
+        printf '      fires %s  ·  in %s\n' "$(epoch_clock "$epoch")" \
+            "$(human_age $(( epoch - now )))"
+        [ -n "$prog" ] && printf '      %s%s%s\n' "$DIM" "$(clip_field "$prog" 64 left)" "$R"
+    done < <(printf '%s' "$rows" | sort -n)
+
+    [ "$count" -eq 0 ] && note "none"
+    return 0
+}
+
+# ── section 5: paused jobs ─────────────────────────────────────────────────────
 #
 # Runs the usage gate stopped at the usage limit. A paused run has no process, so
 # no section above lists it (an automouse plan's queue row only says "paused").
@@ -1431,7 +1572,6 @@ paused_resume_text() {
     fi
     case "$resets" in ''|*[!0-9]*) ;; *) est=$(( resets + 60 )) ;; esac
     case "$window" in
-        five_hour) when='5h reset' ;;
         seven_day) when='weekly reset' ;;
         *)         when='reset' ;;
     esac
@@ -1513,6 +1653,7 @@ render_all() {
     render_queue
     render_icebox
     render_loose
+    render_scheduled
     render_paused
     printf '\n'
 }

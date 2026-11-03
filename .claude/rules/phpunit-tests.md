@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-10-14
+last_verified: 2026-10-30
 ---
 
 # PHPUnit Testing Rules
@@ -154,13 +154,7 @@ class ScheduleEntryPointTest extends ModuleEntryPointTestCase {
 
 ## Mutation Testing (Infection)
 
-1. **Per-PR diff** — every PR touching `classes/**/*.php`; scopes to changed lines (`--git-diff-filter=AM --git-diff-lines`), ~minutes, posts a PR comment.
-2. **Weekly full** — Mon 03:00 UTC.
-3. **On-demand full** — apply the `mutation-test` label.
-
-Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
-
-**Local run.** `bin/mutation-diff <base-ref>`; details in `.claude/rules/phpstan-invocation.md`.
+Mutation testing (Infection): see `phpunit-tests-detail.md`.
 
 ## Completion Criteria
 
@@ -168,7 +162,8 @@ Before considering ANY PHP task complete:
 
 1. **Run the FULL suite**: `composer test` (from `ibl5/`) — never `--testsuite`/`--filter` as final verification; changes in one module frequently break others (shared mocks/interfaces/base classes).
 2. **DB-touching code** → `composer test:all` instead (needs Docker MariaDB + `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`).
-3. Final line must read `OK (X tests, Y assertions)` — zero warnings, failures, errors, skips.
+3. Final line must read `OK (X tests, Y assertions)`, with zero warnings, failures, errors, or skips. One skip is expected on the macOS host, so `OK, but some tests were skipped!` with `Skipped: 1` passes there. That test is `ShadowProcessLauncherTest::launchReturnsImmediatelyWhileChildRunsDetached`.
+   It needs Linux `setsid`, which macOS lacks. It runs for real in CI and in the php container, and it fails in CI if `setsid` is missing. Don't investigate it. A second skip, or a skip anywhere in CI, is real and needs fixing.
 4. If `OK, but there were issues!`, run `--display-all-issues` and FIX root causes (don't suppress).
 
 Use `--testsuite`/`--filter` only for fast feedback while debugging a specific failure — re-run the full suite once it passes.

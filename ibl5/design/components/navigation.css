@@ -462,21 +462,22 @@
     transform: translateY(0);
 }
 
-/* :where() drops specificity to (0,2,0) so .group.nav-hover/.nav-pinned rules (0,3,0) always win */
-:where(.group:hover) .nav-dropdown-item:nth-of-type(1) { transition-delay: 0ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(2) { transition-delay: 25ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(3) { transition-delay: 50ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(4) { transition-delay: 75ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(5) { transition-delay: 100ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(6) { transition-delay: 125ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(7) { transition-delay: 150ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(8) { transition-delay: 175ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(9) { transition-delay: 200ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(10) { transition-delay: 225ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(11) { transition-delay: 250ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(12) { transition-delay: 275ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(13) { transition-delay: 300ms; }
-:where(.group:hover) .nav-dropdown-item:nth-of-type(14) { transition-delay: 325ms; }
+/* :where() keeps specificity at (0,1,0) so .group.nav-hover/.nav-pinned rules (0,3,0) always win.
+   "of .nav-dropdown-item" counts only menu items, so a rawHtml <span> row keeps its place in the stagger. */
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(1 of .nav-dropdown-item)) { transition-delay: 0ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(2 of .nav-dropdown-item)) { transition-delay: 25ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(3 of .nav-dropdown-item)) { transition-delay: 50ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(4 of .nav-dropdown-item)) { transition-delay: 75ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(5 of .nav-dropdown-item)) { transition-delay: 100ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(6 of .nav-dropdown-item)) { transition-delay: 125ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(7 of .nav-dropdown-item)) { transition-delay: 150ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(8 of .nav-dropdown-item)) { transition-delay: 175ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(9 of .nav-dropdown-item)) { transition-delay: 200ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(10 of .nav-dropdown-item)) { transition-delay: 225ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(11 of .nav-dropdown-item)) { transition-delay: 250ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(12 of .nav-dropdown-item)) { transition-delay: 275ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(13 of .nav-dropdown-item)) { transition-delay: 300ms; }
+:where(.group:hover) .nav-dropdown-item:where(:nth-child(14 of .nav-dropdown-item)) { transition-delay: 325ms; }
 
 
 /* ==========================================================================

@@ -182,7 +182,7 @@ class ApiPlayerRepositoryTest extends WideUnitTestCase
 
         $this->repository->getAllPlayersForExport();
 
-        $this->assertQueryExecuted('ORDER BY name ASC, pid ASC');
+        $this->assertQueryExecuted('ORDER BY v.name ASC, v.pid ASC');
     }
 
     // --- getPlayerByUuid ---

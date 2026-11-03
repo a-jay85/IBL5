@@ -86,6 +86,8 @@ final class NewsFactory implements ModuleFactoryInterface
             new \LastSimRecap\LastSimRecapView(),
             new \Topics\News\NewsService($db),
             new \Topics\News\NewsView(),
+            onThisDayService: \OnThisDay\OnThisDayFactory::createService($db, $this->services->leagueContext()),
+            onThisDayView: new \OnThisDay\OnThisDayView(),
             tradeSuggestionsService: $tradeSuggestionsService,
             tradeSuggestionsView: new \TradeSuggestions\TradeSuggestionsView(),
         );

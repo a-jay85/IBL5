@@ -96,6 +96,32 @@ class SeasonArchiveIndexViewTest extends TestCase
         $this->assertStringContainsString('new12.png', $result);
     }
 
+    public function testRenderIndexPrefersEraColorsForThatSeasonsRow(): void
+    {
+        $seasons = [
+            ['year' => 1995, 'label' => 'Season VII (1994-95)', 'iblChampion' => 'Nets', 'heatChampion' => 'Supersonics', 'mvp' => ''],
+            ['year' => 2003, 'label' => 'Season XV (2002-03)', 'iblChampion' => 'Nets', 'heatChampion' => 'Clippers', 'mvp' => ''],
+        ];
+        $teamColors = [
+            'Nets' => ['color1' => 'AAAAAA', 'color2' => 'BBBBBB', 'teamid' => 4],
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+        ];
+        $teamColorsByYear = [
+            1995 => [
+                'Nets' => ['color1' => '000001', 'color2' => 'FFFFFE', 'teamid' => 4],
+                'Supersonics' => ['color1' => '00653A', 'color2' => 'FFC200', 'teamid' => 22],
+            ],
+        ];
+
+        $result = $this->view->renderIndex($seasons, $teamColors, [], [], $teamColorsByYear);
+
+        $this->assertStringContainsString('00653A', $result);
+        $this->assertStringContainsString('teamid=22', $result);
+        $this->assertStringContainsString('000001', $result);
+        // 2003 row has no era map, so Nets falls back to the current colors
+        $this->assertStringContainsString('AAAAAA', $result);
+    }
+
     public function testRenderIndexUsesPlayerCellForMvp(): void
     {
         $seasons = [

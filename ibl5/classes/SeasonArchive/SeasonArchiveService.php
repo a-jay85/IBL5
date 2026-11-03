@@ -107,7 +107,9 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         $gmAwards = $this->repository->getAllGmAwardsWithTeams();
         $gmTenures = $this->repository->getAllGmTenuresWithTeams();
         $heatStandingsRaw = $this->repository->getHeatWinLossByYear($heatYear);
-        $teamColors = $this->repository->getTeamColors();
+        // Era colors for this season win over today's colors; current names remain the fallback.
+        $teamColors = $this->repository->getTeamColorsByYear()[$year] ?? [];
+        $teamColors += $this->repository->getTeamColors();
         $teamConferences = $this->repository->getTeamConferences();
 
         $iblFinals = $this->bracketBuilder->getIblFinals($playoffResults);

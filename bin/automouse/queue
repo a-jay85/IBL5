@@ -655,7 +655,7 @@ if CONSISTENCY_MSG=$("$LIB_DIR/plan-model-consistency" "$SOURCE"); then
 else
     echo "Error: $FILENAME fails impl_model <-> Verification Matrix consistency:" >&2
     echo "  $CONSISTENCY_MSG" >&2
-    echo "Fix the plan's line-1 frontmatter (add/adjust the one-line impl_model: marker), then requeue." >&2
+    echo "Fix the plan's line-1 frontmatter (add/adjust the one-line impl_model: or manual_judge: marker), then requeue." >&2
     exit 1
 fi
 

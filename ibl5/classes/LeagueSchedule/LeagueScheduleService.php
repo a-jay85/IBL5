@@ -187,6 +187,8 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
             'boxid' => $boxid,
             'gameOfThatDay' => $gameOfThatDay,
             'boxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid),
+            'visitorBoxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid, $visitor),
+            'homeBoxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid, $home),
             'isUnplayed' => \Utilities\ScheduleHighlighter::isGameUnplayed($visitorScore, $homeScore),
             'isUpcoming' => $isUpcoming,
             'visitorWon' => ($visitorScore > $homeScore),

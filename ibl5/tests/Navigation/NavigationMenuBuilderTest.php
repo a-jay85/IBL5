@@ -48,6 +48,25 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertArrayHasKey('Community', $menus);
     }
 
+    public function testDebugAdminMenuKeepsDebugMenuFirstAlongsideStandardMenus(): void
+    {
+        $config = new NavigationConfig(
+            isLoggedIn: true,
+            username: 'TestUser',
+            currentLeague: 'ibl',
+            teamId: 1,
+            seasonPhase: 'Regular Season',
+            allowWaivers: 'No',
+            showDraftLink: 'Off',
+            isDraftOrderFinalized: false,
+            isAdmin: false,
+            isDebugAdmin: true,
+        );
+        $menus = (new NavigationMenuBuilder($config))->getMenuStructure();
+
+        $this->assertSame(['Debug', 'Season', 'Stats', 'History', 'Community'], array_keys($menus));
+    }
+
     public function testStatsMenuLinksToHeadToHeadRecords(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig());
@@ -292,6 +311,44 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertNotContains('Trading', $labels);
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function seasonPhaseProvider(): array
+    {
+        return [
+            'Preseason' => ['Preseason'],
+            'HEAT' => ['HEAT'],
+            'Regular Season' => ['Regular Season'],
+            'Playoffs' => ['Playoffs'],
+            'Draft' => ['Draft'],
+            'Free Agency' => ['Free Agency'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('seasonPhaseProvider')]
+    public function testIblTeamMenuLinksRivalriesInEveryPhase(string $phase): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(teamId: 7, seasonPhase: $phase));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $this->assertContains(
+            ['label' => 'Rivalries', 'url' => 'modules.php?name=Rivalries&op=team&team=7'],
+            $menu['links']
+        );
+    }
+
+    public function testOlympicsTeamMenuOmitsRivalries(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'olympics'));
+        $menu = $builder->getMyTeamMenu();
+        $this->assertNotNull($menu);
+
+        $labels = array_map(static fn (array $link): string => $link['label'] ?? '', $menu['links']);
+        $this->assertNotContains('Rivalries', $labels);
+    }
+
     public function testIblModeMenuStructureContainsAllSeasonLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
@@ -304,7 +361,7 @@ class NavigationMenuBuilderTest extends TestCase
 
         $expectedSeasonLinks = [
             'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
-            'Contracts', 'Draft Pick Locator', 'Training Camp Ratings Diff',
+            'Draft Pick Locator', 'Training Camp Ratings Diff',
             'Free Agency Preview', 'Player Movement',
         ];
         foreach ($expectedSeasonLinks as $label) {
@@ -332,16 +389,21 @@ class NavigationMenuBuilderTest extends TestCase
         }
     }
 
-    public function testIblSeasonMenuHasSingleContractsLinkAndNoLegacyLinks(): void
+    public function testIblSeasonMenuHasSplitCapSpaceContractsLinkAndNoLegacyLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
         $menus = $builder->getMenuStructure();
 
         $contractsLinks = array_values(array_filter(
             $menus['Season']['links'],
-            static fn (array $link): bool => ($link['label'] ?? '') === 'Contracts'
+            static fn (array $link): bool => str_contains($link['rawHtml'] ?? '', 'name=Contracts')
         ));
-        $this->assertCount(1, $contractsLinks, 'Season menu should have exactly one Contracts link');
+        $this->assertCount(1, $contractsLinks, 'Season menu should have exactly one Cap Space / Contracts item');
+        $rawHtml = $contractsLinks[0]['rawHtml'];
+        $this->assertMatchesRegularExpression(
+            '#<a href="modules\.php\?name=Contracts&amp;tab=teams"[^>]*>Cap Space</a> / <a href="modules\.php\?name=Contracts&amp;tab=players"[^>]*>Contracts</a>#',
+            $rawHtml
+        );
         $this->assertSame('modules.php?name=Contracts', $contractsLinks[0]['url'] ?? null);
 
         $seasonLabels = array_map(

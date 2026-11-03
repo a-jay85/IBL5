@@ -203,4 +203,62 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
             self::assertGreaterThan($years[$i], $years[$i - 1], 'Years should be in descending order');
         }
     }
+
+    public function testRetiredEraRowGetsEraCityAndColors(): void
+    {
+        $pid = 200000045;
+        $this->insertTestPlayer($pid, 'DB EraLdr', ['teamid' => 1]);
+        $this->insertHistRow($pid, 'DB EraLdr', 2096, ['teamid' => 1, 'team' => 'EraLdrTeam']);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Era City', 'team_name' => 'EraLdrTeam',
+        ]);
+        $this->insertRow('ibl_franchise_era_branding', [
+            'franchise_id' => 1, 'team_city' => 'Era City', 'team_name' => 'EraLdrTeam',
+            'color1' => '112233', 'color2' => '445566',
+        ]);
+
+        $result = $this->repo->getSeasonLeaders(['year' => '2096'], 0);
+
+        $row = $this->findRowByPid($result['results'], $pid);
+        self::assertSame('Era City', $row['team_city']);
+        self::assertSame('112233', $row['color1']);
+        self::assertSame('445566', $row['color2']);
+    }
+
+    public function testRowWithoutEraBrandingKeepsCurrentTeamColors(): void
+    {
+        $pid = 200000046;
+        $this->insertTestPlayer($pid, 'DB NoEraLdr', ['teamid' => 1]);
+        $this->insertHistRow($pid, 'DB NoEraLdr', 2096, ['teamid' => 1]);
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => 1, 'season_year' => 2095, 'season_ending_year' => 2096,
+            'team_city' => 'Current City', 'team_name' => 'CurrentName',
+        ]);
+        $res = $this->db->query('SELECT color1, color2 FROM ibl_team_info WHERE teamid = 1');
+        self::assertInstanceOf(\mysqli_result::class, $res);
+        $current = $res->fetch_assoc();
+        self::assertIsArray($current);
+
+        $result = $this->repo->getSeasonLeaders(['year' => '2096'], 0);
+
+        $row = $this->findRowByPid($result['results'], $pid);
+        self::assertSame('Current City', $row['team_city']);
+        self::assertSame($current['color1'], $row['color1']);
+        self::assertSame($current['color2'], $row['color2']);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return array<string, mixed>
+     */
+    private function findRowByPid(array $rows, int $pid): array
+    {
+        foreach ($rows as $row) {
+            if ((int) $row['pid'] === $pid) {
+                return $row;
+            }
+        }
+        self::fail('Row for pid ' . $pid . ' not found');
+    }
 }

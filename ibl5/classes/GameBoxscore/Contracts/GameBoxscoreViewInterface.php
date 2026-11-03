@@ -19,7 +19,9 @@ interface GameBoxscoreViewInterface
      * chrome flushes headers — the View only produces the body.
      *
      * @param GameBoxscoreViewModel $viewModel
+     * @param int $selectedTeamId Narrowed `team` query value (0 = none). When it equals
+     *                            the away team's id the Away tab opens; any other value keeps Home.
      * @return string HTML output
      */
-    public function render(array $viewModel): string;
+    public function render(array $viewModel, int $selectedTeamId = 0): string;
 }

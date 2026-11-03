@@ -189,16 +189,38 @@ bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw '{"type":"result","i
 bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw '{"type":"result","is_error":false,"stop_reason":"max_tokens","result":"{\"class\":\"bug\",\"bug_has_enough_info\":true}"}'; malformed_case "malformed(f) max_tokens stop with parseable result"
 
 # ── BUG_PIPELINE_FILE_ISSUES_ONLY=1 — classify, file issue, reply, close ───────
-# When the flag is on, a bug row must: file a GH issue, reply in-channel, and
-# transition to 'filed'. No thread opened, no hunting transition.
+# When the flag is on, a bug row must: file a GH issue, open a thread on the GM's
+# message, post the issue URL there, and transition to 'filed' carrying the thread id.
+# No channel reply, no hunting transition.
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
 BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
 bpt_expect_eq "flag-on bug exits 0" 0 "$BPT_RC"
 bpt_log_has   "$STUB" transition.log "filed"         "flag-on bug → filed"
-bpt_log_has   "$STUB" calls.log     "REPLY_TO_MESSAGE" "flag-on bug replies in-channel"
+bpt_log_has   "$STUB" calls.log     "CREATE_THREAD"  "flag-on bug opens a thread on the report"
+bpt_log_has   "$STUB" calls.log     "POST_TO_THREAD" "flag-on bug posts the issue URL in the thread"
+bpt_log_has   "$STUB" curl.log      "/issues/"       "flag-on thread post carries the issue URL"
+bpt_log_lacks "$STUB" calls.log     "REPLY_TO_MESSAGE" "flag-on bug sends no channel reply"
+bpt_log_has   "$STUB" transition.log "--thread-id=880000000000000001" "flag-on filed transition persists the new thread id"
 bpt_log_lacks "$STUB" transition.log "queued --class=bug" "flag-on bug never emits queued"
-bpt_log_lacks "$STUB" calls.log     "CREATE_THREAD"  "flag-on bug opens no thread"
+
+# flag-on row that already has a thread (an operator-woken report): post there, open none.
+QUEUED_WITH_THREAD='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","original_message_id":"1420000000000000007","thread_id":"880000000000000099","issue_number":null}]'
+bpt_reset; bpt_set_actionable "$QUEUED_WITH_THREAD"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_log_lacks "$STUB" calls.log     "CREATE_THREAD"  "existing thread: no second thread opened"
+bpt_log_has   "$STUB" curl.log      "880000000000000099" "existing thread: issue URL posted to that thread"
+bpt_log_lacks "$STUB" calls.log     "REPLY_TO_MESSAGE" "existing thread: no channel reply"
+
+# flag-on + create-thread fails: fall back to the in-channel reply so the GM still hears back.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 STUB_CREATE_THREAD_FAIL=1 bpt_run
+bpt_log_has   "$STUB" transition.log "filed"         "create-thread fail: row still filed"
+bpt_log_has   "$STUB" calls.log     "REPLY_TO_MESSAGE" "create-thread fail: falls back to channel reply"
+bpt_log_lacks "$STUB" calls.log     "POST_TO_THREAD" "create-thread fail: no thread post"
+bpt_log_lacks "$STUB" transition.log "--thread-id="  "create-thread fail: no thread id persisted"
 
 # flag-on feature row: filed, not gathering
 bpt_reset; bpt_set_actionable "$QUEUED"
@@ -231,6 +253,8 @@ bpt_expect_eq "re-tick exits 0" 0 "$BPT_RC"
 bpt_log_has   "$STUB" transition.log "filed"           "re-tick still transitions to filed"
 bpt_log_lacks "$STUB" gh.log     "issue create"        "re-tick mints no second GitHub issue"
 bpt_log_lacks "$STUB" calls.log  "REPLY_TO_MESSAGE"    "re-tick sends no duplicate reply"
+bpt_log_lacks "$STUB" calls.log  "POST_TO_THREAD"      "re-tick posts no duplicate thread message"
+bpt_log_lacks "$STUB" calls.log  "CREATE_THREAD"       "re-tick opens no thread"
 
 # flag-on GH_FAIL: ensure_issue returns empty → row left for next tick, not filed
 bpt_reset; bpt_set_actionable "$QUEUED"

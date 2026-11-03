@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-10-27
+last_verified: 2026-11-02
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -152,20 +152,23 @@ which a Sonnet orchestrator still gets Opus-grade design. Abbreviated below;
 `.claude/rules/agent-tiering.md` § Tiers is authoritative — read it when the call
 isn't obvious:
 
-- security surface / trust boundary / destructive migration / an **executable-gate
-  removal or weakening** (the change lets an input a hook deny, a `bin/check-*`
-  condition, or a Phase 6.5 arming condition previously rejected now pass) or a
-  **bootstrap hazard** (the change rewrites the rule governing its own merge) →
-  **`plan-architect-xhigh`**. Directory alone is never the trigger; full text at
-  `/plan` Step 3 check 1. A characterization-pinned split of existing SQL, POST or
-  rendering code that adds no surface goes to **`plan-architect`** (same check).
+- The tier is an Opus judgment. `bin/plan-tier-hint` makes it with the Fable
+  test from `.claude/rules/agent-tiering-fable.md`: is Opus likely to get this
+  plan wrong, and would a wrong plan be expensive? A security surface, a trust
+  boundary, a destructive migration, or a change to what a gate rejects is a
+  thing to weigh. So are the mitigations the task carries (`auto_merge: false`,
+  a fail-closed hard constraint, characterization pins). When both halves hold
+  → **`plan-architect-xhigh`**.
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**
 
 Before writing the tier directive, run `bin/plan-tier-hint --explain --desc "<task-line>"` on
 the `/plan` task statement line and confirm the returned tier matches your call. `bin/plan-now`
-now cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
+cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
+The hint is one open Opus 5.5 judge call with no trigger list. When its reason starts with
+judge-failsafe:, the judge failed and the hint printed default. Apply the Fable test yourself,
+and pass --tier-ok to bin/plan-now if you keep xhigh.
 
 Also pick the orchestrator model — a single item → **Sonnet**; several items decomposed
 in one pass → **Opus** (`agent-tiering.md` § `/plan` orchestrator model) — and pass

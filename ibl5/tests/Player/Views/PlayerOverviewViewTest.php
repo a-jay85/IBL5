@@ -158,7 +158,7 @@ class PlayerOverviewViewTest extends TestCase
         return [
             [
                 'game_date' => '2030-01-05', 'home_teamid' => 3, 'visitor_teamid' => 7,
-                'game_of_that_day' => 1, 'box_id' => 0,
+                'game_of_that_day' => 1, 'box_id' => 0, 'teamid' => 7,
                 'game_min' => 34, 'game_2gm' => 7, 'game_2ga' => 15,
                 'game_3gm' => 3, 'game_3ga' => 8, 'game_ftm' => 5, 'game_fta' => 6,
                 'game_orb' => 2, 'game_drb' => 9, 'game_ast' => 4, 'game_stl' => 3,
@@ -166,7 +166,7 @@ class PlayerOverviewViewTest extends TestCase
             ],
             [
                 'game_date' => '2030-01-06', 'home_teamid' => 9, 'visitor_teamid' => 5,
-                'game_of_that_day' => 2, 'box_id' => 0,
+                'game_of_that_day' => 2, 'box_id' => 0, 'teamid' => 9,
                 'game_min' => 29, 'game_2gm' => 4, 'game_2ga' => 11,
                 'game_3gm' => 2, 'game_3ga' => 6, 'game_ftm' => 8, 'game_fta' => 10,
                 'game_orb' => 3, 'game_drb' => 7, 'game_ast' => 6, 'game_stl' => 1,

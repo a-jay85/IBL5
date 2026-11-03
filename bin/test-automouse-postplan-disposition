@@ -59,7 +59,8 @@ extract_fn() {
 for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done dispose_entry claim_pr_terminal \
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
-          dispose_resumed_postplan_lock postplan_budget postplan_release_label_after_cap; do
+          dispose_resumed_postplan_lock postplan_budget postplan_release_label_after_cap \
+          parse_judge_verdict plan_requires_judge; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -594,10 +595,10 @@ else
     FAILED=1
 fi
 
-# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + 3 login preflights [startup, pre-impl, pre-post-plan] + stop DM)
+# e8: discord-dm invoked via SELF_DIR, never hard-coded (postplan-hold DM + 4 login preflights [startup, pre-impl, pre-judge, pre-post-plan] + stop DM)
 e8_self=$(grep -cF '"$SELF_DIR/../discord-dm"' "$RUNNER" || true)
 e8_hard=$(grep -cF 'bin/discord-dm' "$RUNNER" || true)
-if [ "$e8_self" -eq 5 ] && [ "$e8_hard" -eq 0 ]; then
+if [ "$e8_self" -eq 6 ] && [ "$e8_hard" -eq 0 ]; then
     echo "ok: e8-discord-dm-path-relative"
 else
     echo "FAIL: e8-discord-dm-path-relative — self_dir_count=$e8_self hard_count=$e8_hard"
@@ -1599,6 +1600,104 @@ else
     FAILED=1
 fi
 rm -rf "$W_DIR"
+
+# ---------------------------------------------------------------------------
+# Opus judge gate: parse_judge_verdict (row 11), plan_requires_judge (row 12),
+# and the prompt pins (row 13).
+# ---------------------------------------------------------------------------
+J_DIR="$(mktemp -d "${TMPDIR:-/tmp}/judge-gate.XXXXXX")"
+J_SAVED_SELF_DIR="${SELF_DIR:-}"
+SELF_DIR="$SCRIPT_DIR/automouse"
+
+# pv_fixture <file> <final message>: an init line, a junk line, then the result.
+pv_fixture() {
+    {
+        echo '{"type":"system","subtype":"init"}'
+        echo 'not json at all'
+        jq -nc --arg r "$2" '{type:"result",result:$r}'
+    } > "$1"
+}
+# pv_case <label> <file> <want stdout> <want rc>
+pv_case() {
+    local out rc=0
+    out=$(parse_judge_verdict "$2") || rc=$?
+    if [ "$out" = "$3" ] && [ "$rc" -eq "$4" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — got '$out' rc=$rc, want '$3' rc=$4"
+        FAILED=1
+    fi
+}
+pv_fixture "$J_DIR/pass.jsonl" $'ROW 1: PASS - ok\nJUDGE_VERDICT: pass'
+pv_case pv-pass "$J_DIR/pass.jsonl" pass 0
+pv_fixture "$J_DIR/bold.jsonl" '**JUDGE_VERDICT: pass**'
+pv_case pv-bold "$J_DIR/bold.jsonl" pass 0
+pv_fixture "$J_DIR/btl.jsonl" '- `JUDGE_VERDICT: pass`'
+pv_case pv-backtick-list "$J_DIR/btl.jsonl" pass 0
+pv_fixture "$J_DIR/fail.jsonl" 'JUDGE_VERDICT: fail'
+pv_case pv-fail "$J_DIR/fail.jsonl" fail 1
+pv_fixture "$J_DIR/passed.jsonl" 'JUDGE_VERDICT: passed'
+pv_case pv-passed "$J_DIR/passed.jsonl" missing 1
+pv_fixture "$J_DIR/notlast.jsonl" $'JUDGE_VERDICT: pass\nReview complete.'
+pv_case pv-not-last "$J_DIR/notlast.jsonl" missing 1
+printf '%s\n' '{"type":"system","subtype":"init"}' 'not json at all' > "$J_DIR/noresult.jsonl"
+pv_case pv-no-result "$J_DIR/noresult.jsonl" missing 1
+pv_case pv-absent-file "$J_DIR/does-not-exist.jsonl" missing 1
+
+J_HDR='| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|'
+J_ROW_JUDGE='| 1 | does the gate read well | Truly-manual | post-impl | opus-judge: the gate 13 paragraph states the rule plainly |'
+J_ROW_HUMAN='| 1 | does the new page feel right | Truly-manual | post-impl | manual (reviewer walkthrough) |'
+J_ROW_AUTO='| 1 | thing works | PHPUnit | post-impl | `tests/X.php` |'
+printf -- '---\nimpl_model: opus\nmanual_judge: opus\n---\n# P\n\n%s\n%s\n' "$J_HDR" "$J_ROW_JUDGE" > "$J_DIR/prj-declared.md"
+printf -- '---\nimpl_model: sonnet\n---\n# P\n\n%s\n%s\n' "$J_HDR" "$J_ROW_HUMAN" > "$J_DIR/prj-force-sonnet.md"
+printf -- '---\nimpl_model: opus\n---\n# P\n\n%s\n%s\n' "$J_HDR" "$J_ROW_HUMAN" > "$J_DIR/prj-opus-manual.md"
+printf -- '---\nimpl_model: sonnet\n---\n# P\n\n%s\n%s\n' "$J_HDR" "$J_ROW_AUTO" > "$J_DIR/prj-no-manual.md"
+
+# prj_case <label> <plan> <base_model> <want rc>
+prj_case() {
+    local rc=0
+    plan_requires_judge "$2" "$3" || rc=$?
+    if [ "$rc" -eq "$4" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — plan_requires_judge rc=$rc, want $4"
+        FAILED=1
+    fi
+}
+prj_case prj-declared "$J_DIR/prj-declared.md" claude-opus-5-5 0
+prj_case prj-force-sonnet "$J_DIR/prj-force-sonnet.md" claude-sonnet-5-5 0
+prj_case prj-opus-manual "$J_DIR/prj-opus-manual.md" claude-opus-5-5 1
+prj_case prj-no-manual "$J_DIR/prj-no-manual.md" claude-sonnet-5-5 1
+# Fail closed: a consistency script that errors means the judge runs.
+mkdir -p "$J_DIR/stub/automouse" "$J_DIR/stub/lib"
+printf '#!/usr/bin/env bash\nexit 3\n' > "$J_DIR/stub/lib/plan-model-consistency"
+chmod +x "$J_DIR/stub/lib/plan-model-consistency"
+SELF_DIR="$J_DIR/stub/automouse"
+prj_case prj-script-error "$J_DIR/prj-opus-manual.md" claude-opus-5-5 0
+SELF_DIR="$SCRIPT_DIR/automouse"
+
+if grep -qF 'NEVER judge, tick, or record a verdict for a Truly-manual row' "$SCRIPT_DIR/automouse/prompt-impl"; then
+    echo "ok: impl-never-judges"
+else
+    echo "FAIL: impl-never-judges — prompt-impl lost its Hard Rule"
+    FAILED=1
+fi
+if [ "$(head -n 1 "$SCRIPT_DIR/automouse/prompt-judge")" = "AUTOMOUSE_JUDGE_PROMPT v1" ]; then
+    echo "ok: judge-prompt-marker"
+else
+    echo "FAIL: judge-prompt-marker — line 1 of prompt-judge is not AUTOMOUSE_JUDGE_PROMPT v1"
+    FAILED=1
+fi
+if grep -qF 'belongs to a human reviewer on the PR. Do not judge it' "$SCRIPT_DIR/automouse/prompt-judge"; then
+    echo "ok: judge-prompt-human-rows-excluded"
+else
+    echo "FAIL: judge-prompt-human-rows-excluded — prompt-judge lost the human-row sentence"
+    FAILED=1
+fi
+
+SELF_DIR="$J_SAVED_SELF_DIR"
+rm -rf "$J_DIR"
 
 # ---------------------------------------------------------------------------
 # Tail

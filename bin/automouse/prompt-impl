@@ -482,25 +482,25 @@ After all implementation is complete and the final checkpoint is pushed, write a
 ```bash
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 mkdir -p "$NIGHTLY_DIR/handoff"
-cat <<'HANDOFF_EOF' > "$NIGHTLY_DIR/handoff/<plan-filename>.json"
+cat <<'HANDOFF_EOF' > "$NIGHTLY_DIR/handoff/<PLAN_FILE>.json"
 {
   "slug": "<slug>",
   "worktree": "/Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>",
   "branch": "<slug>",
-  "plan_file": "<plan-filename>",
+  "plan_file": "<PLAN_FILE>",
   "plan_title": "<title from the plan>",
   "completed_at": "<current ISO-8601 timestamp>"
 }
 HANDOFF_EOF
 ```
 
-Replace all `<placeholder>` values with actual values. The `plan_file` field must be `$PLAN_FILE` exactly: the bare `<slug>.md` name, with no `NNN-` queue prefix.
+Replace all `<placeholder>` values with actual values. The `plan_file` field must be `$PLAN_FILE` exactly: the bare `<slug>.md` name, with no `NNN-` queue prefix. The filename keeps the `.md`: plan `my-slug.md` writes `handoff/my-slug.md.json`, never `handoff/my-slug.json`. The bash loop reads only the `.md.json` name.
 
 After writing the handoff file, verify it parses AND carries every field the bash loop reads. A syntactically valid file with the wrong keys is a failure: the loop cannot resolve the worktree or branch from it.
 
 ```bash
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
-HF="$NIGHTLY_DIR/handoff/<plan-filename>.json"
+HF="$NIGHTLY_DIR/handoff/<PLAN_FILE>.json"
 jq -e '[.slug, .worktree, .branch, .plan_file]
        | all(type == "string" and length > 0)' "$HF" > /dev/null \
   || { echo "ERROR: handoff $HF is missing required keys or has empty values" \
@@ -510,6 +510,9 @@ jq -e '[.slug, .worktree, .branch, .plan_file]
             "and rerun this check. Manual recovery from the worktree:" \
             "cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>" \
             "&& bin/post-plan-now --foreground" >&2; exit 1; }
+[ "$(basename "$HF")" = "$(jq -r .plan_file "$HF").json" ] \
+  || { echo "ERROR: handoff filename $(basename "$HF") must be" \
+            "<plan_file>.json, e.g. my-slug.md.json. Rename it." >&2; exit 1; }
 echo "Handoff file written and validated"
 ```
 
@@ -535,6 +538,7 @@ If ANY step fails after worktree creation (Step 5):
 - NEVER use the AskUserQuestion tool — it will block waiting for a human who is not there
 - NEVER use the ExitPlanMode tool — you are not in plan mode
 - NEVER invoke /post-plan — a separate agent handles that
+- NEVER judge, tick, or record a verdict for a Truly-manual row, and never write a JUDGE_VERDICT line. The runner spawns an Opus judge after you exit; it rules on rows tagged opus-judge:, and every other manual row belongs to a human on the PR.
 - If you encounter ANY ambiguity about requirements, skip and report. Do not guess. A taken migration or ADR number is not ambiguity: renumber per Step 6
 - All CLAUDE.md project rules apply at all times
 - Work only in worktrees, never modify files on the master branch directly

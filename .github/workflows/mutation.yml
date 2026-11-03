@@ -13,7 +13,10 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A labeled event for any label other than mutation-test gets its own group, so it never
+  # cancels a real mutation-test run on the same ref. post-plan-running and hotfix are the
+  # usual ones. The jobs below still skip on those events (same pattern as e2e-tests.yml).
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:

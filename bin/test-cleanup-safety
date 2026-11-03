@@ -930,15 +930,20 @@ kw="$(cd "$TMP/killwt/feat" && pwd -P)"
 # trailing `:` stops bash from exec'ing sleep, so the path stays in argv.
 bash -c "cd '$kw' && sleep 300; :" >/dev/null 2>&1 & victim=$!
 sibling="" infra=""
-# lsof names a process by its real binary, so only a real node can stand in
-# for an infra watcher (a copied or symlinked sleep still reports as sleep).
+# A copied or symlinked sleep still reports as sleep, so only a real node can
+# stand in for an infra watcher. On Linux, Node 24+ reports as "MainThrea".
 if command -v node >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1; then
     (cd "$kw-2" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & sibling=$!
     (cd "$kw" && exec node -e 'setTimeout(() => {}, 300000)') >/dev/null 2>&1 & infra=$!
 fi
+# Linux only: a bash job that renames itself MainThread is not node and must live.
+impostor=""
+if [ -w /proc/self/comm ] && command -v lsof >/dev/null 2>&1; then
+    (cd "$kw" && printf MainThread > /proc/self/comm && while :; do sleep 1; done) >/dev/null 2>&1 & impostor=$!
+fi
 _reap_kill_procs() {
     local p
-    for p in $victim $sibling $infra; do
+    for p in $victim $sibling $infra $impostor; do
         pkill -9 -P "$p" 2>/dev/null || true
         kill -9 "$p" 2>/dev/null || true
     done
@@ -973,6 +978,13 @@ if [ -n "$infra" ]; then
 else
     echo "SKIP: kill-infra-spares-prefix-sibling-worktree (no node or lsof)"
     echo "SKIP: kill-infra-still-kills-node-in-worktree (no node or lsof)"
+fi
+if [ -z "$impostor" ]; then
+    echo "SKIP: kill-infra-spares-non-node-mainthread (needs Linux and lsof)"
+elif kill -0 "$impostor" 2>/dev/null; then
+    pass "kill-infra-spares-non-node-mainthread"
+else
+    failcase "kill-infra-spares-non-node-mainthread"
 fi
 _reap_kill_procs
 wait 2>/dev/null || true

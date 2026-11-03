@@ -310,13 +310,51 @@ bl_local_sod() {
     echo $(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
 }
 
+# bl_in_window <sod>: rc 0 when local time sits in [WIN_START_HOUR, WIN_END_HOUR).
+# A start hour above the end hour wraps past midnight (22 and 6 mean 22:00-06:00).
+bl_in_window() {
+    local h=$(( $1 / 3600 ))
+    if [ "$WIN_START_HOUR" -lt "$WIN_END_HOUR" ]; then
+        [ "$h" -ge "$WIN_START_HOUR" ] && [ "$h" -lt "$WIN_END_HOUR" ]
+    else
+        [ "$h" -ge "$WIN_START_HOUR" ] || [ "$h" -lt "$WIN_END_HOUR" ]
+    fi
+}
+
+# bl_endgame_left <body> <now>: "in" when the weekly reset (seven_day.resets_at) is
+# less than ENDGAME_HOURS away, else the seconds until that point, or "none" when
+# resets_at is missing, garbled or already past. A stale reading never opens endgame.
+bl_endgame_left() {
+    local r eg
+    r=$(usage_resets_epoch "$1" seven_day)
+    if ! bl_nonneg_int "$r" || [ "$r" -le "$2" ]; then echo none; return 0; fi
+    eg=$(( r - $2 - ENDGAME_HOURS * 3600 ))
+    if [ "$eg" -lt 0 ]; then echo in; else echo "$eg"; fi
+}
+
+# bl_window_sleep <sod> <endgame_left>: seconds to sleep outside the window, until
+# the next window start or the endgame start, whichever comes first, clamped to
+# [60, BL_SLEEP_CAP]. The window term is wall-clock arithmetic, so on a DST change
+# day it can be off by up to 3600s; the clamp and the re-check on every wake absorb it.
+bl_window_sleep() {
+    local s=$(( (WIN_START_HOUR * 3600 - $1 + 86400) % 86400 ))
+    case "$2" in
+        none|in) ;;
+        *) if [ "$2" -lt "$s" ]; then s=$2; fi ;;
+    esac
+    if [ "$s" -gt "$BL_SLEEP_CAP" ]; then s=$BL_SLEEP_CAP; fi
+    if [ "$s" -lt 60 ]; then s=60; fi
+    echo "$s"
+}
+
 # bl_decide: prints exactly one line, the single pacing decision for both the live
 # loop and --dry-run. Fails closed on a missing or stale reading: the loop is
 # discretionary work, so a skipped batch costs time while an unpaced one costs the
 # owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
 # A stale reading (fetch rc 2) only shortens the sleep to the backoff or a 120s retry.
+# A go verdict outside the night window (and outside endgame) becomes a night-window sleep.
 bl_decide() {
-    local body frc=0 v verdict wait
+    local body frc=0 v verdict wait now sod eg
     body=$(usage_fetch 45) || frc=$?
     if [ "$frc" -eq 2 ]; then
         bl_fetch_retry_decision "$frc"
@@ -326,10 +364,22 @@ bl_decide() {
         echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
         return 0
     fi
-    v=$(usage_pace_verdict "$body" "$(date +%s)")
+    now=$(bl_now)
+    v=$(usage_pace_verdict "$body" "$now")
     verdict="${v%% *}"
     case "$verdict" in
-        go) echo "launch $v" ;;
+        go)
+            # Night window: start work only inside it, unless the weekly reset is
+            # under ENDGAME_HOURS away. Only a go verdict reaches here, so the
+            # window removes starts and never adds one the pace line refused.
+            sod=$(bl_local_sod)
+            eg=$(bl_endgame_left "$body" "$now")
+            if bl_in_window "$sod" || [ "$eg" = in ]; then
+                echo "launch $v"
+            else
+                echo "sleep $(bl_window_sleep "$sod" "$eg") night-window $v endgame-in=$eg"
+            fi
+            ;;
         wait)
             wait=$(printf '%s' "$v" | cut -d' ' -f4)
             if [ "$wait" -gt "$BL_SLEEP_CAP" ]; then wait=$BL_SLEEP_CAP; fi

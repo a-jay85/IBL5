@@ -725,11 +725,26 @@ run_case() {
     esac
 }
 
-ARG="${1:-all}"
-if [ "$ARG" = "all" ]; then
+# --case NAME (repeatable) or one positional NAME: run only the named cases. A mutation
+# row uses this to fit one case inside the 30s exec-mutations limit. run_case exits 2
+# on a name that matches no case, so a typo cannot pass as a green run.
+SELECTED=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --case)
+            if [ $# -lt 2 ] || [ -z "$2" ]; then
+                echo "usage: $0 [all | NAME | --case NAME ...]" >&2; exit 2
+            fi
+            SELECTED="$SELECTED $2"; shift 2 ;;
+        --*) echo "usage: $0 [all | NAME | --case NAME ...] (unknown flag: $1)" >&2; exit 2 ;;
+        all) shift ;;
+        *) SELECTED="$SELECTED $1"; shift ;;
+    esac
+done
+if [ -z "$SELECTED" ]; then
     for c in $CASES; do run_case "$c"; done
 else
-    run_case "$ARG"
+    for c in $SELECTED; do run_case "$c"; done
 fi
 
 h_done

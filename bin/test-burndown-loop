@@ -62,17 +62,31 @@ new_env() {
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
     unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
         IBL5_BURNDOWN_EMPTY_SLEEP_MIN IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_PR_CEILING \
-        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN IBL5_BURNDOWN_WINDOW_START_HOUR \
+        IBL5_BURNDOWN_WINDOW_END_HOUR IBL5_BURNDOWN_ENDGAME_HOURS \
+        IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN
     STATE="$HOME/.claude/burndown-loop"
     # Existing cases never exercise the scout: a fresh cooldown keeps the empty arm on
     # its old 240m sleep. Scout cases rm this file first and drive the cooldown themselves.
     mkdir -p "$STATE"
     date +%s > "$STATE/scout.last"
+    # Test clock: real epoch, local 03:00 (inside the default 02-07 window), so every
+    # launch-expecting case passes at any wall-clock hour. Window cases call set_clock.
+    export BL_TEST_CLOCK="$T/clock"
+    echo 'now 03:00:00' > "$BL_TEST_CLOCK"
+    # 98 existing cases seed `seed_usage 0 1` (reset 1h away, verdict go), which is
+    # endgame under the 48h default. Endgame off keeps their 240m sleeps; endgame
+    # cases unset this.
+    export IBL5_BURNDOWN_ENDGAME_HOURS=0
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
     PATH="$STUB:$TMPROOT/bin:/usr/bin:/bin"
     export PATH
     make_stubs
+}
+
+set_clock() {  # <"epoch|now HH:MM:SS">: move the loop's clock (read on every call)
+    echo "$1" > "$BL_TEST_CLOCK"
 }
 
 make_stubs() {

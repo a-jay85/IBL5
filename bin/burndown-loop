@@ -102,6 +102,11 @@ EMPTY_SLEEP_MIN=240
 SCOUT_COOLDOWN_MIN=240
 PR_CEILING=0
 UNBLOCK_COOLDOWN_MIN=120
+WIN_START_HOUR=2
+WIN_END_HOUR=7
+ENDGAME_HOURS=48
+ENDGAME_SCOUT_COOLDOWN_MIN=60
+ENDGAME_EMPTY_SLEEP_MIN=30
 START_EPOCH=$(date +%s)
 
 # Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
@@ -168,6 +173,19 @@ bl_posint_env() {
     echo "$v"
 }
 
+# bl_hour_env <NAME> <default>: a local hour from 0 to 23. Unset and empty take the
+# default; anything else (including a leading zero such as 07) exits 2.
+bl_hour_env() {
+    local name="$1" def="$2" v
+    v="${!name:-}"
+    [ -n "$v" ] || { echo "$def"; return 0; }
+    if ! bl_nonneg_int "$v" || [ "$v" -gt 23 ]; then
+        echo "burndown-loop: $name must be an hour from 0 to 23 (got '$v')" >&2
+        exit 2
+    fi
+    echo "$v"
+}
+
 bl_uuid() {
     if command -v uuidgen >/dev/null 2>&1; then
         uuidgen | tr 'A-Z' 'a-z'
@@ -194,6 +212,19 @@ bl_load_knobs() {
         exit 2
     }
     UNBLOCK_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN 120) || exit 2
+    WIN_START_HOUR=$(bl_hour_env IBL5_BURNDOWN_WINDOW_START_HOUR 2) || exit 2
+    WIN_END_HOUR=$(bl_hour_env IBL5_BURNDOWN_WINDOW_END_HOUR 7) || exit 2
+    if [ "$WIN_START_HOUR" -eq "$WIN_END_HOUR" ]; then
+        echo "burndown-loop: IBL5_BURNDOWN_WINDOW_START_HOUR and IBL5_BURNDOWN_WINDOW_END_HOUR must differ (both $WIN_START_HOUR)" >&2
+        exit 2
+    fi
+    ENDGAME_HOURS="${IBL5_BURNDOWN_ENDGAME_HOURS:-48}"
+    bl_nonneg_int "$ENDGAME_HOURS" || {
+        echo "burndown-loop: IBL5_BURNDOWN_ENDGAME_HOURS must be 0 (endgame off) or a positive integer (got '$ENDGAME_HOURS')" >&2
+        exit 2
+    }
+    ENDGAME_SCOUT_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN 60) || exit 2
+    ENDGAME_EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN 30) || exit 2
     bl_timeout_secs >/dev/null || exit 2
 }
 
@@ -250,6 +281,33 @@ bl_fetch_retry_decision() {
         return 0
     fi
     echo "sleep $BL_FETCH_RETRY fetch-retry fetch-rc=$frc"
+}
+
+# Test-only clock. BL_TEST_CLOCK names a file holding "<epoch|now> HH:MM:SS"; the
+# harness rewrites the file mid-run to move local time. The name sits outside the
+# IBL5_BURNDOWN_ prefix on purpose: bl_runner_env persists that prefix into runner.sh.
+bl_test_clock() {
+    [ -n "${BL_TEST_CLOCK:-}" ] && [ -r "$BL_TEST_CLOCK" ] || return 1
+    cat "$BL_TEST_CLOCK"
+}
+
+# bl_now: epoch seconds. The test clock's epoch when it names one, else date +%s.
+bl_now() {
+    local c e
+    if c=$(bl_test_clock); then
+        e=${c%% *}
+        if bl_nonneg_int "$e"; then echo "$e"; return 0; fi
+    fi
+    date +%s
+}
+
+# bl_local_sod: seconds since local midnight, built from the wall-clock hour, minute
+# and second. No date arithmetic flags, so BSD date (macOS) and GNU date (CI) agree.
+bl_local_sod() {
+    local c t h m s
+    if c=$(bl_test_clock); then t=${c#* }; else t=$(date +%H:%M:%S); fi
+    h=${t%%:*}; s=${t##*:}; m=${t#*:}; m=${m%%:*}
+    echo $(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
 }
 
 # bl_decide: prints exactly one line, the single pacing decision for both the live
@@ -584,7 +642,7 @@ bl_cooldown_left() {
     span=$(( $2 * 60 ))
     last=$(cat "$1" 2>/dev/null || true)
     if ! bl_nonneg_int "$last"; then echo 0; return 0; fi
-    now=$(date +%s)
+    now=$(bl_now)
     if [ "$last" -gt "$now" ]; then echo "$span"; return 0; fi
     if [ $((now - last)) -ge "$span" ]; then echo 0; else echo $((span - (now - last))); fi
 }
@@ -700,7 +758,7 @@ log: $LOOP_LOG"
 bl_on_unblock() {
     local prs="${1##* prs=}" marker
     # Cooldown starts at launch, so a crash or timeout never retries at once.
-    date +%s > "$STATE/unblock.last"
+    bl_now > "$STATE/unblock.last"
     bl_run_session unblock claude-sonnet-5-5 "${BL_UNBLOCK_PROMPT//@PRS@/$prs}" \
         --disallowedTools "$BL_UNBLOCK_DENY"
     bl_unblock_arm_check "$prs"
@@ -726,7 +784,7 @@ bl_scout_gate() {
 
 bl_run_scout() {
     # Cooldown starts at launch, so a crash or timeout never retries at once.
-    date +%s > "$STATE/scout.last"
+    bl_now > "$STATE/scout.last"
     bl_run_session scout claude-opus-5-5 "$BL_SCOUT_PROMPT"
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."

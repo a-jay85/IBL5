@@ -80,8 +80,19 @@ def real_remote(tmp_path, monkeypatch):
 
 @pytest.fixture
 def sleeps(monkeypatch):
+    # gitad.time is the global time module, so this patch also catches the stdlib's
+    # subprocess wait-poll loop (0.001, 0.002, ... sleeps when git exits a beat late).
+    # Record only the harness's own sleeps; let every other caller sleep for real.
     recorded = []
-    monkeypatch.setattr(gitad.time, "sleep", recorded.append)
+    real_sleep = gitad.time.sleep
+
+    def _sleep(secs):
+        if sys._getframe(1).f_globals.get("__name__", "").startswith("harness"):
+            recorded.append(secs)
+        else:
+            real_sleep(secs)
+
+    monkeypatch.setattr(gitad.time, "sleep", _sleep)
     return recorded
 
 

@@ -14,6 +14,7 @@ use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Waivers\Contracts\WaiversRosterSlotCounterInterface;
+use Waivers\Contracts\WaiversTeamLockInterface;
 
 /**
  * Security deliverable for backlog 6.22 (Waivers half).
@@ -321,6 +322,189 @@ class WaiversSubmissionServiceTest extends TestCase
         );
     }
 
+    /**
+     * backlog#1570 — count, salary read, and the processor write all run strictly inside the
+     * team lock, so a same-team submission that waits on the lock counts a roster that
+     * already holds the first signing.
+     */
+    public function testSubmitAddRunsCountSalaryAndProcessInsideTeamLock(): void
+    {
+        $events = [];
+        $slotCounter = self::createStub(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->method('countOpenSlots')->willReturnCallback(
+            static function () use (&$events): array {
+                $events[] = 'count';
+
+                return ['open' => 1, 'healthy' => 11];
+            }
+        );
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $slotCounter,
+            teamLock: $this->eventRecordingLock($events)
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturnCallback(
+            static function () use (&$events): int {
+                $events[] = 'salary';
+
+                return 5000;
+            }
+        );
+        $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
+        $processor->expects($this->never())->method('processDrop');
+        $processor->expects($this->once())->method('processAdd')->willReturnCallback(
+            static function () use (&$events): array {
+                $events[] = 'process';
+
+                return ['success' => true, 'result' => 'player_added'];
+            }
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['lock:start', 'count', 'salary', 'process', 'lock:end'], $events);
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+    }
+
+    public function testSubmitWaiveRunsCountSalaryAndProcessInsideTeamLock(): void
+    {
+        $events = [];
+        $slotCounter = self::createStub(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->method('countOpenSlots')->willReturnCallback(
+            static function () use (&$events): array {
+                $events[] = 'count';
+
+                return ['open' => 1, 'healthy' => 11];
+            }
+        );
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            advancesContractYears: true,
+            slotCounter: $slotCounter,
+            teamLock: $this->eventRecordingLock($events)
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamNextYearSalary')->willReturnCallback(
+            static function () use (&$events): int {
+                $events[] = 'salary';
+
+                return 5000;
+            }
+        );
+        $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->once())->method('processDrop')->willReturnCallback(
+            static function () use (&$events): array {
+                $events[] = 'process';
+
+                return ['success' => true, 'result' => 'player_dropped'];
+            }
+        );
+
+        $result = $service->submit(['Action' => 'waive', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['lock:start', 'count', 'salary', 'process', 'lock:end'], $events);
+        $this->assertSame(['success' => true, 'result' => 'player_dropped'], $result);
+    }
+
+    public function testSubmitLocksTheVerifiedTeamId(): void
+    {
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTidFromTeamname')->willReturn(7);
+        $teamLock = $this->createMock(WaiversTeamLockInterface::class);
+        $teamLock->expects($this->once())->method('withTeamLock')
+            ->with(7, self::isCallable())
+            ->willReturnCallback(static fn (int $teamId, callable $fn): mixed => $fn());
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            teamIdentityRepo: $teamIdentityRepo,
+            teamLock: $teamLock
+        );
+        $salaryCapRepo->expects($this->once())->method('getTeamTotalSalary')->willReturn(5000);
+        $processor->expects($this->once())->method('processAdd')->willReturn(['success' => true]);
+
+        $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+    }
+
+    public function testSubmitReturnsTeamErrorWhenLockFindsNoTeamRow(): void
+    {
+        $teamLock = self::createStub(WaiversTeamLockInterface::class);
+        $teamLock->method('withTeamLock')->willReturn(null);
+        $slotCounter = $this->createMock(WaiversRosterSlotCounterInterface::class);
+        $slotCounter->expects($this->never())->method('countOpenSlots');
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            slotCounter: $slotCounter,
+            teamLock: $teamLock
+        );
+        $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->never())->method('processDrop');
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => false, 'error' => 'Unable to determine your team.'], $result);
+    }
+
+    public function testSubmitTakesNoLockWhenTeamIdIsUnresolved(): void
+    {
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTidFromTeamname')->willReturn(null);
+        $teamLock = $this->createMock(WaiversTeamLockInterface::class);
+        $teamLock->expects($this->never())->method('withTeamLock');
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(
+            teamIdentityRepo: $teamIdentityRepo,
+            teamLock: $teamLock
+        );
+        $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->never())->method('processDrop');
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => false, 'error' => 'Unable to determine your team.'], $result);
+    }
+
+    public function testSubmitPropagatesLockFailureWithoutProcessing(): void
+    {
+        $teamLock = self::createStub(WaiversTeamLockInterface::class);
+        $teamLock->method('withTeamLock')->willThrowException(
+            new \mysqli_sql_exception('Lock wait timeout exceeded', 1205)
+        );
+
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks(teamLock: $teamLock);
+        $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $processor->expects($this->never())->method('processAdd');
+        $processor->expects($this->never())->method('processDrop');
+
+        $this->expectException(\mysqli_sql_exception::class);
+        $this->expectExceptionCode(1205);
+
+        $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+    }
+
+    /**
+     * A pass-through lock that records when the locked region starts and ends.
+     *
+     * @param list<string> $events
+     */
+    private function eventRecordingLock(array &$events): WaiversTeamLockInterface
+    {
+        $teamLock = self::createStub(WaiversTeamLockInterface::class);
+        $teamLock->method('withTeamLock')->willReturnCallback(
+            static function (int $teamId, callable $fn) use (&$events): mixed {
+                $events[] = 'lock:start';
+                $result = $fn();
+                $events[] = 'lock:end';
+
+                return $result;
+            }
+        );
+
+        return $teamLock;
+    }
+
     private function counterReporting(int $open, int $healthy): WaiversRosterSlotCounterInterface
     {
         $counter = self::createStub(WaiversRosterSlotCounterInterface::class);
@@ -330,12 +514,13 @@ class WaiversSubmissionServiceTest extends TestCase
     }
 
     /**
-     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub, 4: WaiversRosterSlotCounterInterface, 5: TeamIdentityRepositoryInterface}
+     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub, 4: WaiversRosterSlotCounterInterface, 5: TeamIdentityRepositoryInterface, 6: WaiversTeamLockInterface}
      */
     private function buildServiceWithMocks(
         bool $advancesContractYears = false,
         ?WaiversRosterSlotCounterInterface $slotCounter = null,
-        ?TeamIdentityRepositoryInterface $teamIdentityRepo = null
+        ?TeamIdentityRepositoryInterface $teamIdentityRepo = null,
+        ?WaiversTeamLockInterface $teamLock = null
     ): array {
         $processor = $this->createMock(WaiversProcessorInterface::class);
         $salaryCapRepo = $this->createMock(SalaryCapRepositoryInterface::class);
@@ -350,8 +535,15 @@ class WaiversSubmissionServiceTest extends TestCase
             $teamIdentityRepo->method('getTidFromTeamname')->willReturn(7);
         }
 
-        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo);
+        if ($teamLock === null) {
+            $teamLock = self::createStub(WaiversTeamLockInterface::class);
+            $teamLock->method('withTeamLock')->willReturnCallback(
+                static fn (int $teamId, callable $fn): mixed => $fn()
+            );
+        }
 
-        return [$service, $processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo];
+        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo, $teamLock);
+
+        return [$service, $processor, $salaryCapRepo, $season, $slotCounter, $teamIdentityRepo, $teamLock];
     }
 }

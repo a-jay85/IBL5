@@ -449,7 +449,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 scratch.overlay(overlay_files)
                     results.append(ReplayResult(pr.number, gate.path, outcome, detail,
                                                 base_outcome, base_detail,
-                                                fix_outcome, fix_detail))
+                                                fix_outcome, fix_detail,
+                                                fix_applied=tuple(fix_applied),
+                                                fix_skipped=tuple(fix_skipped)))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

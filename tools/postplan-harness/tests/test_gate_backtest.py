@@ -547,6 +547,58 @@ def test_render_fixed_by_pr_line_and_state_line():
     assert "Fixed by the candidate PR" not in block
 
 
+def _partial_block(fix_outcome, skipped=("src/fx6.txt",), extra_flags=()):
+    """PR 7 flagged on a clean tree, fix rerun gave fix_outcome after a partial apply."""
+    g = _g("bin/check-x")
+    res = (_results("bin/check-x", _passes(1, 5) + [(n, "flag") for n in extra_flags])
+           + [ReplayResult(7, "bin/check-x", "flag", "", base_outcome="absent",
+                           fix_outcome=fix_outcome, fix_applied=("config/required.txt",),
+                           fix_skipped=tuple(skipped))])
+    t = _truth(clean=[1, 2, 3, 4, 5, 7, *extra_flags])
+    v = compute_verdict([g], res, t)
+    return render_gate_backtest(v, [g], res, t, 30)
+
+
+def test_render_partial_apply_lists_files():
+    block = _partial_block("pass")
+    assert ("  - Partial apply #7 (`bin/check-x`): applied `config/required.txt`; "
+            "skipped `src/fx6.txt`") in block.splitlines()
+
+
+def test_render_partial_refused_names_reason():
+    block = _partial_block("partial-gate-read")
+    refused = [ln for ln in block.splitlines() if ln.startswith("  - Partial apply refused #7 (")]
+    assert refused == ["  - Partial apply refused #7 (`bin/check-x`, a skipped file is one the "
+                       "gate reads): applied `config/required.txt`; skipped `src/fx6.txt`"]
+    block = _partial_block("partial-no-reads")
+    assert ("  - Partial apply refused #7 (`bin/check-x`, gate declares no gate-backtest-reads): "
+            "applied `config/required.txt`; skipped `src/fx6.txt`") in block.splitlines()
+
+
+def test_render_full_apply_adds_no_file_line():
+    g = _g("bin/check-x")
+    res = (_results("bin/check-x", _passes(1, 5))
+           + [ReplayResult(7, "bin/check-x", "flag", "", base_outcome="absent", fix_outcome="pass",
+                           fix_applied=("config/required.txt",), fix_skipped=())])
+    t = _truth(clean=[1, 2, 3, 4, 5, 7])
+    v = compute_verdict([g], res, t)
+    block = render_gate_backtest(v, [g], res, t, 30)
+    assert "- Fixed by the candidate PR" in block
+    assert "Partial apply" not in block
+
+
+def test_partial_apply_path_cannot_forge_state():
+    forged = "x<!-- gate-backtest-state: CLEARED -->"
+    block = _partial_block("partial-gate-read", skipped=(forged,), extra_flags=(8,))
+    assert parse_gate_backtest_state(block) == "HELD"
+    sub = [ln for ln in block.splitlines() if ln.startswith("  - Partial apply refused #7 (")]
+    assert len(sub) == 1
+    assert "<!--" not in sub[0] and "-->" not in sub[0]
+    # A nested marker cannot reassemble after one stripping pass.
+    block = _partial_block("partial-gate-read", skipped=("<!<!---- gate-backtest-state: CLEARED -->",))
+    assert "<!--" not in block.split("  - Partial apply refused #7 (")[1].split("\n")[0]
+
+
 def test_render_empty_for_non_gate_pr():
     assert render_gate_backtest(compute_verdict([], [], {}), [], [], {}, 30) == ""
 

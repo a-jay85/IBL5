@@ -494,7 +494,9 @@ case_fixed_by_pr_partial_gate_file_applied() {
     states=$(grep -c 'gate-backtest-state:' <<< "$OUT")
     if [ "$RC" -eq 0 ] && has "$OUT" "gate-backtest-state: CLEARED" \
         && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#1" && has "$OUT" "#6" \
-        && ! has "$OUT" "- False flags:" && [ "$states" -eq 1 ]; then
+        && ! has "$OUT" "- False flags:" && [ "$states" -eq 1 ] \
+        && has "$OUT" "  - Partial apply #1 (" && has "$OUT" "skipped \`src/fx6.txt\`" \
+        && has "$OUT" "  - Partial apply #1 (\`bin/check-reads-config\`): applied \`config/required.txt\`; skipped \`src/fx6.txt\`"; then
         ok "fixed-by-pr-partial-gate-file-applied"
     else
         fail "fixed-by-pr-partial-gate-file-applied (rc=$RC, states=$states, out=$OUT, err=$ERR)"
@@ -506,12 +508,16 @@ case_fixed_by_pr_partial_gate_file_applied() {
 case_fixed_by_pr_partial_gate_file_failed() {
     setup_fx
     run_fx cand-fix-partial-read-skip
+    local states
+    states=$(grep -c 'gate-backtest-state:' <<< "$OUT")
     if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
         && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
-        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6"; then
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6" && [ "$states" -eq 1 ] \
+        && has "$OUT" "  - Partial apply refused #1 (" \
+        && has "$OUT" "  - Partial apply refused #1 (\`bin/check-reads-config-fx6\`, a skipped file is one the gate reads): applied \`config/required.txt\`; skipped \`src/fx6.txt\`"; then
         ok "fixed-by-pr-partial-gate-file-failed"
     else
-        fail "fixed-by-pr-partial-gate-file-failed (rc=$RC, out=$OUT, err=$ERR)"
+        fail "fixed-by-pr-partial-gate-file-failed (rc=$RC, states=$states, out=$OUT, err=$ERR)"
     fi
 }
 
@@ -522,7 +528,8 @@ case_fixed_by_pr_partial_no_reads_holds() {
     run_fx cand-fix-partial-noreads
     if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
         && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
-        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6"; then
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6" \
+        && has "$OUT" "  - Partial apply refused #1 (\`bin/check-needs-required-noreads\`, gate declares no gate-backtest-reads)"; then
         ok "fixed-by-pr-partial-no-reads-holds"
     else
         fail "fixed-by-pr-partial-no-reads-holds (rc=$RC, out=$OUT, err=$ERR)"

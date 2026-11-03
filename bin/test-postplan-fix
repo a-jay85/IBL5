@@ -1571,6 +1571,34 @@ need "no temp dir made" test -z "$(ls -A "$TMP/dryrun-tmp")"
 need "no claude call" no_args
 case_end holdrepeat-dry-run-inert
 fi
+
+# 58b (a guard reject on a real run prints exactly one result line, keeps rc 21 and removes
+# its temp dir: the EXIT trap must not add a second line, change the rc, or skip cleanup)
+if should_run "holdrepeat-normal-exit-single-result"; then
+hr_reset
+mkdir -p "$TMP/hrtmp"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-title.sh"
+TMPDIR="$TMP/hrtmp" hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "exactly one result line" test "$(grep -c 'postplan-fix: holdrepeat result=' <<< "$STDOUT")" = 1
+need "temp dir removed" test -z "$(find "$TMP/hrtmp" -name 'postplan-fix-hr.*' -print)"
+case_end holdrepeat-normal-exit-single-result
+fi
+
+# 58c (a set -e failure inside --holdrepeat still ends with a result line: mktemp -d fails
+# under a TMPDIR that does not exist, after eligibility and before any session)
+if should_run "holdrepeat-unexpected-exit-prints-result"; then
+hr_reset
+TMPDIR="$TMP/no-such-tmpdir" hr_run
+need "rc 1" test "$RC" = 1
+need "dm line before result" line_re "$STDOUT" '^postplan-fix: holdrepeat dm=none$'
+need "final line" final_is "$STDOUT" error
+need "exactly one result line" test "$(grep -c 'postplan-fix: holdrepeat result=' <<< "$STDOUT")" = 1
+need "stderr names the unexpected stop" line_re "$ERR" 'stopped unexpectedly \(rc [1-9][0-9]*\)'
+need "no session launched" test ! -e "$TMP/claude.argc"
+case_end holdrepeat-unexpected-exit-prints-result
+fi
 hr_reset
 
 check_only_cases

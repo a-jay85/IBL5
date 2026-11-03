@@ -431,6 +431,21 @@ case "$JUDGE_CWD" in
 esac
 
 echo
+echo "== J16 --desc-only callers keep the old task block =="
+reset_recorder
+run_hint "$BASE_TMP/judge-rec" --desc 'Rename the standings cache key'
+J16_SHAPE="$(awk '
+    /^<task-/ { inside = 1; next }
+    /^<\/task-/ { inside = 0; next }
+    inside && $0 == "Description: Rename the standings cache key" { d = 1 }
+    inside && $0 == "Files:" { f = 1 }
+    inside && /^(Brief|Signals):/ { extra = 1 }
+    END { printf "%d%d%d", d, f, extra }
+' "$BASE_TMP/argv")"
+expect_eq "J16 --desc-only task block keeps Description and Files lines, no Brief or Signals" "110" "$J16_SHAPE"
+expect_eq "J16 --desc-only still prints default from the stub" "default" "$(cut -f1 "$OUT")"
+
+echo
 echo "== static drift assertions =="
 
 assert_contains "check 1 keeps the gate-14(e) weakening definition" \

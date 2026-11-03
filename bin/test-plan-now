@@ -110,6 +110,24 @@ printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: 
 JUDGE_EOF
 printf '#!/usr/bin/env bash\nexit 3\n' > "$TMP/judge-fail"
 chmod +x "$TMP/judge-default" "$TMP/judge-fail"
+# Recording judge: one argv element per line to $TMP/judge-argv, then a
+# default verdict. TB-* cases read the task block out of the captured prompt.
+cat > "$TMP/judge-rec" <<'JUDGE_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "${PLAN_NOW_TEST_JUDGE_ARGV:?}"
+printf '%s\n' '{"type":"result","is_error":false,"result":"default\nstub judge: recorder"}'
+JUDGE_EOF
+chmod +x "$TMP/judge-rec"
+# task_block_has <argv-file> <fixed-string>: 1 when a line inside the
+# <task-NONCE> fence contains the string, else 0.
+task_block_has() {
+    awk -v s="$2" '
+        /^<task-/ { inside = 1; next }
+        /^<\/task-/ { inside = 0; next }
+        inside && index($0, s) { hit = 1 }
+        END { print hit + 0 }
+    ' "$1"
+}
 export PLAN_TIER_HINT_CLAUDE="$TMP/judge-default"
 export PLAN_TIER_HINT_LOG="$TMP/plan-tier-hint.log"
 
@@ -1180,6 +1198,42 @@ TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
     fail "T-5: no directive line: exits 0 (got $TPRE_RC)"
 want    "T-5: runner is written"              "$TPRE_OUT" "runner:"
 want_no "T-5: no tier warning"                "$TPRE_OUT" "TIER MISMATCH"
+preflight_cleanup "$TPRE_OUT"
+
+TIER_PROMPT_TB="$TMP/tier-prompt-tb.md"
+cat > "$TIER_PROMPT_TB" <<'TIER_TB_EOF'
+/plan Tighten the standings renderer cache key.
+
+- Branch slug: `standings-cache-key`. Base: `master`.
+- Step 3 MUST route to `plan-architect`.
+- Do NOT escalate to `plan-architect-xhigh`.
+
+## Exploration pointers
+- `ibl5/classes/Standings/StandingsRenderer.php:40`: builds the cache key.
+
+## Hard constraints
+- Keep rendered output byte-identical.
+TIER_TB_EOF
+
+# TB-1. The gate's judge prompt carries the /plan task line and no tier directive.
+TB_ARGV="$TMP/tb-judge-argv"
+rm -f "$TB_ARGV"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_TIER_HINT_CLAUDE="$TMP/judge-rec" PLAN_NOW_TEST_JUDGE_ARGV="$TB_ARGV" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_TB" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "TB-1: gate run exits 0" || fail "TB-1: gate run exits 0 (got $TPRE_RC)"
+[ "$(task_block_has "$TB_ARGV" 'Tighten the standings renderer cache key.')" = 1 ] \
+    && ok "TB-1: task line reaches the task block" \
+    || fail "TB-1: task line reaches the task block"
+[ "$(task_block_has "$TB_ARGV" 'MUST route to')" = 0 ] \
+    && ok "TB-1: no MUST route to line inside the task block" \
+    || fail "TB-1: no MUST route to line inside the task block"
+[ "$(task_block_has "$TB_ARGV" 'plan-architect')" = 0 ] \
+    && ok "TB-1: no plan-architect tier name inside the task block" \
+    || fail "TB-1: no plan-architect tier name inside the task block"
 preflight_cleanup "$TPRE_OUT"
 
 # T-6. PLAN_NOW_TIER_HINT unset → falls back to real bin/plan-tier-hint.

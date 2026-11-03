@@ -21,6 +21,18 @@ use Waivers\WaiversTeamLockRepository;
 class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
 {
     private const ER_LOCK_WAIT_TIMEOUT = 1205;
+    private const TEST_PID_BASE = 200070100;
+    private const WAIVED_PLAYER = [
+        'teamid' => 0,
+        'cy' => 0,
+        'cyt' => 0,
+        'salary_yr1' => 0,
+        'salary_yr2' => 0,
+        'exp' => 5,
+        'bird' => 0,
+        'ordinal' => 1000,
+        'droptime' => 1000000,
+    ];
 
     /** @var list<\mysqli> */
     private array $connections = [];
@@ -196,6 +208,216 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
 
         $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $code);
         $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+    }
+
+    /**
+     * A mail failure comes after the lock, so the signing and its news story stand. Under the
+     * outer test transaction a thrown mail error would roll back to the lock's savepoint and
+     * undo both rows, which is what this checks.
+     */
+    public function testThrowingMailerKeepsSigningAndNewsStoryAndStillPostsDiscord(): void
+    {
+        $pid = self::TEST_PID_BASE + 1;
+        $this->insertTestPlayer($pid, 'Mail Failure Pickup', self::WAIVED_PLAYER);
+        $this->insertRow('nuke_stories_cat', ['title' => 'Waiver Pool Moves']);
+        $discordPosts = 0;
+
+        $result = $this->submitWithRealProcessor(
+            $pid,
+            static function (): \Mail\Contracts\MailServiceInterface {
+                throw new \RuntimeException('mail down');
+            },
+            static function () use (&$discordPosts): void {
+                $discordPosts++;
+            }
+        );
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertSame(1, $this->playerTeamId($pid));
+        $this->assertSame(1, $this->newsStoryCount('Mail Failure Pickup'));
+        $this->assertSame(1, $discordPosts);
+    }
+
+    /**
+     * The signing and news story share the lock's transaction. A failure after both are
+     * written (here, the audit log) undoes both and sends nothing.
+     */
+    public function testFailureInsideLockRollsBackSigningAndNewsStoryAndSendsNothing(): void
+    {
+        $pid = self::TEST_PID_BASE + 2;
+        $this->insertTestPlayer($pid, 'Rolled Back Pickup', self::WAIVED_PLAYER);
+        $this->insertRow('nuke_stories_cat', ['title' => 'Waiver Pool Moves']);
+        $sent = 0;
+        $logger = self::createStub(\Psr\Log\LoggerInterface::class);
+        $logger->method('info')->willThrowException(new \RuntimeException('audit failed'));
+
+        try {
+            $this->submitWithRealProcessor(
+                $pid,
+                static function () use (&$sent): \Mail\Contracts\MailServiceInterface {
+                    $sent++;
+
+                    return self::createStub(\Mail\Contracts\MailServiceInterface::class);
+                },
+                static function () use (&$sent): void {
+                    $sent++;
+                },
+                $logger
+            );
+            self::fail('The audit failure must reach the caller.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('audit failed', $e->getMessage());
+        }
+
+        $this->assertSame(0, $this->playerTeamId($pid));
+        $this->assertSame(0, $this->newsStoryCount('Rolled Back Pickup'));
+        $this->assertSame(0, $sent);
+    }
+
+    /**
+     * InnoDB's foreign-key check takes a shared lock on the parent team row, so the team lock
+     * also holds up other features' writes that point a row at that team. B inserts its own
+     * uncommitted player first, so nothing is seeded and everything rolls back.
+     */
+    public function testForeignKeyMoveOntoLockedTeamWaits(): void
+    {
+        $b = $this->openLockedWaitConnection();
+        $pid = $this->insertPlayerOnConnection($b, 2);
+
+        $code = (new WaiversTeamLockRepository($this->db))->withTeamLock(
+            1,
+            fn (): ?int => $this->queryErrorCode($b, "UPDATE ibl_plr SET teamid = 1 WHERE pid = {$pid}")
+        );
+
+        $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $code);
+    }
+
+    public function testForeignKeyChildInsertForLockedTeamWaits(): void
+    {
+        $b = $this->openLockedWaitConnection();
+        $pid = $this->insertPlayerOnConnection($b, 2);
+
+        $code = (new WaiversTeamLockRepository($this->db))->withTeamLock(
+            1,
+            fn (): ?int => $this->queryErrorCode($b, "INSERT INTO ibl_fa_offers (pid, teamid) VALUES ({$pid}, 1)")
+        );
+
+        $this->assertSame(self::ER_LOCK_WAIT_TIMEOUT, $code);
+    }
+
+    public function testLockedTeamDoesNotBlockPlainReadOrWritesOntoAnotherTeam(): void
+    {
+        $b = $this->openLockedWaitConnection();
+        $pid = $this->insertPlayerOnConnection($b, 2);
+
+        $codes = (new WaiversTeamLockRepository($this->db))->withTeamLock(
+            1,
+            fn (): array => [
+                $this->queryErrorCode($b, 'SELECT teamid FROM ibl_team_info WHERE teamid = 1'),
+                $this->queryErrorCode($b, "UPDATE ibl_plr SET teamid = 2, ordinal = 2 WHERE pid = {$pid}"),
+                $this->queryErrorCode($b, "INSERT INTO ibl_fa_offers (pid, teamid) VALUES ({$pid}, 2)"),
+            ]
+        );
+
+        $this->assertSame([null, null, null], $codes);
+    }
+
+    /**
+     * @param \Closure(): \Mail\Contracts\MailServiceInterface $mailerFactory
+     * @param \Closure(string, string): void $discordPoster
+     * @return array{success: bool, result?: string, error?: string}
+     */
+    private function submitWithRealProcessor(
+        int $pid,
+        \Closure $mailerFactory,
+        \Closure $discordPoster,
+        ?\Psr\Log\LoggerInterface $logger = null
+    ): array {
+        $season = self::createStub(\Season\Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $season->method('isOffseasonPhase')->willReturn(false);
+        $teamIdentityRepo = new \Repositories\TeamIdentityRepository($this->db);
+
+        $processor = new \Waivers\WaiversProcessor(
+            new \Waivers\WaiversRepository($this->db),
+            $teamIdentityRepo,
+            new \Repositories\PlayerLookupRepository($this->db),
+            new \Waivers\WaiversValidator(),
+            new \Topics\News\NewsRepository($this->db),
+            $this->db,
+            $logger ?? self::createStub(\Psr\Log\LoggerInterface::class),
+            $season,
+            null,
+            $mailerFactory,
+            $discordPoster
+        );
+
+        $service = new WaiversSubmissionService(
+            $processor,
+            new \Repositories\SalaryCapRepository($this->db),
+            $season,
+            new \Waivers\WaiversRosterSlotCounter(new \Team\TeamQueryRepository($this->db)),
+            $teamIdentityRepo,
+            new WaiversTeamLockRepository($this->db)
+        );
+
+        return $service->submit(['Action' => 'add', 'Player_ID' => (string) $pid], $this->teamName(1));
+    }
+
+    private function teamName(int $teamId): string
+    {
+        return $this->stringColumn('SELECT team_name AS v FROM ibl_team_info WHERE teamid = ' . $teamId);
+    }
+
+    private function playerTeamId(int $pid): int
+    {
+        return (int) $this->stringColumn('SELECT teamid AS v FROM ibl_plr WHERE pid = ' . $pid);
+    }
+
+    private function newsStoryCount(string $playerName): int
+    {
+        return (int) $this->stringColumn(
+            "SELECT COUNT(*) AS v FROM nuke_stories WHERE hometext LIKE '%" . $playerName . "%'"
+        );
+    }
+
+    private function stringColumn(string $sql): string
+    {
+        $result = $this->db->query($sql);
+        $this->assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        $this->assertIsArray($row);
+        $this->assertTrue(is_scalar($row['v']));
+
+        return (string) $row['v'];
+    }
+
+    /**
+     * Connection B's own uncommitted player, so the writes under test have a row B can see.
+     */
+    private function insertPlayerOnConnection(\mysqli $conn, int $teamId): int
+    {
+        $pid = self::TEST_PID_BASE + 50;
+        $uuid = sprintf('test-%09d-0000-000000000001', $pid);
+        $conn->query(
+            "INSERT INTO ibl_plr (pid, name, teamid, ordinal, uuid) VALUES ({$pid}, 'Lock Probe', {$teamId}, 1, '{$uuid}')"
+        );
+
+        return $pid;
+    }
+
+    /**
+     * Run one statement on $conn. Returns the failure's error code, or null when it succeeded.
+     */
+    private function queryErrorCode(\mysqli $conn, string $sql): ?int
+    {
+        try {
+            $conn->query($sql);
+        } catch (\mysqli_sql_exception $e) {
+            return $e->getCode();
+        }
+
+        return null;
     }
 
     /**

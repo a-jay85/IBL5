@@ -65,6 +65,7 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
         }
         // backlog#1570 — count, salary, and write run under one same-team row lock, so two
         // simultaneous submissions from one team cannot both pass the full-roster check.
+        // Mail and Discord run after this returns, so a slow mail server never holds the lock.
         $result = $this->teamLock->withTeamLock(
             $teamID,
             function () use ($teamID, $teamName, $action, $playerID): array {
@@ -86,6 +87,13 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
 
         if ($result === null) {
             return ['success' => false, 'error' => 'Unable to determine your team.'];
+        }
+
+        $notification = $result['notification'] ?? null;
+        unset($result['notification']);
+
+        if ($result['success'] && $notification !== null) {
+            $this->processor->sendNotifications($notification);
         }
 
         return $result;

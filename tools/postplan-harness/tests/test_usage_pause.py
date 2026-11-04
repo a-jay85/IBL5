@@ -1275,3 +1275,52 @@ def test_e2e_bash_site_commit_pause_exits_3(e2e, gate, tmp_path, monkeypatch):
     assert res.error_kind == "usage-pause-dirty"
     assert not record.exists()
     assert f"clear {S}" in gate.read_text()
+
+
+def test_restore_is_a_noop_once_the_tree_is_back_at_pre_tree(rec_gate, tmp_path):
+    _ctx, repo, rec = _recorded(rec_gate, tmp_path)
+    assert usage_pause.restore_from_record(str(repo), rec, S) is None
+    assert usage_pause.restore_from_record(str(repo), rec, S) is None
+    assert (repo / "b.txt").read_text() == "b\n"
+
+
+def test_discard_for_resume_restores_and_keeps_the_record(rec_gate, tmp_path):
+    _ctx, repo, _rec = _recorded(rec_gate, tmp_path)
+    assert usage_pause.discard_for_resume(str(repo)) == "discarded"
+    assert (repo / "b.txt").read_text() == "b\n"
+    _, path = rec_gate
+    assert path.exists(), "the harness clears the record, so it must survive the discard"
+
+
+def test_discard_for_resume_refusal_leaves_the_tree(rec_gate, tmp_path):
+    _ctx, repo, _rec = _recorded(rec_gate, tmp_path)
+    (repo / "b.txt").write_text("edited by hand\n")
+    assert usage_pause.discard_for_resume(str(repo)) == "tree-mismatch"
+    assert (repo / "b.txt").read_text() == "edited by hand\n"
+
+
+def test_discard_for_resume_without_record_or_context(rec_gate, tmp_path, monkeypatch):
+    _ctx, repo, _rec = _recorded(rec_gate, tmp_path)
+    _, path = rec_gate
+    path.unlink()
+    assert usage_pause.discard_for_resume(str(repo)) == "missing"
+    assert (repo / "b.txt").read_text() == "half\n"
+    monkeypatch.delenv("IBL5_USAGE_GATE_SESSION_ID")
+    assert usage_pause.discard_for_resume(str(repo)) == "no-session-id"
+
+
+def test_harness_suite_cannot_pause_a_live_run(tmp_path):
+    """Run the corpus test with a live run's env: no pause marker may land."""
+    harness_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(os.path.dirname(harness_root))
+    state = tmp_path / "ugstate"
+    env = dict(os.environ, IBL5_USAGE_GATE="1", IBL5_USAGE_GATE_RUNNER="post-plan-now",
+               IBL5_USAGE_GATE_SESSION_ID=S,
+               IBL5_USAGE_GATE_RESUME_BIN=os.path.join(repo_root, "bin", "post-plan-now"),
+               IBL5_USAGE_GATE_STATE_DIR=str(state), PYTHONDONTWRITEBYTECODE="1")
+    r = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+         "tests/test_llm_auth_expired_corpus.py::test_committed_corpus_kind_after"],
+        cwd=harness_root, env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout[-2000:]
+    assert not list((state / "markers").glob("*.json"))

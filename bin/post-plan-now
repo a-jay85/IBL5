@@ -624,7 +624,7 @@ if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
         echo "post-plan-now: pre-fire gate $PREFIRE is missing; refusing to fire." >&2
         exit 9
     fi
-    PREFIRE_ARGS=()
+    PREFIRE_ARGS=(--fire-point)
     [ -f "$PLAN_FILE" ] && PREFIRE_ARGS+=(--plan "$PLAN_FILE")
     [ -n "$SKIP_VERIFY_REASON" ] && PREFIRE_ARGS+=(--bypass "$SKIP_VERIFY_REASON")
     if ! "$PREFIRE" ${PREFIRE_ARGS[@]+"${PREFIRE_ARGS[@]}"}; then

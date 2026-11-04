@@ -556,6 +556,7 @@ Act on each exit code:
   plan's content, so any plan edit forces a full rerun of the stage. UNDECIDED means the
   check timed out or could not start; rerun the stage once, and if a row is still UNDECIDED,
   go to Step 7 and add `"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]`.
+  The fire point reruns the stage with larger limits (300 s per check run, 1800 s total).
 - `3`: a prerequisite is missing (docker, the DB container, pcov, vendor). Apply the
   fix the message names once and rerun that stage. If it is still `3`, go to Step 7 and
   add `"prefire_deferred": ["<stage>: <message>"]` to the handoff. The fire point

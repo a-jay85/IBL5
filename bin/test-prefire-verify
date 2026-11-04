@@ -769,6 +769,66 @@ test_xm_revert_failed_maps_to_fail() {
     [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
 }
 
+# xm_argv_stub: stub lib whose `run` records its argv to $D/xm-argv and prints <verdict> row 1;
+# parse and recover go to the real lib, so the plan's record is a real one.
+xm_argv_stub() { # <verdict> <exit>
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) printf "%%s\\n" "$@" > "%s/xm-argv"; echo "%s row 1 — stub"; exit %s ;;\n    pending) exit 1 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$1" "$2" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+}
+xm_argv() { # <flag>: the value after <flag> in the recorded run argv
+    awk -v f="$1" 'prev == f { print; exit } { prev = $0 }' "$D/xm-argv" 2>/dev/null
+}
+
+test_xm_default_uses_short_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 120 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 120"
+    [ "$(xm_argv --budget)" = 300 ] || note "--budget is '$(xm_argv --budget)', wanted 300"
+}
+
+test_xm_fire_point_uses_larger_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 300 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 300"
+    [ "$(xm_argv --budget)" = 1800 ] || note "--budget is '$(xm_argv --budget)', wanted 1800"
+}
+
+test_xm_fire_point_limits_match_harness() {
+    local m="$REPO/tools/postplan-harness/harness/mutations.py" mt bu
+    mt=$(sed -n 's/^DEFAULT_MAX_TIMEOUT = \([0-9]*\).*/\1/p' "$m")
+    bu=$(sed -n 's/^DEFAULT_BUDGET = \([0-9]*\).*/\1/p' "$m")
+    [ "$mt" = 300 ] || note "harness DEFAULT_MAX_TIMEOUT is '$mt'; prefire-verify --fire-point uses 300"
+    [ "$bu" = 1800 ] || note "harness DEFAULT_BUDGET is '$bu'; prefire-verify --fire-point uses 1800"
+    grep -qF 'XM_MAX_TIMEOUT=300' "$GATE" || note "prefire-verify lacks XM_MAX_TIMEOUT=300"
+    grep -qF 'XM_BUDGET=1800' "$GATE" || note "prefire-verify lacks XM_BUDGET=1800"
+}
+
+test_xm_fire_point_undecided_still_fails() {
+    new_case
+    xm_argv_stub UNDECIDED 1
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 1
+    want_out "UNDECIDED row 1"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_post_plan_now_passes_fire_point() {
+    new_ppn_case
+    green_plan
+    mkdir -p "$D/stubs"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/gate-argv"\n' "$D" > "$D/stubs/recgate"
+    chmod +x "$D/stubs/recgate"
+    PPN_GATE="$D/stubs/recgate" run_ppn --plan "$PLAN"
+    grep -qxF -- '--fire-point' "$D/gate-argv" 2>/dev/null || note "post-plan-now did not pass --fire-point to the gate"
+}
+
 test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
@@ -842,6 +902,11 @@ test_xm_term_mid_row_restores_tree
 test_xm_sigkill_leftover_repaired_before_tree_hash
 test_xm_revert_failed_maps_to_fail
 test_xm_bad_stage_rejected
+test_xm_default_uses_short_limits
+test_xm_fire_point_uses_larger_limits
+test_xm_fire_point_limits_match_harness
+test_xm_fire_point_undecided_still_fails
+test_post_plan_now_passes_fire_point
 test_help_lists_exec_mutations
 test_prompt_impl_runs_four_stages
 "

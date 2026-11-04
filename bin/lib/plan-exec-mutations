@@ -487,7 +487,7 @@ next_step() {
         NOT-APPLIED) _ns="the row's match text is not in the file exactly once; update the row's match/replace to the code as written. Do not change the row's check command." ;;
         HELD) _ns="the check passed under mutation; strengthen the test. Never weaken or delete the mutation." ;;
         BASELINE-FAILED) _ns="the check fails on unmutated code; fix the test or its environment first." ;;
-        UNDECIDED) _ns="the check timed out, could not start, or the run budget ran out; rerun with a larger --budget or --max-timeout, or narrow the check to one test file." ;;
+        UNDECIDED) _ns="the check timed out, could not start, or the run budget ran out; rerun the stage once. If it repeats, hand it to the fire point, which uses larger limits. Do not change the row's check command." ;;
         REVERT-FAILED) _ns="the tree may still hold this row's mutation; run bin/lib/plan-exec-mutations recover before anything else." ;;
         *) return 0 ;;
     esac

@@ -10,7 +10,10 @@
 # keyed by tree hash, in the per-worktree git dir. It fails closed.
 #
 # Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|infection|exec-mutations|all]
-#                               [--base <ref>] [--bypass <reason>]
+#                               [--base <ref>] [--bypass <reason>] [--fire-point]
+#   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
+#                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
+#                 bin/post-plan-now passes it; a pass under either limit is the same record.
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
@@ -42,6 +45,7 @@ STAGE="all"
 BASE_OPT=""
 BYPASS_REASON=""
 BYPASS_SET=0
+FIRE_POINT=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -51,6 +55,7 @@ while [ $# -gt 0 ]; do
         --stage)  [ $# -ge 2 ] || die 2 "--stage needs a value"; STAGE="$2"; shift 2 ;;
         --base)   [ $# -ge 2 ] || die 2 "--base needs a ref"; BASE_OPT="$2"; shift 2 ;;
         --bypass) [ $# -ge 2 ] || die 2 "--bypass needs a reason"; BYPASS_REASON="$2"; BYPASS_SET=1; shift 2 ;;
+        --fire-point) FIRE_POINT=1; shift ;;
         -h|--help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die 2 "unknown argument '$1'" ;;
     esac
@@ -270,11 +275,17 @@ stage_infection() {
 }
 
 # --- exec-mutations stage ---------------------------------------------------
-# Sized for one 600 s foreground Bash call (prompt-impl Step 6.9): a row starts only
-# inside the 300 s budget and can then take at most 120 s baseline + 120 s mutated.
+# The short limits fit one 600 s foreground implementer Bash call (prompt-impl Step 6.9):
+# a row starts only inside the 300 s budget and can then take at most 120 s baseline + 120 s
+# mutated. The fire point has no such cap, so --fire-point uses the real post-plan gate's
+# limits (DEFAULT_MAX_TIMEOUT and DEFAULT_BUDGET in tools/postplan-harness/harness/mutations.py).
 XM_TIMEOUT=30
 XM_MAX_TIMEOUT=120
 XM_BUDGET=300
+if [ "$FIRE_POINT" -eq 1 ]; then
+    XM_MAX_TIMEOUT=300
+    XM_BUDGET=1800
+fi
 XM_CHILD=""
 
 xm_cleanup() { # stop a running lib child, then restore any journalled mutation

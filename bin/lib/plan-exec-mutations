@@ -486,8 +486,9 @@ next_step() {
     case "$1" in
         NOT-APPLIED) _ns="the row's match text is not in the file exactly once; update the row's match/replace to the code as written. Do not change the row's check command." ;;
         HELD) _ns="the check passed under mutation; strengthen the test. Never weaken or delete the mutation." ;;
+        WRITE-FAILED) _ns="the row's match is right, but the mutation could not be written to the file; check its permissions and free disk space, then rerun. Do not change the row." ;;
         BASELINE-FAILED) _ns="the check fails on unmutated code; fix the test or its environment first." ;;
-        UNDECIDED) _ns="the check timed out, could not start, or the run budget ran out; rerun the stage once. If it repeats, hand it to the fire point, which uses larger limits. Do not change the row's check command." ;;
+        UNDECIDED) _ns="the check timed out, could not start, or the run budget ran out; rerun the stage once. If it repeats during implementation, defer it to the fire point, which uses larger limits. If it repeats at the fire point, stop and report it. Do not change the row's check command." ;;
         REVERT-FAILED) _ns="the tree may still hold this row's mutation; run bin/lib/plan-exec-mutations recover before anything else." ;;
         *) return 0 ;;
     esac
@@ -517,11 +518,6 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     fi
     if [ "$rc" -eq 124 ]; then
         printf 'UNDECIDED row %s — %s timed out (124) before mutation\n' "$row" "$check"
-        next_step UNDECIDED "$row"
-        FINAL=1; continue
-    fi
-    if [ "$rc" -ge 125 ] && [ "$rc" -le 127 ]; then
-        printf 'UNDECIDED row %s — %s exited %s (check could not run) before mutation\n' "$row" "$check" "$rc"
         next_step UNDECIDED "$row"
         FINAL=1; continue
     fi
@@ -555,7 +551,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
             exit 3
         fi
         printf 'NOT-APPLIED row %s — mutation write to %s failed\n' "$row" "$file"
-        next_step NOT-APPLIED "$row"
+        next_step WRITE-FAILED "$row"
         FINAL=1; continue
     fi
     purge_pyc "$file"

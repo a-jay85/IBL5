@@ -351,6 +351,13 @@ stage_exec_mutations() {
         say "FAIL exec-mutations: a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
         return 1
     fi
+    if [ "$rc" -gt 1 ]; then
+        # The lib died without running its own trap (SIGKILL, OOM), so a mutation may still be
+        # applied and no NEXT-STEP line was printed for the row it was on.
+        xm_cleanup
+        say "FAIL exec-mutations: the mutation script stopped unexpectedly (exit $rc); any planted bug was reverted if recover could. Check git status, then re-run" >&2
+        return 1
+    fi
     if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then
         say "FAIL exec-mutations: a row did not trip (exit $rc); follow the NEXT-STEP line under each failing row. Never edit a row's check command or delete a row to get green" >&2
         return 1

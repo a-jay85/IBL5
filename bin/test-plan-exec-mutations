@@ -289,15 +289,34 @@ chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
 chk "journal empty" journal_clear "$R"
 end_case
 
-start_case run_baseline_cannot_start_is_undecided
+start_case run_baseline_cannot_start_stays_failed
 for code in 125 126 127; do
     R="$TMP/r3c$code"
     mkrepo "$R" "exit $code"
     OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
     chk "exit 1 ($code)" eq "$RC" 1
-    chk "UNDECIDED ($code)" has "$OUT" "UNDECIDED row 1 — bash check.sh exited $code (check could not run) before mutation"
-    chk "not BASELINE-FAILED ($code)" eq "$(grep -c '^BASELINE-FAILED' <<< "$OUT")" 0
+    chk "BASELINE-FAILED ($code)" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited $code before mutation"
+    chk "no hand-off ($code)" eq "$(grep -c 'fire point' <<< "$OUT")" 0
 done
+end_case
+
+start_case run_write_failure_has_its_own_hint
+R="$TMP/r3w"
+mkrepo "$R" 'true'
+mkdir -p "$TMP/failapply"
+REAL_PY=$(command -v python3)
+printf '#!/usr/bin/env bash\n[ "$2" != apply ] || exit 1\nexec "%s" "$@"\n' "$REAL_PY" > "$TMP/failapply/python3"
+chmod +x "$TMP/failapply/python3"
+OUT=$(PATH="$TMP/failapply:$PATH" "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "verdict stays NOT-APPLIED" has "$OUT" "NOT-APPLIED row 1 — mutation write to target.txt failed"
+chk "write hint" has "$OUT" "NEXT-STEP row 1 — the row's match is right, but the mutation could not be written"
+chk "no edit-the-row hint" eq "$(grep -c 'update the row' <<< "$OUT")" 0
+chk "journal empty" journal_clear "$R"
+end_case
+
+start_case run_undecided_hint_covers_the_fire_point
+chk "names both stages" has "$("$LIB" run --root "$TMP/r3t" "$TMP/r3t.plan.md" 2>&1)" "If it repeats at the fire point, stop and report it."
 end_case
 
 start_case run_baseline_exit_128_still_fails

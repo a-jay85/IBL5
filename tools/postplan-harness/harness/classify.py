@@ -489,7 +489,10 @@ def render_exec_mutations(report) -> str:
         if r.kind == "TRIPPED":
             caught.append(f"- {line}")
             continue
-        problems.append(f"- ❌ {line}: {_XM_PROBLEM_WORDS.get(r.kind, r.kind)}")
+        words = _XM_PROBLEM_WORDS.get(r.kind, r.kind)
+        if r.kind == "UNDECIDED" and r.detail.endswith("before mutation"):
+            words = _XM_UNDECIDED_CLEAN_RUN_WORDS
+        problems.append(f"- ❌ {line}: {words}")
         if not _XM_DETAIL_RE.match(r.detail):
             problems.extend(_neutralize_headings(r.detail))
     for h in report.holding:
@@ -524,6 +527,7 @@ _XM_PROBLEM_WORDS = {
     "UNDECIDED": "the test could not run with the bug planted, so we can't tell",
     "BASELINE-FAILED": "the test already failed before any bug was planted",
 }
+_XM_UNDECIDED_CLEAN_RUN_WORDS = "the test timed out before any bug was planted, so we can't tell"
 # "<check> [still ]exited N ..." — the lib's fixed detail shapes; group 1 is the check.
 _XM_DETAIL_RE = re.compile(r"^(.+?) (?:still )?exited -?\d+\b")
 

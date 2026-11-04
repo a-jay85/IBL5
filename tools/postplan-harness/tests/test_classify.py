@@ -1227,6 +1227,17 @@ def test_exec_mutations_failures_outside_details_passes_inside():
     assert "</details>" in details and "Row 5" not in details
 
 
+def test_exec_mutations_clean_run_timeout_has_its_own_words():
+    from harness.classify import render_exec_mutations
+    from harness.mutations import MutationResult
+    out = render_exec_mutations(_xm_report(results=(
+        MutationResult(5, "UNDECIDED", "t timed out (124) before mutation"),
+        MutationResult(6, "UNDECIDED", "t timed out (124) under mutation"),
+    )))
+    assert "**Row 5**: the test timed out before any bug was planted" in out
+    assert "**Row 6**: the test could not run with the bug planted" in out
+
+
 def test_exec_mutations_neutralizes_headings():
     from harness.classify import upsert_exec_mutations
     from harness.mutations import MutationResult

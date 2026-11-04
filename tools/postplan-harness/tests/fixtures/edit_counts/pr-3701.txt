@@ -1,0 +1,77 @@
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** Post-plan now merges a stacked PR's own parent branch instead of master, stops with a clear error when that parent cannot be found, and ends the fix loop early when a stacked branch already carries a stray master merge.
+
+**Why:** PR [#3672](<https://github.com/a-jay85/IBL5/pull/3672>) had about 355 master files merged into a stacked branch, and the fix rounds kept looping on a history problem that no body or file edit can remove.
+
+**Watch:** `branch_base_merge_target` in `bin/lib/branch-base.sh` still trusts a local iblBase whose parent was squash-merged but is still on origin, which the plan leaves out of scope. `.claude/rules/linear-history-squash-merge.md` still says "Both `/post-plan` engines now merge `origin/master`", which is no longer true for stacked branches.
+
+**Touches:** bin/lib/branch-base.sh, bin/postplan-fix, bin/test-postplan-fix, tools/postplan-harness/runner.py, tools/postplan-harness/harness/adapters/gitad.py, tools/postplan-harness/harness/history_shape.py, tools/postplan-harness/harness/premerge.py, tools/postplan-harness/README.md, tools/postplan-harness/tests/
+
+**Machine-authored fixes:** pending — Phase 6.5 has not run
+<!-- merge-digest:end -->
+
+## Summary
+- Adds `branch_base_merge_target` to `bin/lib/branch-base.sh`. It returns the PR's declared base (iblBase config first, then `gh` baseRefName) with no ancestry check. It falls back to `origin/master` only for an unstacked branch. A branch with an iblBase that no layer resolves gets a failure, not master.
+- Adds `LiveGit.merge_target()` and a `ReplayGit` counterpart in `harness/adapters/gitad.py`. An unresolved stacked base raises `base-resolve`, and `base-resolve` joins the fail-closed error kinds in `runner.py`.
+- Phase 2 in `runner.py` merges the stacked parent instead of `origin/master`. The `--onto` fallback is skipped on a conflict against a parent, since that fallback targets master. The retry refresh follows the same base.
+- `bin/postplan-fix --headless` now fetches and merges the resolved base. It prints `result=gave-up-base` and exits 1 when the base does not resolve. It passes the base to `harness.premerge record` through a new `--base` option, which validates the value as an `origin/<branch>` ref.
+- Adds `harness/history_shape.py`. On a NOT READY verdict, the Phase 5.5 round loop checks a stacked branch for a merge commit that pulled in master but not the parent. When it finds one, it records one `history-shape` decision and spawns no fixer. The next action shows in the run log, in `result.json` under `fidelity.history_shape`, and on the RESULT line.
+- Adds tests for the resolver, the Phase 2 stacked merge, the history-shape detector and round stop, and `premerge --base` validation. `bin/test-postplan-fix` gets stacked-base and unresolved-base cases.
+- Updates `tools/postplan-harness/README.md` to describe the new base handling and the history-shape stop.
+
+**Merge danger:** Door: two-way · Blast radius: site-wide · Why: Dev tooling only (post-plan harness and bash helpers); git revert restores the old merge-master behavior with no data effects.
+**How to revert:** `git revert <merge-sha>`; no migration, prod sync, or config is touched.
+
+<!-- scope-notes:begin -->
+## Unplanned changes
+The plan did not name these changes, or the diff lacks a planned file. Auto-merge is not held on them. Check each one.
+- unplanned `tools/postplan-harness/harness/premerge.py` (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)
+- unplanned `tools/postplan-harness/tests/test_premerge.py` (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)
+<!-- scope-notes:end -->
+
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+<!-- exec-mutations:begin -->
+### Bug-planting check on the tests
+
+For each row of the plan's Verification Matrix, a tool planted a small bug in the code and re-ran that row's test. A good test fails when the bug is there.
+
+**⚠️ 3 of 24 rows need attention:**
+
+- ❌ **Row 22** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_parent_merge_not_flagged -q`): the test still passed with the bug planted, so nothing guards this rule
+- ❌ **Row 23** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_unstacked_base_returns_empty -q`): the test still passed with the bug planted, so nothing guards this rule
+- ❌ **Row 24** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_master_merge_shared_with_parent_not_flagged -q`): the test still passed with the bug planted, so nothing guards this rule
+
+<details><summary>✅ 21 rows caught the planted bug</summary>
+
+- **Row 3** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_unstacked_returns_origin_master -q`)
+- **Row 4** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_config_parent_on_remote -q`)
+- **Row 5** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_config_missing_on_remote_fails_closed -q`)
+- **Row 6** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_rejects_option_shaped_config -q`)
+- **Row 7** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_gh_layer_resolves_retargeted_base -q`)
+- **Row 8** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_gh_layer_without_config -q`)
+- **Row 9** (`cd tools/postplan-harness && python3 -m pytest tests/test_merge_target.py::test_merge_target_offline_empty_keeps_gh_layer -q`)
+- **Row 12** (`cd tools/postplan-harness && python3 -m pytest tests/test_phase2_stacked_merge.py::test_phase2_stacked_merges_parent_not_master -q`)
+- **Row 13** (`cd tools/postplan-harness && python3 -m pytest tests/test_phase2_stacked_merge.py::test_phase2_unstacked_still_merges_master -q`)
+- **Row 14** (`cd tools/postplan-harness && python3 -m pytest tests/test_phase2_stacked_merge.py::test_phase2_stacked_unresolvable_raises_before_merge -q`)
+- **Row 16** (`cd tools/postplan-harness && python3 -m pytest tests/test_rebase_only_runner.py::test_rebase_only_merges_stacked_base -q`)
+- **Row 17** (`cd tools/postplan-harness && python3 -m pytest tests/test_rebase_only_runner.py::test_rebase_only_stacked_conflict_skips_onto_fallback -q`)
+- **Row 18** (`bash bin/test-postplan-fix --case headless-stacked-base`)
+- **Row 19** (`bash bin/test-postplan-fix --case headless-stacked-unresolved`)
+- **Row 21** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_stray_master_merge_detected -q`)
+- **Row 25** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_empty_range_returns_empty -q`)
+- **Row 26** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_unresolvable_base_returns_empty -q`)
+- **Row 27** (`cd tools/postplan-harness && python3 -m pytest tests/test_history_shape.py::test_next_action_names_base_and_retarget -q`)
+- **Row 28** (`cd tools/postplan-harness && python3 -m pytest tests/test_fidelity_body_only_round.py::test_history_shape_stops_before_first_fixer -q`)
+- **Row 29** (`cd tools/postplan-harness && python3 -m pytest tests/test_fidelity_body_only_round.py::test_no_stray_merge_keeps_body_only_round -q`)
+- **Row 30** (`cd tools/postplan-harness && python3 -m pytest tests/test_fidelity_body_only_round.py::test_result_line_carries_history_shape_note -q`)
+
+</details>
+<!-- exec-mutations:end -->
+
+

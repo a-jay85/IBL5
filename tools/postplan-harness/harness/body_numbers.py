@@ -216,6 +216,31 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
     return text
 
 
+_EDIT_COUNT = re.compile(
+    r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+"
+    r"((?:[a-z-]+\s+)?(?:assertions|tests|test\s+cases|cases|checks|call\s+sites|functions|edits)"
+    r"\s+(?:were|are)\s+(?:updated|changed|modified|edited|rewritten|reworded|adjusted))\b",
+    re.IGNORECASE,
+)
+_SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
+
+
+def strip_edit_counts(text: str) -> str:
+    """Drop the number from a hand-tallied count of modified items.
+
+    "Two existing assertions were updated" becomes "Existing assertions were updated".
+    Counts of added tests, files and lines are left for the grounded checks.
+    """
+    def _sub(m: re.Match) -> str:
+        rest = m.group(2)
+        line_prefix = text[text.rfind("\n", 0, m.start()) + 1 : m.start()]
+        if m.group(1)[0].isupper() or _SENTENCE_START.search(line_prefix):
+            return rest[0].upper() + rest[1:]
+        return rest
+
+    return _EDIT_COUNT.sub(_sub, text)
+
+
 def correct_body_numbers(body: str, name_status: str, numstat: str) -> str:
     """Rewrite wrong numbers in *body* to match ground-truth facts from the git outputs.
 
@@ -240,11 +265,11 @@ def correct_body_numbers(body: str, name_status: str, numstat: str) -> str:
     pos = 0
     for start, end in spans:
         if pos < start:
-            result_parts.append(_apply_corrections(body[pos:start], facts, body_adr_count))
+            result_parts.append(strip_edit_counts(_apply_corrections(body[pos:start], facts, body_adr_count)))
         result_parts.append(body[start:end])  # protected: verbatim
         pos = end
     if pos < len(body):
-        result_parts.append(_apply_corrections(body[pos:], facts, body_adr_count))
+        result_parts.append(strip_edit_counts(_apply_corrections(body[pos:], facts, body_adr_count)))
 
     return "".join(result_parts)
 

@@ -2152,7 +2152,7 @@ run_manual_judge() {
       timeout "$cap" claude -p "$judge_prompt" \
           --dangerously-skip-permissions \
           --model "$JUDGE_MODEL" \
-          --disallowedTools Edit Write NotebookEdit Agent \
+          --disallowedTools Edit Write NotebookEdit Agent Monitor \
           --effort high \
           --output-format stream-json \
           --verbose \

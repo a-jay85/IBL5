@@ -1917,6 +1917,7 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             status.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
         else:
             status.append("- no arming decision recorded")
+        status.append("Auto-merge disarmed: a held run removes any existing arm on this PR.")
     if status:
         out.extend(status)
         out.append("")

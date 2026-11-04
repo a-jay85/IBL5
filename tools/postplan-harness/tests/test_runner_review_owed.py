@@ -81,6 +81,7 @@ EXPECTED_ORDER = [
     ("pr_comment", "Code review"),
     ("pr_comment", "Security audit"),
     ("pr_sticky_verdict", None),
+    ("pr_disable_auto_merge", None),
 ]
 
 
@@ -176,7 +177,9 @@ def test_arming_is_unchanged_by_every_review_owed_outcome(tmp_path, monkeypatch,
     # reorders both runs the same way.
     assert _ordered_actions(acts) == EXPECTED_ORDER
     names = [a["action"] for a in acts]
-    assert names[0] == "pr_status_label" and names[-1] == "pr_sticky_verdict"
+    # The synthetic plan holds, so the held-run disarm follows the sticky post.
+    assert names[0] == "pr_status_label" and names[-2:] == ["pr_sticky_verdict",
+                                                           "pr_disable_auto_merge"]
     assert res.terminal == base.terminal
 
 

@@ -506,7 +506,13 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     comments_status=ok
     comments_json="$($GH_API_CMD "repos/$SLUG/issues/$num/comments" --paginate 2>/dev/null)" \
         || comments_status=failed
-    sticky="$(printf '%s' "$comments_json" | hp_pick_sticky || true)"
+    # Only repo OWNER/MEMBER/COLLABORATOR comments count: post-plan posts the sticky with
+    # the owner's token, and anyone else could forge a READY banner. A forged sticky is
+    # absent, which gives verdict:none (a hold).
+    trusted_json="$(printf '%s' "$comments_json" | jq -c -s '[ .[][]?
+        | select(.author_association == "OWNER" or .author_association == "MEMBER"
+                 or .author_association == "COLLABORATOR") ]' 2>/dev/null || true)"
+    sticky="$(printf '%s' "$trusted_json" | hp_pick_sticky || true)"
     verdict_holds="$(hp_verdict_holds "$sticky" "$comments_status")"
 
     held_body=0

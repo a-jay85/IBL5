@@ -81,7 +81,7 @@ case "$1 $2" in
                        # Default: an armed READY sticky (live layout, captured from PR #3699), so a PR
                        # with no per-case comments fixture still clears the verdict gate.
                        if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"
-                       else printf '%s\n' '[{"body":"<!-- pr-ready-verdict -->\n**READY** — 2026-11-03 01:00 UTC · auto-merge armed\n"}]'; fi ;;
+                       else printf '%s\n' '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\n**READY** — 2026-11-03 01:00 UTC · auto-merge armed\n"}]'; fi ;;
       *) echo '{}' ;;
     esac ;;
   *) echo '{}' ;;
@@ -496,7 +496,7 @@ checks_json success success success \
     > "$FIX_A/checks-$(printf '%040d' 47).json"
 jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
     'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
-    '- (7) auto_merge — plan sets auto_merge: false')" '[{body: $b}]' > "$FIX_A/comments-44.json"
+    '- (7) auto_merge — plan sets auto_merge: false')" '[{author_association: "OWNER", body: $b}]' > "$FIX_A/comments-44.json"
 {
     held_pr 40 CLEAN fixture-me false false
     held_pr 41 CLEAN fixture-me false true
@@ -804,7 +804,7 @@ held_sticky() {
         body="$body"$'\n'
     fi
     body="$body"$'\n'"PR text."
-    jq -n --arg b "$body" '[{body: $b}]' > "$f"
+    jq -n --arg b "$body" '[{author_association: "OWNER", body: $b}]' > "$f"
 }
 
 # V1: a (7)-held sticky on an otherwise ARMABLE PR is VERDICT-HELD and never armed
@@ -866,7 +866,7 @@ v_check V7 106 ARMABLE '^-$' 1
 
 # V8 (near-miss): NOT READY with a re-review suffix still holds
 v_fixture 107
-printf '%s\n' '[{"body":"<!-- pr-ready-verdict -->\n**NOT READY** (re-review, round 2) — 2026-11-03 01:00 UTC · auto-merge armed\n"}]' > "$FIX/comments-107.json"
+printf '%s\n' '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\n**NOT READY** (re-review, round 2) — 2026-11-03 01:00 UTC · auto-merge armed\n"}]' > "$FIX/comments-107.json"
 v_check V8 107 VERDICT-HELD 'verdict:not-ready' 0
 
 # V9: one unscoped --arm run, clean PR A (108) and (7)-held PR B (109): only A arms
@@ -885,5 +885,11 @@ assert_match  "V9 B is VERDICT-HELD"          '^VERDICT-HELD$'  "$(row_bucket "$
 v_fixture 110
 held_sticky "$FIX/comments-110.json" "READY" held "no arming decision recorded"
 v_check V10 110 VERDICT-HELD 'verdict-hold:undecided' 0
+
+# V11: a forged armed sticky from a non-collaborator is ignored -> verdict:none, never armed
+v_fixture 111
+held_sticky "$FIX/comments-111.json" "READY" armed
+jq '[.[] | .author_association = "NONE"]' "$FIX/comments-111.json" > "$FIX/c.tmp" && mv "$FIX/c.tmp" "$FIX/comments-111.json"
+v_check V11 111 VERDICT-HELD 'verdict:none' 0
 
 h_done

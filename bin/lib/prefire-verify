@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 # bin/lib/prefire-verify — pre-fire verification gate.
 #
-# Re-runs three checks on the current working tree before /post-plan fires:
+# Re-runs four checks on the current working tree before /post-plan fires:
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
 #   2. the full default PHPUnit suite
 #   3. Infection on the changed classes at CI's thresholds (bin/mutation-diff)
+#   4. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
 # It trusts no implementer-written ledger. Only this script writes pass records,
 # keyed by tree hash, in the per-worktree git dir. It fails closed.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|infection|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|infection|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>]
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
+#      (an exec-mutations row that did not trip, or a mutation revert that failed)
 #   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
-#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, pcov
+#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, pcov, gtimeout/timeout
 #   4  the checks changed the working tree, so no pass record was written
 #
 # Test seams (used only by bin/test-prefire-verify):
@@ -22,6 +24,7 @@
 #   PREFIRE_MUTATION_CMD   default bin/mutation-diff, run from the repo root
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
 #   PREFIRE_EXCLUDES_CMD   default bin/check-infection-excludes, run from ibl5/
+#   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
 
 set -uo pipefail
 
@@ -48,14 +51,14 @@ while [ $# -gt 0 ]; do
         --stage)  [ $# -ge 2 ] || die 2 "--stage needs a value"; STAGE="$2"; shift 2 ;;
         --base)   [ $# -ge 2 ] || die 2 "--base needs a ref"; BASE_OPT="$2"; shift 2 ;;
         --bypass) [ $# -ge 2 ] || die 2 "--bypass needs a reason"; BYPASS_REASON="$2"; BYPASS_SET=1; shift 2 ;;
-        -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die 2 "unknown argument '$1'" ;;
     esac
 done
 
 case "$STAGE" in
-    matrix|phpunit|infection|all) : ;;
-    *) die 2 "--stage must be matrix, phpunit, infection, or all (got '$STAGE')" ;;
+    matrix|phpunit|infection|exec-mutations|all) : ;;
+    *) die 2 "--stage must be matrix, phpunit, infection, exec-mutations, or all (got '$STAGE')" ;;
 esac
 if [ "$BYPASS_SET" -eq 1 ] && [ -z "$BYPASS_REASON" ]; then
     die 2 "--bypass needs a non-empty reason"
@@ -82,6 +85,20 @@ prefire_tree_hash() {
     rm -f "$idx"
     return $rc
 }
+
+XM_LIB="${PREFIRE_EXEC_MUTATIONS_LIB:-$SELF_DIR/plan-exec-mutations}"
+# SIGKILL cannot be trapped, so an earlier exec-mutations run may have left a mutation
+# applied and journalled. Restore it before the tree hash is taken: no stage may run
+# against, or record a pass for, a mutated tree.
+"$XM_LIB" pending --root "$ROOT" >/dev/null 2>&1
+case $? in
+    0)
+        "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1 \
+            || die 1 "an interrupted exec-mutations run left a mutation that recover could not restore; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run"
+        say "restored a mutation left by an interrupted exec-mutations run" ;;
+    1) : ;;
+    *) die 3 "cannot read the exec-mutations journal (plan-exec-mutations pending failed)" ;;
+esac
 
 TREE=$(prefire_tree_hash) || die 3 "cannot compute the working-tree hash"
 TREE7="${TREE:0:7}"
@@ -252,14 +269,94 @@ stage_infection() {
     return "$rc"
 }
 
+# --- exec-mutations stage ---------------------------------------------------
+# Sized for one 600 s foreground Bash call (prompt-impl Step 6.9): a row starts only
+# inside the 300 s budget and can then take at most 120 s baseline + 120 s mutated.
+XM_TIMEOUT=30
+XM_MAX_TIMEOUT=120
+XM_BUDGET=300
+XM_CHILD=""
+
+xm_cleanup() { # stop a running lib child, then restore any journalled mutation
+    if [ -n "$XM_CHILD" ]; then
+        kill -TERM "$XM_CHILD" 2>/dev/null
+        wait "$XM_CHILD" 2>/dev/null
+        XM_CHILD=""
+    fi
+    "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1
+}
+
+stage_exec_mutations() {
+    local xm_key recs log rc
+    if [ -z "$PLAN" ]; then
+        say "SKIP exec-mutations: no plan (ad-hoc path)"
+        return 0
+    fi
+    xm_key=$(git hash-object "$PLAN")
+    cache_hit exec-mutations "$xm_key" && return 0
+
+    recs=$(mktemp "${TMPDIR:-/tmp}/prefire-xm.XXXXXX") || return 3
+    "$XM_LIB" parse --root "$ROOT" "$PLAN" > "$recs" 2>&1; rc=$?
+    if [ "$rc" -eq 1 ]; then
+        say "FAIL exec-mutations: PARSE-FAILED: $(head -1 "$recs"); fix the plan's mutation block" >&2
+        rm -f "$recs"; return 1
+    elif [ "$rc" -ne 0 ]; then
+        say "FAIL exec-mutations: plan-exec-mutations parse exited $rc" >&2
+        rm -f "$recs"; return 3
+    fi
+    if [ ! -s "$recs" ]; then
+        rm -f "$recs"
+        say "SKIP exec-mutations: the plan has no Executable Mutations rows"
+        return 0
+    fi
+    rm -f "$recs"
+    if ! command -v gtimeout >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1; then
+        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout (brew install coreutils)" >&2
+        return 3
+    fi
+
+    log="$STATE_DIR/$TREE.exec-mutations.log"
+    # The lib traps its own signals and reverts. This stage adds two things: it runs the
+    # lib in the background so a signal interrupts `wait` at once (bash defers traps
+    # while a foreground child runs), and it forwards the signal and runs recover itself.
+    trap 'xm_cleanup' EXIT
+    trap 'xm_cleanup; exit 130' INT
+    trap 'xm_cleanup; exit 143' TERM
+    trap 'xm_cleanup; exit 129' HUP
+    "$XM_LIB" run --root "$ROOT" --timeout "$XM_TIMEOUT" --max-timeout "$XM_MAX_TIMEOUT" \
+        --scale 2 --budget "$XM_BUDGET" "$PLAN" > "$log" 2>&1 &
+    XM_CHILD=$!
+    wait "$XM_CHILD"; rc=$?
+    XM_CHILD=""
+    trap - EXIT INT TERM HUP
+    cat "$log"
+
+    if grep -q '^NO-TIMEOUT' "$log"; then
+        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout" >&2
+        return 3
+    fi
+    if [ "$rc" -eq 3 ]; then
+        xm_cleanup
+        say "FAIL exec-mutations: a mutation could not be reverted; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
+        return 1
+    fi
+    if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then
+        say "FAIL exec-mutations: a row did not trip (exit $rc); follow the NEXT-STEP line under each failing row. Never edit a row's check command or delete a row to get green" >&2
+        return 1
+    fi
+    write_record exec-mutations "$xm_key"
+    say "exec-mutations passed"
+    return 0
+}
+
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="matrix phpunit infection" ;;
+    all) STAGES="matrix phpunit infection exec-mutations" ;;
     *)   STAGES="$STAGE" ;;
 esac
 
 for s in $STAGES; do
-    "stage_$s"; rc=$?
+    "stage_${s//-/_}"; rc=$?
     [ "$rc" -eq 0 ] || exit "$rc"
 done
 

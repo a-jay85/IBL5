@@ -518,7 +518,7 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         b { print > out }
     ' "$f"
     i=0
-    for stage in matrix phpunit infection; do
+    for stage in matrix phpunit infection exec-mutations; do
         i=$((i + 1))
         if [ ! -f "$D/blocks/$i.sh" ]; then
             note "Step 6.9 has no bash block for $stage"
@@ -784,6 +784,16 @@ test_help_lists_exec_mutations() {
     want_out "PREFIRE_EXEC_MUTATIONS_LIB"
 }
 
+test_prompt_impl_runs_four_stages() {
+    OUT=$(cat "$REPO/bin/automouse/prompt-impl")
+    want_out '--stage exec-mutations'
+    want_out 'When all four return 0, proceed to Step 7.'
+    want_out "Never edit a"
+    want_out 'never delete a mutation block'
+    refute_out 'When all three return 0'
+    want_out '"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]'
+}
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -833,6 +843,7 @@ test_xm_sigkill_leftover_repaired_before_tree_hash
 test_xm_revert_failed_maps_to_fail
 test_xm_bad_stage_rejected
 test_help_lists_exec_mutations
+test_prompt_impl_runs_four_stages
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

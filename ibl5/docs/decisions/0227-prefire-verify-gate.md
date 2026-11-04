@@ -1,6 +1,6 @@
 ---
 description: bin/post-plan-now runs bin/lib/prefire-verify (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all three pass on the current tree; the automouse impl prompt runs it stage by stage first.
-last_verified: 2026-11-03
+last_verified: 2026-11-04
 ---
 
 # ADR-0227: Pre-fire verification gate in post-plan-now
@@ -48,3 +48,7 @@ No existing host owns this. `bin/lib/plan-matrix-assertions` checks that a diff 
 - `bin/lib/plan-matrix-rows.sh`: the shared matrix parser.
 - `.github/workflows/mutation-pr.yml`: the CI side of the same check.
 - `ibl5/docs/decisions/0145-mutation-pr-required-own-workflow.md`: the per-PR mutation check.
+
+## Addendum 2026-11-03: fourth stage, exec-mutations
+
+The gate gained a fourth stage, `exec-mutations`. It runs the plan's Executable Mutations rows through `bin/lib/plan-exec-mutations run`, which stays the only parser and runner (ADR-0199). Its pass record is keyed on tree hash and plan blob hash, so editing a row forces a rerun. Any verdict other than TRIPPED fails the stage. Each failing row prints a `NEXT-STEP` line from the lib, so this gate and post-plan gate 19 print the same guidance. Every gate call first restores a mutation left by a killed run, before it hashes the tree. Gate `[XM]` in `bin/check-plan` now also rejects a mutation row whose check references a `/tmp/` path, because that file is gone by the time either gate runs.

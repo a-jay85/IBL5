@@ -615,7 +615,7 @@ if git diff --quiet && git diff --cached --quiet \
 fi
 
 # Pre-fire verification gate: full PHPUnit, the plan's post-impl CLI-executable
-# matrix rows, and changed-file Infection at CI's thresholds. Fail closed: no
+# matrix rows, changed-file Infection at CI's thresholds, and the plan's mutation rows. Fail closed: no
 # pass for this exact tree means no fire. A --rebase-only run pushes no new
 # content, so it is exempt.
 if [ "${REBASE_ONLY:-0}" -ne 1 ]; then

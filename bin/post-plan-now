@@ -614,6 +614,17 @@ if git diff --quiet && git diff --cached --quiet \
     exit 1
 fi
 
+# A resumed run throws away its recorded half-done edit anyway. Do it before the gate below,
+# or that edit fails the gate on every resume and the job ends up stuck.
+if [ -n "$RESUME_SID" ]; then
+    _resume_discard=$(PYTHONPATH="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}" \
+        IBL5_USAGE_GATE_RUNNER=post-plan-now \
+        IBL5_USAGE_GATE_RESUME_BIN="$ROOT/bin/post-plan-now" \
+        IBL5_USAGE_GATE_SESSION_ID="$RESUME_SID" \
+        python3 -c 'import sys; from harness.usage_pause import discard_for_resume as d; print(d(sys.argv[1]))' "$ROOT" 2>/dev/null || true)
+    echo "post-plan-now: resume discard: ${_resume_discard:-unavailable}"
+fi
+
 # Pre-fire verification gate: full PHPUnit, the plan's post-impl CLI-executable
 # matrix rows, and changed-file Infection at CI's thresholds. Fail closed: no
 # pass for this exact tree means no fire. A --rebase-only run pushes no new

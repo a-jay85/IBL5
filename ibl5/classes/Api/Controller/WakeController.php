@@ -17,6 +17,10 @@ use Discord\Discord;
  * Wakes a dormant report (or appends operator context to one already moving).
  * Authorization is the message AUTHOR, never the mention: author_id must equal the
  * configured operator snowflake, and an unconfigured operator fails closed.
+ *
+ * author_id is caller-supplied body data and Discord ids are public, so the route also
+ * requires a non-'standard' API key (ServiceKeyGuard). Holders of an elevated or
+ * unlimited key sit inside the trust boundary. See the trust-boundary addendum in ADR-0213.
  */
 class WakeController implements ControllerInterface
 {

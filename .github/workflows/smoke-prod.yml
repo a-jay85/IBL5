@@ -31,7 +31,7 @@ concurrency:
 jobs:
   smoke:
     name: Production Health Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # Skip if triggered by a failed deploy
     if: >-
       github.event_name != 'workflow_run' ||
@@ -139,7 +139,7 @@ jobs:
 
   rollback-and-notify:
     name: Auto-Rollback and Notify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: smoke
     if: >-
       always() &&
@@ -240,7 +240,7 @@ jobs:
 
   notify:
     name: Notify Smoke Outcome
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: smoke
     # Single notify-only job replacing notify-scheduled-failure,
     # and notify-inconclusive (ci-backlog 2.1).

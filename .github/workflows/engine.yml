@@ -30,7 +30,7 @@ jobs:
 
   engine:
     name: Go build, vet, lint, test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
 
@@ -90,7 +90,7 @@ jobs:
     name: Engine
     if: always()
     needs: [engine]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

@@ -36,7 +36,7 @@ jobs:
   mutation:
     name: Infection PHP
     needs: [mirror-ready]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: >
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
@@ -132,7 +132,7 @@ jobs:
 
   notify-mutation-failure:
     name: Notify Mutation Failure
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [mirror-ready, mutation]
     if: ${{ always() && (needs.mutation.result == 'failure' || needs.mirror-ready.result == 'failure') }}
     timeout-minutes: 5

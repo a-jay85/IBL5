@@ -15,7 +15,7 @@ concurrency:
 jobs:
   auto-merge:
     name: Enable auto-merge
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - name: Enable auto-merge

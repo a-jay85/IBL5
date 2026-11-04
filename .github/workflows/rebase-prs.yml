@@ -42,7 +42,7 @@ concurrency:
 jobs:
   rebase:
     name: Rebase open PRs onto master
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 75   # up to 45 min bot-commit wait, then the rebase pass
     steps:
       - name: Checkout master

@@ -42,7 +42,7 @@ concurrency:
 jobs:
   select:
     name: VR refresh select
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -186,7 +186,7 @@ jobs:
     name: VR refresh Pages dispatch
     needs: [select, refresh]
     if: always() && needs.refresh.result != 'skipped' && needs.refresh.result != 'cancelled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       actions: write

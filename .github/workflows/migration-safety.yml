@@ -43,7 +43,7 @@ jobs:
   schema-parity-check:
     name: Bash vs PHP Schema Parity
     needs: [mirror-ready]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     # Only consumed when CI writes config.local.php for `php bin/migrate`; the
@@ -140,7 +140,7 @@ jobs:
   schema-completeness:
     name: Schema Completeness
     needs: [mirror-ready]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     env:
@@ -270,7 +270,7 @@ jobs:
 
   destructive-migration-scan:
     name: Destructive Migration Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - name: Checkout code
@@ -299,7 +299,7 @@ jobs:
 
   migration-naming-check:
     name: Migration Naming Convention
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -338,7 +338,7 @@ jobs:
     name: Regenerate current-schema.sql
     needs: [mirror-ready]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -400,7 +400,7 @@ jobs:
     name: Old-Code Compat Self-Test
     needs: [mirror-ready]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     env:
@@ -442,7 +442,7 @@ jobs:
     name: Old-Code Compat (production PHP on PR-head schema)
     needs: [mirror-ready]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     env:
@@ -511,7 +511,7 @@ jobs:
     name: Migration Safety
     if: always()
     needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check, old-code-compat, old-code-compat-selftest, mirror-ready]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - run: exit 1

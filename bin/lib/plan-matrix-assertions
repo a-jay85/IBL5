@@ -88,7 +88,7 @@ if [ "${1:-}" = "--verdict" ]; then
         exit 0
     fi
     VERDICT_PLAN="$2"
-    MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}')
+    MAIN_CHECKOUT=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}') || MAIN_CHECKOUT=""
     MATRIX_SCRIPT="${MATRIX_SCRIPT:-$MAIN_CHECKOUT/bin/lib/plan-matrix-assertions}"
     if [ ! -f "$VERDICT_PLAN" ]; then
         MATRIX_VERDICT=skipped
@@ -96,9 +96,14 @@ if [ "${1:-}" = "--verdict" ]; then
         MATRIX_VERDICT=uncommitted
     else
         MATRIX_DIFF=$(mktemp "${TMPDIR:-/tmp}/matrix-diff.XXXXXX")
-        git diff origin/master...HEAD >"$MATRIX_DIFF"
         MATRIX_RC=0
-        MATRIX_OUT=$("$MATRIX_SCRIPT" "$VERDICT_PLAN" "$MATRIX_DIFF" 2>&1) || MATRIX_RC=$?
+        MATRIX_OUT=""
+        if git diff origin/master...HEAD >"$MATRIX_DIFF" 2>/dev/null; then
+            MATRIX_OUT=$("$MATRIX_SCRIPT" "$VERDICT_PLAN" "$MATRIX_DIFF" 2>&1) || MATRIX_RC=$?
+        else
+            MATRIX_RC=1
+            MATRIX_OUT="git diff origin/master...HEAD failed (no origin/master ref or not a git repo)"
+        fi
         rm -f "$MATRIX_DIFF"
         printf '%s\n' "$MATRIX_OUT"
         if [ "$MATRIX_RC" -ne 0 ]; then

@@ -270,6 +270,12 @@ chmod +x "$STUBDIR/security"
 cp "$REPO/bin/automouse/prompt-impl" "$ROOT/automouse/prompt-impl"
 # The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
 cp "$REPO/bin/automouse/lib-queue-order" "$ROOT/automouse/lib-queue-order"
+# The judge gate (plan_requires_judge) fails closed when $SELF_DIR/../lib/plan-model-consistency
+# is missing, so every case needs the wrapper and prompt-judge.
+cp "$REPO/bin/automouse/prompt-judge" "$ROOT/automouse/prompt-judge"
+mkdir -p "$ROOT/lib"
+printf '#!/bin/sh\nexec "%s/bin/lib/plan-model-consistency" "$@"\n' "$REPO" > "$ROOT/lib/plan-model-consistency"
+chmod +x "$ROOT/lib/plan-model-consistency"
 
 RUN_DAY=$(date +%Y-%m-%d)
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."

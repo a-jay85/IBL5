@@ -58,6 +58,11 @@
 #                   tests.yml, mutation.yml and mutation-pr.yml must each keep at
 #                   least one such block (no vacuous pass). Job-level DB_* env is
 #                   the sanctioned override path and is never inspected.
+#   runner image (U1): no workflow file may name ubuntu-latest anywhere, comments
+#                   included. GitHub moves that label to a new Ubuntu release in a
+#                   staged rollout, so CI changes under open PRs with no diff.
+#                   Workflows pin the one explicit image recorded in
+#                   .claude/rules/ci-gotchas.md.
 #
 # Conditional by design: each check is SKIPPED (visibly) when its target file is
 # absent, so this no-ops on a branch without the file and auto-activates the
@@ -1042,5 +1047,32 @@ else
     fi
   fi
 fi  # end D1
+
+# U1: no workflow may run on the floating ubuntu-latest label. GitHub moves it to
+# a new Ubuntu release in a staged rollout (actions/runner-images issue 14748), so
+# CI changes under open PRs with no related diff. Every workflow pins one explicit
+# image; the literal and the upgrade recipe live in .claude/rules/ci-gotchas.md.
+# The message names no pinned literal, so an upgrade PR never edits this block.
+U1_FORBIDDEN='ubuntu-latest'
+if [ ! -d "$WORKFLOWS" ]; then
+  echo "composite-contracts: workflows dir absent — U1 skipped"
+else
+  u1_files=0
+  u1_bad=0
+  while IFS= read -r u1_wf; do
+    [ -n "$u1_wf" ] || continue
+    u1_files=$((u1_files + 1))
+    while IFS= read -r u1_hit; do
+      [ -n "$u1_hit" ] || continue
+      echo "composite-contracts: runner image (U1) — '$U1_FORBIDDEN' moves to a new Ubuntu release under open PRs; pin the image named in .claude/rules/ci-gotchas.md ($u1_wf:${u1_hit%%:*})" >&2
+      u1_bad=1
+    done <<< "$(grep -nF "$U1_FORBIDDEN" "$u1_wf" || true)"
+  done <<< "$(find "$WORKFLOWS" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)"
+  if [ "$u1_bad" -eq 0 ]; then
+    echo "composite-contracts: no workflow runs on $U1_FORBIDDEN ($u1_files file(s)) (U1)"
+  else
+    fail=1
+  fi
+fi  # end U1
 
 exit "$fail"

@@ -1134,8 +1134,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             fid["review_owed"] = ro
             log(f"phase6.5 review-owed: {ro.get('verdict')} ({ro.get('reason')})"
                 + (f"; {ro['command']}" if ro.get("command") else ""))
+        pr_may_be_armed = decision.armed
         if decision.armed:
             gh.pr_merge_auto(pr)
+        elif pr:
+            # A held run is newer evidence than any arm, hand-set ones included.
+            gh.pr_disable_auto_merge(pr)  # held-run disarm
         state.checkpoint("arm", res)
 
         if res.degraded_agents:
@@ -1199,6 +1203,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 worktree=worktree, pr=pr, sha=sha, live=live, fixture=fixture,
                 out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
                 flag=_mc_flag, post_sticky=_post_sticky)
+            pr_may_be_armed = pr_may_be_armed or decision.armed  # rearm may have armed
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
@@ -1214,6 +1219,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
             flag=_mc_flag, post_sticky=_post_sticky)
 
+        if pr and not decision.armed and pr_may_be_armed:
+            gh.pr_disable_auto_merge(pr)  # late-flip disarm
         res.terminal = _compute_terminal(res, decision.armed)
 
         # ---- Phase 9: retrospective (bounded, record-only) -------------

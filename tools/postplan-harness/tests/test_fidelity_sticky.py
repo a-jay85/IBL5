@@ -1084,7 +1084,9 @@ def test_sticky_layout_keeps_reader_anchors(tmp_path):
     lines = body.splitlines()
     assert lines[0].startswith("**")
     last_hold = max(i for i, ln in enumerate(lines) if ln.startswith("- ("))
-    assert lines[last_hold + 1] == ""
+    assert lines[last_hold + 1] == ("Auto-merge disarmed: a held run removes any "
+                                    "existing arm on this PR.")
+    assert lines[last_hold + 2] == ""
     assert [i for i, ln in enumerate(lines) if re.match(r"^- \(\d", ln)] == [last_hold]
     digest = lines.index(fidelity.MERGE_DIGEST_HEADING)
     for heading in ("### Fixed in this PR", "### Still open (non-blocking)",

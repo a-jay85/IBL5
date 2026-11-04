@@ -2476,22 +2476,53 @@ def _closer_reset(git, pre_head) -> None:
             pass
 
 
+def _closer_keep_ref(git, ref, sha) -> bool:
+    run = getattr(git, "_run", None)
+    if not (callable(run) and sha):
+        return False
+    try:
+        run("update-ref", ref, sha)
+        return True
+    except Exception:  # noqa: BLE001 - reported as "NOT kept", never raised
+        return False
+
+
 def _closer_commit_push(git, llm, log, res, outcome, *, worktree, out_dir, gh, pr,
-                        phase) -> str:
+                        phase, failure=None) -> str:
     """Commit what the session left (if anything) and push. Returns a note ('' on success).
-    `remote-head-diverged` re-raises; every other failure resets to the pre-session head."""
+    `remote-head-diverged` re-raises. A push failure keeps the commit under
+    refs/postplan-closer/ and resets the branch; a commit failure resets and discards."""
+    sha = ""
     try:
         if git.is_dirty():
             first = (outcome.note or outcome.verdict or "closer session").splitlines()[0][:200]
             git.commit_all("fix: address post-plan hold (closer)\n\n" + first)
+        head = git.head()
+        if head and head != outcome.pre_head:
+            sha = head
         _push_with_gate_fix(git, log, phase, llm=llm, worktree=worktree, out_dir=out_dir,
                             res=res, gh=gh, pr=pr)
     except HarnessError as e:
         if e.kind == "remote-head-diverged":
             raise
+        reason, line = closer.push_failure_reason(e.kind, _redact(e.detail or "") or "")
+        ref = f"refs/postplan-closer/{pr}-{sha[:12]}" if sha else ""
+        kept = _closer_keep_ref(git, ref, sha) if sha else False
         _closer_reset(git, outcome.pre_head)
-        log(f"{phase}: closer commit/push failed ({e.kind}); reset to pre-session head")
-        return f"commit/push failed ({e.kind}); edits discarded"
+        if not sha:
+            log(f"{phase}: closer commit failed ({e.kind}/{reason}); reset to pre-session head")
+            msg = f"commit failed ({e.kind}/{reason}): {line}; edits discarded"
+        else:
+            where = f"kept at {ref}" if kept else "NOT kept (update-ref failed)"
+            log(f"{phase}: closer push failed ({e.kind}/{reason}); commit {sha[:12]} {where}")
+            msg = (f"push failed ({e.kind}/{reason}): {line}; closer commit {sha[:12]} "
+                   f"{where} in {worktree}; branch reset to {outcome.pre_head[:12]}; "
+                   f"recover: git -C {worktree} cherry-pick {sha[:12]}")
+        if failure is not None:
+            failure.update({"stage": "push" if sha else "commit", "kind": e.kind,
+                            "reason": reason, "line": line, "sha": sha, "ref": ref,
+                            "kept": kept, "worktree": worktree})
+        return msg
     return ""
 
 
@@ -2601,11 +2632,14 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
     note = co.note
     pushed_note = ""
     if co.status == "edited":
+        pf: dict = {}
         pushed_note = _closer_commit_push(git, llm, log, res, co, worktree=worktree,
-                                          out_dir=out_dir, gh=gh, pr=pr, phase="closer")
+                                          out_dir=out_dir, gh=gh, pr=pr, phase="closer",
+                                          failure=pf)
         if pushed_note:
-            note = f"{note}; {pushed_note}".strip("; ")
+            note = f"{pushed_note}; {note}".strip("; ")
             rec["status"] = "push-failed"
+            rec["push_failure"] = pf
     replies = (_closer_post_replies(gh, log, pr, co)
                if rec["status"] not in _CLOSER_FAIL_STATUSES else 0)
     rec["replies_posted"] = replies
@@ -2644,7 +2678,8 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
     _closer_note(out_dir, f"closer: {rec['status']} verdict={co.verdict} "
                           f"recheck={rec['recheck']}\n\n{note}")
     if callable(post_sticky) and rec["recheck"] != "armed":
-        first = (note or co.verdict or "").splitlines()[0][:200] if (note or co.verdict) else ""
+        cap = 700 if rec["status"] in _CLOSER_FAIL_STATUSES else 200
+        first = (note or co.verdict or "").splitlines()[0][:cap] if (note or co.verdict) else ""
         post_sticky(decision, f"closer: {rec['status']}; {first}", "closer")
     state.checkpoint("arm", res)
     return decision

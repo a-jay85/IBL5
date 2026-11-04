@@ -499,3 +499,28 @@ def apply_body_edits(body: str, edits) -> tuple:
             return None, f"find lands on a checkbox or marker line: {find[:60]!r}"
         new = new.replace(find, repl, 1)
     return new, ""
+
+
+_NFF_TOKENS = ("non-fast-forward", "fetch first", "stale info", "[rejected]")
+_AUTH_TOKENS = ("authentication failed", "permission to", "could not read username",
+                "403", "invalid credentials")
+_HOOK_TOKENS = ("hook declined", "pre-push hook", "pre-receive hook", "pre-commit hook")
+_LINE_TOKENS = ("rejected", "denied", "declined", "fatal:", "error:")
+
+
+def push_failure_reason(kind: str, detail: str) -> tuple:
+    """`(reason, line)`. reason is non-fast-forward | auth | hook-deny | other; line is the
+    most telling single line of `detail` (<= 200 chars). Pure."""
+    low = (detail or "").lower()
+    if any(t in low for t in _NFF_TOKENS):
+        reason = "non-fast-forward"
+    elif any(t in low for t in _AUTH_TOKENS):
+        reason = "auth"
+    elif "gate" in (kind or "") or any(t in low for t in _HOOK_TOKENS):
+        reason = "hook-deny"
+    else:
+        reason = "other"
+    lines = [ln.strip() for ln in (detail or "").splitlines() if ln.strip()]
+    pick = next((ln for ln in lines if any(t in ln.lower() for t in _LINE_TOKENS)),
+                lines[-1] if lines else "")
+    return reason, pick[:200]

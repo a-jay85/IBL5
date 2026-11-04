@@ -208,3 +208,47 @@ def test_closer_body_edit_failure_is_noted(monkeypatch, tmp_path):
         monkeypatch, tmp_path, [("Two follow-ups", "Three follow-ups")],
         "\nFiled: Two follow-ups.\n")
     assert res.closer["body_edits"] == "failed:edit"
+
+
+# ── closer push failure is reported, not silent ───────────────────────────────
+
+def test_closer_push_failed_sticky_leads_with_reason(monkeypatch, tmp_path):
+    from test_runner_closer import (Recorder, _TrackedGit, _arm, _closer_fixture, _install)
+    from harness.closer import CloserOutcome
+
+    class _Edits(Recorder):
+        def __call__(self, llm, **kw):
+            self.calls.append(kw)
+            _TrackedGit.instances[-1].extra_dirty = ["src/closer-edit.php"]
+            return CloserOutcome(status="edited", verdict="fixed", note="closer fixed it",
+                                 cost_usd=1.5, pre_head="")
+
+    note = ("push failed (push-rejected/non-fast-forward): "
+            "! [rejected] HEAD -> wake (non-fast-forward); "
+            "closer commit bbbbbbbbbbbb kept at refs/postplan-closer/3695-bbbbbbbbbbbb "
+            "in /wt; branch reset to aaaaaaaaaaaa; "
+            "recover: git -C /wt cherry-pick bbbbbbbbbbbb")
+
+    def fake(git, llm, log, res, outcome, *, worktree, out_dir, gh, pr, phase, failure=None):
+        failure.update({"stage": "push", "kind": "push-rejected",
+                        "reason": "non-fast-forward",
+                        "line": "! [rejected] HEAD -> wake (non-fast-forward)",
+                        "sha": "b" * 40, "ref": "refs/postplan-closer/3695-bbbbbbbbbbbb",
+                        "kept": True, "worktree": "/wt"})
+        return note
+
+    _arm(monkeypatch)
+    fx = _closer_fixture(monkeypatch, tmp_path)
+    _install(monkeypatch, _Edits())
+    monkeypatch.setattr(runner, "_closer_commit_push", fake)
+    res, _result, out = _go(monkeypatch, tmp_path, fx, git_cls=_TrackedGit)
+    assert res.closer["status"] == "push-failed"
+    assert res.closer["push_failure"]["sha"] == "b" * 40
+    assert res.closer["recheck"] == "not-run"
+    assert res.closer["replies_posted"] == 0
+    stickies = [a for a in _actions(out)
+                if a["action"] == "pr_sticky_verdict" and "closer:" in a.get("body", "")]
+    assert stickies
+    body = stickies[-1]["body"]
+    assert "closer: push-failed; push failed (push-rejected/non-fast-forward)" in body
+    assert "bbbbbbbbbbbb" in body

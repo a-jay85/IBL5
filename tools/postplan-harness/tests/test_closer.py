@@ -503,3 +503,23 @@ def test_parse_body_edits_rejects_bad_shapes():
     assert closer.parse_body_edits(_edits_reply([{"find": "", "replace": "b"}])) == ()
     assert closer.parse_body_edits(_edits_reply([{"find": "a", "replace": 7}])) == ()
     assert closer.parse_body_edits(PR3694_REPLY) == ()
+
+
+# ── push-failure classifier ───────────────────────────────────────────────────
+
+def test_push_failure_reason_classifies():
+    assert closer.push_failure_reason(
+        "push-rejected", "! [rejected] HEAD -> b (non-fast-forward)\n"
+        "error: failed to push some refs") \
+        == ("non-fast-forward", "! [rejected] HEAD -> b (non-fast-forward)")
+    assert closer.push_failure_reason(
+        "push-failed", "remote: Permission to a-jay85/IBL5.git denied to bot.\n"
+        "fatal: unable to access")[0] == "auth"
+    assert closer.push_failure_reason(
+        "local-gate-denied", "bin/pre-push-adr-hook: missing ADR")[0] == "hook-deny"
+    assert closer.push_failure_reason("push-failed", "connection reset by peer")[0] == "other"
+
+
+def test_push_failure_reason_bare_rejected_word_is_other():
+    assert closer.push_failure_reason(
+        "push-failed", "rejected 3 stale files from the cache")[0] == "other"

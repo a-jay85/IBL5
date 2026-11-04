@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
-description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-10-26
+description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, correct a PR body that a verdict blocks on, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
+last_verified: 2026-11-04
 ---
 
 # /pr-burndown
@@ -22,8 +22,8 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 ## Rules
 
 - Prep without asking. Rebasing, regenerating snapshots and golden fixtures, writing
-  tests the plan promised, fixing open review findings, and re-firing post-plan need no
-  owner call. Step 4 runs them.
+  tests the plan promised, fixing open review findings, correcting a PR body that a
+  verdict blocks on, and re-firing post-plan need no owner call. Step 4 runs them.
 - Ask the owner for everything else: a sign-off, a manual-test box, a visual look, a
   one-way door, a design fork (the fix could go two ways), and a hold or a close. Never
   guess one of these.
@@ -88,7 +88,7 @@ The owner's review of the PR comes first.
 Then put each PR in one pile:
 
 - **Prep, then sign-off.** The PR has chores (a stale verdict, `BEHIND` or `DIRTY`, a
-  missing promised test, an open review finding, a failed post-plan run) and an owner hold
+  missing promised test, an open review finding, a body-only verdict, a failed post-plan run) and an owner hold
   (`auto_merge: false`, a feat sign-off, a manual box). No chore needs an owner call. It
   goes to Step 4 now, and its card waits for the sign-off batch.
 - **Prep only.** No owner hold remains once the chores are done. Step 4 preps it and
@@ -180,6 +180,7 @@ last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked
 
 ## Step 4: Run the prep
 
+A PR whose only chore is a body-only verdict needs no job. Fix it as § Body-only blockers below says.
 Launch a prep job for every PR in the two prep piles. Use the Step 6 job template, with
 step 3 listing the chores (rebase, the snapshots to regenerate, each missing test with its
 matrix row and the mutation it must catch, each review finding to fix) and step 7 set to:
@@ -199,6 +200,53 @@ the new verdict.
 
 Never invent an owner pick for a prep job. If a chore needs a judgment the plan does not
 settle, the job stops and comments, and the PR moves to Decide now.
+
+### Body-only blockers
+
+A verdict is body-only when every `[BLOCKING]` finding asks for a stated change to the PR
+body and the fidelity verdict is one of its holds. Fix it in this session with no prep job.
+A body-only fix makes no commit and no worktree edit.
+In each block below, replace `$D`, `N`, and `pN` with literal values first, as Step 6
+says. Each block runs in its own shell, so nothing carries over.
+
+1. Save the verdict comment and classify it. The helper reads the `[BLOCKING]` and `[NOTE]`
+   markers inside the sticky's `Reviewer verdict` block. The `Still open` list above it
+   drops them.
+   ```bash
+   gh pr view N --json comments \
+     --jq '[.comments[] | select(.body | contains("<!-- pr-ready-verdict -->"))] | last | .body' \
+     > "$D/pN-sticky.md"
+   bin/lib/pr-body-only-fix classify "$D/pN-sticky.md"
+   ```
+   `BODY_ONLY=no reason=<token>` means the PR takes its normal pile. When every blocker
+   names the PR body but the token is `correction-not-stated` or `correction-ambiguous`, the
+   PR goes to Decide now and its card quotes the finding.
+2. Confirm the verdict reviewed the current head, as Step 1 says. A stale verdict is a
+   re-fire chore and skips this section.
+3. Run the live-run check from Step 6. If a post-plan run is listed, skip this PR for now.
+   A live run caches the body and writes it back after a fixer commit.
+4. Build the new body.
+   ```bash
+   gh pr view N --json body --jq .body > "$D/pN-body.md"
+   bin/lib/pr-body-only-fix apply "$D/pN-sticky.md" "$D/pN-body.md" "$D/pN-body-new.md"
+   ```
+   Exit 0 prints the diff. Exit 1 prints `refused=<token>`, and the PR goes to Decide now
+   with that token on its card. Never hand-edit the body to get past a refusal. The helper
+   edits only author-written text. It never edits a `<!-- name:begin -->` region or any
+   other HTML comment, and it ignores `[NOTE]` findings.
+5. Apply it, then prove it took.
+   ```bash
+   gh pr edit N --body-file "$D/pN-body-new.md"
+   gh pr view N --json body --jq .body > "$D/pN-body-after.md"
+   diff "$D/pN-body-new.md" "$D/pN-body-after.md"
+   ```
+   A non-empty diff means the edit did not take. Stop and give the PR a card.
+6. Re-fire post-plan with `(cd <abs worktree path> && bin/post-plan-now --auto)` after the
+   live-run check. Get the path from `bin/pr-wt-resolve N`. The run reviews the new body
+   and posts a fresh verdict. Never write or edit a verdict yourself. The PR arms only on
+   that fresh verdict.
+
+Report the one-line diff in the next status line.
 
 ## Step 5: Help the owner look
 

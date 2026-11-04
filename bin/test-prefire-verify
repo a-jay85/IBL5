@@ -192,6 +192,18 @@ test_matrix_extract_skips_near_miss_rows() {
     [ "$got" = "$want" ] || note "expected exactly rows 5 and 6, got: $(printf '%s' "$got" | tr '\t\n' ' >')"
 }
 
+test_relative_plan_from_subdir_runs_rows() {
+    new_case
+    green_plan
+    # cwd = ibl5/, so ../../plan.md is the plan here and nothing at the repo root.
+    OUT=$(cd "$R/ibl5" && "$GATE" --base master --stage matrix --plan ../../plan.md 2>&1); RC=$?
+    want_rc 0
+    refute_out "no evidence to check"
+    want_out "matrix passed"
+    want_cnt row1 1
+    want_cnt row3 1
+}
+
 test_plan_without_matrix_refuses() {
     new_case
     printf '# Plan\n\n## Phase 1\n\nNothing here.\n' > "$PLAN"
@@ -502,6 +514,7 @@ test_matrix_row_failure_refuses_and_names_row
 test_unrun_row_refuses_without_gate_record
 test_matrix_extract_skips_near_miss_rows
 test_plan_without_matrix_refuses
+test_relative_plan_from_subdir_runs_rows
 test_phpunit_red_refuses
 test_db_down_fails_closed_naming_row
 test_all_green_passes_and_records

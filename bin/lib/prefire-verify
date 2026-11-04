@@ -61,6 +61,11 @@ fi
 if [ -n "$PLAN" ] && [ ! -f "$PLAN" ]; then
     die 2 "plan file not found: $PLAN"
 fi
+# The check above reads --plan from the caller's cwd. The cd below moves to the
+# repo root, so pin the path now or a relative plan stops resolving.
+if [ -n "$PLAN" ]; then
+    PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")"
+fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git work tree"
 cd "$ROOT" || die 2 "cannot cd to $ROOT"

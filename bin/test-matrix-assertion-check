@@ -250,7 +250,13 @@ extract_step67_block() {
     # Prints the first bash fence found between ## Step 6.7: and ## Step 7: headings
     local prompt_file
     prompt_file="$(dirname "$0")/automouse/prompt-impl"
-    awk '/^## Step 6\.7:/{found=1} found && /^```bash$/{in_block=1; next} in_block && /^```$/{exit} in_block{print} /^## Step 7:/ && found{exit}' "$prompt_file"
+    local block
+    block=$(awk '/^## Step 6\.7:/{found=1} found && /^```bash$/{in_block=1; next} in_block && /^```$/{exit} in_block{print} /^## Step 7:/ && found{exit}' "$prompt_file")
+    # The prompt names the main checkout's copy and a <plan path> placeholder.
+    # Run this branch's copy against the case's plan. Anything else in the fence is
+    # left alone, so a fence that stops calling --verdict fails every step67 case.
+    block=${block/\/Users\/ajaynicolas\/GitHub\/IBL5\/bin\/lib\/plan-matrix-assertions/$MATRIX_ASSERTIONS_SCRIPT}
+    printf '%s\n' "${block/<plan path>/\"\$PLAN_PATH\"}"
 }
 
 step67-skipped-no-plan() {
@@ -531,6 +537,54 @@ step67-routing() {
     h_pass "step67-routing"
 }
 
+step67-plain-fences() {
+    # A worktree sandbox refuses `$` in a chained command, and these two run in every
+    # plan. Each step's check must stay one plain line.
+    local prompt_file step fence
+    prompt_file="$(dirname "$0")/automouse/prompt-impl"
+    for step in '6\.6' '6\.7'; do
+        fence=$(awk -v h="^## Step $step:" '$0 ~ h{found=1} found && /^```bash$/{in_block=1; next} in_block && /^```$/{exit} in_block{print}' "$prompt_file")
+        if [ -z "$fence" ] || [ "$(wc -l <<< "$fence")" -ne 1 ] || [[ "$fence" == *'$'* ]]; then
+            h_fail "step67-plain-fences — Step $step fence is not one line free of \$: $fence"
+            return 1
+        fi
+    done
+    h_pass "step67-plain-fences"
+}
+
+step67-no-plan-arg() {
+    # An agent that drops the path must not get `skipped`, which proceeds to Step 7.
+    local out
+    out=$("$MATRIX_ASSERTIONS_SCRIPT" --verdict 2>&1)
+    if grep -q 'MATRIX_VERDICT=unavailable' <<< "$out"; then
+        h_pass "step67-no-plan-arg"
+    else
+        h_fail "step67-no-plan-arg — expected MATRIX_VERDICT=unavailable, got: $out"
+        return 1
+    fi
+}
+
+step67-no-origin-master() {
+    # git diff fails with no origin/master ref. --verdict must still print a verdict,
+    # exit 0, and leave no temp file behind.
+    local repo plan tmpd out rc=0 leftover
+    repo=$(mktemp -d)
+    tmpd=$(mktemp -d)
+    git -C "$repo" init -q
+    git -C "$repo" commit --allow-empty -m "base" -q
+    plan="$tmpd/plan.md"
+    plan_fixture '| 1 | `frobnicate_widget_case` verifies the gate | CLI-executable | post-impl | `bin/test-it` |' > "$plan"
+    out=$(cd "$repo" && TMPDIR="$tmpd" MATRIX_SCRIPT="$MATRIX_ASSERTIONS_SCRIPT" "$MATRIX_ASSERTIONS_SCRIPT" --verdict "$plan" 2>&1) || rc=$?
+    leftover=$(find "$tmpd" -name 'matrix-diff.*' | wc -l)
+    rm -rf "$repo" "$tmpd"
+    if [ "$rc" -eq 0 ] && grep -q 'MATRIX_VERDICT=unavailable' <<< "$out" && [ "$leftover" -eq 0 ]; then
+        h_pass "step67-no-origin-master"
+    else
+        h_fail "step67-no-origin-master — rc=$rc leftover=$leftover out: $out"
+        return 1
+    fi
+}
+
 step67() {
     local ok=0
     step67-skipped-no-plan || ok=1
@@ -539,6 +593,9 @@ step67() {
     step67-uncommitted || ok=1
     step67-unavailable || ok=1
     step67-routing || ok=1
+    step67-plain-fences || ok=1
+    step67-no-plan-arg || ok=1
+    step67-no-origin-master || ok=1
     return $ok
 }
 
@@ -1561,7 +1618,7 @@ replay-false-stop-canary)
 
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1573,7 +1630,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

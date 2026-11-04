@@ -93,7 +93,7 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
         unset($result['notification']);
 
         if ($result['success'] && $notification !== null) {
-            $this->processor->sendNotifications($notification);
+            $this->processor->finishCommittedMove($notification);
         }
 
         return $result;

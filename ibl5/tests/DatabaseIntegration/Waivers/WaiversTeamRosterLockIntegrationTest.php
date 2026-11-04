@@ -240,7 +240,7 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
 
     /**
      * The signing and news story share the lock's transaction. A failure after both are
-     * written (here, the audit log) undoes both and sends nothing.
+     * written undoes both, sends nothing, and leaves no audit entry saying the move happened.
      */
     public function testFailureInsideLockRollsBackSigningAndNewsStoryAndSendsNothing(): void
     {
@@ -248,8 +248,23 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
         $this->insertTestPlayer($pid, 'Rolled Back Pickup', self::WAIVED_PLAYER);
         $this->insertRow('nuke_stories_cat', ['title' => 'Waiver Pool Moves']);
         $sent = 0;
-        $logger = self::createStub(\Psr\Log\LoggerInterface::class);
-        $logger->method('info')->willThrowException(new \RuntimeException('audit failed'));
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->never())->method('info');
+        $realLock = new WaiversTeamLockRepository($this->db);
+        $failingLock = new class ($realLock) implements \Waivers\Contracts\WaiversTeamLockInterface {
+            public function __construct(private readonly WaiversTeamLockRepository $lock)
+            {
+            }
+
+            public function withTeamLock(int $teamId, callable $fn): mixed
+            {
+                return $this->lock->withTeamLock($teamId, static function () use ($fn): mixed {
+                    $fn();
+
+                    throw new \RuntimeException('failed before commit');
+                });
+            }
+        };
 
         try {
             $this->submitWithRealProcessor(
@@ -262,11 +277,12 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
                 static function () use (&$sent): void {
                     $sent++;
                 },
-                $logger
+                $logger,
+                $failingLock
             );
-            self::fail('The audit failure must reach the caller.');
+            self::fail('The failure before commit must reach the caller.');
         } catch (\RuntimeException $e) {
-            $this->assertSame('audit failed', $e->getMessage());
+            $this->assertSame('failed before commit', $e->getMessage());
         }
 
         $this->assertSame(0, $this->playerTeamId($pid));
@@ -331,7 +347,8 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
         int $pid,
         \Closure $mailerFactory,
         \Closure $discordPoster,
-        ?\Psr\Log\LoggerInterface $logger = null
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?\Waivers\Contracts\WaiversTeamLockInterface $teamLock = null
     ): array {
         $season = self::createStub(\Season\Season::class);
         $season->method('advancesContractYears')->willReturn(false);
@@ -358,7 +375,7 @@ class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
             $season,
             new \Waivers\WaiversRosterSlotCounter(new \Team\TeamQueryRepository($this->db)),
             $teamIdentityRepo,
-            new WaiversTeamLockRepository($this->db)
+            $teamLock ?? new WaiversTeamLockRepository($this->db)
         );
 
         return $service->submit(['Action' => 'add', 'Player_ID' => (string) $pid], $this->teamName(1));

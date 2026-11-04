@@ -448,7 +448,7 @@ class WaiversSubmissionServiceTest extends TestCase
         $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
-        $processor->expects($this->never())->method('sendNotifications');
+        $processor->expects($this->never())->method('finishCommittedMove');
 
         $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
 
@@ -502,18 +502,33 @@ class WaiversSubmissionServiceTest extends TestCase
         $events = [];
         $mailArgs = [];
         $discordArgs = [];
+        $warnings = [];
+        $audits = [];
         $service = $this->buildServiceWithRealProcessor(
             $events,
             mailerFactory: $this->recordingMailerFactory($events, $mailArgs),
-            discordPoster: $this->recordingDiscordPoster($events, $discordArgs)
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            warnings: $warnings,
+            audits: $audits
         );
 
         $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago <Bulls>');
 
-        $this->assertSame(['lock:start', 'write', 'lock:end', 'mail', 'discord'], $events);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'mail', 'discord'], $events);
         $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertSame([], $warnings);
 
         $salary = \League\ContractRules::getVeteranMinimumSalary(5);
+        $this->assertSame(
+            [['player_signed_from_waivers', [
+                'action' => 'player_signed_from_waivers',
+                'player_id' => 42,
+                'player_name' => 'Test Player',
+                'team_name' => 'Chicago <Bulls>',
+                'salary' => $salary,
+            ]]],
+            $audits
+        );
         $hometext = "The Chicago &lt;Bulls&gt; sign Test Player from waivers for {$salary}.";
         $this->assertSame(
             [['ibldepthcharts@gmail.com', 'Chicago &lt;Bulls&gt; make waiver additions', $hometext, 'waivers@iblhoops.net']],
@@ -527,16 +542,27 @@ class WaiversSubmissionServiceTest extends TestCase
         $events = [];
         $mailArgs = [];
         $discordArgs = [];
+        $audits = [];
         $service = $this->buildServiceWithRealProcessor(
             $events,
             mailerFactory: $this->recordingMailerFactory($events, $mailArgs),
-            discordPoster: $this->recordingDiscordPoster($events, $discordArgs)
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            audits: $audits
         );
 
         $result = $service->submit(['Action' => 'waive', 'Player_ID' => '42'], 'Chicago <Bulls>');
 
-        $this->assertSame(['lock:start', 'write', 'lock:end', 'discord'], $events);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'discord'], $events);
         $this->assertSame(['success' => true, 'result' => 'player_dropped'], $result);
+        $this->assertSame(
+            [['player_waived', [
+                'action' => 'player_waived',
+                'player_id' => 42,
+                'player_name' => 'Test Player',
+                'team_name' => 'Chicago <Bulls>',
+            ]]],
+            $audits
+        );
         $this->assertSame([], $mailArgs);
         $this->assertSame([['#waiver-wire', 'The Chicago &lt;Bulls&gt; cut Test Player to waivers.']], $discordArgs);
     }
@@ -596,6 +622,7 @@ class WaiversSubmissionServiceTest extends TestCase
             $this->assertSame('write failed', $e->getMessage());
         }
 
+        $this->assertNotContains('audit', $events);
         $this->assertSame([], $mailArgs);
         $this->assertSame([], $discordArgs);
     }
@@ -627,6 +654,7 @@ class WaiversSubmissionServiceTest extends TestCase
             $this->assertSame('commit failed', $e->getMessage());
         }
 
+        $this->assertSame(['write'], $events, 'A rolled-back move must leave no audit entry.');
         $this->assertSame([], $mailArgs);
         $this->assertSame([], $discordArgs);
     }
@@ -640,7 +668,7 @@ class WaiversSubmissionServiceTest extends TestCase
             'error' => 'rejected',
             'notification' => ['mailSubject' => 'subject', 'message' => 'message'],
         ]);
-        $processor->expects($this->never())->method('sendNotifications');
+        $processor->expects($this->never())->method('finishCommittedMove');
 
         $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
 
@@ -668,8 +696,115 @@ class WaiversSubmissionServiceTest extends TestCase
         $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
 
         $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
-        $this->assertSame(['lock:start', 'write', 'lock:end', 'discord'], $events);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'discord'], $events);
         $this->assertSame([['waiver_mail_notification_failed', 'mail down']], $warnings);
+    }
+
+    /**
+     * MailService::send() catches SMTP errors and returns false, so false must log like a throw does.
+     */
+    public function testMailSendReturningFalseLogsAWarningAndStillPostsDiscord(): void
+    {
+        $events = [];
+        $discordArgs = [];
+        $warnings = [];
+        $mailer = self::createStub(MailServiceInterface::class);
+        $mailer->method('send')->willReturn(false);
+        $service = $this->buildServiceWithRealProcessor(
+            $events,
+            mailerFactory: static fn (): MailServiceInterface => $mailer,
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            warnings: $warnings
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'discord'], $events);
+        $this->assertSame([['waiver_mail_notification_failed', 'The mail service reported a failed send.']], $warnings);
+    }
+
+    public function testAuditWriteFailureWarnsAndStillSends(): void
+    {
+        $events = [];
+        $mailArgs = [];
+        $discordArgs = [];
+        $warnings = [];
+        $service = $this->buildServiceWithRealProcessor(
+            $events,
+            mailerFactory: $this->recordingMailerFactory($events, $mailArgs),
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            warnings: $warnings,
+            auditFails: true
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'mail', 'discord'], $events);
+        $this->assertSame([['waiver_audit_log_failed', 'log down']], $warnings);
+    }
+
+    /**
+     * The GM must never see an error for a saved move, and a dead log must not stop the Discord post.
+     *
+     * @param \Closure(): MailServiceInterface $failingFactory
+     */
+    #[DataProvider('failingMailerProvider')]
+    public function testLogFailuresAfterCommitNeverEscapeWhenMailFails(\Closure $failingFactory): void
+    {
+        $events = [];
+        $discordArgs = [];
+        $service = $this->buildServiceWithRealProcessor(
+            $events,
+            mailerFactory: $failingFactory,
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            auditFails: true,
+            warningFails: true
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertSame(['lock:start', 'write', 'lock:end', 'audit', 'discord'], $events);
+    }
+
+    public function testLogFailureAfterCommitNeverEscapesWhenDiscordFails(): void
+    {
+        $events = [];
+        $mailArgs = [];
+        $service = $this->buildServiceWithRealProcessor(
+            $events,
+            mailerFactory: $this->recordingMailerFactory($events, $mailArgs),
+            discordPoster: static function (string $channel, string $message): void {
+                throw new \RuntimeException('discord down');
+            },
+            warningFails: true
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertCount(1, $mailArgs);
+    }
+
+    public function testMailSendReturningFalseWithALogFailureNeverEscapes(): void
+    {
+        $events = [];
+        $discordArgs = [];
+        $mailer = self::createStub(MailServiceInterface::class);
+        $mailer->method('send')->willReturn(false);
+        $service = $this->buildServiceWithRealProcessor(
+            $events,
+            mailerFactory: static fn (): MailServiceInterface => $mailer,
+            discordPoster: $this->recordingDiscordPoster($events, $discordArgs),
+            warningFails: true
+        );
+
+        $result = $service->submit(['Action' => 'add', 'Player_ID' => '42'], 'Chicago Bulls');
+
+        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertCount(1, $discordArgs);
     }
 
     /**
@@ -727,6 +862,7 @@ class WaiversSubmissionServiceTest extends TestCase
      * @param \Closure(): MailServiceInterface $mailerFactory
      * @param \Closure(string, string): void $discordPoster
      * @param list<array{0: string, 1: mixed}> $warnings
+     * @param list<array{0: string, 1: array<string, mixed>}> $audits
      */
     private function buildServiceWithRealProcessor(
         array &$events,
@@ -736,7 +872,10 @@ class WaiversSubmissionServiceTest extends TestCase
         bool $writes = true,
         ?\Throwable $writeError = null,
         ?WaiversTeamLockInterface $teamLock = null,
-        array &$warnings = []
+        array &$warnings = [],
+        array &$audits = [],
+        bool $auditFails = false,
+        bool $warningFails = false
     ): WaiversSubmissionService {
         $write = static function () use (&$events, $writes, $writeError): bool {
             $events[] = 'write';
@@ -765,8 +904,20 @@ class WaiversSubmissionServiceTest extends TestCase
         $validator->method('validateDrop')->willReturn($verdict);
 
         $logger = self::createStub(LoggerInterface::class);
+        $logger->method('info')->willReturnCallback(
+            static function (string|\Stringable $message, array $context = []) use (&$events, &$audits, $auditFails): void {
+                $events[] = 'audit';
+                if ($auditFails) {
+                    throw new \RuntimeException('log down');
+                }
+                $audits[] = [(string) $message, $context];
+            }
+        );
         $logger->method('warning')->willReturnCallback(
-            static function (string|\Stringable $message, array $context = []) use (&$warnings): void {
+            static function (string|\Stringable $message, array $context = []) use (&$warnings, $warningFails): void {
+                if ($warningFails) {
+                    throw new \RuntimeException('log down');
+                }
                 $warnings[] = [(string) $message, $context['error'] ?? null];
             }
         );

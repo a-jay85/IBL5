@@ -17,6 +17,7 @@ use Waivers\Contracts\WaiversValidatorInterface;
 /**
  * @see WaiversProcessorInterface
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type WaiverAudit from WaiversProcessorInterface
  * @phpstan-import-type WaiverNotification from WaiversProcessorInterface
  */
 class WaiversProcessor implements WaiversProcessorInterface
@@ -216,17 +217,22 @@ class WaiversProcessor implements WaiversProcessorInterface
 
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
 
-        $this->logger->info('player_waived', [
-            'action' => 'player_waived',
-            'player_id' => $playerID,
-            'player_name' => $playerName,
-            'team_name' => $teamName,
-        ]);
-
         return [
             'success' => true,
             'result' => 'player_dropped',
-            'notification' => ['mailSubject' => null, 'message' => $hometext],
+            'notification' => [
+                'mailSubject' => null,
+                'message' => $hometext,
+                'audit' => [
+                    'event' => 'player_waived',
+                    'context' => [
+                        'action' => 'player_waived',
+                        'player_id' => $playerID,
+                        'player_name' => $playerName,
+                        'team_name' => $teamName,
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -281,43 +287,73 @@ class WaiversProcessor implements WaiversProcessorInterface
         $storytitle = \Security\HtmlSanitizer::e($teamName) . " make waiver additions";
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " sign " . \Security\HtmlSanitizer::e($playerName) . " from waivers for " . \Security\HtmlSanitizer::e($salaryStr) . ".";
 
-        $this->logger->info('player_signed_from_waivers', [
-            'action' => 'player_signed_from_waivers',
-            'player_id' => $playerID,
-            'player_name' => $playerName,
-            'team_name' => $teamName,
-            'salary' => $playerSalary,
-        ]);
-
         return [
             'success' => true,
             'result' => 'player_added',
-            'notification' => ['mailSubject' => $storytitle, 'message' => $hometext],
+            'notification' => [
+                'mailSubject' => $storytitle,
+                'message' => $hometext,
+                'audit' => [
+                    'event' => 'player_signed_from_waivers',
+                    'context' => [
+                        'action' => 'player_signed_from_waivers',
+                        'player_id' => $playerID,
+                        'player_name' => $playerName,
+                        'team_name' => $teamName,
+                        'salary' => $playerSalary,
+                    ],
+                ],
+            ],
         ];
     }
 
     /**
-     * @see WaiversProcessorInterface::sendNotifications()
+     * @see WaiversProcessorInterface::finishCommittedMove()
      */
-    public function sendNotifications(array $notification): void
+    public function finishCommittedMove(array $notification): void
     {
         $mailSubject = $notification['mailSubject'];
         $message = $notification['message'];
+
+        $this->writeAuditEntry($notification['audit']);
 
         if ($mailSubject !== null) {
             try {
                 // Built inside the try: fromConfig() is where a mail config error surfaces.
                 $mailer = ($this->mailerFactory)();
-                $mailer->send(self::NOTIFICATION_EMAIL_RECIPIENT, $mailSubject, $message, self::NOTIFICATION_EMAIL_SENDER);
+                if (!$mailer->send(self::NOTIFICATION_EMAIL_RECIPIENT, $mailSubject, $message, self::NOTIFICATION_EMAIL_SENDER)) {
+                    $this->warnQuietly('waiver_mail_notification_failed', 'The mail service reported a failed send.');
+                }
             } catch (\Throwable $mailErr) {
-                $this->logger->warning('waiver_mail_notification_failed', ['error' => $mailErr->getMessage()]);
+                $this->warnQuietly('waiver_mail_notification_failed', $mailErr->getMessage());
             }
         }
 
         try {
             ($this->discordPoster)('#waiver-wire', $message);
         } catch (\Throwable $discordErr) {
-            $this->logger->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+            $this->warnQuietly('waiver_discord_notification_failed', $discordErr->getMessage());
+        }
+    }
+
+    /**
+     * @param WaiverAudit $audit
+     */
+    private function writeAuditEntry(array $audit): void
+    {
+        try {
+            $this->logger->info($audit['event'], $audit['context']);
+        } catch (\Throwable $auditErr) {
+            $this->warnQuietly('waiver_audit_log_failed', $auditErr->getMessage());
+        }
+    }
+
+    private function warnQuietly(string $event, string $error): void
+    {
+        try {
+            $this->logger->warning($event, ['error' => $error]);
+        } catch (\Throwable) {
+            // The move already committed, and the log is the only place left to report this.
         }
     }
 

@@ -16,6 +16,8 @@ use Season\Season;
  *
  * @package Waivers\Contracts
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-type WaiverAudit array{event: string, context: array<string, mixed>}
+ * @phpstan-type WaiverNotification array{mailSubject: ?string, message: string, audit: WaiverAudit}
  */
 interface WaiversProcessorInterface
 {
@@ -89,21 +91,35 @@ interface WaiversProcessorInterface
     /**
      * Process dropping a player to waivers.
      *
-     * Validates, writes to DB, creates news story, posts Discord notification, and audits.
+     * Validates, writes to DB, and creates news story. Sends and audits nothing: on success the
+     * result carries a 'notification' for finishCommittedMove(), which the caller runs after commit.
      *
-     * @return array{success: bool, result?: string, error?: string}
+     * @return array{success: bool, result?: string, error?: string, notification?: WaiverNotification}
      */
     public function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): array;
 
     /**
      * Process signing a player from waivers.
      *
-     * Validates, determines contract, writes to DB, creates news story,
-     * sends email, posts Discord notification, and audits.
+     * Validates, determines contract, writes to DB, and creates news story.
+     * Sends and audits nothing: on success the result carries a 'notification' for
+     * finishCommittedMove(), which the caller runs after commit.
      *
      * @param int $openRosterSlots Open roster spots counting injured players (15 minus every rostered player)
      * @param int $healthyRosterSlots Healthy roster slots available; drives only the 12-healthy hard-cap rule
-     * @return array{success: bool, result?: string, error?: string}
+     * @return array{success: bool, result?: string, error?: string, notification?: WaiverNotification}
      */
     public function processAdd(?int $playerID, string $teamName, int $openRosterSlots, int $healthyRosterSlots, int $totalSalary): array;
+
+    /**
+     * Write the audit entry, then send the email (when mailSubject is set) and the Discord post
+     * for a committed move.
+     *
+     * Call only after the transaction holding the write has committed. Never throws: a failed
+     * audit write, a failed send (thrown or reported by a false return), and a failed warning
+     * write never stop the later steps or reach the caller.
+     *
+     * @param WaiverNotification $notification
+     */
+    public function finishCommittedMove(array $notification): void;
 }

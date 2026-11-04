@@ -95,7 +95,8 @@ class WaiversController implements WaiversControllerInterface
                 new \Waivers\WaiversRosterSlotCounter(
                     $this->teamQueryRepo ?? new \Team\TeamQueryRepository($this->db)
                 ),
-                $this->teamIdentityRepo
+                $this->teamIdentityRepo,
+                new \Waivers\WaiversTeamLockRepository($this->db)
             );
         }
 

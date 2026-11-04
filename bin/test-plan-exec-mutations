@@ -9,6 +9,10 @@
 
 set -u
 export LC_ALL=C
+# The lib exports these to every check it runs. When this suite is itself a check (the
+# prefire exec-mutations stage runs it), they would stop the stale-.pyc fixture from
+# pre-warming a .pyc, so clear them.
+unset PYTHONDONTWRITEBYTECODE PYTHONPYCACHEPREFIX
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/plan-exec-mutations"

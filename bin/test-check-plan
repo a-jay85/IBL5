@@ -192,6 +192,10 @@ assert_viol "gate-SD-declared-section-bare-fires" 1 "[SD]" "$FM$CF_MATRIX"'
 ## Deferred Security Gaps
 - `ReactionController` tier gate, fix in a separate PR
 '
+assert_viol "gate-SD-declared-numbered-bare-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+1. `ReactionController` tier gate, fix in a separate PR
+'
 assert_viol "gate-SD-preservation-note-clean" 0 "[SD]" "$FM$CF_MATRIX"'
 ## Out of Scope
 - CSRF handling and the auth guard stay in the controller; no authorization change.

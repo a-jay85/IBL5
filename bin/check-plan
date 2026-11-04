@@ -2826,7 +2826,7 @@ if [ -n "$_sd_scope" ]; then
 fi
 _sd_decl_re='^[[:space:]]*[-*][[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
 _sd_decl_bad=$(cf_section_named "$PLAN_FILE" "Deferred Security Gaps" \
-    | grep -E '^[[:space:]]*[-*][[:space:]]+' \
+    | grep -E "$_sd_bullet" \
     | grep -vE "$_sd_decl_re" || true)
 if [ -n "$_sd_decl_bad" ]; then
     while IFS= read -r _sd_line; do

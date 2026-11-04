@@ -389,3 +389,68 @@ def test_run_session_unparsed_default_keeps_status(repo):
     llm = FakeLlm(action=_dirty, reply=PR3694_REPLY)
     out, _ = _session(repo, llm)
     assert out.status == "edited"
+
+
+# ── reply contract and prompt rules ───────────────────────────────────────────
+
+_REACTION = "ibl5/classes/Api/Controller/ReactionController.php"
+_WAKE = "ibl5/classes/Api/Controller/WakeController.php"
+
+
+def test_build_prompt_last_line_marker_and_body_edits():
+    prompt = closer.build_prompt(_ctx())
+    assert "End your FINAL message with ONE JSON object on its own last line, with nothing " \
+        in prompt
+    assert '"body_edits": [{"find": str, "replace": str}]' in prompt
+    assert "Never start a background command" in prompt
+
+
+def test_build_prompt_forbids_deferred_surface_edits():
+    prompt = closer.build_prompt(_ctx(deferred=f"- `{_REACTION}` tier gate is a follow-up"))
+    assert "You MUST NOT edit any file the plan defers" in prompt
+    fence = prompt.split("DEFERRED BY THE PLAN", 1)[1].split("CURRENT PR BODY", 1)[0]
+    assert _REACTION in fence
+
+
+def test_deferred_scope_reads_only_out_of_scope(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("# T\n\n## Phase 1: x\n\ndo it\n\n## Out of Scope\n\n- first thing\n"
+                    "- second thing\n\n## Critical Files\n\n- `a/b.php`\n")
+    assert closer.deferred_scope(str(plan)) == "- first thing\n- second thing"
+    assert closer.deferred_scope(str(tmp_path / "missing.md")) == ""
+
+
+def test_deferred_scope_ignores_prose_mention(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("# T\n\n## Approach\n\nOut of Scope items are listed below.\n\n"
+                    "## Out of Scope Notes\n\n- not a deferred list\n")
+    assert closer.deferred_scope(str(plan)) == ""
+
+
+def test_deferred_paths_needs_slash():
+    text = "`ibl5/a/B.php` and `bin/x` (example) and `foo` and `two words/x`"
+    assert closer.deferred_paths(text) == frozenset({"ibl5/a/B.php", "bin/x"})
+
+
+def _edit_file(rel):
+    def edit(cwd):
+        _write(cwd, rel, "edited\n")
+    return edit
+
+
+def test_run_session_deferred_path_edit_reverts(repo):
+    pre = _head(repo)
+    llm = FakeLlm(action=_edit_file(_REACTION),
+                  reply='{"verdict":"fixed","summary":"s","hold_note":""}')
+    out, _ = _session(repo, llm, deferred=f"- `{_REACTION}` is a follow-up")
+    assert out.status == "deferred-path-edit"
+    assert out.gate_hits == (_REACTION,)
+    assert _head(repo) == pre
+    assert not os.path.exists(os.path.join(repo, _REACTION))
+
+
+def test_run_session_non_deferred_edit_passes(repo):
+    llm = FakeLlm(action=_edit_file(_WAKE),
+                  reply='{"verdict":"fixed","summary":"s","hold_note":""}')
+    out, _ = _session(repo, llm, deferred=f"- `{_REACTION}` is a follow-up")
+    assert out.status == "edited"

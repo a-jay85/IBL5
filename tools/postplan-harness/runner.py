@@ -2509,7 +2509,7 @@ def _closer_post_replies(gh, log, pr, outcome) -> int:
     return n
 
 
-_CLOSER_FAIL_STATUSES = ("push-failed", "unparseable")
+_CLOSER_FAIL_STATUSES = ("push-failed", "unparseable", "deferred-path-edit")
 
 
 def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, *,
@@ -2555,7 +2555,9 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         blocked=tuple((c.number, c.name, c.reason) for c in decision.conditions if c.blocked),
         failed_checks=tuple((n, "") for n in (outcome.failed or [])),
         ci_excerpt=(outcome.evidence or "")[:4000] if ci_red else "",
-        threads=closer.thread_rows(rows))
+        threads=closer.thread_rows(rows),
+        deferred=(closer.deferred_scope(res.plan.path)
+                  if (res.plan and res.plan.found) else ""))
     log(f"closer: running one session (trigger={why})")
     co = closer.run_session(llm, worktree=worktree, base_ref="origin/master", pr=pr,
                             plan_path=ctx.plan_path, context=ctx, log=log,

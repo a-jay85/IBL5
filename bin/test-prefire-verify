@@ -240,6 +240,7 @@ test_all_green_passes_and_records() {
     local n
     n=$(pass_files '\.pass$' | wc -l | tr -d ' ')
     [ "$n" -eq 3 ] || note "expected 3 .pass files, got $n"
+    want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
 }
 
 test_cache_hit_skips_rerun() {
@@ -279,6 +280,7 @@ test_adhoc_no_plan_runs_phpunit_and_infection() {
     run_gate
     want_rc 0
     want_out "SKIP matrix: no plan"
+    want_out "SKIP exec-mutations: no plan"
     want_cnt phpunit 1
     want_cnt mutation 1
 }
@@ -516,7 +518,7 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         b { print > out }
     ' "$f"
     i=0
-    for stage in matrix phpunit infection; do
+    for stage in matrix phpunit infection exec-mutations; do
         i=$((i + 1))
         if [ ! -f "$D/blocks/$i.sh" ]; then
             note "Step 6.9 has no bash block for $stage"
@@ -579,6 +581,292 @@ test_db_probe_does_not_read_callers_stdin() {
 }
 
 # ---------------------------------------------------------------------------
+# exec-mutations stage (fourth stage)
+# ---------------------------------------------------------------------------
+# xm_plan <check> [match] [replace]: plan with matrix row 1 = <check> plus one mutation block
+# on ibl5/tracked.txt (fixture content "a"). The check counts its own runs in $CNT/xm.
+xm_plan() {
+    local chk="echo run >> \"\$CNT/xm\"; $1"
+    write_plan "$(row 1 "${chk//|/\\|}")"
+    {
+        printf '\n## Executable Mutations\n\n'
+        printf '%smutation\nrow: 1\nfile: ibl5/tracked.txt\ncheck: %s\n' '```' "$chk"
+        printf 'match: %s\nreplace: %s\n%s\n' "${2:-a}" "${3:-b}" '```'
+    } >> "$PLAN"
+}
+xm_journal_empty() { [ -z "$(ls -A "$(git -C "$R" rev-parse --absolute-git-dir)/exec-mutations" 2>/dev/null)" ]; }
+xm_tracked() { tr -d '\n' < "$R/ibl5/tracked.txt"; }
+xm_passes() { pass_files '\.exec-mutations\..*\.pass$'; }
+
+test_xm_tripped_passes_and_records() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "TRIPPED row 1"
+    want_out "exec-mutations passed"
+    local want_name
+    want_name="$(tree_hash).exec-mutations.$(git hash-object "$PLAN").pass"
+    [ "$(xm_passes)" = "$want_name" ] || note "pass record is '$(xm_passes)', wanted $want_name"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty"
+    want_cnt xm 2
+}
+
+test_xm_held_fails_without_record() {
+    new_case
+    xm_plan 'true'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "HELD row 1"
+    want_out "NEXT-STEP row 1 — the check passed under mutation; strengthen the test"
+    want_out "Never edit a row's check command"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_baseline_failed_fails() {
+    new_case
+    xm_plan 'false'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "BASELINE-FAILED row 1"
+    want_out "NEXT-STEP row 1 — the check fails on unmutated code"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_not_applied_fails() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt' zzz yyy
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "NOT-APPLIED row 1"
+    want_out "Do not change the row's check command."
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_undecided_is_not_a_pass() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || pem_no_such_cmd_xyz'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "UNDECIDED row 1"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_cache_hit_and_plan_edit_invalidates() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "exec-mutations pass cached"
+    want_cnt xm 2
+    xm_plan 'grep -qx a ibl5/tracked.txt' a c
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    refute_out "pass cached"
+    want_cnt xm 4
+    local n
+    n=$(xm_passes | wc -l | tr -d ' ')
+    [ "$n" -eq 2 ] || note "expected 2 exec-mutations pass files, got $n"
+}
+
+test_xm_skips_without_plan_or_section() {
+    new_case
+    run_gate --stage exec-mutations
+    want_rc 0
+    want_out "SKIP exec-mutations: no plan"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists (no plan)"
+    write_plan "$(row 1 true)"
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists (no section)"
+}
+
+test_xm_parse_failed_fails() {
+    new_case
+    xm_plan 'true'
+    sed -i.bak '/^match: /d' "$PLAN"
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "PARSE-FAILED"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_no_timeout_is_prerequisite() {
+    new_case
+    # A PATH that carries every tool the gate and lib need except gtimeout/timeout.
+    local nt="$D/no-timeout-bin" t p
+    mkdir -p "$nt"
+    for t in bash git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut dirname basename cp mv date env readlink realpath cmp diff touch sha256sum shasum uname ls sleep kill id; do
+        p=$(command -v "$t" 2>/dev/null) || continue
+        case "$p" in /*) ln -sf "$p" "$nt/$t" ;; esac
+    done
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    OUT=$(cd "$R" && PATH="$nt" /bin/bash "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 3
+    want_out "prerequisite missing: gtimeout or timeout (brew install coreutils)"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+}
+
+test_xm_term_mid_row_restores_tree() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || sleep 25'
+    local pid i=0 t0=$SECONDS
+    (cd "$R" && exec "$GATE" --base master --plan "$PLAN" --stage exec-mutations) > "$D/out" 2>&1 &
+    pid=$!
+    while [ "$(xm_tracked)" != b ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+    if [ "$(xm_tracked)" != b ]; then
+        note "the mutation never appeared; cannot test TERM mid-row"
+        kill -KILL "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        return
+    fi
+    kill -TERM "$pid"
+    wait "$pid" 2>/dev/null; RC=$?
+    OUT=$(cat "$D/out")
+    want_rc 143
+    [ $((SECONDS - t0)) -lt 10 ] || note "TERM took $((SECONDS - t0)) s; the stage sat out the row"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_sigkill_leftover_repaired_before_tree_hash() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || sleep 25'
+    local pid i=0
+    "$REPO/bin/lib/plan-exec-mutations" run --root "$R" --timeout 30 "$PLAN" > "$D/lib.out" 2>&1 &
+    pid=$!
+    while [ "$(xm_tracked)" != b ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+    if [ "$(xm_tracked)" != b ]; then
+        note "the mutation never appeared; cannot test the SIGKILL leftover"
+        kill -KILL "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        return
+    fi
+    kill -KILL "$pid"
+    wait "$pid" 2>/dev/null
+    xm_journal_empty && note "no leftover journal after SIGKILL; the fixture is not exercising the repair"
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "restored a mutation left by an interrupted exec-mutations run"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty after the gate"
+    local want_name
+    want_name="$(tree_hash).phpunit.pass"
+    [ "$(pass_files '\.phpunit\.pass$')" = "$want_name" ] || note "phpunit record is '$(pass_files '\.phpunit\.pass$')', wanted $want_name"
+}
+
+test_xm_revert_failed_maps_to_fail() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) echo "REVERT-FAILED row 1 — stub"; exit 3 ;;\n    pending) exit 1 ;;\n    recover) exit 0 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 1
+    want_out "a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_killed_lib_recovers_and_reports() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) kill -9 $$ ;;\n    pending) exit 1 ;;\n    recover) touch "%s/recovered"; exit 0 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 1
+    want_out "the mutation script stopped unexpectedly (exit 137)"
+    [ -e "$D/recovered" ] || note "recover did not run after the lib was killed"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+# xm_argv_stub: stub lib whose `run` records its argv to $D/xm-argv and prints <verdict> row 1;
+# parse and recover go to the real lib, so the plan's record is a real one.
+xm_argv_stub() { # <verdict> <exit>
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) printf "%%s\\n" "$@" > "%s/xm-argv"; echo "%s row 1 — stub"; exit %s ;;\n    pending) exit 1 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$1" "$2" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+}
+xm_argv() { # <flag>: the value after <flag> in the recorded run argv
+    awk -v f="$1" 'prev == f { print; exit } { prev = $0 }' "$D/xm-argv" 2>/dev/null
+}
+
+test_xm_default_uses_short_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 120 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 120"
+    [ "$(xm_argv --budget)" = 300 ] || note "--budget is '$(xm_argv --budget)', wanted 300"
+}
+
+test_xm_fire_point_uses_larger_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 300 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 300"
+    [ "$(xm_argv --budget)" = 1800 ] || note "--budget is '$(xm_argv --budget)', wanted 1800"
+}
+
+test_xm_fire_point_limits_match_harness() {
+    local m="$REPO/tools/postplan-harness/harness/mutations.py" mt bu
+    mt=$(sed -n 's/^DEFAULT_MAX_TIMEOUT = \([0-9]*\).*/\1/p' "$m")
+    bu=$(sed -n 's/^DEFAULT_BUDGET = \([0-9]*\).*/\1/p' "$m")
+    [ "$mt" = 300 ] || note "harness DEFAULT_MAX_TIMEOUT is '$mt'; prefire-verify --fire-point uses 300"
+    [ "$bu" = 1800 ] || note "harness DEFAULT_BUDGET is '$bu'; prefire-verify --fire-point uses 1800"
+    grep -qF 'XM_MAX_TIMEOUT=300' "$GATE" || note "prefire-verify lacks XM_MAX_TIMEOUT=300"
+    grep -qF 'XM_BUDGET=1800' "$GATE" || note "prefire-verify lacks XM_BUDGET=1800"
+}
+
+test_xm_fire_point_undecided_still_fails() {
+    new_case
+    xm_argv_stub UNDECIDED 1
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 1
+    want_out "UNDECIDED row 1"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_post_plan_now_passes_fire_point() {
+    new_ppn_case
+    green_plan
+    mkdir -p "$D/stubs"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/gate-argv"\n' "$D" > "$D/stubs/recgate"
+    chmod +x "$D/stubs/recgate"
+    PPN_GATE="$D/stubs/recgate" run_ppn --plan "$PLAN"
+    grep -qxF -- '--fire-point' "$D/gate-argv" 2>/dev/null || note "post-plan-now did not pass --fire-point to the gate"
+}
+
+test_xm_bad_stage_rejected() {
+    new_case
+    run_gate --stage exec_mutations
+    want_rc 2
+    want_out "--stage must be matrix, phpunit, infection, exec-mutations, or all"
+}
+
+test_help_lists_exec_mutations() {
+    new_case
+    run_gate --help
+    want_rc 0
+    want_out "exec-mutations"
+    want_out "PREFIRE_EXEC_MUTATIONS_LIB"
+}
+
+test_prompt_impl_runs_four_stages() {
+    OUT=$(cat "$REPO/bin/automouse/prompt-impl")
+    want_out '--stage exec-mutations'
+    want_out 'When all four return 0, proceed to Step 7.'
+    want_out "Never edit a"
+    want_out 'never delete a mutation block'
+    refute_out 'When all three return 0'
+    want_out '"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]'
+}
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 ALL_CASES="
@@ -613,6 +901,27 @@ test_prompt_impl_step_6_9_blocks_set_plan_path
 test_prompt_impl_block_without_plan_path_fails
 test_stdin_reading_row_does_not_swallow_later_rows
 test_db_probe_does_not_read_callers_stdin
+test_xm_tripped_passes_and_records
+test_xm_held_fails_without_record
+test_xm_baseline_failed_fails
+test_xm_not_applied_fails
+test_xm_undecided_is_not_a_pass
+test_xm_cache_hit_and_plan_edit_invalidates
+test_xm_skips_without_plan_or_section
+test_xm_parse_failed_fails
+test_xm_no_timeout_is_prerequisite
+test_xm_term_mid_row_restores_tree
+test_xm_sigkill_leftover_repaired_before_tree_hash
+test_xm_revert_failed_maps_to_fail
+test_xm_killed_lib_recovers_and_reports
+test_xm_bad_stage_rejected
+test_xm_default_uses_short_limits
+test_xm_fire_point_uses_larger_limits
+test_xm_fire_point_limits_match_harness
+test_xm_fire_point_undecided_still_fails
+test_post_plan_now_passes_fire_point
+test_help_lists_exec_mutations
+test_prompt_impl_runs_four_stages
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

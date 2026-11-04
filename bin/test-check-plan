@@ -4066,6 +4066,53 @@ assert_viol "xm-check-override-not-runnable" 1 'check override is not runnable' 
 $(xm_block bin/check-docs 'Phase 3')
 "
 
+assert_viol "xm-check-tmp-override-rejected" 1 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash /tmp/x')
+"
+
+assert_viol "xm-check-tmp-names-row" 1 '[XM] row 1: check references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash /tmp/x')
+"
+
+assert_viol "xm-check-repo-path-ok" 0 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash bin/check-docs')
+"
+
+assert_viol "xm-check-tmp-matrix-cell-rejected" 1 'references a /tmp/ path' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | corpus run (one-time-check: corpus diff against the tmp fixture) | CLI-executable | post-impl | `bash /tmp/ro-corpus` |
+
+## Executable Mutations
+
+'"$(xm_block bin/check-docs)
+"
+
+_xm_i=0
+for _xm_ok in 'bash ibl5/tmp/x' 'bash tmp-cleanup' 'bash ${TMPDIR:-/tmp}/x'; do
+    _xm_i=$((_xm_i + 1))
+    assert_viol "xm-check-tmp-near-miss-ok-$_xm_i" 0 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs "$_xm_ok")
+"
+done
+
+_xm_i=0
+for _xm_bad in '--out=/tmp/x' 'bash /private/tmp/x' 'bin/check-docs > /tmp/log'; do
+    _xm_i=$((_xm_i + 1))
+    assert_viol "xm-check-tmp-variant-rejected-$_xm_i" 1 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs "$_xm_bad")
+"
+done
+
 assert_viol "xm-legacy-silent" 0 '[XM]' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | docs clean. Mutation: delete the arm ⇒ fails | CLI-executable | post-impl | `bin/check-docs` |

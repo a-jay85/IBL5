@@ -626,7 +626,7 @@ if [ -n "$RESUME_SID" ]; then
 fi
 
 # Pre-fire verification gate: full PHPUnit, the plan's post-impl CLI-executable
-# matrix rows, and changed-file Infection at CI's thresholds. Fail closed: no
+# matrix rows, changed-file Infection at CI's thresholds, and the plan's mutation rows. Fail closed: no
 # pass for this exact tree means no fire. A --rebase-only run pushes no new
 # content, so it is exempt.
 if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
@@ -635,7 +635,7 @@ if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
         echo "post-plan-now: pre-fire gate $PREFIRE is missing; refusing to fire." >&2
         exit 9
     fi
-    PREFIRE_ARGS=()
+    PREFIRE_ARGS=(--fire-point)
     [ -f "$PLAN_FILE" ] && PREFIRE_ARGS+=(--plan "$PLAN_FILE")
     [ -n "$SKIP_VERIFY_REASON" ] && PREFIRE_ARGS+=(--bypass "$SKIP_VERIFY_REASON")
     if ! "$PREFIRE" ${PREFIRE_ARGS[@]+"${PREFIRE_ARGS[@]}"}; then

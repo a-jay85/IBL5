@@ -891,6 +891,7 @@ fi
 # held to gate V's predicates. Coverage runs only when the plan carries the
 # `## Executable Mutations` heading outside fences: that is the mechanical
 # "authored after this shipped" test, so every legacy plan is silent.
+# A check that references a literal /tmp/ path is a violation (see the loop).
 # The root is the repo being checked, never the plan's own directory: plans live
 # in $HOME/claude-plans/, which can sit inside an unrelated git repo.
 XM_ROOT="$REPO_ROOT"
@@ -916,6 +917,11 @@ elif [ "$XM_RC" -eq 0 ]; then
         if [ "$_xm_check" != "$_xm_cell" ]; then
             _bad=$(gatev_nonrunnable "$_xm_check")
             [ -z "$_bad" ] || viol "[XM] row ${_xm_row}: check override is not runnable — ${_bad}"
+        fi
+        # A check that references a /tmp/ path reads host scratch state that is gone by gate 19
+        # and by the pre-fire stage; it lands HELD or BASELINE-FAILED for a reason unrelated to the mutation.
+        if grep -qE '(^|[^A-Za-z0-9_.~/-])(/private)?/tmp/' <<< "$_xm_check"; then
+            viol "[XM] row ${_xm_row}: check references a /tmp/ path; use a repo path so the check exists at gate time: ${_xm_check}"
         fi
     done < "$XM_REC"
     if grep -qE '^## Executable Mutations[[:space:]]*$' "$GATEP_BODY"; then

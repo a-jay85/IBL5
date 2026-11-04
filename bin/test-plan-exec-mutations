@@ -9,6 +9,10 @@
 
 set -u
 export LC_ALL=C
+# The lib exports these to every check it runs. When this suite is itself a check (the
+# prefire exec-mutations stage runs it), they would stop the stale-.pyc fixture from
+# pre-warming a .pyc, so clear them.
+unset PYTHONDONTWRITEBYTECODE PYTHONPYCACHEPREFIX
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/plan-exec-mutations"
@@ -272,6 +276,57 @@ chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
 chk "journal empty" journal_clear "$R"
 end_case
 
+start_case run_baseline_timeout_is_undecided
+R="$TMP/r3t"
+mkrepo "$R" 'exit 124'
+BEFORE=$(sha "$R/target.txt")
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "UNDECIDED reported" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
+chk "next step hands off" has "$OUT" "NEXT-STEP row 1 — the check timed out"
+chk "not BASELINE-FAILED" eq "$(grep -c '^BASELINE-FAILED' <<< "$OUT")" 0
+chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "journal empty" journal_clear "$R"
+end_case
+
+start_case run_baseline_cannot_start_stays_failed
+for code in 125 126 127; do
+    R="$TMP/r3c$code"
+    mkrepo "$R" "exit $code"
+    OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+    chk "exit 1 ($code)" eq "$RC" 1
+    chk "BASELINE-FAILED ($code)" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited $code before mutation"
+    chk "no hand-off ($code)" eq "$(grep -c 'fire point' <<< "$OUT")" 0
+done
+end_case
+
+start_case run_write_failure_has_its_own_hint
+R="$TMP/r3w"
+mkrepo "$R" 'true'
+mkdir -p "$TMP/failapply"
+REAL_PY=$(command -v python3)
+printf '#!/usr/bin/env bash\n[ "$2" != apply ] || exit 1\nexec "%s" "$@"\n' "$REAL_PY" > "$TMP/failapply/python3"
+chmod +x "$TMP/failapply/python3"
+OUT=$(PATH="$TMP/failapply:$PATH" "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "verdict stays NOT-APPLIED" has "$OUT" "NOT-APPLIED row 1 — mutation write to target.txt failed"
+chk "write hint" has "$OUT" "NEXT-STEP row 1 — the row's match is right, but the mutation could not be written"
+chk "no edit-the-row hint" eq "$(grep -c 'update the row' <<< "$OUT")" 0
+chk "journal empty" journal_clear "$R"
+end_case
+
+start_case run_undecided_hint_covers_the_fire_point
+chk "names both stages" has "$("$LIB" run --root "$TMP/r3t" "$TMP/r3t.plan.md" 2>&1)" "If it repeats at the fire point, stop and report it."
+end_case
+
+start_case run_baseline_exit_128_still_fails
+R="$TMP/r3e"
+mkrepo "$R" 'exit 128'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "BASELINE-FAILED reported" has "$OUT" "BASELINE-FAILED row 1"
+end_case
+
 start_case run_not_applied
 R="$TMP/r4"
 mkrepo "$R" 'true' "$(printf 'ALPHA\nALPHA')"
@@ -285,12 +340,41 @@ chk "zero reported" has "$OUT" "match occurs 0 times"
 chk "porcelain empty" porcelain_clean "$R"
 end_case
 
+start_case run_next_step_lines
+VERDICT_RE='^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row '
+R="$TMP/rns"
+mkrepo "$R" 'true'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "held exit 1" eq "$RC" 1
+chk "held next-step is line 2" eq "$(sed -n 2p <<< "$OUT")" "NEXT-STEP row 1 — the check passed under mutation; strengthen the test. Never weaken or delete the mutation."
+chk "held one verdict line" eq "$(grep -cE "$VERDICT_RE" <<< "$OUT")" 1
+mkrepo "$R" 'false'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "baseline next-step" eq "$(sed -n 2p <<< "$OUT")" "NEXT-STEP row 1 — the check fails on unmutated code; fix the test or its environment first."
+mkrepo "$R" 'true' 'GAMMA'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "not-applied next-step" has "$OUT" "NEXT-STEP row 1 — the row's match text is not in the file exactly once"
+chk "not-applied keeps check" has "$OUT" "Do not change the row's check command."
+mkrepo "$R" 'grep -q ALPHA target.txt || pem_no_such_cmd_xyz'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "undecided 127 reported" has "$OUT" "UNDECIDED row 1"
+chk "undecided next-step" has "$OUT" "NEXT-STEP row 1 — the check timed out, could not start, or the run budget ran out"
+chk "undecided one verdict line" eq "$(grep -cE "$VERDICT_RE" <<< "$OUT")" 1
+mkrepo "$R" 'grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "tripped exit 0" eq "$RC" 0
+chk "tripped prints no next-step" eq "$(grep -c '^NEXT-STEP' <<< "$OUT")" 0
+chk "porcelain empty" porcelain_clean "$R"
+chk "journal empty" journal_clear "$R"
+end_case
+
 start_case run_stray_untracked
 R="$TMP/r5"
 mkrepo "$R" 'grep -q ALPHA target.txt || { touch stray; exit 1; }'
 OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
 chk "exit 3" eq "$RC" 3
 chk "REVERT-FAILED status changed" has "$OUT" "REVERT-FAILED row 1 — status changed"
+chk "revert next-step" has "$OUT" "run bin/lib/plan-exec-mutations recover before anything else"
 "$LIB" pending --root "$R"; PRC=$?
 chk "pending exits 0" eq "$PRC" 0
 "$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?
@@ -351,7 +435,7 @@ end_case
 start_case run_adaptive_tripped
 R="$TMP/r8"; mkrepo "$R" 'sleep 2; grep -q ALPHA target.txt'
 OUT=$("$LIB" run --root "$R" --timeout 1 "$R.plan.md" 2>&1); RC=$?
-chk "defaults still BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+chk "defaults UNDECIDED 124" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
 OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 "$R.plan.md" 2>&1); RC=$?
 chk "exit 0" eq "$RC" 0; chk "TRIPPED" has "$OUT" "TRIPPED row 1 — bash check.sh exited 1"
 chk "porcelain empty" porcelain_clean "$R"
@@ -367,7 +451,7 @@ end_case
 start_case run_adaptive_baseline_hang
 R="$TMP/r10"; mkrepo "$R" 'sleep 60'
 T0=$SECONDS; OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 2 --scale 2 "$R.plan.md" 2>&1); RC=$?
-chk "exit 1" eq "$RC" 1; chk "BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+chk "exit 1" eq "$RC" 1; chk "UNDECIDED 124" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
 chk "bounded by the ceiling" test $((SECONDS - T0)) -lt 6
 end_case
 

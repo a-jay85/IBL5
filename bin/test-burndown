@@ -42,7 +42,8 @@ mkdir -p "$T/home" "$T/fx"
 # ── Phase 8: pr-burndown body-only helper (PB1-PB13) ──
 # Defined early so `TB_ONLY=pb bin/test-burndown` runs only these cases (fast
 # path for mutation checks). Unset or any other value runs the whole file, and
-# the end-of-file call below runs the cases as part of the full pass.
+# the end-of-file call below runs the cases as part of the full pass. The gate
+# must stay `${TB_ONLY:-}`: a `:-pb` default would skip every other case in CI.
 pb_cases() {
     local PBOF PR_SKILL D OUT RC S B CORR NEAR HOLD12 ANCHOR OUT5 RC5
     PBOF="$(cd "$(dirname "$0")" && pwd)/lib/pr-body-only-fix"

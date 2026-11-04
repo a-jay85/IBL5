@@ -79,8 +79,8 @@
 #                            harness merges master, pushes, and stops before review.
 #                            BLOCKED-CHECK and non-DIRTY PRs never use it. Default: 1
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
-#   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
-#   PR_CYCLE_TS              Timestamp token for runner/log/plist paths (tests). Unset = date+PID at launch.
+#   PR_CYCLE_DRY_LAUNCH      With --go: emit the runner and print the submit argv; launch nothing.
+#   PR_CYCLE_TS              Timestamp token for runner/log paths (tests). Unset = date+PID at launch.
 #   PR_CYCLE_LOG             Detached-worker log path; set by --go, read by the worker. Derived from TS.
 #   PR_CYCLE_AUTH_PROBE_CMD  Command to verify Claude auth. Must exit 0 and print OK. Default:
 #                            runs a real `claude -p 'Reply with the single word OK.'` call.
@@ -1789,7 +1789,6 @@ _launch() {
     LABEL="com.ibl5.pr-cycle-$TS"
     LOG="/tmp/pr-cycle-$TS.log"
     RUNNER="/tmp/pr-cycle-$TS.sh"
-    PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
     # The driver never removes the stop file — clearing it is the human's explicit
     # re-enable. Detaching a worker that would halt on its first check is pure noise.
@@ -1798,23 +1797,19 @@ _launch() {
         echo "       clear it first:  rm $PR_CYCLE_STOP_FILE" >&2
         exit 1
     fi
-    for _p in "$RUNNER" "$LOG" "$PLIST"; do
+    for _p in "$RUNNER" "$LOG"; do
         if [ -e "$_p" ]; then
             echo "ERROR: artifact collision, refusing to overwrite: $_p" >&2
             exit 1
         fi
     done
 
-    # ~/Library/LaunchAgents always exists on the Mac this runs on; the mkdir is for the
-    # Linux CI box, where bin/test-pr-cycle drives this under PR_CYCLE_DRY_LAUNCH.
-    mkdir -p "$(dirname "$PLIST")"
-
     # Header shell-quoted once via %q; the body is a QUOTED heredoc emitted verbatim, so
     # nothing in it expands twice.
     {   printf '#!/usr/bin/env bash\n'
         printf 'ROOT=%q\n'       "$ROOT"
         printf 'LABEL=%q\n'      "$LABEL"
-        printf 'PLIST=%q\n'      "$PLIST"
+        printf 'RUNNER=%q\n'     "$RUNNER"
         printf 'LOG=%q\n'        "$LOG"
         printf 'TS=%q\n'         "$TS"
         printf 'MAX_READY=%q\n'  "$MAX_READY"
@@ -1839,29 +1834,35 @@ _launch() {
 # launchd hands this a minimal PATH with no caller preference to respect, so PREPEND here —
 # the opposite of the driver's own appended prelude.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+# Self-delete first; bash keeps reading from the open fd. The ljob_submit
+# wrapper removes the label afterwards, which releases the "already live" guard.
+rm -f "$RUNNER"
 cd "$ROOT" || exit 1
 # $ONLY/$SKIP are interpolated UNQUOTED so an empty one expands to nothing. That is safe
 # only because _normalize_prs guarantees the value is [0-9,]+ with no whitespace; a raw
 # "#2101, #2102" would word-split here into a garbage token. Do not "fix" this by quoting
 # the whole ${VAR:+...} -- that passes an empty argument when the flag is unset.
 "$ROOT/bin/pr-cycle" --worker --max-ready "$MAX_READY" --jobs "$JOBS" ${NO_DM:+--no-dm} ${ONLY:+--only $ONLY} ${SKIP:+--skip $SKIP}
-# Release the label so the "already live" guard stops matching.
-rm -f "$PLIST"
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 RUNNER_EOF
     } > "$RUNNER"
-    chmod +x "$RUNNER"
-
-    # KeepAlive is FALSE and that is specific to this tool, not inherited style: a merge
-    # loop that launchd silently restarted would re-arm PRs a human had just halted.
-    # Plist written by the lib helper (same key order, same PATH string).
-    ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
+    chmod 700 "$RUNNER"
 
     if [ -n "$PR_CYCLE_DRY_LAUNCH" ]; then
-        echo "DRY(plist) pr-cycle: runner=${RUNNER} plist=${PLIST} log=${LOG}"
+        echo "DRY(submit) pr-cycle: runner=${RUNNER} log=${LOG}"
+        ljob_submit_print "$LABEL" "$LOG" "$RUNNER"
         exit 0
     fi
-    ljob_bootstrap "$LABEL" "$PLIST"
+    # No plist: unit 1's ADR on per-run launchd jobs. The runner cds and sets PATH itself.
+    # launchd restarts a submitted job after it exits; ljob_submit's once-guard turns
+    # that restart into a no-op. A merge loop that launchd re-ran would re-arm PRs a
+    # human had just halted.
+    SUBMIT_RC=0
+    ljob_submit "$LABEL" "$LOG" "$RUNNER" || SUBMIT_RC=$?
+    if [ "$SUBMIT_RC" -ne 0 ]; then
+        rm -f "$RUNNER"
+        echo "ERROR: launchctl submit failed (rc $SUBMIT_RC) for ${LABEL}; nothing launched." >&2
+        exit 1
+    fi
     echo "pr-cycle started: label=${LABEL}"
     echo "log: ${LOG}"
 }

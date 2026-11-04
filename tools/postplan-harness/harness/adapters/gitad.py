@@ -42,6 +42,12 @@ def _git_step(args: tuple[str, ...]) -> str:
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
 
+# bin/lib/branch-base.sh of the checkout this harness runs from (main checkout, ADR-0092).
+# The worktree's own copy can predate branch_base_merge_target, so never use it.
+BRANCH_BASE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "branch-base.sh"
+MERGE_TARGET_TIMEOUT = 30   # seconds; covers ls-remote (10 s) + gh (5 s) + bash startup
+_MERGE_TARGET_RE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
+
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
 # without a human writing an ADR, refreshing a doc, or trimming a rule file. A distinct
@@ -604,6 +610,38 @@ class LiveGit:
                              check=False).strip()
         return resolved or None
 
+    def merge_target(self) -> str:
+        """The ref Phase 2, rebase-only and the retry refresh merge in: the PR's declared
+        base from bin/lib/branch-base.sh branch_base_merge_target (iblBase config, then gh
+        baseRefName). "origin/master" for an unstacked branch or a detached HEAD.
+        Raises HarnessError("base-resolve") when the branch records an iblBase that no
+        layer resolves, when the helper times out, or when it prints anything other
+        than one origin/<name> ref. A stacked branch never silently merges master."""
+        name = self.branch()
+        if not name or name == "HEAD":
+            return "origin/master"
+        if not BRANCH_BASE_LIB.is_file():
+            raise HarnessError("base-resolve", f"base resolver missing: {BRANCH_BASE_LIB}")
+        fix = (f"record the real parent and rerun: "
+               f"git config branch.{name}.iblBase <parent-branch>")
+        try:
+            proc = subprocess.run(
+                ["bash", "-c", '. "$1" && branch_base_merge_target "$2" "$3"',
+                 "branch-base", str(BRANCH_BASE_LIB), str(self.worktree), name],
+                cwd=str(self.worktree), capture_output=True, text=True,
+                stdin=subprocess.DEVNULL, timeout=MERGE_TARGET_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise HarnessError("base-resolve",
+                               f"base resolution for {name} timed out after "
+                               f"{MERGE_TARGET_TIMEOUT}s; {fix}")
+        ref = proc.stdout.strip()
+        if proc.returncode != 0 or not _MERGE_TARGET_RE.fullmatch(ref) or ".." in ref:
+            raise HarnessError("base-resolve",
+                               f"branch {name} is stacked (iblBase set) but its base did "
+                               f"not resolve: origin has no such branch and gh gave no "
+                               f"answer; {fix}", output=proc.stderr)
+        return ref
+
     def _merge_tree_conflicts(self, merge_base: str, base: str,
                               tree: str) -> dict[str, frozenset[int]]:
         """One `git merge-tree --write-tree` probe. Returns {path: stages} for each conflicted
@@ -857,7 +895,7 @@ class LiveGit:
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
                              lostwork_path, conflicted, proof_out, regen_exempt=(),
                              stage_sets=None):
-        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        from ..conflict_ladder import LadderContext, default_rungs, make_regen_rung, run_ladder
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
@@ -867,7 +905,11 @@ class LiveGit:
             extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
                 key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
                 exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
-        return run_ladder(ctx, proof_out, rungs=default_rungs(branch))
+        # Closer A/B arm: only the deterministic regen rung runs; an unresolved conflict then
+        # ends in rebase-conflict (exit 3), which is the closer's trigger.
+        rungs = ((make_regen_rung(),) if getattr(self, "llm_conflict_rungs_off", False)
+                 else default_rungs(branch))
+        return run_ladder(ctx, proof_out, rungs=rungs)
 
     def _run_stacked_lost_retry(self, *, key, master_sha, pre_rebase_sha,
                                 lostwork_path, conflicted, proof_out):
@@ -1800,6 +1842,9 @@ class ReplayGit:
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
+
+    def merge_target(self) -> str:
+        return self.fx.get("merge_target", "origin/master")
 
     def stage_all(self) -> None:
         return

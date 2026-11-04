@@ -33,7 +33,7 @@ PROMPT_SOURCE_FILES = (
 # and runner.py so these cannot drift silently.
 MODEL_PINS = (
     "review-agent-a:sonnet", "review-agent-d:sonnet",
-    "security-audit:sonnet", "verify-findings:sonnet",
+    "security-audit:sonnet", "verify-findings:opus",
 )
 REQUIRED_KEYS = ("schema_version", "slug", "pr_number", "run_id", "key", "per_file_ids")
 KEY_FIELDS = ("diff_id", "plan_hash", "version", "pr_title", "file_list")

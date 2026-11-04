@@ -7,6 +7,9 @@
 # keychain and network are never touched.
 
 set -uo pipefail
+# An operator shell may tune these. Tests expect the built-in 93/98 unless a
+# case sets its own, so drop inherited values (see bin/lib/usage-test-isolation.sh).
+unset IBL5_USAGE_DRAIN_PCT IBL5_USAGE_STOP_PCT
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0
@@ -220,15 +223,19 @@ STUB
 }
 
 fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
-    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; usage_fetch $1"
+    PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; ${FETCH_PRELUDE:-}usage_fetch $1"
 }
 
 # fetch_parallel <n> <max_age>: n concurrent usage_fetch calls; results in $T/out.<i>, $T/rc.<i>.
 # Waits only on its own pids (never a bare `wait`).
+# A runner stall past the 15s stale limit lets a late peer reclaim a live lock and call
+# curl a second time, which fails the one-call asserts. Stale reclaim has its own tests,
+# so these runs lift the limit. The prelude is set after the lib is sourced because the
+# lib assigns the default on load.
 fetch_parallel() {
     local i=1 pids=""
     while [ "$i" -le "$1" ]; do
-        ( fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
+        ( FETCH_PRELUDE='USAGE_FETCH_LOCK_STALE=3600; '; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
         pids="$pids $!"
         i=$((i + 1))
     done

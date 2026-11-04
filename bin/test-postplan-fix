@@ -27,6 +27,9 @@
 #      that moves again before the restore is left as is (compare-and-swap); an own ref
 #      the session deleted is restored and one it created is removed. A sibling ref
 #      under the own remote ref's name does not abort the run.
+#      headless-stacked-base: a branch whose iblBase names a pushed parent merges that parent,
+#      not master. headless-stacked-unresolved: an iblBase no layer resolves prints
+#      result=gave-up-base, exits 1, and leaves HEAD alone.
 #      Each prints one "case ok headless-<name>" line.
 #
 # Run: bin/test-postplan-fix [--case NAME]...  (exit 0 = all pass, 1 = a case failed)
@@ -78,6 +81,8 @@ RUNLOG="$TMP/runlog"; mkdir -p "$RUNLOG"
 export POSTPLAN_LOG_DIR="$RUNLOG"   # read by bin/postplan-fix; keeps /tmp clean
 PNLOG="$RUNLOG/post-plan-now-$B_BLOCK-20261008-120001-9.log"
 trap 'rm -rf "$TMP"' EXIT
+# The unstacked cases resolve their merge target to origin/master with no real gh call.
+export BRANCH_BASE_OFFLINE=1
 
 has()   { case "$2" in *"$3"*) ok "$1" ;; *) fail "$1" "missing '$3'" ;; esac; }
 hasnt() { case "$2" in *"$3"*) fail "$1" "unexpected '$3'" ;; *) ok "$1" ;; esac; }
@@ -123,6 +128,28 @@ git -C "$MAIN" push -q origin master
 git -C "$MAIN" worktree add -q -b "$B_CLEAN" "$TMP/wt-$B_CLEAN" master
 # A pre-existing remote-tracking ref for the moved-ref case to disturb.
 git -C "$MAIN" update-ref "refs/remotes/origin/$B_CONFLICT" "$INIT_SHA"
+# Stacked fixture: stackparent is on origin, B_STACK is cut from it with iblBase recorded.
+# Then stackparent gains a conflicting a.txt commit and master gains an unrelated commit,
+# so a merge of the declared parent conflicts while a merge of master would not.
+B_STACK="pfx$$-stack"
+git -C "$MAIN" worktree add -q -b stackparent "$TMP/wt-stackparent" "$INIT_SHA"
+printf 'parent base\n' > "$TMP/wt-stackparent/p.txt"
+git -C "$TMP/wt-stackparent" add p.txt
+"${GITC[@]}" -C "$TMP/wt-stackparent" commit -qm parent-base
+git -C "$TMP/wt-stackparent" push -q origin stackparent
+git -C "$MAIN" worktree add -q -b "$B_STACK" "$TMP/wt-$B_STACK" stackparent
+git -C "$MAIN" config "branch.$B_STACK.iblBase" stackparent
+printf 'feature\n' > "$TMP/wt-$B_STACK/a.txt"
+git -C "$TMP/wt-$B_STACK" add a.txt
+"${GITC[@]}" -C "$TMP/wt-$B_STACK" commit -qm stack-feature
+printf 'parent\n' > "$TMP/wt-stackparent/a.txt"
+git -C "$TMP/wt-stackparent" add a.txt
+"${GITC[@]}" -C "$TMP/wt-stackparent" commit -qm parent-change
+git -C "$TMP/wt-stackparent" push -q origin stackparent
+printf 'other\n' > "$MAIN/m2.txt"
+git -C "$MAIN" add m2.txt
+"${GITC[@]}" -C "$MAIN" commit -qm master-unrelated
+git -C "$MAIN" push -q origin master
 
 OUT="$MAIN/tools/postplan-harness/out"
 JSON_OUT="$TMP/wt-$B_JSON/tools/postplan-harness/out"
@@ -651,6 +678,44 @@ need "no flag" test ! -e "/tmp/postplan-conflict-resolved-$B_CLEAN"
 case_end headless-result-clean
 fi
 
+# Stacked branch: the rescue merges the declared parent and leaves master out.
+stack_reset() {
+    git -C "$WTS" merge --abort >/dev/null 2>&1 || true
+    git -C "$WTS" reset -q --hard "$STIP"
+    git -C "$WTS" clean -fdq
+    git -C "$MAIN" config "branch.$B_STACK.iblBase" "${1:-stackparent}"
+    rm -f "/tmp/postplan-premerged-$B_STACK.json" "/tmp/postplan-conflict-resolved-$B_STACK"
+    unset CLAUDE_STUB_REPLY CLAUDE_STUB_EFFECT CLAUDE_STUB_STDERR
+}
+WTS="$TMP/wt-$B_STACK"
+STIP=$(git -C "$WTS" rev-parse HEAD)
+
+if should_run "headless-stacked-base"; then
+stack_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+run_fix "$SUT" --headless "$B_STACK"
+S_PARENT=$(git -C "$WTS" rev-parse refs/remotes/origin/stackparent)
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "merge commit parents" test "$(git -C "$WTS" log -1 --format='%P' HEAD)" = "$STIP $S_PARENT"
+need "master is not an ancestor" test ! "$(git -C "$WTS" merge-base --is-ancestor refs/remotes/origin/master HEAD && echo yes)" = yes
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=committed"
+stack_reset
+case_end headless-stacked-base
+fi
+
+if should_run "headless-stacked-unresolved"; then
+stack_reset gone
+run_fix "$SUT" --headless "$B_STACK"
+need "rc 1" test "$RC" = 1
+need "last line is the result word" test "$(last_line "$STDOUT")" = "postplan-fix: headless result=gave-up-base"
+need "stderr names the fix" has_s "$ERR" "git config branch."
+need "HEAD unchanged" test "$(git -C "$WTS" rev-parse HEAD)" = "$STIP"
+need "no merge started" test ! -e "$WTS/.git" -o -z "$(git -C "$WTS" rev-parse -q --verify MERGE_HEAD 2>/dev/null)"
+need "no stub call" no_args
+stack_reset
+case_end headless-stacked-unresolved
+fi
+
 if should_run "headless-record-failure-resets"; then
 hl_reset; pm_clean
 mkdir -p "$TMP/pystub"
@@ -1115,6 +1180,27 @@ need "run 3: no new DM" test "$(dm_count)" = 2
 case_end holdrepeat-second-decline
 fi
 
+# 44b (the repeat give-up DM, sent from the rc 11 path with no session, lists the held items;
+# a later give-up with dm=no sends nothing)
+if should_run "holdrepeat-giveup-dm-lists-items"; then
+hr_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-nothing"
+hr_run
+rm -f "$TMP/dm.log"
+hr_run
+need "run 2: rc 21" test "$RC" = 21
+need "run 2: final line" final_is "$STDOUT" gave-up-repeat
+need "run 2: one give-up DM" test "$(dm_count)" = 1
+need "run 2: DM names the hold" dm_has "gave up: repeat"
+need "run 2: DM lists the MISSING item" dm_has "bin/test-widget"
+need "run 2: DM lists the MISSING-FILE item" dm_has "bin/widget-tool"
+need "run 2: each item listed once" test "$(grep -c 'bin/widget-tool' "$TMP/dm.log")" = 1
+hr_run
+need "run 3: final line" final_is "$STDOUT" gave-up-repeat
+need "run 3: dm=no sends nothing" test "$(dm_count)" = 1
+case_end holdrepeat-giveup-dm-lists-items
+fi
+
 # 45
 if should_run "holdrepeat-dirty-worktree"; then
 hr_reset
@@ -1335,6 +1421,24 @@ need "plan edit kept" test ! "$(cmp -s "$TMP/plan.orig" "$HR_PLAN_FILE" && echo 
 case_end holdrepeat-plan-only-fix-ships
 fi
 
+# 52b (a plan-only fix whose plan comment fails: HR_COMMITTED=0 takes _hr_reject, which
+# restores the plan and leaves origin and HEAD at HEAD0; no re-fire. Reuses the effect
+# script case 52 writes, so run it with 52, not alone)
+if should_run "holdrepeat-plan-only-comment-fails-reverts"; then
+hr_reset
+: > "$TMP/gh.commentfail"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-planonly.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-plan-comment
+need "DM comes from the reject path" dm_has "rejected by plan-comment"
+need "plan restored" plan_is_orig
+need "origin unchanged" origin_is_tip
+need "HEAD unchanged" head_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-plan-only-comment-fails-reverts
+fi
+
 # 53 (the default STATE_DIR sits under the gitignored out/ dir: the launcher's own "started"
 # ledger write and a concurrent harness run writing to out/ are not tamper)
 HR_EXCL="$MAIN/.git/info/exclude"
@@ -1502,6 +1606,38 @@ need "HEAD restored" head_is_tip
 case_end holdrepeat-session-push-reverted
 fi
 
+# 57b (item 2: an early guard, pr-state, rejects a session that also pushed its own commit;
+# _hr_reject's revert still rewrites origin back to HEAD0. Reuses the effect script case 57
+# writes, so run it with 57, not alone)
+if should_run "holdrepeat-early-reject-session-push-reverted"; then
+hr_reset
+{ cat "$TMP/effects/hr-sessionpush.sh"; printf 'printf "Other title\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-sessionpush-title.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-sessionpush-title.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "origin rewritten to HEAD0" origin_is_tip
+need "HEAD restored" head_is_tip
+need "no post-plan call" no_ppn
+case_end holdrepeat-early-reject-session-push-reverted
+fi
+
+# 57c (item 4: an early guard rejects while someone else pushed the PR branch; the revert
+# keeps that push and the DM names it. Reuses the effect script case 56 writes)
+if should_run "holdrepeat-early-reject-owner-push-kept"; then
+hr_reset
+rm -f "$TMP/owner.sha"
+{ cat "$TMP/effects/hr-ownerpush.sh"; printf 'printf "Other title\\tbug\\tno\\n" > "%s"\n' "$TMP/gh.snap.after"; } > "$TMP/effects/hr-ownerpush-title.sh"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-ownerpush-title.sh"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "owner's push kept on origin" test "$(origin_hr)" = "$(cat "$TMP/owner.sha" 2>/dev/null)"
+need "DM says the remote was left as is" dm_has "left as is"
+need "worktree back at HEAD0" head_is_tip
+case_end holdrepeat-early-reject-owner-push-kept
+fi
+
 # 58 (--holdrepeat --dry-run is inert: no fetch, so an unreachable origin and a dirty tree
 # do not change the result, and no temp dir is made)
 if should_run "holdrepeat-dry-run-inert"; then
@@ -1520,6 +1656,34 @@ need "prompt printed" has_s "$HR_DRY_OUT" "HOLDREPEAT_FIX: fixed"
 need "no temp dir made" test -z "$(ls -A "$TMP/dryrun-tmp")"
 need "no claude call" no_args
 case_end holdrepeat-dry-run-inert
+fi
+
+# 58b (a guard reject on a real run prints exactly one result line, keeps rc 21 and removes
+# its temp dir: the EXIT trap must not add a second line, change the rc, or skip cleanup)
+if should_run "holdrepeat-normal-exit-single-result"; then
+hr_reset
+mkdir -p "$TMP/hrtmp"
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-blocked" CLAUDE_STUB_EFFECT="$TMP/effects/hr-title.sh"
+TMPDIR="$TMP/hrtmp" hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-pr-state
+need "exactly one result line" test "$(grep -c 'postplan-fix: holdrepeat result=' <<< "$STDOUT")" = 1
+need "temp dir removed" test -z "$(find "$TMP/hrtmp" -name 'postplan-fix-hr.*' -print)"
+case_end holdrepeat-normal-exit-single-result
+fi
+
+# 58c (a set -e failure inside --holdrepeat still ends with a result line: mktemp -d fails
+# under a TMPDIR that does not exist, after eligibility and before any session)
+if should_run "holdrepeat-unexpected-exit-prints-result"; then
+hr_reset
+TMPDIR="$TMP/no-such-tmpdir" hr_run
+need "rc 1" test "$RC" = 1
+need "dm line before result" line_re "$STDOUT" '^postplan-fix: holdrepeat dm=none$'
+need "final line" final_is "$STDOUT" error
+need "exactly one result line" test "$(grep -c 'postplan-fix: holdrepeat result=' <<< "$STDOUT")" = 1
+need "stderr names the unexpected stop" line_re "$ERR" 'stopped unexpectedly \(rc [1-9][0-9]*\)'
+need "no session launched" test ! -e "$TMP/claude.argc"
+case_end holdrepeat-unexpected-exit-prints-result
 fi
 hr_reset
 

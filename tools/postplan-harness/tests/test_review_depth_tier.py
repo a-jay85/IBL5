@@ -137,7 +137,7 @@ def test_standard_models():
     assert "review-agent-b" not in models
     assert models["review-agent-d"] == "sonnet"
     assert models["security-audit"] == "sonnet"
-    assert all(models[p] == "sonnet" for p in VERIFIER_PURPOSES)
+    assert all(models[p] == "opus" for p in VERIFIER_PURPOSES)
 
 
 def test_deep_models():
@@ -146,7 +146,16 @@ def test_deep_models():
     assert models["security-audit"] == "opus"
     assert "review-agent-b" not in models
     assert models["review-agent-d"] == "sonnet"
-    assert all(models[p] == "sonnet" for p in VERIFIER_PURPOSES)
+    assert all(models[p] == "opus" for p in VERIFIER_PURPOSES)
+
+
+@pytest.mark.parametrize("depth", ["standard", "deep"])
+def test_verifier_runs_on_opus_at_both_depths(depth):
+    """Runs as test_verifier_runs_on_opus_at_both_depths[standard] and
+    test_verifier_runs_on_opus_at_both_depths[deep]; every verifier seat must run on opus."""
+    models = _models_for(depth)
+    assert set(VERIFIER_PURPOSES) <= set(models)
+    assert {models[p] for p in VERIFIER_PURPOSES} == {"opus"}
 
 
 def test_deep_agent_a_runs_history_on_opus_any_files():

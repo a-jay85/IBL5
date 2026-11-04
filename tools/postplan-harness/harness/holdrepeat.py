@@ -54,6 +54,8 @@ FIX_GIVEUP_EXIT = 11
 FIX_ATTEMPTS_PER_PR = 2   # hard ceiling across ALL fingerprints for one branch
 FIX_SCHEMA_VERSION = 1
 FIX_RECHECK_FAIL_EXIT = 12
+FIX_ROUND_KEY = "fix_round"
+FIX_ROUND_RUNS_PER_BRANCH = 3   # hard ceiling across all runs until the record is cleared
 
 _RUN_DIR = re.compile(r"live-\S*?-\d{8}-\d{6}-\d+")
 _WT_PATH = re.compile(r"/(?:[^\s/]+/)*IBL5-worktrees/[^\s/]+/")
@@ -203,7 +205,7 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
     record = load_record(state_dir, slug)
     full_set = hold_set(conditions)
     if record is None or record.get("structural_key") != key:
-        _save_record(state_dir, slug, {
+        doc = {
             "schema_version": SCHEMA_VERSION,
             "slug": slug,
             "structural_key": key,
@@ -214,7 +216,10 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
             "fingerprint": fingerprint,
             "pr": pr,
             "updated_at": now,
-        })
+        }
+        if record is not None and record.get(FIX_ROUND_KEY):
+            doc[FIX_ROUND_KEY] = record[FIX_ROUND_KEY]   # fix-round attempts survive a changed hold set
+        _save_record(state_dir, slug, doc)
         return Observation("recorded", key, 1, structural)
 
     record["repeat_count"] = int(record.get("repeat_count") or 1) + 1
@@ -252,6 +257,28 @@ def refresh_fingerprint(state_dir, slug, fp: str, now: str) -> bool:
     record["updated_at"] = now
     _save_record(state_dir, slug, record)
     return True
+
+
+def fix_round_tried(state_dir, slug, target_numbers) -> bool:
+    """True when a fix round already ran for these target conditions, or the ceiling is hit."""
+    rec = load_record(state_dir, slug)
+    if not rec or not rec.get(FIX_ROUND_KEY):
+        return False
+    entry = rec[FIX_ROUND_KEY]
+    if int(entry.get("attempts") or 0) >= FIX_ROUND_RUNS_PER_BRANCH:
+        return True
+    return entry.get("targets") == sorted(target_numbers)
+
+
+def record_fix_round(state_dir, slug, *, target_numbers, status, sha) -> None:
+    """Note one fix-round attempt on the existing record. Never creates a record."""
+    rec = load_record(state_dir, slug)
+    if rec is None:
+        return
+    prior = int((rec.get(FIX_ROUND_KEY) or {}).get("attempts") or 0)
+    rec[FIX_ROUND_KEY] = {"targets": sorted(target_numbers), "status": status,
+                          "sha": sha, "attempts": prior + 1}
+    _save_record(state_dir, slug, rec)
 
 
 def _sha256(data: bytes) -> str:

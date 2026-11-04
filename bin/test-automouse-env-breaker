@@ -896,6 +896,9 @@ want        "e2-judge-prompt: opus-judge criterion present (R&D intact)" "$J_PRO
 want        "e2-judge-prompt: worktree path filled"                      "$J_PROMPT" "$E2_ROOT/wt-judge"
 want_absent "e2-judge-prompt: human-only row withheld"                   "$J_PROMPT" "HUMAN-ONLY-SENTINEL"
 want_absent "e2-judge-prompt: no unfilled placeholder"                   "$J_PROMPT" "{{"
+# Pin the foreground-only rule: the prompt names the banned tool and the judge call denies Monitor.
+want        "e2-judge-prompt: prompt-judge forbids run_in_background"   "$(cat "$REPO_ROOT/bin/automouse/prompt-judge")" "run_in_background"
+want        "e2-judge-prompt: judge call disallows Monitor"             "$(cat "$REPO_ROOT/bin/automouse/run")" "--disallowedTools Edit Write NotebookEdit Agent Monitor"
 fi
 
 if eb_want judge-fail; then

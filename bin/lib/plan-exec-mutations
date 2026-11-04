@@ -7,7 +7,7 @@
 # to this script; nothing else parses the form.
 #
 # Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>
-#        bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] <plan>
+#        bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] [--max-timeout SEC] [--scale K] [--budget SEC] <plan>
 #        bin/lib/plan-exec-mutations recover [--root DIR]
 #        bin/lib/plan-exec-mutations pending [--root DIR]
 # ---
@@ -19,6 +19,16 @@
 #         exit 0 = every entry TRIPPED (or none); 1 = any HELD,
 #         BASELINE-FAILED, NOT-APPLIED, UNDECIDED (or a parse violation,
 #         or NO-TIMEOUT); 3 = REVERT-FAILED (journal retained).
+#         --timeout SEC      floor for the mutated run's bound (default 30).
+#         --max-timeout SEC  bound for the baseline run and ceiling for the
+#                            mutated run (default = --timeout, so a run with
+#                            only --timeout behaves exactly as before).
+#         --scale K          mutated bound = clamp(K * baseline_seconds,
+#                            --timeout, --max-timeout); integer K >= 1 (default 1).
+#         --budget SEC       total wall clock across rows; a row that starts
+#                            after it is spent prints UNDECIDED (0 = unlimited).
+#         Baseline rc + seconds are memoized per distinct check command, so
+#         rows sharing one command run their baseline once.
 # recover restore every journalled entry; exit 0 when the journal is empty
 #         afterwards, 3 otherwise.
 # pending exit 0 when any journal entry exists, 1 otherwise.
@@ -33,7 +43,7 @@ SELF="${BASH_SOURCE[0]}"
 
 usage() {
     echo "Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>" >&2
-    echo "       bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] <plan>" >&2
+    echo "       bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] [--max-timeout SEC] [--scale K] [--budget SEC] <plan>" >&2
     echo "       bin/lib/plan-exec-mutations recover [--root DIR]" >&2
     echo "       bin/lib/plan-exec-mutations pending [--root DIR]" >&2
     exit 2
@@ -47,6 +57,9 @@ esac
 
 ROOT=""
 SEC=30
+MAXSEC=""
+SCALE=1
+BUDGET=0
 PLAN=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -55,6 +68,18 @@ while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || usage
             case "$2" in ''|*[!0-9]*) usage ;; esac
             SEC="$2"; shift 2 ;;
+        --max-timeout)
+            [ $# -ge 2 ] || usage
+            case "$2" in ''|*[!0-9]*) usage ;; esac
+            MAXSEC="$2"; shift 2 ;;
+        --scale)
+            [ $# -ge 2 ] || usage
+            case "$2" in ''|*[!0-9]*|0) usage ;; esac
+            SCALE="$2"; shift 2 ;;
+        --budget)
+            [ $# -ge 2 ] || usage
+            case "$2" in ''|*[!0-9]*) usage ;; esac
+            BUDGET="$2"; shift 2 ;;
         -*) echo "plan-exec-mutations: unknown flag '$1'" >&2; usage ;;
         *) [ -z "$PLAN" ] || usage; PLAN="$1"; shift ;;
     esac
@@ -64,6 +89,8 @@ case "$MODE" in
     parse|run) [ -n "$PLAN" ] && [ -r "$PLAN" ] || usage ;;
     *) [ -z "$PLAN" ] || usage ;;
 esac
+[ -n "$MAXSEC" ] || MAXSEC="$SEC"
+[ "$MAXSEC" -ge "$SEC" ] || usage
 
 TO=""
 
@@ -318,6 +345,22 @@ PY
     return 1
 }
 
+# purge_pyc <file>: delete the cached bytecode of a .py file. Python trusts a
+# .pyc whose recorded source mtime (whole seconds) and size still match, so a
+# same-length edit made within the same second would run the old code. run_check
+# already points Python at an empty cache dir; this covers checks that run
+# `python -E` or `-I`, which ignore that variable and still read __pycache__/.
+purge_pyc() {
+    case "$1" in *.py) : ;; *) return 0 ;; esac
+    _pd=$(dirname "$1")/__pycache__
+    _stem=$(basename "$1" .py)
+    [ -d "$_pd" ] || return 0
+    for _pyc in "$_pd/$_stem".*.pyc; do
+        [ -e "$_pyc" ] && rm -f "$_pyc"
+    done
+    return 0
+}
+
 # restore_entry <meta> — restore from .orig, verify; prints the failure reason.
 restore_entry() {
     _meta="$1"; _orig="${_meta%.meta}.orig"
@@ -327,6 +370,7 @@ restore_entry() {
         echo "journal entry incomplete"; return 1
     fi
     cat "$_orig" > "$_path" || { echo "restore write failed"; return 1; }
+    purge_pyc "$_path"
     if [ "$(sha256 "$_path")" != "$_want" ]; then
         echo "sha mismatch"; return 1
     fi
@@ -397,6 +441,7 @@ if [ -z "$TO" ]; then
 fi
 
 mkdir -p "$JDIR" || exit 3
+BCACHE=$(mktemp -d "${TMPDIR:-/tmp}/pem-bcache.XXXXXX") || exit 2
 snap_status
 
 CHILD=""
@@ -410,7 +455,7 @@ revert_pending() {
     fi
     do_recover >/dev/null || FINAL=3
     journal_empty && rm -f "$JDIR/status.pre"
-    rm -f "$RECS"
+    rm -f "$RECS"; rm -rf "$BCACHE"
 }
 on_signal() { revert_pending; [ "$FINAL" -ne 3 ] || exit 3; exit "$1"; }
 trap 'revert_pending; exit $FINAL' EXIT
@@ -418,27 +463,49 @@ trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
 trap 'on_signal 129' HUP
 
-# run_check <cmd> — backgrounded so a signal interrupts the wait.
+# run_check <sec> <cmd>: runs in the background so a signal interrupts the wait. Each
+# run gets its own empty bytecode cache and writes no .pyc, so Python never
+# reuses bytecode compiled before a mutation (see purge_pyc).
 run_check() {
-    "$TO" "$SEC" bash -c "$1" </dev/null >/dev/null 2>&1 &
+    _pfx=$(mktemp -d "$BCACHE/pyc.XXXXXX") || _pfx="$BCACHE/pyc-none"
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$_pfx" \
+        "$TO" "$1" bash -c "$2" </dev/null >/dev/null 2>&1 &
     CHILD=$!
     wait "$CHILD"
     _crc=$?
     CHILD=""
+    rm -rf "$_pfx"
     return $_crc
 }
 
+RUN0=$SECONDS
 exec 3< "$RECS"
 while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     && IFS= read -r -d '' check <&3 && IFS= read -r -d '' match <&3 \
     && IFS= read -r replace <&3; do
-    run_check "$check"; rc=$?
+    if [ "$BUDGET" -gt 0 ] && [ $((SECONDS - RUN0)) -ge "$BUDGET" ]; then
+        printf 'UNDECIDED row %s — budget exhausted (%ss elapsed of %ss) before its baseline\n' \
+            "$row" "$((SECONDS - RUN0))" "$BUDGET"
+        FINAL=1; continue
+    fi
+    printf '%s' "$check" > "$BCACHE/key"
+    key=$(sha256 "$BCACHE/key") || key=""
+    if [ -n "$key" ] && [ -r "$BCACHE/$key" ]; then
+        read -r rc bsec < "$BCACHE/$key"
+    else
+        b0=$SECONDS
+        run_check "$MAXSEC" "$check"; rc=$?
+        bsec=$((SECONDS - b0 + 1))
+        [ -z "$key" ] || printf '%s %s\n' "$rc" "$bsec" > "$BCACHE/$key"
+    fi
     if [ "$rc" -ne 0 ]; then
         printf 'BASELINE-FAILED row %s — %s exited %s before mutation\n' "$row" "$check" "$rc"
         FINAL=1; continue
     fi
     # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
     # mutation side effect, so the revert check must compare against the tree as it stands here.
+    # Purge first, so the purges after apply and restore cannot change the porcelain.
+    purge_pyc "$file"
     snap_status
     n=$(lit count "$file" "$match" "$replace") || n="?"
     if [ "$n" != 1 ]; then
@@ -454,13 +521,17 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
             printf 'REVERT-FAILED row %s — %s\n' "$row" "$why"
             FINAL=3
             trap - EXIT INT TERM HUP
-            rm -f "$RECS"
+            rm -f "$RECS"; rm -rf "$BCACHE"
             exit 3
         fi
         printf 'NOT-APPLIED row %s — mutation write to %s failed\n' "$row" "$file"
         FINAL=1; continue
     fi
-    run_check "$check"; rc=$?
+    purge_pyc "$file"
+    msec=$((SCALE * bsec))
+    [ "$msec" -ge "$SEC" ] || msec=$SEC
+    [ "$msec" -le "$MAXSEC" ] || msec=$MAXSEC
+    run_check "$msec" "$check"; rc=$?
     if [ "$rc" -eq 0 ]; then
         printf 'HELD row %s — %s still exited 0 under mutation\n' "$row" "$check"
         FINAL=1
@@ -477,7 +548,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         printf 'REVERT-FAILED row %s — %s\n' "$row" "$why"
         FINAL=3
         trap - EXIT INT TERM HUP
-        rm -f "$RECS"
+        rm -f "$RECS"; rm -rf "$BCACHE"
         exit 3
     fi
 done

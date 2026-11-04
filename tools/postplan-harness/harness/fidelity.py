@@ -1867,7 +1867,8 @@ def _status_sections(fid: dict, final_word: str | None) -> list[str]:
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "", own_id: str = "",
-                   posted_at: str = "", reused_from: dict | None = None) -> str:
+                   posted_at: str = "", reused_from: dict | None = None,
+                   fix_round_line: str = "") -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every non-label line sits above `### Merge digest`
@@ -1910,6 +1911,8 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         status.append(rebase_line)
     if ci_line and not _EXPECTED_CI_RE.match(ci_line):
         status.append(ci_line)
+    if fix_round_line:
+        status.append(fix_round_line)
     if not armed:
         status.append("Auto-merge held:")
         holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
@@ -1917,6 +1920,7 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             status.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
         else:
             status.append("- no arming decision recorded")
+        status.append("Auto-merge disarmed: a held run removes any existing arm on this PR.")
     if status:
         out.extend(status)
         out.append("")

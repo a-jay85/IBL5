@@ -1191,18 +1191,40 @@ def test_upsert_exec_mutations_insert_replace_remove():
     body = "## Summary\nx\n"
     once = upsert_exec_mutations(body, _xm_report())
     assert once.count(EXEC_MUTATIONS_BEGIN) == 1 and EXEC_MUTATIONS_END in once
-    assert "- row 1: TRIPPED" in once
+    assert "- **Row 1** (`bash check.sh`)" in once
+    assert "✅ All 1 rows caught the planted bug." in once and "⚠️" not in once
+    assert "exited" not in once
     held = _xm_report(results=(MutationResult(20, "HELD", "x still exited 0 under mutation"),),
                       holding=("row 20 HELD — x still exited 0 under mutation",),
                       tree_suspect=True)
     twice = upsert_exec_mutations(once, held)
     assert twice.count(EXEC_MUTATIONS_BEGIN) == 1
-    assert "- row 20: HELD" in twice and "- row 1: TRIPPED" not in twice
-    assert "tree could not be verified clean" in twice
+    assert "- ❌ **Row 20** (`x`): the test still passed with the bug planted" in twice
+    assert "Row 1**" not in twice and "<details>" not in twice
+    assert "could not confirm the code was put back" in twice
     gone = upsert_exec_mutations(twice, MutationReport(True, (), (), False))
     assert EXEC_MUTATIONS_BEGIN not in gone and gone.startswith("## Summary")
     notrun = upsert_exec_mutations(body, MutationReport(False, (), ("executor-crashed: x",), True))
-    assert "- executor did not run — arming held" in notrun
+    assert "- The bug-planting check did not run, so arming is held." in notrun
+    assert "> executor-crashed: x" in notrun
+
+
+def test_exec_mutations_failures_outside_details_passes_inside():
+    from harness.classify import render_exec_mutations
+    from harness.mutations import MutationResult
+    out = render_exec_mutations(_xm_report(results=(
+        MutationResult(4, "TRIPPED", "t exited 1 under mutation"),
+        MutationResult(5, "HELD", "t still exited 0 under mutation"),
+        MutationResult(6, "UNDECIDED", "t exited 124 (check could not run) under mutation"),
+        MutationResult(7, "TRIPPED", "t exited 1 under mutation"),
+    )))
+    head, details = out.split("<details>")
+    assert "**⚠️ 2 of 4 rows need attention:**" in head
+    assert "❌ **Row 5**" in head and "❌ **Row 6** (`t`): the test could not run" in head
+    assert "Row 4" not in head and "Row 7" not in head
+    assert "✅ 2 rows caught the planted bug</summary>" in details
+    assert "- **Row 4** (`t`)" in details and "- **Row 7** (`t`)" in details
+    assert "</details>" in details and "Row 5" not in details
 
 
 def test_exec_mutations_neutralizes_headings():

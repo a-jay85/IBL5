@@ -371,6 +371,9 @@ fi
 # shellcheck source=bin/lib/critical-files.sh
 source "$SCRIPT_DIR/lib/critical-files.sh"
 
+# shellcheck source=bin/lib/plan-matrix-rows.sh
+source "$SCRIPT_DIR/lib/plan-matrix-rows.sh"
+
 # shellcheck source=lib/hold-check.sh
 if [ -r "$SCRIPT_DIR/lib/hold-check.sh" ]; then
     . "$SCRIPT_DIR/lib/hold-check.sh"
@@ -433,14 +436,12 @@ fi
 # Deliberately NOT `sed 's/\\|/\x01/g' | cut -d'|' -f6 | tr '\x01' '|'`: BSD sed
 # and BSD tr do not honour \x01, so that idiom emits the literal text "x01" on
 # macOS, which is where this script runs most. Pure bash 3.2, no external tools.
-MSEN=$'\001'
 MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
 # Look-and-feel lexicon shared by gates [Q] and [PM]. A What-cell hit means the
 # row is screenshot-reviewable on the open PR (ADR-0126), so [Q] demands a vr:
 # cell and [PM] refuses the post-merge: marker.
 _LOOKFEEL_LEX='(look|feel|visual|appearance|layout|spacing|alignment|legible|readable|styl|design|renders?|\bui\b|\bux\b)'
 
-mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
 
 # gatev_nonrunnable <cell> — gate V's predicate chain. Prints why the cell is
 # not ONE runnable shell command, or nothing when it is. Shared by gate V and
@@ -485,25 +486,6 @@ gatev_nonrunnable() {
     printf '%s' "$_bad"
 }
 
-# matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
-# surrounding backticks stripped, pipes restored) and MC_PIPES (count of
-# STRUCTURAL pipes, i.e. after escaped pipes are hidden). Returns 1 for a
-# separator row or a row with no location cell.
-matrix_split() {
-    case "$1" in
-        *[!\ \|:-]*) : ;;
-        *) return 1 ;;              # separator / all-dashes row
-    esac
-    _r="${1//\\|/$MSEN}"
-    IFS='|' read -r _lead MC_NUM MC_WHAT MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
-    MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
-    MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
-    MC_WHAT=$(mtrim "$MC_WHAT")
-    MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
-    case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
-    [ -n "$MC_LOC" ] || return 1
-    return 0
-}
 
 # ---------------------------------------------------------------------------
 # Gate 1: Matrix exists.

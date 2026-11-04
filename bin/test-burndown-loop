@@ -62,17 +62,31 @@ new_env() {
     mkdir -p "$HOME/claude-plans/_reports" "$IBL5_USAGE_GATE_STATE_DIR/markers" "$STUB"
     unset IBL5_BURNDOWN_RESERVE_PCT IBL5_BURNDOWN_MAX_FAILS IBL5_BURNDOWN_BATCH_TIMEOUT_MIN \
         IBL5_BURNDOWN_EMPTY_SLEEP_MIN IBL5_BURNDOWN_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_PR_CEILING \
-        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN
+        IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN IBL5_BURNDOWN_WINDOW_START_HOUR \
+        IBL5_BURNDOWN_WINDOW_END_HOUR IBL5_BURNDOWN_ENDGAME_HOURS \
+        IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN
     STATE="$HOME/.claude/burndown-loop"
     # Existing cases never exercise the scout: a fresh cooldown keeps the empty arm on
     # its old 240m sleep. Scout cases rm this file first and drive the cooldown themselves.
     mkdir -p "$STATE"
     date +%s > "$STATE/scout.last"
+    # Test clock: real epoch, local 03:00 (inside the default 02-07 window), so every
+    # launch-expecting case passes at any wall-clock hour. Window cases call set_clock.
+    export BL_TEST_CLOCK="$T/clock"
+    echo 'now 03:00:00' > "$BL_TEST_CLOCK"
+    # 98 existing cases seed `seed_usage 0 1` (reset 1h away, verdict go), which is
+    # endgame under the 48h default. Endgame off keeps their 240m sleeps; endgame
+    # cases unset this.
+    export IBL5_BURNDOWN_ENDGAME_HOURS=0
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
     PATH="$STUB:$TMPROOT/bin:/usr/bin:/bin"
     export PATH
     make_stubs
+}
+
+set_clock() {  # <"epoch|now HH:MM:SS">: move the loop's clock (read on every call)
+    echo "$1" > "$BL_TEST_CLOCK"
 }
 
 make_stubs() {
@@ -106,6 +120,7 @@ GH_EOF
 #!/usr/bin/env bash
 T="@T@"
 REPO_ROOT="@REPO@"
+trap 'echo signalled >> "$T/claude.signals"; exit 143' TERM INT HUP
 echo "CLAUDE_HEADLESS=${CLAUDE_HEADLESS:-} SID=${IBL5_USAGE_GATE_SESSION_ID:-} RUNNER=${IBL5_USAGE_GATE_RUNNER:-} CEIL=${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-} OPTIN=${IBL5_BURNDOWN_LOOP-unset} ARGV=$*" >> "$T/claude.calls"
 rx=$(env | grep '^IBL5_BURNDOWN_REEXEC_' || true)
 if [ -n "$rx" ]; then printf '%s\n' "$rx" >> "$T/claude.reexec-env"; fi
@@ -129,6 +144,8 @@ write_items() {
 }
 case "$act" in
     ledger) write_ledger ',"units_used":5' ;;
+    advance-clock) printf 'now 07:00:00\n' > "$T/clock"; write_ledger ',"units_used":5' ;;
+    none-advance) sentinel; printf 'now 07:30:00\n' > "$T/clock"; echo "BURNDOWN-LOOP: none-selected" ;;
     ledger-nounits) write_ledger '' ;;
     ledger-skipped) write_items '{"issue_num":1,"status":"skipped"},{"issue_num":2,"status":"skipped"}' ;;
     ledger-mixed) write_items '{"issue_num":1,"status":"skipped"},{"issue_num":2,"status":"queued"}' ;;
@@ -1817,6 +1834,262 @@ test_dry_run_scout_cooldown() {
     seed_usage 0 1
     run_loop run --dry-run
     assert_contains dry_scout_cd:cooldown "$OUT" "scout=cooldown left="
+}
+
+# ---------------------------------------------------------------- night window
+
+test_window_inside_launches() {
+    new_env
+    seed_usage 0 1
+    run_loop run --dry-run
+    assert_eq window_in:rc 0 "$RC"
+    assert_contains window_in:launch "$OUT" "decision=launch"
+    set_clock "now 06:59:59"
+    run_loop run --dry-run
+    assert_contains window_in:edge-launch "$OUT" "decision=launch"
+    assert_not_contains window_in:edge-no-window "$OUT" "night-window"
+}
+
+test_window_outside_sleeps() {
+    new_env
+    seed_usage 0 1
+    set_clock "now 07:00:00"
+    run_loop run --dry-run
+    assert_contains window_out:end-sleep "$OUT" "decision=sleep 1800 night-window go"
+    assert_not_contains window_out:end-no-launch "$OUT" "decision=launch"
+    set_clock "now 13:00:00"
+    run_loop run --dry-run
+    assert_contains window_out:noon-sleep "$OUT" "decision=sleep 1800 night-window go"
+    assert_not_contains window_out:noon-no-launch "$OUT" "decision=launch"
+}
+
+test_window_sleep_secs() {
+    new_env
+    seed_usage 0 1
+    set_clock "now 01:45:00"
+    run_loop run --dry-run
+    assert_contains window_secs:900 "$OUT" "decision=sleep 900 night-window"
+    set_clock "now 01:59:30"
+    run_loop run --dry-run
+    assert_contains window_secs:floor "$OUT" "decision=sleep 60 night-window"
+    set_clock "now 23:45:00"
+    IBL5_BURNDOWN_WINDOW_START_HOUR=0 IBL5_BURNDOWN_WINDOW_END_HOUR=5 run_loop run --dry-run
+    assert_contains window_secs:wrap "$OUT" "decision=sleep 900 night-window"
+}
+
+# The local time comes from the clock file, so TZ cannot change the result: this proves
+# the arithmetic reads only the injected wall-clock fields. It does not run a real 23h
+# or 25h day. The DST bound stays the documented 3600s error, clamped by BL_SLEEP_CAP.
+test_window_sleep_dst_independent() {
+    new_env
+    seed_usage 0 1
+    set_clock "now 01:30:00"
+    TZ=America/Los_Angeles run_loop run --dry-run
+    assert_contains window_tz:la-1800 "$OUT" "decision=sleep 1800 night-window"
+    TZ=UTC run_loop run --dry-run
+    assert_contains window_tz:utc-1800 "$OUT" "decision=sleep 1800 night-window"
+    set_clock "now 01:50:00"
+    TZ=America/Los_Angeles run_loop run --dry-run
+    assert_contains window_tz:la-600 "$OUT" "decision=sleep 600 night-window"
+    TZ=UTC run_loop run --dry-run
+    assert_contains window_tz:utc-600 "$OUT" "decision=sleep 600 night-window"
+}
+
+test_window_live_sleep_reason() {
+    new_env
+    seed_usage 0 1
+    set_clock "now 13:00:00"
+    stop_on_sleep
+    run_loop run
+    assert_eq window_live:rc 0 "$RC"
+    assert_contains window_live:decision "$OUT" "decision=sleep 1800 night-window"
+    assert_contains window_live:sleep "$OUT" "sleep 1800s reason=night-window"
+    assert_eq window_live:no-claude 0 "$(calls "$T/claude.calls")"
+}
+
+test_window_batch_not_killed() {
+    new_env
+    seed_usage 0 1
+    set_clock "now 06:59:00"
+    echo advance-clock > "$T/claude.queue"
+    stop_on_sleep
+    run_loop run
+    assert_eq window_batch:rc 0 "$RC"
+    assert_eq window_batch:one-call 1 "$(calls "$T/claude.calls")"
+    assert_no_file window_batch:no-signal "$T/claude.signals"
+    assert_contains window_batch:log "$OUT" "batch ran ledgers=1 items=1"
+    assert_contains window_batch:sleep "$OUT" "sleep 1800s reason=night-window"
+}
+
+test_endgame_go_launches() {
+    new_env
+    unset IBL5_BURNDOWN_ENDGAME_HOURS
+    seed_usage 0 30
+    set_clock "now 13:00:00"
+    run_loop run --dry-run
+    assert_contains endgame_go:launch "$OUT" "decision=launch"
+    assert_contains endgame_go:dry-line "$OUT" "DRY RUN endgame=on scout_cooldown_now=60m empty_sleep_now=30m"
+    echo none > "$T/claude.queue"
+    stop_on_sleep
+    run_loop run
+    assert_contains endgame_go:recheck "$OUT" "re-check in 30m"
+    assert_contains endgame_go:sleep "$OUT" "sleep 1800s reason=backlog-empty"
+}
+
+test_endgame_wait_no_launch() {
+    new_env
+    unset IBL5_BURNDOWN_ENDGAME_HOURS
+    seed_usage 80 30
+    set_clock "now 13:00:00"
+    run_loop run --dry-run
+    assert_contains endgame_wait:pace "$OUT" " pace wait"
+    assert_contains endgame_wait:sleep "$OUT" "decision=sleep"
+    assert_not_contains endgame_wait:no-window "$OUT" "night-window"
+    assert_not_contains endgame_wait:no-launch "$OUT" "decision=launch"
+    assert_contains endgame_wait:off "$OUT" "DRY RUN endgame=off"
+}
+
+test_window_reset_60h_sleeps() {
+    new_env
+    unset IBL5_BURNDOWN_ENDGAME_HOURS
+    seed_usage 0 60
+    set_clock "now 13:00:00"
+    run_loop run --dry-run
+    assert_contains window_60h:sleep "$OUT" "decision=sleep 1800 night-window"
+    assert_contains window_60h:endgame-in "$OUT" "endgame-in="
+    assert_contains window_60h:dry-line "$OUT" "DRY RUN endgame=off scout_cooldown_now=240m empty_sleep_now=240m"
+}
+
+test_window_zone_pauses() {
+    local sid
+    new_env
+    seed_usage 95 100
+    run_loop run --once
+    sid=$(cat "$STATE/loop.sid" 2>/dev/null)
+    assert_eq window_zone:rc-night 75 "$RC"
+    assert_eq window_zone:runner-night burndown-loop "$(jq -r .runner "$IBL5_USAGE_GATE_STATE_DIR/markers/$sid.json" 2>/dev/null)"
+    assert_contains window_zone:pause-night "$OUT" "decision=pause"
+    assert_not_contains window_zone:no-window-night "$OUT" "night-window"
+    new_env
+    seed_usage 95 100
+    set_clock "now 13:00:00"
+    run_loop run --once
+    sid=$(cat "$STATE/loop.sid" 2>/dev/null)
+    assert_eq window_zone:rc-noon 75 "$RC"
+    assert_eq window_zone:runner-noon burndown-loop "$(jq -r .runner "$IBL5_USAGE_GATE_STATE_DIR/markers/$sid.json" 2>/dev/null)"
+    assert_contains window_zone:pause-noon "$OUT" "decision=pause"
+    assert_not_contains window_zone:no-window-noon "$OUT" "night-window"
+}
+
+test_window_knobs_unset_default() {
+    new_env
+    unset IBL5_BURNDOWN_ENDGAME_HOURS
+    seed_usage 0 1
+    run_loop run --dry-run
+    assert_eq window_unset:rc 0 "$RC"
+    assert_contains window_unset:knobs "$OUT" "window=2-7 endgame_hours=48 endgame_scout_cooldown=60m endgame_empty_sleep=30m"
+}
+
+test_window_knobs_empty_default() {
+    new_env
+    seed_usage 0 1
+    export IBL5_BURNDOWN_WINDOW_START_HOUR='' IBL5_BURNDOWN_WINDOW_END_HOUR='' \
+        IBL5_BURNDOWN_ENDGAME_HOURS='' IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN='' \
+        IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN=''
+    run_loop run --dry-run
+    assert_eq window_empty:rc 0 "$RC"
+    assert_contains window_empty:knobs "$OUT" "window=2-7 endgame_hours=48 endgame_scout_cooldown=60m endgame_empty_sleep=30m"
+}
+
+test_window_knobs_custom() {
+    new_env
+    seed_usage 0 1
+    export IBL5_BURNDOWN_WINDOW_START_HOUR=22 IBL5_BURNDOWN_WINDOW_END_HOUR=6 \
+        IBL5_BURNDOWN_ENDGAME_HOURS=0 IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN=45 \
+        IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN=15
+    run_loop run --dry-run
+    assert_eq window_custom:rc 0 "$RC"
+    assert_contains window_custom:knobs "$OUT" "window=22-6 endgame_hours=0 endgame_scout_cooldown=45m endgame_empty_sleep=15m"
+    set_clock "now 23:00:00"
+    run_loop run --dry-run
+    assert_contains window_custom:in "$OUT" "decision=launch"
+    set_clock "now 12:00:00"
+    run_loop run --dry-run
+    assert_contains window_custom:out "$OUT" "night-window"
+}
+
+test_window_knob_invalid() {
+    local spec name
+    for spec in WINDOW_START_HOUR=24 WINDOW_START_HOUR=07 WINDOW_START_HOUR=x WINDOW_END_HOUR=24 \
+        ENDGAME_HOURS=-1 ENDGAME_SCOUT_COOLDOWN_MIN=0 ENDGAME_EMPTY_SLEEP_MIN=1.5; do
+        new_env
+        seed_usage 0 1
+        name="${spec%%=*}"
+        env "IBL5_BURNDOWN_$spec" "$LOOP" run --dry-run > "$T/out.txt" 2>&1
+        RC=$?
+        OUT=$(cat "$T/out.txt")
+        assert_eq "window_invalid:$spec:rc" 2 "$RC"
+        assert_contains "window_invalid:$spec:names-var" "$OUT" "IBL5_BURNDOWN_$name"
+    done
+    new_env
+    seed_usage 0 1
+    IBL5_BURNDOWN_WINDOW_START_HOUR=5 IBL5_BURNDOWN_WINDOW_END_HOUR=5 run_loop run --dry-run
+    assert_eq window_invalid:equal:rc 2 "$RC"
+    assert_contains window_invalid:equal:names-start "$OUT" "IBL5_BURNDOWN_WINDOW_START_HOUR"
+    assert_contains window_invalid:equal:names-end "$OUT" "IBL5_BURNDOWN_WINDOW_END_HOUR"
+    new_env
+    seed_usage 0 1
+    IBL5_BURNDOWN_WINDOW_START_HOUR=24 run_loop start
+    assert_eq window_invalid:start:rc 2 "$RC"
+    assert_contains window_invalid:start:names-var "$OUT" "IBL5_BURNDOWN_WINDOW_START_HOUR"
+    assert_no_file window_invalid:start:no-runner "$STATE/runner.sh"
+}
+
+test_runner_persists_window_knobs() {
+    local body
+    new_env
+    seed_usage 0 1
+    IBL5_BURNDOWN_WINDOW_START_HOUR=22 IBL5_BURNDOWN_WINDOW_END_HOUR=6 \
+        IBL5_BURNDOWN_ENDGAME_HOURS=36 IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN=45 \
+        IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN=15 run_loop start
+    assert_eq window_runner:rc 0 "$RC"
+    body=$(cat "$STATE/runner.sh" 2>/dev/null)
+    assert_contains window_runner:start "$body" "export IBL5_BURNDOWN_WINDOW_START_HOUR=22"
+    assert_contains window_runner:end "$body" "export IBL5_BURNDOWN_WINDOW_END_HOUR=6"
+    assert_contains window_runner:hours "$body" "export IBL5_BURNDOWN_ENDGAME_HOURS=36"
+    assert_contains window_runner:scout "$body" "export IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN=45"
+    assert_contains window_runner:empty "$body" "export IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN=15"
+    assert_not_contains window_runner:no-clock "$body" "BL_TEST_CLOCK"
+}
+
+test_window_scout_honours() {
+    new_env
+    seed_usage 0 1
+    rm -f "$STATE/scout.last"
+    set_clock "now 06:59:00"
+    echo none-advance > "$T/claude.queue"
+    stop_on_sleep
+    run_loop run
+    assert_eq window_scout:rc 0 "$RC"
+    assert_contains window_scout:skip "$OUT" "decision=scout-skip pace sleep"
+    assert_contains window_scout:window "$OUT" "night-window"
+    assert_eq window_scout:batch-only 1 "$(calls "$T/claude.calls")"
+}
+
+test_window_unblock_honours() {
+    local fix
+    capped_env
+    seed_usage 0 1
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    set_clock "now 13:00:00"
+    stop_on_sleep
+    run_loop run
+    assert_contains window_unblock:reason "$OUT" "reason=night-window"
+    assert_eq window_unblock:no-claude 0 "$(calls "$T/claude.calls")"
+    assert_not_contains window_unblock:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
 }
 
 # ---------------------------------------------------------------- runner

@@ -369,3 +369,59 @@ def test_empty_body_read_back_is_terminal_not_a_body_fix(tmp_path, git_shim):
         assert any("read back empty after remediation" in m for m in logged)
     finally:
         _cleanup(9936, "9936-2")
+
+
+# ---------------------------------------------------------------------------
+# History-shape stop: a stray master merge in a stacked range ends remediation
+# ---------------------------------------------------------------------------
+
+def _run_stray(tmp_path, monkeypatch, stray_result, pr):
+    from test_fidelity_rounds import _fixer_calls
+    monkeypatch.setattr(runner, "_stray_master_merges", lambda git, log: stray_result)
+    gh = _BodySeqGh(str(tmp_path), ["BEFORE body prose", "AFTER body prose",
+                                     "AFTER body prose"], fixture={"pr_number": pr})
+    git = _counting_git(commit_returns=[""])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": ["answered in the body"],
+        "plan-fidelity-re-review-2": ["READY\n"],
+    })
+    res = _Res()
+    runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                         "diff", "original-body", pr, "dead" * 10, TREE_1, False,
+                         lambda _m: None, res)
+    return res, llm, _fixer_calls(llm)
+
+
+def test_history_shape_stops_before_first_fixer(tmp_path, git_shim, monkeypatch):
+    try:
+        res, _llm, fixers = _run_stray(
+            tmp_path, monkeypatch, ("origin/parent", ["a" * 40]), 9951)
+        assert fixers == []
+        rounds = res.fidelity["rounds"]
+        assert len(rounds) == 1
+        assert rounds[0]["outcome"] == "history-shape"
+        assert "origin/parent" in res.fidelity["history_shape"]["next_action"]
+        assert res.fidelity["verdict_1"] == "NOT READY"
+        assert not res.fidelity.get("verdict_2")
+    finally:
+        _cleanup(9951, "9951-2")
+
+
+def test_no_stray_merge_keeps_body_only_round(tmp_path, git_shim, monkeypatch):
+    try:
+        res, _llm, fixers = _run_stray(tmp_path, monkeypatch, ("origin/master", []), 9952)
+        assert len(fixers) == 1
+        assert res.fidelity["rounds"][0]["outcome"] == "body-only"
+        assert "history_shape" not in res.fidelity
+    finally:
+        _cleanup(9952, "9952-2")
+
+
+def test_result_line_carries_history_shape_note():
+    from harness.state import RunResult, TerminalState
+    res = RunResult(terminal=TerminalState.FAILED)
+    res.fidelity = {"history_shape": {"next_action": "x y"}}
+    assert runner._history_shape_note(res) == " history-shape=x y"
+    res.fidelity = {}
+    assert runner._history_shape_note(res) == ""

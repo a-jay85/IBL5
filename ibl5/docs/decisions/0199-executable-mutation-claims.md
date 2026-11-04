@@ -1,6 +1,6 @@
 ---
 description: Verification Matrix mutation claims become executable through a keyed ## Executable Mutations section; one bin/lib script owns the grammar, Phase 5.0 applies each edit, requires the check to fail, reverts, and arming condition (19) holds on any claim that did not trip.
-last_verified: 2026-10-26
+last_verified: 2026-11-02
 ---
 
 # ADR-0199: Executable mutation claims
@@ -47,3 +47,15 @@ Arming condition (19) holds when the step did not run, when any entry is not `TR
 - `bin/check-plan`: gate `[XM]`.
 - `tools/postplan-harness/harness/armable.py`: condition (19).
 - `tools/postplan-harness/harness/mutations.py`: the harness-side executor (the skill-path block retired with the skill fallback shrink).
+
+## Addendum — adaptive per-check bound (2026-11-02) <!-- slop-ok -->
+
+The 30 s per-check cap above held three open PRs on exit 124 (#3667, #3633, #3673) whose
+rows ran a whole suite: 47 s, 142 s and 191 s measured baselines. The cap is now a floor.
+`bin/lib/plan-exec-mutations run` takes `--max-timeout` (baseline bound and ceiling),
+`--scale K` (mutated bound = K times the measured baseline, clamped to the floor and
+ceiling) and `--budget` (total wall clock; later rows print UNDECIDED). The harness passes
+30 / 300 / 2 / 1800 and bounds the whole run at budget + 2 x ceiling + 60 s. Baseline rc and
+seconds are memoized per check command. A timeout still never counts as TRIPPED.
+The `_architect-contract.md` size cap moved from 31232 B to 31744 B for the sentence that
+tells architects to narrow each check to one test file or a `-k` filter.

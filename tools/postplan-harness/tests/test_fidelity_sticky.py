@@ -146,7 +146,8 @@ def _sticky(**kw):
         kw.pop("terminal", "READY"),
         diff_id=kw.pop("diff_id", ""),
         plan_hash=kw.pop("plan_hash", ""),
-        posted_at=kw.pop("posted_at", ""))
+        posted_at=kw.pop("posted_at", ""),
+        fix_round_line=kw.pop("fix_round_line", ""))
 
 
 def _digest_labels(body: str) -> dict:
@@ -1083,7 +1084,9 @@ def test_sticky_layout_keeps_reader_anchors(tmp_path):
     lines = body.splitlines()
     assert lines[0].startswith("**")
     last_hold = max(i for i, ln in enumerate(lines) if ln.startswith("- ("))
-    assert lines[last_hold + 1] == ""
+    assert lines[last_hold + 1] == ("Auto-merge disarmed: a held run removes any "
+                                    "existing arm on this PR.")
+    assert lines[last_hold + 2] == ""
     assert [i for i, ln in enumerate(lines) if re.match(r"^- \(\d", ln)] == [last_hold]
     digest = lines.index(fidelity.MERGE_DIGEST_HEADING)
     for heading in ("### Fixed in this PR", "### Still open (non-blocking)",
@@ -1103,3 +1106,16 @@ def test_sticky_without_review_items_keeps_excerpt_visible(tmp_path):
     assert "### Still open" not in body
     assert "Reviewer verdict" not in body
     assert "- [NOTE] Note one" in body
+
+
+def test_sticky_renders_fix_round_line():
+    ci_fail = "CI: local verification fail; GitHub checks are watched after this comment"
+    line = "Fix round: discarded (timeout); this verdict is the pre-round hold"
+    body = _sticky(ci_line=ci_fail, fix_round_line=line)
+    assert body.count(line) == 1
+    assert body.index(ci_fail) < body.index(line) < body.index(fidelity.MERGE_DIGEST_HEADING)
+    assert body.index(line) == body.index(ci_fail) + len(ci_fail) + 1
+
+
+def test_sticky_default_has_no_fix_round_line():
+    assert "Fix round:" not in _sticky()

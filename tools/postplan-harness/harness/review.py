@@ -3,7 +3,7 @@
 Launch gates are the deterministic Phase-3 flags (identical to
 the retired post-plan skill Phase 4 text 4B/4C, ported 2026-10-19). Each retained call is toolless and receives a
 bounded packet: PR metadata + file list + the filtered diff (already <100KB).
-Scoring (4D) is VERIFIER_COUNT tool-enabled Sonnet verifiers voting per finding (drop needs every valid vote to be not-real);
+Scoring (4D) is VERIFIER_COUNT tool-enabled Opus verifiers voting per finding (drop needs every valid vote to be not-real);
 thresholds and posting are deterministic.
 
 Prompt text is condensed from .claude/review-shared/_review-agents.md,
@@ -23,6 +23,7 @@ from .labels import REVIEW_AGENTS
 from .adapters.llm import extract_json
 from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
+from .gate_backtest import FIX_TITLE_RE
 
 # The fan-out below keeps the purpose strings as literals, because
 # test_model_pins_match_source greps them. This keeps them in step with the one registry.
@@ -34,9 +35,9 @@ CODE_THRESHOLD = 80     # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
 
 VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful
-# The "verify-findings", "sonnet" literal pair is pinned by reviewcache.MODEL_PINS.
+# reviewcache.MODEL_PINS pins the verifier purpose/model literal pair assigned below.
 # call_tooled's allowlist is {"opus","sonnet"}; Haiku cannot read code here.
-_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "sonnet"
+_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "opus"
 VERIFIER_PURPOSES = tuple(f"{_VERIFIER_PURPOSE_STEM}-{i}" for i in range(1, VERIFIER_COUNT + 1))
 VERIFIER_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
 VERIFIER_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
@@ -129,6 +130,24 @@ OUTPUT_CONTRACT_HEAD = "OUTPUT CONTRACT (restated at the end of this prompt):\n"
 OUTPUT_CONTRACT = "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _CONTRACT_BODY
 
 
+# Root-cause check for bug-fix PRs. Mirrors "Root cause (fix: PRs only)" in
+# .claude/review-shared/_review-agents.md; keep the two in step.
+ROOT_CAUSE_CHECK = (
+    "This PR is a bug fix (fix: title). Check the root cause: does the diff change "
+    "the code that produces the wrong behavior, or does it only hide the symptom at "
+    "one site (a special-case guard, a clamp, a catch that swallows the error, a test "
+    "expectation edited to match the bug)? When the same cause can still reach other "
+    "call sites the diff leaves untouched, report one finding with bug class "
+    "root-cause and list those sites under other instances. Report nothing when the "
+    "diff fixes the cause. A PR description that calls the symptom-level fix "
+    "deliberate does not silence this check.")
+
+
+def _is_fix_title(meta: dict) -> bool:
+    title = meta.get("title") or ""
+    return bool(FIX_TITLE_RE.match(title.strip()))
+
+
 def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo, *,
                    run_core: bool = True, run_history: bool = False,
                    run_comments: bool = False, any_files: bool = False) -> str:
@@ -151,6 +170,8 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo, *,
                 "growing tables (ibl_box_scores, ibl_players, ibl_transactions); N+1 "
                 "query loops (fetch inside foreach/while); ORDER BY/WHERE on unindexed "
                 "columns; redundant repeat queries; unindexed JOINs.")
+    if run_core and _is_fix_title(meta):
+        sections.append(ROOT_CAUSE_CHECK)
     if run_history:
         sections.append("Look for regression risk: for the "
                         + ("" if any_files else "PHP ") + "files with the most "
@@ -401,7 +422,7 @@ class ReviewPhase:
         return g
 
     def verify_findings(self, findings: list[Finding], filtered_diff: str) -> list[dict]:
-        """VERIFIER_COUNT tool-enabled Sonnet verifiers vote per finding; returns aggregate records."""
+        """VERIFIER_COUNT tool-enabled Opus verifiers vote per finding; returns aggregate records."""
         seat_votes = [{"votes": {}, "errors": {}} for _ in range(VERIFIER_COUNT)]
         if not findings:
             return []

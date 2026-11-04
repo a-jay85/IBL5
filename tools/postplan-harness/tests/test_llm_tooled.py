@@ -497,3 +497,42 @@ def test_call_tooled_forwards_minimal_context(shim, tmp_path):
     logged = shim.read_text()
     assert "--strict-mcp-config" in logged
     assert "--disable-slash-commands" in logged
+
+
+# --- extra_env overlay --------------------------------------------------------
+
+def _captured_env(tmp_path, monkeypatch, **call_kw):
+    import types
+
+    from harness.adapters import llm as llm_mod
+    seen = []
+
+    def fake_run(argv, stdin_text, timeout, cwd, env, *a, **k):
+        seen.append((list(argv), dict(env)))
+        return types.SimpleNamespace(returncode=0, stdout=OK_ENVELOPE, stderr="")
+
+    monkeypatch.setattr(llm_mod, "_run_reaped", fake_run)
+    _cli(tmp_path).call_tooled("r", "opus", "p", cwd=str(tmp_path),
+                               allowed_tools=REMEDIATION_ALLOWED_TOOLS,
+                               denied_tools=REMEDIATION_DENIED_TOOLS, **call_kw)
+    return seen[0]
+
+
+def test_extra_env_none_keeps_argv_and_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("GH_TOKEN", "secret")
+    argv_a, env_a = _captured_env(tmp_path, monkeypatch)
+    argv_b, env_b = _captured_env(tmp_path, monkeypatch, extra_env=None)
+    assert argv_a == argv_b
+    assert env_a == env_b
+    assert env_b["GH_TOKEN"] == "secret"
+    _argv, env_c = _captured_env(tmp_path, monkeypatch,
+                                 extra_env={"GH_TOKEN": None, "EXTRA_X": "1"})
+    assert "GH_TOKEN" not in env_c
+    assert env_c["EXTRA_X"] == "1"
+
+
+def test_extra_env_fixture_records_overlay():
+    fx = FixtureLlm(UsageLedger(), {"p": "ok"})
+    fx.call_tooled("p", "opus", "x", cwd=".", allowed_tools=("Read",),
+                   extra_env={"GH_TOKEN": None})
+    assert fx.tooled_extra_envs == [("p", {"GH_TOKEN": None})]

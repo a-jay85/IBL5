@@ -8,7 +8,7 @@ Do NOT invoke /post-plan, /simplify, /commit, /code-review, or /security-audit. 
 
 You have **{{IMPL_BUDGET_MINUTES}} minutes** of wall-clock time for this phase. The outer loop runs you under `timeout`, so at that mark your process is SIGTERM'd mid-sentence — no cleanup turn, no chance to write anything afterward. An unfinished phase that left a handoff is recoverable; one that left nothing is not.
 
-So: commit a checkpoint after each phase of the plan rather than batching, and treat roughly 90% of the budget as your real deadline. If you reach that point with work outstanding, STOP implementing and write the handoff file describing what landed, what did not, and the exact next step. Run Step 6.7 before that handoff; when Step 6.7 blocks, its no-handoff STOP path wins. Budget for asynchronous `Agent` delegates too — they can block you for tens of minutes while emitting nothing.
+So: commit a checkpoint after each phase of the plan rather than batching, and treat roughly 90% of the budget as your real deadline. If you reach that point with work outstanding, STOP implementing and write the handoff file describing what landed, what did not, and the exact next step. Run Steps 6.7 and 6.9 before that handoff; when either blocks, its no-handoff STOP path wins. Budget for asynchronous `Agent` delegates too — they can block you for tens of minutes while emitting nothing.
 
 After every tool call you will see a line like `elapsed 123s / 1800s`. That is your clock. Once it says you are past 90%, stop implementing and write the handoff.
 
@@ -475,6 +475,77 @@ Act on the verdict line:
 
 Never edit the plan's `## Must preserve` or `### Intended removals` to silence a flag. The same rule applies to the Verification Matrix in Step 6.7.
 
+## Step 6.9: Pre-Fire Verification Gate
+
+The runner ships this branch through `post-plan-now`, which refuses to fire unless
+`bin/lib/prefire-verify` has passed on this exact working tree. Run the gate here so
+you can fix what it finds. Its pass records are keyed by tree hash, so the runner's
+fire-time call is a cache hit when you change nothing afterwards.
+
+Run each stage as its own foreground Bash call with `timeout: 600000`:
+
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage matrix
+```
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage phpunit
+```
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage infection
+```
+
+Act on each exit code:
+
+- `0`: next stage. When all three return 0, proceed to Step 7.
+- `1`: a check failed. The output names the matrix row or stage. Fix the production
+  code or the test the plan asked for. Never edit the plan's Verification Matrix, and
+  never weaken an assertion. Commit a checkpoint and rerun all three stages, because
+  the fix changed the tree. A stage still at `1` never proceeds to Step 7. At the
+  budget wall, take the Step 6.7 no-handoff STOP path.
+- `3`: a prerequisite is missing (docker, the DB container, pcov, vendor). Apply the
+  fix the message names once and rerun that stage. If it is still `3`, go to Step 7 and
+  add `"prefire_deferred": ["<stage>: <message>"]` to the handoff. The fire point
+  reruns the stage and refuses to ship while it still fails.
+- The Bash call is killed at 600 s: the stage wrote no pass record. Go to Step 7 and
+  add `"prefire_deferred": ["<stage>: timed out at 600 s"]`. The fire point has no
+  600 s cap and reruns it.
+- `4`: the checks changed tracked files. Commit them, or gitignore generated output,
+  then rerun.
+- `2`: usage error. Use the Error Handling path in Step 8.
+
+Never pass `--bypass`; the gate refuses it under `CLAUDE_HEADLESS`. If there is no
+plan file, drop `--plan "$PLAN_PATH"`. The matrix stage then skips and the other two still run.
+
 ## Step 7: Write Handoff File
 
 After all implementation is complete and the final checkpoint is pushed, write a handoff file so the post-plan agent can pick up:
@@ -495,6 +566,8 @@ HANDOFF_EOF
 ```
 
 Replace all `<placeholder>` values with actual values. The `plan_file` field must be `$PLAN_FILE` exactly: the bare `<slug>.md` name, with no `NNN-` queue prefix. The filename keeps the `.md`: plan `my-slug.md` writes `handoff/my-slug.md.json`, never `handoff/my-slug.json`. The bash loop reads only the `.md.json` name.
+
+When Step 6.9 deferred a stage, add "prefire_deferred" with the strings Step 6.9 named; the six required fields stay as they are.
 
 After writing the handoff file, verify it parses AND carries every field the bash loop reads. A syntactically valid file with the wrong keys is a failure: the loop cannot resolve the worktree or branch from it.
 

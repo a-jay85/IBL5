@@ -17,6 +17,8 @@ use Waivers\Contracts\WaiversValidatorInterface;
 /**
  * @see WaiversProcessorInterface
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-import-type WaiverAudit from WaiversProcessorInterface
+ * @phpstan-import-type WaiverNotification from WaiversProcessorInterface
  */
 class WaiversProcessor implements WaiversProcessorInterface
 {
@@ -42,7 +44,15 @@ class WaiversProcessor implements WaiversProcessorInterface
      */
     private ?Season $season = null;
     private \Clock\ClockInterface $clock;
+    /** @var \Closure(): \Mail\Contracts\MailServiceInterface */
+    private \Closure $mailerFactory;
+    /** @var \Closure(string, string): void */
+    private \Closure $discordPoster;
 
+    /**
+     * @param ?\Closure(): \Mail\Contracts\MailServiceInterface $mailerFactory Builds the mailer at send time; may throw. When null, uses MailService::fromConfig().
+     * @param ?\Closure(string, string): void $discordPoster Posts one message to a channel; may throw. When null, uses Discord::postToChannel().
+     */
     public function __construct(
         WaiversRepositoryInterface $repository,
         \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo,
@@ -52,7 +62,9 @@ class WaiversProcessor implements WaiversProcessorInterface
         \mysqli $db,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null,
-        ?\Clock\ClockInterface $clock = null
+        ?\Clock\ClockInterface $clock = null,
+        ?\Closure $mailerFactory = null,
+        ?\Closure $discordPoster = null
     ) {
         $this->repository = $repository;
         $this->teamIdentityRepo = $teamIdentityRepo;
@@ -64,6 +76,8 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
         $this->clock = $clock ?? new \Clock\SystemClock();
+        $this->mailerFactory = $mailerFactory ?? \Mail\MailService::fromConfig(...);
+        $this->discordPoster = $discordPoster ?? Discord::postToChannel(...);
     }
 
     /**
@@ -174,7 +188,7 @@ class WaiversProcessor implements WaiversProcessorInterface
     /**
      * @see WaiversProcessorInterface::processDrop()
      *
-     * @return array{success: bool, result?: string, error?: string}
+     * @return array{success: bool, result?: string, error?: string, notification?: WaiverNotification}
      */
     public function processDrop(?int $playerID, string $teamName, int $rosterSlots, int $totalSalary): array
     {
@@ -202,26 +216,30 @@ class WaiversProcessor implements WaiversProcessorInterface
         $this->createWaiverNewsStory($teamName, $playerName, 'waive', '');
 
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " cut " . \Security\HtmlSanitizer::e($playerName) . " to waivers.";
-        try {
-            Discord::postToChannel('#waiver-wire', $hometext);
-        } catch (\Throwable $discordErr) {
-            $this->logger->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
-        }
 
-        $this->logger->info('player_waived', [
-            'action' => 'player_waived',
-            'player_id' => $playerID,
-            'player_name' => $playerName,
-            'team_name' => $teamName,
-        ]);
-
-        return ['success' => true, 'result' => 'player_dropped'];
+        return [
+            'success' => true,
+            'result' => 'player_dropped',
+            'notification' => [
+                'mailSubject' => null,
+                'message' => $hometext,
+                'audit' => [
+                    'event' => 'player_waived',
+                    'context' => [
+                        'action' => 'player_waived',
+                        'player_id' => $playerID,
+                        'player_name' => $playerName,
+                        'team_name' => $teamName,
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
      * @see WaiversProcessorInterface::processAdd()
      *
-     * @return array{success: bool, result?: string, error?: string}
+     * @return array{success: bool, result?: string, error?: string, notification?: WaiverNotification}
      */
     public function processAdd(?int $playerID, string $teamName, int $openRosterSlots, int $healthyRosterSlots, int $totalSalary): array
     {
@@ -268,23 +286,75 @@ class WaiversProcessor implements WaiversProcessorInterface
 
         $storytitle = \Security\HtmlSanitizer::e($teamName) . " make waiver additions";
         $hometext = "The " . \Security\HtmlSanitizer::e($teamName) . " sign " . \Security\HtmlSanitizer::e($playerName) . " from waivers for " . \Security\HtmlSanitizer::e($salaryStr) . ".";
-        \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, self::NOTIFICATION_EMAIL_SENDER);
 
-        try {
-            Discord::postToChannel('#waiver-wire', $hometext);
-        } catch (\Throwable $discordErr) {
-            $this->logger->warning('waiver_discord_notification_failed', ['error' => $discordErr->getMessage()]);
+        return [
+            'success' => true,
+            'result' => 'player_added',
+            'notification' => [
+                'mailSubject' => $storytitle,
+                'message' => $hometext,
+                'audit' => [
+                    'event' => 'player_signed_from_waivers',
+                    'context' => [
+                        'action' => 'player_signed_from_waivers',
+                        'player_id' => $playerID,
+                        'player_name' => $playerName,
+                        'team_name' => $teamName,
+                        'salary' => $playerSalary,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @see WaiversProcessorInterface::finishCommittedMove()
+     */
+    public function finishCommittedMove(array $notification): void
+    {
+        $mailSubject = $notification['mailSubject'];
+        $message = $notification['message'];
+
+        $this->writeAuditEntry($notification['audit']);
+
+        if ($mailSubject !== null) {
+            try {
+                // Built inside the try: fromConfig() is where a mail config error surfaces.
+                $mailer = ($this->mailerFactory)();
+                if (!$mailer->send(self::NOTIFICATION_EMAIL_RECIPIENT, $mailSubject, $message, self::NOTIFICATION_EMAIL_SENDER)) {
+                    $this->warnQuietly('waiver_mail_notification_failed', 'The mail service reported a failed send.');
+                }
+            } catch (\Throwable $mailErr) {
+                $this->warnQuietly('waiver_mail_notification_failed', $mailErr->getMessage());
+            }
         }
 
-        $this->logger->info('player_signed_from_waivers', [
-            'action' => 'player_signed_from_waivers',
-            'player_id' => $playerID,
-            'player_name' => $playerName,
-            'team_name' => $teamName,
-            'salary' => $playerSalary,
-        ]);
+        try {
+            ($this->discordPoster)('#waiver-wire', $message);
+        } catch (\Throwable $discordErr) {
+            $this->warnQuietly('waiver_discord_notification_failed', $discordErr->getMessage());
+        }
+    }
 
-        return ['success' => true, 'result' => 'player_added'];
+    /**
+     * @param WaiverAudit $audit
+     */
+    private function writeAuditEntry(array $audit): void
+    {
+        try {
+            $this->logger->info($audit['event'], $audit['context']);
+        } catch (\Throwable $auditErr) {
+            $this->warnQuietly('waiver_audit_log_failed', $auditErr->getMessage());
+        }
+    }
+
+    private function warnQuietly(string $event, string $error): void
+    {
+        try {
+            $this->logger->warning($event, ['error' => $error]);
+        } catch (\Throwable) {
+            // The move already committed, and the log is the only place left to report this.
+        }
     }
 
     private function createWaiverNewsStory(string $teamName, string $playerName, string $action, string $contract): void

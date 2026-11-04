@@ -984,6 +984,7 @@ jobs:
             bin/test-wt-rebase \
             bin/test-check-plan-staleness \
             bin/test-matrix-assertion-check \
+            bin/test-prefire-verify \
             bin/test-plan-tier-hint \
             bin/test-backlog \
             bin/test-rehearsal-clone-fallback \

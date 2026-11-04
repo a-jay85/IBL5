@@ -30,13 +30,21 @@ class WakeControllerTest extends TestCase
      */
     private static function keys(bool $serviceKey): ApiKeyRepository
     {
+        return self::keysWithTier($serviceKey ? 'unlimited' : 'standard');
+    }
+
+    /**
+     * Key lookup stub returning a key row with the given rate_limit_tier.
+     */
+    private static function keysWithTier(string $tier): ApiKeyRepository
+    {
         $keys = self::createStub(ApiKeyRepository::class);
         $keys->method('findByHash')->willReturn([
             'key_hash'         => hash('sha256', 'test-bot-key'),
             'key_prefix'       => 'test-bot',
             'owner_name'       => 'x',
             'permission_level' => 'public',
-            'rate_limit_tier'  => $serviceKey ? 'unlimited' : 'standard',
+            'rate_limit_tier'  => $tier,
         ]);
         return $keys;
     }
@@ -53,6 +61,43 @@ class WakeControllerTest extends TestCase
             ->with(403, 'forbidden', self::anything());
 
         (new WakeController($bugRepo, self::keys(false), self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
+    }
+
+    public function testElevatedTierKeyWithOperatorAuthorIdIsAccepted(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->once())
+            ->method('findByOriginalMessageId')
+            ->with('111')
+            ->willReturn(['id' => 7, 'status' => 'dormant']);
+        $bugRepo->expects($this->once())
+            ->method('wakeByOperator')
+            ->with(7, '222', '333', self::OPERATOR_ID, 'text')
+            ->willReturn(['outcome' => 'woke', 'status' => 'queued']);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->never())->method('error');
+        $responder->expects($this->once())
+            ->method('success')
+            ->with(['id' => 7, 'outcome' => 'woke', 'status' => 'queued']);
+
+        (new WakeController($bugRepo, self::keysWithTier('elevated'), self::OPERATOR_ID))->handle([], [], $responder, self::validBody());
+    }
+
+    public function testElevatedTierKeyWithNonOperatorAuthorIdRejected403AndNoRepositoryCall(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->never())->method('findByOriginalMessageId');
+        $bugRepo->expects($this->never())->method('wakeByOperator');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline operator can wake a report.');
+
+        $body = self::validBody();
+        $body['author_id'] = '100000000000000002';
+        (new WakeController($bugRepo, self::keysWithTier('elevated'), self::OPERATOR_ID))->handle([], [], $responder, $body);
     }
 
     /**

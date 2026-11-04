@@ -7,6 +7,9 @@
 # keychain and network are never touched.
 
 set -uo pipefail
+# An operator shell may tune these. Tests expect the built-in 93/98 unless a
+# case sets its own, so drop inherited values (see bin/lib/usage-test-isolation.sh).
+unset IBL5_USAGE_DRAIN_PCT IBL5_USAGE_STOP_PCT
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0

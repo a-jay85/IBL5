@@ -225,9 +225,11 @@ says. Each block runs in its own shell, so nothing carries over.
    re-fire chore and skips this section.
 3. Run the live-run check from Step 6. If a post-plan run is listed, skip this PR for now.
    A live run caches the body and writes it back after a fixer commit.
-4. Build the new body.
+4. Build the new body. `--jq` prints a newline after the body, so each save here and in
+   step 5 goes through `$(...)`, which strips it. A file with that newline would add a
+   stray one to the live body and make the step 5 diff fail on a good edit.
    ```bash
-   gh pr view N --json body --jq .body > "$D/pN-body.md"
+   printf '%s' "$(gh pr view N --json body --jq .body)" > "$D/pN-body.md"
    bin/lib/pr-body-only-fix apply "$D/pN-sticky.md" "$D/pN-body.md" "$D/pN-body-new.md"
    ```
    Exit 0 prints the diff. Exit 1 prints `refused=<token>`, and the PR goes to Decide now
@@ -237,7 +239,7 @@ says. Each block runs in its own shell, so nothing carries over.
 5. Apply it, then prove it took.
    ```bash
    gh pr edit N --body-file "$D/pN-body-new.md"
-   gh pr view N --json body --jq .body > "$D/pN-body-after.md"
+   printf '%s' "$(gh pr view N --json body --jq .body)" > "$D/pN-body-after.md"
    diff "$D/pN-body-new.md" "$D/pN-body-after.md"
    ```
    A non-empty diff means the edit did not take. Stop and give the PR a card.

@@ -206,6 +206,14 @@ PB_EOF
         [ -n "$REG" ] && ! grep -qF 'git commit' <<< "$REG" && ! grep -qF 'git push' <<< "$REG" \
             && ok "PB13: body-only region names no git commit or push" \
             || fail "PB13: body-only region names no git commit or push"
+        # A bare `--jq .body > file` keeps gh's added newline: it reaches the live
+        # body through --body-file and makes the step 5 diff fail on a good edit.
+        [ -n "$REG" ] \
+            && grep -qF "printf '%s' \"\$(gh pr view N --json body --jq .body)\" > \"\$D/pN-body.md\"" <<< "$REG" \
+            && grep -qF "printf '%s' \"\$(gh pr view N --json body --jq .body)\" > \"\$D/pN-body-after.md\"" <<< "$REG" \
+            && ! grep -qF -- '--jq .body >' <<< "$REG" \
+            && ok "PB13: body saves strip the newline gh adds" \
+            || fail "PB13: body saves strip the newline gh adds"
     fi
 }
 if [ "${TB_ONLY:-}" = pb ]; then pb_cases; h_done; fi

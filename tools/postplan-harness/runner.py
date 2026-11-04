@@ -2476,22 +2476,53 @@ def _closer_reset(git, pre_head) -> None:
             pass
 
 
+def _closer_keep_ref(git, ref, sha) -> bool:
+    run = getattr(git, "_run", None)
+    if not (callable(run) and sha):
+        return False
+    try:
+        run("update-ref", ref, sha)
+        return True
+    except Exception:  # noqa: BLE001 - reported as "NOT kept", never raised
+        return False
+
+
 def _closer_commit_push(git, llm, log, res, outcome, *, worktree, out_dir, gh, pr,
-                        phase) -> str:
+                        phase, failure=None) -> str:
     """Commit what the session left (if anything) and push. Returns a note ('' on success).
-    `remote-head-diverged` re-raises; every other failure resets to the pre-session head."""
+    `remote-head-diverged` re-raises. A push failure keeps the commit under
+    refs/postplan-closer/ and resets the branch; a commit failure resets and discards."""
+    sha = ""
     try:
         if git.is_dirty():
             first = (outcome.note or outcome.verdict or "closer session").splitlines()[0][:200]
             git.commit_all("fix: address post-plan hold (closer)\n\n" + first)
+        head = git.head()
+        if head and head != outcome.pre_head:
+            sha = head
         _push_with_gate_fix(git, log, phase, llm=llm, worktree=worktree, out_dir=out_dir,
                             res=res, gh=gh, pr=pr)
     except HarnessError as e:
         if e.kind == "remote-head-diverged":
             raise
+        reason, line = closer.push_failure_reason(e.kind, _redact(e.detail or "") or "")
+        ref = f"refs/postplan-closer/{pr}-{sha[:12]}" if sha else ""
+        kept = _closer_keep_ref(git, ref, sha) if sha else False
         _closer_reset(git, outcome.pre_head)
-        log(f"{phase}: closer commit/push failed ({e.kind}); reset to pre-session head")
-        return f"commit/push failed ({e.kind}); edits discarded"
+        if not sha:
+            log(f"{phase}: closer commit failed ({e.kind}/{reason}); reset to pre-session head")
+            msg = f"commit failed ({e.kind}/{reason}): {line}; edits discarded"
+        else:
+            where = f"kept at {ref}" if kept else "NOT kept (update-ref failed)"
+            log(f"{phase}: closer push failed ({e.kind}/{reason}); commit {sha[:12]} {where}")
+            msg = (f"push failed ({e.kind}/{reason}): {line}; closer commit {sha[:12]} "
+                   f"{where} in {worktree}; branch reset to {outcome.pre_head[:12]}; "
+                   f"recover: git -C {worktree} cherry-pick {sha[:12]}")
+        if failure is not None:
+            failure.update({"stage": "push" if sha else "commit", "kind": e.kind,
+                            "reason": reason, "line": line, "sha": sha, "ref": ref,
+                            "kept": kept, "worktree": worktree})
+        return msg
     return ""
 
 
@@ -2507,6 +2538,41 @@ def _closer_post_replies(gh, log, pr, outcome) -> int:
         except Exception as e:  # noqa: BLE001 - a failed reply is noted, never raised
             log(f"closer: thread reply failed for {r.get('comment_id')} ({e!r})")
     return n
+
+
+def _closer_pr_body(gh, log) -> str:
+    try:
+        return gh.pr_body_fresh() or ""
+    except Exception as e:  # noqa: BLE001 - the prompt degrades to an empty body block
+        log(f"closer: PR body read failed ({e!r}); prompt gets no body")
+        return ""
+
+
+def _closer_apply_body_edits(gh, log, pr, outcome) -> str:
+    """Apply validated body edits with one `gh pr edit`. Never commits. Returns a rec tag."""
+    if not outcome.body_edits:
+        return ""
+    try:
+        body = gh.pr_body_fresh() or ""
+    except Exception as e:  # noqa: BLE001 - noted, never raised
+        log(f"closer: PR body read failed ({e!r}); body edits skipped")
+        return "failed:read"
+    new_body, why = closer.apply_body_edits(body, outcome.body_edits)
+    if new_body is None:
+        log(f"closer: body edits rejected ({why})")
+        return "rejected:" + why
+    if new_body == body:
+        return "noop"
+    try:
+        gh.pr_edit_body(pr, new_body)
+    except Exception as e:  # noqa: BLE001 - a failed body edit is noted, never raised
+        log(f"closer: gh pr edit failed ({e!r})")
+        return "failed:edit"
+    log(f"closer: PR body edited ({len(outcome.body_edits)} edit(s)); no commit")
+    return f"applied:{len(outcome.body_edits)}"
+
+
+_CLOSER_FAIL_STATUSES = ("push-failed", "unparseable", "deferred-path-edit")
 
 
 def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, *,
@@ -2552,23 +2618,36 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         blocked=tuple((c.number, c.name, c.reason) for c in decision.conditions if c.blocked),
         failed_checks=tuple((n, "") for n in (outcome.failed or [])),
         ci_excerpt=(outcome.evidence or "")[:4000] if ci_red else "",
-        threads=closer.thread_rows(rows))
+        threads=closer.thread_rows(rows),
+        deferred=(closer.deferred_scope(res.plan.path)
+                  if (res.plan and res.plan.found) else ""),
+        pr_body=_closer_pr_body(gh, log))
     log(f"closer: running one session (trigger={why})")
     co = closer.run_session(llm, worktree=worktree, base_ref="origin/master", pr=pr,
-                            plan_path=ctx.plan_path, context=ctx, log=log)
+                            plan_path=ctx.plan_path, context=ctx, log=log,
+                            discard_on_unparsed=True)
     rec = {"ran": True, "status": co.status, "verdict": co.verdict, "cost_usd": co.cost_usd,
            "recheck": "not-run", "stop_reason": co.stop_reason, "trigger": why}
     res.closer = rec
     note = co.note
     pushed_note = ""
     if co.status == "edited":
+        pf: dict = {}
         pushed_note = _closer_commit_push(git, llm, log, res, co, worktree=worktree,
-                                          out_dir=out_dir, gh=gh, pr=pr, phase="closer")
+                                          out_dir=out_dir, gh=gh, pr=pr, phase="closer",
+                                          failure=pf)
         if pushed_note:
-            note = f"{note}; {pushed_note}".strip("; ")
+            note = f"{pushed_note}; {note}".strip("; ")
             rec["status"] = "push-failed"
-    replies = _closer_post_replies(gh, log, pr, co) if rec["status"] != "push-failed" else 0
+            rec["push_failure"] = pf
+    replies = (_closer_post_replies(gh, log, pr, co)
+               if rec["status"] not in _CLOSER_FAIL_STATUSES else 0)
     rec["replies_posted"] = replies
+    body_tag = (_closer_apply_body_edits(gh, log, pr, co)
+                if rec["status"] in ("edited", "no-change") else "")
+    if body_tag:
+        rec["body_edits"] = body_tag
+        note = f"{note}; PR body {body_tag}".strip("; ")
     try:
         cur_tree = git.head_tree()
     except Exception as e:  # noqa: BLE001 - unknown tree: defer the re-check, keep the decision
@@ -2576,7 +2655,10 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         cur_tree = None
     if not live and (fixture or {}).get("current_tree"):
         cur_tree = fixture["current_tree"]
-    if rec["status"] in ("edited", "no-change") and cur_tree != inputs.current_tree:
+    if body_tag.startswith("applied:"):
+        rec["recheck"] = "deferred-body-edited"
+        log("closer: PR body edited; arming re-check deferred to the next run")
+    elif rec["status"] in ("edited", "no-change") and cur_tree != inputs.current_tree:
         rec["recheck"] = "deferred-tree-moved"
         log("closer: tree moved; arming re-check deferred to the next run")
     elif rec["status"] in ("edited", "no-change"):
@@ -2596,7 +2678,8 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
     _closer_note(out_dir, f"closer: {rec['status']} verdict={co.verdict} "
                           f"recheck={rec['recheck']}\n\n{note}")
     if callable(post_sticky) and rec["recheck"] != "armed":
-        first = (note or co.verdict or "").splitlines()[0][:200] if (note or co.verdict) else ""
+        cap = 700 if rec["status"] in _CLOSER_FAIL_STATUSES else 200
+        first = (note or co.verdict or "").splitlines()[0][:cap] if (note or co.verdict) else ""
         post_sticky(decision, f"closer: {rec['status']}; {first}", "closer")
     state.checkpoint("arm", res)
     return decision

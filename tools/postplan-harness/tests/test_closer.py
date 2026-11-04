@@ -294,3 +294,232 @@ def test_thread_reply_unknown_id_dropped():
     assert degraded is False
     assert [r["comment_id"] for r in replies] == [11]
     assert any("unknown thread 99" in m for m in logs)
+
+
+# ── tolerant reply extraction (#3694) ─────────────────────────────────────────
+
+# The closer's final message in the #3694 run: prose only, no JSON object.
+PR3694_REPLY = (
+    "An old background search I started has stopped. It ran out of time. It doesn't matter, "
+    "because I already found the review file another way, so I won't restart it.\n\n"
+    'My answer stays the same. Change "Two" to "Three" in the body of '
+    "[#3694](https://github.com/a-jay85/IBL5/pull/3694). Then run:\n\n"
+    "`cd /Users/ajaynicolas/GitHub/IBL5-worktrees/plan-now-resume-on-early-exit "
+    "&& bin/post-plan-now --force`\n")
+
+
+def test_parse_reply_bold_wrapped():
+    text = 'Done.\n\n**{"verdict": "fixed", "summary": "s", "hold_note": "", "thread_replies": []}**'
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert verdict == "fixed"
+    assert degraded is False
+
+
+def test_parse_reply_backtick_wrapped_trailing_prose():
+    text = ('`{"verdict": "not-fixable", "summary": "x", "hold_note": "h", '
+            '"thread_replies": []}`\nLet me know {if} you need more.')
+    verdict, note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, note, degraded) == ("not-fixable", "h", False)
+
+
+def test_parse_reply_dict_wrapper():
+    text = '{"result": {"verdict": "false-positive", "summary": "s"}}'
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, degraded) == ("false-positive", False)
+
+
+def test_parse_reply_non_json_fence_then_json():
+    text = ('```diff\n- {a}\n+ {b}\n```\n'
+            '{"verdict": "fixed", "summary": "s", "hold_note": "", "thread_replies": []}')
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, degraded) == ("fixed", False)
+
+
+def test_parse_reply_pr3694_prose_degrades_and_logs_raw():
+    logs = []
+    got = parse_reply(PR3694_REPLY, set(), log=logs.append)
+    assert got == ("unparsed", closer.UNPARSEABLE_NOTE, [], True)
+    lines = [m for m in logs if m.startswith("closer: reply unparseable (no-json); "
+                                             "raw reply tail:")]
+    assert len(lines) == 1
+    assert 'Change "Two" to "Three"' in lines[0]
+
+
+def test_parse_reply_near_miss_verdict_case():
+    logs = []
+    got = parse_reply('{"verdict": "Fixed"}', set(), log=logs.append)
+    assert got[3] is True
+    assert any("(bad-verdict)" in m for m in logs)
+
+
+def test_parse_reply_near_miss_prose_braces():
+    logs = []
+    got = parse_reply("None of these {fixed} items apply; verdict fixed", set(),
+                      log=logs.append)
+    assert got[3] is True
+    assert any("(no-json)" in m for m in logs)
+
+
+def test_parse_reply_last_object_wins_strictly():
+    logs = []
+    text = '{"verdict": "fixed", "summary": "s"}\nThen I changed my mind: {"verdict": "done"}'
+    verdict, _note, _replies, degraded = parse_reply(text, set(), log=logs.append)
+    assert degraded is True
+    assert verdict == "unparsed"
+    assert any("(bad-verdict)" in m for m in logs)
+
+
+def _dirty(cwd):
+    _write(cwd, "src.txt", "changed by the closer\n")
+
+
+def test_run_session_unparsed_discards_when_asked(repo):
+    pre = _head(repo)
+    llm = FakeLlm(action=_dirty, reply=PR3694_REPLY)
+    out = run_session(llm, worktree=repo, base_ref="master", pr=7, plan_path="/p/plan.md",
+                      context=_ctx(), log=[].append, discard_on_unparsed=True)
+    assert out.status == "unparseable"
+    assert _head(repo) == pre
+    assert _g(repo, "status", "--porcelain").stdout.strip() == ""
+    with open(os.path.join(repo, "src.txt")) as fh:
+        assert fh.read() == "feature work\n"
+
+
+def test_run_session_unparsed_default_keeps_status(repo):
+    llm = FakeLlm(action=_dirty, reply=PR3694_REPLY)
+    out, _ = _session(repo, llm)
+    assert out.status == "edited"
+
+
+# ── reply contract and prompt rules ───────────────────────────────────────────
+
+_REACTION = "ibl5/classes/Api/Controller/ReactionController.php"
+_WAKE = "ibl5/classes/Api/Controller/WakeController.php"
+
+
+def test_build_prompt_last_line_marker_and_body_edits():
+    prompt = closer.build_prompt(_ctx())
+    assert "End your FINAL message with ONE JSON object on its own last line, with nothing " \
+        in prompt
+    assert '"body_edits": [{"find": str, "replace": str}]' in prompt
+    assert "Never start a background command" in prompt
+
+
+def test_build_prompt_forbids_deferred_surface_edits():
+    prompt = closer.build_prompt(_ctx(deferred=f"- `{_REACTION}` tier gate is a follow-up"))
+    assert "You MUST NOT edit any file the plan defers" in prompt
+    fence = prompt.split("DEFERRED BY THE PLAN", 1)[1].split("CURRENT PR BODY", 1)[0]
+    assert _REACTION in fence
+
+
+def test_deferred_scope_reads_only_out_of_scope(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("# T\n\n## Phase 1: x\n\ndo it\n\n## Out of Scope\n\n- first thing\n"
+                    "- second thing\n\n## Critical Files\n\n- `a/b.php`\n")
+    assert closer.deferred_scope(str(plan)) == "- first thing\n- second thing"
+    assert closer.deferred_scope(str(tmp_path / "missing.md")) == ""
+
+
+def test_deferred_scope_ignores_prose_mention(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("# T\n\n## Approach\n\nOut of Scope items are listed below.\n\n"
+                    "## Out of Scope Notes\n\n- not a deferred list\n")
+    assert closer.deferred_scope(str(plan)) == ""
+
+
+def test_deferred_paths_needs_slash():
+    text = "`ibl5/a/B.php` and `bin/x` (example) and `foo` and `two words/x`"
+    assert closer.deferred_paths(text) == frozenset({"ibl5/a/B.php", "bin/x"})
+
+
+def _edit_file(rel):
+    def edit(cwd):
+        _write(cwd, rel, "edited\n")
+    return edit
+
+
+def test_run_session_deferred_path_edit_reverts(repo):
+    pre = _head(repo)
+    llm = FakeLlm(action=_edit_file(_REACTION),
+                  reply='{"verdict":"fixed","summary":"s","hold_note":""}')
+    out, _ = _session(repo, llm, deferred=f"- `{_REACTION}` is a follow-up")
+    assert out.status == "deferred-path-edit"
+    assert out.gate_hits == (_REACTION,)
+    assert _head(repo) == pre
+    assert not os.path.exists(os.path.join(repo, _REACTION))
+
+
+def test_run_session_non_deferred_edit_passes(repo):
+    llm = FakeLlm(action=_edit_file(_WAKE),
+                  reply='{"verdict":"fixed","summary":"s","hold_note":""}')
+    out, _ = _session(repo, llm, deferred=f"- `{_REACTION}` is a follow-up")
+    assert out.status == "edited"
+
+
+# ── harness-applied PR body edits ─────────────────────────────────────────────
+
+def _edits_reply(edits):
+    import json
+    return json.dumps({"verdict": "fixed", "summary": "s", "hold_note": "",
+                       "body_edits": edits, "thread_replies": []})
+
+
+def test_apply_body_edits_unique_find():
+    got = closer.apply_body_edits("## Summary\nTwo prompts changed.\n",
+                                  (("Two prompts", "Three prompts"),))
+    assert got == ("## Summary\nThree prompts changed.\n", "")
+
+
+def test_apply_body_edits_rejects_non_unique_and_absent():
+    assert closer.apply_body_edits("Two and Two", (("Two", "Three"),)) \
+        == (None, "find not unique: 'Two'")
+    body, reason = closer.apply_body_edits("Two and Two", (("Four", "Five"),))
+    assert body is None
+    assert reason.startswith("find absent")
+
+
+def test_apply_body_edits_rejects_checkbox_line():
+    body, reason = closer.apply_body_edits("- [ ] manual check passes\n",
+                                           (("manual check passes", "changed"),))
+    assert body is None
+    assert "checkbox or marker line" in reason
+
+
+def test_parse_body_edits_rejects_marker_and_checkbox():
+    good = {"find": "a", "replace": "b"}
+    assert closer.parse_body_edits(
+        _edits_reply([{"find": "<!-- pr-ready-verdict -->", "replace": "x"}])) == ()
+    assert closer.parse_body_edits(
+        _edits_reply([{"find": "done", "replace": "- [x] done"}])) == ()
+    assert closer.parse_body_edits(
+        _edits_reply([good, {"find": "c", "replace": "<!-- d -->"}, good])) == ()
+    assert closer.parse_body_edits(_edits_reply([good, good])) == (("a", "b"), ("a", "b"))
+
+
+def test_parse_body_edits_rejects_bad_shapes():
+    ok = {"find": "a", "replace": "b"}
+    assert closer.parse_body_edits(_edits_reply({"find": "a", "replace": "b"})) == ()
+    assert closer.parse_body_edits(_edits_reply([ok] * 11)) == ()
+    assert closer.parse_body_edits(_edits_reply([{"find": "", "replace": "b"}])) == ()
+    assert closer.parse_body_edits(_edits_reply([{"find": "a", "replace": 7}])) == ()
+    assert closer.parse_body_edits(PR3694_REPLY) == ()
+
+
+# ── push-failure classifier ───────────────────────────────────────────────────
+
+def test_push_failure_reason_classifies():
+    assert closer.push_failure_reason(
+        "push-rejected", "! [rejected] HEAD -> b (non-fast-forward)\n"
+        "error: failed to push some refs") \
+        == ("non-fast-forward", "! [rejected] HEAD -> b (non-fast-forward)")
+    assert closer.push_failure_reason(
+        "push-failed", "remote: Permission to a-jay85/IBL5.git denied to bot.\n"
+        "fatal: unable to access")[0] == "auth"
+    assert closer.push_failure_reason(
+        "local-gate-denied", "bin/pre-push-adr-hook: missing ADR")[0] == "hook-deny"
+    assert closer.push_failure_reason("push-failed", "connection reset by peer")[0] == "other"
+
+
+def test_push_failure_reason_bare_rejected_word_is_other():
+    assert closer.push_failure_reason(
+        "push-failed", "rejected 3 stale files from the cache")[0] == "other"

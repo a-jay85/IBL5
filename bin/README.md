@@ -15,7 +15,7 @@ first one. For the other three, read the script's header comment and `--help`.
 | Gate or harness | `check-*` (read-only gate) or `test-*` (self-contained harness) | Yes. A gate reads and reports with exit code 0, 1, or 2 (see Check-script conventions below). A harness builds its own temp fixtures. |
 | CI-invoked | Unprefixed, called from `.github/workflows/` or `.github/actions/`. This includes runner-side scripts CI ships to the prod host, such as `predeploy-db-snapshot` and `rehearsal-prod-dump`. | Read the header first. Some update remote branches, post to Discord, or act on the prod host. |
 | Operator | Unprefixed, run by a person: `wt-new`, `e2e-for-file`, `merge-master-to-prod`, `rollback-phantom-repair`. | Yes. That is what they are for. Some act on prod, so read `--help` first. |
-| Automation | launchd or cron jobs: `*-tick`, `*-cron-setup`, `automouse/*`, `burndown-loop`, `docfix-poll`. | Run a `*-tick` by hand only to debug it. A `*-cron-setup` installs or replaces a job on this machine. |
+| Automation | launchd or cron jobs: `*-tick`, `*-cron-setup`, `automouse/*`, `burndown-loop`, `docfix-poll`. | Run a `*-tick` by hand only to debug it. A `*-cron-setup` installs or replaces a job on this machine. `burndown-loop` starts new work only inside its night window (02:00-07:00 local by default) unless the weekly reset is under 48 hours away; its header lists the knobs. |
 
 A script can serve two audiences. `wt-new` is an operator tool that CI also
 runs, and `merge-master-to-prod` is the manual twin of the promotion CI runs.

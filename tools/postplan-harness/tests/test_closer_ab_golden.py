@@ -108,3 +108,37 @@ def test_harness_only_golden_rebase_conflict_sequence(monkeypatch, tmp_path, ab_
     fx = _armable_fixture(monkeypatch, tmp_path)
     res, result, out = _go(monkeypatch, tmp_path, fx, git_cls=_RebaseConflictGit)
     _check(_observe(result, res, out), PIN_REBASE, "rebase")
+
+
+# ── closer reply contract (#3694) ─────────────────────────────────────────────
+
+def test_closer_unparseable_reply_is_not_success(monkeypatch, tmp_path):
+    """A JSON-free closer reply (the #3694 shape) fails closed: no commit, no push, no re-check."""
+    from test_runner_closer import (Recorder, _TrackedGit, _arm, _closer_fixture, _install)
+    from harness.closer import CloserOutcome
+
+    class _UnparsedAware(Recorder):
+        """Mirrors run_session: edits survive only when the caller did not ask to discard."""
+
+        def __call__(self, llm, **kw):
+            self.calls.append(kw)
+            if kw.get("discard_on_unparsed"):
+                return CloserOutcome("unparseable", "unparsed",
+                                     "closer reply unparseable; no thread replies posted",
+                                     (), 1.5, "unparseable", "")
+            _TrackedGit.instances[-1].extra_dirty = ["src/closer-edit.php"]
+            return CloserOutcome("edited", "unparsed", "unparsed", (), 1.5, "", "")
+
+    _arm(monkeypatch)
+    fx = _closer_fixture(monkeypatch, tmp_path)
+    rec = _UnparsedAware()
+    _install(monkeypatch, rec)
+    res, _result, out = _go(monkeypatch, tmp_path, fx, git_cls=_TrackedGit)
+    assert len(rec.calls) == 1
+    assert res.closer["status"] == "unparseable"
+    assert res.closer["recheck"] == "not-run"
+    assert res.closer["replies_posted"] == 0
+    git = _TrackedGit.instances[-1]
+    assert not [m for m in git.commit_messages if "(closer)" in m]
+    assert res.arm.armed is False
+    assert _merge_count(out) == 0

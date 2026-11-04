@@ -10,6 +10,7 @@ session env has no gh token and no git credential path (`session_env`), its deny
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -17,7 +18,6 @@ import tempfile
 from dataclasses import dataclass, field
 
 from . import cifix, fidelity
-from .adapters.llm import extract_json
 from .state import HarnessError
 
 # The call_tooled adapter takes the alias; MODEL_MAP resolves "opus" to claude-opus-5-5.
@@ -105,7 +105,7 @@ class CloserContext:
 @dataclass(frozen=True)
 class CloserOutcome:
     status: str          # edited | no-change | gate-path-edit | incomplete-rebase |
-    #                      session-error | cap-wall | cap-budget
+    #                      unparseable | session-error | cap-wall | cap-budget
     verdict: str = ""
     note: str = ""
     thread_replies: tuple = ()
@@ -202,6 +202,7 @@ def _ledger_cost(llm, n0: int) -> float:
 
 
 def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContext, log,
+                discard_on_unparsed: bool = False,
                 run=subprocess.run) -> CloserOutcome:
     """One bounded Opus session. Never raises a HarnessError; never commits or pushes."""
     head = _git(run, worktree, "rev-parse", "HEAD")
@@ -230,7 +231,7 @@ def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContex
     cost = _ledger_cost(llm, n0)
     if cost >= CLOSER_BUDGET_USD and status != "cap-wall":
         status, stop_reason = "cap-budget", stop_reason or "budget"
-    verdict, note, replies, _degraded = parse_reply(reply, context.open_thread_ids, log)
+    verdict, note, replies, degraded = parse_reply(reply, context.open_thread_ids, log)
 
     if status in _CAPPED:
         _restore(worktree, pre_head, untracked_before, run)
@@ -243,6 +244,10 @@ def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContex
         _restore(worktree, pre_head, untracked_before, run)
         return CloserOutcome("gate-path-edit", verdict, "gate paths edited: " + ", ".join(hits),
                              (), cost, "gate-path", pre_head, tuple(hits))
+    if degraded and discard_on_unparsed:
+        _restore(worktree, pre_head, untracked_before, run)
+        return CloserOutcome("unparseable", "unparsed", UNPARSEABLE_NOTE, (), cost,
+                             "unparseable", pre_head)
     moved = _git(run, worktree, "rev-parse", "HEAD").stdout.strip() != pre_head
     dirty = bool(_git(run, worktree, "status", "--porcelain").stdout.strip())
     return CloserOutcome("edited" if (moved or dirty) else "no-change", verdict, note,
@@ -322,7 +327,37 @@ def build_prompt(ctx: CloserContext) -> str:
 
 # ── 4. reply parser ───────────────────────────────────────────────────────────
 
-def _degraded():
+_REPLY_SCAN_CAP = 65_536      # only the reply's tail is scanned
+_REPLY_STARTS_CAP = 400       # at most this many "{" start positions are tried
+_RAW_LOG_CAP = 2_000          # raw-reply tail written to the run log on a parse failure
+
+
+def _extract_reply(text: str):
+    """The LAST JSON object in `text` that carries a "verdict" key, directly or one wrapper
+    deep. Tolerates ``` fences, **bold** / `backtick` decoration and trailing prose.
+    Returns None when no such object exists. Never raises."""
+    text = text[-_REPLY_SCAN_CAP:]
+    decoder = json.JSONDecoder()
+    starts = [i for i, ch in enumerate(text) if ch == "{"][-_REPLY_STARTS_CAP:]
+    for i in reversed(starts):
+        try:
+            obj, _end = decoder.raw_decode(text, i)
+        except ValueError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if "verdict" not in obj and len(obj) == 1:
+            (inner,) = obj.values()
+            if isinstance(inner, dict):
+                obj = inner
+        if "verdict" in obj:
+            return obj
+    return None
+
+
+def _degraded(log, reason: str, text: str):
+    tail = (text or "")[-_RAW_LOG_CAP:]
+    log(f"closer: reply unparseable ({reason}); raw reply tail: {tail!r}")
     return "unparsed", UNPARSEABLE_NOTE, [], True
 
 
@@ -330,17 +365,12 @@ def parse_reply(text, open_thread_ids, log=None):
     """`(verdict, note, replies, degraded)`. Never raises; never emits "No issues found"."""
     log = log or (lambda m: None)
     if not isinstance(text, str) or not text.strip():
-        return _degraded()
-    try:
-        data = extract_json(text)
-    except ValueError:
-        return _degraded()
-    if isinstance(data, dict) and "verdict" not in data and len(data) == 1:
-        (inner,) = data.values()
-        if isinstance(inner, dict):
-            data = inner
-    if not isinstance(data, dict) or data.get("verdict") not in VERDICTS:
-        return _degraded()
+        return _degraded(log, "empty", text if isinstance(text, str) else "")
+    data = _extract_reply(text)
+    if data is None:
+        return _degraded(log, "no-json", text)
+    if data.get("verdict") not in VERDICTS:
+        return _degraded(log, "bad-verdict", text)
     note = str(data.get("hold_note") or data.get("summary") or "")
     allowed = set(open_thread_ids or ())
     replies = []

@@ -294,3 +294,98 @@ def test_thread_reply_unknown_id_dropped():
     assert degraded is False
     assert [r["comment_id"] for r in replies] == [11]
     assert any("unknown thread 99" in m for m in logs)
+
+
+# ── tolerant reply extraction (#3694) ─────────────────────────────────────────
+
+# The closer's final message in the #3694 run: prose only, no JSON object.
+PR3694_REPLY = (
+    "An old background search I started has stopped. It ran out of time. It doesn't matter, "
+    "because I already found the review file another way, so I won't restart it.\n\n"
+    'My answer stays the same. Change "Two" to "Three" in the body of '
+    "[#3694](https://github.com/a-jay85/IBL5/pull/3694). Then run:\n\n"
+    "`cd /Users/ajaynicolas/GitHub/IBL5-worktrees/plan-now-resume-on-early-exit "
+    "&& bin/post-plan-now --force`\n")
+
+
+def test_parse_reply_bold_wrapped():
+    text = 'Done.\n\n**{"verdict": "fixed", "summary": "s", "hold_note": "", "thread_replies": []}**'
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert verdict == "fixed"
+    assert degraded is False
+
+
+def test_parse_reply_backtick_wrapped_trailing_prose():
+    text = ('`{"verdict": "not-fixable", "summary": "x", "hold_note": "h", '
+            '"thread_replies": []}`\nLet me know {if} you need more.')
+    verdict, note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, note, degraded) == ("not-fixable", "h", False)
+
+
+def test_parse_reply_dict_wrapper():
+    text = '{"result": {"verdict": "false-positive", "summary": "s"}}'
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, degraded) == ("false-positive", False)
+
+
+def test_parse_reply_non_json_fence_then_json():
+    text = ('```diff\n- {a}\n+ {b}\n```\n'
+            '{"verdict": "fixed", "summary": "s", "hold_note": "", "thread_replies": []}')
+    verdict, _note, _replies, degraded = parse_reply(text, set())
+    assert (verdict, degraded) == ("fixed", False)
+
+
+def test_parse_reply_pr3694_prose_degrades_and_logs_raw():
+    logs = []
+    got = parse_reply(PR3694_REPLY, set(), log=logs.append)
+    assert got == ("unparsed", closer.UNPARSEABLE_NOTE, [], True)
+    lines = [m for m in logs if m.startswith("closer: reply unparseable (no-json); "
+                                             "raw reply tail:")]
+    assert len(lines) == 1
+    assert 'Change "Two" to "Three"' in lines[0]
+
+
+def test_parse_reply_near_miss_verdict_case():
+    logs = []
+    got = parse_reply('{"verdict": "Fixed"}', set(), log=logs.append)
+    assert got[3] is True
+    assert any("(bad-verdict)" in m for m in logs)
+
+
+def test_parse_reply_near_miss_prose_braces():
+    logs = []
+    got = parse_reply("None of these {fixed} items apply; verdict fixed", set(),
+                      log=logs.append)
+    assert got[3] is True
+    assert any("(no-json)" in m for m in logs)
+
+
+def test_parse_reply_last_object_wins_strictly():
+    logs = []
+    text = '{"verdict": "fixed", "summary": "s"}\nThen I changed my mind: {"verdict": "done"}'
+    verdict, _note, _replies, degraded = parse_reply(text, set(), log=logs.append)
+    assert degraded is True
+    assert verdict == "unparsed"
+    assert any("(bad-verdict)" in m for m in logs)
+
+
+def _dirty(cwd):
+    _write(cwd, "src.txt", "changed by the closer\n")
+
+
+def test_run_session_unparsed_discards_when_asked(repo):
+    pre = _head(repo)
+    llm = FakeLlm(action=_dirty, reply=PR3694_REPLY)
+    out = run_session(llm, worktree=repo, base_ref="master", pr=7, plan_path="/p/plan.md",
+                      context=_ctx(), log=[].append, discard_on_unparsed=True)
+    assert out.status == "unparseable"
+    assert _head(repo) == pre
+    assert _g(repo, "status", "--porcelain").stdout.strip() == ""
+    with open(os.path.join(repo, "src.txt")) as fh:
+        assert fh.read() == "feature work\n"
+
+
+def test_run_session_unparsed_default_keeps_status(repo):
+    llm = FakeLlm(action=_dirty, reply=PR3694_REPLY)
+    out, _ = _session(repo, llm)
+    assert out.status == "edited"

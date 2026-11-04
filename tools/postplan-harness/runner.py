@@ -2509,6 +2509,9 @@ def _closer_post_replies(gh, log, pr, outcome) -> int:
     return n
 
 
+_CLOSER_FAIL_STATUSES = ("push-failed", "unparseable")
+
+
 def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, *,
                       worktree, pr, sha, live, fixture, mode, out_dir, state_dir, slug,
                       flag, post_sticky):
@@ -2555,7 +2558,8 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         threads=closer.thread_rows(rows))
     log(f"closer: running one session (trigger={why})")
     co = closer.run_session(llm, worktree=worktree, base_ref="origin/master", pr=pr,
-                            plan_path=ctx.plan_path, context=ctx, log=log)
+                            plan_path=ctx.plan_path, context=ctx, log=log,
+                            discard_on_unparsed=True)
     rec = {"ran": True, "status": co.status, "verdict": co.verdict, "cost_usd": co.cost_usd,
            "recheck": "not-run", "stop_reason": co.stop_reason, "trigger": why}
     res.closer = rec
@@ -2567,7 +2571,8 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         if pushed_note:
             note = f"{note}; {pushed_note}".strip("; ")
             rec["status"] = "push-failed"
-    replies = _closer_post_replies(gh, log, pr, co) if rec["status"] != "push-failed" else 0
+    replies = (_closer_post_replies(gh, log, pr, co)
+               if rec["status"] not in _CLOSER_FAIL_STATUSES else 0)
     rec["replies_posted"] = replies
     try:
         cur_tree = git.head_tree()

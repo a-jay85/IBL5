@@ -117,6 +117,7 @@ class CloserOutcome:
     stop_reason: str = ""
     pre_head: str = ""
     gate_hits: tuple = field(default=())
+    body_edits: tuple = ()          # ((find, replace), ...) shape-validated
 
 
 def _git(run, worktree, *args):
@@ -266,7 +267,8 @@ def run_session(llm, *, worktree, base_ref, pr, plan_path, context: CloserContex
     moved =_git(run, worktree, "rev-parse", "HEAD").stdout.strip() != pre_head
     dirty = bool(_git(run, worktree, "status", "--porcelain").stdout.strip())
     return CloserOutcome("edited" if (moved or dirty) else "no-change", verdict, note,
-                         tuple(replies), cost, "", pre_head)
+                         tuple(replies), cost, "", pre_head,
+                         body_edits=parse_body_edits(reply, log))
 
 
 # ── 3. prompt ─────────────────────────────────────────────────────────────────
@@ -443,3 +445,57 @@ def parse_reply(text, open_thread_ids, log=None):
         replies.append({"comment_id": cid, "body": str(item.get("body", "")),
                         "resolve": bool(item.get("resolve", False))})
     return data["verdict"], note, replies, False
+
+
+_BODY_EDITS_MAX = 10
+_BODY_EDIT_TEXT_CAP = 2_000
+_CHECKBOX = re.compile(r"\[[ xX]\]")
+
+
+def _bad_body_text(s: str) -> bool:
+    return "<!--" in s or "-->" in s or bool(_CHECKBOX.search(s))
+
+
+def parse_body_edits(text, log=None) -> tuple:
+    """Shape-validated `((find, replace), ...)` from a parseable closer reply. One bad item
+    rejects the whole list (fail closed). Never raises."""
+    log = log or (lambda m: None)
+    data = _extract_reply(text) if isinstance(text, str) else None
+    if not data or data.get("verdict") not in VERDICTS:
+        return ()
+    raw = data.get("body_edits")
+    if raw is None or raw == []:
+        return ()
+    if not isinstance(raw, list) or len(raw) > _BODY_EDITS_MAX:
+        log("closer: body_edits rejected (not a list, or too many)")
+        return ()
+    out = []
+    for item in raw:
+        find = item.get("find") if isinstance(item, dict) else None
+        repl = item.get("replace") if isinstance(item, dict) else None
+        if not (isinstance(find, str) and isinstance(repl, str) and find.strip()):
+            log("closer: body_edits rejected (bad item shape)")
+            return ()
+        if max(len(find), len(repl)) > _BODY_EDIT_TEXT_CAP or \
+                _bad_body_text(find) or _bad_body_text(repl):
+            log("closer: body_edits rejected (too long, or touches a marker or checkbox)")
+            return ()
+        out.append((find, repl))
+    return tuple(out)
+
+
+def apply_body_edits(body: str, edits) -> tuple:
+    """`(new_body, "")` or `(None, reason)`. Each `find` must occur exactly once in the body
+    as it stands when that edit applies, on lines holding no checkbox and no HTML comment."""
+    new = body or ""
+    for find, repl in edits:
+        n = new.count(find)
+        if n != 1:
+            return None, ("find absent" if n == 0 else "find not unique") + f": {find[:60]!r}"
+        i = new.index(find)
+        lo = new.rfind("\n", 0, i) + 1
+        hi = new.find("\n", i + len(find))
+        if _bad_body_text(new[lo:hi if hi != -1 else len(new)]):
+            return None, f"find lands on a checkbox or marker line: {find[:60]!r}"
+        new = new.replace(find, repl, 1)
+    return new, ""

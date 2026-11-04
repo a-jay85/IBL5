@@ -2509,6 +2509,38 @@ def _closer_post_replies(gh, log, pr, outcome) -> int:
     return n
 
 
+def _closer_pr_body(gh, log) -> str:
+    try:
+        return gh.pr_body_fresh() or ""
+    except Exception as e:  # noqa: BLE001 - the prompt degrades to an empty body block
+        log(f"closer: PR body read failed ({e!r}); prompt gets no body")
+        return ""
+
+
+def _closer_apply_body_edits(gh, log, pr, outcome) -> str:
+    """Apply validated body edits with one `gh pr edit`. Never commits. Returns a rec tag."""
+    if not outcome.body_edits:
+        return ""
+    try:
+        body = gh.pr_body_fresh() or ""
+    except Exception as e:  # noqa: BLE001 - noted, never raised
+        log(f"closer: PR body read failed ({e!r}); body edits skipped")
+        return "failed:read"
+    new_body, why = closer.apply_body_edits(body, outcome.body_edits)
+    if new_body is None:
+        log(f"closer: body edits rejected ({why})")
+        return "rejected:" + why
+    if new_body == body:
+        return "noop"
+    try:
+        gh.pr_edit_body(pr, new_body)
+    except Exception as e:  # noqa: BLE001 - a failed body edit is noted, never raised
+        log(f"closer: gh pr edit failed ({e!r})")
+        return "failed:edit"
+    log(f"closer: PR body edited ({len(outcome.body_edits)} edit(s)); no commit")
+    return f"applied:{len(outcome.body_edits)}"
+
+
 _CLOSER_FAIL_STATUSES = ("push-failed", "unparseable", "deferred-path-edit")
 
 
@@ -2557,7 +2589,8 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         ci_excerpt=(outcome.evidence or "")[:4000] if ci_red else "",
         threads=closer.thread_rows(rows),
         deferred=(closer.deferred_scope(res.plan.path)
-                  if (res.plan and res.plan.found) else ""))
+                  if (res.plan and res.plan.found) else ""),
+        pr_body=_closer_pr_body(gh, log))
     log(f"closer: running one session (trigger={why})")
     co = closer.run_session(llm, worktree=worktree, base_ref="origin/master", pr=pr,
                             plan_path=ctx.plan_path, context=ctx, log=log,
@@ -2576,6 +2609,11 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
     replies = (_closer_post_replies(gh, log, pr, co)
                if rec["status"] not in _CLOSER_FAIL_STATUSES else 0)
     rec["replies_posted"] = replies
+    body_tag = (_closer_apply_body_edits(gh, log, pr, co)
+                if rec["status"] in ("edited", "no-change") else "")
+    if body_tag:
+        rec["body_edits"] = body_tag
+        note = f"{note}; PR body {body_tag}".strip("; ")
     try:
         cur_tree = git.head_tree()
     except Exception as e:  # noqa: BLE001 - unknown tree: defer the re-check, keep the decision
@@ -2583,7 +2621,10 @@ def _maybe_run_closer(git, gh, llm, log, res, state, inputs, decision, outcome, 
         cur_tree = None
     if not live and (fixture or {}).get("current_tree"):
         cur_tree = fixture["current_tree"]
-    if rec["status"] in ("edited", "no-change") and cur_tree != inputs.current_tree:
+    if body_tag.startswith("applied:"):
+        rec["recheck"] = "deferred-body-edited"
+        log("closer: PR body edited; arming re-check deferred to the next run")
+    elif rec["status"] in ("edited", "no-change") and cur_tree != inputs.current_tree:
         rec["recheck"] = "deferred-tree-moved"
         log("closer: tree moved; arming re-check deferred to the next run")
     elif rec["status"] in ("edited", "no-change"):

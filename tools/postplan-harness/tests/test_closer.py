@@ -454,3 +454,52 @@ def test_run_session_non_deferred_edit_passes(repo):
                   reply='{"verdict":"fixed","summary":"s","hold_note":""}')
     out, _ = _session(repo, llm, deferred=f"- `{_REACTION}` is a follow-up")
     assert out.status == "edited"
+
+
+# ── harness-applied PR body edits ─────────────────────────────────────────────
+
+def _edits_reply(edits):
+    import json
+    return json.dumps({"verdict": "fixed", "summary": "s", "hold_note": "",
+                       "body_edits": edits, "thread_replies": []})
+
+
+def test_apply_body_edits_unique_find():
+    got = closer.apply_body_edits("## Summary\nTwo prompts changed.\n",
+                                  (("Two prompts", "Three prompts"),))
+    assert got == ("## Summary\nThree prompts changed.\n", "")
+
+
+def test_apply_body_edits_rejects_non_unique_and_absent():
+    assert closer.apply_body_edits("Two and Two", (("Two", "Three"),)) \
+        == (None, "find not unique: 'Two'")
+    body, reason = closer.apply_body_edits("Two and Two", (("Four", "Five"),))
+    assert body is None
+    assert reason.startswith("find absent")
+
+
+def test_apply_body_edits_rejects_checkbox_line():
+    body, reason = closer.apply_body_edits("- [ ] manual check passes\n",
+                                           (("manual check passes", "changed"),))
+    assert body is None
+    assert "checkbox or marker line" in reason
+
+
+def test_parse_body_edits_rejects_marker_and_checkbox():
+    good = {"find": "a", "replace": "b"}
+    assert closer.parse_body_edits(
+        _edits_reply([{"find": "<!-- pr-ready-verdict -->", "replace": "x"}])) == ()
+    assert closer.parse_body_edits(
+        _edits_reply([{"find": "done", "replace": "- [x] done"}])) == ()
+    assert closer.parse_body_edits(
+        _edits_reply([good, {"find": "c", "replace": "<!-- d -->"}, good])) == ()
+    assert closer.parse_body_edits(_edits_reply([good, good])) == (("a", "b"), ("a", "b"))
+
+
+def test_parse_body_edits_rejects_bad_shapes():
+    ok = {"find": "a", "replace": "b"}
+    assert closer.parse_body_edits(_edits_reply({"find": "a", "replace": "b"})) == ()
+    assert closer.parse_body_edits(_edits_reply([ok] * 11)) == ()
+    assert closer.parse_body_edits(_edits_reply([{"find": "", "replace": "b"}])) == ()
+    assert closer.parse_body_edits(_edits_reply([{"find": "a", "replace": 7}])) == ()
+    assert closer.parse_body_edits(PR3694_REPLY) == ()

@@ -10,6 +10,7 @@
 #
 # Run: bin/test-check-plan  (exit 0 = all pass, 1 = a case failed)
 #      bin/test-check-plan gate13  (only the gate 13 block, for plan mutation checks)
+#      bin/test-check-plan matrix-split  (only the gate XM block, whose verdicts need matrix_split)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # are literal markdown code spans, not command substitution — single quotes are
@@ -23,7 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
-# Case filter: empty runs every case; `gate13` skips the cases outside gate 13.
+# Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
+# `matrix-split` skips the cases outside gate XM.
 TCP_ONLY="${1:-}"
 
 # Inline checks further below still set FAILED=1 directly; h_done reads it.
@@ -158,6 +160,7 @@ CF_MATRIX='
 | 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
 
+if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
@@ -4006,6 +4009,8 @@ assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
 | 1 | run something | CLI-executable | post-impl | curl + bin/db-query |
 '
 
+fi
+
 # ---------------------------------------------------------------------------
 # Gate XM: executable mutation claims (ADR-0199). The grammar lives in
 # bin/lib/plan-exec-mutations; these fixtures pin the gate's wiring. Fixture
@@ -4155,6 +4160,7 @@ if [ "$XM_SURV_RC" -eq 0 ] \
 else
     h_fail "xm-gate-survival" "expected a clean run, got exit $XM_SURV_RC: $XM_SURV_OUT"
 fi
+[ "$TCP_ONLY" != matrix-split ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate V: a CLI-executable row's location cell must be ONE runnable command.

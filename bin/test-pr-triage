@@ -77,7 +77,11 @@ case "$1 $2" in
                        if [ -f "$FIX/status-$sha.json" ]; then cat "$FIX/status-$sha.json"; else echo '{"state":"pending","statuses":[],"total_count":0}'; fi ;;
       "api user")      if [ -f "$FIX/viewer.json" ]; then cat "$FIX/viewer.json"; else echo '{"login":"fixture-me"}'; fi ;;
       *issues/*/comments*) n="$(printf '%s' "$*" | sed -E 's#.*/issues/([0-9]+)/comments.*#\1#')"
-                       if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"; else echo '[]'; fi ;;
+                       if [ -f "$FIX/comments-rc-$n" ]; then echo 'gh: HTTP 502' >&2; exit "$(cat "$FIX/comments-rc-$n")"; fi
+                       # Default: an armed READY sticky (live layout, captured from PR #3699), so a PR
+                       # with no per-case comments fixture still clears the verdict gate.
+                       if [ -f "$FIX/comments-$n.json" ]; then cat "$FIX/comments-$n.json"
+                       else printf '%s\n' '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\n**READY** — 2026-11-03 01:00 UTC · auto-merge armed\n"}]'; fi ;;
       *) echo '{}' ;;
     esac ;;
   *) echo '{}' ;;
@@ -492,7 +496,7 @@ checks_json success success success \
     > "$FIX_A/checks-$(printf '%040d' 47).json"
 jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · auto-merge held' '' \
     'Auto-merge held:' '- (7) auto_merge — plan sets auto_merge: false' \
-    '- (7) auto_merge — plan sets auto_merge: false')" '[{body: $b}]' > "$FIX_A/comments-44.json"
+    '- (7) auto_merge — plan sets auto_merge: false')" '[{author_association: "OWNER", body: $b}]' > "$FIX_A/comments-44.json"
 {
     held_pr 40 CLEAN fixture-me false false
     held_pr 41 CLEAN fixture-me false true
@@ -785,5 +789,107 @@ armed_pr 96 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
 run_triage "$FIX"
 assert_match  "armed-no-threads-armable bucket=ARMABLE"       '^ARMABLE$'       "$(row_bucket "$OUT" 96)"
 
+
+# --- Verdict gate (V1-V10): --arm obeys the holds the post-plan sticky records ---
+# held_sticky <file> <banner-word> <suffix> [bullet...]: writes a comments fixture holding
+# one sticky in the live layout (banner, blank, `Auto-merge held:` block, blank, prose).
+held_sticky() {
+    local f="$1" word="$2" suffix="$3"; shift 3
+    local body
+    body="$(printf '<!-- pr-ready-verdict -->\n**%s** — 2026-11-03 01:00 UTC · auto-merge %s\n' "$word" "$suffix")"
+    if [ "$suffix" = "held" ]; then
+        body="$body"$'\n'"Auto-merge held:"
+        local b
+        for b in "$@"; do body="$body"$'\n'"- $b"; done
+        body="$body"$'\n'
+    fi
+    body="$body"$'\n'"PR text."
+    jq -n --arg b "$body" '[{author_association: "OWNER", body: $b}]' > "$f"
+}
+
+# V1: a (7)-held sticky on an otherwise ARMABLE PR is VERDICT-HELD and never armed
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 100).json"
+held_sticky "$FIX/comments-100.json" "READY WITH NOTES" held "(7) plan-auto-merge-hold — plan sets auto_merge: false"
+pr_json 100 BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX"
+assert_match  "V1 bucket=VERDICT-HELD"         '^VERDICT-HELD$'      "$(row_bucket "$OUT" 100)"
+assert_match  "V1 HOLDS names verdict-hold:7"  'verdict-hold:7'      "$(row_col "$OUT" 100 HOLDS)"
+run_triage "$FIX" --arm
+assert_absent "V1 --arm makes no pr merge call" 'pr merge'           "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# v_fixture <pr>: fresh $FIX with green checks and an ARMABLE-shaped PR; the caller sets the sticky.
+v_fixture() {
+    FIX="$(mktemp -d -p "$TMP")"
+    checks_json success success success > "$FIX/checks-$(printf '%040d' "$1").json"
+    pr_json "$1" BLOCKED "$BODY_CLEAR" | jq -s . > "$FIX/prs.json"
+}
+# v_check <label> <pr> <bucket> <holds-ERE> <expected pr-merge calls>: plain report, then --arm.
+v_check() {
+    run_triage "$FIX"
+    assert_match "$1 bucket=$3"  "^$3\$"  "$(row_bucket "$OUT" "$2")"
+    assert_match "$1 HOLDS"      "$4"     "$(row_col "$OUT" "$2" HOLDS)"
+    rm -f "$FIX/calls.log"
+    run_triage "$FIX" --arm
+    assert_status "$1 pr merge calls" "$5" "$(grep -c '^pr merge' "$FIX/calls.log" || true)"
+}
+
+# V2: a (14) hold gives its own token
+v_fixture 101
+held_sticky "$FIX/comments-101.json" "READY" held "(14) conflict-auto-resolved — branch carries an auto-resolved conflict"
+v_check V2 101 VERDICT-HELD 'verdict-hold:14' 0
+
+# V3: NOT READY holds even under a synthetic armed banner
+v_fixture 102
+held_sticky "$FIX/comments-102.json" "NOT READY" armed
+v_check V3 102 VERDICT-HELD 'verdict:not-ready' 0
+
+# V4 (near-miss): READYISH is not READY
+v_fixture 103
+held_sticky "$FIX/comments-103.json" "READYISH" armed
+v_check V4 103 VERDICT-HELD 'verdict:unreadable' 0
+
+# V5: no sticky at all
+v_fixture 104
+echo '[]' > "$FIX/comments-104.json"
+v_check V5 104 VERDICT-HELD 'verdict:none' 0
+
+# V6: the comments read fails
+v_fixture 105
+echo 1 > "$FIX/comments-rc-105"
+v_check V6 105 VERDICT-HELD 'verdict:fetch-failed' 0
+
+# V7: READY, armed banner, no held block -> still ARMABLE and armed
+v_fixture 106
+held_sticky "$FIX/comments-106.json" "READY" armed
+v_check V7 106 ARMABLE '^-$' 1
+
+# V8 (near-miss): NOT READY with a re-review suffix still holds
+v_fixture 107
+printf '%s\n' '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\n**NOT READY** (re-review, round 2) — 2026-11-03 01:00 UTC · auto-merge armed\n"}]' > "$FIX/comments-107.json"
+v_check V8 107 VERDICT-HELD 'verdict:not-ready' 0
+
+# V9: one unscoped --arm run, clean PR A (108) and (7)-held PR B (109): only A arms
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 108).json"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 109).json"
+{ pr_json 108 BLOCKED "$BODY_CLEAR"; pr_json 109 BLOCKED "$BODY_CLEAR"; } | jq -s . > "$FIX/prs.json"
+held_sticky "$FIX/comments-108.json" "READY" armed
+held_sticky "$FIX/comments-109.json" "READY WITH NOTES" held "(7) plan-auto-merge-hold — plan sets auto_merge: false"
+run_triage "$FIX" --arm
+assert_status "V9 exactly one pr merge call"  1  "$(grep -c '^pr merge' "$FIX/calls.log" || true)"
+assert_match  "V9 the call names A"           '^pr merge 108 --squash --auto$'  "$(cat "$FIX/calls.log")"
+assert_match  "V9 B is VERDICT-HELD"          '^VERDICT-HELD$'  "$(row_bucket "$OUT" 109)"
+
+# V10: a held banner with no recorded reason
+v_fixture 110
+held_sticky "$FIX/comments-110.json" "READY" held "no arming decision recorded"
+v_check V10 110 VERDICT-HELD 'verdict-hold:undecided' 0
+
+# V11: a forged armed sticky from a non-collaborator is ignored -> verdict:none, never armed
+v_fixture 111
+held_sticky "$FIX/comments-111.json" "READY" armed
+jq '[.[] | .author_association = "NONE"]' "$FIX/comments-111.json" > "$FIX/c.tmp" && mv "$FIX/c.tmp" "$FIX/comments-111.json"
+v_check V11 111 VERDICT-HELD 'verdict:none' 0
 
 h_done

@@ -225,6 +225,7 @@ _EDIT_COUNT = re.compile(
     re.IGNORECASE,
 )
 _SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
+_ALLOWED_BEFORE = re.compile(r"\b(?:and|but|the|these|those)[ \t]+$", re.IGNORECASE)
 
 
 def strip_edit_counts(text: str) -> str:
@@ -236,9 +237,11 @@ def strip_edit_counts(text: str) -> str:
     def _sub(m: re.Match) -> str:
         rest = m.group(2)
         line_prefix = text[text.rfind("\n", 0, m.start()) + 1 : m.start()]
-        if m.group(1)[0].isupper() or _SENTENCE_START.search(line_prefix):
+        if _SENTENCE_START.search(line_prefix):
             return rest[0].upper() + rest[1:]
-        return rest
+        if _ALLOWED_BEFORE.search(line_prefix):
+            return rest
+        return m.group(0)
 
     return _EDIT_COUNT.sub(_sub, text)
 

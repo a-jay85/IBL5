@@ -48,6 +48,11 @@ def test_strip_edit_counts_capitalizes_after_bullet_digit():
         "Another two tests were changed",
         "At least two tests were changed",
         "Exactly three checks were updated",
+        "Phase 2 tests were updated",
+        "2 of 3 tests were updated",
+        "At most two tests were changed",
+        "Just two tests were changed",
+        "No two tests were changed",
     ],
 )
 def test_strip_edit_counts_leaves_near_misses_unchanged(text):

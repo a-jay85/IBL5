@@ -40,6 +40,14 @@ def test_strip_edit_counts_capitalizes_after_bullet_digit():
         "one test was updated",
         "120 rows were updated by the migration",
         "40 lines were rewritten",
+        "The L-7 probe assertions were updated",
+        "Phase 5.5 checks were updated",
+        "### Phase 2\n\nTests were updated",
+        "Only two tests were changed",
+        "All 12 tests were updated",
+        "Another two tests were changed",
+        "At least two tests were changed",
+        "Exactly three checks were updated",
     ],
 )
 def test_strip_edit_counts_leaves_near_misses_unchanged(text):

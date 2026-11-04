@@ -217,7 +217,9 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
 
 
 _EDIT_COUNT = re.compile(
-    r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+"
+    r"(?<![\w.#-])"
+    r"(?<!\bonly[ \t])(?<!\ball[ \t])(?<!\banother[ \t])(?<!\bexactly[ \t])(?<!\bat[ \t]least[ \t])"
+    r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[ \t]+"
     r"((?:[a-z-]+\s+)?(?:assertions|tests|test\s+cases|cases|checks|call\s+sites|functions|edits)"
     r"\s+(?:were|are)\s+(?:updated|changed|modified|edited|rewritten|reworded|adjusted))\b",
     re.IGNORECASE,

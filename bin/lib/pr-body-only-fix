@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Classify a pr-ready sticky as body-only, and rewrite the PR body to match.
+
+Reads files only and never calls gh, so every case is fixture-testable.
+The /pr-burndown skill fetches the sticky and the PR body and passes them in.
+
+Every unknown fails toward "not body-only": exit 1 and the PR's normal path.
+"""
+
+import difflib
+import re
+import sys
+
+USAGE = "usage: pr-body-only-fix classify <sticky> | apply <sticky> <body> <out>"
+
+# Copied from tools/postplan-harness/harness/fidelity.py:102 (_FINDING_MARKER_RE).
+# A marker grammar change there must be mirrored here.
+MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
+BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+CORRECTION_RE = re.compile(r'Change "([^"]+)" to "([^"]+)" in the PR body\.')
+ANCHOR_RE = re.compile(r'"([^"]{20,})"')
+COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+BEGIN_RE = re.compile(r"^<!--\s*([a-z-]+):begin\s*-->$")
+
+
+class Refuse(Exception):
+    def __init__(self, token):
+        super().__init__(token)
+        self.token = token
+
+
+def read_text(path):
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            return fh.read()
+    except OSError:
+        print(f"pr-body-only-fix: cannot read {path}", file=sys.stderr)
+        sys.exit(2)
+
+
+def not_body_only(reason):
+    print(f"BODY_ONLY=no reason={reason}")
+    return None
+
+
+def group_bullets(lines):
+    """Group FINDINGS lines into bullets; continuation lines join with a space."""
+    bullets = []
+    for line in lines:
+        if BULLET_RE.match(line):
+            bullets.append(line.strip())
+        elif line.strip() and bullets:
+            bullets[-1] += " " + line.strip()
+    return bullets
+
+
+def blocking_bullets(sticky):
+    """Return (bullets, reason). bullets is the BLOCKING list, or None on failure."""
+    lines = sticky.splitlines()
+    if not lines or not lines[0].startswith("**NOT READY**"):
+        return None, "not-not-ready"
+
+    holds = None
+    for i, line in enumerate(lines):
+        if line.strip() == "Auto-merge held:":
+            holds = []
+            for held in lines[i + 1:]:
+                if not held.startswith("- ("):
+                    break
+                holds.append(held)
+            break
+    if holds is None:
+        return None, "no-hold-list"
+    if not any(re.match(r"^- \(12\) plan-fidelity-verdict", h) for h in holds):
+        return None, "no-fidelity-hold"
+
+    start = next(
+        (i for i, l in enumerate(lines)
+         if "<details><summary>Reviewer verdict</summary>" in l),
+        None,
+    )
+    end = None
+    if start is not None:
+        end = next((i for i in range(start + 1, len(lines))
+                    if "</details>" in lines[i]), None)
+    if start is None or end is None:
+        return None, "no-reviewer-verdict"
+
+    block = lines[start + 1:end]
+    heading = next((i for i, l in enumerate(block) if l.strip() == "## FINDINGS"), None)
+    if heading is None:
+        return None, "no-findings"
+    section = []
+    for line in block[heading + 1:]:
+        if line.startswith("## "):
+            break
+        section.append(line)
+
+    bullets = group_bullets(section)
+    if any(not MARKER_RE.match(b) for b in bullets):
+        return None, "unmarked-finding"
+    blocking = [b for b in bullets if MARKER_RE.match(b).group(1) == "BLOCKING"]
+    if not blocking:
+        return None, "no-blocking"
+
+    for bullet in blocking:
+        text = MARKER_RE.sub("", bullet, count=1).strip()
+        first = text.split(". ", 1)[0]
+        if "PR body" not in first:
+            return None, "blocking-not-body"
+        found = CORRECTION_RE.findall(text)
+        if not found:
+            return None, "correction-not-stated"
+        if len(found) > 1:
+            return None, "correction-ambiguous"
+        if found[0][0] == found[0][1]:
+            return None, "correction-noop"
+    return blocking, None
+
+
+def classify(sticky_path):
+    blocking, reason = blocking_bullets(read_text(sticky_path))
+    if blocking is None:
+        not_body_only(reason)
+        return 1
+    print("BODY_ONLY=yes")
+    return 0
+
+
+def protected_spans(body):
+    spans = []
+    comments = [(m.start(), m.end(), m.group(0)) for m in COMMENT_RE.finditer(body)]
+    paired = set()
+    for idx, (s, _e, text) in enumerate(comments):
+        begin = BEGIN_RE.match(text)
+        if not begin:
+            continue
+        end_re = re.compile(r"^<!--\s*" + re.escape(begin.group(1)) + r":end\s*-->$")
+        match = next((j for j in range(idx + 1, len(comments))
+                      if end_re.match(comments[j][2])), None)
+        if match is None:
+            raise Refuse("unbalanced-marker")
+        spans.append((s, comments[match][1]))
+        paired.add(idx)
+        paired.add(match)
+    for idx, (s, e, _t) in enumerate(comments):
+        if idx not in paired:
+            spans.append((s, e))
+    return spans
+
+
+def find_all(haystack, needle):
+    out = []
+    pos = haystack.find(needle)
+    while pos != -1:
+        out.append(pos)
+        pos = haystack.find(needle, pos + 1)
+    return out
+
+
+def apply_one(body, bullet):
+    old, new = CORRECTION_RE.search(bullet).groups()
+    spans = protected_spans(body)
+    anchor = next(
+        (m.group(1) for m in ANCHOR_RE.finditer(bullet) if m.group(1).count(old) == 1),
+        None,
+    )
+    target = anchor if anchor is not None else old
+    hits = find_all(body, target)
+    if not hits:
+        raise Refuse("target-missing")
+    if len(hits) > 1:
+        raise Refuse("target-ambiguous")
+    pos = hits[0]
+    end = pos + len(target)
+    if any(pos < se and end > ss for ss, se in spans):
+        raise Refuse("target-protected")
+    replacement = target.replace(old, new, 1)
+    return body[:pos] + replacement + body[end:]
+
+
+def apply(sticky_path, body_path, out_path):
+    sticky = read_text(sticky_path)
+    body = read_text(body_path)
+    blocking, reason = blocking_bullets(sticky)
+    if blocking is None:
+        not_body_only(reason)
+        return 1
+    new_body = body
+    for n, bullet in enumerate(blocking, start=1):
+        try:
+            new_body = apply_one(new_body, bullet)
+        except Refuse as refusal:
+            print(f"refused={refusal.token} finding={n}")
+            return 1
+    with open(out_path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(new_body)
+    diff = difflib.unified_diff(
+        body.splitlines(), new_body.splitlines(),
+        fromfile="a/body", tofile="b/body", lineterm="",
+    )
+    for line in diff:
+        print(line)
+    return 0
+
+
+def main(argv):
+    args = argv[1:]
+    if any(a.startswith("-") for a in args):
+        print(USAGE, file=sys.stderr)
+        return 2
+    if len(args) == 2 and args[0] == "classify":
+        return classify(args[1])
+    if len(args) == 4 and args[0] == "apply":
+        return apply(args[1], args[2], args[3])
+    print(USAGE, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

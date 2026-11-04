@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-burndown — offline harness for bin/backlog burndown* subcommands.
+# bin/test-burndown — offline harness for bin/backlog burndown* subcommands and the /pr-burndown body-only helper (bin/lib/pr-body-only-fix).
 set -uo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -38,6 +38,176 @@ export PLAN_TIER_HINT_CLAUDE="$PTJ_DIR/judge-default"
 export PLAN_TIER_HINT_LOG="$PTJ_DIR/plan-tier-hint.log"
 
 mkdir -p "$T/home" "$T/fx"
+
+# ── Phase 8: pr-burndown body-only helper (PB1-PB13) ──
+# Defined early so `TB_ONLY=pb bin/test-burndown` runs only these cases (fast
+# path for mutation checks). Unset or any other value runs the whole file, and
+# the end-of-file call below runs the cases as part of the full pass.
+pb_cases() {
+    local PBOF PR_SKILL D OUT RC S B CORR NEAR HOLD12 ANCHOR OUT5 RC5
+    PBOF="$(cd "$(dirname "$0")" && pwd)/lib/pr-body-only-fix"
+    PR_SKILL="$(cd "$(dirname "$0")/.." && pwd)/.claude/skills/pr-burndown/SKILL.md"
+    D="$T/pb"
+    mkdir -p "$D"
+    CORR='Change "Two" to "Three" in the PR body.'
+    NEAR='Do not change "Two" to "Three" in the PR body until the count is rechecked. Do not change "Two" to "Three" in the PR body.'
+    HOLD12='- (12) plan-fidelity-verdict — fidelity review is NOT READY'
+    ANCHOR='Two existing assertions were updated for the renamed call and the reworded continue message.'
+
+    cat > "$D/s3694.md" <<'PB_EOF'
+**NOT READY** — 2026-11-03 14:55:00 PST · auto-merge held
+
+Auto-merge held:
+- (12) plan-fidelity-verdict — fidelity review is NOT READY
+
+### Still open (blocking)
+- [ ] The PR body undercounts the updated assertions (not filed)
+- [ ] Keep the scope note (not filed)
+
+<details><summary>Reviewer verdict</summary>
+
+NOT READY
+## FINDINGS
+- [BLOCKING] The PR body undercounts the updated assertions. It says "Two existing assertions were updated for the renamed call and the reworded continue message." but `bin/test-plan-now:1563,1732,2144` change three. Change "Two" to "Three" in the PR body.
+- [NOTE] Keep the scope note short. The diff touches `bin/plan-now` beyond the stated plan, which is drift but harmless.
+- [NOTE] The fixture rename in `bin/test-plan-now` is correct. No change needed.
+- [NOTE] The grep in `bin/plan-now` matches a substring where a whole-word match would read clearer.
+- [NOTE] The body omits two behaviors the diff adds. They are small.
+
+</details>
+
+### Merge digest
+**What changed:** The resume path now retries once.
+
+<!-- pr-ready-verdict -->
+PB_EOF
+    cat > "$D/b3694.md" <<'PB_EOF'
+<!-- merge-digest:begin -->
+**What changed:** The resume path now retries once.
+**Why:** A half-written draft was left behind.
+**Watch:** The continue message changed.
+<!-- merge-digest:end -->
+
+## Summary
+- `bin/test-plan-now`: new cases cover the resume path. Two existing assertions were updated for the renamed call and the reworded continue message.
+
+<!-- exec-mutations:begin -->
+row 2 held
+<!-- exec-mutations:end -->
+PB_EOF
+    S="$(cat "$D/s3694.md")"
+    B="$(cat "$D/b3694.md")"
+    local BLK='- [BLOCKING] Add the missing `bin/foo` case for the empty queue. The diff has none.'
+    local N1='- [NOTE] Keep the scope note' N1U='- Keep the scope note'
+    local H3='- (3) ci-green — CI not green' WATCH='**Watch:** The continue message changed.'
+    # Unquoted replacement in an assignment: bash 3.2 keeps nested quotes literal otherwise.
+    pb_sub() { local r=${1/"$2"/$3}; printf '%s\n' "$r"; }
+    local NL=$'\n'
+    pb_sub "$S" "$N1" "$BLK$NL$N1" > "$D/smixed.md"
+    pb_sub "$S" " $CORR" "" > "$D/snostated.md"
+    pb_sub "$S" "$N1" "$N1U" > "$D/sunmarked.md"
+    pb_sub "$S" "$HOLD12" "$H3" > "$D/sholds.md"
+    pb_sub "$S" "$HOLD12" "$HOLD12$NL- (13) human-signoff — feat needs owner sign-off" > "$D/ssignoff.md"
+    pb_sub "$S" "$CORR" "$NEAR" > "$D/snearmiss.md"
+    pb_sub "$S" "$CORR" "$CORR Change \"updated\" to \"edited\" in the PR body." > "$D/stwice.md"
+    # bprotected: the author bullet lives only inside the merge-digest region
+    printf '<!-- merge-digest:begin -->\n- `bin/test-plan-now`: new cases cover the resume path. %s\n<!-- merge-digest:end -->\n\n## Summary\n' "$ANCHOR" > "$D/bprotected.md"
+    # btwin: the anchor also sits inside the digest, so it occurs twice
+    pb_sub "$B" "$WATCH" "$WATCH$NL$ANCHOR" > "$D/btwin.md"
+    # bunbal: delete the exec-mutations end marker
+    grep -vF '<!-- exec-mutations:end -->' "$D/b3694.md" > "$D/bunbal.md"
+
+    OUT="$("$PBOF" classify "$D/s3694.md" 2>&1)"; RC=$?
+    [ "$RC" = 0 ] && [ "$OUT" = "BODY_ONLY=yes" ] \
+        && ok "PB1: 3694 sticky classifies body-only" \
+        || fail "PB1: 3694 sticky classifies body-only (got $RC: $OUT)"
+
+    OUT="$("$PBOF" classify "$D/smixed.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'BODY_ONLY=no reason=blocking-not-body' <<< "$OUT" \
+        && ok "PB2: mixed code+body verdict is not body-only" \
+        || fail "PB2: mixed code+body verdict is not body-only (got $RC: $OUT)"
+
+    OUT="$("$PBOF" classify "$D/snostated.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=correction-not-stated' <<< "$OUT" \
+        && ok "PB3: blocker with no stated correction goes to a card" \
+        || fail "PB3: blocker with no stated correction goes to a card (got $RC: $OUT)"
+
+    OUT="$("$PBOF" classify "$D/sunmarked.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=unmarked-finding' <<< "$OUT" \
+        && ok "PB4: unmarked bullet fails closed" \
+        || fail "PB4: unmarked bullet fails closed (got $RC: $OUT)"
+
+    OUT="$("$PBOF" classify "$D/sholds.md" 2>&1)"; RC=$?
+    OUT5="$("$PBOF" classify "$D/ssignoff.md" 2>&1)"; RC5=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=no-fidelity-hold' <<< "$OUT" \
+        && [ "$RC5" = 0 ] && [ "$OUT5" = "BODY_ONLY=yes" ] \
+        && ok "PB5: needs the (12) hold; a sign-off hold beside it is fine" \
+        || fail "PB5: needs the (12) hold; a sign-off hold beside it is fine (got $RC: $OUT / $RC5: $OUT5)"
+
+    OUT="$("$PBOF" classify "$D/snearmiss.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=correction-not-stated' <<< "$OUT" \
+        && ok "PB6: lower-case 'change' near-miss is not a stated correction" \
+        || fail "PB6: lower-case 'change' near-miss is not a stated correction (got $RC: $OUT)"
+
+    OUT="$("$PBOF" classify "$D/stwice.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=correction-ambiguous' <<< "$OUT" \
+        && ok "PB7: two correction sentences are ambiguous" \
+        || fail "PB7: two correction sentences are ambiguous (got $RC: $OUT)"
+
+    OUT="$("$PBOF" apply "$D/s3694.md" "$D/b3694.md" "$D/out1.md" 2>&1)"; RC=$?
+    [ "$RC" = 0 ] \
+        && grep -qF 'Three existing assertions were updated' "$D/out1.md" \
+        && ! grep -qF 'Two existing assertions' "$D/out1.md" \
+        && [ "$(sed -n '/<!-- merge-digest:begin -->/,/<!-- merge-digest:end -->/p' "$D/out1.md")" = "$(sed -n '/<!-- merge-digest:begin -->/,/<!-- merge-digest:end -->/p' "$D/b3694.md")" ] \
+        && [ "$(sed -n '/<!-- exec-mutations:begin -->/,/<!-- exec-mutations:end -->/p' "$D/out1.md")" = "$(sed -n '/<!-- exec-mutations:begin -->/,/<!-- exec-mutations:end -->/p' "$D/b3694.md")" ] \
+        && grep -qE '^-.*Two existing' <<< "$OUT" \
+        && grep -qE '^\+.*Three existing' <<< "$OUT" \
+        && ok "PB8: apply rewrites only the author sentence and prints the diff" \
+        || fail "PB8: apply rewrites only the author sentence and prints the diff (got $RC: $OUT)"
+
+    OUT="$("$PBOF" apply "$D/s3694.md" "$D/bprotected.md" "$D/out2.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'refused=target-protected' <<< "$OUT" && [ ! -e "$D/out2.md" ] \
+        && ok "PB9: anchor inside a protected region is refused" \
+        || fail "PB9: anchor inside a protected region is refused (got $RC: $OUT)"
+
+    OUT="$("$PBOF" apply "$D/s3694.md" "$D/btwin.md" "$D/out3.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'refused=target-ambiguous' <<< "$OUT" && [ ! -e "$D/out3.md" ] \
+        && ok "PB10: anchor with a twin in the digest is refused" \
+        || fail "PB10: anchor with a twin in the digest is refused (got $RC: $OUT)"
+
+    OUT="$("$PBOF" apply "$D/s3694.md" "$D/bunbal.md" "$D/out4.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'refused=unbalanced-marker' <<< "$OUT" && [ ! -e "$D/out4.md" ] \
+        && ok "PB11: unbalanced begin marker is refused" \
+        || fail "PB11: unbalanced begin marker is refused (got $RC: $OUT)"
+
+    local OUT12a RC12a OUT12b RC12b
+    OUT12a="$("$PBOF" frob x 2>&1)"; RC12a=$?
+    OUT12b="$("$PBOF" classify --dry-run 2>&1)"; RC12b=$?
+    [ "$RC12a" = 2 ] && [ "$RC12b" = 2 ] \
+        && grep -qF 'usage: pr-body-only-fix' <<< "$OUT12a" \
+        && grep -qF 'usage: pr-body-only-fix' <<< "$OUT12b" \
+        && ok "PB12: unknown subcommand and flag form exit 2 with usage" \
+        || fail "PB12: unknown subcommand and flag form exit 2 with usage (got $RC12a/$RC12b: $OUT12a / $OUT12b)"
+
+    if [ ! -f "$PR_SKILL" ]; then
+        fail "PB13: skill file missing at $PR_SKILL"
+    else
+        local REG
+        REG="$(awk '/^### Body-only blockers$/{f=1;next} f&&/^###? /{exit} f' "$PR_SKILL")"
+        [ -n "$REG" ] \
+            && grep -qF 'A body-only fix makes no commit and no worktree edit.' <<< "$REG" \
+            && grep -qF 'bin/lib/pr-body-only-fix classify' <<< "$REG" \
+            && grep -qF 'gh pr edit' <<< "$REG" \
+            && grep -qF -- '--body-file' <<< "$REG" \
+            && grep -qF 'bin/post-plan-now --auto' <<< "$REG" \
+            && ok "PB13: no-commit sentence and helper calls present" \
+            || fail "PB13: no-commit sentence and helper calls present"
+        [ -n "$REG" ] && ! grep -qF 'git commit' <<< "$REG" && ! grep -qF 'git push' <<< "$REG" \
+            && ok "PB13: body-only region names no git commit or push" \
+            || fail "PB13: body-only region names no git commit or push"
+    fi
+}
+if [ "${TB_ONLY:-}" = pb ]; then pb_cases; h_done; fi
 
 # gh stub: dispatches by args
 cat > "$T/gh" <<'STUB'
@@ -3127,5 +3297,8 @@ OUT="$(bdl burndown-record "$L" 42 status=skipped "why=duplicate of a merged fix
 
 OUT="$("$SCRIPT" --help 2>&1)"
 want "SR26: help lists why=" "$OUT" "blocked_by=, why= on ledger item"
+
+# ── Phase 8: pr-burndown body-only helper (PB1-PB13) ──
+pb_cases
 
 h_done

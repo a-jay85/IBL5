@@ -283,6 +283,17 @@ test_adhoc_no_plan_runs_phpunit_and_infection() {
     want_cnt mutation 1
 }
 
+test_empty_plan_value_refuses() {
+    new_case
+    green_plan
+    run_gate --plan ""
+    want_rc 2
+    want_out "--plan got an empty value"
+    refute_out "SKIP matrix"
+    want_cnt phpunit 0
+    want_cnt mutation 0
+}
+
 test_infection_below_threshold_refuses_3672() {
     new_case
     green_plan
@@ -484,6 +495,67 @@ test_prompt_impl_missing_step_6_9_heading_fails() {
     fi
 }
 
+# Runs each Step 6.9 bash block in its own shell, as the impl agent's Bash calls
+# do, against a stub gate. Every block must reach the gate with the resolved plan.
+assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
+    local f="$1" home="$D/home" slug="my-plan" q want i stage got
+    q="$home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+    mkdir -p "$q" "$R/bin/lib" "$D/blocks"
+    printf '# plan\n' > "$D/real-plan.md"
+    ln -s "$D/real-plan.md" "$q/010-$slug.md"
+    want="$(cd "$D" && pwd -P)/real-plan.md"
+    # shellcheck disable=SC2016  # the stub expands $CNT and $* when it runs
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "$CNT/gate-args"\n' \
+        > "$R/bin/lib/prefire-verify"
+    chmod +x "$R/bin/lib/prefire-verify"
+    awk -v dir="$D/blocks" '
+        /^## Step 6\.9:/ { s = 1; next }
+        /^## Step 7:/ { s = 0 }
+        s && /^```bash$/ { n++; out = dir "/" n ".sh"; b = 1; next }
+        b && /^```$/ { b = 0; close(out); next }
+        b { print > out }
+    ' "$f"
+    i=0
+    for stage in matrix phpunit infection; do
+        i=$((i + 1))
+        if [ ! -f "$D/blocks/$i.sh" ]; then
+            note "Step 6.9 has no bash block for $stage"
+            continue
+        fi
+        sed -e "s|<the PLAN_FILE value from the end of this prompt>|$slug|" \
+            -e "s|/Users/ajaynicolas/GitHub/IBL5/bin/lib/|$REPO/bin/lib/|" \
+            "$D/blocks/$i.sh" > "$D/blocks/$i.run"
+        : > "$CNT/gate-args"
+        (cd "$R" && env -u PLAN_PATH HOME="$home" bash "$D/blocks/$i.run") >/dev/null 2>&1
+        got=$(cat "$CNT/gate-args")
+        [ "$got" = "--plan $want --stage $stage" ] \
+            || note "$stage block called the gate with '$got'"
+    done
+}
+
+test_prompt_impl_step_6_9_blocks_set_plan_path() {
+    new_case
+    assert_step_6_9_blocks_set_plan_path "$REPO/bin/automouse/prompt-impl"
+}
+
+test_prompt_impl_block_without_plan_path_fails() {
+    new_case
+    local fixture="$D/prompt-impl-unset"
+    # Drop the setter from the second Step 6.9 block only.
+    awk '
+        /^## Step 6\.9:/ { s = 1 }
+        /^## Step 7:/ { s = 0 }
+        s && /^```bash$/ { n++ }
+        s && n == 2 && /PLAN_PATH=/ { next }
+        { print }
+    ' "$REPO/bin/automouse/prompt-impl" > "$fixture"
+    assert_step_6_9_blocks_set_plan_path "$fixture"
+    case "$WHY" in
+        "phpunit block called the gate with '--plan  --stage phpunit'") WHY="" ;;
+        *) WHY="a block with no PLAN_PATH must fail, got: '${WHY}'" ;;
+    esac
+}
+
 test_stdin_reading_row_does_not_swallow_later_rows() {
     new_case
     write_plan "$(row 1 'cat > /dev/null')" \
@@ -522,6 +594,7 @@ test_cache_hit_skips_rerun
 test_tree_change_invalidates_cache
 test_checks_mutating_tree_refuse
 test_adhoc_no_plan_runs_phpunit_and_infection
+test_empty_plan_value_refuses
 test_infection_below_threshold_refuses_3672
 test_infection_at_threshold_passes
 test_infection_prereq_missing_fails_closed
@@ -536,6 +609,8 @@ test_rebase_only_skips_gate
 test_missing_gate_script_refuses
 test_prompt_impl_step_6_9_precedes_step_7
 test_prompt_impl_missing_step_6_9_heading_fails
+test_prompt_impl_step_6_9_blocks_set_plan_path
+test_prompt_impl_block_without_plan_path_fails
 test_stdin_reading_row_does_not_swallow_later_rows
 test_db_probe_does_not_read_callers_stdin
 "

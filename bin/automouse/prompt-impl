@@ -485,14 +485,41 @@ fire-time call is a cache hit when you change nothing afterwards.
 Run each stage as its own foreground Bash call with `timeout: 600000`:
 
 ```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
 GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
 "$GATE" --plan "$PLAN_PATH" --stage matrix
 ```
 ```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
 GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
 "$GATE" --plan "$PLAN_PATH" --stage phpunit
 ```
 ```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
 GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
 "$GATE" --plan "$PLAN_PATH" --stage infection
 ```

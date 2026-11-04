@@ -13,7 +13,7 @@
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
-#   2  usage error
+#   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
 #   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, pcov
 #   4  the checks changed the working tree, so no pass record was written
 #
@@ -42,7 +42,9 @@ BYPASS_SET=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --plan)   [ $# -ge 2 ] || die 2 "--plan needs a path"; PLAN="$2"; shift 2 ;;
+        --plan)   [ $# -ge 2 ] || die 2 "--plan needs a path"
+                  [ -n "$2" ] || die 2 "--plan got an empty value; omit the flag when there is no plan"
+                  PLAN="$2"; shift 2 ;;
         --stage)  [ $# -ge 2 ] || die 2 "--stage needs a value"; STAGE="$2"; shift 2 ;;
         --base)   [ $# -ge 2 ] || die 2 "--base needs a ref"; BASE_OPT="$2"; shift 2 ;;
         --bypass) [ $# -ge 2 ] || die 2 "--bypass needs a reason"; BYPASS_REASON="$2"; BYPASS_SET=1; shift 2 ;;

@@ -213,6 +213,7 @@ def test_closer_body_edit_failure_is_noted(monkeypatch, tmp_path):
 # ── closer push failure is reported, not silent ───────────────────────────────
 
 def test_closer_push_failed_sticky_leads_with_reason(monkeypatch, tmp_path):
+    """A push failure is not success: `push_failure.sha` is set and the sticky leads with the reason."""
     from test_runner_closer import (Recorder, _TrackedGit, _arm, _closer_fixture, _install)
     from harness.closer import CloserOutcome
 

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
 
@@ -27,7 +27,7 @@ When the test fails, stay on Opus (or a lower tier). Most tasks fail it.
 - `bin/plan-now`: `--effort high` on the orchestrator.
 - `bin/post-plan-now`: `--effort high` on the Sonnet 5.5 skill engine.
 - The three architect defs: `effort: high` frontmatter.
-- Post-plan harness review seats: no flag. They inherit `effortLevel: medium` from `~/.claude/settings.json`.
+- Post-plan harness review seats: no flag. They inherit `effortLevel: medium` from `~/.claude/settings.json`. The 2026-11-04 run found no loss from `medium` on agent A (§ Medium vs high below).
 
 The measurement covers one toolless code-review seat. Planning surfaces (`bin/plan-now`, the architect defs) stay at `high` by judgment, because no planning corpus exists.
 
@@ -35,7 +35,7 @@ Re-tune trigger: a re-run of `python3 -m harness.tier_measure` in which `opus-ma
 
 ## Review-seat measurement table
 
-These cells measure one toolless review seat (agent A) on the 8-case code-review subset, at explicit `--effort`. Production review seats pass no `--effort` and inherit `effortLevel: medium`, so no cell equals current production behavior. Agents B and D, the security seat and the verifier seats were not measured.
+These cells measure one toolless review seat (agent A) on the 8-case code-review subset, at explicit `--effort`. Production review seats pass no `--effort` and inherit `effortLevel: medium`, so no cell in this 2026-10 table equals current production behavior. § Medium vs high below has those cells. Agents B and D, the security seat and the verifier seats were not measured.
 
 - **R1.** Sonnet high tied Opus high on review (H 0.42 vs 0.33, S 2/6 each) at 2.1× lower cost per call.
 - **R6.** Opus 5.5 is 2.0× Sonnet 5.5 per token (claude-api skill); `bin/measure-delegate-cost` measures about 1.63 to 1.7× effective; agent A measured 2.1× per call.
@@ -50,6 +50,19 @@ These cells measure one toolless review seat (agent A) on the 8-case code-review
 Total spend $19.51 ($19.13 measured plus $0.38 in probes), under the $25.00 ceiling. Each cell ran in its own driver process with its own budget share. Opus max stopped at the time cap after 3 calls. Fable high stopped after 9 calls with 3 errors. Prior data, not re-measured: [#2996](https://github.com/a-jay85/IBL5/pull/2996) (Sonnet 5.5 vs Opus 5.5 negative-proof A/B) and [#2977](https://github.com/a-jay85/IBL5/pull/2977) (Haiku 5.5 retier).
 
 Reproduce: `python3 -m harness.tier_measure run --repo-root ../.. --out <path> --dry-run` from `tools/postplan-harness/`, then drop `--dry-run`. The $25 ceiling is a module constant.
+
+## Medium vs high
+
+The 2026-11-04 run measured what production runs: `sonnet-medium` is the default depth and `opus-medium` is deep depth. Both `high` cells were re-run the same day as controls. Same seat and corpus as the table above.
+
+| cell | model | effort | bug runs | H | S | spread | FP | C (USD/call) | T (s/call) | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sonnet-high | claude-sonnet-5-5 | high | 12 | 0.33 (4/12) | 2/6 | 0.00 | 0 | 0.161 | 28.0 | ok |
+| sonnet-medium | claude-sonnet-5-5 | medium | 12 | 0.33 (4/12) | 2/6 | 0.00 | 0 | 0.134 | 11.8 | ok |
+| opus-high | claude-opus-5-5 | high | 12 | 0.33 (4/12) | 2/6 | 0.00 | 0 | 0.374 | 63.2 | ok |
+| opus-medium | claude-opus-5-5 | medium | 12 | 0.50 (6/12) | 3/6 | 0.00 | 0 | 0.333 | 43.1 | ok |
+
+Total spend $14.03. Sonnet `medium` caught the same cases as Sonnet `high`. Opus `medium` caught one more case (`team-page-missing-pick-team`) in both runs. Six bug cases are too few to call `medium` better, so this shows only that `medium` lost nothing here. The `high` pins above are unchanged. Reproduce with `--drop-cell opus-max --drop-cell fable-high`.
 
 ## Pinned agent defs
 

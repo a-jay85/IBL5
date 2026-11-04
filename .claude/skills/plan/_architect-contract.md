@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 ---
 
 ## Read budget: read this once, read nothing else
@@ -89,6 +89,11 @@ Conditionally — include a section **only when it applies**; never emit an empt
   - Auth/authz-gated route → guard present on the state-changing endpoint; row asserts an unauthorized request is refused.
   - Output rendering → escaped output (enforced by `RequireEscapedOutputRule`); note it so the impl agent doesn't fight the PHPStan rule.
   XSS and input validation are deterministically enforced by PHPStan custom rules — note which apply, do not write redundant manual checks. Encoding the defense satisfies Step 4 gate 12 but does **not** by itself release the gate-14(b) merge hold — if the surface is dischargeable, see § Security-surface mechanization above; otherwise the plan holds and says why.
+- **Deferred Security Gaps** (only when the architect finds a security gap on a surface the plan touches, such as a route that trusts a caller-supplied id or a handler with no CSRF check): pick one of two dispositions and write it down.
+  - **Fix it in the plan.** This is the default when the fix is small and sits on the same surface. Add the defense phase and its matrix rows per the `**Security**` bullet above.
+  - **Defer it to a filed issue.** File it first with `gh issue create -R a-jay85/IBL5-backlog`, then emit a `## Deferred Security Gaps` section with one bullet per gap: `- a-jay85/IBL5-backlog#N — <the gap and its surface>`. Keep it out of `## Backlog issues`, which lists only issues this PR closes or advances.
+  - A gap written only as prose (an `## Out of Scope` bullet, a "separate PR" note) is a silent deferral. `bin/check-plan` gate `[SD]` fails a scope-section bullet that describes an exposure (`any valid API key`, `has never checked`, `security gap`, `impersonat…`) with no `a-jay85/IBL5-backlog#N` on the line, and fails a `## Deferred Security Gaps` bullet that lacks one.
+  - A declared deferral changes nothing at review time. Phase 4B still scores the gap and gates (2) and (11) still hold on it. The backlog link tells the reviewer the gap is tracked.
 - **Automouse Hold Justification** (only when the plan keeps `auto_merge: false`): the section carries the **decision**, never a **check**. Every *observable* claim a reader might expect the human to re-run is a Verification Matrix row you have not written yet — write it, cite it, and leave only the judgment behind. Emit exactly this four-part skeleton:
   ```
   ## Automouse Hold Justification

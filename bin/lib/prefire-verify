@@ -348,7 +348,7 @@ stage_exec_mutations() {
     fi
     if [ "$rc" -eq 3 ]; then
         xm_cleanup
-        say "FAIL exec-mutations: a mutation could not be reverted; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
+        say "FAIL exec-mutations: a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
         return 1
     fi
     if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then

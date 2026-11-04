@@ -276,6 +276,38 @@ chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
 chk "journal empty" journal_clear "$R"
 end_case
 
+start_case run_baseline_timeout_is_undecided
+R="$TMP/r3t"
+mkrepo "$R" 'exit 124'
+BEFORE=$(sha "$R/target.txt")
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "UNDECIDED reported" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
+chk "next step hands off" has "$OUT" "NEXT-STEP row 1 — the check timed out"
+chk "not BASELINE-FAILED" eq "$(grep -c '^BASELINE-FAILED' <<< "$OUT")" 0
+chk "sha unchanged" eq "$(sha "$R/target.txt")" "$BEFORE"
+chk "journal empty" journal_clear "$R"
+end_case
+
+start_case run_baseline_cannot_start_is_undecided
+for code in 125 126 127; do
+    R="$TMP/r3c$code"
+    mkrepo "$R" "exit $code"
+    OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+    chk "exit 1 ($code)" eq "$RC" 1
+    chk "UNDECIDED ($code)" has "$OUT" "UNDECIDED row 1 — bash check.sh exited $code (check could not run) before mutation"
+    chk "not BASELINE-FAILED ($code)" eq "$(grep -c '^BASELINE-FAILED' <<< "$OUT")" 0
+done
+end_case
+
+start_case run_baseline_exit_128_still_fails
+R="$TMP/r3e"
+mkrepo "$R" 'exit 128'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 1" eq "$RC" 1
+chk "BASELINE-FAILED reported" has "$OUT" "BASELINE-FAILED row 1"
+end_case
+
 start_case run_not_applied
 R="$TMP/r4"
 mkrepo "$R" 'true' "$(printf 'ALPHA\nALPHA')"
@@ -384,7 +416,7 @@ end_case
 start_case run_adaptive_tripped
 R="$TMP/r8"; mkrepo "$R" 'sleep 2; grep -q ALPHA target.txt'
 OUT=$("$LIB" run --root "$R" --timeout 1 "$R.plan.md" 2>&1); RC=$?
-chk "defaults still BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+chk "defaults UNDECIDED 124" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
 OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 6 --scale 2 "$R.plan.md" 2>&1); RC=$?
 chk "exit 0" eq "$RC" 0; chk "TRIPPED" has "$OUT" "TRIPPED row 1 — bash check.sh exited 1"
 chk "porcelain empty" porcelain_clean "$R"
@@ -400,7 +432,7 @@ end_case
 start_case run_adaptive_baseline_hang
 R="$TMP/r10"; mkrepo "$R" 'sleep 60'
 T0=$SECONDS; OUT=$("$LIB" run --root "$R" --timeout 1 --max-timeout 2 --scale 2 "$R.plan.md" 2>&1); RC=$?
-chk "exit 1" eq "$RC" 1; chk "BASELINE-FAILED 124" has "$OUT" "BASELINE-FAILED row 1 — bash check.sh exited 124"
+chk "exit 1" eq "$RC" 1; chk "UNDECIDED 124" has "$OUT" "UNDECIDED row 1 — bash check.sh timed out (124) before mutation"
 chk "bounded by the ceiling" test $((SECONDS - T0)) -lt 6
 end_case
 

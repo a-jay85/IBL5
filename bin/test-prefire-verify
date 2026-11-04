@@ -765,7 +765,7 @@ test_xm_revert_failed_maps_to_fail() {
     xm_plan 'true'
     OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
     want_rc 1
-    want_out "a mutation could not be reverted; run bin/lib/plan-exec-mutations recover"
+    want_out "a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover"
     [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
 }
 

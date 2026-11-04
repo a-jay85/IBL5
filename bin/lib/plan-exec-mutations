@@ -515,6 +515,16 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         bsec=$((SECONDS - b0 + 1))
         [ -z "$key" ] || printf '%s %s\n' "$rc" "$bsec" > "$BCACHE/$key"
     fi
+    if [ "$rc" -eq 124 ]; then
+        printf 'UNDECIDED row %s — %s timed out (124) before mutation\n' "$row" "$check"
+        next_step UNDECIDED "$row"
+        FINAL=1; continue
+    fi
+    if [ "$rc" -ge 125 ] && [ "$rc" -le 127 ]; then
+        printf 'UNDECIDED row %s — %s exited %s (check could not run) before mutation\n' "$row" "$check" "$rc"
+        next_step UNDECIDED "$row"
+        FINAL=1; continue
+    fi
     if [ "$rc" -ne 0 ]; then
         printf 'BASELINE-FAILED row %s — %s exited %s before mutation\n' "$row" "$check" "$rc"
         next_step BASELINE-FAILED "$row"

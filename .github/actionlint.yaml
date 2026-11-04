@@ -1,0 +1,8 @@
+# actionlint v1.7.12 predates the GitHub-hosted ubuntu-26.04 image, so its built-in
+# label list rejects it. This entry names that one image. Every other unknown label
+# still fails bin/lint-workflows. Delete the entry when the actionlint pin in
+# .github/workflows/tests.yml moves to a release that lists the image, and swap the
+# literal when the upgrade recipe in .claude/rules/ci-gotchas.md moves the pin.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

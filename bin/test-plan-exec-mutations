@@ -285,12 +285,41 @@ chk "zero reported" has "$OUT" "match occurs 0 times"
 chk "porcelain empty" porcelain_clean "$R"
 end_case
 
+start_case run_next_step_lines
+VERDICT_RE='^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row '
+R="$TMP/rns"
+mkrepo "$R" 'true'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "held exit 1" eq "$RC" 1
+chk "held next-step is line 2" eq "$(sed -n 2p <<< "$OUT")" "NEXT-STEP row 1 — the check passed under mutation; strengthen the test. Never weaken or delete the mutation."
+chk "held one verdict line" eq "$(grep -cE "$VERDICT_RE" <<< "$OUT")" 1
+mkrepo "$R" 'false'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "baseline next-step" eq "$(sed -n 2p <<< "$OUT")" "NEXT-STEP row 1 — the check fails on unmutated code; fix the test or its environment first."
+mkrepo "$R" 'true' 'GAMMA'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "not-applied next-step" has "$OUT" "NEXT-STEP row 1 — the row's match text is not in the file exactly once"
+chk "not-applied keeps check" has "$OUT" "Do not change the row's check command."
+mkrepo "$R" 'grep -q ALPHA target.txt || pem_no_such_cmd_xyz'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "undecided 127 reported" has "$OUT" "UNDECIDED row 1"
+chk "undecided next-step" has "$OUT" "NEXT-STEP row 1 — the check timed out, could not start, or the run budget ran out"
+chk "undecided one verdict line" eq "$(grep -cE "$VERDICT_RE" <<< "$OUT")" 1
+mkrepo "$R" 'grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "tripped exit 0" eq "$RC" 0
+chk "tripped prints no next-step" eq "$(grep -c '^NEXT-STEP' <<< "$OUT")" 0
+chk "porcelain empty" porcelain_clean "$R"
+chk "journal empty" journal_clear "$R"
+end_case
+
 start_case run_stray_untracked
 R="$TMP/r5"
 mkrepo "$R" 'grep -q ALPHA target.txt || { touch stray; exit 1; }'
 OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
 chk "exit 3" eq "$RC" 3
 chk "REVERT-FAILED status changed" has "$OUT" "REVERT-FAILED row 1 — status changed"
+chk "revert next-step" has "$OUT" "run bin/lib/plan-exec-mutations recover before anything else"
 "$LIB" pending --root "$R"; PRC=$?
 chk "pending exits 0" eq "$PRC" 0
 "$LIB" recover --root "$R" >/dev/null 2>&1; RRC=$?

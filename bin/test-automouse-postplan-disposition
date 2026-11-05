@@ -1700,6 +1700,84 @@ SELF_DIR="$J_SAVED_SELF_DIR"
 rm -rf "$J_DIR"
 
 # ---------------------------------------------------------------------------
+# Group c: postplan classifier (rc3-terminal through env-breaker), 2026-11-04 fixture
+# ---------------------------------------------------------------------------
+# extract_run_region <begin> <end>: the lines of $RUNNER from the first line holding
+# <begin> through the first later line holding <end>. Both are unique comment anchors.
+extract_run_region() {
+    awk -v a="$1" -v b="$2" '
+        !cap && index($0, a) { cap = 1 }
+        cap { print }
+        cap && index($0, b) { exit }
+    ' "$RUNNER"
+}
+
+CLASSIFIER_SRC=$(extract_run_region '# postplan-rc3-terminal: begin' '# postplan-env-breaker: end')
+c0_begin=$(grep -cF '# postplan-rc3-terminal: begin' "$RUNNER")
+c0_end=$(grep -cF '# postplan-env-breaker: end' "$RUNNER")
+if [ "$c0_begin" = "1" ] && [ "$c0_end" = "1" ] \
+   && grep -qF '# postplan-env-breaker: begin' <<< "$CLASSIFIER_SRC" \
+   && grep -qF 'dispose_plan_postplan_blocked' <<< "$CLASSIFIER_SRC"; then
+    echo "ok: c0-classifier-anchors"
+else
+    echo "FAIL: c0-classifier-anchors — anchor drifted? (begin=$c0_begin end=$c0_end)"
+    FAILED=1
+fi
+
+# classify_case <label> <status> <dur>: evals the classifier region in a subshell and prints
+# the call log, one word per call. The fixture is the 2026-11-04 attempt: handoff present,
+# MIN_VIABLE_SECS=60, the harness rc from 2026-11-04-8163.log.
+classify_case() {
+    local label="$1" status="$2" dur="$3" calls
+    calls=$(mktemp)
+    (
+        # shellcheck disable=SC2034  # these vars are read by the eval'd region
+        LOG="$calls.log"; NIGHTLY_DIR=$(mktemp -d); PLAN_NAME=p.md; PLAN_SLUG=p
+        PP_STATUS="$status"; PP_DUR="$dur"; MIN_VIABLE_SECS=60; HANDOFF_FILE="$calls"
+        PP_LOG_BEFORE=0; PP_NOWT_DISPOSED=0; STALL_KILL_SECS=600
+        PP_START_MARKER="$calls.marker"; CURRENT_LOCK="$NIGHTLY_DIR/lock"
+        dispose_plan_postplan_blocked() { echo dispose >> "$calls"; }
+        note_failure() { echo note_failure >> "$calls"; }
+        note_stop() { echo note_stop >> "$calls"; }
+        refund_attempt() { echo refund >> "$calls"; }
+        write_env_stop_report() { echo "env_stop $3" >> "$calls"; }
+        phase_env_error() { return 1; }
+        phase_stalled() { return 1; }
+        postplan_no_worktree_dispose_if_merged() { return 1; }
+        usage_marker_find() { return 1; }
+        automouse_branch_for_plan() { :; }
+        # shellcheck disable=SC2043  # one-pass loop gives the region's `break` a target
+        for _once in 1; do
+            eval "$CLASSIFIER_SRC"
+            echo fellthrough >> "$calls"
+        done
+    ) >/dev/null 2>&1
+    CLASSIFY_OUT=$(tr '\n' ' ' < "$calls")
+    rm -f "$calls" "$calls.log" "$calls.marker"
+    : "$label"
+}
+
+# c1: rc 3 after 95 s moves the plan to skipped/ with no refund and no env-stop report.
+classify_case c1 3 95
+if grep -qF 'dispose' <<< "$CLASSIFY_OUT" && grep -qF 'note_failure' <<< "$CLASSIFY_OUT" \
+   && grep -qF 'fellthrough' <<< "$CLASSIFY_OUT" \
+   && ! grep -qF 'refund' <<< "$CLASSIFY_OUT" && ! grep -qF 'env_stop' <<< "$CLASSIFY_OUT"; then
+    echo "ok: c1-rc3-moves-to-skipped"
+else
+    echo "FAIL: c1-rc3-moves-to-skipped — $CLASSIFY_OUT"
+    FAILED=1
+fi
+
+# c2: rc 1 after 95 s matches no arm (why the 03:01 attempt missed the breaker).
+classify_case c2 1 95
+if [ "$CLASSIFY_OUT" = "fellthrough " ]; then
+    echo "ok: c2-rc1-95s-not-environmental"
+else
+    echo "FAIL: c2-rc1-95s-not-environmental — $CLASSIFY_OUT"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
 # Tail
 # ---------------------------------------------------------------------------
 

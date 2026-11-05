@@ -49,7 +49,7 @@ _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
         "llm-usage-limit", "llm-auth-expired", "usage-pause-unconfirmed", "usage-pause-dirty",
-        "subprocess-timeout")]
+        "base-resolve", "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",

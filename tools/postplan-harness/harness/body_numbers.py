@@ -226,6 +226,11 @@ _EDIT_COUNT = re.compile(
 )
 _SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
 _ALLOWED_BEFORE = re.compile(r"\b(?:and|but|the|these|those)[ \t]+$", re.IGNORECASE)
+_NUM_WORD = r"(?:\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+_LIST_OR_FRACTION = re.compile(
+    rf"\b{_NUM_WORD}[ \t]+(?:(?:and|but|or)|of(?:[ \t]+(?:the|these|those))?)[ \t]+$",
+    re.IGNORECASE,
+)
 
 
 def strip_edit_counts(text: str) -> str:
@@ -239,7 +244,7 @@ def strip_edit_counts(text: str) -> str:
         line_prefix = text[text.rfind("\n", 0, m.start()) + 1 : m.start()]
         if _SENTENCE_START.search(line_prefix):
             return rest[0].upper() + rest[1:]
-        if _ALLOWED_BEFORE.search(line_prefix):
+        if _ALLOWED_BEFORE.search(line_prefix) and not _LIST_OR_FRACTION.search(line_prefix):
             return rest
         return m.group(0)
 

@@ -2811,17 +2811,35 @@ fi
 # plans, all real unfiled gaps (the PR #3695 plan among them), zero false
 # positives. Broad terms (csrf, authori[sz], security) hit 51-181 lines, mostly
 # "stays unchanged" notes. Re-measure the corpus before widening the lexicon.
+# Re-measured 2026-11-04 with wrapped bullets and heading spellings: 4 hits in
+# 2281 plans. The new hit is a false positive: reaction-endpoint-tier-gate.md
+# quotes "has no tier check" while it fixes that gap. Rewording the bullet clears it.
 # The backlog link is the only release; there is no inline escape marker.
-# cf_section_named is case-sensitive. A plan may spell these headings in any
-# case, so rewrite a matching heading to the spelling asked for before the call.
+# cf_section_named is case-sensitive. A plan may spell these headings with any
+# case, with a hyphen, space or underscore between words, or with a singular
+# last word, so rewrite a matching heading to the spelling asked for before the
+# call. The trailing echo keeps one section's last bullet from joining the next
+# section's first line in _sd_bullets.
 _sd_section() {
-    cf_section_named <(awk -v h="$1" 'tolower($0) ~ ("^##[[:space:]]*" tolower(h)) { print "## " h; next } { print }' "$PLAN_FILE") "$1"
+    cf_section_named <(awk -v h="$1" 'BEGIN { p = tolower(h); gsub(/[- ]/, "[-_[:space:]]*", p); sub(/s$/, "s?", p); p = "^##[[:space:]]*" p }
+        tolower($0) ~ p { print "## " h; next } { print }' "$PLAN_FILE") "$1"
+    echo ""
 }
 _sd_lex='security (gap|hole|flaw|exposure)|residual exposure|any (holder of a )?valid api key|impersonat|privilege escalat|has no [a-z-]* ?(tier|auth[a-z]*|csrf|permission) (check|gate|guard)|has never checked|can approve as|(auth[a-z]*|csrf|tier) gap'
 _sd_ref='a-jay85/IBL5-backlog#[0-9]+'
-_sd_bullet='^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+'
+_sd_bullet='^[[:space:]]*([-*]|[0-9]+[.])[[:space:]]+'
+# Print each bullet on one line, wrapped lines joined on, so the lexicon and the
+# backlog ref are judged per bullet. A blank line or a heading ends a bullet.
+_sd_bullets() {
+    awk -v b="$_sd_bullet" '
+        function flush() { if (cur != "") print cur; cur = "" }
+        $0 ~ b { flush(); cur = $0; next }
+        /^[[:space:]]*(#|$)/ { flush(); next }
+        cur != "" { line = $0; sub(/^[[:space:]]+/, "", line); cur = cur " " line }
+        END { flush() }'
+}
 _sd_scope=$( { _sd_section "Out of Scope"; _sd_section "Non-Goals"; } \
-    | grep -E "$_sd_bullet" \
+    | _sd_bullets \
     | grep -iE "$_sd_lex" \
     | grep -vE "$_sd_ref" || true)
 if [ -n "$_sd_scope" ]; then
@@ -2831,7 +2849,7 @@ if [ -n "$_sd_scope" ]; then
 fi
 _sd_decl_re='^[[:space:]]*[-*][[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
 _sd_decl_bad=$(_sd_section "Deferred Security Gaps" \
-    | grep -E "$_sd_bullet" \
+    | _sd_bullets \
     | grep -vE "$_sd_decl_re" || true)
 if [ -n "$_sd_decl_bad" ]; then
     while IFS= read -r _sd_line; do

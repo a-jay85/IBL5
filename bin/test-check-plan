@@ -204,6 +204,54 @@ assert_viol "gate-SD-lowercase-declared-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
 ## Deferred security gaps
 - `ReactionController` tier gate, fix in a separate PR
 '
+assert_viol "gate-SD-hyphenated-scope-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out-of-Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-spaced-non-goals-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Non Goals
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-singular-non-goal-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Non-Goal
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-near-miss-heading-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Outside Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-wrapped-exposure-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Fixing it is left for a separate PR,
+  because any valid API key can approve as the operator.
+'
+assert_viol "gate-SD-phrase-split-by-wrap-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Today any valid API
+  key works on this route. Fixing it is left for a separate PR.
+'
+assert_viol "gate-SD-wrapped-ref-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Any valid API key can approve as the operator.
+  Filed as a-jay85/IBL5-backlog#1571.
+'
+assert_viol "gate-SD-wrapped-declared-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+- a-jay85/IBL5-backlog#1571 —
+  `ReactionController` has no service-key tier check
+'
+assert_viol "gate-SD-paragraph-after-blank-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- The wake endpoint response format.
+
+Any valid API key can read that format today, and that is the intended contract.
+'
+assert_viol "gate-SD-next-section-not-joined-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- The wake endpoint response format.
+## Non-Goals
+Any valid API key can read that format today, and that is the intended contract.
+'
 assert_viol "gate-SD-preservation-note-clean" 0 "[SD]" "$FM$CF_MATRIX"'
 ## Out of Scope
 - CSRF handling and the auth guard stay in the controller; no authorization change.

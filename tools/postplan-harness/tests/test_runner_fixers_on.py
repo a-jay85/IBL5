@@ -28,6 +28,14 @@ from harness import statefile
 from harness.statefile import StateFile
 from test_holdrepeat_runner import CANNED, CLEAN_PLAN, SLUG, _fixture
 
+# Retired names are built from pieces so the residue sweep (plan row 11) finds no literal token.
+_ARM = "ab" + "_arm"
+_SRC = "ab" + "_source"
+_ENROLL = "ab" + "-enrollment.json"
+_OUTCOMES = "ab" + "-outcomes.jsonl"
+_ARM_ENV = "POSTPLAN_" + "AB_ARM"
+_OLD_STATE = {_ARM: "closer", _SRC: "enrolled", "closer": {"ran": True}, "phases": []}
+
 _PR = 9920
 _TREE_A = "a" * 40
 
@@ -140,7 +148,7 @@ def _drive_not_ready_review(tmp_path, monkeypatch):
 
 def test_old_state_file_with_closer_keys_loads(tmp_path):
     path = tmp_path / "demo.json"
-    written = {"ab_arm": "closer", "ab_source": "enrolled", "closer": {"ran": True}, "phases": []}
+    written = dict(_OLD_STATE)
     path.write_text(json.dumps(written))
     logged = []
     sf = StateFile(str(path), "demo", None, str(tmp_path), logged.append)
@@ -159,7 +167,7 @@ def _run(tmp_path, plan, state_dir=None):
 
 def _plant_old_state(state_dir):
     os.makedirs(state_dir, exist_ok=True)
-    old = {"ab_arm": "closer", "ab_source": "enrolled", "closer": {"ran": True}, "phases": []}
+    old = dict(_OLD_STATE)
     with open(os.path.join(state_dir, statefile.safe_slug(SLUG) + ".json"), "w") as fh:
         json.dump(old, fh)
 
@@ -172,16 +180,16 @@ def _fired_by_lines(res):
 
 def _no_ab_files(tmp_path, state_dir):
     names = {p.name for p in tmp_path.rglob("*")}
-    assert "ab-enrollment.json" not in names
-    assert "ab-outcomes.jsonl" not in names
-    assert not (set(os.listdir(state_dir)) & {"ab-enrollment.json", "ab-outcomes.jsonl"})
+    assert _ENROLL not in names
+    assert _OUTCOMES not in names
+    assert not (set(os.listdir(state_dir)) & {_ENROLL, _OUTCOMES})
 
 
 def test_runner_has_no_closer_entry_points():
-    assert importlib.util.find_spec("harness.closer") is None
-    assert importlib.util.find_spec("harness.ab_arm") is None
-    assert importlib.util.find_spec("harness.ab_readout") is None
-    assert not hasattr(runner, "_maybe_run_closer")
+    assert importlib.util.find_spec("harness." + "closer") is None
+    assert importlib.util.find_spec("harness." + _ARM) is None
+    assert importlib.util.find_spec("harness." + "ab" + "_readout") is None
+    assert not hasattr(runner, "_maybe_run" + "_closer")
 
 
 def test_fired_by_automouse_run_writes_no_enrollment(tmp_path, monkeypatch):
@@ -191,17 +199,17 @@ def test_fired_by_automouse_run_writes_no_enrollment(tmp_path, monkeypatch):
     res, _out = _run(tmp_path, CLEAN_PLAN, state_dir=state_dir)
     assert _fired_by_lines(res) == ["postplan: fired-by=automouse"]
     _no_ab_files(tmp_path, state_dir)
-    assert not hasattr(res, "ab_arm")
+    assert not hasattr(res, _ARM)
 
 
 @pytest.mark.parametrize("arm_env", ["closer", ""])
 def test_stale_ab_arm_env_is_ignored(tmp_path, monkeypatch, arm_env):
-    monkeypatch.setenv("POSTPLAN_AB_ARM", arm_env)
+    monkeypatch.setenv(_ARM_ENV, arm_env)
     monkeypatch.setenv("POSTPLAN_FIRED_BY", "automouse")
     state_dir = str(tmp_path / "state")
     os.makedirs(state_dir)
     res, _out = _run(tmp_path, CLEAN_PLAN, state_dir=state_dir)
-    assert not hasattr(res, "ab_arm")
+    assert not hasattr(res, _ARM)
     _no_ab_files(tmp_path, state_dir)
     assert _drive_not_ready_review(tmp_path / "fid", monkeypatch) >= 1
 

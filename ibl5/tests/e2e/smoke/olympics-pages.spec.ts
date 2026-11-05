@@ -53,7 +53,7 @@ test.describe('Olympics nav filtering', () => {
 
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Standings' }).first()).toBeVisible();
     await expect(nav.locator('.nav-dropdown-item', { hasText: 'Contracts' })).not.toBeAttached();
-    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Draft Pick Locator' })).not.toBeAttached();
+    await expect(nav.locator('.nav-dropdown-item', { hasText: 'Draft Info' })).not.toBeAttached();
   });
 
   test('Olympics nav: IBL-only History links absent', async ({ page }) => {

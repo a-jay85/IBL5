@@ -1,6 +1,6 @@
 ---
 description: Main site navigation bar (desktop and mobile) rendered via Repository/Service/View pattern with sub-views for teams, login, and menus.
-last_verified: 2026-09-22
+last_verified: 2026-11-02
 ---
 
 # Navigation Module

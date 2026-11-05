@@ -11,12 +11,14 @@ use Auth\AuthService;
 use DraftHistory\DraftHistoryRepository;
 use DraftHistory\DraftHistoryView;
 use DraftInfo\DraftInfoView;
+use DraftInfo\HistorySubTabState;
 use DraftPickLocator\DraftPickLocatorRepository;
 use DraftPickLocator\DraftPickLocatorService;
 use DraftPickLocator\DraftPickLocatorView;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use ProjectedDraftOrder\ProjectedDraftOrderService;
 use ProjectedDraftOrder\ProjectedDraftOrderView;
+use Repositories\TeamIdentityRepository;
 
 $module_name = basename(dirname(__FILE__));
 global $mysqli_db;
@@ -116,6 +118,7 @@ $tabs = new \UI\Components\PageTabs(DraftInfoView::TABS, DraftInfoView::DEFAULT_
 $tab = $tabs->resolve($_GET['tab'] ?? null);
 
 $trailingHtml = '';
+$draftInfoView = new DraftInfoView();
 
 if ($tab === DraftInfoView::TAB_PICKS) {
     $season = \Season\SharedSeason::get($mysqli_db);
@@ -139,16 +142,32 @@ if ($tab === DraftInfoView::TAB_PICKS) {
         }
     }
 
-    if ($team instanceof \Team\Team) {
-        $tabBodyHtml = $historyView->renderTeamHistory($team, $historyRepository->getDraftPicksByTeam($team->name));
-        $pagetitle = "- {$team->name} Draft History";
+    $view = is_string($_GET['view'] ?? null) ? $_GET['view'] : '';
+    $identityRepository = new TeamIdentityRepository($mysqli_db);
+    $viewerTeamId = HistorySubTabState::resolveViewerTeamId(
+        (new AuthService(new AuthRepository($mysqli_db)))->getUsername(),
+        $identityRepository->getTeamnameFromUsername(...),
+        $identityRepository->getTidFromTeamname(...),
+    );
+    $state = HistorySubTabState::resolve($team?->teamid, $team?->name, $view, $viewerTeamId);
+
+    if ($state->showLoginPrompt) {
+        $panelHtml = $draftInfoView->renderTeamLoginPrompt();
+        $pagetitle = '- My Team Draft History';
+    } elseif ($state->teamIdToRender !== null) {
+        $renderTeam = ($team instanceof \Team\Team && $team->teamid === $state->teamIdToRender)
+            ? $team
+            : \Team\Team::initialize($mysqli_db, $state->teamIdToRender);
+        $panelHtml = $historyView->renderTeamHistory($renderTeam, $historyRepository->getDraftPicksByTeam($renderTeam->name));
+        $pagetitle = "- {$renderTeam->name} Draft History";
     } else {
         $startYear = $historyRepository->getFirstDraftYear();
         $endYear = $historyRepository->getLastDraftYear();
         $year = is_string($_REQUEST['year'] ?? null) ? (int) $_REQUEST['year'] : $endYear;
-        $tabBodyHtml = $historyView->render($year, $startYear, $endYear, $historyRepository->getDraftPicksByYear($year));
+        $panelHtml = $historyView->render($year, $startYear, $endYear, $historyRepository->getDraftPicksByYear($year));
         $pagetitle = "- $year Draft";
     }
+    $tabBodyHtml = $draftInfoView->renderHistorySubTabs($state->activeSubTab, $state->teamTabLabel, $state->otherTeamId, $panelHtml);
 } else {
     // order tab (default)
     $season = \Season\SharedSeason::get($mysqli_db);
@@ -174,7 +193,6 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     $pagetitle = $isFinalized ? '- Draft Order' : '- Projected Draft Order';
 }
 
-$draftInfoView = new DraftInfoView();
 PageLayout\PageLayout::header();
 echo $draftInfoView->render($tab, $tabBodyHtml);
 echo $trailingHtml;

@@ -43,16 +43,83 @@ test.describe('DraftInfo: tab navigation', () => {
     expect(await page.locator('tr[data-team-id]').count()).toBeGreaterThanOrEqual(28);
   });
 
-  test('clicking Past drafts loads the history tab', async ({ page }) => {
+  test('clicking History loads the League sub-tab', async ({ page }) => {
     await page.goto('modules.php?name=DraftInfo');
 
     await page.locator('a.ibl-tab[data-tab="history"]').click();
     await expect(page).toHaveURL(/tab=history/);
 
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await expect(
       page.locator('a.ibl-tab--active[data-tab="history"]'),
+    ).toHaveText('History');
+    await expect(
+      page.locator('.ibl-tabs--sub .ibl-tab[aria-current="page"]'),
+    ).toHaveText('League');
+    await expect(
+      page.locator('.ibl-subtab-panel .ibl-data-table').first(),
     ).toBeVisible();
+  });
+
+  test('My team sub-tab shows a login prompt when logged out', async ({ page }) => {
+    await page.goto('modules.php?name=DraftInfo&tab=history');
+
+    await page.locator('.ibl-tabs--sub a.ibl-tab[data-tab="team"]').click();
+    await expect(page).toHaveURL(/view=team/);
+
+    await expect(
+      page.locator('.ibl-subtab-login-prompt a[href="modules.php?name=YourAccount"]'),
+    ).toBeVisible();
+    await expect(page.locator('.ibl-subtab-panel .ibl-data-table')).toHaveCount(0);
+  });
+
+  test('year switcher swaps the table and keeps the sub-tab strip', async ({ page }) => {
+    await page.goto('modules.php?name=DraftInfo&tab=history');
+
+    const select = page.locator('#draft-year-select');
+    const year = await select.locator('option').nth(1).getAttribute('value');
+    expect(year).toBeTruthy();
+
+    const apiResponse = page.waitForResponse(
+      (r) => r.url().includes('op=api') && r.status() === 200,
+    );
+    await select.selectOption(year!);
+    await apiResponse;
+
+    await expect(page).toHaveURL(new RegExp('year=' + year));
+    await expect(page.locator('.ibl-tabs--sub .ibl-tab')).toHaveCount(2);
+    await expect(
+      page.locator('.ibl-tabs--sub .ibl-tab[data-tab="league"]'),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('teamid link selects a team sub-tab labeled with the team name', async ({ page }) => {
+    await page.goto('modules.php?name=DraftInfo&tab=history&teamid=2');
+
+    const title = ((await page.locator('h1.ibl-title').first().textContent()) ?? '').trim();
+    const teamName = title.replace(/ Draft History$/i, '');
+
+    const active = page.locator('.ibl-tabs--sub .ibl-tab[aria-current="page"]');
+    await expect(active).toHaveText(teamName, { ignoreCase: true });
+    await expect(active).not.toHaveText('My team');
+    await expect(active).toHaveAttribute('href', /teamid=2/);
+  });
+
+  test('Season menu has one Draft Info link to the Order tab', async ({ page }) => {
+    await page.goto('modules.php?name=DraftInfo&tab=history');
+
+    const link = page.locator('.nav-dropdown-item', { hasText: /^\s*Draft Info\s*$/ }).first();
+    await expect(link).toBeAttached();
+    await expect(link).toHaveAttribute('href', 'modules.php?name=DraftInfo&tab=order');
+    expect(((await link.textContent()) ?? '').trim()).toBe('Draft Info');
+    await expect(
+      page.locator('.nav-dropdown-item', { hasText: 'Draft Pick Locator' }),
+    ).not.toBeAttached();
+    await expect(
+      page.locator('.nav-dropdown-item', { hasText: 'Projected Draft Order' }),
+    ).not.toBeAttached();
+
+    await page.goto('modules.php?name=DraftInfo&tab=order');
+    await expect(page.locator('.ibl-tabs a.ibl-tab--active').first()).toHaveText('Order');
   });
 
   test('unknown tab falls back to Order', async ({ page }) => {
@@ -109,18 +176,15 @@ test.describe('DraftInfo: legacy redirects', () => {
 });
 
 test.describe('DraftInfo: nav links', () => {
-  test('nav exposes the three draft tabs and no legacy draft link', async ({ page }) => {
+  test('nav exposes one Draft Info link and no legacy draft link', async ({ page }) => {
     await page.goto('index.php');
 
     await expect(
       page.locator('a[href*="name=DraftInfo&tab=order"]').first(),
     ).toBeAttached();
     await expect(
-      page.locator('a[href*="name=DraftInfo&tab=picks"]').first(),
-    ).toBeAttached();
-    await expect(
-      page.locator('a[href*="name=DraftInfo&tab=history"]').first(),
-    ).toBeAttached();
+      page.locator('a[href*="name=DraftInfo&tab=picks"]'),
+    ).toHaveCount(0);
 
     await expect(page.locator('a[href*="name=DraftPickLocator"]')).toHaveCount(0);
     await expect(page.locator('a[href*="name=ProjectedDraftOrder"]')).toHaveCount(0);
@@ -128,14 +192,16 @@ test.describe('DraftInfo: nav links', () => {
       page.locator('a[href="modules.php?name=DraftHistory"]'),
     ).toHaveCount(0);
 
-    const picksHref = await page
-      .locator('a[href*="name=DraftInfo&tab=picks"]')
+    const orderHref = await page
+      .locator('a[href*="name=DraftInfo&tab=order"]')
       .first()
       .getAttribute('href');
-    expect(picksHref).not.toBeNull();
-    await page.goto(picksHref as string);
+    expect(orderHref).not.toBeNull();
+    await page.goto(orderHref as string);
     await expect(
-      page.locator('a.ibl-tab--active[data-tab="picks"]'),
+      page.locator('a.ibl-tab--active[data-tab="order"]'),
     ).toBeVisible();
+    await expect(page.locator('a.ibl-tab[data-tab="picks"]')).toBeVisible();
+    await expect(page.locator('a.ibl-tab[data-tab="history"]')).toBeVisible();
   });
 });

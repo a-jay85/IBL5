@@ -69,7 +69,6 @@ function themeheader(): void
     $seasonPhase = '';
     $allowWaivers = '';
     $showDraftLink = '';
-    $isDraftOrderFinalized = false;
     if ($db !== null) {
         try {
             $season = \Season\SharedSeason::get($db, $leagueContext);
@@ -80,9 +79,6 @@ function themeheader(): void
             // Graceful degradation: Season init can fail during CI migration
             // window when column renames are in progress. Nav renders with defaults.
         }
-
-        $draftOrderRepo = new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db);
-        $isDraftOrderFinalized = $draftOrderRepo->isDraftOrderFinalized();
     }
 
     $rawServerName = $_SERVER['SERVER_NAME'] ?? null;
@@ -110,7 +106,6 @@ function themeheader(): void
         showDraftLink: $showDraftLink,
         serverName: $serverName,
         requestUri: $requestUri,
-        isDraftOrderFinalized: $isDraftOrderFinalized,
         isDebugAdmin: $debugSession->isDebugAdmin(),
         isAdmin: $nukeCompat->isAdmin(),
         debugViewAllExtensions: $debugSession->isViewAllExtensionsEnabled(),

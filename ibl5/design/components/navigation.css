@@ -269,6 +269,39 @@
     width: 100%;
 }
 
+/* Nested sub-tabs inside a hub panel (DraftInfo History: League / My team).
+   Reuses the .ibl-tabs / .ibl-tab markup but drops the navy bar: a light
+   gray tray with a raised white chip for the active tab, so it reads as a
+   second level under the navy hub tabs. */
+.ibl-tabs.ibl-tabs--sub {
+    gap: var(--space-1);
+    margin: 0 var(--space-4) var(--space-4);
+    padding: var(--space-1);
+    background: var(--gray-100);
+    border-radius: var(--radius-md);
+    flex-wrap: nowrap;
+}
+.ibl-tabs--sub .ibl-tab {
+    padding: var(--space-1) var(--space-3);
+    color: var(--gray-600);
+    border-bottom: none;
+    border-radius: var(--radius-sm);
+}
+.ibl-tabs--sub .ibl-tab:hover {
+    color: var(--navy-800);
+    background: var(--gray-200);
+}
+.ibl-tabs--sub .ibl-tab--active,
+.ibl-tabs--sub .ibl-tab--active:hover {
+    /* accent-700, not 500/600: those fall under 4.5:1 on white. */
+    color: var(--accent-700);
+    background: var(--white);
+    box-shadow: var(--shadow-sm);
+}
+.ibl-subtab-login-prompt {
+    padding: 1rem 0;
+}
+
 .ibl-tab-card .sticky-scroll-wrapper {
     max-width: 100%;
 }

@@ -126,6 +126,24 @@ final class PageTabsTest extends TestCase
         $this->assertStringContainsString('data-tab="2025" aria-current="page"', $html);
     }
 
+    public function testRenderTabBarGoldenMarkupIsStable(): void
+    {
+        $tabs = new PageTabs(['a' => 'Alpha', 'b' => 'B & C'], 'a');
+        $this->assertSame(
+            '<div class="ibl-tabs"><a class="ibl-tab ibl-tab--active" href="modules.php?name=X&amp;tab=a" data-tab="a" aria-current="page">Alpha</a><a class="ibl-tab" href="modules.php?name=X&amp;tab=b" data-tab="b">B &amp; C</a></div>',
+            $tabs->renderTabBar('a', 'modules.php?name=X')
+        );
+    }
+
+    public function testWrapPanelGoldenMarkupIsStable(): void
+    {
+        $tabs = new PageTabs(['a' => 'A'], 'a');
+        $this->assertSame(
+            '<div class="ibl-tab-panel" data-tab="a"><p>x</p></div>',
+            $tabs->wrapPanel('<p>x</p>', 'a')
+        );
+    }
+
     public function testRenderTabBarActiveTabHasActiveClass(): void
     {
         $tabs = $this->makeTabs();
@@ -213,6 +231,61 @@ final class PageTabsTest extends TestCase
         $out = $tabs->wrapPanel('', '"><script>');
         $this->assertStringContainsString('data-tab="&quot;&gt;&lt;script&gt;"', $out);
         $this->assertStringNotContainsString('<script>', $out);
+    }
+
+    /**
+     * @return list<array{key: string, label: string, href: string}>
+     */
+    private function stripItems(): array
+    {
+        return [
+            ['key' => 'league', 'label' => 'League', 'href' => 'modules.php?name=X&tab=h'],
+            ['key' => 'team', 'label' => 'My team', 'href' => 'modules.php?name=X&tab=h&view=team'],
+        ];
+    }
+
+    public function testRenderLinkStripUsesExplicitHrefs(): void
+    {
+        $html = PageTabs::renderLinkStrip($this->stripItems(), 'league');
+        $this->assertStringContainsString('href="modules.php?name=X&amp;tab=h&amp;view=team"', $html);
+        $this->assertStringNotContainsString('&amp;tab=team', $html);
+    }
+
+    public function testRenderLinkStripAppendsModifierClass(): void
+    {
+        $html = PageTabs::renderLinkStrip($this->stripItems(), 'league', 'ibl-tabs--sub');
+        $this->assertStringStartsWith('<div class="ibl-tabs ibl-tabs--sub">', $html);
+    }
+
+    public function testRenderLinkStripOmitsModifierWhenEmpty(): void
+    {
+        $html = PageTabs::renderLinkStrip($this->stripItems(), 'league', '');
+        $this->assertStringStartsWith('<div class="ibl-tabs">', $html);
+    }
+
+    public function testRenderLinkStripMarksOnlyActiveItem(): void
+    {
+        $html = PageTabs::renderLinkStrip($this->stripItems(), 'team');
+        $this->assertSame(1, substr_count($html, 'aria-current="page"'));
+        $this->assertStringContainsString('data-tab="team" aria-current="page"', $html);
+    }
+
+    public function testRenderLinkStripUnknownActiveMarksNone(): void
+    {
+        $html = PageTabs::renderLinkStrip($this->stripItems(), 'nope');
+        $this->assertSame(0, substr_count($html, 'aria-current'));
+        $this->assertStringNotContainsString('ibl-tab--active', $html);
+    }
+
+    public function testRenderLinkStripEscapesLabelAndHref(): void
+    {
+        $html = PageTabs::renderLinkStrip(
+            [['key' => 'x', 'label' => '<b>A&B</b>', 'href' => 'x?a=1&b="2"']],
+            'x'
+        );
+        $this->assertStringContainsString('&lt;b&gt;A&amp;B&lt;/b&gt;', $html);
+        $this->assertStringNotContainsString('<b>', $html);
+        $this->assertStringContainsString('&quot;2&quot;', $html);
     }
 
     // --- Phase 5: security-discharge structural assertions ---

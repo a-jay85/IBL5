@@ -18,7 +18,6 @@ class NavigationMenuBuilderTest extends TestCase
         string $seasonPhase = 'Regular Season',
         string $allowWaivers = 'No',
         string $showDraftLink = 'Off',
-        bool $isDraftOrderFinalized = false,
         bool $isAdmin = false,
     ): NavigationConfig {
         return new NavigationConfig(
@@ -29,7 +28,6 @@ class NavigationMenuBuilderTest extends TestCase
             seasonPhase: $seasonPhase,
             allowWaivers: $allowWaivers,
             showDraftLink: $showDraftLink,
-            isDraftOrderFinalized: $isDraftOrderFinalized,
             isAdmin: $isAdmin,
         );
     }
@@ -58,7 +56,6 @@ class NavigationMenuBuilderTest extends TestCase
             seasonPhase: 'Regular Season',
             allowWaivers: 'No',
             showDraftLink: 'Off',
-            isDraftOrderFinalized: false,
             isAdmin: false,
             isDebugAdmin: true,
         );
@@ -361,7 +358,7 @@ class NavigationMenuBuilderTest extends TestCase
 
         $expectedSeasonLinks = [
             'Standings', 'Schedule', 'Injuries', 'Player Database', 'Player Export',
-            'Draft Pick Locator', 'Training Camp Ratings Diff',
+            'Draft Info', 'Training Camp Ratings Diff',
             'Free Agency Preview', 'Player Movement',
         ];
         foreach ($expectedSeasonLinks as $label) {
@@ -387,6 +384,31 @@ class NavigationMenuBuilderTest extends TestCase
         foreach ($expectedHistoryLinks as $label) {
             $this->assertContains($label, $historyLabels, "History menu should contain '$label'");
         }
+    }
+
+    public function testIblSeasonMenuLabelOrderIsPinned(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(currentLeague: 'ibl'));
+        $menus = $builder->getMenuStructure();
+
+        $labels = array_map(
+            static fn (array $link): string => $link['label'] ?? strip_tags($link['rawHtml'] ?? ''),
+            $menus['Season']['links']
+        );
+
+        $this->assertSame([
+            'Standings',
+            'Schedule',
+            'Injuries',
+            'Player Database',
+            'Player Export',
+            'Cap Space / Contracts',
+            'Draft Info',
+            'Training Camp Ratings Diff',
+            'Free Agency Preview',
+            'Player Movement',
+            'JSB Export',
+        ], $labels);
     }
 
     public function testIblSeasonMenuHasSplitCapSpaceContractsLinkAndNoLegacyLinks(): void
@@ -430,12 +452,12 @@ class NavigationMenuBuilderTest extends TestCase
         $allLabels = [];
         foreach ($menus as $menu) {
             foreach ($menu['links'] as $link) {
-                $allLabels[] = $link['label'] ?? ($link['rawHtml'] ?? '');
+                $allLabels[] = $link['label'] ?? strip_tags($link['rawHtml'] ?? '');
             }
         }
 
         $shouldBeAbsent = [
-            'Contracts', 'Projected Draft Order', 'Draft Pick Locator',
+            'Contracts', 'Draft Info',
             'Training Camp Ratings Diff', 'Free Agency Preview',
             'Player Movement', 'Franchise History', 'Draft History',
             'All-Star Appearances', '1-On-1 Game', 'JSB Export',
@@ -455,63 +477,52 @@ class NavigationMenuBuilderTest extends TestCase
         }
     }
 
-    // --- Draft Order Finalization Tests ---
+    // --- Draft Info Link Tests ---
 
-    public function testProjectedDraftOrderLabelWhenNotFinalized(): void
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function draftInfoSeasonLinks(string $seasonPhase = 'Regular Season'): array
     {
-        $builder = new NavigationMenuBuilder($this->createConfig(isDraftOrderFinalized: false));
+        $builder = new NavigationMenuBuilder($this->createConfig(seasonPhase: $seasonPhase));
         $menus = $builder->getMenuStructure();
 
-        $seasonLinks = $menus['Season']['links'];
-        $draftOrderLink = null;
-        foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
-                $draftOrderLink = $link;
-                break;
-            }
-        }
-
-        $this->assertNotNull($draftOrderLink);
-        $this->assertSame('Projected Draft Order', $draftOrderLink['label']);
-        $this->assertArrayNotHasKey('badge', $draftOrderLink);
+        return array_values(array_filter(
+            $menus['Season']['links'],
+            static fn (array $link): bool => str_contains($link['url'] ?? '', 'name=DraftInfo')
+        ));
     }
 
-    public function testDraftOrderLabelWithFinalBadgeWhenFinalizedDuringDraft(): void
+    public function testSeasonMenuHasSingleDraftInfoLinkToOrderTab(): void
     {
-        $builder = new NavigationMenuBuilder($this->createConfig(isDraftOrderFinalized: true, seasonPhase: 'Draft'));
-        $menus = $builder->getMenuStructure();
+        $links = $this->draftInfoSeasonLinks();
 
-        $seasonLinks = $menus['Season']['links'];
-        $draftOrderLink = null;
-        foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
-                $draftOrderLink = $link;
-                break;
-            }
-        }
-
-        $this->assertNotNull($draftOrderLink);
-        $this->assertSame('Draft Order', $draftOrderLink['label']);
-        $this->assertSame('FINAL', $draftOrderLink['badge'] ?? null);
+        $this->assertCount(1, $links);
+        $this->assertSame('Draft Info', $links[0]['label']);
+        $this->assertSame('modules.php?name=DraftInfo&tab=order', $links[0]['url']);
+        $this->assertArrayNotHasKey('badge', $links[0]);
     }
 
-    public function testDraftOrderLabelWithoutBadgeWhenFinalizedOutsideDraft(): void
+    public function testSeasonDraftInfoLinkHasNoBadgeDuringDraftPhase(): void
     {
-        $builder = new NavigationMenuBuilder($this->createConfig(isDraftOrderFinalized: true, seasonPhase: 'Regular Season'));
+        $links = $this->draftInfoSeasonLinks('Draft');
+
+        $this->assertCount(1, $links);
+        $this->assertArrayNotHasKey('badge', $links[0]);
+    }
+
+    public function testSeasonMenuDropsOldDraftLabels(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
         $menus = $builder->getMenuStructure();
+        $seasonLabels = array_map(
+            static fn (array $link): string => $link['label'] ?? '',
+            $menus['Season']['links']
+        );
 
-        $seasonLinks = $menus['Season']['links'];
-        $draftOrderLink = null;
-        foreach ($seasonLinks as $link) {
-            if (str_contains($link['url'] ?? '', 'DraftInfo')) {
-                $draftOrderLink = $link;
-                break;
-            }
-        }
-
-        $this->assertNotNull($draftOrderLink);
-        $this->assertSame('Draft Order', $draftOrderLink['label']);
-        $this->assertNull($draftOrderLink['badge'] ?? null);
+        $this->assertNotContains('Projected Draft Order', $seasonLabels);
+        $this->assertNotContains('Draft Order', $seasonLabels);
+        $this->assertNotContains('Draft Pick Locator', $seasonLabels);
     }
 
     public function testAllStarAppearancesLinkPointsToAllStarAppearancesModule(): void
@@ -625,7 +636,7 @@ class NavigationMenuBuilderTest extends TestCase
         $urls = array_column($allLinks, 'url');
 
         $this->assertContains('modules.php?name=DraftInfo&tab=order', $urls);
-        $this->assertContains('modules.php?name=DraftInfo&tab=picks', $urls);
+        $this->assertNotContains('modules.php?name=DraftInfo&tab=picks', $urls);
         $this->assertContains('modules.php?name=DraftInfo&tab=history', $urls);
 
         $teamMenu = $builder->getMyTeamMenu();

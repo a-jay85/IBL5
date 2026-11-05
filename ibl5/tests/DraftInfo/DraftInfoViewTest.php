@@ -36,7 +36,7 @@ class DraftInfoViewTest extends TestCase
         $this->assertLessThan($historyPos, $picksPos);
         $this->assertStringContainsString('>Order</a>', $html);
         $this->assertStringContainsString('>Pick ownership</a>', $html);
-        $this->assertStringContainsString('>Past drafts</a>', $html);
+        $this->assertStringContainsString('>History</a>', $html);
     }
 
     public function testRenderMarksOnlyActiveTabActive(): void
@@ -85,5 +85,75 @@ class DraftInfoViewTest extends TestCase
 
         $this->assertStringNotContainsString('data-tab=""><script>', $html);
         $this->assertStringNotContainsString('"><script>', $html);
+    }
+
+    public function testHistoryTabLabelIsHistory(): void
+    {
+        $html = $this->view->render('history', '');
+
+        $this->assertStringContainsString('>History</a>', $html);
+        $this->assertStringNotContainsString('Past drafts', $html);
+    }
+
+    public function testHistorySubTabsLeagueHrefHasNoViewOrTeamParam(): void
+    {
+        $html = $this->view->renderHistorySubTabs('league', 'My team', null, '');
+
+        $this->assertStringContainsString('href="modules.php?name=DraftInfo&amp;tab=history"', $html);
+    }
+
+    public function testHistorySubTabsMyTeamHrefUsesViewTeam(): void
+    {
+        $html = $this->view->renderHistorySubTabs('team', 'My team', null, '');
+
+        $this->assertStringContainsString('href="modules.php?name=DraftInfo&amp;tab=history&amp;view=team"', $html);
+        $this->assertStringNotContainsString('teamid=', $html);
+    }
+
+    public function testHistorySubTabsOtherTeamHrefUsesTeamid(): void
+    {
+        $html = $this->view->renderHistorySubTabs('team', 'Celtics', 7, '');
+
+        $this->assertStringContainsString('&amp;tab=history&amp;teamid=7"', $html);
+        $this->assertStringNotContainsString('view=team', $html);
+    }
+
+    public function testHistorySubTabsMarksActiveSubTab(): void
+    {
+        $html = $this->view->renderHistorySubTabs('team', 'My team', null, '');
+
+        $this->assertSame(1, substr_count($html, 'aria-current="page"'));
+        $this->assertStringContainsString('data-tab="team" aria-current="page"', $html);
+        $this->assertStringContainsString('class="ibl-tab" href="modules.php?name=DraftInfo&amp;tab=history" data-tab="league">', $html);
+    }
+
+    public function testHistorySubTabsEscapesTeamLabel(): void
+    {
+        $html = $this->view->renderHistorySubTabs('team', '<script>x</script>', 3, '');
+
+        $this->assertStringContainsString('&lt;script&gt;', $html);
+        $this->assertStringNotContainsString('<script>', $html);
+    }
+
+    public function testHistorySubTabsWrapsPanelVerbatimWithModifier(): void
+    {
+        $html = $this->view->renderHistorySubTabs('league', 'My team', null, '<div id="draft-history-content">x</div>');
+
+        $this->assertStringContainsString('class="ibl-tabs ibl-tabs--sub"', $html);
+        $this->assertStringContainsString(
+            '<div class="ibl-subtab-panel" data-subtab="league"><div id="draft-history-content">x</div></div>',
+            $html
+        );
+    }
+
+    public function testTeamLoginPromptLinksToLogin(): void
+    {
+        $html = $this->view->renderTeamLoginPrompt();
+
+        $this->assertSame(
+            '<p class="ibl-subtab-login-prompt"><a href="modules.php?name=YourAccount">Log in</a>'
+            . ' to see your team&#039;s draft history.</p>',
+            $html
+        );
     }
 }

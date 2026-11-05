@@ -80,6 +80,11 @@
     /* em, not rem: the select inherits the h1 font size, and so does the
        1.25em chevron. A rem gap stays small while the digits grow into it. */
     padding: 0.25rem 1.75em 0.25rem 0.5rem;
+    /* The browser sizes the text box a hair narrower than the display
+       font's digits, which clips the last digit. Floor it at 4 digits
+       plus slack. content-box so the floor ignores padding. */
+    box-sizing: content-box;
+    min-width: calc(4ch + 0.25em);
     font-size: inherit;
     font-weight: inherit;
     color: inherit;

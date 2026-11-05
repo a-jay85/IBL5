@@ -350,14 +350,20 @@ def fidelity_notes_prompt(verdict_text: str) -> str:
         "  - \"detail\": two or three sentences a reader can act on weeks later without "
         "opening the PR: name the file (and function or test when the verdict gives one), "
         "what is wrong, and the change to make\n"
-        "  - \"kind\": one of the eight above\n\n"
+        "  - \"kind\": one of the eight above\n"
+        "  - \"harm\": what breaks if this is never fixed, one of: crash; wrong-value (a "
+        "wrong value is stored or shown); lost-data; security; false-gate (a gate, check "
+        "or test runner passes when it should fail, or blocks when it should pass); none. "
+        "Use none for a test that could be tighter, doc wording, tidying, or an input "
+        "nobody sends. When torn, use none.\n\n"
         "Only `followup` is filed; the rest are discarded. When torn, do NOT call it "
         "`followup` — a dropped note costs nothing, a wrongly filed one is noise a human "
         "triages by hand. A note that only describes a difference, naming no remaining "
         "work, is never `followup`.\n\n"
         "Cover only the notes, not blocking findings. Return [] if there are none.\n\n"
         f"VERDICT:\n{verdict_text[:8000]}\n\n"
-        'Return ONLY JSON: [{"title": "...", "detail": "...", "kind": "followup"}] or [].'
+        'Return ONLY JSON: [{"title": "...", "detail": "...", "kind": "followup", '
+        '"harm": "none"}] or [].'
     )
 
 

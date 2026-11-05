@@ -1095,14 +1095,25 @@ class LiveGit:
         _sys.stderr.write(f"postplan: {note}\n")
         _sys.stderr.flush()
 
-    def _rebind_carried_flag(self, branch: str) -> None:
+    def _rebind_carried_flag(self, branch: str, pre_rebase_sha: Optional[str] = None) -> None:
         """A clean replay re-stamps the commit a carried condition-(14) marker names.
         Without a new entry the next run finds the old SHA gone and drops the hold with no
         CONFLICT-REVIEW=CLEAN verdict. Append the new HEAD. Only a SHA-bound "carried"
-        marker is re-bound; an unknown one stays untouched."""
+        marker is re-bound; an unknown one stays untouched. A failed write restores the
+        pre-rebase head, so the old SHA stays in history and the hold survives."""
         from ..armable import FLAG_CARRIED, record_conflict_resolution
-        if self.last_conflict_flag_state == FLAG_CARRIED:
+        if self.last_conflict_flag_state != FLAG_CARRIED:
+            return
+        try:
             record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+        except (OSError, ValueError) as exc:
+            if pre_rebase_sha is None:
+                raise
+            from ..conflict import abort_and_restore
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"could not re-bind conflict flag: "
+                                     f"{exc.__class__.__name__}: {exc}")
 
     def _rebase_in_progress(self) -> bool:
         for sub in ("rebase-merge", "rebase-apply"):
@@ -1251,7 +1262,7 @@ class LiveGit:
                 f"rebase did not start: {(proc.stderr or proc.stdout).strip()[:400]}")
         if proc.returncode == 0:
             self._assert_no_sync_merges(master_sha, pre_rebase_sha)
-            self._rebind_carried_flag(branch)
+            self._rebind_carried_flag(branch, pre_rebase_sha)
             return
         conflict_detail =(proc.stderr or proc.stdout).strip()[:400]
 
@@ -1286,7 +1297,7 @@ class LiveGit:
             (*_NO_RERERE, "rebase", "--onto", master_sha, upstream), errors="replace")
         if proc.returncode == 0:
             self._assert_no_sync_merges(master_sha, pre_rebase_sha)
-            self._rebind_carried_flag(branch)
+            self._rebind_carried_flag(branch, pre_rebase_sha)
             return
         if not self._rebase_in_progress():
             abort_and_restore(self._run, worktree=self.worktree,

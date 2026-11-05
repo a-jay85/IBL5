@@ -34,6 +34,37 @@ final class NewsFactory implements ModuleFactoryInterface
         string $tableBgcolor2 = '#CCCCCC',
     ): \Topics\News\NewsController {
         $db = $this->services->db();
+        $season = $this->services->season();
+        $tradeFormRepo = new \Trading\TradeFormRepository($db);
+        $tradeValidator = new \Trading\TradeValidator($db, $season);
+        $teamModeRepo = new \TradeSuggestions\TeamModeRepository($db);
+
+        $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
+            new \TradeSuggestions\TeamModeService($teamModeRepo, new \TradeSuggestions\TeamModeGuesser()),
+            $teamModeRepo,
+            new \TradeSuggestions\SuggestionAssetRepository($db),
+            new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db)),
+            $tradeFormRepo,
+            new \Settings\SettingsService($season),
+            $season,
+            new \TradeSuggestions\PickValuer(),
+            new \TradeSuggestions\NeedsCardBuilder(),
+            new \TradeSuggestions\NeedPairMatcher(),
+            new \TradeSuggestions\NeedJudge(),
+            new \TradeSuggestions\ReasonBuilder(),
+            new \TradeSuggestions\SuggestionValidationFilter(
+                $tradeValidator,
+                new \Trading\TradeCapCalculator(
+                    $this->services->teamIdentity(),
+                    new \Trading\BuyoutLedgerRepository($db),
+                    $season,
+                    $tradeValidator,
+                ),
+                $tradeFormRepo,
+                $season,
+            ),
+            new \TradeSuggestions\SuggestionRanker(),
+        );
 
         return new \Topics\News\NewsController(
             new \Topics\News\NewsPageConfig(
@@ -57,6 +88,8 @@ final class NewsFactory implements ModuleFactoryInterface
             new \Topics\News\NewsView(),
             onThisDayService: \OnThisDay\OnThisDayFactory::createService($db, $this->services->leagueContext()),
             onThisDayView: new \OnThisDay\OnThisDayView(),
+            tradeSuggestionsService: $tradeSuggestionsService,
+            tradeSuggestionsView: new \TradeSuggestions\TradeSuggestionsView(),
         );
     }
 }

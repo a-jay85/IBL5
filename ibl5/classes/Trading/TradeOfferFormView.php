@@ -235,17 +235,7 @@ $tradeConfig = [
         foreach ($players as $row) {
             $pid = $row['pid'];
             $ordinal = $row['ordinal'] ?? 0;
-            $contractYear = $row['cy'] ?? 0;
-
-            if ($isOffseason) {
-                $contractYear++;
-            }
-            if ($contractYear === 0) {
-                $contractYear = 1;
-            }
-
-            /** @var int $contractAmount */
-            $contractAmount = ($contractYear < 7) ? ($row["salary_yr{$contractYear}"] ?? 0) : 0;
+            $contractAmount = TradeFormContract::amountFor($row, $isOffseason);
             ?>
 <tr>
 <?php if ($contractAmount !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL):

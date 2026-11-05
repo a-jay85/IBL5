@@ -954,6 +954,29 @@ for iter in 1 2 3; do
 done
 h_pass "row44 — parallel normalize_queue calls serialize on .normalize.lock"
 # ---------------------------------------------------------------------------
+# Row 44a — a mkdir that wrongly reports success does not hand out the lock
+# twice. uutils mkdir (Ubuntu 26.04) does this to racing callers, so the shim
+# makes the race certain on every platform. Max tries 0 returns without a sleep.
+# ---------------------------------------------------------------------------
+setup
+out=$(
+    mkdir() { command mkdir "$@" 2>/dev/null; return 0; }
+    queue_lock "$NDIR/queue" 0; printf '%s ' "$?"
+    queue_lock "$NDIR/queue" 0; printf '%s' "$?"
+)
+h_eq "row44a first caller gets the lock, second is refused" "0 1" "$out"
+queue_unlock "$NDIR/queue"
+assert_absent "row44a unlock removes the lock" "$NDIR/queue/.normalize.lock"
+# A crashed holder leaves its owner file behind. The steal must still clear it.
+mkdir "$NDIR/queue/.normalize.lock"
+: > "$NDIR/queue/.normalize.lock/owner"
+touch -t 202001010000.00 "$NDIR/queue/.normalize.lock"
+queue_lock "$NDIR/queue" 0; rc=$?
+h_eq "row44a a crashed holder's lock is stolen" "0" "$rc"
+queue_unlock "$NDIR/queue"
+h_eq "row44a the steal leaves nothing behind" "" "$(ls -A "$NDIR/queue")"
+h_pass "row44a — a false mkdir success never makes two lock holders"
+# ---------------------------------------------------------------------------
 # Row 44b — an enqueue that lands while a renumber is between its two phases
 # waits for the queue lock instead of reusing a prefix. The fixture freezes a
 # renumber mid-flight by hand: the lock is held and both entries sit in the

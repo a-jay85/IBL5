@@ -2812,10 +2812,15 @@ fi
 # positives. Broad terms (csrf, authori[sz], security) hit 51-181 lines, mostly
 # "stays unchanged" notes. Re-measure the corpus before widening the lexicon.
 # The backlog link is the only release; there is no inline escape marker.
+# cf_section_named is case-sensitive. A plan may spell these headings in any
+# case, so rewrite a matching heading to the spelling asked for before the call.
+_sd_section() {
+    cf_section_named <(awk -v h="$1" 'tolower($0) ~ ("^##[[:space:]]*" tolower(h)) { print "## " h; next } { print }' "$PLAN_FILE") "$1"
+}
 _sd_lex='security (gap|hole|flaw|exposure)|residual exposure|any (holder of a )?valid api key|impersonat|privilege escalat|has no [a-z-]* ?(tier|auth[a-z]*|csrf|permission) (check|gate|guard)|has never checked|can approve as|(auth[a-z]*|csrf|tier) gap'
 _sd_ref='a-jay85/IBL5-backlog#[0-9]+'
 _sd_bullet='^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+'
-_sd_scope=$( { cf_section_named "$PLAN_FILE" "Out of Scope"; cf_section_named "$PLAN_FILE" "Non-Goals"; } \
+_sd_scope=$( { _sd_section "Out of Scope"; _sd_section "Non-Goals"; } \
     | grep -E "$_sd_bullet" \
     | grep -iE "$_sd_lex" \
     | grep -vE "$_sd_ref" || true)
@@ -2825,7 +2830,7 @@ if [ -n "$_sd_scope" ]; then
     done <<< "$_sd_scope"
 fi
 _sd_decl_re='^[[:space:]]*[-*][[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
-_sd_decl_bad=$(cf_section_named "$PLAN_FILE" "Deferred Security Gaps" \
+_sd_decl_bad=$(_sd_section "Deferred Security Gaps" \
     | grep -E "$_sd_bullet" \
     | grep -vE "$_sd_decl_re" || true)
 if [ -n "$_sd_decl_bad" ]; then

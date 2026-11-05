@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-04
+last_verified: 2026-11-03
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -163,8 +163,6 @@ If the judgment can only be rendered after *this PR's own* artifact is live on p
 ### Pre-prod testability — distinct from Verification-gap
 
 **Verification-gap mechanization** fires on a *silent* correctness property needing a mechanical self-check. **Pre-prod testability mechanization** fires on *deploy-dependent* behavior lacking any pre-prod-exercisable row. They overlap often — when both apply, one well-scoped phase can satisfy both; say so rather than writing two phases.
-
-A verification gap is *reducible*, unlike a `Truly-manual` UI/UX judgment or an `irreducible` hold.
 
 **Stub-only coverage is not a pre-prod exercise path**: a suite that drives only stubs (e.g. `STUB_CREATE_THREAD_FAIL`) proves the *caller's* branch handling, never that the real call shape works. The full worked catalogue — per-artifact-class rows with their reducible/intrinsic disposals — lives in `_plan-verification.md` § Pre-prod exercise paths.
 

@@ -182,5 +182,122 @@ def test_merge_target_helper_anomaly_fails_closed(repo, tmp_path, monkeypatch, b
     assert ei.value.kind == "base-resolve"
 
 
+def _online(monkeypatch):
+    monkeypatch.delenv("BRANCH_BASE_OFFLINE")
+
+
+def test_helper_publickey_and_gh_down_returns_2_prints_nothing(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", _err(OUTAGE_GIT_STDERR, 128))
+    _gh_script(tmp_path, monkeypatch, _err(GH_DOWN_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+    assert "origin/master" not in proc.stdout
+
+
+def test_helper_lsremote_unreachable_gh_none_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", _err(OUTAGE_GIT_STDERR, 128))
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_absent_branch_gh_down_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "gone")
+    _gh_script(tmp_path, monkeypatch, _err(GH_DOWN_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_absent_branch_gh_none_returns_1(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "gone")
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 1
+    assert proc.stdout == ""
+
+
+def test_helper_gh_timeout_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "gone")
+    _gh_script(tmp_path, monkeypatch, "sleep 5; exit 0")
+    proc = _helper(repo, pre="BRANCH_BASE_GH_TIMEOUT_SECS=1;")
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_lsremote_timeout_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", "sleep 5; exit 0")
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo, pre="BRANCH_BASE_LSREMOTE_TIMEOUT_SECS=1;")
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_git_5xx_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", _err(
+        "fatal: unable to access 'https://github.com/a-jay85/IBL5.git/': "
+        "The requested URL returned error: 503", 128))
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_gh_5xx_returns_2(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "gone")
+    _gh_script(tmp_path, monkeypatch,
+               _err("HTTP 502: Bad Gateway (https://api.github.com/graphql)", 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_unrecorded_gh_down_returns_2_not_master(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _gh_script(tmp_path, monkeypatch, _err(GH_DOWN_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_helper_unrecorded_gh_none_returns_master(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 0
+    assert proc.stdout == "origin/master\n"
+
+
+def test_helper_lsremote_other_exit_stays_answer(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", _err("error: unexpected", 1))
+    _gh_script(tmp_path, monkeypatch, _err(GH_NONE_STDERR, 1))
+    proc = _helper(repo)
+    assert proc.returncode == 1
+
+
+def test_helper_gh_near_miss_text_is_unreachable(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "gone")
+    _gh_script(tmp_path, monkeypatch, _err("no open pull requests", 1))
+    proc = _helper(repo)
+    assert proc.returncode == 2
+
+
 def test_adapters_define_merge_target():
     assert hasattr(LiveGit, "merge_target") and hasattr(ReplayGit, "merge_target")

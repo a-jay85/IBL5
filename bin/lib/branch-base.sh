@@ -69,19 +69,23 @@ branch_base_from_config() {
 # Uses explicit XXXXXX template for mktemp (not -t PREFIX, which is deprecated on GNU coreutils).
 # </dev/null is mandatory: a pre-push hook receives git's ref-update list on stdin; the first
 # subprocess that forgets to close it would consume that list and misbehave silently.
-_branch_base_run_timed() {
-    local secs="$1"; shift
+# _branch_base_run_timed_err <secs> <errfile> <cmd...>
+# Runs <cmd> under a hard timeout with stdout captured and stderr written to <errfile>.
+# Returns 124 on timeout (the coreutils timeout code), else the command's rc. Prints the
+# command's stdout only on rc 0.
+_branch_base_run_timed_err() {
+    local secs="$1" errf="$2"; shift 2
     local tmp rc ticks=0 maxTicks pid
     maxTicks=$(( secs * 5 ))
     tmp="$(mktemp "${TMPDIR:-/tmp}/branchbase.XXXXXX")" || return 1
-    "$@" >"$tmp" 2>/dev/null </dev/null &
+    "$@" >"$tmp" 2>"$errf" </dev/null &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         if [ "$ticks" -ge "$maxTicks" ]; then
             kill -9 "$pid" 2>/dev/null
             wait "$pid" 2>/dev/null
             rm -f "$tmp"
-            return 1
+            return 124
         fi
         sleep 0.2
         ticks=$(( ticks + 1 ))
@@ -90,6 +94,12 @@ _branch_base_run_timed() {
     if [ "$rc" -eq 0 ]; then cat "$tmp"; fi
     rm -f "$tmp"
     return "$rc"
+}
+
+# _branch_base_run_timed <secs> <cmd...>: _branch_base_run_timed_err with stderr discarded.
+_branch_base_run_timed() {
+    local secs="$1"; shift
+    _branch_base_run_timed_err "$secs" /dev/null "$@"
 }
 
 # _branch_base_gh <repo_root> <branch>
@@ -120,31 +130,53 @@ branch_base_resolve() {
 # Layer order matches branch_base_resolve: iblBase config first, then gh baseRefName.
 # A recorded name that origin no longer has (the parent merged and was deleted) falls
 # through to gh, which reports the retargeted base.
-# Prints "origin/<name>" and returns 0. With no iblBase key and no gh answer it prints
-# "origin/master" (an unstacked branch). Returns 1 and prints nothing when the iblBase key
-# is set but no layer resolves: a stacked branch never falls back to master.
+# Prints "origin/<name>" and returns 0. With no iblBase key, and gh answering that the
+# branch has no PR (or gh absent or offline), it prints "origin/master" (an unstacked branch).
+# Returns 1 and prints nothing when the iblBase key is set and every layer that ran
+# answered that the base is absent: a stacked branch never falls back to master.
+# Returns 2 and prints nothing when a layer could not ask GitHub and no layer resolved:
+# ls-remote exit 128 or a timeout, or a gh timeout or a gh failure whose stderr is not
+# gh's no-PR text. Callers treat 2 as GitHub unreachable, never as absence or master.
 # Read-only: it never fetches. The caller fetches the printed ref before merging.
 branch_base_merge_target() {
-    local repo="$1" branch="$2" name recorded=0
+    local repo="$1" branch="$2" name recorded=0 unreach=0 rc errf
     name="$(git -C "$repo" config --get "branch.$branch.iblBase" 2>/dev/null)" || name=""
     if [ -n "$name" ]; then
         recorded=1
-        if _branch_base_valid_name "$name" \
-            && _branch_base_run_timed "$BRANCH_BASE_LSREMOTE_TIMEOUT_SECS" \
+        if _branch_base_valid_name "$name"; then
+            rc=0
+            _branch_base_run_timed "$BRANCH_BASE_LSREMOTE_TIMEOUT_SECS" \
                 git -C "$repo" ls-remote --exit-code --heads origin "refs/heads/$name" \
-                >/dev/null; then
-            printf 'origin/%s\n' "$name"
-            return 0
+                >/dev/null || rc=$?
+            if [ "$rc" -eq 0 ]; then
+                printf 'origin/%s\n' "$name"
+                return 0
+            fi
+            # Exit 2 is origin answering "no such ref". 128 (git could not query origin)
+            # and 124 (timed out) mean the question was never answered.
+            case "$rc" in 124|128) unreach=1 ;; esac
         fi
     fi
     if [ "${BRANCH_BASE_OFFLINE:-}" != "1" ] && command -v gh >/dev/null 2>&1; then
-        name="$(cd "$repo" && _branch_base_run_timed "$BRANCH_BASE_GH_TIMEOUT_SECS" \
-                  gh pr view "$branch" --json baseRefName --jq .baseRefName)" || name=""
-        if [ -n "$name" ] && _branch_base_valid_name "$name"; then
+        errf="$(mktemp "${TMPDIR:-/tmp}/branchbase-err.XXXXXX")" || return 1
+        rc=0
+        name="$(cd "$repo" && _branch_base_run_timed_err "$BRANCH_BASE_GH_TIMEOUT_SECS" \
+                  "$errf" gh pr view "$branch" --json baseRefName --jq .baseRefName)" || rc=$?
+        if [ "$rc" -eq 0 ] && [ -n "$name" ] && _branch_base_valid_name "$name"; then
+            rm -f "$errf"
             printf 'origin/%s\n' "$name"
             return 0
         fi
+        # gh pr view has no structured exit for "this branch has no PR", so its stderr
+        # text is the one prose probe here. Empty stderr counts as an answer (fail closed).
+        if [ "$rc" -eq 124 ]; then
+            unreach=1
+        elif [ "$rc" -ne 0 ] && [ -s "$errf" ] && ! grep -qF 'no pull requests found' "$errf"; then
+            unreach=1
+        fi
+        rm -f "$errf"
     fi
+    [ "$unreach" = "1" ] && return 2
     [ "$recorded" = "1" ] && return 1
     printf 'origin/master\n'
     return 0

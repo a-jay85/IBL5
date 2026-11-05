@@ -77,6 +77,7 @@
 #                              would all fire spuriously; draft mode exits 0/1 on
 #                              gate D alone.
 #   MP Must preserve section — present and well-formed; required only with --require-must-preserve
+#   SD Security deferral — an Out of Scope / Non-Goals bullet naming a security exposure must cite a-jay85/IBL5-backlog#N; ## Deferred Security Gaps bullets must read '- a-jay85/IBL5-backlog#N — <what>'
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
 #                              (outside fences) must name **Invariant:**,
 #                              **Asserted by:** <path>Test.php, and **Not covered:**,
@@ -2794,6 +2795,75 @@ if [ -n "$_u_bad" ]; then
     while IFS= read -r _u_line; do
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [SD]: undeclared security deferral (hard-fail).
+# ---------------------------------------------------------------------------
+# A plan that leaves a security gap on a surface it touches must fix it or name
+# the filed issue (.claude/skills/plan/_architect-contract.md, the "Deferred
+# Security Gaps" bullet). Two checks, both fence-stripped via cf_section_named:
+#  (a) a bullet under ## Out of Scope* / ## Non-Goals* matching the exposure
+#      lexicon, with no a-jay85/IBL5-backlog#N in the same bullet, fails;
+#  (b) every bullet under ## Deferred Security Gaps must read
+#      '- a-jay85/IBL5-backlog#N — <what>'.
+# Lexicon measured against ~/claude-plans/*.md on 2026-11-03: 3 hits in 2258
+# plans, all real unfiled gaps (the PR #3695 plan among them), zero false
+# positives. Broad terms (csrf, authori[sz], security) hit 51-181 lines, mostly
+# "stays unchanged" notes. Re-measure the corpus before widening the lexicon.
+# Re-measured 2026-11-04 with wrapped bullets and heading spellings: 4 hits in
+# 2281 plans. The new hit is a false positive: reaction-endpoint-tier-gate.md
+# quotes "has no tier check" while it fixes that gap. Rewording the bullet clears it.
+# Re-measured the same day with H3-and-deeper headings: the same 4 hits in 2281
+# plans. The 9 plans with a deeper scope heading add no hit.
+# The backlog link is the only release; there is no inline escape marker.
+# cf_section_named is case-sensitive and reads only H2. A plan may spell these
+# headings at H2 or deeper, with any case, with a hyphen, space or underscore
+# between words, or with a singular last word, so rewrite a matching heading to
+# the spelling asked for before the call. A deeper heading's section ends at the
+# next heading of its level or higher, so the rewrite adds an H2 there. Fenced
+# lines pass through untouched. The trailing echo keeps one section's last bullet
+# from joining the next section's first line in _sd_bullets.
+_sd_section() {
+    cf_section_named <(awk -v h="$1" 'BEGIN { p = tolower(h); gsub(/[- ]/, "[-_[:space:]]*", p); sub(/s$/, "s?", p); p = "^##+[[:space:]]*" p }
+        { l = $0; sub(/^[[:space:]]*/, "", l); n = 0; while (substr(l, n + 1, 1) == "`") n++
+          if (n >= 3) { if (!fence) fence = n; else if (n >= fence) fence = 0; print; next }
+          if (fence) { print; next } }
+        tolower($0) ~ p { match($0, /^#+/); lvl = RLENGTH; print "## " h; next }
+        lvl && match($0, /^#+[[:space:]]/) && RLENGTH - 1 <= lvl { print "## end of scoped section"; lvl = 0 }
+        { print }' "$PLAN_FILE") "$1"
+    echo ""
+}
+_sd_lex='security (gap|hole|flaw|exposure)|residual exposure|any (holder of a )?valid api key|impersonat|privilege escalat|has no [a-z-]* ?(tier|auth[a-z]*|csrf|permission) (check|gate|guard)|has never checked|can approve as|(auth[a-z]*|csrf|tier) gap'
+_sd_ref='a-jay85/IBL5-backlog#[0-9]+'
+_sd_bullet='^[[:space:]]*([-*]|[0-9]+[.])[[:space:]]+'
+# Print each bullet on one line, wrapped lines joined on, so the lexicon and the
+# backlog ref are judged per bullet. A blank line or a heading ends a bullet.
+_sd_bullets() {
+    awk -v b="$_sd_bullet" '
+        function flush() { if (cur != "") print cur; cur = "" }
+        $0 ~ b { flush(); cur = $0; next }
+        /^[[:space:]]*(#|$)/ { flush(); next }
+        cur != "" { line = $0; sub(/^[[:space:]]+/, "", line); cur = cur " " line }
+        END { flush() }'
+}
+_sd_scope=$( { _sd_section "Out of Scope"; _sd_section "Non-Goals"; } \
+    | _sd_bullets \
+    | grep -iE "$_sd_lex" \
+    | grep -vE "$_sd_ref" || true)
+if [ -n "$_sd_scope" ]; then
+    while IFS= read -r _sd_line; do
+        viol "[SD] out-of-scope bullet names a security exposure with no a-jay85/IBL5-backlog#N: fix the gap in this plan, or file an issue and list it under ## Deferred Security Gaps: \"${_sd_line}\""
+    done <<< "$_sd_scope"
+fi
+_sd_decl_re='^[[:space:]]*[-*][[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
+_sd_decl_bad=$(_sd_section "Deferred Security Gaps" \
+    | _sd_bullets \
+    | grep -vE "$_sd_decl_re" || true)
+if [ -n "$_sd_decl_bad" ]; then
+    while IFS= read -r _sd_line; do
+        viol "[SD] ## Deferred Security Gaps line must read '- a-jay85/IBL5-backlog#N — <what>': \"${_sd_line}\""
+    done <<< "$_sd_decl_bad"
 fi
 
 # Gate [MP]: `## Must preserve` grammar. bin/lib/deleted-guards --lint-plan is

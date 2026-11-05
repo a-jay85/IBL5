@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 ---
 
 ## Read budget: read this once, read nothing else
@@ -73,8 +73,8 @@ Conditionally — include a section **only when it applies**; never emit an empt
   - **Logic slice — reducible; build it, always.** Exercise on the worktree Docker stack through a one-shot seam (`--dry-run` / `--once` / `--sim=N`).
   - **Scheduling slice — intrinsic.** launchd/cron actually firing on the prod box.
   - **Network / credential boundary — intrinsic.** The real endpoint with the real token.
-  - **Exception is claimable for the scheduling / reachability slice ONLY** — logic slice is still built in the same plan. A surviving slice is **recorded**: `<!-- pre-prod-exception: <slice + why> -->` plus `## Pre-prod Exception Justification`.
-  - **Stub-only coverage is not a pre-prod exercise path** — a stub proves the caller's branch handling, not the real call shape. `_architect-contract-detail.md` § Pre-prod testability — distinct from Verification-gap.
+  - **Exception is claimable for the scheduling / reachability slice ONLY**. The logic slice is still built in the same plan.
+  - **Stub-only coverage is not a pre-prod exercise path** (see the MUST-produce bullet above).
   - Tier the seam-adding step **Sonnet (delegated — recipe-backed: copy the named existing `--dry-run` seam)**.
 - **Schema-safety mechanization** (only for a *reversible* schema-tightening migration that would otherwise stay held under Step 4 gate 14(c)): the plan MUST include a migration phase with all of: (1) **apply-time fail-closed guard** that aborts if any live row violates the new constraint, raising a real SQL **error** via a mode-independent idiom; (2) **forward-bound assertion** that the writer's source column cannot produce a violating value; (3) **idempotency** via `information_schema`; (4) **documented lossless rollback**; (5) **DatabaseIntegration test** running under `SET SESSION sql_mode = ''` that inserts a violating row and asserts the migration aborts, plus a conforming row asserting it succeeds. `_architect-contract-detail.md` § Schema-safety — guard mechanics. <!-- slop-ok -->
 - **Security-surface mechanization** (only when Step 2 flagged a dischargeable touched surface under Step 4 gate 14(b)): the plan MUST carry a `## Security-Surface Discharge` section plus the assertion phase, with all of: (a) **`**Invariant:**`** — a *falsifiable structural* claim about the code; (b) **`**Asserted by:**`** — one `*Test.php` path in a registered `<testsuite>` directory holding a reflection assertion; (c) **`**Not covered:**`** — surfaces this discharge does NOT cover; (d) **matrix rows** for the reflection assertion including a negative-path row proving it fails when a forbidden property is introduced. `bin/check-plan` gate `[B]` enforces (a)–(d). `_architect-contract-detail.md` § Security-surface — dischargeable taxonomy. <!-- slop-ok -->
@@ -89,6 +89,7 @@ Conditionally — include a section **only when it applies**; never emit an empt
   - Auth/authz-gated route → guard present on the state-changing endpoint; row asserts an unauthorized request is refused.
   - Output rendering → escaped output (enforced by `RequireEscapedOutputRule`); note it so the impl agent doesn't fight the PHPStan rule.
   XSS and input validation are deterministically enforced by PHPStan custom rules — note which apply, do not write redundant manual checks. Encoding the defense satisfies Step 4 gate 12 but does **not** by itself release the gate-14(b) merge hold — if the surface is dischargeable, see § Security-surface mechanization above; otherwise the plan holds and says why.
+- **Deferred Security Gaps** (only when a touched surface has a security gap): fix it in the plan when small. Otherwise file it and list `- a-jay85/IBL5-backlog#N — <gap and surface>` under `## Deferred Security Gaps`, not `## Backlog issues`. Gate `[SD]` fails an unlinked exposure bullet. Review still scores a declared gap and can hold the PR.
 - **Automouse Hold Justification** (only when the plan keeps `auto_merge: false`): the section carries the **decision**, never a **check**. Every *observable* claim a reader might expect the human to re-run is a Verification Matrix row you have not written yet — write it, cite it, and leave only the judgment behind. Emit exactly this four-part skeleton:
   ```
   ## Automouse Hold Justification

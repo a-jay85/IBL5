@@ -21,9 +21,10 @@ def test_strip_edit_counts_drops_number_at_sentence_start():
     assert result == "Existing assertions were updated for the renamed call."
 
 
-def test_strip_edit_counts_keeps_lowercase_mid_sentence():
-    result = strip_edit_counts("It adds cases, and two tests were changed.")
-    assert result == "It adds cases, and tests were changed."
+@pytest.mark.parametrize("word", ["and", "but", "the", "these", "those"])
+def test_strip_edit_counts_keeps_lowercase_mid_sentence(word):
+    result = strip_edit_counts(f"It adds cases, {word} two tests were changed.")
+    assert result == f"It adds cases, {word} tests were changed."
 
 
 def test_strip_edit_counts_capitalizes_after_bullet_digit():
@@ -81,6 +82,13 @@ def test_correct_body_numbers_strips_edit_count():
 
 def test_correct_body_numbers_leaves_edit_count_in_protected_span():
     block = f"{FILES_CHANGED_BEGIN}Two tests were updated{FILES_CHANGED_END}"
+    body = f"Intro line.\n{block}\nOutro line.\n"
+    result = correct_body_numbers(body, "", "")
+    assert block in result
+
+
+def test_correct_body_numbers_leaves_edit_count_in_protected_span_own_line():
+    block = f"{FILES_CHANGED_BEGIN}\nTwo tests were updated\n{FILES_CHANGED_END}"
     body = f"Intro line.\n{block}\nOutro line.\n"
     result = correct_body_numbers(body, "", "")
     assert block in result

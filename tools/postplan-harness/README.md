@@ -229,19 +229,6 @@ record alone, and the next cycle reviews the new tree. A failed rebase-only run 
 back to the skill. The fleet outcome word is `rebased`, and `bin/pr-cycle-tick` logs it
 without charging an attempt. The same tick also removes a `post-plan-running` label that is at least `PCW_STALE_LABEL_MIN` minutes old when no post-plan run for the PR is alive, so a run that died stops holding the PR out of the merge line; `bin/pr-cycle-tick --dry-run` shows what it would remove. When a PR's only failure is the `All checks green` gate timing out on anchors that have since gone green on the same head, the tick runs `gh run rerun <id> --failed` in place of a rescue, at most `PCW_GATE_RERUN_CAP` (2) times per head SHA, and the gate's fail-closed check is unchanged (ADR-0167, addendum `gate-timeout reruns`).
 
-## Closer A/B
-
-An A/B trial runs on automouse-queued PRs. Each enrolled PR gets one arm for every run.
-
-- **Enrollment.** `harness/ab_arm.py` enrolls the first 20 PRs fired with `POSTPLAN_FIRED_BY=automouse`. The arm is the low bit of the slug's sha256, so a re-run keeps its arm. After 20 PRs, new PRs run the harness arm. The state lives in `out/state/ab-enrollment.json`.
-- **Override.** `POSTPLAN_AB_ARM=harness` or `POSTPLAN_AB_ARM=closer` forces an arm and enrolls nothing. Any other non-empty value logs a warning and runs the harness arm.
-- **Harness arm.** Runs exactly as before this trial.
-- **Closer arm.** The narrow LLM fixers stay off: gate fix, conformance fix, fidelity remediation, CI fix, prose fix, thread remediation, the Phase 6.5 fix round, and conflict-ladder rungs 2 to 4. When a run would end held on a heuristic condition (1, 2, 3, 11, 12, 13, 14, 17, 18), red on CI, or failed on `rebase-conflict`, the runner starts one Opus 5.5 session from `harness/closer.py`. A run held only by conditions 7, 8, 9, 15, 16 or 20 gets no session. Neither does any other failure kind.
-- **Caps.** $15 and 60 minutes per session, and at most 3 sessions per PR. A capped session's edits are discarded and the run keeps its original terminal state.
-- **Safety.** The session runs with the CI-fix deny list plus `gh`, `git commit` and `git push` denied, and with GitHub auth stripped from its environment. Any edit under `fidelity.LOCAL_GATE_PATH_PREFIXES` reverts the whole attempt. The harness commits, pushes, and posts thread replies. The session never arms. When the tree did not move, the harness re-runs `evaluate()` from `harness/armable.py` once. When the tree moved, the next post-plan run reviews the new head. The closer ends its reply with one JSON object on its last line that carries a `verdict` key; the parser also accepts a fenced or bare JSON object and takes the last one that carries `verdict`. A reply with no parseable verdict fails closed on the hold path: the status is `unparseable`, the edits are discarded, and no re-check runs. Paths the plan marks as deferred are off limits, and an edit there ends the attempt as `deferred-path-edit`. A PR body fix is a `body_edits` list of find/replace pairs in the reply. The harness applies it with `gh pr edit`, makes no commit, and defers the re-check as `deferred-body-edited`. When the push of the closer commit fails, the harness keeps the commit under `refs/postplan-closer/<pr>-<sha12>`, resets the branch to its pre-session head, and leads the sticky comment with the reason and the cherry-pick command.
-- **Outcome log.** Each enrolled run appends one line to `out/state/ab-outcomes.jsonl`.
-- **Readout.** `bin/postplan-ab-readout` prints per-arm n, $/PR, time to merge, human touches, armed-without-human rate, and reverts within 14 days. A human touch is a non-bot commit, comment, or review after the first post-plan run that falls outside every post-plan run window.
-
 ## Exit codes
 
 | rc | Meaning |

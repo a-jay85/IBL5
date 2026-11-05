@@ -247,6 +247,7 @@ _LIST_ITEM = re.compile(
 )
 _AFTER_END_PUNCTUATION = re.compile(r"[.!?]\s+$")
 _TILDE_FENCE = re.compile(r"^[ \t]*~~~", re.MULTILINE)
+_QUOTE_LINE = re.compile(r"[ \t]*(?:(?:[-*+]|\d+\.)[ \t]+)*>")
 _BLOCK_START = re.compile(r"[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|#)")
 
 
@@ -266,7 +267,7 @@ def _inside_code_or_quote(text: str, start: int, line_prefix: str) -> bool:
     return (
         before.count("```") % 2 == 1
         or len(_TILDE_FENCE.findall(before)) % 2 == 1
-        or own_line.lstrip().startswith(">")
+        or _QUOTE_LINE.match(own_line) is not None
         or before.count("<!--") > before.count("-->")
         or line_prefix.count("`") % 2 == 1
         or line_prefix.count('"') % 2 == 1

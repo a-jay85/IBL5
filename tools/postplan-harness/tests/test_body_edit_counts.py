@@ -295,3 +295,15 @@ def test_strip_edit_counts_leaves_phrases_around_number_unchanged(text):
 )
 def test_strip_edit_counts_still_strips_at_clause_openings(text, expected):
     assert strip_edit_counts(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Intro line\n> Done. Two tests were updated",
+        "- > Done. Two tests were updated",
+        "1. > Done. Two tests were updated",
+    ],
+)
+def test_strip_edit_counts_leaves_blockquote_text_unchanged(text):
+    assert strip_edit_counts(text) == text

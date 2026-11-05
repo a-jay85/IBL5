@@ -147,7 +147,7 @@ def test_live_bun_lock_conflict_regenerated_and_proof_passes(make_repo, monkeypa
     assert res.error_kind == "test-stop", res.error
     assert [p for p, _m, _pr in llm.first_pass_calls] == [f"conflict-resolve:{_MANIFEST}"]
     assert llm.ladder_calls == []
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
     assert _show(fx.d, f"HEAD:{_LOCK}") == fx.expected_lock
     assert ("phase2: lockfile regenerated: ibl5/bun.lock via "
             "bash ../gen/fake-lock.sh package.json bun.lock") in _audit(fx)

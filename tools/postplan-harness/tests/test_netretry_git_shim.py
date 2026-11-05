@@ -143,14 +143,14 @@ def test_shim_fetch_kex_once_then_succeeds(shim_repo, monkeypatch, sleeps):
     assert sleeps == [5.0]
 
 
-def _assert_fetch_single_attempt(shim_repo, monkeypatch, sleeps, msg):
+def _assert_fetch_single_attempt(shim_repo, monkeypatch, sleeps, msg, kind="git"):
     git, wt, new_sha, log = shim_repo
     monkeypatch.setenv("GIT_SHIM_FAIL_CMDS", "fetch")
     monkeypatch.setenv("GIT_SHIM_ALWAYS", "1")
     monkeypatch.setenv("GIT_SHIM_MSG", msg)
     with pytest.raises(HarnessError) as ei:
         git.fetch_base("origin/master")
-    assert ei.value.kind == "git"
+    assert ei.value.kind == kind
     assert _count(log, "fetch") == 1
     assert sleeps == []
 
@@ -160,8 +160,11 @@ def test_shim_fetch_repository_not_found_is_not_retried(shim_repo, monkeypatch, 
 
 
 def test_shim_fetch_bare_could_not_read_is_not_retried(shim_repo, monkeypatch, sleeps):
+    # Still a single attempt (not a TRANSIENT_MARKER), but the bare shape is now typed
+    # remote-unreachable: the outage marker list includes it.
     _assert_fetch_single_attempt(shim_repo, monkeypatch, sleeps,
-                                 "fatal: Could not read from remote repository.")
+                                 "fatal: Could not read from remote repository.",
+                                 kind="remote-unreachable")
 
 
 def _bare_tip(bare):
@@ -201,3 +204,17 @@ def test_shim_push_repository_not_found_is_not_retried(push_repo, monkeypatch, s
     assert ei.value.kind == "push-failed"
     assert _count(log, "push") == 1
     assert sleeps == []
+
+
+def test_fetch_timeout_retries_then_remote_unreachable(shim_repo, monkeypatch, sleeps):
+    git, wt, new_sha, log = shim_repo
+    monkeypatch.setenv("GIT_SHIM_FAIL_CMDS", "fetch")
+    monkeypatch.setenv("GIT_SHIM_ALWAYS", "1")
+    monkeypatch.setenv("GIT_SHIM_MSG",
+                       "ssh: connect to host github.com port 22: Operation timed out\n"
+                       "fatal: Could not read from remote repository.")
+    with pytest.raises(HarnessError) as ei:
+        git.fetch_base("origin/master")
+    assert ei.value.kind == "remote-unreachable"
+    assert _count(log, "fetch") == 1 + len(netretry.RETRY_DELAYS)
+    assert sleeps == list(netretry.RETRY_DELAYS)

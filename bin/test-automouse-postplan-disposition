@@ -1777,6 +1777,20 @@ else
     FAILED=1
 fi
 
+# c3: the 03:02 input after the fix. Same handoff, same 95 s, exit 76 in place of 3. The
+# breaker refunds, stops and writes the env-stop report, and the loop breaks before the
+# stays-queued path. A genuine rc 3 still sets PP_TERMINAL=1 first, so it cannot reach here.
+classify_case c3 76 95
+if grep -qF 'refund' <<< "$CLASSIFY_OUT" && grep -qF 'note_stop' <<< "$CLASSIFY_OUT" \
+   && grep -qF 'env_stop GitHub unreachable' <<< "$CLASSIFY_OUT" \
+   && ! grep -qF 'dispose' <<< "$CLASSIFY_OUT" && ! grep -qF 'note_failure' <<< "$CLASSIFY_OUT" \
+   && ! grep -qF 'fellthrough' <<< "$CLASSIFY_OUT"; then
+    echo "ok: c3-rc76-95s-env-stop"
+else
+    echo "FAIL: c3-rc76-95s-env-stop — $CLASSIFY_OUT"
+    FAILED=1
+fi
+
 # ---------------------------------------------------------------------------
 # Tail
 # ---------------------------------------------------------------------------

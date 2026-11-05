@@ -3810,6 +3810,7 @@ _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged",
                       "usage-pause-unconfirmed", "usage-pause-dirty", "base-resolve",
                       SUBPROCESS_TIMEOUT, PRECOMMIT_HANG)
 PAUSE_EXIT = 75   # ADR-0143 reserved pause exit; only with an S marker on disk
+REMOTE_UNREACHABLE_EXIT = 76   # remote-unreachable: GitHub unreachable; no skill fallback
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -3861,10 +3862,15 @@ def exit_code_for(res: RunResult) -> int:
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, degraded, hold-repeat declined,
         or rebased-held (rebase-only mode pushed or found nothing to push).
+    76 = remote-unreachable: git fetch/push/ls-remote or the base lookup could not reach
+        GitHub (publickey, DNS, timeout, 5xx). bin/post-plan-now skips the skill
+        fallback; bin/automouse/run refunds the attempt and keeps the plan queued.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm.
     usage-pause maps to 75; main() downgrades it to 3 when the marker is gone."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "usage-pause":
         return PAUSE_EXIT
+    if res.terminal == TerminalState.FAILED and res.error_kind == "remote-unreachable":
+        return REMOTE_UNREACHABLE_EXIT
     if res.terminal == TerminalState.FAILED and res.error_kind in _FAIL_CLOSED_KINDS:
         return 3
     if res.terminal == TerminalState.DEGRADED:

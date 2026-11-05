@@ -72,7 +72,7 @@ def test_push_landed_check_failure_reraises_original(monkeypatch, sleeps):
                ls_remote=[(128, "fatal: unable to access")])
     with pytest.raises(HarnessError) as ei:
         git.push()
-    assert ei.value.kind == "push-failed"
+    assert ei.value.kind == "remote-unreachable"
     assert KEX in ei.value.detail
     assert _count(git, "push") == 1
     assert sleeps == []

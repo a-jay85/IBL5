@@ -9,11 +9,14 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness import netretry
 from harness.adapters import gitad
 from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.state import HarnessError
@@ -297,6 +300,53 @@ def test_helper_gh_near_miss_text_is_unreachable(repo, tmp_path, monkeypatch):
     _gh_script(tmp_path, monkeypatch, _err("no open pull requests", 1))
     proc = _helper(repo)
     assert proc.returncode == 2
+
+
+def test_merge_target_outage_maps_to_remote_unreachable(repo, tmp_path, monkeypatch):
+    _online(monkeypatch)
+    _git(repo, "config", "branch.feature.iblBase", "master")
+    _git_sub(tmp_path, monkeypatch, "ls-remote", _err(OUTAGE_GIT_STDERR, 128))
+    _gh_script(tmp_path, monkeypatch, _err(GH_DOWN_STDERR, 1))
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo).merge_target()
+    assert ei.value.kind == "remote-unreachable"
+    assert "could not reach GitHub" in ei.value.detail
+    assert "origin has no such branch" not in ei.value.detail
+
+
+def test_fetch_publickey_is_remote_unreachable(repo, tmp_path, monkeypatch):
+    _git_sub(tmp_path, monkeypatch, "fetch", _err(OUTAGE_GIT_STDERR, 128))
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo)._run("fetch", "origin", "master")
+    assert ei.value.kind == "remote-unreachable"
+
+
+def test_push_publickey_is_remote_unreachable(repo, tmp_path, monkeypatch):
+    """_run_out never raises (it returns rc and output), so drive the real push path."""
+    sleeps = []
+    monkeypatch.setattr(netretry, "time", SimpleNamespace(sleep=sleeps.append,
+                                                          monotonic=time.monotonic))
+    _git_sub(tmp_path, monkeypatch, "push", _err(OUTAGE_GIT_STDERR, 128))
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo, push_remote="origin").push_ff()
+    assert ei.value.kind == "remote-unreachable"
+    assert "Permission denied (publickey)" in ei.value.output
+
+
+def test_local_git_failure_stays_git_kind(repo, tmp_path, monkeypatch):
+    _git_sub(tmp_path, monkeypatch, "rev-parse",
+             _err("fatal: Could not resolve host: github.com", 128))
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo)._run("rev-parse", "HEAD")
+    assert ei.value.kind == "git"
+
+
+def test_fetch_local_permission_denied_stays_git_kind(repo, tmp_path, monkeypatch):
+    _git_sub(tmp_path, monkeypatch, "fetch",
+             _err("error: cannot open .git/FETCH_HEAD: Permission denied", 1))
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(repo)._run("fetch", "origin", "master")
+    assert ei.value.kind == "git"
 
 
 def test_adapters_define_merge_target():

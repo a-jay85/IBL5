@@ -29,6 +29,26 @@ TRANSIENT_MARKERS: tuple[str, ...] = (
     "Connection reset by peer",
     "TLS handshake timeout",
 )
+# A failed network git subcommand whose output names one of these shapes means GitHub
+# could not be reached. After netretry gives up, post-plan exits 76 and automouse keeps
+# the plan queued. It is a superset of TRANSIENT_MARKERS, because an exhausted transient
+# is still an outage. It applies only to REMOTE_SUBCOMMANDS, so local git work never matches.
+REMOTE_UNREACHABLE_KIND = "remote-unreachable"
+REMOTE_SUBCOMMANDS: frozenset[str] = frozenset({"fetch", "push", "ls-remote", "pull"})
+REMOTE_UNREACHABLE_MARKERS: tuple[str, ...] = TRANSIENT_MARKERS + (
+    "Permission denied (publickey)",
+    "Could not read from remote repository",
+    "Could not resolve host",
+    "unable to access '",
+    "The requested URL returned error: 5",
+)
+
+
+def is_remote_unreachable(args, stderr: str) -> bool:
+    """True for a failed network git subcommand whose stderr names an outage shape."""
+    return bool(args) and args[0] in REMOTE_SUBCOMMANDS and any(
+        m in stderr for m in REMOTE_UNREACHABLE_MARKERS)
+
 # Go net/http shape printed by gh: <Verb> "https://host/path": EOF
 # A bare "EOF" never matches; the quoted URL and the ": EOF" suffix are required.
 HTTP_EOF_RE = re.compile(r'\b[A-Z][a-z]+ "https?://[^"\s]+": EOF\b')

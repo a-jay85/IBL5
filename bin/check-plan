@@ -2804,7 +2804,7 @@ fi
 # the filed issue (.claude/skills/plan/_architect-contract.md, the "Deferred
 # Security Gaps" bullet). Two checks, both fence-stripped via cf_section_named:
 #  (a) a bullet under ## Out of Scope* / ## Non-Goals* matching the exposure
-#      lexicon, with no a-jay85/IBL5-backlog#N on the same line, fails;
+#      lexicon, with no a-jay85/IBL5-backlog#N in the same bullet, fails;
 #  (b) every bullet under ## Deferred Security Gaps must read
 #      '- a-jay85/IBL5-backlog#N — <what>'.
 # Lexicon measured against ~/claude-plans/*.md on 2026-11-03: 3 hits in 2258
@@ -2814,15 +2814,24 @@ fi
 # Re-measured 2026-11-04 with wrapped bullets and heading spellings: 4 hits in
 # 2281 plans. The new hit is a false positive: reaction-endpoint-tier-gate.md
 # quotes "has no tier check" while it fixes that gap. Rewording the bullet clears it.
+# Re-measured the same day with H3-and-deeper headings: the same 4 hits in 2281
+# plans. The 9 plans with a deeper scope heading add no hit.
 # The backlog link is the only release; there is no inline escape marker.
-# cf_section_named is case-sensitive. A plan may spell these headings with any
-# case, with a hyphen, space or underscore between words, or with a singular
-# last word, so rewrite a matching heading to the spelling asked for before the
-# call. The trailing echo keeps one section's last bullet from joining the next
-# section's first line in _sd_bullets.
+# cf_section_named is case-sensitive and reads only H2. A plan may spell these
+# headings at H2 or deeper, with any case, with a hyphen, space or underscore
+# between words, or with a singular last word, so rewrite a matching heading to
+# the spelling asked for before the call. A deeper heading's section ends at the
+# next heading of its level or higher, so the rewrite adds an H2 there. Fenced
+# lines pass through untouched. The trailing echo keeps one section's last bullet
+# from joining the next section's first line in _sd_bullets.
 _sd_section() {
-    cf_section_named <(awk -v h="$1" 'BEGIN { p = tolower(h); gsub(/[- ]/, "[-_[:space:]]*", p); sub(/s$/, "s?", p); p = "^##[[:space:]]*" p }
-        tolower($0) ~ p { print "## " h; next } { print }' "$PLAN_FILE") "$1"
+    cf_section_named <(awk -v h="$1" 'BEGIN { p = tolower(h); gsub(/[- ]/, "[-_[:space:]]*", p); sub(/s$/, "s?", p); p = "^##+[[:space:]]*" p }
+        { l = $0; sub(/^[[:space:]]*/, "", l); n = 0; while (substr(l, n + 1, 1) == "`") n++
+          if (n >= 3) { if (!fence) fence = n; else if (n >= fence) fence = 0; print; next }
+          if (fence) { print; next } }
+        tolower($0) ~ p { match($0, /^#+/); lvl = RLENGTH; print "## " h; next }
+        lvl && match($0, /^#+[[:space:]]/) && RLENGTH - 1 <= lvl { print "## end of scoped section"; lvl = 0 }
+        { print }' "$PLAN_FILE") "$1"
     echo ""
 }
 _sd_lex='security (gap|hole|flaw|exposure)|residual exposure|any (holder of a )?valid api key|impersonat|privilege escalat|has no [a-z-]* ?(tier|auth[a-z]*|csrf|permission) (check|gate|guard)|has never checked|can approve as|(auth[a-z]*|csrf|tier) gap'

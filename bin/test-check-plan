@@ -216,6 +216,28 @@ assert_viol "gate-SD-singular-non-goal-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
 ## Non-Goal
 - Leave the wake endpoint auth gap for a separate PR.
 '
+assert_viol "gate-SD-h3-out-of-scope-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+### Out of Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-h3-non-goals-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+### Non-Goals
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-h3-section-ends-at-sibling-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+### Out of Scope
+- The wake endpoint response format.
+### Threat model
+- Any valid API key can read that format today, and that is the intended contract.
+'
+assert_viol "gate-SD-fenced-h3-keeps-h2-section-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+```
+### Out of Scope
+```
+### Wake endpoint
+- Leave the wake endpoint auth gap for a separate PR.
+'
 assert_viol "gate-SD-near-miss-heading-clean" 0 "[SD]" "$FM$CF_MATRIX"'
 ## Outside Scope
 - Leave the wake endpoint auth gap for a separate PR.

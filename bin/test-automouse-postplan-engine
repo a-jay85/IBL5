@@ -79,6 +79,8 @@ PP_BREAKER_ONLY=$(awk '/# postplan-env-breaker: begin/,/# postplan-env-breaker: 
 PP_NOWT_SPAN=$(awk '/# postplan-no-worktree-merged: begin/,/# postplan-no-worktree-merged: end/' "$RUN_FILE")
 # rc=8 (repeat-hold decline) arm. Unique comment anchors delimit it, the same scheme as rc3.
 PP_RC8_SPAN=$(awk '/# postplan-rc8-declined: begin/,/# postplan-rc8-declined: end/' "$RUN_FILE")
+# rc=9 (pre-fire refusal) arm, same anchor scheme.
+PP_RC9_SPAN=$(awk '/# postplan-rc9-refused: begin/,/# postplan-rc9-refused: end/' "$RUN_FILE")
 # Terminal-disposition block that follows the env breaker: it finds the OPEN PR and calls
 # dispose_plan_done. The range ends at the block's own closing cleanup line.
 PP_DISPOSE_SPAN=$(awk '/# Terminal-disposition: the environmental breaker did not trip/,/^        rm -f "\$PP_START_MARKER"$/' "$RUN_FILE")
@@ -112,6 +114,8 @@ for anchor in '# postplan-rc3-terminal: begin' \
               '# postplan-no-worktree-merged: end' \
               '# postplan-rc8-declined: begin' \
               '# postplan-rc8-declined: end' \
+              '# postplan-rc9-refused: begin' \
+              '# postplan-rc9-refused: end' \
               '# If the plan moved out of queue/ (to done/ or skipped/)' \
               '# --- Between-plans master health canary dispatch ---'; do
     n=$(grep -cF -e "$anchor" "$RUN_FILE" || true)
@@ -128,6 +132,8 @@ assert_contains "$PP_NOWT_SPAN" 'PP_NOWT_DISPOSED' "rc7 span honors the pre-call
 assert_contains "$PP_LOOP_BOTTOM_SPAN" '[ -n "${SINGLE_PLAN:-}" ]' "loop-bottom span holds the single-plan check"
 assert_contains "$PP_RC8_SPAN" '"$PP_STATUS" -eq 8' "rc8 span tests PP_STATUS against 8"
 assert_contains "$PP_RC8_SPAN" 'PP_TERMINAL=1' "rc8 span marks the exit terminal"
+assert_contains "$PP_RC9_SPAN" '"$PP_STATUS" -eq 9' "rc9 span tests PP_STATUS against 9"
+assert_contains "$PP_RC9_SPAN" 'PP_TERMINAL=1' "rc9 span marks the exit terminal"
 assert_contains "$PP_DISPOSE_SPAN" 'dispose_plan_done' "terminal-disposition span extracted"
 # Ordering: the rc7 arm must sit BEFORE the env breaker. Otherwise the breaker's
 # fast-exit `break` fires first and the merged PR is refunded instead of disposed.
@@ -146,6 +152,15 @@ if [ -n "$RC8_LN" ] && [ -n "$BRK_LN" ] && [ "$RC8_LN" -lt "$BRK_LN" ]; then
     h_pass "rc8 span precedes the env breaker"
 else
     h_fail "rc8 span must precede # postplan-env-breaker: begin" "got ${RC8_LN:-none} vs ${BRK_LN:-none}"
+fi
+
+# Ordering: the rc9 arm must sit BEFORE the env breaker, or a cached refusal refunds
+# and stops the whole night on every run.
+RC9_LN=$(grep -nF -e '# postplan-rc9-refused: begin' "$RUN_FILE" | head -1 | cut -d: -f1)
+if [ -n "$RC9_LN" ] && [ -n "$BRK_LN" ] && [ "$RC9_LN" -lt "$BRK_LN" ]; then
+    h_pass "rc9 span precedes the env breaker"
+else
+    h_fail "rc9 span must precede # postplan-env-breaker: begin" "got ${RC9_LN:-none} vs ${BRK_LN:-none}"
 fi
 
 # Sanity: confirm extraction captured the right block before evaling anything.
@@ -728,11 +743,12 @@ refund_attempt() { printf 'REFUND\n' >> "$CALLS"; }
 write_env_stop_report() { printf 'ENVSTOP\n' >> "$CALLS"; }
 dispose_plan_done() { printf 'DISPOSE\n' >> "$CALLS"; }
 automouse_branch_for_plan() { printf 'test-plan\n'; }
-automouse_pr_state() { printf 'OPEN https://github.com/a-jay85/IBL5/pull/1\n'; }
+automouse_pr_state() { [ "${PR_STUB:-open}" = none ] && return 1; printf 'OPEN https://github.com/a-jay85/IBL5/pull/1\n'; }
 postplan_cap_timeout() { return 1; }
 postplan_newest_verdict() { printf ''; }
 should_hold_postplan_disposal() { return 1; }
 notify_postplan_hold() { printf 'HOLD\n' >> "$CALLS"; }
+note_failure() { printf 'NOTE\n' >> "$CALLS"; }
 PRELUDE
 )
     run_span "$prelude"$'\n'"$PP_TERMINAL_SPAN"$'\n'"$PP_DISPOSE_SPAN"
@@ -779,5 +795,38 @@ else
     h_pass "row 14c: neutered arm breaks the loop"
 fi
 rm -rf "$SB"
+
+echo
+echo "-- row 15: post-plan-now rc=9 (pre-fire refusal) → counted; breaker skipped, loop continues --"
+
+# --- Row 15a: fast rc=9, no PR: no refund, no env-stop, no break, plan stays queued ---
+PR_STUB=none
+run_rc8_case 9
+assert_eq "$PP_STATUS" "9" "row 15a: PP_STATUS captures post-plan-now exit 9"
+assert_eq "$(yn test -f "$HANDOFF_FILE")" "yes" "row 15a: handoff still present (the breaker's fast-exit clause is live)"
+assert_eq "$SPAN_RC" "0" "row 15a: span completes under set -euo pipefail"
+assert_eq "$(rc8_calls REFUND)" "0" "row 15a: attempt not refunded"
+assert_eq "$(rc8_calls ENVSTOP)" "0" "row 15a: no env-stop report"
+assert_eq "$(rc8_calls DISPOSE)" "0" "row 15a: no PR, so the plan is not disposed"
+assert_eq "$(rc8_calls NOTE)" "1" "row 15a: the refusal reaches the failure notes"
+assert_contains "$(cat "$SB/span.out")" "SPAN-FELL-THROUGH" "row 15a: loop not broken"
+assert_contains "$(cat "$LOG")" "pre-fire verification (rc=9)" "row 15a: arm logs the refusal"
+rm -rf "$SB"
+
+# --- Row 15b: a neutered arm sends rc=9 back to the breaker ---
+RC9_MUTANT_SPAN=${PP_TERMINAL_SPAN//'"$PP_STATUS" -eq 9'/'"$PP_STATUS" -eq 99'}
+assert_eq "$(yn test "$RC9_MUTANT_SPAN" != "$PP_TERMINAL_SPAN")" "yes" "row 15b: the rewrite changed the span (arm text found)"
+PP_TERMINAL_SPAN_LIVE=$PP_TERMINAL_SPAN
+PP_TERMINAL_SPAN=$RC9_MUTANT_SPAN
+run_rc8_case 9
+PP_TERMINAL_SPAN=$PP_TERMINAL_SPAN_LIVE
+assert_eq "$(rc8_calls REFUND)" "1" "row 15b: neutered arm lets the breaker refund an rc=9 exit"
+if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then
+    h_fail "row 15b: neutered arm must break the loop" "SPAN-FELL-THROUGH present"
+else
+    h_pass "row 15b: neutered arm breaks the loop"
+fi
+rm -rf "$SB"
+unset PR_STUB
 
 h_done

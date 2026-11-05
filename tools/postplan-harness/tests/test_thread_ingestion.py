@@ -1653,3 +1653,123 @@ def test_disposition_forwards_timeout_only_when_set(tmp_path):
     assert llm.kwargs[0]["timeout"] == 37
     _, _, llm2 = _frd(tmp_path, '{"verdict":"DECLINE","reason":"ok"}')
     assert "timeout" not in llm2.kwargs[0]
+
+
+# ---------------------------------------------------------------------------
+# DECLINE follow-up filing
+# ---------------------------------------------------------------------------
+
+def _followup_answer(**over):
+    followup = {"title": "Return team names from getSimTrades", "harm": "wrong-value",
+                "trigger": "A sim with a trade shows blank team names"}
+    followup.update(over)
+    return json.dumps({"verdict": "DECLINE", "reason": "fix is in another file",
+                       "category": "not-worth-it", "followup": followup})
+
+
+def _filed(gh):
+    return [a for a in gh.actions() if a.get("action") == "followup_create"]
+
+
+def _ingest_followup(tmp_path, answer, patch=None):
+    gh = _gh(tmp_path)
+    if patch:
+        patch(gh)
+    logs: list[str] = []
+    outcome = disposition_thread(THREAD_2340, _llm({PURPOSE: answer}), ReplayGit({}), str(tmp_path),
+                                 PR, gh, logs.append, commit=lambda m: "", push=lambda: "")
+    return outcome, gh, logs
+
+
+def test_thread_prompt_offers_followup_for_named_harms_only():
+    prompt = thread_prompt(THREAD_2340, "")
+    assert '"followup"' in prompt
+    for harm in ("crash", "wrong-value", "lost-data", "security"):
+        assert f'"{harm}"' in prompt
+
+
+def test_followup_filed_once_after_thread_resolves(tmp_path):
+    outcome, gh, _ = _ingest_followup(tmp_path, _followup_answer())
+    assert outcome == "declined"
+    assert len(_resolves(gh)) == 1
+    filed = _filed(gh)
+    assert [f["title"] for f in filed] == ["Return team names from getSimTrades"]
+    assert filed[0]["label"] == "maintenance"
+    body = filed[0]["body"]
+    assert body.startswith(f"https://github.com/a-jay85/IBL5/pull/{PR}\n")
+    assert f"#discussion_r{THREAD_2340['commentId']}" in body
+    assert f"`{THREAD_2340['path']}:{THREAD_2340['line']}`" in body
+    assert "Harm: wrong-value" in body
+    assert "A sim with a trade shows blank team names" in body
+    assert "fix is in another file" in body
+    names = [a["action"] for a in gh.actions()]
+    assert names.index("pr_resolve_thread") < names.index("followup_create")
+
+
+@pytest.mark.parametrize("answer", [
+    _followup_answer(harm="slow-query"),
+    _followup_answer(harm=None),
+    _followup_answer(title="  "),
+    _followup_answer(title=7),
+    _followup_answer(trigger=""),
+    _followup_answer(trigger=None),
+    json.dumps({"verdict": "DECLINE", "reason": "r", "category": "not-worth-it", "followup": "yes"}),
+    json.dumps({"verdict": "DECLINE", "reason": "r", "category": "not-worth-it"}),
+    json.dumps({"verdict": "DECLINE", "reason": "r", "category": "wrong",
+                "followup": {"title": "t", "harm": "crash", "trigger": "x"}}),
+])
+def test_followup_invalid_request_files_nothing_and_still_resolves(tmp_path, answer):
+    outcome, gh, _ = _ingest_followup(tmp_path, answer)
+    assert outcome == "declined"
+    assert len(_resolves(gh)) == 1
+    assert _filed(gh) == []
+
+
+def test_followup_title_capped_at_seventy_chars(tmp_path):
+    _, gh, _ = _ingest_followup(tmp_path, _followup_answer(title="x" * 90))
+    assert _filed(gh)[0]["title"] == "x" * 70
+
+
+def test_followup_skips_title_already_tracked(tmp_path):
+    def patch(gh):
+        gh.issue_titles = lambda label, strict=False: ["Return team names from getSimTrades!"]
+    outcome, gh, logs = _ingest_followup(tmp_path, _followup_answer(), patch)
+    assert outcome == "declined"
+    assert _filed(gh) == []
+    assert any("already tracked" in m for m in logs)
+
+
+def test_followup_filing_failure_leaves_outcome_declined(tmp_path):
+    def patch(gh):
+        def boom(*a, **k):
+            raise HarnessError("gh", "backlog down")
+        gh.followup_create = boom
+    outcome, gh, logs = _ingest_followup(tmp_path, _followup_answer(), patch)
+    assert outcome == "declined"
+    assert len(_resolves(gh)) == 1
+    assert any("filing failed" in m for m in logs)
+
+
+def test_followup_not_filed_when_resolve_fails(tmp_path):
+    gh = _gh(tmp_path)
+
+    def boom(*a, **k):
+        raise HarnessError("thread-resolve-failed", "x")
+    gh.resolve_review_thread = boom
+    with pytest.raises(HarnessError):
+        disposition_thread(THREAD_2340, _llm({PURPOSE: _followup_answer()}), ReplayGit({}),
+                           str(tmp_path), PR, gh, lambda m: None, commit=lambda m: "", push=lambda: "")
+    assert _filed(gh) == []
+
+
+def test_followup_waits_in_defer_entry(tmp_path):
+    gh = _gh(tmp_path)
+    defer: list[dict] = []
+    outcome = disposition_thread(THREAD_2340, _llm({PURPOSE: _followup_answer()}), ReplayGit({}),
+                                 str(tmp_path), PR, gh, lambda m: None, commit=lambda m: "",
+                                 push=lambda: "", defer=defer)
+    assert outcome == "declined"
+    assert _filed(gh) == []
+    assert defer[0]["followup"]["harm"] == "wrong-value"
+    assert defer[0]["path"] == THREAD_2340["path"]
+    assert defer[0]["line"] == THREAD_2340["line"]

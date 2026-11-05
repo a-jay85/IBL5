@@ -402,3 +402,39 @@ def test_closer_arm_skips_the_round(tmp_path):
     assert llm.calls == 0
     assert git.n == 0
     assert git.head() == "head0"
+
+
+class _FlushGh:
+    def __init__(self, fail_resolve=False):
+        self.fail_resolve = fail_resolve
+        self.filed = []
+
+    def resolve_review_thread(self, pr, cid, body):
+        if self.fail_resolve:
+            raise HarnessError("gh", "down")
+
+    def issue_titles(self, label, strict=False):
+        return []
+
+    def followup_create(self, title, body, label):
+        self.filed.append(title)
+        return 5
+
+
+def _followup_record():
+    return {"defer": [{"comment_id": 9, "kind": "declined", "reason": "elsewhere", "path": "a.php", "line": 3,
+                       "followup": {"title": "Fix it", "harm": "crash", "trigger": "null row"}}]}
+
+
+def test_flush_files_deferred_followup_after_reply():
+    gh = _FlushGh()
+    assert fix_round.flush(gh, PR, _followup_record(), "abc", lambda m: None) == 1
+    assert gh.filed == ["Fix it"]
+
+
+def test_flush_skips_followup_when_reply_fails():
+    gh = _FlushGh(fail_resolve=True)
+    rec = _followup_record()
+    assert fix_round.flush(gh, PR, rec, "abc", lambda m: None) == 0
+    assert gh.filed == []
+    assert rec["defer"][0]["flush_failed"] is True

@@ -282,6 +282,10 @@ def flush(gh, pr, record: dict, pushed_sha: str, log) -> int:
         except (HarnessError, OSError) as e:
             d["flush_failed"] = True
             log(f"fix-round: reply on thread {cid} failed ({e!r}); thread stays open")
+            continue
+        if d.get("followup"):
+            thread_ingestion.file_declined_followup(gh, pr, cid, d.get("path"), d.get("line"),
+                                                    d["followup"], d.get("reason", ""), log)
     return posted
 
 

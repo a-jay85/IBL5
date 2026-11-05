@@ -18,6 +18,8 @@
 # S11-S16 pin the API read retry and the fail-closed body guard in bin/settle-pr-status.
 # S17-S27 (plan S11-S21) pin the ghost description and sweep mode, which also records
 #        workflow_dispatch bodies in $PFIX/dispatched.jsonl.
+# S28-S39 cover settle-pr-status --line-dispatch (head-of-line restart); the shim records
+#        those dispatches in $PFIX/line-dispatched.jsonl and serves the line from $PFIX/line.json.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
 set -uo pipefail
@@ -982,7 +984,7 @@ if [ "$RC" -eq 0 ] && [[ "$(head -1 "$OUT")" == "$STUCK_PASS_PREFIX"* ]] && grep
     ok "P50 empty CCG_NOW_EPOCH falls back to the clock (2026-10-22 fixture is past grace)"
 else fail "P50 empty CCG_NOW_EPOCH falls back to the clock (rc=$RC out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
 
-# --- S1-S27: bin/settle-pr-status against a URL-dispatch gh shim ---------------
+# --- S1-S39: bin/settle-pr-status against a URL-dispatch gh shim ---------------
 SETTLE="$SCRIPT_DIR/settle-pr-status"
 S_SHA2="fedcba9876543210fedcba9876543210fedcba98"
 
@@ -999,6 +1001,7 @@ cat > "$SSHIM_DIR/gh" <<'SHIM'
 #!/bin/bash
 echo "$*" >> "$PFIX/calls.log"
 case "$*" in
+    *"api graphql"*)      [ -f "$PFIX/line-fail" ] && exit 1; cat "$PFIX/line.json" ;;
     *"-X POST"*statuses*) cat > "$PFIX/posted.json" ;;
     *pulls\?state=open*)  cat "$PFIX/open.json" ;;
     *commits/*/status)    p="$*"; p="${p##*commits/}"
@@ -1007,6 +1010,9 @@ case "$*" in
     *actions/workflows/all-checks-settled.yml/dispatches*)
                           [ -f "$PFIX/dispatch-fail" ] && exit 1
                           jq -c . >> "$PFIX/dispatched.jsonl" ;;
+    *actions/workflows/update-behind-prs.yml/dispatches*)
+                          [ -f "$PFIX/line-dispatch-fail" ] && exit 1
+                          jq -c . >> "$PFIX/line-dispatched.jsonl" ;;
     *commits/*/pulls*)    if [ -f "$PFIX/assoc-fail-once" ]; then rm -f "$PFIX/assoc-fail-once"; echo 'unexpected end of JSON input' >&2; exit 1; fi
                           if [ -f "$PFIX/assoc-empty-once" ]; then rm -f "$PFIX/assoc-empty-once"; exit 0; fi; cat "$PFIX/assoc.json" ;;
     */pulls/[0-9]*)       [ -f "$PFIX/pull-404" ] && { echo 'gh: Not Found (HTTP 404)' >&2; exit 1; }
@@ -1068,6 +1074,48 @@ run_sweep() {
     RC=$?
 }
 dispatched() { if [ -f "$PFIX/dispatched.jsonl" ]; then wc -l < "$PFIX/dispatched.jsonl" | tr -d ' '; else echo 0; fi; }
+line_dispatched() { if [ -f "$PFIX/line-dispatched.jsonl" ]; then wc -l < "$PFIX/line-dispatched.jsonl" | tr -d ' '; else echo 0; fi; }
+# run_line_settle <args...> — run_settle with --line-dispatch and GH_CMD pointed at the shim,
+# so the real bin/merge-line-select reads $PFIX/line.json through the same shim.
+run_line_settle() { GH_CMD="$SSHIM_DIR/gh" run_settle --line-dispatch=update-behind-prs.yml "$@"; }
+LINE_WANT='{"ref":"master","inputs":{"settle":"true"}}'
+
+# Selector snapshot builders, copied from bin/test-merge-line-select under an ml_ prefix so
+# they never collide with this file's own cr(). Every line fixture: ml_snapshot ... > "$PFIX/line.json".
+ml_cr() {
+    jq -cn --arg name "$1" --arg status "$2" --arg concl "$3" \
+        '{__typename:"CheckRun", name:$name, status:$status,
+          conclusion:(if $concl == "null" then null else $concl end)}'
+}
+ml_ctxs() {
+    if [ $# -eq 0 ]; then
+        echo '[]'
+    else
+        printf '%s\n' "$@" | jq -cs '.'
+    fi
+}
+# ml_pr_node <number> <draft:true|false> <base> <enabledAt|null> <mergeStateStatus> <mergeable> <contexts-json>
+ml_pr_node() {
+    jq -cn --argjson number "$1" --argjson draft "$2" --arg base "$3" --arg en "$4" \
+        --arg mss "$5" --arg mg "$6" --argjson ctx "$7" '
+        { number: $number, isDraft: $draft, baseRefName: $base, headRefOid: "abc123",
+          mergeable: $mg, mergeStateStatus: $mss,
+          autoMergeRequest: (if $en == "null" then null else {enabledAt: $en} end),
+          commits: {nodes: [{commit: {oid: "abc123",
+            statusCheckRollup: {state: "PENDING", contexts: {nodes: $ctx}}}}]} }'
+}
+# ml_snapshot <node-json>... — wrap nodes into the pullRequests GraphQL response.
+ml_snapshot() {
+    if [ $# -eq 0 ]; then
+        echo '[]'
+    else
+        printf '%s\n' "$@" | jq -cs '.'
+    fi | jq -c '{data:{repository:{pullRequests:{pageInfo:{hasNextPage:false},nodes:.}}}}'
+}
+ML_T6="2026-01-01T06:00:00Z"
+ML_T7="2026-01-01T07:00:00Z"
+ML_T8="2026-01-01T08:00:00Z"
+ML_NOCTX="$(ml_ctxs)"
 
 # S1: all green -> success posted.
 s_case s1
@@ -1431,5 +1479,199 @@ else fail "S27 (plan S21) malformed head is skipped without dispatch (rc=$RC n=$
 s27_reads="$(calls_of 'commits/not-a-sha/status')"
 if [ "$s27_reads" = "0" ]; then ok "S27 (plan S21) malformed head gets no commits/not-a-sha/status read"
 else fail "S27 (plan S21) malformed head gets no commits/not-a-sha/status read (reads=$s27_reads)"; fi
+
+# --- S28-S38: bin/settle-pr-status --line-dispatch (head-of-line restart) -----------------
+# PR 7 is the settled PR (s_case default). The real bin/merge-line-select runs against the
+# GraphQL snapshot in $PFIX/line.json, served by the shim through GH_CMD.
+
+# ml_red_ctx — a failed required check, so the owning line member is red.
+ml_red_ctx() { ml_ctxs "$(ml_cr 'Meta checks' COMPLETED FAILURE)"; }
+# ll_red_verdict — make the settle verdict for this case red (the S2 failure fixture).
+ll_red_verdict() {
+    cr 1 "[{\"name\":\"A\",$G},{\"name\":\"B\",$G},{\"name\":\"Lint broke\",\"status\":\"completed\",\"conclusion\":\"failure\",\"completed_at\":\"2026-01-01T00:00:00Z\"}]"
+    cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+}
+# ll_pending_verdict — make the settle verdict pending (the S3 missing-anchor fixture).
+ll_pending_verdict() {
+    cr 1 "[{\"name\":\"A\",$G}]"
+    cp "$PFIX/1-checkruns.json" "$PFIX/cr.json"
+}
+# ll_line_head9 — line [5 red, 7 red, 9 BEHIND no ctx]: head is 9, PR 7 is ahead of it.
+ll_line_head9() {
+    ml_snapshot \
+        "$(ml_pr_node 5 false master "$ML_T6" BEHIND MERGEABLE "$(ml_red_ctx)")" \
+        "$(ml_pr_node 7 false master "$ML_T7" BEHIND MERGEABLE "$(ml_red_ctx)")" \
+        "$(ml_pr_node 9 false master "$ML_T8" BEHIND MERGEABLE "$ML_NOCTX")" > "$PFIX/line.json"
+}
+# ll_line_only7 — line [7 BEHIND no ctx]: PR 7 is the head.
+ll_line_only7() {
+    ml_snapshot "$(ml_pr_node 7 false master "$ML_T6" BEHIND MERGEABLE "$ML_NOCTX")" > "$PFIX/line.json"
+}
+
+# S28: head red, prior pending -> one settle pass dispatched; the selector then picks PR 9.
+s_case s28
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ll_line_head9
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+s28_sel="$("$SCRIPT_DIR/merge-line-select" --input "$PFIX/line.json")"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [ "$(line_dispatched)" = "1" ] \
+        && [ "$(jq -c . "$PFIX/line-dispatched.jsonl")" = "$LINE_WANT" ] \
+        && grep -qF 'LINE: dispatched update-behind-prs.yml (PR 7 settled failure; head 9)' "$OUT" \
+        && grep -qxF 'head=9' <<< "$s28_sel" && grep -qxF 'action=update' <<< "$s28_sel"; then
+    ok "S28 head red dispatches one settle pass and the selector on the same line picks PR 9"
+else fail "S28 head red dispatches one settle pass and the selector on the same line picks PR 9 (rc=$RC state=$(s_state) n=$(line_dispatched) out=$(cat "$OUT") err=$(cat "$ERR") sel=$s28_sel)"; fi
+
+# S29: green verdict on a BEHIND head dispatches.
+s_case s29
+sw_status "$P_SHA" pending "$T0"
+ll_line_only7
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(line_dispatched)" = "1" ] \
+        && grep -qF 'LINE: dispatched update-behind-prs.yml (PR 7 settled success; head 7)' "$OUT"; then
+    ok "S29 green BEHIND head dispatches"
+else fail "S29 green BEHIND head dispatches (rc=$RC state=$(s_state) n=$(line_dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S30: PR 7 sits behind head 5 -> nothing dispatched.
+s_case s30
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ml_snapshot \
+    "$(ml_pr_node 5 false master "$ML_T6" BEHIND MERGEABLE "$ML_NOCTX")" \
+    "$(ml_pr_node 7 false master "$ML_T7" BEHIND MERGEABLE "$(ml_red_ctx)")" > "$PFIX/line.json"
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF 'LINE: skip: PR 7 is behind head 5' "$OUT"; then
+    ok "S30 non-head PR dispatches nothing"
+else fail "S30 non-head PR dispatches nothing (rc=$RC state=$(s_state) n=$(line_dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S31: PR 7 is not armed -> nothing dispatched.
+s_case s31
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ml_snapshot \
+    "$(ml_pr_node 5 false master "$ML_T6" BEHIND MERGEABLE "$(ml_red_ctx)")" \
+    "$(ml_pr_node 9 false master "$ML_T8" BEHIND MERGEABLE "$ML_NOCTX")" > "$PFIX/line.json"
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF 'LINE: skip: PR 7 not armed' "$OUT"; then
+    ok "S31 unarmed PR dispatches nothing"
+else fail "S31 unarmed PR dispatches nothing (rc=$RC n=$(line_dispatched) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S32: settling the same head SHA twice dispatches once; the second run reads no line.
+s_case s32
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ll_line_head9
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+s32_first="$(line_dispatched)"
+sw_status "$P_SHA" failure "$T0"
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$s32_first" = "1" ] && [ "$(line_dispatched)" = "1" ] \
+        && grep -qF "LINE: skip: already failure on $P_SHA" "$OUT" \
+        && [ "$(calls_of 'api graphql')" = "0" ]; then
+    ok "S32 a repeated settle of one head SHA does not dispatch again"
+else fail "S32 a repeated settle of one head SHA does not dispatch again (rc=$RC first=$s32_first n=$(line_dispatched) graphql=$(calls_of 'api graphql') out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S33: a pending verdict dispatches nothing and reads neither the prior status nor the line.
+s_case s33
+ll_pending_verdict
+printf '{"statuses":[]}' > "$PFIX/status-$P_SHA.json"
+ll_line_only7
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "pending" ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF 'LINE: skip: state pending' "$OUT" \
+        && [ "$(calls_of "commits/$P_SHA/status")" = "0" ] \
+        && [ "$(calls_of 'api graphql')" = "0" ]; then
+    ok "S33 pending verdict dispatches nothing and reads nothing"
+else fail "S33 pending verdict dispatches nothing and reads nothing (rc=$RC state=$(s_state) n=$(line_dispatched) status-reads=$(calls_of "commits/$P_SHA/status") graphql=$(calls_of 'api graphql') out=$(cat "$OUT"))"; fi
+
+# S34: a failed dispatch keeps rc 0 and the posted status.
+s_case s34
+sw_status "$P_SHA" pending "$T0"
+ll_line_only7
+touch "$PFIX/line-dispatch-fail"
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF '::warning::LINE: dispatch failed for update-behind-prs.yml (PR 7)' "$ERR"; then
+    ok "S34 dispatch failure keeps rc 0 and the posted status"
+else fail "S34 dispatch failure keeps rc 0 and the posted status (rc=$RC state=$(s_state) n=$(line_dispatched) err=$(cat "$ERR"))"; fi
+
+# S35: a failed line read dispatches nothing and keeps rc 0.
+s_case s35
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ll_line_head9
+touch "$PFIX/line-fail"
+rm -f "$PFIX/calls.log"
+run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF '::warning::LINE: skip: line read failed' "$ERR"; then
+    ok "S35 line read failure dispatches nothing, rc 0"
+else fail "S35 line read failure dispatches nothing, rc 0 (rc=$RC state=$(s_state) n=$(line_dispatched) err=$(cat "$ERR"))"; fi
+
+# S36: a failed prior-status read dispatches nothing, keeps rc 0, and never reads the line.
+s_case s36
+ll_red_verdict
+sw_status "$P_SHA" pending "$T0"
+ll_line_head9
+touch "$PFIX/status-fail-$P_SHA"
+rm -f "$PFIX/calls.log"
+IBL5_GH_RETRY_DELAYS="0 0" run_line_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "failure" ] && [ "$(line_dispatched)" = "0" ] \
+        && grep -qF '::warning::LINE: skip: prior status read failed' "$ERR" \
+        && [ "$(calls_of 'api graphql')" = "0" ]; then
+    ok "S36 prior read failure dispatches nothing, rc 0"
+else fail "S36 prior read failure dispatches nothing, rc 0 (rc=$RC state=$(s_state) n=$(line_dispatched) graphql=$(calls_of 'api graphql') err=$(cat "$ERR"))"; fi
+
+# S37: rejected --line-dispatch forms exit 2 and post nothing.
+s_case s37
+ll_red_verdict
+ll_line_head9
+s37_ok=1
+run_settle --head-sha="$P_SHA" --line-dispatch update-behind-prs.yml
+{ [ "$RC" -eq 2 ] && grep -qF 'unknown flag: --line-dispatch' "$ERR" && [ ! -f "$PFIX/posted.json" ]; } \
+    || { s37_ok=0; echo "  S37 space form -> rc=$RC: $(head -1 "$ERR")" >&2; }
+for bad in "--line-dispatch=" "--line-dispatch=../update-behind-prs.yml" \
+        "--line-dispatch=update-behind-prs.yml.bak" "--line-dispatch=.yml"; do
+    run_settle --head-sha="$P_SHA" "$bad"
+    { [ "$RC" -eq 2 ] && grep -qF 'invalid --line-dispatch' "$ERR" && [ ! -f "$PFIX/posted.json" ]; } \
+        || { s37_ok=0; echo "  S37 '$bad' -> rc=$RC: $(head -1 "$ERR")" >&2; }
+done
+run_sweep --line-dispatch=update-behind-prs.yml
+{ [ "$RC" -eq 2 ] && grep -qF 'mutually exclusive' "$ERR" && [ "$(dispatched)" = "0" ]; } \
+    || { s37_ok=0; echo "  S37 with sweep -> rc=$RC: $(head -1 "$ERR")" >&2; }
+if [ "$s37_ok" -eq 1 ] && [ "$(line_dispatched)" = "0" ]; then ok "S37 rejected --line-dispatch forms exit 2"
+else fail "S37 rejected --line-dispatch forms exit 2 (n=$(line_dispatched))"; fi
+
+# S38: without the flag there is no line work (no prior-status read, no line read).
+s_case s38
+printf '{"statuses":[]}' > "$PFIX/status-$P_SHA.json"
+ll_line_only7
+rm -f "$PFIX/calls.log"
+GH_CMD="$SSHIM_DIR/gh" run_settle --head-sha="$P_SHA"
+if [ "$RC" -eq 0 ] && [ "$(s_state)" = "success" ] && ! grep -qF 'LINE:' "$OUT" \
+        && [ "$(calls_of "commits/$P_SHA/status")" = "0" ] \
+        && [ "$(calls_of 'api graphql')" = "0" ] && [ "$(line_dispatched)" = "0" ]; then
+    ok "S38 without the flag there is no line work"
+else fail "S38 without the flag there is no line work (rc=$RC state=$(s_state) out=$(cat "$OUT") err=$(cat "$ERR"))"; fi
+
+# S39: the settle job may dispatch, and it passes the line-dispatch flag.
+ACS_WF="$SCRIPT_DIR/../.github/workflows/all-checks-settled.yml"
+s39_write=$(grep -cE '^  actions: write( |$)' "$ACS_WF" || true)
+s39_read=$(grep -cE '^  actions: read( |$)' "$ACS_WF" || true)
+s39_flag=$(grep -cF -- '--line-dispatch=update-behind-prs.yml' "$ACS_WF" || true)
+if [ "$s39_write" = 1 ] && [ "$s39_read" = 0 ]; then ok "S39 all-checks-settled grants actions: write"
+else fail "S39 all-checks-settled grants actions: write (write=$s39_write read=$s39_read)"; fi
+if [ "$s39_flag" = 1 ]; then ok "S39 all-checks-settled passes --line-dispatch"
+else fail "S39 all-checks-settled passes --line-dispatch (lines=$s39_flag)"; fi
 
 h_done

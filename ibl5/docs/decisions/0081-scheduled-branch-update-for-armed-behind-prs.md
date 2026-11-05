@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once.
-last_verified: 2026-11-02
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once. Amended 2026-11-03: a settled verdict on the PR the line holds on dispatches one head-of-line pass.
+last_verified: 2026-11-05
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -209,3 +209,25 @@ The Decision bullet saying `pr-canary.yml` covers the armed line via `bin/merge-
 
 
 A PR labeled `hotfix` now sorts ahead of every other armed PR in the merge line. The 2026-09-29 addendum's order by arm time, oldest first, now holds within the hotfix group and within the group behind it. The decision, the dispatch workflow, and the label audit are recorded in ADR-0223, `ibl5/docs/decisions/0223-hotfix-merge-lane.md`.
+
+## Addendum: restart the merge line when its head settles (2026-11-03)
+
+**Incident.** On 2026-11-03 master moved at 20:08Z and the push pass ran. The selector returned `head=3703` and `action=wait` because that PR's checks were still running. The PR then went red. No later event re-ran the selector, so four armed green PRs sat BEHIND for over an hour. The cron backstop (`7,22,37,52 * * * *`) is best-effort, and GitHub dropped most of its runs that day. Real runs landed about 8 hours apart.
+
+**Decision.** The settle path restarts the line. `.github/workflows/all-checks-settled.yml` passes `--line-dispatch=update-behind-prs.yml` to `bin/settle-pr-status`. Before it posts a `success` or `failure` verdict, the script dispatches one head-of-line pass of `.github/workflows/update-behind-prs.yml` when all three of these hold:
+
+1. This post changes the `All checks settled` state on that head SHA. A repeat of the same terminal state dispatches nothing.
+2. The PR is in the armed line that `bin/merge-line-select --list` prints.
+3. The PR sits at or ahead of the selector's current `head=` in line order, so every armed PR ahead of it is skipped as dirty, red, or running.
+
+The pass carries one input, `settle=true`, and no PR number. It runs in its own `-settle` concurrency group, so it never cancels a push pass. It keeps the bot-commit wait and the 20-attempt UNKNOWN window, as the hotfix pass does. The selector stays the only decider. Each pass still updates at most one PR, and a PR labeled `post-plan-running` stays skipped.
+
+**Failure handling.** A pending verdict, an unarmed PR, a PR behind the head, a failed read, and a failed dispatch each log a `LINE:` line. None of them changes the posted status or the job's exit code. Read and dispatch failures print as `::warning::` so they show on the run. The cron pass remains the backstop.
+
+**Loop freedom.** A dispatch needs a new terminal state on one head SHA. Only check completions move that state, and a repeat of the same state dispatches nothing. The dispatched pass updates at most one PR, and only a BEHIND one. That update makes a new head SHA. Its checks run, and their settles can dispatch one more pass. That pass finds the updated PR current with master, so it does not update it. If the updated PR went red instead, the pass moves to the next armed PR, which is the restart this addendum adds. A PR updated onto one master SHA is never BEHIND that SHA again, so with no new master push the chain ends within the length of the line.
+
+**Permissions.** The settle job's `actions` permission rises from read to write. This puts `actions: write` on the workflow that holds `statuses: write`. `.github/workflows/hotfix-dispatch.yml` holds the same grant for the same dispatch, but it holds no `statuses: write`, so it is not a precedent for sharing one token. ADR-0149 (`ibl5/docs/decisions/0149-required-ci-aggregator-all-checks-green.md`, Rejected paragraph) rejected a delayed self-redispatch partly for this pairing. This addendum reverses that part: the dispatch here is a constant body to a different, fixed workflow, and the job checks out master without persisted credentials under `workflow_run`, which always runs master's copy. That argument covers `workflow_run` only. A `workflow_dispatch` of `all-checks-settled.yml` runs the copy on the dispatched ref and its checkout step takes that same ref, so a dispatch from another branch runs that branch's code with this token. Starting one takes write access to the repo. The reversal needs human sign-off before merge. If refused, the dispatch moves to a workflow that holds only `actions: write`.
+
+**Gate change.** `bin/check-composite-contracts` A4 used to accept only `statuses` as a write scope on `all-checks-settled.yml`. It now requires exactly `actions statuses`. The check is an exact match. `bin/test-check-composite-contracts` rejects a third write scope and a dropped `actions: write` grant.
+
+**Unchanged.** The cron line, every arming and merge gate, and the verdict `bin/check-pr-checks-green` computes. There is still no GitHub merge queue.

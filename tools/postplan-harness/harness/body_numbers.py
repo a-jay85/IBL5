@@ -218,19 +218,34 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
 
 _EDIT_COUNT = re.compile(
     r"(?<![\w.#-])"
-    r"(?<!\bonly\s)(?<!\ball\s)(?<!\banother\s)(?<!\bexactly\s)(?<!\bat\sleast\s)"
-    r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[ \t]+"
-    r"((?:[a-z-]+[ \t]+)?(?:assertions|tests|test[ \t]+cases|cases|checks|call[ \t]+sites|functions|edits)"
+    r"\b(?!\d{4})(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[ \t]+"
+    r"((?:(?!(?:hundred|thousand|million|billion|dozen|percent|times|half|thirds"
+    r"|of|or|and|to|out|in|per|not|more|fewer|less)\b)[a-z-]{2,}[ \t]+)?"
+    r"(?:assertions|tests|test[ \t]+cases|cases|checks|call[ \t]+sites|functions|edits)"
     r"[ \t]+(?:were|are)[ \t]+(?:updated|changed|modified|edited|rewritten|reworded|adjusted))\b",
     re.IGNORECASE,
 )
-_SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
-_ALLOWED_BEFORE = re.compile(r"\b(?:and|but|the|these|those)[ \t]+$", re.IGNORECASE)
 _NUM_WORD = r"(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
-_LIST_OR_FRACTION = re.compile(
-    rf"\b{_NUM_WORD},?[ \t]+(?:(?:and|but|or)|of(?:[ \t]+(?:the|these|those))?)[ \t]+$",
+# Punctuation after a number label does not end a sentence, and neither does a
+# period after a short token or a long abbreviation.
+_LABEL_OR_ABBREVIATION = (
+    rf"(?:(?:\b{_NUM_WORD}|\d\w*|\b[ivx]+)[*_`)\]]*\s*[.!?:]"
+    r"|(?:\b[a-z]{1,3}|\b(?:figs|approx|incl|excl))[*_`)\]]*\.)\s+$"
+)
+_SENTENCE_START = re.compile(
+    rf"(?:^|^\s*(?:[-*+]|\d+\.)\s+|^(?!.*{_LABEL_OR_ABBREVIATION}).*[.!?:]\s+)$",
     re.IGNORECASE,
 )
+_ALLOWED_BEFORE = re.compile(
+    r"\b(?:(?:and|but)[ \t]+(?:(?:the|these|those)[ \t]+)?|(?:the|these|those)[ \t]+)$",
+    re.IGNORECASE,
+)
+_CLAUSE_BREAK = re.compile(r"[,;]\s+$")
+_LIST_ITEM = re.compile(
+    rf"\b{_NUM_WORD}[,;][ \t]+(?:(?:and|but)[ \t]+)?(?:(?:the|these|those)[ \t]+)?$",
+    re.IGNORECASE,
+)
+_AFTER_END_PUNCTUATION = re.compile(r"[.!?]\s+$")
 _BLOCK_START = re.compile(r"[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|#)")
 
 
@@ -243,20 +258,48 @@ def _logical_line_prefix(text: str, end: int) -> str:
     return re.sub(r"\s+", " ", " ".join(reversed(kept)))
 
 
+def _inside_code_or_quote(text: str, start: int, line_prefix: str) -> bool:
+    """Return True when a fence, code span, quote, blockquote or HTML comment covers *start*."""
+    before = text[:start]
+    return (
+        before.count("```") % 2 == 1
+        or before.count("<!--") > before.count("-->")
+        or line_prefix.count("`") % 2 == 1
+        or line_prefix.count('"') % 2 == 1
+        or line_prefix.lstrip().startswith(">")
+    )
+
+
+def _follows_clause_opener(line_prefix: str) -> bool:
+    """Return True when and/but/the/these/those before the number opens a clause."""
+    opener = _ALLOWED_BEFORE.search(line_prefix)
+    if opener is None or _LIST_ITEM.search(line_prefix):
+        return False
+    before = line_prefix[:opener.start()]
+    return bool(_SENTENCE_START.search(before) or _CLAUSE_BREAK.search(before))
+
+
 def strip_edit_counts(text: str) -> str:
     """Drop the number from a hand-tallied count of modified items.
 
     "Two existing assertions were updated" becomes "Existing assertions were updated".
     Counts of added tests, files and lines are left for the grounded checks.
+    The number goes only where it opens a sentence, bullet or numbered item, or where
+    and/but/the/these/those before it opens a clause. Anything else keeps the number,
+    because a kept number is safer than a garbled sentence.
     A hard-wrapped line is judged with the lines before it, so a number that merely
     starts a line keeps its place unless the sentence really starts there.
     """
     def _sub(m: re.Match) -> str:
         rest = m.group(2)
         line_prefix = _logical_line_prefix(text, m.start())
+        if _inside_code_or_quote(text, m.start(), line_prefix):
+            return m.group(0)
+        if m.group(1)[0].islower() and _AFTER_END_PUNCTUATION.search(line_prefix):
+            return m.group(0)
         if _SENTENCE_START.search(line_prefix):
             return rest[0].upper() + rest[1:]
-        if _ALLOWED_BEFORE.search(line_prefix) and not _LIST_OR_FRACTION.search(line_prefix):
+        if _follows_clause_opener(line_prefix):
             return rest
         return m.group(0)
 

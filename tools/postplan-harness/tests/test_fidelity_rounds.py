@@ -7,6 +7,7 @@ across retries, and no retry can push the loop past MAX_FIDELITY_ROUNDS.
 from __future__ import annotations
 
 import os
+import pathlib
 import stat
 import sys
 import types
@@ -378,6 +379,16 @@ def test_retries_never_exceed_max_rounds(tmp_path, git_shim):
         assert res.fidelity["rounds_completed"] == 0
     finally:
         _cleanup(9306, "9306-2")
+
+
+def test_attempt_loop_range_stays_one_retry():
+    """The loop's own range is half of the 2 * MAX_FIDELITY_ROUNDS spawn bound.
+
+    A driven run cannot see a wider range: the `attempt < _MAX_ROUND_RETRIES` guards
+    break every path on the last retry, so the extra pass is never reached. Those
+    guards and this range each hold the bound, so a source pin covers the range."""
+    src = pathlib.Path(runner.__file__).read_text()
+    assert "for attempt in range(_MAX_ROUND_RETRIES + 1):" in src
 
 
 # --- re-review retry ----------------------------------------------------------

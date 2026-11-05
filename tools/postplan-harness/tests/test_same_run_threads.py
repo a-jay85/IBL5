@@ -6,6 +6,8 @@ import os
 import sys
 import textwrap
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import reviewcache, same_run_threads
@@ -19,7 +21,7 @@ from harness.same_run_threads import (
     prune_findings,
     run_same_run_pass,
 )
-from harness.state import Finding, UsageLedger
+from harness.state import Finding, HarnessError, UsageLedger
 from harness.thread_ingestion import PURPOSE
 
 PR = 2340
@@ -364,3 +366,15 @@ def test_max_same_run_rounds_is_one():
     tree = ast.parse(textwrap.dedent(src))
     loops = [n for n in ast.walk(tree) if isinstance(n, (ast.For, ast.While, ast.AsyncFor))]
     assert loops == []
+
+
+def test_same_run_remote_unreachable_push_propagates(tmp_path):
+    """An outage-typed push failure leaves the 4.5b pass instead of being swallowed."""
+    gh = _gh(tmp_path, {"thread_ids": [111, 222], "trusted_threads": [_thread(222)]})
+
+    def _push():
+        raise HarnessError("remote-unreachable", "git push: Permission denied (publickey)")
+
+    with pytest.raises(HarnessError) as ei:
+        _run(tmp_path, gh, _llm(FIX), commit=lambda m: "abc123", push=_push)
+    assert ei.value.kind == "remote-unreachable"

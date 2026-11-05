@@ -78,6 +78,17 @@ def no_ambient_usage_gate(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def offline_branch_base(monkeypatch):
+    """Keep the base lookup's gh layer off in tests.
+
+    branch_base_merge_target returns 2 when gh fails with anything but "no pull requests
+    found", and gh run against a temp repo with a local-path remote always fails that way.
+    Tests that exercise the gh layer (test_merge_target.py) delete this variable themselves.
+    """
+    monkeypatch.setenv("BRANCH_BASE_OFFLINE", "1")
+
+
+@pytest.fixture(autouse=True)
 def stub_prefire_gate(monkeypatch):
     """Keep every test that runs the real `bin/post-plan-now` away from the real pre-fire gate.
 

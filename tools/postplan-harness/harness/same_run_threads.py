@@ -25,7 +25,7 @@ MAX_SAME_RUN_ROUNDS = 1          # asserted by test; the pass has no loop
 ORIGIN = thread_ingestion.ORIGIN_SAME_RUN
 KEY_LEN = 160                    # matches review.py body_head and the per-thread body_head
 POSTED_BODY_LIMIT = 1000         # the limit ghad passes to render_body when it posts
-_PROPAGATE_KINDS = ("gate-path-edit", "push-failed")
+_PROPAGATE_KINDS = ("gate-path-edit", "push-failed", "remote-unreachable")
 
 # Local copy of runner._redact's token rules: this module cannot import runner.
 _REDACT_RULES = (

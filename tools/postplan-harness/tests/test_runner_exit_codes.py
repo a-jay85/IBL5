@@ -1,6 +1,8 @@
 import dataclasses
 import inspect
 import os, sys
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -49,8 +51,9 @@ _EXIT_CODE_TABLE = (
     [(TerminalState.FAILED, k, 3) for k in (
         "rebase-conflict", "local-gate", "remote-head-diverged",
         "llm-usage-limit", "llm-auth-expired", "usage-pause-unconfirmed", "usage-pause-dirty",
-        "subprocess-timeout")]
+        "base-resolve", "subprocess-timeout")]
     + [(TerminalState.FAILED, "usage-pause", 75)]
+    + [(TerminalState.FAILED, "remote-unreachable", 76)]
     + [(TerminalState.FAILED, k, 1) for k in (
         "push-disabled", "push-failed", "push-retry-cap",
         "lostwork-unproved", "llm-invalid-output", "git", None)]
@@ -76,6 +79,21 @@ def test_verdict_line_rebased_held():
     assert "prior hold 7,8" in line
     noop = _res(TerminalState.REBASED_HELD, rebase_only={"noop": True, "hold": "3"})
     assert "nothing pushed" in runner.verdict_line(noop, 0)
+
+
+def test_remote_unreachable_exits_76():
+    res = _res(TerminalState.FAILED, "remote-unreachable")
+    assert runner.exit_code_for(res) == 76 == runner.REMOTE_UNREACHABLE_EXIT
+    assert "remote-unreachable" not in runner._FAIL_CLOSED_KINDS
+
+
+def test_verdict_line_remote_unreachable_names_kind():
+    line = runner.verdict_line(
+        _res(TerminalState.FAILED, "remote-unreachable",
+             error="remote-unreachable: could not reach GitHub to resolve the base of x"), 76)
+    assert "kind=remote-unreachable" in line
+    assert "cause unknown" not in line
+    assert "BLOCKED" not in line
 
 
 @pytest.mark.parametrize("terminal,error_kind,expected", _EXIT_CODE_TABLE)
@@ -626,3 +644,32 @@ def test_phase2_conflict_exits_3_without_push():
     res.error_kind = exc.value.kind
     assert runner.exit_code_for(res) == 3
     assert git.pushes == 0
+
+
+_PPN = Path(__file__).resolve().parents[3] / "bin" / "post-plan-now"
+
+
+def _sh(script):
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
+
+
+def test_post_plan_now_skips_fallback_on_remote_unreachable():
+    line = next(l for l in _PPN.read_text().splitlines() if l.startswith("should_fallback() {"))
+    out = _sh(f'{line}\nfor c in 76 1 3; do should_fallback "$c"; printf "%s=%s " "$c" "$?"; done')
+    assert out.stdout.split() == ["76=1", "1=0", "3=1"]
+
+
+def test_post_plan_now_tail_forwards_remote_unreachable():
+    text = _PPN.read_text()
+    start = text.index('if [ \\"\\${rc:-0}\\" = 3 ]')
+    snippet = text[start:text.index(" fi;", start) + len(" fi;")]
+    snippet = snippet.replace('\\"', '"').replace("\\$", "$")
+    assert _sh(f"rc=76; pp_rc=1; {snippet} echo $pp_rc").stdout.strip() == "76"
+    assert _sh(f"rc=3; pp_rc=1; {snippet} echo $pp_rc").stdout.strip() == "3"
+
+
+def test_post_plan_now_failure_body_names_76():
+    text = _PPN.read_text()
+    arm = text.index("76) printf 'GitHub could not be reached")
+    assert text.index("75) printf 'Paused for usage limit") < arm
+    assert arm < text.index("*) printf 'The run ended abnormally")

@@ -1,6 +1,6 @@
 ---
 description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter) and the cost ledger columns. Companion to automouse-workflow.md; attaches on the same paths.
-last_verified: 2026-10-28
+last_verified: 2026-11-05
 paths: "bin/automouse/**"
 ---
 
@@ -37,3 +37,7 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 **Prov column:** `recomputed` (no anomaly flagged), `recomputed-anomalous` (>$0.01 below harness or duration mismatch), `unknown` (no transcript, e.g. aged out after ~30 days; harness figure kept), `harness-ledger` (harness's `result.json` usage ledger; harness-only runs exiting 0 or 3).
 
 **`peak_ctx`:** main transcript occupancy over `usage.iterations[]` (top-level `usage` sums them), excluding `advisor_message` iterations and sub-agents; pre-2026-08-26 rows read high. Reported cost is a floor: compaction surcharge is separate, a `low–high` range in "Surcharge est ($)" for recomputed(-anomalous) rows with a compaction, else an em-dash (—).
+
+## Post-plan exit 76: GitHub unreachable
+
+When the post-plan harness cannot reach GitHub, it stops with kind `remote-unreachable` and exit 76. A failed `git fetch`, `push`, `ls-remote` or `pull` raises it once netretry gives up on an outage shape (publickey, DNS, timeout, HTTP 5xx). `bin/lib/branch-base.sh` raises it by returning 2 when a base lookup could not ask GitHub. `bin/post-plan-now` passes 76 through and skips the skill fallback. `bin/automouse/run` treats 76 as environmental at any duration. It refunds the attempt, writes the env-stop report and stops the loop with the plan still queued, so the next run claims it first. A base that origin reports absent, a rebase conflict and a local gate denial still exit 3 and move the plan to skipped/.

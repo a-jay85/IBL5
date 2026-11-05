@@ -564,7 +564,7 @@ def test_no_upstream_branch(tmp_path):
     assert push_args, "no push argv recorded"
     push_argv = push_args[0]
     zero_sha = "0" * 40
-    assert any(f"--force-with-lease=my-branch:{zero_sha}" in str(a) for a in push_argv), \
+    assert any(f"--force-with-lease=refs/heads/my-branch:{zero_sha}" in str(a) for a in push_argv), \
         f"expected zero-sha lease in push argv, got: {push_argv}"
     assert any("HEAD:refs/heads/my-branch" in str(a) for a in push_argv), \
         f"expected explicit refspec in push argv, got: {push_argv}"
@@ -681,7 +681,7 @@ def test_stale_lease_once_then_ok_real_remote(tmp_path):
     pushes = _push_argvs(argvs)
     assert len(pushes) == 2
     for argv in pushes:
-        assert f"--force-with-lease=feature:{'0' * 40}" in argv
+        assert f"--force-with-lease=refs/heads/feature:{'0' * 40}" in argv
         assert "HEAD:refs/heads/feature" in argv
 
 
@@ -751,8 +751,8 @@ def test_lease_owner_update_branch_merge_adopted_real_remote(tmp_path):
     assert result == local_head
     assert _bare_feature(bare) == local_head
     pushes = _push_argvs(argvs)
-    assert f"--force-with-lease=feature:{y}" in pushes[0]
-    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+    assert f"--force-with-lease=refs/heads/feature:{y}" in pushes[0]
+    assert f"--force-with-lease=refs/heads/feature:{z}" in pushes[-1]
 
 
 def test_lease_owner_tree_equivalent_adopted_real_remote(tmp_path):
@@ -767,8 +767,8 @@ def test_lease_owner_tree_equivalent_adopted_real_remote(tmp_path):
     assert result == local_head
     assert _bare_feature(bare) == local_head
     pushes = _push_argvs(argvs)
-    assert f"--force-with-lease=feature:{y}" in pushes[0]
-    assert f"--force-with-lease=feature:{z}" in pushes[-1]
+    assert f"--force-with-lease=refs/heads/feature:{y}" in pushes[0]
+    assert f"--force-with-lease=refs/heads/feature:{z}" in pushes[-1]
 
 
 def test_lease_owner_foreign_tip_fails_closed_real_remote(tmp_path):
@@ -799,7 +799,7 @@ def test_lease_owner_no_tracking_equivalent_adopted_real_remote(tmp_path):
     assert _bare_feature(bare) == local_head
     pushes = _push_argvs(argvs)
     assert len(pushes) == 1
-    assert f"--force-with-lease=feature:{z}" in pushes[0]
+    assert f"--force-with-lease=refs/heads/feature:{z}" in pushes[0]
 
 
 def test_lease_owner_no_tracking_foreign_fails_closed_real_remote(tmp_path):
@@ -848,7 +848,7 @@ def test_lease_owner_unmoved_tip_falls_through_real_remote(tmp_path):
     pushes = _push_argvs(argvs)
     assert len(pushes) == 2
     for argv in pushes:
-        assert f"--force-with-lease=feature:{y}" in argv
+        assert f"--force-with-lease=refs/heads/feature:{y}" in argv
 
 
 def test_verdict_remote_head_diverged_no_pr():

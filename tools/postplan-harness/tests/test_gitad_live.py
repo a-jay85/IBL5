@@ -520,8 +520,8 @@ def test_push_uses_origin_tip_lease_when_remote_has_branch(tmp_path):
     push_calls = [a for a in recorded if a and a[0] == "push"]
     assert push_calls, "no push argv recorded"
     argv = push_calls[0]
-    assert any(f"--force-with-lease=my-branch:{origin_tip}" in str(a) for a in argv), \
-        f"expected --force-with-lease=my-branch:{origin_tip} in argv, got: {argv}"
+    assert any(f"--force-with-lease=refs/heads/my-branch:{origin_tip}" in str(a) for a in argv), \
+        f"expected --force-with-lease=refs/heads/my-branch:{origin_tip} in argv, got: {argv}"
     assert any("HEAD:refs/heads/my-branch" in str(a) for a in argv), \
         f"expected HEAD:refs/heads/my-branch in argv, got: {argv}"
 
@@ -724,3 +724,36 @@ def test_precommit_hang_makes_no_commit(repo, tmp_path, monkeypatch):
                           capture_output=True, text=True).stdout.strip()
     assert post == pre
     assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))
+
+
+def test_carried_conflict_flag_survives_two_clean_syncs(repo, tmp_path, monkeypatch):
+    """A carried condition-(14) marker keeps the hold across two clean rebases in a row.
+
+    Mutation caught: drop `_rebind_carried_flag` from the clean-replay returns and the
+    second sync finds the first resolving SHA gone, so the marker is dropped as stale."""
+    import harness.armable as armable
+    import harness.premerge as premerge
+
+    def sh(*a):
+        return subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True,
+                              text=True).stdout.strip()
+
+    flag = str(tmp_path / "flag")
+    monkeypatch.setattr(armable, "conflict_flag_path", lambda branch, tmp_dir="/tmp": flag)
+    monkeypatch.setattr(premerge, "load", lambda key: None)
+    sh("checkout", "-b", "feature-two-syncs")
+    open(os.path.join(repo, "f.txt"), "w").write("f\n")
+    sh("add", "-A")
+    sh("commit", "-m", "feat: f")
+    armable.record_conflict_resolution("feature-two-syncs", sh("rev-parse", "HEAD"))
+    g = LiveGit(repo)
+    for n in (1, 2):
+        sh("checkout", "master")
+        open(os.path.join(repo, f"m{n}.txt"), "w").write("m\n")
+        sh("add", "-A")
+        sh("commit", "-m", f"master {n}")
+        sh("checkout", "feature-two-syncs")
+        g.rebase_onto("master")
+        assert os.path.exists(flag), f"marker dropped after sync {n}"
+        assert g.last_conflict_flag_state == "carried"
+    assert open(flag).read().split().count(sh("rev-parse", "HEAD")) == 1

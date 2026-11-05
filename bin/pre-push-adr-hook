@@ -85,8 +85,7 @@ fi
 # keep push latency low; wt-new already syncs at creation time. Freshness-versus-
 # origin/master is owned by the stack root: when the root is pushed its hook enforces that
 # obligation; this hook deliberately does not walk the stack. If a branch is behind its base,
-# `git fetch origin master && git merge origin/master` or `bin/wt-rebase` (which merges
-# despite its name) brings it current.
+# `git fetch origin master` then `git rebase --onto origin/master "$(git merge-base HEAD origin/master)"` brings it current.
 CURRENT_BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short HEAD 2>/dev/null || true)
 BASE_REF="origin/master"
 if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
@@ -107,9 +106,10 @@ if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
             cat >&2 <<EOF
 
 pre-push-adr-hook: branch does not contain origin/master.
-Fetch and merge before pushing:
-  git fetch origin master && git merge origin/master
-  # or update all active worktrees at once: bin/wt-rebase (merges despite its name)
+Fetch and rebase before pushing:
+  git fetch origin master
+  git rebase --onto origin/master "\$(git merge-base HEAD origin/master)"
+  git push --force-with-lease="refs/heads/<branch>:\$(git rev-parse origin/<branch>)" origin "HEAD:refs/heads/<branch>"
 If this branch is stacked on another PR, record its real base and retry:
   git config branch.$CURRENT_BRANCH.iblBase <parent-branch>
 EOF

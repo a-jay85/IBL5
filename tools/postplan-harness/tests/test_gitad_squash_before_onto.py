@@ -802,7 +802,7 @@ def test_push_after_squash_leases_against_pre_squash_remote_tip():
 
         push_args = [a for a in recorded if a and a[0] == "push"]
         assert push_args, "no push argv recorded"
-        assert f"--force-with-lease={branch}:{pre_tip}" in push_args[0]
+        assert f"--force-with-lease=refs/heads/{branch}:{pre_tip}" in push_args[0]
         assert f"HEAD:refs/heads/{branch}" in push_args[0]
         remote_tip = subprocess.run(
             ["git", "-C", bare, "rev-parse", f"refs/heads/{branch}"],

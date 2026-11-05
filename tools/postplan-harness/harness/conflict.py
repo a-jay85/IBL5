@@ -316,6 +316,11 @@ def _decline_reason(path: str, reply: str) -> str:
     return f"resolver declined: {path}" + (f" (model: {said})" if said else "")
 
 
+# Both master-sync paths (plain and stacked) replay the branch with a rebase onto master,
+# so the branch's copy of a conflicted path sits in index stage 3.
+SYNC_BRANCH_STAGE = 3
+
+
 def resolve_one(
     llm,
     run: Callable[..., str],
@@ -339,7 +344,8 @@ def resolve_one(
     RESOLVED round.
 
     `stages` is the path's unmerged stage set. `branch_stage` names the stage holding the
-    branch's copy: 2 under `git merge origin/master`, 3 under a rebase. The missing stage
+    branch's copy: 3 under the harness's rebase sync (`SYNC_BRANCH_STAGE`), 2 only for a caller
+    that merges. The missing stage
     of a modify/delete conflict names the side that deleted the file."""
     from .adapters.llm import TOOLED_MAX_TURNS
 

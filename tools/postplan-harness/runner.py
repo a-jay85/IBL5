@@ -4573,15 +4573,15 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         snapshot_regen.clear_audit_lines(getattr(git, "worktree", "") or "")
         base = _merge_target(git)
         if base == "origin/master":
-            git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); merge, never rebase
+            git.rebase_onto()  # pre-push policy: origin/master must be an ancestor of HEAD (bin/pre-push-adr-hook); rebase --onto, then a lease push
         else:
             # Stacked PR: merge the declared parent, never master (PR #3672 pulled ~355
             # master files into a stack). bin/pre-push-adr-hook accepts origin/<parent>
-            # as an ancestor of HEAD. Merge, never rebase.
-            log(f"phase2: stacked base {base} -- merging it instead of origin/master")
+            # as an ancestor of HEAD. Rebase only the branch's own commits onto it.
+            log(f"phase2: stacked base {base} -- rebasing onto it instead of origin/master")
             git.fetch_base(base)
             git.rebase_onto(base)
-        # A plain merge the resolver settled can also carry accepted adapted lines.
+        # A plain sync the resolver settled can also carry accepted adapted lines.
         plain_resolution = getattr(git, "last_conflict_resolution", None)
         for line in audit_lines_for_adaptations(
                 getattr(plain_resolution, "adapted_lines", ())):
@@ -4649,10 +4649,10 @@ def _phase2_rebase(git, res, log) -> tuple[str, str]:
         rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
                        f"manifest={conflict_resolved.manifest_path}{auto_files}")
     else:
-        log("phase2: merged origin/master")
-        # the skill's two success spellings, verbatim
+        log(f"phase2: rebased onto {base}")
+        # clean keeps the skill's spelling verbatim; rebased names the sync target
         rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
-                       if sha == pre_rebase else "REBASE=merged origin/master")
+                       if sha == pre_rebase else f"REBASE=rebased onto {base}")
     return sha, rebase_line
 
 
@@ -5056,7 +5056,7 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     if res.terminal == TerminalState.REBASED_HELD:
         ro = res.rebase_only or {}
         what = ("already up to date with master, nothing pushed"
-                if ro.get("noop") else "merged origin/master and pushed")
+                if ro.get("noop") else "rebased onto origin/master and pushed")
         return (f"RESULT: post-plan REBASED — terminal=rebased-held{pr}; "
                 f"{what}; held for a human (prior hold {_flat(ro.get('hold') or '') or 'unknown'}); "
                 "no review run, auto-merge not armed.")
@@ -5182,7 +5182,7 @@ def main() -> int:
                                    "slug-derived variant selection")
     ap.add_argument("--rebase-only", action="store_true",
                     help="rebase-only mode (live only): when the last hold is a subset of "
-                         "{3,7,8}, merge origin/master, push, and stop before review; "
+                         "{3,7,8}, rebase onto origin/master, push, and stop before review; "
                          "otherwise run normally")
     args = ap.parse_args()
     if args.live and args.mode != "isolated":

@@ -29,6 +29,8 @@ Delete the closer session, the arm assignment and enrollment, the outcome log, t
 
 `POSTPLAN_FIRED_BY` and the `fired-by=` log line stay, because automouse, the fleet and burndown attribution use them. `POSTPLAN_AB_ARM` is no longer read. Old files under `tools/postplan-harness/out/state/` stay on disk and are ignored. No revert check runs on the merged closer PRs. The saved report is the record.
 
+The harness tests assert that `harness.closer`, `harness.ab_arm` and `harness.ab_readout` stay unimportable and that `runner._maybe_run_closer` stays absent.
+
 ## Alternatives Considered
 
 - Keep the closer behind a disabled switch. It keeps the closer code and its eight branch sites alive for a trial with a settled result. Rejected because the result is in the saved report.

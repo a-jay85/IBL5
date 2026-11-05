@@ -15,6 +15,7 @@ import types
 import pytest
 
 import ppn_launch
+from harness import usage_pause
 from test_post_plan_now_fallback import (  # noqa: F401  (_private_log_dir is autouse from conftest.py)
     PPN, REPO, _fixture_repo, _generate_cmd, _run_gate, _run_ppn,
 )
@@ -316,3 +317,39 @@ def test_resume_without_marker_rejects(tmp_path):
     assert r.returncode == 2, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     assert "no pause marker" in r.stderr
     assert not run_log.exists(), "no harness may launch on a rejected resume"
+
+
+def test_resume_discards_recorded_edit_before_prefire_gate(tmp_path):
+    """The gate must judge the tree the resume ships, not the half-done edit it will drop."""
+    saw = tmp_path / "prefire-saw.txt"
+    prefire = tmp_path / "prefire-stub"
+    _stub_exec(prefire, f'#!/bin/sh\nif [ -e half.txt ]; then echo dirty; else echo clean; fi >> "{saw}"\n')
+    extra = {"RUN_LOG": str(tmp_path / "run-log.txt"),
+             "ENV_DUMP": str(tmp_path / "env-dump.txt"),
+             "RESUME_FLAG": str(tmp_path / "resume-flag"),
+             "PREFIRE_VERIFY_SCRIPT": str(prefire)}
+    run = _run_foreground_with(tmp_path, RESUME_BODY, extra_env=extra)
+    marker = _markers(run.state)[0]
+    sid, repo = marker["session_id"], marker["resume_cwd"]
+    harness_pkg = pathlib.Path(REPO, "tools", "postplan-harness", "harness")
+    (pathlib.Path(run.env["HARNESS"]) / "harness").symlink_to(harness_pkg)
+
+    pre = usage_pause.capture_prespawn(repo)
+    (pathlib.Path(repo) / "half.txt").write_text("half\n")
+    post = usage_pause.capture_prespawn(repo)
+    record = pathlib.Path(run.state) / "runs" / f"{sid}.pause.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps({
+        "version": 1, "session_id": sid, "purpose": "fidelity-remediation", "head": pre.head,
+        "pre_tree": pre.tree, "post_tree": post.tree, "changed": [["A", "half.txt"]]}))
+
+    pathlib.Path(extra["RESUME_FLAG"]).touch()
+    cache = dict(NORMAL_USAGE, fetched_at=int(__import__("time").time()))
+    (pathlib.Path(run.state) / "cache.json").write_text(json.dumps(cache))
+    resume = subprocess.run(marker["resume_argv"], cwd=repo, env=run.env,
+                            capture_output=True, text=True)
+
+    assert resume.returncode == 0, f"stdout={resume.stdout!r} stderr={resume.stderr!r}"
+    assert "resume discard: discarded" in resume.stdout
+    assert saw.read_text().splitlines()[-1] == "clean"
+    assert record.exists(), "the harness clears the record on its own discard"

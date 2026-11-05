@@ -35,6 +35,11 @@
 #   IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN minimum gap between unblock sessions (120)
 #   IBL5_BURNDOWN_MAX_FAILS           consecutive failed or aborted batches before giving up (3)
 #   IBL5_BURNDOWN_EMPTY_SLEEP_MIN     minutes between re-checks while the backlog is empty (240)
+#   IBL5_BURNDOWN_WINDOW_START_HOUR   local hour (0-23) the night window opens (2)
+#   IBL5_BURNDOWN_WINDOW_END_HOUR     local hour (0-23) it closes, exclusive; below the start wraps past midnight (7)
+#   IBL5_BURNDOWN_ENDGAME_HOURS       hours before the weekly reset when a go verdict ignores the window (48; 0 = off)
+#   IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN  scout cooldown while in endgame (60)
+#   IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN     empty-backlog re-check while in endgame (30)
 #   IBL5_BURNDOWN_REEXEC_*            internal re-exec hand-off; ignored unless this PID set it
 #   IBL5_BURNDOWN_BATCH_TIMEOUT_MIN   per-batch wall clock in minutes (90)
 #   IBL5_BURNDOWN_DISCORD_DM          finish-DM sender (default bin/discord-dm)
@@ -43,6 +48,13 @@
 #   runs a no-arm unblock session on conflicting or red non-feat: PRs. A detected arm
 #   disarms the PR and writes $STATE/unblock-disabled; rm it to re-enable unblock. A
 #   failed gh count holds all new work (batches, scouts and unblock) until it recovers.
+#   Night window: batches, scouts and unblock sessions start only from the window start
+#   hour up to the end hour, local time. A batch still running at the end hour finishes
+#   normally. Outside the window the loop logs reason=night-window and sleeps at most
+#   30 minutes per check. Endgame (weekly reset under ENDGAME_HOURS away plus a go pace
+#   verdict) ignores the window and uses the endgame scout cooldown and empty sleep.
+#   The pace line and the drain and stop zones apply in every mode. Hours take no
+#   leading zero (07 exits 2), and equal start and end hours exit 2.
 #
 # Exit codes: 0 loop finished (stop requested, or --once done; an empty --once batch ends here).
 #             1 consecutive-failure cap hit. Failed batches and /burndown exit-3
@@ -102,6 +114,11 @@ EMPTY_SLEEP_MIN=240
 SCOUT_COOLDOWN_MIN=240
 PR_CEILING=0
 UNBLOCK_COOLDOWN_MIN=120
+WIN_START_HOUR=2
+WIN_END_HOUR=7
+ENDGAME_HOURS=48
+ENDGAME_SCOUT_COOLDOWN_MIN=60
+ENDGAME_EMPTY_SLEEP_MIN=30
 START_EPOCH=$(date +%s)
 
 # Re-exec hand-off (see bl_maybe_reexec). Read once, then unset, so batch children
@@ -131,7 +148,7 @@ BL_SCOUT_RECHECK=900
 BL_SCOUT_PROMPT='Invoke the /reset-ready skill now and run every step to completion. No human is present: never ask questions or wait for input; print what you would have told the user and continue. Step 1 has no usage hook line here and the caller already checked pace, so treat usage as allowing work. In Step 6, skip the burndown-loop stop/start bullet because the loop is your caller; keep the other bullets. Pick no new frontend features. For picks that touch SQL, auth or destructive changes, weigh plan-architect-xhigh with the tier hint as the skill says. The tier is an Opus judgment. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-SCOUT: fired <n> (n = prompts handed to bin/plan-now), BURNDOWN-SCOUT: none, or BURNDOWN-SCOUT: aborted'
 BL_UNBLOCK_MAX=5
 BL_UNBLOCK_DENY='Bash(gh pr merge:*),Bash(gh api:*),Bash(bin/post-plan-now:*),Bash(bin/post-plan-fleet:*),Bash(bin/pr-cycle:*),Bash(bin/pr-cycle-tick:*),Bash(bin/pr-triage:*),Bash(bin/postplan-fix:*)'
-BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin` and `git merge origin/master`, resolve every conflict keeping the intent of both sides, run the tests that cover the touched files, commit, and `git push` without force. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
+BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin`, then record <sha> as `git rev-parse origin/<branch>` and run `git merge-base --is-ancestor origin/<branch> HEAD`; if that check fails the local branch lacks remote commits, so skip the PR. Also skip the PR when `git rev-list --merges origin/master..HEAD` prints anything: a plain rebase drops merge commits and any edits made inside them. Then run `git rebase --onto origin/master "$(git merge-base HEAD origin/master)"`; at each stop resolve every conflict keeping the intent of both sides, `git add` it and run `GIT_EDITOR=true git rebase --continue`; run the tests that cover the touched files; then push with `git push --force-with-lease="refs/heads/<branch>:<sha>" origin HEAD:refs/heads/<branch>`, where <sha> is the value you recorded before rebasing; never re-read it at push time. Always pass that explicit refs/heads lease. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Skip a reason=conflict PR when the file /tmp/postplan-conflict-resolved-<branch> exists and is not empty, where <branch> is the head branch with every / and : replaced by -; that file marks a conflict resolution still awaiting review, and a rebase would rewrite the commit it names and drop the hold. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
 
 bl_usage() {
     cat <<'USAGE_EOF'
@@ -168,6 +185,19 @@ bl_posint_env() {
     echo "$v"
 }
 
+# bl_hour_env <NAME> <default>: a local hour from 0 to 23. Unset and empty take the
+# default; anything else (including a leading zero such as 07) exits 2.
+bl_hour_env() {
+    local name="$1" def="$2" v
+    v="${!name:-}"
+    [ -n "$v" ] || { echo "$def"; return 0; }
+    if ! bl_nonneg_int "$v" || [ "$v" -gt 23 ]; then
+        echo "burndown-loop: $name must be an hour from 0 to 23 (got '$v')" >&2
+        exit 2
+    fi
+    echo "$v"
+}
+
 bl_uuid() {
     if command -v uuidgen >/dev/null 2>&1; then
         uuidgen | tr 'A-Z' 'a-z'
@@ -194,6 +224,19 @@ bl_load_knobs() {
         exit 2
     }
     UNBLOCK_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_UNBLOCK_COOLDOWN_MIN 120) || exit 2
+    WIN_START_HOUR=$(bl_hour_env IBL5_BURNDOWN_WINDOW_START_HOUR 2) || exit 2
+    WIN_END_HOUR=$(bl_hour_env IBL5_BURNDOWN_WINDOW_END_HOUR 7) || exit 2
+    if [ "$WIN_START_HOUR" -eq "$WIN_END_HOUR" ]; then
+        echo "burndown-loop: IBL5_BURNDOWN_WINDOW_START_HOUR and IBL5_BURNDOWN_WINDOW_END_HOUR must differ (both $WIN_START_HOUR)" >&2
+        exit 2
+    fi
+    ENDGAME_HOURS="${IBL5_BURNDOWN_ENDGAME_HOURS:-48}"
+    bl_nonneg_int "$ENDGAME_HOURS" || {
+        echo "burndown-loop: IBL5_BURNDOWN_ENDGAME_HOURS must be 0 (endgame off) or a positive integer (got '$ENDGAME_HOURS')" >&2
+        exit 2
+    }
+    ENDGAME_SCOUT_COOLDOWN_MIN=$(bl_posint_env IBL5_BURNDOWN_ENDGAME_SCOUT_COOLDOWN_MIN 60) || exit 2
+    ENDGAME_EMPTY_SLEEP_MIN=$(bl_posint_env IBL5_BURNDOWN_ENDGAME_EMPTY_SLEEP_MIN 30) || exit 2
     bl_timeout_secs >/dev/null || exit 2
 }
 
@@ -252,13 +295,98 @@ bl_fetch_retry_decision() {
     echo "sleep $BL_FETCH_RETRY fetch-retry fetch-rc=$frc"
 }
 
+# Test-only clock. BL_TEST_CLOCK names a file holding "<epoch|now> HH:MM:SS"; the
+# harness rewrites the file mid-run to move local time. The name sits outside the
+# IBL5_BURNDOWN_ prefix on purpose: bl_runner_env persists that prefix into runner.sh.
+bl_test_clock() {
+    [ -n "${BL_TEST_CLOCK:-}" ] && [ -r "$BL_TEST_CLOCK" ] || return 1
+    cat "$BL_TEST_CLOCK"
+}
+
+# bl_now: epoch seconds. The test clock's epoch when it names one, else date +%s.
+bl_now() {
+    local c e
+    if c=$(bl_test_clock); then
+        e=${c%% *}
+        if bl_nonneg_int "$e"; then echo "$e"; return 0; fi
+    fi
+    date +%s
+}
+
+# bl_local_sod: seconds since local midnight, built from the wall-clock hour, minute
+# and second. No date arithmetic flags, so BSD date (macOS) and GNU date (CI) agree.
+bl_local_sod() {
+    local c t h m s
+    if c=$(bl_test_clock); then t=${c#* }; else t=$(date +%H:%M:%S); fi
+    h=${t%%:*}; s=${t##*:}; m=${t#*:}; m=${m%%:*}
+    echo $(( 10#$h * 3600 + 10#$m * 60 + 10#$s ))
+}
+
+# bl_in_window <sod>: rc 0 when local time sits in [WIN_START_HOUR, WIN_END_HOUR).
+# A start hour above the end hour wraps past midnight (22 and 6 mean 22:00-06:00).
+bl_in_window() {
+    local h=$(( $1 / 3600 ))
+    if [ "$WIN_START_HOUR" -lt "$WIN_END_HOUR" ]; then
+        [ "$h" -ge "$WIN_START_HOUR" ] && [ "$h" -lt "$WIN_END_HOUR" ]
+    else
+        [ "$h" -ge "$WIN_START_HOUR" ] || [ "$h" -lt "$WIN_END_HOUR" ]
+    fi
+}
+
+# bl_endgame_left <body> <now>: "in" when the weekly reset (seven_day.resets_at) is
+# less than ENDGAME_HOURS away, else the seconds until that point, or "none" when
+# resets_at is missing, garbled or already past. A stale reading never opens endgame.
+bl_endgame_left() {
+    local r eg
+    r=$(usage_resets_epoch "$1" seven_day)
+    if ! bl_nonneg_int "$r" || [ "$r" -le "$2" ]; then echo none; return 0; fi
+    eg=$(( r - $2 - ENDGAME_HOURS * 3600 ))
+    if [ "$eg" -lt 0 ]; then echo in; else echo "$eg"; fi
+}
+
+# bl_window_sleep <sod> <endgame_left>: seconds to sleep outside the window, until
+# the next window start or the endgame start, whichever comes first, clamped to
+# [60, BL_SLEEP_CAP]. The window term is wall-clock arithmetic, so on a DST change
+# day it can be off by up to 3600s; the clamp and the re-check on every wake absorb it.
+bl_window_sleep() {
+    local s=$(( (WIN_START_HOUR * 3600 - $1 + 86400) % 86400 ))
+    case "$2" in
+        none|in) ;;
+        *) if [ "$2" -lt "$s" ]; then s=$2; fi ;;
+    esac
+    if [ "$s" -gt "$BL_SLEEP_CAP" ]; then s=$BL_SLEEP_CAP; fi
+    if [ "$s" -lt 60 ]; then s=60; fi
+    echo "$s"
+}
+
+# bl_endgame_on: rc 0 when endgame is in force now: a go pace verdict and the weekly
+# reset under ENDGAME_HOURS away (the test bl_decide uses). A failed or stale fetch
+# is rc 1, so the normal, longer values apply.
+bl_endgame_on() {
+    local body now v
+    [ "$ENDGAME_HOURS" -gt 0 ] || return 1
+    body=$(usage_fetch 45) || return 1
+    now=$(bl_now)
+    v=$(usage_pace_verdict "$body" "$now")
+    [ "${v%% *}" = go ] && [ "$(bl_endgame_left "$body" "$now")" = in ]
+}
+
+# bl_scout_cooldown_min / bl_empty_sleep_min: the minutes in force right now.
+bl_scout_cooldown_min() {
+    if bl_endgame_on; then echo "$ENDGAME_SCOUT_COOLDOWN_MIN"; else echo "$SCOUT_COOLDOWN_MIN"; fi
+}
+bl_empty_sleep_min() {
+    if bl_endgame_on; then echo "$ENDGAME_EMPTY_SLEEP_MIN"; else echo "$EMPTY_SLEEP_MIN"; fi
+}
+
 # bl_decide: prints exactly one line, the single pacing decision for both the live
 # loop and --dry-run. Fails closed on a missing or stale reading: the loop is
 # discretionary work, so a skipped batch costs time while an unpaced one costs the
 # owner's week (unlike usage_prestart_gate, which guards a run the user asked for).
 # A stale reading (fetch rc 2) only shortens the sleep to the backoff or a 120s retry.
+# A go verdict outside the night window (and outside endgame) becomes a night-window sleep.
 bl_decide() {
-    local body frc=0 v verdict wait
+    local body frc=0 v verdict wait now sod eg
     body=$(usage_fetch 45) || frc=$?
     if [ "$frc" -eq 2 ]; then
         bl_fetch_retry_decision "$frc"
@@ -268,10 +396,22 @@ bl_decide() {
         echo "sleep $BL_SLEEP_CAP blind fetch-rc=$frc"
         return 0
     fi
-    v=$(usage_pace_verdict "$body" "$(date +%s)")
+    now=$(bl_now)
+    v=$(usage_pace_verdict "$body" "$now")
     verdict="${v%% *}"
     case "$verdict" in
-        go) echo "launch $v" ;;
+        go)
+            # Night window: start work only inside it, unless the weekly reset is
+            # under ENDGAME_HOURS away. Only a go verdict reaches here, so the
+            # window removes starts and never adds one the pace line refused.
+            sod=$(bl_local_sod)
+            eg=$(bl_endgame_left "$body" "$now")
+            if bl_in_window "$sod" || [ "$eg" = in ]; then
+                echo "launch $v"
+            else
+                echo "sleep $(bl_window_sleep "$sod" "$eg") night-window $v endgame-in=$eg"
+            fi
+            ;;
         wait)
             wait=$(printf '%s' "$v" | cut -d' ' -f4)
             if [ "$wait" -gt "$BL_SLEEP_CAP" ]; then wait=$BL_SLEEP_CAP; fi
@@ -488,7 +628,7 @@ bl_all_skipped() {
 }
 
 bl_on_launch() {
-    local class reason new units tail3 scout
+    local class reason new units tail3 scout es
     bl_run_batch
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$BATCH_RC" "$BLOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."
@@ -519,8 +659,9 @@ bl_on_launch() {
                             bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
                             ;;
                         *)
-                            bl_log "every picked item skipped; re-check in ${EMPTY_SLEEP_MIN}m"
-                            bl_sleep $((EMPTY_SLEEP_MIN * 60)) all-skipped || bl_stopped
+                            es=$(bl_empty_sleep_min)
+                            bl_log "every picked item skipped; re-check in ${es}m"
+                            bl_sleep $((es * 60)) all-skipped || bl_stopped
                             ;;
                     esac
                 else
@@ -534,9 +675,10 @@ bl_on_launch() {
                 bl_log "backlog empty (sentinel confirmed first round LEDGER: none); --once ends the run"
                 bl_finish exhausted 0
             fi
-            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${EMPTY_SLEEP_MIN}m streak=$((EMPTY_STREAK + 1))"
+            es=$(bl_empty_sleep_min)
+            bl_log "backlog empty (sentinel confirmed first round LEDGER: none); re-check in ${es}m streak=$((EMPTY_STREAK + 1))"
             if [ "$EMPTY_STREAK" -eq 0 ]; then
-                bl_dm "burndown-loop: backlog empty; re-checking every ${EMPTY_SLEEP_MIN}m until work appears
+                bl_dm "burndown-loop: backlog empty; re-checking every ${es}m until work appears
 batches=$BATCHES items=$ITEMS
 log: $LOOP_LOG"
             fi
@@ -548,7 +690,7 @@ log: $LOOP_LOG"
                     bl_run_scout
                     bl_sleep "$BL_SCOUT_RECHECK" scout-recheck || bl_stopped
                     ;;
-                *) bl_sleep $((EMPTY_SLEEP_MIN * 60)) backlog-empty || bl_stopped ;;
+                *) bl_sleep $((es * 60)) backlog-empty || bl_stopped ;;
             esac
             ;;
         abort)
@@ -584,7 +726,7 @@ bl_cooldown_left() {
     span=$(( $2 * 60 ))
     last=$(cat "$1" 2>/dev/null || true)
     if ! bl_nonneg_int "$last"; then echo 0; return 0; fi
-    now=$(date +%s)
+    now=$(bl_now)
     if [ "$last" -gt "$now" ]; then echo "$span"; return 0; fi
     if [ $((now - last)) -ge "$span" ]; then echo 0; else echo $((span - (now - last))); fi
 }
@@ -700,7 +842,7 @@ log: $LOOP_LOG"
 bl_on_unblock() {
     local prs="${1##* prs=}" marker
     # Cooldown starts at launch, so a crash or timeout never retries at once.
-    date +%s > "$STATE/unblock.last"
+    bl_now > "$STATE/unblock.last"
     bl_run_session unblock claude-sonnet-5-5 "${BL_UNBLOCK_PROMPT//@PRS@/$prs}" \
         --disallowedTools "$BL_UNBLOCK_DENY"
     bl_unblock_arm_check "$prs"
@@ -718,7 +860,7 @@ bl_on_unblock() {
 # the batch that just ended may have spent the budget.
 bl_scout_gate() {
     local left d
-    left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+    left=$(bl_cooldown_left "$STATE/scout.last" "$(bl_scout_cooldown_min)")
     if [ "$left" -gt 0 ]; then echo "scout-skip cooldown left=${left}s"; return 0; fi
     d=$(bl_decide)
     case "$d" in launch*) echo "scout $d" ;; *) echo "scout-skip pace $d" ;; esac
@@ -726,7 +868,7 @@ bl_scout_gate() {
 
 bl_run_scout() {
     # Cooldown starts at launch, so a crash or timeout never retries at once.
-    date +%s > "$STATE/scout.last"
+    bl_now > "$STATE/scout.last"
     bl_run_session scout claude-opus-5-5 "$BL_SCOUT_PROMPT"
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
         bl_log "RESULT paused (usage gate); auto-resumes after reset."
@@ -842,7 +984,7 @@ bl_maybe_reexec() {
 # ------------------------------------------------------------ run
 
 bl_cmd_run() {
-    local dry=0 a decision action rest secs reason max_fails timeout_secs work left s
+    local dry=0 a decision action rest secs reason max_fails timeout_secs work left s cdm
     for a in "$@"; do
         case "$a" in
             --once) ONCE=1 ;;
@@ -863,9 +1005,12 @@ bl_cmd_run() {
     if [ "$dry" -eq 1 ]; then
         decision=$(bl_decide)
         echo "burndown-loop: DRY RUN reserve=$(usage_pace_reserve) timeout=$timeout_secs max_fails=$max_fails dm=$DISCORD_DM decision=$decision"
-        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m"
+        echo "burndown-loop: DRY RUN knobs ceiling=$PR_CEILING scout_cooldown=${SCOUT_COOLDOWN_MIN}m unblock_cooldown=${UNBLOCK_COOLDOWN_MIN}m empty_sleep=${EMPTY_SLEEP_MIN}m window=${WIN_START_HOUR}-${WIN_END_HOUR} endgame_hours=${ENDGAME_HOURS} endgame_scout_cooldown=${ENDGAME_SCOUT_COOLDOWN_MIN}m endgame_empty_sleep=${ENDGAME_EMPTY_SLEEP_MIN}m"
+        cdm=$(bl_scout_cooldown_min)
+        if bl_endgame_on; then s=on; else s=off; fi
+        echo "burndown-loop: DRY RUN endgame=$s scout_cooldown_now=${cdm}m empty_sleep_now=$(bl_empty_sleep_min)m"
         work=$(bl_work_gate)
-        left=$(bl_cooldown_left "$STATE/scout.last" "$SCOUT_COOLDOWN_MIN")
+        left=$(bl_cooldown_left "$STATE/scout.last" "$cdm")
         if [ "$left" -gt 0 ]; then s="cooldown left=${left}s"; else s=ready; fi
         echo "burndown-loop: DRY RUN work=$work scout=$s"
         return 0

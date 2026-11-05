@@ -1882,7 +1882,10 @@ def test_phase7_red_ci_leaves_arming_unchanged(monkeypatch, tmp_path):
     green_merges = [a["action"] for a in _actions(out_green)].count("pr_merge_auto")
     red_merges = [a["action"] for a in _actions(out_red)].count("pr_merge_auto")
     assert green_merges == red_merges
-    assert "pr_disable_auto_merge" not in [a["action"] for a in _actions(out_red)]
+    # A held run disarms once at the arm point; the red CI itself adds no further disarm.
+    green_disarms = [a["action"] for a in _actions(out_green)].count("pr_disable_auto_merge")
+    red_disarms = [a["action"] for a in _actions(out_red)].count("pr_disable_auto_merge")
+    assert red_disarms == green_disarms
 
 
 def test_phase7_incident_red_ci_is_fixed_and_rewatched(monkeypatch, tmp_path):

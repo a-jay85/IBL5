@@ -72,16 +72,22 @@ def _write_canned(directory, cost):
 
 def test_plan_calls_round_robin_order_and_count():
     calls = tm.plan_calls(tm.CELLS)
-    assert len(calls) == 56
+    assert len(calls) == 84
     names = [c[0] for c in tm.CELLS]
-    assert [c[2] for c in calls[:4]] == names
+    assert [c[2] for c in calls[:6]] == names
     assert calls[0] == (1, tm.BUG_CASES[0], names[0])
-    assert calls[4] == (1, tm.BUG_CASES[1], names[0])
-    assert calls[24] == (1, tm.CLEAN_CASES[0], names[0])
-    assert calls[32] == (2, tm.BUG_CASES[0], names[0])
+    assert calls[6] == (1, tm.BUG_CASES[1], names[0])
+    assert calls[36] == (1, tm.CLEAN_CASES[0], names[0])
+    assert calls[48] == (2, tm.BUG_CASES[0], names[0])
     assert calls[-1] == (2, tm.BUG_CASES[-1], names[-1])
     assert all(c[0] == 1 for c in calls if c[1] in tm.CLEAN_CASES)
     assert len(tm.plan_calls(tm.CELLS[:2])) == 28
+
+
+def test_cells_include_the_production_review_seat_settings():
+    cells = {c[0]: (c[1], c[2]) for c in tm.CELLS}
+    assert cells["sonnet-medium"] == ("claude-sonnet-5-5", "medium")
+    assert cells["opus-medium"] == ("claude-opus-5-5", "medium")
 
 
 def test_build_argv_carries_effort_budget_and_toolless():
@@ -313,7 +319,7 @@ def test_dry_run_never_invokes_runner(tmp_path, capsys):
     assert code == 0
     assert not out.exists()
     text = capsys.readouterr().out
-    assert "planned_calls=56" in text
+    assert "planned_calls=84" in text
     assert "ceiling=25.00 per_call_cap=1.50" in text
 
 

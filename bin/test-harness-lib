@@ -367,6 +367,21 @@ h_done' HOME="$WORK/home-ow" IBL5_USAGE_GATE_STATE_DIR="$fake_default" \
     fi
 }
 
+# Inherited usage thresholds are dropped, so an operator shell that tunes them
+# cannot change a test's pace or pause decisions.
+case_usage_isolation_drops_thresholds() {
+    run_scenario usage_thresholds 'echo "DR=${IBL5_USAGE_DRAIN_PCT-unset}"
+echo "ST=${IBL5_USAGE_STOP_PCT-unset}"
+h_pass a
+h_done' IBL5_USAGE_DRAIN_PCT=98 IBL5_USAGE_STOP_PCT=100
+    if [ "$RC" -eq 0 ] && grep -qxF "DR=unset" <<<"$OUT" &&
+        grep -qxF "ST=unset" <<<"$OUT"; then
+        t_ok "case_usage_isolation_drops_thresholds"
+    else
+        t_bad "case_usage_isolation_drops_thresholds (rc=$RC out=[$OUT] err=[$ERR])"
+    fi
+}
+
 # A harness consumer under a fake HOME holding a fresh 95% cache at the default
 # path must not read it: prestart passes (fail open) and nothing is written
 # beside that cache.
@@ -693,6 +708,7 @@ case_tmp_blank_tmpdir
 case_bpt_delegates
 case_usage_isolation_env
 case_usage_isolation_overwrites
+case_usage_isolation_drops_thresholds
 case_usage_isolation_prestart_fail_open
 case_usage_isolation_lib_env_i
 case_consumers_end_with_h_done

@@ -201,7 +201,7 @@ def test_runner_logs_one_audit_line_per_accepted_adaptation(tmp_path, monkeypatc
         AcceptedAdaptation("bin/a", 'x > "/tmp/a"', 'x > "$RL/a"', "/tmp", "$RL"),
         AcceptedAdaptation("bin/b", "call(old_name)", "call(new_name)", "old_", "new_"),
     )[:count]
-    wt = _plain_scenario(tmp_path, conflict=False, dirty=True)
+    wt = _plain_scenario(tmp_path, conflict=False, dirty=False)
     _Orig = runner.LiveGit
 
     class _FakeOntoGit(_Orig):
@@ -257,7 +257,7 @@ def test_runner_logs_one_audit_line_per_accepted_adaptation_on_plain_merge(
         AcceptedAdaptation("bin/b", "call(old_name)", "call(new_name)", "old_", "new_"),
     )
     count = 2 if mode == "two" else 0
-    wt = _plain_scenario(tmp_path, conflict=False, dirty=True)
+    wt = _plain_scenario(tmp_path, conflict=False, dirty=False)
     _Orig = runner.LiveGit
 
     def _result(git, adapted):

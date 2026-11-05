@@ -1,0 +1,962 @@
+#!/usr/bin/env bash
+# Tests bin/lib/prefire-verify (the pre-fire verification gate) and its wiring
+# into bin/post-plan-now, with stubbed PHPUnit / Infection / DB probe.
+#
+# Usage: bin/test-prefire-verify [case_name ...]
+# With no arguments every case runs; with arguments only the named cases run.
+# Prints `PASS <name>` / `FAIL <name>: <why>` per case. Exit 0 iff all pass.
+set -uo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GATE="$REPO/bin/lib/prefire-verify"
+PPN="$REPO/bin/post-plan-now"
+
+h_tmp TMP
+mkdir -p "$TMP/shims" "$TMP/runlog" "$TMP/Library/LaunchAgents"
+# Never touch real launchd, the keychain, or a shared /tmp log dir.
+printf '#!/bin/sh\nexit 1\n' > "$TMP/shims/security"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/shims/launchctl"
+chmod +x "$TMP/shims/security" "$TMP/shims/launchctl"
+export PATH="$TMP/shims:$PATH"
+export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
+mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
+export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
+unset CLAUDE_HEADLESS
+
+WHY=""      # failure reasons for the current case
+OUT=""      # combined stdout+stderr of the last run
+RC=0        # exit code of the last run
+
+note() { WHY="${WHY:+$WHY; }$*"; }
+want_rc() { [ "$RC" -eq "$1" ] || note "expected exit $1, got $RC"; }
+want_out() { grep -qF -- "$1" <<< "$OUT" || note "output lacks '$1'"; }
+refute_out() { if grep -qF -- "$1" <<< "$OUT"; then note "output unexpectedly has '$1'"; fi; }
+want_cnt() { # <counter> <n>
+    local got; got=$(cnt "$1")
+    [ "$got" -eq "$2" ] || note "counter $1 expected $2, got $got"
+}
+cnt() {
+    if [ -f "$CNT/$1" ]; then wc -l < "$CNT/$1" | tr -d ' '; else echo 0; fi
+}
+
+# ---------------------------------------------------------------------------
+# Fixture: a fresh temp git repo plus stubs. Sets D (case dir), R (repo),
+# CNT (counter dir), PLAN (plan file path), and the PREFIRE_* seams.
+# ---------------------------------------------------------------------------
+new_case() {
+    D=$(mktemp -d "$TMP/case.XXXXXX")
+    R="$D/repo"
+    CNT="$D/cnt"
+    PLAN="$D/plan.md"
+    mkdir -p "$R/ibl5/vendor/bin" "$CNT" "$D/stubs"
+    export CNT
+    unset STUB_PHPUNIT_RC STUB_MUT_MODE
+    cat > "$R/ibl5/vendor/bin/phpunit" <<'EOF'
+#!/usr/bin/env bash
+echo run >> "$CNT/phpunit"
+exit "${STUB_PHPUNIT_RC:-0}"
+EOF
+    cat > "$D/stubs/mutation" <<'EOF'
+#!/usr/bin/env bash
+echo run >> "$CNT/mutation"
+case "${STUB_MUT_MODE:-ok}" in
+    3672)
+        echo "2295 mutations were generated"
+        echo "491 mutants were escaped"
+        echo "[ERROR] The minimum required MSI percentage should be 100%, but actual is 78.6%"
+        exit 1 ;;
+    prereq) echo "Error: pcov is not loaded"; exit 3 ;;
+    *) echo "Mutation Score Indicator (MSI): 100%"; exit 0 ;;
+esac
+EOF
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/probe"\nexit "${STUB_PROBE_RC:-0}"\n' > "$D/stubs/probe"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/excludes"\nexit 0\n' > "$D/stubs/excludes"
+    chmod +x "$R/ibl5/vendor/bin/phpunit" "$D/stubs/mutation" "$D/stubs/probe" "$D/stubs/excludes"
+    (
+        cd "$R" || exit 1
+        git init -q -b master
+        git config user.email t@example.com
+        git config user.name Test
+        printf 'a\n' > ibl5/tracked.txt
+        git add -A
+        git commit -q -m init
+    ) || { echo "HARNESS-SETUP: fixture repo failed" >&2; exit 2; }
+    export PREFIRE_PHPUNIT_CMD="vendor/bin/phpunit"
+    export PREFIRE_MUTATION_CMD="$D/stubs/mutation"
+    export PREFIRE_DB_PROBE_CMD="$D/stubs/probe"
+    export PREFIRE_EXCLUDES_CMD="$D/stubs/excludes"
+}
+
+# write_plan <row-line>...  — each argument is a full table row.
+write_plan() {
+    {
+        printf '# Plan\n\n## Verification Matrix\n\n'
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|----------------|-----------|--------|----------------------|\n'
+        local r
+        for r in "$@"; do printf '%s\n' "$r"; done
+        printf '\nAll verification is automated.\n'
+    } > "$PLAN"
+}
+
+row() { # <n> <cmd>
+    printf '| %s | check %s | CLI-executable | post-impl | %s |' "$1" "$1" "$2"
+}
+
+# Three green rows that count their runs.
+green_plan() {
+    write_plan "$(row 1 "echo x >> $CNT/row1")" \
+               "$(row 2 "echo x >> $CNT/row2")" \
+               "$(row 3 "echo x >> $CNT/row3")"
+}
+
+run_gate() { # args passed to the gate; cwd = fixture repo
+    OUT=$(cd "$R" && "$GATE" --base master "$@" 2>&1); RC=$?
+}
+
+# The gate's per-worktree pass-record dir (git-path may be relative to the repo).
+state_dir() {
+    local p; p=$(cd "$R" && git rev-parse --git-path prefire-verify)
+    case "$p" in /*) printf '%s' "$p" ;; *) printf '%s/%s' "$R" "$p" ;; esac
+}
+pass_files() { # <glob>
+    local d f; d=$(state_dir)
+    [ -d "$d" ] || return 0
+    for f in "$d"/*; do
+        [ -e "$f" ] || continue
+        f=${f##*/}
+        if [[ "$f" =~ $1 ]]; then printf '%s\n' "$f"; fi
+    done
+}
+tree_hash() {
+    local idx rc
+    idx=$(mktemp "$TMP/idx.XXXXXX")
+    (cd "$R" && cp "$(git rev-parse --git-path index)" "$idx" \
+        && GIT_INDEX_FILE="$idx" git add -A >/dev/null 2>&1 \
+        && GIT_INDEX_FILE="$idx" git write-tree)
+    rc=$?
+    rm -f "$idx"
+    return $rc
+}
+
+# ---------------------------------------------------------------------------
+# Gate cases (matrix rows 7-21)
+# ---------------------------------------------------------------------------
+test_matrix_row_failure_refuses_and_names_row() {
+    new_case
+    write_plan "$(row 1 true)" "$(row 2 true)" "$(row 3 'exit 7')"
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_out "FAIL matrix row 3 exited 7"
+    [ -z "$(pass_files '\.matrix\..*\.pass$')" ] || note "a matrix pass record exists"
+}
+
+test_unrun_row_refuses_without_gate_record() {
+    new_case
+    write_plan "$(row 1 "echo x >> $CNT/row1; exit 7")"
+    local d sha tree
+    d=$(state_dir); mkdir -p "$d"
+    sha=$(git hash-object "$PLAN")
+    tree=$(tree_hash)
+    printf 'All rows passed.\n' > "$D/ledger.md"
+    printf 'stage=matrix tree=OTHERTREE key=%s at=x by=prefire-verify\n' "$sha" \
+        > "$d/OTHERTREE.matrix.$sha.pass"
+    # Correct filename, wrong tree= field inside.
+    printf 'stage=matrix tree=WRONGTREE key=%s at=x by=prefire-verify\n' "$sha" \
+        > "$d/$tree.matrix.$sha.pass"
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_cnt row1 1
+}
+
+test_matrix_extract_skips_near_miss_rows() {
+    new_case
+    {
+        printf '## Verification Matrix\n\n'
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|---|---|---|---|\n'
+        printf '| 1 | manual; run CLI-executable thing | Truly-manual | post-impl | echo manual |\n'
+        printf '| 2 | pre | CLI-executable | pre-impl | echo pre |\n'
+        printf '| 3 | plan-time (one-time-check: plan-time corpus diff) | CLI-executable | post-impl | echo onetime |\n'
+        printf '| 4 | merge | CLI-executable | post-impl | post-merge: echo merged |\n'
+        printf '| 5 | run-only | CLI-executable (run-only) | post-impl | echo runonly |\n'
+        printf '| 6 | pipe | CLI-executable | post-impl | echo a \\| tr a b |\n'
+        printf '\n## Next\n\n| 7 | after | CLI-executable | post-impl | echo outside |\n'
+    } > "$PLAN"
+    local got want
+    got=$(bash -c ". '$REPO/bin/lib/plan-matrix-rows.sh'; plan_matrix_rows '$PLAN'" 2>&1)
+    want=$'5\techo runonly\n6\techo a | tr a b'
+    [ "$got" = "$want" ] || note "expected exactly rows 5 and 6, got: $(printf '%s' "$got" | tr '\t\n' ' >')"
+}
+
+test_relative_plan_from_subdir_runs_rows() {
+    new_case
+    green_plan
+    # cwd = ibl5/, so ../../plan.md is the plan here and nothing at the repo root.
+    OUT=$(cd "$R/ibl5" && "$GATE" --base master --stage matrix --plan ../../plan.md 2>&1); RC=$?
+    want_rc 0
+    refute_out "no evidence to check"
+    want_out "matrix passed"
+    want_cnt row1 1
+    want_cnt row3 1
+}
+
+test_plan_without_matrix_refuses() {
+    new_case
+    printf '# Plan\n\n## Phase 1\n\nNothing here.\n' > "$PLAN"
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_out "no evidence to check"
+}
+
+test_phpunit_red_refuses() {
+    new_case
+    green_plan
+    export STUB_PHPUNIT_RC=1
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_out "FAIL phpunit: full default suite red"
+}
+
+test_db_down_fails_closed_naming_row() {
+    new_case
+    write_plan "$(row 1 true)" "$(row 2 "echo x >> $CNT/row2; bin/db-query 'SELECT 1'")"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "DB unreachable; matrix row 2 needs it"
+    want_cnt row2 0
+    unset STUB_PROBE_RC
+}
+
+test_all_green_passes_and_records() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN"
+    want_rc 0
+    local n
+    n=$(pass_files '\.pass$' | wc -l | tr -d ' ')
+    [ "$n" -eq 3 ] || note "expected 3 .pass files, got $n"
+    want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
+}
+
+test_cache_hit_skips_rerun() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN"; want_rc 0
+    run_gate --plan "$PLAN"; want_rc 0
+    want_cnt phpunit 1
+    want_cnt mutation 1
+    want_cnt row1 1
+    want_out "pass cached for tree"
+}
+
+test_tree_change_invalidates_cache() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN"; want_rc 0
+    printf 'b\n' >> "$R/ibl5/tracked.txt"
+    run_gate --plan "$PLAN"; want_rc 0
+    want_cnt phpunit 2
+}
+
+test_checks_mutating_tree_refuse() {
+    new_case
+    green_plan
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/phpunit"\necho gen > ../generated.txt\nexit 0\n' > "$D/stubs/phpunit-mut"
+    chmod +x "$D/stubs/phpunit-mut"
+    export PREFIRE_PHPUNIT_CMD="$D/stubs/phpunit-mut"
+    run_gate --plan "$PLAN"
+    want_rc 4
+    want_out "changed the working tree"
+    [ -z "$(pass_files '\.phpunit\.pass$')" ] || note "a phpunit pass record exists"
+}
+
+test_adhoc_no_plan_runs_phpunit_and_infection() {
+    new_case
+    run_gate
+    want_rc 0
+    want_out "SKIP matrix: no plan"
+    want_out "SKIP exec-mutations: no plan"
+    want_cnt phpunit 1
+    want_cnt mutation 1
+}
+
+test_empty_plan_value_refuses() {
+    new_case
+    green_plan
+    run_gate --plan ""
+    want_rc 2
+    want_out "--plan got an empty value"
+    refute_out "SKIP matrix"
+    want_cnt phpunit 0
+    want_cnt mutation 0
+}
+
+test_infection_below_threshold_refuses_3672() {
+    new_case
+    green_plan
+    export STUB_MUT_MODE=3672
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_out "FAIL infection: below CI threshold"
+    want_out "491 mutants were escaped"
+    [ -z "$(pass_files '\.infection\..*\.pass$')" ] || note "an infection pass record exists"
+}
+
+test_infection_at_threshold_passes() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN"
+    want_rc 0
+    [ -n "$(pass_files '\.infection\..*\.pass$')" ] || note "no infection pass record"
+}
+
+test_infection_prereq_missing_fails_closed() {
+    new_case
+    green_plan
+    export STUB_MUT_MODE=prereq
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "prerequisite missing"
+    [ -z "$(pass_files '\.infection\..*\.pass$')" ] || note "an infection pass record exists"
+}
+
+test_mutation_diff_flags_match_ci() {
+    new_case
+    local wf="$REPO/.github/workflows/mutation-pr.yml" md="$REPO/bin/mutation-diff"
+    local flags f n=0 re
+    re='^--(min-msi|min-covered-msi|ignore-msi|git-diff-lines|only-covering|map-source|skip-initial|configuration=infection)'
+    flags=$(awk '/vendor\/bin\/infection/ {on=1} on {print} on && !/\\[[:space:]]*$/ {exit}' "$wf" \
+        | tr -s ' \\' '\n\n' | command grep -E -- "$re" || true)
+    for f in $flags; do
+        n=$((n + 1))
+        grep -qF -- "$f" "$md" || note "CI flag $f missing from bin/mutation-diff"
+    done
+    [ "$n" -ge 5 ] || note "extracted only $n CI flags; parsing broke"
+}
+
+# ---------------------------------------------------------------------------
+# post-plan-now cases (matrix rows 22-29)
+# ---------------------------------------------------------------------------
+# Builds MAIN (with origin) and a worktree WT on branch feat-x holding an
+# untracked file, so post-plan-now passes its nothing-to-ship check.
+new_ppn_case() {
+    new_case
+    local origin="$D/origin.git"
+    MAIN="$D/IBL5"
+    WT="$D/IBL5-worktrees/feat-x"
+    mkdir -p "$D/home"
+    git init -q --bare -b master "$origin"
+    mkdir -p "$MAIN/bin/lib" "$MAIN/ibl5/vendor/bin"
+    (
+        cd "$MAIN" || exit 1
+        git init -q -b master
+        git config user.email t@example.com
+        git config user.name Test
+        git remote add origin "file://$origin"
+        cp "$REPO/bin/lib/git-helpers.sh" bin/lib/git-helpers.sh
+        cp "$R/ibl5/vendor/bin/phpunit" ibl5/vendor/bin/phpunit
+        printf 'a\n' > ibl5/tracked.txt
+        git add -A
+        git commit -q -m init
+        git push -q origin master
+        git fetch -q origin
+        git worktree add -q -b feat-x "$WT" master
+    ) || { echo "HARNESS-SETUP: ppn fixture failed" >&2; exit 2; }
+    git -C "$WT" config branch.feat-x.iblBase master
+    printf 'new\n' > "$WT/NewTest.php"
+    R="$WT"   # the gate state helpers now point at the worktree
+    PLAN="$D/plan.md"
+    rm -f "$D"/runlog.* 2>/dev/null || true
+    rm -f "$POSTPLAN_LOG_DIR"/post-plan-now-feat-x-*.log 2>/dev/null || true
+}
+
+run_ppn() { # extra post-plan-now args; PPN_GATE overrides the gate path
+    OUT=$(cd "$WT" && \
+        BRANCH_BASE_OFFLINE=1 HOME="$D/home" \
+        POST_PLAN_MAIN_ROOT="$MAIN" POST_PLAN_SELF_BIN="$MAIN/bin" \
+        PREFIRE_VERIFY_SCRIPT="${PPN_GATE:-$GATE}" \
+        "$PPN" "$@" 2>&1); RC=$?
+}
+fired() { ls "$POSTPLAN_LOG_DIR"/post-plan-now-feat-x-*.log >/dev/null 2>&1; }
+
+test_post_plan_now_refuses_exit_9_on_gate_failure() {
+    new_ppn_case
+    write_plan "$(row 1 'exit 7')"
+    run_ppn --plan "$PLAN"
+    want_rc 9
+    want_out "pre-fire verification refused"
+    ! fired || note "post-plan-now launched despite a red gate"
+}
+
+test_post_plan_now_fires_when_gate_green() {
+    new_ppn_case
+    green_plan
+    run_ppn --plan "$PLAN"
+    refute_out "pre-fire verification refused"
+    fired || note "no runner log; post-plan-now did not get past the gate"
+}
+
+test_post_plan_now_adhoc_no_plan_skips_matrix_only() {
+    new_ppn_case
+    run_ppn
+    want_out "SKIP matrix: no plan"
+    want_cnt phpunit 1
+    refute_out "pre-fire verification refused"
+}
+
+test_bypass_logs_line_and_fires() {
+    new_ppn_case
+    write_plan "$(row 1 'exit 7')"
+    local log="$MAIN/.git/prefire-verify-bypass.log" n
+    run_ppn --plan "$PLAN" "--skip-verify=fixture bypass reason ok"
+    [ "$RC" -ne 9 ] || note "exit 9; the bypass did not fire"
+    if [ -f "$log" ]; then
+        n=$(wc -l < "$log" | tr -d ' ')
+        [ "$n" -eq 1 ] || note "bypass log has $n lines, expected 1"
+        grep -qF -- "fixture bypass reason ok" "$log" || note "bypass log lacks the reason"
+    else
+        note "no bypass log at $log"
+    fi
+    want_cnt phpunit 0
+}
+
+test_bypass_refused_under_headless() {
+    new_ppn_case
+    write_plan "$(row 1 true)"
+    local log="$MAIN/.git/prefire-verify-bypass.log"
+    CLAUDE_HEADLESS=1 run_ppn --plan "$PLAN" "--skip-verify=fixture bypass reason ok"
+    want_rc 9
+    want_out "refused under CLAUDE_HEADLESS"
+    [ ! -f "$log" ] || note "bypass log was written under headless"
+}
+
+test_bypass_short_reason_rejected() {
+    new_ppn_case
+    write_plan "$(row 1 true)"
+    run_ppn --plan "$PLAN" "--skip-verify=short"
+    want_rc 9
+    want_out "at least 15 characters"
+}
+
+test_rebase_only_skips_gate() {
+    new_ppn_case
+    write_plan "$(row 1 'exit 7')"
+    run_ppn --plan "$PLAN" --rebase-only
+    refute_out "pre-fire verification refused"
+    want_cnt phpunit 0
+}
+
+test_missing_gate_script_refuses() {
+    new_ppn_case
+    green_plan
+    PPN_GATE="$D/no-such-gate" run_ppn --plan "$PLAN"
+    want_rc 10
+    want_out "pre-fire gate"
+    ! fired || note "post-plan-now launched with no gate script"
+}
+
+test_gate_environment_failure_exits_10() {
+    new_ppn_case
+    green_plan
+    mkdir -p "$D/stubs"
+    printf '#!/bin/sh\nexit 3\n' > "$D/stubs/gate3"
+    chmod +x "$D/stubs/gate3"
+    PPN_GATE="$D/stubs/gate3" run_ppn --plan "$PLAN"
+    want_rc 10
+    want_out "could not run (environment)"
+    refute_out "pre-fire verification refused"
+    ! fired || note "post-plan-now launched when the gate could not run"
+}
+
+assert_step_6_9() { # <prompt-impl path>
+    local f="$1" l69 l68 l7 body
+    l69=$(grep -nF -- '## Step 6.9: Pre-Fire Verification Gate' "$f" | head -n 1 | cut -d: -f1)
+    if [ -z "$l69" ]; then
+        note "no Step 6.9 heading"
+        return 0
+    fi
+    l68=$(grep -nF -- '## Step 6.8:' "$f" | head -n 1 | cut -d: -f1)
+    l7=$(grep -nF -- '## Step 7: Write Handoff File' "$f" | head -n 1 | cut -d: -f1)
+    [ -n "$l68" ] || note "no Step 6.8 heading"
+    [ -n "$l7" ] || note "no Step 7 heading"
+    [ -n "$l68" ] && [ "$l69" -gt "$l68" ] || note "Step 6.9 is not after Step 6.8"
+    [ -n "$l7" ] && [ "$l69" -lt "$l7" ] || note "Step 6.9 is not before Step 7"
+    if [ -n "$l7" ] && [ "$l69" -lt "$l7" ]; then
+        body=$(sed -n "${l69},$((l7 - 1))p" "$f")
+        local s
+        for s in "--stage matrix" "--stage phpunit" "--stage infection"; do
+            grep -qF -- "$s" <<< "$body" || note "Step 6.9 does not name '$s'"
+        done
+    fi
+}
+
+test_prompt_impl_step_6_9_precedes_step_7() {
+    assert_step_6_9 "$REPO/bin/automouse/prompt-impl"
+}
+
+test_prompt_impl_missing_step_6_9_heading_fails() {
+    local fixture="$TMP/prompt-impl-no-6-9"
+    grep -vF -- '## Step 6.9: Pre-Fire Verification Gate' \
+        "$REPO/bin/automouse/prompt-impl" > "$fixture"
+    assert_step_6_9 "$fixture"
+    if [ "$WHY" = "no Step 6.9 heading" ]; then
+        WHY=""
+    else
+        WHY="a missing heading must fail, got: '${WHY}'"
+    fi
+}
+
+# Runs each Step 6.9 bash block in its own shell, as the impl agent's Bash calls
+# do, against a stub gate. Every block must reach the gate with the resolved plan.
+assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
+    local f="$1" home="$D/home" slug="my-plan" q want i stage got
+    q="$home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue"
+    mkdir -p "$q" "$R/bin/lib" "$D/blocks"
+    printf '# plan\n' > "$D/real-plan.md"
+    ln -s "$D/real-plan.md" "$q/010-$slug.md"
+    want="$(cd "$D" && pwd -P)/real-plan.md"
+    # shellcheck disable=SC2016  # the stub expands $CNT and $* when it runs
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "$CNT/gate-args"\n' \
+        > "$R/bin/lib/prefire-verify"
+    chmod +x "$R/bin/lib/prefire-verify"
+    awk -v dir="$D/blocks" '
+        /^## Step 6\.9:/ { s = 1; next }
+        /^## Step 7:/ { s = 0 }
+        s && /^```bash$/ { n++; out = dir "/" n ".sh"; b = 1; next }
+        b && /^```$/ { b = 0; close(out); next }
+        b { print > out }
+    ' "$f"
+    i=0
+    for stage in matrix phpunit infection exec-mutations; do
+        i=$((i + 1))
+        if [ ! -f "$D/blocks/$i.sh" ]; then
+            note "Step 6.9 has no bash block for $stage"
+            continue
+        fi
+        sed -e "s|<the PLAN_FILE value from the end of this prompt>|$slug|" \
+            -e "s|/Users/ajaynicolas/GitHub/IBL5/bin/lib/|$REPO/bin/lib/|" \
+            "$D/blocks/$i.sh" > "$D/blocks/$i.run"
+        : > "$CNT/gate-args"
+        (cd "$R" && env -u PLAN_PATH HOME="$home" bash "$D/blocks/$i.run") >/dev/null 2>&1
+        got=$(cat "$CNT/gate-args")
+        [ "$got" = "--plan $want --stage $stage" ] \
+            || note "$stage block called the gate with '$got'"
+    done
+}
+
+test_prompt_impl_step_6_9_blocks_set_plan_path() {
+    new_case
+    assert_step_6_9_blocks_set_plan_path "$REPO/bin/automouse/prompt-impl"
+}
+
+test_prompt_impl_block_without_plan_path_fails() {
+    new_case
+    local fixture="$D/prompt-impl-unset"
+    # Drop the setter from the second Step 6.9 block only.
+    awk '
+        /^## Step 6\.9:/ { s = 1 }
+        /^## Step 7:/ { s = 0 }
+        s && /^```bash$/ { n++ }
+        s && n == 2 && /PLAN_PATH=/ { next }
+        { print }
+    ' "$REPO/bin/automouse/prompt-impl" > "$fixture"
+    assert_step_6_9_blocks_set_plan_path "$fixture"
+    case "$WHY" in
+        "phpunit block called the gate with '--plan  --stage phpunit'") WHY="" ;;
+        *) WHY="a block with no PLAN_PATH must fail, got: '${WHY}'" ;;
+    esac
+}
+
+test_stdin_reading_row_does_not_swallow_later_rows() {
+    new_case
+    write_plan "$(row 1 'cat > /dev/null')" \
+               "$(row 2 "echo x >> $CNT/row2; exit 7")"
+    run_gate --plan "$PLAN"
+    want_rc 1
+    want_out "FAIL matrix row 2 exited 7"
+    want_cnt row2 1
+    [ -z "$(pass_files '\.matrix\..*\.pass$')" ] || note "a matrix pass record exists"
+}
+
+test_db_probe_does_not_read_callers_stdin() {
+    new_case
+    write_plan "$(row 1 "echo x >> $CNT/row1; bin/db-query 'SELECT 1'")"
+    # The probe fails if it can read a line, so an inherited stdin refuses.
+    local saved="${PREFIRE_DB_PROBE_CMD:-}"
+    export PREFIRE_DB_PROBE_CMD='! read -r _line'
+    run_gate --plan "$PLAN" <<< "caller stdin"
+    refute_out "DB unreachable"
+    export PREFIRE_DB_PROBE_CMD="$saved"
+}
+
+# ---------------------------------------------------------------------------
+# exec-mutations stage (fourth stage)
+# ---------------------------------------------------------------------------
+# xm_plan <check> [match] [replace]: plan with matrix row 1 = <check> plus one mutation block
+# on ibl5/tracked.txt (fixture content "a"). The check counts its own runs in $CNT/xm.
+xm_plan() {
+    local chk="echo run >> \"\$CNT/xm\"; $1"
+    write_plan "$(row 1 "${chk//|/\\|}")"
+    {
+        printf '\n## Executable Mutations\n\n'
+        printf '%smutation\nrow: 1\nfile: ibl5/tracked.txt\ncheck: %s\n' '```' "$chk"
+        printf 'match: %s\nreplace: %s\n%s\n' "${2:-a}" "${3:-b}" '```'
+    } >> "$PLAN"
+}
+xm_journal_empty() { [ -z "$(ls -A "$(git -C "$R" rev-parse --absolute-git-dir)/exec-mutations" 2>/dev/null)" ]; }
+xm_tracked() { tr -d '\n' < "$R/ibl5/tracked.txt"; }
+xm_passes() { pass_files '\.exec-mutations\..*\.pass$'; }
+
+test_xm_tripped_passes_and_records() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "TRIPPED row 1"
+    want_out "exec-mutations passed"
+    local want_name
+    want_name="$(tree_hash).exec-mutations.$(git hash-object "$PLAN").pass"
+    [ "$(xm_passes)" = "$want_name" ] || note "pass record is '$(xm_passes)', wanted $want_name"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty"
+    want_cnt xm 2
+}
+
+test_xm_held_fails_without_record() {
+    new_case
+    xm_plan 'true'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "HELD row 1"
+    want_out "NEXT-STEP row 1 — the check passed under mutation; strengthen the test"
+    want_out "Never edit a row's check command"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_baseline_failed_fails() {
+    new_case
+    xm_plan 'false'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "BASELINE-FAILED row 1"
+    want_out "NEXT-STEP row 1 — the check fails on unmutated code"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_not_applied_fails() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt' zzz yyy
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "NOT-APPLIED row 1"
+    want_out "Do not change the row's check command."
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_undecided_is_not_a_pass() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || pem_no_such_cmd_xyz'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "UNDECIDED row 1"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_cache_hit_and_plan_edit_invalidates() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "exec-mutations pass cached"
+    want_cnt xm 2
+    xm_plan 'grep -qx a ibl5/tracked.txt' a c
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    refute_out "pass cached"
+    want_cnt xm 4
+    local n
+    n=$(xm_passes | wc -l | tr -d ' ')
+    [ "$n" -eq 2 ] || note "expected 2 exec-mutations pass files, got $n"
+}
+
+test_xm_skips_without_plan_or_section() {
+    new_case
+    run_gate --stage exec-mutations
+    want_rc 0
+    want_out "SKIP exec-mutations: no plan"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists (no plan)"
+    write_plan "$(row 1 true)"
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 0
+    want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists (no section)"
+}
+
+test_xm_parse_failed_fails() {
+    new_case
+    xm_plan 'true'
+    sed -i.bak '/^match: /d' "$PLAN"
+    run_gate --plan "$PLAN" --stage exec-mutations
+    want_rc 1
+    want_out "PARSE-FAILED"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_no_timeout_is_prerequisite() {
+    new_case
+    # A PATH that carries every tool the gate and lib need except gtimeout/timeout.
+    local nt="$D/no-timeout-bin" t p
+    mkdir -p "$nt"
+    for t in bash git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut dirname basename cp mv date env readlink realpath cmp diff touch sha256sum shasum uname ls sleep kill id; do
+        p=$(command -v "$t" 2>/dev/null) || continue
+        case "$p" in /*) ln -sf "$p" "$nt/$t" ;; esac
+    done
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    OUT=$(cd "$R" && PATH="$nt" /bin/bash "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 3
+    want_out "prerequisite missing: gtimeout or timeout (brew install coreutils)"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+}
+
+test_xm_term_mid_row_restores_tree() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || sleep 25'
+    local pid i=0 t0=$SECONDS
+    (cd "$R" && exec "$GATE" --base master --plan "$PLAN" --stage exec-mutations) > "$D/out" 2>&1 &
+    pid=$!
+    while [ "$(xm_tracked)" != b ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+    if [ "$(xm_tracked)" != b ]; then
+        note "the mutation never appeared; cannot test TERM mid-row"
+        kill -KILL "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        return
+    fi
+    kill -TERM "$pid"
+    wait "$pid" 2>/dev/null; RC=$?
+    OUT=$(cat "$D/out")
+    want_rc 143
+    [ $((SECONDS - t0)) -lt 10 ] || note "TERM took $((SECONDS - t0)) s; the stage sat out the row"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_sigkill_leftover_repaired_before_tree_hash() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt || sleep 25'
+    local pid i=0
+    "$REPO/bin/lib/plan-exec-mutations" run --root "$R" --timeout 30 "$PLAN" > "$D/lib.out" 2>&1 &
+    pid=$!
+    while [ "$(xm_tracked)" != b ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+    if [ "$(xm_tracked)" != b ]; then
+        note "the mutation never appeared; cannot test the SIGKILL leftover"
+        kill -KILL "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        return
+    fi
+    kill -KILL "$pid"
+    wait "$pid" 2>/dev/null
+    xm_journal_empty && note "no leftover journal after SIGKILL; the fixture is not exercising the repair"
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "restored a mutation left by an interrupted exec-mutations run"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    xm_journal_empty || note "journal not empty after the gate"
+    local want_name
+    want_name="$(tree_hash).phpunit.pass"
+    [ "$(pass_files '\.phpunit\.pass$')" = "$want_name" ] || note "phpunit record is '$(pass_files '\.phpunit\.pass$')', wanted $want_name"
+}
+
+test_xm_revert_failed_maps_to_fail() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) echo "REVERT-FAILED row 1 — stub"; exit 3 ;;\n    pending) exit 1 ;;\n    recover) exit 0 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 1
+    want_out "a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_killed_lib_recovers_and_reports() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) kill -9 $$ ;;\n    pending) exit 1 ;;\n    recover) touch "%s/recovered"; exit 0 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 1
+    want_out "the mutation script stopped unexpectedly (exit 137)"
+    [ -e "$D/recovered" ] || note "recover did not run after the lib was killed"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+# xm_argv_stub: stub lib whose `run` records its argv to $D/xm-argv and prints <verdict> row 1;
+# parse and recover go to the real lib, so the plan's record is a real one.
+xm_argv_stub() { # <verdict> <exit>
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) printf "%%s\\n" "$@" > "%s/xm-argv"; echo "%s row 1 — stub"; exit %s ;;\n    pending) exit 1 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$1" "$2" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+}
+xm_argv() { # <flag>: the value after <flag> in the recorded run argv
+    awk -v f="$1" 'prev == f { print; exit } { prev = $0 }' "$D/xm-argv" 2>/dev/null
+}
+
+test_xm_default_uses_short_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 120 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 120"
+    [ "$(xm_argv --budget)" = 300 ] || note "--budget is '$(xm_argv --budget)', wanted 300"
+}
+
+test_xm_fire_point_uses_larger_limits() {
+    new_case
+    xm_argv_stub TRIPPED 0
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 0
+    [ "$(xm_argv --max-timeout)" = 300 ] || note "--max-timeout is '$(xm_argv --max-timeout)', wanted 300"
+    [ "$(xm_argv --budget)" = 1800 ] || note "--budget is '$(xm_argv --budget)', wanted 1800"
+}
+
+test_xm_fire_point_limits_match_harness() {
+    local m="$REPO/tools/postplan-harness/harness/mutations.py" mt bu
+    mt=$(sed -n 's/^DEFAULT_MAX_TIMEOUT = \([0-9]*\).*/\1/p' "$m")
+    bu=$(sed -n 's/^DEFAULT_BUDGET = \([0-9]*\).*/\1/p' "$m")
+    [ "$mt" = 300 ] || note "harness DEFAULT_MAX_TIMEOUT is '$mt'; prefire-verify --fire-point uses 300"
+    [ "$bu" = 1800 ] || note "harness DEFAULT_BUDGET is '$bu'; prefire-verify --fire-point uses 1800"
+    grep -qF 'XM_MAX_TIMEOUT=300' "$GATE" || note "prefire-verify lacks XM_MAX_TIMEOUT=300"
+    grep -qF 'XM_BUDGET=1800' "$GATE" || note "prefire-verify lacks XM_BUDGET=1800"
+}
+
+test_xm_fire_point_undecided_still_fails() {
+    new_case
+    xm_argv_stub UNDECIDED 1
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations --fire-point 2>&1); RC=$?
+    want_rc 1
+    want_out "UNDECIDED row 1"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_post_plan_now_passes_fire_point() {
+    new_ppn_case
+    green_plan
+    mkdir -p "$D/stubs"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$@" > "%s/gate-argv"\n' "$D" > "$D/stubs/recgate"
+    chmod +x "$D/stubs/recgate"
+    PPN_GATE="$D/stubs/recgate" run_ppn --plan "$PLAN"
+    grep -qxF -- '--fire-point' "$D/gate-argv" 2>/dev/null || note "post-plan-now did not pass --fire-point to the gate"
+}
+
+test_xm_bad_stage_rejected() {
+    new_case
+    run_gate --stage exec_mutations
+    want_rc 2
+    want_out "--stage must be matrix, phpunit, infection, exec-mutations, or all"
+}
+
+test_help_lists_exec_mutations() {
+    new_case
+    run_gate --help
+    want_rc 0
+    want_out "exec-mutations"
+    want_out "PREFIRE_EXEC_MUTATIONS_LIB"
+}
+
+test_prompt_impl_runs_four_stages() {
+    OUT=$(cat "$REPO/bin/automouse/prompt-impl")
+    want_out '--stage exec-mutations'
+    want_out 'When all four return 0, proceed to Step 7.'
+    want_out "Never edit a"
+    want_out 'never delete a mutation block'
+    refute_out 'When all three return 0'
+    want_out '"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]'
+}
+
+# ---------------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------------
+ALL_CASES="
+test_matrix_row_failure_refuses_and_names_row
+test_unrun_row_refuses_without_gate_record
+test_matrix_extract_skips_near_miss_rows
+test_plan_without_matrix_refuses
+test_relative_plan_from_subdir_runs_rows
+test_phpunit_red_refuses
+test_db_down_fails_closed_naming_row
+test_all_green_passes_and_records
+test_cache_hit_skips_rerun
+test_tree_change_invalidates_cache
+test_checks_mutating_tree_refuse
+test_adhoc_no_plan_runs_phpunit_and_infection
+test_empty_plan_value_refuses
+test_infection_below_threshold_refuses_3672
+test_infection_at_threshold_passes
+test_infection_prereq_missing_fails_closed
+test_mutation_diff_flags_match_ci
+test_post_plan_now_refuses_exit_9_on_gate_failure
+test_post_plan_now_fires_when_gate_green
+test_post_plan_now_adhoc_no_plan_skips_matrix_only
+test_bypass_logs_line_and_fires
+test_bypass_refused_under_headless
+test_bypass_short_reason_rejected
+test_rebase_only_skips_gate
+test_missing_gate_script_refuses
+test_gate_environment_failure_exits_10
+test_prompt_impl_step_6_9_precedes_step_7
+test_prompt_impl_missing_step_6_9_heading_fails
+test_prompt_impl_step_6_9_blocks_set_plan_path
+test_prompt_impl_block_without_plan_path_fails
+test_stdin_reading_row_does_not_swallow_later_rows
+test_db_probe_does_not_read_callers_stdin
+test_xm_tripped_passes_and_records
+test_xm_held_fails_without_record
+test_xm_baseline_failed_fails
+test_xm_not_applied_fails
+test_xm_undecided_is_not_a_pass
+test_xm_cache_hit_and_plan_edit_invalidates
+test_xm_skips_without_plan_or_section
+test_xm_parse_failed_fails
+test_xm_no_timeout_is_prerequisite
+test_xm_term_mid_row_restores_tree
+test_xm_sigkill_leftover_repaired_before_tree_hash
+test_xm_revert_failed_maps_to_fail
+test_xm_killed_lib_recovers_and_reports
+test_xm_bad_stage_rejected
+test_xm_default_uses_short_limits
+test_xm_fire_point_uses_larger_limits
+test_xm_fire_point_limits_match_harness
+test_xm_fire_point_undecided_still_fails
+test_post_plan_now_passes_fire_point
+test_help_lists_exec_mutations
+test_prompt_impl_runs_four_stages
+"
+
+if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi
+
+for name in $CASES; do
+    if ! declare -F "$name" >/dev/null; then
+        echo "FAIL $name: no such case"
+        H_FAIL=$((H_FAIL + 1))
+        continue
+    fi
+    WHY=""
+    "$name"
+    if [ -z "$WHY" ]; then
+        echo "PASS $name"
+        H_PASS=$((H_PASS + 1))
+    else
+        echo "FAIL $name: $WHY"
+        printf '%s\n' "$OUT" | sed -n '1,15p' | sed 's/^/    | /'
+        H_FAIL=$((H_FAIL + 1))
+    fi
+done
+
+h_done

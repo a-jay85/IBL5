@@ -1,14 +1,14 @@
-"""SHA-bound manifest for a merge that `bin/postplan-fix --headless` committed locally.
+"""SHA-bound manifest for a rebase that `bin/postplan-fix --headless` finished locally.
 
-A local merge of origin/master makes the harness's own `git merge --no-edit origin/master`
-a no-op, so without this manifest no lost-work proof and no conflict review would run on
-the bot's resolution. `LiveGit._rebase_onto` loads the manifest, and applies it only when
+A local rebase onto the PR base makes the harness's own sync a no-op, so without this
+manifest no lost-work proof and no conflict review would run on the bot's resolution. `LiveGit._rebase_onto` loads the manifest, and applies it only when
 its SHA equals HEAD. The proof itself stays in `LiveGit._prove_tree_equivalent`; nothing
 here proves anything.
 
 CLI (used by bin/postplan-fix):
 
-    python3 -m harness.premerge record --worktree W --branch B --pre-sha S --files-from F
+    python3 -m harness.premerge record --worktree W --branch B --pre-sha S --files-from F \\
+        [--base origin/<parent>]
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from typing import Optional
 MANIFEST_SCHEMA = 1
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
+_BASE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
 
 
 class PremergeError(Exception):
@@ -87,21 +88,32 @@ def _git(worktree: str, *args: str) -> tuple[int, str]:
 
 
 def record(worktree: str, branch: str, pre_sha: str, files: tuple[str, ...],
-           tmp_dir: str = "/tmp") -> Premerged:
-    """Validate that HEAD is the bot's merge of origin/master onto pre_sha, then write the
-    manifest and, last, the condition-(14) flag. The flag goes last so a crash between the
+           tmp_dir: str = "/tmp", base: str = "origin/master") -> Premerged:
+    """Validate that HEAD is the bot's resolution of `base` (origin/master, or a stacked PR's
+    declared parent): a single commit rebased onto `base` (one parent, inside `base`), or
+    a legacy two-parent merge of `base` onto pre_sha. Then write the manifest and, last, the condition-(14)
+    flag. The flag goes last so a crash between the
     two leaves a manifest with no flag, which the harness still proves and reviews."""
     from .armable import record_conflict_resolution
 
+    if not _BASE.fullmatch(base) or ".." in base:
+        raise PremergeError("base is not an origin/<branch> ref")
     rc, out = _git(worktree, "rev-list", "--parents", "-n", "1", "HEAD")
     parts = out.split()
-    if rc != 0 or len(parts) != 3:
-        raise PremergeError("HEAD is not a two-parent merge")
-    head_sha, parent1, parent2 = parts
-    if parent1 != pre_sha:
-        raise PremergeError("first parent is not --pre-sha")
-    if _git(worktree, "merge-base", "--is-ancestor", parent2, "origin/master")[0] != 0:
-        raise PremergeError("second parent is not in origin/master")
+    if rc != 0 or len(parts) not in (2, 3):
+        raise PremergeError("HEAD is not a rebased commit or a two-parent merge")
+    if len(parts) == 2:
+        head_sha, parent1 = parts
+        if head_sha == pre_sha:
+            raise PremergeError("HEAD is not a rebased commit or a two-parent merge")
+        if _git(worktree, "merge-base", "--is-ancestor", parent1, base)[0] != 0:
+            raise PremergeError(f"rebased parent is not in {base}")
+    else:
+        head_sha, parent1, parent2 = parts
+        if parent1 != pre_sha:
+            raise PremergeError("first parent is not --pre-sha")
+        if _git(worktree, "merge-base", "--is-ancestor", parent2, base)[0] != 0:
+            raise PremergeError(f"second parent is not in {base}")
     if not files:
         raise PremergeError("no conflicted files")
     if not _SHA.match(head_sha) or not _SHA.match(pre_sha):
@@ -121,11 +133,13 @@ def main(argv: list[str]) -> int:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--pre-sha", required=True)
     rec.add_argument("--files-from", required=True)
+    rec.add_argument("--base", default="origin/master")
     args = parser.parse_args(argv)
     try:
         with open(args.files_from) as fh:
             files = tuple(line.strip() for line in fh if line.strip())
-        premerged = record(args.worktree, args.branch, args.pre_sha, files)
+        premerged = record(args.worktree, args.branch, args.pre_sha, files,
+                           base=args.base)
     except (PremergeError, OSError) as exc:
         sys.stderr.write(f"premerge: {exc}\n")
         return 3

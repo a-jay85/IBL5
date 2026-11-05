@@ -107,7 +107,7 @@ def test_lease_read_retries_transient_ls_remote(monkeypatch, sleeps):
     assert _count(git, "ls-remote") == 2
     pushes = [a for a in git.calls if a[0] == "push"]
     assert len(pushes) == 1
-    assert pushes[0][1] == f"--force-with-lease=b:{_ZERO_SHA}"
+    assert pushes[0][1] == f"--force-with-lease=refs/heads/b:{_ZERO_SHA}"
     assert sleeps == [5.0]
 
 

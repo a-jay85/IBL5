@@ -28,7 +28,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       contains(github.event.pull_request.labels.*.name, 'pipeline-authored')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Join tailnet (ephemeral)
         uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0

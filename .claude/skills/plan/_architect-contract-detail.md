@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -114,6 +114,8 @@ Observed incident (`ibl5/IBLbot/src/bug-bot/php-client.test.ts:37`): a shared co
 Gates `[13]` (`impl_model` consistency, via `bin/lib/plan-model-consistency`), `[H]` (hold justification), `[T]` (tier binding, via `bin/lib/plan-impl-model`) and `[S]` (Sonnet-recipe completeness) all read the frontmatter at `NR==1`. A draft's first line is always `## <section title>` — never the `---` block, which the architect cannot write (the orchestrator writes line-1 at Step 5 assembly). So every violation those gates report against a draft is unreachable from where the architect sits: no edit permitted to the architect can clear them. Re-running to chase them is an unbounded loop that burns the run without ever converging.
 
 The prohibition is on *invoking the script*, not on the gates themselves: `[C]` (size budget), `[F]` (list-form `## Critical Files`), `[8]` (creation phrasing), and `[T]` (tier lines) remain **authoring constraints you satisfy while writing** — self-verify them by reading what you wrote.
+
+2026-11-02: about 10 of 48 sampled architects ran or probed `bin/check-plan`. The ban is now stated in all three architect defs as well as here. A hook deny was rejected. `~/.claude/hooks/bash-guard.sh` Check 22 keys on the PreToolUse agent id, which every subagent carries, and it exempts `CLAUDE_HEADLESS=1`, which covers the `bin/plan-now` runs where architects execute. A deny that worked there would need a new non-exempt check outside the repo, shipped with no PR diff and no CI. Zero invocations in the 8 runs measured on 2026-11-02 did not justify that.
 
 ### Pre-prod exercise path — slice elaboration
 
@@ -283,7 +285,7 @@ A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, 
 
 ## Context bounds rationale
 
-A sectioned delivery keeps one context across all turns, so what you read on turn 1 is still in front of you on turn 9. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.
+The batched delivery keeps one context across its outline, body, and re-send turns, so what you read on turn 1 is still in front of you on the last turn. Re-Reading the contract re-pays ~7K tokens for text the architect already holds. Opening a `*-detail.md` companion costs ~5K tokens and changes no decision made while writing a plan. Re-reading a `$DRAFT` that grows each turn costs quadratically across the delivery.
 
 ## Post-merge rows
 

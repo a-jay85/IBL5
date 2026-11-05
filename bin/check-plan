@@ -77,6 +77,7 @@
 #                              would all fire spuriously; draft mode exits 0/1 on
 #                              gate D alone.
 #   MP Must preserve section — present and well-formed; required only with --require-must-preserve
+#   SD Security deferral — an Out of Scope / Non-Goals bullet naming a security exposure must cite a-jay85/IBL5-backlog#N; ## Deferred Security Gaps bullets must read '- a-jay85/IBL5-backlog#N — <what>'
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
 #                              (outside fences) must name **Invariant:**,
 #                              **Asserted by:** <path>Test.php, and **Not covered:**,
@@ -371,6 +372,9 @@ fi
 # shellcheck source=bin/lib/critical-files.sh
 source "$SCRIPT_DIR/lib/critical-files.sh"
 
+# shellcheck source=bin/lib/plan-matrix-rows.sh
+source "$SCRIPT_DIR/lib/plan-matrix-rows.sh"
+
 # shellcheck source=lib/hold-check.sh
 if [ -r "$SCRIPT_DIR/lib/hold-check.sh" ]; then
     . "$SCRIPT_DIR/lib/hold-check.sh"
@@ -433,14 +437,12 @@ fi
 # Deliberately NOT `sed 's/\\|/\x01/g' | cut -d'|' -f6 | tr '\x01' '|'`: BSD sed
 # and BSD tr do not honour \x01, so that idiom emits the literal text "x01" on
 # macOS, which is where this script runs most. Pure bash 3.2, no external tools.
-MSEN=$'\001'
 MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
 # Look-and-feel lexicon shared by gates [Q] and [PM]. A What-cell hit means the
 # row is screenshot-reviewable on the open PR (ADR-0126), so [Q] demands a vr:
 # cell and [PM] refuses the post-merge: marker.
 _LOOKFEEL_LEX='(look|feel|visual|appearance|layout|spacing|alignment|legible|readable|styl|design|renders?|\bui\b|\bux\b)'
 
-mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
 
 # gatev_nonrunnable <cell> — gate V's predicate chain. Prints why the cell is
 # not ONE runnable shell command, or nothing when it is. Shared by gate V and
@@ -485,25 +487,6 @@ gatev_nonrunnable() {
     printf '%s' "$_bad"
 }
 
-# matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
-# surrounding backticks stripped, pipes restored) and MC_PIPES (count of
-# STRUCTURAL pipes, i.e. after escaped pipes are hidden). Returns 1 for a
-# separator row or a row with no location cell.
-matrix_split() {
-    case "$1" in
-        *[!\ \|:-]*) : ;;
-        *) return 1 ;;              # separator / all-dashes row
-    esac
-    _r="${1//\\|/$MSEN}"
-    IFS='|' read -r _lead MC_NUM MC_WHAT MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
-    MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
-    MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
-    MC_WHAT=$(mtrim "$MC_WHAT")
-    MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
-    case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
-    [ -n "$MC_LOC" ] || return 1
-    return 0
-}
 
 # ---------------------------------------------------------------------------
 # Gate 1: Matrix exists.
@@ -909,6 +892,7 @@ fi
 # held to gate V's predicates. Coverage runs only when the plan carries the
 # `## Executable Mutations` heading outside fences: that is the mechanical
 # "authored after this shipped" test, so every legacy plan is silent.
+# A check that references a literal /tmp/ path is a violation (see the loop).
 # The root is the repo being checked, never the plan's own directory: plans live
 # in $HOME/claude-plans/, which can sit inside an unrelated git repo.
 XM_ROOT="$REPO_ROOT"
@@ -934,6 +918,11 @@ elif [ "$XM_RC" -eq 0 ]; then
         if [ "$_xm_check" != "$_xm_cell" ]; then
             _bad=$(gatev_nonrunnable "$_xm_check")
             [ -z "$_bad" ] || viol "[XM] row ${_xm_row}: check override is not runnable — ${_bad}"
+        fi
+        # A check that references a /tmp/ path reads host scratch state that is gone by gate 19
+        # and by the pre-fire stage; it lands HELD or BASELINE-FAILED for a reason unrelated to the mutation.
+        if grep -qE '(^|[^A-Za-z0-9_.~/-])(/private)?/tmp/' <<< "$_xm_check"; then
+            viol "[XM] row ${_xm_row}: check references a /tmp/ path; use a repo path so the check exists at gate time: ${_xm_check}"
         fi
     done < "$XM_REC"
     if grep -qE '^## Executable Mutations[[:space:]]*$' "$GATEP_BODY"; then
@@ -2806,6 +2795,75 @@ if [ -n "$_u_bad" ]; then
     while IFS= read -r _u_line; do
         viol "[U] ## Backlog issues line must read '- closes|refs a-jay85/IBL5-backlog#N — <what>' (lowercase tag, full repo path, a description): \"${_u_line}\""
     done <<< "$_u_bad"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [SD]: undeclared security deferral (hard-fail).
+# ---------------------------------------------------------------------------
+# A plan that leaves a security gap on a surface it touches must fix it or name
+# the filed issue (.claude/skills/plan/_architect-contract.md, the "Deferred
+# Security Gaps" bullet). Two checks, both fence-stripped via cf_section_named:
+#  (a) a bullet under ## Out of Scope* / ## Non-Goals* matching the exposure
+#      lexicon, with no a-jay85/IBL5-backlog#N in the same bullet, fails;
+#  (b) every bullet under ## Deferred Security Gaps must read
+#      '- a-jay85/IBL5-backlog#N — <what>'.
+# Lexicon measured against ~/claude-plans/*.md on 2026-11-03: 3 hits in 2258
+# plans, all real unfiled gaps (the PR #3695 plan among them), zero false
+# positives. Broad terms (csrf, authori[sz], security) hit 51-181 lines, mostly
+# "stays unchanged" notes. Re-measure the corpus before widening the lexicon.
+# Re-measured 2026-11-04 with wrapped bullets and heading spellings: 4 hits in
+# 2281 plans. The new hit is a false positive: reaction-endpoint-tier-gate.md
+# quotes "has no tier check" while it fixes that gap. Rewording the bullet clears it.
+# Re-measured the same day with H3-and-deeper headings: the same 4 hits in 2281
+# plans. The 9 plans with a deeper scope heading add no hit.
+# The backlog link is the only release; there is no inline escape marker.
+# cf_section_named is case-sensitive and reads only H2. A plan may spell these
+# headings at H2 or deeper, with any case, with a hyphen, space or underscore
+# between words, or with a singular last word, so rewrite a matching heading to
+# the spelling asked for before the call. A deeper heading's section ends at the
+# next heading of its level or higher, so the rewrite adds an H2 there. Fenced
+# lines pass through untouched. The trailing echo keeps one section's last bullet
+# from joining the next section's first line in _sd_bullets.
+_sd_section() {
+    cf_section_named <(awk -v h="$1" 'BEGIN { p = tolower(h); gsub(/[- ]/, "[-_[:space:]]*", p); sub(/s$/, "s?", p); p = "^##+[[:space:]]*" p }
+        { l = $0; sub(/^[[:space:]]*/, "", l); n = 0; while (substr(l, n + 1, 1) == "`") n++
+          if (n >= 3) { if (!fence) fence = n; else if (n >= fence) fence = 0; print; next }
+          if (fence) { print; next } }
+        tolower($0) ~ p { match($0, /^#+/); lvl = RLENGTH; print "## " h; next }
+        lvl && match($0, /^#+[[:space:]]/) && RLENGTH - 1 <= lvl { print "## end of scoped section"; lvl = 0 }
+        { print }' "$PLAN_FILE") "$1"
+    echo ""
+}
+_sd_lex='security (gap|hole|flaw|exposure)|residual exposure|any (holder of a )?valid api key|impersonat|privilege escalat|has no [a-z-]* ?(tier|auth[a-z]*|csrf|permission) (check|gate|guard)|has never checked|can approve as|(auth[a-z]*|csrf|tier) gap'
+_sd_ref='a-jay85/IBL5-backlog#[0-9]+'
+_sd_bullet='^[[:space:]]*([-*]|[0-9]+[.])[[:space:]]+'
+# Print each bullet on one line, wrapped lines joined on, so the lexicon and the
+# backlog ref are judged per bullet. A blank line or a heading ends a bullet.
+_sd_bullets() {
+    awk -v b="$_sd_bullet" '
+        function flush() { if (cur != "") print cur; cur = "" }
+        $0 ~ b { flush(); cur = $0; next }
+        /^[[:space:]]*(#|$)/ { flush(); next }
+        cur != "" { line = $0; sub(/^[[:space:]]+/, "", line); cur = cur " " line }
+        END { flush() }'
+}
+_sd_scope=$( { _sd_section "Out of Scope"; _sd_section "Non-Goals"; } \
+    | _sd_bullets \
+    | grep -iE "$_sd_lex" \
+    | grep -vE "$_sd_ref" || true)
+if [ -n "$_sd_scope" ]; then
+    while IFS= read -r _sd_line; do
+        viol "[SD] out-of-scope bullet names a security exposure with no a-jay85/IBL5-backlog#N: fix the gap in this plan, or file an issue and list it under ## Deferred Security Gaps: \"${_sd_line}\""
+    done <<< "$_sd_scope"
+fi
+_sd_decl_re='^[[:space:]]*[-*][[:space:]]+a-jay85/IBL5-backlog#[0-9]+[[:space:]]+(—|–|-)[[:space:]]+[^[:space:]]'
+_sd_decl_bad=$(_sd_section "Deferred Security Gaps" \
+    | _sd_bullets \
+    | grep -vE "$_sd_decl_re" || true)
+if [ -n "$_sd_decl_bad" ]; then
+    while IFS= read -r _sd_line; do
+        viol "[SD] ## Deferred Security Gaps line must read '- a-jay85/IBL5-backlog#N — <what>': \"${_sd_line}\""
+    done <<< "$_sd_decl_bad"
 fi
 
 # Gate [MP]: `## Must preserve` grammar. bin/lib/deleted-guards --lint-plan is

@@ -1,6 +1,6 @@
 ---
 description: The Discord bug pipeline parks every new report as dormant and wakes it only when the league operator @mentions the bot; the operator's text rides in a trusted prompt block above the untrusted GM text.
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ---
 
 # ADR-0213: Bug pipeline wakes only on an operator mention
@@ -51,3 +51,17 @@ Supersedes nothing. Extends ADR-0080 (topology unchanged) and ADR-0081 (hunter t
 ## Addendum 2026-11-02: the wake route checks the key tier before the author
 
 Decision 2 names the author ID as the authorization. The wake controller enforces one more check, and it runs first: the calling API key must have a `rate_limit_tier` other than `standard`. A standard-tier key gets 403 `forbidden` with "Only the pipeline bot can wake a report." Only a service key reaches the author check, whose rejection is 403 `forbidden` with "Only the pipeline operator can wake a report." The two rejections differ only in `error.message`. `bin/bug-pipeline-e2e` case 8.2 asserts the author message, so a mis-provisioned standard-tier test key fails the E2E run instead of passing it. Code: `ibl5/classes/Api/Controller/WakeController.php`. Tests: `ibl5/tests/Api/Controller/WakeControllerTest.php`.
+
+## Addendum — wake trust boundary (2026-11-03) <!-- slop-ok -->
+
+Decision item 2 says PHP re-checks the author. That check compares `author_id` from the request body with the configured operator snowflake. The bot fills `author_id` from the Discord message, and the PHP route cannot confirm where the value came from. Discord user ids are public, so the author check alone would let any caller name the operator.
+
+Since [#3472](https://github.com/a-jay85/IBL5/pull/3472) the route also requires a service key. `ServiceKeyGuard::callerIsServiceKey()` rejects a missing key, an unknown key, and any key whose `rate_limit_tier` is `standard`. Both checks run before any repository read or write.
+
+The trust boundary is the set of API keys at the `elevated` or `unlimited` tier. The self-service API Keys page (`ApiKeysRepository::createKey`) always creates `standard` keys. Keys at the `elevated` or `unlimited` tier exist only when the operator provisions them in the database, as `ibl5/IBLbot/README.bugbot.md` requires for the bot key. A holder of such a key can send the operator's id as `author_id` and wake a report with trusted operator text. Compromise of an `elevated` or `unlimited` key therefore equals compromise of the operator account under the second Negative consequence above. Both grant operator-prompt authorship.
+
+`ReactionController` (the approval reaction) compares the body `reactor_id` with the same snowflake. Until [#3707](https://github.com/a-jay85/IBL5/pull/3707) it had no tier check, so a caller holding any valid API key could approve as the operator. It now runs the same service-key check first and returns 403 `forbidden` with "Only the pipeline bot can report a reaction." The bot sends one `API_KEY` to both routes, so the bot key already meets the tier rule. `ReactionControllerTest` pins the reaction gate.
+
+Considered and rejected: pinning the wake route to one dedicated bot key, by key hash or a new config value. No self-service path produces a non-`standard` key, so the pin would add a column or config key without closing a reachable path. Revisit if a self-service flow ever hands out `elevated` keys.
+
+`WakeControllerTest::testElevatedTierKeyWithOperatorAuthorIdIsAccepted` and `WakeControllerTest::testElevatedTierKeyWithNonOperatorAuthorIdRejected403AndNoRepositoryCall` pin this boundary, so a change to the tier rule fails CI.

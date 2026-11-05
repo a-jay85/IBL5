@@ -5,7 +5,9 @@
 #
 # Usage: bin/review-outcomes record --pr=N --verdicts=PATH --threads=PATH [--pipeline=skill|harness] [--log=PATH]
 #        bin/review-outcomes sweep --pr=N [--pipeline=skill|harness] [--log=PATH]   (thread JSONL on stdin)
-#   exit 0 = done, or a logging failure that was swallowed on purpose; 2 = usage error
+#        bin/review-outcomes report [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--log=PATH] [--json]
+#   report prints the outcome table, then cycles-to-pass per PR and monthly reverts on origin/master.
+#   exit 0 = done, or a logging failure that was swallowed on purpose; 1 = report could not read the log; 2 = usage error
 #
 # Flags take the `--flag=value` form only. The logic lives in
 # tools/postplan-harness/harness/outcome_log.py; this wrapper puts the harness on PYTHONPATH.

@@ -49,7 +49,13 @@
 #                             worktree; the coordinator resumes it, so nothing to do and
 #                             --arm skips it
 #  11. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#  12. ARMABLE                CLEARED + an armable merge-state (mergeable, or
+#  12. VERDICT-HELD           the latest `<!-- pr-ready-verdict -->` sticky is NOT READY,
+#                             carries an `Auto-merge held:` reason, lacks the
+#                             `· auto-merge armed` banner, is absent, or could not be
+#                             read; --arm never arms it. HOLDS shows `verdict:not-ready`,
+#                             `verdict-hold:<N>`, `verdict-hold:undecided`,
+#                             `verdict:unreadable`, `verdict:none` or `verdict:fetch-failed`
+#  13. ARMABLE                CLEARED + an armable merge-state (mergeable, or
 #                             BEHIND) + all required checks green on the current
 #                             head
 #
@@ -495,6 +501,20 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         blocked_check=1
     fi
 
+    # Sticky verdict: one comments read per PR, shared by the bucket chain, the HOLDS
+    # column and --held. A failed read is a hold (fail closed), never a clear.
+    comments_status=ok
+    comments_json="$($GH_API_CMD "repos/$SLUG/issues/$num/comments" --paginate 2>/dev/null)" \
+        || comments_status=failed
+    # Only repo OWNER/MEMBER/COLLABORATOR comments count: post-plan posts the sticky with
+    # the owner's token, and anyone else could forge a READY banner. A forged sticky is
+    # absent, which gives verdict:none (a hold).
+    trusted_json="$(printf '%s' "$comments_json" | jq -c -s '[ .[][]?
+        | select(.author_association == "OWNER" or .author_association == "MEMBER"
+                 or .author_association == "COLLABORATOR") ]' 2>/dev/null || true)"
+    sticky="$(printf '%s' "$trusted_json" | hp_pick_sticky || true)"
+    verdict_holds="$(hp_verdict_holds "$sticky" "$comments_status")"
+
     held_body=0
     if echo "$body" | grep -qiE "$HELD_BODY_RE"; then
         held_body=1
@@ -543,6 +563,9 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="PAUSED"; action="none — post-plan paused by usage gate"
     elif [ "$clearance" = "UNKNOWN" ]; then
         bucket="UNCLEARED"; action="human review (no clearance)"
+    elif [ -n "$verdict_holds" ]; then
+        # The latest pr-ready-verdict sticky holds (or cannot be read): never arm.
+        bucket="VERDICT-HELD"; action="re-run post-plan (sticky verdict holds)"
     elif [ "$clearance" = "CLEARED" ] && mss_armable "$mss" && [ "$armable_checks_green" = "1" ]; then
         bucket="ARMABLE"
         if [ "$mss" = "BEHIND" ]; then
@@ -574,11 +597,13 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     if [ -n "$open_threads" ];    then holds="${holds}${open_threads}"; fi
     holds="${holds% }"
     if [ -z "$holds" ]; then holds="-"; fi
+    row_holds="$holds"
+    if [ -n "$verdict_holds" ]; then
+        if [ "$row_holds" = "-" ]; then row_holds="$verdict_holds"; else row_holds="$row_holds $verdict_holds"; fi
+    fi
 
     if [ "$HELD" = "1" ]; then
         # A failed comments read loses only the recorded reasons; live ones still print.
-        sticky="$($GH_API_CMD "repos/$SLUG/issues/$num/comments" --paginate 2>/dev/null \
-            | hp_pick_sticky || true)"
         reasons="$(hp_sticky_reasons "$sticky"; \
             hp_live_reasons "$mss" "$clearance" "$holds" "$CR_JSON")"
         hp_format_line "$num" "${url:--}" "$title" "$reasons"
@@ -588,7 +613,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
 
     # shellcheck disable=SC2059
     printf "$ROW_FMT" "#$num" "$bucket" "$action" "${mss:-?}" "$clearance" \
-        "${check_states[@]}" "$holds"
+        "${check_states[@]}" "$row_holds"
     ROWS=$((ROWS + 1))
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---

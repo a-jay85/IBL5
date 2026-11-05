@@ -3,9 +3,9 @@
 #
 # Bash 3.2 / macOS compatible.  No set options, no traps — lib must not alter
 # the caller's shell state.  Sourced by bin/docfix-run, bin/launchd-health-check,
-# bin/lib/pr-cycle-watch.sh, bin/plan-now, bin/post-plan-fleet, bin/post-plan-now,
-# bin/pr-cycle, bin/pr-review-now, bin/usage-gate-coordinator,
-# bin/usage-gate-cron-setup, bin/wt-new.
+# bin/lib/pr-cycle-watch.sh, bin/plan-now, bin/post-plan-fleet,
+# bin/post-plan-fail-dm, bin/post-plan-now, bin/pr-cycle, bin/pr-review-now,
+# bin/usage-gate-coordinator, bin/usage-gate-cron-setup, bin/wt-new.
 #
 # Callers: . "$SCRIPT_DIR/lib/launchd-job.sh"
 #          . "$ROOT/bin/lib/launchd-job.sh"

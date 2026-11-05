@@ -42,6 +42,12 @@ def _git_step(args: tuple[str, ...]) -> str:
 FETCH_LOCK_RETRIES = 3      # fetch_base retries after a concurrent-fetch ref-lock race
 FETCH_LOCK_BACKOFF = 1.0    # seconds; attempt n sleeps n * this
 
+# bin/lib/branch-base.sh of the checkout this harness runs from (main checkout, ADR-0092).
+# The worktree's own copy can predate branch_base_merge_target, so never use it.
+BRANCH_BASE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "branch-base.sh"
+MERGE_TARGET_TIMEOUT = 30   # seconds; covers ls-remote (10 s) + gh (5 s) + bash startup
+_MERGE_TARGET_RE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
+
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
 # re-running the FULL /post-plan skill hits the identical hook and cannot clear it
 # without a human writing an ADR, refreshing a doc, or trimming a rule file. A distinct
@@ -604,6 +610,38 @@ class LiveGit:
                              check=False).strip()
         return resolved or None
 
+    def merge_target(self) -> str:
+        """The ref Phase 2, rebase-only and the retry refresh merge in: the PR's declared
+        base from bin/lib/branch-base.sh branch_base_merge_target (iblBase config, then gh
+        baseRefName). "origin/master" for an unstacked branch or a detached HEAD.
+        Raises HarnessError("base-resolve") when the branch records an iblBase that no
+        layer resolves, when the helper times out, or when it prints anything other
+        than one origin/<name> ref. A stacked branch never silently merges master."""
+        name = self.branch()
+        if not name or name == "HEAD":
+            return "origin/master"
+        if not BRANCH_BASE_LIB.is_file():
+            raise HarnessError("base-resolve", f"base resolver missing: {BRANCH_BASE_LIB}")
+        fix = (f"record the real parent and rerun: "
+               f"git config branch.{name}.iblBase <parent-branch>")
+        try:
+            proc = subprocess.run(
+                ["bash", "-c", '. "$1" && branch_base_merge_target "$2" "$3"',
+                 "branch-base", str(BRANCH_BASE_LIB), str(self.worktree), name],
+                cwd=str(self.worktree), capture_output=True, text=True,
+                stdin=subprocess.DEVNULL, timeout=MERGE_TARGET_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise HarnessError("base-resolve",
+                               f"base resolution for {name} timed out after "
+                               f"{MERGE_TARGET_TIMEOUT}s; {fix}")
+        ref = proc.stdout.strip()
+        if proc.returncode != 0 or not _MERGE_TARGET_RE.fullmatch(ref) or ".." in ref:
+            raise HarnessError("base-resolve",
+                               f"branch {name} is stacked (iblBase set) but its base did "
+                               f"not resolve: origin has no such branch and gh gave no "
+                               f"answer; {fix}", output=proc.stderr)
+        return ref
+
     def _merge_tree_conflicts(self, merge_base: str, base: str,
                               tree: str) -> dict[str, frozenset[int]]:
         """One `git merge-tree --write-tree` probe. Returns {path: stages} for each conflicted
@@ -857,20 +895,21 @@ class LiveGit:
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
                              lostwork_path, conflicted, proof_out, regen_exempt=(),
                              stage_sets=None):
-        from ..conflict_ladder import LadderContext, default_rungs, make_regen_rung, run_ladder
+        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
+        # The sync is a rebase, so the replayed commit has ONE parent (master's tip or the
+        # previous replayed commit). Snapshot it now so the parents guard matches that shape.
+        head_parents = tuple(self._run("rev-list", "--parents", "-n", "1", "HEAD").split()[1:])
         ctx = LadderContext(
             llm=self.llm, run=self._run, run_out=self._run_out,
             prove=lambda: self._run_proof(lostwork_path, key),
             worktree=self.worktree, key=key, master_sha=master_sha,
             pre_rebase_sha=pre_rebase_sha, conflicted_files=conflicted,
             state_dir=self.state_dir, stage_sets=dict(stage_sets or {}),
+            expected_parents=head_parents,
             extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
                 key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
                 exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
-        # Closer A/B arm: only the deterministic regen rung runs; an unresolved conflict then
-        # ends in rebase-conflict (exit 3), which is the closer's trigger.
-        rungs = ((make_regen_rung(),) if getattr(self, "llm_conflict_rungs_off", False)
-                 else default_rungs(branch))
+        rungs = default_rungs(branch)
         return run_ladder(ctx, proof_out, rungs=rungs)
 
     def _run_stacked_lost_retry(self, *, key, master_sha, pre_rebase_sha,
@@ -1053,22 +1092,85 @@ class LiveGit:
         _sys.stderr.write(f"postplan: {note}\n")
         _sys.stderr.flush()
 
+    def _rebind_carried_flag(self, branch: str, pre_rebase_sha: Optional[str] = None) -> None:
+        """A clean replay re-stamps the commit a carried condition-(14) marker names.
+        Without a new entry the next run finds the old SHA gone and drops the hold with no
+        CONFLICT-REVIEW=CLEAN verdict. Append the new HEAD. Only a SHA-bound "carried"
+        marker is re-bound; an unknown one stays untouched. A failed write restores the
+        pre-rebase head, so the old SHA stays in history and the hold survives."""
+        from ..armable import FLAG_CARRIED, record_conflict_resolution
+        if self.last_conflict_flag_state != FLAG_CARRIED:
+            return
+        try:
+            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+        except (OSError, ValueError) as exc:
+            if pre_rebase_sha is None:
+                raise
+            from ..conflict import abort_and_restore
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"could not re-bind conflict flag: "
+                                     f"{exc.__class__.__name__}: {exc}")
+
+    def _rebase_in_progress(self) -> bool:
+        for sub in ("rebase-merge", "rebase-apply"):
+            p = self._run("rev-parse", "--git-path", sub, check=False).strip()
+            if p and os.path.exists(os.path.join(self.worktree, p)):
+                return True
+        return False
+
+    def _sync_merges_reason(self, master_sha: str) -> str:
+        """Non-empty when `master_sha..HEAD` holds a merge commit. A plain rebase (no
+        --rebase-merges) linearizes old merges, so this guards a future flag change."""
+        merges = self._run("rev-list", "--merges", f"{master_sha}..HEAD").split()
+        return "sync left merge commits in master..HEAD" if merges else ""
+
+    def _assert_no_sync_merges(self, master_sha: str, pre_rebase_sha: str) -> None:
+        from ..conflict import abort_and_restore
+
+        reason = self._sync_merges_reason(master_sha)
+        if reason:
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha, reason=reason)
+
+    def _replay_upstream(self, target_sha: str) -> str:
+        """The commit a `rebase --onto <target_sha>` replay starts after.
+
+        A stacked branch whose recorded parent tip is not in the target (the parent was
+        squash-merged, so its SHAs never land) replays only `ibl..HEAD`, the branch's own
+        commits. Every other branch replays from `merge-base HEAD target_sha`."""
+        ibl = self.branch_base()
+        if ibl is not None:
+            in_head, _ = self._run_out("merge-base", "--is-ancestor", ibl, "HEAD")
+            in_target, _ = self._run_out("merge-base", "--is-ancestor", ibl, target_sha)
+            if in_head == 0 and in_target != 0:
+                return ibl
+        return self._run("merge-base", "HEAD", target_sha).strip()
+
     def rebase_onto(self, base: str = "origin/master") -> None:
-        # Every exit (return or raise) disarms the SIGTERM restore point.
+        # Every exit (return or raise) disarms the SIGTERM restore point. A failed run
+        # also undoes a squash this run made, so a retry never starts from the squashed head.
+        ok = False
         try:
             self._rebase_onto(base)
+            ok = True
         finally:
+            if not ok:
+                self._restore_pre_squash()
+            self._squashed_from = None
             self._pre_rebase_sha = None
 
     def _rebase_onto(self, base: str) -> None:
         """Repo pre-push policy (bin/pre-push-adr-hook) requires origin/master to be an
-        ancestor of HEAD. This merges `base` in, so every conflict surfaces at one stop
-        and no branch commit is rewritten. Conflict → attempt auto-resolution; if that
-        fails or is not applicable, abort the merge, restore the tree, and raise
+        ancestor of HEAD. This replays the branch's own commits onto `base` with
+        `git rebase --onto`, so the branch stays linear. A conflicting replay aborts,
+        squashes the branch's own range to one commit, and retries, so every conflict
+        surfaces at one stop. Conflict → attempt auto-resolution; if that fails or is
+        not applicable, abort the rebase, restore the tree, and raise
         HarnessError. Fail closed: exit_code_for() maps this to exit 3, which
         bin/post-plan-now refuses to escalate to the skill fallback."""
         from ..conflict import (
-            DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES,
+            DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES, SYNC_BRANCH_STAGE,
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
@@ -1102,40 +1204,105 @@ class LiveGit:
         self._reconcile_conflict_flag(branch, key, base)
         purge_verdict_artifacts(key)
 
-        proc = self._bounded((*_NO_RERERE, "merge", "--no-edit", base), errors="replace")
-        if premerged is not None:
-            # The ladder's review would cover only its own files and its --onto replay can
-            # drop the merge commit, so a pre-merged head never enters it. Fail closed.
-            if proc.returncode != 0:  # premerged-newer-master
-                self._bounded(("merge", "--abort"), errors="replace")
-                raise HarnessError(
-                    "rebase-conflict",
-                    "premerged head conflicts with a newer origin/master; "
-                    "rerun bin/postplan-fix --headless")
-            lostwork_path = self._load_lostwork(master_sha, key)
-            if lostwork_path is None:  # premerged-lostwork-missing
-                raise HarnessError(
-                    "rebase-conflict",
-                    "tree proof failed: lostwork.sh missing at origin/master")
-            ok, out = self._prove_tree_equivalent(lostwork_path, key)
-            if not ok:
-                raise HarnessError("rebase-conflict", out)
-            self._record_resolution(
-                key, branch, master_sha, premerged.files, proof_out=out)
+        contained_rc, _ = self._run_out("merge-base", "--is-ancestor", master_sha, "HEAD")
+        if contained_rc == 0:
+            if premerged is not None:
+                # A bin/postplan-fix head already holds the target: no history change,
+                # and the proof still runs on the local result. A head that still carries
+                # a merge commit (a manifest from the old merge-based script) fails closed.
+                merges = self._run("rev-list", "--merges", f"{master_sha}..HEAD").strip()
+                if merges:
+                    raise HarnessError(
+                        "rebase-conflict",
+                        "premerged head carries a merge commit; "
+                        "rerun bin/postplan-fix --headless")
+                lostwork_path = self._load_lostwork(master_sha, key)
+                if lostwork_path is None:  # premerged-lostwork-missing
+                    raise HarnessError(
+                        "rebase-conflict",
+                        "tree proof failed: lostwork.sh missing at origin/master")
+                ok, out = self._prove_tree_equivalent(lostwork_path, key)
+                if not ok:
+                    raise HarnessError("rebase-conflict", out)
+                self._record_resolution(
+                    key, branch, master_sha, premerged.files, proof_out=out)
             return
+        if premerged is not None:
+            # The ladder's review would cover only its own files, so a pre-merged head
+            # never enters it. Fail closed.
+            raise HarnessError(  # premerged-newer-master
+                "rebase-conflict",
+                "premerged head is stale: origin/master moved after the fix "
+                "(no conflict was tested); rerun bin/postplan-fix --headless")
+
+        upstream = self._replay_upstream(master_sha)
+        # A per-commit replay drops merge commits, and any edit made inside one with them.
+        # Collapse a merge-carrying range first: the squash keeps the tree identical.
+        replay_start = pre_rebase_sha
+        self._squashed_from = pre_rebase_sha  # armed BEFORE the ref moves
+        pre_squashed, pre_squash_note, pre_squash_fatal = self._squash_merge_range_for_replay(
+            upstream, branch, pre_rebase_sha)
+        if pre_squashed:
+            self._last_squash_note = pre_squash_note
+            replay_start = pre_squashed
+        else:
+            self._squashed_from = None
+        if pre_squash_fatal:
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha, reason=pre_squash_note)
+        proc = self._bounded(
+            (*_NO_RERERE, "rebase", "--onto", master_sha, upstream), errors="replace")
+        if proc.returncode != 0 and not self._rebase_in_progress():
+            # git refused before replaying (dirty tree, bad ref): nothing to abort.
+            raise HarnessError(
+                "rebase-conflict",
+                f"rebase did not start: {(proc.stderr or proc.stdout).strip()[:400]}")
+        if proc.returncode == 0:
+            self._assert_no_sync_merges(master_sha, pre_rebase_sha)
+            self._rebind_carried_flag(branch, pre_rebase_sha)
+            return
+        conflict_detail =(proc.stderr or proc.stdout).strip()[:400]
+
+        if self.llm is None or not pre_patch.strip():
+            # No LLM or no pre-patch: immediate abort-and-restore. Snapshot the
+            # unmerged set FIRST; the abort clears it.
+            files = self._snapshot_conflicted_paths()
+            self._bounded(("rebase", "--abort"), errors="replace")
+            raise HarnessError(
+                "rebase-conflict",
+                f"{conflict_detail} | conflicted: {', '.join(files) or '?'}",
+            )
+
+        # Replay the branch's own range squashed, so the resolver sees one stop.
+        abort_proc = self._bounded(("rebase", "--abort"), errors="replace")
+        if (abort_proc.returncode != 0
+                or self._run("rev-parse", "HEAD").strip() != replay_start):
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"rebase --abort before squash failed: "
+                                     f"{(abort_proc.stderr or abort_proc.stdout).strip()[:300]}")
+        self._squashed_from = pre_rebase_sha  # armed BEFORE the ref moves
+        squashed_head, squash_note, squash_fatal = self._squash_merge_range_for_replay(
+            upstream, branch, replay_start, include_linear=True)
+        self._last_squash_note = squash_note
+        if not squashed_head and replay_start == pre_rebase_sha:
+            self._squashed_from = None
+        if squash_fatal:
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha, reason=squash_note)
+        proc = self._bounded(
+            (*_NO_RERERE, "rebase", "--onto", master_sha, upstream), errors="replace")
+        if proc.returncode == 0:
+            self._assert_no_sync_merges(master_sha, pre_rebase_sha)
+            self._rebind_carried_flag(branch, pre_rebase_sha)
+            return
+        if not self._rebase_in_progress():
+            abort_and_restore(self._run, worktree=self.worktree,
+                              pre_rebase_sha=pre_rebase_sha,
+                              reason=f"rebase did not start: "
+                                     f"{(proc.stderr or proc.stdout).strip()[:400]}")
+
         if proc.returncode != 0:
-            conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
-
-            if self.llm is None or not pre_patch.strip():
-                # No LLM or no pre-patch: immediate abort-and-restore. Snapshot the
-                # unmerged set FIRST; the abort clears it.
-                files = self._snapshot_conflicted_paths()
-                self._bounded(("merge", "--abort"), errors="replace")
-                raise HarnessError(
-                    "rebase-conflict",
-                    f"{conflict_detail} | conflicted: {', '.join(files) or '?'}",
-                )
-
             try:
                 self._snapshot_conflicted_paths()
                 inventory = inventory_conflicts(self._run, regen_lockfiles=True)
@@ -1148,7 +1315,7 @@ class LiveGit:
                     inventory, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha)
                 resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
                                             key=key, inventory=llm_inventory,
-                                            branch_stage=2, master_sha=master_sha,
+                                            branch_stage=SYNC_BRANCH_STAGE, master_sha=master_sha,
                                             pre_sha=pre_rebase_sha,
                                             decline_retry_model=DECLINE_RETRY_MODEL,
                                             max_decline_retries=MAX_DECLINE_RETRIES - self._decline_retries_used)
@@ -1167,18 +1334,30 @@ class LiveGit:
                         inventory.lockfiles, master_sha=master_sha,
                         pre_rebase_sha=pre_rebase_sha)}))
 
-                # The merge commit runs bin/pre-commit-hook; a hook denial lands here
-                # and restores the tree with the hook's own text in the reason.
+                # `rebase --continue` commits the staged resolution through the
+                # sequencer, which skips pre-commit (like `git commit -n`). Run the hook
+                # explicitly; a denial restores the tree with the hook's own text.
+                hook_proc = run_bounded(
+                    ["git", "-C", self.worktree, "hook", "run", "--ignore-missing", "pre-commit"],
+                    step="git hook run pre-commit", timeout=COMMIT_HOOK_TIMEOUT,
+                    errors="replace")
+                if hook_proc.returncode != 0:
+                    hook_out = "\n".join(s for s in (hook_proc.stderr.strip(), hook_proc.stdout.strip()) if s)
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"pre-commit hook denied the resolution: {hook_out[:400]}")
                 env = {**os.environ, "GIT_EDITOR": "true"}
-                cont_proc = subprocess.run(
-                    ["git", "-C", self.worktree, "-c", "core.editor=true",
-                     "commit", "--no-edit"],
-                    capture_output=True, text=True, errors="replace", env=env,
-                )
+                cont_proc = self._bounded((*_NO_RERERE, "rebase", "--continue"),
+                                          errors="replace", env=env)
                 if cont_proc.returncode != 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
-                                      reason=f"merge commit failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
+                                      reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
+                merge_reason = self._sync_merges_reason(master_sha)
+                if merge_reason:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=merge_reason)
 
                 # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
                 # and >=2 on its own failure, so branch on rc: reading stdout alone would
@@ -1485,7 +1664,7 @@ class LiveGit:
 
         # Step 7: the --onto rebase (bounded via _bounded, same shape as rebase_onto)
         from ..conflict import (
-            DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES,
+            DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES, SYNC_BRANCH_STAGE,
             abort_and_restore, assert_text_only, inventory_conflicts,
             purge_verdict_artifacts, resolve_all,
         )
@@ -1561,7 +1740,7 @@ class LiveGit:
 
                 resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
                                             key=key, inventory=inventory,
-                                            branch_stage=3, master_sha=master_sha,
+                                            branch_stage=SYNC_BRANCH_STAGE, master_sha=master_sha,
                                             pre_sha=pre_rebase_sha,
                                             replay_base=pre_base if pre_base != master_sha else "",
                                             decline_retry_model=DECLINE_RETRY_MODEL,
@@ -1751,15 +1930,15 @@ class LiveGit:
             lease = _ZERO_SHA
 
         def _push_once() -> None:
-            rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
+            rc, out = self._run_out("push", f"--force-with-lease=refs/heads/{branch}:{lease}",
                                     remote, f"HEAD:refs/heads/{branch}")
             if rc != 0:
                 if any(m in out for m in _LOCAL_GATE_MARKERS):
                     raise HarnessError("local-gate", f"git push: {out[:600]}",
-                                       cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                       cmd=f"git push --force-with-lease=refs/heads/{branch}:{lease} {remote} HEAD:refs/heads/{branch}",
                                        output=out)
                 raise HarnessError("push-failed", out[:600],
-                                   cmd=f"git push --force-with-lease={branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                   cmd=f"git push --force-with-lease=refs/heads/{branch}:{lease} {remote} HEAD:refs/heads/{branch}",
                                    output=out)
 
         netretry.call(_push_once, label=f"git push {remote} {branch}",
@@ -1804,6 +1983,9 @@ class ReplayGit:
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
+
+    def merge_target(self) -> str:
+        return self.fx.get("merge_target", "origin/master")
 
     def stage_all(self) -> None:
         return

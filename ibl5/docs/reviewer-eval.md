@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, and the before/after rule for review-surface PRs.
-last_verified: 2026-11-02
+last_verified: 2026-11-03
 ---
 
 # Reviewer eval
@@ -80,6 +80,15 @@ Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or mor
 The check binds a claimed score to the exact surface and corpus content. It cannot prove the run happened.
 
 One run is a sample. LLM output varies between runs. Pass `--runs N` to `run` or `compare` to review each case N times. A bug case then counts as a hit only when every run hits, and a clean case keeps the run with the most findings. Each case line gains `runs_hit=<h>/<N>` or `runs_flagged=<f>/<N>`, plus `FLAKY` when the runs disagree. A `runs=<N> flaky=<k>` line prints before `llm_calls`. The score line keeps its shape, so `bin/check-reviewer-eval` reads it unchanged. Run 1 uses the same cache entry as a plain run, and runs 2 to N get their own `-r<k>` entries. `compare --runs` needs a base that already has the flag.
+
+## Opus verifier (2026-10-27)
+
+At both review depths, the Phase 4D verifier now runs on Opus. It ran on Sonnet before. The seat count stayed at 3. Each side was scored once.
+
+```
+Reviewer eval before: reviewer-eval v=247f8fcb9b0f c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+Reviewer eval after: reviewer-eval v=05b22ea13c35 c=98210c961f08 recall=2/6 false_alarms=0 clean_flagged=0/9 degraded=0
+```
 
 ## Fold B into A trial (2026-10-25)
 

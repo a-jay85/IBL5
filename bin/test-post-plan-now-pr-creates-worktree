@@ -14,6 +14,9 @@ set -euo pipefail
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"; h_cleanup' EXIT
 # Runner logs and .session sidecars go to a private dir, never the shared /tmp.
 mkdir -p "$TMP/runlog"
+# Pre-fire verify gate stub: these harnesses assert other post-plan-now behavior, not the gate.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/prefire-pass"; chmod +x "$TMP/prefire-pass"
+export PREFIRE_VERIFY_SCRIPT="$TMP/prefire-pass"
 export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGIN="$TMP/origin.git"

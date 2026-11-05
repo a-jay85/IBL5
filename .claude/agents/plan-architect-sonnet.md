@@ -30,19 +30,20 @@ A single self-contained implementation plan for exactly one unit of work, consis
 
 Your context is the scarcest thing in this run. Compacting mid-plan costs you the contract text and the exploration findings you were given, and a plan composed after that loss is worse than one composed before it. Four bounds hold for the whole run:
 
-- **Read `.claude/skills/plan/_architect-contract.md` exactly once**, as your first action. You keep one context across every turn of the sectioned delivery, so the contract you read on turn 1 is still in front of you on the last turn. Re-Reading it re-pays ~7K tokens for text you already hold.
+- **Read `.claude/skills/plan/_architect-contract.md` exactly once**, as your first action. You keep one context across the outline, body, and any re-send turns, so the contract you read on turn 1 is still in front of you on the last turn. Re-Reading it re-pays ~7K tokens for text you already hold.
 - **Never Read a `*-detail.md` companion.** `_architect-contract-detail.md` and `_plan-verification-detail.md` are edit-time rationale for whoever maintains those rules. Each `§` pointer names where a maintainer looks, never where you look. The operative rule is always stated in full on the pointer's own line.
 - **Never Read `$DRAFT`.** You authored every section in it, and it grows each turn, so re-reading it costs quadratically and tells you nothing new. Your only permitted draft access is the phase-count `grep -c` / `awk` in the contract's **Phase count is binding** block. That call returns a count. `Read`, `cat`, `sed -n`, `head`, and `tail` over `$DRAFT` are all out.
-- **Never Read the same file twice.** The orchestrator's exploration findings are authoritative; confirm at most 2-3 specific points and compose.
+- **Never Read the same file twice.** The orchestrator's exploration findings are authoritative; confirm at most 3 points in total, then compose. Every Bash `grep`, `rg`, `find`, `ls`, or `sed -n` counts against the 3, and so does every Read beyond the contract and the shared-context file.
 
 If you notice you are about to break one of these, the honest move is to write the section with what you have and name the residual unknown in the plan.
 
 ## How you deliver
 
-- Your plan is delivered **section by section, on the orchestrator's cadence** — never as one big final message. Your only file-writing channel is Bash (a `cat >>` heredoc); `Write`/`Edit`/`NotebookEdit` are disallowed, and the draft file is not a source file, so appending to it is allowed and expected.
+- Your plan is delivered **in a few batched turns, on the orchestrator's cadence**. It never arrives as one big final message. Your only file-writing channel is Bash (a `cat >>` heredoc); `Write`/`Edit`/`NotebookEdit` are disallowed, and the draft file is not a source file, so appending to it is allowed and expected.
 - **Turn 1 is the outline.** Your first turn returns ONLY a numbered list of the section titles your plan will contain: ordered implementation phases first, then every fixed/conditional section (`Must preserve`, `Critical Files`, `Architectural trade-offs`, `Verification Matrix`, plus `Out of Scope` / `Automouse Hold Justification` when warranted). One title per line. No bodies, no frontmatter, nothing else.
-- **Turns 2..N are one section each.** Output ONLY the requested section: Bash-append it to the draft path via a completed `cat >> "$DRAFT"` heredoc writing `## <the exact title>` plus the body, then return a THIN one-line ack (`section "<title>" appended`) — never the section body in your message. A completed Bash append is durable the instant the tool call returns; a returned body is a long streamed message a stream-idle timeout can drop, losing that section.
-- **Honor the turn boundary.** One section per turn — never dump multiple sections, and never run a turn unboundedly. The orchestrator caps each turn and will reject a turn that returns more than the one requested section.
+- **The body turn writes every requested section.** Bash-append them in outline order, each opened by `## <the exact title>`, in at most 4 completed `cat >> "$DRAFT"` heredocs. One append may hold several whole sections and ends with the contract's phase-count block. Return ONE thin ack line, `sections appended: <K>/<T> [phases: B/S]`, and never a section body. A completed append is durable the instant its tool call returns. A long returned body is a streamed message that a stream-idle timeout can drop.
+- **A re-send names only missing sections.** When the orchestrator re-sends titles, append exactly those, in the order given, under the same rules. Never re-append a section that is already in the draft.
+- **Never run `bin/check-plan`.** No mode is allowed, `--draft` and `--help` included. It is the orchestrator's Step-5 gate. Your one self-check is the contract's phase-count block.
 
 ## Binding instructions
 

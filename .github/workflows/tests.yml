@@ -46,7 +46,7 @@ jobs:
 
   changes:
     name: Detect changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
       pull-requests: read
@@ -100,7 +100,7 @@ jobs:
   # gate.needs), so a broken memo can only cost a real run.
   ci-memo-check:
     name: CI Memo Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -133,7 +133,7 @@ jobs:
     name: PHPUnit Tests
     needs: [ci-memo-check]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     permissions:
       contents: read
@@ -218,7 +218,7 @@ jobs:
     name: PHP Dependency Audit
     needs: [changes, ci-memo-check]
     if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     steps:
@@ -239,7 +239,7 @@ jobs:
     name: JS Dependency Audit (bun)
     needs: [changes, ci-memo-check]
     if: (needs.changes.outputs.src == 'true' || needs.changes.outputs.jsdeps == 'true') && needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     steps:
@@ -323,7 +323,7 @@ jobs:
     name: IBL5 TS Unit Tests
     needs: [ci-memo-check]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
     - name: Checkout code
@@ -346,7 +346,7 @@ jobs:
     name: IBLbot Type Check & Unit Tests
     needs: [changes, ci-memo-check]
     if: needs.changes.outputs.iblbot == 'true' && needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
     - name: Checkout code
@@ -379,7 +379,7 @@ jobs:
     name: Database Integration Tests
     needs: [ci-memo-check, mirror-ready]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
 
     services:
@@ -427,7 +427,7 @@ jobs:
     name: PHPStan Analysis
     needs: [ci-memo-check]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     steps:
@@ -510,7 +510,7 @@ jobs:
     name: ShellCheck (bash 3.2 compat)
     needs: [ci-memo-check]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     steps:
@@ -558,7 +558,7 @@ jobs:
     name: Update coverage & PHPStan baselines
     needs: [test, phpstan, ci-memo-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -628,7 +628,7 @@ jobs:
     # push. `bin/generate-codebase-map` normalizes the date before comparing, so
     # a bot commit only happens when module content actually changed.
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write
@@ -657,7 +657,7 @@ jobs:
 
   static-guards:
     name: Static guards
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     # Folds every unconditional guard in this workflow into one sequential job to
     # save runner slots (PR #1269 meta-checks fold, ADR-0186).
@@ -898,7 +898,7 @@ jobs:
     name: Shell harness regression tests
     needs: [ci-memo-check, mirror-ready]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     env:
       IBL5_TEST_MARIADB_IMAGE: ghcr.io/a-jay85/mirror/mariadb:10.11
@@ -984,6 +984,7 @@ jobs:
             bin/test-wt-rebase \
             bin/test-check-plan-staleness \
             bin/test-matrix-assertion-check \
+            bin/test-prefire-verify \
             bin/test-plan-tier-hint \
             bin/test-backlog \
             bin/test-rehearsal-clone-fallback \
@@ -1061,7 +1062,7 @@ jobs:
     name: Shell harness tests (isolated)
     needs: [ci-memo-check, mirror-ready]
     if: needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     # Harnesses that cannot share a runner with bin/run-shell-harnesses: one
     # exercises a real lsof port guard and four need an env -i scrubbed shell.
@@ -1099,7 +1100,7 @@ jobs:
     name: Tests and Analysis
     if: always()
     needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, shellcheck, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, mirror-ready]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     # The memo is written only here: after a clean aggregate, on a run that was a miss.
     env:

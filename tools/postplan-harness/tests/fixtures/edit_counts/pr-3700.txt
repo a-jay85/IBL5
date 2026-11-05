@@ -1,0 +1,91 @@
+<!-- vr-new-screens:begin -->
+
+_VR screens for head `59a1f8b` at 2026-11-04 00:42 UTC._
+
+## 🔍 Changed VR screens
+
+<details><summary>head-to-head-records: mobile (1 spots)</summary>
+
+### head-to-head-records · head-to-head-records-mobile · full page (no pixel mask)
+
+_Before: left or top, red band · After: right or bottom, green band_
+
+<a href="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/head-to-head-records-mobile.1.side.png"><picture><source media="(min-width: 768px)" srcset="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/head-to-head-records-mobile.1.side.png"><img src="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/head-to-head-records-mobile.1.stack.png" alt="head-to-head-records-mobile before and after"></picture></a>
+
+</details>
+
+<details><summary>rivalries-teams-pair: mobile (1 spots)</summary>
+
+### rivalries-teams-pair · rivalries-teams-pair-mobile · top, y 24-148 px
+
+_Before: left or top, red band · After: right or bottom, green band_
+
+<a href="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/rivalries-teams-pair-mobile.1.side.png"><picture><source media="(min-width: 768px)" srcset="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/rivalries-teams-pair-mobile.1.side.png"><img src="https://a-jay85.github.io/IBL5/fd01a8c8062d3f04b34e6e37b0466e5ac8a308b4/visual-review/changed/rivalries-teams-pair-mobile.1.stack.png" alt="rivalries-teams-pair-mobile before and after"></picture></a>
+
+</details>
+
+<!-- vr-new-screens:end -->
+
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** A team's waiver add or drop now waits for that team's earlier request to finish, so a double-click cannot overfill the roster. Mail, Discord and the audit entry now run after the move is saved.
+
+**Why:** Two simultaneous waiver requests from one team could both pass the full-roster check and overfill the roster, as backlog item 1570 reports.
+
+**Watch:** `MailService.php` sets no SMTP timeout, so a stuck mail server can keep a GM's page waiting after the signing commits. Writes that point `fk_plr_team` or `fk_faoffer_tid` at a locked team wait for the lock, per `WaiversTeamRosterLockIntegrationTest`.
+
+**Touches:** ibl5/classes/Waivers/, ibl5/tests/Waivers/, ibl5/tests/DatabaseIntegration/Waivers/, WaiversSubmissionService.php, WaiversProcessor.php, WaiversProcessorInterface.php, WaiversTeamLockRepository.php, WaiversTeamLockInterface.php, WaiversController.php
+
+**Machine-authored fixes:** pending — Phase 6.5 has not run
+<!-- merge-digest:end -->
+
+## Summary
+- Fixes a race in waiver submissions. Before, the roster count in `WaiversSubmissionService::submit()` ran with no lock. Two simultaneous requests from one team could both pass the full-roster check. Tracked in a-jay85/IBL5-backlog#1570.
+- Adds `WaiversTeamLockInterface` and `WaiversTeamLockRepository`. The repository runs a callback inside one transaction and takes ``SELECT teamid FROM `ibl_team_info` WHERE teamid = ? FOR UPDATE`` first. A second request for the same team waits until the first commits or rolls back.
+- Another team's waiver submission does not wait. Some other writes do. [Measured by hand](https://github.com/a-jay85/IBL5/pull/3700#issuecomment-6618611998) on MariaDB 10.11.16 with the row locked: moving an `ibl_plr` row onto the locked team (`fk_plr_team`) and inserting an `ibl_fa_offers` row for it (`fk_faoffer_tid`) both waited until a 1-second timeout. A plain read, a move onto another team, a move off the locked team and an update that leaves the team unchanged did not wait. A rough local timing, with no saved command and excluding the real commit flush, held the lock for a median of 4.4 ms and at most 5.7 ms over 30 runs. No network call runs under it.
+- `submit()` runs the slot count, the salary read and the processor add/drop inside that lock. If the team row is missing, it returns `Unable to determine your team.` and does not call the callback.
+- The signing or drop and its news story commit or roll back together inside the lock. Mail and Discord now run after the lock has committed and been released. Neither runs if the callback failed, rolled back or returned `success=false`.
+- A thrown mail config error no longer shows the GM an error, and the signing stands as it did before. Any failed send logs `waiver_mail_notification_failed`, and Discord still posts. The audit entry now runs after commit and before mail, and a failed audit write logs `waiver_audit_log_failed`. A Discord failure logs `waiver_discord_notification_failed`. The mail and Discord text did not change, and a drop still sends no mail.
+- A stuck mail server can still make that GM's page slow, because `MailService` sets no timeout of its own, and SMTP keeps PHPMailer's 300-second default. By then the signing is committed and no lock is held. If PHP kills the request during the mail send, Discord may not post.
+- **Deliberate change from the plan.** The plan left mail and Discord inside the lock (design decision 4, the "file is not edited" line for `WaiversProcessor.php` under Must preserve, and the Out of Scope line). The owner [decided on 2026-11-03](https://github.com/a-jay85/IBL5/pull/3700#issuecomment-6619570658) to move them after the lock, so `WaiversProcessor.php` and its interface changed. A harmless difference from the plan: the lock SQL backticks the table name.
+- `WaiversSubmissionService` takes the lock as a new constructor argument. `WaiversController` passes in a `WaiversTeamLockRepository`. `WaiversProcessor` takes optional mailer and Discord arguments so tests can record the sends.
+- `WaiversSubmissionServiceTest.php` checks the order (lock start, count, salary, process, lock end) for add and waive, that the verified team id is locked, that nothing is locked when the team id is unresolved, and that a lock failure passes through without processing. With a real processor it also checks that mail and Discord run after the lock ends with the exact text, that nothing is sent on a rejected move, a failed write or a failed commit, and that a throwing mailer or a mail config error leaves success in place and still posts to Discord.
+- Adds a structure test: the lock class holds no state, takes only a team id and a callable, and contains one fixed parameterised SQL statement.
+- Adds a two-connection database integration test on real MariaDB. It shows a plain roster count does not block a second connection. It shows the `FOR UPDATE` lock does block the same team until release, and does not block a different team. It shows the two foreign-key writes above wait, and that a plain read and a write onto another team do not. It also covers a normal return (inside the test's outer transaction, so this path never runs a real commit), null return, rollback on exception, the lock being held while the processor runs inside `submit()`, a throwing mailer that keeps the signing and news story, and a failure inside the lock that rolls both back and sends nothing.
+
+**Merge danger:** Door: two-way · Blast radius: site-wide · Why: Changes waiver submit to take a per-team row lock and moves mail and Discord after it; no schema or data change, so a revert restores the old unlocked behaviour.
+**How to revert:** `git revert <merge-sha>`; no migration or config is touched, so nothing else is needed.
+
+
+
+<!-- manual-confirmation:begin -->
+## Manual confirmation needed
+
+> **Decision:** Merge if you're OK with two things: a new row-lock query on the waiver submit path shipping on structural tests and two-connection database tests, and mail, Discord, and the audit entry moving to after commit. The second one means a mail config error used to show the GM an error and now shows success with a logged warning.
+<!-- manual-confirmation:end -->
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+
+<!-- exec-mutations:begin -->
+### Bug-planting check on the tests
+
+For each row of the plan's Verification Matrix, a tool planted a small bug in the code and re-ran that row's test. A good test fails when the bug is there.
+
+**✅ All 1 rows caught the planted bug.**
+
+<details><summary>✅ 1 rows caught the planted bug</summary>
+
+- **Row 29** (`cd ibl5 && composer run analyse`)
+
+</details>
+<!-- exec-mutations:end -->
+
+<!-- backlog-closes:start -->
+Closes a-jay85/IBL5-backlog#1570
+<!-- backlog-closes:end -->
+
+

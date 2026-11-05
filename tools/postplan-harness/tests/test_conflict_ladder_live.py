@@ -377,7 +377,7 @@ def test_live_generated_conflict_resolved_by_regen_without_llm(
     assert [p for p, _m, _pr in llm.first_pass_calls] == ["conflict-resolve:gen/counts.json"]
     assert llm.ladder_calls == []
     assert _result_json(fx)["conflict_rung"] == "regen"
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
     assert _show(fx.d, "HEAD:gen/counts.json") == _counts(fx.all_ids)
 
 
@@ -395,7 +395,7 @@ def test_live_flagged_generated_conflict_regenerated_before_resolver(
     assert llm.first_pass_calls == []
     assert llm.ladder_calls == []
     assert _result_json(fx)["conflict_rung"] == "regen"
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
     assert _show(fx.d, "HEAD:gen/counts.json") == _counts(fx.all_ids)
 
 
@@ -485,7 +485,7 @@ def test_live_vr_png_conflict_takes_master_copy_without_llm(make_repo):
     # `conflict-review` runs after any success; no resolver call may have been made.
     assert llm.first_pass_calls == []
     assert llm.ladder_calls == []
-    assert len(_parents(fx.d)) == 2
+    assert _parents(fx.d) == [fx.master]
     assert _show_bytes(fx.d, f"HEAD:{_VR_PNG}") == _PNG_MASTER
     assert _show(fx.d, "HEAD:notes.txt") == "a\nbranch\n"
     assert git.last_conflict_rung == "regen"
@@ -581,7 +581,7 @@ def test_live_dropped_lines_restored_by_opus_retry(make_repo):
     head = _show(fx.d, f"HEAD:{_COMPOSE}")
     assert head == fx.full
     assert "DB_HOST: db-ci" in head
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
 
 
 def test_live_dropped_lines_restored_by_session(make_repo):
@@ -600,7 +600,7 @@ def test_live_dropped_lines_restored_by_session(make_repo):
     argv = dict(llm.tooled_argvs)["conflict-ladder-session"]
     assert argv[argv.index("--max-budget-usd") + 1] == "5.00"
     assert _show(fx.d, f"HEAD:{_COMPOSE}") == fx.full
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
 
 
 def test_live_all_rungs_drop_a_line_fails_closed_with_dm_block(
@@ -663,5 +663,5 @@ def test_live_clean_merge_omits_conflict_rung(make_repo, monkeypatch, tmp_path):
 
     assert res.error_kind == "test-stop", res.error
     assert llm.calls == []
-    assert len(_parents(fx.d)) == 2
+    assert _parents(fx.d) == [fx.master]
     assert "conflict_rung" not in _result_json(fx)

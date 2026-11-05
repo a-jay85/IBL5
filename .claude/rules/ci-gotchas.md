@@ -1,6 +1,6 @@
 ---
-description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow, conversation resolution.
-last_verified: 2026-11-02
+description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow, conversation resolution, runner image pin.
+last_verified: 2026-11-04
 paths: ".github/workflows/**"
 ---
 
@@ -79,3 +79,17 @@ The `update-baselines` label starts `.github/workflows/update-baselines.yml`, wh
 The completion signal is the PR **head SHA changing**, not the bot's comment. After `@dependabot rebase` posts, read the bot's reply (`gh pr view <n> --json comments`) and confirm `headRefOid` moved.
 
 **On "edited by someone other than Dependabot":** first verify the branch has no real human commits (`git log --format='%an' origin/<branch>`). If none — the common case — `@dependabot recreate` is the actual fix. If recreate also stalls, resolve by hand in a worktree: merge `origin/master` (never rebase), regenerate the lockfile with the ecosystem's tool, then push.
+
+## Runner image is pinned to `ubuntu-26.04`
+
+Every job in `.github/workflows/` runs on `ubuntu-26.04`. GitHub moves the `ubuntu-latest` label to a new Ubuntu release in a staged rollout. [runner-images#14748](https://github.com/actions/runner-images/issues/14748) moved it to 26.04 between 2026-10-19 and 2026-11-19, with systemd 255 to 259 and kernel 6.17 to 7.0. During a rollout some jobs land on the old image and some on the new one. A check can then fail on one PR and pass on another with no related diff. On 2026-11-03 `bin/test-cleanup-safety` failed that way on jobs that ran on 26.04, until [#3706](https://github.com/a-jay85/IBL5/pull/3706) taught it the Node 24 thread name.
+
+`bin/check-composite-contracts` check U1 fails any workflow file that names `ubuntu-latest`, comments included. All jobs share one literal, so an upgrade is one PR.
+
+**Support window.** As of 2026-11-04 the [runner-images README](https://github.com/actions/runner-images#available-images) lists `ubuntu-26.04` as a GA image and publishes no retirement date for it. Review this pin by 2027-05-01. That is a review date chosen in the pinning PR. GitHub did not announce it.
+
+**Upgrade recipe.** Do all of it in one worktree PR.
+
+1. Swap the literal in every workflow with `sed -i '' 's/runs-on: ubuntu-26.04/runs-on: ubuntu-NN.04/' .github/workflows/*.yml` on macOS. On Linux, drop the `''`.
+2. Swap the same literal in the fixtures of `bin/test-check-composite-contracts`, in `.github/actionlint.yaml`, and in this section, and set a new review date. Delete the `.github/actionlint.yaml` entry if the actionlint pin in `.github/workflows/tests.yml` already lists the new image.
+3. Run `bin/check-composite-contracts` and `bin/test-check-composite-contracts`, then let the PR's full CI run on the new image. A check that fails only on the new image is part of the upgrade. Fix it in the same PR, or keep the old pin and name the failing check in the PR body.

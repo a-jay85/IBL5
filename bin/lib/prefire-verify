@@ -1,0 +1,390 @@
+#!/usr/bin/env bash
+# bin/lib/prefire-verify — pre-fire verification gate.
+#
+# Re-runs four checks on the current working tree before /post-plan fires:
+#   1. every post-impl CLI-executable row of the plan's Verification Matrix
+#   2. the full default PHPUnit suite
+#   3. Infection on the changed classes at CI's thresholds (bin/mutation-diff)
+#   4. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
+# It trusts no implementer-written ledger. Only this script writes pass records,
+# keyed by tree hash, in the per-worktree git dir. It fails closed.
+#
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|infection|exec-mutations|all]
+#                               [--base <ref>] [--bypass <reason>] [--fire-point]
+#   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
+#                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
+#                 bin/post-plan-now passes it; a pass under either limit is the same record.
+# Exit codes:
+#   0  every requested stage passed (fresh run, or a valid pass record for this tree)
+#   1  a check failed (the message names the matrix row or the stage)
+#      (an exec-mutations row that did not trip, or a mutation revert that failed)
+#   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
+#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, pcov, gtimeout/timeout
+#   4  the checks changed the working tree, so no pass record was written
+#
+# Test seams (used only by bin/test-prefire-verify):
+#   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/
+#   PREFIRE_MUTATION_CMD   default bin/mutation-diff, run from the repo root
+#   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
+#   PREFIRE_EXCLUDES_CMD   default bin/check-infection-excludes, run from ibl5/
+#   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
+
+set -uo pipefail
+
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/lib/plan-matrix-rows.sh
+source "$SELF_DIR/plan-matrix-rows.sh"
+# shellcheck source=bin/lib/branch-base.sh
+source "$SELF_DIR/branch-base.sh"
+
+say() { printf 'prefire-verify: %s\n' "$*"; }
+die() { local rc="$1"; shift; printf 'prefire-verify: %s\n' "$*" >&2; exit "$rc"; }
+
+PLAN=""
+STAGE="all"
+BASE_OPT=""
+BYPASS_REASON=""
+BYPASS_SET=0
+FIRE_POINT=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --plan)   [ $# -ge 2 ] || die 2 "--plan needs a path"
+                  [ -n "$2" ] || die 2 "--plan got an empty value; omit the flag when there is no plan"
+                  PLAN="$2"; shift 2 ;;
+        --stage)  [ $# -ge 2 ] || die 2 "--stage needs a value"; STAGE="$2"; shift 2 ;;
+        --base)   [ $# -ge 2 ] || die 2 "--base needs a ref"; BASE_OPT="$2"; shift 2 ;;
+        --bypass) [ $# -ge 2 ] || die 2 "--bypass needs a reason"; BYPASS_REASON="$2"; BYPASS_SET=1; shift 2 ;;
+        --fire-point) FIRE_POINT=1; shift ;;
+        -h|--help) sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) die 2 "unknown argument '$1'" ;;
+    esac
+done
+
+case "$STAGE" in
+    matrix|phpunit|infection|exec-mutations|all) : ;;
+    *) die 2 "--stage must be matrix, phpunit, infection, exec-mutations, or all (got '$STAGE')" ;;
+esac
+if [ "$BYPASS_SET" -eq 1 ] && [ -z "$BYPASS_REASON" ]; then
+    die 2 "--bypass needs a non-empty reason"
+fi
+if [ -n "$PLAN" ] && [ ! -f "$PLAN" ]; then
+    die 2 "plan file not found: $PLAN"
+fi
+# The check above reads --plan from the caller's cwd. The cd below moves to the
+# repo root, so pin the path now or a relative plan stops resolving.
+if [ -n "$PLAN" ]; then
+    PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")"
+fi
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git work tree"
+cd "$ROOT" || die 2 "cannot cd to $ROOT"
+
+prefire_tree_hash() {
+    local idx rc
+    idx=$(mktemp "${TMPDIR:-/tmp}/prefire-idx.XXXXXX") || return 1
+    cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null || true
+    GIT_INDEX_FILE="$idx" git add -A >/dev/null 2>&1 \
+        && GIT_INDEX_FILE="$idx" git write-tree
+    rc=$?
+    rm -f "$idx"
+    return $rc
+}
+
+XM_LIB="${PREFIRE_EXEC_MUTATIONS_LIB:-$SELF_DIR/plan-exec-mutations}"
+# SIGKILL cannot be trapped, so an earlier exec-mutations run may have left a mutation
+# applied and journalled. Restore it before the tree hash is taken: no stage may run
+# against, or record a pass for, a mutated tree.
+"$XM_LIB" pending --root "$ROOT" >/dev/null 2>&1
+case $? in
+    0)
+        "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1 \
+            || die 1 "an interrupted exec-mutations run left a mutation that recover could not restore; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run"
+        say "restored a mutation left by an interrupted exec-mutations run" ;;
+    1) : ;;
+    *) die 3 "cannot read the exec-mutations journal (plan-exec-mutations pending failed)" ;;
+esac
+
+TREE=$(prefire_tree_hash) || die 3 "cannot compute the working-tree hash"
+TREE7="${TREE:0:7}"
+STATE_DIR="$(git rev-parse --git-path prefire-verify)"
+mkdir -p "$STATE_DIR" || die 3 "cannot create $STATE_DIR"
+
+# --- escape hatch (human only, logged) -------------------------------------
+if [ "$BYPASS_SET" -eq 1 ]; then
+    if [ "${CLAUDE_HEADLESS:-0}" = "1" ]; then
+        die 2 "--bypass is for a human at a terminal; refused under CLAUDE_HEADLESS"
+    fi
+    if [ "${#BYPASS_REASON}" -lt 15 ]; then
+        die 2 "--bypass needs a reason of at least 15 characters"
+    fi
+    BYPASS_LOG="$(git rev-parse --git-common-dir)/prefire-verify-bypass.log"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        "$(git rev-parse --abbrev-ref HEAD)" "$TREE7" "${USER:-unknown}" "$BYPASS_REASON" \
+        >> "$BYPASS_LOG"
+    printf 'prefire-verify: BYPASSED (logged to %s): %s\n' "$BYPASS_LOG" "$BYPASS_REASON" >&2
+    exit 0
+fi
+
+# --- pass records -----------------------------------------------------------
+record_path() { # <stage> <key>
+    if [ -n "$2" ]; then
+        printf '%s/%s.%s.%s.pass' "$STATE_DIR" "$TREE" "$1" "$2"
+    else
+        printf '%s/%s.%s.pass' "$STATE_DIR" "$TREE" "$1"
+    fi
+}
+
+cache_hit() { # <stage> <key>; prints the cache message on a hit
+    local f body at
+    f=$(record_path "$1" "$2")
+    [ -f "$f" ] || return 1
+    body=$(cat "$f")
+    case " $body " in *" tree=$TREE "*) : ;; *) return 1 ;; esac
+    if [ -n "$2" ]; then
+        case " $body " in *" key=$2 "*) : ;; *) return 1 ;; esac
+    fi
+    at="${body#*at=}"; at="${at%% *}"
+    say "$1 pass cached for tree $TREE7 (recorded $at)"
+    return 0
+}
+
+write_record() { # <stage> <key>
+    printf 'stage=%s tree=%s key=%s at=%s by=prefire-verify\n' \
+        "$1" "$TREE" "${2:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$(record_path "$1" "$2")"
+}
+
+# --- matrix stage -----------------------------------------------------------
+stage_matrix() {
+    local plan_sha rows rc num cmd log rows_rc
+    if [ -z "$PLAN" ]; then
+        say "SKIP matrix: no plan (ad-hoc path); PHPUnit and Infection still run"
+        return 0
+    fi
+    plan_sha=$(git hash-object "$PLAN")
+    cache_hit matrix "$plan_sha" && return 0
+
+    rows=$(plan_matrix_rows "$PLAN"); rows_rc=$?
+    if [ "$rows_rc" -eq 2 ]; then
+        say "FAIL plan has no Verification Matrix; no evidence to check" >&2
+        return 1
+    fi
+
+    # DB probe, once, before the first DB-touching row.
+    local db_re='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-up|run-migrations|mariadb'
+    local first_db_num="" first_db_cmd=""
+    while IFS=$'\t' read -r num cmd; do
+        [ -n "$num" ] || continue
+        if grep -Eq -- "$db_re" <<< "$cmd"; then first_db_num="$num"; first_db_cmd="$cmd"; break; fi
+    done <<< "$rows"
+    if [ -n "$first_db_num" ]; then
+        if [ -n "${PREFIRE_DB_PROBE_CMD:-}" ]; then
+            bash -c "$PREFIRE_DB_PROBE_CMD" </dev/null >/dev/null 2>&1; rc=$?
+        else
+            bin/db-query "SELECT 1" >/dev/null 2>&1; rc=$?
+        fi
+        if [ "$rc" -ne 0 ]; then
+            say "FAIL DB unreachable; matrix row $first_db_num needs it ($first_db_cmd). Start the worktree stack, then re-run" >&2
+            return 3
+        fi
+    fi
+
+    log="$STATE_DIR/$TREE.matrix.log"
+    : > "$log"
+    while IFS=$'\t' read -r num cmd; do
+        [ -n "$num" ] || continue
+        say "matrix row $num: $cmd"
+        printf '### row %s: %s\n' "$num" "$cmd" >> "$log"
+        bash -c "$cmd" </dev/null >> "$log" 2>&1; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            say "FAIL matrix row $num exited $rc: $cmd" >&2
+            tail -n 30 "$log" >&2
+            return 1
+        fi
+    done <<< "$rows"
+    write_record matrix "$plan_sha"
+    say "matrix passed"
+    return 0
+}
+
+# --- phpunit stage ----------------------------------------------------------
+stage_phpunit() {
+    local log rc cmd="${PREFIRE_PHPUNIT_CMD:-vendor/bin/phpunit}"
+    cache_hit phpunit "" && return 0
+    if [ -z "${PREFIRE_PHPUNIT_CMD:-}" ] && [ ! -x ibl5/vendor/bin/phpunit ]; then
+        say "FAIL phpunit prerequisite missing: ibl5/vendor/bin/phpunit; run composer install in ibl5/" >&2
+        return 3
+    fi
+    log="$STATE_DIR/$TREE.phpunit.log"
+    (cd ibl5 && bash -c "$cmd") > "$log" 2>&1; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        say "FAIL phpunit: full default suite red (exit $rc); log: $log" >&2
+        tail -n 40 "$log" >&2
+        return 1
+    fi
+    write_record phpunit ""
+    say "phpunit passed"
+    return 0
+}
+
+# --- infection stage --------------------------------------------------------
+resolve_base() {
+    if [ -n "$BASE_OPT" ]; then
+        BASE_REF="$BASE_OPT"
+    elif _b=$(branch_base_resolve "$ROOT" "$(git rev-parse --abbrev-ref HEAD)") && [ -n "$_b" ]; then
+        BASE_REF="$_b"   # branch_base_resolve already prints "origin/<name>"
+    else
+        BASE_REF="origin/master"
+    fi
+    BASE_SHA=$(git rev-parse --verify --quiet "$BASE_REF^{commit}") || {
+        say "FAIL base ref $BASE_REF does not resolve; run git fetch origin" >&2
+        return 3
+    }
+    return 0
+}
+
+stage_infection() {
+    local log rc cmd="${PREFIRE_MUTATION_CMD:-bin/mutation-diff}"
+    resolve_base || return 3
+    cache_hit infection "$BASE_SHA" && return 0
+    log="$STATE_DIR/$TREE.infection.log"
+
+    (cd ibl5 && bash -c "${PREFIRE_EXCLUDES_CMD:-bin/check-infection-excludes}") > "$log" 2>&1; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        say "FAIL infection: check-infection-excludes red (exit $rc)" >&2
+        tail -n 20 "$log" >&2
+        return 1
+    fi
+
+    bash -c "$cmd \"\$1\"" _ "$BASE_REF" > "$log" 2>&1; rc=$?
+    case "$rc" in
+        0)
+            write_record infection "$BASE_SHA"
+            say "infection passed (or skipped: no changed classes) vs $BASE_REF"
+            return 0 ;;
+        2) say "FAIL infection: base ref unusable" >&2; rc=3 ;;
+        3) say "FAIL infection: prerequisite missing (pcov, docker, ibl5-mariadb, or db-test-up)" >&2
+           grep -E 'Error:' "$log" | tail -n 2 >&2; rc=3 ;;
+        4) say "FAIL infection: another bin/mutation-diff run holds /tmp/ibl5-mutation-diff.lock; re-run after it finishes" >&2; rc=3 ;;
+        5) say "FAIL infection: Infection matched no source files although classes changed" >&2; rc=1 ;;
+        *) say "FAIL infection: below CI threshold (min-msi=100) or coverage run red (exit $rc)" >&2; rc=1 ;;
+    esac
+    grep -E 'mutations were generated|escaped|Mutation Score Indicator|minimum required MSI' "$log" | tail -n 6 >&2
+    return "$rc"
+}
+
+# --- exec-mutations stage ---------------------------------------------------
+# The short limits fit one 600 s foreground implementer Bash call (prompt-impl Step 6.9):
+# a row starts only inside the 300 s budget and can then take at most 120 s baseline + 120 s
+# mutated. The fire point has no such cap, so --fire-point uses the real post-plan gate's
+# limits (DEFAULT_MAX_TIMEOUT and DEFAULT_BUDGET in tools/postplan-harness/harness/mutations.py).
+XM_TIMEOUT=30
+XM_MAX_TIMEOUT=120
+XM_BUDGET=300
+if [ "$FIRE_POINT" -eq 1 ]; then
+    XM_MAX_TIMEOUT=300
+    XM_BUDGET=1800
+fi
+XM_CHILD=""
+
+xm_cleanup() { # stop a running lib child, then restore any journalled mutation
+    if [ -n "$XM_CHILD" ]; then
+        kill -TERM "$XM_CHILD" 2>/dev/null
+        wait "$XM_CHILD" 2>/dev/null
+        XM_CHILD=""
+    fi
+    "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1
+}
+
+stage_exec_mutations() {
+    local xm_key recs log rc
+    if [ -z "$PLAN" ]; then
+        say "SKIP exec-mutations: no plan (ad-hoc path)"
+        return 0
+    fi
+    xm_key=$(git hash-object "$PLAN")
+    cache_hit exec-mutations "$xm_key" && return 0
+
+    recs=$(mktemp "${TMPDIR:-/tmp}/prefire-xm.XXXXXX") || return 3
+    "$XM_LIB" parse --root "$ROOT" "$PLAN" > "$recs" 2>&1; rc=$?
+    if [ "$rc" -eq 1 ]; then
+        say "FAIL exec-mutations: PARSE-FAILED: $(head -1 "$recs"); fix the plan's mutation block" >&2
+        rm -f "$recs"; return 1
+    elif [ "$rc" -ne 0 ]; then
+        say "FAIL exec-mutations: plan-exec-mutations parse exited $rc" >&2
+        rm -f "$recs"; return 3
+    fi
+    if [ ! -s "$recs" ]; then
+        rm -f "$recs"
+        say "SKIP exec-mutations: the plan has no Executable Mutations rows"
+        return 0
+    fi
+    rm -f "$recs"
+    if ! command -v gtimeout >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1; then
+        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout (brew install coreutils)" >&2
+        return 3
+    fi
+
+    log="$STATE_DIR/$TREE.exec-mutations.log"
+    # The lib traps its own signals and reverts. This stage adds two things: it runs the
+    # lib in the background so a signal interrupts `wait` at once (bash defers traps
+    # while a foreground child runs), and it forwards the signal and runs recover itself.
+    trap 'xm_cleanup' EXIT
+    trap 'xm_cleanup; exit 130' INT
+    trap 'xm_cleanup; exit 143' TERM
+    trap 'xm_cleanup; exit 129' HUP
+    "$XM_LIB" run --root "$ROOT" --timeout "$XM_TIMEOUT" --max-timeout "$XM_MAX_TIMEOUT" \
+        --scale 2 --budget "$XM_BUDGET" "$PLAN" > "$log" 2>&1 &
+    XM_CHILD=$!
+    wait "$XM_CHILD"; rc=$?
+    XM_CHILD=""
+    trap - EXIT INT TERM HUP
+    cat "$log"
+
+    if grep -q '^NO-TIMEOUT' "$log"; then
+        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout" >&2
+        return 3
+    fi
+    if [ "$rc" -eq 3 ]; then
+        xm_cleanup
+        say "FAIL exec-mutations: a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
+        return 1
+    fi
+    if [ "$rc" -gt 1 ]; then
+        # The lib died without running its own trap (SIGKILL, OOM), so a mutation may still be
+        # applied and no NEXT-STEP line was printed for the row it was on.
+        xm_cleanup
+        say "FAIL exec-mutations: the mutation script stopped unexpectedly (exit $rc); any planted bug was reverted if recover could. Check git status, then re-run" >&2
+        return 1
+    fi
+    if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then
+        say "FAIL exec-mutations: a row did not trip (exit $rc); follow the NEXT-STEP line under each failing row. Never edit a row's check command or delete a row to get green" >&2
+        return 1
+    fi
+    write_record exec-mutations "$xm_key"
+    say "exec-mutations passed"
+    return 0
+}
+
+# --- run --------------------------------------------------------------------
+case "$STAGE" in
+    all) STAGES="matrix phpunit infection exec-mutations" ;;
+    *)   STAGES="$STAGE" ;;
+esac
+
+for s in $STAGES; do
+    "stage_${s//-/_}"; rc=$?
+    [ "$rc" -eq 0 ] || exit "$rc"
+done
+
+NEW_TREE=$(prefire_tree_hash) || die 3 "cannot recompute the working-tree hash"
+if [ "$NEW_TREE" != "$TREE" ]; then
+    # Drop every record this run wrote for the old tree.
+    rm -f "$STATE_DIR/$TREE".*.pass
+    say "FAIL the checks changed the working tree (${TREE:0:7} -> ${NEW_TREE:0:7}); commit or gitignore the generated files, then re-run" >&2
+    git status --short | head -n 20 >&2
+    exit 4
+fi
+say "all requested stages passed ($STAGES)"
+exit 0

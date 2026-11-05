@@ -29,7 +29,11 @@ from .state import Finding, HarnessError, PlanInfo
 CELLS = (("sonnet-high", "claude-sonnet-5-5", "high"),
          ("opus-high", "claude-opus-5-5", "high"),
          ("opus-max", "claude-opus-5-5", "max"),
-         ("fable-high", "claude-fable-5-1", "high"))
+         ("fable-high", "claude-fable-5-1", "high"),
+         # What production review seats run: review.py picks Sonnet (Opus at deep depth)
+         # and passes no effort, so they inherit effortLevel from ~/.claude/settings.json.
+         ("sonnet-medium", "claude-sonnet-5-5", "medium"),
+         ("opus-medium", "claude-opus-5-5", "medium"))
 BUG_CASES = ("depth-chart-log-after-commit", "playoff-series-invalid-group-by",
              "saved-dc-sum-is-int", "table-dropdown-unencoded-param",
              "team-page-missing-pick-team", "trade-preview-unbounded-cash-years")

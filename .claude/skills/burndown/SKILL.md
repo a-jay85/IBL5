@@ -1,7 +1,7 @@
 ---
 name: burndown
 description: Run an automatic backlog burn-down: rank new issues, pick 5 units (backfilling freed units with further selection rounds), route each item to a plan or an ad-hoc worktree, and start it.
-last_verified: 2026-10-23
+last_verified: 2026-11-04
 ---
 
 # /burndown
@@ -96,6 +96,10 @@ The full output stays in `$W/select.txt`. Only `SKIP` rows and the `LEDGER:` lin
 the transcript. The redirect keeps `rc`, so exit 3 stops the run with stderr shown to
 the user. A pipe into `tee` or `grep` would report that pipe's status and hide the 3.
 Stderr is left unredirected, so `cleared blocked on #N` lines still show.
+
+Selection takes P1 first, then P2 to P4 items that cite website code, then the rest by
+rank. Website code means the `ibl5/` folders classes, modules, themes, migrations, includes, blocks, language, config, jslib and design, plus `.php` files in the `ibl5/` root. Tests, docs and `class-scan:` items do not count. The ledger keeps
+each item's real rank. Rank by severity in step 2 as usual.
 
 Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all
 delta issues are in flight or over budget. Show the SKIP rows and stop. On a later

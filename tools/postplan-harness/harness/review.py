@@ -3,7 +3,7 @@
 Launch gates are the deterministic Phase-3 flags (identical to
 the retired post-plan skill Phase 4 text 4B/4C, ported 2026-10-19). Each retained call is toolless and receives a
 bounded packet: PR metadata + file list + the filtered diff (already <100KB).
-Scoring (4D) is VERIFIER_COUNT tool-enabled Sonnet verifiers voting per finding (drop needs every valid vote to be not-real);
+Scoring (4D) is VERIFIER_COUNT tool-enabled Opus verifiers voting per finding (drop needs every valid vote to be not-real);
 thresholds and posting are deterministic.
 
 Prompt text is condensed from .claude/review-shared/_review-agents.md,
@@ -35,9 +35,9 @@ CODE_THRESHOLD = 80     # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
 
 VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful
-# The "verify-findings", "sonnet" literal pair is pinned by reviewcache.MODEL_PINS.
+# reviewcache.MODEL_PINS pins the verifier purpose/model literal pair assigned below.
 # call_tooled's allowlist is {"opus","sonnet"}; Haiku cannot read code here.
-_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "sonnet"
+_VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "opus"
 VERIFIER_PURPOSES = tuple(f"{_VERIFIER_PURPOSE_STEM}-{i}" for i in range(1, VERIFIER_COUNT + 1))
 VERIFIER_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
 VERIFIER_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
@@ -422,7 +422,7 @@ class ReviewPhase:
         return g
 
     def verify_findings(self, findings: list[Finding], filtered_diff: str) -> list[dict]:
-        """VERIFIER_COUNT tool-enabled Sonnet verifiers vote per finding; returns aggregate records."""
+        """VERIFIER_COUNT tool-enabled Opus verifiers vote per finding; returns aggregate records."""
         seat_votes = [{"votes": {}, "errors": {}} for _ in range(VERIFIER_COUNT)]
         if not findings:
             return []

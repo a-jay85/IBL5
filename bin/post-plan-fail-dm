@@ -11,7 +11,7 @@
 #
 #   - No live interactive Claude session in the worktree -> DM now. Nobody else will fix it.
 #   - A live interactive session in the worktree         -> hold the DM for FAILDM_DELAY seconds
-#     (default 900) in a detached launchd job. When it wakes, a newer
+#     (default 900) in a detached job submitted through ljob_submit. When it wakes, a newer
 #     post-plan-now log for the same branch means someone re-fired, so it stays
 #     silent (that newer run DMs on its own if it fails too). No newer log means
 #     the session did not act, so the DM goes out.
@@ -27,7 +27,7 @@
 #   bin/post-plan-fail-dm --deferred <root> <safe-slug> <log> <message>   (the held job)
 #
 # Env (tests): FAILDM_DELAY, FAILDM_REGISTRY, FAILDM_DM_CMD, FAILDM_LAUNCHCTL,
-# FAILDM_PLIST_DIR, FAILDM_LOG_DIR.
+# FAILDM_LOG_DIR.
 
 if [ "${1:-}" = "--help" ]; then
     cat <<'EOF'
@@ -35,10 +35,10 @@ Usage: bin/post-plan-fail-dm [--deferred] <root> <safe-slug> <log> <message>
 
 Send (or hold) the Discord DM for a post-plan harness exit 3.
 If a live interactive Claude session is detected in the worktree, holds the
-DM for FAILDM_DELAY seconds via a detached launchd job; sends immediately
+DM for FAILDM_DELAY seconds via a job submitted through ljob_submit; sends immediately
 otherwise. Headless sessions (claude -p / --print) do not count.
 
-  --deferred   Run as the held launchd job (wakes after FAILDM_DELAY seconds)
+  --deferred   Run as the held job (wakes after FAILDM_DELAY seconds)
   root         Worktree root directory
   safe-slug    Branch slug (safe for filenames)
   log          Path to the post-plan-now log file
@@ -49,7 +49,6 @@ Env:
   FAILDM_REGISTRY  Session registry path
   FAILDM_DM_CMD    Override discord-dm binary path
   FAILDM_LAUNCHCTL Override launchctl binary path
-  FAILDM_PLIST_DIR Override LaunchAgents directory
   FAILDM_LOG_DIR   Override log directory
 
 Exit codes:
@@ -72,11 +71,13 @@ ROOT=$1 SAFE_SLUG=$2 LOG=$3 MSG=$4
 SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
 # shellcheck source=bin/lib/dm.sh
 . "$(dirname "$SELF")/lib/dm.sh"
+# shellcheck source=bin/lib/launchd-job.sh
+. "$(dirname "$SELF")/lib/launchd-job.sh"
 DELAY=${FAILDM_DELAY:-900}
 REGISTRY=${FAILDM_REGISTRY:-$HOME/.claude/session-registry/active.json}
 DM_CMD=$(dm_bin "$ROOT/bin" FAILDM_DM_CMD)
-LAUNCHCTL=${FAILDM_LAUNCHCTL:-launchctl}
-PLIST_DIR=${FAILDM_PLIST_DIR:-$HOME/Library/LaunchAgents}
+# ljob_submit reads LAUNCHCTL_CMD. FAILDM_LAUNCHCTL stays the test seam.
+LAUNCHCTL_CMD=${FAILDM_LAUNCHCTL:-${LAUNCHCTL_CMD:-launchctl}}
 LOG_DIR=${FAILDM_LOG_DIR:-$(dirname "$LOG")}
 
 send_dm() {
@@ -130,14 +131,6 @@ newer_run_exists() {
     return 1
 }
 
-xml_escape() {
-    local s=$1
-    s=${s//&/&amp;}; s=${s//</&lt;}; s=${s//>/&gt;}
-    printf '%s' "$s"
-}
-
-shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-
 if [ "$DEFERRED" -eq 1 ]; then
     trap 'rm -f "$STAMP"' EXIT
     if newer_run_exists; then
@@ -157,39 +150,27 @@ fi
 
 LOG_BASE=$(basename "$LOG" .log)
 LABEL="com.ibl5.postplan-faildm-${LOG_BASE#post-plan-now-}"
-PLIST="$PLIST_DIR/$LABEL.plist"
-JOB="sleep $DELAY; FAILDM_DELAY=$(shq "$DELAY") FAILDM_DM_CMD=$(shq "$DM_CMD") FAILDM_LOG_DIR=$(shq "$LOG_DIR") $(shq "$SELF") --deferred $(shq "$ROOT") $(shq "$SAFE_SLUG") $(shq "$LOG") $(shq "$MSG"); rm -f $(shq "$PLIST"); launchctl bootout gui/\$(id -u)/$LABEL"
+SCRIPT="$LOG_DIR/postplan-faildm-${LOG_BASE#post-plan-now-}.sh"
 
 touch "$STAMP"
-mkdir -p "$PLIST_DIR"
-cat > "$PLIST" <<PLIST_EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>$(xml_escape "$LABEL")</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/bash</string>
-		<string>-lc</string>
-		<string>$(xml_escape "$JOB")</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>StandardOutPath</key>
-	<string>$(xml_escape "$LOG")</string>
-	<key>StandardErrorPath</key>
-	<string>$(xml_escape "$LOG")</string>
-</dict>
-</plist>
-PLIST_EOF
+SCRIPT_Q=$(shq "$SCRIPT")
+{
+    printf '#!/bin/bash\n'
+    # Delete this file first: bash keeps reading from the open fd, and a kill
+    # during the hold then leaves no script behind.
+    printf 'rm -f %s\n' "$SCRIPT_Q"
+    printf 'sleep %s\n' "$(shq "$DELAY")"
+    printf 'FAILDM_DELAY=%s FAILDM_DM_CMD=%s FAILDM_LOG_DIR=%s %s --deferred %s %s %s %s\n' \
+        "$(shq "$DELAY")" "$(shq "$DM_CMD")" "$(shq "$LOG_DIR")" "$(shq "$SELF")" \
+        "$(shq "$ROOT")" "$(shq "$SAFE_SLUG")" "$(shq "$LOG")" "$(shq "$MSG")"
+} > "$SCRIPT"
+chmod 700 "$SCRIPT"
 
-if "$LAUNCHCTL" bootstrap "gui/$(id -u)" "$PLIST" 2>/dev/null; then
+if ljob_submit "$LABEL" "$LOG" "$SCRIPT" 2>/dev/null; then
     echo "post-plan-fail-dm: a Claude session is live in $ROOT; DM held $(( DELAY / 60 )) min (job $LABEL)."
 else
     # Could not schedule the hold: fall back to the old behavior rather than lose the alert.
-    rm -f "$PLIST" "$STAMP"
+    rm -f "$SCRIPT" "$STAMP"
     send_dm "$MSG"
     echo "post-plan-fail-dm: could not schedule the hold; DM sent now."
 fi

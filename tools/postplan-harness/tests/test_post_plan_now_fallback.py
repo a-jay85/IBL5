@@ -336,6 +336,7 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
                PATH=f"{shim}:{os.environ['PATH']}")
     env.pop("POST_PLAN_SKILL", None)
     env.pop("FAKE_PR_NUMBER", None)
+    env.pop("POSTPLAN_FIRED_BY", None)
     env.update(extra_env or {})
     repo = _fixture_repo(tmp_path, dirty_default=dirty is None, dirty=dirty)
     return subprocess.run(["bash", PPN, *args], cwd=repo, env=env,

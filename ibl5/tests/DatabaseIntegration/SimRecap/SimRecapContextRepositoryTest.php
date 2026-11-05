@@ -322,6 +322,8 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
         self::assertSame(85, $games[0]['home_score']);
         self::assertSame('Cees', $games[0]['visitor_name']);
         self::assertNull($games[0]['home_name']);
+        self::assertSame('Cees City', $games[0]['visitor_city']);
+        self::assertSame('Dees City', $games[0]['home_city']);
         self::assertSame('2031-02-03', $games[0]['game_date']);
         self::assertSame(2031, $games[0]['season_year']);
 
@@ -518,6 +520,7 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
 
         self::assertSame([999161, 999162], array_column($standings, 'teamid'));
         self::assertSame('Ayes', $standings[0]['name']);
+        self::assertSame('Ayes City', $standings[0]['city']);
         self::assertSame(50, $standings[0]['wins']);
         self::assertSame(10, $standings[0]['losses']);
         self::assertSame('W3', $standings[0]['streak']);

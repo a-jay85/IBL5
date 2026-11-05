@@ -71,7 +71,7 @@ def test_verdict_line_rebased_held():
     res = _res(TerminalState.REBASED_HELD, rebase_only={"noop": False, "hold": "7,8"})
     line = runner.verdict_line(res, 0)
     assert "terminal=rebased-held" in line
-    assert "merged origin/master and pushed" in line
+    assert "rebased onto origin/master and pushed" in line
     assert "auto-merge not armed" in line
     assert "prior hold 7,8" in line
     noop = _res(TerminalState.REBASED_HELD, rebase_only={"noop": True, "hold": "3"})
@@ -557,3 +557,72 @@ run_bounded(["bash", {str(child)!r}], step="probe", timeout=120)
 
 def test_precommit_hang_exits_3():
     assert runner.exit_code_for(_res(TerminalState.FAILED, "precommit-hang")) == 3
+
+
+class _SyncGit:
+    """Phase 2 sync double: HEAD moves on rebase_onto when `moves` is set; push is counted."""
+    last_conflict_rung = ""
+    last_conflict_fix_summary = ""
+    last_conflict_files = ()
+
+    def __init__(self, target="origin/master", moves=True, conflict=False):
+        self.target, self.moves, self.conflict = target, moves, conflict
+        self.sha = "aaa"
+        self.pushes = 0
+        self.rebased_onto = []
+
+    def merge_target(self):
+        return self.target
+
+    def head(self):
+        return self.sha
+
+    def branch(self):
+        return "feat"
+
+    def fetch_base(self, base):
+        pass
+
+    def rebase_onto(self, base="origin/master"):
+        self.rebased_onto.append(base)
+        if self.conflict:
+            raise HarnessError("rebase-conflict", "CONFLICT (content)")
+        if self.moves:
+            self.sha = "bbb"
+
+    def autoresolve_stacked_rebase(self):
+        return type("R", (), {"resolved": False, "reason": "declined"})()
+
+    def push(self):
+        self.pushes += 1
+
+
+def test_phase2_rebase_line_names_sync_target():
+    logs = []
+    moved = _SyncGit(target="origin/parent-branch", moves=True)
+    sha, line = runner._phase2_rebase(
+        moved, RunResult(terminal=TerminalState.FAILED), logs.append)
+    assert sha == "bbb"
+    assert line == "REBASE=rebased onto origin/parent-branch"
+    assert moved.rebased_onto == ["origin/parent-branch"]
+    assert "phase2: rebased onto origin/parent-branch" in logs
+
+    master = _SyncGit(moves=True)
+    assert runner._phase2_rebase(master, RunResult(terminal=TerminalState.FAILED),
+                                 lambda *_a: None)[1] == "REBASE=rebased onto origin/master"
+
+    still = _SyncGit(target="origin/parent-branch", moves=False)
+    assert runner._phase2_rebase(still, RunResult(terminal=TerminalState.FAILED),
+                                 lambda *_a: None)[1] == \
+        "REBASE=clean (HEAD already contains origin/master)"
+
+
+def test_phase2_conflict_exits_3_without_push():
+    git = _SyncGit(conflict=True)
+    res = RunResult(terminal=TerminalState.FAILED)
+    with pytest.raises(HarnessError) as exc:
+        runner._phase2_rebase(git, res, lambda *_a, **_k: None)
+    assert exc.value.kind == "rebase-conflict"
+    res.error_kind = exc.value.kind
+    assert runner.exit_code_for(res) == 3
+    assert git.pushes == 0

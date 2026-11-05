@@ -459,6 +459,8 @@ def restore_from_record(cwd: str, rec: dict, session_id: str) -> str | None:
         return "head-moved"
     if cur.ops:
         return "op-in-progress"
+    if cur.tree == rec["pre_tree"]:
+        return None  # discard_for_resume already ran; nothing left to restore
     if cur.tree != rec["post_tree"]:
         return "tree-mismatch"
     # Same shape as gatefix.revert's tree half: restore M/D/T from the pre-spawn tree
@@ -481,3 +483,20 @@ def restore_from_record(cwd: str, rec: dict, session_id: str) -> str | None:
     if after is None or after.tree != rec["pre_tree"]:
         return "restore-unverified"
     return None
+
+
+def discard_for_resume(cwd: str) -> str:
+    """Discard this session's recorded edit before bin/post-plan-now's pre-fire gate.
+
+    The gate must judge the tree the resumed run will ship. Otherwise a half-done edit
+    fails the gate on every resume and the harness never reaches its own discard. The
+    record stays on disk for the harness to clear. Returns "discarded", or why nothing
+    was discarded (a refusal leaves the worktree untouched, and the harness refuses too).
+    """
+    ctx, why = context_from_env()
+    if ctx is None:
+        return why
+    status, rec = pause_record_load(ctx)
+    if status != "ok" or rec is None:
+        return status
+    return restore_from_record(cwd, rec, ctx.session_id) or "discarded"

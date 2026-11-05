@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -48,7 +48,7 @@ branch; it survives you closing Claude Code. Engine selection:
   purpose. Visual Regression stays red until a human applies the `update-baselines` label, which
   regenerates it in CI. The harness never adds that label. For the baseline,
   once every other conflicted file resolves, the harness takes master's copy, runs
-  `bin/regen-baselines` on the merged tree and commits the output in the merge commit. It then
+  `bin/regen-baselines` on the merged tree and commits the output in the replay. It then
   rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
   proof checks every other file unchanged. A generator that fails, times out or writes a file
   outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
@@ -69,7 +69,7 @@ branch; it survives you closing Claude Code. Engine selection:
   `postplan: conflict flag dropped as stale`. A marker whose commit is still in history
   keeps the hold until a `CONFLICT-REVIEW=CLEAN` verdict exists for the current head.
   Detail and the empty-marker rule: `tools/postplan-harness/README.md` § Safety model.
-  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, merges `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, commits the merge locally, and prints the `bin/post-plan-now` paste line. It never pushes. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, rebases onto `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, leaves the rebased commit locally, and prints the `bin/post-plan-now` paste line. It never pushes. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
   `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
   worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
   one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
@@ -126,9 +126,7 @@ suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming 
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
 § Rebase-only mode.
 
-**Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once, and the harness proves and reviews the merge before it pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot merge is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean merge writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot merge in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
-
-**Closer arm.** An A/B trial: `tools/postplan-harness/README.md` § Closer A/B.
+**Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once, and the harness proves and reviews the rebase before it pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot rebase is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean rebase writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot rebase in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
 
 ## What `--auto` adds
 

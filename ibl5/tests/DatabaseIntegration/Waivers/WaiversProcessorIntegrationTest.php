@@ -136,7 +136,8 @@ class WaiversProcessorIntegrationTest extends DatabaseTestCase
 
         $result = $processor->processAdd($pid, 'Metros', 1, 4, \League\League::HARD_CAP_MAX);
 
-        $this->assertSame(['success' => true, 'result' => 'player_added'], $result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('player_added', $result['result'] ?? '');
 
         $player = $this->playerLookupRepository->getPlayerByID($pid);
         $this->assertNotNull($player);

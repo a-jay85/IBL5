@@ -10,6 +10,7 @@ use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Waivers\Contracts\WaiversRosterSlotCounterInterface;
+use Waivers\Contracts\WaiversTeamLockInterface;
 
 /**
  * @see WaiversSubmissionServiceInterface
@@ -21,19 +22,22 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
     private readonly Season $season;
     private readonly WaiversRosterSlotCounterInterface $slotCounter;
     private readonly TeamIdentityRepositoryInterface $teamIdentityRepo;
+    private readonly WaiversTeamLockInterface $teamLock;
 
     public function __construct(
         WaiversProcessorInterface $processor,
         SalaryCapRepositoryInterface $salaryCapRepo,
         Season $season,
         WaiversRosterSlotCounterInterface $slotCounter,
-        TeamIdentityRepositoryInterface $teamIdentityRepo
+        TeamIdentityRepositoryInterface $teamIdentityRepo,
+        WaiversTeamLockInterface $teamLock
     ) {
         $this->processor = $processor;
         $this->salaryCapRepo = $salaryCapRepo;
         $this->season = $season;
         $this->slotCounter = $slotCounter;
         $this->teamIdentityRepo = $teamIdentityRepo;
+        $this->teamLock = $teamLock;
     }
 
     /**
@@ -59,18 +63,39 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
         if ($teamID === null) {
             return ['success' => false, 'error' => 'Unable to determine your team.'];
         }
-        $slots = $this->slotCounter->countOpenSlots($teamID, $this->season);
+        // backlog#1570 — count, salary, and write run under one same-team row lock, so two
+        // simultaneous submissions from one team cannot both pass the full-roster check.
+        // Mail and Discord run after this returns, so a slow mail server never holds the lock.
+        $result = $this->teamLock->withTeamLock(
+            $teamID,
+            function () use ($teamID, $teamName, $action, $playerID): array {
+                $slots = $this->slotCounter->countOpenSlots($teamID, $this->season);
 
-        // Backlog 13.14 — during phases that advance the contract year (Playoffs, Draft,
-        // Free Agency) the live cap basis is next_year_salary, not current_salary.
-        $totalSalary = $this->season->advancesContractYears()
-            ? $this->salaryCapRepo->getTeamNextYearSalary($teamName)
-            : $this->salaryCapRepo->getTeamTotalSalary($teamName);
+                // Backlog 13.14 — during phases that advance the contract year (Playoffs, Draft,
+                // Free Agency) the live cap basis is next_year_salary, not current_salary.
+                $totalSalary = $this->season->advancesContractYears()
+                    ? $this->salaryCapRepo->getTeamNextYearSalary($teamName)
+                    : $this->salaryCapRepo->getTeamTotalSalary($teamName);
 
-        if ($action === 'waive') {
-            return $this->processor->processDrop($playerID, $teamName, $slots['open'], $totalSalary);
+                if ($action === 'waive') {
+                    return $this->processor->processDrop($playerID, $teamName, $slots['open'], $totalSalary);
+                }
+
+                return $this->processor->processAdd($playerID, $teamName, $slots['open'], $slots['healthy'], $totalSalary);
+            }
+        );
+
+        if ($result === null) {
+            return ['success' => false, 'error' => 'Unable to determine your team.'];
         }
 
-        return $this->processor->processAdd($playerID, $teamName, $slots['open'], $slots['healthy'], $totalSalary);
+        $notification = $result['notification'] ?? null;
+        unset($result['notification']);
+
+        if ($result['success'] && $notification !== null) {
+            $this->processor->finishCommittedMove($notification);
+        }
+
+        return $result;
     }
 }

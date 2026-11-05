@@ -130,6 +130,16 @@ def test_run_passes_adaptive_flags(tmp_path):
         assert argv[argv.index(flag) + 1] == val
 
 
+def test_next_step_lines_are_not_results(tmp_path):
+    repo, plan = _repo(tmp_path)
+    for verdict, holds in (("TRIPPED row 1 — ok", False), ("HELD row 1 — survived", True)):
+        lib = _stub(tmp_path, ONE_RECORD + f'\nrun) echo "{verdict}"; echo "NEXT-STEP row 1 — some hint"; exit {1 if holds else 0} ;;')
+        report = run_executable_mutations(plan, repo, lib=lib)
+        assert len(report.results) == 1
+        assert report.results[0].kind == verdict.split()[0]
+        assert bool(report.holding) is holds
+
+
 def test_outer_bound_is_budget_based(tmp_path, monkeypatch):
     import harness.mutations as m
     seen = {}

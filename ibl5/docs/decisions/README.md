@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 ---
 
 # IBL5 Architecture Decision Records
@@ -96,6 +96,8 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
 | [0225](0225-update-baselines-caller-workflow.md) | Update-baselines regen runs from a caller workflow | Accepted | `.github/workflows/update-baselines.yml` calls `e2e-tests.yml`, which no longer triggers on `labeled`, so a label event cannot re-post the required `E2E Tests` check; `bin/check-composite-contracts` L1 and L2 pin it. |
 | [0226](0226-plan-tier-hint-open-judgment.md) | Open Opus judgment for the /plan architect tier | Accepted | `bin/plan-tier-hint` asks one open Opus 5.5 question with no trigger list, prints `default` on any failure, and logs every verdict; it supersedes ADR-0222. |
+| [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
+| [0228](0228-postplan-sync-rebases-onto-target.md) | Post-plan sync rebases onto the target | Accepted | The harness Phase 2 sync replays the branch's own commits with `git rebase --onto`, pushes with `--force-with-lease=refs/heads/<b>:<sha>`, and fails closed. Supersedes ADR-0064's fix advice in part. |
 
 ## When an ADR is Required
 

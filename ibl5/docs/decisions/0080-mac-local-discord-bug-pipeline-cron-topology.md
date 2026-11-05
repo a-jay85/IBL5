@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-10-23
+last_verified: 2026-11-04
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -129,6 +129,9 @@ does not exist yet is left alone so the prod dump still creates it. The conditio
 the `schema_migrations` backfill copies prod's applied-migration list, so `bin/db-migrate` treats
 migrations 153 and 158 as already done and skips them; an unconditionally-excluded table would
 therefore never be created by anything.
+
+`ibl_bug_report_operator_context` (ADR-0213, migration 198) joined the list later as its sixth table.
+`bin/test-db-sync-prod-argv` now fails when a migration creates an `ibl_bug_*` table the list omits.
 
 Deliberate trade-off: preserving `ibl_api_keys` wholesale means prod key changes no longer
 propagate to local. API keys are per-environment credentials, so a local mirror of prod's keys was

@@ -72,29 +72,29 @@ def _no_index_lock(d):
     return not os.path.exists(os.path.join(d, ".git", "index.lock"))
 
 
-def test_merge_hang_raises_subprocess_timeout_naming_git_merge(monkeypatch):
+def test_sync_rebase_hang_raises_subprocess_timeout(monkeypatch):
     d, key, branch, _shas, _master = _make_clean_repo()
     try:
-        _hang_on(monkeypatch, "merge", "--no-edit")
+        _hang_on(monkeypatch, "rebase", "--onto")
         start = time.monotonic()
         with pytest.raises(HarnessError) as ei:
             LiveGit(d).rebase_onto()
         # The -c rerere pair must not leak into the step name.
-        _assert_timeout(ei, "git merge", start)
+        _assert_timeout(ei, "git rebase", start)
         assert _no_index_lock(d)
     finally:
         _cleanup_full(key, branch, d)
 
 
-def test_merge_abort_hang_in_no_llm_conflict_path_raises_timeout(monkeypatch):
+def test_sync_rebase_abort_hang_in_no_llm_conflict_path_raises_timeout(monkeypatch):
     d, _base, _master, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)
     try:
-        _hang_on(monkeypatch, "merge", "--abort")
+        _hang_on(monkeypatch, "rebase", "--abort")
         start = time.monotonic()
         with pytest.raises(HarnessError) as ei:
-            LiveGit(d).rebase_onto()   # no llm: conflict -> immediate merge --abort
-        _assert_timeout(ei, "git merge", start)
+            LiveGit(d).rebase_onto()   # no llm: conflict -> immediate rebase --abort
+        _assert_timeout(ei, "git rebase", start)
     finally:
         _cleanup_full(key, branch, d)
 

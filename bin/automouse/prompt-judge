@@ -11,6 +11,8 @@ Branch HEAD when the runner spawned you: {{HEAD_SHA}}
 
 Never edit, create, or delete a tracked file. Never run `git commit`, `git push`, `git reset`, `git checkout`, or `git stash`. Never call `gh`. Never spawn an Agent. You may Read, Grep, run `git diff`, `git log` and `git show`, and run the plan's own test commands read-only.
 
+Run every command in the foreground and wait for it. Never use `run_in_background` or Monitor. Print mode ends your session as soon as you end your turn, so a turn that ends with "waiting for" something loses your verdict and counts as a failure. Pass a Bash `timeout` of 600000 for slow test runs. If a run still cannot finish, end with `JUDGE_VERDICT: fail` and name the run.
+
 Run `git rev-parse HEAD` first. If it differs from {{HEAD_SHA}}, end with `JUDGE_VERDICT: fail` and the reason `head moved`.
 
 Do not read the plan file whole. Run `bin/plan-index {{PLAN_PATH}}` and read only the sections you need with `sed -n 'START,ENDp'`.

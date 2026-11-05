@@ -10,6 +10,8 @@
 #
 # Run: bin/test-check-plan  (exit 0 = all pass, 1 = a case failed)
 #      bin/test-check-plan gate13  (only the gate 13 block, for plan mutation checks)
+#      bin/test-check-plan matrix-split  (only the gate XM block, whose verdicts need matrix_split)
+#      bin/test-check-plan gateSD  (only the gate [SD] block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # are literal markdown code spans, not command substitution — single quotes are
@@ -23,7 +25,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$SCRIPT_DIR/check-plan"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
-# Case filter: empty runs every case; `gate13` skips the cases outside gate 13.
+# Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
+# `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
+# [SD] cases and exits.
 TCP_ONLY="${1:-}"
 
 # Inline checks further below still set FAILED=1 directly; h_done reads it.
@@ -158,6 +162,137 @@ CF_MATRIX='
 | 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
 
+# ---------------------------------------------------------------------------
+# Gate [SD]: undeclared security deferral. Placed ahead of the gate13 guard so
+# `bin/test-check-plan gateSD` runs these cases alone; `gate13` skips them.
+# Case 1 copies the PR #3695 plan's ## Out of Scope bullet shape.
+# ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateSD ]; then
+assert_viol "gate-SD-3695-shape-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** The approval route compares body `reactor_id` with the operator snowflake and has no service-key tier check, so any valid API key can approve as the operator. Fixing it is left for a separate PR.
+'
+assert_viol "gate-SD-non-goals-auth-gap-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Non-Goals
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-backlog-ref-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** It has no service-key tier check, so any valid API key can approve as the operator. Filed as a-jay85/IBL5-backlog#1571.
+'
+assert_viol "gate-SD-wrong-repo-ref-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Any valid API key can approve as the operator. Filed as a-jay85/IBL5#1571.
+'
+assert_viol "gate-SD-declared-section-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+- a-jay85/IBL5-backlog#1571 — `ReactionController` has no service-key tier check; any valid API key can approve as the operator
+'
+assert_viol "gate-SD-declared-section-bare-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+- `ReactionController` tier gate, fix in a separate PR
+'
+assert_viol "gate-SD-declared-numbered-bare-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+1. `ReactionController` tier gate, fix in a separate PR
+'
+assert_viol "gate-SD-lowercase-scope-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-lowercase-declared-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Deferred security gaps
+- `ReactionController` tier gate, fix in a separate PR
+'
+assert_viol "gate-SD-hyphenated-scope-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out-of-Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-spaced-non-goals-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Non Goals
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-singular-non-goal-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Non-Goal
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-h3-out-of-scope-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+### Out of Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-h3-non-goals-heading-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+### Non-Goals
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-h3-section-ends-at-sibling-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+### Out of Scope
+- The wake endpoint response format.
+### Threat model
+- Any valid API key can read that format today, and that is the intended contract.
+'
+assert_viol "gate-SD-fenced-h3-keeps-h2-section-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+```
+### Out of Scope
+```
+### Wake endpoint
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-near-miss-heading-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Outside Scope
+- Leave the wake endpoint auth gap for a separate PR.
+'
+assert_viol "gate-SD-wrapped-exposure-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Fixing it is left for a separate PR,
+  because any valid API key can approve as the operator.
+'
+assert_viol "gate-SD-phrase-split-by-wrap-fires" 1 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Today any valid API
+  key works on this route. Fixing it is left for a separate PR.
+'
+assert_viol "gate-SD-wrapped-ref-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- **Tier gate on `ReactionController`.** Any valid API key can approve as the operator.
+  Filed as a-jay85/IBL5-backlog#1571.
+'
+assert_viol "gate-SD-wrapped-declared-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Deferred Security Gaps
+- a-jay85/IBL5-backlog#1571 —
+  `ReactionController` has no service-key tier check
+'
+assert_viol "gate-SD-paragraph-after-blank-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- The wake endpoint response format.
+
+Any valid API key can read that format today, and that is the intended contract.
+'
+assert_viol "gate-SD-next-section-not-joined-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- The wake endpoint response format.
+## Non-Goals
+Any valid API key can read that format today, and that is the intended contract.
+'
+assert_viol "gate-SD-preservation-note-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Out of Scope
+- CSRF handling and the auth guard stay in the controller; no authorization change.
+- Security review of the API keys page is unchanged.
+'
+assert_viol "gate-SD-fenced-example-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+```
+## Out of Scope
+- Any valid API key can approve as the operator.
+```
+'
+assert_viol "gate-SD-outside-scope-heading-clean" 0 "[SD]" "$FM$CF_MATRIX"'
+## Approach
+Today any valid API key can approve as the operator; this PR adds the tier check.
+'
+fi
+[ "$TCP_ONLY" != gateSD ] || h_done
+
+if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
@@ -4006,6 +4141,8 @@ assert_viol "gateG-non-bin-command-ok" 0 '[G]' "$FM"'
 | 1 | run something | CLI-executable | post-impl | curl + bin/db-query |
 '
 
+fi
+
 # ---------------------------------------------------------------------------
 # Gate XM: executable mutation claims (ADR-0199). The grammar lives in
 # bin/lib/plan-exec-mutations; these fixtures pin the gate's wiring. Fixture
@@ -4060,6 +4197,53 @@ assert_viol "xm-check-override-not-runnable" 1 'check override is not runnable' 
 
 $(xm_block bin/check-docs 'Phase 3')
 "
+
+assert_viol "xm-check-tmp-override-rejected" 1 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash /tmp/x')
+"
+
+assert_viol "xm-check-tmp-names-row" 1 '[XM] row 1: check references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash /tmp/x')
+"
+
+assert_viol "xm-check-repo-path-ok" 0 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs 'bash bin/check-docs')
+"
+
+assert_viol "xm-check-tmp-matrix-cell-rejected" 1 'references a /tmp/ path' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | corpus run (one-time-check: corpus diff against the tmp fixture) | CLI-executable | post-impl | `bash /tmp/ro-corpus` |
+
+## Executable Mutations
+
+'"$(xm_block bin/check-docs)
+"
+
+_xm_i=0
+for _xm_ok in 'bash ibl5/tmp/x' 'bash tmp-cleanup' 'bash ${TMPDIR:-/tmp}/x'; do
+    _xm_i=$((_xm_i + 1))
+    assert_viol "xm-check-tmp-near-miss-ok-$_xm_i" 0 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs "$_xm_ok")
+"
+done
+
+_xm_i=0
+for _xm_bad in '--out=/tmp/x' 'bash /private/tmp/x' 'bin/check-docs > /tmp/log'; do
+    _xm_i=$((_xm_i + 1))
+    assert_viol "xm-check-tmp-variant-rejected-$_xm_i" 1 'references a /tmp/ path' "$FM$XM_MATRIX
+## Executable Mutations
+
+$(xm_block bin/check-docs "$_xm_bad")
+"
+done
 
 assert_viol "xm-legacy-silent" 0 '[XM]' "$FM"'| # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
@@ -4155,6 +4339,7 @@ if [ "$XM_SURV_RC" -eq 0 ] \
 else
     h_fail "xm-gate-survival" "expected a clean run, got exit $XM_SURV_RC: $XM_SURV_OUT"
 fi
+[ "$TCP_ONLY" != matrix-split ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate V: a CLI-executable row's location cell must be ONE runnable command.

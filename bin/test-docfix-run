@@ -134,9 +134,14 @@ case "$1 $2" in
 esac
 exit 0
 H
-    # bootstrap exits SHIM_LAUNCHCTL_BOOTSTRAP_RC (default 0): the docfix abort-trap seam.
-    printf '#!/usr/bin/env bash\n[ "$1" = bootstrap ] && exit "${SHIM_LAUNCHCTL_BOOTSTRAP_RC:-0}"\nexit 0\n' \
-        > "$SB/shim/launchctl"
+    # Records one "--- call" line, then one argv element per line. A submit
+    # exits with the number in $SB/launchctl.submit_rc when that file exists.
+    cat > "$SB/shim/launchctl" <<SHIM_EOF
+#!/usr/bin/env bash
+{ printf '%s\n' '--- call'; printf '%s\n' "\$@"; } >> "$SB/launchctl.argv"
+if [ "\$1" = submit ] && [ -f "$SB/launchctl.submit_rc" ]; then exit "\$(cat "$SB/launchctl.submit_rc")"; fi
+exit 0
+SHIM_EOF
     chmod +x "$SB/shim/git" "$SB/shim/gh" "$SB/shim/launchctl"
     printf '%s' "$SB"
 }
@@ -178,12 +183,15 @@ W
 # Inherited env: SHIM_PR_UNARMED, SHIM_GH_FAIL (set as caller env-prefix vars).
 run_docfix() {
     local SB="$1"
+    # SHIM_LAUNCHCTL_SUBMIT_RC=N makes the launchctl shim's submit exit N (abort-trap seam).
+    if [ "${SHIM_LAUNCHCTL_SUBMIT_RC:-0}" != 0 ]; then
+        printf '%s\n' "$SHIM_LAUNCHCTL_SUBMIT_RC" > "$SB/launchctl.submit_rc"
+    fi
     IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
         SHIM_BRANCH_OUT="$2" SHIM_PR_OPEN="$3" \
         SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
         SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
         SHIM_WTNEW_COMMIT="${SHIM_WTNEW_COMMIT:-}" SHIM_WTNEW_DIRTY="${SHIM_WTNEW_DIRTY:-}" \
-        SHIM_LAUNCHCTL_BOOTSTRAP_RC="${SHIM_LAUNCHCTL_BOOTSTRAP_RC:-0}" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
     local RC=$?
     runner_of "$SB" >/dev/null 2>&1 || true   # register the runner for exit-time cleanup
@@ -213,74 +221,97 @@ run_health() {
         "$REAL_POLL" --health-report "$ISSUE" 2>/dev/null
 }
 
-plist_of() { ls "$1/home/Library/LaunchAgents/"*.plist 2>/dev/null | head -1; }
-# runner_of "$SB" -> path of the runner script the plist execs (ProgramArguments[2] = "exec <path>").
-# Runner files land in real /tmp (LOG is /tmp/...), so every path handed out is logged
-# and removed at exit.
+# Number of `launchctl submit` calls recorded in sandbox $1.
+submit_count() {
+    local n
+    n="$(grep -cx 'submit' "$1/launchctl.argv" 2>/dev/null || true)"
+    printf '%s\n' "${n:-0}"
+}
+# Element after flag $2 in the first submit call of sandbox $1 (-l label, -o/-e log).
+submit_arg() {
+    awk -v f="$2" '$0=="--- call"{n=0; insub=0; p=0; next} {n++} n==1{insub=($0=="submit"); next} insub && p{print; exit} insub{p=($0==f)}' "$1/launchctl.argv" 2>/dev/null
+}
+# Every argv element after `submit` in the first submit call of sandbox $1, one per line.
+submit_call() {
+    awk '$0=="--- call"{if(s)exit; n=0; next} {n++} n==1 && $0=="submit"{s=1; next} s{print}' "$1/launchctl.argv" 2>/dev/null
+}
+# Last argv element of the first submit call: the wrapper text bash -lc runs.
+submit_wrapper() { awk '$0=="--- call"{if(s)exit; buf=""; next} $0=="submit"{s=1} s{last=$0} END{print last}' "$1/launchctl.argv" 2>/dev/null; }
+# runner_of "$SB" -> path of the runner script the submit launches: the launcher names it
+# "${LOG%.log}.sh" and LOG is the -o value. Runner files land in real /tmp (LOG is /tmp/...),
+# so every path handed out is logged and removed at exit.
 RUNNERS_SEEN="$(mktemp)"
 trap 'xargs rm -f < "$RUNNERS_SEEN" 2>/dev/null; rm -f "$RUNNERS_SEEN"' EXIT
+# Real-agents-dir leak guard (same idea as unit 1's guard in bin/test-plan-now,
+# scoped to the three launchers converted in this unit). Captured before any
+# HOME override; compared at the end of the file.
+REAL_AGENTS="$HOME/Library/LaunchAgents"
+real_agents_names() {
+    find "$REAL_AGENTS" -maxdepth 1 -type f \
+        \( -name 'com.ibl5.docfix-run-*' -o -name 'com.ibl5.pr-cycle-*' \
+           -o -name 'com.ibl5.postplan-faildm-*' \) 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
 runner_of() {
-    local P R
-    P="$(plist_of "$1")"; [ -n "$P" ] || return 1
-    R=$(python3 -I -c 'import plistlib,sys
-a=plistlib.load(open(sys.argv[1],"rb"))["ProgramArguments"]
-assert a[:2]==["/bin/bash","-lc"] and a[2].startswith("exec "), a
-print(a[2][5:])' "$P") || return 1
-    printf '%s\n' "$R" >> "$RUNNERS_SEEN"
-    printf '%s\n' "$R"
+    local log; log="$(submit_arg "$1" -o)"
+    [ -n "$log" ] || return 1
+    printf '%s\n' "${log%.log}.sh" | tee -a "$RUNNERS_SEEN"
 }
 plan_of()  { ls "$1/home/claude-plans/docs-stale-refresh-"*.md 2>/dev/null | head -1; }
 
 # --- Cases 1-5: bin/docfix-run launcher ----------------------------------------
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
-P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"; R="$(runner_of "$SB")"
+PLAN="$(plan_of "$SB")"; R="$(runner_of "$SB")"
 { [ -n "$R" ] && grep -q "cd '$SB/wts/docs-stale-refresh-[^/']*' && CLAUDE_HEADLESS=1" "$R" \
     && grep -q 'Closes #4242' "$R" \
     && grep -q 'ibl5/docs/foo.md,README.md' "$R" \
     && grep -q 'claude-sonnet-5-5' "$R"; } \
   && ok "(1) runner carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
   || bad "(1) runner composition"
-# (1b) the plist is the helper's layout and only execs the runner.
-PLIST_REPORT="$(python3 -I - "$P" "$R" <<'PLIST_PY'
-import os
-import plistlib
-import re
-import sys
-
-plist_path, runner = sys.argv[1:3]
-with open(plist_path, "rb") as fh:
-    d = plistlib.load(fh)
-
-
-def strings(v):
-    if isinstance(v, str):
-        yield v
-    elif isinstance(v, list):
-        for x in v:
-            yield from strings(x)
-    elif isinstance(v, dict):
-        for x in v.values():
-            yield from strings(x)
-
-
-vals = list(strings(d))
-path_dirs = d.get("EnvironmentVariables", {}).get("PATH", "").split(":")
-checks = [
-    d.get("ProgramArguments") == ["/bin/bash", "-lc", "exec " + runner],
-    d.get("KeepAlive") is False,
-    all(p in path_dirs for p in ("/usr/bin", "/bin", "/opt/homebrew/bin")),
-    not any("$" in v for v in vals),
-    all(v != "" for v in vals),
-    re.fullmatch(r"/tmp/docfix-run-[^\s]+\.sh", runner) is not None,
-    os.access(runner, os.X_OK),
-]
-print("ok" if all(checks) else "bad " + repr(checks))
-PLIST_PY
-)"
-{ [ "$PLIST_REPORT" = "ok" ] && [ "$(grep -c '<string></string>' "$P")" = "0" ]; } \
-  && ok "(1b) plist execs the runner: KeepAlive false, PATH set, no \$ or empty values, runner path clean" \
-  || bad "(1b) plist shape: $PLIST_REPORT"
+{ [ "$(submit_count "$SB")" = 1 ] && [ -n "$R" ] && [ -f "$R" ]; } \
+  && ok "(1) [docfix_submit_on_launch] exactly one launchctl submit recorded; runner exists" \
+  || bad "(1) [docfix_submit_on_launch] submit count $(submit_count "$SB"), runner '$R'"
+# (1b) the submit argv is the helper's layout and only names the runner; no plist.
+LABEL1="$(submit_arg "$SB" -l)"; LOG1="$(submit_arg "$SB" -o)"; ERR1="$(submit_arg "$SB" -e)"
+CALL1="$(submit_call "$SB")"
+PATHEL1="$(grep -m1 '^PATH=' <<< "$CALL1" || true)"
+WRAP1="$(submit_wrapper "$SB")"
+RUNNER_L2="$(sed -n 2p "$R" 2>/dev/null)"
+CHK1B=ok
+[ "$(submit_count "$SB")" = 1 ] || CHK1B="submit count $(submit_count "$SB")"
+[[ "$LABEL1" =~ ^com\.ibl5\.docfix-run-[A-Za-z0-9._-]+-[0-9]{8}-[0-9]{6}-[0-9]+$ ]] || CHK1B="label '$LABEL1'"
+case "$LOG1" in /tmp/docfix-run-*.log) ;; *) CHK1B="log '$LOG1'" ;; esac
+{ [ -n "$ERR1" ] && [ "$ERR1" = "$LOG1" ]; } || CHK1B="err '$ERR1' != log '$LOG1'"
+grep -qxF "HOME=$SB/home" <<< "$CALL1" || CHK1B="no HOME=\$SB/home element"
+for d in /usr/bin /bin /opt/homebrew/bin; do
+    case ":${PATHEL1#PATH=}:" in *":$d:"*) ;; *) CHK1B="PATH lacks $d ($PATHEL1)" ;; esac
+done
+case "$PATHEL1" in *'$'*) CHK1B="PATH holds a dollar sign" ;; esac
+{ [ -n "$CALL1" ] && ! grep -qx '' <<< "$CALL1"; } || CHK1B="empty or missing argv element"
+case "$WRAP1" in *"$R"*) ;; *) CHK1B="wrapper lacks runner path" ;; esac
+case "$WRAP1" in *.once*) ;; *) CHK1B="wrapper lacks .once" ;; esac
+[ -n "$(find "$R" -perm 700 2>/dev/null)" ] || CHK1B="runner is not mode 700"
+case "$RUNNER_L2" in "rm -f "*"$R"*) ;; *) CHK1B="runner line 2 is '$RUNNER_L2'" ;; esac
+if grep -q 'launchctl' "$R"; then CHK1B="runner mentions launchctl"; fi
+[ -z "$(ls -A "$SB/home/Library/LaunchAgents" 2>/dev/null)" ] || CHK1B="LaunchAgents is not empty"
+[ "$CHK1B" = ok ] \
+  && ok "(1b) [docfix_submit_argv] label, log=err, HOME/PATH elements, wrapper+.once, runner 700 self-deleting without launchctl, no plist" \
+  || bad "(1b) [docfix_submit_argv] $CHK1B"
+# (1c) a failed submit exits 1, says so, and removes the runner it wrote.
+SB1="$SB"
+SB="$(build_sandbox)"
+echo 7 > "$SB/launchctl.submit_rc"
+ERR1C_F="$(mktemp)"; RC1C=0
+IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_DOCFIX" "1c" "probe.md" >/dev/null 2>"$ERR1C_F" || RC1C=$?
+ERR1C="$(cat "$ERR1C_F")"; rm -f "$ERR1C_F"
+R1C="$(runner_of "$SB")"
+{ [ "$RC1C" = 1 ] && grep -qF 'launchctl submit failed (rc 7)' <<< "$ERR1C" \
+    && [ "$(submit_count "$SB")" = 1 ] && [ -n "$R1C" ] && [ ! -e "$R1C" ]; } \
+  && ok "(1c) [docfix_submit_fail_cleans] failed submit: exit 1, 'launchctl submit failed (rc 7)', runner removed" \
+  || bad "(1c) [docfix_submit_fail_cleans] rc=$RC1C submits=$(submit_count "$SB") runner='$R1C' stderr: $ERR1C"
+SB="$SB1"
 { [ -n "$PLAN" ] && head -1 "$PLAN" | grep -q '^---$' \
     && grep -q '^auto_merge: docs-only-ready$' "$PLAN" \
     && ! grep -q '^auto_merge: false$' "$PLAN" \
@@ -290,19 +321,19 @@ PLIST_PY
 
 SB="$(build_sandbox)"
 run_docfix "$SB" "docs-stale-refresh-$(date +%Y%m%d)" "" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] && ok "(3a) dedupe-skip on existing branch (no plist)" \
+[ "$(submit_count "$SB")" = 0 ] && ok "(3a) [docfix_no_submit_on_dedupe] dedupe-skip on existing branch (no submit)" \
                            || bad "(3a) dedupe branch skip"
 SB="$(build_sandbox)"
 SHIM_PR_UNARMED="docs-stale-refresh-20260703" run_docfix "$SB" "" "" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] && ok "(3b) dedupe-skip on open unarmed PR head (no plist)" \
+[ "$(submit_count "$SB")" = 0 ] && ok "(3b) [docfix_no_submit_on_dedupe] dedupe-skip on open unarmed PR head (no submit)" \
                            || bad "(3b) dedupe PR skip"
 
 SB="$(build_sandbox)"
-[ "$(run_docfix "$SB" "" "" "" "a.md")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
-  && ok "(4) empty issue-num rejected" || bad "(4) empty issue-num not rejected"
+[ "$(run_docfix "$SB" "" "" "" "a.md")" != "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+  && ok "(4) [docfix_no_submit_on_dedupe] empty issue-num rejected, no submit" || bad "(4) empty issue-num not rejected"
 SB="$(build_sandbox)"
-[ "$(run_docfix "$SB" "" "" "42" "")" != "rc=0" ] && [ -z "$(plist_of "$SB")" ] \
-  && ok "(5) empty sig rejected" || bad "(5) empty sig not rejected"
+[ "$(run_docfix "$SB" "" "" "42" "")" != "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+  && ok "(5) [docfix_no_submit_on_dedupe] empty sig rejected, no submit" || bad "(5) empty sig not rejected"
 
 # --- Case 6: doc-freshness-audit.yml static assertions (NEGATIVE) -------------
 { ! grep -q 'self-hosted' "$WORKFLOW" \
@@ -669,9 +700,9 @@ SB="$(build_sandbox)"
 # the model received (2026-08-08 run: `bin/post-plan-now` fired mid-assembly).
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "9999" "probe.md" >/dev/null
-PLIST_F20="$(plist_of "$SB")"
-if [ -n "$PLIST_F20" ]; then
-    # The claude -p line lives in the runner script the plist execs; no XML layer.
+SUBMITS20="$(submit_count "$SB")"
+if [ "$SUBMITS20" = 1 ]; then
+    # The claude -p line lives in the runner script the submit launches; no XML layer.
     CMD_LINE20=$(grep 'claude -p' "$(runner_of "$SB")")
     # Pull the claude -p token (single-quoted after fix; double-quoted in old script).
     PROMPT_TOKEN20=$(printf '%s' "$CMD_LINE20" \
@@ -694,38 +725,24 @@ if [ -n "$PLIST_F20" ]; then
           && ok "(20.1) session-id: uuid is bare and unquoted in the runner" \
           || bad "(20.1) session-id: --session-id missing or UUID is quoted in the runner"
         # Sub-check 20.1 sidecar: docfix-run writes a .session sidecar whose content
-        # equals the UUID embedded in the plist command line.
+        # equals the UUID embedded in the runner's command line.
         UUID20=$(printf '%s' "$CMD_LINE20" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-        LOG20=$(python3 -I -c 'import plistlib,sys
-print(plistlib.load(open(sys.argv[1],"rb"))["StandardOutPath"])' "$PLIST_F20")
+        LOG20="$(submit_arg "$SB" -o)"
         SIDECAR20="${LOG20%.log}.session"
         { [ -n "$UUID20" ] && [ -f "$SIDECAR20" ] && [ "$(cat "$SIDECAR20")" = "$UUID20" ]; } \
-          && ok "(20.1) session-id: sidecar exists and uuid matches plist" \
+          && ok "(20.1) session-id: sidecar exists and uuid matches runner" \
           || bad "(20.1) session-id: sidecar missing or uuid mismatch (uuid=${UUID20:-<none>} sidecar=${SIDECAR20:-<none>})"
-        # Sub-check 20.2: interpolating the uuid leaves the plist valid XML. This is the
-        # forced-trigger assertion for "changes a launchd plist", and it runs against the
-        # plist THIS sandbox just emitted. Never glob ~/Library/LaunchAgents for it:
-        # com.ibl5.docfix-*.plist also matches the long-lived com.ibl5.docfix-poll (so the
-        # check would lint the poller and pass while testing nothing), and a real docfix-run
-        # plist rm -f's itself when its job exits, leaving the glob no correct file to find.
-        # plutil is macOS-only, so fall back to python3 xml.etree (present on macOS and
-        # the ubuntu-latest runner) exactly as case 22/plan15 below does. Without the
-        # fallback this sub-check fails on CI because the binary is absent.
-        if command -v plutil >/dev/null 2>&1; then
-            plist_lint20() { plutil -lint "$1" >/dev/null 2>&1; }
-            LINTER20="plutil -lint"
-        else
-            plist_lint20() { python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "$1" >/dev/null 2>&1; }
-            LINTER20="python3 xml.etree"
-        fi
-        plist_lint20 "$PLIST_F20" \
-          && ok "(20.2) plist hygiene: $LINTER20 passes after uuid interpolation" \
-          || bad "(20.2) plist hygiene: $LINTER20 rejects the plist the uuid was interpolated into"
+        # Sub-check 20.2: no plist is written. The launch is a `launchctl submit`, so
+        # nothing may land in the sandbox's ~/Library/LaunchAgents (the old plist hygiene
+        # lint has nothing left to lint).
+        [ -z "$(ls -A "$SB/home/Library/LaunchAgents" 2>/dev/null)" ] \
+          && ok "(20.2) no plist hygiene needed: LaunchAgents stays empty after the uuid is interpolated" \
+          || bad "(20.2) LaunchAgents is not empty after a submit launch"
     else
-        bad "(20) prompt-fidelity: could not extract claude -p argument from plist"
+        bad "(20) prompt-fidelity: could not extract claude -p argument from runner"
     fi
 else
-    bad "(20) prompt-fidelity: plist not generated"
+    bad "(20) prompt-fidelity: no submit recorded"
 fi
 
 # --- Helper: dm_marker_of ---------------------------------------------------
@@ -873,32 +890,32 @@ grep -qF 'bin/docfix-check-veronly' "$REAL_DOCFIX" \
 
 # --- Cases 28-31: bin/docfix-run dedupe and fail-closed gates ----------------
 
-# Case 28: SHIM_PR_UNARMED set → unarmed-PR dedupe skips (no plist)
+# Case 28: SHIM_PR_UNARMED set → unarmed-PR dedupe skips (no submit)
 SB="$(build_sandbox)"
 SHIM_PR_UNARMED="docs-stale-refresh-20260703" run_docfix "$SB" "" "" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] \
-  && ok "(28) veronly: unarmed-PR dedupe skips (no plist)" \
+[ "$(submit_count "$SB")" = 0 ] \
+  && ok "(28) [docfix_no_submit_on_dedupe] veronly: unarmed-PR dedupe skips (no submit)" \
   || bad "(28) veronly: unarmed-PR dedupe"
 
-# Case 29: prior-day SHIM_BRANCH_OUT + empty SHIM_PR_UNARMED → plist created
+# Case 29: prior-day SHIM_BRANCH_OUT + empty SHIM_PR_UNARMED → one submit
 SB="$(build_sandbox)"
 SHIM_PR_UNARMED="" run_docfix "$SB" "docs-stale-refresh-20260703" "" "1" "a.md" >/dev/null
-[ -n "$(plist_of "$SB")" ] \
-  && ok "(29) veronly: prior-day branch allows today's run (plist created)" \
+[ "$(submit_count "$SB")" = 1 ] \
+  && ok "(29) [docfix_submit_on_launch] veronly: prior-day branch allows today's run (one submit)" \
   || bad "(29) veronly: prior-day branch blocked today's run"
 
-# Case 30: today's SHIM_BRANCH_OUT → branch dedupe skips (no plist)
+# Case 30: today's SHIM_BRANCH_OUT → branch dedupe skips (no submit)
 SB="$(build_sandbox)"
 run_docfix "$SB" "docs-stale-refresh-$(date +%Y%m%d)" "" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] \
-  && ok "(30) veronly: today's branch dedupe skips (no plist)" \
+[ "$(submit_count "$SB")" = 0 ] \
+  && ok "(30) [docfix_no_submit_on_dedupe] veronly: today's branch dedupe skips (no submit)" \
   || bad "(30) veronly: today's branch dedupe"
 
-# Case 31: SHIM_GH_FAIL=1 → fail-closed skip (no plist)
+# Case 31: SHIM_GH_FAIL=1 → fail-closed skip (no submit)
 SB="$(build_sandbox)"
 SHIM_GH_FAIL=1 run_docfix "$SB" "" "" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] \
-  && ok "(31) veronly: gh-fail skips fail-closed (no plist)" \
+[ "$(submit_count "$SB")" = 0 ] \
+  && ok "(31) [docfix_no_submit_on_dedupe] veronly: gh-fail skips fail-closed (no submit)" \
   || bad "(31) veronly: gh-fail should skip"
 
 # --- Cases 32-36: poll DM dispatch -------------------------------------------
@@ -1258,8 +1275,8 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
 
 # --- Cases 20a-23 (plan matrix #13-16): prompt-safety + fail-closed guard --------
 
-# Case 20a (plan #13): injection chars in SIG — not executed, written literally to plist.
-# shq() single-quotes the prompt, so $() spans are never evaluated by the plist shell.
+# Case 20a (plan #13): injection chars in SIG — not executed, written literally to the runner.
+# shq() single-quotes the prompt, so $() spans are never evaluated by the runner's shell.
 SB="$(build_sandbox)"
 SIG13='ibl5/docs/foo.md,$(touch /tmp/pr13-pwned-backtick)'
 run_docfix "$SB" "" "" "13p" "$SIG13" >/dev/null
@@ -1270,27 +1287,20 @@ R_INJ="$(runner_of "$SB")"
   && ok "(20a/plan13) injection chars in SIG written literally to runner, not executed" \
   || bad "(20a/plan13) prompt injection guard"
 
-# Case 20b (plan #14): malicious $SIG — not executed during plist construction.
+# Case 20b (plan #14): malicious $SIG — not executed during runner construction.
 # $SIG is substituted into PROMPT as a literal; no second expansion occurs in bash.
 SB="$(build_sandbox)"
 SIG14='ibl5/docs/foo.md $(touch /tmp/pr14-pwned-sig)'
 run_docfix "$SB" "" "" "14p" "$SIG14" >/dev/null
 { [ ! -f /tmp/pr14-pwned-sig ]; } \
-  && ok "(20b/plan14) malicious SIG not executed during plist construction" \
+  && ok "(20b/plan14) malicious SIG not executed during runner construction" \
   || bad "(20b/plan14) malicious SIG executed"
 
-# Case 22 (plan #15): XML metacharacters in SIG — plist still parses.
-# xml_escape() converts & → &amp; and < → &lt; so the plist XML stays well-formed.
+# Case 22 (plan #15): XML metacharacters in SIG. No plist exists, so the runner is the only place they land.
 SB="$(build_sandbox)"
 SIG15='ibl5/docs/foo.md &amp; <tag>'
 run_docfix "$SB" "" "" "15p" "$SIG15" >/dev/null
-PLIST22="$(plist_of "$SB")"
-# plutil is macOS-only; use python3 xml.etree (available on macOS + Linux CI) as a
-# portable plist/XML validator so the test passes on ubuntu-latest runners.
-{ [ -n "$PLIST22" ] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('$PLIST22')" >/dev/null 2>&1; } \
-  && ok "(22/plan15) SIG with & and < yields a python3-ET-parse-clean plist" \
-  || bad "(22/plan15) XML metacharacters broke plist"
-# The prompt never crosses the XML layer now, so the runner holds & raw.
+# The prompt never crosses an XML layer, so the runner holds & raw.
 R22="$(runner_of "$SB")"
 { [ -n "$R22" ] && grep -qF 'foo.md &amp; <tag>' "$R22" && ! grep -qF '&amp;amp;' "$R22" \
     && ! grep -qF '&lt;tag' "$R22"; } \
@@ -1305,9 +1315,9 @@ OUT23="$(SHIM_GH_FAIL=1 IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
     "$REAL_DOCFIX" "16p" "a.md" 2>&1)"
 RC23=$?
 { [ "$RC23" -eq 0 ] \
-    && [ -z "$(plist_of "$SB")" ] \
+    && [ "$(submit_count "$SB")" = 0 ] \
     && printf '%s' "$OUT23" | grep -q 'could not query open PRs'; } \
-  && ok "(23) gh API failure → exit 0, no plist, upstream #1861 fail-closed guard fires" \
+  && ok "(23) [docfix_no_submit_on_dedupe] gh API failure → exit 0, no submit, upstream #1861 fail-closed guard fires" \
   || bad "(23) upstream #1861 fail-closed open-PR guard did not fire as expected"
 
 # --- Case 48: static — prompt still carries the append-only + disclosure clauses
@@ -1382,10 +1392,6 @@ prompt_check_contract() {
     return 0
 }
 
-# plist_field <plist> <key> -> prints one top-level string value of the plist.
-plist_field() { python3 -I -c 'import plistlib,sys
-print(plistlib.load(open(sys.argv[1],"rb"))[sys.argv[2]])' "$1" "$2"; }
-
 # exec_runner <runner> <outdir> -> runs the generated runner under exported-function stubs.
 # Functions win over every PATH lookup; the runner prepends /usr/local/bin and
 # /opt/homebrew/bin, so a PATH stub could lose to a real `claude` and launch a live session.
@@ -1402,15 +1408,17 @@ exec_runner() {
 }
 
 # Case 20c: the generated runner, executed under stubs, delivers the prompt byte-for-byte,
-# runs from the worktree, boots the job out, and removes the plist and itself.
+# runs from the worktree, deletes itself, and makes no launchctl call (the submit wrapper
+# removes the label, not the runner).
 SB="$(build_sandbox)"
 SIG20C='ibl5/docs/foo.md,$(touch /tmp/pr20c-pwned) `touch /tmp/pr20c-pwned-bt`'
 run_docfix "$SB" "" "" "20c" "$SIG20C" >/dev/null
-P20C="$(plist_of "$SB")"; R20C="$(runner_of "$SB")"
-WD20C="$(plist_field "$P20C" WorkingDirectory)"; LABEL20C="$(plist_field "$P20C" Label)"
+R20C="$(runner_of "$SB")"; LABEL20C="$(submit_arg "$SB" -l)"
+WD20C="$(sed -n "s/^cd '\([^']*\)' && CLAUDE_HEADLESS=1.*/\1/p" "$R20C")"
 mkdir -p "$WD20C"
 EXPECT20C="$SB/expect20c"; emitted_prompt_of "$SB" > "$EXPECT20C"
-exec_runner "$R20C" "$SB/run20c"
+[ -f "$R20C" ] && R20C_BEFORE=yes || R20C_BEFORE=no
+RC20C=0; exec_runner "$R20C" "$SB/run20c" || RC20C=$?
 { cmp -s "$EXPECT20C" "$SB/run20c/prompt" \
     && prompt_check_contract "$(cat "$SB/run20c/prompt")" \
     && grep -qF '$(touch /tmp/pr20c-pwned)' "$SB/run20c/prompt" \
@@ -1424,24 +1432,23 @@ exec_runner "$R20C" "$SB/run20c"
     && grep -qxF -- '--name' "$SB/run20c/args" && grep -qxF "$LABEL20C" "$SB/run20c/args"; } \
   && ok "(20c) runner execution: cwd = worktree, CLAUDE_HEADLESS=1, model/session-id/name flags" \
   || bad "(20c) runner execution: cwd or flags"
-{ grep -qxF "bootout gui/$(id -u)/$LABEL20C" "$SB/run20c/launchctl" 2>/dev/null \
-    && [ ! -e "$P20C" ] && [ ! -e "$R20C" ]; } \
-  && ok "(20c) runner execution: launchctl bootout fired; plist and runner removed" \
-  || bad "(20c) runner execution: cleanup"
+{ [ "$R20C_BEFORE" = yes ] && [ "$RC20C" = 0 ] && [ ! -e "$R20C" ] && [ ! -s "$SB/run20c/launchctl" ]; } \
+  && ok "(20c) [docfix_runner_selfdeletes_no_launchctl] runner exits 0, deletes itself, makes no launchctl call" \
+  || bad "(20c) [docfix_runner_selfdeletes_no_launchctl] rc=$RC20C existed-before=$R20C_BEFORE still-there=$([ -e "$R20C" ] && echo yes || echo no) launchctl-log=$(cat "$SB/run20c/launchctl" 2>/dev/null)"
 
-# Case 20d (negative): a missing worktree dir means claude never runs, but the job still
-# boots itself out and removes the plist and runner.
+# Case 20d (negative): a missing worktree dir means claude never runs, the runner exits
+# nonzero, still deletes itself, and still makes no launchctl call.
 SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "20d" "probe.md" >/dev/null
-P20D="$(plist_of "$SB")"; R20D="$(runner_of "$SB")"
-LABEL20D="$(plist_field "$P20D" Label)"
-rm -rf "$(plist_field "$P20D" WorkingDirectory)"
-exec_runner "$R20D" "$SB/run20d"
-{ [ ! -e "$SB/run20d/prompt" ] \
-    && grep -qxF "bootout gui/$(id -u)/$LABEL20D" "$SB/run20d/launchctl" 2>/dev/null \
-    && [ ! -e "$P20D" ] && [ ! -e "$R20D" ]; } \
-  && ok "(20d) failed cd skips claude but the job still boots out and cleans up" \
-  || bad "(20d) failed cd: claude ran or cleanup skipped"
+R20D="$(runner_of "$SB")"
+WD20D="$(sed -n "s/^cd '\([^']*\)' && CLAUDE_HEADLESS=1.*/\1/p" "$R20D")"
+rm -rf "$WD20D"
+[ -f "$R20D" ] && R20D_BEFORE=yes || R20D_BEFORE=no
+RC20D=0; exec_runner "$R20D" "$SB/run20d" || RC20D=$?
+{ [ "$R20D_BEFORE" = yes ] && [ ! -e "$SB/run20d/prompt" ] && [ "$RC20D" != 0 ] \
+    && [ ! -e "$R20D" ] && [ ! -s "$SB/run20d/launchctl" ]; } \
+  && ok "(20d) [docfix_runner_cd_fail] failed cd skips claude, exits nonzero, runner removed, no launchctl call" \
+  || bad "(20d) [docfix_runner_cd_fail] rc=$RC20D existed-before=$R20D_BEFORE still-there=$([ -e "$R20D" ] && echo yes || echo no)"
 
 # Case 48d: the real emitted prompt satisfies the contract.
 SB="$(build_sandbox)"
@@ -2154,49 +2161,63 @@ cp "$PLAN_V" "$SB2/after1.md"
   || bad "(84) veronly: docs-only-ready idempotency"
 
 # Cases 21a-21e: docfix-run's EXIT trap hands an aborted run's worktree to the
-# real bin/wt-remove --if-empty, until launchctl bootstrap succeeds.
+# real bin/wt-remove --if-empty, until launchctl submit succeeds.
 DS="docs-stale-refresh-$(date +%Y%m%d)"
 
-# Case 21a: bootstrap fails, empty worktree -> worktree, branch, plan, plist gone
+# Case 21a: submit fails, empty worktree -> worktree, branch, plan, runner gone
 SB="$(build_git_sandbox)"
-R21="$(SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+R21="$(SHIM_LAUNCHCTL_SUBMIT_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" != "rc=0" ] && [ ! -d "$SB/wts/$DS" ] \
     && [ -z "$(git -C "$SB" branch --list "$DS")" ] \
     && [ ! -e "$SB/home/claude-plans/$DS.md" ]; } \
-  && ok "(21a) bootstrap failure: empty worktree, branch and seeded plan removed" \
-  || bad "(21a) bootstrap failure cleanup ($R21)"
-[ -z "$(plist_of "$SB")" ] \
-  && ok "(21a) bootstrap failure: no plist left in LaunchAgents" \
-  || bad "(21a) plist left behind: $(plist_of "$SB")"
+  && ok "(21a) submit failure: empty worktree, branch and seeded plan removed" \
+  || bad "(21a) submit failure cleanup ($R21)"
+[ -z "$(ls -A "$SB/home/Library/LaunchAgents" 2>/dev/null)" ] \
+  && ok "(21a) submit failure: nothing in LaunchAgents" \
+  || bad "(21a) LaunchAgents not empty: $(ls -A "$SB/home/Library/LaunchAgents")"
 
-# Case 21b: bootstrap fails, worktree has a commit -> worktree and branch kept
+# Case 21b: submit fails, worktree has a commit -> worktree and branch kept
 SB="$(build_git_sandbox)"
-R21="$(SHIM_WTNEW_COMMIT=1 SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+R21="$(SHIM_WTNEW_COMMIT=1 SHIM_LAUNCHCTL_SUBMIT_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" != "rc=0" ] && [ -d "$SB/wts/$DS" ] \
     && [ -n "$(git -C "$SB" branch --list "$DS")" ]; } \
-  && ok "(21b) bootstrap failure with a commit: worktree and branch kept" \
+  && ok "(21b) submit failure with a commit: worktree and branch kept" \
   || bad "(21b) worktree with a commit kept ($R21)"
 
-# Case 21c: bootstrap fails, worktree has an untracked file -> kept
+# Case 21c: submit fails, worktree has an untracked file -> kept
 SB="$(build_git_sandbox)"
-R21="$(SHIM_WTNEW_DIRTY=1 SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+R21="$(SHIM_WTNEW_DIRTY=1 SHIM_LAUNCHCTL_SUBMIT_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" != "rc=0" ] && [ -d "$SB/wts/$DS" ]; } \
-  && ok "(21c) bootstrap failure with an untracked file: worktree kept" \
+  && ok "(21c) submit failure with an untracked file: worktree kept" \
   || bad "(21c) dirty worktree kept ($R21)"
 
 # Case 21d: an existing _pool-1 slot is untouched by the abort cleanup
 SB="$(build_git_sandbox)"
 git -C "$SB" worktree add -q -b _pool-1 "$SB/wts/_pool-1" origin/master >/dev/null 2>&1
-R21="$(SHIM_LAUNCHCTL_BOOTSTRAP_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
+R21="$(SHIM_LAUNCHCTL_SUBMIT_RC=1 run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" != "rc=0" ] && [ -d "$SB/wts/_pool-1" ] && [ ! -d "$SB/wts/$DS" ]; } \
-  && ok "(21d) bootstrap failure: _pool-1 untouched, aborted worktree removed" \
+  && ok "(21d) submit failure: _pool-1 untouched, aborted worktree removed" \
   || bad "(21d) pool slot untouched ($R21)"
 
 # Case 21e: successful launch -> trap disarmed, worktree kept
 SB="$(build_git_sandbox)"
 R21="$(run_docfix "$SB" "" "" "21" "probe.md")"
 { [ "$R21" = "rc=0" ] && [ -d "$SB/wts/$DS" ]; } \
-  && ok "(21e) successful launch: worktree kept (trap disarmed after bootstrap)" \
+  && ok "(21e) successful launch: worktree kept (trap disarmed after submit)" \
   || bad "(21e) successful launch keeps the worktree ($R21)"
+
+# docfix_no_plist_helpers: docfix-run launches through ljob_submit only.
+if grep -qE 'ljob_write_runner_plist|ljob_bootstrap' "$REAL_DOCFIX"; then
+  bad "docfix_no_plist_helpers: $REAL_DOCFIX still calls ljob_write_runner_plist or ljob_bootstrap"
+else
+  ok "docfix_no_plist_helpers: $REAL_DOCFIX calls neither ljob_write_runner_plist nor ljob_bootstrap"
+fi
+
+REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
+if [ -n "$REAL_AGENTS_NEW" ]; then
+    echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"
+    exit 1
+fi
+echo "PASS real-agents-guard"
 
 h_done

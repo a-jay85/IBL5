@@ -3,13 +3,14 @@
 # bin/db-sync-prod sends to `docker exec` on the --snapshot path, plus the
 # bin/lib/db-helpers.sh constants and db_cmd helper behind it.
 #
-# Pins the five preserve-tables probes, the in-container preserved-tables dump,
+# Pins the six preserve-tables probes, the in-container preserved-tables dump,
 # the two db_import_sql loads, the schema_migrations backfill and the final row
 # count. docker is stubbed on PATH: no Docker, no MariaDB, no prod contact.
 #
 # Cases: D1 default argv, O1 env override, N1 ambient DB_NAME ignored, F1
 # fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
-# M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin.
+# M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin, P1 keep-list
+# covers every ibl_bug_* table the migrations create.
 set -euo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -92,19 +93,19 @@ run_sync() {   # usage: run_sync [VAR=value ...] — extra env assignments for a
 assert_default_argv() {  # <label>
     local l="$1"
     assert_eq "$l exit 0" "0" "$RC"
-    assert_eq "$l probe argv x5" "5" \
+    assert_eq "$l probe argv x6" "6" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot -N -B -e SELECT COUNT(*) FROM information_schema.tables' "$LOG")"
     assert_eq "$l probe schema literal" "1" \
         "$(count_in "WHERE table_schema='iblhoops_ibl5' AND table_name='ibl_bug_reports'" "$LOG")"
     assert_eq "$l dump argv" "1" \
-        "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state' "$LOG")"
+        "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context' "$LOG")"
     assert_eq "$l import argv x2" "2" \
         "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
     assert_eq "$l backfill argv" "1" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -e ' "$LOG")"
     assert_eq "$l rowcount argv" "1" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
-    assert_eq "$l exec total" "10" "$(grep -c '^exec ' <<<"$LOG" || true)"
+    assert_eq "$l exec total" "11" "$(grep -c '^exec ' <<<"$LOG" || true)"
     assert_eq "$l two-token form absent" "0" "$(count_in '-u root' "$LOG")"
     assert_eq "$l password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
     assert_match "$l snapshot banner" "Source: snapshot file" "$OUT"
@@ -117,9 +118,9 @@ assert_default_argv "D1"
 # O1: env override changes every argv. Distinctive values make a leak greppable.
 run_sync DB_ROOT_USER=u1 DB_ROOT_PASS=sekret99 DB_DEFAULT_NAME=altdb
 assert_eq "O1 exit 0" "0" "$RC"
-assert_eq "O1 probe argv x5" "5" \
+assert_eq "O1 probe argv x6" "6" \
     "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 -N -B -e SELECT COUNT(*)' "$LOG")"
-assert_eq "O1 probe schema altdb x5" "5" "$(count_in "table_schema='altdb'" "$LOG")"
+assert_eq "O1 probe schema altdb x6" "6" "$(count_in "table_schema='altdb'" "$LOG")"
 assert_eq "O1 dump argv" "1" \
     "$(count_in 'exec ibl5-mariadb mariadb-dump -uu1 -psekret99 --single-transaction --skip-lock-tables altdb ibl_api_keys' "$LOG")"
 assert_eq "O1 import argv x2" "2" \
@@ -229,5 +230,15 @@ assert_eq "E1 passes E2E_DB_NAME" "1" "$(grep -cF -- '-e "E2E_DB_NAME=$DB_DEFAUL
 assert_eq "E1 reads getenv" "1" "$(grep -cF -- 'getenv("E2E_DB_NAME")' "$E2E" || true)"
 assert_eq "E1 no literal name" "0" "$(grep -cF -- '"iblhoops_ibl5")' "$E2E" || true)"
 assert_eq "E1 sources db-helpers" "1" "$(grep -cF -- 'source "$REPO_ROOT/bin/lib/db-helpers.sh"' "$E2E" || true)"
+
+# P1: the sync must keep every local-only bug-pipeline table. A new ibl_bug_* table
+# that misses PRESERVE_TABLES is dropped on each prod sync with no visible error.
+P_LIST=$(sed -n 's/^PRESERVE_TABLES="\(.*\)"$/\1/p' "$REPO_ROOT/bin/db-sync-prod")
+P_TABLES=$(cat "$REPO_ROOT"/ibl5/migrations/*.sql \
+    | sed -nE 's/.*CREATE TABLE (IF NOT EXISTS )?`?(ibl_bug_[a-z_]+).*/\2/p' | sort -u)
+assert_match "P1 migrations create ibl_bug_reports" "ibl_bug_reports" "$P_TABLES"
+for t in $P_TABLES; do
+    assert_match "P1 $t preserved" " $t " " $P_LIST "
+done
 
 h_done

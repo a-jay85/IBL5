@@ -158,10 +158,6 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     if not enabled(env):
         record["reason"] = "disabled"
         return _write(out_dir, record)
-    if getattr(res, "ab_arm", None) == "closer":
-        # Closer A/B arm: the closer session replaces every narrow fixer, this round included.
-        record["reason"] = "closer-arm"
-        return _write(out_dir, record)
     if not tg:
         record["reason"] = "no-target-hold"
         return _write(out_dir, record)
@@ -282,6 +278,10 @@ def flush(gh, pr, record: dict, pushed_sha: str, log) -> int:
         except (HarnessError, OSError) as e:
             d["flush_failed"] = True
             log(f"fix-round: reply on thread {cid} failed ({e!r}); thread stays open")
+            continue
+        if d.get("followup"):
+            thread_ingestion.file_declined_followup(gh, pr, cid, d.get("path"), d.get("line"),
+                                                    d["followup"], d.get("reason", ""), log)
     return posted
 
 

@@ -14,6 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness import review as review_mod
 from harness import verdictcache
 from harness.review import ReviewPhase
 from tests.test_review_verifiers import _DualLlm, _RecordingGh, _f, _reply, _vote
@@ -203,3 +204,26 @@ def test_all_chunks_reused_skips_executor(tmp_path, monkeypatch):
     second = phase.verify_findings(FINDINGS, DIFF)
     assert len(llm.tooled_calls) == spawned
     assert second == first
+
+
+def test_cache_key_differs_by_model():
+    common = dict(prompt="p", tree="t" * 40, purposes=("verify-findings-1",), tools=("Read",))
+    assert verdictcache.key(model="sonnet", **common) != verdictcache.key(model="opus", **common)
+    assert verdictcache.key(model="opus", **common) == verdictcache.key(model="opus", **common)
+
+
+def test_sonnet_keyed_verdict_not_reused_for_opus(tmp_path, monkeypatch):
+    monkeypatch.setenv("POSTPLAN_VERDICT_CACHE", "1")
+    llm, phase, wt = _phase(tmp_path)
+    monkeypatch.setattr(review_mod, "VERIFIER_MODEL", "sonnet")
+    phase.verify_findings(FINDINGS, DIFF)            # seeds a Sonnet-keyed verdict file
+    seeded_files = len(_cache_files(wt))
+    seeded_calls = len(llm.tooled_calls)
+    assert seeded_files > 0
+    monkeypatch.setattr(review_mod, "VERIFIER_MODEL", "opus")
+    phase.verify_findings(FINDINGS, DIFF)            # same tree, same prompt, new model
+    assert len(llm.tooled_calls) == 2 * seeded_calls  # every seat re-spawned: no reuse
+    assert {c["model"] for c in llm.tooled_calls[seeded_calls:]} == {"opus"}
+    assert len(_cache_files(wt)) == 2 * seeded_files  # an Opus file beside the Sonnet one
+    phase.verify_findings(FINDINGS, DIFF)            # control: Opus now reuses its own verdict
+    assert len(llm.tooled_calls) == 2 * seeded_calls

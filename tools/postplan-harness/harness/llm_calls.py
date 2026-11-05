@@ -111,6 +111,12 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         'Describe the change in words instead: "adds tests for the truncation note", never '
         '"adds 3 tests". The reviewer verifies every number against the diff and rewrites a '
         'wrong one.'
+        + ' EDIT COUNTS: never state how many existing assertions, tests, cases, checks, '
+        'files, lines or call sites the change updated, changed or added, even when the DIFF '
+        'shows them, because a hand tally is the count the reviewer most often finds wrong. '
+        'Name the items instead: "updates the run_ln ordering, R-10 wording and L-7 probe '
+        'assertions", never "two existing assertions were updated". A number that is the '
+        'subject of the change (a threshold value, a row count the plan asks for) is allowed.'
         + '\n\nCLAIMS: every summary_md bullet claims only what the DIFF above shows. The PLAN '
         'EXCERPT is intent; when the diff lacks something the plan intended, do not claim it '
         'and do not describe it as done.'
@@ -344,14 +350,20 @@ def fidelity_notes_prompt(verdict_text: str) -> str:
         "  - \"detail\": two or three sentences a reader can act on weeks later without "
         "opening the PR: name the file (and function or test when the verdict gives one), "
         "what is wrong, and the change to make\n"
-        "  - \"kind\": one of the eight above\n\n"
+        "  - \"kind\": one of the eight above\n"
+        "  - \"harm\": what breaks if this is never fixed, one of: crash; wrong-value (a "
+        "wrong value is stored or shown); lost-data; security; false-gate (a gate, check "
+        "or test runner passes when it should fail, or blocks when it should pass); none. "
+        "Use none for a test that could be tighter, doc wording, tidying, or an input "
+        "nobody sends. When torn, use none.\n\n"
         "Only `followup` is filed; the rest are discarded. When torn, do NOT call it "
         "`followup` — a dropped note costs nothing, a wrongly filed one is noise a human "
         "triages by hand. A note that only describes a difference, naming no remaining "
         "work, is never `followup`.\n\n"
         "Cover only the notes, not blocking findings. Return [] if there are none.\n\n"
         f"VERDICT:\n{verdict_text[:8000]}\n\n"
-        'Return ONLY JSON: [{"title": "...", "detail": "...", "kind": "followup"}] or [].'
+        'Return ONLY JSON: [{"title": "...", "detail": "...", "kind": "followup", '
+        '"harm": "none"}] or [].'
     )
 
 

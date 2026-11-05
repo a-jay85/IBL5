@@ -344,7 +344,8 @@ def test_extract_notes_drops_followups_that_only_reword_a_comment(tmp_path):
     """Comment and docstring nits from the 2026-09-24 triage never file; real work does."""
     notes_fixture = [
         {"title": "Update stale cadence comment in bin/plan-review-drain:260",
-         "kind": "followup", "detail": "It now runs every 180s, not nightly."},
+         "kind": "followup", "harm": "wrong-value",
+         "detail": "It now runs every 180s, not nightly."},
         {"title": "Move doc comment back to regenerate_weekly_section", "kind": "followup",
          "detail": "The docblock drifted above the helper."},
         {"title": "Remove hard-wrap from Step 5 paragraph in prompt-impl",
@@ -361,7 +362,8 @@ def test_extract_notes_drops_followups_that_only_reword_a_comment(tmp_path):
         {"title": "Update sticky comment to list carried-forward findings",
          "kind": "followup", "detail": "Carried findings are missing from the comment."},
         {"title": "Add a comment explaining the lock order in bin/automouse/run",
-         "kind": "followup", "detail": "Two locks are taken with no stated order."},
+         "kind": "followup", "harm": "wrong-value",
+         "detail": "Two locks are taken with no stated order."},
     ]
     llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
     result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
@@ -390,7 +392,7 @@ def test_extract_notes_counts_only_the_reviewed_pr_as_already_done(tmp_path):
 def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
     """Titles from the 2026-09-24 triage that edit the plan never file; real work does."""
     notes_fixture = [
-        {"title": "Update Verification Matrix row 11", "kind": "followup",
+        {"title": "Update Verification Matrix row 11", "kind": "followup", "harm": "wrong-value",
          "detail": "Row 11 expects zero verdict_1 in bin/test-post-plan-fleet."},
         {"title": "Fix Verification Matrix row 5 grep pattern", "kind": "followup",
          "detail": "Row 5 greps for cost_row_count but the test uses ROW_COUNT."},
@@ -400,7 +402,7 @@ def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
          "detail": "test_ciwatch.py changed but is not listed."},
         {"title": "Reword plan step 3 to match the shipped helper", "kind": "followup",
          "detail": "Step 3 names bindAndExecute(), which does not exist."},
-        {"title": "Move cost report header write inside lock", "kind": "followup",
+        {"title": "Move cost report header write inside lock", "kind": "followup", "harm": "lost-data",
          "detail": "bin/automouse/run writes the header before taking the lock, so two "
                    "runners can both write it. Verification Matrix row 4 missed this."},
         {"title": "Fix issue_titles() to respect label argument", "kind": "followup",
@@ -413,6 +415,54 @@ def test_extract_notes_drops_followups_whose_title_targets_the_plan(tmp_path):
     assert [n["title"] for n in result] == ["Move cost report header write inside lock",
                                             "Fix issue_titles() to respect label argument",
                                             "Fix head-to-head matrix row highlight for gms"]
+
+
+@pytest.mark.parametrize("harm", fidelity.NOTE_HARMS)
+def test_extract_notes_keeps_tooling_note_that_names_a_harm(tmp_path, harm):
+    notes = [{"title": "Fix the check", "kind": "followup", "harm": harm,
+              "detail": "bin/check-plan passes a missing script."}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Fix the check"]
+
+
+@pytest.mark.parametrize("path", ["bin/test-x", "tools/postplan-harness/harness/a.py",
+                                  ".claude/rules/a.md", ".github/workflows/a.yml",
+                                  "ibl5/docs/decisions/0001-a.md"])
+@pytest.mark.parametrize("harm", [{"harm": "none"}, {"harm": "annoying"}, {}])
+def test_extract_notes_drops_tooling_note_without_a_harm(tmp_path, path, harm):
+    notes = [{"title": "Tighten the test", "kind": "followup",
+              "detail": f"{path} could assert more.", **harm}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes})
+    assert fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES")) == []
+
+
+@pytest.mark.parametrize("detail", [
+    "ibl5/classes/Waivers/WaiversView.php could use role=status.",
+    "ibl5/tests/Waivers/WaiversViewTest.php could count the options.",
+    "bin/check-x and ibl5/classes/Waivers/WaiversView.php disagree on the role.",
+    "The waiver page could use role=status.",
+    "ibl5/bin/seed could log more.",
+])
+def test_extract_notes_keeps_harmless_note_that_is_not_only_tooling(tmp_path, detail):
+    notes = [{"title": "Tidy this", "kind": "followup", "harm": "none", "detail": detail}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Tidy this"]
+
+
+def test_extract_notes_reads_tooling_path_from_the_title(tmp_path):
+    notes = [{"title": "Tighten bin/test-x", "kind": "followup", "harm": "none",
+              "detail": "It could assert more."}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes})
+    assert fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES")) == []
+
+
+def test_fidelity_notes_prompt_asks_for_every_harm():
+    prompt = llm_calls.fidelity_notes_prompt("READY WITH NOTES")
+    for harm in (*fidelity.NOTE_HARMS, "none"):
+        assert harm in prompt
+    assert '"harm": "none"' in prompt
 
 
 def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():

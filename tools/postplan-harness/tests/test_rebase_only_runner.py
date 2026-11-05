@@ -370,3 +370,40 @@ def test_refresh_keeps_heldmarker_active(tmp_path, dm, push, sentinel):
     assert res.terminal == TerminalState.REBASED_HELD
     assert _result(out)["rebase_only"]["record_refreshed"] is True
     assert heldmarker.active(str(state), SLUG, plan.path)[0] is True
+
+
+# --- Stacked base: rebase-only merges the PR's declared parent, never master --------------
+
+def test_rebase_only_merges_stacked_base(tmp_path, dm, push, sentinel, monkeypatch):
+    seen = {"fetch": [], "rebase": []}
+    monkeypatch.setattr(LiveGit, "merge_target", lambda self: "origin/stackparent")
+    monkeypatch.setattr(LiveGit, "fetch_base",
+                        lambda self, base="origin/master": seen["fetch"].append(base))
+    monkeypatch.setattr(LiveGit, "rebase_onto",
+                        lambda self, base="origin/master": seen["rebase"].append(base))
+    _seed(tmp_path / "state", [7, 8])
+    wt = _real_repo(tmp_path)
+    res, _, _ = _run(tmp_path, wt)
+    assert res.terminal == TerminalState.REBASED_HELD
+    assert seen["rebase"] == ["origin/stackparent"]
+    assert seen["fetch"].count("origin/stackparent") == 1
+
+
+def test_rebase_only_stacked_conflict_skips_onto_fallback(tmp_path, dm, push, sentinel,
+                                                          monkeypatch):
+    onto_calls = []
+
+    def conflict(self, base="origin/master"):
+        raise HarnessError("rebase-conflict", "d")
+    monkeypatch.setattr(LiveGit, "merge_target", lambda self: "origin/stackparent")
+    monkeypatch.setattr(LiveGit, "fetch_base", lambda self, base="origin/master": None)
+    monkeypatch.setattr(LiveGit, "rebase_onto", conflict)
+    monkeypatch.setattr(LiveGit, "autoresolve_stacked_rebase",
+                        lambda self: onto_calls.append(1))
+    _seed(tmp_path / "state", [7, 8])
+    wt = _real_repo(tmp_path)
+    res, _, _ = _run(tmp_path, wt)
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "rebase-conflict"
+    assert onto_calls == []
+    assert push.calls == []

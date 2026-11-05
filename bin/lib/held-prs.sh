@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Held-PR reason logic for `bin/pr-triage --held`. Pure functions: no gh calls.
+# Held-PR and sticky-verdict logic for `bin/pr-triage`. Pure functions: no gh calls.
 # bin/pr-triage fetches the PR list, check-runs and comments and passes them in.
-# Fixture-tested by bin/test-pr-triage (cases H1-H13).
+# Fixture-tested by bin/test-pr-triage (cases H1-H13, V1-V10).
 
 # shellcheck source=bin/lib/ci-checks-green.sh
 source "$(dirname "${BASH_SOURCE[0]}")/ci-checks-green.sh"
@@ -43,6 +43,54 @@ hp_sticky_reasons() {
             *) break ;;
         esac
     done <<< "$1"
+    return 0
+}
+
+# hp_verdict_banner <sticky-body>: the sticky's banner, the first line carrying
+# `· auto-merge armed` or `· auto-merge held`. Prints nothing when no line matches.
+hp_verdict_banner() {
+    local line
+    while IFS= read -r line; do
+        line="${line%$'\r'}"
+        case "$line" in
+            *"· auto-merge armed"*|*"· auto-merge held"*) printf '%s\n' "$line"; return 0 ;;
+        esac
+    done <<< "$1"
+    return 0
+}
+
+# hp_verdict_holds <sticky-body> <comments-status>: space-separated HOLDS tokens the
+# latest pr-ready-verdict sticky imposes. Prints nothing ONLY for a READY or READY WITH
+# NOTES banner that says `· auto-merge armed` and carries no `Auto-merge held:` reason.
+# Every other shape is a hold (fail closed). <comments-status> is `failed` when the
+# comments read failed.
+hp_verdict_holds() {
+    local body="$1" banner bare word="" reasons line num armed=0 out=""
+    if [ "${2:-ok}" = "failed" ]; then printf 'verdict:fetch-failed\n'; return 0; fi
+    if [ -z "$body" ]; then printf 'verdict:none\n'; return 0; fi
+    banner="$(hp_verdict_banner "$body")"
+    bare="${banner//\*/}"
+    bare="${bare#LATEST VERDICT: }"
+    case "$bare" in
+        "NOT READY "*) word="NOT READY" ;;
+        "READY WITH NOTES "*) word="READY WITH NOTES" ;;
+        "READY "*) word="READY" ;;
+    esac
+    if [ -z "$word" ]; then printf 'verdict:unreadable\n'; return 0; fi
+    if [ "$word" = "NOT READY" ]; then out="verdict:not-ready "; fi
+    case "$banner" in
+        *"· auto-merge armed"*) armed=1 ;;
+    esac
+    reasons="$(hp_sticky_reasons "$body")"
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        num="${line#(}"
+        num="${num%%)*}"
+        out="${out}verdict-hold:${num} "
+    done <<< "$reasons"
+    if [ "$armed" != "1" ] && [ -z "$reasons" ]; then out="${out}verdict-hold:undecided "; fi
+    out="${out% }"
+    if [ -n "$out" ]; then printf '%s\n' "$out"; fi
     return 0
 }
 

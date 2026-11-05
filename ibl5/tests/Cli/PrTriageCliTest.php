@@ -373,6 +373,9 @@ if [ "\$1" = "api" ]; then
       sha=\$(echo "\$url" | sed -E 's#.*/commits/([^/]+)/check-runs.*#\\1#')
       cat "\$CRDIR/\$sha.json" 2>/dev/null || echo '{"check_runs":[]}'
       exit 0 ;;
+    *"/issues/"*"/comments"*)
+      echo '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\\n**READY** — 2026-11-03 01:00 UTC · auto-merge armed\\n"}]'
+      exit 0 ;;
     graphql) echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'; exit 0 ;;
   esac
   echo '{}'; exit 0

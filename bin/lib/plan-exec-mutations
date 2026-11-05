@@ -29,6 +29,8 @@
 #                            after it is spent prints UNDECIDED (0 = unlimited).
 #         Baseline rc + seconds are memoized per distinct check command, so
 #         rows sharing one command run their baseline once.
+#         Each non-TRIPPED verdict line is followed by one NEXT-STEP row <id> line
+#         of guidance; harness/mutations.py skips it (not a verdict token).
 # recover restore every journalled entry; exit 0 when the journal is empty
 #         afterwards, 3 otherwise.
 # pending exit 0 when any journal entry exists, 1 otherwise.
@@ -478,6 +480,21 @@ run_check() {
     return $_crc
 }
 
+# next_step <kind> <row>: one guidance line after each non-TRIPPED verdict. The
+# NEXT-STEP prefix is not a verdict token, so harness/mutations.py RESULT_RE skips it.
+next_step() {
+    case "$1" in
+        NOT-APPLIED) _ns="the row's match text is not in the file exactly once; update the row's match/replace to the code as written. Do not change the row's check command." ;;
+        HELD) _ns="the check passed under mutation; strengthen the test. Never weaken or delete the mutation." ;;
+        WRITE-FAILED) _ns="the row's match is right, but the mutation could not be written to the file; check its permissions and free disk space, then rerun. Do not change the row." ;;
+        BASELINE-FAILED) _ns="the check fails on unmutated code; fix the test or its environment first." ;;
+        UNDECIDED) _ns="the check timed out, could not start, or the run budget ran out; rerun the stage once. If it repeats during implementation, defer it to the fire point, which uses larger limits. If it repeats at the fire point, stop and report it. Do not change the row's check command." ;;
+        REVERT-FAILED) _ns="the tree may still hold this row's mutation; run bin/lib/plan-exec-mutations recover before anything else." ;;
+        *) return 0 ;;
+    esac
+    printf 'NEXT-STEP row %s — %s\n' "$2" "$_ns"
+}
+
 RUN0=$SECONDS
 exec 3< "$RECS"
 while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
@@ -486,6 +503,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     if [ "$BUDGET" -gt 0 ] && [ $((SECONDS - RUN0)) -ge "$BUDGET" ]; then
         printf 'UNDECIDED row %s — budget exhausted (%ss elapsed of %ss) before its baseline\n' \
             "$row" "$((SECONDS - RUN0))" "$BUDGET"
+        next_step UNDECIDED "$row"
         FINAL=1; continue
     fi
     printf '%s' "$check" > "$BCACHE/key"
@@ -498,8 +516,14 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         bsec=$((SECONDS - b0 + 1))
         [ -z "$key" ] || printf '%s %s\n' "$rc" "$bsec" > "$BCACHE/$key"
     fi
+    if [ "$rc" -eq 124 ]; then
+        printf 'UNDECIDED row %s — %s timed out (124) before mutation\n' "$row" "$check"
+        next_step UNDECIDED "$row"
+        FINAL=1; continue
+    fi
     if [ "$rc" -ne 0 ]; then
         printf 'BASELINE-FAILED row %s — %s exited %s before mutation\n' "$row" "$check" "$rc"
+        next_step BASELINE-FAILED "$row"
         FINAL=1; continue
     fi
     # Re-take the snapshot now: an artifact the clean baseline check left behind is not a
@@ -510,6 +534,7 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     n=$(lit count "$file" "$match" "$replace") || n="?"
     if [ "$n" != 1 ]; then
         printf 'NOT-APPLIED row %s — match occurs %s times in %s (need exactly 1)\n' "$row" "$n" "$file"
+        next_step NOT-APPLIED "$row"
         FINAL=1; continue
     fi
     cp -p "$file" "$JDIR/$row.orig" || { FINAL=3; exit 3; }
@@ -519,12 +544,14 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
         # A failed write may have left the file half-written; restore before reporting.
         if ! why=$(restore_entry "$JDIR/$row.meta"); then
             printf 'REVERT-FAILED row %s — %s\n' "$row" "$why"
+            next_step REVERT-FAILED "$row"
             FINAL=3
             trap - EXIT INT TERM HUP
             rm -f "$RECS"; rm -rf "$BCACHE"
             exit 3
         fi
         printf 'NOT-APPLIED row %s — mutation write to %s failed\n' "$row" "$file"
+        next_step WRITE-FAILED "$row"
         FINAL=1; continue
     fi
     purge_pyc "$file"
@@ -534,18 +561,22 @@ while IFS= read -r -d '' row <&3 && IFS= read -r -d '' file <&3 \
     run_check "$msec" "$check"; rc=$?
     if [ "$rc" -eq 0 ]; then
         printf 'HELD row %s — %s still exited 0 under mutation\n' "$row" "$check"
+        next_step HELD "$row"
         FINAL=1
     elif [ "$rc" -eq 124 ]; then
         printf 'UNDECIDED row %s — %s timed out (124) under mutation\n' "$row" "$check"
+        next_step UNDECIDED "$row"
         FINAL=1
     elif [ "$rc" -ge 125 ] && [ "$rc" -le 127 ]; then
         printf 'UNDECIDED row %s — %s exited %s (check could not run) under mutation\n' "$row" "$check" "$rc"
+        next_step UNDECIDED "$row"
         FINAL=1
     else
         printf 'TRIPPED row %s — %s exited %s under mutation\n' "$row" "$check" "$rc"
     fi
     if ! why=$(restore_entry "$JDIR/$row.meta"); then
         printf 'REVERT-FAILED row %s — %s\n' "$row" "$why"
+        next_step REVERT-FAILED "$row"
         FINAL=3
         trap - EXIT INT TERM HUP
         rm -f "$RECS"; rm -rf "$BCACHE"

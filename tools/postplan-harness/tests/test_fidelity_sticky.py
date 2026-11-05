@@ -414,14 +414,36 @@ def test_deviating_status_lines_print():
     assert "REBASE=clean" not in skipped
 
 
-def test_fidelity_expects_merged_rebase_label():
-    # Phase 2 merges origin/master in, so the plain merge label is expected and stays
-    # out of the sticky; the retired rebase label now reads as a deviation and prints.
-    merged = _sticky(rebase_line="REBASE=merged origin/master")
-    assert "REBASE=" not in merged
-    old = "REBASE=rebased onto origin/master"
+def test_fidelity_expects_rebased_onto_label():
+    # Phase 2 rebases onto origin/master, so the rebased label is expected and stays
+    # out of the sticky; the retired merge label now reads as a deviation and prints.
+    rebased = _sticky(rebase_line="REBASE=rebased onto origin/master")
+    assert "REBASE=" not in rebased
+    old = "REBASE=merged origin/master"
     stale = _sticky(rebase_line=old)
     assert stale.index(old) < stale.index(fidelity.MERGE_DIGEST_HEADING)
+
+
+@pytest.mark.parametrize("line", [
+    "REBASE=rebased onto origin/master",
+    "REBASE=rebased onto origin/gm-trade-suggestions-panel",
+    "REBASE=clean (HEAD already contains origin/master)",
+])
+def test_expected_rebase_accepts_rebased_onto_target(line):
+    assert "REBASE=" not in _sticky(rebase_line=line)
+
+
+@pytest.mark.parametrize("line", [
+    "REBASE=rebased onto master",
+    "REBASE=rebased onto origin/master; extra",
+    "REBASE=rebased onto origin/",
+    "REBASE=merged origin/master",
+    "REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; manifest=x",
+])
+def test_expected_rebase_rejects_near_misses(line):
+    body = _sticky(rebase_line=line)
+    assert line in body
+    assert body.index(line) < body.index(fidelity.MERGE_DIGEST_HEADING)
 
 
 def test_nonempty_findings_are_kept_verbatim():
@@ -1084,7 +1106,9 @@ def test_sticky_layout_keeps_reader_anchors(tmp_path):
     lines = body.splitlines()
     assert lines[0].startswith("**")
     last_hold = max(i for i, ln in enumerate(lines) if ln.startswith("- ("))
-    assert lines[last_hold + 1] == ""
+    assert lines[last_hold + 1] == ("Auto-merge disarmed: a held run removes any "
+                                    "existing arm on this PR.")
+    assert lines[last_hold + 2] == ""
     assert [i for i, ln in enumerate(lines) if re.match(r"^- \(\d", ln)] == [last_hold]
     digest = lines.index(fidelity.MERGE_DIGEST_HEADING)
     for heading in ("### Fixed in this PR", "### Still open (non-blocking)",

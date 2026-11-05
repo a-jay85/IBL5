@@ -2152,7 +2152,7 @@ run_manual_judge() {
       timeout "$cap" claude -p "$judge_prompt" \
           --dangerously-skip-permissions \
           --model "$JUDGE_MODEL" \
-          --disallowedTools Edit Write NotebookEdit Agent \
+          --disallowedTools Edit Write NotebookEdit Agent Monitor \
           --effort high \
           --output-format stream-json \
           --verbose \
@@ -3141,6 +3141,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             printf '[%s] %s post-plan-now declined a repeat hold (rc=8), not environmental\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
         fi
         # postplan-rc8-declined: end
+        # postplan-rc9-refused: begin
+        # post-plan-now exit 9 = the pre-fire gate refused this tree. It fails fast when
+        # its stages are cached, but it is a verdict on the plan, so a sub-minute exit
+        # with the handoff present is not environmental. Refunding it would retry this
+        # plan forever and block the queue. Count the attempt, so MAX_ATTEMPTS retires it.
+        if [ "$PP_STATUS" -eq 9 ]; then
+            PP_TERMINAL=1
+            printf '[%s] %s post-plan-now refused by pre-fire verification (rc=9), not environmental\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+            note_failure "The pre-fire check refused $PLAN_SLUG, so it did not ship. The try was counted. The full log has the failing check."
+        fi
+        # postplan-rc9-refused: end
         # postplan-no-worktree-merged: begin
         # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
         # whose branch PR is MERGED already went to done/ via
@@ -3187,12 +3198,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # so a handoff still present after a sub-minute exit means the agent never
         # ran — environmental. A known limit/auth signature stops regardless, so a
         # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
+        # post-plan-now exit 10 = the pre-fire gate could not run. It can arrive after
+        # an uncached PHPUnit stage, past MIN_VIABLE_SECS, so it trips at any duration.
         if [ "$PP_TERMINAL" -eq 0 ] && { phase_env_error "$PP_LOG_BEFORE" \
            || phase_stalled "$PP_LOG_BEFORE" \
+           || [ "$PP_STATUS" -eq 10 ] \
            || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; }; then
             REASON="usage/rate limit, auth error, or transient"
             if phase_stalled "$PP_LOG_BEFORE"; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
+            elif [ "$PP_STATUS" -eq 10 ]; then
+                REASON="pre-fire gate could not run (post-plan-now rc=10, ${PP_DUR}s)"
             elif [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; then
                 REASON="$REASON (postplan exited in ${PP_DUR}s)"
             fi

@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-11-02
+last_verified: 2026-11-04
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -118,3 +118,11 @@ The usage endpoint now returns `"five_hour": null`. A reading on 2026-11-01 show
 Pause markers, the blind-trust check and the limit-hit marker always name window `seven_day`. `usage_delta_log` writes only `week` and `d_week`, and `last/<sid>` keeps the weekly figure as its last field. An old `last/<sid>` file in the two-field form still reads correctly. A `last/<sid>` file whose last field is not a number counts as unchanged, so that session logs no deltas until the file is replaced. `bin/usage-gate-coordinator` gives the `WEEKLY` DM prefix only to `seven_day` markers. An old marker with `window: five_hour` still resumes by its `resets_at`, and `bin/fleet-status` shows a generic `reset` for it.
 
 The Context section's mention of the 5-hour and weekly plan limits is history. It stays true for the period it describes.
+
+## Addendum 2026-11-04: discard the recorded edit before the pre-fire gate
+
+`bin/post-plan-now --resume-paused` now discards a recorded interrupted edit before it runs `bin/lib/prefire-verify`. The gate therefore judges the tree the resumed run will ship. Before this, a half-done edit that failed the gate blocked every resume, because only the harness discarded it and the harness starts after the gate. The job then ended up stuck at the pause limit.
+
+`restore_from_record` also returns success when the tree is already at `pre_tree`, so the harness's own discard still clears the record. Every other refusal stands.
+
+The harness test suite now strips the live gate context from its environment. A test that fed limit text to a real `ClaudeCli` had written a real pause marker for the post-plan run that launched it.

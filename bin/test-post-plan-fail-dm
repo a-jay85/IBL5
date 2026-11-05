@@ -7,7 +7,7 @@
 #   2. Live session in the worktree: no DM now, one held job scheduled.
 #   3. Live session in a different worktree: DM now.
 #   4. Registry unreadable (missing, or malformed JSON): DM now (fail open).
-#   5. launchctl bootstrap fails: DM now.
+#   5. launchctl submit fails: DM now.
 #   6. Held job, newer log for the branch: no DM.
 #   7. Held job, no newer log: DM, prefixed so you know nobody re-ran it.
 #   8. Held job, newer log for a longer branch name ("foo-bar" vs "foo"): still DMs.
@@ -19,6 +19,9 @@
 #  14. ps cannot read the live pid's argv: DM held (counts as live).
 #  16. Generic blocked_ship_block (no blocked-ship.txt) ends with the postplan-fix
 #      paste line, and the DM body keeps it as its last line.
+#
+# 5 (bootstrap) now means ljob_submit fails. Cases named faildm_* cover the submit argv,
+# the self-deleting per-run script, and the fallbacks.
 #
 # launchctl and discord-dm are stubbed; nothing leaves the machine.
 # Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
@@ -37,9 +40,27 @@ fail() { h_fail "$@"; }
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-post-plan-fail-dm.XXXXXX")
 STUBS=""
 trap 'kill $STUBS 2>/dev/null; rm -rf "$TMP"' EXIT
+# Real-agents-dir leak guard (same idea as unit 1's guard in bin/test-plan-now,
+# scoped to the three launchers converted in this unit). Captured before any
+# HOME override; compared at the end of the file.
+REAL_AGENTS="$HOME/Library/LaunchAgents"
+real_agents_names() {
+    find "$REAL_AGENTS" -maxdepth 1 -type f \
+        \( -name 'com.ibl5.docfix-run-*' -o -name 'com.ibl5.pr-cycle-*' \
+           -o -name 'com.ibl5.postplan-faildm-*' \) 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
+# Sandbox HOME, and a PATH launchctl that records any call that bypasses the
+# FAILDM_LAUNCHCTL seam. Submit writes no file, so the agents-dir guard alone
+# cannot see a real-launchctl leak; this file can.
+export HOME="$TMP/home"
+mkdir -p "$HOME/Library/LaunchAgents" "$TMP/leakbin"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> %q\nexit 1\n' "$TMP/launchctl.LEAK" > "$TMP/leakbin/launchctl"
+chmod +x "$TMP/leakbin/launchctl"
+export PATH="$TMP/leakbin:$PATH"
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
-WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"; PLISTS="$TMP/plists"
+WT="$TMP/wt"; OTHER="$TMP/other"; LOGS="$TMP/logs"
 mkdir -p "$WT" "$OTHER" "$LOGS" "$TMP/bin"
 DM_OUT="$TMP/dm.out"; DM_ARGV="$TMP/dm.argv"; LC_OUT="$TMP/lc.out"
 
@@ -91,14 +112,15 @@ LOG="$LOGS/post-plan-now-foo-20260926-182719-111.log"
 
 reset() {
     rm -f "$DM_OUT" "$DM_ARGV" "$LC_OUT" "$LOGS"/* "$TMP/reg.json"
-    rm -rf "$PLISTS"
     : > "$LOG"
 }
 
+faildm_script() { printf '%s/postplan-faildm-%s.sh' "$LOGS" "$(basename "$LOG" .log | sed 's/^post-plan-now-//')"; }
+
 run() {   # run [--deferred]
     FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="$TMP/bin/dm" \
-    FAILDM_LAUNCHCTL="${LC:-$TMP/bin/lc-ok}" FAILDM_PLIST_DIR="$PLISTS" \
-    FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
+    FAILDM_LAUNCHCTL="${LC:-$TMP/bin/lc-ok}" \
+    FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY="${HOLD_DELAY:-900}" \
         "$SUT" "$@" "$WT" foo "$LOG" "the-msg" >/dev/null 2>&1
 }
 
@@ -119,8 +141,23 @@ grep -qF -- '--ping' <<< "$(cat "$DM_ARGV" 2>/dev/null)" \
 reset; registry "$WT" $$
 run
 [ "$(dm_count)" = 0 ] && [ "$(lc_count)" = 1 ] && [ -f "$LOG.faildm-stamp" ] \
-    && ls "$PLISTS"/*.plist >/dev/null 2>&1 \
     && ok "2 live session: DM held" || fail "2 live session: DM held"
+# faildm_submit_argv: one recorded call, the submit argv, a self-deleting 0700
+# script, and nothing in the sandbox agents dir or the leak shim.
+S="$(faildm_script)"
+LC_LINE="$(cat "$LC_OUT" 2>/dev/null)"
+if [ "$(lc_count)" = 1 ] \
+    && grep -qF -- 'submit -l com.ibl5.postplan-faildm-' <<< "$LC_LINE" \
+    && grep -qF -- "-o $LOG -e $LOG" <<< "$LC_LINE" \
+    && [ -f "$S" ] && [ -x "$S" ] && [ -n "$(find "$S" -perm 700)" ] \
+    && [ "$(sed -n 2p "$S")" = "rm -f '$S'" ] \
+    && grep -qF -- '--deferred' "$S" \
+    && [ -z "$(ls -A "$HOME/Library/LaunchAgents")" ] \
+    && [ ! -e "$TMP/launchctl.LEAK" ]; then
+    ok "faildm_submit_argv: one submit call, 0700 self-deleting script, no agents-dir file"
+else
+    fail "faildm_submit_argv: calls=$(lc_count) argv=$LC_LINE script=$S"
+fi
 
 reset; registry "$OTHER" $$
 run
@@ -137,7 +174,48 @@ run
 
 reset; registry "$WT" $$
 LC="$TMP/bin/lc-bad" run
-[ "$(dm_count)" = 1 ] && [ ! -f "$LOG.faildm-stamp" ] && ok "5 bootstrap fails: DM now" || fail "5 bootstrap fails: DM now"
+[ "$(dm_count)" = 1 ] && [ ! -f "$LOG.faildm-stamp" ] && [ ! -e "$(faildm_script)" ] \
+    && ok "faildm_submit_fail_cleans: 5 submit fails: DM now, no stamp, no script" \
+    || fail "faildm_submit_fail_cleans: 5 submit fails: DM now (dm=$(dm_count))"
+
+# faildm_bad_label_falls_back: "+" is outside the label charset, so ljob_submit
+# returns 2 before any launchctl call.
+SAVED_LOG="$LOG"
+LOG="$LOGS/post-plan-now-a+b-20261021-120000-1.log"
+reset; registry "$WT" $$
+run
+[ "$(lc_count)" = 0 ] && [ "$(dm_count)" = 1 ] && [ ! -e "$(faildm_script)" ] \
+    && [ ! -f "$LOG.faildm-stamp" ] \
+    && ok "faildm_bad_label_falls_back: bad label sends the DM now, leaves no script or stamp" \
+    || fail "faildm_bad_label_falls_back: lc=$(lc_count) dm=$(dm_count)"
+LOG="$SAVED_LOG"
+
+# faildm_script_runs_once_selfdeletes: run the generated script with no delay.
+reset; registry "$WT" $$
+HOLD_DELAY=0 run
+S="$(faildm_script)"
+bash "$S" >/dev/null 2>&1; SRC=$?
+if [ "$SRC" = 0 ] && [ "$(dm_count)" = 1 ] && grep -qF -- 'Nobody re-ran it' "$DM_OUT" \
+    && [ ! -e "$S" ] && [ ! -f "$LOG.faildm-stamp" ] && [ "$(lc_count)" = 1 ] \
+    && [ ! -e "$TMP/launchctl.LEAK" ]; then
+    ok "faildm_script_runs_once_selfdeletes: script ran, one DM, script and stamp gone, no extra launchctl"
+else
+    fail "faildm_script_runs_once_selfdeletes: rc=$SRC dm=$(dm_count) script=$([ -e "$S" ] && echo present || echo gone) lc=$(lc_count)"
+fi
+
+# faildm_kill_leaves_no_script: a SIGKILL during the hold leaves no script and no DM.
+reset; registry "$WT" $$
+HOLD_DELAY=30 run
+S="$(faildm_script)"
+bash "$S" >/dev/null 2>&1 &
+KJOB=$!
+for _i in $(seq 1 20); do [ -e "$S" ] || break; sleep 0.1; done
+pkill -9 -P "$KJOB" 2>/dev/null
+kill -9 "$KJOB" 2>/dev/null
+wait "$KJOB" 2>/dev/null
+[ ! -e "$S" ] && [ ! -s "$DM_OUT" ] \
+    && ok "faildm_kill_leaves_no_script: SIGKILL during the hold leaves no script and no DM" \
+    || fail "faildm_kill_leaves_no_script: script=$([ -e "$S" ] && echo present || echo gone) dm=$(dm_count)"
 
 reset; touch -t 202609261800 "$LOG.faildm-stamp"
 : > "$LOGS/post-plan-now-foo-20260926-183043-222.log"
@@ -209,7 +287,7 @@ EOF
 chmod +x "$WT/bin/discord-dm"
 rm -f "$TMP/default-dm.argv"
 FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="" \
-FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" \
 FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     "$SUT" "$WT" foo "$LOG" "the-msg" >/dev/null 2>&1
 [ "$(wc -l < "$TMP/default-dm.argv" 2>/dev/null | tr -d ' ')" = 1 ] \
@@ -224,7 +302,7 @@ reset; registry "$WT" 999999
 GEN_BLOCK=$(bash -c 'source "$1" >/dev/null 2>&1; blocked_ship_block "$2" "$3" "$4" "$5" "$6"' \
     _ "$ROOT/bin/post-plan-now" "$TMP/no-run-dir" "feat/gen" "$WT" "$LOG" "/main/root")
 FAILDM_REGISTRY="$TMP/reg.json" FAILDM_DM_CMD="$TMP/bin/dm" \
-FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" FAILDM_PLIST_DIR="$PLISTS" \
+FAILDM_LAUNCHCTL="$TMP/bin/lc-ok" \
 FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     "$SUT" "$WT" foo "$LOG" "$GEN_BLOCK" >/dev/null 2>&1
 [ "$(tail -n 1 "$DM_OUT")" = "/main/root/bin/postplan-fix feat/gen" ] \
@@ -233,5 +311,22 @@ FAILDM_LOG_DIR="$LOGS" FAILDM_DELAY=900 \
     && ! grep -qF "Or open Claude in that folder" "$DM_OUT" \
     && ok "16 generic block DM ends with the postplan-fix paste line" \
     || fail "16 generic block DM tail: $(tail -n 3 "$DM_OUT" 2>/dev/null)"
+
+# no_plist_word: the launch path names no plist, no XML escaper, no plist dir seam.
+grep -qiE 'plist|xml_escape|FAILDM_PLIST_DIR' "$SUT" \
+    && fail "no_plist_word: $SUT still mentions plist/xml_escape/FAILDM_PLIST_DIR" \
+    || ok "no_plist_word: $SUT has no plist, xml_escape or FAILDM_PLIST_DIR"
+
+if [ -e "$TMP/launchctl.LEAK" ]; then
+    echo "FAIL launchctl-leak: unseamed launchctl call: $(cat "$TMP/launchctl.LEAK")"
+    exit 1
+fi
+echo "PASS launchctl-leak"
+REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
+if [ -n "$REAL_AGENTS_NEW" ]; then
+    echo "FAIL real-agents-guard: test wrote into $REAL_AGENTS: $REAL_AGENTS_NEW"
+    exit 1
+fi
+echo "PASS real-agents-guard"
 
 h_done

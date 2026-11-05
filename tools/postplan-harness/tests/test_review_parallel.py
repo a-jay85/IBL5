@@ -194,8 +194,8 @@ def test_ledger_has_entry_for_every_agent(tmp_path):
     assert "review-agent-b" not in purposes
 
 
-def test_security_audit_and_verifiers_are_sonnet(tmp_path):
-    """security-audit and every verifier seat run on sonnet (Haiku price cliff, code-reading votes)."""
+def test_security_audit_is_sonnet_and_verifiers_are_opus(tmp_path):
+    """security-audit runs on sonnet (Haiku price cliff); every verifier seat runs on opus (final merge call)."""
     canned = _make_canned({
         "security": [{"path": "ibl5/s.php", "line": 3, "body": "security issue"}],
     })
@@ -209,7 +209,7 @@ def test_security_audit_and_verifiers_are_sonnet(tmp_path):
     assert models["review-agent-a"] == "sleep:sonnet"
     verifier_records = [r for r in ledger.calls if r.purpose.startswith("verify-findings-")]
     assert {r.purpose for r in verifier_records} == set(VERIFIER_PURPOSES)
-    assert all(r.model == "sleep:sonnet" for r in verifier_records)
+    assert all(r.model == "sleep:opus" for r in verifier_records)
 
 
 def test_findings_from_all_agents_are_returned(tmp_path):

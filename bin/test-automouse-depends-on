@@ -465,6 +465,12 @@ mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
 ln -sf "$REPO_ROOT/bin/automouse/prompt-impl" "$E2_NDIR/prompt-impl"
 # The runner also sources $SELF_DIR/lib-queue-order (queue_entries_ordered).
 ln -sf "$REPO_ROOT/bin/automouse/lib-queue-order" "$E2_NDIR/lib-queue-order"
+# The judge gate (plan_requires_judge) fails closed when $SELF_DIR/../lib/plan-model-consistency
+# is missing, so every case needs the wrapper and prompt-judge.
+ln -sf "$REPO_ROOT/bin/automouse/prompt-judge" "$E2_NDIR/prompt-judge"
+mkdir -p "$E2_ROOT/lib"
+printf '#!/bin/sh\nexec "%s/bin/lib/plan-model-consistency" "$@"\n' "$REPO_ROOT" > "$E2_ROOT/lib/plan-model-consistency"
+chmod +x "$E2_ROOT/lib/plan-model-consistency"
 
 # Rewritten runner: REPO→worktree, NIGHTLY_DIR→temp, PATH→stub first
 E2_RUNNER="$E2_NDIR/run"

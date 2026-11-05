@@ -1047,6 +1047,81 @@ else
     fail "C24: P1 picked before P2 (P1=$P1_LINE, P2=$P2_LINE)"
 fi
 
+# ── WF1: website items pick ahead of higher-ranked tooling, below P1 ─────────
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md" <<'REPORT'
+# Backlog triage 2026-09-29
+
+## P1 (1)
+
+- [#70](u70) P1 tooling — ref
+
+## P2 (1)
+
+- [#100](u100) P2 tooling — ref
+
+## P3 (3)
+
+- [#103](u103) P3 website tests only — ref
+- [#101](u101) P3 website class — ref
+- [#104](u104) P3 website root page — ref
+
+## P4 (2)
+
+- [#102](u102) P4 class-scan on website code — ref
+- [#105](u105) P4 tooling — ref
+REPORT
+touch -t 202609290000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md"
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":70,"title":"P1 tooling","body":"bin/wf70:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":100,"title":"P2 tooling","body":"bin/wf100:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":103,"title":"P3 website tests only","body":"ibl5/tests/WfTest.php:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":101,"title":"P3 website class","body":"ibl5/classes/Wf/A.php:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":104,"title":"P3 website root page","body":"ibl5/wf.php:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":102,"title":"class-scan: website class","body":"ibl5/classes/Wf/B.php:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":105,"title":"P4 tooling","body":"bin/wf105:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+WF_ORDER="$(grep -oE 'PICK.*#[0-9]+' <<< "$OUT" | grep -oE '#[0-9]+' | tr -d '#' | tr '\n' ' ')"
+[ "$RC" -eq 0 ] && [ "$WF_ORDER" = "70 101 104 100 103 " ] \
+    && ok "WF1: P1, then website, then the rest by rank; tests and class-scan stay put" \
+    || fail "WF1: P1, then website, then the rest by rank (got $RC: $WF_ORDER)"
+WF_LEDGER="$(grep -E '^LEDGER:' <<< "$OUT" | tail -1 | sed 's/^LEDGER: //')"
+[ "$(jq -r '.items[] | select(.issue_num==101) | .rank' "$WF_LEDGER")" = "P3" ] \
+    && ok "WF2: a moved item keeps its real rank in the ledger" \
+    || fail "WF2: a moved item keeps its real rank in the ledger"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md"
+
+# ── WF3: jslib and design count as website code ──────────────────────────────
+# Separate from WF1 so these items do not fill the pick budget there.
+cat > "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md" <<'REPORT'
+# Backlog triage 2026-09-29
+
+## P2 (1)
+
+- [#110](u110) P2 tooling — ref
+
+## P3 (2)
+
+- [#106](u106) P3 website jslib — ref
+- [#107](u107) P3 website design — ref
+REPORT
+touch -t 202609290000 "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md"
+cat > "$T/fx/issues.json" <<'JSON'
+[
+  {"number":110,"title":"P2 tooling","body":"bin/wf110:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":106,"title":"P3 website jslib","body":"ibl5/jslib/wf.js:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]},
+  {"number":107,"title":"P3 website design","body":"ibl5/design/wf.css:1 thing","url":"u","updatedAt":"2026-09-27T00:00:00Z","labels":[]}
+]
+JSON
+OUT="$(bd_b 2>&1)"; RC=$?
+WF_ORDER="$(grep -oE 'PICK.*#[0-9]+' <<< "$OUT" | grep -oE '#[0-9]+' | tr -d '#' | tr '\n' ' ')"
+[ "$RC" -eq 0 ] && [ "$WF_ORDER" = "106 107 110 " ] \
+    && ok "WF3: jslib and design items pick ahead of P2 tooling" \
+    || fail "WF3: jslib and design items pick ahead of P2 tooling (got $RC: $WF_ORDER)"
+rm -f "$T/home/claude-plans/_reports/backlog-triage-2026-09-29.md"
+
 # ── Phase 4: ledger write, record, and refresh ────────────────────────────────
 
 # ── C25: ledger written ───────────────────────────────────────────────────────

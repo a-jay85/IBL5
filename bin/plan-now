@@ -479,6 +479,12 @@ conflicting default in the skill):**
   your turn, and expect to collect it afterwards. Under \`claude -p\` the turn you
   end is the run, so a background result has no next turn to land on and is
   discarded. If you have already started one, collect it before you finish.
+- **Wait for each architect section.** \`SendMessage\` returns before the
+  architect replies, and the turn you end is the run.
+  Never end your turn while a section you sent has not landed.
+  Poll the draft for its \`## <title>\` heading in foreground Bash loops of
+  under 500s each, about 20 minutes in total per section. Send the next section
+  only after the previous one lands.
 - $DISPOSITION_LINE
 CODA
 fi
@@ -486,10 +492,8 @@ fi
 # The resume turn's whole prompt. Short on purpose: the session already holds the
 # original prompt and the headless coda, so this restates only what a cut-off
 # turn loses: where it was, what is already on disk, and the marker contract.
-CONTINUE_MSG=""
-if [ -n "$RESUME_ID" ]; then
-    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md — or, only if you halt having written no plan at all (the work is already done), exactly: NO_PLAN: <one-line reason with the evidence>"
-fi
+# Used by a manual --resume run and by the runner's one-shot auto-resume after an early exit.
+CONTINUE_MSG="Your previous turn ended before the plan was finished (a usage limit, the run timeout, or a turn that ended while a sub-agent reply was still pending). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. If a sectioned plan draft is part-written, compare the numbered titles in its PLAN OUTLINE comment with its ## headings and request only the missing sections, one at a time, waiting for each heading to land in the draft before you send the next. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md; or, only if you halt having written no plan at all (the work is already done), exactly: NO_PLAN: <one-line reason with the evidence>"
 
 # ---------------------------------------------------------------------------
 # The detached job. The plist invokes this runner by path rather than inlining
@@ -646,6 +650,26 @@ recovery_candidate() {
     return 1
 }
 
+# Echo "<sections>/<titles>" and return 0 when this run's draft declares more
+# outline titles than it holds body sections. Titles are the numbered lines inside
+# the <!-- PLAN OUTLINE ... --> comment. Sections are `## ` lines outside that
+# comment and outside fenced blocks. No draft, or no outline (zero titles), returns
+# 1: the wrapper cannot tell finished from part-written, so recovery A keeps it.
+draft_unfinished() {
+    local d titles body
+    d=$(recovery_candidate) || return 1
+    titles=$(awk '/<!-- PLAN OUTLINE/,/-->/' "$d" \
+        | grep -cE '^[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]')
+    body=$(awk '
+        /<!-- PLAN OUTLINE/ { inc = 1 }
+        inc { if (/-->/) inc = 0; next }
+        /^[[:space:]]*```/ { f = !f; next }
+        !f && /^## / { n++ }
+        END { print n + 0 }' "$d")
+    [ "$body" -lt "$titles" ] || return 1
+    printf '%s/%s\n' "$body" "$titles"
+}
+
 # Render draft $1 into plan $2: drop the outline scaffold, then hoist a
 # frontmatter block the scaffold shape stranded below the title. Writes via a
 # temp file in the same directory, so $2 is never observed half-written.
@@ -709,10 +733,29 @@ else
     PROMPT_TEXT=$(cat "$PROMPT")
     SESSION_ARGS=(--session-id "$SESSION_ID")
 fi
+# One model call into $OUT. $1 = timeout seconds, $2 = prompt text, the rest are
+# the session args. Shared by the first call and the one-shot auto-resume below,
+# so the env prefix and flag list live in one place.
+AUTO_RESUME_MIN_SECS=600
+claude_call() {
+    local secs="$1" prompt="$2"
+    shift 2
+    IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_MODEL="$MODEL" \
+        IBL5_USAGE_GATE_RESUME_BIN="$RESUME_BIN" \
+        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+        CLAUDE_HEADLESS=1 caffeinate -s \
+        timeout "$secs" "$CLAUDE_BIN" -p "$prompt" \
+        --dangerously-skip-permissions \
+        --model "$MODEL" \
+        "$@" \
+        --effort high \
+        --name "$LABEL" > "$OUT" 2>&1
+}
 # Usage gate (ADR-0143): in the drain/stop zone a run without the token pauses before
 # the call; a limit-hit or hook pause after it is classified before any verdict.
 PAUSED=0
 LOGIN_PARKED=0
+AUTO_RESUMED=0
 # Login probe before the claude spawn: park (no spawn) only on a definite logged-out verdict.
 # unknown:* returns 0 here, so an inconclusive probe never blocks the run.
 if ! login_preflight "$LOGIN_NIGHTLY_DIR" "$LOG" "$DISCORD_DM" plan-now "bin/plan-now --resume $TS"; then
@@ -724,18 +767,32 @@ elif ! usage_prestart_gate plan-now "$SESSION_ID" "$RESUME_BIN"; then
     rc=0
     : > "$OUT"
 else
-    IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_MODEL="$MODEL" \
-        IBL5_USAGE_GATE_RESUME_BIN="$RESUME_BIN" \
-        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
-        CLAUDE_HEADLESS=1 caffeinate -s \
-        timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
-        --dangerously-skip-permissions \
-        --model "$MODEL" \
-        "${SESSION_ARGS[@]}" \
-        --effort high \
-        --name "$LABEL" > "$OUT" 2>&1
+    claude_call "$RUN_TIMEOUT" "$PROMPT_TEXT" "${SESSION_ARGS[@]}"
     rc=$?
     usage_postrun_pause plan-now "$SESSION_ID" "$RESUME_BIN" "$rc" "$OUT" && PAUSED=1
+    # One-shot auto-resume after an early exit. A clean exit with neither final
+    # marker and a part-written draft means the orchestrator ended its turn while
+    # a sub-agent reply was still pending; under claude -p that ends the run.
+    # Resume the same session once with $CONTINUE_MSG, inside this branch so the
+    # usage token is still held, and before the verdict chain and recovery A read
+    # $OUT. Never on a manual --resume run (RESUME_FROM set). The block is a plain
+    # if, so it can fire at most once per runner. The resumed call gets what is
+    # left of RUN_TIMEOUT, so RUN_TIMEOUT stays the cap for the whole run.
+    if [ "$rc" -eq 0 ] && [ "$PAUSED" = 0 ] && [ -z "${RESUME_FROM:-}" ] \
+        && ! grep -qE '^[-*>`[:space:]]*(PLAN_FILE|NO_PLAN):' "$OUT" 2>/dev/null \
+        && AR_PROGRESS=$(draft_unfinished); then
+        AR_LEFT=$(( RUN_TIMEOUT - ($(date +%s) - started) ))
+        if [ "$AR_LEFT" -lt "$AUTO_RESUME_MIN_SECS" ]; then
+            echo "plan-now: no auto-resume — only ${AR_LEFT}s of the ${RUN_TIMEOUT}s budget left (floor ${AUTO_RESUME_MIN_SECS}s)."
+        else
+            AUTO_RESUMED=1
+            cat "$OUT"
+            echo "plan-now: auto-resume — claude exited 0 with no PLAN_FILE:/NO_PLAN: line and draft sections ${AR_PROGRESS}; resuming session $SESSION_ID once with ${AR_LEFT}s left."
+            claude_call "$AR_LEFT" "$CONTINUE_MSG" --resume "$SESSION_ID"
+            rc=$?
+            usage_postrun_pause plan-now "$SESSION_ID" "$RESUME_BIN" "$rc" "$OUT" && PAUSED=1
+        fi
+    fi
 fi
 usage_token_release "$SESSION_ID" 2>/dev/null || true
 cat "$OUT"
@@ -779,6 +836,7 @@ newfiles=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep 
 
 echo "----------------------------------------------------------------"
 echo "plan-now: claude exited $rc after ${elapsed}s"
+[ "$AUTO_RESUMED" = 1 ] && echo "plan-now: this run was auto-resumed once after an early exit (session $SESSION_ID)."
 
 if [ "$LOGIN_PARKED" = 1 ]; then
     echo "plan-now: RESULT parked — Claude login expired; no model call was made."
@@ -1078,6 +1136,10 @@ ${elapsed}s · ${DM_NEXT:-read the log}"
     if [ -n "$DM_PLAN" ]; then
         msg="$msg
 ${DM_PLAN/#$HOME/~}"
+    fi
+    if [ "${AUTO_RESUMED:-0}" = 1 ]; then
+        msg="$msg
+auto-resumed once after an early exit"
     fi
     if [ -n "${TIER_OVERRIDE:-}" ]; then
         msg="$msg

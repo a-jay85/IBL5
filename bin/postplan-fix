@@ -8,9 +8,9 @@
 # then opens an interactive Claude session in that worktree with one opening prompt.
 # Never ships: the prompt tells Claude to leave bin/post-plan-now and merging to you.
 #
-# --headless is the rescue path for a blocked origin/master merge: it merges origin/master
-# into the branch worktree, runs one tool-restricted `claude -p` session to resolve the
-# conflicts, checks the result, and commits the merge locally. It never pushes. A committed
+# --headless is the rescue path for a blocked origin/master sync: it rebases the branch onto
+# origin/master in the branch worktree, runs one tool-restricted `claude -p` session to resolve
+# the conflicts, checks the result, and finishes the rebase locally. It never pushes. A committed
 # resolution also writes the pre-merge manifest and the condition-14 flag (the harness proves
 # and reviews it before any push). The last stdout line is
 # "postplan-fix: headless result=<committed|clean|gave-up-record>". --dry-run
@@ -37,7 +37,7 @@ while [ "$#" -gt 0 ]; do
             usage
             echo "Resolves the worktree and newest post-plan run dir for the PR or branch,"
             echo "extracts the failure text, and starts an interactive claude session there."
-            echo "--headless merges origin/master and runs one restricted claude -p session to"
+            echo "--headless rebases onto origin/master and runs one restricted claude -p session to"
             echo "resolve conflicts (--dry-run prints the argv and prompt only)."
             echo "--holdrepeat <PR> fixes a repeat condition-3 hold with one bounded session,"
             echo "then pushes and re-fires post-plan itself (exit 0 fixed, 20 skip, 21 gave up)."
@@ -222,14 +222,39 @@ if [ "$HOLDREPEAT" = 1 ]; then
         python3 -I -B -c 'import runpy, sys; sys.path.insert(0, sys.argv[1]); sys.argv = ["holdrepeat"] + sys.argv[2:]; runpy.run_module("harness.holdrepeat", run_name="__main__", alter_sys=True)' \
             "$MAIN_ROOT/tools/postplan-harness" "$@"
     }
+    # The rc 11 give-up line carries no part: lines, so its DM reads the held items from the
+    # hold record. fix_eligibility only reads. A record whose fingerprint no longer matches the
+    # verdict's moved on in between, so its items are not this hold's: print none.
+    _hr_giveup_parts() {
+        python3 -I -B -c 'import sys
+sys.path.insert(0, sys.argv[1])
+from harness.holdrepeat import fix_eligibility
+word, fp, parts = fix_eligibility(sys.argv[2], sys.argv[3])
+if word == "eligible" and fp == sys.argv[4]:
+    print("\n".join(parts))' "$MAIN_ROOT/tools/postplan-harness" "$STATE_DIR" "$branch" "$HR_FP" 2>/dev/null
+    }
     # Final stdout line for every --holdrepeat exit; callers parse it with the exit code.
     _hr_finish() {  # <rc> <result word>
+        HR_FINISHED=1
         printf 'postplan-fix: holdrepeat dm=%s\n' "$HR_DM_STATE"
         printf 'postplan-fix: holdrepeat result=%s\n' "$2"
         exit "$1"
     }
     # Owner DM: the fleet's call shape (message on stdin, "-" as the argument).
     HR_DM_STATE=none   # "sent" once the owner DM went out; the fleet reads it to avoid a second DM
+    # Every --holdrepeat exit ends with the result line. _hr_finish sets HR_FINISHED; any other
+    # exit (a set -e failure, an unset variable) lands here and reports result=error with rc 1,
+    # so bin/post-plan-fleet never sees a result-less exit. It also owns the temp-dir cleanup.
+    HR_FINISHED=0 HR_TMP_MADE=0
+    _hr_on_exit() {
+        local rc=$?
+        if [ "$HR_TMP_MADE" = 1 ]; then rm -rf "$HR_TMP" || true; fi
+        if [ "$HR_FINISHED" != 1 ]; then
+            echo "postplan-fix: --holdrepeat stopped unexpectedly (rc $rc)" >&2
+            _hr_finish "$HR_RC_ERROR" error
+        fi
+    }
+    trap _hr_on_exit EXIT
     _hr_dm() {  # <reason>
         local text line n=0
         HR_DM_STATE=sent
@@ -342,7 +367,10 @@ if [ "$HOLDREPEAT" = 1 ]; then
             if [[ "$HR_ELIG" == *"fingerprint="* ]]; then
                 HR_FP="${HR_ELIG#*fingerprint=}"; HR_FP="${HR_FP%%[[:space:]]*}"
             fi
-            if [[ "$HR_ELIG" == *"dm=yes"* ]]; then _hr_dm "gave up: $HR_WORD"; fi
+            if [[ "$HR_ELIG" == *"dm=yes"* ]]; then
+                HR_PARTS="$(_hr_giveup_parts)" || HR_PARTS=""
+                _hr_dm "gave up: $HR_WORD"
+            fi
             _hr_finish "$HR_RC_GAVEUP" "gave-up-$HR_WORD" ;;
         10)
             HR_FP="${HR_ELIG#*fingerprint=}"; HR_FP="${HR_FP%%[[:space:]]*}"
@@ -363,7 +391,7 @@ if [ "$HOLDREPEAT" = 1 ]; then
     HR_TMP="${TMPDIR:-/tmp}/postplan-fix-hr.XXXXXX"
     if [ "$DRY_RUN" != 1 ]; then
         HR_TMP="$(mktemp -d "$HR_TMP")"
-        trap 'rm -rf "$HR_TMP"' EXIT
+        HR_TMP_MADE=1
     fi
     HR_NOTE="$HR_TMP/plan-change-note.md"
 
@@ -799,7 +827,7 @@ if [ "$HEADLESS" = 1 ]; then
         echo "postplan-fix: denied-tool list unavailable from $MAIN_ROOT/tools/postplan-harness" >&2
         exit 1
     fi
-    PROMPT+=$'\n\n'"Headless remit: the working tree holds an in-progress merge of origin/master into $branch with conflict markers."$'\n'
+    PROMPT+=$'\n\n'"Headless remit: the working tree holds an in-progress rebase of $branch's own changes, squashed to one commit, onto the PR base. In each conflict the HEAD side is the PR base and the other side is $branch."$'\n'
     PROMPT+="Resolve each conflicted file, keeping both sides' intent."$'\n'
     PROMPT+="Verify: run bin/test-<x> for a touched bin/<x>; run cd tools/postplan-harness && python3 -m pytest -q tests for harness files; run cd ibl5 && vendor/bin/phpunit --no-progress <test file> only when ibl5/vendor/autoload.php exists."$'\n'
     PROMPT+="You may edit tests that master added which assume the pre-branch behaviour."$'\n'
@@ -827,7 +855,26 @@ if [ "$HEADLESS" = 1 ]; then
     fi
     HEAD0="$(git -C "$WT" rev-parse HEAD)"
     printf 'postplan-fix: headless head0=%s wt=%s\n' "$HEAD0" "$WT"
-    git -C "$WT" fetch -q origin master
+    # shellcheck source=bin/lib/branch-base.sh
+    . "$MAIN_ROOT/bin/lib/branch-base.sh"
+    # A stacked branch rebases onto its declared parent, never master (PR #3672).
+    if ! BASE_REF="$(branch_base_merge_target "$WT" "$branch")"; then
+        echo "postplan-fix: $branch records branch.$branch.iblBase but its base did not resolve." >&2
+        echo "  Record the real parent: git config branch.$branch.iblBase <parent-branch>" >&2
+        echo "postplan-fix: headless result=gave-up-base"
+        exit 1
+    fi
+    git -C "$WT" fetch -q origin "${BASE_REF#origin/}"
+    # Replay upstream: the same rule as the harness's _replay_upstream. The merge base, unless a
+    # recorded parent tip is an ancestor of HEAD and not yet in BASE_REF (a squash-merged parent).
+    UPSTREAM="$(git -C "$WT" merge-base HEAD "$BASE_REF")"
+    _ibl_base_ref="$(git -C "$WT" config --get "branch.$branch.iblBase" 2>/dev/null || true)"
+    if [ -n "$_ibl_base_ref" ] \
+        && _ibl_base_sha="$(git -C "$WT" rev-parse -q --verify "${_ibl_base_ref}^{commit}" 2>/dev/null)" \
+        && git -C "$WT" merge-base --is-ancestor "$_ibl_base_sha" HEAD \
+        && ! git -C "$WT" merge-base --is-ancestor "$_ibl_base_sha" "$BASE_REF"; then
+        UPSTREAM="$_ibl_base_sha"
+    fi
     # Refs live in the shared common dir, so every checkout sees every other
     # checkout's pull, fetch and branch create/delete. A whole-repo snapshot
     # reads those as session moves and rolls them back. Guard only the
@@ -835,18 +882,103 @@ if [ "$HEADLESS" = 1 ]; then
     OWN_REFS=("refs/heads/$branch" "refs/remotes/origin/$branch")
     ZERO_OID="${HEAD0//?/0}"
     RESTORE_MSG="postplan-fix: restore after session moved refs"
-    REFS0="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")"
-    if git -C "$WT" merge --no-edit origin/master; then
-        echo "postplan-fix: origin/master merges cleanly; nothing for a session. Ship: cd $WT && bin/post-plan-now"
+    # A carried condition-(14) marker names a SHA in HEAD's history. A clean replay rewrites
+    # that SHA, so the next sync would call the marker stale and drop the hold. Note it now,
+    # re-bind after the replay.
+    _pf_flag_carried() {  # prints 1 when the marker holds a SHA that is an ancestor of HEAD0
+        local f sha
+        f="$(python3 -c 'import sys,os; b=sys.argv[1]; print("/tmp/postplan-conflict-resolved-"+b.translate(str.maketrans("/:","--")))' "$branch")"
+        [ -s "$f" ] || { echo 0; return 0; }
+        while IFS= read -r sha; do
+            if [ -n "$sha" ] && git -C "$WT" merge-base --is-ancestor "$sha" "$HEAD0" 2>/dev/null; then
+                echo 1
+                return 0
+            fi
+        done < "$f"
+        echo 0
+    }
+    _pf_rebind_carried_flag() {  # append the new HEAD to a carried marker
+        [ "$CARRIED0" = 1 ] || return 0
+        local rc=0 new_head
+        new_head="$(git -C "$WT" rev-parse HEAD)" || rc=$?
+        if [ "$rc" = 0 ]; then
+            PYTHONPATH="$SELF_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import sys; from harness.armable import record_conflict_resolution as r; r(sys.argv[1], sys.argv[2])' "$branch" "$new_head" || rc=$?
+        fi
+        if [ "$rc" != 0 ]; then
+            git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
+            echo "postplan-fix: could not re-bind the conflict-resolution marker; reset to $HEAD0" >&2
+            echo "postplan-fix: headless result=gave-up-record"
+            exit 1
+        fi
+    }
+    _pf_rebind_manifest() {  # a manifest bound to HEAD0 follows the clean replay, or the replay is undone
+        local rc=0
+        PYTHONPATH="$SELF_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from harness import premerge
+wt, branch, head0, base = sys.argv[1:5]
+pm = premerge.load(branch.replace("/", "-"))
+if pm is None or pm.sha != head0:
+    sys.exit(0)
+try:
+    premerge.record(wt, branch, pm.pre_sha, pm.files, base=base)
+except (premerge.PremergeError, OSError) as exc:
+    sys.stderr.write("premerge: %s\n" % exc)
+    sys.exit(3)
+' "$WT" "$branch" "$HEAD0" "$BASE_REF" || rc=$?
+        if [ "$rc" != 0 ]; then
+            git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
+            echo "postplan-fix: could not re-bind the resolution manifest; reset to $HEAD0" >&2
+            echo "postplan-fix: headless result=gave-up-record"
+            exit 1
+        fi
+    }
+    CARRIED0="$(_pf_flag_carried)"
+    # A range holding a merge commit is squashed first, as the harness does: a plain
+    # replay drops the merge and any edit made inside it, and still reports clean.
+    if [ "$(git -C "$WT" rev-list --merges --count "$UPSTREAM..$HEAD0")" != 0 ]; then
+        git -C "$WT" reset -q --soft "$UPSTREAM"
+        if ! git -C "$WT" commit -q -C "$HEAD0"; then
+            echo "postplan-fix: squash commit refused; restoring $branch to $HEAD0" >&2
+            git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
+            exit 1
+        fi
+    fi
+    if git -C "$WT" rebase --onto "$BASE_REF" "$UPSTREAM"; then
+        _pf_rebind_carried_flag
+        _pf_rebind_manifest
+        echo "postplan-fix: $BASE_REF rebases cleanly; nothing for a session. Ship: cd $WT && bin/post-plan-now"
         echo "postplan-fix: headless result=clean"
         exit 0
     fi
-    if ! git -C "$WT" rev-parse -q --verify MERGE_HEAD >/dev/null; then
-        echo "postplan-fix: merge of origin/master failed without a conflict state" >&2
+    # Single-stop retry: back to HEAD0, squash the branch's own commits to one, replay that.
+    git -C "$WT" rebase --abort >/dev/null 2>&1 || true
+    git -C "$WT" reset -q --hard "$HEAD0"
+    git -C "$WT" reset -q --soft "$UPSTREAM"
+    if ! git -C "$WT" commit -q -C "$HEAD0"; then
+        echo "postplan-fix: squash commit refused; restoring $branch to $HEAD0" >&2
+        git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
+        exit 1
+    fi
+    if git -C "$WT" rebase --onto "$BASE_REF" "$UPSTREAM"; then
+        # The squashed replay is clean (the multi-commit conflict cancelled out), the same
+        # case the harness accepts. Nothing for a session.
+        _pf_rebind_carried_flag
+        _pf_rebind_manifest
+        echo "postplan-fix: $BASE_REF rebases cleanly once squashed; nothing for a session. Ship: cd $WT && bin/post-plan-now"
+        echo "postplan-fix: headless result=clean"
+        exit 0
+    fi
+    # The squash legitimately moved refs/heads/$branch, so the ref snapshot is taken here.
+    REFS0="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")"
+    STOP_HEAD="$(git -C "$WT" rev-parse HEAD)"
+    if [ ! -d "$(git -C "$WT" rev-parse --path-format=absolute --git-path rebase-merge)" ]; then
+        echo "postplan-fix: rebase onto $BASE_REF failed without a conflict state" >&2
+        git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         exit 1
     fi
     CONFLICTED0="$(git -C "$WT" -c core.quotepath=off diff --name-only --diff-filter=U)"
-    BRANCH_PATHS="$(git -C "$WT" -c core.quotepath=off diff --name-only "origin/master...$HEAD0")"
+    BRANCH_PATHS="$(git -C "$WT" -c core.quotepath=off diff --name-only "$BASE_REF...$HEAD0")"
     cd "$WT"
     ERRLOG="$(mktemp "${TMPDIR:-/tmp}/postplan-fix-stderr.XXXXXX")"
     trap 'rm -f "$ERRLOG"' EXIT
@@ -856,18 +988,18 @@ if [ "$HEADLESS" = 1 ]; then
     SUMMARY="$(printf '%s\n' "$REPLY" | tr -cd '[:print:]\n' | sed '/^[[:space:]]*$/d' | tail -n 3 | tr '\n' ' ' | cut -c1-300)"
     fix_abort() {
         echo "postplan-fix: $1: $SUMMARY" >&2
-        # A session that ran `git commit` or `merge --continue` removed
-        # MERGE_HEAD, so --abort fails; the worktree was clean at HEAD0 on
-        # entry, so a hard reset restores it.
-        git -C "$WT" merge --abort >/dev/null 2>&1 \
-            || git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
+        # The reset always runs: the squash moved the branch, so `rebase --abort`
+        # alone would leave it at the squash commit. The worktree was clean at
+        # HEAD0 on entry, so a hard reset restores it.
+        git -C "$WT" rebase --abort >/dev/null 2>&1 || true
+        git -C "$WT" reset -q --hard "$HEAD0" >/dev/null 2>&1 || true
         exit 1
     }
     REFS1="$(git -C "$WT" for-each-ref --format='%(refname) %(objectname)' "${OWN_REFS[@]}")" \
         || fix_abort "own-ref snapshot failed"
     _pf_restore_own_refs
     [ "$PF_MOVED" = 0 ] || fix_abort "session moved refs"
-    [ "$(git -C "$WT" rev-parse HEAD)" = "$HEAD0" ] || fix_abort "session moved HEAD"
+    [ "$(git -C "$WT" rev-parse HEAD)" = "$STOP_HEAD" ] || fix_abort "session moved HEAD"
     [ "$LAST" = "RESOLVED" ] || fix_abort "session ended ${LAST:-without verdict}"
     # Only the paths that were conflicted: a stray `=======` line in an
     # unrelated tracked file (setext heading, fixture) is not a leftover marker.
@@ -881,8 +1013,8 @@ if [ "$HEADLESS" = 1 ]; then
         fix_abort "unresolved paths remain"
     fi
     # Remit: a changed path must be conflicted, a branch path, a test path, or
-    # identical to origin/master (a clean master-side change from the merge). An
-    # untracked path is a new file, so the origin/master shortcut never applies to it.
+    # identical to the merged base (a clean base-side change from the merge). An
+    # untracked path is a new file, so the merged-base shortcut never applies to it.
     remit_ok() {
         case $'\n'"$CONFLICTED0"$'\n'"$BRANCH_PATHS"$'\n' in
             *$'\n'"$1"$'\n'*) return 0 ;;
@@ -895,7 +1027,7 @@ if [ "$HEADLESS" = 1 ]; then
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         remit_ok "$p" && continue
-        git -C "$WT" diff --quiet origin/master -- "$p" && continue
+        git -C "$WT" diff --quiet "$BASE_REF" -- "$p" && continue
         fix_abort "session touched $p outside its remit"
     done < <(git -C "$WT" -c core.quotepath=off diff --name-only HEAD)
     while IFS= read -r p; do
@@ -904,15 +1036,21 @@ if [ "$HEADLESS" = 1 ]; then
         fix_abort "session touched $p outside its remit"
     done < <(git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)
     git -C "$WT" add -A
-    if ! COMMIT_OUT="$(git -C "$WT" commit --no-edit 2>&1)"; then
+    # `rebase --continue` commits through the sequencer, which skips pre-commit. Run the
+    # hook first; a denial resets the branch with the hook's own text.
+    if ! HOOK_OUT="$(git -C "$WT" hook run --ignore-missing pre-commit 2>&1)"; then
+        SUMMARY="$(printf '%s\n' "$HOOK_OUT" | tail -n 5 | tr '\n' ' ' | cut -c1-300)"
+        fix_abort "pre-commit hook denied the resolution"
+    fi
+    if ! COMMIT_OUT="$(git -C "$WT" -c core.editor=true rebase --continue 2>&1)"; then
         printf '%s\n' "$COMMIT_OUT" >&2
-        echo "postplan-fix: commit refused; the merge is still in progress with your staged resolution. Finish by hand in $WT" >&2
+        echo "postplan-fix: rebase --continue refused; the rebase is still in progress with your staged resolution. Finish by hand in $WT" >&2
         exit 1
     fi
     _cf_list="$(mktemp /tmp/postplan-fix-conflicted.XXXXXX)"
     printf '%s\n' "$CONFLICTED0" > "$_cf_list"
     _pm_rc=0
-    PYTHONPATH="$SELF_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" python3 -m harness.premerge record --worktree "$WT" --branch "$branch" --pre-sha "$HEAD0" --files-from "$_cf_list" || _pm_rc=$?
+    PYTHONPATH="$SELF_ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}" python3 -m harness.premerge record --worktree "$WT" --branch "$branch" --pre-sha "$HEAD0" --files-from "$_cf_list" --base "$BASE_REF" || _pm_rc=$?
     rm -f "$_cf_list"
     if [ "$_pm_rc" != 0 ]; then
         git -C "$WT" reset --hard "$HEAD0" >/dev/null 2>&1 || true
@@ -920,7 +1058,7 @@ if [ "$HEADLESS" = 1 ]; then
         echo "postplan-fix: headless result=gave-up-record"
         exit 1
     fi
-    echo "postplan-fix: merged origin/master into $branch locally ($(git -C "$WT" rev-parse --short HEAD)); nothing pushed."
+    echo "postplan-fix: rebased $branch onto $BASE_REF locally ($(git -C "$WT" rev-parse --short HEAD)); nothing pushed."
     echo "Review: git -C $WT show --stat HEAD"
     echo "Ship: cd $WT && bin/post-plan-now"
     echo "postplan-fix: headless result=committed"

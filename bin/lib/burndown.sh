@@ -16,6 +16,7 @@ BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
 BD_SKIP_LABELS_JSON='["blocked","out-of-repo","deferred"]'
+BD_WEBSITE_PATH_RE='^ibl5/(classes|modules|themes|migrations|includes|blocks|language|config)/|^ibl5/[^/]+\.php$'
 BD_RANKS='^P[1-4]$'
 # Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
 # and its paths. Closed-fixed and merged items are settled, and so is a skip
@@ -382,6 +383,32 @@ bd_paths_for() {
     _bd_paths="$(printf '%s\n%s\n%s\n' "$fl" "$bare" "$base" | grep -v '^$' | LC_ALL=C sort -u)" || true
 }
 
+# bd_website_first <rank-sorted tsv> <issues_file> — print the tsv with website items moved
+# up. Order: P1, then P2-P4 items citing website code, then everything else, with rank
+# order kept inside each group. Website code excludes ibl5/tests and ibl5/docs. A
+# class-scan item names a recurring defect class, so it keeps its place.
+bd_website_first() {
+    local line num rest rank title first="" website="" other=""
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        num="${line%%$'\t'*}"
+        rest="${line#*$'\t'}"
+        rank="${rest%%$'\t'*}"
+        if [ "$rank" = "P1" ]; then
+            first="${first}${line}"$'\n'
+            continue
+        fi
+        title="$(bd_issue_field "$num" "title" "$2")"
+        bd_paths_for "$(bd_issue_field "$num" "body" "$2")"
+        if [[ "$title" != class-scan:* ]] && grep -qE "$BD_WEBSITE_PATH_RE" <<< "$_bd_paths"; then
+            website="${website}${line}"$'\n'
+        else
+            other="${other}${line}"$'\n'
+        fi
+    done <<< "$1"
+    printf '%s%s%s' "$first" "$website" "$other"
+}
+
 # bd_has_overlap <paths> <held_tsv_file> — print "path<TAB>holder_num"; exit 1 if none
 # held_tsv_file has lines: path<TAB>issue_num
 bd_has_overlap() {
@@ -545,9 +572,10 @@ bd_cmd_burndown() {
     bd_inflight "$inflight_file"
     bd_load_repo_files
 
-    # 3. Main selection loop — sorted by rank so P1 is always before P2-P4
+    # 3. Main selection loop — P1 first, then website items, then the rest by rank
     local sorted_tsv
     sorted_tsv="$(sort -s -t$'\t' -k2,2 <<< "$BD_REPORT_TSV")"
+    sorted_tsv="$(bd_website_first "$sorted_tsv" "$issues_file")"
     local used=0 done_flag=0 notreached=0
     local held_file="$BD_TMP/held.tsv"
     touch "$held_file"

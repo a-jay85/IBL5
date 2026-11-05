@@ -83,6 +83,14 @@ def test_pr_copy_prompt_forbids_counts_absent_from_packet():
     assert "Describe the change in words instead" in prompt
 
 
+def test_pr_copy_prompt_forbids_hand_tallied_edit_counts():
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "EDIT COUNTS: never state how many existing assertions" in prompt
+    assert "even when the DIFF shows them" in prompt
+    assert "Name the items instead" in prompt
+    assert "subject of the change (a threshold value, a row count the plan asks for) is allowed" in prompt
+
+
 def test_pr_copy_prompt_limits_claims_to_the_diff():
     prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
     assert "CLAIMS: every summary_md bullet claims only what the DIFF above shows" in prompt

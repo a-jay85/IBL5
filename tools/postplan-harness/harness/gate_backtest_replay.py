@@ -290,13 +290,31 @@ def resolve_plan(plans_dir: str, head_ref: str) -> tuple[str | None, str]:
     return None, "no-plan"
 
 
+def select_plan_sample(fetched: list[HistoricalPR], truth: dict, plans_dir: str,
+                       limit: int) -> tuple[list[HistoricalPR], int]:
+    """The newest `limit` settled PRs that have a plan file, newest first, and how many settled
+    PRs were walked to find them. Only plan-needing gates replay this sample."""
+    sample: list[HistoricalPR] = []
+    depth = 0
+    for pr in fetched:
+        if truth[pr.number].state == "unsettled":
+            continue
+        if len(sample) >= limit:
+            break
+        depth += 1
+        if resolve_plan(plans_dir, pr.head_ref)[0] is not None:
+            sample.append(pr)
+    return sample, depth
+
+
 def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  history: list[HistoricalPR], overlay_files: dict[str, tuple[bytes, int]],
                  plans_dir: str, *, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
                  total_cap: int = TOTAL_CAP, clock=time.monotonic,
                  bodies: dict[int, str] | None = None,
                  base_overlay: dict[str, tuple[bytes, int] | None] | None = None,
-                 fix_patch: bytes | None = None
+                 fix_patch: bytes | None = None,
+                 plan_history: list[HistoricalPR] | None = None
                  ) -> list[ReplayResult]:
     """Replay every replayable gate against every historical PR's tree, newest first.
 
@@ -306,10 +324,19 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
     With `fix_patch`, a head `flag` the base gate did not also flag is followed by one head-gate
     replay on the same checkout with the candidate's own non-gate diff applied; the result rides
     on `fix_outcome`/`fix_detail` and never changes `outcome`.
+    With `plan_history`, gates that need a plan replay those PRs after every other gate has
+    replayed `history`; gates that need no plan never see `plan_history`.
     """
     replayable = [g for g in gates if g.state == "replayable" and g.spec is not None]
     results: list[ReplayResult] = []
-    if not replayable or not history:
+    if plan_history is None:
+        schedule = [(pr, replayable) for pr in history]
+    else:
+        plain = [g for g in replayable if not g.spec.needs_plan]
+        planned = [g for g in replayable if g.spec.needs_plan]
+        schedule = ([(pr, plain) for pr in history if plain]
+                    + [(pr, planned) for pr in plan_history if planned])
+    if not schedule or not replayable:
         return results
     bodies = bodies or {}
     start = clock()
@@ -327,14 +354,14 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                     base_plan[g.path] = ("run", base_spec)
                 else:
                     base_plan[g.path] = ("no-spec", None)
-    first = next((p for p in history if p.parent_count == 1), None)
+    first = next((p for p, _ in schedule if p.parent_count == 1), None)
 
     def skip(pr: HistoricalPR, gate: GateChange, reason: str) -> None:
         results.append(ReplayResult(pr.number, gate.path, "skipped", reason))
 
     if first is None:
-        for pr in history:
-            for gate in replayable:
+        for pr, pr_gates in schedule:
+            for gate in pr_gates:
                 skip(pr, gate, "non-squash" if pr.parent_count > 1 else "sha-missing")
         return results
 
@@ -370,9 +397,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
     capped = False
     try:
         with ScratchTree(repo, first.merge_sha) as scratch:
-            for pr in history:
+            for pr, pr_gates in schedule:
                 checked_out = False
-                for gate in replayable:
+                for gate in pr_gates:
                     if pr.parent_count > 1:
                         skip(pr, gate, "non-squash")
                         continue
@@ -596,6 +623,8 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
     results: list[ReplayResult] | None = []
     truth: dict = {}
     window = 0
+    plan_history: list[HistoricalPR] | None = None
+    plan_sample: tuple[int, int] | None = None
     if any(g.state == "replayable" for g in gates):
         try:
             if fetch:
@@ -608,18 +637,22 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             truth = classify_truth(fetched, now or datetime.now(timezone.utc))
             history = [p for p in fetched if truth[p.number].state != "unsettled"][:limit]
             window = len(history)
+            if any(g.state == "replayable" and g.spec is not None and g.spec.needs_plan
+                   for g in gates):
+                plan_history, plan_depth = select_plan_sample(fetched, truth, plans_dir, limit)
+                plan_sample = (len(plan_history), plan_depth)
             base_overlay = _base_overlay(repo, base, head, overlay_files)
             fix_patch = None if forced_gate is not None else _fix_patch(
                 repo, base, head, overlay_files)
             results = run_backtest(repo, head, gates, history, overlay_files, plans_dir,
                                    per_replay_timeout=per_replay_timeout, total_cap=total_cap,
                                    bodies=bodies, base_overlay=base_overlay,
-                                   fix_patch=fix_patch)
+                                   fix_patch=fix_patch, plan_history=plan_history)
         except Exception:
             results = None
             truth = {}
     verdict = compute_verdict(gates, results, truth)
-    block = render_gate_backtest(verdict, gates, results or [], truth, window)
+    block = render_gate_backtest(verdict, gates, results or [], truth, window, plan_sample)
     return BacktestOutcome(verdict, gates, results, truth, window, block)
 
 

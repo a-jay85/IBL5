@@ -558,6 +558,16 @@ case_quiet_gate_clears() {
     else
         fail "quiet-gate-clears (rc=$RC, out=$OUT, err=$ERR)"
     fi
+    if has "$OUT" "Replayed against the newest"; then
+        ok "quiet-gate-clears: non-plan block keeps the base window sentence"
+    else
+        fail "quiet-gate-clears: non-plan block lost the base window sentence (out=$OUT)"
+    fi
+    if has "$OUT" "that have a plan file"; then
+        fail "quiet-gate-clears: non-plan block mentions the plan sample (out=$OUT)"
+    else
+        ok "quiet-gate-clears: non-plan block omits the plan sample sentence"
+    fi
 }
 
 case_non_gate_zero_cost() {

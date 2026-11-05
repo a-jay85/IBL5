@@ -778,6 +778,14 @@ agg_edit "$d_wf/all-checks-settled.yml" 's/^  contents: read$/  contents: write/
 run_agg_mut "A4 rejects contents write" "(A4)" "$d_wf"
 
 d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^  pull-requests: read$/  pull-requests: write/m'
+run_agg_mut "A4 rejects a third write scope" "(A4)" "$d_wf"
+
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^  actions: write .*$/  actions: read/m'
+run_agg_mut "A4 rejects dropping the actions write grant" "(A4)" "$d_wf"
+
+d_wf="$(agg_copy)"
 printf 'name: All checks green\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: "true"\n' > "$d_wf/all-checks-green.yml"
 run_agg_mut "A5 rejects a missing All checks green ignore while a legacy file exists" "(A5)" "$d_wf"
 

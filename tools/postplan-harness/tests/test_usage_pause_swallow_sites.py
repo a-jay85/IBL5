@@ -413,7 +413,6 @@ def test_usage_pause_handlers_are_only_the_known_sites():
         if n:
             counts[str(path.relative_to(ROOT))] = n
     # runner.py: the Phase 9 retrospective swallow (ADR-0143 addendum), the outer run()
-    # handler, the conflict-closer pause inside the HarnessError handler (a pause raised
-    # there skips the sibling outer clause, so it is classified in place), and the
-    # background-review join in run()'s finally. A fifth site needs the same review.
-    assert counts == {"runner.py": 4, os.path.join("harness", "adr_draft.py"): 1}
+    # handler, and the background-review join in run()'s finally. A fourth site needs the
+    # same review.
+    assert counts == {"runner.py": 3, os.path.join("harness", "adr_draft.py"): 1}

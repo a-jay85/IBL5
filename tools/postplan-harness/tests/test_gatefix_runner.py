@@ -318,6 +318,6 @@ def test_push_sites_use_gate_fix_wrapper():
                  if not (s0 <= p < s1 or a0 <= p < a1)]
     assert adr_calls == []
     fix = [p for p in _call_sites("_push_with_gate_fix") if not s0 <= p < s1]
-    # Includes the Phase 4.5b same-run pass, the Phase 5.0-pre fixer, the in-run fix round and
-    # the two closer-arm pushes (hold, rebase conflict). Those pushes go through the wrapper like every other.
-    assert len(fix) == 10
+    # Includes the Phase 4.5b same-run pass, the Phase 5.0-pre fixer and the in-run fix round.
+    # Those pushes go through the wrapper like every other.
+    assert len(fix) == 8

@@ -128,8 +128,6 @@ one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged sk
 
 **Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once, and the harness proves and reviews the rebase before it pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot rebase is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean rebase writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot rebase in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
 
-**Closer arm.** An A/B trial: `tools/postplan-harness/README.md` § Closer A/B.
-
 ## What `--auto` adds
 
 `--auto` adds exactly one safety gate; a bare `bin/post-plan-now` skips it, because running it by

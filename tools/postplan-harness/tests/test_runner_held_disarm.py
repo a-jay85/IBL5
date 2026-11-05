@@ -18,7 +18,7 @@ import runner
 import sticky_shapes
 from harness import holdrepeat
 from harness.adapters.llm import FixtureLlm
-from harness.state import ArmDecision, TerminalState, UsageLedger
+from harness.state import TerminalState, UsageLedger
 from test_holdrepeat_runner import CANNED, CLEAN_PLAN, HOLD_7_PLAN, _fixture
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
@@ -64,17 +64,6 @@ def test_armed_run_does_not_disarm(tmp_path):
     names = _names(out)
     assert names.count("pr_disable_auto_merge") == 0
     assert names.count("pr_merge_auto") == 1
-
-
-def test_late_flip_to_held_disarms_once(tmp_path, monkeypatch):
-    held = ArmDecision(armed=False, conditions=[])
-    monkeypatch.setattr(runner, "_maybe_run_closer", lambda *a, **k: held)
-    res, out = _run(tmp_path, CLEAN_PLAN)
-    assert res.terminal != TerminalState.SHIPPED_ARMED
-    names = _names(out)
-    assert names.count("pr_merge_auto") == 1
-    assert names.count("pr_disable_auto_merge") == 1
-    assert names.index("pr_disable_auto_merge") > names.index("pr_merge_auto")
 
 
 def _sticky(tmp_path, decision):

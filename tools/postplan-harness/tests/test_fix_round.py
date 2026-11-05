@@ -392,18 +392,6 @@ def test_discard_cleans_tree_before_undo(tmp_path):
     assert git.head() == "head0"
 
 
-def test_closer_arm_skips_the_round(tmp_path):
-    res = RunResult(terminal="x")
-    res.findings = [_finding()]
-    res.ab_arm = "closer"
-    rec, res, gh, git, llm = _run(tmp_path, res=res)
-    assert rec["status"] == "skipped"
-    assert rec["reason"] == "closer-arm"
-    assert llm.calls == 0
-    assert git.n == 0
-    assert git.head() == "head0"
-
-
 class _FlushGh:
     def __init__(self, fail_resolve=False):
         self.fail_resolve = fail_resolve

@@ -98,7 +98,7 @@ the user. A pipe into `tee` or `grep` would report that pipe's status and hide t
 Stderr is left unredirected, so `cleared blocked on #N` lines still show.
 
 Selection takes P1 first, then P2 to P4 items that cite website code, then the rest by
-rank. Tests, docs and `class-scan:` items do not count as website code. The ledger keeps
+rank. Website code means the `ibl5/` folders classes, modules, themes, migrations, includes, blocks, language, config, jslib and design, plus `.php` files in the `ibl5/` root. Tests, docs and `class-scan:` items do not count. The ledger keeps
 each item's real rank. Rank by severity in step 2 as usual.
 
 Parse only the final `LEDGER:` line. `LEDGER: none` on the first round means all

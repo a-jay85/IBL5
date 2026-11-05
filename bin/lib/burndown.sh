@@ -16,7 +16,7 @@ BD_CODE_REPO="a-jay85/IBL5"
 BD_LABEL_BLOCKED="blocked"
 BD_LABEL_OUT_OF_REPO="out-of-repo"
 BD_SKIP_LABELS_JSON='["blocked","out-of-repo","deferred"]'
-BD_WEBSITE_PATH_RE='^ibl5/(classes|modules|themes|migrations|includes|blocks|language|config)/|^ibl5/[^/]+\.php$'
+BD_WEBSITE_PATH_RE='^ibl5/(classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/|^ibl5/[^/]+\.php$'
 BD_RANKS='^P[1-4]$'
 # Live-item predicate over a jq -s slurp of ledgers. A live item holds its unit
 # and its paths. Closed-fixed and merged items are settled, and so is a skip

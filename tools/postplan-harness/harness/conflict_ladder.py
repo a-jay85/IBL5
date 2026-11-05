@@ -503,7 +503,7 @@ def _opus_context(ctx: LadderContext, path: str, lines) -> str:
         "Requirements:\n"
         '- Every LOST line starting with "+" must appear as a whole, unchanged line in your result.\n'
         '- Every LOST line starting with "-" was deleted by the branch. Remove it unless '
-        "master's side (theirs) also has it.\n"
+        "master's side also has it.\n"
         "- Keep master's changes too. Never wholesale-take one side.\n"
         "If you conclude a line must NOT be restored because master already carries it "
         f"elsewhere, write one line per such case to {_stage_dir(ctx.key)}/citations.txt as "
@@ -514,7 +514,7 @@ def _opus_context(ctx: LadderContext, path: str, lines) -> str:
 
 def make_opus_rung() -> Rung:
     def fn(ctx: LadderContext, proof_out: str) -> RungAttempt:
-        from .conflict import resolve_one
+        from .conflict import SYNC_BRANCH_STAGE, resolve_one
 
         # Cleared before any early return, so a stale file never feeds rung 3's prompt.
         citations = Path(_stage_dir(ctx.key)) / "citations.txt"
@@ -524,7 +524,9 @@ def make_opus_rung() -> Rung:
         if not lost:
             return RungAttempt(False, (), "no line-level LOST")
         merge_base = ctx.run("merge-base", ctx.pre_rebase_sha, ctx.master_sha).strip()
-        revs = {1: merge_base, 2: ctx.pre_rebase_sha, 3: ctx.master_sha}
+        # Index stages under the rebase sync: 2 is master (the base being replayed onto),
+        # 3 is the replayed branch commit.
+        revs = {1: merge_base, 2: ctx.master_sha, 3: ctx.pre_rebase_sha}
         eligible: list[str] = []
         notes: list[str] = []
         for path, lines in lost.items():
@@ -542,7 +544,7 @@ def make_opus_rung() -> Rung:
         for path in eligible:
             ok, reason = resolve_one(
                 ctx.llm, ctx.run, worktree=ctx.worktree, key=ctx.key, path=path,
-                stages=frozenset({1, 2, 3}), branch_stage=2,
+                stages=frozenset({1, 2, 3}), branch_stage=SYNC_BRANCH_STAGE,
                 master_sha=ctx.master_sha, pre_sha=ctx.pre_rebase_sha,
                 model="opus", max_rounds=1, stage_revs=revs,
                 extra_context=_opus_context(ctx, path, lost[path]),
@@ -608,10 +610,10 @@ def _session_prompt(ctx: LadderContext, proof_out: str, citations: str) -> str:
                  + "\n[proof output truncated]")
     citations_block = (f"Citations from the Opus retry:\n{citations}\n" if citations else "")
     return (
-        "You are finishing a git merge of origin/master into this branch, in the worktree "
+        "You are finishing a rebase of this branch onto origin/master, in the worktree "
         "that is your cwd.\n"
-        f"HEAD is already the merge commit (parents: branch {ctx.pre_rebase_sha}, master "
-        f"{ctx.master_sha}). Earlier automated\n"
+        f"HEAD is already the replayed branch commit on top of master {ctx.master_sha} "
+        f"(the branch tip before the rebase was {ctx.pre_rebase_sha}). Earlier automated\n"
         "attempts left the tree failing the lost-work proof. Conflicted files: "
         f"{', '.join(ctx.conflicted_files)}.\n"
         "Proof output (every LOST line is branch work missing from HEAD):\n"

@@ -1,6 +1,6 @@
 ---
 description: Local pre-push hook that front-runs the CI ADR decision-trigger gate, catching missing-ADR triggers before the round-trip to CI.
-last_verified: 2026-10-05
+last_verified: 2026-11-04
 ---
 
 # ADR-0064: Local pre-push ADR decision-trigger gate
@@ -53,3 +53,9 @@ The decision above stands. The hook is still a tracked script behind an installe
 - `bin/check-plan` — gate `[8]`, the plan-write-time surface for the same triggers.
 - `bin/test-adr-check` — the regression harness.
 - `ibl5/docs/decisions/README.md` — the "When an ADR is Required" policy.
+
+## Addendum — post-plan sync rebases (2026-11-04) <!-- slop-ok -->
+
+The fix advice in Context and Decision (`git fetch origin master && git merge origin/master`) is superseded in part by ADR-0228. The hook's printed advice is now the rebase-plus-lease recipe. The ancestor check itself is unchanged.
+
+**Superseded by:** ADR-0228 (fix advice only)

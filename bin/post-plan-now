@@ -360,7 +360,7 @@ Options:
                    Passed by bin/pr-cycle for DIRTY or red-check rescues through
                    bin/post-plan-fleet. Bare flag only.
   --rebase-only    Pass --rebase-only to the harness: when the last hold was only
-                   human conditions (3, 7, 8), merge origin/master, push, and stop
+                   human conditions (3, 7, 8), rebase onto origin/master, lease-push, and stop
                    before review. Implies --state-changed. Passed by bin/pr-cycle
                    through bin/post-plan-fleet. Bare flag only.
   --foreground     Run the engine in this shell instead of detaching via launchd.

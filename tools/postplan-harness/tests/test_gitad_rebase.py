@@ -1,8 +1,8 @@
-"""Phase 2 merges origin/master into the branch instead of rebasing onto it.
+"""Phase 2 replays the branch onto origin/master with `git rebase --onto`.
 
-These tests drive LiveGit.rebase_onto() against scratch repos and pin the merge
-shape: branch commits stay ancestors of HEAD, a resolved conflict lands as a
-two-parent merge commit, and every failure path leaves no MERGE_HEAD behind.
+These tests drive LiveGit.rebase_onto() against scratch repos and pin the rebase
+shape: the branch stays linear on top of origin/master, a resolved conflict lands as
+one replayed commit, and every failure path leaves no rebase or merge state behind.
 """
 import os
 import shutil
@@ -75,14 +75,16 @@ def _make_clean_repo():
     return d, branch, branch, branch_shas, master_sha
 
 
-def test_rebase_onto_keeps_branch_commits_as_ancestors():
+def test_rebase_onto_replays_branch_commits_on_top_of_master():
     d, key, branch, branch_shas, master_sha = _make_clean_repo()
     try:
         LiveGit(d).rebase_onto()
-        for sha in branch_shas:
-            assert _is_ancestor(d, sha, "HEAD"), f"branch commit {sha} was rewritten"
         assert _is_ancestor(d, master_sha, "HEAD")
-        assert _parents(d) == [branch_shas[-1], master_sha]
+        for sha in branch_shas:
+            assert not _is_ancestor(d, sha, "HEAD"), f"branch commit {sha} was not replayed"
+        assert _parents(d) != [branch_shas[-1], master_sha]
+        assert len(_parents(d)) == 1
+        assert _sh(d, "rev-list", "--merges", f"{master_sha}..HEAD").stdout.strip() == ""
         assert _merge_head(d) == ""
     finally:
         _cleanup_full(key, branch, d)
@@ -117,7 +119,7 @@ def test_rebase_onto_conflict_without_llm_restores():
         _cleanup_full(key, branch, d)
 
 
-def test_rebase_onto_conflict_resolved_lands_merge_commit():
+def test_rebase_onto_conflict_resolved_lands_linear_history():
     d, _base, master_sha, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)
     pre = _rev(d, "HEAD")
@@ -131,31 +133,36 @@ def test_rebase_onto_conflict_resolved_lands_merge_commit():
         assert g.last_conflict_resolution.manifest_path
         assert os.path.exists(conflict_flag_path(branch))
         assert open(conflict_flag_path(branch)).read() == _rev(d, "HEAD") + "\n"
-        assert _parents(d) == [pre, master_sha]
+        assert _sh(d, "rev-list", "--merges", f"{master_sha}..HEAD").stdout.strip() == ""
+        assert _parents(d) == [master_sha]
         assert _merge_head(d) == ""
         assert open(os.path.join(d, "feature.txt")).read() == "merged content\n"
     finally:
         _cleanup_full(key, branch, d)
 
 
-def test_rebase_onto_merge_commit_hook_denial_restores():
+def test_rebase_onto_continue_failure_restores(monkeypatch):
+    import harness.adapters.gitad as gitad
+
     d, _base, _master, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)
     pre = _rev(d, "HEAD")
-    hooks = os.path.join(d, ".git", "hooks")
-    os.makedirs(hooks, exist_ok=True)
-    hook = os.path.join(hooks, "pre-commit")
-    with open(hook, "w") as fh:
-        fh.write("#!/usr/bin/env bash\necho 'pre-commit-adr-gate: write the ADR'\nexit 1\n")
-    os.chmod(hook, 0o755)
-    _sh(d, "config", "core.hooksPath", hooks)
+    real = gitad.run_bounded
+
+    def failing_continue(argv, **kw):
+        if "--continue" in argv:
+            return subprocess.CompletedProcess(argv, 1, "", "pre-commit-adr-gate: write the ADR")
+        return real(argv, **kw)
+
+    monkeypatch.setattr(gitad, "run_bounded", failing_continue)
     llm = _WritingLlm(d, "feature.txt", content="merged content\n")
     try:
         with pytest.raises(HarnessError) as exc:
             LiveGit(d, llm=llm).rebase_onto()
-        assert "merge commit failed" in exc.value.detail
+        assert "rebase --continue failed" in exc.value.detail
         assert "pre-commit-adr-gate: write the ADR" in exc.value.detail
         assert _merge_head(d) == ""
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
         assert _rev(d, "HEAD") == pre
         assert _sh(d, "status", "--porcelain").stdout.strip() == ""
     finally:
@@ -197,7 +204,7 @@ def test_resolve_all_orientation_per_path(monkeypatch):
             LiveGit(d, llm=_WritingLlm(d, "feature.txt")).rebase_onto()
     finally:
         _cleanup_full(key, branch, d)
-    assert seen[-1]["branch_stage"] == 2
+    assert seen[-1]["branch_stage"] == 3
     assert seen[-1]["master_sha"] == master_sha
 
     d, _tip, master_sha, key, branch = _make_modify_conflict_repo(

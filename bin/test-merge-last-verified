@@ -88,8 +88,9 @@ strip_nl() {
 # three_way_raw <repo> <path> <base-file> <ours-file> <theirs-file>
 # Commits base on master, branches `side`, commits theirs on master, then ours on
 # side, and leaves side checked out. Merging master into side reproduces the
-# post-plan harness shape (`git merge --no-edit origin/master` in the PR worktree:
-# ours = branch, theirs = master).
+# hand or update-branch merge shape (`git merge --no-edit origin/master` in the PR
+# worktree: ours = branch, theirs = master). The harness itself now rebases; the
+# rebase-replay-bumps-last-verified case below covers that path.
 three_way_raw() {
     local repo=$1 path=$2
     mkdir -p "$repo/$(dirname "$path")"
@@ -297,7 +298,7 @@ IFS= read -r tree < "$TMP/mt.out"
 git -C "$R" cat-file -p "$tree:$FX" > "$TMP/mt.file" 2>/dev/null
 ok_if "merge-tree-honors-driver: date" has_line "$TMP/mt.file" "last_verified: 2026-10-18"
 
-R=$(fresh_path r-rebase); new_repo "$R"; register_direct "$R"
+R=$(fresh_path r-rebase-replay); new_repo "$R"; register_direct "$R"
 three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 base base" "2026-10-18 base base"
 rc=0
 git -C "$R" rebase master > "$TMP/rb.out" 2>&1 || rc=$?
@@ -384,6 +385,20 @@ for f in "$C1" "$C2"; do
     ok_if "synthetic-contract-replay: bottom $f" has_line "$WT/$f" "bottom: theirs"
     ok_if "synthetic-contract-replay: no markers $f" lacks_text "$WT/$f" "<<<<<<<"
 done
+
+# --- rebase replay (post-plan Phase 2 shape): master and the branch each bump
+# last_verified on one doc; `git rebase --onto master <merge-base>` must finish
+# with no conflict and the newer date. Checks that the ort rebase backend runs
+# the .gitattributes merge driver on each pick. ---
+R=$(fresh_path r-rebase-onto-replay); new_repo "$R"; register_direct "$R"
+three_way "$R" "$FX" "2026-10-14 base base" "2026-10-15 ours base" "2026-10-18 base theirs"
+rc=0
+git -C "$R" rebase --onto master "$(git -C "$R" merge-base HEAD master)" > "$TMP/rebase.out" 2> "$TMP/rebase.err" || rc=$?
+h_eq "rebase-replay-bumps-last-verified: rc" "0" "$rc"
+ok_if "rebase-replay-bumps-last-verified: date" has_line "$R/$FX" "last_verified: 2026-10-18"
+ok_if "rebase-replay-bumps-last-verified: ours edit" has_line "$R/$FX" "top: ours"
+ok_if "rebase-replay-bumps-last-verified: theirs edit" has_line "$R/$FX" "bottom: theirs"
+ok_if "rebase-replay-bumps-last-verified: no markers" lacks_text "$R/$FX" "<<<<<<<"
 
 fi
 

@@ -6,6 +6,7 @@ test_runner_held_disarm.py (the full-run driver).
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import stat
@@ -23,7 +24,9 @@ from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.state import UsageLedger
+from harness import statefile
 from harness.statefile import StateFile
+from test_holdrepeat_runner import CANNED, CLEAN_PLAN, SLUG, _fixture
 
 _PR = 9920
 _TREE_A = "a" * 40
@@ -98,6 +101,12 @@ def _cleanup(*suffixes):
 
 
 def test_not_ready_first_review_enters_fidelity_rounds(tmp_path, monkeypatch):
+    assert _drive_not_ready_review(tmp_path, monkeypatch) >= 1
+
+
+def _drive_not_ready_review(tmp_path, monkeypatch):
+    """Run Phase 5.5 on a not-ready first review; return the number of fixer calls."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
     _install_git_shim(tmp_path, monkeypatch)
     canned = {
         "plan-fidelity-review": "6d checks\n\nNOT READY\n",
@@ -125,8 +134,8 @@ def test_not_ready_first_review_enters_fidelity_rounds(tmp_path, monkeypatch):
         )
     finally:
         _cleanup(_PR, f"{_PR}-2")
-    assert rounds, "a not-ready first review must call the fixer for round 1"
     assert res.fidelity["rounds"][0]["round"] == 1
+    return len(rounds)
 
 
 def test_old_state_file_with_closer_keys_loads(tmp_path):
@@ -137,3 +146,73 @@ def test_old_state_file_with_closer_keys_loads(tmp_path):
     sf = StateFile(str(path), "demo", None, str(tmp_path), logged.append)
     assert sf.previous == written
     assert "state: previous file unreadable — rewriting" not in logged
+
+
+# ── full-run scaffold (copied from test_runner_held_disarm.py) ─────────────────────────────
+
+def _run(tmp_path, plan, state_dir=None):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), dict(CANNED))
+    res = runner.run(_fixture(plan), out, llm, mode="replay", live=False, state_dir=state_dir)
+    return res, out
+
+
+def _plant_old_state(state_dir):
+    os.makedirs(state_dir, exist_ok=True)
+    old = {"ab_arm": "closer", "ab_source": "enrolled", "closer": {"ran": True}, "phases": []}
+    with open(os.path.join(state_dir, statefile.safe_slug(SLUG) + ".json"), "w") as fh:
+        json.dump(old, fh)
+
+
+def _fired_by_lines(res):
+    """Each audit line is `[HH:MM:SS] <msg>`; strip the clock and keep the fired-by messages."""
+    msgs = [ln.split("] ", 1)[-1] for ln in res.audit]
+    return [m for m in msgs if m.startswith("postplan: fired-by=")]
+
+
+def _no_ab_files(tmp_path, state_dir):
+    names = {p.name for p in tmp_path.rglob("*")}
+    assert "ab-enrollment.json" not in names
+    assert "ab-outcomes.jsonl" not in names
+    assert not (set(os.listdir(state_dir)) & {"ab-enrollment.json", "ab-outcomes.jsonl"})
+
+
+def test_runner_has_no_closer_entry_points():
+    assert importlib.util.find_spec("harness.closer") is None
+    assert importlib.util.find_spec("harness.ab_arm") is None
+    assert importlib.util.find_spec("harness.ab_readout") is None
+    assert not hasattr(runner, "_maybe_run_closer")
+
+
+def test_fired_by_automouse_run_writes_no_enrollment(tmp_path, monkeypatch):
+    monkeypatch.setenv("POSTPLAN_FIRED_BY", "automouse")
+    state_dir = str(tmp_path / "state")
+    _plant_old_state(state_dir)
+    res, _out = _run(tmp_path, CLEAN_PLAN, state_dir=state_dir)
+    assert _fired_by_lines(res) == ["postplan: fired-by=automouse"]
+    _no_ab_files(tmp_path, state_dir)
+    assert not hasattr(res, "ab_arm")
+
+
+@pytest.mark.parametrize("arm_env", ["closer", ""])
+def test_stale_ab_arm_env_is_ignored(tmp_path, monkeypatch, arm_env):
+    monkeypatch.setenv("POSTPLAN_AB_ARM", arm_env)
+    monkeypatch.setenv("POSTPLAN_FIRED_BY", "automouse")
+    state_dir = str(tmp_path / "state")
+    os.makedirs(state_dir)
+    res, _out = _run(tmp_path, CLEAN_PLAN, state_dir=state_dir)
+    assert not hasattr(res, "ab_arm")
+    _no_ab_files(tmp_path, state_dir)
+    assert _drive_not_ready_review(tmp_path / "fid", monkeypatch) >= 1
+
+
+@pytest.mark.parametrize("mode", ["unset", "empty"])
+def test_fired_by_unset_or_empty_is_logged(tmp_path, monkeypatch, mode):
+    if mode == "unset":
+        monkeypatch.delenv("POSTPLAN_FIRED_BY", raising=False)
+    else:
+        monkeypatch.setenv("POSTPLAN_FIRED_BY", "")
+    state_dir = str(tmp_path / "state")
+    os.makedirs(state_dir)
+    res, _out = _run(tmp_path, CLEAN_PLAN, state_dir=state_dir)
+    assert _fired_by_lines(res) == ["postplan: fired-by=unknown"]

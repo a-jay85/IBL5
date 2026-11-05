@@ -6,6 +6,9 @@
 # sibling workflow completion (ADR-0149 addendum). The verdict logic (V1-V5) lives in
 # bin/check-pr-checks-green and is never re-implemented here.
 #
+# With --line-dispatch it also restarts the armed merge line after a settled verdict on the
+# PR the line holds on (ADR-0081 addendum 2026-11-03). That step never changes the exit code.
+#
 # Exit codes: 0 = posted, or nothing to settle, or dry-run printed; 2 = usage or API error.
 
 set -euo pipefail
@@ -20,6 +23,9 @@ Usage: bin/settle-pr-status --repo=<owner/repo> (--head-sha=<40-hex> | --pr=<n>)
                             status is pending and last updated more than M minutes ago, POST a
                             workflow_dispatch of all-checks-settled.yml (ref master, pr_number=N).
                             With --dry-run prints each payload instead. Exit 2 if any dispatch fails.
+  --line-dispatch=<file>    After a success/failure verdict that changes <context> on a PR the
+                            merge line holds on, POST a workflow_dispatch of <file> (ref master,
+                            inputs settle=true). Never changes the posted status or the exit code.
   --dry-run                 Print the payload and `would POST ...`; never call the statuses API
 Exit: 0 = posted, or nothing to settle (stale event, no open PR, closed PR), or dry-run printed
       2 = usage error, API read error, POST failure (the job turns red; no status is written)
@@ -48,6 +54,9 @@ IGNORE_WF=""
 DRY_RUN=0
 SWEEP_MIN=""
 SWEEP_SET=0
+LINE_WORKFLOW=""
+LINE_SET=0
+LINE_RE='^[A-Za-z0-9._-]+\.ya?ml$'
 # Dispatched from master only: the workflow header says so, and the dispatch ref is pinned below.
 SWEEP_WORKFLOW="all-checks-settled.yml"
 
@@ -64,6 +73,7 @@ for arg in "$@"; do
         --anchor=*)           ANCHOR="${arg#--anchor=}" ;;
         --ignore-workflows=*) IGNORE_WF="${arg#--ignore-workflows=}" ;;
         --sweep-stale-minutes=*) SWEEP_MIN="${arg#--sweep-stale-minutes=}"; SWEEP_SET=1 ;;
+        --line-dispatch=*)    LINE_WORKFLOW="${arg#--line-dispatch=}"; LINE_SET=1 ;;
         --dry-run)            DRY_RUN=1 ;;
         --*)
             echo "unknown flag: $arg" >&2
@@ -152,6 +162,13 @@ api_get_paged() {
     printf '%s' "$out"
 }
 
+if [ "$LINE_SET" -eq 1 ]; then
+    if ! [[ "$LINE_WORKFLOW" =~ $LINE_RE ]] || [[ "$LINE_WORKFLOW" == .* ]]; then
+        echo "invalid --line-dispatch: '$LINE_WORKFLOW' (want a workflow file name such as update-behind-prs.yml)" >&2
+        exit 2
+    fi
+    [ "$SWEEP_SET" -eq 0 ] || { echo "--line-dispatch and --sweep-stale-minutes are mutually exclusive" >&2; exit 2; }
+fi
 if [ "$SWEEP_SET" -eq 1 ]; then
     # Stateless re-settle for a status left pending with no further workflow_run event
     # (ADR-0149 addendum 2026-10-22: the ghost run). Every open PR is read; only a pending
@@ -289,6 +306,37 @@ if [ "$DRY_RUN" -eq 1 ]; then
     echo "would POST repos/$REPO/statuses/$SHA"
     exit 0
 fi
+
+# Head-of-line restart (ADR-0081 addendum 2026-11-03). Runs before the status POST so a
+# cancelled settle errs toward one extra pass. Every miss or error logs a LINE: line and
+# returns 0: the posted status and this job's exit code never depend on it.
+line_dispatch() {
+    local sel list out head idx hidx prior_json prior payload
+    sel="$(dirname "$0")/merge-line-select"
+    case "$STATE" in success|failure) ;; *) echo "LINE: skip: state $STATE"; return 0 ;; esac
+    if ! prior_json="$(api_get "repos/$REPO/commits/$SHA/status")"; then echo "::warning::LINE: skip: prior status read failed" >&2; return 0; fi
+    prior="$(jq -r --arg ctx "$CONTEXT" '([.statuses[]? | select(.context == $ctx)] | first | .state) // "none"' <<< "$prior_json" 2>/dev/null)" || prior=""
+    if [ -z "$prior" ]; then echo "::warning::LINE: skip: prior status unparseable" >&2; return 0; fi
+    if [ "$prior" = "$STATE" ]; then echo "LINE: skip: already $STATE on $SHA"; return 0; fi
+    if ! [[ "$N" =~ ^[0-9]{1,7}$ ]]; then echo "LINE: skip: PR number malformed"; return 0; fi
+    if ! list="$("$sel" --live --repo "$REPO" --list)"; then echo "::warning::LINE: skip: line read failed" >&2; return 0; fi
+    idx="$(jq -r --argjson n "$N" '(to_entries | map(select(.value == $n)) | first | .key) // "none"' <<< "$list" 2>/dev/null)" || idx=none
+    if [ "$idx" = none ]; then echo "LINE: skip: PR $N not armed"; return 0; fi
+    if ! out="$("$sel" --live --repo "$REPO")"; then echo "::warning::LINE: skip: line read failed" >&2; return 0; fi
+    head="$(sed -n 's/^head=//p' <<< "$out")"
+    if [ -z "$head" ]; then echo "LINE: skip: no head (every line member skipped)"; return 0; fi
+    hidx="$(jq -r --argjson h "$head" '(to_entries | map(select(.value == $h)) | first | .key) // "none"' <<< "$list" 2>/dev/null)" || hidx=none
+    if [ "$hidx" = none ]; then echo "LINE: skip: head $head not in the line read"; return 0; fi
+    if [ "$idx" -gt "$hidx" ]; then echo "LINE: skip: PR $N is behind head $head"; return 0; fi
+    payload='{"ref":"master","inputs":{"settle":"true"}}'
+    if printf '%s' "$payload" | bash -c "$GH_API_CMD -X POST \"repos/$REPO/actions/workflows/$LINE_WORKFLOW/dispatches\" --input -" >/dev/null; then
+        echo "LINE: dispatched $LINE_WORKFLOW (PR $N settled $STATE; head $head)"
+    else
+        echo "::warning::LINE: dispatch failed for $LINE_WORKFLOW (PR $N); the cron pass is the backstop" >&2
+    fi
+    return 0
+}
+if [ "$LINE_SET" -eq 1 ]; then line_dispatch || true; fi
 
 if ! printf '%s' "$PAYLOAD" | bash -c "$GH_API_CMD -X POST \"repos/$REPO/statuses/$SHA\" --input -" >/dev/null; then
     echo "POST repos/$REPO/statuses/$SHA failed" >&2

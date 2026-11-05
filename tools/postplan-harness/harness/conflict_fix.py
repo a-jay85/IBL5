@@ -92,10 +92,10 @@ def _fix_prompt(ctx: LadderContext, proof_out: str, branch_paths) -> str:
     merge_base = ctx.run("merge-base", ctx.pre_rebase_sha, ctx.master_sha,
                          check=False).strip() or "<merge-base>"
     return (
-        "You are finishing a git merge of origin/master into this branch, in the worktree "
+        "You are finishing a rebase of this branch onto origin/master, in the worktree "
         "that is your cwd.\n"
-        f"HEAD is already the merge commit (parents: branch {ctx.pre_rebase_sha}, master "
-        f"{ctx.master_sha}). Earlier automated\n"
+        f"HEAD is already the replayed branch commit on top of master {ctx.master_sha} "
+        f"(the branch tip before the rebase was {ctx.pre_rebase_sha}). Earlier automated\n"
         "attempts left the tree failing the lost-work proof. Conflicted files: "
         f"{', '.join(ctx.conflicted_files)}.\n"
         "Proof output (every LOST line is branch work missing from HEAD):\n"

@@ -1643,8 +1643,16 @@ def own_change_carry_diff(sticky_body, own_id: str) -> tuple[str, str]:
 
 # Status lines the runner builds on every clean run. The composer prints only a line that
 # deviates from these, so a clean sticky carries no REBASE= or CI: line at all.
-_EXPECTED_REBASE = ("REBASE=clean (HEAD already contains origin/master)",
-                    "REBASE=merged origin/master")
+_EXPECTED_REBASE_CLEAN = "REBASE=clean (HEAD already contains origin/master)"
+# runner.py builds "REBASE=rebased onto <sync target>"; the target is origin/master or a
+# stacked parent's origin/<branch> (same ref grammar as premerge._BASE).
+_EXPECTED_REBASE_RE = re.compile(r"^REBASE=rebased onto origin/[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
+
+def _is_expected_rebase(line: str) -> bool:
+    return line == _EXPECTED_REBASE_CLEAN or bool(_EXPECTED_REBASE_RE.match(line))
+
+
 _EXPECTED_CI_RE = re.compile(
     r"^CI: local verification pass; GitHub checks are watched after this comment"
     r"(; remediation commit [0-9a-f]+ is inside that watch)?$")
@@ -1904,7 +1912,7 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     out = [banner, ""]
 
     status = []
-    if rebase_line and rebase_line not in _EXPECTED_REBASE:
+    if rebase_line and not _is_expected_rebase(rebase_line):
         status.append(rebase_line)
     if ci_line and not _EXPECTED_CI_RE.match(ci_line):
         status.append(ci_line)

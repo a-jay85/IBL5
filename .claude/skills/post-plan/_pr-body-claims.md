@@ -1,6 +1,6 @@
 ---
-description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show."
-last_verified: 2026-10-23
+description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show; a body names edited items and never tallies them by hand."
+last_verified: 2026-11-04
 ---
 
 # PR Body Claims
@@ -128,6 +128,18 @@ This rule has no mechanical check. The claims it covers are free-form prose, and
 The harness's pr-copy call writes no exact count (tests, cases, call sites, files, functions, rows) that its input packet does not show, and it claims only what the diff shows. When the number is not in front of it, it describes the change in words. The Phase 5.5 fidelity review's check 4 is the body-vs-diff gate for every count that reaches the body. `body_numbers.py` still corrects file, line, migration and ADR numbers and adds the test-count note described below.
 
 **Headless.** Applies: the prompt rule runs on every harness pr-copy call.
+
+## Edit-count rule
+
+A PR body names the edited items and states no count of them. Do not write how many existing assertions, tests, cases, checks, call sites, files or lines a change updated, changed or added, even when the diff shows every one of them. A hand tally of visible edits is still a hand tally. Write `updates the run_ln ordering, R-10 wording and L-7 probe assertions` in place of `two existing assertions were updated`. A number that is the subject of the change stays allowed: a threshold value the diff sets, or a row count from a query the plan asks for.
+
+This rule narrows the Unseen-count rule above, which allows a count the packet shows. It leaves the Test-count claims rule below intact: a count of tests added, copied from a runner summary line or a diff grep and placed beside its one backticked test file, is a measurement and stays legal. Check 4 of the Phase 5.5 fidelity review keeps blocking a count the diff contradicts.
+
+The harness enforces both halves. The pr-copy prompt's `EDIT COUNTS:` clause carries the rule. `strip_edit_counts` in `body_numbers.py` then drops the number from a plural count of modified items outside the protected blocks, so `Two existing assertions were updated` becomes `Existing assertions were updated`. It leaves counts of added items, files and lines to the grounded checks. It only drops a number in two positions, and it reads a hard-wrapped line together with the lines before it. The first is `_SENTENCE_START`: the number opens the text, a bullet or numbered item, or follows `.`, `!`, `?` or `:` and whitespace. Punctuation after a number label does not count, and neither does a period after a token of up to three letters or a listed longer abbreviation, so `Row 3: two tests were updated` and `No. 2 tests were updated` stay as written. A lowercase number word after `.`, `!` or `?` also stays. The second is after `and`, `but`, `the`, `these` or `those` when that word opens a clause, meaning it follows a sentence start, `,` or `;`. Any other position keeps the number, so `Just two tests were changed`, `Two out of the 3 tests were updated`, `All but two tests were changed` and `Phases 4 and 5 checks were updated` stay as written. Text inside a code span, a fenced block (backtick or `~~~`), double quotes, a blockquote line (a line that starts with `>`) or an HTML comment also stays, and so does a number of four or more digits. The prompt clause still applies to those sentences.
+
+Trigger: #3694 (the body said two existing assertions were updated, the diff changed three, and check 4 held the PR).
+
+**Headless.** Applies: the pr-copy prompt clause and the body-pass strip run on every harness run, and a `/post-plan` skill run that writes the body itself follows the rule directly.
 
 ## Test-count claims rule
 

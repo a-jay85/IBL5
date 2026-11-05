@@ -144,15 +144,15 @@ def squash_repo():
     shutil.rmtree(d, ignore_errors=True)
 
 
-def test_plain_merge_is_clean_on_the_squash_fixture(squash_repo):
-    """rebase_onto merges origin/master in, so the squashed parent's content sits on both
-    sides and does not replay. The squash trap a plain rebase hits never fires here."""
+def test_plain_sync_is_clean_on_the_squash_fixture(squash_repo):
+    """rebase_onto replays only the branch's own commits (iblBase..HEAD) onto master, so the
+    squashed parent's commits never replay. The squash trap a plain rebase hits never fires."""
     d, parent_tip, master_sha, key, branch = squash_repo
     g = LiveGit(d)
     g.rebase_onto()
     assert not g.is_dirty()
-    for ref in (parent_tip, master_sha):
-        assert _sh(d, "merge-base", "--is-ancestor", ref, "HEAD", check=False).returncode == 0
+    assert _sh(d, "merge-base", "--is-ancestor", master_sha, "HEAD", check=False).returncode == 0
+    assert _sh(d, "merge-base", "--is-ancestor", parent_tip, "HEAD", check=False).returncode != 0
 
 
 def test_stacked_conflict_auto_resolves_and_proves_tree_equivalent(squash_repo):

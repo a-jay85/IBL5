@@ -70,6 +70,16 @@ class Repo:
         _git(self.d, "commit", "--no-edit")
         return _rev(self.d, "HEAD")
 
+    def rebase_by_hand(self, text):
+        """What bin/postplan-fix --headless leaves: the branch squashed to one commit on
+        top of origin/master, f.txt resolved to `text`. Linear, one parent."""
+        _git(self.d, "reset", "-q", "--hard", "origin/master")
+        _git(self.d, "checkout", self.pre_sha, "--", "own.txt")
+        _write(self.d, "f.txt", text)
+        _git(self.d, "add", "-A")
+        _git(self.d, "commit", "-q", "-m", "branch: add line")
+        return _rev(self.d, "HEAD")
+
     def record(self, merge_sha=None):
         return premerge.record(self.d, self.branch, self.pre_sha, ("f.txt",))
 
@@ -140,7 +150,7 @@ DROPPED = "line1\nMASTER_LINE\nline3\n"
 
 def test_premerged_dropped_branch_line_fails_proof(make_repo):
     r = make_repo()
-    merge_sha = r.merge_by_hand(DROPPED)
+    merge_sha = r.rebase_by_hand(DROPPED)
     r.record()
     with pytest.raises(HarnessError) as ei:
         LiveGit(r.d, llm=FakeLlm()).rebase_onto("origin/master")
@@ -156,7 +166,7 @@ def test_premerged_dropped_branch_line_fails_proof(make_repo):
 
 def test_premerged_clean_resolution_passes_and_flags(make_repo):
     r = make_repo()
-    merge_sha = r.merge_by_hand(CLEAN)
+    merge_sha = r.rebase_by_hand(CLEAN)
     r.record()
     flag = conflict_flag_path(r.branch)
     # premerge.record writes the flag itself; the harness's later write must not mask a skip.
@@ -174,7 +184,7 @@ def test_premerged_clean_resolution_passes_and_flags(make_repo):
 
 def test_premerged_review_runs_on_clean_resolution(make_repo):
     r = make_repo()
-    merge_sha = r.merge_by_hand(CLEAN)
+    merge_sha = r.rebase_by_hand(CLEAN)
     r.record()
     llm = FakeLlm()
     LiveGit(r.d, llm=llm).rebase_onto("origin/master")
@@ -187,7 +197,7 @@ def test_premerged_review_runs_on_clean_resolution(make_repo):
 
 def test_premerged_manifest_ignored_when_head_moved(make_repo):
     r = make_repo()
-    r.merge_by_hand(CLEAN)
+    r.rebase_by_hand(CLEAN)
     r.record()
     _write(r.d, "g.txt", "later\n")
     _git(r.d, "add", "g.txt")
@@ -201,14 +211,14 @@ def test_premerged_manifest_ignored_when_head_moved(make_repo):
 
 def test_premerged_conflict_with_newer_master_fails_closed(make_repo):
     r = make_repo()
-    merge_sha = r.merge_by_hand(CLEAN)
+    merge_sha = r.rebase_by_hand(CLEAN)
     r.record()
     r.advance_master("line1\nMASTER_V2\nline3\n")
     llm = FakeLlm()
     with pytest.raises(HarnessError) as ei:
         LiveGit(r.d, llm=llm).rebase_onto("origin/master")
     assert ei.value.kind == "rebase-conflict"
-    assert "premerged head conflicts with a newer origin/master" in ei.value.detail
+    assert "premerged head is stale: origin/master moved after the fix" in ei.value.detail
     assert _rev(r.d, "HEAD") == merge_sha
     assert not os.path.exists(os.path.join(r.d, ".git", "MERGE_HEAD"))
     assert llm.calls == []
@@ -216,12 +226,51 @@ def test_premerged_conflict_with_newer_master_fails_closed(make_repo):
 
 def test_premerged_missing_lostwork_fails_closed(make_repo):
     r = make_repo(with_lostwork=False)
-    r.merge_by_hand(CLEAN)
+    r.rebase_by_hand(CLEAN)
     r.record()
     with pytest.raises(HarnessError) as ei:
         LiveGit(r.d, llm=FakeLlm()).rebase_onto("origin/master")
     assert ei.value.kind == "rebase-conflict"
     assert "lostwork.sh missing" in ei.value.detail
+
+
+def test_premerged_head_with_merge_commit_fails_closed(make_repo):
+    """A manifest written by the old merge-based script binds a head that carries a merge."""
+    r = make_repo()
+    merge_sha = r.merge_by_hand(CLEAN)
+    r.record()
+    llm = FakeLlm()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(r.d, llm=llm).rebase_onto("origin/master")
+    assert ei.value.kind == "rebase-conflict"
+    assert "premerged head carries a merge commit; rerun bin/postplan-fix --headless" \
+        in ei.value.detail
+    assert _rev(r.d, "HEAD") == merge_sha
+    assert llm.calls == []
+
+
+def test_premerged_linear_head_runs_proof(make_repo, monkeypatch):
+    r = make_repo()
+    r.rebase_by_hand(CLEAN)
+    r.record()
+    calls = []
+
+    def fake_prove(self, lostwork_path, key):
+        calls.append(key)
+        return True, "ok"
+
+    monkeypatch.setattr(LiveGit, "_prove_tree_equivalent", fake_prove)
+    LiveGit(r.d, llm=None).rebase_onto("origin/master")
+    assert calls == [r.key]
+
+
+def test_premerge_record_accepts_rebased_head(make_repo):
+    r = make_repo()
+    head = r.rebase_by_hand(CLEAN)
+    proc = _cli(r, "f.txt\n")
+    assert proc.returncode == 0, proc.stderr
+    data = json.load(open(premerge.manifest_path(r.key)))
+    assert data["sha"] == head and data["pre_sha"] == r.pre_sha
 
 
 def _cli(r, files_text, *extra, pre_sha=None):
@@ -245,7 +294,7 @@ def test_premerge_record_rejects_non_merge_head(make_repo):
     r = make_repo()
     proc = _cli(r, "f.txt\n")
     assert proc.returncode == 3
-    assert "premerge: HEAD is not a two-parent merge" in proc.stderr
+    assert "premerge: HEAD is not a rebased commit or a two-parent merge" in proc.stderr
     assert _nothing_written(r)
 
 

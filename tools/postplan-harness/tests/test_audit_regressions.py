@@ -116,7 +116,7 @@ def test_audit_modify_delete_branch_deletion_is_kept():
         assert _sh(d, "cat-file", "-e", f"HEAD:{_SCRIPT}", check=False).returncode != 0
         assert llm.calls == ["conflict-review"]
         assert g.last_conflict_resolution.resolved_files == (_SCRIPT,)
-        assert _parents(d) == [pre, master_sha]
+        assert _parents(d) == [master_sha]
         assert "TREE-EQUIVALENT" in _notes(g)
     finally:
         _cleanup_full(branch, branch, d)
@@ -146,7 +146,7 @@ def test_audit_modify_delete_blocked_by_new_master_reference():
 def test_audit_three_commit_branch_two_conflicting_commits():
     """Reproduces live-css-font-size-scale-20261006-195213-53979 and
     live-records-hub-20261006-175220-44478: rebase --continue failed at stop 2/N."""
-    d, branch, shas, _master = _make_audit_repo(
+    d, branch, shas, master_sha = _make_audit_repo(
         "three-commit",
         base_files={"a.css": "a1\na2\na3\n", "b.css": "b1\nb2\nb3\n"},
         branch_commits=[{"a.css": "a1\na2-branch\na3\n"},
@@ -164,9 +164,12 @@ def test_audit_three_commit_branch_two_conflicting_commits():
         resolves = [c for c in llm.calls if c.startswith("conflict-resolve:")]
         assert resolves == ["conflict-resolve:a.css", "conflict-resolve:b.css"]
         assert g.last_conflict_resolution.resolved_files == ("a.css", "b.css")
-        for sha in shas:
-            assert _sh(d, "merge-base", "--is-ancestor", sha, "HEAD",
-                       check=False).returncode == 0
+        # Linear replay: the branch's commits are squashed into one on master's tip, so the
+        # original shas are no longer ancestors; the proof is content plus the single parent.
+        assert _parents(d) == [master_sha]
+        assert _sh(d, "rev-list", "--merges", f"{master_sha}..HEAD").stdout.strip() == ""
+        assert _sh(d, "show", "HEAD:a.css").stdout == "a1\na2-branch\na2-master\na3\n"
+        assert _sh(d, "show", "HEAD:b.css").stdout == "b1\nb2-branch\nb2-master\nb3\n"
         assert _sh(d, "cat-file", "-e", "HEAD:c.txt", check=False).returncode == 0
         assert "TREE-EQUIVALENT" in _notes(g)
     finally:

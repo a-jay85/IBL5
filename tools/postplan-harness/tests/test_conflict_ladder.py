@@ -638,6 +638,29 @@ def test_opus_rung_restores_dropped_lines(tmp_path, key):
         assert f"LOST: docker-compose.ci.yml: +{l}" in prompt
 
 
+def test_opus_rung_resolves_with_rebase_branch_stage(tmp_path, key, monkeypatch):
+    from harness import conflict
+
+    d, pre, master, _ = _compose_repo(tmp_path)
+    seen = []
+
+    def recorder(llm, run, **kw):
+        seen.append(kw)
+        return True, ""
+
+    monkeypatch.setattr(conflict, "resolve_one", recorder)
+    ctx = _ctx(d, key, pre, master, ("docker-compose.ci.yml",), _compose_prove(d),
+               llm=_OpusLlm())
+    _, fn = make_opus_rung()
+    attempt = fn(ctx, _COMPOSE_PROOF)
+    assert attempt.applied is True
+    assert len(seen) == 1
+    assert seen[0]["branch_stage"] == 3
+    assert seen[0]["branch_stage"] == conflict.SYNC_BRANCH_STAGE
+    base = _git(d, "merge-base", pre, master).stdout.strip()
+    assert seen[0]["stage_revs"] == {1: base, 2: master, 3: pre}
+
+
 def test_opus_rung_still_dropping_a_line_fails(tmp_path, key):
     d, pre, master, merge = _compose_repo(tmp_path)
     llm = _OpusLlm("docker-compose.ci.yml", _compose_with(_OAUTH[:2]))

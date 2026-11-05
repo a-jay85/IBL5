@@ -48,8 +48,9 @@ from harness.state import PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError, RunR
 
 _STALE_BASE_TEXT = (
     "git push: pre-push-adr-hook: branch does not contain origin/master.\n"
-    "Fetch and merge before pushing:\n"
-    "  git fetch origin master && git merge origin/master"
+    "Fetch and rebase before pushing:\n"
+    "  git fetch origin master\n"
+    '  git rebase --onto origin/master "$(git merge-base HEAD origin/master)"'
 )
 
 _ADR_TEXT = (

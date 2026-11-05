@@ -38,8 +38,9 @@ from harness.state import HarnessError, RunResult, TerminalState, UsageLedger
 
 _STALE_BASE_TEXT = (
     "git push: pre-push-adr-hook: branch does not contain origin/master.\n"
-    "Fetch and merge before pushing:\n"
-    "  git fetch origin master && git merge origin/master"
+    "Fetch and rebase before pushing:\n"
+    "  git fetch origin master\n"
+    '  git rebase --onto origin/master "$(git merge-base HEAD origin/master)"'
 )
 
 _ADR_TEXT = (
@@ -377,8 +378,9 @@ def test_gate_remedy_names_stale_base():
     # Pattern matches test_verdict_line.py's _local_gate_res + verdict_line calls.
     stale_error = (
         "local-gate: git push: pre-push-adr-hook: branch does not contain origin/master.\n"
-        "Fetch and merge before pushing:\n"
-        "  git fetch origin master && git merge origin/master"
+        "Fetch and rebase before pushing:\n"
+        "  git fetch origin master\n"
+        '  git rebase --onto origin/master "$(git merge-base HEAD origin/master)"'
     )
     r = RunResult(
         terminal=TerminalState.FAILED,

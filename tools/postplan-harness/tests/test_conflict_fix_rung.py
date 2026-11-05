@@ -535,7 +535,7 @@ def test_rebase_onto_fix_rung_ships_merge(make_repo, tmp_path):
     live.rebase_onto()
 
     assert live.last_conflict_rung == "sonnet-fix"
-    assert _parents(fx.d) == [fx.pre, fx.master]
+    assert _parents(fx.d) == [fx.master]
     assert list((tmp_path / "state").glob("*.sonnet-fix.json"))
     listed = Path(f"/tmp/postplan-conflict-files-{fx.key}-autoresolved.txt").read_text()
     assert _COMPOSE in listed

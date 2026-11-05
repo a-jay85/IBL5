@@ -14,7 +14,7 @@ import json
 import os
 
 from .fidelity import (GATE_EDIT_DENY_TEXT, GATE_OWNING_PREFIXES, REMEDIATION_ALLOWED_TOOLS,
-                       REMEDIATION_DENIED_TOOLS, denied_gate_edits)
+                       REMEDIATION_DENIED_TOOLS, _norm_title, denied_gate_edits)
 from .adapters.llm import extract_json
 from . import outcome_log
 from .labels import NON_HOLDING_LABELS, parse_label
@@ -29,6 +29,12 @@ GATE_HOLD_MARKER = "<!-- postplan-gate-hold -->"
 # or unknown category on those labels leaves the thread open; gate-path always holds.
 # Important threads are unaffected: their non-gate declines resolve as before.
 WONT_FIX_CATEGORIES = ("wrong", "intentional", "already-fixed", "not-worth-it")
+# A real defect the fixer cannot reach (the fix needs a file it may not edit) goes to the
+# backlog only when it causes one of these harms. Anything else stays declined and unfiled.
+FOLLOWUP_CATEGORY = "not-worth-it"
+FOLLOWUP_HARMS = ("crash", "wrong-value", "lost-data", "security")
+FOLLOWUP_LABEL = "maintenance"
+FOLLOWUP_TITLE_MAX = 70
 ORIGIN_PRE_EXISTING = "pre-existing"
 ORIGIN_SAME_RUN = "same-run"
 # Phase 4.5 (pre-existing origin) takes at most this many OUTDATED trusted threads
@@ -169,8 +175,44 @@ def thread_prompt(thread: dict, file_excerpt: str) -> str:
         "stays open for a human.",
         'Required final answer: one JSON object {"verdict": "FIX"|"DECLINE", "reason": "<one sentence>", "category": "wrong"|"intentional"|"already-fixed"|"not-worth-it"|"gate-path"} as the last line of your result.',
         'category is required for DECLINE and ignored for FIX: wrong = the finding is mistaken or not a defect; intentional = the flagged behavior is deliberate; already-fixed = the current tree already addresses it; not-worth-it = real but out of scope or not worth changing here; gate-path = the only fix edits a gate path listed above.',
+        'Add a "followup" key only with category not-worth-it, and only when the defect is real, can happen today, and its fix needs a file you may not edit: "followup": {"title": "<imperative, under 70 characters>", "harm": "crash"|"wrong-value"|"lost-data"|"security", "trigger": "<the concrete input or state that causes it today>"}. Leave it out for anything else, including slow queries, design points, missing tests and doc wording. The harness files it as a backlog issue.',
     ]
     return "\n".join(lines)
+
+
+def followup_from_verdict(verdict_obj: dict) -> dict | None:
+    """The fixer's validated follow-up request, or None. Any malformed field means no filing."""
+    if verdict_obj.get("category") != FOLLOWUP_CATEGORY:
+        return None
+    raw = verdict_obj.get("followup")
+    if not isinstance(raw, dict) or raw.get("harm") not in FOLLOWUP_HARMS:
+        return None
+    title, trigger = raw.get("title"), raw.get("trigger")
+    if not (isinstance(title, str) and title.strip() and isinstance(trigger, str) and trigger.strip()):
+        return None
+    return {"title": title.strip()[:FOLLOWUP_TITLE_MAX], "harm": raw["harm"], "trigger": trigger.strip()}
+
+
+def file_declined_followup(gh, pr, cid, path, line, followup: dict, reason: str, log) -> int | None:
+    """File one declined finding as a backlog issue. Never raises: a lost filing is only a log line."""
+    pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr}"
+    where = f"{path}:{line}" if line else path
+    body = (f"{pr_link}\n\n"
+            f"Review finding the post-plan fixer could not reach: {pr_link}#discussion_r{cid}\n\n"
+            f"- File: `{where}`\n"
+            f"- Harm: {followup['harm']}\n"
+            f"- Trigger: {followup['trigger']}\n"
+            f"- Why it was declined: {reason}\n")
+    try:
+        if _norm_title(followup["title"]) in {_norm_title(t) for t in gh.issue_titles(FOLLOWUP_LABEL)}:
+            log(f"thread {cid}: follow-up already tracked; not filed")
+            return None
+        number = gh.followup_create(followup["title"], body, FOLLOWUP_LABEL)
+    except Exception as e:  # noqa: BLE001 - filing must never change the run result
+        log(f"thread {cid}: follow-up filing failed ({e!r})")
+        return None
+    log(f"thread {cid}: filed follow-up #{number}")
+    return number
 
 
 def declined_body(reason: str) -> str:
@@ -187,7 +229,8 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
     """Evaluate and action one review thread. Returns 'fixed', 'declined', or 'skipped'.
 
     A DECLINE with category gate-path returns 'skipped' and sets info["gate_hold"].
-    With `defer` set, the resolve reply is appended to `defer` as a dict instead of posted;
+    A DECLINE carrying a valid follow-up files a backlog issue after its thread resolves.
+    With `defer` set, the resolve reply (and any follow-up) is appended to `defer` as a dict instead of posted;
     with `timeout` set, it bounds the fixer session.
     """
     cid = thread.get("commentId")
@@ -259,10 +302,16 @@ def disposition_thread(thread, llm, git, worktree, pr, gh, log, *, commit, push,
             log(f"thread {cid}: {thread.get('label')} decline with category {category!r} "
                 "is not an allowed won't-fix category; thread left open")
             return "skipped"
+        followup = followup_from_verdict(verdict_obj)
         if defer is not None:
-            defer.append({"comment_id": cid, "kind": "declined", "reason": reason})
+            entry = {"comment_id": cid, "kind": "declined", "reason": reason}
+            if followup:
+                entry.update(followup=followup, path=path, line=line)
+            defer.append(entry)
         else:
             gh.resolve_review_thread(pr, cid, declined_body(reason))
+            if followup:
+                file_declined_followup(gh, pr, cid, path, line, followup, reason, log)
         return "declined"
 
     # Step 4: FIX

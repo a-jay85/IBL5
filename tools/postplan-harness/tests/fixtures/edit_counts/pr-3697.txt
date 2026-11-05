@@ -1,0 +1,82 @@
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** The `bin/review-outcomes report` command now prints cycles-to-pass per PR and a monthly count of revert commits on `origin/master`.
+
+**Why:** The plan wants a cheap health check on the review loop, so a reviewer change that cuts findings can be checked against any rise in reverts.
+
+**Watch:** The bug-planting block in the PR body predates commit `0468bbda`, so its flags on rows 7, 11 and 25 are stale. `build_cycles` undercounts cycles because a review run with zero findings writes no event.
+
+**Touches:** bin/review-outcomes, tools/postplan-harness/harness/outcome_log.py, tools/postplan-harness/README.md, tools/postplan-harness/tests/
+
+**Machine-authored fixes:** pending — Phase 6.5 has not run
+<!-- merge-digest:end -->
+
+## Summary
+- `report` in `tools/postplan-harness/harness/outcome_log.py` now prints two extra stats after the outcome table: cycles-to-pass per PR and reverts on `origin/master`.
+- Cycles come from the raw `phase4.5` events. A new cycle starts when two events of one PR are more than 300 seconds apart. A PR counts toward `--since`/`--until` by the UTC day of its last `phase4.5` event.
+- The text output shows mean, median, max and a 1/2/3/4+ histogram. Review runs that logged zero findings write no event, so the stat undercounts. The output says so.
+- Reverts are commits on `origin/master` whose subject starts with `Revert "`. They are grouped by UTC month, with the month's commit total beside each count.
+- If `git log` fails, the text says the count is unavailable and `--json` carries `"reverts": null`. The error goes to stderr and the exit code stays 0.
+- The existing table and existing JSON keys are unchanged. The new data sits under new `cycles` and `reverts` keys.
+- Added tests for cycle gap edges, sweep events being ignored, date range handling, bad timestamps, revert subject near-misses, month bucketing, and git failure paths.
+- Updated two existing test files to read only the table part of the output, since extra sections now follow it.
+- `bin/review-outcomes` header comment and `tools/postplan-harness/README.md` now describe the `report` command and the two new stats.
+
+**Merge danger:** Door: two-way · Blast radius: site-wide · Why: Read-only report addition in dev tooling; no data written, no migration, no GM-facing change.
+**How to revert:** `git revert <merge-sha>`; no migration, prod sync or config step is involved.
+
+<!-- scope-notes:begin -->
+## Unplanned changes
+The plan did not name these changes, or the diff lacks a planned file. Auto-merge is not held on them. Check each one.
+- unplanned `tools/postplan-harness/tests/test_outcome_agent_attribution.py` (changed path that no plan Critical File, no matrix test path and no PR-body '## Declared scope' bullet accounts for)
+<!-- scope-notes:end -->
+
+
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+
+<!-- exec-mutations:begin -->
+### Bug-planting check on the tests
+
+For each row of the plan's Verification Matrix, a tool planted a small bug in the code and re-ran that row's test. A good test fails when the bug is there.
+
+**✅ All 24 rows caught the planted bug.**
+
+<details><summary>✅ 24 rows caught the planted bug</summary>
+
+- **Row 3** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_minute_boundary_is_one_batch`)
+- **Row 4** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_gap_at_threshold_stays_one_batch`)
+- **Row 5** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_ignore_sweep_events`)
+- **Row 6** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_range_uses_last_phase45_day`)
+- **Row 7** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_histogram_and_stats`)
+- **Row 8** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_cycles_skip_unparseable_ts`)
+- **Row 9** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_text_table_header_and_total_row`)
+- **Row 10** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_text_shows_cycles_section`)
+- **Row 11** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_log.py -k test_read_events_still_reads_pre_origin_lines`)
+- **Row 12** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_reverts_subject_rule_near_misses`)
+- **Row 13** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_reverts_bucket_by_month_and_range`)
+- **Row 15** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_git_failure_degrades_loudly`)
+- **Row 16** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_git_failure_degrades_loudly`)
+- **Row 17** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_git_failure_degrades_loudly`)
+- **Row 18** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_unreadable_log_still_exits_one_with_git_stubbed`)
+- **Row 19** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k "test_read_master_subjects_failures_raise and nonzero"`)
+- **Row 20** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k "test_read_master_subjects_failures_raise and not nonzero"`)
+- **Row 21** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_read_master_subjects_parses_rows_utc`)
+- **Row 22** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_read_master_subjects_parses_rows_utc`)
+- **Row 24** (`test "$(bin/review-outcomes report --log=tools/postplan-harness/tests/fixtures/review_outcomes_sample.jsonl --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["reverts"]["total"])')" = "$(git log origin/master --format=%s | grep -c '^Revert "')" && echo REVERTS-MATCH`)
+- **Row 25** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py -k test_report_corpus_matches_master_baseline`)
+- **Row 26** (`bin/review-outcomes --help | grep -c 'bin/review-outcomes report \[--since'`)
+- **Row 27** (`bin/check-prose --since=master`)
+- **Row 28** (`cd tools/postplan-harness && python3 -m pytest -q tests/test_outcome_report.py tests/test_outcome_log.py tests/test_outcome_log_cli.py`)
+
+</details>
+<!-- exec-mutations:end -->
+
+<!-- backlog-closes:start -->
+Closes a-jay85/IBL5-backlog#1696
+<!-- backlog-closes:end -->
+

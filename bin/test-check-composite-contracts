@@ -230,7 +230,7 @@ permissions:
 jobs:
   mutation-pr:
     name: Infection PHP (per-PR diff)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
     - name: Detect covered changes
@@ -515,7 +515,7 @@ put_required_wf() {
       no-pr)
         printf "  push:\n    branches: [master]\n" ;;
     esac
-    printf "jobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n"
+    printf "jobs:\n  noop:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: true\n"
   } > "$f"
 }
 
@@ -592,14 +592,14 @@ put_e2e_on() {
     printf 'name: E2E Tests\non:\n  pull_request:\n'
     # shellcheck disable=SC2059
     printf "$2"
-    printf 'jobs:\n  noop:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n'
+    printf 'jobs:\n  noop:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: true\n'
   } > "$1/e2e-tests.yml"
 }
 
 # put_update_baselines <dir> <job-name>
 # Writes <dir>/update-baselines.yml with a workflow name and one job named <job-name>.
 put_update_baselines() {
-  printf 'name: VR Baseline Regen\non:\n  pull_request:\n    types: [labeled]\njobs:\n  regen:\n    name: %s\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n' "$2" > "$1/update-baselines.yml"
+  printf 'name: VR Baseline Regen\non:\n  pull_request:\n    types: [labeled]\njobs:\n  regen:\n    name: %s\n    runs-on: ubuntu-26.04\n    steps:\n      - run: true\n' "$2" > "$1/update-baselines.yml"
 }
 
 # run_l_case <case-name> <want-exit> <want-text> <stream: out|err> <dir>
@@ -778,19 +778,19 @@ agg_edit "$d_wf/all-checks-settled.yml" 's/^  contents: read$/  contents: write/
 run_agg_mut "A4 rejects contents write" "(A4)" "$d_wf"
 
 d_wf="$(agg_copy)"
-printf 'name: All checks green\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/all-checks-green.yml"
+printf 'name: All checks green\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: "true"\n' > "$d_wf/all-checks-green.yml"
 run_agg_mut "A5 rejects a missing All checks green ignore while a legacy file exists" "(A5)" "$d_wf"
 
 d_wf="$(agg_copy)"
-printf 'name: Unlisted PR Gate\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/unlisted-pr-gate.yml"
+printf 'name: Unlisted PR Gate\non:\n  pull_request:\njobs:\n  gate:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: "true"\n' > "$d_wf/unlisted-pr-gate.yml"
 run_agg_mut "A6 rejects an unlisted PR workflow" "(A6)" "$d_wf"
 
 d_wf="$(agg_copy)"
-printf 'name: Commented PR Gate\non:\n  pull_request: # every PR\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/commented-pr-gate.yml"
+printf 'name: Commented PR Gate\non:\n  pull_request: # every PR\njobs:\n  gate:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: "true"\n' > "$d_wf/commented-pr-gate.yml"
 run_agg_mut "A6 rejects an unlisted PR workflow whose trigger carries a comment" "(A6)" "$d_wf"
 
 d_wf="$(agg_copy)"
-printf 'name: Flow PR Gate\non:\n  pull_request: {types: [opened]}\njobs:\n  gate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' > "$d_wf/flow-pr-gate.yml"
+printf 'name: Flow PR Gate\non:\n  pull_request: {types: [opened]}\njobs:\n  gate:\n    runs-on: ubuntu-26.04\n    steps:\n      - run: "true"\n' > "$d_wf/flow-pr-gate.yml"
 run_agg_mut "A6 rejects an unlisted PR workflow with a flow-map trigger" "(A6)" "$d_wf"
 
 d_wf="$(agg_copy)"
@@ -1038,7 +1038,7 @@ put_db_wf() {
   else
     {
       printf 'name: fixture\non:\n  pull_request:\n    branches: [master]\n'
-      printf 'jobs:\n  db:\n    runs-on: ubuntu-latest\n'
+      printf 'jobs:\n  db:\n    runs-on: ubuntu-26.04\n'
       if [ "$mode" = joblevel ]; then
         printf '    env:\n      DB_NAME: ibl5_override\n      DB_PASS: other\n'
         printf '    services:\n      mariadb:\n        image: mariadb:11\n'
@@ -1153,6 +1153,36 @@ out="$(d1_run "$d_bad" "$d_wf")"; rc=$?
 expect "d1-unparseable-composite-fails" 1 "$rc"
 d1_has "d1-unparseable-composite-named" "expected exactly one \${DB_PASS:-default}" "$out"
 fi  # unfiltered
+
+# U1: runner-image pin. Each case writes one probe workflow into an otherwise
+# empty workflows dir; the actions dir is empty, so every other family skips.
+# MUT_LITERAL is set inside the unfiltered wrapper, so a --case run needs its own copy.
+U1_ADR_LITERAL='Infection PHP (per-PR diff)'
+u1_case() { # name want probe-file probe-job-body [needle]
+  should_run "$1" || return 0
+  local act wf dec out rc
+  act="$(fresh_actions)"; wf="$(fresh_workflows)"; dec="$(fresh_decisions)"
+  put_mut_adr "$dec" "$U1_ADR_LITERAL"
+  printf 'name: U1 probe\non:\n  push:\njobs:\n  probe:\n%s\n    steps:\n      - run: "true"\n' "$4" > "$wf/$3"
+  out="$("$CHECK" "$act" "$wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$dec" 2>&1)"; rc=$?
+  expect "$1" "$2" "$rc"
+  if [ -n "${5:-}" ]; then h_contains "$1-output" "$out" "$5"; fi
+}
+
+u1_case u1-pinned-passes 0 u1-probe.yml '    runs-on: ubuntu-26.04' 'no workflow runs on'
+u1_case u1-other-image-passes 0 u1-probe.yml '    runs-on: ubuntu-24.04-arm' 'no workflow runs on'
+u1_case u1-latest-runs-on-fails 1 u1-probe.yml '    runs-on: ubuntu-latest' 'u1-probe.yml:'
+u1_case u1-latest-matrix-fails 1 u1-probe.yml $'    strategy:\n      matrix:\n        os: [ubuntu-latest]\n    runs-on: ${{ matrix.os }}' 'u1-probe.yml:'
+u1_case u1-latest-in-comment-fails 1 u1-probe.yml $'    # was ubuntu-latest before the pin\n    runs-on: ubuntu-26.04' 'u1-probe.yml:'
+u1_case u1-latest-yaml-ext-fails 1 u1-probe.yaml '    runs-on: ubuntu-latest' 'u1-probe.yaml:'
+
+# u1-workflows-absent-skips: workflows dir missing → exit 0 with a visible skip line
+if should_run u1-workflows-absent-skips; then
+  u1_dec="$(fresh_decisions)"; put_mut_adr "$u1_dec" "$U1_ADR_LITERAL"
+  out="$("$CHECK" "$(fresh_actions)" "$TMP/u1-no-workflows" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$u1_dec" 2>&1)"; rc=$?
+  expect "u1-workflows-absent-skips" 0 "$rc"
+  h_contains "u1-workflows-absent-skips-output" "$out" "U1 skipped"
+fi
 
 check_only_cases
 h_done

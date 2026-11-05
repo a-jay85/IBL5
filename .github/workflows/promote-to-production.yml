@@ -52,7 +52,7 @@ jobs:
     # both list it verbatim. It must contain NO comma (SKIP_CHECKS is comma-split).
     # bin/check-composite-contracts pins the pairing (plan Phase 5).
     name: Promote master to production
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     if: >-
       github.event.workflow_run.head_branch == 'master' &&
@@ -149,7 +149,7 @@ jobs:
     # Second and last job in this workflow. Also listed verbatim in SKIP_CHECKS
     # and in bin/merge-master-to-prod. No comma.
     name: Auto-promotion paused
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     # Debounce: a master push fires ~13 workflow_run events, and a paused notice on
     # each would send ~13 identical DMs. `PR meta checks` is unfiltered, so it runs

@@ -253,7 +253,7 @@ remote_dump() {
 # changes (new keys, revocations) no longer propagate to local. API keys are
 # per-environment credentials, so a local copy of prod's keys was never the
 # point; keeping the local bot working is.
-PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state"
+PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context"
 
 # Detect STORED GENERATED column tables — their data needs dedicated column-list
 # INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.

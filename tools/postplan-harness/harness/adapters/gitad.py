@@ -895,7 +895,7 @@ class LiveGit:
     def _run_conflict_ladder(self, *, key, branch, master_sha, pre_rebase_sha,
                              lostwork_path, conflicted, proof_out, regen_exempt=(),
                              stage_sets=None):
-        from ..conflict_ladder import LadderContext, default_rungs, make_regen_rung, run_ladder
+        from ..conflict_ladder import LadderContext, default_rungs, run_ladder
         # The sync is a rebase, so the replayed commit has ONE parent (master's tip or the
         # previous replayed commit). Snapshot it now so the parents guard matches that shape.
         head_parents = tuple(self._run("rev-list", "--parents", "-n", "1", "HEAD").split()[1:])
@@ -909,10 +909,7 @@ class LiveGit:
             extend_pre_patch=lambda paths: self._rewrite_pre_patch_for_regen(
                 key, master_sha=master_sha, pre_rebase_sha=pre_rebase_sha,
                 exempt=tuple(dict.fromkeys([*regen_exempt, *paths]))))
-        # Closer A/B arm: only the deterministic regen rung runs; an unresolved conflict then
-        # ends in rebase-conflict (exit 3), which is the closer's trigger.
-        rungs = ((make_regen_rung(),) if getattr(self, "llm_conflict_rungs_off", False)
-                 else default_rungs(branch))
+        rungs = default_rungs(branch)
         return run_ladder(ctx, proof_out, rungs=rungs)
 
     def _run_stacked_lost_retry(self, *, key, master_sha, pre_rebase_sha,

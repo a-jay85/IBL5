@@ -158,10 +158,6 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     if not enabled(env):
         record["reason"] = "disabled"
         return _write(out_dir, record)
-    if getattr(res, "ab_arm", None) == "closer":
-        # Closer A/B arm: the closer session replaces every narrow fixer, this round included.
-        record["reason"] = "closer-arm"
-        return _write(out_dir, record)
     if not tg:
         record["reason"] = "no-target-hold"
         return _write(out_dir, record)

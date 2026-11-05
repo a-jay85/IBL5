@@ -173,21 +173,24 @@ echo "== FACT SHEET (complete and authoritative) =="
 echo ""
 echo "Each game carries a key (g1, g2, ...). Your prose.json games object is keyed by these."
 echo ""
+echo "Team cities below are the IBL's and can differ from real life. The IBL Grizzlies play in Vancouver, not Memphis. Use the city shown here. Never assume a team's city, arena, or local color from its real-life namesake."
+echo ""
 jq -r '
   def tn($nm; $id; $n): $n // $nm[$id | tostring] // ("team " + ($id | tostring));
+  def fn($city; $name): if ($city // "") == "" then $name else "\($city) \($name)" end;
   def pl($s): "  \($s) \(.name) \(.min)m \(.pts)p \(.reb)r \(.ast)a \(.stl)s \(.blk)b \(.fgm)-\(.fga) \(.tpm)-\(.tpa)";
   (reduce .standings[] as $s ({}; .[$s.teamid | tostring] = $s.name)) as $nm
   | "Sim \(.sim): \(.start_date) to \(.end_date)",
     "",
     "GAMES (key date Visitor score @ Home score; V/H lines: min pts reb ast stl blk FGM-FGA 3PM-3PA)",
     (.games[]
-      | "\(.key) \(.game_date) \(tn($nm; .visitor_teamid; .visitor_name)) \(.visitor_score) @ \(tn($nm; .home_teamid; .home_name)) \(.home_score)",
+      | "\(.key) \(.game_date) \(fn(.visitor_city; tn($nm; .visitor_teamid; .visitor_name))) \(.visitor_score) @ \(fn(.home_city; tn($nm; .home_teamid; .home_name))) \(.home_score)",
         (.visitor_top[] | pl("V")),
         (.home_top[] | pl("H")),
         (.injuries[] | "  INJ \(.name): \(.injuryDescription) (\(.injuryGamesMissed) games)")),
     "",
     "STANDINGS (team W-L conference/division confGB streak last10)",
-    (.standings[] | "\(.name) \(.wins)-\(.losses) \(.conference // "-")/\(.division // "-") \(.conf_gb // "-") \(if .streak == "" then "-" else .streak end) \(if .last10 == "" then "-" else .last10 end)"),
+    (.standings[] | "\(fn(.city; .name)) \(.wins)-\(.losses) \(.conference // "-")/\(.division // "-") \(.conf_gb // "-") \(if .streak == "" then "-" else .streak end) \(if .last10 == "" then "-" else .last10 end)"),
     "",
     "TRADES",
     (if (.sim_trades | length) == 0 then "(none)"

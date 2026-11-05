@@ -91,5 +91,5 @@ Every job in `.github/workflows/` runs on `ubuntu-26.04`. GitHub moves the `ubun
 **Upgrade recipe.** Do all of it in one worktree PR.
 
 1. Swap the literal in every workflow with `sed -i '' 's/runs-on: ubuntu-26.04/runs-on: ubuntu-NN.04/' .github/workflows/*.yml` on macOS. On Linux, drop the `''`.
-2. Swap the same literal in the fixtures of `bin/test-check-composite-contracts` and in this section, and set a new review date.
+2. Swap the same literal in the fixtures of `bin/test-check-composite-contracts`, in `.github/actionlint.yaml`, and in this section, and set a new review date. Delete the `.github/actionlint.yaml` entry if the actionlint pin in `.github/workflows/tests.yml` already lists the new image.
 3. Run `bin/check-composite-contracts` and `bin/test-check-composite-contracts`, then let the PR's full CI run on the new image. A check that fails only on the new image is part of the upgrade. Fix it in the same PR, or keep the old pin and name the failing check in the PR body.

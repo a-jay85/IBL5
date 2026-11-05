@@ -38,7 +38,8 @@ REMOTE_SUBCOMMANDS: frozenset[str] = frozenset({"fetch", "push", "ls-remote", "p
 REMOTE_UNREACHABLE_MARKERS: tuple[str, ...] = TRANSIENT_MARKERS + (
     "Permission denied (publickey)",
     "Could not resolve host",
-    "unable to access '",
+    "Failed to connect to",
+    "Couldn't connect to server",
     "The requested URL returned error: 5",
 )
 

@@ -18,10 +18,10 @@ use League\LeagueContext;
  *
  * @phpstan-type PlayerLine array{pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
  * @phpstan-type GameInjury array{pid:int,name:string,injuryDescription:string,injuryGamesMissed:int}
- * @phpstan-type GameRow array{id:int,season_year:int,box_id:int,game_date:string,visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int,visitor_name:string|null,home_name:string|null,game_of_that_day:int|null}
+ * @phpstan-type GameRow array{id:int,season_year:int,box_id:int,game_date:string,visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,game_of_that_day:int|null}
  * @phpstan-type BoxLine array{game_date:string,visitor_teamid:int,home_teamid:int,teamid:int,pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
- * @phpstan-type GameFact array{key:string,season_year:int,game_date:string,box_id:int|null,game_of_that_day:int|null,visitor_teamid:int,home_teamid:int,visitor_name:string|null,home_name:string|null,visitor_score:int,home_score:int,visitor_top:list<PlayerLine>,home_top:list<PlayerLine>,injuries:list<GameInjury>}
- * @phpstan-type StandingRow array{teamid:int,name:string,wins:int,losses:int,conference:string|null,division:string|null,conf_gb:string|null,streak:string,last10:string}
+ * @phpstan-type GameFact array{key:string,season_year:int,game_date:string,box_id:int|null,game_of_that_day:int|null,visitor_teamid:int,home_teamid:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,visitor_score:int,home_score:int,visitor_top:list<PlayerLine>,home_top:list<PlayerLine>,injuries:list<GameInjury>}
+ * @phpstan-type StandingRow array{teamid:int,name:string,city:string|null,wins:int,losses:int,conference:string|null,division:string|null,conf_gb:string|null,streak:string,last10:string}
  * @phpstan-type InjuryRow array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool,current_teamid:int}
  */
 final class SimRecapContextRepository extends \Database\BaseMysqliRepository
@@ -287,7 +287,9 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
-     * Played schedule rows in the window, with names and the box-score ordinal.
+     * Played schedule rows in the window, with names, IBL cities, and the
+     * box-score ordinal. The agent needs the city from ibl_team_info because IBL
+     * franchises can sit in a different city than their real-life namesakes.
      * Unplayed (0-0) rows are dropped. game_of_that_day comes from
      * ibl_box_scores_teams (MIN over the two team rows) and is null when the
      * game has no team box row.
@@ -301,10 +303,13 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
             "SELECT s.id, s.season_year, s.box_id, s.game_date,
                     s.visitor_teamid, s.visitor_score, s.home_teamid, s.home_score,
                     sv.team_name AS visitor_name, sh.team_name AS home_name,
+                    tv.team_city AS visitor_city, th.team_city AS home_city,
                     bst.game_of_that_day
              FROM `ibl_schedule` s
              LEFT JOIN `ibl_standings` sv ON sv.teamid = s.visitor_teamid
              LEFT JOIN `ibl_standings` sh ON sh.teamid = s.home_teamid
+             LEFT JOIN `ibl_team_info` tv ON tv.teamid = s.visitor_teamid
+             LEFT JOIN `ibl_team_info` th ON th.teamid = s.home_teamid
              LEFT JOIN (SELECT game_date, visitor_teamid, home_teamid,
                                MIN(game_of_that_day) AS game_of_that_day
                         FROM `ibl_box_scores_teams`
@@ -364,13 +369,14 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
             return [];
         }
 
-        /** @var list<array{teamid:int,name:string,wins:int,losses:int,conference:string|null,division:string|null,conf_gb:string|null,streak_type:string|null,streak:int|null,last_win:int|null,last_loss:int|null}> $rows */
+        /** @var list<array{teamid:int,name:string,city:string|null,wins:int,losses:int,conference:string|null,division:string|null,conf_gb:string|null,streak_type:string|null,streak:int|null,last_win:int|null,last_loss:int|null}> $rows */
         $rows = $this->fetchAllInList(
-            "SELECT st.teamid, st.team_name AS name, st.wins, st.losses, st.conference,
+            "SELECT st.teamid, st.team_name AS name, ti.team_city AS city, st.wins, st.losses, st.conference,
                     st.division, st.conf_gb, pw.streak_type, pw.streak,
                     pw.last_win, pw.last_loss
              FROM `ibl_standings` st
              LEFT JOIN `ibl_power` pw ON pw.teamid = st.teamid
+             LEFT JOIN `ibl_team_info` ti ON ti.teamid = st.teamid
              WHERE st.teamid IN ({IN})
              ORDER BY st.conference ASC, st.wins DESC, st.losses ASC, st.teamid ASC",
             'i',
@@ -383,6 +389,7 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
             $out[] = [
                 'teamid'     => $row['teamid'],
                 'name'       => $row['name'],
+                'city'       => $row['city'],
                 'wins'       => $row['wins'],
                 'losses'     => $row['losses'],
                 'conference' => $row['conference'],
@@ -465,6 +472,8 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
                 'home_teamid'      => $game['home_teamid'],
                 'visitor_name'     => $game['visitor_name'],
                 'home_name'        => $game['home_name'],
+                'visitor_city'     => $game['visitor_city'],
+                'home_city'        => $game['home_city'],
                 'visitor_score'    => $game['visitor_score'],
                 'home_score'       => $game['home_score'],
                 'visitor_top'      => $this->topPerformers($visitorLines),

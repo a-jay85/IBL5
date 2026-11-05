@@ -22,6 +22,53 @@ ANCHOR_RE = re.compile(r'"([^"]{20,})"')
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 BEGIN_RE = re.compile(r"^<!--\s*([a-z-]+):begin\s*-->$")
 
+# What a finding may say around its one correction. The checks are an allowlist
+# of clause openers plus word lists, so an unknown shape fails closed.
+SPAN_RE = re.compile(r'`[^`]*`|"[^"]*"')
+SENTENCE_END_RE = re.compile(r"[.;:!?](?:\s+|$)")
+CLAUSE_SPLIT_RE = re.compile(
+    r"[.;:!?](?:\s+|$)|(?:,\s+|\s+)(?:and|but)\s+|,\s+|\s+[-\u2013\u2014]+\s+"
+)
+NEXT_ACTION_RE = re.compile(r"\bNext action:\s*$", re.IGNORECASE)
+BODY_IMPERATIVE_RE = re.compile(
+    r"^(?:(?:Correct|Fix|Reword|Update) (?:the )?PR body(?:'s [\w ]+)?"
+    r"|(?:Correct|Reword) (?:the |a )?[\w ]+ in the PR body)$"
+)
+JOINED_RE = re.compile(r"\b(?:and|or|but)\b")
+CLAUSE_OPENERS = frozenset(
+    "\u00a7 the it its this that these those they pr line lines only both not "
+    "while whereas though although since because which "
+    "one two three four five six seven eight nine ten".split()
+)
+ASK_RE = re.compile(
+    r"\b(?:either|or|nor|alternatively|instead|otherwise|unless|whichever|whether|if"
+    r"|decide|choose|choice|options?|pick"
+    r"|also|too|additionally|plus|then|afterwards?|another|separately"
+    r"|follow-?up|as well"
+    r"|should|must|shall|ought|needs?|needed|have to|has to|had to"
+    r"|requires?|required|please|wants?|recommend|suggest|consider|prefer"
+    r"|may|might|could|would|can|cannot|perhaps|probably|possibly|maybe|likely"
+    r"|fix|fixes|fixing|add|adds|adding|remove|removing|delete|deleting"
+    r"|rename|renaming|update|updating|rewrite|rewriting|refactor|revert|restore"
+    r"|implement|create|rerun|re-run|run|move|replace|adjust|amend|commit|push|patch"
+    r"|wire|chore|todo|owed|outstanding|pending)\b",
+    re.IGNORECASE,
+)
+# After "the", only a named artifact may open a clause, so "The retry loop still
+# deserves a test" fails on its subject even though no word below catches it.
+THE_SUBJECTS = frozenset(
+    "\u00a7 pr body diff code plan helper script file first second "
+    "third bullet summary sentence line claim count text".split()
+)
+# Fine when the clause blames the body, a code defect when it blames anything else.
+BLAME_RE = re.compile(
+    r"\b(?:wrong|incorrect|has no|have no|lacks?|missing|bugs?|buggy|broken|untested"
+    r"|fails?|failing|regression|defect|mistake|flaw|error|off by"
+    r"|still|owner|picks?|forks?|paths?|problem|issue|worth|deserves?|looks?|open"
+    r"|design|decisions?|later|remains?|remaining)\b",
+    re.IGNORECASE,
+)
+
 
 class Refuse(Exception):
     def __init__(self, token):
@@ -44,14 +91,60 @@ def not_body_only(reason):
 
 
 def group_bullets(lines):
-    """Group FINDINGS lines into bullets; continuation lines join with a space."""
+    """Group FINDINGS lines into bullets; continuation lines join with a space.
+
+    Prose that follows no bullet directly is kept as its own unmarked entry, so
+    a request written outside a bullet cannot pass unread.
+    """
     bullets = []
+    after_blank = True
     for line in lines:
         if BULLET_RE.match(line):
             bullets.append(line.strip())
-        elif line.strip() and bullets:
-            bullets[-1] += " " + line.strip()
+        elif line.strip():
+            if after_blank:
+                bullets.append(line.strip())
+            else:
+                bullets[-1] += " " + line.strip()
+        after_blank = not line.strip()
     return bullets
+
+
+def mask_span(match):
+    """Hide a body quote or a one-word code span. A spaced code span stays readable."""
+    span = match.group(0)
+    if span.startswith("`") and re.search(r"\s", span):
+        return span.strip("`")
+    return "\u00a7"
+
+
+def clause_passes(clause):
+    words = clause.split()
+    if not words:
+        return True
+    opener = words[0].lower()
+    if opener not in CLAUSE_OPENERS and "/" not in opener \
+            and not re.search(r"\.\w{1,4}$", opener) and not opener.isdigit():
+        return False
+    if opener == "the" and (len(words) < 2 or words[1].lower() not in THE_SUBJECTS):
+        return False
+    if ASK_RE.search(clause):
+        return False
+    return "body" in clause.lower() or not BLAME_RE.search(clause)
+
+
+def asks_beyond_body(text, correction):
+    """True unless the correction ends the finding and the rest only describes."""
+    if text[correction.end():].strip():
+        return True
+    rest = SPAN_RE.sub(mask_span, text[:correction.start()])
+    if '"' in rest or "`" in rest:
+        return True
+    rest = NEXT_ACTION_RE.sub("", rest.rstrip())
+    parts = SENTENCE_END_RE.split(rest, maxsplit=1)
+    if BODY_IMPERATIVE_RE.match(parts[0]) and not JOINED_RE.search(parts[0]):
+        rest = parts[1] if len(parts) > 1 else ""
+    return not all(clause_passes(c) for c in CLAUSE_SPLIT_RE.split(rest))
 
 
 def blocking_bullets(sticky):
@@ -115,6 +208,8 @@ def blocking_bullets(sticky):
             return None, "correction-ambiguous"
         if found[0][0] == found[0][1]:
             return None, "correction-noop"
+        if asks_beyond_body(text, CORRECTION_RE.search(text)):
+            return None, "beyond-body-request"
     return blocking, None
 
 

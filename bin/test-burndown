@@ -39,7 +39,7 @@ export PLAN_TIER_HINT_LOG="$PTJ_DIR/plan-tier-hint.log"
 
 mkdir -p "$T/home" "$T/fx"
 
-# ── Phase 8: pr-burndown body-only helper (PB1-PB13) ──
+# ── Phase 8: pr-burndown body-only helper (PB1-PB18) ──
 # Defined early so `TB_ONLY=pb bin/test-burndown` runs only these cases (fast
 # path for mutation checks). Unset or any other value runs the whole file, and
 # the end-of-file call below runs the cases as part of the full pass. The gate
@@ -155,6 +155,83 @@ PB_EOF
         && ok "PB7: two correction sentences are ambiguous" \
         || fail "PB7: two correction sentences are ambiguous (got $RC: $OUT)"
 
+    # PB14-PB16 keep the fixture's first sentence, which names the PR body, so
+    # only the new check can reject them. PB2 stops at the first-sentence check.
+    pb_sub "$S" "$CORR" "Either fix \`bin/foo\` to retry twice, or update the text. $CORR" > "$D/seither.md"
+    OUT="$("$PBOF" classify "$D/seither.md" 2>&1)"; RC=$?
+    [ "$RC" = 1 ] && grep -qF 'BODY_ONLY=no reason=beyond-body-request' <<< "$OUT" \
+        && ok "PB14: an 'Either fix' choice beside the correction is not body-only" \
+        || fail "PB14: an 'Either fix' choice beside the correction is not body-only (got $RC: $OUT)"
+
+    pb_sub "$S" "$CORR" "$CORR Add the test to bin/foo." > "$D/saddafter.md"
+    pb_sub "$S" "$CORR" "Add the test to bin/foo. $CORR" > "$D/saddbefore.md"
+    OUT="$("$PBOF" classify "$D/saddafter.md" 2>&1)"; RC=$?
+    OUT5="$("$PBOF" classify "$D/saddbefore.md" 2>&1)"; RC5=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=beyond-body-request' <<< "$OUT" \
+        && [ "$RC5" = 1 ] && grep -qF 'reason=beyond-body-request' <<< "$OUT5" \
+        && ok "PB15: 'Add the test' before or after the correction is not body-only" \
+        || fail "PB15: 'Add the test' before or after the correction is not body-only (got $RC: $OUT / $RC5: $OUT5)"
+
+    local ASK NASK=0 NSLIP=0
+    while IFS= read -r ASK; do
+        NASK=$((NASK + 1))
+        pb_sub "$S" "$CORR" "$ASK $CORR" > "$D/sask.md"
+        OUT="$("$PBOF" classify "$D/sask.md" 2>&1)"; RC=$?
+        if [ "$RC" != 1 ] || ! grep -qF 'reason=beyond-body-request' <<< "$OUT"; then
+            NSLIP=$((NSLIP + 1))
+            printf 'PB16 slip: %s (got %s: %s)\n' "$ASK" "$RC" "$OUT"
+        fi
+    done <<'PB_EOF'
+Or fix bin/foo instead.
+`bin/foo` also needs a test.
+Alternatively, make `bin/foo` retry twice.
+`bin/foo` should retry twice.
+`bin/foo` is wrong.
+`bin/foo` has no test.
+No test covers `bin/foo`.
+Tighten the retry loop.
+Next action: tighten `bin/foo`.
+The retry loop still deserves a test.
+The owner picks one of two paths.
+If the retry is meant to run twice, the code is the problem.
+Two sides, tighten the retry loop.
+`Add the test to bin/foo`.
+PB_EOF
+    [ "$NASK" = 14 ] && [ "$NSLIP" = 0 ] \
+        && ok "PB16: other request and choice wordings are not body-only" \
+        || fail "PB16: other request and choice wordings are not body-only ($NSLIP of $NASK slipped)"
+
+    # Each plain finding replaces the whole bullet, so each shape stands alone.
+    local PLAIN FIRST_LINE NPLAIN=0 NREJ=0
+    FIRST_LINE="$(grep -F '[BLOCKING]' "$D/s3694.md")"
+    while IFS= read -r PLAIN; do
+        NPLAIN=$((NPLAIN + 1))
+        pb_sub "$S" "$FIRST_LINE" "- [BLOCKING] $PLAIN" > "$D/splain.md"
+        OUT="$("$PBOF" classify "$D/splain.md" 2>&1)"; RC=$?
+        if [ "$RC" != 0 ] || [ "$OUT" != "BODY_ONLY=yes" ]; then
+            NREJ=$((NREJ + 1))
+            printf 'PB17 rejected: %s (got %s: %s)\n' "$PLAIN" "$RC" "$OUT"
+        fi
+    done <<'PB_EOF'
+The PR body says the retry runs twice but bin/foo retries once. Change "twice" to "once" in the PR body.
+The PR body is wrong about the retry count. Next action: Change "twice" to "once" in the PR body.
+Correct the retry count in the PR body. Change "twice" to "once" in the PR body.
+The PR body still says "twice". `bin/foo:12` retries once. Change "twice" to "once" in the PR body.
+PB_EOF
+    [ "$NPLAIN" = 4 ] && [ "$NREJ" = 0 ] \
+        && ok "PB17: plain body corrections stay body-only" \
+        || fail "PB17: plain body corrections stay body-only ($NREJ of $NPLAIN rejected)"
+
+    pb_sub "$S" "$N1" "$N1$NL$NL  Also fix bin/foo." > "$D/sorphan.md"
+    OUT="$("$PBOF" classify "$D/sorphan.md" 2>&1)"; RC=$?
+    rm -f "$D/out-either.md"
+    OUT5="$("$PBOF" apply "$D/seither.md" "$D/b3694.md" "$D/out-either.md" 2>&1)"; RC5=$?
+    [ "$RC" = 1 ] && grep -qF 'reason=unmarked-finding' <<< "$OUT" \
+        && [ "$RC5" = 1 ] && grep -qF 'reason=beyond-body-request' <<< "$OUT5" \
+        && [ ! -e "$D/out-either.md" ] \
+        && ok "PB18: stray prose fails closed and apply refuses a mixed finding" \
+        || fail "PB18: stray prose fails closed and apply refuses a mixed finding (got $RC: $OUT / $RC5: $OUT5)"
+
     OUT="$("$PBOF" apply "$D/s3694.md" "$D/b3694.md" "$D/out1.md" 2>&1)"; RC=$?
     [ "$RC" = 0 ] \
         && grep -qF 'Three existing assertions were updated' "$D/out1.md" \
@@ -214,6 +291,9 @@ PB_EOF
             && ! grep -qF -- '--jq .body >' <<< "$REG" \
             && ok "PB13: body saves strip the newline gh adds" \
             || fail "PB13: body saves strip the newline gh adds"
+        [ -n "$REG" ] && grep -qF 'or `beyond-body-request`, the' <<< "$REG" \
+            && ok "PB13: beyond-body-request routes to Decide now" \
+            || fail "PB13: beyond-body-request routes to Decide now"
     fi
 }
 if [ "${TB_ONLY:-}" = pb ]; then pb_cases; h_done; fi
@@ -3307,7 +3387,7 @@ OUT="$(bdl burndown-record "$L" 42 status=skipped "why=duplicate of a merged fix
 OUT="$("$SCRIPT" --help 2>&1)"
 want "SR26: help lists why=" "$OUT" "blocked_by=, why= on ledger item"
 
-# ── Phase 8: pr-burndown body-only helper (PB1-PB13) ──
+# ── Phase 8: pr-burndown body-only helper (PB1-PB18) ──
 pb_cases
 
 h_done

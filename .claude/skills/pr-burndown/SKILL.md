@@ -219,8 +219,10 @@ says. Each block runs in its own shell, so nothing carries over.
    bin/lib/pr-body-only-fix classify "$D/pN-sticky.md"
    ```
    `BODY_ONLY=no reason=<token>` means the PR takes its normal pile. When every blocker
-   names the PR body but the token is `correction-not-stated` or `correction-ambiguous`, the
-   PR goes to Decide now and its card quotes the finding.
+   names the PR body but the token is `correction-not-stated`, `correction-ambiguous`,
+   or `beyond-body-request`, the PR goes to Decide now and its card quotes the finding.
+   `beyond-body-request` means a finding asks for more than the one correction or offers
+   a choice, which the owner settles.
 2. Confirm the verdict reviewed the current head, as Step 1 says. A stale verdict is a
    re-fire chore and skips this section.
 3. Run the live-run check from Step 6. If a post-plan run is listed, skip this PR for now.

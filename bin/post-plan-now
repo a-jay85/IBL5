@@ -633,12 +633,21 @@ if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
     PREFIRE="${PREFIRE_VERIFY_SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/prefire-verify}"
     if [ ! -x "$PREFIRE" ]; then
         echo "post-plan-now: pre-fire gate $PREFIRE is missing; refusing to fire." >&2
-        exit 9
+        exit 10
     fi
     PREFIRE_ARGS=(--fire-point)
     [ -f "$PLAN_FILE" ] && PREFIRE_ARGS+=(--plan "$PLAN_FILE")
     [ -n "$SKIP_VERIFY_REASON" ] && PREFIRE_ARGS+=(--bypass "$SKIP_VERIFY_REASON")
-    if ! "$PREFIRE" ${PREFIRE_ARGS[@]+"${PREFIRE_ARGS[@]}"}; then
+    PREFIRE_RC=0
+    "$PREFIRE" ${PREFIRE_ARGS[@]+"${PREFIRE_ARGS[@]}"} || PREFIRE_RC=$?
+    if [ "$PREFIRE_RC" -ne 0 ]; then
+        # prefire-verify exit 3 = environment (missing prerequisite, Docker/DB down, lock
+        # held). Exit 10 tells automouse it is not a verdict on the plan. Other failures
+        # are refusals (exit 9).
+        if [ "$PREFIRE_RC" -eq 3 ]; then
+            echo "post-plan-now: pre-fire verification could not run (environment); fix it and re-run." >&2
+            exit 10
+        fi
         echo "post-plan-now: pre-fire verification refused; fix the check named above and re-run." >&2
         echo "post-plan-now: a human may bypass with --skip-verify=<reason> (logged)." >&2
         exit 9

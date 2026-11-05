@@ -53,6 +53,8 @@ def test_strip_edit_counts_capitalizes_after_bullet_digit():
         "2 of 3 tests were updated",
         "Phases 4 and 5 checks were updated",
         "Rows 7 and 11 tests were changed",
+        "Phases 1, 2, and 3 checks were updated",
+        "Phases 1, 2, or 3 checks were updated",
         "3 of the 5 tests were updated",
         "At most two tests were changed",
         "Just two tests were changed",

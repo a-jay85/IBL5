@@ -316,6 +316,13 @@ class RepoGit:
     def changed_files(self, base="origin/master"):
         return _g(self.root, "diff", "--name-only", base, "HEAD").splitlines()
 
+    def conformance_files(self, base="origin/master"):
+        return _g(self.root, "diff", "--no-renames", "--name-only", base, "HEAD").splitlines()
+
+    def strip_head_paths(self, sha, paths):
+        """A strip that does nothing, so the deny cases pin remediate's fail-closed raise."""
+        return ""
+
     def commit_all(self, message):
         _g(self.root, "add", "-A")
         if not _g(self.root, "diff", "--cached", "--name-only"):

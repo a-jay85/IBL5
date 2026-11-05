@@ -125,6 +125,53 @@ def denied_gate_edits(paths) -> list[str]:
             if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
 
 
+def _strip_gate_paths(gitad, sha: str, hits, commit, log, out) -> str:
+    """Revert refused gate paths to the pre-round tree (`sha^`) and recommit the rest.
+
+    Returns the new commit sha, or "" when the fixer changed only gate paths. Raises
+    HarnessError("gate-path-edit") when the strip fails or the tree is unclear after it.
+    """
+    joined = ", ".join(hits)
+    log(f"phase5.5: remediation touched gate-owning paths ({joined}) - reverting them "
+        f"to {str(sha)[:12]}^ and keeping the other edits")
+    try:
+        strip_err = gitad.strip_head_paths(sha, hits)
+        if strip_err:
+            raise HarnessError("gate-path-edit", f"{joined}: strip failed: {strip_err[:300]}")
+        new_sha = commit(REMEDIATION_COMMIT_MSG) or ""
+        leftover = denied_gate_edits(gitad.conformance_files(f"{sha}^"))
+        dirty = gitad.is_dirty()
+        if leftover or dirty:
+            raise HarnessError("gate-path-edit",
+                               f"{joined}: tree unclear after strip "
+                               f"(leftover={', '.join(leftover) or 'none'}, dirty={dirty})")
+    except Exception as exc:  # noqa: BLE001 - fail closed on any strip or recommit error
+        kind = getattr(exc, "kind", exc.__class__.__name__)
+        log(f"phase5.5: remediation gate-path revert failed or tree unclear "
+            f"({kind}: {getattr(exc, 'detail', exc)}) - commit left local, remediation ends")
+        out("gate-path-edit")
+        if kind == "gate-path-edit":
+            raise
+        raise HarnessError("gate-path-edit", f"{joined}: {kind}: {exc}") from exc
+    return new_sha
+
+
+def _first_line(text: str) -> str:
+    """A finding's first line in plain words: no bullet and no `[BLOCKING]` marker."""
+    line = (str(text).strip().splitlines() or [""])[0]
+    return _FINDING_MARKER_RE.sub("", line).strip()[:200]
+
+
+def gate_hold_record(paths, finding_texts) -> list[dict]:
+    """One entry per refused gate path: the path and the first blocking finding naming it."""
+    texts = [str(t) for t in (finding_texts or [])]
+    out = []
+    for p in paths:
+        finding = next((_first_line(t) for t in texts if p in t), None)
+        out.append({"path": p, "finding": finding})
+    return out
+
+
 # Local-gate fixer (harness/gatefix.py) deny list. A superset of GATE_OWNING_PREFIXES:
 # the fixer runs at a pre-commit/pre-push denial, so the hook bodies, their installer,
 # their config, the Phase 6.5 arming files, and the whole harness are gate paths too.
@@ -894,18 +941,24 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         return None
     # Between commit and push on purpose. Checking after the push would need a
     # force-push to undo; checking before the commit would need a working-tree diff and
-    # a reset. A denied commit stays local, which is the same state the other terminal
-    # kinds already leave behind.
-    hits = denied_gate_edits(gitad.changed_files(f"{sha}^"))
+    # a reset. A refused gate path is stripped from the local commit before anything is
+    # pushed; a strip that fails leaves the commit local, the same state the other terminal
+    # kinds leave behind.
+    hits = denied_gate_edits(gitad.conformance_files(f"{sha}^"))
     if hits and fidelity_filefix.permit(hits, filefix, worktree, sha, log):
         log(f"phase5.5: remediation file-fix commit allowed ({', '.join(hits)})")
         _out("filefix-committed")
         hits = []
     if hits:
-        log(f"phase5.5: remediation touched gate-owning paths ({', '.join(hits)}) "
-            "- commit left local, remediation ends")
-        _out("gate-path-edit")
-        raise HarnessError("gate-path-edit", ", ".join(hits))
+        sha = _strip_gate_paths(gitad, sha, hits, commit, log, _out)
+        if outcome is not None:
+            outcome["gate_reverted"] = list(hits)
+            outcome["gate_hold"] = gate_hold_record(hits, blocking_finding_texts(verdict1_path))
+        if not sha:
+            log("phase5.5: remediation changed only gate-owning paths; all reverted, "
+                "nothing to push")
+            _out("gate-path-edit")
+            return None
     pushed = push()
     if pushed:
         # A stale-base recovery inside `push` rebased the commit onto the fresh master,
@@ -1833,6 +1886,22 @@ def _fixed_citation(sha: str | None, round_no: int) -> str:
     return f"fixed in {(sha or '')[:12]}" if sha else "fixed"
 
 
+def _gate_hold_lines(fid: dict, final_word: str | None) -> list[str]:
+    """Plain-words lines for findings whose fix needs a protected gate file."""
+    hold = fid.get("gate_path_hold") or []
+    if not hold or final_word != "NOT READY":
+        return []
+    lines = ["### Needs the owner (protected file)"]
+    for h in hold:
+        path = h.get("path") or ""
+        what = (linkify_refs(h["finding"]) if h.get("finding")
+                else "A blocking finding (listed below)")
+        lines.append(f"- [ ] {what}: the fix needs an edit to `{path}`. That file is a "
+                     "protected gate file the fixer may not change, so its edit was "
+                     "reverted. The owner has to make this change.")
+    return [*lines, ""]
+
+
 def _status_sections(fid: dict, final_word: str | None) -> list[str]:
     """Fixed and Still-open sections from the per-review items, or [] without them.
 
@@ -1841,9 +1910,10 @@ def _status_sections(fid: dict, final_word: str | None) -> list[str]:
     proven fixed. Still open lists what the final review left, with each note's backlog
     link when `filed_notes` records one.
     """
+    gate_hold = _gate_hold_lines(fid, final_word)
     items = fid.get("review_items") or []
     if not items or final_word not in ("READY", "READY WITH NOTES", "NOT READY"):
-        return []
+        return gate_hold
     passing = final_word != "NOT READY"
     # The last review that produced a verdict: an indeterminate final re-review has no items.
     final = next((r for r in reversed(items) if r.get("verdict")), items[-1])
@@ -1887,7 +1957,7 @@ def _status_sections(fid: dict, final_word: str | None) -> list[str]:
         heading = "### Still open (non-blocking)"
     if open_lines:
         out.extend([heading, *open_lines, ""])
-    return out
+    return gate_hold + out
 
 
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,

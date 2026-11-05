@@ -246,6 +246,7 @@ _LIST_ITEM = re.compile(
     re.IGNORECASE,
 )
 _AFTER_END_PUNCTUATION = re.compile(r"[.!?]\s+$")
+_TILDE_FENCE = re.compile(r"^[ \t]*~~~", re.MULTILINE)
 _BLOCK_START = re.compile(r"[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|#)")
 
 
@@ -261,8 +262,11 @@ def _logical_line_prefix(text: str, end: int) -> str:
 def _inside_code_or_quote(text: str, start: int, line_prefix: str) -> bool:
     """Return True when a fence, code span, quote, blockquote or HTML comment covers *start*."""
     before = text[:start]
+    own_line = before[before.rfind("\n") + 1:]
     return (
         before.count("```") % 2 == 1
+        or len(_TILDE_FENCE.findall(before)) % 2 == 1
+        or own_line.lstrip().startswith(">")
         or before.count("<!--") > before.count("-->")
         or line_prefix.count("`") % 2 == 1
         or line_prefix.count('"') % 2 == 1

@@ -255,6 +255,8 @@ def test_strip_edit_counts_keeps_one_of_the_fraction():
         "<!-- Note. Two tests were updated -->",
         "<!-- Note\n\nTwo tests were updated -->",
         "> Done. Two tests were updated",
+        "~~~\nFirst line.\n\nTwo tests were updated\n~~~\n",
+        "Intro.\n> Done. Two tests were updated",
         "<!-- Note -->\nTwo tests were updated",
     ],
 )

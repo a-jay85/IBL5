@@ -160,11 +160,9 @@ def test_shim_fetch_repository_not_found_is_not_retried(shim_repo, monkeypatch, 
 
 
 def test_shim_fetch_bare_could_not_read_is_not_retried(shim_repo, monkeypatch, sleeps):
-    # Still a single attempt (not a TRANSIENT_MARKER), but the bare shape is now typed
-    # remote-unreachable: the outage marker list includes it.
+    # The bare line follows every SSH-side refusal, so it alone is not an outage shape.
     _assert_fetch_single_attempt(shim_repo, monkeypatch, sleeps,
-                                 "fatal: Could not read from remote repository.",
-                                 kind="remote-unreachable")
+                                 "fatal: Could not read from remote repository.")
 
 
 def _bare_tip(bare):

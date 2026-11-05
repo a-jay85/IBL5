@@ -37,7 +37,6 @@ REMOTE_UNREACHABLE_KIND = "remote-unreachable"
 REMOTE_SUBCOMMANDS: frozenset[str] = frozenset({"fetch", "push", "ls-remote", "pull"})
 REMOTE_UNREACHABLE_MARKERS: tuple[str, ...] = TRANSIENT_MARKERS + (
     "Permission denied (publickey)",
-    "Could not read from remote repository",
     "Could not resolve host",
     "unable to access '",
     "The requested URL returned error: 5",

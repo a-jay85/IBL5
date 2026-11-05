@@ -162,7 +162,7 @@ postplan_failure_body() {   # <rc> <label> <started>
         case "$rc" in
             75) printf 'Paused for usage limit; auto-resumes after reset.\n' ;;
             3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, a local pre-commit/pre-push gate denial, a Claude usage limit, or an expired Claude login; the RESULT line in the log names which}" ;;
-            76) printf 'GitHub could not be reached (git or gh failed), so nothing was pushed and no PR was opened. Re-run once GitHub responds.\n' ;;
+            76) printf 'GitHub could not be reached (git or gh failed). The run stopped without falling back. Re-run once GitHub responds.\n' ;;
             *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
         esac
     fi

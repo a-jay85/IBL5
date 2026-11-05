@@ -226,7 +226,7 @@ _EDIT_COUNT = re.compile(
 )
 _SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
 _ALLOWED_BEFORE = re.compile(r"\b(?:and|but|the|these|those)[ \t]+$", re.IGNORECASE)
-_NUM_WORD = r"(?:\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+_NUM_WORD = r"(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
 _LIST_OR_FRACTION = re.compile(
     rf"\b{_NUM_WORD},?[ \t]+(?:(?:and|but|or)|of(?:[ \t]+(?:the|these|those))?)[ \t]+$",
     re.IGNORECASE,

@@ -144,3 +144,13 @@ def test_correct_body_numbers_leaves_edit_count_in_protected_span_own_line():
     body = f"Intro line.\n{block}\nOutro line.\n"
     result = correct_body_numbers(body, "", "")
     assert block in result
+
+
+def test_strip_edit_counts_keeps_list_starting_with_one():
+    text = "Phases one and two checks were updated.\n"
+    assert strip_edit_counts(text) == text
+
+
+def test_strip_edit_counts_keeps_one_of_the_fraction():
+    text = "One of the 3 checks were updated.\n"
+    assert strip_edit_counts(text) == text

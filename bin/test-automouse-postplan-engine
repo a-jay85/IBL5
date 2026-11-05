@@ -735,6 +735,7 @@ echo "-- row 14: post-plan-now rc=8 (repeat-hold decline) → terminal; breaker 
 # shellcheck disable=SC2034
 run_rc8_case() {
     rc3_sandbox "$1" no
+    PP_DUR=${RC8_DUR:-$PP_DUR}   # RC8_DUR: a slow exit, past the breaker's fast-exit clause
     set_runner_state
     CALLS="$SB/rc8-calls"; : > "$CALLS"
     local prelude
@@ -827,6 +828,55 @@ else
     h_pass "row 15b: neutered arm breaks the loop"
 fi
 rm -rf "$SB"
+
+echo
+echo "-- row 16: post-plan-now rc=10 (pre-fire gate could not run) → refund + stop at any duration --"
+
+# --- Row 16a: fast rc=10 refunds and stops, and names the gate as the reason ---
+run_rc8_case 10
+assert_eq "$PP_STATUS" "10" "row 16a: PP_STATUS captures post-plan-now exit 10"
+assert_eq "$(rc8_calls REFUND)" "1" "row 16a: attempt refunded"
+assert_eq "$(rc8_calls ENVSTOP)" "1" "row 16a: env-stop report written"
+assert_eq "$(rc8_calls NOTE)" "0" "row 16a: no counted-failure note"
+assert_contains "$(cat "$LOG")" "pre-fire gate could not run (post-plan-now rc=10, 2s)" "row 16a: log names the gate"
+if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then
+    h_fail "row 16a: rc=10 must break the loop" "SPAN-FELL-THROUGH present"
+else
+    h_pass "row 16a: rc=10 breaks the loop"
+fi
+rm -rf "$SB"
+
+# --- Row 16b: rc=10 past MIN_VIABLE_SECS: the status clause alone trips the breaker ---
+RC8_DUR=600
+run_rc8_case 10
+assert_eq "$PP_DUR" "600" "row 16b: the exit is past MIN_VIABLE_SECS"
+assert_eq "$(rc8_calls REFUND)" "1" "row 16b: slow rc=10 still refunds"
+assert_eq "$(rc8_calls ENVSTOP)" "1" "row 16b: slow rc=10 still writes the env-stop report"
+assert_contains "$(cat "$LOG")" "pre-fire gate could not run (post-plan-now rc=10, 600s)" "row 16b: log names the gate"
+if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then
+    h_fail "row 16b: slow rc=10 must break the loop" "SPAN-FELL-THROUGH present"
+else
+    h_pass "row 16b: slow rc=10 breaks the loop"
+fi
+rm -rf "$SB"
+
+# --- Row 16c: a neutered clause lets a slow rc=10 keep its counted try ---
+RC10_MUTANT_SPAN=${PP_TERMINAL_SPAN//'"$PP_STATUS" -eq 10'/'"$PP_STATUS" -eq 99'}
+assert_eq "$(yn test "$RC10_MUTANT_SPAN" != "$PP_TERMINAL_SPAN")" "yes" "row 16c: the rewrite changed the span (clause text found)"
+PP_TERMINAL_SPAN_LIVE=$PP_TERMINAL_SPAN
+PP_TERMINAL_SPAN=$RC10_MUTANT_SPAN
+run_rc8_case 10
+PP_TERMINAL_SPAN=$PP_TERMINAL_SPAN_LIVE
+assert_eq "$(rc8_calls REFUND)" "0" "row 16c: neutered clause does not refund a slow rc=10"
+assert_contains "$(cat "$SB/span.out")" "SPAN-FELL-THROUGH" "row 16c: neutered clause does not break the loop"
+rm -rf "$SB"
+
+# --- Row 16d: a slow rc=1 stays a counted failure, so the clause is scoped to rc=10 ---
+run_rc8_case 1
+assert_eq "$(rc8_calls REFUND)" "0" "row 16d: slow rc=1 is not refunded"
+assert_contains "$(cat "$SB/span.out")" "SPAN-FELL-THROUGH" "row 16d: slow rc=1 does not break the loop"
+rm -rf "$SB"
+unset RC8_DUR
 unset PR_STUB
 
 h_done

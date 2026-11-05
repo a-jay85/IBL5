@@ -455,8 +455,22 @@ test_missing_gate_script_refuses() {
     new_ppn_case
     green_plan
     PPN_GATE="$D/no-such-gate" run_ppn --plan "$PLAN"
-    want_rc 9
+    want_rc 10
     want_out "pre-fire gate"
+    ! fired || note "post-plan-now launched with no gate script"
+}
+
+test_gate_environment_failure_exits_10() {
+    new_ppn_case
+    green_plan
+    mkdir -p "$D/stubs"
+    printf '#!/bin/sh\nexit 3\n' > "$D/stubs/gate3"
+    chmod +x "$D/stubs/gate3"
+    PPN_GATE="$D/stubs/gate3" run_ppn --plan "$PLAN"
+    want_rc 10
+    want_out "could not run (environment)"
+    refute_out "pre-fire verification refused"
+    ! fired || note "post-plan-now launched when the gate could not run"
 }
 
 assert_step_6_9() { # <prompt-impl path>
@@ -895,6 +909,7 @@ test_bypass_refused_under_headless
 test_bypass_short_reason_rejected
 test_rebase_only_skips_gate
 test_missing_gate_script_refuses
+test_gate_environment_failure_exits_10
 test_prompt_impl_step_6_9_precedes_step_7
 test_prompt_impl_missing_step_6_9_heading_fails
 test_prompt_impl_step_6_9_blocks_set_plan_path

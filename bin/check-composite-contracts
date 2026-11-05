@@ -40,7 +40,7 @@
 #                   bin/lib/pr-armable.sh, the harness armable.py and the ADR, and
 #                   no job named after it; A3 never waits (no --wait, timeout <= 10,
 #                   cancel-in-progress keyed on the PR, exact job if:); A4 only
-#                   statuses: write, no ${{ }} inside run:, a master checkout
+#                   statuses: write plus the actions: write dispatch grant, no ${{ }} inside run:, a master checkout
 #                   without persisted credentials, event fields only via env; A5 the
 #                   four ADR-0149 anchors, and no leftover `All checks green`
 #                   ignore token now that all-checks-green.yml is retired; A6 workflow_run.workflows
@@ -798,7 +798,8 @@ else
     echo "composite-contracts: all-checks-settled never waits, is bounded, cancels stale runs and keeps its exact job if (A3)"
   fi
 
-  # A4: trust boundary. statuses: write is the only write; no expression reaches a
+  # A4: trust boundary. statuses: write and the actions: write dispatch grant (ADR-0081
+  # addendum 2026-11-03, for bin/settle-pr-status --line-dispatch) are the only writes; no expression reaches a
   # shell line; the checkout is master with no persisted token; event fields cross
   # into the step only through env.
   _a4_bad=""
@@ -814,8 +815,8 @@ else
   if ! grep -qE '^  statuses:[[:space:]]*write[[:space:]]*$' <<< "$agg_perms" \
      || ! grep -qE '^  contents:[[:space:]]*read[[:space:]]*$' <<< "$agg_perms"; then
     _a4_bad="permissions lack statuses: write or contents: read"
-  elif [ "$_a4_writes" != "statuses " ]; then
-    _a4_bad="write scopes are '${_a4_writes}', want only statuses"
+  elif [ "$_a4_writes" != "actions statuses " ]; then
+    _a4_bad="write scopes are '${_a4_writes}', want only actions and statuses"
   elif grep -qF -- "$_a4_expr" <<< "$agg_run"; then
     _a4_bad="a $_a4_expr }} expression sits inside a run: block"
   elif [ -z "$_a4_checkout" ]; then
@@ -833,7 +834,7 @@ else
     echo "composite-contracts: all-checks-settled (A4) — $_a4_bad; event data or PR code could reach a step holding statuses: write ($agg_file)" >&2
     fail=1
   else
-    echo "composite-contracts: all-checks-settled holds only statuses: write, keeps expressions out of run:, and checks out master without credentials (A4)"
+    echo "composite-contracts: all-checks-settled holds only statuses: write and the actions: write dispatch grant, keeps expressions out of run:, and checks out master without credentials (A4)"
   fi
 
   # A5: verdict inputs. The anchors are the four ADR-0149 contexts. The legacy

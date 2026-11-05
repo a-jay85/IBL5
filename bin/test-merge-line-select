@@ -814,10 +814,10 @@ W6_GROUP=$(grep -cE "^  group: update-behind-prs.*'-dryrun'.*'-pr'.*inputs\.hotf
 W6_INPUT=$(awk '/^      hotfix:/{f=1} f&&/type:/{print; exit}' "$W6_WF")
 W6_COALESCE=$(awk '/- name: Coalesce a burst of master merges/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
 W6_BOTWAIT=$(awk '/- name: Wait for master CI that can push a bot commit/{f=1;next} f&&/- name:/{f=0} f&&/if:/' "$W6_WF")
-W6_ATTEMPTS=$(count_lines '[ "$HOTFIX" = "true" ]; then UNKNOWN_ATTEMPTS=20' "$W6_WF")
+W6_ATTEMPTS=$(count_lines '[ "$HOTFIX" = "true" ] || [ "$SETTLE" = "true" ]; then UNKNOWN_ATTEMPTS=20' "$W6_WF")
 if [ "$W6_GROUP" = 1 ] && grep -qF 'type: boolean' <<< "$W6_INPUT" \
     && [ "$W6_COALESCE" = "        if: github.event_name == 'push'" ] \
-    && [ "$W6_BOTWAIT" = "        if: github.event_name == 'push' || inputs.hotfix == true" ] \
+    && [ "$W6_BOTWAIT" = "        if: github.event_name == 'push' || inputs.hotfix == true || inputs.settle == true" ] \
     && [ "$W6_ATTEMPTS" = 1 ]; then
     pass "W6-hotfix-dispatch-path"
 else
@@ -865,5 +865,17 @@ if [ "$W5_LABELS" = 1 ]; then
 else
     failcase "W5-live-query-labels — labels selection lines=$W5_LABELS"
 fi
+
+# W9: a settle dispatch (all-checks-settled.yml via bin/settle-pr-status --line-dispatch) runs in
+# its own group, keeps the bot-commit wait and the 20-attempt UNKNOWN window; the cron is untouched.
+UBP_WF="$(cd "$(dirname "$0")/.." && pwd)/.github/workflows/update-behind-prs.yml"
+W9_GROUP=$(grep -cF -- "\${{ inputs.settle == true && '-settle' || '' }}" "$UBP_WF" || true)
+W9_WAIT=$(grep -cF -- "if: github.event_name == 'push' || inputs.hotfix == true || inputs.settle == true" "$UBP_WF" || true)
+W9_UNK=$(grep -cF -- '[ "$SETTLE" = "true" ]; then UNKNOWN_ATTEMPTS=20' "$UBP_WF" || true)
+W9_CRON=$(grep -cF -- "- cron: '7,22,37,52 * * * *'" "$UBP_WF" || true)
+if [ "$W9_GROUP" = 1 ]; then pass "W9-settle-own-group"; else failcase "W9-settle-own-group — lines=$W9_GROUP"; fi
+if [ "$W9_WAIT" = 1 ]; then pass "W9-settle-bot-wait"; else failcase "W9-settle-bot-wait — lines=$W9_WAIT"; fi
+if [ "$W9_UNK" = 1 ]; then pass "W9-settle-unknown-attempts"; else failcase "W9-settle-unknown-attempts — lines=$W9_UNK"; fi
+if [ "$W9_CRON" = 1 ]; then pass "W9-cron-unchanged"; else failcase "W9-cron-unchanged — lines=$W9_CRON"; fi
 
 h_done

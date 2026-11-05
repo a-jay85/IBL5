@@ -58,6 +58,11 @@ on:
         required: false
         default: false
         type: boolean
+      settle:
+        description: 'Head-of-line pass from all-checks-settled.yml after the line head settles. Skips the coalesce sleep, keeps the bot-commit wait, runs in its own concurrency group.'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write        # update-branch writes a merge commit onto the PR head branch
@@ -69,9 +74,10 @@ concurrency:
   # A named-PR dispatch gets its own group so a manual one-PR update never cancels the
   # head-of-line pass. A hotfix dispatch (hotfix-dispatch.yml) gets its own group so it never
   # cancels a push pass during its coalesce or bot-commit wait; a second hotfix dispatch still
-  # cancels the first. On push and schedule every input is null, so the group is the plain
+  # cancels the first. A settle dispatch (all-checks-settled.yml) gets its own group for the same reason; a second settle dispatch cancels the first.
+  # On push and schedule every input is null, so the group is the plain
   # name and a second master merge still cancels the first pass during its coalesce wait.
-  group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}${{ inputs.hotfix == true && '-hotfix' || '' }}
+  group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}${{ inputs.hotfix == true && '-hotfix' || '' }}${{ inputs.settle == true && '-settle' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -96,7 +102,7 @@ jobs:
       # pass even re-updates it. The helper's header says which workflows push them and why
       # the check covers every master SHA. Past its 45-min cap the pass goes ahead as before.
       - name: Wait for master CI that can push a bot commit
-        if: github.event_name == 'push' || inputs.hotfix == true
+        if: github.event_name == 'push' || inputs.hotfix == true || inputs.settle == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -114,6 +120,7 @@ jobs:
           DISPATCH_PR: ${{ inputs.pr }}
           DRY_RUN: ${{ inputs.dry_run }}
           HOTFIX: ${{ inputs.hotfix }}
+          SETTLE: ${{ inputs.settle }}
         run: |
           set -euo pipefail
 
@@ -121,7 +128,8 @@ jobs:
           # set, and it has no next tick: the run after a push is the next master merge. So it
           # gets a longer settle window than the scheduled backstop.
           # A hotfix dispatch fires right after a label or arm event and has no next tick either.
-          if [ "$EVENT_NAME" = "push" ] || [ "$HOTFIX" = "true" ]; then UNKNOWN_ATTEMPTS=20; else UNKNOWN_ATTEMPTS=5; fi
+          # A settle dispatch has no next tick either.
+          if [ "$EVENT_NAME" = "push" ] || [ "$HOTFIX" = "true" ] || [ "$SETTLE" = "true" ]; then UNKNOWN_ATTEMPTS=20; else UNKNOWN_ATTEMPTS=5; fi
 
           OUT="$RUNNER_TEMP/merge-line.out"
           SUM="$RUNNER_TEMP/merge-line.md"

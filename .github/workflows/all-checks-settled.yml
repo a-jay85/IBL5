@@ -47,7 +47,7 @@ permissions:
   contents: read
   statuses: write
   pull-requests: read
-  actions: read
+  actions: write        # bin/settle-pr-status --line-dispatch starts update-behind-prs.yml (ADR-0081 addendum 2026-11-03)
   checks: read
 
 # The trigger event is in the group key so a sibling completion that the job `if:` skips
@@ -81,6 +81,7 @@ jobs:
           if [ -n "$PR_NUMBER" ]; then sel="--pr=$PR_NUMBER"; else sel="--head-sha=$EVENT_HEAD_SHA"; fi
           bin/settle-pr-status --repo="$GITHUB_REPOSITORY" "$sel" \
             --context='All checks settled' --target-url="$RUN_URL" \
+            --line-dispatch=update-behind-prs.yml \
             --self='Aggregate check status,All checks settled' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
             --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Notify Mutation Failure'

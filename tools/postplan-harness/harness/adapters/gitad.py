@@ -299,6 +299,10 @@ class LiveGit:
                 detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
                 raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}",
                                    cmd=f"git {' '.join(args)}", output=detail)
+            if netretry.is_remote_unreachable(args, proc.stderr):
+                raise HarnessError(netretry.REMOTE_UNREACHABLE_KIND,
+                                   f"git {' '.join(args)}: {proc.stderr.strip()[:400]}",
+                                   cmd=f"git {' '.join(args)}", output=proc.stderr.strip())
             raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}",
                                cmd=f"git {' '.join(args)}", output=proc.stderr.strip())
         return proc.stdout
@@ -616,7 +620,9 @@ class LiveGit:
         baseRefName). "origin/master" for an unstacked branch or a detached HEAD.
         Raises HarnessError("base-resolve") when the branch records an iblBase that no
         layer resolves, when the helper times out, or when it prints anything other
-        than one origin/<name> ref. A stacked branch never silently merges master."""
+        than one origin/<name> ref. Raises HarnessError("remote-unreachable") when the
+        helper returns 2 (a layer could not ask GitHub).
+        A stacked branch never silently merges master."""
         name = self.branch()
         if not name or name == "HEAD":
             return "origin/master"
@@ -635,6 +641,11 @@ class LiveGit:
                                f"base resolution for {name} timed out after "
                                f"{MERGE_TARGET_TIMEOUT}s; {fix}")
         ref = proc.stdout.strip()
+        if proc.returncode == 2:   # helper: a layer could not ask GitHub
+            raise HarnessError(netretry.REMOTE_UNREACHABLE_KIND,
+                               f"could not reach GitHub to resolve the base of {name} "
+                               f"(git ls-remote or gh failed); nothing was pushed or "
+                               f"opened", output=proc.stderr)
         if proc.returncode != 0 or not _MERGE_TARGET_RE.fullmatch(ref) or ".." in ref:
             raise HarnessError("base-resolve",
                                f"branch {name} is stacked (iblBase set) but its base did "
@@ -1917,6 +1928,10 @@ class LiveGit:
             def _lease_read() -> str:
                 rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
                 if rc != 0:
+                    if netretry.is_remote_unreachable(("ls-remote",), out):
+                        raise HarnessError(netretry.REMOTE_UNREACHABLE_KIND,
+                                           f"lease read failed for {remote}/{branch}: {out[:400]}",
+                                           output=out)
                     raise HarnessError("push-failed",
                                        f"lease read failed for {remote}/{branch}: {out[:400]}",
                                        output=out)
@@ -1935,6 +1950,10 @@ class LiveGit:
             if rc != 0:
                 if any(m in out for m in _LOCAL_GATE_MARKERS):
                     raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push --force-with-lease=refs/heads/{branch}:{lease} {remote} HEAD:refs/heads/{branch}",
+                                       output=out)
+                if netretry.is_remote_unreachable(("push",), out):
+                    raise HarnessError(netretry.REMOTE_UNREACHABLE_KIND, out[:600],
                                        cmd=f"git push --force-with-lease=refs/heads/{branch}:{lease} {remote} HEAD:refs/heads/{branch}",
                                        output=out)
                 raise HarnessError("push-failed", out[:600],
@@ -1958,6 +1977,9 @@ class LiveGit:
             if rc != 0:
                 if any(m in out for m in _LOCAL_GATE_MARKERS):
                     raise HarnessError("local-gate", f"git push: {out[:600]}",
+                                       cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
+                if netretry.is_remote_unreachable(("push",), out):
+                    raise HarnessError(netretry.REMOTE_UNREACHABLE_KIND, out[:600],
                                        cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)
                 raise HarnessError("push-failed", out[:600],
                                    cmd=f"git push {remote} HEAD:refs/heads/{branch}", output=out)

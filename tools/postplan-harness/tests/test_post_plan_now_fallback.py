@@ -668,10 +668,11 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7|76) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
     assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
     assert _fb(8) == "0"
+    assert _fb(76) == "1"    # remote-unreachable: GitHub is down, a skill run would hit the same wall
 
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""

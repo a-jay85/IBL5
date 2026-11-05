@@ -112,7 +112,7 @@ def test_real_fetch_persistent_kex_timeout_raises_after_four_attempts(
     before = _git(wt, "rev-parse", "origin/master")
     with pytest.raises(HarnessError) as ei:
         git.fetch_base("origin/master")
-    assert ei.value.kind == "git"
+    assert ei.value.kind == "remote-unreachable"
     assert "kex_exchange_identification" in ei.value.detail
     assert count_file.read_text().strip() == "4"
     assert sleeps == list(netretry.RETRY_DELAYS)
@@ -125,6 +125,6 @@ def test_real_fetch_resolve_host_failure_is_not_retried(real_remote, monkeypatch
     monkeypatch.setenv("SHIM_MSG", "ssh: Could not resolve host: fakehost")
     with pytest.raises(HarnessError) as ei:
         git.fetch_base("origin/master")
-    assert ei.value.kind == "git"
+    assert ei.value.kind == "remote-unreachable"
     assert count_file.read_text().strip() == "1"
     assert sleeps == []

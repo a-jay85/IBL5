@@ -5,6 +5,7 @@ test_runner_live_wiring.py style).  Behavioural tests call
 runner._run_thread_ingestion_phase directly with a fake run_thread_ingestion,
 a RecordingGh, a ReplayGit, and a RunResult.
 """
+import inspect
 import os
 import re
 import sys
@@ -490,3 +491,24 @@ def test_same_run_pass_never_opts_into_outdated_threads():
     call = src[src.index("out = thread_ingestion.run_thread_ingestion("):src.index("except HarnessError", src.index("out = thread_ingestion.run_thread_ingestion("))]
     assert "include_outdated" not in call
     assert "keep=this_run_only(keys)" in call
+
+
+def test_thread_ingestion_remote_unreachable_propagates(tmp_path, monkeypatch):
+    """remote-unreachable re-raises out of Phase 4.5 so the run reaches exit 76.
+
+    Mutation caught: dropping remote-unreachable from the propagating kinds.
+    """
+    def _fake_ingestion(*args, **kwargs):
+        raise HarnessError("remote-unreachable", "git push: Permission denied (publickey)")
+
+    monkeypatch.setattr(runner, "run_thread_ingestion", _fake_ingestion)
+    with pytest.raises(HarnessError) as ei:
+        runner._run_thread_ingestion_phase(
+            _gh(tmp_path), None, _git(), str(tmp_path), None, {111}, str(tmp_path), _log(), _res())
+    assert ei.value.kind == "remote-unreachable"
+
+
+def test_fidelity_remediation_catch_propagates_remote_unreachable():
+    """The Phase 5.5 remediation catch re-raises remote-unreachable like push-failed."""
+    src = inspect.getsource(runner)
+    assert 'if e.kind in ("push-failed", "remote-unreachable"):' in src

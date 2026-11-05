@@ -57,10 +57,57 @@ def test_strip_edit_counts_capitalizes_after_bullet_digit():
         "At most two tests were changed",
         "Just two tests were changed",
         "No two tests were changed",
+        "Phases 4 and\n5 checks were updated",
+        "Phases 4 and\r\n5 checks were updated",
+        "3 of the\n5 tests were updated",
+        "Phase\n2 tests were updated",
+        "Phases 4\nand 5 checks were updated",
+        "3 of\nthe 5 tests were updated",
+        "only\ntwo tests were changed",
+        "at least\ntwo tests were changed",
+        "- Phases 4 and\n  5 checks were updated",
+        "### Phase\n2 tests were updated",
+        "3 fixtures\nTests were updated",
+        "2 fixes\n\nTests were updated",
+        "Two existing\nassertions were updated",
     ],
 )
 def test_strip_edit_counts_leaves_near_misses_unchanged(text):
     assert strip_edit_counts(text) == text
+
+
+@pytest.mark.parametrize(
+    "before",
+    [
+        "",
+        "\n",
+        "Intro line\n\n",
+        "Intro line\n \n",
+        "Intro line\r\n\r\n",
+        "Done.\n",
+        "Done!\n",
+        "Done?\n",
+        "Done:\n",
+        "Done.  \n",
+        "Done.\r\n",
+        "- ",
+        "* ",
+        "+ ",
+        "1. ",
+        "- First item\n- ",
+        "1. First item\n2. ",
+        "- Done.\n  ",
+    ],
+)
+def test_strip_edit_counts_strips_at_real_sentence_boundary(before):
+    result = strip_edit_counts(f"{before}Two existing assertions were updated")
+    assert result == f"{before}Existing assertions were updated"
+
+
+def test_strip_edit_counts_keeps_lowercase_after_wrapped_allowed_word():
+    assert strip_edit_counts("It adds cases, and\ntwo tests were changed.") == (
+        "It adds cases, and\ntests were changed."
+    )
 
 
 def test_strip_edit_counts_corpus():
@@ -91,7 +138,7 @@ def test_correct_body_numbers_leaves_edit_count_in_protected_span():
 
 
 def test_correct_body_numbers_leaves_edit_count_in_protected_span_own_line():
-    block = f"{FILES_CHANGED_BEGIN}\nTwo tests were updated\n{FILES_CHANGED_END}"
+    block = f"{FILES_CHANGED_BEGIN}\n\nTwo tests were updated\n\n{FILES_CHANGED_END}"
     body = f"Intro line.\n{block}\nOutro line.\n"
     result = correct_body_numbers(body, "", "")
     assert block in result

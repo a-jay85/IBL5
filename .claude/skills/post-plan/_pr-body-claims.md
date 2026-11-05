@@ -135,7 +135,7 @@ A PR body names the edited items and states no count of them. Do not write how m
 
 This rule narrows the Unseen-count rule above, which allows a count the packet shows. It leaves the Test-count claims rule below intact: a count of tests added, copied from a runner summary line or a diff grep and placed beside its one backticked test file, is a measurement and stays legal. Check 4 of the Phase 5.5 fidelity review keeps blocking a count the diff contradicts.
 
-The harness enforces both halves. The pr-copy prompt's `EDIT COUNTS:` clause carries the rule. `strip_edit_counts` in `body_numbers.py` then drops the number from a plural count of modified items outside the protected blocks, so `Two existing assertions were updated` becomes `Existing assertions were updated`. It leaves counts of added items, files and lines to the grounded checks.
+The harness enforces both halves. The pr-copy prompt's `EDIT COUNTS:` clause carries the rule. `strip_edit_counts` in `body_numbers.py` then drops the number from a plural count of modified items outside the protected blocks, so `Two existing assertions were updated` becomes `Existing assertions were updated`. It leaves counts of added items, files and lines to the grounded checks. It only drops a number that opens a sentence, bullet or numbered item, or that follows `and`, `but`, `the`, `these` or `those`, and it reads a hard-wrapped line together with the lines before it. Any other position keeps the number, so `Just two tests were changed` and `Phases 4 and 5 checks were updated` stay as written. The prompt clause still applies to those sentences.
 
 Trigger: #3694 (the body said two existing assertions were updated, the diff changed three, and check 4 held the PR).
 

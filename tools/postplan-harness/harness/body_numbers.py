@@ -218,10 +218,10 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
 
 _EDIT_COUNT = re.compile(
     r"(?<![\w.#-])"
-    r"(?<!\bonly[ \t])(?<!\ball[ \t])(?<!\banother[ \t])(?<!\bexactly[ \t])(?<!\bat[ \t]least[ \t])"
+    r"(?<!\bonly\s)(?<!\ball\s)(?<!\banother\s)(?<!\bexactly\s)(?<!\bat\sleast\s)"
     r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[ \t]+"
-    r"((?:[a-z-]+\s+)?(?:assertions|tests|test\s+cases|cases|checks|call\s+sites|functions|edits)"
-    r"\s+(?:were|are)\s+(?:updated|changed|modified|edited|rewritten|reworded|adjusted))\b",
+    r"((?:[a-z-]+[ \t]+)?(?:assertions|tests|test[ \t]+cases|cases|checks|call[ \t]+sites|functions|edits)"
+    r"[ \t]+(?:were|are)[ \t]+(?:updated|changed|modified|edited|rewritten|reworded|adjusted))\b",
     re.IGNORECASE,
 )
 _SENTENCE_START = re.compile(r"(?:^|[.!?:]\s+|^\s*(?:[-*+]|\d+\.)\s+)$")
@@ -231,6 +231,16 @@ _LIST_OR_FRACTION = re.compile(
     rf"\b{_NUM_WORD}[ \t]+(?:(?:and|but|or)|of(?:[ \t]+(?:the|these|those))?)[ \t]+$",
     re.IGNORECASE,
 )
+_BLOCK_START = re.compile(r"[ \t]*(?:[-*+][ \t]|\d+\.[ \t]|#)")
+
+
+def _logical_line_prefix(text: str, end: int) -> str:
+    """Return the text before *end* in its paragraph or list item, with hard wraps collapsed."""
+    lines = text[:end].split("\n")
+    kept = [lines.pop()]
+    while lines and not _BLOCK_START.match(kept[-1]) and lines[-1].strip():
+        kept.append(lines.pop())
+    return re.sub(r"\s+", " ", " ".join(reversed(kept)))
 
 
 def strip_edit_counts(text: str) -> str:
@@ -238,10 +248,12 @@ def strip_edit_counts(text: str) -> str:
 
     "Two existing assertions were updated" becomes "Existing assertions were updated".
     Counts of added tests, files and lines are left for the grounded checks.
+    A hard-wrapped line is judged with the lines before it, so a number that merely
+    starts a line keeps its place unless the sentence really starts there.
     """
     def _sub(m: re.Match) -> str:
         rest = m.group(2)
-        line_prefix = text[text.rfind("\n", 0, m.start()) + 1 : m.start()]
+        line_prefix = _logical_line_prefix(text, m.start())
         if _SENTENCE_START.search(line_prefix):
             return rest[0].upper() + rest[1:]
         if _ALLOWED_BEFORE.search(line_prefix) and not _LIST_OR_FRACTION.search(line_prefix):

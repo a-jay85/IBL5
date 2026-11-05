@@ -66,7 +66,7 @@ jobs:
   human-signoff:
     name: human-signoff
     if: ${{ !(!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       verdict: ${{ steps.eval.outputs.verdict }}
       reason: ${{ steps.eval.outputs.reason }}
@@ -161,7 +161,7 @@ jobs:
     # always() so a red gate still runs this job. A cancelled gate was
     # superseded by a newer run, which owns the label instead.
     if: always() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       issues: write
       pull-requests: write
@@ -195,7 +195,7 @@ jobs:
     # A cancelled gate was superseded by a newer run, which owns the write.
     # !cancelled() so a cancelled run skips this job even if its gate finished.
     if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       issues: write
       pull-requests: write

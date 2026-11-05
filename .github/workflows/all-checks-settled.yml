@@ -63,7 +63,7 @@ jobs:
     name: Aggregate check status
     # Skipped jobs take no runner slot: master-push and schedule runs of the siblings never spawn a job.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
       - name: Checkout master (for bin/settle-pr-status and bin/check-pr-checks-green)

@@ -72,7 +72,7 @@ jobs:
 
   changes:
     name: Detect changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pull-requests: read
@@ -161,7 +161,7 @@ jobs:
   # failure here reds the gate (it is in gate.needs).
   ci-memo-check:
     name: E2E Memo Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -200,7 +200,7 @@ jobs:
     name: Visual Regression
     needs: [changes, ci-memo-check, mirror-ready]
     if: inputs.refresh_pr || (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
     # wall-clock of the prior 13 element crops.
     timeout-minutes: 30
@@ -810,7 +810,7 @@ jobs:
     name: API E2E Tests (Vitest)
     needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
 
     steps:
@@ -869,7 +869,7 @@ jobs:
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
     needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -1007,7 +1007,7 @@ jobs:
     name: E2E Mutators (non-sharded, dedicated DB)
     needs: [changes, ci-memo-check, mirror-ready]
     if: ${{ !inputs.refresh_pr && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     steps:
@@ -1117,7 +1117,7 @@ jobs:
     name: Merge E2E Reports
     needs: [changes, ci-memo-check, e2e, e2e-shards, e2e-mutators, api-e2e]
     if: always() && !inputs.refresh_pr && (needs.changes.outputs.src == 'true') && needs.ci-memo-check.outputs.hit != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: write
@@ -1278,7 +1278,7 @@ jobs:
     # the regen run must not write the CI memo, and its prefixed gate check adds nothing.
     if: always() && !inputs.refresh_pr && github.event.action != 'labeled'
     needs: [changes, ci-memo-check, mirror-ready, e2e, api-e2e, e2e-shards, e2e-mutators]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # The memo is written only here: after a clean aggregate, on a run that was a miss.
     env:
       MEMO_WRITE: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.ci-memo-check.outputs.hash != '' && needs.ci-memo-check.outputs.hit != 'true' }}
@@ -1320,7 +1320,7 @@ jobs:
   vr-pages-cleanup:
     name: VR Pages retention cleanup
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       actions: write

@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   recap:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 40          # SIM_RECAP_CLAUDE_TIMEOUT 1800s + setup
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

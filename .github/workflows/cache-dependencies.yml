@@ -39,7 +39,7 @@ concurrency:
 jobs:
   cache-dependencies:
     name: Pre-cache Dependencies
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write

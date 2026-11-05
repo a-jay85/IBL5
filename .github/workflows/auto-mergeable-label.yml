@@ -46,7 +46,7 @@ jobs:
     # A merged PR keeps whatever label it had when it merged.
     # Then the payload-provable skip; see the header comment.
     if: ${{ github.event.pull_request.merged != true && !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' && github.event.label.name != 'auto-mergeable' || github.event.action == 'edited' && github.event.changes.title == null && github.event.changes.base == null) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       issues: write

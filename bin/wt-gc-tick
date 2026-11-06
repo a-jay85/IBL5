@@ -328,7 +328,7 @@ _pra_live_label() {
     [ -n "$pr" ] || return 1
     while IFS=$'\t' read -r _pid _st label; do
         case "$label" in
-            com.ibl5.post-plan-fleet-"$pr")
+            com.ibl5.post-plan-fleet-"$pr"|com.ibl5.post-plan-fleet-"$pr"-*)
                 printf '%s\n' "$label"; return 0 ;;
         esac
     done <<< "$snap"

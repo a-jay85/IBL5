@@ -52,8 +52,11 @@ class Discord
      */
     private static function isPhpUnit(): bool
     {
+        // PHPUnit sets this constant to the autoloader's path, so a bare
+        // `PHPUNIT_COMPOSER_INSTALL === true` would always be false. Compare its truthiness.
+        /** @infection-ignore-all Untestable in-process: PHPUnit always defines both constants and PHP cannot undefine them, so no test can reach the false branch. */
         return defined('PHPUNIT_RUNNING')
-            || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
+            || (defined('PHPUNIT_COMPOSER_INSTALL') && (bool) PHPUNIT_COMPOSER_INSTALL === true);
     }
 
     /**

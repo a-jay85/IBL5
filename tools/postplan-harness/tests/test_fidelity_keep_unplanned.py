@@ -333,7 +333,8 @@ def _drive(tmp_path, canned):
 
 
 def _review(*items):
-    return "## FINDINGS\n" + "\n".join(items) + "\n\nNOT READY\n"
+    return ("3. Remove or plan the button grid in " + GRID + "\n\n## FINDINGS\n"
+            + "\n".join(items) + "\n\nNOT READY\n")
 
 
 def test_kept_only_verdict_spawns_no_fixer_and_declares(tmp_path, loop_env):
@@ -356,6 +357,7 @@ def test_mixed_verdict_cuts_kept_finding_from_fixer_prompt(tmp_path, loop_env):
     prompt = llm.tooled_prompts["fidelity-remediation"]
     assert UNTAGGED_ITEM in prompt
     assert "[unplanned-scope]" not in prompt
+    assert "3. Remove or plan the button grid" not in prompt
     assert "Delete no code the work list does not name." in prompt
     assert res.fidelity["rounds"][0]["work_list_sizes"]["12"] == 1
     assert us.KEPT_BEGIN in gh.pr_body()

@@ -128,7 +128,7 @@ def commit_subjects_for(worktree: str, base_sha: str,
 
 
 def _subjects_for(worktree: str, base_sha: str, path: str) -> list[str]:
-    cmd = ["git", "-C", worktree, "log", "--no-merges", "--format=%s",
+    cmd = ["git", "-C", worktree, "log", "--follow", "--no-merges", "--format=%s",
            f"{base_sha}..HEAD", "--", path]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)

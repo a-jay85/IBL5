@@ -56,7 +56,7 @@ A `bin/test-*` harness row that names a secondary stderr/stdout token in its lab
     want "runner is written" "$OUT" "runner:"
     want "warning names the proceed decision" "$OUT" "proceeding"
 
-`bin/test-plan-now:1170` — `want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"` — is the assertion added when this class was discovered (PR #1966).
+`bin/test-plan-now:1170` holds `want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"`. It is the assertion added when this class was discovered (PR #1966).
 
 ## Why
 

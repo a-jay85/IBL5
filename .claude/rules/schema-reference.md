@@ -23,7 +23,7 @@ last_verified: 2026-11-05
 
 | Purpose | Table | Key Fields |
 |---------|-------|------------|
-| Players | `ibl_plr` | `pid`, `teamid`, `name`, `cy`, `cy1-cy6` |
+| Players | `ibl_plr` | `pid`, `teamid`, `name`, `cy`, `salary_yr1`-`salary_yr6` |
 | Teams | `ibl_team_info` | `teamid`, `team_name`, `gm_username` |
 | Users | `auth_users` | `username`, `email`, `password` (team mapping via `ibl_team_info.gm_username`) |
 | History | `ibl_hist` (table) | Historical player stats (materialized from `ibl_plr_snapshots`) |

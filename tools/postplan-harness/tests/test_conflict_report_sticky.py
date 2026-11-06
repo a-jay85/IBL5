@@ -104,6 +104,8 @@ def test_stale_resolution_shows_dropped_line(tmp_path):
     got = cr.section_for("stale", repo["repo"], head=repo["head"], prior_body=prior,
                          tmp_dir=str(tmp_path))
     assert got == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.DROPPED_LINE}\n{cr.SECTION_END}"
+    assert ("An earlier conflict resolution by Claude was dropped by a later rebase. "
+            "None of it remains on this branch.") in got
     # Nothing recorded and nothing to carry: no section at all.
     assert cr.section_for("stale", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path)) == ""
 

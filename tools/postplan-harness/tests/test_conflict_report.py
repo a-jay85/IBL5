@@ -210,6 +210,7 @@ def test_cleared_review_still_shows_section():
     out = _section(_rec(), current=CLEAN)
     assert cr.HEADING in out
     assert cr.CLEAN_WORDS in out
+    assert "The review ran and found no problem." in out
     assert "No unique code was lost." in out
 
 
@@ -223,6 +224,8 @@ def test_purged_review_explains_absent():
     rec = _rec(review={"verdict": PROBLEM, "excerpt": "", "retries": 0})
     out = _section(rec, current=None)
     assert cr.PURGED_WORDS.format(recorded=PROBLEM) in out
+    assert ("The review ran on an earlier run (CONFLICT-REVIEW=FOUND-PROBLEM), but a later rebase "
+            "cleared its result file, so the merge check reads it as missing (verdict=ABSENT).") in out
 
 
 def test_incomplete_review_counts_attempts():
@@ -240,6 +243,7 @@ def test_found_problem_reason_from_review_excerpt():
 
 def test_no_reason_recorded_says_so():
     assert f"Why: {cr.NO_REASON}" in _section(_rec(), current=None)
+    assert "Why: No reason was recorded." in _section(_rec(), current=None)
 
 
 def test_ladder_rung_reason_attributed():

@@ -1,6 +1,6 @@
 ---
 description: PR body ## Manual Testing must match the plan's Verification Matrix — lazy-loaded on rule doc edits; governs PR authorship.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 paths: ".claude/rules/*.md"
 ---
 

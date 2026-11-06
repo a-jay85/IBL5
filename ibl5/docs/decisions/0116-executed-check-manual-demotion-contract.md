@@ -1,6 +1,6 @@
 ---
 description: Contract for demoting a planned-test row to truly-manual when the test command cannot be executed by the harness.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 ---
 
 # ADR-0116: Executed-Check Manual Demotion Contract

@@ -365,6 +365,7 @@ run_tick() {
         WT_GC_WT_REMOVE=/usr/bin/false
         WT_GC_LAUNCHCTL="$STUBBIN/launchctl-stub"
         WT_GC_DISCORD_DM="$STUBBIN/discord-dm-stub"
+        IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR"
         WT_GC_LSOF="$STUBBIN/lsof"
         WT_GC_GH="$STUBBIN/gh-stub"
         WT_GC_DOCKER="$STUBBIN/docker"
@@ -900,6 +901,7 @@ mkdir -p "$CD/state"
 # The reap steps run at their defaults here, so lsof/gh/docker resolve from
 # the stub dir (first on PATH and the only WT_GC_BIN_DIRS entry).
 G12_ENV=(PATH="$STUBBIN:/usr/bin:/bin" WT_GC_BIN_DIRS="$STUBBIN" STUB_CASE_DIR="$CD"
+    IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR"
     WT_GC_LOCK_DIR="$CD/state" WT_GC_IOREG="$STUBBIN/ioreg"
     WT_GC_CLEANUP="$STUBBIN/cleanup-stub" WT_GC_WT_STATUS="$STUBBIN/wt-status-stub"
     WT_GC_REPO_ROOT="$G10_MAIN")

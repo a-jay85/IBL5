@@ -120,6 +120,14 @@ WT_GC_WT_REMOVE="${WT_GC_WT_REMOVE:-$SCRIPT_DIR/wt-remove}"
 WT_GC_QUEUE_DIR="${WT_GC_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
 WT_GC_SESSION_REGISTRY="${WT_GC_SESSION_REGISTRY:-$HOME/.claude/session-registry/active.json}"
 WT_GC_LAUNCHCTL="${WT_GC_LAUNCHCTL:-/bin/launchctl}"
+# Unpushed open-PR alert (read-only on worktrees; never pushes or deletes).
+WT_GC_PR_ALERT="${WT_GC_PR_ALERT:-1}"   # "0" = alert pass disabled; unset/empty = enabled
+# Newest unpushed commit must be at least this many seconds old. Empty or
+# non-numeric = the alert pass logs and skips (exit code unchanged).
+WT_GC_PR_ALERT_MIN_AGE_SECS="${WT_GC_PR_ALERT_MIN_AGE_SECS-3600}"
+WT_GC_PR_ALERT_DIR="${WT_GC_PR_ALERT_DIR:-$WT_GC_LOCK_DIR/pr-alerts}"   # dedupe markers
+# Set-but-empty = no sender: the pass logs dm=unavailable and writes no marker.
+WT_GC_DISCORD_DM="${WT_GC_DISCORD_DM-$SCRIPT_DIR/discord-dm}"
 # The launchd PATH is minimal, so WT_GC_LSOF / WT_GC_GH / WT_GC_DOCKER are
 # resolved after the library loads: PATH first, then these dirs. A seam that
 # is set, even to "", is used as given and never resolved. "" or a missing
@@ -172,6 +180,8 @@ source "$SCRIPT_DIR/lib/git-helpers.sh"
 source "$SCRIPT_DIR/lib/wt-guards.sh"
 # shellcheck source=bin/lib/wt-gc-reap.sh disable=SC1091
 source "$SCRIPT_DIR/lib/wt-gc-reap.sh"
+# shellcheck source=bin/lib/launchd-job.sh disable=SC1091
+source "$SCRIPT_DIR/lib/launchd-job.sh"
 [ -n "${WT_GC_LSOF+x}" ]   || WT_GC_LSOF="$(_gc_resolve_bin lsof)"
 [ -n "${WT_GC_GH+x}" ]     || WT_GC_GH="$(_gc_resolve_bin gh)"
 [ -n "${WT_GC_DOCKER+x}" ] || WT_GC_DOCKER="$(_gc_resolve_bin docker)"
@@ -289,6 +299,144 @@ awk '$1=="STALLED" || $1=="UNPUSHED" {print $1, $2}' "$TMP_STATUS" | while read 
     log "SURFACE $cls $wt"
 done
 
+# ── Unpushed open-PR alert helpers (read-only) ────────────────────────────────
+# _pra_wt_for_name <wt-name>: print "<path>\t<branch>" for the worktree whose
+# basename is <wt-name> (the name bin/wt-status prints) and that has a branch.
+# Returns 1 when none matches or the worktree list fails.
+_pra_wt_for_name() {
+    local want="$1" porcelain
+    porcelain="$(git -C "$WT_GC_REPO_ROOT" worktree list --porcelain 2>/dev/null)" || return 1
+    awk -v want="$want" '
+        function emit() {
+            if (p != "" && b != "" && !f) {
+                n = p; sub(/.*\//, "", n)
+                if (n == want) { printf "%s\t%s\n", p, b; f = 1 }
+            }
+            p = ""; b = ""
+        }
+        /^worktree /            { emit(); p = substr($0, 10) }
+        /^branch refs\/heads\// { b = substr($0, 19) }
+        END                     { emit(); exit !f }' <<< "$porcelain"
+}
+
+# _pra_live_label <branch> <pr-number> <launchctl-list-text>: print the label of
+# a live post-plan-now run for <branch> or a live fleet rescue for <pr-number>.
+# Returns 0 when one is live, 1 otherwise.
+_pra_live_label() {
+    local br="$1" pr="$2" snap="$3" _pid _st label
+    ljob_postplan_now_live "$(ljob_safe_slug "$br")" "$snap" && return 0
+    [ -n "$pr" ] || return 1
+    while IFS=$'\t' read -r _pid _st label; do
+        case "$label" in
+            com.ibl5.post-plan-fleet-"$pr"|com.ibl5.post-plan-fleet-"$pr"-*)
+                printf '%s\n' "$label"; return 0 ;;
+        esac
+    done <<< "$snap"
+    return 1
+}
+
+# _pra_unique_shas <branch>: print, newest first, the commits on refs/heads/<branch>
+# with no patch-equivalent twin on refs/remotes/origin/<branch>. Prints nothing
+# when every commit has a twin. Returns 2 when rev-list fails, so a failed
+# rev-list never reads as "nothing unpushed".
+_pra_unique_shas() {
+    local br="$1" out rc=0
+    out="$(git -C "$WT_GC_REPO_ROOT" rev-list --cherry-pick --right-only \
+        "refs/remotes/origin/$br...refs/heads/$br" 2>/dev/null)" || rc=$?
+    [ "$rc" -eq 0 ] || return 2
+    if [ -n "$out" ]; then printf '%s\n' "$out"; fi
+    return 0
+}
+
+# alert_unpushed_open_prs: DM the owner once per (branch, local head SHA) when an
+# OPEN-PR worktree holds commits with no origin twin, the newest such commit is
+# at least WT_GC_PR_ALERT_MIN_AGE_SECS old, and no post-plan-now or fleet run for
+# it is live. Read-only on every worktree: never pushes, resets, or deletes.
+# The caller runs it in a subshell; it always returns 0.
+alert_unpushed_open_prs() {
+    local sent=0 suppressed=0 skipped=0 failed=0
+    local rows snap now cls wt rest pr hit wt_path br shas newest ct age
+    local label head safe marker prev count first subjects more msg dm_rc pr_line
+    if [ "$WT_GC_PR_ALERT" = 0 ]; then
+        log "pr-alert disabled (WT_GC_PR_ALERT=0)"; return 0
+    fi
+    case "$WT_GC_PR_ALERT_MIN_AGE_SECS" in
+        ''|*[!0-9]*)
+            log "pr-alert skipped: invalid WT_GC_PR_ALERT_MIN_AGE_SECS '$WT_GC_PR_ALERT_MIN_AGE_SECS'"
+            return 0 ;;
+    esac
+    rows="$(awk '$1=="OPEN-PR"' "$TMP_STATUS" 2>/dev/null || true)"
+    snap="$("$WT_GC_LAUNCHCTL" list 2>/dev/null || true)"
+    now="$(date +%s)"
+    while read -r cls wt rest <&3; do
+        [ -n "$wt" ] || continue
+        pr="$(sed -nE 's/.*\(PR #([0-9]+)\).*/\1/p' <<< "$rest")"
+        if ! hit="$(_pra_wt_for_name "$wt")"; then
+            log "PR-ALERT skip $wt (no branch worktree)"; skipped=$((skipped + 1)); continue
+        fi
+        wt_path="${hit%%	*}"; br="${hit#*	}"
+        if ! git -C "$WT_GC_REPO_ROOT" show-ref --verify --quiet "refs/remotes/origin/$br"; then
+            log "PR-ALERT skip $br (no origin ref)"; skipped=$((skipped + 1)); continue
+        fi
+        if ! shas="$(_pra_unique_shas "$br")"; then
+            log "PR-ALERT skip $br (rev-list failed)"; skipped=$((skipped + 1)); continue
+        fi
+        if [ -z "$shas" ]; then
+            log "PR-ALERT twin $br (every commit has an origin twin)"
+            suppressed=$((suppressed + 1)); continue
+        fi
+        newest="$(sed -n '1p' <<< "$shas")"
+        ct="$(git -C "$WT_GC_REPO_ROOT" log -1 --format=%ct "$newest" 2>/dev/null || true)"
+        case "$ct" in ''|*[!0-9]*)
+            log "PR-ALERT skip $br (commit time unreadable)"; skipped=$((skipped + 1)); continue ;;
+        esac
+        age=$((now - ct))
+        if [ "$age" -lt "$WT_GC_PR_ALERT_MIN_AGE_SECS" ]; then
+            log "PR-ALERT fresh $br age=${age}s"; suppressed=$((suppressed + 1)); continue
+        fi
+        if label="$(_pra_live_label "$br" "$pr" "$snap")"; then
+            log "PR-ALERT live-run $br ($label)"; suppressed=$((suppressed + 1)); continue
+        fi
+        if ! head="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify --quiet "refs/heads/$br")"; then
+            log "PR-ALERT skip $br (head unreadable)"; skipped=$((skipped + 1)); continue
+        fi
+        safe="$(ljob_safe_slug "$br")"
+        marker="$WT_GC_PR_ALERT_DIR/$safe"
+        prev=""
+        if [ -f "$marker" ]; then prev="$(cat "$marker" 2>/dev/null || true)"; fi
+        if [ "$prev" = "$head" ]; then
+            log "PR-ALERT dedupe $br head=$head"; suppressed=$((suppressed + 1)); continue
+        fi
+        count="$(grep -c . <<< "$shas")"
+        first="$(sed -n '1,15p' <<< "$shas")"
+        subjects="$(git -C "$WT_GC_REPO_ROOT" log --no-walk=unsorted --format='- %h %s' --stdin <<< "$first" 2>/dev/null)" \
+            || subjects="- (commit subjects unreadable)"
+        more=""
+        if [ "$count" -gt 15 ]; then more="$(printf '\n- ... and %d more' $((count - 15)))"; fi
+        if [ -n "$pr" ]; then pr_line="https://github.com/a-jay85/IBL5/pull/$pr"
+        else pr_line="(number not reported by wt-status)"; fi
+        msg="$(printf 'wt-gc: open-PR branch has commits not on origin\nPR: %s\nBranch: %s\nWorktree: %s\nLocal head: %s\nUnpushed commits (%s, newest first):\n%s%s' \
+            "$pr_line" "$br" "$wt_path" "$head" "$count" "$subjects" "$more")"
+        if [ "$DRY_RUN" = 1 ]; then
+            log "PR-ALERT would-send $br head=$head unique=$count"; continue
+        fi
+        if [ -z "$WT_GC_DISCORD_DM" ] || [ ! -x "$WT_GC_DISCORD_DM" ]; then
+            log "PR-ALERT dm=unavailable $br ('${WT_GC_DISCORD_DM}')"; failed=$((failed + 1)); continue
+        fi
+        dm_rc=0
+        "$WT_GC_DISCORD_DM" --attempts 2 - <<< "$msg" >> "$WT_GC_LOG" 2>&1 || dm_rc=$?
+        if [ "$dm_rc" -ne 0 ]; then
+            log "PR-ALERT dm-failed $br rc=$dm_rc (retries next sweep)"; failed=$((failed + 1)); continue
+        fi
+        { mkdir -p "$WT_GC_PR_ALERT_DIR" && printf '%s\n' "$head" > "$marker"; } 2>/dev/null \
+            || log "PR-ALERT marker-write-failed $br ($marker)"
+        log "PR-ALERT sent $br head=$head unique=$count"
+        sent=$((sent + 1))
+    done 3<<< "$rows"
+    log "pr-alert done sent=$sent suppressed=$suppressed skipped=$skipped failed=$failed"
+    return 0
+}
+
 # ── Reap steps (bin/lib/wt-gc-reap.sh) ────────────────────────────────────────
 STEPS_FAILED=0
 # run_step <name> <switch-value> <switch-name> <fn>: kill switch, then the step
@@ -328,6 +476,10 @@ run_step docker       "$WT_GC_DOCKER_PRUNE"      WT_GC_DOCKER_PRUNE      docker_
 run_step stale-list   "$WT_GC_STALE_LIST"        WT_GC_STALE_LIST        write_stale_list
 run_step archive-prune "$WT_GC_ARCHIVE_PRUNE"    WT_GC_ARCHIVE_PRUNE     prune_archives
 log "reap done steps_failed=$STEPS_FAILED"
+# Unpushed open-PR alert. Runs after every cleanup and reap decision, in a
+# subshell, so a failure here (even a set -u trip) can change neither those
+# decisions nor EXIT_CODE nor the sweep stamp.
+( alert_unpushed_open_prs ) || log "pr-alert pass exited rc=$? (exit code unchanged)"
 
 log "done dry_run=$DRY_RUN cleaned=$cleaned skipped=$skipped stalled=$n_stalled unpushed=$n_unpushed empty=$n_empty open_pr=$n_open_pr merged=$n_merged rc=$EXIT_CODE"
 

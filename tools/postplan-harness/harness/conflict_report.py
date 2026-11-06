@@ -51,7 +51,7 @@ NOT_RUN_WORDS = "The review did not run for this resolution, so the merge check 
 REVIEW_REASON_FMT = "The review recorded: \"{excerpt}\""
 RUNG_FMT = " Then escalation rung {rung} changed the resolution: \"{fix}\""
 NO_REASON = "No reason was recorded."
-TRUNC_FMT = "... and {hidden} more lines not shown ({total} lost in this file)"
+TRUNC_FMT = "... and {hidden} more lines not shown ({total} {kind} in this file)"
 DROPPED_LINE = "An earlier conflict resolution by Claude was dropped by a later rebase. None of it remains on this branch."
 NO_RECORD_LINE = "Claude resolved a merge conflict on this branch, but no report record was found for it."
 
@@ -190,19 +190,21 @@ def _counter(text: str) -> Counter[str]:
     return Counter(n for n in (_norm(x) for x in text.splitlines()) if not _is_noise(n))
 
 
-def lost_lines(base_text: str, side_text: str, resolved_text: str, other_lines: dict[str, str]) -> tuple[list[str], list[tuple[str, str]]]:
+def lost_lines(base_text: str, side_text: str, resolved_text: str, other_lines: dict[str, list[str]]) -> tuple[list[str], list[tuple[str, str]]]:
     side_added = _counter(side_text) - _counter(base_text)
     # Copies the file already had at the merge base cannot cancel a loss of an added copy.
     missing = side_added - (_counter(resolved_text) - _counter(base_text))
     lost: list[str] = []
     moved: list[tuple[str, str]] = []
+    # One gained copy elsewhere accounts for one missing line. A second missing copy is lost.
+    targets = {norm: list(paths) for norm, paths in other_lines.items()}
     for raw in side_text.splitlines():
         norm = _norm(raw)
         if missing.get(norm, 0) <= 0:
             continue
         missing[norm] -= 1
-        if norm in other_lines:
-            moved.append((raw.rstrip(), other_lines[norm]))
+        if targets.get(norm):
+            moved.append((raw.rstrip(), targets[norm].pop(0)))
             continue
         lost.append(raw.rstrip())
     return lost, moved
@@ -227,22 +229,24 @@ def _show(repo: str, sha: str, path: str) -> str | None:
     return "" if _rev(repo, sha) else None
 
 
-def _other_lines(repo: str, base_sha: str, head: str, skip: str) -> dict[str, str]:
-    """Normalized lines the other changed files gained since the merge base, mapped to
-    their path. Lines a file already had at the base do not count as a place a line moved to."""
+def _other_lines(repo: str, base_sha: str, onto_sha: str, branch_sha: str, head: str, skip: str) -> dict[str, list[str]]:
+    """Normalized lines the other changed files hold at `head` beyond what master and the
+    branch each gave them, mapped to one path per gained copy. A copy either side already
+    had (at the merge base or added since) is not a place a line moved to, so it cannot
+    hide a real loss."""
     rc, out = _git(repo, "diff", "--name-only", base_sha, head)
     if rc != 0:
         return {}
-    mapping: dict[str, str] = {}
+    mapping: dict[str, list[str]] = {}
     budget = _MAX_BYTES_READ
     for other in [p for p in out.splitlines() if p.strip()][:_MAX_FILES_COMPARED]:
         if other == skip or budget <= 0:
             continue
         text = _show(repo, head, other) or ""
         budget -= len(text)
-        before = _counter(_show(repo, base_sha, other) or "")
-        for norm in _counter(text) - before:
-            mapping.setdefault(norm, other)
+        before = _counter(_show(repo, onto_sha, other) or "") | _counter(_show(repo, branch_sha, other) or "")
+        for norm, copies in (_counter(text) - before).items():
+            mapping.setdefault(norm, []).extend([other] * copies)
     return mapping
 
 
@@ -260,7 +264,7 @@ def file_loss(repo: str, record: dict, path: str, head: str, resolving: str | No
     at_resolve = _show(repo, resolving, path) if resolving else resolved
     if base is None or master is None or branch is None or resolved is None or at_resolve is None:
         return FileLoss(path=path, compare_failed=True)
-    others = _other_lines(repo, record["base_sha"], head, path)
+    others = _other_lines(repo, record["base_sha"], record["onto_sha"], record["branch_sha"], head, path)
     out = FileLoss(path=path)
     for side, lost_attr in ((master, "master_lost"), (branch, "branch_lost")):
         lost, moved = lost_lines(base, side, resolved, others)
@@ -341,7 +345,7 @@ def _loss_words(losses: list[FileLoss]) -> str:
     else:
         words = "No unique code was lost."
     if moved:
-        words += f" {_count_words(moved, 'line')} moved to another file."
+        words += f" {_count_words(moved, 'line')} moved to another file (listed below)."
     if failed:
         words += f" {_count_words(failed, 'file')} could not be compared."
     return words
@@ -349,27 +353,27 @@ def _loss_words(losses: list[FileLoss]) -> str:
 
 def _detail_block(fl: FileLoss, budget: int) -> tuple[list[str], int]:
     """One <details> block for a file, plus the number of lines it used from the total budget."""
-    sides = [("master", fl.master_lost), ("branch", fl.branch_lost)]
+    entries = [f"- (master) {neutralize(x, LINE_CHARS)}" for x in fl.master_lost]
+    entries += [f"- (branch) {neutralize(x, LINE_CHARS)}" for x in fl.branch_lost]
+    entries += [f"- (moved to {neutralize(to, LINE_CHARS)}) {neutralize(x, LINE_CHARS)}" for x, to in fl.moved]
     count_bits = []
-    for label, lines in sides:
-        if lines:
-            count_bits.append(f"{len(lines)} {'master' if label == 'master' else 'this branch'} lines")
-    total = len(fl.master_lost) + len(fl.branch_lost)
+    if fl.master_lost:
+        count_bits.append(f"{len(fl.master_lost)} master lines")
+    if fl.branch_lost:
+        count_bits.append(f"{len(fl.branch_lost)} this branch lines")
+    if fl.moved:
+        count_bits.append(f"{len(fl.moved)} moved lines")
     allowed = max(0, min(PER_FILE_LINES, budget))
-    shown: list[str] = []
-    for label, lines in sides:
-        for line in lines:
-            if len(shown) >= allowed:
-                break
-            shown.append(f"- ({label}) {neutralize(line, LINE_CHARS)}")
+    shown = entries[:allowed]
     out = [
         f"<details><summary><code>{neutralize(fl.path, LINE_CHARS)}</code>: "
         f"{' and '.join(count_bits)} not in the resolved file</summary>",
         "<pre>",
         *shown,
     ]
-    if len(shown) < total:
-        out.append(TRUNC_FMT.format(hidden=total - len(shown), total=total))
+    if len(shown) < len(entries):
+        kind = "lost or moved" if fl.moved else "lost"
+        out.append(TRUNC_FMT.format(hidden=len(entries) - len(shown), total=len(entries), kind=kind))
     out.append("</pre></details>")
     return out, len(shown)
 
@@ -390,7 +394,7 @@ def render_section(records: list[dict], losses: list[FileLoss], current_verdict:
     budget = TOTAL_LINES
     blocks = 0
     for fl in losses:
-        if not (fl.master_lost or fl.branch_lost):
+        if not (fl.master_lost or fl.branch_lost or fl.moved):
             continue
         if blocks >= MAX_DETAIL_FILES:
             break

@@ -199,6 +199,89 @@ def test_line_moved_to_other_file_not_lost(tmp_path):
     assert loss.moved == [("special_function_xyz", "b.sh")]
 
 
+def test_moved_line_is_listed_in_the_details(tmp_path):
+    repo = _build_repo(
+        tmp_path,
+        base={"a.sh": "alpha_line\n", "b.sh": "beta_line\n"},
+        master={"a.sh": "alpha_line\nspecial_function_xyz\n"},
+        branch={"c.sh": "branch_only_line\n"},
+        resolved={"a.sh": "alpha_line\n", "b.sh": "beta_line\nspecial_function_xyz\n"},
+    )
+    rec = _record_for(tmp_path, repo, "movedlist", ["a.sh"])
+    loss = cr.file_loss(repo["repo"], rec, "a.sh", repo["head"])
+    out = cr.render_section([rec], [loss], CLEAN)
+    assert "1 line moved to another file (listed below)." in out
+    assert "- (moved to b.sh) special&#95;function&#95;xyz" in out
+
+
+def test_master_line_in_two_files_dropped_from_one_is_lost(tmp_path):
+    line = "$stmt->execute();"
+    repo = _build_repo(
+        tmp_path,
+        base={"a.php": "alpha_line\n", "b.php": "beta_line\n"},
+        master={"a.php": f"alpha_line\n{line}\n", "b.php": f"beta_line\n{line}\n"},
+        branch={"c.sh": "branch_only_line\n"},
+        resolved={"a.php": "alpha_line\n"},
+    )
+    rec = _record_for(tmp_path, repo, "twofiles", ["a.php"])
+    loss = cr.file_loss(repo["repo"], rec, "a.php", repo["head"])
+    assert loss.master_lost == [line]
+    assert loss.moved == []
+    assert "No unique code was lost." not in cr.render_section([rec], [loss], CLEAN)
+
+
+def test_branch_line_in_two_files_dropped_from_one_is_lost(tmp_path):
+    repo = _build_repo(
+        tmp_path,
+        base={"a.sh": "alpha_line\n", "b.sh": "beta_line\n"},
+        master={"m.sh": "master_only_line\n"},
+        branch={"a.sh": "alpha_line\nbranch_copy_line\n", "b.sh": "beta_line\nbranch_copy_line\n"},
+        resolved={"b.sh": "beta_line\nbranch_copy_line\n"},
+    )
+    rec = _record_for(tmp_path, repo, "branchtwo", ["a.sh"])
+    loss = cr.file_loss(repo["repo"], rec, "a.sh", repo["head"])
+    assert loss.branch_lost == ["branch_copy_line"]
+    assert loss.moved == []
+
+
+def test_one_gained_copy_excuses_only_one_missing_line(tmp_path):
+    repo = _build_repo(
+        tmp_path,
+        base={"a.sh": "alpha_line\n", "b.sh": "beta_line\n"},
+        master={"a.sh": "alpha_line\nrepeated_line\nrepeated_line\n"},
+        branch={"c.sh": "branch_only_line\n"},
+        resolved={"a.sh": "alpha_line\n", "b.sh": "beta_line\nrepeated_line\n"},
+    )
+    rec = _record_for(tmp_path, repo, "onecopy", ["a.sh"])
+    loss = cr.file_loss(repo["repo"], rec, "a.sh", repo["head"])
+    assert loss.moved == [("repeated_line", "b.sh")]
+    assert loss.master_lost == ["repeated_line"]
+
+
+def test_line_other_file_held_at_base_is_not_a_move_target(tmp_path):
+    shared = "declare_strict_types_line"
+    repo = _build_repo(
+        tmp_path,
+        base={"a.sh": "alpha_line\n", "b.sh": f"{shared}\n"},
+        master={"a.sh": f"alpha_line\n{shared}\n"},
+        # The branch edit puts b.sh in the merge-base diff, which is what makes it a candidate.
+        branch={"b.sh": f"{shared}\nbranch_extra_line\n"},
+        resolved={"a.sh": "alpha_line\n", "b.sh": f"{shared}\nbranch_extra_line\n"},
+    )
+    rec = _record_for(tmp_path, repo, "heldatbase", ["a.sh"])
+    loss = cr.file_loss(repo["repo"], rec, "a.sh", repo["head"])
+    assert loss.master_lost == [shared]
+    assert loss.moved == []
+
+
+def test_copy_from_base_then_lost_is_reported():
+    base = "return_zero\nreturn_zero\nreturn_zero\n"
+    side = base + "return_zero\n"
+    lost, moved = cr.lost_lines(base, side, base, {})
+    assert lost == ["return_zero"]
+    assert moved == []
+
+
 # -------------------------------------------------------------------- wording
 
 

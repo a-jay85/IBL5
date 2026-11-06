@@ -58,11 +58,6 @@ ljob_postplan_now_live() {
 ljob_listed() { grep -qE -- "$1" <<< "$2"; }
 
 # ---------------------------------------------------------------------------
-# ljob_label_loaded <label> — point lookup used by the reaper.
-# ---------------------------------------------------------------------------
-ljob_label_loaded() { launchctl list "$1" >/dev/null 2>&1; }
-
-# ---------------------------------------------------------------------------
 # ljob_pgrep_alive <pattern>... — 0 = alive OR undecidable, 1 = provably dead.
 # Missing pgrep => alive.  Any pattern matching => alive.  Otherwise the exit
 # status of the LAST pgrep decides: 1 => dead, anything else => alive.
@@ -127,58 +122,6 @@ ljob_release_slot() {
     if [[ -n "$keep" ]]; then
         mv -f "$keep" "${log}.aborted"
     fi
-}
-
-# ---------------------------------------------------------------------------
-# ljob_count_plists <label_prefix>
-# Count of $(ljob_agents_dir)/<prefix>*.plist; -e check so unmatched glob = 0.
-# ---------------------------------------------------------------------------
-ljob_count_plists() {
-    local prefix="$1" f n=0
-    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
-        [[ -e "$f" ]] && n=$((n + 1))
-    done
-    printf '%s\n' "$n"
-}
-
-# ---------------------------------------------------------------------------
-# ljob_reap_stale <label_prefix> <alive_fn>
-# For each plist: keep if ljob_label_loaded; keep if <alive_fn> <label>;
-# else rm -f and echo "reaped stale slot <label>".  Always return 0.
-# ---------------------------------------------------------------------------
-ljob_reap_stale() {
-    local prefix="$1" alive_fn="$2"
-    local f label
-    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
-        [[ -e "$f" ]] || continue
-        label="$(basename "$f" .plist)"
-        ljob_label_loaded "$label" && continue
-        "$alive_fn" "$label" && continue
-        rm -f "$f"; echo "reaped stale slot $label"
-    done
-    return 0
-}
-
-# ---------------------------------------------------------------------------
-# ljob_wait_for_slot <count_fn> <reap_fn> <jobs> <ceiling_secs> <dry_seam_name>
-# Verbatim fleet loop; reads the dry seam indirectly via ${!5:-}.
-# ---------------------------------------------------------------------------
-ljob_wait_for_slot() {
-    local count_fn="$1" reap_fn="$2" jobs="$3" ceiling_secs="$4" dry_seam_name="$5"
-    local waited=0
-    while [[ "$("$count_fn")" -ge "$jobs" ]]; do
-        echo "waiting for slot ($("$count_fn")/$jobs in flight)…"
-        "$reap_fn"
-        [[ "$("$count_fn")" -lt "$jobs" ]] && break
-        if [[ -n "${!dry_seam_name:-}" ]]; then
-            echo "cap reached under ${dry_seam_name} — not sleeping; stopping here." >&2
-            exit 0
-        fi
-        sleep 5; waited=$((waited + 5))
-        if [[ $waited -ge $ceiling_secs ]]; then
-            echo "ERROR: waited 2h for a slot; aborting" >&2; exit 1
-        fi
-    done
 }
 
 # ---------------------------------------------------------------------------
@@ -323,6 +266,7 @@ ljob_claim_slot() {
 # string, unquoted heredoc so variables expand at write time).
 # Does NOT mkdir.
 # ---------------------------------------------------------------------------
+# Fixed-label recurring jobs only (wt-pool, launchd-sched, sim-recap-cron-setup); per-run jobs use ljob_submit.
 ljob_write_runner_plist() {
     local plist="$1" label="$2" runner="$3" root="$4" log="$5"
     cat > "$plist" <<PLIST_EOF
@@ -349,6 +293,7 @@ PLIST_EOF
 # ljob_bootstrap <label> <plist>
 # bootout (errors ignored) then bootstrap; returns bootstrap's exit status.
 # ---------------------------------------------------------------------------
+# Fixed-label recurring jobs only (wt-pool, launchd-sched, sim-recap-cron-setup); per-run jobs use ljob_submit.
 ljob_bootstrap() {
     local label="$1" plist="$2"
     launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true

@@ -43,6 +43,7 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
+from harness import conflict_report
 from harness import armable as _armable_mod
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
@@ -1068,6 +1069,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if rsha:
                 ci_line += f"; remediation commit {rsha} is inside that watch"
             def _post_sticky(decision_, ci_line_, phase_label):
+                # The prior sticky carries the conflict-report section forward when the
+                # local record is gone. A failed read only loses that recovery path.
+                prior_body_ = None
+                if live:
+                    try:
+                        prior_body_ = gh.pr_sticky_body(pr)
+                    except Exception:
+                        prior_body_ = None
                 sticky_ = fidelity.compose_sticky(
                     rebase_line, ci_line_, fid, decision_, digest,
                     fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
@@ -1079,6 +1088,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     own_id=fid.get("own_id", ""),
                     reused_from=res.reused_from,
                     fix_round_line=fix_round.summary_line(res.fix_round),
+                    conflict_section=_conflict_report_section(
+                        git, worktree, prior_body_),
                     posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
                 try:
                     cid_ = gh.pr_sticky_verdict(pr, sticky_)
@@ -3071,6 +3082,15 @@ def _harness_version(worktree, master_sha, harness_root, log=None) -> str:
 
 def _conflict_key(branch: str) -> str:
     return (branch or "").translate(str.maketrans("/:", "--"))
+
+
+def _conflict_report_section(git, repo: str, prior_body: str | None) -> str:
+    try:
+        return conflict_report.section_for(
+            git.branch(), repo, prior_body=prior_body,
+            flag_state=getattr(git, "last_conflict_flag_state", "") or "")
+    except Exception:  # conflict report never changes verdict or exit code
+        return f"{conflict_report.SECTION_BEGIN}\n{conflict_report.FAILURE_LINE}\n{conflict_report.SECTION_END}"
 
 
 def _conflict_only_proof(git, cache_rec, cache_key, cache_files, log) -> bool:

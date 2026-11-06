@@ -20,6 +20,7 @@ from pathlib import Path
 
 from harness.armable import DESTRUCTIVE_SQL
 from harness.sql_comments import strip_added_sql_comments
+from harness.workflow_scope import workflow_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
@@ -54,18 +55,46 @@ class MalformedMergeDanger(ValueError):
     """The body carries a `**Merge danger:**` line that does not parse, or more than one."""
 
 
+def _diff_sections(diff_text: str) -> list[tuple[str, str]] | None:
+    """(b-path, section text) per `diff --git` header, in order. None when the text has no
+    header at all: an empty diff or a bare hunk."""
+    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
+    if not headers:
+        return None
+    sections: list[tuple[str, str]] = []
+    for i, m in enumerate(headers):
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
+        sections.append((m.group(1), diff_text[m.start():end]))
+    return sections
+
+
 def _migration_sections(diff_text: str) -> str:
     """The diff text belonging to migration files. A diff without `diff --git` headers is
     searched whole, so a bare hunk still counts."""
-    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
-    if not headers:
+    sections = _diff_sections(diff_text)
+    if sections is None:
         return diff_text
-    parts: list[str] = []
-    for i, m in enumerate(headers):
-        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
-        if _MIGRATION_RE.match(m.group(1)):
-            parts.append(diff_text[m.start():end])
-    return "".join(parts)
+    return "".join(text for path, text in sections if _MIGRATION_RE.match(path))
+
+
+def _section_for(diff_text: str, path: str) -> str | None:
+    """The section whose `b/` path is `path`. None when the diff has no header, when the
+    file's header is quoted (`diff --git "a/x y" "b/x y"` matches no header regex), or when
+    the file has no section. The caller treats None as unreadable and fires."""
+    for section_path, text in _diff_sections(diff_text) or []:
+        if section_path == path:
+            return text
+    return None
+
+
+_MOVE_SOURCE_RE = re.compile(r"^(?:rename|copy) from (.+)$", re.MULTILINE)
+
+
+def _moved_in_from_outside(section: str | None) -> bool:
+    """True when the section is a rename or copy whose source is outside the workflow glob.
+    Such a move activates a new sender even when git shows no changed notify line."""
+    m = _MOVE_SOURCE_RE.search(section or "")
+    return bool(m) and not fnmatch.fnmatchcase(m.group(1).strip(), _WORKFLOW_GLOB)
 
 
 def _module_root(path: str) -> str:
@@ -124,17 +153,27 @@ def derive_merge_danger(
         for p in migrations:
             add(f"destructive-migration:{p}")
 
-    # 2. Prod external state and outbound notification senders.
+    # 2. Prod external state and outbound notification senders (changed lines of the workflow's own section).
     external = False
     for status, p in pairs:
-        if p in _EXTERNAL_PATHS or p.startswith(_EXTERNAL_PREFIXES):
+        wf = p.split(" → ")[-1]
+        if wf in _EXTERNAL_PATHS or wf.startswith(_EXTERNAL_PREFIXES):
             add(f"external-path:{p}")
             external = True
-        elif fnmatch.fnmatchcase(p, _WORKFLOW_GLOB) and not status.startswith("D"):
-            text = read_candidate(p)
-            if text is not None and _NOTIFY_TEXT_RE.search(text):
-                add(f"notify-workflow:{p}")
+        elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):
+            text = read_candidate(wf)
+            # Notify text in the file is only the precondition; the workflow's own changed
+            # lines decide. An unreadable section or candidate fires (fail closed).
+            if text is None:
+                add(f"notify-workflow:{wf}")
                 external = True
+            elif _NOTIFY_TEXT_RE.search(text):
+                section = _section_for(diff_text or "", wf)
+                hit = _moved_in_from_outside(section) or \
+                    workflow_send_change(text, section, _NOTIFY_TEXT_RE)
+                if hit:
+                    add(f"notify-workflow:{wf}")
+                    external = True
 
     # 3. Self-governing merge machinery (the bootstrap hazard).
     for p in paths:

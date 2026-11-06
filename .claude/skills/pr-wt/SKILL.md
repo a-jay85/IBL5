@@ -1,7 +1,7 @@
 ---
 name: pr-wt
 description: "Switch this session's working directory into the worktree for a given PR number or branch name. Use when the user types /pr-wt <pr-number|branch-name>."
-last_verified: 2026-09-05
+last_verified: 2026-11-05
 ---
 
 # /pr-wt — enter a PR's worktree

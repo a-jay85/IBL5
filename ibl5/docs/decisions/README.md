@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-04
+last_verified: 2026-11-05
 ---
 
 # IBL5 Architecture Decision Records
@@ -98,6 +98,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0226](0226-plan-tier-hint-open-judgment.md) | Open Opus judgment for the /plan architect tier | Accepted | `bin/plan-tier-hint` asks one open Opus 5.5 question with no trigger list, prints `default` on any failure, and logs every verdict; it supersedes ADR-0222. |
 | [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
 | [0228](0228-postplan-sync-rebases-onto-target.md) | Post-plan sync rebases onto the target | Accepted | The harness Phase 2 sync replays the branch's own commits with `git rebase --onto`, pushes with `--force-with-lease=refs/heads/<b>:<sha>`, and fails closed. Supersedes ADR-0064's fix advice in part. |
+| [0230](0230-postplan-conflict-report.md) | Show model-resolved conflicts in the post-plan sticky | Accepted | The sticky gains a display-only conflict section built from a record beside the condition-(14) marker; no arming condition changes. |
 
 ## When an ADR is Required
 

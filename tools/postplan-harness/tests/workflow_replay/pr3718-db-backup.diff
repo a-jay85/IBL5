@@ -1,0 +1,40 @@
+diff --git a/.github/workflows/db-backup.yml b/.github/workflows/db-backup.yml
+index f2781ef3f4..07a4807bb2 100644
+--- a/.github/workflows/db-backup.yml
++++ b/.github/workflows/db-backup.yml
+@@ -71,7 +71,7 @@ jobs:
+   backup:
+     name: Dump, rotate, and verify restore
+     needs: [mirror-ready]
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-26.04
+     timeout-minutes: 30
+ 
+     # Ephemeral MariaDB used only for the restore self-test.
+@@ -312,7 +312,7 @@ jobs:
+ 
+   notify-backup-failure:
+     name: Notify Backup Failure
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-26.04
+     needs: [mirror-ready, backup]
+     if: ${{ always() && (needs.backup.result == 'failure' || needs.mirror-ready.result == 'failure') }}
+     timeout-minutes: 5
+@@ -337,7 +337,7 @@ jobs:
+ 
+   purge-audit-log:
+     name: Purge auth audit log past retention
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-26.04
+     needs: backup
+     # Never purge without tonight's verified dump of the real host. A dispatch
+     # with ssh_host_override backed up some other host, so it must not purge prod.
+@@ -366,7 +366,7 @@ jobs:
+ 
+   notify-purge-failure:
+     name: Notify Audit-Log Purge Failure
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-26.04
+     needs: purge-audit-log
+     if: ${{ always() && needs.purge-audit-log.result == 'failure' }}
+     timeout-minutes: 5

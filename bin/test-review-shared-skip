@@ -37,7 +37,9 @@ end_case() {
 
 want() {
     local label="$1" haystack="$2" token="$3"
-    printf '%s\n' "$haystack" | grep -qF "$token" || fail "$label: expected '$token' not found in: $haystack"
+    # A here-string, because `printf | grep -q` under pipefail can read FOUND as NOT-FOUND:
+    # grep exits on its match and printf hits a broken pipe writing the later lines.
+    grep -qF "$token" <<< "$haystack" || fail "$label: expected '$token' not found in: $haystack"
 }
 
 # --- scratch git repo --------------------------------------------------------------------

@@ -418,6 +418,33 @@ def test_render_has_state_line_and_markers():
     assert "`bin/check-foo`" in block
 
 
+PLAN_SPEC = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
+
+
+def _plan_g(path="bin/check-plan"):
+    return GateChange(path, "check-script", "replayable", PLAN_SPEC, "r")
+
+
+def test_render_plan_only_sample_window_sentence():
+    gates = [_plan_g()]
+    res = _results("bin/check-plan", _passes(1, 8))
+    t = _truth(clean=range(1, 9))
+    block = render_gate_backtest(compute_verdict(gates, res, t), gates, res, t, 30, (7, 35))
+    assert "newest 30 settled merged PRs" not in block
+    assert ("the 7 newest settled merged PRs that have one, found in the newest 35 settled"
+            in block)
+
+
+def test_render_mixed_gates_keeps_base_window_sentence():
+    gates = [_plan_g(), _g()]
+    res = _results("bin/check-plan", _passes(1, 8)) + _results("bin/check-foo", _passes(1, 8))
+    t = _truth(clean=range(1, 9))
+    block = render_gate_backtest(compute_verdict(gates, res, t), gates, res, t, 30, (7, 35))
+    assert "Replayed against the newest 30 settled merged PRs" in block
+    assert ("the 7 newest settled merged PRs that have one, found in the newest 35 settled"
+            in block)
+
+
 def _based(gate, rows):
     """rows: list of (pr, outcome, base_outcome)"""
     return [ReplayResult(pr, gate, outcome, "", base_outcome=base) for pr, outcome, base in rows]

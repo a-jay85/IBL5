@@ -630,3 +630,168 @@ def test_apply_patch_per_file_unsplittable_is_no_apply(tmp_path):
     patch = b"--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-zz\n+a2\n"
     with ScratchTree(str(repo), root) as scratch:
         assert scratch.apply_patch_per_file(patch) == ([], [_UNKNOWN_PATH])
+
+
+# --- Plan-bearing sample for plan-needing gates ----------------------------------------------
+
+PLAN_SPEC = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
+PLAN_GATE = '#!/bin/sh\n[ -f "$1" ] && exit 0\nexit 1\n'
+
+
+def _settled_prs(count, now, head_refs=None):
+    """`count` settled PRs numbered 1..count, newest first, all older than 48h."""
+    from harness.gate_backtest import HistoricalPR
+    return [HistoricalPR(i, "feat: x", "a" * 40, 1, now - timedelta(days=4, hours=i),
+                         (head_refs or {}).get(i, f"b{i}"), ())
+            for i in range(1, count + 1)]
+
+
+def _touch_plans(plans_dir, refs):
+    plans_dir.mkdir(parents=True, exist_ok=True)
+    for ref in refs:
+        (plans_dir / f"{ref}.md").write_text("# plan\n")
+
+
+def test_plan_sample_stops_at_limit(tmp_path):
+    from harness.gate_backtest import classify_truth
+    from harness.gate_backtest_replay import select_plan_sample
+    now = T0 + timedelta(days=30)
+    fetched = _settled_prs(40, now)
+    _touch_plans(tmp_path / "plans", [f"b{i}" for i in range(1, 41)])
+    truth = classify_truth(fetched, now)
+    sample, depth = select_plan_sample(fetched, truth, str(tmp_path / "plans"), 30)
+    assert [p.number for p in sample] == list(range(1, 31))
+    assert depth == 30
+
+
+def test_plan_sample_counts_archived_and_rejects_bad_head_ref(tmp_path):
+    from harness.gate_backtest import classify_truth
+    from harness.gate_backtest_replay import select_plan_sample
+    now = T0 + timedelta(days=30)
+    plans = tmp_path / "plans"
+    (plans / "_archive").mkdir(parents=True)
+    (plans / "b1.md").write_text("# plan\n")
+    (plans / "_archive" / "b2.md").write_text("# archived plan\n")
+    (tmp_path / "escape.md").write_text("# traversal target\n")
+    (plans / "b4.txt").write_text("near miss\n")
+    fetched = _settled_prs(4, now, head_refs={3: "../escape"})
+    truth = classify_truth(fetched, now)
+    sample, depth = select_plan_sample(fetched, truth, str(plans), 30)
+    assert [p.number for p in sample] == [1, 2]
+    assert depth == 4
+
+
+def _selection_setup(monkeypatch, tmp_path, plan_refs, flag_numbers=(), count=40, detect=None):
+    """Patch backtest_changes' collaborators; return (call, seen) for the recorded run_backtest."""
+    from harness import gate_backtest_replay as gbr
+    from harness.gate_backtest import ReplayResult
+    now = T0 + timedelta(days=30)
+    plans = tmp_path / "plans"
+    _touch_plans(plans, plan_refs)
+    seen = {"history": None, "plan_history": "unset"}
+    plan_gate = gate(PLAN_SPEC, path="bin/check-plan")
+    monkeypatch.setattr(gbr, "_detect",
+                        lambda *a, **k: detect if detect is not None else [plan_gate])
+    monkeypatch.setattr(gbr, "fetch_history", lambda *a, **k: _settled_prs(count, now))
+
+    def fake_run(repo, head, gates, history, *a, plan_history=None, **k):
+        seen["history"] = [p.number for p in history]
+        seen["plan_history"] = None if plan_history is None else [p.number for p in plan_history]
+        rows = []
+        for g in gates:
+            prs = plan_history if g.spec.needs_plan else history
+            for pr in prs or []:
+                rows.append(ReplayResult(pr.number, g.path,
+                                         "flag" if pr.number in flag_numbers else "pass", ""))
+        return rows
+
+    monkeypatch.setattr(gbr, "run_backtest", fake_run)
+
+    def call():
+        return gbr.backtest_changes(str(tmp_path), "HEAD", [("M", "bin/check-plan")], fetch=False,
+                                    plans_dir=str(plans), limit=30, now=now)
+    return call, seen
+
+
+def test_plan_sample_reaches_past_window_and_clears(monkeypatch, tmp_path):
+    call, seen = _selection_setup(
+        monkeypatch, tmp_path, ["b1", "b2", "b31", "b32", "b33", "b34", "b35"], count=35)
+    out = call()
+    assert seen["plan_history"] == [1, 2, 31, 32, 33, 34, 35]
+    assert out.verdict.state == "CLEARED"
+    assert out.window == 30
+    assert ("the 7 newest settled merged PRs that have one, found in the newest 35 settled"
+            in out.block)
+
+
+def test_plan_sample_too_few_anywhere_stays_thin_unknown(monkeypatch, tmp_path):
+    call, seen = _selection_setup(monkeypatch, tmp_path, ["b1", "b2", "b33"])
+    out = call()
+    assert seen["plan_history"] == [1, 2, 33]
+    assert out.verdict.state == "UNKNOWN"
+    assert "thin sample" in out.verdict.reason
+
+
+def test_plan_sample_false_flags_on_deep_prs_hold(monkeypatch, tmp_path):
+    call, _ = _selection_setup(
+        monkeypatch, tmp_path, ["b1", "b2", "b31", "b32", "b33", "b34", "b35"],
+        flag_numbers={31, 32}, count=35)
+    out = call()
+    assert out.verdict.state == "HELD"
+    assert "flagged 2 clean PRs" in out.verdict.reason
+
+
+def test_non_plan_gate_history_unchanged_with_plan_gate(monkeypatch, tmp_path):
+    detect = [gate(PLAN_SPEC, path="bin/check-plan"), gate(path="bin/check-fake")]
+    call, seen = _selection_setup(
+        monkeypatch, tmp_path, ["b1", "b2", "b31", "b32", "b33", "b34", "b35"], detect=detect)
+    call()
+    assert seen["history"] == list(range(1, 31))
+    assert seen["plan_history"] == [1, 2, 31, 32, 33, 34, 35]
+
+
+def test_non_plan_run_skips_plan_sample_selection(monkeypatch, tmp_path):
+    from harness import gate_backtest_replay as gbr
+
+    def boom(*a, **k):
+        raise AssertionError("resolve_plan must not run for a non-plan candidate")
+
+    call, seen = _selection_setup(monkeypatch, tmp_path, ["b1"],
+                                  detect=[gate(path="bin/check-fake")])
+    monkeypatch.setattr(gbr, "resolve_plan", boom)
+    call()
+    assert seen["plan_history"] is None
+    assert seen["history"] == list(range(1, 31))
+
+
+def _plan_engine(tmp_path, plan_numbers, plan_history_given):
+    repo, shas = build_repo(tmp_path)
+    head_refs = {i: f"b{i}" for i in range(1, 7)}
+    history = fetch_history(fake_gh(shas, head_refs=head_refs), make_git(str(repo)))
+    plans = tmp_path / "plans"
+    _touch_plans(plans, [f"b{n}" for n in plan_numbers])
+    gates = [gate(), gate(PLAN_SPEC, path="bin/check-fakeplan")]
+    files = {"bin/check-fake": (NEW_GATE.encode(), 0o100755),
+             "bin/check-fakeplan": (PLAN_GATE.encode(), 0o100755)}
+    plan_history = ([p for p in history if p.number in plan_numbers]
+                    if plan_history_given else None)
+    return run_backtest(str(repo), "HEAD", gates, history, files, str(plans),
+                        plan_history=plan_history)
+
+
+def test_run_backtest_non_plan_rows_identical_with_plan_history(tmp_path):
+    def rows(results):
+        return [(r.pr, r.outcome, r.detail) for r in results if r.gate == "bin/check-fake"]
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    without = rows(_plan_engine(tmp_path / "a", {2, 4, 5}, False))
+    with_sample = rows(_plan_engine(tmp_path / "b", {2, 4, 5}, True))
+    assert without and without == with_sample
+
+
+def test_plan_gate_records_no_no_plan_skips_outside_sample(tmp_path):
+    results = _plan_engine(tmp_path, {2, 4, 5}, True)
+    plan_rows = [r for r in results if r.gate == "bin/check-fakeplan"]
+    assert not [r for r in plan_rows if r.detail == "no-plan"]
+    assert [r.pr for r in plan_rows] == [5, 4, 2]

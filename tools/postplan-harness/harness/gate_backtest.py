@@ -553,17 +553,27 @@ def _file_list(paths) -> str:
 
 
 def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Truth],
-                         window_size: int) -> str:
+                         window_size: int, plan_sample: tuple[int, int] | None = None) -> str:
     """Markdown block for the PR body. Only PR numbers are rendered, never historical titles."""
     if not gates:
         return ""
+    replayable_gates = [g for g in gates if g.state == "replayable" and g.spec is not None]
+    plan_only = [g for g in replayable_gates if g.spec.needs_plan]
+    window_text = ""
+    if plan_sample is None or len(plan_only) < len(replayable_gates):
+        window_text = (f"Replayed against the newest {window_size} settled merged PRs "
+                       "(older than 48h). ")
+    if plan_sample is not None and plan_only:
+        count, depth = plan_sample
+        window_text += (f"Gates that need a plan file replayed against the {count} newest "
+                        f"settled merged PRs that have one, found in the newest {depth} settled. ")
     by_key = {(r.gate, r.pr): r for r in (results or [])}
     partial_fixed: list = []
     partial_refused: list = []
     lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
              "### Gate backtest", "",
              f"**State:** {verdict.state}. {verdict.reason}", "",
-             f"Replayed against the newest {window_size} settled merged PRs (older than 48h). "
+             window_text +
              "Repaired: a `fix` PR touching an overlapping file merged within 48h. "
              "Clean: older than 48h and not repaired. "
              "Unsettled: younger than 48h, never replayed.", ""]

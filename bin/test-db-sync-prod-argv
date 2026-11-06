@@ -10,7 +10,8 @@
 # Cases: D1 default argv, O1 env override, N1 ambient DB_NAME ignored, F1
 # fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
 # M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin, P1 keep-list
-# covers every ibl_bug_* table the migrations create.
+# covers every ibl_bug_* table the migrations create, P2 keep-list order, P3-P4 no inline
+# list or source, K1-K12 fail-closed keep-list.
 set -euo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -69,6 +70,7 @@ mkdir -p "$MAIN/bin/lib"
 cp "$REPO_ROOT/bin/lib/db-helpers.sh"  "$MAIN/bin/lib/db-helpers.sh"
 cp "$REPO_ROOT/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
 cp "$REPO_ROOT/bin/db-sync-prod"       "$MAIN/bin/db-sync-prod"
+cp "$REPO_ROOT/bin/db-sync-preserve-tables.txt" "$MAIN/bin/db-sync-preserve-tables.txt"
 chmod +x "$MAIN/bin/db-sync-prod"
 h_git_repo "$MAIN" --no-commit
 git -C "$MAIN" add -A
@@ -232,13 +234,59 @@ assert_eq "E1 no literal name" "0" "$(grep -cF -- '"iblhoops_ibl5")' "$E2E" || t
 assert_eq "E1 sources db-helpers" "1" "$(grep -cF -- 'source "$REPO_ROOT/bin/lib/db-helpers.sh"' "$E2E" || true)"
 
 # P1: the sync must keep every local-only bug-pipeline table. A new ibl_bug_* table
-# that misses PRESERVE_TABLES is dropped on each prod sync with no visible error.
-P_LIST=$(sed -n 's/^PRESERVE_TABLES="\(.*\)"$/\1/p' "$REPO_ROOT/bin/db-sync-prod")
+# that misses bin/db-sync-preserve-tables.txt is dropped on each prod sync with no visible error.
+P_LIST=$(sed -e '/^#/d' -e '/^$/d' "$REPO_ROOT/bin/db-sync-preserve-tables.txt" | paste -s -d ' ' -)
 P_TABLES=$(cat "$REPO_ROOT"/ibl5/migrations/*.sql \
     | sed -nE 's/.*CREATE TABLE (IF NOT EXISTS )?`?(ibl_bug_[a-z_]+).*/\2/p' | sort -u)
 assert_match "P1 migrations create ibl_bug_reports" "ibl_bug_reports" "$P_TABLES"
 for t in $P_TABLES; do
     assert_match "P1 $t preserved" " $t " " $P_LIST "
 done
+assert_eq "P2 keep-list names and order" \
+    "ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context" \
+    "$P_LIST"
+SYNC_SRC=$(cat "$REPO_ROOT/bin/db-sync-prod")
+assert_eq "P3 no inline keep-list literal" "0" "$(count_in 'PRESERVE_TABLES="ibl_' "$SYNC_SRC")"
+assert_eq "P4 keep-list never sourced (.)" "0" "$(count_in '. "$PRESERVE_LIST_FILE"' "$SYNC_SRC")"
+assert_eq "P4 keep-list never sourced (source)" "0" "$(count_in 'source "$PRESERVE_LIST_FILE"' "$SYNC_SRC")"
+
+# K1-K12: the keep-list is read fail-closed. Each case swaps the sandbox list,
+# runs the D1 invocation (run_sync), then restores the real list.
+KEEP_SRC="$REPO_ROOT/bin/db-sync-preserve-tables.txt"
+KEEP_DST="$MAIN/bin/db-sync-preserve-tables.txt"
+run_keep_case() {  # <label> <missing|unreadable|content> [content] [stderr-needle]
+    local label="$1" mode="$2" body="${3:-}" needle="${4:-}"
+    rm -f "$KEEP_DST" "$TMP/pwn"
+    case "$mode" in
+        unreadable) cp "$KEEP_SRC" "$KEEP_DST"; chmod 000 "$KEEP_DST" ;;
+        content)    printf '%s' "$body" > "$KEEP_DST" ;;
+    esac
+    run_sync
+    rm -f "$KEEP_DST"
+    cp "$KEEP_SRC" "$KEEP_DST"
+    if [ "$RC" -ne 0 ]; then pass "$label exits non-zero"; else failcase "$label exits non-zero" "rc=$RC"; fi
+    assert_match "$label names the list" "ERROR: preserved-tables list" "$ERR"
+    if [ -n "$needle" ]; then assert_match "$label reason" "$needle" "$ERR"; fi
+    assert_eq "$label no docker/dump/drop/import call" "" "$LOG"
+    if [ ! -e "$TMP/pwn" ]; then pass "$label nothing executed"; else failcase "$label nothing executed" "$TMP/pwn exists"; fi
+}
+run_keep_case "K1 missing"       missing    "" "missing or unreadable"
+if [ "$(id -u)" -eq 0 ]; then echo "SKIP: K9 unreadable (root ignores mode 000)"; else
+run_keep_case "K9 unreadable"    unreadable "" "missing or unreadable"; fi
+run_keep_case "K2 empty"         content "" "has no table names"
+run_keep_case "K3 comment-only"  content $'# header\n\n#ibl_api_keys\n' "has no table names"
+run_keep_case "K4 uppercase"     content $'IBL_API_KEYS\n' "invalid table name"
+run_keep_case "K5 semicolon"     content "ibl_x;touch $TMP/pwn"$'\n' "invalid table name"
+run_keep_case "K6 dollar-paren"  content $'ibl_$(id)\n' "invalid table name"
+run_keep_case "K7 backtick"      content $'ibl_`id`\n' "invalid table name"
+run_keep_case "K8 leading space" content $' ibl_api_keys\n' "invalid table name"
+run_keep_case "K11 bare prefix"  content $'ibl_\n' "invalid table name"
+run_keep_case "K12 inline note"  content $'ibl_api_keys # keep\n' "invalid table name"
+# K10: a list without a trailing newline still keeps its last name.
+printf '%s' "$(grep -v '^#' "$KEEP_SRC")" > "$KEEP_DST"
+run_sync
+cp "$KEEP_SRC" "$KEEP_DST"
+assert_eq "K10 no-trailing-newline list runs" "0" "$RC"
+assert_match "K10 last name still probed" "ibl_bug_report_operator_context" "$LOG"
 
 h_done

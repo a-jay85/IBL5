@@ -29,6 +29,7 @@ from pathlib import Path
 
 from .armable import conflict_flag_path, conflict_verdict_for
 from .conflict import VERDICT_CLEAN, VERDICT_FOUND_PROBLEM
+from .fidelity import MERGE_DIGEST_HEADING, STICKY_MARKER
 
 REPORT_SUFFIX = ".report.json"
 SECTION_BEGIN = "<!-- conflict-report:begin -->"
@@ -59,6 +60,10 @@ _NON_ESCALATION_RUNGS = ("", "first-pass", "regen")
 _NO_FIX_SUMMARY = "no summary recorded"
 
 _GIT_TIMEOUT = 30
+_GIT_FAILED = 255
+MAX_PATHS_SHOWN = 30
+MAX_DETAIL_FILES = 20
+MAX_RECOVERED_CHARS = 20000
 _MAX_FILES_COMPARED = 200
 _MAX_BYTES_READ = 2 * 1024 * 1024
 
@@ -77,7 +82,7 @@ def _git(repo: str, *args: str) -> tuple[int, str]:
             ["git", "-C", repo, *args], capture_output=True, text=True,
             errors="replace", timeout=_GIT_TIMEOUT)
     except (OSError, subprocess.SubprocessError):
-        return 1, ""
+        return _GIT_FAILED, ""  # never 1: `merge-base --is-ancestor` uses 1 for "no"
     return proc.returncode, proc.stdout
 
 
@@ -352,7 +357,9 @@ def render_section(records: list[dict], losses: list[FileLoss], current_verdict:
     """The sticky section. Several records merge: paths deduplicated, newest record wins."""
     newest = records[-1] if records else {}
     paths = list(dict.fromkeys(p for r in records for p in r.get("files", [])))
-    shown_paths = ", ".join(f"<code>{neutralize(p, LINE_CHARS)}</code>" for p in paths)
+    shown_paths = ", ".join(f"<code>{neutralize(p, LINE_CHARS)}</code>" for p in paths[:MAX_PATHS_SHOWN])
+    if len(paths) > MAX_PATHS_SHOWN:
+        shown_paths += f" and {len(paths) - MAX_PATHS_SHOWN} more"
     summary = (
         f"Claude resolved a merge conflict in {_count_words(len(paths), 'file')}: {shown_paths}. "
         f"{review_status_words(current_verdict, newest)} {_loss_words(losses)} "
@@ -360,9 +367,13 @@ def render_section(records: list[dict], losses: list[FileLoss], current_verdict:
     )
     lines = [SECTION_BEGIN, HEADING, summary]
     budget = TOTAL_LINES
+    blocks = 0
     for fl in losses:
         if not (fl.master_lost or fl.branch_lost):
             continue
+        if blocks >= MAX_DETAIL_FILES:
+            break
+        blocks += 1
         block, used = _detail_block(fl, budget)
         budget -= used
         lines.extend(block)
@@ -373,17 +384,24 @@ def render_section(records: list[dict], losses: list[FileLoss], current_verdict:
 # --------------------------------------------------------------------- entry points
 
 
+_SECTION_RE = re.compile(
+    rf"^{re.escape(SECTION_BEGIN)}\n{re.escape(HEADING)}\n.*?^{re.escape(SECTION_END)}$",
+    re.MULTILINE | re.DOTALL)
+
+
 def _extract_section(body: str | None) -> str | None:
     """The last section in a prior sticky body, markers included."""
     if not body:
         return None
-    start = body.rfind(SECTION_BEGIN)
-    if start < 0:
+    # Markers must sit alone at column 0, with our heading right under the begin marker.
+    # A reviewer excerpt that quotes them is indented, quoted or escaped, so it never matches.
+    found = _SECTION_RE.findall(body)
+    if not found:
         return None
-    end = body.find(SECTION_END, start)
-    if end < 0:
+    section = found[-1]
+    if len(section) > MAX_RECOVERED_CHARS or STICKY_MARKER in section or MERGE_DIGEST_HEADING in section:
         return None
-    return body[start:end + len(SECTION_END)]
+    return section
 
 
 def _block(*lines: str) -> str:
@@ -400,8 +418,17 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
                     if s.strip()]
         except OSError:
             shas = []
-        live = [s for s in shas
-                if _git(repo, "merge-base", "--is-ancestor", s, head)[0] == 0]
+        if shas and not _rev(repo, head):
+            raise RuntimeError("head does not resolve")
+        codes = {}
+        for s in shas:
+            rc = _git(repo, "merge-base", "--is-ancestor", s, head)[0]
+            if rc == 128 and not _rev(repo, s):
+                rc = 1  # the object is gone from this repo: not in history
+            codes[s] = rc
+        if any(rc not in (0, 1) for rc in codes.values()):
+            raise RuntimeError("git could not answer the ancestry question")  # failure block, not "dropped"
+        live = [s for s, rc in codes.items() if rc == 0]
         recovered = _extract_section(prior_body)
         if not live and recovered is None:
             return ""  # no model-resolved conflict on this branch
@@ -413,7 +440,12 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
                 return recovered  # carried from the prior sticky
             return _block(HEADING, NO_RECORD_LINE)
         paths = list(dict.fromkeys(p for r in records for p in r.get("files", [])))
-        losses = [file_loss(repo, records[-1], p, head) for p in paths]
+        losses = []
+        for p in paths:
+            # Each file is judged by the newest record that resolved it, against the tree
+            # that resolution produced, so a later commit's edits are not blamed on it.
+            owner = [r for r in records if p in r.get("files", [])][-1]
+            losses.append(file_loss(repo, owner, p, owner["resolving_sha"]))
         return render_section(records, losses, conflict_verdict_for(branch, tmp_dir))
     except Exception:  # the report must never raise
         return f"{SECTION_BEGIN}\n{FAILURE_LINE}\n{SECTION_END}"

@@ -122,6 +122,54 @@ def test_carried_sticky_keeps_section_bytes(tmp_path):
     assert none == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.NO_RECORD_LINE}\n{cr.SECTION_END}"
 
 
+def test_quoted_section_markers_are_not_recovered(tmp_path):
+    repo = _small_repo(tmp_path)
+    quoted = "\n".join(f"> {ln}" for ln in (cr.SECTION_BEGIN, cr.HEADING, "text", cr.SECTION_END))
+    indented = "\n".join(f"    {ln}" for ln in (cr.SECTION_BEGIN, cr.HEADING, "text", cr.SECTION_END))
+    for prior in (quoted, indented, f"{cr.SECTION_BEGIN} {cr.HEADING} x {cr.SECTION_END}"):
+        got = cr.section_for("quoted", repo["repo"], head=repo["head"], prior_body=prior,
+                             tmp_dir=str(tmp_path))
+        assert got == ""
+
+
+def test_recovered_section_with_sticky_marker_is_refused(tmp_path):
+    repo = _small_repo(tmp_path)
+    record_conflict_resolution("forged", repo["head"], str(tmp_path))  # marker, no record
+    forged = "\n".join((cr.SECTION_BEGIN, cr.HEADING, STICKY_MARKER, cr.SECTION_END))
+    got = cr.section_for("forged", repo["repo"], head=repo["head"], prior_body=forged,
+                         tmp_dir=str(tmp_path))
+    assert STICKY_MARKER not in got
+    assert got == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.NO_RECORD_LINE}\n{cr.SECTION_END}"
+
+
+def test_git_failure_is_not_read_as_dropped(tmp_path, monkeypatch):
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "gitfail", ["a.sh"])
+    monkeypatch.setattr(cr, "_git", lambda *a, **k: (255, ""))
+    got = cr.section_for("gitfail", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path))
+    assert got == FAILURE_BLOCK
+
+
+def test_later_commit_edit_is_not_blamed_on_the_resolution(tmp_path):
+    from test_gitad_stacked_rebase import _rev, _sh
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "later", ["a.sh"])
+    with open(os.path.join(repo["repo"], "a.sh"), "w") as fh:
+        fh.write("keep line one\n")  # a later commit drops the branch's extra line
+    _sh(repo["repo"], "add", "-A")
+    _sh(repo["repo"], "commit", "-m", "later edit")
+    new_head = _rev(repo["repo"], "HEAD")
+    got = cr.section_for("later", repo["repo"], head=new_head, tmp_dir=str(tmp_path))
+    assert "(branch)" not in got  # the branch's own line was resolved in; only master's was lost
+    assert "branch extra line" not in got
+
+
+def test_many_paths_are_capped(tmp_path):
+    rec = _rec(files=[f"f{i}.sh" for i in range(cr.MAX_PATHS_SHOWN + 5)])
+    section = cr.render_section([rec], [], None)
+    assert "and 5 more" in section
+
+
 # ------------------------------------------------------------------- real-PR replays
 
 PR3705_LOST = [

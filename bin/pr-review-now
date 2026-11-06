@@ -264,11 +264,10 @@ rc=$?
 # `claude -p` does not stream, so $LOG is empty until this point and there is no
 # earlier moment worth watching.
 #
-# BEFORE the teardown below, and that ordering is load-bearing: `launchctl bootout`
-# terminates this job, and discord-dm retries across a window longer than a pm2
-# restart (~5min15s). Sending after the bootout would race the send against its
-# own termination and lose exactly the messages that matter — the ones sent while
-# prod is bouncing.
+# The submit wrapper removes the label after this script returns, and that ordering
+# is load-bearing: discord-dm retries across a window longer than a pm2 restart
+# (~5min15s). Sending after the label is removed would race the send against its
+# own termination and lose the messages sent while prod is bouncing.
 notify() {
     ljob_dm_ready pr-review-now || return 0
     if [ "$rc" -eq 0 ] && [ "$PRIOR_REVIEW" = 1 ]; then

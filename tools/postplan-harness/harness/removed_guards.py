@@ -158,13 +158,18 @@ def render_block(rows: Sequence[Sequence[str]], reasons: dict[str, str]) -> str:
 
 
 def upsert_block(body: str, block: str) -> str:
+    """Upsert the `## Removed guards` block. See `upsert_marked_block`."""
+    return upsert_marked_block(body, block, BEGIN, END)
+
+
+def upsert_marked_block(body: str, block: str, begin: str, end: str) -> str:
     """Replace a well-formed block in place, else insert after the scope-notes block, else append.
     An empty `block` removes a stale well-formed span. Mirrors `classify.upsert_scope_notes`."""
     body = body or ""
-    begin_idx = body.find(BEGIN)
-    end_idx = body.find(END)
+    begin_idx = body.find(begin)
+    end_idx = body.find(end)
     if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
-        after_end = end_idx + len(END)
+        after_end = end_idx + len(end)
         if not block:
             head = body[:begin_idx].rstrip("\n")
             tail = body[after_end:].lstrip("\n")

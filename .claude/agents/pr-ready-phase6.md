@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-10-26
+last_verified: 2026-11-05
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -110,7 +110,9 @@ in this review.
    line of the prose body, and `## DIGEST` still follows it as the last thing in the file.
    **Severity marker.** Open every top-level finding bullet with exactly one marker,
    written in upper case right after the bullet dash: `- [BLOCKING] ` for a finding that
-   matched a blocking clause in 6d, `- [NOTE] ` for a finding that matched none. The
+   matched a blocking clause in 6d, `- [NOTE] ` for a finding that matched none. A
+   check-3 (Scope creep) finding also carries the class tag `[unplanned-scope]` after its
+   severity marker, as `_plan-fidelity-review.md` check 3 specifies. The
    marker sits on the top-level bullet line only. A nested bullet, a `####` sub-heading,
    or a `**Finding N:**` continuation under that bullet inherits its marker and carries
    none of its own. The marker and the verdict word must agree: `NOT READY` has at least

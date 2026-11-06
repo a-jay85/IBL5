@@ -31,6 +31,7 @@ Do not guess the mode from context.
 | Review layer + corpus case (step 2a) | yours | skipped: the PR is still in flight, so no layer has missed a shipped bug |
 | Commit / push | `bin/post-plan-now --auto` at SKILL.md Step 3 | the caller's Phase 6.5 commit + push steps |
 | Ends with | a PR opened by `/post-plan` | control returned to the caller |
+| Finding tagged `[unplanned-scope]` | Not applicable. | Classify with `harness.unplanned_scope` first; `KEEP` and `HOLD` findings are never deleted (`.claude/review-shared/_phase65-remediation.md` step 3). |
 
 Everything below runs identically in both modes, except step 2a, which runs in `Mode: standalone` only.
 

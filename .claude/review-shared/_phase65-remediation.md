@@ -1,6 +1,6 @@
 ---
 description: Phase 6.5 remediation procedure for the post-plan harness. Fixes every Phase 6 finding in-PR; harness commits and pushes after exit.
-last_verified: 2026-10-02
+last_verified: 2026-11-05
 ---
 
 # Phase 6.5 in-PR remediation
@@ -22,6 +22,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 3. **Remediate every finding.** For each Phase 6 finding (notes as well as blocking, across all six 6d classes) follow `_remediation.md` in **`Mode: in-PR`**. State that mode line out loud before its step 1; the procedure refuses to run without a declared mode. In-PR mode overrides `/fix-and-prevent`'s § Calibration "Out of scope" carve-outs: a finding too small to name a defect class still gets an entry, with `class: n/a — <reason>`. Never zero entries.
 "Never zero entries" binds the findings Phase 6 actually emitted. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh. It produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
+   - **Unplanned-scope findings.** A finding tagged `[unplanned-scope]` is not yours to delete by judgment. Before editing for any such finding, run the `python3 -m harness.unplanned_scope` command from `.claude/skills/post-plan/_phase-5.5-fidelity.md` Step 4 and act on each line it prints. `KEEP`: leave the code as it is, add the block that `--render-block` prints to the PR body with `gh pr edit`, and record the entry as `kept — declared in PR body` with `class: n/a — kept unplanned scope`. File no backlog issue for it. `REMOVE`: a post-plan fix commit introduced the code, so remediate it like any other finding. `HOLD`: the change removes a guard the plan's `## Must preserve` lists. Leave it unfixed and record `not fixed — Must preserve conflict at <path>`. If the command exits non-zero, leave every tagged finding unfixed and record `not fixed — unplanned-scope classifier unavailable`. Never delete code for a tagged finding the command did not mark `REMOVE`.
    - **Worktree:** this PR's existing one. Do not run `bin/wt-new`, do not create a second worktree, do not tear down the existing one.
    - **Backlog:** file an issue only for a finding with work left after this pass: a `not fixed — filed` row or a prevention rung 1-5 (`_remediation.md` step 5, `Mode: in-PR`). A finding fixed here with no gate warranted gets its entry in the Phase 7 verdict and no issue. Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue. Apply these filing rules in order:
      - **File after the last fix.** Write issues only once every step 3 fix for this pass is in the tree. Any issue filed earlier in this run gets re-checked against `git diff HEAD` now. Close each one the final diff resolved with `bin/backlog close <n> "resolved in-PR by <pr-url>"`.

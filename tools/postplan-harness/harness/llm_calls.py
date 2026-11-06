@@ -10,6 +10,7 @@ import re
 
 from .classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END, MERGE_DIGEST_BEGIN,
                        MERGE_DIGEST_END)
+from . import unplanned_scope
 from .state import ArmDecision, Classification, PlanInfo
 
 # Probe allowlist sentence for manual_recheck_prompt.  Keep `at most 8 elements`
@@ -140,6 +141,8 @@ FILES_CHANGED_BLOCK_RE = re.compile(
     re.escape(FILES_CHANGED_BEGIN) + r".*?" + re.escape(FILES_CHANGED_END), re.S)
 MERGE_DIGEST_BLOCK_RE = re.compile(
     re.escape(MERGE_DIGEST_BEGIN) + r".*?" + re.escape(MERGE_DIGEST_END), re.S)
+KEPT_UNPLANNED_BLOCK_RE = re.compile(
+    re.escape(unplanned_scope.KEPT_BEGIN) + r".*?" + re.escape(unplanned_scope.KEPT_END), re.S)
 _DIFF_SECTION_RE = re.compile(r"^diff --git ", re.M)
 _DIFF_PATHS_RE = re.compile(r"^diff --git a/(\S+) b/(\S+)")
 
@@ -157,8 +160,9 @@ def _cap(s: str, n: int) -> str:
 
 
 def strip_machine_blocks(body: str) -> str:
-    """Remove the two runner-generated blocks check 4 excludes; everything else stays."""
-    return MERGE_DIGEST_BLOCK_RE.sub("", FILES_CHANGED_BLOCK_RE.sub("", body or ""))
+    """Remove the runner-generated blocks check 4 excludes; everything else stays."""
+    stripped = MERGE_DIGEST_BLOCK_RE.sub("", FILES_CHANGED_BLOCK_RE.sub("", body or ""))
+    return KEPT_UNPLANNED_BLOCK_RE.sub("", stripped)
 
 
 def body_hunks(old_body: str, new_body: str) -> list[dict]:

@@ -286,6 +286,10 @@ A `## Declared scope` section lists paths this PR edits on purpose that the plan
 
 The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a path mentioned elsewhere in the PR body dismisses nothing. Generated marker spans (`<!-- files-changed:begin -->` through `<!-- files-changed:end -->`, and every other `<!-- name:begin -->` / `<!-- name:end -->` pair) are stripped before the section is read, so the generated block never declares anything, even when it sits under this heading. Write a reason on each bullet for the reviewer; the check reads only the path.
 
+### Kept unplanned changes (runner-written)
+
+Phase 5.5 writes this block when it keeps a change that the fidelity reviewer tagged `[unplanned-scope]` and that no post-plan fix commit introduced. It is delimited by `<!-- kept-unplanned:begin -->` and `<!-- kept-unplanned:end -->` and carries its own `## Kept unplanned changes` heading, one bullet per kept change: the behavior first, then the paths. Never move these bullets under `## Declared scope`. That section is the author's path list, and `bin/lib/plan-scope-conformance` treats every path in it as declared. Never hand-edit the block. To veto a kept change, revert it and let the next run drop the block.
+
 ## Plan gaps
 
 A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.

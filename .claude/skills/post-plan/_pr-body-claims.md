@@ -9,7 +9,7 @@ last_verified: 2026-11-06
 
 When a PR body states a **version string** (`v2 → v3`, `@v3`), a **numeric baseline**
 (`147 call sites`), or an **`X → Y` figure**, name the **authoritative source file**
-inline — e.g. ``147 → 134 call sites (per `ibl5/phpstan-baseline.neon`)``.
+inline, e.g. ``147 → 134 call sites (per `ibl5/phpstan-baseline.neon`)``.
 
 Uncited claims silently stale. Trigger: L43 (2026-09-02, PR #2059).
 
@@ -17,17 +17,17 @@ Uncited claims silently stale. Trigger: L43 (2026-09-02, PR #2059).
 |---|---|
 | Version string | ``(per `.github/workflows/security.yml` (example) line N)`` |
 | Numeric baseline | ``(per `ibl5/phpstan-baseline.neon`)`` |
-| `X → Y` figure | ``(per `ibl5/phpstan-baseline.neon` — N sites)`` |
+| `X → Y` figure | ``(per `ibl5/phpstan-baseline.neon`: N sites)`` |
 | ADR frozen section rewritten | See `.claude/rules/adr-append-only.md` |
 
 Governs the **claim** (citation present), not whether the figure is correct.
 Applies to human-authored and autonomous-loop PR bodies alike.
-**Headless:** applies — automouse/`/post-plan` PR bodies must include inline citations.
+**Headless:** applies. Automouse and `/post-plan` PR bodies must include inline citations.
 
 ## Negative-claim re-check rule
 
-A "What is NOT in this PR" bullet is a claim about the **final** diff, not about the diff as
-it stood when you wrote the body. Any commit that lands after the body is written can
+A "What is NOT in this PR" bullet is a claim about the **final** diff. The diff as it stood
+when you wrote the body does not count. Any commit that lands after the body is written can
 falsify it silently.
 
 **Before opening or updating a PR, and again after every commit pushed to an open PR, re-read
@@ -40,7 +40,7 @@ A `/post-plan` remediation commit is the highest-risk moment, because remediatio
 precisely to close a gap the body may have already described as still open.
 
 Delete or rewrite any bullet the diff has overtaken. Do not leave it standing with a
-softening qualifier — a residual entry that is no longer residual misreports scope to
+softening qualifier. A residual entry that is no longer residual misreports scope to
 reviewers and poisons the post-merge audit trail.
 
 Trigger: E46, PR #2077.
@@ -49,13 +49,13 @@ Trigger: E46, PR #2077.
 |---|---|
 | Remediation commit landed a plan deliverable | Re-read every bullet; delete each one the deliverable satisfies |
 | Any commit pushed to an open PR | Re-read the list against the new diff before considering the push done |
-| Body written and no commit since | Nothing to do — the list still describes the diff it was written against |
+| Body written and no commit since | Nothing to do. The list still describes the diff it was written against |
 | A bullet is now only *partly* true | Rewrite it to name the residual precisely; never leave the original wording |
 
-This rule governs the **claim**, not the scope. Deliberately leaving work out of a PR is
-fine and normal — say so accurately. The defect is a stale absence assertion, not a real one.
+This rule governs the **claim** and leaves scope alone. Deliberately leaving work out of a PR is
+fine and normal. Say so accurately. The defect is a stale absence assertion.
 
-Applies to any residual / out-of-scope / follow-up list under any heading wording, not only
+Applies to any residual / out-of-scope / follow-up list under any heading wording, including
 the literal string "What is NOT in this PR".
 
 **Headless.** Applies: an automouse or `/post-plan` run authoring a PR body performs the same
@@ -167,7 +167,7 @@ Any one of these triggers forces `Door: one-way`:
 
 - Destructive migration. A changed `ibl5/migrations/*.sql` whose added lines match `armable.DESTRUCTIVE_SQL` after `strip_added_sql_comments` in `tools/postplan-harness/harness/sql_comments.py` has blanked SQL comments (`-- `, `#`, `/* */`). Strings pass through verbatim, and an unterminated block or quote is matched raw, so ambiguity fails closed. Condition (9) runs the same regex over `filter_diff` output, which carries no migration section, so comment stripping does not change it. The `-- destructive-migration[trigger]:` bypass marker satisfies `bin/check-destructive-migrations` but does not lower the door, because a bypassed destructive migration is still irreversible. That CI gate keeps its own tokenizer in `bin/lib/destructive-migration-scan.py`.
 - Prod external state. A diff touching `bin/db-sync-prod` or `.github/workflows/promote-to-production.yml`. The keep-list data file `bin/db-sync-preserve-tables.txt` is not a trigger, because `bin/db-sync-prod` validates every name and aborts on a bad list, so a list-only diff derives a two-way door.
-- Outbound notification senders. A diff touching `bin/discord-dm`, anything under `.github/actions/notify-discord/` or `ibl5/classes/Mail/`, or a changed `.github/workflows/*.yml` whose candidate text contains `notify-discord` or `DISCORD_`. A sent message cannot be recalled.
+- Outbound notification senders. A diff touching `bin/discord-dm`, anything under `.github/actions/notify-discord/` or `ibl5/classes/Mail/`, or a changed `.github/workflows/*.yml` whose candidate text contains `notify-discord` or `DISCORD_` and whose own diff section changes when or what it sends. A sent message cannot be recalled. A change to sending is an added or removed line that names either token, any line of the top-level `on:` or `env:` block, any line of a sender job (a job whose text names either token) except `runs-on:` and `timeout-minutes:`, or the `if:`, `needs:`, `strategy:`, `continue-on-error:`, or `outputs:` lines of a job a sender job needs, directly or through another job. When no job names either token, every job counts as a sender. A diff section or workflow file the harness cannot read fires the trigger. A `runs-on:` pin, a `concurrency:` or `permissions:` edit, a YAML comment, or a step edit in a job that does not send stays two-way.
 - Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md`. This is the bootstrap hazard.
 - Gate removal. Any `detect_gate_changes` result whose state is `removed`: a deleted `bin/check-*`, lib gate, CI workflow, or arming path.
 

@@ -1,0 +1,249 @@
+name: Build and Deploy
+on:
+  push:
+    branches:
+      - production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  pre-flight:
+    name: Pre-flight (composer --no-dev + migrate + validate-schema dry-run)
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/deploy-rehearsal.yml
+    # Reusable workflows receive NO secrets by default; the rehearsal needs the
+    # deploy SSH secrets (PORT/HOST/USERNAME/PRIVATE_KEY) to clone prod over SSH.
+    secrets: inherit
+
+  build-and-deploy:
+    name: Build and Deploy
+    needs: pre-flight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: ibl5
+
+      - name: Build CSS
+        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify
+        working-directory: ibl5
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Fetch latest code on server
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Fetch latest code on server" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www
+            git fetch origin
+          '
+
+      # Runs after fetch and before reset: the prod checkout is still at the OLD
+      # commit, so the script ships from this runner checkout. It dumps the DB only
+      # when the deploy brings new migration files. No continue-on-error: a failed
+      # snapshot fails the deploy before the code changes.
+      - name: Snapshot database before migrations
+        env:
+          REMOTE_DATABASE: iblhoops_ibl5
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Snapshot database before migrations" > /tmp/ibl5-last-deploy-step
+            mkdir -p ~/.predeploy-snapshot
+          '
+          scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            bin/predeploy-db-snapshot \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/.predeploy-snapshot/
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "cd www && REMOTE_DATABASE='${REMOTE_DATABASE}' bash ~/.predeploy-snapshot/predeploy-db-snapshot"
+
+      - name: Reset server to latest code
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Reset server to latest code" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www
+            git reset --hard origin/production
+          '
+
+      - name: Install PHP dependencies
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Install PHP dependencies" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www/ibl5
+            composer install --no-dev --no-interaction --optimize-autoloader
+          '
+
+      - name: Run database migrations
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Run database migrations" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www
+            php ibl5/bin/migrate
+          '
+
+      - name: Validate database schema
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Validate database schema" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www
+            php ibl5/bin/validate-schema
+          '
+
+      - name: Deploy compiled CSS to server
+        run: scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy ibl5/themes/IBL/style/style.css ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/ibl5/themes/IBL/style/style.css
+
+      - name: Flush OPcache
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Flush OPcache" > /tmp/ibl5-last-deploy-step
+            # killall is not installed on the host; pkill exits 1 when nothing matched, 2+ on error.
+            if pkill -u "$(id -un)" lsphp; then
+              echo "OPcache flushed (lsphp workers killed)"
+            elif [ $? -eq 1 ]; then
+              echo "No lsphp processes found"
+            else
+              echo "::error::pkill failed; OPcache was NOT flushed"
+              exit 1
+            fi
+          '
+
+      - name: Purge page cache
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Purge page cache" > /tmp/ibl5-last-deploy-step
+            cd www/ibl5
+            php -r "require \"vendor/autoload.php\"; echo \"Purged \" . Cache\PageCache::purge() . \" cached pages\" . PHP_EOL;"
+          '
+
+      - name: Check for IBLbot changes
+        id: iblbot-changes
+        run: |
+          if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -qE '^(ibl5/IBLbot/|\.github/workflows/main\.yml)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.iblbot-changes.outputs.changed == 'true'
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ibl5/IBLbot/package-lock.json
+
+      - name: Build IBLbot
+        if: steps.iblbot-changes.outputs.changed == 'true'
+        working-directory: ibl5/IBLbot
+        run: |
+          npm ci --include=dev
+          npm run build
+
+      - name: Deploy IBLbot dist to server
+        if: steps.iblbot-changes.outputs.changed == 'true'
+        run: scp -r -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy ibl5/IBLbot/dist ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/ibl5/IBLbot/
+
+      - name: Deploy and restart IBLbot
+        if: steps.iblbot-changes.outputs.changed == 'true'
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            echo "Deploy and restart IBLbot" > /tmp/ibl5-last-deploy-step
+            set -e
+            cd www/ibl5/IBLbot
+
+            echo "Installing dependencies..."
+            npm ci --omit=dev
+
+            echo "Registering slash commands..."
+            npm run deploy-commands:prod
+
+            echo "Restarting IBLbot via PM2..."
+            pm2 startOrRestart ecosystem.config.cjs --update-env
+            pm2 save
+
+            echo "IBLbot deployed successfully (PID: $(pm2 pid iblbot))"
+          '
+
+  notify-deploy-failure:
+    name: Notify Deploy Failure
+    runs-on: ubuntu-latest
+    # pre-flight failure → build-and-deploy is 'skipped', not 'failure'
+    needs: [pre-flight, build-and-deploy]
+    if: ${{ always() && (needs.build-and-deploy.result == 'failure' || needs.pre-flight.result == 'failure' || needs.pre-flight.result == 'cancelled') }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Capture deploy state from server
+        id: state
+        continue-on-error: true
+        run: |
+          OUTPUT=$(ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            STEP=$(cat /tmp/ibl5-last-deploy-step 2>/dev/null || echo "unknown — deploy did not reach the server")
+            cd www 2>/dev/null || { printf "STEP_NAME=%s\nLAST_MIGRATION=unknown\nDEPLOYED_SHA=unknown\n" "$STEP"; exit 0; }
+            SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+            MIG=$(mysql -N -e "SELECT migration FROM iblhoops_ibl5.migrations ORDER BY id DESC LIMIT 1" 2>/dev/null || echo "unknown")
+            printf "STEP_NAME=%s\nLAST_MIGRATION=%s\nDEPLOYED_SHA=%s\n" "$STEP" "$MIG" "$SHA"
+          ') || OUTPUT=$'STEP_NAME=unknown\nLAST_MIGRATION=unknown\nDEPLOYED_SHA=unknown'
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+
+      - name: Build Discord message
+        env:
+          PREFLIGHT_RESULT: ${{ needs.pre-flight.result }}
+          STEP_NAME: ${{ steps.state.outputs.STEP_NAME }}
+          LAST_MIGRATION: ${{ steps.state.outputs.LAST_MIGRATION }}
+          DEPLOYED_SHA: ${{ steps.state.outputs.DEPLOYED_SHA }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          STEP_NAME="${STEP_NAME:-unknown}"
+          LAST_MIGRATION="${LAST_MIGRATION:-unknown}"
+          DEPLOYED_SHA="${DEPLOYED_SHA:-unknown}"
+          if [ "$PREFLIGHT_RESULT" = "failure" ] || [ "$PREFLIGHT_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCurrently live: SHA %s, last applied migration: %s\n\nRun: %s' \
+              "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$DEPLOYED_SHA" "$LAST_MIGRATION" "$RUN_URL")
+          else
+            MSG=$(printf 'Production deploy FAILED at step: %s\n\nCommit: %s\nLast applied migration: %s\nDeployed SHA on box: %s\n\nRun: %s' \
+              "$STEP_NAME" "$SHORT_SHA" "$LAST_MIGRATION" "$DEPLOYED_SHA" "$RUN_URL")
+          fi
+          printf '%s' "$MSG" > /tmp/discord-msg.txt
+
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}

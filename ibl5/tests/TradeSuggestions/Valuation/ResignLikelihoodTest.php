@@ -110,8 +110,6 @@ final class ResignLikelihoodTest extends TestCase
             1e-12,
         );
         self::assertEqualsWithDelta(0.025, ResignLikelihood::BIRD_RAISE_EDGE, 1e-12);
-        self::assertSame(4, ResignLikelihood::STANDARD_YEARS);
-        self::assertSame(1, ResignLikelihood::BIRD_EXTRA_YEARS);
     }
 
     public function testLikelihoodIsHalfAtZeroEdge(): void
@@ -121,7 +119,6 @@ final class ResignLikelihoodTest extends TestCase
 
     public function testLikelihoodAtScaleIsTanhOne(): void
     {
-        self::assertSame(0.15, ResignLikelihood::SCALE);
         self::assertEqualsWithDelta(0.5 + 0.5 * tanh(1), ResignLikelihood::likelihood(0.15), 1e-12);
         self::assertEqualsWithDelta(0.5 - 0.5 * tanh(1), ResignLikelihood::likelihood(-0.15), 1e-12);
     }

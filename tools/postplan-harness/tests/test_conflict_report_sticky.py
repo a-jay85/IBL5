@@ -166,6 +166,22 @@ def test_later_commit_edit_is_not_blamed_on_the_resolution(tmp_path):
     assert "branch extra line" not in got
 
 
+def test_later_commit_restoring_a_line_clears_it_from_the_list(tmp_path):
+    from test_gitad_stacked_rebase import _rev, _sh
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "restored", ["a.sh"])
+    before = cr.section_for("restored", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path))
+    assert "master extra line" in before
+    with open(os.path.join(repo["repo"], "a.sh"), "w") as fh:
+        fh.write("keep line one\nbranch extra line\nmaster extra line\n")
+    _sh(repo["repo"], "add", "-A")
+    _sh(repo["repo"], "commit", "-m", "restore master line")
+    new_head = _rev(repo["repo"], "HEAD")
+    got = cr.section_for("restored", repo["repo"], head=new_head, tmp_dir=str(tmp_path))
+    assert "master extra line" not in got
+    assert "No unique code was lost." in got
+
+
 def test_many_paths_are_capped(tmp_path):
     rec = _rec(files=[f"f{i}.sh" for i in range(cr.MAX_PATHS_SHOWN + 5)])
     section = cr.render_section([rec], [], None)

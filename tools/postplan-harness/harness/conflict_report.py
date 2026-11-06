@@ -192,7 +192,8 @@ def _counter(text: str) -> Counter[str]:
 
 def lost_lines(base_text: str, side_text: str, resolved_text: str, other_lines: dict[str, str]) -> tuple[list[str], list[tuple[str, str]]]:
     side_added = _counter(side_text) - _counter(base_text)
-    missing = side_added - _counter(resolved_text)
+    # Copies the file already had at the merge base cannot cancel a loss of an added copy.
+    missing = side_added - (_counter(resolved_text) - _counter(base_text))
     lost: list[str] = []
     moved: list[tuple[str, str]] = []
     for raw in side_text.splitlines():
@@ -227,7 +228,8 @@ def _show(repo: str, sha: str, path: str) -> str | None:
 
 
 def _other_lines(repo: str, base_sha: str, head: str, skip: str) -> dict[str, str]:
-    """Normalized lines of the other changed files at `head`, mapped to their path."""
+    """Normalized lines the other changed files gained since the merge base, mapped to
+    their path. Lines a file already had at the base do not count as a place a line moved to."""
     rc, out = _git(repo, "diff", "--name-only", base_sha, head)
     if rc != 0:
         return {}
@@ -238,24 +240,43 @@ def _other_lines(repo: str, base_sha: str, head: str, skip: str) -> dict[str, st
             continue
         text = _show(repo, head, other) or ""
         budget -= len(text)
-        for norm in _counter(text):
+        before = _counter(_show(repo, base_sha, other) or "")
+        for norm in _counter(text) - before:
             mapping.setdefault(norm, other)
     return mapping
 
 
-def file_loss(repo: str, record: dict, path: str, head: str) -> FileLoss:
-    """Lines unique to master or to the branch that the resolved file at `head` lacks."""
+def file_loss(repo: str, record: dict, path: str, head: str, resolving: str | None = None) -> FileLoss:
+    """Lines unique to master or to the branch that the resolved file at `head` lacks.
+
+    Computed against `head`, so a line a later commit restored drops out of the list.
+    When `resolving` is given, a line also has to be missing at the resolving commit, so a
+    later commit's own deletion is not blamed on the resolution.
+    """
     base = _show(repo, record.get("base_sha", ""), path)
     master = _show(repo, record.get("onto_sha", ""), path)
     branch = _show(repo, record.get("branch_sha", ""), path)
     resolved = _show(repo, head, path)
-    if base is None or master is None or branch is None or resolved is None:
+    at_resolve = _show(repo, resolving, path) if resolving else resolved
+    if base is None or master is None or branch is None or resolved is None or at_resolve is None:
         return FileLoss(path=path, compare_failed=True)
     others = _other_lines(repo, record["base_sha"], head, path)
-    master_lost, master_moved = lost_lines(base, master, resolved, others)
-    branch_lost, branch_moved = lost_lines(base, branch, resolved, others)
-    return FileLoss(path=path, master_lost=master_lost, branch_lost=branch_lost,
-                    moved=master_moved + branch_moved)
+    out = FileLoss(path=path)
+    for side, lost_attr in ((master, "master_lost"), (branch, "branch_lost")):
+        lost, moved = lost_lines(base, side, resolved, others)
+        if resolving:
+            early, _ = lost_lines(base, side, at_resolve, others)
+            allowed = Counter(_norm(x) for x in early)
+            kept = []
+            for line in lost:
+                n = _norm(line)
+                if allowed.get(n, 0) > 0:
+                    allowed[n] -= 1
+                    kept.append(line)
+            lost = kept
+        setattr(out, lost_attr, lost)
+        out.moved += moved
+    return out
 
 
 # ---------------------------------------------------------------------- rendering
@@ -442,10 +463,11 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
         paths = list(dict.fromkeys(p for r in records for p in r.get("files", [])))
         losses = []
         for p in paths:
-            # Each file is judged by the newest record that resolved it, against the tree
-            # that resolution produced, so a later commit's edits are not blamed on it.
+            # Each file is judged by the newest record that resolved it. Lost lines are
+            # computed against `head` (a later fix that restored a line clears it) and
+            # must also be missing at the resolving commit (a later deletion is not blamed).
             owner = [r for r in records if p in r.get("files", [])][-1]
-            losses.append(file_loss(repo, owner, p, owner["resolving_sha"]))
+            losses.append(file_loss(repo, owner, p, head, resolving=owner["resolving_sha"]))
         return render_section(records, losses, conflict_verdict_for(branch, tmp_dir))
     except Exception:  # the report must never raise
         return f"{SECTION_BEGIN}\n{FAILURE_LINE}\n{SECTION_END}"

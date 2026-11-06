@@ -52,8 +52,9 @@ class Discord
      */
     private static function isPhpUnit(): bool
     {
+        /** @infection-ignore-all Untestable: the PHPUnit process always defines both constants and cannot undefine them, so the mutants differ only in a process Infection cannot mutate. */
         return defined('PHPUNIT_RUNNING')
-            || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
+            || defined('PHPUNIT_COMPOSER_INSTALL');
     }
 
     /**

@@ -149,9 +149,9 @@ def _writer(rel, content, reply="RESOLVED"):
 @pytest.fixture
 def make_repo(request, tmp_path):
     """Factory for a repo with a bare `origin`, an `origin/master` tracking ref, and the real
-    lostwork.sh committed on master. The branch is named `ladder-<test name>`, so the
-    `/tmp/...-<key>...` scratch paths never collide across tests."""
-    key = f"ladder-{request.node.name}"
+    lostwork.sh committed on master. The branch is named `ladder-<pid>-<test name>`, so the
+    `/tmp/...-<key>...` scratch paths never collide across tests or across pytest runs."""
+    key = f"ladder-{os.getpid()}-{request.node.name}"
     made = []
 
     def build(base, branch, master):

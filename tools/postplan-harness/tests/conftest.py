@@ -4,7 +4,7 @@ Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_s
 `stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
 exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
 defeat them. `standard_review_depth` is opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `stub_prefire_gate`, `_reset_netretry_latch`,
-`isolate_live_reviewcache`, `_private_log_dir`, and `no_ambient_usage_gate`.
+`isolate_live_reviewcache`, `_private_verdict_files`, `_private_log_dir`, and `no_ambient_usage_gate`.
 """
 from __future__ import annotations
 
@@ -128,6 +128,20 @@ def isolate_live_reviewcache(tmp_path, monkeypatch):
         return orig(state_dir, slug)
 
     monkeypatch.setattr(reviewcache, "record_path", _path)
+
+
+@pytest.fixture(autouse=True)
+def _private_verdict_files(tmp_path_factory, monkeypatch):
+    """Give each test its own fidelity verdict files.
+
+    `fidelity.verdict_path` is keyed only on the PR and round, under /tmp. Tests reuse the
+    same PR numbers, so under xdist one test can read another test's verdict.
+
+    The dir comes from tmp_path_factory because some tests assert their own tmp_path is
+    empty. A test that needs a set path can still patch `verdict_path` over this one."""
+    d = tmp_path_factory.mktemp("fidelity-verdicts")
+    monkeypatch.setattr(
+        fidelity, "verdict_path", lambda pr_number: str(d / f"verdict-{pr_number}.md"))
 
 
 @pytest.fixture(autouse=True)

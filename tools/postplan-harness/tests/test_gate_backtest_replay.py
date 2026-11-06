@@ -225,11 +225,12 @@ def test_base_replay_absent_gate_is_absent(tmp_path):
 
 def test_base_replay_timeout_fails_closed(tmp_path):
     repo, shas = build_repo(tmp_path)
-    results = run(repo, shas, tmp_path, per_replay_timeout=2,
-                  base_overlay=base("#!/bin/sh\n# gate-backtest-argv:\nsleep 5\n"))
+    # 10 s, because on a loaded machine the head replay can take over 2 s and time out too.
+    results = run(repo, shas, tmp_path, per_replay_timeout=10,
+                  base_overlay=base("#!/bin/sh\n# gate-backtest-argv:\nsleep 30\n"))
     for r in (r for r in results if r.pr in (3, 5)):
         assert r.outcome == "flag"
-        assert r.base_outcome == "timeout" and r.base_detail == "2s"
+        assert r.base_outcome == "timeout" and r.base_detail == "10s"
 
 
 def test_base_replay_no_spec_fails_closed(tmp_path):

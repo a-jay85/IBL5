@@ -430,14 +430,15 @@ def test_commit_all_timeout_raises_precommit_hang_and_reaps(repo, tmp_path, monk
     the run_bounded swap and the elapsed assertion fails (bare run blocks 300s).
     """
     _install_reject_hook(repo, f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
-    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 1)
+    # 10 s, because on a loaded machine the hook can take over 1 s to write its pid file.
+    monkeypatch.setattr(gitad, "COMMIT_HOOK_TIMEOUT", 10)
     g = LiveGit(repo)
     with open(os.path.join(repo, "slow.txt"), "w") as fh:
         fh.write("hangs\n")
     start = time.monotonic()
     with pytest.raises(HarnessError) as ei:
         g.commit_all("chore: hook hangs")
-    assert time.monotonic() - start < 15
+    assert time.monotonic() - start < 40
     assert ei.value.kind == "precommit-hang", f"kind was {ei.value.kind!r}"
     assert "commit" in ei.value.detail
     grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
@@ -655,11 +656,12 @@ def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monk
         fh.write("slow\n")
     pre = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
                          capture_output=True, text=True).stdout.strip()
-    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 1)
+    # 10 s, because on a loaded machine the filter can take over 1 s to write its pid file.
+    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 10)
     start = time.monotonic()
     with pytest.raises(HarnessError) as ei:
         LiveGit(repo).commit_all("m")
-    assert time.monotonic() - start < 15
+    assert time.monotonic() - start < 25
     assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
     assert ei.value.kind != "precommit-hang"
     assert "step 'git add'" in ei.value.detail

@@ -30,14 +30,21 @@ final readonly class TeamFactors
             return new self(0, 0, 0, 0, 0);
         }
 
-        $mean = static fn (callable $field): int => (int) round(array_sum(array_map($field, $teams)) / count($teams));
-
         return new self(
             0,
-            $mean(static fn (self $t): int => $t->wins),
-            $mean(static fn (self $t): int => $t->losses),
-            $mean(static fn (self $t): int => $t->tradWins),
-            $mean(static fn (self $t): int => $t->tradLosses),
+            self::mean($teams, static fn (self $t): int => $t->wins),
+            self::mean($teams, static fn (self $t): int => $t->losses),
+            self::mean($teams, static fn (self $t): int => $t->tradWins),
+            self::mean($teams, static fn (self $t): int => $t->tradLosses),
         );
+    }
+
+    /**
+     * @param non-empty-list<TeamFactors> $teams
+     * @param \Closure(TeamFactors): int $field
+     */
+    private static function mean(array $teams, \Closure $field): int
+    {
+        return (int) round(array_sum(array_map($field, $teams)) / count($teams));
     }
 }

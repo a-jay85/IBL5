@@ -107,6 +107,8 @@ docfix_abort_cleanup() {
 trap docfix_abort_cleanup EXIT
 
 # --- 5. Seed the auto_merge:docs-only-ready plan (resolved by slug at post-plan) ----
+# The matrix is what bin/lib/prefire-verify runs before bin/post-plan-now fires. Without
+# one the fire is refused, and only a human may bypass that, so this unattended run wedges.
 PLAN_FILE="$(plans_dir)/$SLUG.md"
 cat > "$PLAN_FILE" <<PLAN_EOF
 ---
@@ -118,6 +120,13 @@ auto_merge: docs-only-ready
 Runtime-seeded plan for the autonomous doc-fix run. Refreshes the docs the
 nightly Doc Freshness Audit flagged (issue #$ISSUE_NUM).
 Held for human merge unless Phase 6.5 finds it docs-only, two-way and READY.
+
+## Verification Matrix
+
+| # | What | Type | Timing | Location |
+|---|------|------|--------|----------|
+| 1 | Every in-scope doc passes the freshness policy | CLI-executable | post-impl | bin/check-docs |
+| 2 | No stale doc or dead glob remains | CLI-executable | post-impl | bin/check-docs --staleness-report \| jq -e 'length == 0' |
 
 ## Automouse Hold Justification
 

@@ -400,6 +400,48 @@ class LiveGit:
         if paths:
             self._run("reset", "-q", "--", *paths, check=False)
 
+    def strip_head_paths(self, sha: str, paths) -> str:
+        """Undo HEAD's change to `paths`; the rest of HEAD's change stays staged.
+
+        HEAD must be `sha`. HEAD moves back to `sha^` with a soft reset, so the commit that
+        carried the paths is never pushed. A path that exists in `sha^` gets its `sha^`
+        content back in the index and the worktree (modified, deleted, and the old side of
+        a rename). A path absent from `sha^` is removed from both (new, and the new side of
+        a rename). Returns "" on success and the error text on failure. Never raises: the
+        caller verifies the tree and fails closed on anything unclear.
+        """
+        paths = sorted({p for p in (paths or []) if p})
+        if not paths:
+            # `ls-tree` with no pathspec lists the whole tree, so an empty call would
+            # check every file out of `sha^` and wipe the edits this method must keep.
+            return "no paths to strip"
+        try:
+            if self._run("rev-parse", "HEAD").strip() != self._run("rev-parse", sha).strip():
+                return f"HEAD is not {sha[:12]}; refusing to strip"
+            base = self._run("rev-parse", f"{sha}^").strip()
+            # Named `postplan` for the same reason as drop_commit: collapse-guard.sh reads
+            # ^(rebase|reset:|filter-branch|amend) reflog subjects as a history rewrite.
+            proc = subprocess.run(
+                ["git", "-C", self.worktree, "reset", "--soft", base],
+                env={**os.environ, "GIT_REFLOG_ACTION": "postplan"},
+                capture_output=True, text=True, errors="replace",
+            )
+            if proc.returncode != 0:
+                return (proc.stderr.strip() or proc.stdout.strip() or
+                        f"reset --soft {base[:12]} exited {proc.returncode}")[:300]
+            present = set(self._run("ls-tree", "-r", "-z", "--name-only", base, "--",
+                                    *paths).split("\0")) - {""}
+            absent = [p for p in paths if p not in present]
+            if present:
+                self._run("checkout", base, "--", *sorted(present))
+            if absent:
+                self._run("rm", "-q", "-f", "--ignore-unmatch", "--", *absent)
+            if self._run("rev-parse", "HEAD").strip() != base:
+                return f"HEAD did not move to {base[:12]}"
+            return ""
+        except Exception as exc:  # noqa: BLE001 - the caller fails closed on any text
+            return str(exc) or exc.__class__.__name__
+
     def stage_all(self) -> None:
         """post-plan-now fires on a DIRTY worktree by design — stage everything
         so untracked files land in the shippable diff before classification."""
@@ -453,11 +495,11 @@ class LiveGit:
         add of the new one, so one diff call yields both sides with no extra parsing
         (PR #2514: `R067 .claude/agents/sonnet-4-6.md -> .claude/agents/sonnet-5-5.md`
         held arming condition (3) because only the new path was listed). This is a
-        strict superset of `changed_files`, and it is read ONLY by the conformance
-        check (runner conformance.check / phase_omission_items); classify(), scope
-        conformance and denied_gate_edits keep reading `changed_files`, because an
-        old path showing up there would look like an unplanned file and create a
-        new hold. Same two git calls as `changed_files`: no third call.
+        strict superset of `changed_files`, and it is read by the conformance check
+        (runner conformance.check / phase_omission_items) and by `fidelity.remediate`'s
+        gate-path check; classify() and scope conformance keep reading `changed_files`,
+        because an old path showing up there would look like an unplanned file and
+        create a new hold. Same two git calls as `changed_files`: no third call.
         """
         vs_base = self._run("diff", "--no-renames", "--name-only",
                             self._merge_base(base)).strip()
@@ -2036,6 +2078,11 @@ class ReplayGit:
 
     def unstage_paths(self, paths) -> None:
         self.unstaged.append(list(paths))
+
+    def strip_head_paths(self, sha: str, paths) -> str:
+        """Record the strip; replay has no tree to move. Returns "" like a successful strip."""
+        self.__dict__.setdefault("stripped", []).append(list(paths))
+        return ""
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""

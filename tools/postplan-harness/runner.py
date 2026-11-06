@@ -3580,6 +3580,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 rec["outcome"] = e.kind
                 terminal = e.kind not in _TRANSIENT_ROUND_KINDS
                 break
+            if outcome.get("gate_reverted"):
+                rec["gate_reverted"] = list(outcome["gate_reverted"])
+                hold = res.fidelity.setdefault("gate_path_hold", [])
+                for entry in outcome.get("gate_hold") or []:
+                    if all(h.get("path") != entry.get("path") for h in hold):
+                        hold.append(entry)
             if sha:
                 rec["outcome"] = "committed"
                 break

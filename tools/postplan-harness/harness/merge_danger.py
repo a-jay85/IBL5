@@ -157,7 +157,7 @@ def derive_merge_danger(
     external = False
     for status, p in pairs:
         wf = p.split(" → ")[-1]
-        if p in _EXTERNAL_PATHS or p.startswith(_EXTERNAL_PREFIXES):
+        if wf in _EXTERNAL_PATHS or wf.startswith(_EXTERNAL_PREFIXES):
             add(f"external-path:{p}")
             external = True
         elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):

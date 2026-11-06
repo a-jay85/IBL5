@@ -148,6 +148,20 @@ def test_commit_subjects_for_real_git(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_subjects_for_follows_a_rename_on_the_branch(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/old.txt", ["user wrote this"])
+    (repo / "src" / "old.txt").write_text("".join(f"line {i}\n" for i in range(40)), encoding="utf-8")
+    _git(repo, "add", "src/old.txt")
+    _git(repo, "commit", "-m", "user grew this")
+    _git(repo, "mv", "src/old.txt", "src/new.txt")
+    _git(repo, "commit", "-m", "fix: machine rename")
+
+    assert us._subjects_for(str(repo), base, "src/new.txt") == [
+        "fix: machine rename", "user grew this", "user wrote this"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 def test_non_utf8_commit_subject_maps_to_empty_and_keeps(tmp_path):
     repo = tmp_path / "repo"
     base = _repo_with_subjects(repo, GRID, [])

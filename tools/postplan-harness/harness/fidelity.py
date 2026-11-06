@@ -100,6 +100,7 @@ _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
 # `[NOTE]`, upper case, right after the bullet prefix. Anything else is unmarked, and an
 # unmarked bullet is blocking (fail-closed).
 _FINDING_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
+_CHECK_3_LINE_RE = re.compile(r"^\s*3[.)]\s")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
@@ -372,21 +373,21 @@ def marked_finding_texts(verdict_path: str, marker_word: str) -> list[str]:
 
 def _without_findings(verdict_text: str, texts) -> str:
     """`verdict_text` minus every line of the given finding texts. Compares stripped lines,
-    because `_group_findings` strips each line of a finding."""
+    because `_group_findings` strips each line of a finding.
+
+    Also drops the check-3 line of the summary above `## FINDINGS`. A reviewer may reword a
+    finding there, so that line cannot be matched to a finding's text. Every tagged finding
+    is a check-3 finding, and one the fixer must act on keeps its own text in the work list.
+    """
     drop = {ln.strip() for text in texts for ln in text.splitlines() if ln.strip()}
-    # The reviewer's numbered check summary ("3. <one-line finding>") restates the finding.
-    heads = [re.sub(r"^\s*(?:[-*]|\d+[.)])\s+(?:\[[A-Za-z-]+\]\s*)+", "", t.splitlines()[0])
-             .split(". Next action", 1)[0].strip().rstrip(".")
-             for t in texts if t.strip()]
-    heads = [h for h in heads if h]
-
-    def restates(ln: str) -> bool:
-        m = re.match(r"\s*\d+[.)]\s+(.*)", ln)
-        body = m.group(1).strip().rstrip(".") if m else ""
-        return bool(body) and any(h in body or body in h for h in heads)
-
-    return "\n".join(ln for ln in verdict_text.split("\n")
-                     if ln.strip() not in drop and not restates(ln))
+    kept: list[str] = []
+    in_summary = True
+    for ln in verdict_text.split("\n"):
+        in_summary = in_summary and ln.rstrip() != FINDINGS_HEADING
+        if ln.strip() in drop or (in_summary and _CHECK_3_LINE_RE.match(ln)):
+            continue
+        kept.append(ln)
+    return "\n".join(kept)
 
 
 def _render_finding(f: dict) -> str:

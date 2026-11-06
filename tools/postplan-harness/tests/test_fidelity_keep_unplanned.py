@@ -332,8 +332,12 @@ def _drive(tmp_path, canned):
     return llm, gh, res, logs
 
 
+# Reworded on purpose: a reviewer's check line need not repeat the finding's title.
+REWORDED_CHECK_3 = f"3. {GRID} changes with no plan phase naming it"
+
+
 def _review(*items):
-    return ("3. Remove or plan the button grid in " + GRID + "\n\n## FINDINGS\n"
+    return (REWORDED_CHECK_3 + "\n\n## FINDINGS\n"
             + "\n".join(items) + "\n\nNOT READY\n")
 
 
@@ -357,10 +361,24 @@ def test_mixed_verdict_cuts_kept_finding_from_fixer_prompt(tmp_path, loop_env):
     prompt = llm.tooled_prompts["fidelity-remediation"]
     assert UNTAGGED_ITEM in prompt
     assert "[unplanned-scope]" not in prompt
-    assert "3. Remove or plan the button grid" not in prompt
+    assert REWORDED_CHECK_3 not in prompt
     assert "Delete no code the work list does not name." in prompt
     assert res.fidelity["rounds"][0]["work_list_sizes"]["12"] == 1
     assert us.KEPT_BEGIN in gh.pr_body()
+
+
+@pytest.mark.parametrize("check_line", [
+    REWORDED_CHECK_3,
+    f"3) {GRID} changes with no plan phase naming it",
+    "3. Remove or plan the button grid",
+])
+def test_without_findings_drops_only_the_check_3_summary_line(check_line):
+    nested = "3. A numbered step inside a finding the fixer keeps."
+    verdict = (f"2. The helper name drifted.\n{check_line}\nPassed: 1, 3, 4.\n\n"
+               f"## FINDINGS\n{KEEP_ITEM}\n{UNTAGGED_ITEM}\n{nested}\n\nNOT READY\n")
+    assert fidelity._without_findings(verdict, [KEEP_ITEM]) == (
+        "2. The helper name drifted.\nPassed: 1, 3, 4.\n\n"
+        f"## FINDINGS\n{UNTAGGED_ITEM}\n{nested}\n\nNOT READY\n")
 
 
 def test_kept_block_restored_when_fixer_drops_it(tmp_path, loop_env):

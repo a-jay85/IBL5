@@ -41,13 +41,14 @@ final readonly class FairSalaryTable
             self::assertSlot($slot);
         }
 
+        $paid = array_filter($salaryByPid, static fn (int $salary): bool => $salary > 0);
+
         $medians = [];
         foreach (SlotMapper::SLOTS as $slot) {
             $salariesByTier = [];
             foreach ($poolRanks[$slot] ?? [] as $pid => $rank) {
-                $salary = $salaryByPid[$pid] ?? 0;
-                if ($salary > 0) {
-                    $salariesByTier[self::tierFor($rank)][] = $salary;
+                if (isset($paid[$pid])) {
+                    $salariesByTier[self::tierFor($rank)][] = $paid[$pid];
                 }
             }
             $medians[$slot] = array_map(self::median(...), $salariesByTier);
@@ -65,13 +66,9 @@ final readonly class FairSalaryTable
     public function fairSalary(string $slot, int $tier): int
     {
         $tiers = $this->tiers($slot);
-        if (isset($tiers[$tier])) {
-            return $tiers[$tier];
-        }
-
-        $worse = array_filter($tiers, static fn (int $t): bool => $t > $tier, ARRAY_FILTER_USE_KEY);
-        if ($worse !== []) {
-            return $worse[min(array_keys($worse))];
+        $sameOrWorse = array_filter($tiers, static fn (int $t): bool => $t >= $tier, ARRAY_FILTER_USE_KEY);
+        if ($sameOrWorse !== []) {
+            return $sameOrWorse[min(array_keys($sameOrWorse))];
         }
 
         if ($tiers !== []) {

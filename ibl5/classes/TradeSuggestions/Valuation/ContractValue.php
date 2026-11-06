@@ -40,7 +40,9 @@ final class ContractValue
     {
         $surplus = [];
         foreach (Horizon::OFFSETS as $offset) {
-            $surplus[$offset] = self::surplusAt($fairByOffset[$offset] ?? 0, $salaryByOffset[$offset] ?? 0);
+            $surplus[$offset] = isset($salaryByOffset[$offset])
+                ? self::surplusAt($fairByOffset[$offset] ?? 0, $salaryByOffset[$offset])
+                : 0;
         }
 
         return $surplus;
@@ -106,13 +108,13 @@ final class ContractValue
      */
     public static function averageRemainingSalary(ProjectionPlayer $p): float
     {
-        $salaries = [];
-        for ($year = $p->effectiveCy; $year <= self::LAST_SALARY_YEAR; $year++) {
-            $salary = $p->salaryByYear[$year] ?? 0;
-            if ($salary > 0) {
-                $salaries[] = $salary;
-            }
-        }
+        $salaries = array_filter(
+            $p->salaryByYear,
+            static fn (int $salary, int $year): bool => $salary > 0
+                && $year >= $p->effectiveCy
+                && $year <= self::LAST_SALARY_YEAR,
+            ARRAY_FILTER_USE_BOTH,
+        );
 
         return $salaries === [] ? 0.0 : array_sum($salaries) / count($salaries);
     }

@@ -55,12 +55,12 @@ final class ResignLikelihoodTest extends TestCase
             self::prefs(winner: 5),
             0,
             new TeamFactors(1, 60, 22, 0, 0),
-            new TeamFactors(0, 41, 41, 0, 0),
+            new TeamFactors(0, 45, 37, 0, 0),
             0,
             0,
         );
 
-        self::assertEqualsWithDelta(0.000153 * 38 * 4, $edge, 1e-9);
+        self::assertEqualsWithDelta(0.000153 * (38 - 8) * 4, $edge, 1e-9);
     }
 
     public function testTraditionEdgeUsesOwnMinusAverageRecord(): void
@@ -172,6 +172,14 @@ final class ResignLikelihoodTest extends TestCase
 
         $halfUp = TeamFactors::average([new TeamFactors(1, 41, 0, 0, 0), new TeamFactors(2, 42, 0, 0, 0)]);
         self::assertSame(42, $halfUp->wins);
+
+        $roundsDown = TeamFactors::average([
+            new TeamFactors(1, 40, 0, 0, 0),
+            new TeamFactors(2, 40, 0, 0, 0),
+            new TeamFactors(3, 40, 0, 0, 0),
+            new TeamFactors(4, 41, 0, 0, 0),
+        ]);
+        self::assertSame(40, $roundsDown->wins);
 
         self::assertEquals(new TeamFactors(0, 0, 0, 0, 0), TeamFactors::average([]));
     }

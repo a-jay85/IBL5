@@ -45,6 +45,14 @@ final class FairSalaryTableTest extends TestCase
         self::assertSame([], FairSalaryTable::build(0, ['PG' => [1 => 1]], [])->tiers('PG'));
     }
 
+    public function testTierWithDataPricesAtItsOwnMedianOverAWorseTier(): void
+    {
+        $table = FairSalaryTable::build(0, ['PG' => [1 => 1, 2 => 6]], [1 => 900, 2 => 300]);
+
+        self::assertSame(900, $table->fairSalary('PG', 1));
+        self::assertSame(300, $table->fairSalary('PG', 2));
+    }
+
     public function testEmptyTierFallsBackToWorseTierFirst(): void
     {
         $topEmpty = FairSalaryTable::build(0, ['PG' => [1 => 6]], [1 => 200]);

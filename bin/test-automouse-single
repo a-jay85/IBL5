@@ -4,11 +4,12 @@
 # bin/test-automouse-single — characterization + regression test for the
 # bin/automouse/run plan <slug> single-plan mode.
 #
+# Case 18 locks the argument guard (an unsupported argument exits 2 before any side effect).
 # Verifies: selection guard (only the named plan runs), untouched-queue contract,
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
 # unresolvable slug, and already-queued tolerance.
 #
-# Cases 4, 6, 10, 13, 14, 15 and 16 run on every platform. Cases 1, 2, 3, 5 and 17 drive the run loop,
+# Cases 4, 6, 10, 13, 14, 15, 16 and 18 run on every platform. Cases 1, 2, 3, 5, 17 and 18b drive the run loop,
 # which needs macOS tools inside bin/automouse/run (caffeinate, BSD mktemp,
 # stat -f, BSD date), so off macOS they print a SKIP line and do not run.
 # Case 10 unit-tests write_stop_file (the stop-file writer extracted from the
@@ -232,6 +233,184 @@ assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
 assert_present "case6 skipped report written"   "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md"
 grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md" \
     || h_fail "case6 report lacks the rejection reason"
+
+# ===========================================================================
+# Case 18 — argument guard: an unsupported argument is refused before any side
+# effect (portable: the guard exits before the run loop).
+# DANGER: a broken guard starts a real run, so every invocation here is sealed
+# off. HOME, NIGHTLY_DIR, PLANS_DIR and REPO point into a temp tree. PATH holds
+# only stubs (claude, git, caffeinate, gh, curl, launchctl, osascript, security)
+# that record their calls, plus /usr/bin:/bin. The DM sender and post-plan-now
+# are stubs too. The real queue under ~/.claude is never named.
+# The mutation check strips the guard from a copy of the runner and requires
+# the same checks to fail, so they cannot pass vacuously.
+# ===========================================================================
+echo "--- case 18: argument guard ---"
+G_ROOT="$ROOT/guard"
+G_HOME="$G_ROOT/home"
+G_STUB="$G_ROOT/stub"
+G_ND="$G_ROOT/nd"
+G_CALLS="$G_ROOT/calls"
+G_OUTF="$G_ROOT/out"
+# A guardless runner must never hang the harness: cap each probe when a timeout tool exists.
+G_TIMEOUT=""
+if command -v timeout >/dev/null 2>&1; then G_TIMEOUT="timeout 60"
+elif command -v gtimeout >/dev/null 2>&1; then G_TIMEOUT="gtimeout 60"; fi
+G_AGENTS="$G_ROOT/agents"
+mkdir -p "$G_HOME" "$G_STUB" "$G_ROOT/repo" "$G_AGENTS"
+for g_tool in claude git caffeinate gh curl launchctl osascript security; do
+    printf '#!/bin/sh\necho "%s $*" >> "%s"\nexit 0\n' "$g_tool" "$G_CALLS" > "$G_STUB/$g_tool"
+    chmod +x "$G_STUB/$g_tool"
+done
+printf '#!/bin/sh\necho "discord-dm $*" >> "%s"\ncat >/dev/null\nexit 0\n' "$G_CALLS" > "$G_STUB/discord-dm"
+printf '#!/bin/sh\necho "post-plan-now $*" >> "%s"\nexit 0\n' "$G_CALLS" > "$G_STUB/post-plan-now"
+chmod +x "$G_STUB/discord-dm" "$G_STUB/post-plan-now"
+
+# g_make_runner <dest> [strip]: sealed copy of the real runner; "strip" drops the guard.
+g_make_runner() {
+    sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$G_ND\"#" \
+        -e "s#^REPO=.*#REPO=\"$G_ROOT/repo\"#" \
+        -e "s#^SELF_DIR=.*#SELF_DIR=\"$REPO/bin/automouse\"#" \
+        -e "s#^export PATH=.*#export PATH=\"$G_STUB:/usr/bin:/bin\"#" \
+        -e "s#\"\$SELF_DIR/../post-plan-now\"#\"$G_STUB/post-plan-now\"#" \
+        -e "s#\"\$SELF_DIR/../discord-dm\"#\"$G_STUB/discord-dm\"#" \
+        "$REPO/bin/automouse/run" > "$1"
+    if [ "${2:-}" = strip ]; then
+        sed -i.bak '/^# BEGIN arg-guard$/,/^# END arg-guard$/d' "$1" && rm -f "$1.bak"
+    fi
+    chmod +x "$1"
+}
+
+G_QUIET=0
+G_BAD=0
+# gcheck <desc> <status>: status 0 = pass. Quiet mode (mutant run) only counts.
+gcheck() {
+    if [ "$G_QUIET" = 1 ]; then
+        [ "$2" -eq 0 ] || G_BAD=$((G_BAD + 1))
+    elif [ "$2" -eq 0 ]; then
+        h_pass "$1"
+    else
+        h_fail "$1"
+    fi
+    return 0
+}
+
+# gtest <desc> <command...>: run the command; a leading "!" inverts it.
+gtest() {
+    local d="$1" inv=0
+    shift
+    if [ "$1" = "!" ]; then inv=1; shift; fi
+    "$@" >/dev/null 2>&1
+    local r=$?
+    if [ "$inv" -eq 1 ]; then r=$((r == 0 ? 1 : 0)); fi
+    gcheck "$d" "$r"
+}
+# g_has <needle>: the last g_run output contains the fixed string.
+g_has() { grep -qF -- "$1" "$G_OUTF"; }
+g_noqueue_report() { ls "$G_ND"/reports/*-no-queue.md; }
+
+# g_reset: empty sealed dirs, no recorded calls.
+g_reset() {
+    rm -rf "$G_ND" "$G_HOME" "$G_ROOT/repo" "$G_AGENTS" "$G_CALLS" "$G_ROOT/plans"
+    mkdir -p "$G_ND" "$G_HOME" "$G_ROOT/repo" "$G_AGENTS"
+}
+
+# g_run <runner> <args...>: sets G_RC, G_OUT (stdout+stderr).
+g_run() {
+    local runner="$1"; shift
+    G_OUT=$($G_TIMEOUT env HOME="$G_HOME" NIGHTLY_DIR="$G_ND" PLANS_DIR="$G_ROOT/plans" \
+        LAUNCH_AGENTS_DIR="$G_AGENTS" AUTOMOUSE_LOGIN_PROBE_CMD="echo ok" \
+        AUTOMOUSE_CHECK_PLAN=/usr/bin/true AUTOMOUSE_SKIP_CANARY=1 \
+        "$runner" "$@" 2>&1)
+    G_RC=$?
+    printf '%s\n' "$G_OUT" > "$G_OUTF"
+}
+
+# g_untouched: 0 when the sealed tree is empty and no stub was called.
+g_untouched() {
+    [ ! -e "$G_CALLS" ] || return 1
+    [ -z "$(find "$G_ND" "$G_HOME" "$G_ROOT/repo" "$G_AGENTS" -mindepth 1 2>/dev/null)" ]
+}
+
+# g_refusal_suite <runner> [core]: every refused form must exit 2 with a message, touch nothing.
+# "core" runs only the three unknown-word rows: the mutant pass must not drive the
+# schedule or disarm branches under a runner that has lost its guard.
+g_refusal_suite() {
+    local runner="$1" only="${2:-all}" label rc
+    # label|then args (a literal EMPTY stands for the empty string)
+    while IFS='|' read -r label want_msg a1 a2 a3; do
+        [ -n "$label" ] || continue
+        if [ "$only" = core ]; then
+            case "$a1" in status|--foo|EMPTY) ;; *) continue ;; esac
+        fi
+        [ "$a1" != EMPTY ] || a1=""
+        g_reset
+        if [ -n "$a3" ]; then g_run "$runner" "$a1" "$a2" "$a3"
+        elif [ -n "$a2" ]; then g_run "$runner" "$a1" "$a2"
+        else g_run "$runner" "$a1"; fi
+        rc=$G_RC
+        gtest "case18 $label: exit 2 (got $rc)" [ "$rc" -eq 2 ]
+        gtest "case18 $label: message names the problem" g_has "$want_msg"
+        gtest "case18 $label: lists the supported forms" g_has 'supported forms:'
+        gtest "case18 $label: no side effect, no stub called" g_untouched
+    done <<'CASES'
+unknown word|unsupported argument 'status'|status
+unknown flag|unsupported argument '--foo'|--foo
+empty string|unsupported argument ''|EMPTY
+plan extra arg|'plan' takes one argument|plan|some-slug|extra
+schedule extra arg|'schedule' takes one argument|schedule|20:00|extra
+disarm-tonight extra arg|'disarm-tonight' takes no arguments|disarm-tonight|extra
+disarm-until extra arg|'disarm-until' takes one argument|disarm-until|20:00|extra
+resume-paused no sid|--resume-paused takes exactly one session id|--resume-paused
+resume-paused two sids|--resume-paused takes exactly one session id|--resume-paused|a|b
+CASES
+}
+
+REAL_GUARD_RUNNER="$G_ROOT/run-real"
+MUT_GUARD_RUNNER="$G_ROOT/run-nog"
+g_make_runner "$REAL_GUARD_RUNNER"
+g_make_runner "$MUT_GUARD_RUNNER" strip
+gtest "case18 sealed copy keeps the guard" grep -qF '# BEGIN arg-guard' "$REAL_GUARD_RUNNER"
+gtest "case18 mutant copy lost the guard" ! grep -qF 'arg-guard' "$MUT_GUARD_RUNNER"
+gtest "case18 sealed copy names no real automouse dir" ! grep -qE '^NIGHTLY_DIR=.*\.claude/projects' "$REAL_GUARD_RUNNER"
+
+g_refusal_suite "$REAL_GUARD_RUNNER"
+
+# Supported forms still reach their own branch (no run starts).
+g_reset; g_run "$REAL_GUARD_RUNNER" --help
+gtest "case18 --help: exit 0 with usage" [ "$G_RC" -eq 0 ]
+gtest "case18 --help: exit 0 with usage (message)" g_has 'Usage: bin/automouse/run'
+g_reset; g_run "$REAL_GUARD_RUNNER" -h
+gtest "case18 -h: exit 0 with usage" [ "$G_RC" -eq 0 ]
+gtest "case18 -h: exit 0 with usage (message)" g_has 'Usage: bin/automouse/run'
+g_reset; g_run "$REAL_GUARD_RUNNER" schedule
+gtest "case18 schedule without time: own usage, exit 1" [ "$G_RC" -eq 1 ]
+gtest "case18 schedule without time: own usage, exit 1 (message)" g_has 'usage: bin/automouse/run schedule'
+g_reset; g_run "$REAL_GUARD_RUNNER" disarm-until
+gtest "case18 disarm-until without time: own usage, exit 1" [ "$G_RC" -eq 1 ]
+gtest "case18 disarm-until without time: own usage, exit 1 (message)" g_has 'usage: bin/automouse/run disarm-until'
+g_reset; g_run "$REAL_GUARD_RUNNER" disarm-tonight
+gtest "case18 disarm-tonight: reaches the plist read, exit 1" [ "$G_RC" -eq 1 ]
+gtest "case18 disarm-tonight: reaches the plist read, exit 1 (message)" g_has 'could not read StartCalendarInterval'
+g_reset; g_run "$REAL_GUARD_RUNNER" plan
+gtest "case18 plan without slug: own usage, exit 1" [ "$G_RC" -eq 1 ]
+gtest "case18 plan without slug: own usage, exit 1 (message)" g_has 'usage: bin/automouse/run plan <slug>'
+g_reset; g_run "$REAL_GUARD_RUNNER" --resume-paused no-such-session
+gtest "case18 --resume-paused <sid>: reaches its handler, not the guard" [ "$G_RC" -eq 2 ]
+gtest "case18 --resume-paused <sid>: reaches its handler, not the guard (message)" ! g_has 'supported forms:'
+gtest "case18 claude stub never called by any supported-form probe" ! grep -qs '^claude ' "$G_CALLS"
+
+# Mutation check: with the guard stripped the unknown-word rows must fail.
+G_QUIET=1; G_BAD=0
+g_refusal_suite "$MUT_GUARD_RUNNER" core
+G_QUIET=0
+G_MUT_BAD=$G_BAD
+if [ "$G_MUT_BAD" -gt 0 ]; then
+    h_pass "case18 mutation: unknown-word rows fail without the guard ($G_MUT_BAD checks failed)"
+else
+    h_fail "case18 mutation: unknown-word rows still passed with the guard stripped"
+fi
+g_reset
 
 # ===========================================================================
 # Case 10 — write_stop_file records one atomic line per stop cause
@@ -591,15 +770,29 @@ fi
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then
     echo ""
-    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
+    echo "SKIP: cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17, 18b (run loop) need macOS: bin/automouse/run calls caffeinate, BSD mktemp, stat -f and BSD date. macOS coverage for them comes from running bin/test-automouse-single locally on a Mac (there is no macOS CI job). Platform: $PLATFORM."
     if [ "$H_FAIL" -ne 0 ]; then
         echo "RESULT: FAILED"
     else
-        echo "RESULT: cases 4, 6, 10, 13, 14, 15 and 16 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17 skipped"
+        echo "RESULT: cases 4, 6, 10, 13, 14, 15, 16 and 18 passed; cases 1, 2, 3, 5, 7, 8, 9, 11, 12, 17, 18b skipped"
     fi
     [ "$H_FAIL" -eq 0 ] || exit 1
     exit 0
 fi
+
+# ===========================================================================
+# Case 18b — the bare form (launchd and the one-shot plists) still runs the
+# queue: it passes the guard and reaches the loop. Sealed like case 18; the
+# queue is empty, so the loop writes its no-queue report and stops.
+# ===========================================================================
+echo "--- case 18b: bare run still reaches the run loop ---"
+g_reset
+g_run "$REAL_GUARD_RUNNER"
+gtest "case18b bare run: exit 0 (got $G_RC)" [ "$G_RC" -eq 0 ]
+gtest "case18b bare run: no guard refusal" ! g_has 'supported forms:'
+gtest "case18b bare run: reached the loop (no-queue report)" g_noqueue_report
+gtest "case18b bare run: claude stub never called" ! grep -qs '^claude ' "$G_CALLS"
+g_reset
 
 # ===========================================================================
 # Case 1 — only the named plan runs; others remain untouched (Phases 2 & 4)

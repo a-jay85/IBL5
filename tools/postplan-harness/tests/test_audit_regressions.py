@@ -56,7 +56,8 @@ def _apply(d, files, message):
 
 def _make_audit_repo(name, *, base_files, branch_commits, master_commits):
     """Returns (d, branch, branch_shas, master_sha). No iblBase, so --onto never runs."""
-    branch = f"feat-{name}"
+    # The harness keys /tmp scratch files on the branch. The pid keeps two pytest runs apart.
+    branch = f"feat-{os.getpid()}-{name}"
     d = tempfile.mkdtemp(prefix="postplan-audit-")
     subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
     _sh(d, "config", "user.email", "t@t")

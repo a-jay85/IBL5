@@ -236,9 +236,10 @@ def test_missing_usage_key_still_returns_text(shim, tmp_path, monkeypatch):
 def test_timeout_reaps_the_process_group(shim, tmp_path, monkeypatch):
     pid_file = tmp_path / "grandchild.pid"
     monkeypatch.setenv("CLAUDE_SHIM_SPAWN_PID_FILE", str(pid_file))
+    # 10 s, because on a loaded machine the shim can take over 2 s to spawn its grandchild.
     with pytest.raises(HarnessError):
         _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
-                                   allowed_tools=("Read",), timeout=2, max_retries=0)
+                                   allowed_tools=("Read",), timeout=10, max_retries=0)
     assert pid_file.exists() and pid_file.read_text().strip(), \
         "shim never spawned its grandchild"
     pid = int(pid_file.read_text().strip())

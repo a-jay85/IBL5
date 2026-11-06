@@ -100,6 +100,7 @@ _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
 # `[NOTE]`, upper case, right after the bullet prefix. Anything else is unmarked, and an
 # unmarked bullet is blocking (fail-closed).
 _FINDING_MARKER_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[(BLOCKING|NOTE)\](?=\s|$)")
+_CHECK_3_LINE_RE = re.compile(r"^\s*3[.)]\s")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
@@ -352,6 +353,11 @@ def blocking_finding_texts(verdict_path: str) -> list[str]:
     Only this heading feeds the file-fix carve-out: the pre-digest and whole-body fallbacks
     `_verdict_findings` uses for the work list are too loose to widen a commit permission.
     """
+    return marked_finding_texts(verdict_path, "BLOCKING")
+
+
+def marked_finding_texts(verdict_path: str, marker_word: str) -> list[str]:
+    """Full text of each bullet under `## FINDINGS` carrying the given severity marker."""
     text = _read_or_marker(verdict_path, "")
     lines = text.splitlines()
     for i, line in enumerate(lines):
@@ -362,7 +368,26 @@ def blocking_finding_texts(verdict_path: str) -> list[str]:
     section = _findings_section(body)
     if section is None:
         return []
-    return [item for marker, item in _group_findings(section) if marker == "BLOCKING"]
+    return [item for marker, item in _group_findings(section) if marker == marker_word]
+
+
+def _without_findings(verdict_text: str, texts) -> str:
+    """`verdict_text` minus every line of the given finding texts. Compares stripped lines,
+    because `_group_findings` strips each line of a finding.
+
+    Also drops the check-3 line of the summary above `## FINDINGS`. A reviewer may reword a
+    finding there, so that line cannot be matched to a finding's text. Every tagged finding
+    is a check-3 finding, and one the fixer must act on keeps its own text in the work list.
+    """
+    drop = {ln.strip() for text in texts for ln in text.splitlines() if ln.strip()}
+    kept: list[str] = []
+    in_summary = True
+    for ln in verdict_text.split("\n"):
+        in_summary = in_summary and ln.rstrip() != FINDINGS_HEADING
+        if ln.strip() in drop or (in_summary and _CHECK_3_LINE_RE.match(ln)):
+            continue
+        kept.append(ln)
+    return "\n".join(kept)
 
 
 def _render_finding(f: dict) -> str:
@@ -827,7 +852,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
               commit=None, push=None, pr_number: int | str | None = None,
               model: str = "sonnet", work_list: list[dict] | None = None,
-              outcome: dict | None = None) -> str | None:
+              outcome: dict | None = None, withheld=()) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
@@ -847,7 +872,8 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     escalates it across rounds. `work_list` is the tagged union of machine-fixable
     arming holds; omitted, it falls back to the verdict findings alone. `outcome` is an
     out-dict the runner reads for the round record -- the return stays `str | None` so
-    no existing call site changes.
+    no existing call site changes. `withheld` holds finding texts the runner decided itself
+    (`unplanned_scope.partition`). They are cut from the verdict this fixer reads.
     """
     log = log or _noop_log
     commit = commit or gitad.commit_all
@@ -874,7 +900,8 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         _out("empty-work-list")
         return None
 
-    filefix = fidelity_filefix.snapshot(blocking_finding_texts(verdict1_path), gitad, worktree)
+    filefix = fidelity_filefix.snapshot(
+        [t for t in blocking_finding_texts(verdict1_path) if t not in withheld], gitad, worktree)
     log("phase5.5: file-fix carve-out "
         + (f"active for {', '.join(sorted(filefix.eligible))}" if filefix.active
            else f"inactive ({filefix.reason})"))
@@ -887,6 +914,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         fh.write(procedure)
 
     verdict_text = _read_or_marker(verdict1_path, "(verdict unreadable)")
+    verdict_ref, withheld_note = verdict1_path, ""
+    if withheld:
+        verdict_text = _without_findings(verdict_text, withheld)
+        verdict_ref = os.path.join(packet_dir, "verdict-for-fixer.md")
+        with open(verdict_ref, "w") as fh:
+            fh.write(verdict_text)
+        withheld_note = (f"The harness decided {len(withheld)} other finding(s) itself and cut "
+                         "them from this verdict.\nDelete no code the work list does not name.\n\n")
     diff_text = _read_or_marker(os.path.join(packet_dir, "diff.patch"), "(diff unreadable)")
     diff_note = ""
     if len(diff_text) > REMEDIATION_DIFF_INLINE_CAP:
@@ -917,6 +952,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         f"{procedure}\n"
         "=== END PROCEDURE ===\n\n"
         f"{render_work_list(work_list)}\n"
+        f"{withheld_note}"
         "=== VERDICT ===\n"
         f"{verdict_text}\n"
         "=== END VERDICT ===\n\n"
@@ -925,7 +961,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         "=== END DIFF ===\n\n"
         "Reference paths (secondary; content is above):\n"
         f"  - {os.path.join(packet_dir, 'remediation.md')}\n"
-        f"  - {verdict1_path}\n"
+        f"  - {verdict_ref}\n"
         f"  - {os.path.join(packet_dir, 'diff.patch')}\n"
     )
     llm.call_tooled(
@@ -1825,15 +1861,30 @@ def linkify_refs(text: str) -> str:
     return "".join(out)
 
 
-def digest_rows_for_display(digest: list, fid: dict) -> list:
+_WATCH_LABEL = "**Watch:**"
+
+
+def _watch_with_kept(row: str, kept_titles) -> str:
+    """`**Watch:**` plus one clause per kept change. A `none` value is replaced outright."""
+    value = row[len(_WATCH_LABEL):].strip()
+    clauses = [f"kept unplanned change: {title}" for title in kept_titles]
+    if value and value.rstrip(".").lower() != "none":
+        clauses.insert(0, value)
+    return f"{_WATCH_LABEL} " + "; ".join(clauses)
+
+
+def digest_rows_for_display(digest: list, fid: dict, kept_titles=()) -> list:
     """The five digest rows exactly as the sticky prints them, remediation suffix included.
 
     Shared by compose_sticky and the runner's PR-body write so the two cannot disagree.
+    `kept_titles` names the changes Phase 5.5 kept. Watch is the row a human reads to veto.
     """
     rows = list(digest)[:5]
     sha = (fid or {}).get("remediation_sha")
     if sha and len(rows) == 5:
         rows[4] = rows[4] + f" (post-plan remediation: {sha})"
+    if kept_titles and len(rows) == 5 and rows[2].startswith(_WATCH_LABEL):
+        rows[2] = _watch_with_kept(rows[2], kept_titles)
     return rows
 
 
@@ -2045,7 +2096,8 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
 
     out.append("")
     out.append(MERGE_DIGEST_HEADING)
-    out.extend(digest_rows_for_display(digest, fid))
+    out.extend(digest_rows_for_display(digest, fid,
+                                       kept_titles=(fid or {}).get("kept_unplanned") or ()))
 
     # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
     # later non-label, non-blank line into the LAST label's value until it hits a heading

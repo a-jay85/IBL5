@@ -75,6 +75,7 @@ from harness.gate_backtest import upsert_gate_backtest
 from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
 from harness import removed_guards
+from harness import unplanned_scope
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
 from harness.adaptations import audit_lines_for_adaptations
@@ -909,6 +910,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if not live and (fixture or {}).get("red_ci_checks") is not None:
                 # replay-only seam for condition (15): live mode never reads this path
                 inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
+            _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log)
             preview = evaluate(inputs)
             if not preview.holds:
                 # only spend the add-only safety verdict when deterministic checks pass
@@ -1106,7 +1108,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # Digest at the top of the PR body, from the same rows the sticky printed.
             # Still BEFORE arming, and never able to change it: log-and-continue.
             try:
-                drows = fidelity.digest_rows_for_display(digest, fid)
+                drows = fidelity.digest_rows_for_display(
+                    digest, fid, kept_titles=fid.get("kept_unplanned") or ())
                 if all(" unavailable — " in r for r in drows):
                     log("phase6.5: merge digest all degraded; PR body digest left as is")
                 else:
@@ -2753,6 +2756,97 @@ def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list
     return removed_guards.classify_body(arm_body, [r[0] for r in rows])
 
 
+def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):
+    """Classifier inputs for `unplanned_scope`, or None when any of them cannot be read.
+
+    None restores today's handling: every tagged finding reaches the fixer and no verdict
+    is downgraded. A detector failure counts, because a guard conflict could not be seen.
+    """
+    plan_path = plan.path if (plan and getattr(plan, "found", False)) else None
+    try:
+        if diff_body is None:
+            diff_body = git.diff_vs_base()   # read here so a git failure stays inside the guard
+        ok, rows = removed_guards.run_detector(_detector_root(worktree), diff_body, plan_path)
+        if ok:
+            plan_text = ""
+            if plan_path:
+                with open(plan_path, encoding="utf-8") as fh:
+                    plan_text = fh.read()
+            return unplanned_scope.context_for(worktree or ".", master_sha, plan_text,
+                                               git.changed_files(), rows)
+    except (HarnessError, OSError, ValueError, subprocess.SubprocessError) as e:
+        log(f"phase5.5: unplanned-scope context error ({e.__class__.__name__}: {e})")
+    log("phase5.5: unplanned-scope context unavailable")
+    return None
+
+
+def _partition_unplanned(work, kept_all, worktree, git, gh, plan, master_sha, body, pr, res, log):
+    """Split tagged hold-12 items off `work`, and declare every kept item in the PR body.
+
+    Returns (work for the fixer, finding texts cut from the fixer's verdict). With nothing
+    tagged and nothing kept so far, `work` comes back as is and nothing is read. `kept_all`
+    carries kept items across rounds, so a later round cannot drop an earlier declaration.
+    """
+    if not kept_all and not any(item["hold"] == "12"
+                                and unplanned_scope.is_unplanned_scope(item["text"])
+                                for item in work):
+        if unplanned_scope.KEPT_BEGIN in (body or ""):
+            _declare_kept([], None, gh, body, pr, log)   # drop a stale block
+        return work, []
+    ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
+    work, kept, held = unplanned_scope.partition(work, ctx)
+    kept_all.extend(item for item in kept if item not in kept_all)
+    res.fidelity["held_unplanned"] = [unplanned_scope.title_of(i["text"]) for i in held]
+    log(f"phase5.5: unplanned-scope kept={len(kept)} held={len(held)}")
+    if kept_all and ctx is not None:
+        res.fidelity["kept_unplanned"] = [unplanned_scope.title_of(i["text"]) for i in kept_all]
+        _declare_kept(kept_all, ctx, gh, body, pr, log)
+    elif not kept_all and unplanned_scope.KEPT_BEGIN in (body or ""):
+        _declare_kept([], ctx, gh, body, pr, log)   # nothing kept now: drop the stale block
+    return work, [item["text"] for item in kept + held]
+
+
+def _declare_kept(kept_all, ctx, gh, body, pr, log) -> None:
+    """Upsert the kept block. A failed write leaves no marker, so the arming downgrade refuses."""
+    try:
+        cur = gh.pr_body_fresh() or body or ""
+        new = unplanned_scope.upsert_kept_block(
+            cur, unplanned_scope.render_kept_block(kept_all, ctx))
+        if new != cur:
+            gh.pr_edit_body(pr, new)
+    except (HarnessError, OSError, subprocess.SubprocessError) as e:
+        log(f"phase5.5: kept-unplanned body write failed ({e.__class__.__name__}: {e})")
+
+
+def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log) -> None:
+    """Condition (12) arm input: read a NOT READY whose blockers are all kept and declared
+    as READY WITH NOTES. Only the selected slot of `inputs` moves. The verdict file and
+    res.fidelity's verdict words stay as the reviewer wrote them."""
+    selected, source = select_fidelity_verdict(
+        inputs.fidelity_verdict, inputs.fidelity_verdict_2,
+        inputs.fidelity_tree_2, inputs.current_tree)
+    if selected != "NOT READY":
+        return
+    fid = res.fidelity or {}
+    if source == "verdict-2":
+        path = ((fid.get("same_run_repin") or {}).get("verdict_path")
+                or fid.get("verdict_path"))
+    else:
+        path = fidelity.verdict_path(pr)
+    if not path or not any(unplanned_scope.is_unplanned_scope(t)
+                           for t in fidelity.blocking_finding_texts(path)):
+        return
+    ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
+    if not unplanned_scope.downgrade_applies(path, ctx, inputs.pr_body):
+        return
+    if source == "verdict-2":
+        inputs.fidelity_verdict_2 = "READY WITH NOTES"
+    else:
+        inputs.fidelity_verdict = "READY WITH NOTES"
+    fid["downgraded_unplanned"] = True
+    log("phase5.5: blocking findings are all kept unplanned scope; declared in PR body")
+
+
 def _inject_removed_guards(copy: dict, plan, diff_body: str, worktree, log) -> bool:
     """Phase 2: upsert the `## Removed guards` block into copy["summary_md"].
 
@@ -3505,6 +3599,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # handle on the first review's findings by compose time.
     verdict_path_1 = current_verdict_path
     final_verdict, final_err = verdict, err
+    kept_all: list = []   # every finding this run kept, across rounds
     stray_base, stray = (_stray_master_merges(git, log) if final_verdict == "NOT READY"
                          else ("origin/master", []))
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
@@ -3515,6 +3610,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         work = fidelity.build_work_list(current_verdict_path, unresolved_conformance,
                                         meta_check_failures,
                                         getattr(res, "scored_findings", ()) or scored_findings)
+        work, withheld = _partition_unplanned(work, kept_all, worktree, git, gh, plan, master_sha,
+                                              body, pr, res, log)
         rec = {"round": round_num, "model": model,
                "work_list_sizes": fidelity.work_list_sizes(work),
                "retries": 0, "outcome": None, "remediation_sha": None,
@@ -3561,7 +3658,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                                                      worktree=worktree, out_dir=out_dir,
                                                      res=res, gh=gh,
                                                      pr=(pr if isinstance(git, LiveGit) else None)),
-                    pr_number=pr, model=model, work_list=work, outcome=outcome)
+                    pr_number=pr, model=model, work_list=work, outcome=outcome,
+                    withheld=withheld)
             except HarnessError as e:
                 if raw_before_round and "## Manual Testing" in raw_before_round:
                     _live = gh.pr_body_fresh()
@@ -3733,6 +3831,11 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
         res.fidelity["verdict_path"] = path_n
         res.fidelity["findings_round"] = round_num
+    # The last re-review may name a change no round partitioned, and a fixer may have
+    # dropped the block. Both need the declaration before arming reads the body. A verdict
+    # that is not NOT READY yields no work here, and the earlier kept items still declare.
+    _partition_unplanned(fidelity.build_work_list(current_verdict_path), kept_all, worktree,
+                         git, gh, plan, master_sha, body, pr, res, log)
     res.fidelity["review_items"] = [
         {**fidelity.verdict_items(verdict_path_1), "remediation_sha": None}
     ] + [

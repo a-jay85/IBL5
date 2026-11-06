@@ -86,7 +86,8 @@ def test_block_shape_every_class(key):
 
 @pytest.mark.parametrize("key", list(_CLASSES))
 def test_block_has_no_jargon_every_class(key):
-    low = _block(key).lower()
+    # FIX holds this checkout's path, and a worktree's folder name can contain any word.
+    low = _block(key).replace(FIX, "bin/postplan-fix").lower()
     for word in ("harness", "sentinel", "fallback", "terminal", "class=", "rc=", "phase2"):
         assert word not in low, word
 

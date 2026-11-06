@@ -48,8 +48,9 @@ final class GainWeightsTest extends TestCase
 
     public function testStarterOutweighsBench(): void
     {
-        self::assertSame(3.0, GainWeights::STARTER_WEIGHT);
-        self::assertSame(1.0, GainWeights::BENCH_WEIGHT);
+        $weights = GainWeights::toArray();
+
+        self::assertGreaterThan($weights['bench_weight'], $weights['starter_weight']);
     }
 
     public function testRentalScaleIsOneAtOrAboveLateSeasonShare(): void

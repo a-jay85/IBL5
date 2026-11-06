@@ -327,7 +327,7 @@ _submit_line="$(grep -F 'com.ibl5.post-plan-fleet-1901' <<< "$SHAPE_OUT" | grep 
 grep -qF '/tmp/post-plan-fleet-1901.log' <<< "$_submit_line" || fail "submit-shape: line lacks the log"
 grep -qF '/tmp/post-plan-fleet-runner-1901.sh' <<< "$_submit_line" || fail "submit-shape: line lacks the runner"
 _runner1901="/tmp/post-plan-fleet-runner-1901.sh"
-_mode="$(stat -f %Lp "$_runner1901" 2>/dev/null || stat -c %a "$_runner1901")"
+_mode="$(stat -c %a "$_runner1901" 2>/dev/null || stat -f %Lp "$_runner1901")"
 [[ "$_mode" == 700 ]] || fail "submit-shape: runner mode $_mode, want 700"
 _rm_n="$(grep -nF 'rm -f -- "$RUNNER"' "$_runner1901" | sed -n 1p | cut -d: -f1)"
 [[ -n "$_rm_n" ]] || fail "submit-shape: runner has no rm -f -- \"\$RUNNER\" line"
@@ -3043,7 +3043,7 @@ grep -qF '/tmp/post-plan-fleet-runner-9999.sh' <<< "$_sub_line" || fail "6c.2: s
 ! grep -qE '[$]HOME|[$][A-Z_]+|string></string' "$_sub_tmp" \
   || fail "6c.2: submit output has an unexpanded var"
 _r9999=/tmp/post-plan-fleet-runner-9999.sh
-_mode="$(stat -f %Lp "$_r9999" 2>/dev/null || stat -c %a "$_r9999")"
+_mode="$(stat -c %a "$_r9999" 2>/dev/null || stat -f %Lp "$_r9999")"
 [[ "$_mode" == 700 ]] || fail "6c.2: runner mode $_mode, want 700"
 _rm_n="$(grep -nF 'rm -f -- "$RUNNER"' "$_r9999" | sed -n 1p | cut -d: -f1)"
 [[ -n "$_rm_n" ]] || fail "6c.2: runner has no rm -f -- \"\$RUNNER\" line"

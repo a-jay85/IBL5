@@ -991,11 +991,13 @@ class LiveGit:
         proof_out: str = "",
         base_sha: str = "",
         adapted_lines: tuple = (),
+        pre_rebase_sha: str = "",
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
+        from .. import conflict_report
         from ..armable import record_conflict_resolution
-        from ..conflict import review_resolution
+        from ..conflict import review_resolution, verdict_ok_path
 
         manifest_content = self._run("diff", "--name-only", f"{master_sha}...HEAD")
         if not manifest_content.strip():
@@ -1064,6 +1066,26 @@ class LiveGit:
                 adaptations=adapted_lines,
                 retries_out=self.conflict_review_retries,
             )
+
+        if resolved_files:
+            # Facts for the sticky's conflict report, beside the marker. Written after the
+            # ladder's last rung assignment, so it describes the final amended tree.
+            try:
+                resolving_sha = self._run("rev-parse", "HEAD").strip()
+                conflict_report.write_record(
+                    repo=self.worktree,
+                    branch=branch,
+                    resolving_sha=resolving_sha,
+                    resolved_files=list(resolved_files),
+                    target_ref=master_sha,
+                    review_verdict_path=verdict_ok_path(key, resolving_sha),
+                    retries=self.conflict_review_retries.get("conflict-review", 0),
+                    rung=getattr(self, "last_conflict_rung", None),
+                    fix_summary=getattr(self, "last_conflict_fix_summary", None),
+                    branch_sha=pre_rebase_sha or None,
+                )
+            except Exception:  # report record never changes the rebase outcome
+                pass
 
         return manifest_path, notes_path
 
@@ -1500,6 +1522,7 @@ class LiveGit:
                     manifest_path, notes_path = self._record_resolution(
                         key, branch, master_sha, resolved_files,
                         proof_out=proof_out, adapted_lines=adapted,
+                        pre_rebase_sha=pre_rebase_sha,
                     )
                 except HarnessError as exc:
                     # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
@@ -1884,7 +1907,7 @@ class LiveGit:
             manifest_path, notes_path = self._record_resolution(
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
-                adapted_lines=adapted,
+                adapted_lines=adapted, pre_rebase_sha=pre_rebase_sha,
             )
         except HarnessError as exc:
             if auto_resolved_files:

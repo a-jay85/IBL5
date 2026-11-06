@@ -454,6 +454,8 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
         if not live and recovered is None:
             return ""  # no model-resolved conflict on this branch
         if not live:
+            if not shas:
+                return recovered  # marker gone: cannot tell dropped from cleared, keep the prior text
             return _block(HEADING, DROPPED_LINE)
         records = [r for r in read_records(branch, tmp_dir) if r.get("resolving_sha") in live]
         if not records:

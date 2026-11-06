@@ -110,6 +110,15 @@ def test_stale_resolution_shows_dropped_line(tmp_path):
     assert cr.section_for("stale", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path)) == ""
 
 
+def test_missing_marker_carries_prior_section_not_dropped(tmp_path):
+    repo = _small_repo(tmp_path)
+    prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
+    got = cr.section_for("gone", repo["repo"], head=repo["head"], prior_body=prior,
+                         tmp_dir=str(tmp_path))
+    assert got == cr._extract_section(prior)
+    assert cr.DROPPED_LINE not in got
+
+
 def test_carried_sticky_keeps_section_bytes(tmp_path):
     repo = _small_repo(tmp_path)
     record_conflict_resolution("carried", repo["head"], str(tmp_path))  # marker, no record

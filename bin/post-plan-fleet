@@ -282,7 +282,6 @@ _label_alive() {
 stop_one_pr() {
     local PR="$1"
     local LABEL="com.ibl5.post-plan-fleet-${PR}"
-    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
     local LOG="/tmp/post-plan-fleet-${PR}.log"
     # End-anchored by .sh: runner-1901 (unanchored) also matches PR 19011 mid-publish.
     # CHILD_PAT matches timeout's argv, which retains "post-plan-now --pr $PR" after
@@ -294,7 +293,7 @@ stop_one_pr() {
     # survives KILL we would rather over-count slots than hand a slot to a second session.
     if ! ljob_kill_label "$LABEL" _label_alive "$PAT" "$CHILD_PAT"; then
         echo "ERROR: PR #${PR}: a process still carries ${LABEL} after SIGKILL;" >&2
-        echo "       slot left occupied (${PLIST}); investigate before re-firing." >&2
+        echo "       slot left occupied (${LABEL}); investigate before re-firing." >&2
         return 1
     fi
 
@@ -307,14 +306,17 @@ stop_one_pr() {
 }
 
 stop_all() {
-    local f label pr rc=0 found=0
-    for f in "$HOME/Library/LaunchAgents"/com.ibl5.post-plan-fleet-*.plist; do
-        [[ -e "$f" ]] || continue              # unmatched globs stay literal
+    local label labels pr rc=0 found=0
+    if ! labels="$(ljob_live_labels com.ibl5.post-plan-fleet-)"; then
+        echo "ERROR: cannot list live post-plan-fleet slots" >&2
+        return 1
+    fi
+    while IFS= read -r label; do
+        [[ -n "$label" ]] || continue
         found=1
-        label="$(basename "$f" .plist)"
         pr="${label##*-}"
         stop_one_pr "$pr" || rc=1              # aggregate: one stuck PR must not mask the rest
-    done
+    done <<< "$labels"
     [[ "$found" -eq 1 ]] || echo "no post-plan-fleet slots held; nothing to stop"
     return "$rc"
 }
@@ -634,11 +636,9 @@ fi
 fire_pr() {
     local PR="$1"
     local LABEL="com.ibl5.post-plan-fleet-${PR}"
-    local PLIST RUNNER LOG
+    local RUNNER LOG
     RUNNER="/tmp/post-plan-fleet-runner-${PR}.sh"
     LOG="/tmp/post-plan-fleet-${PR}.log"
-    PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
-    mkdir -p "$(dirname "$PLIST")"
 
     # Clear stale scratch from a previously interrupted --stop, but only when the label is
     # provably dead. The driver's OWN two paths (LOG, RUNNER) are excluded by name; LOG is
@@ -649,7 +649,7 @@ fire_pr() {
         for _stale in /tmp/post-plan-fleet-*-"${PR}".* /tmp/post-plan-fleet-runner-"${PR}".sh; do
             [[ -e "$_stale" ]] || continue
             case "$_stale" in
-                "$LOG"|"$RUNNER") continue ;;
+                "$LOG"|"$RUNNER"|"${RUNNER}.once") continue ;;
             esac
             rm -f "$_stale"
         done
@@ -669,7 +669,7 @@ fire_pr() {
     {   printf '#!/usr/bin/env bash\n'
         printf 'ROOT=%q\n'       "$ROOT"
         printf 'LABEL=%q\n'      "$LABEL"
-        printf 'PLIST=%q\n'      "$PLIST"
+        printf 'RUNNER=%q\n'     "$RUNNER"
         printf 'LOG=%q\n'        "$LOG"
         printf 'PR=%q\n'         "$PR"
         printf 'NOTIFY=%q\n'     "$NOTIFY"
@@ -708,6 +708,7 @@ fire_pr() {
         printf 'HR_FIX_TIMEOUT_SECS=%q\n' "$HR_FIX_TIMEOUT_SECS"
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
+rm -f -- "$RUNNER"
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
 RC=0
@@ -719,7 +720,7 @@ else
 fi
 [ "$RC" = 124 ] && echo "post-plan-now: TIMED OUT after 90m (rc=124)" >> "$LOG"
 # Holdrepeat autofix: one bounded fix session for a MISSING / UNREALISED repeat hold.
-# Runs while $PLIST still exists (slot held) and before bootout, which ends this job.
+# Runs while the label is still live (slot held); the submit wrapper ends this job.
 # HR_FIX_TIMEOUT_SECS is HR_TIMEOUT_SECS (1500) + one full post-plan re-fire + 300 s margin.
 _hr_quiet=0
 _hr_timed_out=0
@@ -1172,75 +1173,79 @@ elif [ "$_cf_ran" = 1 ]; then
 fi
 echo "post-plan-fleet: outcome=$_ppf_outcome" >> "$LOG"
 [ -z "$_ppf_reason" ] || echo "post-plan-fleet: reason=$_ppf_reason" >> "$LOG"
-# Releasing the slot is the FIRST post-run action: "plist present" == "job live"
-# is what the concurrency cap counts.
-rm -f "$PLIST"
-# THEN notify, and only THEN bootout. The bootout command terminates this job, and
-# discord-dm retries across a window longer than a pm2 restart; sending after the
-# bootout races the send against its own termination. The slot is already free.
+# The slot is the live label: it is released by the submit wrapper after this script
+# returns, so notify runs first and the send cannot race its own termination.
 notify
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 RUNNER_EOF
     } > "$RUNNER"
-    chmod +x "$RUNNER"
+    chmod 700 "$RUNNER"
 
-    # Compact plist layout shared with pr-review-now and pr-cycle (bin/lib/launchd-job.sh).
-    ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
+    # The once-marker lives at a fixed per-PR path; a --stop, logout or reboot never
+    # reaches the wrapper tail, so clear it here (the duplicate guard showed no live label).
+    rm -rf -- "${RUNNER}.once"
 
-    if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
-        _sc_arg=""; [[ ",$STATE_CHANGED_PRS," == *",$PR,"* ]] && _sc_arg=--state-changed
-        _ro_arg=""; [[ ",$REBASE_ONLY_PRS," == *",$PR,"* ]] && _ro_arg=--rebase-only
+    # In-lock re-check: closes the window between the duplicate guard and the claim.
+    local _rc=0 _skipped=0
+    _submit_fleet() {
+        local snap
+        snap="$(ljob_snapshot)"
+        if ljob_listed "com\.ibl5\.post-plan-fleet-${PR}$" "$snap"; then
+            echo "PR #${PR} is already running — skipped." >&2
+            _skipped=1
+            return 0
+        fi
+        ljob_submit "$LABEL" "$LOG" "$RUNNER"
+    }
+    _print_fleet() {
+        local _sc_arg="" _ro_arg=""
+        [[ ",$STATE_CHANGED_PRS," == *",$PR,"* ]] && _sc_arg=--state-changed
+        [[ ",$REBASE_ONLY_PRS," == *",$PR,"* ]] && _ro_arg=--rebase-only
         if [[ ",$HOLDREPEAT_FIX_PRS," == *",$PR,"* ]]; then
             echo "DRY(invocation) PR #${PR}: ${POST_PLAN_FLEET_POSTPLAN_FIX:-$ROOT/bin/postplan-fix} --holdrepeat $PR"
         else
             echo "DRY(invocation) PR #${PR}: $ROOT/bin/post-plan-now --pr $PR --foreground${ALLOW_TEST_ONLY_ARG:+ $ALLOW_TEST_ONLY_ARG}${_sc_arg:+ $_sc_arg}${_ro_arg:+ $_ro_arg}"
         fi
-        cat "$PLIST"
-        # Remove the plist when invoked via --dry-run (CLI flag sets SAW_DRY_RUN).
-        # Tests that set POST_PLAN_FLEET_DRY_RUN=1 directly keep the plist for shape checks.
-        [[ "${SAW_DRY_RUN:-0}" == "1" ]] && rm -f "$PLIST"
-        return 0
+        ljob_submit_print "$LABEL" "$LOG" "$RUNNER"
+    }
+
+    if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
+        ljob_claim_slot com.ibl5.post-plan-fleet- "$JOBS" "$CEILING_SECS" \
+            POST_PLAN_FLEET_DRY_RUN "" -- _print_fleet || _rc=$?
+        return "$_rc"
     fi
-    ljob_bootstrap "$LABEL" "$PLIST"
-    echo "Fired PR #${PR}: label=${LABEL}, log=${LOG}"
+    ljob_claim_slot com.ibl5.post-plan-fleet- "$JOBS" "$CEILING_SECS" \
+        POST_PLAN_FLEET_DRY_RUN "$LABEL" -- _submit_fleet || _rc=$?
+    if [[ $_rc -ne 0 ]]; then
+        echo "ERROR: launchctl submit failed for ${LABEL} (rc=${_rc})" >&2
+        rm -f -- "$RUNNER"
+        rm -rf -- "${RUNNER}.once"
+        exit 1
+    fi
+    [[ $_skipped -eq 1 ]] || echo "Fired PR #${PR}: label=${LABEL}, log=${LOG}"
 }
 
-# --- concurrency cap ---------------------------------------------------------------------
-# The plist IS the slot token: the runner deletes it the moment claude returns.
-
-# _label_alive() (the liveness probe reap_stale and stop_one_pr share) is defined ABOVE the
-# stop dispatch: bash defines functions as it executes, so a definition down here would not
-# exist yet when the --stop path runs.
-live_slots() { ljob_count_plists com.ibl5.post-plan-fleet-; }
-
-reap_stale() {   # plist on disk, no live label AND no live process = the job really died
-    # Under the test seam nothing is ever bootstrapped, so every plist would look stale
-    # and the reaper would eat the very output the cap is counting.
-    [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]] && return 0
-    ljob_reap_stale com.ibl5.post-plan-fleet- _label_alive
-}
-
-wait_for_slot() {
-    ljob_wait_for_slot live_slots reap_stale "$JOBS" "$CEILING_SECS" POST_PLAN_FLEET_DRY_RUN
-}
+# _label_alive() (the liveness probe stop_one_pr uses) is defined ABOVE the stop dispatch:
+# bash defines functions as it executes, so a definition down here would not exist yet when
+# the --stop path runs.
 
 for PR in "${FIRE_PRS[@]}"; do
-    wait_for_slot
     fire_pr "$PR"
 done
 
 # --- wait for completion -----------------------------------------------------------------
-# Active only when --wait and --go are both set. Polls live_slots() (plist count) until all
+# Active only when --wait and --go are both set. Polls ljob_count_live (live labels) until all
 # sessions finish. Under POST_PLAN_FLEET_DRY_RUN=1 the block is skipped entirely: fire_pr
-# leaves plists on disk under dry-run, and sleeping on them would hang indefinitely.
+# submits nothing under dry-run, so there is nothing to wait for.
 _WAIT_TIMED_OUT=0
 if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
     if [[ -z "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         _wait_elapsed=0
         _wait_last_n=""
         while :; do
-            reap_stale
-            n="$(live_slots)"
+            if ! n="$(ljob_count_live com.ibl5.post-plan-fleet-)"; then
+                echo "ERROR: cannot count live fleet slots" >&2
+                exit 1
+            fi
             [ "$n" -eq 0 ] && break
             if [ "$n" != "$_wait_last_n" ]; then
                 printf '[%s] waiting for %s session(s) to finish…\n' \

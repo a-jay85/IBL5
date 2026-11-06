@@ -80,12 +80,19 @@ def test_section_for_internal_error_returns_failure_line(tmp_path, monkeypatch):
     assert got == FAILURE_BLOCK
 
 
+class _FakeGit:
+    last_conflict_flag_state = ""
+
+    def branch(self):
+        return "any-branch"
+
+
 def test_report_failure_keeps_verdict_and_exit(tmp_path, monkeypatch):
     def explode(*args, **kwargs):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(cr, "section_for", explode)
-    section = runner._conflict_report_section("any-branch", ".", None)
+    section = runner._conflict_report_section(_FakeGit(), ".", None)
     assert section == FAILURE_BLOCK
     inputs = pr3267_inputs(tmp_path)
     plain = render_sticky(inputs)
@@ -310,3 +317,28 @@ def test_condition14_identical_with_report_record(tmp_path):
         assert before == after
     assert before[1][0] == FLAG_CARRIED
     assert before[2] == "CONFLICT-REVIEW=CLEAN"
+
+
+def test_stale_flag_state_renders_dropped_after_reconcile_deleted_marker(tmp_path):
+    from harness.armable import FLAG_STALE
+    repo = _small_repo(tmp_path)  # no marker on disk: reconcile already deleted it
+    prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
+    got = cr.section_for("wiped", repo["repo"], head=repo["head"], prior_body=prior,
+                         tmp_dir=str(tmp_path), flag_state=FLAG_STALE)
+    assert got == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.DROPPED_LINE}\n{cr.SECTION_END}"
+
+
+def test_clean_replay_rebinds_record_to_new_sha(tmp_path):
+    repo = _small_repo(tmp_path)
+    old = "9" * 40
+    record_conflict_resolution("replay", old, str(tmp_path))
+    cr.write_record(
+        repo=repo["repo"], branch="replay", resolving_sha=old, resolved_files=["a.sh"],
+        target_ref=repo["onto"], review_verdict_path=None, retries=0, rung=None,
+        fix_summary=None, branch_sha=repo["branch"], tmp_dir=str(tmp_path))
+    record_conflict_resolution("replay", repo["head"], str(tmp_path))  # the replay's new HEAD
+    cr.rebind_records("replay", repo["head"], [old], str(tmp_path))
+    got = cr.section_for("replay", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path))
+    assert cr.NO_RECORD_LINE not in got
+    assert "a.sh" in got
+    assert "verdict=ABSENT" in got

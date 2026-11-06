@@ -1089,7 +1089,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     reused_from=res.reused_from,
                     fix_round_line=fix_round.summary_line(res.fix_round),
                     conflict_section=_conflict_report_section(
-                        git.branch(), worktree, prior_body_),
+                        git, worktree, prior_body_),
                     posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
                 try:
                     cid_ = gh.pr_sticky_verdict(pr, sticky_)
@@ -3084,9 +3084,11 @@ def _conflict_key(branch: str) -> str:
     return (branch or "").translate(str.maketrans("/:", "--"))
 
 
-def _conflict_report_section(branch: str, repo: str, prior_body: str | None) -> str:
+def _conflict_report_section(git, repo: str, prior_body: str | None) -> str:
     try:
-        return conflict_report.section_for(branch, repo, prior_body=prior_body)
+        return conflict_report.section_for(
+            git.branch(), repo, prior_body=prior_body,
+            flag_state=getattr(git, "last_conflict_flag_state", "") or "")
     except Exception:  # conflict report never changes verdict or exit code
         return f"{conflict_report.SECTION_BEGIN}\n{conflict_report.FAILURE_LINE}\n{conflict_report.SECTION_END}"
 

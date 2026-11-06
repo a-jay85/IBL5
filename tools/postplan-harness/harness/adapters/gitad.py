@@ -1173,11 +1173,22 @@ class LiveGit:
         CONFLICT-REVIEW=CLEAN verdict. Append the new HEAD. Only a SHA-bound "carried"
         marker is re-bound; an unknown one stays untouched. A failed write restores the
         pre-rebase head, so the old SHA stays in history and the hold survives."""
-        from ..armable import FLAG_CARRIED, record_conflict_resolution
+        from ..armable import FLAG_CARRIED, conflict_flag_path, record_conflict_resolution
         if self.last_conflict_flag_state != FLAG_CARRIED:
             return
         try:
-            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+            try:
+                with open(conflict_flag_path(branch), encoding="utf-8") as fh:
+                    old_shas = [ln.strip() for ln in fh if ln.strip()]
+            except OSError:
+                old_shas = []
+            new_sha = self._run("rev-parse", "HEAD").strip()
+            record_conflict_resolution(branch, new_sha)
+            try:  # display-only: the report record follows the marker's new SHA
+                from .. import conflict_report
+                conflict_report.rebind_records(branch, new_sha, old_shas)
+            except Exception:
+                pass
         except (OSError, ValueError) as exc:
             if pre_rebase_sha is None:
                 raise
@@ -1514,6 +1525,7 @@ class LiveGit:
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
                     self.last_conflict_rung = outcome.rung
+                    self.last_conflict_fix_summary = "; ".join(outcome.trail)
                     proof_out = outcome.proof_out
                     resolved_files = outcome.resolved_files
                     adapted = ()  # a ladder rung re-proved strictly; no adaptation relaxation applies
@@ -1898,6 +1910,7 @@ class LiveGit:
                                   pre_rebase_sha=pre_rebase_sha,
                                   reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
             self.last_conflict_rung = outcome.rung
+            self.last_conflict_fix_summary = "; ".join(outcome.trail)
             proof_out = outcome.proof_out
             auto_resolved_files = tuple(sorted(set(auto_resolved_files) | set(outcome.resolved_files)))
             adapted = ()  # the rung re-proved strictly; no adaptation relaxation applies

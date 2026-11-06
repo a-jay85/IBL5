@@ -27,7 +27,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .armable import conflict_flag_path, conflict_verdict_for
+from .armable import FLAG_STALE, conflict_flag_path, conflict_verdict_for
 from .conflict import VERDICT_CLEAN, VERDICT_FOUND_PROBLEM
 from .fidelity import MERGE_DIGEST_HEADING, STICKY_MARKER
 
@@ -162,6 +162,21 @@ def write_record(
     return path
 
 
+def rebind_records(branch: str, new_sha: str, old_shas: list[str], tmp_dir: str = "/tmp") -> None:
+    """A clean replay re-stamps the resolving commit. Copy each record keyed to one of
+    `old_shas` onto `new_sha`, so the report still finds it for the live marker entry."""
+    entries = read_records(branch, tmp_dir)
+    copies = [dict(e, resolving_sha=new_sha) for e in entries
+              if e.get("resolving_sha") in old_shas and e.get("resolving_sha") != new_sha]
+    if not copies:
+        return
+    entries = [e for e in entries if e.get("resolving_sha") != new_sha] + copies
+    path = record_path(branch, tmp_dir)
+    tmp = Path(str(path) + ".tmp")
+    tmp.write_text(json.dumps(entries))
+    os.replace(tmp, path)
+
+
 def read_records(branch: str, tmp_dir: str = "/tmp") -> list[dict]:
     """The recorded resolutions for this branch; [] when missing or unparsable."""
     try:
@@ -226,6 +241,8 @@ def _show(repo: str, sha: str, path: str) -> str | None:
     rc, out = _git(repo, "show", f"{sha}:{path}")
     if rc == 0:
         return out[:_MAX_BYTES_READ]
+    if rc == _GIT_FAILED:
+        return None  # git itself failed (timeout, spawn error): not proof the path is absent
     return "" if _rev(repo, sha) else None
 
 
@@ -434,7 +451,7 @@ def _block(*lines: str) -> str:
 
 
 def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | None = None,
-                tmp_dir: str = "/tmp") -> str:
+                tmp_dir: str = "/tmp", flag_state: str = "") -> str:
     """The conflict-report section for the sticky, or "" when no model resolved a conflict
     on this branch. Never raises."""
     try:
@@ -458,7 +475,7 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
         if not live and recovered is None:
             return ""  # no model-resolved conflict on this branch
         if not live:
-            if not shas:
+            if not shas and flag_state != FLAG_STALE:
                 return recovered  # marker gone: cannot tell dropped from cleared, keep the prior text
             return _block(HEADING, DROPPED_LINE)
         records = [r for r in read_records(branch, tmp_dir) if r.get("resolving_sha") in live]

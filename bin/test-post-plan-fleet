@@ -20,6 +20,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 DRIVER="$SCRIPT_DIR/post-plan-fleet"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
 
+# bin/automouse/run exports POSTPLAN_FIRED_BY=automouse to post-plan-now, and the
+# prefire matrix stage runs this file under it. Cases must see the driver's own default.
+unset POSTPLAN_FIRED_BY
+
 SCRATCH="$(mktemp -d)"
 TMP_LOGS=()
 _cleanup() {

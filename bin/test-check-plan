@@ -4552,14 +4552,15 @@ _corpus_guard_ok() {
     # clean run too, so a bare '^\[' match would flag passing plans.
     # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
     # the plans it flags carry genuine plan-only negated greps (true positives).
+    # Gate [CW] is the same: frozen plans shipped before prefire-verify ran their rows.
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -5819,5 +5820,91 @@ else
     h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
 fi
 GUARD="$AB_GUARD_SAVED"
+
+# ---------------------------------------------------------------------------
+# Gate [CW]: prefire-verify runs matrix rows from the repo root, so a row that starts
+# with an ibl5/-only tool can never pass. The 2026-11-06 trade-suggestions skip.
+# ---------------------------------------------------------------------------
+assert_viol "gateCW-bare-phpunit-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `vendor/bin/phpunit tests/Foo` |
+'
+assert_viol "gateCW-bare-composer-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer run analyse` |
+'
+assert_viol "gateCW-bare-bun-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run test:e2e` |
+'
+assert_viol "gateCW-bare-php-script-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php scripts/foo.php --bogus` |
+'
+assert_viol "gateCW-later-segment-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose --since=master && composer test` |
+'
+assert_viol "gateCW-env-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `FOO=1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-comment-does-not-excuse-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer run analyse # run from the worktree ibl5 dir` |
+'
+assert_viol "gateCW-cd-ibl5-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `cd ibl5 && vendor/bin/phpunit && composer run analyse` |
+'
+assert_viol "gateCW-subshell-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `(cd ibl5 && vendor/bin/phpunit)` |
+'
+assert_viol "gateCW-root-tools-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose --since=master` |
+'
+assert_viol "gateCW-quoted-text-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `command grep -c "; vendor/bin/phpunit" README.md` |
+'
+assert_viol "gateCW-tool-name-in-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose ibl5/vendor/bin/README.md` |
+'
+assert_viol "gateCW-one-time-check-not-run-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x (one-time-check: run once by hand) | CLI-executable | post-impl | `composer run analyse` |
+| 2 | y | CLI-executable | post-impl | `bin/check-prose --since=master` |
+| 3 | z | CLI-executable | post-impl | `bin/check-docs --since=master` |
+| 4 | w | CLI-executable | post-impl | `bin/check-prose --since=origin/master` |
+'
 
 h_done

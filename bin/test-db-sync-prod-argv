@@ -245,5 +245,9 @@ done
 assert_eq "P2 keep-list names and order" \
     "ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context" \
     "$P_LIST"
+SYNC_SRC=$(cat "$REPO_ROOT/bin/db-sync-prod")
+assert_eq "P3 no inline keep-list literal" "0" "$(count_in 'PRESERVE_TABLES="ibl_' "$SYNC_SRC")"
+assert_eq "P4 keep-list never sourced (.)" "0" "$(count_in '. "$PRESERVE_LIST_FILE"' "$SYNC_SRC")"
+assert_eq "P4 keep-list never sourced (source)" "0" "$(count_in 'source "$PRESERVE_LIST_FILE"' "$SYNC_SRC")"
 
 h_done

@@ -55,6 +55,40 @@ source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
+# Local-only tables to keep, read as DATA from bin/db-sync-preserve-tables.txt
+# (never sourced). Fail-closed: a missing, unreadable or empty list, or any bad
+# name, aborts before any docker, dump, drop or prod call. A bad list must never
+# mean "preserve nothing" (the 2026-09-14 loss, ADR-0080). The character set is
+# spelled out so the check does not depend on the locale (bash 3.2 safe).
+PRESERVE_LIST_FILE="$REPO_ROOT/bin/db-sync-preserve-tables.txt"
+_preserve_name_ok() {
+    case "$1" in ibl_?*) ;; *) return 1 ;; esac
+    case "${1#ibl_}" in *[!abcdefghijklmnopqrstuvwxyz0123456789_]*) return 1 ;; esac
+    return 0
+}
+if [ ! -f "$PRESERVE_LIST_FILE" ] || [ ! -r "$PRESERVE_LIST_FILE" ]; then
+    printf 'ERROR: preserved-tables list missing or unreadable: %s. Aborting before any sync.\n' \
+        "$PRESERVE_LIST_FILE" >&2
+    exit 1
+fi
+PRESERVE_TABLES=""
+_pt_lineno=0
+while IFS= read -r _pt_line || [ -n "$_pt_line" ]; do
+    _pt_lineno=$((_pt_lineno + 1))
+    case "$_pt_line" in ''|'#'*) continue ;; esac
+    if ! _preserve_name_ok "$_pt_line"; then
+        printf 'ERROR: preserved-tables list %s:%d: invalid table name %q (must match ^ibl_[a-z0-9_]+$). Aborting before any sync.\n' \
+            "$PRESERVE_LIST_FILE" "$_pt_lineno" "$_pt_line" >&2
+        exit 1
+    fi
+    PRESERVE_TABLES="${PRESERVE_TABLES:+$PRESERVE_TABLES }$_pt_line"
+done < "$PRESERVE_LIST_FILE"
+if [ -z "$PRESERVE_TABLES" ]; then
+    printf 'ERROR: preserved-tables list has no table names: %s. Aborting before any sync.\n' \
+        "$PRESERVE_LIST_FILE" >&2
+    exit 1
+fi
+
 WORKTREE_ARG=""
 SNAPSHOT=""
 PRINT_PLAN=false
@@ -253,7 +287,7 @@ remote_dump() {
 # changes (new keys, revocations) no longer propagate to local. API keys are
 # per-environment credentials, so a local copy of prod's keys was never the
 # point; keeping the local bot working is.
-PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context"
+# PRESERVE_TABLES is loaded and validated near the top of this script, from bin/db-sync-preserve-tables.txt.
 
 # Detect STORED GENERATED column tables — their data needs dedicated column-list
 # INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.

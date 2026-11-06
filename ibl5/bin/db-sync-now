@@ -274,7 +274,7 @@ from_backup_mode() {
     fi
 
     log "restoring $artifact_name into $DB_SYNC_CONTAINER via db-sync-prod --snapshot..."
-    # Route through db-sync-prod's snapshot mode so PRESERVE_TABLES (ibl_api_keys
+    # Route through db-sync-prod's snapshot mode so PRESERVE_TABLES (listed in bin/db-sync-preserve-tables.txt: ibl_api_keys
     # and the four ibl_bug_* tables) survive the restore. A direct import drops
     # them every night. db-sync-prod picks its container from $PWD: inside a
     # worktree it targets ibl5-db-<slug>. Run it from / so it always resolves

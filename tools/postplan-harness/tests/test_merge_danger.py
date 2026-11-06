@@ -120,6 +120,32 @@ def test_db_sync_prod_is_external_one_way():
     assert "external-path:bin/db-sync-prod" in d.triggers
 
 
+KEEP_LIST = "bin/db-sync-preserve-tables.txt"
+
+
+def test_db_sync_preserve_list_alone_is_two_way_localized():
+    d = _derive([("M", KEEP_LIST)])
+    assert (d.door, d.blast) == ("two-way", "localized")
+    assert not any(t.startswith("external-path:") for t in d.triggers)
+
+
+def test_db_sync_preserve_list_with_argv_test_is_two_way_localized():
+    d = _derive([("M", KEEP_LIST), ("M", "bin/test-db-sync-prod-argv")])
+    assert (d.door, d.blast) == ("two-way", "localized")
+
+
+def test_db_sync_preserve_list_with_db_sync_prod_is_external_one_way():
+    d = _derive([("M", KEEP_LIST), ("M", "bin/db-sync-prod")])
+    assert (d.door, d.blast) == ("one-way", "external")
+    assert "external-path:bin/db-sync-prod" in d.triggers
+
+
+def test_db_sync_preserve_list_with_three_bin_files_is_module():
+    d = _derive([("M", KEEP_LIST), ("M", "bin/test-db-sync-prod-argv"),
+                 ("M", "bin/test-phase-snapshot-detect"), ("M", "bin/orphan-css-routes.txt")])
+    assert (d.door, d.blast) == ("two-way", "module")
+
+
 def test_notify_workflow_text_is_external_one_way():
     wf = ".github/workflows/nightly.yml"
     d = _derive([("M", wf)], read=lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == wf else None)

@@ -381,6 +381,108 @@ comment_json "$BOT" Bot "2026-11-02T23:00:00Z" "$(printf 'hi\n%s' "$(record_body
 run_newer "$T/aw-n5/e.json" "$T/aw-n5/c.json"
 want "newer: marker text on line 2 is not a marker -> wait" "$LAST_OUT" "NEWER_RC=0"
 
+# ---- race-fix wiring in human-signoff.yml (static) ----
+HS_WF="$REPO_ROOT/.github/workflows/human-signoff.yml"
+# hs_job_block <job_id> — the job's lines, up to the next top-level job key.
+hs_job_block() { awk -v j="  $1:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$HS_WF"; }
+GATE_BLOCK=$(hs_job_block human-signoff)
+WRITE_BLOCK=$(hs_job_block human-approved-fingerprint)
+gate_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$GATE_BLOCK")
+write_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$WRITE_BLOCK")
+aw_n=$(sed -nE "s/^          HS_AWAIT_ATTEMPTS: '([0-9]+)'$/\1/p" <<< "$GATE_BLOCK")
+aw_s=$(sed -nE "s/^          HS_AWAIT_SLEEP: '([0-9]+)'$/\1/p" <<< "$GATE_BLOCK")
+if [ -n "$gate_to" ] && [ -n "$aw_n" ] && [ -n "$aw_s" ] \
+   && [ $((aw_n * aw_s * 2)) -le $((gate_to * 60)) ]; then
+    h_pass "wf: wait budget fits twice in the gate timeout"
+else
+    h_fail "wf: wait budget fits twice in the gate timeout" "timeout=[$gate_to] attempts=[$aw_n] sleep=[$aw_s]"
+fi
+if [ -n "$write_to" ]; then h_pass "wf: write job has timeout-minutes"; else h_fail "wf: write job has timeout-minutes" "none"; fi
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: eval step calls hs_await_record" "$GATE_BLOCK" 'hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments'
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: eval step reads issue events" "$GATE_BLOCK" '"repos/$GH_REPO/issues/$PR/events"'
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: write job guards the record" "$WRITE_BLOCK" 'hs_record_write_ok "$APPROVED_AT" "$LABELS_NOW"'
+want "wf: gate publishes approved_at" "$GATE_BLOCK" 'approved_at: ${{ steps.eval.outputs.approved_at }}'
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: drop still deletes the label" "$WRITE_BLOCK" 'gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/human-approved"'
+src_ln=$(command grep -nF 'source bin/lib/human-signoff-classifier.sh' <<< "$WRITE_BLOCK" | cut -d: -f1)
+rec_ln=$(command grep -nF 'if [ "$VERDICT" = "record" ]; then' <<< "$WRITE_BLOCK" | cut -d: -f1)
+if [ -n "$src_ln" ] && [ -n "$rec_ln" ] && [ "$src_ln" -gt "$rec_ln" ]; then
+    h_pass "wf: drop path never sources the lib"
+else
+    h_fail "wf: drop path never sources the lib" "source line [$src_ln] record-if line [$rec_ln]"
+fi
+
+# run_write <approved_at> <labels> <events_file> <comments_file> — prints WRITE_RC=<rc>.
+run_write() {
+    # shellcheck disable=SC2016  # expands in the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; rc=0; hs_record_write_ok "$@" || rc=$?; echo "WRITE_RC=$rc"' "$LIB" "$@" 2>&1)
+}
+# run_label_at <events_file> — prints LABEL_AT=<ts> LABEL_RC=<rc>.
+run_label_at() {
+    # shellcheck disable=SC2016  # expands in the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; rc=0; v=$(hs_newest_label_at "$1") || rc=$?; echo "LABEL_AT=$v LABEL_RC=$rc"' "$LIB" "$@" 2>&1)
+}
+
+# R1-R11: the write-time guard. Approval time is the PR #3685 label event.
+wr_mk() { mkdir -p "$T/wr-$1"; printf '[]' > "$T/wr-$1/c.json"; event_json labeled human-approved "$LBL_AT" | jq -s . > "$T/wr-$1/e.json"; }
+wr_mk r1
+run_write "$LBL_AT" human-approved "$T/wr-r1/e.json" "$T/wr-r1/c.json"
+want "write: PR 3685, nothing newer -> write" "$LAST_OUT" "WRITE_RC=0"
+wr_mk r2
+comment_json "$BOT" Bot "2026-11-02T23:01:00Z" "$(drop_body missing)" | jq -s . > "$T/wr-r2/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r2/e.json" "$T/wr-r2/c.json"
+want "write: revoke after approval -> skip" "$LAST_OUT" "WRITE_RC=1"
+wr_mk r3
+comment_json "$BOT" Bot "$LBL_AT" "$(drop_body missing)" | jq -s . > "$T/wr-r3/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r3/e.json" "$T/wr-r3/c.json"
+want "write: revoke same second -> skip" "$LAST_OUT" "WRITE_RC=1"
+wr_mk r4
+comment_json "$BOT" Bot "2026-11-02T22:50:00Z" "$(drop_body missing)" | jq -s . > "$T/wr-r4/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r4/e.json" "$T/wr-r4/c.json"
+want "write: revoke before approval -> write" "$LAST_OUT" "WRITE_RC=0"
+wr_mk r5
+{ event_json labeled human-approved "$LBL_AT"; event_json labeled human-approved "2026-11-02T23:05:00Z"; } | jq -s . > "$T/wr-r5/e.json"
+run_write "$LBL_AT" human-approved "$T/wr-r5/e.json" "$T/wr-r5/c.json"
+want "write: newer approval label -> skip" "$LAST_OUT" "WRITE_RC=1"
+wr_mk r6
+comment_json "$BOT" Bot "2026-11-02T23:01:00Z" "$(record_body "$A")" | jq -s . > "$T/wr-r6/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r6/e.json" "$T/wr-r6/c.json"
+want "write: newer record from another run -> write" "$LAST_OUT" "WRITE_RC=0"
+wr_mk r7
+run_write "$LBL_AT" needs-a-human "$T/wr-r7/e.json" "$T/wr-r7/c.json"
+want "write: label removed -> skip" "$LAST_OUT" "WRITE_RC=1"
+wr_mk r8
+run_write "$LBL_AT" human-approved-x "$T/wr-r8/e.json" "$T/wr-r8/c.json"
+want "write: lookalike label only -> skip" "$LAST_OUT" "WRITE_RC=1"
+wr_mk r9
+run_write "" human-approved "$T/wr-r9/e.json" "$T/wr-r9/c.json"
+want "write: empty approved_at -> error" "$LAST_OUT" "WRITE_RC=2"
+wr_mk r10
+printf '{}' > "$T/wr-r10/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r10/e.json" "$T/wr-r10/c.json"
+want "write: comments not an array -> error" "$LAST_OUT" "WRITE_RC=2"
+wr_mk r11
+comment_json "$BOT" User "2026-11-02T23:01:00Z" "$(drop_body missing)" | jq -s . > "$T/wr-r11/c.json"
+run_write "$LBL_AT" human-approved "$T/wr-r11/e.json" "$T/wr-r11/c.json"
+want "write: forged non-bot revoke -> write" "$LAST_OUT" "WRITE_RC=0"
+
+# L1-L3: the newest label event.
+wr_mk l1
+{ event_json labeled human-approved "2026-11-02T23:05:00Z"; event_json labeled human-approved "$LBL_AT"; } | jq -s . > "$T/wr-l1/e.json"
+run_label_at "$T/wr-l1/e.json"
+want "label-at: newest of two" "$LAST_OUT" "LABEL_AT=2026-11-02T23:05:00Z LABEL_RC=0"
+wr_mk l2
+event_json labeled needs-a-human "$LBL_AT" | jq -s . > "$T/wr-l2/e.json"
+run_label_at "$T/wr-l2/e.json"
+want "label-at: none -> rc 1" "$LAST_OUT" "LABEL_RC=1"
+wr_mk l3
+printf 'not json' > "$T/wr-l3/e.json"
+run_label_at "$T/wr-l3/e.json"
+want "label-at: invalid json -> rc 2" "$LAST_OUT" "LABEL_RC=2"
+
 # E11: a non-feat PR skips the fingerprint entirely
 run_approval synchronize "" "fix: y" human-approved "" /nonexistent; rc=$?
 expect "approval: non-feat skips fingerprint -> rc 0" 0 "$rc"
@@ -764,11 +866,28 @@ group_pred() {
     return 1
 }
 
+# hs_group_pred <workflow-file> — human-signoff's three-arm group:
+# `(P) && format('human-signoff-{0}-skip-{1}', ...) || (approving label) &&
+# format('human-signoff-{0}-approve-{1}', ...) || format('human-signoff-{0}', ...)`.
+# The approving-label arm is pinned literally. Sets GP to P; rc 1 (GP empty)
+# on any other shape. Silent.
+hs_group_pred() {
+    local grp re
+    GP=""
+    grp=$(wf_concurrency_group "$1") || return 1
+    re="^\\((.*)\\) && format\\('human-signoff-\\{0\\}-skip-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| \\(github\\.event\\.action == 'labeled' && github\\.event\\.label\\.name == 'human-approved'\\) && format\\('human-signoff-\\{0\\}-approve-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| format\\('human-signoff-\\{0\\}', github\\.event\\.pull_request\\.number\\)\$"
+    if [[ "$grp" =~ $re ]]; then
+        GP="${BASH_REMATCH[1]}"
+        return 0
+    fi
+    return 1
+}
+
 # hs_ident_ok / am_ident_ok <workflow-file> — 0 when the job `if:` equals the
 # negated group predicate (4a). Silent, so mutants can reuse them.
 hs_ident_ok() {
     local ifx
-    group_pred "$1" human-signoff || return 1
+    hs_group_pred "$1" || return 1
     ifx=$(wf_job_if "$1" human-signoff) || return 1
     [ "$ifx" = "!($GP)" ]
 }
@@ -780,7 +899,7 @@ am_ident_ok() {
 }
 
 # ---- 4a. predicate identity ----
-if ! group_pred "$WF_DIR/human-signoff.yml" human-signoff; then
+if ! hs_group_pred "$WF_DIR/human-signoff.yml"; then
     h_fail "group shape human-signoff.yml"
 fi
 if hs_ident_ok "$WF_DIR/human-signoff.yml"; then
@@ -789,7 +908,7 @@ else
     h_fail "hs if == !(group predicate)" "job if and negated group predicate differ"
 fi
 HS_P=""
-group_pred "$WF_DIR/human-signoff.yml" human-signoff && HS_P=$GP
+hs_group_pred "$WF_DIR/human-signoff.yml" && HS_P=$GP
 if ! group_pred "$WF_DIR/auto-mergeable-label.yml" auto-mergeable-label; then
     h_fail "group shape auto-mergeable-label.yml"
 fi
@@ -859,7 +978,7 @@ hs_job_ok() {
             return 1
         fi
     done
-    group_pred "$1" human-signoff || return 1
+    hs_group_pred "$1" || return 1
     ifx=$(wf_job_if "$1" "$id") || return 1
     [ "$ifx" = "!($GP)" ]
 }
@@ -997,6 +1116,26 @@ for t_row in "${EXPECT[@]}"; do
     fi
 done
 
+# ---- 4f. concurrency group values (race fix, ADR-0062 Update 2026-11-02) ----
+HS_GROUP=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
+# grp_check <name> <action> <title> <label> <changes> <pr-labels> <expected-group>
+grp_check() {
+    local ev
+    ev=$(mk_event "$2" "$3" "$4" "$5" "$6") || { h_fail "$1" "mk_event failed"; return 0; }
+    # gha-if-eval prints only true or false, so compare inside the expression.
+    # The parentheses matter: the group expression has a top-level ||.
+    ev_check "$1" "$ev" "($HS_GROUP) == '$7'" true
+}
+grp_check "group: labeled human-approved feat -> per-run approve" labeled "feat: x" human-approved n human-approved "human-signoff-1-approve-1"
+grp_check "group: labeled human-approved fix -> per-run approve" labeled "fix: x" human-approved n human-approved "human-signoff-1-approve-1"
+grp_check "group: synchronize feat -> shared" synchronize "feat: x" - n human-approved "human-signoff-1"
+grp_check "group: synchronize fix -> shared" synchronize "fix: x" - n - "human-signoff-1"
+grp_check "group: unlabeled human-approved feat -> shared" unlabeled "feat: x" human-approved n - "human-signoff-1"
+grp_check "group: labeled lookalike human-approved-x feat -> shared" labeled "feat: x" human-approved-x n human-approved-x "human-signoff-1"
+grp_check "group: labeled needs-a-human feat -> shared" labeled "feat: x" needs-a-human n needs-a-human "human-signoff-1"
+grp_check "group: labeled needs-a-human fix -> per-run skip" labeled "fix: x" needs-a-human n needs-a-human "human-signoff-1-skip-1"
+grp_check "group: edited title feat -> shared" edited "feat: x" - y - "human-signoff-1"
+
 # ---- 4e. permanent mutation checks (forced-trigger rows) ----
 # mutate <name> <orig> <out> <sed-arg>... — build the mutant; fail loudly if identical.
 mutate() {
@@ -1035,6 +1174,19 @@ if mutate hs-group-drops-feat "$WF_DIR/human-signoff.yml" "$M2" -e "/^  group: /
     else
         h_pass "mutant hs-group-drops-feat identity guard catches it"
     fi
+fi
+
+# 2b. hs-group-drops-approve-arm: the approving-label arm removed from the group.
+M2B="$EV_DIR/m-hs-group-drops-approve-arm.yml"
+if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  group: /s/ || (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id)//"; then
+    if hs_group_pred "$M2B"; then
+        h_fail "mutant hs-group-drops-approve-arm shape guard catches it" "shape still matched"
+    else
+        h_pass "mutant hs-group-drops-approve-arm shape guard catches it"
+    fi
+    ev_check "mutant hs-group-drops-approve-arm evaluator exposes the shared group" \
+        "$(mk_event labeled 'feat: x' human-approved n human-approved)" \
+        "($(wf_concurrency_group "$M2B")) == 'human-signoff-1'" true
 fi
 
 # 3. hs-if-removed: the human-signoff job `if:` line deleted.

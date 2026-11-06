@@ -275,6 +275,61 @@ hs_await_record() {
     return 1
 }
 
+# hs_newest_label_at <events_json_file> — print created_at of the newest
+# `labeled` event for human-approved. The approving run captures it at eval
+# time as its own label event. rc 1: none. rc 2: unreadable, not an array,
+# or a bad timestamp.
+hs_newest_label_at() {
+    local val
+    if ! val=$(jq -r '
+            if type != "array" then error("events payload is not an array") else . end
+            | [ .[] | select(.event == "labeled" and .label.name == "human-approved") ]
+            | sort_by(.created_at | fromdateiso8601) | last | .created_at // ""' "$1" 2>&1); then
+        echo "hs_newest_label_at: cannot read $1: $val" >&2
+        return 2
+    fi
+    [ -n "$val" ] || return 1
+    printf '%s\n' "$val"
+}
+
+# hs_record_write_ok <approved_at> <labels_csv> <events_json_file> <comments_json_file>
+# Decide, at write time, whether the approving run may post its record.
+#   rc 0: write
+#   rc 1: skip. A newer human-approved label event exists (its run owns the
+#         record), a github-actions[bot] revoked marker is at or after
+#         <approved_at>, or the label is no longer held
+#   rc 2: skip on error. Bad <approved_at>, or an unreadable/invalid payload
+hs_record_write_ok() {
+    local approved_at="$1" labels="$2" val
+    if ! val=$(jq -nr --arg at "$approved_at" --arg re "$HS_FP_MARKER_RE" \
+            --slurpfile ev "$3" --slurpfile cm "$4" '
+            def arr: if type != "array" then error("payload is not an array") else . end;
+            ($at | fromdateiso8601) as $t
+            | ($ev[0] | arr) as $e | ($cm[0] | arr) as $c
+            | ([ $e[] | select(.event == "labeled" and .label.name == "human-approved")
+                 | .created_at | fromdateiso8601 | select(. > $t) ] | length) as $newer_labels
+            | ([ $c[] | select(.user.login == "github-actions[bot]" and .user.type == "Bot")
+                 | (.body // "") as $b | select($b | test($re))
+                 | select(($b | capture($re) | .v) == "revoked")
+                 | .created_at | fromdateiso8601 | select(. >= $t) ] | length) as $newer_revokes
+            | if $newer_labels > 0 then "newer-label"
+              elif $newer_revokes > 0 then "revoked"
+              else "ok" end' 2>&1); then
+        echo "hs_record_write_ok: cannot decide: $val" >&2
+        return 2
+    fi
+    case "$val" in
+        ok) ;;
+        newer-label|revoked) echo "Record write: skip ($val)"; return 1 ;;
+        *) return 2 ;;
+    esac
+    if ! grep -q ',human-approved,' <<< ",$labels,"; then
+        echo "Record write: skip (label no longer held)"
+        return 1
+    fi
+    return 0
+}
+
 # _hs_drop <reason> — set the drop verdict and emit the annotation that reds
 # the required check.
 # shellcheck disable=SC2034  # HS_VERDICT and HS_DROP_REASON are read by the sourcing caller

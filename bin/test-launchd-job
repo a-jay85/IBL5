@@ -1083,6 +1083,183 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Live-label slot cases L1-L6. A dedicated launchctl stub, reached only through
+# LAUNCHCTL_CMD, and a sandbox HOME. Real sleep, because L5 and L6 need real time.
+# ---------------------------------------------------------------------------
+SLOT="$T/slot"
+export SLOT
+mkdir -p "$SLOT/home"
+cat > "$SLOT/launchctl-stub" <<'STUB'
+#!/bin/bash
+case "${1:-}" in
+    list)
+        if [ -n "${2:-}" ]; then
+            grep -qxF -- "$2" "$SLOT/listed" 2>/dev/null
+            exit $?
+        fi
+        [ -e "$SLOT/listfail" ] && exit 1
+        printf 'PID\tStatus\tLabel\n'
+        if [ -f "$SLOT/listed" ]; then
+            while IFS= read -r _l; do printf '123\t0\t%s\n' "$_l"; done < "$SLOT/listed"
+        fi
+        [ -e "$SLOT/dashrow" ] && printf -- '-\t0\tcom.ibl5.test-a-dash\n'
+        exit 0
+        ;;
+    submit)
+        sleep "${STUB_SUBMIT_DELAY:-0}"
+        printf '%s\n' "$3" >> "$SLOT/listed"
+        printf '%s\n' "$3" >> "$SLOT/submits"
+        exit 0
+        ;;
+esac
+exit 0
+STUB
+chmod +x "$SLOT/launchctl-stub"
+SLOT_STUB="$SLOT/launchctl-stub"
+SLOT_LOCK="$SLOT/home/Library/Caches/com.ibl5.ljob-locks/com.ibl5.test-a-lock.d"
+reset_slot() {
+    rm -f "$SLOT/listed" "$SLOT/submits" "$SLOT/listfail" "$SLOT/dashrow" "$SLOT/ran" "$SLOT/out" "$SLOT/err"
+    rm -rf "$SLOT/home/Library"
+}
+slot_lines() { if [[ -f "$1" ]]; then grep -c . "$1" || true; else printf '0\n'; fi; }
+
+# L1: both PID shapes count; the longer prefix and the header do not.
+reset_slot
+printf 'com.ibl5.test-a-1\ncom.ibl5.test-ab-3\n' > "$SLOT/listed"
+touch "$SLOT/dashrow"
+L1_N="$(HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"; ljob_count_live "com.ibl5.test-a-")"
+if [[ "$L1_N" == "2" ]]; then pass "L1_count_live_prefix_and_dash_row"
+else fail "L1_count_live_prefix_and_dash_row" "count=$L1_N (want 2)"; fi
+
+# L2: an empty list is 0; a failing list fails the count and the claim.
+reset_slot
+L2_EMPTY="$(HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"; ljob_count_live "com.ibl5.test-a-")"
+touch "$SLOT/listfail"
+(HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"; ljob_count_live "com.ibl5.test-a-") >/dev/null 2>&1
+L2_COUNT_RC=$?
+(
+    HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"
+    ljob_claim_slot "com.ibl5.test-a-" 2 60 FAKE_DRY "com.ibl5.test-a-n" -- "$SLOT_STUB" submit -l com.ibl5.test-a-n -- /bin/true
+) >"$SLOT/out" 2>"$SLOT/err"
+L2_CLAIM_RC=$?
+if [[ "$L2_EMPTY" == "0" && $L2_COUNT_RC -eq 1 && $L2_CLAIM_RC -eq 1 ]] \
+    && grep -qF "ERROR: cannot count live slots" "$SLOT/err" && [[ ! -e "$SLOT/submits" ]]; then
+    pass "L2_empty_and_failing_list"
+else
+    fail "L2_empty_and_failing_list" "empty=$L2_EMPTY count_rc=$L2_COUNT_RC claim_rc=$L2_CLAIM_RC"
+fi
+
+# L3: at cap under the dry seam the claim stops without running the cmd.
+reset_slot
+printf 'com.ibl5.test-a-1\ncom.ibl5.test-a-2\n' > "$SLOT/listed"
+(
+    HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; FAKE_DRY=1; . "$LIB"
+    ran() { touch "$SLOT/ran"; }
+    ljob_claim_slot "com.ibl5.test-a-" 2 60 FAKE_DRY "" -- ran
+) >"$SLOT/out" 2>"$SLOT/err"
+L3_RC=$?
+if [[ $L3_RC -eq 0 && ! -e "$SLOT/ran" ]] \
+    && grep -qF "cap reached under FAKE_DRY" "$SLOT/err" \
+    && grep -qF "waiting for slot (2/2 in flight)…" "$SLOT/out"; then
+    pass "L3_cap_reached_under_dry_seam"
+else
+    fail "L3_cap_reached_under_dry_seam" "rc=$L3_RC"
+fi
+
+# L4: a free slot runs the cmd once and releases the lock. An empty LJOB_LOCK_DIR
+# still locks under the HOME default, which the cmd sees while the lock is held.
+reset_slot
+printf 'com.ibl5.test-a-1\n' > "$SLOT/listed"
+(
+    HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"
+    ljob_claim_slot "com.ibl5.test-a-" 2 60 FAKE_DRY "com.ibl5.test-a-new" -- "$SLOT_STUB" submit -l com.ibl5.test-a-new -- /bin/true
+) >/dev/null 2>"$SLOT/err"
+L4_RC=$?
+L4_SUBMITS="$(slot_lines "$SLOT/submits")"
+L4_LOCK_LEFT=0; [[ -e "$SLOT_LOCK" ]] && L4_LOCK_LEFT=1
+reset_slot
+(
+    HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; LJOB_LOCK_DIR=""; . "$LIB"
+    see_lock() { [[ -d "$SLOT_LOCK" ]] && touch "$SLOT/ran"; }
+    ljob_claim_slot "com.ibl5.test-a-" 2 60 FAKE_DRY "" -- see_lock
+) >/dev/null 2>&1
+L4_DEFAULT_SEEN=0; [[ -e "$SLOT/ran" ]] && L4_DEFAULT_SEEN=1
+if [[ $L4_RC -eq 0 && "$L4_SUBMITS" == "1" && $L4_LOCK_LEFT -eq 0 && $L4_DEFAULT_SEEN -eq 1 && ! -e "$SLOT_LOCK" ]]; then
+    pass "L4_free_slot_runs_cmd_and_unlocks"
+else
+    fail "L4_free_slot_runs_cmd_and_unlocks" "rc=$L4_RC submits=$L4_SUBMITS lock_left=$L4_LOCK_LEFT default_seen=$L4_DEFAULT_SEEN"
+fi
+
+# L5: two concurrent launchers at cap 1 give one submit and one cap-reached.
+reset_slot
+for i in 1 2; do
+    (
+        HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; STUB_SUBMIT_DELAY=1; FAKE_DRY=1
+        export STUB_SUBMIT_DELAY
+        . "$LIB"
+        ljob_claim_slot "com.ibl5.test-a-" 1 60 FAKE_DRY "com.ibl5.test-a-$i" -- "$SLOT_STUB" submit -l "com.ibl5.test-a-$i" -- /bin/true
+    ) >/dev/null 2>>"$SLOT/err" &
+done
+wait
+L5_SUBMITS="$(slot_lines "$SLOT/submits")"
+L5_CAP="$(grep -c "cap reached under FAKE_DRY" "$SLOT/err" || true)"
+if [[ "$L5_SUBMITS" == "1" && "$L5_CAP" == "1" ]]; then
+    pass "L5_concurrent_launchers_cap_1"
+else
+    fail "L5_concurrent_launchers_cap_1" "submits=$L5_SUBMITS cap_reached=$L5_CAP"
+fi
+
+# L6: a dead holder's lock breaks; a live holder's lock holds; an empty
+# LJOB_LOCK_TRIES is unbounded, not "0 tries".
+slot_claim() {
+    (
+        HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; . "$LIB"
+        ljob_claim_slot "com.ibl5.test-a-" 2 60 FAKE_DRY "" -- "$SLOT_STUB" submit -l "$1" -- /bin/true
+    ) >/dev/null 2>>"$SLOT/err"
+}
+slot_plant_lock() { mkdir -p "$SLOT_LOCK"; printf '%s\n' "$1" > "$SLOT_LOCK/pid"; }
+
+reset_slot
+sleep 0 & L6_DEAD=$!
+wait "$L6_DEAD" 2>/dev/null
+slot_plant_lock "$L6_DEAD"
+slot_claim com.ibl5.test-a-dead
+L6_DEAD_RC=$?
+L6_DEAD_LOCK=0; [[ -e "$SLOT_LOCK" ]] && L6_DEAD_LOCK=1
+L6_DEAD_SUBMITS="$(slot_lines "$SLOT/submits")"
+
+reset_slot
+sleep 30 & L6_LIVE=$!
+slot_plant_lock "$L6_LIVE"
+export LJOB_LOCK_TRIES=3
+slot_claim com.ibl5.test-a-live
+L6_LIVE_RC=$?
+unset LJOB_LOCK_TRIES
+L6_LIVE_SUBMITS="$(slot_lines "$SLOT/submits")"
+L6_LIVE_MSG=0; grep -qF "ERROR: slot lock busy" "$SLOT/err" && L6_LIVE_MSG=1
+kill "$L6_LIVE" 2>/dev/null
+wait "$L6_LIVE" 2>/dev/null
+
+reset_slot
+sleep 2 & L6_BRIEF=$!
+slot_plant_lock "$L6_BRIEF"
+export LJOB_LOCK_TRIES=""
+slot_claim com.ibl5.test-a-brief
+L6_EMPTY_RC=$?
+unset LJOB_LOCK_TRIES
+L6_EMPTY_SUBMITS="$(slot_lines "$SLOT/submits")"
+wait "$L6_BRIEF" 2>/dev/null
+
+if [[ $L6_DEAD_RC -eq 0 && $L6_DEAD_LOCK -eq 0 && "$L6_DEAD_SUBMITS" == "1" \
+    && $L6_LIVE_RC -eq 1 && "$L6_LIVE_SUBMITS" == "0" && $L6_LIVE_MSG -eq 1 \
+    && $L6_EMPTY_RC -eq 0 && "$L6_EMPTY_SUBMITS" == "1" ]]; then
+    pass "L6_stale_lock_broken_live_lock_respected"
+else
+    fail "L6_stale_lock_broken_live_lock_respected" \
+        "dead rc=$L6_DEAD_RC lock=$L6_DEAD_LOCK submits=$L6_DEAD_SUBMITS; live rc=$L6_LIVE_RC submits=$L6_LIVE_SUBMITS msg=$L6_LIVE_MSG; empty rc=$L6_EMPTY_RC submits=$L6_EMPTY_SUBMITS"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 h_done

@@ -46,7 +46,7 @@ final class CapRoomAsset
      */
     public static function payroll(array $salariesAtOffset, int $cashAtOffset): int
     {
-        return (int) array_sum($salariesAtOffset) + $cashAtOffset;
+        return array_sum($salariesAtOffset) + $cashAtOffset;
     }
 
     /**

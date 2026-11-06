@@ -102,11 +102,12 @@ final class ValuationTeamFactorsRepositoryTest extends TestCase
     {
         $this->db->onQuery('FROM `?ibl_cash_considerations', [
             self::cashRow(3, 1, [1 => 10]),
+            self::cashRow(5, 1, [1 => 20]),
         ]);
 
         $cash = (new ValuationTeamFactorsRepository($this->db))->getCashByTeamAndOffset(false);
 
-        self::assertSame([3], array_keys($cash));
+        self::assertSame([3, 5], array_keys($cash));
         self::assertArrayNotHasKey(4, $cash);
     }
 

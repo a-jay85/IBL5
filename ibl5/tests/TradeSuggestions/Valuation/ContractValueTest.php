@@ -21,6 +21,19 @@ final class ContractValueTest extends TestCase
         );
     }
 
+    public function testSurplusBySeasonTreatsMissingOffsetsAsEmpty(): void
+    {
+        self::assertSame(
+            [0 => -500, 1 => 0, 2 => 0, 3 => 0],
+            ContractValue::surplusBySeason([0 => 500], [1 => 300]),
+        );
+    }
+
+    public function testRaiseAtCurrentSeasonIgnoresThePriorContractYear(): void
+    {
+        self::assertSame(0, ContractValue::raiseAt(self::player([1 => 100, 2 => 200], 2), 0));
+    }
+
     public function testSurplusIsZeroWhenOffTheBooks(): void
     {
         self::assertSame(0, ContractValue::surplusAt(500, 0));

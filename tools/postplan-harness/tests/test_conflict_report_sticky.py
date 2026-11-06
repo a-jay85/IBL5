@@ -1,7 +1,9 @@
 """conflict_report in the sticky: section_for, compose_sticky wiring, real-PR replays."""
 import os
 import pathlib
+import subprocess
 import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -9,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runner
 from harness import conflict_report as cr
 from harness import fidelity
+from harness.adapters.gitad import LiveGit
 from harness.armable import (
     FLAG_CARRIED,
     classify_conflict_flag,
@@ -18,7 +21,16 @@ from harness.armable import (
 )
 from harness.fidelity import MERGE_DIGEST_HEADING, STICKY_MARKER
 from sticky_shapes import pr3267_inputs, render_sticky
+from test_conflict_fix_rung import (  # noqa: F401  (make_repo is a fixture)
+    _COMPOSE,
+    _OK_REPLY,
+    _compose_repo,
+    _fix_handlers,
+    _writer,
+    make_repo,
+)
 from test_conflict_report import PROBLEM, _build_repo, _rec
+from test_gitad_stacked_rebase import squash_repo  # noqa: F401  (a fixture)
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "conflict_report"
 FAILURE_BLOCK = f"{cr.SECTION_BEGIN}\n{cr.FAILURE_LINE}\n{cr.SECTION_END}"
@@ -104,17 +116,54 @@ def test_report_failure_keeps_verdict_and_exit(tmp_path, monkeypatch):
 # ------------------------------------------------------------------- dropped / carried
 
 
+def _commit_on_new_branch(repo, start, text, name="rewritten"):
+    """A commit off `start` holding a.sh = `text`, so the resolving commit leaves its history."""
+    d = repo["repo"]
+    subprocess.run(["git", "-C", d, "checkout", "-q", "-b", name, start], check=True)
+    pathlib.Path(d, "a.sh").write_text(text)
+    subprocess.run(["git", "-C", d, "add", "-A"], check=True)
+    subprocess.run(["git", "-C", d, "commit", "-q", "--allow-empty", "-m", name], check=True)
+    return subprocess.run(["git", "-C", d, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _sticky_block(line):
+    return f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{line}\n{cr.SECTION_END}"
+
+
 def test_stale_resolution_shows_dropped_line(tmp_path):
     repo = _small_repo(tmp_path)
-    record_conflict_resolution("stale", "9" * 40, str(tmp_path))
+    _mark(tmp_path, repo, "stale", ["a.sh"])
+    # A rebase rewrote the resolving commit and its "branch extra line" did not survive.
+    head = _commit_on_new_branch(repo, repo["onto"], "keep line one\nmaster extra line\n")
     prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
-    got = cr.section_for("stale", repo["repo"], head=repo["head"], prior_body=prior,
+    got = cr.section_for("stale", repo["repo"], head=head, prior_body=prior,
                          tmp_dir=str(tmp_path))
-    assert got == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.DROPPED_LINE}\n{cr.SECTION_END}"
+    assert got == _sticky_block(cr.DROPPED_LINE)
     assert ("An earlier conflict resolution by Claude was dropped by a later rebase. "
             "None of it remains on this branch.") in got
     # Nothing recorded and nothing to carry: no section at all.
-    assert cr.section_for("stale", repo["repo"], head=repo["head"], tmp_dir=str(tmp_path)) == ""
+    assert cr.section_for("stale", repo["repo"], head=head, tmp_dir=str(tmp_path)) == ""
+
+
+def test_rewritten_commit_whose_lines_survive_is_not_called_dropped(tmp_path):
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "survives", ["a.sh"])
+    # The same lines under a new SHA: a clean rebase the marker was not re-bound for.
+    head = _commit_on_new_branch(repo, repo["onto"], "keep line one\nbranch extra line\n")
+    prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
+    got = cr.section_for("survives", repo["repo"], head=head, prior_body=prior,
+                         tmp_dir=str(tmp_path))
+    assert got == _sticky_block(cr.REWRITTEN_LINE)
+
+
+def test_no_record_cannot_prove_dropped(tmp_path):
+    repo = _small_repo(tmp_path)
+    record_conflict_resolution("unproved", "9" * 40, str(tmp_path))
+    prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
+    got = cr.section_for("unproved", repo["repo"], head=repo["head"], prior_body=prior,
+                         tmp_dir=str(tmp_path))
+    assert got == _sticky_block(cr.REWRITTEN_LINE)
 
 
 def test_missing_marker_carries_prior_section_not_dropped(tmp_path):
@@ -319,13 +368,230 @@ def test_condition14_identical_with_report_record(tmp_path):
     assert before[2] == "CONFLICT-REVIEW=CLEAN"
 
 
-def test_stale_flag_state_renders_dropped_after_reconcile_deleted_marker(tmp_path):
+def test_stale_flag_state_reads_the_records_after_reconcile_deleted_marker(tmp_path):
     from harness.armable import FLAG_STALE
-    repo = _small_repo(tmp_path)  # no marker on disk: reconcile already deleted it
+    repo = _small_repo(tmp_path)
+    cr.write_record(
+        repo=repo["repo"], branch="wiped", resolving_sha=repo["head"], resolved_files=["a.sh"],
+        target_ref=repo["onto"], review_verdict_path=None, retries=0, rung=None,
+        fix_summary=None, branch_sha=repo["branch"], tmp_dir=str(tmp_path))
+    head = _commit_on_new_branch(repo, repo["onto"], "keep line one\nmaster extra line\n")
     prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
-    got = cr.section_for("wiped", repo["repo"], head=repo["head"], prior_body=prior,
+    got = cr.section_for("wiped", repo["repo"], head=head, prior_body=prior,
                          tmp_dir=str(tmp_path), flag_state=FLAG_STALE)
-    assert got == f"{cr.SECTION_BEGIN}\n{cr.HEADING}\n{cr.DROPPED_LINE}\n{cr.SECTION_END}"
+    assert got == _sticky_block(cr.DROPPED_LINE)
+
+
+def _feature_branch():
+    return f"report-{uuid.uuid4().hex[:12]}"
+
+
+def _clear_tmp(branch):
+    for path in (conflict_flag_path(branch), cr.record_path(branch)):
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+def test_reconcile_stale_state_reaches_the_section_through_the_runner(tmp_path):
+    repo = _small_repo(tmp_path)
+    branch = _feature_branch()
+    subprocess.run(["git", "-C", repo["repo"], "checkout", "-q", "-b", branch], check=True)
+    record_conflict_resolution(branch, "9" * 40)
+    try:
+        git = LiveGit(repo["repo"])
+        git._reconcile_conflict_flag(branch, branch, "master")
+        assert git.last_conflict_flag_state == "stale"
+        assert not os.path.exists(conflict_flag_path(branch))
+        prior = "intro\n" + cr.render_section([_rec()], [], None) + "\ntail"
+        assert runner._conflict_report_section(git, repo["repo"], prior) == _sticky_block(cr.REWRITTEN_LINE)
+    finally:
+        _clear_tmp(branch)
+
+
+def test_three_clean_replays_keep_one_record(tmp_path, monkeypatch):
+    """Through the real rebase_onto. The marker only grows, so a rebind that kept the old
+    entries would double the list on each replay."""
+    import harness.premerge as premerge
+    monkeypatch.setattr(premerge, "load", lambda key: None)
+    repo = _small_repo(tmp_path)
+    d = repo["repo"]
+    branch = _feature_branch()
+
+    def sh(*args):
+        return subprocess.run(["git", "-C", d, *args], check=True, capture_output=True,
+                              text=True).stdout.strip()
+
+    sh("checkout", "-q", "-b", branch)
+    first = sh("rev-parse", "HEAD")
+    record_conflict_resolution(branch, first)
+    cr.write_record(
+        repo=d, branch=branch, resolving_sha=first, resolved_files=["a.sh"],
+        target_ref=repo["onto"], review_verdict_path=None, retries=0, rung=None,
+        fix_summary=None, branch_sha=repo["branch"])
+    try:
+        git = LiveGit(d)
+        for n in (1, 2, 3):
+            sh("checkout", "-q", "master")
+            pathlib.Path(d, f"m{n}.txt").write_text("m\n")
+            sh("add", "-A")
+            sh("commit", "-q", "-m", f"master {n}")
+            sh("checkout", "-q", branch)
+            git.rebase_onto("master")
+            assert sh("rev-parse", "HEAD") != first
+            records = cr.read_records(branch)
+            assert len(records) == 1, f"records after replay {n}: {len(records)}"
+            assert records[0]["resolving_sha"] == sh("rev-parse", "HEAD")
+            assert records[0]["original_sha"] == first
+    finally:
+        _clear_tmp(branch)
+
+
+def test_rebind_leaves_records_alone_when_the_replay_kept_the_sha(tmp_path):
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "noop", ["a.sh"])
+    before = cr.read_records("noop", str(tmp_path))
+    cr.rebind_records("noop", repo["head"], [repo["head"]], str(tmp_path))
+    assert cr.read_records("noop", str(tmp_path)) == before
+    assert "original_sha" not in before[0]
+
+
+def test_later_deletion_is_not_blamed_after_a_replay(tmp_path):
+    repo = _small_repo(tmp_path)
+    _mark(tmp_path, repo, "later", ["a.sh"])
+    # A later commit deletes the branch's line. The replay re-stamps the record onto it.
+    head = _commit_on_new_branch(repo, repo["head"], "keep line one\n")
+    record_conflict_resolution("later", head, str(tmp_path))
+    cr.rebind_records("later", head, [repo["head"]], str(tmp_path))
+    got = cr.section_for("later", repo["repo"], head=head, tmp_dir=str(tmp_path))
+    assert "(master) master extra line" in got  # the resolution's own loss stays listed
+    assert "branch extra line" not in got
+
+
+def test_passing_rung_trail_reaches_the_record_and_not_the_blocked_ship_field(make_repo, tmp_path):
+    fx = _compose_repo(make_repo)
+    llm = _fix_handlers(fx, _writer(_COMPOSE, fx.full, reply=_OK_REPLY))
+    git = LiveGit(fx.d, llm=llm, state_dir=str(tmp_path / "state"))
+    git.rebase_onto()
+    # runner.py prints this field as "the lost-work proof still failed".
+    assert git.last_conflict_fix_summary == ""
+    record = cr.read_records(git.branch())[-1]
+    assert record["rung"] == "sonnet-fix"
+    assert "sonnet-fix: passed" in record["fix_summary"]
+
+
+def test_stacked_replay_rebinds_the_record_to_the_rewritten_head(squash_repo):
+    d, _parent, master_sha, _key, branch = squash_repo
+    git = LiveGit(d)
+    old_head = git.head()
+    record_conflict_resolution(branch, old_head)
+    cr.write_record(
+        repo=d, branch=branch, resolving_sha=old_head, resolved_files=["feature.txt"],
+        target_ref=master_sha, review_verdict_path=None, retries=0, rung=None,
+        fix_summary=None, branch_sha=old_head)
+    try:
+        assert git.autoresolve_stacked_rebase().resolved is True
+        assert git.head() != old_head
+        records = cr.read_records(branch)
+        assert [r["resolving_sha"] for r in records] == [git.head()]
+        assert records[0]["original_sha"] == old_head
+        got = cr.section_for(branch, d, head=git.head())
+        assert cr.NO_RECORD_LINE not in got
+        assert "feature.txt" in got
+    finally:
+        _clear_tmp(branch)
+
+
+# ------------------------------------------------------------------- renames / failed reads
+
+_RENAMED = "".join(f"shared line number {n}\n" for n in range(12))
+
+
+def _rename_repo(tmp_path, master_file, resolved):
+    """Master renames bin/a to bin/b (holding `master_file`). The branch edits bin/a."""
+    d = str(tmp_path / "rename")
+    subprocess.run(["git", "init", "-q", "-b", "master", d], check=True)
+
+    def sh(*args):
+        return subprocess.run(["git", "-C", d, "-c", "user.email=t@t", "-c", "user.name=t", *args],
+                              check=True, capture_output=True, text=True).stdout.strip()
+
+    pathlib.Path(d, "bin").mkdir()
+    pathlib.Path(d, "bin/a").write_text(_RENAMED)
+    sh("add", "-A")
+    sh("commit", "-m", "base")
+    base = sh("rev-parse", "HEAD")
+    sh("checkout", "-q", "-b", "side")
+    pathlib.Path(d, "bin/a").write_text(_RENAMED + "branch edit line\n")
+    sh("add", "-A")
+    sh("commit", "-m", "branch")
+    branch = sh("rev-parse", "HEAD")
+    sh("checkout", "-q", "master")
+    pathlib.Path(d, "bin/a").unlink()
+    pathlib.Path(d, "bin/b").write_text(master_file)
+    sh("add", "-A")
+    sh("commit", "-m", "master")
+    onto = sh("rev-parse", "HEAD")
+    pathlib.Path(d, "bin/b").write_text(resolved)
+    sh("add", "-A")
+    sh("commit", "--allow-empty", "-m", "resolved")
+    return d, {"base_sha": base, "onto_sha": onto, "branch_sha": branch}, sh("rev-parse", "HEAD")
+
+
+def test_rename_on_master_keeps_the_branch_side_in_the_check(tmp_path):
+    d, rec, head = _rename_repo(tmp_path, _RENAMED, _RENAMED)
+    loss = cr.file_loss(d, rec, "bin/b", head)
+    assert not loss.compare_failed
+    assert loss.branch_lost == ["branch edit line"]
+
+
+def test_rename_git_cannot_detect_marks_compare_failed(tmp_path):
+    rewritten = "".join(f"totally different text {n}\n" for n in range(12))
+    d, rec, head = _rename_repo(tmp_path, rewritten, rewritten)
+    assert cr.file_loss(d, rec, "bin/b", head).compare_failed
+
+
+def test_file_only_one_side_added_is_still_compared(tmp_path):
+    repo = _build_repo(tmp_path, {"a.sh": "keep line one\n"}, {"a.sh": "keep line one\n"},
+                       {"a.sh": "keep line one\n", "new.sh": "branch only line\n"},
+                       {"new.sh": "resolved only line\n"})
+    rec = {"base_sha": repo["base"], "onto_sha": repo["onto"], "branch_sha": repo["branch"]}
+    loss = cr.file_loss(repo["repo"], rec, "new.sh", repo["head"])
+    assert not loss.compare_failed
+    assert loss.branch_lost == ["branch only line"]
+
+
+def test_show_reads_absent_only_from_a_tree_without_the_path(tmp_path, monkeypatch):
+    repo = _small_repo(tmp_path)
+    assert cr._show(repo["repo"], repo["head"], "no-such-file") == ""
+    assert cr._show(repo["repo"], "0" * 40, "a.sh") is None
+    real = cr._git
+
+    def failing_show(code):
+        def fake(d, *args):
+            return (code, "") if args[0] == "show" else real(d, *args)
+        return fake
+
+    for code in (cr._GIT_FAILED, 128):  # a timeout, then a read error on a path the tree holds
+        monkeypatch.setattr(cr, "_git", failing_show(code))
+        assert cr._show(repo["repo"], repo["head"], "a.sh") is None
+
+
+def test_failed_read_of_another_file_marks_compare_failed(tmp_path, monkeypatch):
+    repo = _build_repo(tmp_path, {"a.sh": "keep line one\n", "b.sh": "other file\n"},
+                       {"b.sh": "other file changed\n"}, {"a.sh": "keep line one\nbranch line\n"},
+                       {"a.sh": "keep line one\n"})
+    rec = {"base_sha": repo["base"], "onto_sha": repo["onto"], "branch_sha": repo["branch"]}
+    real = cr._show
+    monkeypatch.setattr(cr, "_show", lambda d, sha, path: None if path == "b.sh" else real(d, sha, path))
+    assert cr.file_loss(repo["repo"], rec, "a.sh", repo["head"]).compare_failed
+
+
+def test_branch_lookup_failure_stays_inside_the_report_guard():
+    class _BrokenGit:
+        def branch(self):
+            raise RuntimeError("git failed")
+
+    assert runner._conflict_report_section(_BrokenGit(), ".", None) == FAILURE_BLOCK
 
 
 def test_clean_replay_rebinds_record_to_new_sha(tmp_path):

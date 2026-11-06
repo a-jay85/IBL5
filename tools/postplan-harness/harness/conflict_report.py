@@ -53,6 +53,7 @@ RUNG_FMT = " Then escalation rung {rung} changed the resolution: \"{fix}\""
 NO_REASON = "No reason was recorded."
 TRUNC_FMT = "... and {hidden} more lines not shown ({total} {kind} in this file)"
 DROPPED_LINE = "An earlier conflict resolution by Claude was dropped by a later rebase. None of it remains on this branch."
+REWRITTEN_LINE = "An earlier conflict resolution by Claude is no longer in this branch's history, because a later rebase rewrote its commit. Some of its lines may still be on this branch."
 NO_RECORD_LINE = "Claude resolved a merge conflict on this branch, but no report record was found for it."
 
 # Rungs that are the resolver's own pass, not an escalation that amended its result.
@@ -156,25 +157,31 @@ def write_record(
     path = record_path(branch, tmp_dir)
     entries = [e for e in read_records(branch, tmp_dir) if e.get("resolving_sha") != resolving_sha]
     entries.append(entry)
-    tmp = Path(str(path) + ".tmp")
-    tmp.write_text(json.dumps(entries))
-    os.replace(tmp, path)
+    _write_records(path, entries)
     return path
 
 
-def rebind_records(branch: str, new_sha: str, old_shas: list[str], tmp_dir: str = "/tmp") -> None:
-    """A clean replay re-stamps the resolving commit. Copy each record keyed to one of
-    `old_shas` onto `new_sha`, so the report still finds it for the live marker entry."""
-    entries = read_records(branch, tmp_dir)
-    copies = [dict(e, resolving_sha=new_sha) for e in entries
-              if e.get("resolving_sha") in old_shas and e.get("resolving_sha") != new_sha]
-    if not copies:
-        return
-    entries = [e for e in entries if e.get("resolving_sha") != new_sha] + copies
-    path = record_path(branch, tmp_dir)
+def _write_records(path: Path, entries: list[dict]) -> None:
     tmp = Path(str(path) + ".tmp")
     tmp.write_text(json.dumps(entries))
     os.replace(tmp, path)
+
+
+def rebind_records(branch: str, new_sha: str, old_shas: list[str], tmp_dir: str = "/tmp") -> None:
+    """A clean replay re-stamps the resolving commit. Replace the records keyed to `old_shas`
+    with one copy of the newest, keyed to `new_sha`, so the report still finds it for the
+    live marker entry. The marker only grows, so keeping the old entries would double the
+    list on each replay. `original_sha` keeps the commit that made the resolution, the only
+    place the "missing at the resolving commit" filter can read it from."""
+    entries = read_records(branch, tmp_dir)
+    matched = [e for e in entries if e.get("resolving_sha") in old_shas]
+    if not matched or matched[-1].get("resolving_sha") == new_sha:
+        return
+    newest = matched[-1]
+    copy = dict(newest, resolving_sha=new_sha,
+                original_sha=newest.get("original_sha") or newest["resolving_sha"])
+    kept = [e for e in entries if e.get("resolving_sha") not in old_shas and e.get("resolving_sha") != new_sha]
+    _write_records(record_path(branch, tmp_dir), kept + [copy])
 
 
 def read_records(branch: str, tmp_dir: str = "/tmp") -> list[dict]:
@@ -241,27 +248,61 @@ def _show(repo: str, sha: str, path: str) -> str | None:
     rc, out = _git(repo, "show", f"{sha}:{path}")
     if rc == 0:
         return out[:_MAX_BYTES_READ]
-    if rc == _GIT_FAILED:
-        return None  # git itself failed (timeout, spawn error): not proof the path is absent
-    return "" if _rev(repo, sha) else None
+    # A failed show is not proof the path is absent: it may be a timeout or a bad object.
+    # Only a readable tree without the path counts as absent.
+    ls_rc, listing = _git(repo, "ls-tree", sha, "--", path)
+    return "" if ls_rc == 0 and not listing.strip() else None
 
 
-def _other_lines(repo: str, base_sha: str, onto_sha: str, branch_sha: str, head: str, skip: str) -> dict[str, list[str]]:
+def _renames(repo: str, base_sha: str, side_sha: str) -> dict[str, str] | None:
+    """Old path to new path for files `side_sha` renamed since the merge base."""
+    rc, out = _git(repo, "diff", "-z", "--find-renames", "--name-status", "--diff-filter=R", base_sha, side_sha)
+    if rc != 0:
+        return None
+    fields = out.split("\0")
+    return {fields[i + 1]: fields[i + 2] for i in range(0, len(fields) - 2, 3)}
+
+
+def _side_paths(repo: str, record: dict, path: str) -> tuple[str, str, str] | None:
+    """Where the resolved `path` lived at the merge base, on master and on the branch."""
+    base_sha = record.get("base_sha", "")
+    on_master = _renames(repo, base_sha, record.get("onto_sha", ""))
+    on_branch = _renames(repo, base_sha, record.get("branch_sha", ""))
+    if on_master is None or on_branch is None:
+        return None
+    origin = path
+    for renames in (on_master, on_branch):
+        for old, new in renames.items():
+            if new == path:
+                origin = old
+    return origin, on_master.get(origin, origin), on_branch.get(origin, origin)
+
+
+def _maybe_unseen_rename(repo: str, base_sha: str, adder_sha: str) -> bool:
+    """A path one side added may be a rename too heavily edited for git to detect. A side
+    that also deleted a file could have done that, so its copy cannot be compared."""
+    rc, out = _git(repo, "diff", "--name-only", "--diff-filter=D", base_sha, adder_sha)
+    return rc != 0 or bool(out.strip())
+
+
+def _other_lines(repo: str, base_sha: str, onto_sha: str, branch_sha: str, head: str, skip: str) -> dict[str, list[str]] | None:
     """Normalized lines the other changed files hold at `head` beyond what master and the
     branch each gave them, mapped to one path per gained copy. A copy either side already
     had (at the merge base or added since) is not a place a line moved to, so it cannot
-    hide a real loss."""
+    hide a real loss. None when a read fails: lost and moved cannot be told apart then."""
     rc, out = _git(repo, "diff", "--name-only", base_sha, head)
     if rc != 0:
-        return {}
+        return None
     mapping: dict[str, list[str]] = {}
     budget = _MAX_BYTES_READ
     for other in [p for p in out.splitlines() if p.strip()][:_MAX_FILES_COMPARED]:
         if other == skip or budget <= 0:
             continue
-        text = _show(repo, head, other) or ""
+        text, at_onto, at_branch = (_show(repo, sha, other) for sha in (head, onto_sha, branch_sha))
+        if text is None or at_onto is None or at_branch is None:
+            return None
         budget -= len(text)
-        before = _counter(_show(repo, onto_sha, other) or "") | _counter(_show(repo, branch_sha, other) or "")
+        before = _counter(at_onto) | _counter(at_branch)
         for norm, copies in (_counter(text) - before).items():
             mapping.setdefault(norm, []).extend([other] * copies)
     return mapping
@@ -272,16 +313,26 @@ def file_loss(repo: str, record: dict, path: str, head: str, resolving: str | No
 
     Computed against `head`, so a line a later commit restored drops out of the list.
     When `resolving` is given, a line also has to be missing at the resolving commit, so a
-    later commit's own deletion is not blamed on the resolution.
+    later commit's own deletion is not blamed on the resolution. Each side is read at the
+    path it gave the file, so a rename on either side does not hide that side's lines.
     """
-    base = _show(repo, record.get("base_sha", ""), path)
-    master = _show(repo, record.get("onto_sha", ""), path)
-    branch = _show(repo, record.get("branch_sha", ""), path)
+    paths = _side_paths(repo, record, path)
+    if paths is None:
+        return FileLoss(path=path, compare_failed=True)
+    base = _show(repo, record.get("base_sha", ""), paths[0])
+    master = _show(repo, record.get("onto_sha", ""), paths[1])
+    branch = _show(repo, record.get("branch_sha", ""), paths[2])
     resolved = _show(repo, head, path)
     at_resolve = _show(repo, resolving, path) if resolving else resolved
     if base is None or master is None or branch is None or resolved is None or at_resolve is None:
         return FileLoss(path=path, compare_failed=True)
+    if not base and bool(master) != bool(branch):
+        adder = record["onto_sha"] if master else record["branch_sha"]
+        if _maybe_unseen_rename(repo, record["base_sha"], adder):
+            return FileLoss(path=path, compare_failed=True)
     others = _other_lines(repo, record["base_sha"], record["onto_sha"], record["branch_sha"], head, path)
+    if others is None:
+        return FileLoss(path=path, compare_failed=True)
     out = FileLoss(path=path)
     for side, lost_attr in ((master, "master_lost"), (branch, "branch_lost")):
         lost, moved = lost_lines(base, side, resolved, others)
@@ -450,6 +501,29 @@ def _block(*lines: str) -> str:
     return "\n".join([SECTION_BEGIN, *lines, SECTION_END])
 
 
+def _resolution_gone(repo: str, records: list[dict], head: str) -> bool:
+    """True only when the records prove none of the lines a resolution wrote is at `head`.
+    A line master already held does not count: it stays whatever happened to the resolution.
+    No record, a commit git no longer has, or a failed read all prove nothing."""
+    if not records:
+        return False
+    for record in records:
+        resolving = record.get("original_sha") or record.get("resolving_sha", "")
+        for path in record.get("files", []):
+            paths = _side_paths(repo, record, path)
+            if paths is None:
+                return False
+            written = _show(repo, resolving, path)
+            base = _show(repo, record.get("base_sha", ""), paths[0])
+            master = _show(repo, record.get("onto_sha", ""), paths[1])
+            at_head = _show(repo, head, path)
+            if written is None or base is None or master is None or at_head is None:
+                return False
+            if (_counter(written) - (_counter(base) | _counter(master))) & _counter(at_head):
+                return False
+    return True
+
+
 def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | None = None,
                 tmp_dir: str = "/tmp", flag_state: str = "") -> str:
     """The conflict-report section for the sticky, or "" when no model resolved a conflict
@@ -477,7 +551,11 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
         if not live:
             if not shas and flag_state != FLAG_STALE:
                 return recovered  # marker gone: cannot tell dropped from cleared, keep the prior text
-            return _block(HEADING, DROPPED_LINE)
+            # Ancestry alone cannot say "dropped": a clean rebase rewrites the SHA and keeps
+            # the lines. With no SHAs left, reconcile deleted the marker: every record counts.
+            candidates = [r for r in read_records(branch, tmp_dir)
+                          if not shas or r.get("resolving_sha") in shas]
+            return _block(HEADING, DROPPED_LINE if _resolution_gone(repo, candidates, head) else REWRITTEN_LINE)
         records = [r for r in read_records(branch, tmp_dir) if r.get("resolving_sha") in live]
         if not records:
             if recovered is not None:
@@ -490,7 +568,8 @@ def section_for(branch: str, repo: str, head: str = "HEAD", prior_body: str | No
             # computed against `head` (a later fix that restored a line clears it) and
             # must also be missing at the resolving commit (a later deletion is not blamed).
             owner = [r for r in records if p in r.get("files", [])][-1]
-            losses.append(file_loss(repo, owner, p, head, resolving=owner["resolving_sha"]))
+            resolving = owner.get("original_sha") or owner["resolving_sha"]
+            losses.append(file_loss(repo, owner, p, head, resolving=resolving))
         return render_section(records, losses, conflict_verdict_for(branch, tmp_dir))
     except Exception:  # the report must never raise
         return f"{SECTION_BEGIN}\n{FAILURE_LINE}\n{SECTION_END}"

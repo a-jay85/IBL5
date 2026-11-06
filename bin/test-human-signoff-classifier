@@ -398,6 +398,14 @@ else
     h_fail "wf: wait budget fits twice in the gate timeout" "timeout=[$gate_to] attempts=[$aw_n] sleep=[$aw_s]"
 fi
 if [ -n "$write_to" ]; then h_pass "wf: write job has timeout-minutes"; else h_fail "wf: write job has timeout-minutes" "none"; fi
+# A job-level permissions block zeroes every scope it omits, so the write job's
+# checkout of the shared lib needs contents: read.
+write_perms=$(awk '/^    permissions:$/ {f=1; next} f && /^      / {print; next} f {exit}' <<< "$WRITE_BLOCK")
+if command grep -qxF '      contents: read' <<< "$write_perms"; then
+    h_pass "wf: write job grants contents: read for its checkout"
+else
+    h_fail "wf: write job grants contents: read for its checkout" "permissions=[$write_perms]"
+fi
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: eval step calls hs_await_record" "$GATE_BLOCK" 'hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments'
 # shellcheck disable=SC2016  # literal workflow text

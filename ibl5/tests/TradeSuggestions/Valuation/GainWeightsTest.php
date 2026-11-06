@@ -88,6 +88,10 @@ final class GainWeightsTest extends TestCase
         self::assertSame(GainWeights::SEASON_WEIGHTS, $array['season_weights']);
     }
 
+    /**
+     * Adding playerValue(ProjectionPlayer) to GainWeights turns this red twice:
+     * the name matches the pattern and the parameter type is banned.
+     */
     public function testNoMethodAcceptsAPlayerOrRatingObject(): void
     {
         $banned = ['ProjectionPlayer', 'SuggestionPlayer', 'RatingSet', 'ProjectedSeason'];

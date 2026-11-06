@@ -54,18 +54,36 @@ class MalformedMergeDanger(ValueError):
     """The body carries a `**Merge danger:**` line that does not parse, or more than one."""
 
 
+def _diff_sections(diff_text: str) -> list[tuple[str, str]] | None:
+    """(b-path, section text) per `diff --git` header, in order. None when the text has no
+    header at all: an empty diff or a bare hunk."""
+    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
+    if not headers:
+        return None
+    sections: list[tuple[str, str]] = []
+    for i, m in enumerate(headers):
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
+        sections.append((m.group(1), diff_text[m.start():end]))
+    return sections
+
+
 def _migration_sections(diff_text: str) -> str:
     """The diff text belonging to migration files. A diff without `diff --git` headers is
     searched whole, so a bare hunk still counts."""
-    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
-    if not headers:
+    sections = _diff_sections(diff_text)
+    if sections is None:
         return diff_text
-    parts: list[str] = []
-    for i, m in enumerate(headers):
-        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
-        if _MIGRATION_RE.match(m.group(1)):
-            parts.append(diff_text[m.start():end])
-    return "".join(parts)
+    return "".join(text for path, text in sections if _MIGRATION_RE.match(path))
+
+
+def _section_for(diff_text: str, path: str) -> str | None:
+    """The section whose `b/` path is `path`. None when the diff has no header, when the
+    file's header is quoted (`diff --git "a/x y" "b/x y"` matches no header regex), or when
+    the file has no section. The caller treats None as unreadable and fires."""
+    for section_path, text in _diff_sections(diff_text) or []:
+        if section_path == path:
+            return text
+    return None
 
 
 def _module_root(path: str) -> str:

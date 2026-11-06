@@ -246,6 +246,141 @@ run_approval labeled needs-a-human "feat: x" human-approved "$A" "$EMPTY"; rc=$?
 expect "approval: other label event compares -> rc 1" 1 "$rc"
 want "approval: other label event compares -> drop missing" "$LAST_OUT" "REASON=missing"
 
+# ---- approval-record wait (race fix, ADR-0062 Update 2026-11-02) ----
+# event_json <event> <label> <created_at> — one REST-shaped issue event.
+event_json() { jq -n --arg e "$1" --arg l "$2" --arg c "$3" '{event:$e,label:{name:$l},created_at:$c}'; }
+# run_newer <events_file> <comments_file> — prints NEWER_RC=<rc>.
+run_newer() {
+    # shellcheck disable=SC2016  # expands in the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; rc=0; hs_label_newer_than_marker "$1" "$2" || rc=$?; echo "NEWER_RC=$rc"' "$LIB" "$@" 2>&1)
+}
+# run_await <fixdir> <attempts> <fp> <comments_file> <events_file>
+# Runs hs_eval_approval then hs_await_record for a synchronize event on a feat:
+# PR holding the label, with sleep 0 and a stub refetch. On call N the stub
+# fails if <fixdir>/fail-N exists, else copies <fixdir>/attempt-N.json over the
+# comments file when it exists. Prints VERDICT=, REASON=, CALLS=.
+run_await() {
+    # shellcheck disable=SC2016  # expands in the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; fix="$1"; calls=0
+        stub_refetch() { calls=$((calls + 1)); [ ! -e "$fix/fail-$calls" ] || return 1
+            if [ -e "$fix/attempt-$calls.json" ]; then cp "$fix/attempt-$calls.json" "$1"; fi; }
+        rc=0
+        hs_eval_approval synchronize "" "feat: x" human-approved "$3" "$4" || true
+        hs_await_record "$2" 0 stub_refetch synchronize "" "feat: x" human-approved "$3" "$4" "$5" || rc=$?
+        echo "VERDICT=$HS_VERDICT REASON=$HS_DROP_REASON CALLS=$calls"; exit "$rc"' "$LIB" "$@" 2>&1)
+}
+
+# Fixture PR #3685's timestamps. aw_mk <case> — make the case dir, print nothing.
+LBL_AT="2026-11-02T22:58:17Z"
+BOT="github-actions[bot]"
+B40=$(printf '%040d' 0 | tr 0 b)
+aw_mk() { mkdir -p "$T/aw-$1"; printf '[]' > "$T/aw-$1/c.json"; event_json labeled human-approved "$LBL_AT" | jq -s . > "$T/aw-$1/e.json"; }
+
+# W1: the PR #3685 sequence. The label is newer than every marker; the record
+# lands on the second re-read and matches.
+aw_mk w1
+comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(record_body "$A")" | jq -s . > "$T/aw-w1/attempt-2.json"
+run_await "$T/aw-w1" 5 "$A" "$T/aw-w1/c.json" "$T/aw-w1/e.json"; rc=$?
+expect "await: PR 3685 sequence -> keep (rc)" 0 "$rc"
+want "await: PR 3685 sequence -> keep" "$LAST_OUT" "VERDICT=keep"
+want "await: PR 3685 sequence -> keep (calls)" "$LAST_OUT" "CALLS=2"
+
+# W2: a marker newer than the label means no wait at all.
+aw_mk w2
+comment_json "$BOT" Bot "2026-11-02T23:00:00Z" "$(drop_body missing)" | jq -s . > "$T/aw-w2/c.json"
+run_await "$T/aw-w2" 3 "$A" "$T/aw-w2/c.json" "$T/aw-w2/e.json"; rc=$?
+expect "await: marker newer than label -> immediate drop missing (rc)" 1 "$rc"
+want "await: marker newer than label -> immediate drop missing" "$LAST_OUT" "REASON=missing"
+want "await: marker newer than label -> immediate drop missing (calls)" "$LAST_OUT" "CALLS=0"
+
+# W3 / W4: an unusable events file fails closed.
+aw_mk w3
+printf '{}' > "$T/aw-w3/e.json"
+run_await "$T/aw-w3" 3 "$A" "$T/aw-w3/c.json" "$T/aw-w3/e.json"; rc=$?
+want "await: events not an array -> drop error" "$LAST_OUT" "REASON=error"
+want "await: events not an array -> drop error (calls)" "$LAST_OUT" "CALLS=0"
+aw_mk w4
+printf 'not json' > "$T/aw-w4/e.json"
+run_await "$T/aw-w4" 3 "$A" "$T/aw-w4/c.json" "$T/aw-w4/e.json"; rc=$?
+want "await: events invalid JSON -> drop error" "$LAST_OUT" "REASON=error"
+want "await: events invalid JSON -> drop error (calls)" "$LAST_OUT" "CALLS=0"
+
+# W5: a record with another fingerprint during the wait is a mismatch.
+aw_mk w5
+comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w5/attempt-1.json"
+run_await "$T/aw-w5" 5 "$A" "$T/aw-w5/c.json" "$T/aw-w5/e.json"; rc=$?
+want "await: record appears with other fp -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+want "await: record appears with other fp -> drop mismatch (calls)" "$LAST_OUT" "CALLS=1"
+
+# W6: no record inside the budget.
+aw_mk w6
+run_await "$T/aw-w6" 3 "$A" "$T/aw-w6/c.json" "$T/aw-w6/e.json"; rc=$?
+want "await: no record before budget -> drop missing" "$LAST_OUT" "REASON=missing"
+want "await: no record before budget -> drop missing (calls)" "$LAST_OUT" "CALLS=3"
+
+# W7: a refetch failure fails closed.
+aw_mk w7
+touch "$T/aw-w7/fail-1"
+run_await "$T/aw-w7" 5 "$A" "$T/aw-w7/c.json" "$T/aw-w7/e.json"; rc=$?
+want "await: refetch fails -> drop error" "$LAST_OUT" "REASON=error"
+want "await: refetch fails -> drop error (calls)" "$LAST_OUT" "CALLS=1"
+
+# W8: the right login with the wrong type never keeps.
+aw_mk w8
+comment_json "$BOT" User "2026-11-02T22:59:55Z" "$(record_body "$A")" | jq -s . > "$T/aw-w8/attempt-1.json"
+run_await "$T/aw-w8" 2 "$A" "$T/aw-w8/c.json" "$T/aw-w8/e.json"; rc=$?
+want "await: forged non-bot record -> drop missing" "$LAST_OUT" "REASON=missing"
+want "await: forged non-bot record -> drop missing (calls)" "$LAST_OUT" "CALLS=2"
+
+# W9: a newer revoke during the wait stops it.
+aw_mk w9
+comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(drop_body missing)" | jq -s . > "$T/aw-w9/attempt-1.json"
+run_await "$T/aw-w9" 5 "$A" "$T/aw-w9/c.json" "$T/aw-w9/e.json"; rc=$?
+want "await: newer revoke mid-wait -> stop, drop missing" "$LAST_OUT" "REASON=missing"
+want "await: newer revoke mid-wait -> stop, drop missing (calls)" "$LAST_OUT" "CALLS=1"
+
+# W10: only another label's event means there is nothing to wait for.
+aw_mk w10
+event_json labeled needs-a-human "$LBL_AT" | jq -s . > "$T/aw-w10/e.json"
+run_await "$T/aw-w10" 3 "$A" "$T/aw-w10/c.json" "$T/aw-w10/e.json"; rc=$?
+want "await: no labeled event -> drop missing" "$LAST_OUT" "REASON=missing"
+want "await: no labeled event -> drop missing (calls)" "$LAST_OUT" "CALLS=0"
+
+# W11: a mismatch verdict is left alone.
+aw_mk w11
+comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w11/c.json"
+run_await "$T/aw-w11" 3 "$A" "$T/aw-w11/c.json" "$T/aw-w11/e.json"; rc=$?
+want "await: mismatch verdict is untouched" "$LAST_OUT" "REASON=mismatch"
+want "await: mismatch verdict is untouched (calls)" "$LAST_OUT" "CALLS=0"
+
+# W12: a bad attempts argument fails closed.
+aw_mk w12
+run_await "$T/aw-w12" x "$A" "$T/aw-w12/c.json" "$T/aw-w12/e.json"; rc=$?
+want "await: bad attempts arg -> drop error" "$LAST_OUT" "REASON=error"
+want "await: bad attempts arg -> drop error (calls)" "$LAST_OUT" "CALLS=0"
+
+# N1-N5: the predicate alone.
+aw_mk n1
+comment_json "$BOT" Bot "$LBL_AT" "$(drop_body missing)" | jq -s . > "$T/aw-n1/c.json"
+run_newer "$T/aw-n1/e.json" "$T/aw-n1/c.json"
+want "newer: same-second tie -> wait" "$LAST_OUT" "NEWER_RC=0"
+aw_mk n2
+comment_json "$BOT" Bot "2026-11-02T22:58:18Z" "$(drop_body missing)" | jq -s . > "$T/aw-n2/c.json"
+run_newer "$T/aw-n2/e.json" "$T/aw-n2/c.json"
+want "newer: marker one second later -> no wait" "$LAST_OUT" "NEWER_RC=1"
+aw_mk n3
+event_json labeled human-approved yesterday | jq -s . > "$T/aw-n3/e.json"
+run_newer "$T/aw-n3/e.json" "$T/aw-n3/c.json"
+want "newer: bad timestamp -> error" "$LAST_OUT" "NEWER_RC=2"
+aw_mk n4
+event_json labeled human-approved-x "$LBL_AT" | jq -s . > "$T/aw-n4/e.json"
+run_newer "$T/aw-n4/e.json" "$T/aw-n4/c.json"
+want "newer: lookalike label human-approved-x -> no wait" "$LAST_OUT" "NEWER_RC=1"
+aw_mk n5
+comment_json "$BOT" Bot "2026-11-02T23:00:00Z" "$(printf 'hi\n%s' "$(record_body "$A")")" | jq -s . > "$T/aw-n5/c.json"
+run_newer "$T/aw-n5/e.json" "$T/aw-n5/c.json"
+want "newer: marker text on line 2 is not a marker -> wait" "$LAST_OUT" "NEWER_RC=0"
+
 # E11: a non-feat PR skips the fingerprint entirely
 run_approval synchronize "" "fix: y" human-approved "" /nonexistent; rc=$?
 expect "approval: non-feat skips fingerprint -> rc 0" 0 "$rc"

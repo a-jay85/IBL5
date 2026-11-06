@@ -178,6 +178,103 @@ hs_eval_approval() {
     return 1
 }
 
+# ---- Approval-record wait (ADR-0062 Update 2026-11-02) ----
+# A push that lands seconds after the label (an update-branch merge) starts a
+# run that can read comments before the approving `labeled` run posts its
+# record. These two functions let that run wait a bounded time for the record.
+# Waiting never keeps the label by itself: only hs_eval_approval's `keep`, a
+# current fingerprint equal to a github-actions[bot] record, does.
+
+# hs_label_newer_than_marker <events_json_file> <comments_json_file> — read a
+# flat array of issue events and a flat array of issue comments (GitHub REST
+# shapes) and decide whether a would-be `missing` drop should wait.
+#   rc 0: a `labeled` event for human-approved exists, and no github-actions[bot]
+#         hs marker (record or revoked) is strictly newer than the newest one
+#   rc 1: no such labeled event, or a bot marker is strictly newer
+#   rc 2: unreadable file, invalid JSON, not an array, or a bad timestamp
+# A same-second tie waits; waiting is safe because keep still needs an FP match.
+hs_label_newer_than_marker() {
+    local val
+    if ! val=$(jq -nr --arg re "$HS_FP_MARKER_RE" \
+            --slurpfile ev "$1" --slurpfile cm "$2" '
+            def arr: if type != "array" then error("payload is not an array") else . end;
+            ($ev[0] | arr) as $e | ($cm[0] | arr) as $c
+            | ([ $e[] | select(.event == "labeled" and .label.name == "human-approved")
+                 | .created_at | fromdateiso8601 ] | max) as $lab
+            | ([ $c[] | select(.user.login == "github-actions[bot]" and .user.type == "Bot")
+                 | select((.body // "") | test($re))
+                 | .created_at | fromdateiso8601 ] | max) as $mark
+            | if $lab == null then "nowait"
+              elif $mark == null or $lab >= $mark then "wait"
+              else "nowait" end' 2>&1); then
+        echo "hs_label_newer_than_marker: cannot read $1 or $2: $val" >&2
+        return 2
+    fi
+    case "$val" in
+        wait) return 0 ;;
+        nowait) return 1 ;;
+        *) return 2 ;;
+    esac
+}
+
+# hs_await_record <attempts> <sleep_s> <refetch_fn> <action> <event_label> <title> <labels_csv> <current_fp> <comments_json_file> <events_json_file>
+# Call right after hs_eval_approval with the same arguments. Changes nothing
+# unless the verdict is `drop missing`. When hs_label_newer_than_marker says
+# wait, it re-reads comments up to <attempts> times, <sleep_s> seconds apart,
+# by calling "$refetch_fn" <comments_json_file> directly (never in a subshell),
+# and re-runs hs_eval_approval after each read.
+#   rc 0: verdict became keep (a matching bot record appeared)
+#   rc 1: any drop. mismatch if a non-matching record appeared; error on a bad
+#         argument, an events/comments read error, or a refetch failure;
+#         missing on timeout or when a newer bot marker appears
+hs_await_record() {
+    local attempts="$1" sleep_s="$2" refetch="$3" action="$4" event_label="$5"
+    local title="$6" labels="$7" current="$8" comments="$9" events="${10}"
+    local hs_await_i=0 nrc=0
+    if [ "${HS_VERDICT:-}" != "drop" ] || [ "${HS_DROP_REASON:-}" != "missing" ]; then
+        if [ "${HS_VERDICT:-}" = "drop" ]; then return 1; fi
+        return 0
+    fi
+    if ! [[ "$attempts" =~ ^[0-9]+$ ]] || ! [[ "$sleep_s" =~ ^[0-9]+$ ]]; then
+        _hs_drop error
+        return 1
+    fi
+    hs_label_newer_than_marker "$events" "$comments" || nrc=$?
+    case "$nrc" in
+        0) ;;
+        1) echo "Entry gate: a bot marker is newer than the approving label; no wait"
+           return 1 ;;
+        *) _hs_drop error
+           return 1 ;;
+    esac
+    while [ "$hs_await_i" -lt "$attempts" ]; do
+        hs_await_i=$((hs_await_i + 1))
+        echo "Entry gate: approving label is newer than every record; re-read $hs_await_i/$attempts in ${sleep_s}s"
+        sleep "$sleep_s"
+        if ! "$refetch" "$comments"; then
+            _hs_drop error
+            return 1
+        fi
+        if hs_eval_approval "$action" "$event_label" "$title" "$labels" "$current" "$comments"; then
+            if [ "$HS_VERDICT" = "keep" ]; then return 0; fi
+            _hs_drop error
+            return 1
+        fi
+        if [ "$HS_VERDICT" != "drop" ] || [ "$HS_DROP_REASON" != "missing" ]; then return 1; fi
+        nrc=0
+        hs_label_newer_than_marker "$events" "$comments" || nrc=$?
+        case "$nrc" in
+            0) ;;
+            1) echo "Entry gate: a newer bot marker appeared; stop waiting"
+               return 1 ;;
+            *) _hs_drop error
+               return 1 ;;
+        esac
+    done
+    echo "Entry gate: no approval record after $attempts re-reads; dropping (missing)"
+    return 1
+}
+
 # _hs_drop <reason> — set the drop verdict and emit the annotation that reds
 # the required check.
 # shellcheck disable=SC2034  # HS_VERDICT and HS_DROP_REASON are read by the sourcing caller

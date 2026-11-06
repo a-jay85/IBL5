@@ -261,9 +261,10 @@
 #                              or be named in ## Critical Files. Covers
 #                              (one-shot) rows, which gate G skips.
 #   CW Matrix row cwd        — prefire-verify runs each runnable row from the
-#                              repo root, so a row that starts with an
-#                              ibl5/-only tool (vendor/bin/, composer, bun,
-#                              php scripts/) needs `cd ibl5 && ` first.
+#                              repo root, so a row that starts with a tool
+#                              found only under ibl5/ (vendor/bin/, composer,
+#                              bun, php scripts/) needs `cd ibl5 && ` first,
+#                              or the tool's own directory flag.
 #   XM Executable mutations  — bin/lib/plan-exec-mutations parse must pass; a
 #                              check: override obeys gate V (gatev_nonrunnable);
 #                              with `## Executable Mutations` present, every
@@ -2090,10 +2091,14 @@ done < "$MATRIX_FILE"
 # Gate CW: bin/lib/prefire-verify runs each runnable matrix row with `bash -c` from
 # the repo root. vendor/, composer.json, package.json and scripts/ live under ibl5/,
 # so a bare row exits 127 or 1 there and the plan can never fire. Reads the same rows
-# prefire reads. A segment starting with `cd` makes the cwd unknown, so checking stops
-# for the rest of that row.
+# prefire reads. A segment starting with `cd` or `pushd` makes the cwd unknown, so
+# checking stops for the rest of that row. A segment that names its own directory
+# (composer -d or --working-dir, npm --prefix, bun --cwd) passes alone: that flag does
+# not move the shell, so later segments are still checked. Flags after a bare `--`
+# belong to the script. bun reads --cwd only before the script name.
 # ---------------------------------------------------------------------------
 _cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(\./)?(scripts|tests)/'
+_cw_dir_re='^composer[[:space:]](.*[[:space:]])?(-d[^[:space:]]*|--working-dir(=[^[:space:]]*)?)([[:space:]]|$)|^npm[[:space:]](.*[[:space:]])?--prefix([=[:space:]]|$)|^bun[[:space:]]+(run[[:space:]]+)?--cwd([=[:space:]]|$)'
 while IFS=$'\t' read -r _cw_num _cw_cmd; do
     [ -n "$_cw_num" ] || continue
     # Blank quoted text, drop a trailing comment, then split at shell separators.
@@ -2102,11 +2107,15 @@ while IFS=$'\t' read -r _cw_num _cw_cmd; do
     _cw_src="${_cw_src//;/$'\n'}"; _cw_src="${_cw_src//|/$'\n'}"
     while IFS= read -r _cw_seg; do
         _cw_seg="$(mtrim "$_cw_seg")"
-        _cw_seg="${_cw_seg#\(}"; _cw_seg="$(mtrim "$_cw_seg")"
+        while [[ "$_cw_seg" == [\(\{]* ]]; do
+            _cw_seg="${_cw_seg:1}"; _cw_seg="$(mtrim "$_cw_seg")"
+        done
         while [[ "$_cw_seg" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; do
             _cw_seg="${BASH_REMATCH[1]}"
         done
-        case "$_cw_seg" in cd|cd[[:space:]]*) break ;; esac
+        case "$_cw_seg" in cd|cd[[:space:]]*|pushd|pushd[[:space:]]*) break ;; esac
+        _cw_opts=" ${_cw_seg} "; _cw_opts="${_cw_opts%%[[:space:]]--[[:space:]]*}"; _cw_opts="${_cw_opts# }"
+        [[ "$_cw_opts" =~ $_cw_dir_re ]] && continue
         if [[ "$_cw_seg" =~ $_cw_re ]]; then
             viol "[CW] matrix row $_cw_num runs \`$_cw_seg\` from the repo root, where that path does not exist (prefire-verify runs rows from the root; these tools live under ibl5/) — start the command with \`cd ibl5 && \`"
             break

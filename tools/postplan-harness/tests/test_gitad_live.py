@@ -419,6 +419,9 @@ def test_drop_commit_returns_error_text_on_bad_target(repo):
     assert g.head() != ""            # HEAD untouched, repo still usable
 
 
+pytestmark = pytest.mark.xdist_group("real_timeout")
+
+
 def test_commit_all_timeout_raises_precommit_hang_and_reaps(repo, tmp_path, monkeypatch):
     """A pre-commit hook that hangs is bounded: typed precommit-hang (not local-gate),
     the hook's process group is reaped, and the index.lock git left behind is cleared.

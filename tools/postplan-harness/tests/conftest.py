@@ -16,6 +16,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
+from parallel_default import (  # noqa: E402,F401  (hooks registered by import)
+    pytest_cmdline_main, pytest_configure, pytest_terminal_summary)
 
 
 @pytest.fixture

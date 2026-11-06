@@ -334,3 +334,37 @@ python3 -m harness.conformance_fix classify --plan <plan> --worktree <worktree> 
 | [#3455](https://github.com/a-jay85/IBL5/pull/3455) `wt-gc-reap-stale-junk` | `092b5b9db6` | 0 | none | none |
 
 Run on 2026-10-25. This is classification only: no fixer round was run against these PRs, and whether the fixer would have written a passing test is unknown until a real run after merge. The `harness.conformance` CLI reports only `MISSING:` and `MISSING-FILE:` items, so `MISSING-METHOD:` and `UNREALISED-ASSERTION:` holds do not show up in this replay. All three heads exit 0 with no items, so their condition (3) holds at the time of the 2026-10-24 triage came from item classes this CLI does not print, or were cleared by later commits.
+
+## Parallel test runs
+
+A bare `python3 -m pytest` from this directory, or `python3 -m pytest tools/postplan-harness/tests/` from the repo root, runs on 8 pytest-xdist workers with `--dist loadgroup`. `tests/parallel_default.py` makes that choice. Every run ends with one line naming it, for example `harness-pytest: workers=8 dist=loadgroup reason=whole-suite`.
+
+These runs stay serial:
+
+- A file or nodeid argument, or a `-k`, `-m`, `--lf`, `--sw`, `--pdb`, or `--trace` option.
+- Any explicit `-n`. The caller's value wins, and `-n 0` forces serial.
+- `-p no:xdist`, or an interpreter without pytest-xdist. Every test still runs and nothing errors.
+
+Tests that time a real subprocess hang carry `xdist_group("real_timeout")`, so they share one worker.
+
+A worker crash stops the run with a non-zero exit, the same way a crash stops a serial run. The plugin sets `--max-worker-restart 0` because xdist 3.8.0 requeues a crashed test under `loadgroup`, which can hang the run. An explicit `--max-worker-restart` still wins.
+
+### Installing pytest-xdist
+
+The automouse launchd jobs put `/opt/homebrew/bin` first on PATH, so they run `/opt/homebrew/bin/python3`. Homebrew marks that interpreter externally managed (PEP 668). Install into the scheme pytest already uses:
+
+```bash
+/opt/homebrew/bin/python3 -m pip show pytest | grep Location
+/opt/homebrew/bin/python3 -m pip install --user --break-system-packages \
+  pytest-xdist
+/usr/local/bin/python3 -m pip install pytest-xdist
+```
+
+Drop `--user` when pytest's Location is outside `~/Library/Python`. To check what a launchd job sees:
+
+```bash
+LPATH=$(plutil -extract EnvironmentVariables.PATH raw \
+  ~/Library/LaunchAgents/com.ibl5.automouse-cutover-check.plist)
+env -i HOME="$HOME" PATH="$LPATH" sh -c \
+  'command -v python3; python3 -c "import xdist; print(xdist.__version__)"'
+```

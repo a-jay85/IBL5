@@ -415,18 +415,27 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         self::assertNull($byGotd[2]['box_id'], 'gotd=2 must have null box_id when no box score exists');
     }
 
+    private function countBoxScoreTeamRows(): int
+    {
+        $result = $this->db->query("SELECT COUNT(*) AS `cnt` FROM `ibl_box_scores_teams`");
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+
+        return (int) ($row['cnt'] ?? 0);
+    }
+
     public function testIngestDoesNotTreatAQuoteBearingGameDateAsSql(): void
     {
         $this->repo->queuePendingIfAbsent(self::SIM);
 
-        $countBefore = (int) ($this->db->query("SELECT COUNT(*) AS `cnt` FROM `ibl_box_scores_teams`")?->fetch_assoc()['cnt'] ?? 0);
+        $countBefore = $this->countBoxScoreTeamRows();
 
         $maliciousPayload = '{"intro_text":"Intro text.","outro_text":"Outro text.","recap_text":"Recap.","themes":["comeback"],'
             . '"games":[{"season_year":2025,"game_date":"2025-01-01\' OR \'1\'=\'1","visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":0,"recap_text":"Game recap."}]}';
 
         $result = $this->runScript(['--sim=' . self::SIM], $maliciousPayload);
 
-        $countAfter = (int) ($this->db->query("SELECT COUNT(*) AS `cnt` FROM `ibl_box_scores_teams`")?->fetch_assoc()['cnt'] ?? 0);
+        $countAfter = $this->countBoxScoreTeamRows();
         self::assertSame($countBefore, $countAfter, 'ibl_box_scores_teams row count must be unchanged');
 
         if ($result['exit_code'] === 0) {

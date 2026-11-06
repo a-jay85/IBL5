@@ -44,6 +44,42 @@ EOF
     exit 0
 fi
 
+# --- Argument guard ----------------------------------------------------------
+# Runs before every side effect (lock, log, git, caffeinate, self-heal, attempt
+# counter, claude). An unsupported first word used to be ignored, so a typo like
+# `run status` started a real overnight run. Bare `run` (launchd and the one-shot
+# plists) is the only form with no argument. Callers: launchd plists, the plists
+# `schedule` writes, the usage-gate coordinator (`--resume-paused <sid>`), the
+# `bin/test-automouse-*` harnesses, and the docs. --help/-h is handled above.
+# A missing <slug>/<time> keeps each subcommand's own usage error (exit 1).
+# Locked by `bin/test-automouse-single` case 18.
+# BEGIN arg-guard
+automouse_arg_usage() {
+    echo "automouse-run: $1" >&2
+    cat >&2 <<'USAGE_EOF'
+supported forms:
+  bin/automouse/run                         run the queue (no arguments)
+  bin/automouse/run plan <slug>             run exactly one plan
+  bin/automouse/run schedule "<time>"       schedule a one-shot run
+  bin/automouse/run disarm-tonight          skip tonight's run
+  bin/automouse/run disarm-until "<time>"   pause until the given time
+  bin/automouse/run --resume-paused <sid>   resume a paused session (coordinator)
+  bin/automouse/run --help | -h             show help
+USAGE_EOF
+    exit 2
+}
+if [ $# -gt 0 ]; then
+    case "$1" in
+        plan)           [ $# -le 2 ] || automouse_arg_usage "'plan' takes one argument: <slug>" ;;
+        schedule)       [ $# -le 2 ] || automouse_arg_usage "'schedule' takes one argument: \"[YYYY-MM-DD] HH:MM [TZ]\"" ;;
+        disarm-tonight) [ $# -eq 1 ] || automouse_arg_usage "'disarm-tonight' takes no arguments" ;;
+        disarm-until)   [ $# -le 2 ] || automouse_arg_usage "'disarm-until' takes one argument: \"[YYYY-MM-DD] HH:MM [TZ]\"" ;;
+        --resume-paused) [ $# -eq 2 ] || automouse_arg_usage "--resume-paused takes exactly one session id" ;;
+        *)              automouse_arg_usage "unsupported argument '$1'" ;;
+    esac
+fi
+# END arg-guard
+
 # Resolve "[YYYY-MM-DD] HH:MM [TZ]" to an epoch. A missing date means today; a
 # missing TZ means system-local. BSD (macOS) forms first, GNU fallback last so
 # these helpers stay exercisable on the Linux CI runner.

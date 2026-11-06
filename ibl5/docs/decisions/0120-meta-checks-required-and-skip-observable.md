@@ -1,6 +1,6 @@
 ---
 description: "Meta checks" is promoted to a required status check on master, and the adr paths-filter gains an else-branch so a filter skip is legible in the job log.
-last_verified: 2026-09-06
+last_verified: 2026-11-05
 owner: ajaynicolas
 ---
 

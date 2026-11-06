@@ -1,6 +1,6 @@
 ---
 description: When authoring a bin/ script: do not use a bare '#' line inside a '# Usage:' help-comment span (it terminates the sed extractor early); every verification-matrix row that declares a secondary stderr/stdout token must have a matching 'want' assertion in the test harness for that specific token.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 paths:
   - "bin/**"
 ---
@@ -9,7 +9,7 @@ paths:
 
 ## Clause 1 — No bare `#` inside a `# Usage:` help span
 
-`bin/plan-now:111` reads its own help block with:
+`bin/plan-now:179` reads its own help block with:
 
     sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 
@@ -33,7 +33,7 @@ The sed range `^#$` stops at the **first** line that is exactly `#`. Any bare `#
     # ---
     # Operator note that is now visible.
 
-`bin/plan-now:18` was changed from a bare `#` to `# ---` when this class was discovered (PR #1966).
+`bin/plan-now:43` was changed from a bare `#` to `# ---` when this class was discovered (PR #1966).
 
 ## Why
 
@@ -56,7 +56,7 @@ A `bin/test-*` harness row that names a secondary stderr/stdout token in its lab
     want "runner is written" "$OUT" "runner:"
     want "warning names the proceed decision" "$OUT" "proceeding"
 
-`bin/test-plan-now:776` — `want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"` — is the assertion added when this class was discovered (PR #1966).
+`bin/test-plan-now:1170` — `want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"` — is the assertion added when this class was discovered (PR #1966).
 
 ## Why
 

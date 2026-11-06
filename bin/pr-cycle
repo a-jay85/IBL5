@@ -535,9 +535,9 @@ _excluded_dirty_rows() {
     ' "$RUNDIR/attack.md"
 }
 
-# True when launchd already holds a post-plan-fleet slot for this PR. The plist IS the slot
-# token (bin/post-plan-fleet:688), so firing a rescue against a PR whose session is already in
-# flight would put two sessions on one PR.
+# True when launchd already holds a post-plan-fleet slot for this PR. The live launchctl label
+# IS the slot token (ljob_claim_slot in bin/lib/launchd-job.sh), so firing a rescue against a
+# PR whose session is already in flight would put two sessions on one PR.
 #
 # The list is snapshotted into a VARIABLE and matched with a `case` glob. NEVER
 # `printf '%s\n' "$list" | grep -q ...`: under `set -o pipefail` grep exits at the first

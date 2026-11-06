@@ -421,10 +421,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# T12d: idle pr-review-now label → not reported (submitted prefixes only)
+# T12d: idle finding-class-scan-verify label → not reported (submitted prefixes only)
 # ---------------------------------------------------------------------------
 healthy_fixture T12d
-printf -- '-\t0\tcom.ibl5.pr-review-now-42\n' >> "$CASE/launchctl.out"
+printf -- '-\t0\tcom.ibl5.finding-class-scan-verify-42\n' >> "$CASE/launchctl.out"
 run_checker
 if ! grep -q 'idle-oneshot' <<< "$OUT"; then
     ok T12d
@@ -449,6 +449,48 @@ if [ "$RC" -eq 0 ] \
     ok T12e
 else
     fail T12e "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# fleet-idle-oneshot: idle submitted post-plan-fleet label → INFO idle-oneshot, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture fleet-idle-oneshot
+printf -- '-\t0\tcom.ibl5.post-plan-fleet-42\n' >> "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.post-plan-fleet-42' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok fleet-idle-oneshot
+else
+    fail fleet-idle-oneshot "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# review-idle-oneshot: idle submitted pr-review-now label → INFO idle-oneshot, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture review-idle-oneshot
+printf -- '-\t0\tcom.ibl5.pr-review-now-1901\n' >> "$CASE/launchctl.out"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*idle-oneshot:com.ibl5.pr-review-now-1901' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok review-idle-oneshot
+else
+    fail review-idle-oneshot "rc=$RC out=$(printf '%s' "$OUT")"
+fi
+
+# ---------------------------------------------------------------------------
+# fleet-stale-oneshot: leftover post-plan-fleet plist, label absent → INFO stale-oneshot, exit 0
+# ---------------------------------------------------------------------------
+healthy_fixture fleet-stale-oneshot
+touch "$CASE/home/Library/LaunchAgents/com.ibl5.post-plan-fleet-42.plist"
+run_checker
+if [ "$RC" -eq 0 ] \
+    && grep -q 'INFO.*stale-oneshot:com.ibl5.post-plan-fleet-42' <<< "$OUT" \
+    && ! grep -q '^FAIL: ' <<< "$OUT"; then
+    ok fleet-stale-oneshot
+else
+    fail fleet-stale-oneshot "rc=$RC out=$(printf '%s' "$OUT")"
 fi
 
 # ---------------------------------------------------------------------------

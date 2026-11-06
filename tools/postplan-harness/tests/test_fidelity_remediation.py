@@ -1177,6 +1177,8 @@ def test_gate_path_edit_raises_before_push(tmp_path, git_shim):
     assert ".claude/rules/x.md" in (ei.value.detail or "")
     assert gitad_double.pushes == 0
     assert outcome["reason"] == "gate-path-edit"
+    # The fail-closed branch: the strip ran, yet the fake still reports the protected path.
+    assert gitad_double.stripped == [[".claude/rules/x.md"]]
 
 
 def test_non_gate_edit_still_pushes(tmp_path, git_shim):

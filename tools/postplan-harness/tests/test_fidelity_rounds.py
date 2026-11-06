@@ -7,6 +7,7 @@ across retries, and no retry can push the loop past MAX_FIDELITY_ROUNDS.
 from __future__ import annotations
 
 import os
+import pathlib
 import stat
 import sys
 import types
@@ -246,8 +247,123 @@ def test_gate_path_edit_is_terminal_via_path_check(tmp_path, git_shim):
         assert res.fidelity["rounds"][0]["outcome"] == "gate-path-edit"
         assert git.pushes == 0
         assert len(_fixer_calls(llm)) == 1
+        # The fail-closed branch: the strip ran, yet the fake still reports the path.
+        assert git.stripped == [["bin/check-plan"]]
     finally:
         _cleanup(9305, "9305-2")
+
+
+class _StripGit(_CountingGit):
+    """A fake whose strip really takes the protected paths out of the touched list."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.stripped = []
+
+    def strip_head_paths(self, sha, paths):
+        self.stripped.append(list(paths))
+        return ""
+
+    def _gone(self):
+        return {p for batch in self.stripped for p in batch}
+
+    def changed_files(self, base="origin/master"):
+        return [p for p in self._touched if p not in self._gone()]
+
+    def commit_all(self, message):
+        if self.stripped and not self.changed_files():
+            return ""
+        return super().commit_all(message)
+
+
+def _strip_git(touched):
+    return _StripGit({"slug": "demo", "worktree_diff": "",
+                      "diff": "diff --git a/x b/x\n",
+                      "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4]}, touched=touched)
+
+
+GATE_FINDING = "Fix `.claude/rules/x.md` wording"
+NOT_READY_GATE = (f"6d checks\n\nNOT READY\n\n## FINDINGS\n- [BLOCKING] {GATE_FINDING}\n\n"
+                  "## DIGEST\nx\n")
+
+
+def _carve_out_refuses(monkeypatch):
+    monkeypatch.setattr(fidelity.fidelity_filefix, "snapshot",
+                        lambda *a, **k: types.SimpleNamespace(active=False, eligible=(),
+                                                              reason="test"))
+    monkeypatch.setattr(fidelity.fidelity_filefix, "permit", lambda *a, **k: False)
+
+
+def test_gate_strip_round_keeps_fix_and_body_and_rereviews(tmp_path, git_shim):
+    """Allowed file, protected file and PR body: only the protected edit is dropped."""
+    from test_fidelity_body_only_round import _BodySeqGh
+
+    class _EditLogGh(_BodySeqGh):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.body_edits = []
+
+        def pr_edit_body(self, pr, body):
+            self.body_edits.append(body)
+            super().pr_edit_body(pr, body)
+
+    _carve_out_refuses(git_shim)
+    gh = _EditLogGh(str(tmp_path), ["BEFORE body prose", "AFTER body prose"],
+                    fixture={"pr_number": 9306})
+    git = _strip_git(["ibl5/x.php", ".claude/rules/x.md"])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY_GATE],
+        "fidelity-remediation": ["edited"],
+        "plan-fidelity-re-review-2": ["READY\n"],
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9306, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        rounds = res.fidelity["rounds"]
+        assert rounds[0]["outcome"] == "committed"
+        assert rounds[0]["gate_reverted"] == [".claude/rules/x.md"]
+        assert git.stripped == [[".claude/rules/x.md"]]
+        assert git.pushes == 1
+        assert rounds[0]["verdict"] == "READY"
+        assert rounds[0]["reviewed_tree"] == git.head_tree()
+        assert len(_fixer_calls(llm)) == 1
+        assert gh.body_edits
+        assert all("AFTER body prose" in b for b in gh.body_edits)
+        assert not any("BEFORE body prose" in b for b in gh.body_edits)
+    finally:
+        _cleanup(9306, "9306-2")
+
+
+def test_gate_strip_only_protected_holds_with_sticky(tmp_path, git_shim):
+    """Only a protected edit: nothing lands, the run ends held, the sticky says who acts."""
+    _carve_out_refuses(git_shim)
+    git = _strip_git([".claude/rules/x.md"])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY_GATE],
+        "fidelity-remediation": ["edited"],
+    })
+    try:
+        res = _drive(tmp_path, llm, git, 9307)
+        rounds = res.fidelity["rounds"]
+        assert rounds[0]["outcome"] == "gate-path-edit"
+        assert len(rounds) == 1
+        assert len(_fixer_calls(llm)) == 1
+        assert git.pushes == 0
+        assert res.fidelity["gate_path_hold"][0]["path"] == ".claude/rules/x.md"
+        sticky = "\n".join(fidelity._status_sections(res.fidelity, "NOT READY"))
+        assert "Needs the owner (protected file)" in sticky
+        assert GATE_FINDING in sticky
+        assert "`.claude/rules/x.md`" in sticky
+    finally:
+        _cleanup(9307, "9307-2")
+
+
+def test_gate_hold_sticky_hidden_when_final_verdict_passes():
+    fid = {"gate_path_hold": [{"path": ".claude/rules/x.md", "finding": "f"}]}
+    assert not any("Needs the owner" in line
+                   for line in fidelity._status_sections(fid, "READY"))
 
 
 def test_retries_never_exceed_max_rounds(tmp_path, git_shim):
@@ -263,6 +379,16 @@ def test_retries_never_exceed_max_rounds(tmp_path, git_shim):
         assert res.fidelity["rounds_completed"] == 0
     finally:
         _cleanup(9306, "9306-2")
+
+
+def test_attempt_loop_range_stays_one_retry():
+    """The loop's own range is half of the 2 * MAX_FIDELITY_ROUNDS spawn bound.
+
+    A driven run cannot see a wider range: the `attempt < _MAX_ROUND_RETRIES` guards
+    break every path on the last retry, so the extra pass is never reached. Those
+    guards and this range each hold the bound, so a source pin covers the range."""
+    src = pathlib.Path(runner.__file__).read_text()
+    assert "for attempt in range(_MAX_ROUND_RETRIES + 1):" in src
 
 
 # --- re-review retry ----------------------------------------------------------

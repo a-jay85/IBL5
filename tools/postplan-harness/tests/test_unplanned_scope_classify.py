@@ -1,8 +1,11 @@
 """The keep/remove/hold classifier for `[unplanned-scope]` fidelity findings."""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -144,6 +147,29 @@ def test_commit_subjects_for_real_git(tmp_path):
     assert us.commit_subjects_for(str(repo), "0" * 39 + "1", ["src/a.txt"]) == {"src/a.txt": []}
 
 
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_non_utf8_commit_subject_maps_to_empty_and_keeps(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, GRID, [])
+    target = repo / GRID
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("grid\n", encoding="utf-8")
+    _git(repo, "add", GRID)
+    # `git commit` rewrites a Latin-1 message to UTF-8, so write the commit object directly.
+    identity = b"T <t@example.com> 1700000000 +0000"
+    raw = (b"tree " + _git(repo, "write-tree").encode() + b"\n"
+           b"parent " + base.encode() + b"\n"
+           b"author " + identity + b"\ncommitter " + identity + b"\n\ncaf\xe9 grid\n")
+    made = subprocess.run(["git", "hash-object", "-t", "commit", "-w", "--stdin"],
+                          cwd=str(repo), input=raw, check=True, capture_output=True)
+    _git(repo, "update-ref", "HEAD", made.stdout.decode().strip())
+
+    assert us._subjects_for(str(repo), base, GRID) == []
+    subjects = us.commit_subjects_for(str(repo), base, [GRID])
+    assert subjects == {GRID: []}
+    assert _classify(subjects=subjects) == "keep"
+
+
 def _cli_fixture(tmp_path):
     """A repo with a user commit on one path and a fixer commit on another, plus inputs."""
     repo = tmp_path / "repo"
@@ -220,6 +246,27 @@ def test_cli_detector_failure_exits_3(tmp_path, capsys):
         fh.write("#!/usr/bin/env bash\nexit 2\n")
     assert us.main(args) == 3
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+def test_cli_non_utf8_diff_exits_3_without_traceback(tmp_path):
+    args, _, _ = _cli_fixture(tmp_path)
+    repo = Path(args[args.index("--worktree") + 1])
+    (repo / "latin1.txt").write_bytes(b"caf\xe9\n")
+    _git(repo, "add", "latin1.txt")
+    _git(repo, "commit", "-q", "-m", "add a Latin-1 file")
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness.unplanned_scope", *args],
+        cwd=str(Path(us.__file__).resolve().parents[1]),
+        env={**os.environ, "PYTHONUTF8": "1"},
+        capture_output=True, text=True, timeout=60,
+    )
+
+    assert proc.returncode == 3
+    assert "Traceback" not in proc.stderr
+    assert "unplanned_scope: git diff" in proc.stderr
+    assert proc.stdout == ""
 
 
 def test_cli_missing_verdict_exits_2(tmp_path, capsys):

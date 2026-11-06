@@ -87,6 +87,16 @@ def _section_for(diff_text: str, path: str) -> str | None:
     return None
 
 
+_MOVE_SOURCE_RE = re.compile(r"^(?:rename|copy) from (.+)$", re.MULTILINE)
+
+
+def _moved_in_from_outside(section: str | None) -> bool:
+    """True when the section is a rename or copy whose source is outside the workflow glob.
+    Such a move activates a new sender even when git shows no changed notify line."""
+    m = _MOVE_SOURCE_RE.search(section or "")
+    return bool(m) and not fnmatch.fnmatchcase(m.group(1).strip(), _WORKFLOW_GLOB)
+
+
 def _module_root(path: str) -> str:
     parts = path.split("/")
     if len(parts) >= 3 and parts[0] == "ibl5" and parts[1] in ("classes", "modules"):
@@ -158,7 +168,9 @@ def derive_merge_danger(
                 add(f"notify-workflow:{wf}")
                 external = True
             elif _NOTIFY_TEXT_RE.search(text):
-                hit = workflow_send_change(text, _section_for(diff_text or "", wf), _NOTIFY_TEXT_RE)
+                section = _section_for(diff_text or "", wf)
+                hit = _moved_in_from_outside(section) or \
+                    workflow_send_change(text, section, _NOTIFY_TEXT_RE)
                 if hit:
                     add(f"notify-workflow:{wf}")
                     external = True

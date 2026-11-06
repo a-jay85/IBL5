@@ -9,12 +9,12 @@
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
 #   --pr N[,N...] Explicit PR numbers; bypasses the open/non-draft selector.
-#   --dry-run     Print the resolved per-PR invocation line and the generated plist XML for
+#   --dry-run     Print the resolved per-PR invocation line and the launchctl submit command for
 #                 each selected PR, then exit 0 without loading anything into launchd.
 #   --help, -h    Print this usage and exit 0.
 #   --pr-list N[,N...]  Batch form of --pr: fire every listed PR, in the given order,
 #                       at most --jobs at a time. Used by bin/pr-cycle Stage 1.
-#   --wait        After all sessions are fired, poll until every launchd plist is gone
+#   --wait        After all sessions are fired, poll until every live launchctl label is gone
 #                 (all sessions finished). For use inside a detached wrapper only —
 #                 never from an interactive main-thread session (foreground poll loop is
 #                 a spend bug; see .claude/rules/work-triage.md). Times out at 14400s and then exits 1 after writing the report.
@@ -24,7 +24,7 @@
 #                 as settled here and the report lists it as PAUSED. The exit code is unchanged.
 #   --stop N[,N...]   Abort the fired session(s) for these PRs: bootout the launchd label,
 #                     TERM then KILL anything carrying --name <label>, release the slot
-#                     (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
+#                     (the label is gone from launchctl list) and clear the PR's /tmp scratch. Exits nonzero and
 #                     LEAVES the slot held if a process survives KILL.
 #   --stop-all        Apply --stop to every PR currently holding a slot.
 #   --no-dm       Skip the Discord DM this script sends when each fired session ends.
@@ -49,7 +49,7 @@
 # /Users/ajaynicolas/GitHub/IBL5.
 #
 # Env seams (used by bin/test-post-plan-fleet):
-#   POST_PLAN_FLEET_DRY_RUN=1  With --go: emit invocation + plist per PR but skip launchctl bootstrap.
+#   POST_PLAN_FLEET_DRY_RUN=1  With --go: emit invocation + submit command per PR but skip launchctl submit.
 #   POST_PLAN_FLEET_PR_JSON    Read selector JSON from this file instead of shelling to gh.
 #   POST_PLAN_FLEET_GH_USER    Use this GitHub login instead of calling `gh api user`. Lets the
 #                           tests run on CI, which has no gh auth. Never set it by hand.
@@ -276,7 +276,7 @@ _label_alive() {
 
 # --- stop path (L34) ---------------------------------------------------------------------
 # `launchctl bootout` unloads the label but does NOT kill the timeout/bin/post-plan-now
-# child chain, so bootout alone leaves the run burning tokens while the plist (the slot
+# child chain, so bootout alone leaves the run burning tokens while the live label (the slot
 # token) disappears. Kill both the runner and its timeout child, verify death, THEN release
 # the slot — in that order.
 stop_one_pr() {
@@ -1098,7 +1098,7 @@ ${fix_cmd}"
     ljob_dm_send post-plan-fleet "$msg"
 }
 # Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the
-# slot. pr-cycle --wait returns when the plist disappears; the LOG must be fully
+# slot. pr-cycle --wait returns when the live label disappears; the LOG must be fully
 # written before that happens so _stage1_outcome_summary() can read it.
 # Outcome words: shipped, held, declined, paused, conflict, failed, timed-out.
 # A second line `post-plan-fleet: reason=<short>` follows when there is a reason.

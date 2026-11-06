@@ -7,11 +7,11 @@
 #   bin/pr-review-now --stop-all
 #
 #   <PR>          PR number to review (required). Fires /pr-review <PR> as a detached launchd job.
-#   --dry-run     Emit the runner + plist but skip launchctl bootstrap.
+#   --dry-run     Emit the runner + submit command but skip launchctl submit.
 #                 Also honoured via env: PR_REVIEW_NOW_DRY_RUN=1.
 #   --stop <PR>   Abort the fired session for this PR: bootout the launchd label,
 #                 TERM then KILL anything carrying --name <label>, release the slot
-#                 (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
+#                 (the label is gone from launchctl list) and clear the PR's /tmp scratch. Exits nonzero and
 #                 LEAVES the slot held if a process survives KILL.
 #   --stop-all    Apply --stop to every PR currently holding a pr-review-now slot.
 #   --help, -h    Print this usage and exit 0.
@@ -22,7 +22,7 @@
 #
 # Env seams:
 #   PR_REVIEW_NOW_CLAUDE     Override the claude binary (stub for tests). Unset = auto-detect.
-#   PR_REVIEW_NOW_DRY_RUN=1  Emit runner + plist per PR but skip launchctl bootstrap.
+#   PR_REVIEW_NOW_DRY_RUN=1  Emit runner + submit command per PR but skip launchctl submit.
 #   PR_REVIEW_NOW_MODEL      Model for the fired session (default: sonnet — lets the
 #                            /pr-review skill's own frontmatter pin win).
 #   PR_REVIEW_NOW_DISCORD_DM Override the discord-dm binary path for the finish DM.
@@ -130,7 +130,7 @@ _label_alive() {
 
 # --- stop path --------------------------------------------------------------------------
 # `launchctl bootout` unloads the label but does NOT kill the reparented caffeinate → timeout
-# → claude chain, so bootout alone leaves the run burning tokens while the plist (the slot
+# → claude chain, so bootout alone leaves the run burning tokens while the live label (the slot
 # token) disappears. Kill by label, verify death, THEN release the slot — in that order.
 stop_one_pr() {
     local PR="$1"

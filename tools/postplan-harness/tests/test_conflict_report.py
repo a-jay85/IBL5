@@ -44,7 +44,7 @@ def _build_repo(tmp_path, base, master, branch, resolved):
     _sh(d, "checkout", "master")
     _write_tree(d, master)
     _sh(d, "add", "-A")
-    _sh(d, "commit", "-m", "master")
+    _sh(d, "commit", "--allow-empty", "-m", "master")
     onto_sha = _rev(d, "HEAD")
     _write_tree(d, resolved)
     _sh(d, "add", "-A")

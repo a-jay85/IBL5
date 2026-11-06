@@ -95,8 +95,12 @@ def test_pr_copy_prompt_requests_merge_danger_line():
 
 def test_derive_from_worktree_reads_candidate_text(tmp_path):
     wf = ".github/workflows/x.yml"
-    wt = _worktree(tmp_path, {wf: "env:\n  DISCORD_WEBHOOK: ${{ secrets.X }}\n"})
-    d = merge_danger.derive_from_worktree(wt, _diff(wf))
+    text = ("env:\n  DISCORD_WEBHOOK: ${{ secrets.X }}\njobs:\n  a:\n"
+            "    runs-on: ubuntu-26.04\n    steps:\n      - run: echo hi\n")
+    wt = _worktree(tmp_path, {wf: text})
+    diff = (f"diff --git a/{wf} b/{wf}\n--- a/{wf}\n+++ b/{wf}\n@@ -1,2 +1,2 @@\n env:\n"
+            "-  DISCORD_WEBHOOK: ${{ secrets.OLD }}\n+  DISCORD_WEBHOOK: ${{ secrets.X }}\n")
+    d = merge_danger.derive_from_worktree(wt, diff)
     assert (d.door, d.blast) == ("one-way", "external")
     assert f"notify-workflow:{wf}" in d.triggers
 

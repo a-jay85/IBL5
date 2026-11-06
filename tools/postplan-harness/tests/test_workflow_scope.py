@@ -240,10 +240,7 @@ def test_unknown_hunk_tag_fires():
 
 
 def test_misaligned_context_fires():
-    candidate, _ = _edit(_MAIN_LIKE, "timeout-minutes: 5", "    timeout-minutes: 10")
-    n = _line_of(candidate, "timeout-minutes: 10")
-    hunk = f"@@ -{n - 1},2 +{n - 1},2 @@\n not the real context\n-    timeout-minutes: 5\n+    timeout-minutes: 10\n"
-    assert _run(candidate, HEADER + hunk) == "misaligned"
+    assert _run(_MAIN_LIKE, f"{HEADER}@@ -1,2 +1,2 @@\n name: Wrong\n-on:\n+on:\n") == "misaligned"
 
 
 def test_misaligned_added_line_fires():

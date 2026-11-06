@@ -20,6 +20,7 @@ from pathlib import Path
 
 from harness.armable import DESTRUCTIVE_SQL
 from harness.sql_comments import strip_added_sql_comments
+from harness.workflow_scope import workflow_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
@@ -142,17 +143,22 @@ def derive_merge_danger(
         for p in migrations:
             add(f"destructive-migration:{p}")
 
-    # 2. Prod external state and outbound notification senders.
+    # 2. Prod external state and outbound notification senders (changed lines of the workflow's own section).
     external = False
     for status, p in pairs:
+        wf = p.split(" → ")[-1]
         if p in _EXTERNAL_PATHS or p.startswith(_EXTERNAL_PREFIXES):
             add(f"external-path:{p}")
             external = True
-        elif fnmatch.fnmatchcase(p, _WORKFLOW_GLOB) and not status.startswith("D"):
-            text = read_candidate(p)
+        elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):
+            text = read_candidate(wf)
+            # Notify text in the file is only the precondition; the workflow's own changed
+            # lines decide. An unreadable section or candidate fires (fail closed).
             if text is not None and _NOTIFY_TEXT_RE.search(text):
-                add(f"notify-workflow:{p}")
-                external = True
+                hit = workflow_send_change(text, _section_for(diff_text or "", wf), _NOTIFY_TEXT_RE)
+                if hit:
+                    add(f"notify-workflow:{wf}")
+                    external = True
 
     # 3. Self-governing merge machinery (the bootstrap hazard).
     for p in paths:

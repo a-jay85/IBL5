@@ -1,0 +1,11 @@
+# Local-only tables that bin/db-sync-prod keeps across a prod sync or snapshot load.
+# Read as data by bin/db-sync-prod and never sourced. One table name per line.
+# Lines starting with # and empty lines are ignored. Any other line must match
+# ^ibl_[a-z0-9_]+$ or the sync aborts before it touches any database.
+# Why these tables: ibl5/docs/decisions/0080-mac-local-discord-bug-pipeline-cron-topology.md
+ibl_api_keys
+ibl_bug_reports
+ibl_bug_report_attachments
+ibl_bug_reporter_profile
+ibl_bug_pipeline_state
+ibl_bug_report_operator_context

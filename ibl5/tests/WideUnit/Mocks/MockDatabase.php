@@ -123,7 +123,7 @@ class MockDatabase extends \mysqli
     /**
      * Mock close() — no real connection to release.
      */
-    public function close(): bool
+    public function close(): true
     {
         // Mock close - nothing to release.
         return true;

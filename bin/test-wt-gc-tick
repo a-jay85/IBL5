@@ -213,6 +213,17 @@ if [ "$sub" = list ]; then echo none; exit 0; fi
 echo '[]'
 SH
 
+# discord-dm-stub (alert pass, via WT_GC_DISCORD_DM): appends its argv as one
+# line to dm-argv, appends stdin plus a '---END---' line to dm-msg, and exits
+# ${STUB_DM_RC:-0}.
+cat > "$STUBBIN/discord-dm-stub" <<'SH'
+#!/bin/bash
+printf '%s\n' "$*" >> "$STUB_CASE_DIR/dm-argv"
+{ cat; printf '\n---END---\n'; } >> "$STUB_CASE_DIR/dm-msg"
+exit "${STUB_DM_RC:-0}"
+SH
+chmod +x "$STUBBIN/discord-dm-stub"
+
 # launchctl-stub (reap steps, via WT_GC_LAUNCHCTL): `list` prints the file
 # $STUB_LAUNCHCTL_LIST; anything else records argv and exits 1.
 cat > "$STUBBIN/launchctl-stub" <<'SH'
@@ -353,6 +364,7 @@ run_tick() {
         WT_GC_ARCHIVE_PRUNE=0
         WT_GC_WT_REMOVE=/usr/bin/false
         WT_GC_LAUNCHCTL="$STUBBIN/launchctl-stub"
+        WT_GC_DISCORD_DM="$STUBBIN/discord-dm-stub"
         WT_GC_LSOF="$STUBBIN/lsof"
         WT_GC_GH="$STUBBIN/gh-stub"
         WT_GC_DOCKER="$STUBBIN/docker"
@@ -2904,6 +2916,192 @@ if [ ! -s "$ROOT/all-argv" ]; then note_err "no cleanup argv was ever captured";
 if grep -E -- '--discard-generated|--discard-closed|--drop-merged-stashes' "$ROOT/all-argv" >/dev/null 2>&1; then
     note_err "a run passed a destructive flag to cleanup"
 fi
+finish_case
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PRA — unpushed open-PR alert (alert_unpushed_open_prs)
+# ══════════════════════════════════════════════════════════════════════════════
+# pra_setup <wt-name> <branch>: fixture env + worktree with one commit dated one
+# day back, an origin ref at origin/master (so the commit has no twin), and an
+# OPEN-PR row for PR 4242. Sets PRA_WT to the worktree path.
+pra_setup() {
+    local old
+    mk_wt "$1" "$2"
+    PRA_WT="$(dirname "$ENV_MAIN")/IBL5-worktrees/$1"
+    old=$(( $(date +%s) - 86400 ))
+    printf 'pra\n' > "$PRA_WT/pra-$1.txt"
+    git -C "$PRA_WT" add "pra-$1.txt"
+    GIT_AUTHOR_DATE="@$old" GIT_COMMITTER_DATE="@$old" \
+        git -C "$PRA_WT" commit -qm "pra: stranded change"
+    git -C "$ENV_MAIN" update-ref "refs/remotes/origin/$2" origin/master
+    printf 'OPEN-PR %s (PR #4242)\n' "$1" > "$CD/rows"
+    rm -f "$CD/dm-argv" "$CD/dm-msg"
+}
+# pra_twin <branch>: point origin/<branch> at a patch-equivalent commit with a
+# different SHA (same tree and parent, different message).
+pra_twin() {
+    local tree twin
+    tree="$(git -C "$PRA_WT" rev-parse 'HEAD^{tree}')"
+    twin="$(git -C "$ENV_MAIN" commit-tree "$tree" -p origin/master -m 'pra: twin')"
+    git -C "$ENV_MAIN" update-ref "refs/remotes/origin/$1" "$twin"
+}
+dm_calls() { if [ -f "$CD/dm-argv" ]; then grep -c . "$CD/dm-argv"; else echo 0; fi; }
+pra_marker() { cat "$CD/state/pr-alerts/$1" 2>/dev/null || true; }
+# rt_keep: rt without wiping the state dir, so the dedupe marker survives.
+rt_keep() {
+    rm -f "$CD/docker-argv" "$CD/wt-remove-argv" "$CD/gh-argv"
+    run_tick WT_GC_REPO_ROOT="$ENV_MAIN" WT_GC_WT_STATUS="$STUBBIN/wt-status-rows" \
+        STUB_WT_STATUS_ROWS="$CD/rows" WT_GC_WT_REMOVE="$ENV_MAIN/bin/wt-remove" "$@"
+}
+pra_head() { git -C "$ENV_MAIN" rev-parse refs/heads/pra-br; }
+
+if should_run PRA1-alert-fires; then
+fx PRA1-alert-fires
+pra_setup pra-wt pra-br
+rt -- --force
+chk_rc "alert run" 0
+log_has 'PR-ALERT sent pra-br head=' || note_err "no sent line"
+[ "$(dm_calls)" = 1 ] || note_err "dm_calls=$(dm_calls), expected 1"
+for want in 'https://github.com/a-jay85/IBL5/pull/4242' 'Branch: pra-br' "Worktree: $PRA_WT" \
+    "Local head: $(pra_head)" 'pra: stranded change'; do
+    grep -qF -- "$want" "$CD/dm-msg" 2>/dev/null || note_err "dm-msg lacks '$want'"
+done
+grep -qF -- '--attempts 2 -' "$CD/dm-argv" 2>/dev/null || note_err "dm-argv lacks '--attempts 2 -'"
+[ "$(pra_marker pra-br)" = "$(pra_head)" ] || note_err "marker is not the head SHA"
+log_has 'pr-alert done sent=1' || note_err "no pr-alert done sent=1"
+finish_case
+fi
+
+if should_run PRA2-twin-suppresses; then
+fx PRA2-twin-suppresses
+pra_setup pra-wt pra-br
+pra_twin pra-br
+rt -- --force
+log_has 'PR-ALERT twin pra-br' || note_err "no twin line"
+[ "$(dm_calls)" = 0 ] || note_err "a twin still sent a DM"
+[ -z "$(pra_marker pra-br)" ] || note_err "marker written for a twin"
+finish_case
+fi
+
+if should_run PRA3-age-gate; then
+fx PRA3-age-gate
+pra_setup pra-wt pra-br
+rt WT_GC_PR_ALERT_MIN_AGE_SECS=315360000 -- --force
+log_has 'PR-ALERT fresh pra-br age=' || note_err "no fresh line"
+[ "$(dm_calls)" = 0 ] || note_err "a young commit still sent a DM"
+finish_case
+fi
+
+if should_run PRA4-age-seam-empty; then
+fx PRA4-age-seam-empty
+pra_setup pra-wt pra-br
+rt WT_GC_PR_ALERT_MIN_AGE_SECS= -- --force
+chk_rc "empty age seam" 0
+log_has "pr-alert skipped: invalid WT_GC_PR_ALERT_MIN_AGE_SECS ''" || note_err "no invalid line"
+[ "$(dm_calls)" = 0 ] || note_err "an invalid age seam still sent a DM"
+finish_case
+fi
+
+if should_run PRA5-postplan-live-suppresses; then
+fx PRA5-postplan-live-suppresses
+pra_setup pra-wt pra-br
+printf '123\t0\tcom.ibl5.postplan-now-pra-br-20261103-120000-123\n' > "$CD/lctl"
+rt STUB_LAUNCHCTL_LIST="$CD/lctl" -- --force
+log_has 'PR-ALERT live-run pra-br' || note_err "leg 1: no live-run line"
+[ "$(dm_calls)" = 0 ] || note_err "leg 1: a live run still sent a DM"
+printf '123\t0\tcom.ibl5.postplan-now-pra-brx-20261103-120000-123\n' > "$CD/lctl"
+rt STUB_LAUNCHCTL_LIST="$CD/lctl" -- --force
+[ "$(dm_calls)" = 1 ] || note_err "leg 2: near-miss slug suppressed the alert (dm_calls=$(dm_calls))"
+finish_case
+fi
+
+if should_run PRA6-fleet-live-suppresses; then
+fx PRA6-fleet-live-suppresses
+pra_setup pra-wt pra-br
+printf '123\t0\tcom.ibl5.post-plan-fleet-4242\n' > "$CD/lctl"
+rt STUB_LAUNCHCTL_LIST="$CD/lctl" -- --force
+log_has 'PR-ALERT live-run pra-br \(com.ibl5.post-plan-fleet-4242\)' || note_err "leg 1: no fleet live-run line"
+[ "$(dm_calls)" = 0 ] || note_err "leg 1: a live fleet run still sent a DM"
+printf '123\t0\tcom.ibl5.post-plan-fleet-42420\n' > "$CD/lctl"
+rt STUB_LAUNCHCTL_LIST="$CD/lctl" -- --force
+[ "$(dm_calls)" = 1 ] || note_err "leg 2: near-miss fleet label suppressed the alert (dm_calls=$(dm_calls))"
+finish_case
+fi
+
+if should_run PRA7-dedupe-holds; then
+fx PRA7-dedupe-holds
+pra_setup pra-wt pra-br
+rt -- --force
+rt_keep -- --force
+[ "$(dm_calls)" = 1 ] || note_err "dm_calls=$(dm_calls) after two sweeps, expected 1"
+log_has 'PR-ALERT dedupe pra-br head=' || note_err "second run logged no dedupe line"
+finish_case
+fi
+
+if should_run PRA8-new-sha-realerts; then
+fx PRA8-new-sha-realerts
+pra_setup pra-wt pra-br
+rt -- --force
+old=$(( $(date +%s) - 86400 ))
+printf 'more\n' > "$PRA_WT/pra-more.txt"
+git -C "$PRA_WT" add pra-more.txt
+GIT_AUTHOR_DATE="@$old" GIT_COMMITTER_DATE="@$old" git -C "$PRA_WT" commit -qm "pra: second stranded change"
+rt_keep -- --force
+[ "$(dm_calls)" = 2 ] || note_err "dm_calls=$(dm_calls), expected 2 after a new head"
+[ "$(pra_marker pra-br)" = "$(pra_head)" ] || note_err "marker did not move to the new head"
+finish_case
+fi
+
+if should_run PRA9-dm-failure-isolated; then
+fx PRA9-dm-failure-isolated
+pra_setup pra-wt pra-br
+rt STUB_DM_RC=1 -- --force
+chk_rc "failed dm" 0
+log_has 'PR-ALERT dm-failed pra-br rc=1' || note_err "no dm-failed line"
+[ -z "$(pra_marker pra-br)" ] || note_err "marker written after a failed send"
+argv_exists || note_err "cleanup stub did not run"
+[ -f "$CD/state/last-sweep" ] || note_err "sweep stamp missing"
+log_has 'done dry_run=0 .* rc=0' || note_err "done line is not rc=0"
+rt_keep -- --force
+[ "$(dm_calls)" = 2 ] || note_err "retry: dm_calls=$(dm_calls), expected 2"
+[ "$(pra_marker pra-br)" = "$(pra_head)" ] || note_err "retry wrote no marker"
+finish_case
+fi
+
+if should_run PRA10-dm-unavailable; then
+fx PRA10-dm-unavailable
+pra_setup pra-wt pra-br
+rt WT_GC_DISCORD_DM= -- --force
+chk_rc "no sender" 0
+log_has 'PR-ALERT dm=unavailable pra-br' || note_err "no dm=unavailable line"
+[ -z "$(pra_marker pra-br)" ] || note_err "marker written with no sender"
+[ "$(dm_calls)" = 0 ] || note_err "a DM was sent with no sender"
+finish_case
+fi
+
+if should_run PRA11-kill-switch; then
+fx PRA11-kill-switch
+pra_setup pra-wt pra-br
+rt WT_GC_PR_ALERT=0 -- --force
+log_has 'pr-alert disabled' || note_err "leg 1: no disabled line"
+[ "$(dm_calls)" = 0 ] || note_err "leg 1: a DM was sent while disabled"
+rt WT_GC_PR_ALERT= -- --force
+[ "$(dm_calls)" = 1 ] || note_err "leg 2: empty switch did not mean enabled (dm_calls=$(dm_calls))"
+finish_case
+fi
+
+if should_run PRA12-dry-run-and-no-origin; then
+fx PRA12-dry-run-and-no-origin
+pra_setup pra-wt pra-br
+rt -- --dry-run --force
+log_has 'PR-ALERT would-send pra-br' || note_err "leg 1: no would-send line"
+[ "$(dm_calls)" = 0 ] || note_err "leg 1: dry-run sent a DM"
+[ -z "$(pra_marker pra-br)" ] || note_err "leg 1: dry-run wrote a marker"
+git -C "$ENV_MAIN" update-ref -d refs/remotes/origin/pra-br
+rt -- --force
+log_has 'PR-ALERT skip pra-br \(no origin ref\)' || note_err "leg 2: no 'no origin ref' line"
+[ "$(dm_calls)" = 0 ] || note_err "leg 2: a DM was sent with no origin ref"
 finish_case
 fi
 

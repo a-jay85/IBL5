@@ -153,6 +153,13 @@ def test_notify_workflow_text_is_external_one_way():
     assert f"notify-workflow:{wf}" in d.triggers
 
 
+def test_unreadable_modified_workflow_fails_closed():
+    wf = ".github/workflows/nightly.yml"
+    d = _derive([("M", wf)], read=lambda p: None)
+    assert (d.door, d.blast) == ("one-way", "external")
+    assert f"notify-workflow:{wf}" in d.triggers
+
+
 def test_workflow_without_notify_text_is_two_way_site_wide():
     wf = ".github/workflows/ci.yml"
     gates = [GateChange(wf, "ci-workflow", "not-replayable", None, "CI workflow")]

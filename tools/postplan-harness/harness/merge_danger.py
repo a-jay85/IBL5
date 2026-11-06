@@ -154,7 +154,10 @@ def derive_merge_danger(
             text = read_candidate(wf)
             # Notify text in the file is only the precondition; the workflow's own changed
             # lines decide. An unreadable section or candidate fires (fail closed).
-            if text is not None and _NOTIFY_TEXT_RE.search(text):
+            if text is None:
+                add(f"notify-workflow:{wf}")
+                external = True
+            elif _NOTIFY_TEXT_RE.search(text):
                 hit = workflow_send_change(text, _section_for(diff_text or "", wf), _NOTIFY_TEXT_RE)
                 if hit:
                     add(f"notify-workflow:{wf}")

@@ -58,11 +58,6 @@ ljob_postplan_now_live() {
 ljob_listed() { grep -qE -- "$1" <<< "$2"; }
 
 # ---------------------------------------------------------------------------
-# ljob_label_loaded <label> — point lookup used by the reaper.
-# ---------------------------------------------------------------------------
-ljob_label_loaded() { launchctl list "$1" >/dev/null 2>&1; }
-
-# ---------------------------------------------------------------------------
 # ljob_pgrep_alive <pattern>... — 0 = alive OR undecidable, 1 = provably dead.
 # Missing pgrep => alive.  Any pattern matching => alive.  Otherwise the exit
 # status of the LAST pgrep decides: 1 => dead, anything else => alive.
@@ -109,21 +104,20 @@ ljob_kill_label() {
 }
 
 # ---------------------------------------------------------------------------
-# ljob_release_slot <plist> <log> <scratch_glob>
-# mktemp-keep the log, rm plist, rm every compgen -G match of <scratch_glob>,
+# ljob_release_slot <log> <scratch_glob>
+# mktemp-keep the log, rm -rf every compgen -G match of <scratch_glob>,
 # move the keep to <log>.aborted.  The .aborted file is created AFTER the
 # scratch sweep, so it survives even when the glob would otherwise match it.
 # ---------------------------------------------------------------------------
 ljob_release_slot() {
-    local plist="$1" log="$2" scratch_glob="$3"
+    local log="$1" scratch_glob="$2"
     local keep="" _s
     if [[ -f "$log" ]]; then
         keep="$(mktemp /tmp/prn-keep.XXXXXX)"
         mv -f "$log" "$keep"
     fi
-    rm -f "$plist"
     for _s in $(compgen -G "$scratch_glob" 2>/dev/null); do
-        rm -f "$_s"
+        rm -rf -- "$_s"
     done
     if [[ -n "$keep" ]]; then
         mv -f "$keep" "${log}.aborted"
@@ -131,46 +125,130 @@ ljob_release_slot() {
 }
 
 # ---------------------------------------------------------------------------
-# ljob_count_plists <label_prefix>
-# Count of $(ljob_agents_dir)/<prefix>*.plist; -e check so unmatched glob = 0.
+# Live-label concurrency slots. A slot is a row in `launchctl list`, so no file
+# can outlive its job. Every row counts, numeric PID or `-`: a `-` row is a job
+# between launchd's start and exec, or a killed run waiting out the respawn
+# throttle before its once-guard removes the label. Both still own the slot.
 # ---------------------------------------------------------------------------
-ljob_count_plists() {
-    local prefix="$1" f n=0
-    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
-        [[ -e "$f" ]] && n=$((n + 1))
-    done
-    printf '%s\n' "$n"
-}
 
-# ---------------------------------------------------------------------------
-# ljob_reap_stale <label_prefix> <alive_fn>
-# For each plist: keep if ljob_label_loaded; keep if <alive_fn> <label>;
-# else rm -f and echo "reaped stale slot <label>".  Always return 0.
-# ---------------------------------------------------------------------------
-ljob_reap_stale() {
-    local prefix="$1" alive_fn="$2"
-    local f label
-    for f in "$(ljob_agents_dir)/${prefix}"*.plist; do
-        [[ -e "$f" ]] || continue
-        label="$(basename "$f" .plist)"
-        ljob_label_loaded "$label" && continue
-        "$alive_fn" "$label" && continue
-        rm -f "$f"; echo "reaped stale slot $label"
-    done
+# ljob_live_labels <label_prefix>: prints each listed label starting with the
+# prefix. The quoted case pattern matches the prefix literally. A failed list
+# returns 1: a silent 0 would oversubscribe the cap.
+ljob_live_labels() {
+    local prefix="$1" out _pid _status label
+    out="$("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null)" || {
+        echo "ERROR: launchctl list failed" >&2
+        return 1
+    }
+    while IFS=$'\t' read -r _pid _status label; do
+        case "$label" in
+            "$prefix"*) printf '%s\n' "$label" ;;
+        esac
+    done <<< "$out"
     return 0
 }
 
-# ---------------------------------------------------------------------------
-# ljob_wait_for_slot <count_fn> <reap_fn> <jobs> <ceiling_secs> <dry_seam_name>
-# Verbatim fleet loop; reads the dry seam indirectly via ${!5:-}.
-# ---------------------------------------------------------------------------
-ljob_wait_for_slot() {
-    local count_fn="$1" reap_fn="$2" jobs="$3" ceiling_secs="$4" dry_seam_name="$5"
-    local waited=0
-    while [[ "$("$count_fn")" -ge "$jobs" ]]; do
-        echo "waiting for slot ($("$count_fn")/$jobs in flight)…"
-        "$reap_fn"
-        [[ "$("$count_fn")" -lt "$jobs" ]] && break
+# ljob_count_live <label_prefix>: prints how many listed labels hold the prefix.
+ljob_count_live() {
+    local labels
+    labels="$(ljob_live_labels "$1")" || return 1
+    grep -c . <<< "$labels" || true
+}
+
+# ljob_lock_dir: HOME-derived so a terminal launcher and a launchd-spawned one
+# (whose TMPDIR may differ or be unset) share one lock. Empty means unset.
+ljob_lock_dir() { printf '%s\n' "${LJOB_LOCK_DIR:-$HOME/Library/Caches/com.ibl5.ljob-locks}"; }
+
+# ljob_slot_lock <label_prefix>: per-prefix mkdir lock holding the launcher's PID.
+# A lock whose holder is dead is broken, after re-reading the pid file so a lock
+# taken over in between survives. A pid file still empty after 5 tries means the
+# holder died between its mkdir and its write. LJOB_LOCK_TRIES caps the retries
+# (unset or empty = unbounded) and a capped run returns 1.
+ljob_slot_lock() {
+    local prefix="$1" dir lock holder tries=0 empties=0
+    dir="$(ljob_lock_dir)"
+    lock="$dir/${prefix}lock.d"
+    mkdir -p "$dir" || { echo "ERROR: cannot create lock dir $dir" >&2; return 1; }
+    while :; do
+        if mkdir "$lock" 2>/dev/null; then
+            printf '%s\n' "$$" > "$lock/pid"
+            return 0
+        fi
+        holder="$(cat "$lock/pid" 2>/dev/null || true)"
+        if [[ -z "$holder" ]]; then
+            empties=$((empties + 1))
+            if [[ $empties -ge 5 ]]; then
+                rm -rf "$lock"
+                empties=0
+                continue
+            fi
+        elif ! kill -0 "$holder" 2>/dev/null; then
+            if [[ "$(cat "$lock/pid" 2>/dev/null || true)" == "$holder" ]]; then
+                rm -rf "$lock"
+            fi
+            continue
+        else
+            empties=0
+        fi
+        tries=$((tries + 1))
+        if [[ -n "${LJOB_LOCK_TRIES:-}" && $tries -ge $LJOB_LOCK_TRIES ]]; then
+            echo "ERROR: slot lock busy: $lock" >&2
+            return 1
+        fi
+        sleep 1
+    done
+}
+
+# ljob_slot_unlock <label_prefix>: removes the lock only when this launcher holds it.
+ljob_slot_unlock() {
+    local lock
+    lock="$(ljob_lock_dir)/${1}lock.d"
+    if [[ "$(cat "$lock/pid" 2>/dev/null || true)" == "$$" ]]; then
+        rm -rf "$lock"
+    fi
+    return 0
+}
+
+# ljob_await_listed <label> <secs>: 0 once the label is listed, 1 on timeout.
+ljob_await_listed() {
+    local label="$1" secs="$2" waited=0
+    while :; do
+        "${LAUNCHCTL_CMD:-launchctl}" list "$label" >/dev/null 2>&1 && return 0
+        [[ $waited -ge $secs ]] && return 1
+        sleep 1
+        waited=$((waited + 1))
+    done
+}
+
+# ljob_claim_slot <label_prefix> <jobs> <ceiling_secs> <dry_seam_name> <await_label> -- <cmd> [args...]
+# Waits for a free slot, then runs <cmd> and confirms <await_label> is listed
+# before releasing the lock, so the next claimant's count includes it. The lock
+# covers count + cmd + confirm only, never the 5 s wait. Returns the cmd's status.
+# An empty <await_label> skips the confirm (a dry-run cmd lists nothing).
+ljob_claim_slot() {
+    local prefix="$1" jobs="$2" ceiling_secs="$3" dry_seam_name="$4" await_label="$5"
+    shift 5
+    [[ "${1:-}" == "--" ]] && shift
+    local waited=0 n rc
+    while :; do
+        ljob_slot_lock "$prefix" || exit 1
+        if ! n="$(ljob_count_live "$prefix")"; then
+            ljob_slot_unlock "$prefix"
+            echo "ERROR: cannot count live slots; aborting" >&2
+            exit 1
+        fi
+        if [[ "$n" -lt "$jobs" ]]; then
+            rc=0
+            "$@" || rc=$?
+            if [[ $rc -eq 0 && -n "$await_label" ]]; then
+                ljob_await_listed "$await_label" 5 \
+                    || echo "WARN: $await_label not listed 5s after submit" >&2
+            fi
+            ljob_slot_unlock "$prefix"
+            return "$rc"
+        fi
+        ljob_slot_unlock "$prefix"
+        echo "waiting for slot ($n/$jobs in flight)…"
         if [[ -n "${!dry_seam_name:-}" ]]; then
             echo "cap reached under ${dry_seam_name} — not sleeping; stopping here." >&2
             exit 0
@@ -188,6 +266,7 @@ ljob_wait_for_slot() {
 # string, unquoted heredoc so variables expand at write time).
 # Does NOT mkdir.
 # ---------------------------------------------------------------------------
+# Fixed-label recurring jobs only (wt-pool, launchd-sched, sim-recap-cron-setup); per-run jobs use ljob_submit.
 ljob_write_runner_plist() {
     local plist="$1" label="$2" runner="$3" root="$4" log="$5"
     cat > "$plist" <<PLIST_EOF
@@ -214,6 +293,7 @@ PLIST_EOF
 # ljob_bootstrap <label> <plist>
 # bootout (errors ignored) then bootstrap; returns bootstrap's exit status.
 # ---------------------------------------------------------------------------
+# Fixed-label recurring jobs only (wt-pool, launchd-sched, sim-recap-cron-setup); per-run jobs use ljob_submit.
 ljob_bootstrap() {
     local label="$1" plist="$2"
     launchctl bootout "gui/$(id -u)/${label}" 2>/dev/null || true

@@ -22,7 +22,13 @@ DRIVER="$SCRIPT_DIR/post-plan-fleet"
 
 SCRATCH="$(mktemp -d)"
 TMP_LOGS=()
-_cleanup() { rm -rf "$SCRATCH"; [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"; h_cleanup; }
+_cleanup() {
+    rm -rf "$SCRATCH"
+    [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"
+    # Once-markers are directories; the submit cases create and leave them under fixed names.
+    rm -rf /tmp/post-plan-fleet-runner-*.sh.once
+    h_cleanup
+}
 trap _cleanup EXIT
 
 CASE_BASE=0
@@ -30,7 +36,7 @@ fail() { h_fail "$*"; }
 # --case NAME (repeatable): run only the named cases. Shared fixtures and helpers between
 # cases still run. A mutation-matrix row uses this to fit one case inside its 30s timeout.
 # A name that matches no case fails the run, so a typo cannot pass as a green baseline.
-# Two cases read state an earlier case built, so name the earlier case too: plist-shape
+# Two cases read state an earlier case built, so name the earlier case too: submit-shape
 # needs path-uniqueness, and push-zero-lease-not-a-wildcard needs the four push-* cases
 # before it. runner-line-hand-started and dm-unknown-flag-rejected build their own
 # runner and helper, so they run alone. Case names with spaces need quoting after --case.
@@ -133,23 +139,66 @@ cp "$SCRATCH/.local/bin/gh" "$SCRATCH/.bun/bin/gh"
 : > "$SCRATCH/launchctl-list.txt"
 cat > "$SCRATCH/.local/bin/launchctl" <<LC_EOF
 #!/usr/bin/env bash
+echo "launchctl \$*" >> "$SCRATCH/launchctl-calls.txt"
 if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
     cat "$SCRATCH/launchctl-list.txt"
+    # list-extra: "<n> <label>" adds that row from the n-th bare list call on.
+    if [[ -f "$SCRATCH/list-extra" ]]; then
+        c=\$(cat "$SCRATCH/list-count" 2>/dev/null || echo 0); c=\$((c + 1))
+        echo "\$c" > "$SCRATCH/list-count"
+        read -r n row < "$SCRATCH/list-extra"
+        [[ \$c -ge \$n ]] && printf -- '-\t0\t%s\n' "\$row"
+    fi
     i=0
     while [[ \$i -lt 6000 ]]; do
         printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
         i=\$((i + 1))
     done
+    exit 0
 fi
 if [[ "\${1:-}" == "list" && \$# -eq 2 ]]; then
-    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0 || exit 1
+    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0
+    # Without a register delay a submitted label counts as listed at once, so the claim's
+    # confirm step does not burn its 5 s wait on every non-dry fire.
+    if [[ -z "\${SHIM_SUBMIT_REGISTER_DELAY:-}" ]] \\
+        && grep -qF "submit -l \${2} " "$SCRATCH/launchctl-calls.txt" 2>/dev/null; then
+        exit 0
+    fi
+    exit 1
+fi
+if [[ "\${1:-}" == "submit" ]]; then
+    if [[ -n "\${SHIM_SUBMIT_REGISTER_DELAY:-}" ]]; then
+        ( sleep "\$SHIM_SUBMIT_REGISTER_DELAY"
+          printf -- '-\t0\t%s\n' "\$3" >> "$SCRATCH/launchctl-list.txt" ) >/dev/null 2>&1 &
+    fi
+    exit "\${SHIM_SUBMIT_RC:-0}"
+fi
+if [[ "\${1:-}" == "bootout" || "\${1:-}" == "remove" ]]; then
+    lab="\${2##*/}"
+    grep -vF "\$lab" "$SCRATCH/launchctl-list.txt" > "$SCRATCH/launchctl-list.tmp" || true
+    mv "$SCRATCH/launchctl-list.tmp" "$SCRATCH/launchctl-list.txt"
 fi
 exit 0
 LC_EOF
 chmod +x "$SCRATCH/.local/bin/launchctl"
 
-set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
+# One row per label in launchctl's "pid status label" tab layout (the library reads field 3).
+set_live_labels() {
+    local l
+    : > "$SCRATCH/launchctl-list.txt"
+    for l in "$@"; do
+        if [[ "$l" == *$'\t'* ]]; then printf '%s\n' "$l"; else printf '1\t0\t%s\n' "$l"; fi
+    done >> "$SCRATCH/launchctl-list.txt"
+}
 clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
+: > "$SCRATCH/launchctl-calls.txt"
+
+# Real-agents-dir guard: the conversion must never write under the real HOME. A helper
+# (find, not ls | grep) so the check can run as a case before h_done picks the exit code.
+real_agents_names() {
+    find "$HOME/Library/LaunchAgents" -maxdepth 1 -name '*post-plan-fleet*' 2>/dev/null | sort
+}
+REAL_AGENTS_BEFORE="$(real_agents_names)"
 
 # Run the driver in a sealed environment: scratch HOME (so plists land in the scratch
 # tree), stubbed claude, seamed gh identity, shim dir on PATH.
@@ -178,7 +227,11 @@ plist_count() {
     printf '%s\n' "$n"
 }
 
-clean_slots() { rm -rf "$SCRATCH/Library/LaunchAgents"; clear_live_labels; }
+clean_slots() {
+    rm -rf "$SCRATCH/Library/LaunchAgents" "$SCRATCH/list-extra" "$SCRATCH/list-count"
+    clear_live_labels
+    : > "$SCRATCH/launchctl-calls.txt"
+}
 
 field() { grep -o "<key>$2</key><string>[^<]*</string>" "$1" | sed "s|<key>$2</key><string>||; s|</string>||"; }
 
@@ -225,6 +278,7 @@ grep -q '1902' <<< "$out"          || fail "dry-run report omits PR 1902"
 grep -q 'branch-one' <<< "$out"    || fail "dry-run report omits branch-one"
 grep -q 'DRY RUN' <<< "$out"       || fail "dry-run report never says DRY RUN"
 [[ "$(plist_count)" -eq 0 ]]       || fail "dry-run wrote $(plist_count) plist(s), want 0"
+grep -q '^launchctl submit' "$SCRATCH/launchctl-calls.txt" && fail "dry-run called launchctl submit"
 end_case dry-run-report
 fi
 
@@ -247,51 +301,48 @@ begin_case
 clean_slots
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 3 2>&1)"; rc=$?
 [[ $rc -eq 0 ]]                || fail "--go dry-run exited $rc, want 0 (out: $out)"
-[[ "$(plist_count)" -eq 2 ]]   || fail "--go dry-run wrote $(plist_count) plist(s), want 2"
+[[ "$(plist_count)" -eq 0 ]]   || fail "--go dry-run wrote $(plist_count) plist(s), want 0"
 
-P1="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1901.plist"
-P2="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1902.plist"
-if [[ -f "$P1" && -f "$P2" ]]; then
-    for k in Label StandardOutPath; do
-        v1="$(field "$P1" "$k")"; v2="$(field "$P2" "$k")"
-        [[ -n "$v1" && -n "$v2" ]] || fail "$k empty in a plist (1901='$v1' 1902='$v2')"
-        [[ "$v1" != "$v2" ]]       || fail "$k collides across PRs: '$v1'"
-    done
-    r1="$(grep -o 'exec [^<]*' "$P1")"; r2="$(grep -o 'exec [^<]*' "$P2")"
-    [[ -n "$r1" && "$r1" != "$r2" ]] || fail "runner path collides across PRs: '$r1'"
-    grep -q 'post-plan-fleet-runner-1901.sh' "$P1" || fail "PR 1901 runner path is not PR-keyed"
-else
-    fail "expected a plist for both 1901 and 1902"
-fi
+# Two distinct com.ibl5.post-plan-fleet-<PR> labels, each with its own PR-keyed log and runner.
+PU_L1="$(grep -o 'com\.ibl5\.post-plan-fleet-[0-9]*' <<< "$out" | sort -u | sed -n 1p)"
+PU_L2="$(grep -o 'com\.ibl5\.post-plan-fleet-[0-9]*' <<< "$out" | sort -u | sed -n 2p)"
+PU_N="$(grep -o 'com\.ibl5\.post-plan-fleet-[0-9]*' <<< "$out" | sort -u | grep -c .)"
+[[ "$PU_N" -eq 2 && -n "$PU_L1" && -n "$PU_L2" && "$PU_L1" != "$PU_L2" ]] \
+    || fail "path-uniqueness: want two distinct fleet labels in the submit lines (got $PU_N: $PU_L1 $PU_L2)"
+grep -qF 'com.ibl5.post-plan-fleet-1901' <<< "$out" || fail "path-uniqueness: no label for 1901"
+grep -qF 'com.ibl5.post-plan-fleet-1902' <<< "$out" || fail "path-uniqueness: no label for 1902"
+grep -qF '/tmp/post-plan-fleet-runner-1901.sh' <<< "$out" || fail "PR 1901 runner path is not PR-keyed"
+grep -qF '/tmp/post-plan-fleet-runner-1902.sh' <<< "$out" || fail "PR 1902 runner path is not PR-keyed"
+grep -qF '/tmp/post-plan-fleet-1901.log' <<< "$out" || fail "PR 1901 log path is not PR-keyed"
+grep -qF '/tmp/post-plan-fleet-1902.log' <<< "$out" || fail "PR 1902 log path is not PR-keyed"
+SHAPE_OUT="$out"
 end_case path-uniqueness
 fi
 
-# --- case 6: plist shape -----------------------------------------------------------------
-if should_run "plist-shape"; then
+# --- case 6: submit shape ----------------------------------------------------------------
+if should_run "submit-shape"; then
 begin_case
-if [[ -f "$P1" ]]; then
-    grep -q '<key>PATH</key>' "$P1"   || fail "plist has no PATH environment key"
-    grep -q '/opt/homebrew/bin' "$P1" || fail "plist PATH lacks /opt/homebrew/bin"
-    # Nothing may survive as a literal, unexpanded shell variable.
-    grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1" && fail "plist contains an unexpanded shell variable"
-    # An empty <string> means some value expanded to nothing at write time.
-    grep -q '<string></string>' "$P1" && fail "plist contains an empty <string>"
-    grep -q '<key>WorkingDirectory</key><string>/' "$P1" \
-        || fail "plist WorkingDirectory is not an absolute path"
-    # The runner must start in the MAIN checkout, never a worktree.
-    grep -q '<key>WorkingDirectory</key><string>[^<]*</string>' "$P1" \
-        || fail "plist has no WorkingDirectory key"
-    # Phase 1g row 6: sidecar exists and runner preamble carries matching SESSION_ID.
-    _runner1901="/tmp/post-plan-fleet-runner-1901.sh"
-    _sidecar1901="/tmp/post-plan-fleet-1901.session"
-    [ -f "$_sidecar1901" ] || fail "post-plan-fleet left no .session sidecar at $_sidecar1901"
-    _sid1901=$(< "$_sidecar1901")
-    grep -qF "SESSION_ID=$_sid1901" "$_runner1901" \
-        || fail "runner-1901 preamble lacks SESSION_ID=$_sid1901 — sidecar and runner uuid differ"
-else
-    fail "no plist to inspect for shape"
-fi
-end_case plist-shape
+_submit_line="$(grep -F 'com.ibl5.post-plan-fleet-1901' <<< "$SHAPE_OUT" | grep -F 'submit' | sed -n 1p)"
+[[ -n "$_submit_line" ]] || fail "submit-shape: no ljob_submit_print line for 1901 (out: $SHAPE_OUT)"
+grep -qF '/tmp/post-plan-fleet-1901.log' <<< "$_submit_line" || fail "submit-shape: line lacks the log"
+grep -qF '/tmp/post-plan-fleet-runner-1901.sh' <<< "$_submit_line" || fail "submit-shape: line lacks the runner"
+_runner1901="/tmp/post-plan-fleet-runner-1901.sh"
+_mode="$(stat -c %a "$_runner1901" 2>/dev/null || stat -f %Lp "$_runner1901")"
+[[ "$_mode" == 700 ]] || fail "submit-shape: runner mode $_mode, want 700"
+_rm_n="$(grep -nF 'rm -f -- "$RUNNER"' "$_runner1901" | sed -n 1p | cut -d: -f1)"
+[[ -n "$_rm_n" ]] || fail "submit-shape: runner has no rm -f -- \"\$RUNNER\" line"
+_after="$(sed -n "$((_rm_n + 1))p" "$_runner1901")"
+[[ "$_after" == 'export PATH='* ]] \
+    || fail "submit-shape: rm -f -- \"\$RUNNER\" is not the runner body's first line (next: $_after)"
+grep -qF 'bootout' "$_runner1901" && fail "submit-shape: runner still calls bootout"
+grep -qF 'PLIST' "$_runner1901" && fail "submit-shape: runner still mentions PLIST"
+# Phase 1g row 6: sidecar exists and runner preamble carries matching SESSION_ID.
+_sidecar1901="/tmp/post-plan-fleet-1901.session"
+[ -f "$_sidecar1901" ] || fail "post-plan-fleet left no .session sidecar at $_sidecar1901"
+_sid1901=$(< "$_sidecar1901")
+grep -qF "SESSION_ID=$_sid1901" "$_runner1901" \
+    || fail "runner-1901 preamble lacks SESSION_ID=$_sid1901 — sidecar and runner uuid differ"
+end_case submit-shape
 fi
 
 # A hand-started --go run never carries --allow-test-only, so the rescue-only exemption
@@ -561,15 +612,18 @@ fi
 
 # --- case 8: concurrency cap -------------------------------------------------------------
 # --jobs 1 with two PRs: the first consumes the only slot, the second must block on it
-# rather than firing. Asserted on the emitted wait line, not on surviving plist count —
-# reap_stale is what would otherwise decide that question.
+# rather than firing. A pre-listed fleet label fills the only slot; asserted on the wait line.
 if should_run "concurrency-cap"; then
 begin_case
 clean_slots
+set_live_labels "com.ibl5.post-plan-fleet-9001"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 1 2>&1)"; rc=$?
 [[ $rc -eq 0 ]]                        || fail "--jobs 1 run exited $rc, want 0 (out: $out)"
-grep -q 'waiting for slot' <<< "$out"  || fail "--jobs 1 never waited for a slot (cap not enforced)"
-[[ "$(plist_count)" -eq 1 ]]           || fail "--jobs 1 wrote $(plist_count) plist(s), want 1"
+grep -qF 'waiting for slot (1/1 in flight)' <<< "$out" || fail "--jobs 1 never waited for a slot (cap not enforced)"
+grep -qF 'cap reached under POST_PLAN_FLEET_DRY_RUN' <<< "$out" || fail "concurrency-cap: no cap-reached line (out: $out)"
+grep -qF 'DRY(invocation)' <<< "$out" && fail "concurrency-cap: fired past a full cap (out: $out)"
+[[ "$(plist_count)" -eq 0 ]]           || fail "--jobs 1 wrote $(plist_count) plist(s), want 0"
+clean_slots
 end_case concurrency-cap
 fi
 
@@ -797,11 +851,10 @@ end_case wait-dry-run-inert
 fi
 
 # --- case 20: wait-drains ----------------------------------------------------------------
-# Sub-case A (fast): empty label list → reap_stale reaps all plists in the first
-# iteration → live_slots=0 → break without printing "waiting for".
-# Sub-case B (~4s at WAIT_POLL=1): a plist for a PR that is NOT a selection candidate, whose label IS
-# live, survives the first reap → "waiting for 1 session(s)…" printed → a background job
-# clears the label list → the second iteration reaps it → live_slots hits 0 → exit 0.
+# Sub-case A (fast): empty label list → ljob_count_live=0 → break without printing "waiting for".
+# Sub-case B (~4s at WAIT_POLL=1): a LIVE label for a PR that is NOT a selection candidate →
+# "waiting for 1 session(s)…" printed → a background job clears the label list → the next
+# poll counts 0 → exit 0.
 #
 # Sub-case B needs the wait block to be REACHED, and line 635 exits 0 before it whenever
 # FIRE_PRS is empty. So the candidate PRs must actually fire — which is safe here because
@@ -820,8 +873,6 @@ grep -q 'waiting for' <<< "$out_a" && fail "wait-drains/A: printed 'waiting for'
 
 # Sub-case B — the block must actually wait, then drain to zero.
 clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 ( sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
 _wd_bg=$!
@@ -831,14 +882,12 @@ wait "$_wd_bg" 2>/dev/null
 [[ $rc_b -eq 0 ]] || fail "wait-drains/B: exit $rc_b (out: $out_b)"
 grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
     || fail "wait-drains/B: never printed a 'waiting for N session(s)' line — the wait block did not wait (out: $out_b)"
-[[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: drained to $(plist_count) plists, want 0"
+[[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: left $(plist_count) plists under the agents dir, want 0"
+[[ -z "$(grep -F 'com.ibl5.post-plan-fleet-9999' "$SCRATCH/launchctl-list.txt")" ]] || fail "wait-drains/B: list not drained"
 clear_live_labels
 clean_slots
 
 # Sub-case C — N changes 2 -> 1 -> 0; one timestamped line per distinct N.
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9998.plist"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40476	0	com.ibl5.post-plan-fleet-9998" "40477	0	com.ibl5.post-plan-fleet-9999"
 ( sleep 2; printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
   sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
@@ -953,14 +1002,15 @@ fi
 
 # --- case 23: report-no-mutation ---------------------------------------------------------
 # The driver must never make mutating gh calls (merge, approve, worktree remove, etc.).
-# The strict shim exits 1 on any non-list gh call, so exit 0 + correct plist count
+# The strict shim exits 1 on any non-list gh call, so exit 0 + the fire count
 # proves no mutation occurred.
 if should_run "report-no-mutation"; then
 begin_case
 clean_slots
 out="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "report-no-mutation: exit $rc — strict shim may have caught a mutating gh call"
-[[ "$(plist_count)" -eq 2 ]] || fail "report-no-mutation: plist_count=$(plist_count), want 2"
+[[ "$(grep -c 'DRY(invocation)' <<< "$out")" -eq 2 ]] || fail "report-no-mutation: want 2 DRY(invocation) lines (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "report-no-mutation: plist_count=$(plist_count), want 0"
 end_case report-no-mutation
 fi
 
@@ -1008,60 +1058,6 @@ fi
 # (case 31 was the L34 characterization: it asserted the buggy reaper freeing a live slot.
 #  Deleted with the fix — case 32 is its inverse and is the permanent regression guard.)
 
-# --- case 32: reap-respects-live-process -------------------------------------------------
-# 32a: a plist whose process is ALIVE survives the first reap → the wait block actually waits.
-# 32b: once that process exits, the next iteration DOES reap it → live_slots reaches 0.
-# The 6s stub straddles the wait block's poll (WAIT_POLL=1 below): iteration 1 (t≈0) preserves the
-# slot, a later iteration (t≈6) reaps it. Never go below 6: a slow driver start would reap on
-# iteration 1 and fail 32a. A longer stub would loop to CEILING_SECS=14400 and hang the harness.
-if should_run "reap-respects-live-process"; then
-begin_case
-clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist"
-clear_live_labels
-( SLEEP_SECS=6 "$SLEEPER" post-plan-now --pr 9001 --foreground >/dev/null 2>&1 & )
-sleep 0.5
-pgrep -f "post-plan-now --pr 9001( |$)" >/dev/null 2>&1 \
-    || fail "reap-respects-live-process: sleeper fixture never started"
-out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 run_driver --go --wait 2>&1)"; rc=$?
-pkill -f "post-plan-now --pr 9001( |$)" 2>/dev/null || true
-[[ $rc -eq 0 ]] || fail "reap-respects-live-process: exit $rc (out: $out)"
-grep -qE 'waiting for [0-9]+ session' <<< "$out" \
-    || fail "32a: reaped a slot whose process was alive — L34 has regressed (out: $out)"
-grep -qF 'reaped stale slot com.ibl5.post-plan-fleet-9001' <<< "$out" \
-    || fail "32b: never reaped the slot after its process exited (out: $out)"
-[[ "$(plist_count)" -eq 0 ]] || fail "32b: drained to $(plist_count) plists, want 0"
-clean_slots
-end_case reap-respects-live-process
-fi
-
-# --- case 32c: reap-fails-closed-on-broken-pgrep -----------------------------------------
-# A pgrep that ERRORS (exit 2 — how procps rejects a BSD-only flag) must read as ALIVE.
-# Reading an error as "dead" is exactly how a portability slip would silently restore L34.
-# Because failing closed means the wait block never drains, the driver is bounded and killed
-# rather than waited on; the 8s window is about 8 polls at WAIT_POLL=1. The assertion is on the
-# surviving plist, not on the exit code.
-if should_run "reap-fails-closed-on-broken-pgrep"; then
-begin_case
-clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist"
-clear_live_labels
-printf '#!/usr/bin/env bash\necho "pgrep: invalid option" >&2\nexit 2\n' > "$SCRATCH/.local/bin/pgrep"
-chmod +x "$SCRATCH/.local/bin/pgrep"
-POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 run_driver --go --wait >/dev/null 2>&1 &
-_p=$!
-sleep 8
-kill "$_p" 2>/dev/null || true
-wait "$_p" 2>/dev/null || true
-rm -f "$SCRATCH/.local/bin/pgrep"
-[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist" ]] \
-    || fail "32c: reaped a slot on a pgrep ERROR exit — the probe is not failing closed"
-clean_slots
-end_case reap-fails-closed-on-broken-pgrep
-fi
-
 # --- case 33: stop-flag-validation -------------------------------------------------------
 # Every malformed or mode-conflicting invocation exits nonzero AND says why. A stop verb that
 # exits 0 having done nothing is the worst outcome: the operator believes the run is dead.
@@ -1102,8 +1098,8 @@ fi
 if should_run "stop-e2e"; then
 begin_case
 clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9002.plist"
+set_live_labels "com.ibl5.post-plan-fleet-9002"
+mkdir -p /tmp/post-plan-fleet-runner-9002.sh.once
 printf 'stale baseline\n' > /tmp/post-plan-fleet-scratch-9002.patch
 printf 'partial run\n'    > /tmp/post-plan-fleet-9002.log
 TMP_LOGS+=("/tmp/post-plan-fleet-scratch-9002.patch" "/tmp/post-plan-fleet-9002.log" "/tmp/post-plan-fleet-9002.log.aborted")
@@ -1115,9 +1111,12 @@ out="$(run_driver --stop 9002 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "stop-e2e: exit $rc (out: $out)"
 pgrep -f "post-plan-now --pr 9002( |$)" >/dev/null 2>&1 \
     && fail "stop-e2e: the process survived --stop (out: $out)"
-[[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9002.plist" ]] \
-    || fail "stop-e2e: plist not removed — the slot was never released"
-[[ "$(plist_count)" -eq 0 ]] || fail "stop-e2e: live_slots sees $(plist_count), want 0"
+grep -F 'bootout' "$SCRATCH/launchctl-calls.txt" | grep -qF 'com.ibl5.post-plan-fleet-9002' \
+    || fail "stop-e2e: no bootout for the label in the call log (slot never released)"
+[[ ! -e /tmp/post-plan-fleet-runner-9002.sh.once ]] || fail "stop-e2e: once-marker dir not cleared"
+[[ -z "$(grep -F 'com.ibl5.post-plan-fleet-9002' "$SCRATCH/launchctl-list.txt")" ]] \
+    || fail "stop-e2e: label still listed after --stop"
+[[ "$(plist_count)" -eq 0 ]] || fail "stop-e2e: agents dir holds $(plist_count) plist(s), want 0"
 [[ ! -e /tmp/post-plan-fleet-scratch-9002.patch ]] || fail "stop-e2e: /pr-ready scratch not cleared"
 [[ -e /tmp/post-plan-fleet-9002.log.aborted ]] || fail "stop-e2e: log not preserved as .aborted"
 [[ ! -e /tmp/post-plan-fleet-9002.log ]] || fail "stop-e2e: original log left in place"
@@ -1150,14 +1149,13 @@ fi
 if should_run "stop-label-anchor"; then
 begin_case
 clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-19002.plist"
+set_live_labels "com.ibl5.post-plan-fleet-19002"
 ( SLEEP_SECS=60 "$SLEEPER" post-plan-now --pr 19002 --foreground >/dev/null 2>&1 & )
 sleep 0.5
 out="$(run_driver --stop 9002 2>&1)"; rc=$?
 pgrep -f "post-plan-now --pr 19002( |$)" >/dev/null 2>&1 \
     || fail "stop-label-anchor: --stop 9002 killed the live PR 19002 session (rc=$rc, out: $out)"
-[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-19002.plist" ]] \
+grep -qF 'com.ibl5.post-plan-fleet-19002' "$SCRATCH/launchctl-list.txt" \
     || fail "stop-label-anchor: --stop 9002 released PR 19002's slot"
 pkill -f "post-plan-now --pr 19002( |$)" 2>/dev/null || true
 clean_slots
@@ -1171,18 +1169,18 @@ fi
 if should_run "stop-fails-closed"; then
 begin_case
 clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9003.plist"
+set_live_labels "com.ibl5.post-plan-fleet-9003"
 printf 'scratch\n' > /tmp/post-plan-fleet-scratch-9003.patch
-TMP_LOGS+=("/tmp/post-plan-fleet-scratch-9003.patch")
+printf 'kept log\n' > /tmp/post-plan-fleet-9003.log
+TMP_LOGS+=("/tmp/post-plan-fleet-scratch-9003.patch" "/tmp/post-plan-fleet-9003.log")
 printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/pgrep"   # "always alive"
 chmod +x "$SCRATCH/.local/bin/pgrep"
 out="$(run_driver --stop 9003 2>&1)"; rc=$?
 rm -f "$SCRATCH/.local/bin/pgrep"
 [[ $rc -ne 0 ]] || fail "stop-fails-closed: exited 0 with the process still alive (out: $out)"
 grep -q 'slot left occupied' <<< "$out" || fail "stop-fails-closed: no fail-closed message (out: $out)"
-[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9003.plist" ]] \
-    || fail "stop-fails-closed: released the slot without proving the process died"
+grep -qF 'com.ibl5.post-plan-fleet-9003' <<< "$out" || fail "stop-fails-closed: message does not name the label (out: $out)"
+[[ -e /tmp/post-plan-fleet-9003.log ]] || fail "stop-fails-closed: the log was not kept"
 [[ -e /tmp/post-plan-fleet-scratch-9003.patch ]] \
     || fail "stop-fails-closed: cleared scratch for a run that may still be writing to it"
 clean_slots
@@ -1355,8 +1353,8 @@ POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_dm41_stub" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go >/dev/null 2>&1
 _out41="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
-[[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist" ]] \
-    || fail "dm-undeliverable-is-not-fatal: plist not removed after undeliverable DM"
+[[ ! -e "$_DM_RUNNER" ]] \
+    || fail "dm-undeliverable-is-not-fatal: runner did not self-delete (slot would leak)"
 grep -q 'DM UNDELIVERED' <<< "$_out41" \
     || fail "dm-undeliverable-is-not-fatal: missing spool message in runner output"
 end_case dm-undeliverable-is-not-fatal
@@ -1479,15 +1477,18 @@ clean_slots; rm -f "$_DM_LOG"
 POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
     POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$CLAUDE_STUB" \
     run_dm_driver --go >/dev/null 2>&1
-_rm_line="$(grep -Fn 'rm -f "$PLIST"' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
+_rm_line="$(grep -Fn 'rm -f -- "$RUNNER"' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
 _notify_line="$(grep -n '^notify$' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
-_bootout_line="$(grep -Fn 'launchctl bootout' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
-[[ -n "$_rm_line" && -n "$_notify_line" && -n "$_bootout_line" ]] \
-    || fail "dm-teardown-order-static: runner missing rm/notify/bootout (rm=$_rm_line notify=$_notify_line bootout=$_bootout_line)"
+[[ -n "$_rm_line" && -n "$_notify_line" ]] \
+    || fail "dm-teardown-order-static: runner missing rm/notify (rm=$_rm_line notify=$_notify_line)"
 [[ "$_rm_line" -lt "$_notify_line" ]] \
-    || fail "dm-teardown-order-static: rm-plist (line $_rm_line) must precede notify (line $_notify_line)"
-[[ "$_notify_line" -lt "$_bootout_line" ]] \
-    || fail "dm-teardown-order-static: notify (line $_notify_line) must precede bootout (line $_bootout_line)"
+    || fail "dm-teardown-order-static: self-delete (line $_rm_line) must precede notify (line $_notify_line)"
+# The submit wrapper owns teardown: notify is the runner's last action and nothing boots out.
+_last_line="$(grep -v '^[[:space:]]*#' "$_DM_RUNNER" | grep -v '^[[:space:]]*$' | tail -1)"
+[[ "$_last_line" == notify ]] \
+    || fail "dm-teardown-order-static: notify is not the last runner action (last: $_last_line)"
+grep -v '^[[:space:]]*#' "$_DM_RUNNER" | grep -qF 'launchctl bootout' \
+    && fail "dm-teardown-order-static: runner still calls launchctl bootout"
 end_case dm-teardown-order-static
 fi
 
@@ -3026,17 +3027,33 @@ grep -qF 'bin/post-plan-now --pr 9999 --foreground' <<< "$out" \
 end_case dry-run-prints-invocation
 fi
 
-# --- 6c.2: plist has expanded PATH, no literal $VAR, no empty <string></string> ------
-if should_run "plist-shape-dry-run"; then
+# --- 6c.2: submit shape under --dry-run: label, log, runner, no unexpanded variable -----
+if should_run "submit-shape-dry-run"; then
 begin_case
-_plist_tmp="$SCRATCH/fleet-dry-plist.txt"
+_sub_tmp="$SCRATCH/fleet-dry-submit.txt"
+rm -f /tmp/post-plan-fleet-runner-9999.sh
 HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
-    bin/post-plan-fleet --dry-run --pr 9999 > "$_plist_tmp" 2>&1; rc=$?
-[[ $rc -eq 0 ]] || fail "6c.2: --dry-run exited $rc (see $_plist_tmp)"
-! grep -qE '[$]HOME|[$][A-Z_]+|string></string' "$_plist_tmp" \
-  || fail "6c.2: plist has unexpanded var or empty <string></string>"
-rm -f "$_plist_tmp"
-end_case plist-shape-dry-run
+    bin/post-plan-fleet --dry-run --pr 9999 > "$_sub_tmp" 2>&1; rc=$?
+[[ $rc -eq 0 ]] || fail "6c.2: --dry-run exited $rc (see $_sub_tmp)"
+_sub_out="$(< "$_sub_tmp")"
+_sub_line="$(grep -F 'com.ibl5.post-plan-fleet-9999' <<< "$_sub_out" | grep -F 'submit' | sed -n 1p)"
+[[ -n "$_sub_line" ]] || fail "6c.2: no ljob_submit_print line for 9999 (out: $_sub_out)"
+grep -qF '/tmp/post-plan-fleet-9999.log' <<< "$_sub_line" || fail "6c.2: submit line lacks the log"
+grep -qF '/tmp/post-plan-fleet-runner-9999.sh' <<< "$_sub_line" || fail "6c.2: submit line lacks the runner"
+! grep -qE '[$]HOME|[$][A-Z_]+|string></string' "$_sub_tmp" \
+  || fail "6c.2: submit output has an unexpanded var"
+_r9999=/tmp/post-plan-fleet-runner-9999.sh
+_mode="$(stat -c %a "$_r9999" 2>/dev/null || stat -f %Lp "$_r9999")"
+[[ "$_mode" == 700 ]] || fail "6c.2: runner mode $_mode, want 700"
+_rm_n="$(grep -nF 'rm -f -- "$RUNNER"' "$_r9999" | sed -n 1p | cut -d: -f1)"
+[[ -n "$_rm_n" ]] || fail "6c.2: runner has no rm -f -- \"\$RUNNER\" line"
+_after="$(sed -n "$((_rm_n + 1))p" "$_r9999")"
+[[ "$_after" == 'export PATH='* ]] || fail "6c.2: self-delete is not the runner body's first line (next: $_after)"
+grep -qF 'bootout' "$_r9999" && fail "6c.2: runner still calls bootout"
+grep -qF 'PLIST' "$_r9999" && fail "6c.2: runner still mentions PLIST"
+[[ "$(plist_count)" -eq 0 ]] || fail "6c.2: wrote under the agents dir"
+rm -f "$_sub_tmp" "$_r9999" /tmp/post-plan-fleet-9999.session
+end_case submit-shape-dry-run
 fi
 
 # _dm_hold_case: _dm_result_case's sibling for the hold fixtures. result.json may be
@@ -3046,7 +3063,6 @@ _HOLD_DM_STUB="$SCRATCH/.local/bin/dm-hold-capture"
 printf '#!/usr/bin/env bash\necho "@@DM@@" >> "%s"\ncat >> "%s"\n' \
     "$_DM_CAPTURE" "$_DM_CAPTURE" > "$_HOLD_DM_STUB"
 chmod +x "$_HOLD_DM_STUB"
-_HOLD_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist"
 _dm_hold_case() {  # $1 arm id, $2 absent|garbage, $3 RESULT: line or "", $4 bash flag or ""
     local n="$1" mode="$2" result_line="$3" bflag="${4:-}"
     local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
@@ -3063,7 +3079,6 @@ _dm_hold_case() {  # $1 arm id, $2 absent|garbage, $3 RESULT: line or "", $4 bas
         POST_PLAN_FLEET_DISCORD_DM="$_HOLD_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
         run_dm_driver --go >/dev/null 2>&1
     [[ -f "$_DM_RUNNER" ]] || fail "$n: driver generated no runner at $_DM_RUNNER"
-    [[ -f "$_HOLD_PLIST" ]] || fail "$n: precondition: no plist at $_HOLD_PLIST before the run"
     HOME="$SCRATCH" bash $bflag "$_DM_RUNNER" >/dev/null 2>&1 || true
 }
 # _assert_hold: the shared hold contract for 6c.3 / 6c.4 arms.
@@ -3081,7 +3096,7 @@ _assert_hold() {  # $1 = case label
         || fail "$c: DM says merge when you're ready"
     grep -qxF 'post-plan-fleet: outcome=failed' "$_DM_LOG" 2>/dev/null \
         || fail "$c: log lacks 'post-plan-fleet: outcome=failed' ($(grep 'outcome=' "$_DM_LOG" 2>/dev/null))"
-    [[ ! -f "$_HOLD_PLIST" ]] || fail "$c: plist not removed (slot leaked)"
+    [[ ! -e "$_DM_RUNNER" ]] || fail "$c: runner did not self-delete (slot leaked)"
 }
 
 # --- 6c.3: absent result.json produces a hold (behavioral) ------------------------------
@@ -3161,7 +3176,7 @@ else
     [[ "$_t_dms" == 1 ]] || fail "runner-real-timeout: want exactly one DM, got '${_t_dms:-0}'"
     grep -qF 'TIMED OUT' "$_DM_CAPTURE" 2>/dev/null \
         || fail "runner-real-timeout: DM lacks TIMED OUT ($(cat "$_DM_CAPTURE" 2>/dev/null))"
-    [[ ! -f "$_HOLD_PLIST" ]] || fail "runner-real-timeout: plist not removed (slot leaked)"
+    [[ ! -e "$_DM_RUNNER" ]] || fail "runner-real-timeout: runner did not self-delete (slot leaked)"
     (( _T_ELAPSED <= 10 )) \
         || fail "runner-real-timeout: runner took ${_T_ELAPSED}s; the 1 s timeout never fired"
     # No run dir in this arm, so the timeout wording must stay as it was.
@@ -3265,12 +3280,10 @@ fi
 #   1. exit 1
 #   2. print TIMED OUT on stderr
 #   3. still write the report (last stdout line is a path that exists)
-#   4. leave the slot held (plist not removed)
+#   4. leave the slot held (the label stays listed)
 if should_run "wait-timeout-exits-nonzero"; then
 begin_case
 clean_slots
-mkdir -p "$SCRATCH/Library/LaunchAgents"
-: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist"
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" \
        POST_PLAN_FLEET_CEILING=3 POST_PLAN_FLEET_WAIT_POLL=1 \
@@ -3283,7 +3296,9 @@ grep -qF 'TIMED OUT waiting for' <<< "$out" || \
 _rpath="$(echo "$out" | tail -1)"
 [[ -f "$_rpath" ]] || fail "wait-timeout-exits-nonzero: report not written (last line: $_rpath)"
 [[ "$_rpath" == *pr-firstpass-*.md ]] || fail "wait-timeout-exits-nonzero: last line is not a report path: $_rpath"
-[[ "$(plist_count)" -eq 1 ]] || fail "wait-timeout-exits-nonzero: slot was removed, want 1 plist"
+grep -qF 'com.ibl5.post-plan-fleet-9999' "$SCRATCH/launchctl-list.txt" \
+    || fail "wait-timeout-exits-nonzero: the label left the list, want it held"
+[[ "$(plist_count)" -eq 0 ]] || fail "wait-timeout-exits-nonzero: wrote under the agents dir"
 clear_live_labels; clean_slots
 end_case wait-timeout-exits-nonzero
 fi
@@ -3327,11 +3342,9 @@ begin_case
 clean_slots
 out="$(POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --pr-list 1911,1910 --jobs 3 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "pr-list-fires-each: exit $rc (out: $out)"
-P1910="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1910.plist"
-P1911="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-1911.plist"
-[[ -f "$P1910" ]] || fail "pr-list-fires-each: plist for 1910 not created"
-[[ -f "$P1911" ]] || fail "pr-list-fires-each: plist for 1911 not created"
-[[ "$(plist_count)" -eq 2 ]] || fail "pr-list-fires-each: plist_count=$(plist_count), want 2"
+grep -qF 'DRY(invocation) PR #1910:' <<< "$out" || fail "pr-list-fires-each: 1910 not fired (out: $out)"
+grep -qF 'DRY(invocation) PR #1911:' <<< "$out" || fail "pr-list-fires-each: 1911 not fired (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "pr-list-fires-each: plist_count=$(plist_count), want 0"
 end_case pr-list-fires-each
 fi
 
@@ -3409,10 +3422,9 @@ POST_PLAN_FLEET_AUTH_PROBE_CMD=false \
     run_driver --go --wait > /dev/null 2>"$_apf_e"; _apf_rc=$?
 [[ $_apf_rc -ne 0 ]] || fail "auth-probe-false: want nonzero exit, got 0"
 grep -qi 'auth' "$_apf_e" || fail "auth-probe-false: no auth error in stderr (got: $(cat "$_apf_e"))"
-# No plist should have been written for PR 301
-_plist_301="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-301.plist"
-[[ ! -e "$_plist_301" ]] || fail "auth-probe-false: plist was written despite probe failure"
-rm -f "$_apf_e" "$_apf_pr" "$_plist_301"
+# No runner should have been written for PR 301
+[[ ! -e /tmp/post-plan-fleet-runner-301.sh ]] || fail "auth-probe-false: runner was written despite probe failure"
+rm -f "$_apf_e" "$_apf_pr"
 end_case auth-probe-false
 fi
 
@@ -3548,12 +3560,12 @@ fi
 # --- holdrepeat autofix cases -----------------------------------------------------------
 # The runner runs `bin/postplan-fix --holdrepeat <PR>` (POST_PLAN_FLEET_POSTPLAN_FIX) when the
 # first post-plan pass declined on a repeat hold, or INSTEAD of that pass for a PR passed in
-# --holdrepeat-fix-prs=. The fix must run while the slot plist still exists. Two recorder
+# --holdrepeat-fix-prs=. The fix must run while the slot label is still live. Two recorder
 # stubs write one line per call: the post-plan-now stub (POST_PLAN_FLEET_CLAUDE) and the fix
-# stub (POST_PLAN_FLEET_POSTPLAN_FIX, which also records `plist-present=yes|no`).
+# stub (POST_PLAN_FLEET_POSTPLAN_FIX, which also records `label-live=yes|no`).
 _HR_PPOUT="$SCRATCH/hr-pp-out.txt"; _HR_FIXOUT="$SCRATCH/hr-fix-out.txt"
 _HR_PPREC="$SCRATCH/hr-pp-calls.txt"; _HR_FIXREC="$SCRATCH/hr-fix-calls.txt"
-_HR_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-${_DM_PR}.plist"
+_HR_LISTFILE="$SCRATCH/launchctl-list.txt"
 _HR_PPSTUB="$SCRATCH/.local/bin/hr-pp-stub"
 _HR_FIXSTUB="$SCRATCH/.local/bin/hr-fix-stub"
 TMP_LOGS+=("$_DM_LOG.declined" "$_DM_LOG.holdrepeat-fix")
@@ -3565,7 +3577,7 @@ exit "${HR_PPRC:-0}"
 HRSTUB
 cat > "$_HR_FIXSTUB" <<'HRSTUB'
 #!/usr/bin/env bash
-echo "argv=$* plist-present=$([ -f "$HR_PLIST" ] && echo yes || echo no)" >> "$HR_FIXREC"
+echo "argv=$* label-live=$(grep -qF "com.ibl5.post-plan-fleet-" "$HR_LISTFILE" && echo yes || echo no)" >> "$HR_FIXREC"
 cat "$HR_FIXOUT"
 exit "${HR_FIXRC:-0}"
 HRSTUB
@@ -3581,8 +3593,9 @@ _hr_run() {  # $1 = post-plan-now stub stdout, $2 = fix stub stdout; rest = extr
         POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_HR_PPSTUB" \
         POST_PLAN_FLEET_POSTPLAN_FIX="$_HR_FIXSTUB" \
         run_dm_driver --go "$@" >/dev/null 2>&1
+    set_live_labels "com.ibl5.post-plan-fleet-${_DM_PR}"   # the submit wrapper holds the label until the runner returns
     HOME="$SCRATCH" HR_PPOUT="$_HR_PPOUT" HR_FIXOUT="$_HR_FIXOUT" HR_PPREC="$_HR_PPREC" \
-        HR_PPRC="${_HR_PPRC:-0}" HR_FIXRC="${_HR_FIXRC:-0}" HR_FIXREC="$_HR_FIXREC" HR_PLIST="$_HR_PLIST" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+        HR_PPRC="${_HR_PPRC:-0}" HR_FIXRC="${_HR_FIXRC:-0}" HR_FIXREC="$_HR_FIXREC" HR_LISTFILE="$_HR_LISTFILE" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 }
 _hr_calls() { local f="$1"; if [[ -f "$f" ]]; then wc -l < "$f" | tr -d ' '; else echo 0; fi; }
 _hr_decline_line='RESULT: post-plan DECLINED — terminal=hold-repeat-declined; declined: same hold as last run (missing files: a.md), no tokens spent.'
@@ -3595,8 +3608,8 @@ _hr_run "$_hr_decline_line" $'postplan-fix: holdrepeat dm=sent\npostplan-fix: ho
     || fail "holdrepeat-decline-fires-fix: want exactly one fix call, got $(_hr_calls "$_HR_FIXREC")"
 grep -qF -- "argv=--holdrepeat ${_DM_PR} " "$_HR_FIXREC" 2>/dev/null \
     || fail "holdrepeat-decline-fires-fix: fix argv is not '--holdrepeat ${_DM_PR}' ($(cat "$_HR_FIXREC" 2>/dev/null))"
-grep -qF 'plist-present=yes' "$_HR_FIXREC" 2>/dev/null \
-    || fail "holdrepeat-decline-fires-fix: fix ran after the slot plist was released ($(cat "$_HR_FIXREC" 2>/dev/null))"
+grep -qF 'label-live=yes' "$_HR_FIXREC" 2>/dev/null \
+    || fail "holdrepeat-decline-fires-fix: fix ran after the slot label was released ($(cat "$_HR_FIXREC" 2>/dev/null))"
 [[ "$(_outcome_of)" == declined ]] || fail "holdrepeat-decline-fires-fix: outcome '$(_outcome_of)'"
 grep -qF 'post-plan-fleet: holdrepeat-fix=gave-up-repeat' "$_DM_LOG" 2>/dev/null \
     || fail "holdrepeat-decline-fires-fix: log lacks holdrepeat-fix=gave-up-repeat"
@@ -4128,11 +4141,11 @@ out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/gate-open.json" POST_PLAN_FLEET_WTL="$S
 [[ $rc -eq 0 ]] || fail "usage-gate-paused: exit $rc (out: $out)"
 grep -E '^3101 ' <<< "$out" | grep -qF 'post-plan paused by usage gate; coordinator resumes it' \
     || fail "usage-gate-paused: PR 3101 has no paused SKIP line (out: $out)"
-[[ ! -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3101.plist" ]] \
-    || fail "usage-gate-paused: the paused PR 3101 was fired"
-[[ -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3102.plist" ]] \
+grep -qF 'DRY(invocation) PR #3101:' <<< "$out" \
+    && fail "usage-gate-paused: the paused PR 3101 was fired"
+grep -qF 'DRY(invocation) PR #3102:' <<< "$out" \
     || fail "usage-gate-paused: the free PR 3102 did not fire"
-[[ "$(plist_count)" -eq 2 ]] || fail "usage-gate-paused: $(plist_count) plist(s), want 2 (3102, 3103)"
+[[ "$(grep -c 'DRY(invocation)' <<< "$out")" -eq 2 ]] || fail "usage-gate-paused: want 2 fires (3102, 3103) (out: $out)"
 rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp" ]] || fail "usage-gate-paused: report not found at $rp"
 grep '3101' "$rp" | grep -qF 'SKIPPED (post-plan paused by usage gate' \
@@ -4146,13 +4159,130 @@ clean_slots
 rm -rf "$IBL5_USAGE_GATE_STATE_DIR/markers"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/gate-open.json" POST_PLAN_FLEET_WTL="$SCRATCH/gate-wtl.txt" \
        POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 5 2>&1)"; rc=$?
-[[ -f "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-3101.plist" ]] \
+grep -qF 'DRY(invocation) PR #3101:' <<< "$out" \
     || fail "usage-gate-paused: with no marker PR 3101 did not fire (out: $out)"
 grep -qF 'paused by usage gate' <<< "$out" && fail "usage-gate-paused: SKIP line printed with no marker"
 clean_slots
 unset IBL5_USAGE_GATE_STATE_DIR
 end_case usage-gate-paused
 fi
+
+# === slot-writer conversion cases (ljob_submit + live-label slots) =======================
+cat > "$SCRATCH/one-1901.json" <<'JSON'
+[{"number": 1901, "title": "first", "isDraft": false, "headRefName": "branch-one", "author": {"login": "a-jay85"}}]
+JSON
+# Each case below owns its /tmp/post-plan-fleet-*-<PR>* paths and removes them on exit.
+
+# --- legacy-plist-ignored ------------------------------------------------------------------
+# A plist left by the pre-conversion launcher is NOT a slot: only listed labels are counted.
+if should_run "legacy-plist-ignored"; then
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go --jobs 1 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "legacy-plist-ignored: exit $rc (out: $out)"
+grep -qF 'cap reached' <<< "$out" && fail "legacy-plist-ignored: a leftover plist counted as a slot (out: $out)"
+grep -qF 'DRY(invocation)' <<< "$out" || fail "legacy-plist-ignored: nothing fired (out: $out)"
+clean_slots
+rm -f /tmp/post-plan-fleet-runner-190[12].sh /tmp/post-plan-fleet-190[12].session
+end_case legacy-plist-ignored
+fi
+
+# --- self-count-after-submit ---------------------------------------------------------------
+# --jobs 1, two PRs, the label registers 2 s after submit. The claim must wait for the label
+# to be listed before it releases the lock, so the second count sees the first PR's slot.
+if should_run "self-count-after-submit"; then
+begin_case
+clean_slots
+_sc_err="$SCRATCH/self-count.err"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" SHIM_SUBMIT_REGISTER_DELAY=2 \
+       POST_PLAN_FLEET_CEILING=6 run_driver --go --jobs 1 2>"$_sc_err")"; rc=$?
+_sc_n="$(grep -c '^launchctl submit' "$SCRATCH/launchctl-calls.txt" || true)"
+[[ "$_sc_n" == 1 ]] || fail "self-count-after-submit: want exactly one submit, got $_sc_n"
+[[ $rc -eq 1 ]] || fail "self-count-after-submit: exit $rc, want 1"
+grep -qF 'ERROR: waited 2h for a slot; aborting' "$_sc_err" \
+    || fail "self-count-after-submit: no ceiling abort on stderr ($(cat "$_sc_err"))"
+clean_slots
+rm -f "$_sc_err" /tmp/post-plan-fleet-runner-190[12].sh /tmp/post-plan-fleet-190[12].session
+rm -rf /tmp/post-plan-fleet-runner-190[12].sh.once
+end_case self-count-after-submit
+fi
+
+# --- submit-fails ---------------------------------------------------------------------------
+if should_run "submit-fails"; then
+begin_case
+clean_slots
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/one-1901.json" SHIM_SUBMIT_RC=1 run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 1 ]] || fail "submit-fails: exit $rc, want 1 (out: $out)"
+grep -qF 'launchctl submit failed' <<< "$out" || fail "submit-fails: no failure message (out: $out)"
+[[ ! -e /tmp/post-plan-fleet-runner-1901.sh ]] || fail "submit-fails: runner left behind"
+[[ ! -e /tmp/post-plan-fleet-runner-1901.sh.once ]] || fail "submit-fails: once-marker left behind"
+grep -qF 'Fired PR' <<< "$out" && fail "submit-fails: printed Fired PR (out: $out)"
+clean_slots
+rm -f /tmp/post-plan-fleet-1901.session /tmp/post-plan-fleet-1901.log
+end_case submit-fails
+fi
+
+# --- stale-once-cleared ---------------------------------------------------------------------
+# ljob_submit refuses a script whose marker exists, and the failure path also clears the
+# marker, so "marker gone" alone cannot tell a cleared fire from a refused one.
+if should_run "stale-once-cleared"; then
+begin_case
+clean_slots
+mkdir -p /tmp/post-plan-fleet-runner-1901.sh.once
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/one-1901.json" run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "stale-once-cleared: exit $rc, want 0 (out: $out)"
+grep -qF 'Fired PR #1901' <<< "$out" || fail "stale-once-cleared: the fire did not go through (out: $out)"
+[[ ! -e /tmp/post-plan-fleet-runner-1901.sh.once ]] || fail "stale-once-cleared: marker survived the fire"
+clean_slots
+rm -rf /tmp/post-plan-fleet-runner-1901.sh /tmp/post-plan-fleet-1901.session /tmp/post-plan-fleet-1901.log
+end_case stale-once-cleared
+fi
+
+# --- stop-all-from-list ---------------------------------------------------------------------
+if should_run "stop-all-from-list"; then
+begin_case
+clean_slots
+set_live_labels "com.ibl5.post-plan-fleet-9004" "com.ibl5.post-plan-fleet-9005"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/.local/bin/pgrep"; chmod +x "$SCRATCH/.local/bin/pgrep"
+out="$(run_driver --stop-all 2>&1)"; rc=$?
+rm -f "$SCRATCH/.local/bin/pgrep"
+[[ $rc -eq 0 ]] || fail "stop-all-from-list: exit $rc, want 0 (out: $out)"
+for _pr in 9004 9005; do
+    grep -qF "stopped PR #$_pr" <<< "$out" || fail "stop-all-from-list: no 'stopped PR #$_pr' (out: $out)"
+    grep -F 'bootout' "$SCRATCH/launchctl-calls.txt" | grep -qF "com.ibl5.post-plan-fleet-$_pr" \
+        || fail "stop-all-from-list: no bootout for $_pr"
+done
+clean_slots
+rm -f /tmp/post-plan-fleet-9004.log* /tmp/post-plan-fleet-9005.log*
+end_case stop-all-from-list
+fi
+
+# --- inlock-duplicate -----------------------------------------------------------------------
+# The shim lists the target label from its second bare list call on: the pre-claim duplicate
+# guard sees nothing, the in-lock re-check does, and the PR is skipped without a submit.
+if should_run "inlock-duplicate"; then
+begin_case
+clean_slots
+printf '2 com.ibl5.post-plan-fleet-1901\n' > "$SCRATCH/list-extra"
+out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/one-1901.json" run_driver --go 2>&1)"; rc=$?
+rm -f "$SCRATCH/list-extra" "$SCRATCH/list-count"
+[[ $rc -eq 0 ]] || fail "inlock-duplicate: exit $rc, want 0 (out: $out)"
+grep -qF 'already running — skipped' <<< "$out" || fail "inlock-duplicate: no 'already running' skip (out: $out)"
+grep -q '^launchctl submit' "$SCRATCH/launchctl-calls.txt" && fail "inlock-duplicate: submit despite a live label"
+grep -qF 'Fired PR #1901' <<< "$out" && fail "inlock-duplicate: printed Fired PR for a skipped PR (out: $out)"
+clean_slots
+rm -rf /tmp/post-plan-fleet-runner-1901.sh /tmp/post-plan-fleet-runner-1901.sh.once /tmp/post-plan-fleet-1901.session /tmp/post-plan-fleet-1901.log
+end_case inlock-duplicate
+fi
+
+# --- real-agents-dir guard ------------------------------------------------------------------
+# A case, not an exit trap: h_done picks the exit code before a trap would run.
+begin_case
+[[ "$(real_agents_names)" == "$REAL_AGENTS_BEFORE" ]] \
+    || fail "real LaunchAgents post-plan-fleet entries changed during the run"
+end_case real-agents-dir-untouched
 
 # --- verdict -----------------------------------------------------------------------------
 check_only_cases

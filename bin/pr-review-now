@@ -7,11 +7,11 @@
 #   bin/pr-review-now --stop-all
 #
 #   <PR>          PR number to review (required). Fires /pr-review <PR> as a detached launchd job.
-#   --dry-run     Emit the runner + plist but skip launchctl bootstrap.
+#   --dry-run     Emit the runner + submit command but skip launchctl submit.
 #                 Also honoured via env: PR_REVIEW_NOW_DRY_RUN=1.
 #   --stop <PR>   Abort the fired session for this PR: bootout the launchd label,
 #                 TERM then KILL anything carrying --name <label>, release the slot
-#                 (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
+#                 (the label is gone from launchctl list) and clear the PR's /tmp scratch. Exits nonzero and
 #                 LEAVES the slot held if a process survives KILL.
 #   --stop-all    Apply --stop to every PR currently holding a pr-review-now slot.
 #   --help, -h    Print this usage and exit 0.
@@ -22,7 +22,7 @@
 #
 # Env seams:
 #   PR_REVIEW_NOW_CLAUDE     Override the claude binary (stub for tests). Unset = auto-detect.
-#   PR_REVIEW_NOW_DRY_RUN=1  Emit runner + plist per PR but skip launchctl bootstrap.
+#   PR_REVIEW_NOW_DRY_RUN=1  Emit runner + submit command per PR but skip launchctl submit.
 #   PR_REVIEW_NOW_MODEL      Model for the fired session (default: sonnet — lets the
 #                            /pr-review skill's own frontmatter pin win).
 #   PR_REVIEW_NOW_DISCORD_DM Override the discord-dm binary path for the finish DM.
@@ -130,12 +130,11 @@ _label_alive() {
 
 # --- stop path --------------------------------------------------------------------------
 # `launchctl bootout` unloads the label but does NOT kill the reparented caffeinate → timeout
-# → claude chain, so bootout alone leaves the run burning tokens while the plist (the slot
+# → claude chain, so bootout alone leaves the run burning tokens while the live label (the slot
 # token) disappears. Kill by label, verify death, THEN release the slot — in that order.
 stop_one_pr() {
     local PR="$1"
     local LABEL="com.ibl5.pr-review-now-${PR}"
-    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
     local LOG="/tmp/pr-review-now-${PR}.log"
     # End-anchored: `name ...-1901` (unanchored) also matches a LIVE session for PR 19011,
     # and on the kill path that means SIGKILLing the wrong run mid-publish.
@@ -143,23 +142,26 @@ stop_one_pr() {
 
     if ! ljob_kill_label "$LABEL" _label_alive "$PAT"; then
         echo "ERROR: PR #${PR}: a process still carries ${LABEL} after SIGKILL;" >&2
-        echo "       slot left occupied (${PLIST}); investigate before re-firing." >&2
+        echo "       slot left occupied (${LABEL}); investigate before re-firing." >&2
         return 1
     fi
-    ljob_release_slot "$PLIST" "$LOG" "/tmp/pr-review-*-${PR}.*"
+    ljob_release_slot "$LOG" "/tmp/pr-review-*-${PR}.*"
     echo "stopped PR #${PR}: process killed, slot released, scratch cleared"
     return 0
 }
 
 stop_all() {
-    local f label pr rc=0 found=0
-    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-review-now-*.plist; do
-        [[ -e "$f" ]] || continue              # unmatched globs stay literal
+    local label labels pr rc=0 found=0
+    if ! labels="$(ljob_live_labels com.ibl5.pr-review-now-)"; then
+        echo "ERROR: cannot list live pr-review-now slots" >&2
+        return 1
+    fi
+    while IFS= read -r label; do
+        [[ -n "$label" ]] || continue
         found=1
-        label="$(basename "$f" .plist)"
         pr="${label##*-}"
         stop_one_pr "$pr" || rc=1             # aggregate: one stuck PR must not mask the rest
-    done
+    done <<< "$labels"
     [[ "$found" -eq 1 ]] || echo "no pr-review-now slots held; nothing to stop"
     return "$rc"
 }
@@ -187,11 +189,9 @@ fi
 fire_pr() {
     local PR="$1"
     local LABEL="com.ibl5.pr-review-now-${PR}"
-    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
     local RUNNER="/tmp/pr-review-now-runner-${PR}.sh"
     local LOG="/tmp/pr-review-now-${PR}.log"
     local PROMPT="/tmp/pr-review-now-prompt-${PR}.md"
-    mkdir -p "$(dirname "$PLIST")"
 
     # A --stop that was itself interrupted can leave this PR's /pr-review scratch behind.
     # Clear it — but only when the label is provably dead, so we can never delete a live
@@ -207,7 +207,7 @@ fire_pr() {
         for _stale in /tmp/pr-review-*-"${PR}".*; do
             [[ -e "$_stale" ]] || continue
             case "$_stale" in
-                "$LOG"|"$PROMPT"|"$RUNNER") continue ;;
+                "$LOG"|"$PROMPT"|"$RUNNER"|"${RUNNER}.once") continue ;;
             esac
             rm -f "$_stale"
         done
@@ -222,7 +222,7 @@ fire_pr() {
     {   printf '#!/usr/bin/env bash\n'
         printf 'ROOT=%q\n'       "$ROOT"
         printf 'LABEL=%q\n'      "$LABEL"
-        printf 'PLIST=%q\n'      "$PLIST"
+        printf 'RUNNER=%q\n'     "$RUNNER"
         printf 'LOG=%q\n'        "$LOG"
         printf 'PROMPT=%q\n'     "$PROMPT"
         printf 'PR=%q\n'         "$PR"
@@ -234,6 +234,7 @@ fire_pr() {
         printf 'NOTIFY=1\n'
         declare -f ljob_dm_ready ljob_dm_send
         cat <<'RUNNER_EOF'
+rm -f -- "$RUNNER"
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
 
@@ -263,11 +264,10 @@ rc=$?
 # `claude -p` does not stream, so $LOG is empty until this point and there is no
 # earlier moment worth watching.
 #
-# BEFORE the teardown below, and that ordering is load-bearing: `launchctl bootout`
-# terminates this job, and discord-dm retries across a window longer than a pm2
-# restart (~5min15s). Sending after the bootout would race the send against its
-# own termination and lose exactly the messages that matter — the ones sent while
-# prod is bouncing.
+# The submit wrapper removes the label after this script returns, and that ordering
+# is load-bearing: discord-dm retries across a window longer than a pm2 restart
+# (~5min15s). Sending after the label is removed would race the send against its
+# own termination and lose the messages sent while prod is bouncing.
 notify() {
     ljob_dm_ready pr-review-now || return 0
     if [ "$rc" -eq 0 ] && [ "$PRIOR_REVIEW" = 1 ]; then
@@ -303,43 +303,50 @@ log: $LOG"
     ljob_dm_send pr-review-now "$msg"
 }
 notify
-# Releasing the slot is the FIRST post-claude action: "plist present" == "job live"
-# is what the concurrency cap counts.
-rm -f "$PLIST"
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 RUNNER_EOF
     } > "$RUNNER"
-    chmod +x "$RUNNER"
+    chmod 700 "$RUNNER"
 
-    # Plist written by the lib helper (same key order, same PATH string).
-    ljob_write_runner_plist "$PLIST" "$LABEL" "$RUNNER" "$ROOT" "$LOG"
+    # The once-marker lives at a fixed per-PR path; a --stop, logout or reboot never
+    # reaches the wrapper tail, so clear it here (the duplicate guard showed no live label).
+    rm -rf -- "${RUNNER}.once"
 
+    # In-lock re-check: closes the window between the duplicate guard and the claim.
+    _submit_review() {
+        local snap
+        snap="$(ljob_snapshot)"
+        if ljob_listed "com\.ibl5\.pr-review-now-${PR}$" "$snap"; then
+            echo "PR #${PR} is already running — skipping. Use --stop ${PR} to abort it." >&2
+            _skipped=1
+            return 0
+        fi
+        ljob_submit "$LABEL" "$LOG" "$RUNNER"
+    }
+    _print_review() {
+        echo "DRY(submit) PR #${PR}: runner=${RUNNER}"
+        ljob_submit_print "$LABEL" "$LOG" "$RUNNER"
+    }
+
+    local _rc=0 _skipped=0
     if [[ -n "${PR_REVIEW_NOW_DRY_RUN:-}" ]]; then
-        echo "DRY(plist) PR #${PR}: runner=${RUNNER} plist=${PLIST}"
-        return 0
+        ljob_claim_slot com.ibl5.pr-review-now- "$JOBS" "$CEILING_SECS" \
+            PR_REVIEW_NOW_DRY_RUN "" -- _print_review || _rc=$?
+        return "$_rc"
     fi
-    ljob_bootstrap "$LABEL" "$PLIST"
-    echo "Fired PR #${PR}: label=${LABEL}, log=${LOG}"
+    ljob_claim_slot com.ibl5.pr-review-now- "$JOBS" "$CEILING_SECS" \
+        PR_REVIEW_NOW_DRY_RUN "$LABEL" -- _submit_review || _rc=$?
+    if [[ $_rc -ne 0 ]]; then
+        echo "ERROR: launchctl submit failed for ${LABEL} (rc=${_rc})" >&2
+        rm -f -- "$RUNNER" "$PROMPT"
+        rm -rf -- "${RUNNER}.once"
+        exit 1
+    fi
+    [[ $_skipped -eq 1 ]] || echo "Fired PR #${PR}: label=${LABEL}, log=${LOG}"
 }
 
-# --- concurrency cap --------------------------------------------------------------------
-# The plist IS the slot token: the runner deletes it the moment claude returns.
-
-# _label_alive() (the liveness probe reap_stale and stop_one_pr share) is defined ABOVE the
-# stop dispatch: bash defines functions as it executes, so a definition down here would not
-# exist yet when the --stop path runs.
-live_slots() { ljob_count_plists com.ibl5.pr-review-now-; }
-
-reap_stale() {   # plist on disk, no live label AND no live process = the job really died
-    # Under the test seam nothing is ever bootstrapped, so every plist would look stale
-    # and the reaper would eat the very output the cap is counting.
-    [[ -n "${PR_REVIEW_NOW_DRY_RUN:-}" ]] && return 0
-    ljob_reap_stale com.ibl5.pr-review-now- _label_alive
-}
-
-wait_for_slot() {
-    ljob_wait_for_slot live_slots reap_stale "$JOBS" "$CEILING_SECS" PR_REVIEW_NOW_DRY_RUN
-}
+# _label_alive() (the liveness probe stop_one_pr uses) is defined ABOVE the stop dispatch:
+# bash defines functions as it executes, so a definition down here would not exist yet when
+# the --stop path runs.
 
 # Snapshot the live job table ONCE, into a variable. Never `launchctl list | grep -q`:
 # under `set -o pipefail`, grep -q exits on the first match, launchctl takes SIGPIPE, and
@@ -354,5 +361,4 @@ if ljob_listed "com\.ibl5\.pr-review-now-${TARGET_PR}$" "$LAUNCHCTL_LIST"; then
     exit 0
 fi
 
-wait_for_slot
 fire_pr "$TARGET_PR"

@@ -35,18 +35,18 @@ com.ibl5.wt-sync standard'
 
 # One-shot runner label prefixes (bin/plan-now, bin/pr-review-now,
 # bin/docfix-run, bin/post-plan-now, bin/pr-cycle, bin/post-plan-fail-dm,
-# bin/finding-class-scan --verify-schedule).
-# Never alerted on; a leftover plist is reported as stale only. bin/plan-now,
-# bin/post-plan-now, bin/docfix-run, bin/pr-cycle and bin/post-plan-fail-dm
-# launch through ljob_submit and write no plist, so a hit under their prefixes
-# is a leak.
+# bin/post-plan-fleet, bin/finding-class-scan --verify-schedule).
+# Never alerted on; a leftover plist is reported as stale only. All of them but
+# finding-class-scan launch through ljob_submit and write no plist, so a hit
+# under their prefixes is a leak.
 LEJ_TRANSIENT_PREFIXES='com.ibl5.plan-now-
 com.ibl5.pr-review-now-
 com.ibl5.docfix-run-
 com.ibl5.pr-cycle-
 com.ibl5.postplan-faildm-
 com.ibl5.postplan-now-
-com.ibl5.finding-class-scan-verify-'
+com.ibl5.finding-class-scan-verify-
+com.ibl5.post-plan-fleet-'
 
 # Prefixes launched through ljob_submit (no plist). A loaded label under one of
 # these whose PID column is "-" is reported as idle-oneshot. Units that convert
@@ -55,7 +55,9 @@ LEJ_SUBMITTED_PREFIXES='com.ibl5.plan-now-
 com.ibl5.postplan-now-
 com.ibl5.docfix-run-
 com.ibl5.pr-cycle-
-com.ibl5.postplan-faildm-'
+com.ibl5.postplan-faildm-
+com.ibl5.pr-review-now-
+com.ibl5.post-plan-fleet-'
 
 # Labels a setup script installs that the health check deliberately does NOT
 # expect. One record per line: "<label> <reason>". bin/test-launchd-sched

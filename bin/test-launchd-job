@@ -569,36 +569,37 @@ fi
 
 # ---------------------------------------------------------------------------
 # Case: release_slot_preserves_log
-# log -> log.aborted; plist gone; scratch files removed; .aborted survives.
+# log -> log.aborted; once-marker dir gone; scratch files removed; .aborted survives.
 # ---------------------------------------------------------------------------
 reset_ctl
 REL_DIR="$T/release"
 mkdir -p "$REL_DIR"
-REL_PLIST="$REL_DIR/rel.plist"
+REL_ONCE="$REL_DIR/rel.sh.once"
 REL_LOG="$REL_DIR/rel.log"
 REL_SCRATCH1="$REL_DIR/rel.scratch1"
 REL_SCRATCH2="$REL_DIR/rel.scratch2"
 
-touch "$REL_PLIST" "$REL_LOG" "$REL_SCRATCH1" "$REL_SCRATCH2"
+touch "$REL_LOG" "$REL_SCRATCH1" "$REL_SCRATCH2"
+mkdir -p "$REL_ONCE"
 
 (
     HOME="$T/home"
     PATH="$SHIM_PATH"
     . "$LIB"
-    ljob_release_slot "$REL_PLIST" "$REL_LOG" "$REL_DIR/rel.*"
+    ljob_release_slot "$REL_LOG" "$REL_DIR/rel.*"
 )
 
-PLIST_GONE=0; [[ ! -f "$REL_PLIST" ]]      && PLIST_GONE=1
+ONCE_GONE=0;  [[ ! -e "$REL_ONCE" ]]        && ONCE_GONE=1
 LOG_GONE=0;   [[ ! -f "$REL_LOG" ]]        && LOG_GONE=1
 S1_GONE=0;    [[ ! -f "$REL_SCRATCH1" ]]   && S1_GONE=1
 S2_GONE=0;    [[ ! -f "$REL_SCRATCH2" ]]   && S2_GONE=1
 ABORTED=0;    [[ -f "${REL_LOG}.aborted" ]] && ABORTED=1
 
-if [[ $PLIST_GONE -eq 1 && $LOG_GONE -eq 1 && $S1_GONE -eq 1 && $S2_GONE -eq 1 && $ABORTED -eq 1 ]]; then
+if [[ $ONCE_GONE -eq 1 && $LOG_GONE -eq 1 && $S1_GONE -eq 1 && $S2_GONE -eq 1 && $ABORTED -eq 1 ]]; then
     pass "release_slot_preserves_log"
 else
     fail "release_slot_preserves_log" \
-        "plist_gone=$PLIST_GONE log_gone=$LOG_GONE s1_gone=$S1_GONE s2_gone=$S2_GONE aborted=$ABORTED"
+        "once_gone=$ONCE_GONE log_gone=$LOG_GONE s1_gone=$S1_GONE s2_gone=$S2_GONE aborted=$ABORTED"
 fi
 
 # ---------------------------------------------------------------------------

@@ -109,21 +109,20 @@ ljob_kill_label() {
 }
 
 # ---------------------------------------------------------------------------
-# ljob_release_slot <plist> <log> <scratch_glob>
-# mktemp-keep the log, rm plist, rm every compgen -G match of <scratch_glob>,
+# ljob_release_slot <log> <scratch_glob>
+# mktemp-keep the log, rm -rf every compgen -G match of <scratch_glob>,
 # move the keep to <log>.aborted.  The .aborted file is created AFTER the
 # scratch sweep, so it survives even when the glob would otherwise match it.
 # ---------------------------------------------------------------------------
 ljob_release_slot() {
-    local plist="$1" log="$2" scratch_glob="$3"
+    local log="$1" scratch_glob="$2"
     local keep="" _s
     if [[ -f "$log" ]]; then
         keep="$(mktemp /tmp/prn-keep.XXXXXX)"
         mv -f "$log" "$keep"
     fi
-    rm -f "$plist"
     for _s in $(compgen -G "$scratch_glob" 2>/dev/null); do
-        rm -f "$_s"
+        rm -rf -- "$_s"
     done
     if [[ -n "$keep" ]]; then
         mv -f "$keep" "${log}.aborted"

@@ -301,7 +301,7 @@ stop_one_pr() {
     # Preserve the log for forensics under a name the NEXT fire's pre-clear will collect.
     # It must be moved out of the glob's reach first: /tmp/post-plan-fleet-<N>.log.aborted also
     # matches /tmp/pr-ready-*-<N>.*, so a mv-then-rm would delete what it just preserved.
-    ljob_release_slot "$PLIST" "$LOG" "/tmp/post-plan-fleet-*-${PR}.*"
+    ljob_release_slot "$LOG" "/tmp/post-plan-fleet-*-${PR}.*"
     echo "stopped PR #${PR}: process killed, slot released, scratch cleared"
     return 0
 }

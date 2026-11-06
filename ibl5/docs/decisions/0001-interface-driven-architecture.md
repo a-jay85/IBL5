@@ -1,6 +1,6 @@
 ---
 description: Why every module in ibl5/classes/ uses interface-driven Repository/Service/View split with Contracts/ subdirs.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 ---
 
 # ADR-0001: Interface-driven Repository/Service/View architecture

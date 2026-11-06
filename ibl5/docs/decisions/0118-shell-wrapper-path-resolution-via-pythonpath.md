@@ -1,6 +1,6 @@
 ---
 description: Shell wrappers grant module access via PYTHONPATH instead of cd-ing to the module root, so caller-supplied relative path arguments keep resolving against the caller's cwd.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 ---
 
 # ADR-0118: Shell wrapper path resolution via `PYTHONPATH`, not `cd`

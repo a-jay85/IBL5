@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-10-22
+last_verified: 2026-11-02
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -48,6 +48,17 @@ The `human-approved` label now covers one specific PR diff. Before this change t
 - **Missing record drops.** A cancelled or failed `labeled` run leaves no record. Treating that as unchanged would let a later real diff change inherit the approval, so it drops instead. Zero open PRs carried the label when this shipped, so no approval was lost.
 - **Conservative edge.** patch-id hashes hunk context. An upstream edit inside the three context lines of a PR hunk changes the id after a clean rebase and drops the label. The maintainer re-applies it.
 - **Residual.** A same-repo PR can still edit this workflow or the classifier it sources, as before this change. The bot-author filter stops outside commenters from forging a record.
+
+## Update (2026-11-02): an approving run survives a racing push
+
+On PR [#3685](https://github.com/a-jay85/IBL5/pull/3685) the label was applied at 22:58:17Z. An update-branch merge pushed six seconds later. Its synchronize run shared the PR's concurrency group, so it cancelled the approving `labeled` run before the record was posted. It then found no record and removed the label, although the diff fingerprint was unchanged.
+
+- **Per-run approving group.** A `labeled` event for `human-approved` runs in the group `human-signoff-<PR>-approve-<run_id>`. A later push cannot cancel it, and it cannot cancel a later push. The skip predicate and the per-run skip group (ADR-0145, ADR-0210) are unchanged.
+- **Bounded wait before a missing drop.** A run that would drop `missing` reads the PR's issue events. When the newest `human-approved` label event is at or after the newest github-actions[bot] marker, it re-reads comments 20 times, 15 seconds apart. A matching bot record keeps the label. A record with another fingerprint drops `mismatch`. A newer revoke or the end of the wait drops `missing`. An events or comments read error drops `error`.
+- **Write-time ordering guard.** The approving run captures its own label event time. Its write job skips the record when the label is gone, when a newer `human-approved` label event exists, or when a bot revoke is at or after that time. A skipped record leaves the next run with nothing to match, so it drops. The head SHA in the record is for audit only, because an update-branch merge moves the head without changing the diff.
+- **Job timeouts.** The gate job has `timeout-minutes: 20` and the write job has 5. A run that times out publishes no verdict, so it writes nothing and cannot keep the label.
+
+Keeping the label still requires the current fingerprint to equal a record written by github-actions[bot]. A recent label event never counts as approval on its own. `bin/test-human-signoff-classifier` pins each case, including the PR #3685 sequence.
 
 ## Lineage
 

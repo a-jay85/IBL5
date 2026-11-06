@@ -44,6 +44,15 @@ name: Human Sign-off
 # they never cancel a real queued run (the ADR-0145 incident). The predicate is
 # copied verbatim into the concurrency group; bin/test-human-signoff-classifier
 # asserts the two copies are identical and that a feat title never skips.
+#
+# Approval race (ADR-0062 Update 2026-11-02): a `labeled` event for
+# human-approved runs in its own per-run group (`-approve-<run_id>`), so a push
+# seconds later (an update-branch merge) can no longer cancel it before it
+# records the fingerprint. A run that would drop `missing` while that label
+# event is at or after the newest bot marker re-reads comments for up to
+# HS_AWAIT_ATTEMPTS x HS_AWAIT_SLEEP seconds, and only a matching bot record
+# keeps the label. The write job skips a record that a newer approval or a
+# newer revoke supersedes.
 
 on:
   pull_request:
@@ -59,7 +68,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ (!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) && format('human-signoff-{0}-skip-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
+  group: ${{ (!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) && format('human-signoff-{0}-skip-{1}', github.event.pull_request.number, github.run_id) || (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
   cancel-in-progress: true
 
 jobs:
@@ -67,11 +76,13 @@ jobs:
     name: human-signoff
     if: ${{ !(!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) }}
     runs-on: ubuntu-26.04
+    timeout-minutes: 20
     outputs:
       verdict: ${{ steps.eval.outputs.verdict }}
       reason: ${{ steps.eval.outputs.reason }}
       fingerprint: ${{ steps.eval.outputs.fingerprint }}
       comment_body: ${{ steps.eval.outputs.comment_body }}
+      approved_at: ${{ steps.eval.outputs.approved_at }}
     steps:
       # Check out the PR HEAD (not the default refs/pull/N/merge), shallow. The
       # eval step deepens history only for a feat: PR holding the label, so the
@@ -93,6 +104,9 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          # Bounded wait for an in-flight approving run's record (ADR-0062 Update 2026-11-02).
+          HS_AWAIT_ATTEMPTS: '20'
+          HS_AWAIT_SLEEP: '15'
         run: |
           set -euo pipefail
           # shellcheck source=bin/lib/human-signoff-classifier.sh
@@ -128,6 +142,40 @@ jobs:
 
           hs_eval_approval "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" || true
 
+          # A push seconds after the label (an update-branch merge) can read
+          # comments before the approving run posts its record. When the newest
+          # human-approved label event is at or after the newest bot marker,
+          # re-read comments for a bounded time. Only a matching bot record
+          # keeps the label; an events read error drops `error`.
+          if [ "$HS_VERDICT" = "drop" ] && [ "$HS_DROP_REASON" = "missing" ]; then
+            EVENTS="$RUNNER_TEMP/hs-events.json"
+            if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/events" > "$RUNNER_TEMP/hs-event-pages.json" \
+                   && jq 'add // []' "$RUNNER_TEMP/hs-event-pages.json" > "$EVENTS"; }; then
+              rm -f "$EVENTS"
+              echo "Issue events read failed; the would-be missing drop becomes error"
+            fi
+            hs_refetch_comments() {
+              gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \
+                && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$1"
+            }
+            hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments \
+              "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" "$EVENTS" || true
+          fi
+
+          # The approving run records its own label event time, so the write
+          # job can skip a record that a newer approval or revoke supersedes.
+          APPROVED_AT=""
+          if [ "$HS_VERDICT" = "record" ]; then
+            if { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/events" > "$RUNNER_TEMP/hs-event-pages.json" \
+                 && jq 'add // []' "$RUNNER_TEMP/hs-event-pages.json" > "$RUNNER_TEMP/hs-events.json"; } \
+               && APPROVED_AT=$(hs_newest_label_at "$RUNNER_TEMP/hs-events.json"); then
+              echo "Approving label event: $APPROVED_AT"
+            else
+              APPROVED_AT=""
+              echo "::warning::could not read the approving label event; the write job will skip the record (fail closed)"
+            fi
+          fi
+
           BODY=""
           case "$HS_VERDICT" in
             record) BODY=$(hs_record_comment_body "$FP" "$HEAD_SHA") ;;
@@ -138,6 +186,7 @@ jobs:
             echo "verdict=$HS_VERDICT"
             echo "reason=$HS_DROP_REASON"
             echo "fingerprint=$FP"
+            echo "approved_at=$APPROVED_AT"
             echo "comment_body<<$delim"
             printf '%s\n' "$BODY"
             echo "$delim"
@@ -196,10 +245,20 @@ jobs:
     # !cancelled() so a cancelled run skips this job even if its gate finished.
     if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') }}
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
     permissions:
+      contents: read
       issues: write
       pull-requests: write
     steps:
+      # Only the record branch reads the lib. A failed checkout makes the
+      # record guard skip; the drop branch never depends on it.
+      - name: Checkout the PR head (shared classifier lib)
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
       - name: Record or revoke the approved diff fingerprint
         # A failed write never adds a red check (pr-armable.sh condition 15).
         # A failed record leaves no fingerprint, so the next push drops the
@@ -212,11 +271,34 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           VERDICT: ${{ needs.human-signoff.outputs.verdict }}
           BODY: ${{ needs.human-signoff.outputs.comment_body }}
+          APPROVED_AT: ${{ needs.human-signoff.outputs.approved_at }}
         run: |
           set -euo pipefail
           if [ -z "$BODY" ]; then
             echo "::warning::empty comment body for verdict $VERDICT; nothing written"
             exit 1
+          fi
+          if [ "$VERDICT" = "record" ]; then
+            WOK=0
+            LABELS_NOW=""
+            # shellcheck source=bin/lib/human-signoff-classifier.sh
+            if ! source bin/lib/human-signoff-classifier.sh; then WOK=2; fi
+            if [ "$WOK" = 0 ] && ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/events" > "$RUNNER_TEMP/w-ev-pages.json" \
+                && jq 'add // []' "$RUNNER_TEMP/w-ev-pages.json" > "$RUNNER_TEMP/w-ev.json" \
+                && gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/w-cm-pages.json" \
+                && jq 'add // []' "$RUNNER_TEMP/w-cm-pages.json" > "$RUNNER_TEMP/w-cm.json" \
+                && gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/labels" > "$RUNNER_TEMP/w-lb-pages.json" \
+                && LABELS_NOW=$(jq -r 'add // [] | map(.name) | join(",")' "$RUNNER_TEMP/w-lb-pages.json"); }; then
+              WOK=2
+            fi
+            if [ "$WOK" = 0 ]; then
+              hs_record_write_ok "$APPROVED_AT" "$LABELS_NOW" "$RUNNER_TEMP/w-ev.json" "$RUNNER_TEMP/w-cm.json" || WOK=$?
+            fi
+            case "$WOK" in
+              0) ;;
+              1) echo "Record skipped: a newer approval, a newer revoke, or a removed label owns the PR state"; exit 0 ;;
+              *) echo "::warning::record guard could not read PR state; record skipped (fail closed)"; exit 1 ;;
+            esac
           fi
           gh api --method POST "repos/$GH_REPO/issues/$PR/comments" -f body="$BODY" >/dev/null
           if [ "$VERDICT" = "drop" ]; then

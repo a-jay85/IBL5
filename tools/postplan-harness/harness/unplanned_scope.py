@@ -132,7 +132,7 @@ def _subjects_for(worktree: str, base_sha: str, path: str) -> list[str]:
            f"{base_sha}..HEAD", "--", path]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, ValueError, subprocess.SubprocessError):
         return []
     if proc.returncode != 0:
         return []
@@ -216,7 +216,7 @@ def _git_output(worktree: str, *args: str) -> str:
     cmd = ["git", "-C", worktree, *args]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    except (OSError, subprocess.SubprocessError) as e:
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
         raise _ReadFailed(f"git {args[0]}: {e}") from e
     if proc.returncode != 0:
         raise _ReadFailed(f"git {args[0]}: {proc.stderr.strip()}")

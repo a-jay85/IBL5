@@ -1,6 +1,6 @@
 ---
 description: When authoring a shell script wrapper that invokes a Python module, use PYTHONPATH to grant module access instead of cd-ing to the module root — cd before argument use silently reinterprets any caller-provided relative path.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 paths:
   - "bin/**"
 ---

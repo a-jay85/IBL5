@@ -318,6 +318,14 @@ SB="$SB1"
     && grep -q '## Automouse Hold Justification' "$PLAN"; } \
   && ok "(2) plan seeded with auto_merge:docs-only-ready + hold section" \
   || bad "(2) hold plan seeding"
+# Case 2b: the seeded plan must carry rows bin/lib/prefire-verify can run, parsed by the
+# real parser. No matrix means post-plan-now exits 9 and the unattended run wedges.
+PLAN_ROWS="$(. "$(dirname "$REAL_DOCFIX")/lib/plan-matrix-rows.sh"; plan_matrix_rows "$PLAN")"; PLAN_ROWS_RC=$?
+{ [ "$PLAN_ROWS_RC" = 0 ] \
+    && grep -qF "$(printf '1\tbin/check-docs')" <<< "$PLAN_ROWS" \
+    && grep -qF "$(printf "2\tbin/check-docs --staleness-report | jq -e 'length == 0'")" <<< "$PLAN_ROWS"; } \
+  && ok "(2b) [docfix_plan_has_runnable_matrix] seeded plan yields both post-impl matrix rows" \
+  || bad "(2b) [docfix_plan_has_runnable_matrix] rc=$PLAN_ROWS_RC rows: $PLAN_ROWS"
 
 SB="$(build_sandbox)"
 run_docfix "$SB" "docs-stale-refresh-$(date +%Y%m%d)" "" "1" "a.md" >/dev/null

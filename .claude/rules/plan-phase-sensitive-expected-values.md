@@ -1,6 +1,6 @@
 ---
 description: When a plan prescribes expected values for phase-sensitive salary/contract boundary cases, trace the resolver chain — domain intuition is insufficient.
-last_verified: 2026-09-05
+last_verified: 2026-11-05
 paths:
   - "ibl5/classes/Player/Contract/**/*"
   - "ibl5/classes/Team/**/*"

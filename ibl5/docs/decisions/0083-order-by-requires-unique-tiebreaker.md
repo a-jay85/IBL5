@@ -1,6 +1,6 @@
 ---
 description: ORDER BY on rendered/LIMIT-cut output must be a total order (final term unique within the result set); enforced by a PHPStan proxy rule, not provable totality.
-last_verified: 2026-09-04
+last_verified: 2026-11-05
 ---
 
 # ADR-0083: Rendered `ORDER BY` Must Be a Total Order (Unique Final Tiebreaker)

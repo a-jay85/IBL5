@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-10-26
+last_verified: 2026-11-05
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -352,7 +352,8 @@ the `**Code review:**` line (the six rows from the harness `_code_review_line`, 
 `### Still open (non-blocking)` or `### Still open (blocking)`
 (`- [ ] <title> (<backlog link | already tracked in the backlog | not filed>)`).
 The banner word on line 1 is the terminal line's leading word. The reviewer excerpt goes in a
-`<details><summary>Reviewer verdict</summary>` block whenever either section renders.>
+`<details><summary>Reviewer verdict</summary>` block whenever either section renders.
+Then the conflict section from the block below, pasted verbatim, when it prints anything.>
 
 ### Merge digest
 **What changed:** <paste line 1 from /tmp/post-plan-digest-lines-<N>.txt>
@@ -374,6 +375,15 @@ The banner word on line 1 is the terminal line's leading word. The reviewer exce
 
 <terminal verdict line from step 4's terminal-line recipe>
 <!-- pr-ready-verdict -->
+```
+
+**Conflict section.** When Claude resolved a rebase conflict on this branch, the sticky says what it resolved and which unique lines the resolution dropped. The harness builds that section itself. The skill fallback runs the same code. The command prints the section, or nothing when no model resolved a conflict, and it always exits 0. Paste its output verbatim into the status-section slot above. It is display-only and changes no verdict, banner word or arming condition.
+
+```bash
+(cd tools/postplan-harness && python3 -m harness.conflict_report \
+  --branch "$(git rev-parse --abbrev-ref HEAD)" \
+  --repo "$(git rev-parse --show-toplevel)" \
+  --prior-body-file "/tmp/pr-ready-prior-verdict-$(gh pr view --json number --jq '.number').md")
 ```
 
 **Skip path (`FIDELITY_GATE=skip`):** do not compose the template above. The body is the prior sticky body with one disclosure line, so every field the next run's gate reads (terminal line, `**Reviewed tree:**`, `**Plan hash:**`, five labels) stays byte-identical to what a reviewer wrote. Post it with the same find-and-update-else-create shape named at the end of this step.

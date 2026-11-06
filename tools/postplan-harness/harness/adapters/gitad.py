@@ -181,6 +181,9 @@ class LiveGit:
         # The note is for logging only; control flow keys on the FLAG_* state.
         self.last_conflict_flag_note: str = ""
         self.last_conflict_flag_state: str = ""
+        # The passing ladder's trail, for the sticky's conflict report only. Kept apart from
+        # last_conflict_fix_summary, which the blocked-ship text reads as a failed Sonnet fix.
+        self.last_conflict_rung_trail: str = ""
         self.conflict_review_retries: dict[str, int] = {}   # review_resolution retries_out; runner copies into RunResult.retries
         # Probe-only state (set by predict_rebase_conflict, read by resolver_refusal_reason).
         # Stage sets per conflicted path from the merge-tree probe, and whether the probe's
@@ -991,11 +994,13 @@ class LiveGit:
         proof_out: str = "",
         base_sha: str = "",
         adapted_lines: tuple = (),
+        pre_rebase_sha: str = "",
     ) -> tuple[str, str]:
         """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
         Returns (manifest_path, notes_path)."""
+        from .. import conflict_report
         from ..armable import record_conflict_resolution
-        from ..conflict import review_resolution
+        from ..conflict import review_resolution, verdict_ok_path
 
         manifest_content = self._run("diff", "--name-only", f"{master_sha}...HEAD")
         if not manifest_content.strip():
@@ -1064,6 +1069,28 @@ class LiveGit:
                 adaptations=adapted_lines,
                 retries_out=self.conflict_review_retries,
             )
+
+        if resolved_files:
+            # Facts for the sticky's conflict report, beside the marker. Written after the
+            # ladder's last rung assignment, so it describes the final amended tree.
+            try:
+                resolving_sha = self._run("rev-parse", "HEAD").strip()
+                conflict_report.write_record(
+                    repo=self.worktree,
+                    branch=branch,
+                    resolving_sha=resolving_sha,
+                    resolved_files=list(resolved_files),
+                    target_ref=master_sha,
+                    review_verdict_path=verdict_ok_path(key, resolving_sha),
+                    retries=self.conflict_review_retries.get("conflict-review", 0),
+                    # An empty trail means no rung ran in this rebase, so a rung value here
+                    # is left over from an earlier attempt.
+                    rung=getattr(self, "last_conflict_rung", None) if self.last_conflict_rung_trail else None,
+                    fix_summary=self.last_conflict_rung_trail or None,
+                    branch_sha=pre_rebase_sha or None,
+                )
+            except Exception:  # report record never changes the rebase outcome
+                pass
 
         return manifest_path, notes_path
 
@@ -1151,11 +1178,22 @@ class LiveGit:
         CONFLICT-REVIEW=CLEAN verdict. Append the new HEAD. Only a SHA-bound "carried"
         marker is re-bound; an unknown one stays untouched. A failed write restores the
         pre-rebase head, so the old SHA stays in history and the hold survives."""
-        from ..armable import FLAG_CARRIED, record_conflict_resolution
+        from ..armable import FLAG_CARRIED, conflict_flag_path, record_conflict_resolution
         if self.last_conflict_flag_state != FLAG_CARRIED:
             return
         try:
-            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+            try:
+                with open(conflict_flag_path(branch), encoding="utf-8") as fh:
+                    old_shas = [ln.strip() for ln in fh if ln.strip()]
+            except OSError:
+                old_shas = []
+            new_sha = self._run("rev-parse", "HEAD").strip()
+            record_conflict_resolution(branch, new_sha)
+            try:  # display-only: the report record follows the marker's new SHA
+                from .. import conflict_report
+                conflict_report.rebind_records(branch, new_sha, old_shas)
+            except Exception:
+                pass
         except (OSError, ValueError) as exc:
             if pre_rebase_sha is None:
                 raise
@@ -1237,6 +1275,7 @@ class LiveGit:
         self.last_conflict_resolution = None
         self.last_conflict_rung = ""
         self.last_conflict_fix_summary = ""
+        self.last_conflict_rung_trail = ""
         self.last_lockfile_regens: tuple[tuple[str, str], ...] = ()
         self.conflict_review_retries = {}
         master_sha = self._run("rev-parse", base).strip()
@@ -1492,6 +1531,7 @@ class LiveGit:
                                           pre_rebase_sha=pre_rebase_sha,
                                           reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
                     self.last_conflict_rung = outcome.rung
+                    self.last_conflict_rung_trail = "; ".join(outcome.trail)
                     proof_out = outcome.proof_out
                     resolved_files = outcome.resolved_files
                     adapted = ()  # a ladder rung re-proved strictly; no adaptation relaxation applies
@@ -1500,6 +1540,7 @@ class LiveGit:
                     manifest_path, notes_path = self._record_resolution(
                         key, branch, master_sha, resolved_files,
                         proof_out=proof_out, adapted_lines=adapted,
+                        pre_rebase_sha=pre_rebase_sha,
                     )
                 except HarnessError as exc:
                     # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
@@ -1642,6 +1683,7 @@ class LiveGit:
         branch = self.branch()
         key = branch.replace("/", "-")
         self.last_conflict_files = ()
+        self.last_conflict_rung_trail = ""
         self._squashed_from = None
         self._last_squash_note = ""
 
@@ -1875,6 +1917,7 @@ class LiveGit:
                                   pre_rebase_sha=pre_rebase_sha,
                                   reason=ladder_failure_reason(first_proof, adapt_trail + tuple(outcome.trail)))
             self.last_conflict_rung = outcome.rung
+            self.last_conflict_rung_trail = "; ".join(outcome.trail)
             proof_out = outcome.proof_out
             auto_resolved_files = tuple(sorted(set(auto_resolved_files) | set(outcome.resolved_files)))
             adapted = ()  # the rung re-proved strictly; no adaptation relaxation applies
@@ -1884,7 +1927,7 @@ class LiveGit:
             manifest_path, notes_path = self._record_resolution(
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
-                adapted_lines=adapted,
+                adapted_lines=adapted, pre_rebase_sha=pre_rebase_sha,
             )
         except HarnessError as exc:
             if auto_resolved_files:
@@ -1905,9 +1948,8 @@ class LiveGit:
         # new HEAD. (_record_resolution already did so when a model resolved files.) Only a
         # SHA-bound "carried" marker is re-bound; an unknown one (malformed, legacy empty,
         # git error) stays untouched so appending a SHA cannot turn it into a droppable one.
-        from ..armable import FLAG_CARRIED, record_conflict_resolution
-        if not auto_resolved_files and self.last_conflict_flag_state == FLAG_CARRIED:
-            record_conflict_resolution(branch, self._run("rev-parse", "HEAD").strip())
+        if not auto_resolved_files:
+            self._rebind_carried_flag(branch, pre_rebase_sha)
 
         return StackedRebaseResult(
             resolved=True,

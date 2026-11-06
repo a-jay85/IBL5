@@ -1964,7 +1964,7 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
                    diff_id: str = "", plan_hash: str = "", own_id: str = "",
                    posted_at: str = "", reused_from: dict | None = None,
-                   fix_round_line: str = "") -> str:
+                   fix_round_line: str = "", conflict_section: str = "") -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every non-label line sits above `### Merge digest`
@@ -2020,6 +2020,10 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     if status:
         out.extend(status)
         out.append("")
+    if conflict_section:
+        # Display-only block from harness.conflict_report: escaped, so it cannot form the
+        # marker, a second digest heading or a verdict line. It changes no hold.
+        out.extend([conflict_section, ""])
 
     visible, coverage = _shape_excerpt(excerpt)
     cr_line = _code_review_line(fid.get("code_review"))

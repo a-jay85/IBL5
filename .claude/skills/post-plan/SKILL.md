@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-10-26
+last_verified: 2026-11-05
 ---
 
 # Post-Plan Fallback
@@ -126,6 +126,8 @@ fi
 Record `PR_NUM` from the `CRASH-TRIAGE:` line (`pr=none` means no PR exists). On the skipped path, read it with `gh pr view --json number --jq .number`; an error there means no PR exists.
 
 An armed PR stays armed: the harness armed it under its own conditions before the stop, and the fallback has no standing to reverse that. An unarmed PR stays unarmed and open. No PR means nothing is pushed; the human re-runs `bin/post-plan-now`, which is the only path that can open or arm one. The 2026-10-11 crash (PR #3159, a transient `gh pr edit` timeout with the PR already open) is the case this handles.
+
+When Claude resolved a rebase conflict on the branch, the sticky comment carries a `### Conflict resolved by Claude` section. The fallback builds it with `python3 -m harness.conflict_report` (command in `_phase-5.5-fidelity.md` Step 6). It is display-only and never changes the hold.
 
 ---
 

@@ -10,7 +10,8 @@
 # Cases: D1 default argv, O1 env override, N1 ambient DB_NAME ignored, F1
 # fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
 # M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin, P1 keep-list
-# covers every ibl_bug_* table the migrations create.
+# covers every ibl_bug_* table the migrations create, P2 keep-list order, P3-P4 no inline
+# list or source, K1-K12 fail-closed keep-list.
 set -euo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -69,6 +70,7 @@ mkdir -p "$MAIN/bin/lib"
 cp "$REPO_ROOT/bin/lib/db-helpers.sh"  "$MAIN/bin/lib/db-helpers.sh"
 cp "$REPO_ROOT/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
 cp "$REPO_ROOT/bin/db-sync-prod"       "$MAIN/bin/db-sync-prod"
+cp "$REPO_ROOT/bin/db-sync-preserve-tables.txt" "$MAIN/bin/db-sync-preserve-tables.txt"
 chmod +x "$MAIN/bin/db-sync-prod"
 h_git_repo "$MAIN" --no-commit
 git -C "$MAIN" add -A
@@ -232,13 +234,16 @@ assert_eq "E1 no literal name" "0" "$(grep -cF -- '"iblhoops_ibl5")' "$E2E" || t
 assert_eq "E1 sources db-helpers" "1" "$(grep -cF -- 'source "$REPO_ROOT/bin/lib/db-helpers.sh"' "$E2E" || true)"
 
 # P1: the sync must keep every local-only bug-pipeline table. A new ibl_bug_* table
-# that misses PRESERVE_TABLES is dropped on each prod sync with no visible error.
-P_LIST=$(sed -n 's/^PRESERVE_TABLES="\(.*\)"$/\1/p' "$REPO_ROOT/bin/db-sync-prod")
+# that misses bin/db-sync-preserve-tables.txt is dropped on each prod sync with no visible error.
+P_LIST=$(sed -e '/^#/d' -e '/^$/d' "$REPO_ROOT/bin/db-sync-preserve-tables.txt" | paste -s -d ' ' -)
 P_TABLES=$(cat "$REPO_ROOT"/ibl5/migrations/*.sql \
     | sed -nE 's/.*CREATE TABLE (IF NOT EXISTS )?`?(ibl_bug_[a-z_]+).*/\2/p' | sort -u)
 assert_match "P1 migrations create ibl_bug_reports" "ibl_bug_reports" "$P_TABLES"
 for t in $P_TABLES; do
     assert_match "P1 $t preserved" " $t " " $P_LIST "
 done
+assert_eq "P2 keep-list names and order" \
+    "ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context" \
+    "$P_LIST"
 
 h_done

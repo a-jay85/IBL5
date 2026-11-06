@@ -52,8 +52,10 @@ class Discord
      */
     private static function isPhpUnit(): bool
     {
+        // PHPUnit sets this constant to the autoloader's path, so a bare
+        // `PHPUNIT_COMPOSER_INSTALL === true` would always be false. Compare its truthiness.
         return defined('PHPUNIT_RUNNING')
-            || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
+            || (defined('PHPUNIT_COMPOSER_INSTALL') && (bool) PHPUNIT_COMPOSER_INSTALL === true);
     }
 
     /**

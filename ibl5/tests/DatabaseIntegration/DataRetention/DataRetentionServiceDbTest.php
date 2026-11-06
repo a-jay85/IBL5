@@ -81,7 +81,9 @@ class DataRetentionServiceDbTest extends DatabaseTestCase
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $epoch);
         $stmt->execute();
-        $row = $stmt->get_result()?->fetch_assoc();
+        $result = $stmt->get_result();
+        self::assertNotFalse($result);
+        $row = $result->fetch_assoc();
         $stmt->close();
 
         return is_array($row) && is_int($row['n']) ? $row['n'] : -1;

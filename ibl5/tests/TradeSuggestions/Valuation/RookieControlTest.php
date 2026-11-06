@@ -11,6 +11,7 @@ final class RookieControlTest extends TestCase
 {
     public function testRoundOneIsThreeYearsPlusOptionYearFour(): void
     {
+        self::assertSame(3, RookieControl::CONTRACT_YEARS[1]);
         self::assertSame(3, RookieControl::contractYears(1));
         self::assertSame(4, RookieControl::optionSalaryYear(1));
         self::assertSame(4, RookieControl::controlYearsLeft(1, 0));
@@ -18,6 +19,7 @@ final class RookieControlTest extends TestCase
 
     public function testRoundTwoIsTwoYearsPlusOptionYearThree(): void
     {
+        self::assertSame(3, RookieControl::OPTION_SALARY_YEAR[2]);
         self::assertSame(2, RookieControl::contractYears(2));
         self::assertSame(3, RookieControl::optionSalaryYear(2));
         self::assertSame(3, RookieControl::controlYearsLeft(2, 0));

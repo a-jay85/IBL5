@@ -104,3 +104,49 @@ def test_new_held_set_matches_legacy_both_twins():
         body = _new_body(changed, diff, gates, read)
         assert _python_held(merge_danger.classify_body(body)) == legacy[label], label
         assert (_shell_token(body) != "") == legacy[label], label
+
+
+_SEG_PFX = _PFX + "Door: two-way · Blast radius: localized"
+_WHY = " · Why: mechanical: arming-path:bin/lib/pr-armable.sh"
+NEAR_MISS_BODIES = [
+    ("seg-no", "## Summary\nx\n\n" + _SEG_PFX + " · Self-governing: no" + _WHY),
+    ("seg-Yes", "## Summary\nx\n\n" + _SEG_PFX + " · Self-governing: Yes" + _WHY),
+]
+AFTER_WHY_BODY = "## Summary\nx\n\n" + _SEG_PFX + _WHY + " · Self-governing: yes"
+PROSE_ONLY_BODY = ("## Summary\nx\n\n" + _SEG_PFX
+                   + " · Why: a self-governing helper rename with no behavior change at all")
+
+
+def test_near_miss_value_markers_malformed_both_twins():
+    for label, body in NEAR_MISS_BODIES:
+        assert merge_danger.classify_body(body) == "MALFORMED", label
+        assert _shell_state(body) == "MALFORMED", label
+        assert _python_held(merge_danger.classify_body(body)), label
+
+
+def test_marker_after_why_malformed_both_twins():
+    assert merge_danger.classify_body(AFTER_WHY_BODY) == "MALFORMED"
+    assert _shell_state(AFTER_WHY_BODY) == "MALFORMED"
+
+
+def test_shell_python_state_parity():
+    bodies = [(label, body) for label, body, _ in LEGACY_BODIES]
+    bodies += [(label, _new_body(c, d, g, r)) for label, c, d, g, r in DIFF_FIXTURES]
+    bodies += NEAR_MISS_BODIES + [("after-why", AFTER_WHY_BODY), ("prose-only", PROSE_ONLY_BODY)]
+    for label, body in bodies:
+        assert _shell_state(body) == merge_danger.classify_body(body), label
+    states = {label: merge_danger.classify_body(_new_body(c, d, g, r))
+              for label, c, d, g, r in DIFF_FIXTURES}
+    assert states["L2"] == states["L3"] == "SELF-GOVERNING"
+    assert states["L7"] == "ONE-WAY"
+    assert _shell_state(PROSE_ONLY_BODY) == merge_danger.classify_body(PROSE_ONLY_BODY) == "TWO-WAY"
+
+
+def test_shell_docs_refresh_self_governing():
+    body = _new_body(*DIFF_FIXTURES[1][1:])
+    state = _shell_state(body)
+    out = subprocess.run(
+        ["bash", "-c", 'source "$1/bin/lib/pr-armable.sh" && pr_docs_refresh_hold "$2" "$3" "$4" "$5"',
+         "_", str(REPO), "docs-stale-refresh-20261015", '[{"path": "ibl5/docs/guide.md"}]', state, "READY"],
+        capture_output=True, text=True, check=True).stdout.strip().splitlines()
+    assert out == ["docs-refresh:merge-danger:SELF-GOVERNING"]

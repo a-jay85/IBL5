@@ -197,17 +197,24 @@ EOF
 }
 
 # pr_merge_danger_hold <body>
-#   Phase 6.5 condition (18). Mirrors harness/merge_danger.py classify_body.
-#   Prints nothing for exactly one well-formed line with Door two-way; otherwise prints
-#   merge-danger:ONE-WAY | merge-danger:MISSING | merge-danger:MALFORMED (fail-closed).
+#   Phase 6.5 condition (18). Mirrors harness/merge_danger.py classify_body and FIELD_RE,
+#   including the optional ` · Self-governing: yes` segment before Why (any other value, or a
+#   segment inside Why, is MALFORMED).
+#   Prints nothing for exactly one well-formed line with Door two-way and no segment; otherwise
+#   prints merge-danger:ONE-WAY | merge-danger:SELF-GOVERNING | merge-danger:MISSING |
+#   merge-danger:MALFORMED (fail-closed). One-way wins when both signals are present.
 pr_merge_danger_hold() {
     local body="$1" n well
     n=$(printf '%s\n' "$body" | grep -cE '^\*\*Merge danger:\*\*' || true)
     [ "$n" = 0 ] && { echo "merge-danger:MISSING"; return 0; }
     [ "$n" != 1 ] && { echo "merge-danger:MALFORMED"; return 0; }
-    well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' || true)
+    well=$(printf '%s\n' "$body" | grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external)( · Self-governing: yes)? · Why: .{20,}$' || true)
     [ -z "$well" ] && { echo "merge-danger:MALFORMED"; return 0; }
-    case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY" ;; esac
+    local md_head="${well%% · Why: *}"
+    local md_why="${well#* · Why: }"
+    case "$md_why" in *' · Self-governing:'*) echo "merge-danger:MALFORMED"; return 0 ;; esac
+    case "$well" in *'Door: one-way'*) echo "merge-danger:ONE-WAY"; return 0 ;; esac
+    case "$md_head" in *' · Self-governing: yes') echo "merge-danger:SELF-GOVERNING"; return 0 ;; esac
 }
 
 # pr_removed_guards_hold <body> [<flagged_keys>]

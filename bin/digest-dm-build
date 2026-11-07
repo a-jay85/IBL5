@@ -199,7 +199,8 @@ DANGER_LINE=""; MD_DOOR=""; MD_BLAST=""; MD_SG=no
 if [ -n "$PR_BODY_FILE" ]; then
     [ -r "$PR_BODY_FILE" ] || { echo "digest-dm-build: --pr-body-file not readable: $PR_BODY_FILE" >&2; exit 2; }
     MD_RAW="$(grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external)( · Self-governing: [^ ]+)? · Why: .{20,}$' "$PR_BODY_FILE" | head -n1 || true)"
-    case "$MD_RAW" in *'Self-governing:'*) MD_SG=yes ;; *) MD_SG=no ;; esac
+    # Look only at the part before ` · Why: ` so Why prose that says "Self-governing:" cannot set it.
+    case "${MD_RAW%% · Why: *}" in *' · Self-governing: '*) MD_SG=yes ;; *) MD_SG=no ;; esac
     if [ -n "$MD_RAW" ]; then
         MD_DOOR="${MD_RAW#*Door: }"; MD_DOOR="${MD_DOOR%% ·*}"
         MD_BLAST="${MD_RAW#*Blast radius: }"; MD_BLAST="${MD_BLAST%% ·*}"

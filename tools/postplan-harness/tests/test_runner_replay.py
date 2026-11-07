@@ -236,6 +236,23 @@ def test_bad_pr_copy_json_without_subject_opens_feat_pr():
     assert not res.arm.armed
 
 
+def _created_base(**fixture_over):
+    out = tempfile.mkdtemp()
+    llm = FixtureLlm(UsageLedger(), CANNED)
+    runner.run(_fixture(pr_number=None, pr_meta=None, **fixture_over), out, llm, mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates
+    return creates[-1]["base"]
+
+
+def test_new_pr_on_unstacked_branch_opens_against_master():
+    assert _created_base() == "master"
+
+
+def test_new_pr_on_stacked_branch_opens_against_its_parent():
+    assert _created_base(merge_target="origin/parent-branch") == "parent-branch"
+
+
 _TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
 
 

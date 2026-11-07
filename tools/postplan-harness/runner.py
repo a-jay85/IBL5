@@ -461,7 +461,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
             create_body = upsert_gate_fix(create_body, render_gate_fix(res.gate_fix))
-            pr = gh.pr_create(copy["title"], create_body, "master")
+            # A stacked branch opens against its declared parent, so its diff stays its own.
+            pr_base = _merge_target(git).removeprefix("origin/")
+            pr = gh.pr_create(copy["title"], create_body, pr_base)
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
         state.checkpoint("pr-open", res)

@@ -25,9 +25,10 @@ hp_pick_sticky() {
         2>/dev/null || true
 }
 
-# hp_sticky_reasons <sticky-body>: one line per `- (N) name — reason` bullet in the
-# `Auto-merge held:` block. An armed banner, no block, or the
-# `- no arming decision recorded` bullet prints nothing.
+# hp_sticky_reasons <sticky-body>: one line per `- (N) <plain sentence>` bullet in the
+# `Auto-merge held:` block, printed as-is without the `- `. Older stickies used
+# `- (N) name — reason`; both shapes start with `- (N)`, so both still parse. An armed
+# banner, no block, or the `- no arming decision recorded` bullet prints nothing.
 hp_sticky_reasons() {
     local line bare in_block=0
     while IFS= read -r line; do

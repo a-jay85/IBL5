@@ -1,6 +1,6 @@
 ---
-description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, and the before/after rule for review-surface PRs.
-last_verified: 2026-11-03
+description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, the before/after rule for review-surface PRs, and the reviewer bar that gates security fixes.
+last_verified: 2026-11-07
 ---
 
 # Reviewer eval
@@ -74,6 +74,25 @@ Two waivers go in the PR body as HTML comments. Each needs a reason of 15 or mor
 
 - `<!-- reviewer-eval-skip: <reason> -->` skips the check.
 - `<!-- reviewer-eval-regression-ok: <reason> -->` accepts a worse after score.
+
+## The bar
+
+The post-plan fix round lets the fixer touch a security-audit finding only while the reviewer meets the owner's bar. Below the bar the finding stays out of the round and holds arming condition (2), so the owner fixes it. Decision record: `ibl5/docs/decisions/0232-reviewer-bar-security-fixes.md`.
+
+The bar passes when all four hold:
+
+- the corpus has at least 30 confirmed cases, and the score covers every one of them
+- recall is at least 60%
+- at most 20% of clean cases are flagged, and the corpus has at least one clean case
+- no agent degraded
+
+The checks use integer arithmetic, so 18/30 recall and 2/10 clean flagged both pass.
+
+`bin/reviewer-eval run --write-record` records a score. It writes `tools/postplan-harness/out/state/reviewer-bar.json` in the main checkout, a gitignored directory every worktree reads. The record holds `v`, `c`, the score line, and the run-1 cache entry for each case. `--record-path FILE` writes elsewhere. The command refuses `--canned`, `--cases`, `--kinds`, `--no-cache` and `--dry-run`. With fewer than 30 confirmed cases it prints `reviewer-bar: record NOT written (too-few-cases: <n> < 30)` and exits 1 before any LLM call, so it costs nothing until the corpus is big enough. A degraded run writes nothing and keeps exit 3.
+
+`bin/reviewer-eval bar` prints `reviewer-bar: PASS <reason>` and exits 0, or `reviewer-bar: FAIL <reason>` and exits 1. It never calls an LLM. It fails on too few cases, a missing or unreadable record, a stale `v` (the reviewer surface changed) or `c` (the corpus changed), a score line the stored entries do not reproduce, or any error.
+
+Nothing runs the eval on a schedule. The owner or a Claude session runs `bin/reviewer-eval run --write-record` from the main checkout after a reviewer or corpus change lands on `master`.
 
 ## Limits
 

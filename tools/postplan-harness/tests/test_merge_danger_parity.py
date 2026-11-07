@@ -129,6 +129,23 @@ def test_marker_after_why_malformed_both_twins():
     assert _shell_state(AFTER_WHY_BODY) == "MALFORMED"
 
 
+_SHELL_AFTER_WHY_CASE = """*' · Self-governing:'*) echo "merge-danger:MALFORMED\""""
+
+
+def test_shell_after_why_case_is_load_bearing(tmp_path):
+    # Shell mutation of row 10: rename the misplaced-segment case pattern. The same body then
+    # reads TWO-WAY, so the case is what makes the shell twin hold it.
+    src = (REPO / "bin/lib/pr-armable.sh").read_text()
+    assert src.count(_SHELL_AFTER_WHY_CASE) == 1
+    mutated = tmp_path / "pr-armable.sh"
+    mutated.write_text(src.replace(_SHELL_AFTER_WHY_CASE,
+                                   """*' · NO-SUCH-SEGMENT:'*) echo "merge-danger:MALFORMED\""""))
+    out = subprocess.run(
+        ["bash", "-c", 'source "$1" && pr_merge_danger_hold "$2"', "_", str(mutated), AFTER_WHY_BODY],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert out == ""
+
+
 def test_shell_python_state_parity():
     bodies = [(label, body) for label, body, _ in LEGACY_BODIES]
     bodies += [(label, _new_body(c, d, g, r)) for label, c, d, g, r in DIFF_FIXTURES]

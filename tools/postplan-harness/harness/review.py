@@ -395,6 +395,14 @@ def _reused_note(reused: list[Finding]) -> str:
             "(not re-posted).")
 
 
+def _kept_security_note(kept: list[Finding]) -> str:
+    """Name each security finding still standing on an unchanged file."""
+    if not kept:
+        return ""
+    where = ", ".join(f"`{f.path}:{f.line}`" for f in kept)
+    return _reused_note(kept) + f" Still open: {where}."
+
+
 class ReviewPhase:
     def __init__(self, llm, gh, depth: str = STANDARD, *, log=None, worktree: str | None = None):
         self.llm = llm
@@ -537,6 +545,8 @@ class ReviewPhase:
         # gate is off, and reused security findings are not counted as already reviewed.
         # `gates` stays untouched, since the review cache record is built from it.
         run_sec = bool(gates["security"]) or security_model is not None
+        # Security findings on unchanged files still stand; the posted summary counts them.
+        kept_sec = [f for f in (reused or []) if f.source == "security-audit"]
         if security_model is not None:
             reused = [f for f in (reused or []) if f.source != "security-audit"]
         findings: list[Finding] = []
@@ -622,7 +632,7 @@ class ReviewPhase:
         # Interdiff mode: findings on unchanged files were posted by the run that produced
         # them; they are never re-posted, and their presence rules out "No issues found.".
         reused_code = [f for f in (reused or []) if f.source == "code-review"]
-        reused_sec = [f for f in (reused or []) if f.source == "security-audit"]
+        reused_sec = kept_sec
         if code:
             self.gh.post_review_findings(pr, sha, "Code review", code)
         elif code_degraded:
@@ -639,9 +649,9 @@ class ReviewPhase:
             elif "security-audit" in degraded_agents:
                 self.gh.post_review_summary(pr, "Security audit",
                                             "Review unavailable - unparseable output from: "
-                                            "security-audit" + _reused_note(reused_sec))
+                                            "security-audit" + _kept_security_note(reused_sec))
             elif reused_sec:
-                self.gh.post_review_summary(pr, "Security audit", _reused_note(reused_sec).strip())
+                self.gh.post_review_summary(pr, "Security audit", _kept_security_note(reused_sec).strip())
             else:
                 self.gh.post_review_summary(
                     pr, "Security audit",

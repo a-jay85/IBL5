@@ -98,7 +98,9 @@ def test_security_recheck_drops_reused_security_findings(tmp_path):
         {}, _cls(), PlanInfo(), reused=[_reused_security_finding()], security_model="opus")
     assert len(_security_calls(llm)) == 1
     sec = [b for t, b in gh.summaries if t == "Security audit"]
-    assert sec and sec[0].startswith("No security issues found.")
+    assert sec and not sec[0].startswith("No security issues found.")
+    assert "1 finding(s) on unchanged files" in sec[0]
+    assert "`ibl5/s.php:3`" in sec[0]
 
 
 def test_plain_review_keeps_reused_security_note(tmp_path):
@@ -109,3 +111,31 @@ def test_plain_review_keeps_reused_security_note(tmp_path):
     assert [c[1] for c in _security_calls(llm)] == ["sonnet"]
     sec = [b for t, b in gh.summaries if t == "Security audit"]
     assert sec and "reused" in sec[0]
+
+
+def test_accepted_round_summary_names_kept_security_finding(tmp_path):
+    """An accepted round's Opus recheck keeps a non-holding security finding on an
+    unchanged file: the posted summary must name it, never say "No security issues found."."""
+    import dataclasses
+    import runner
+    from harness import armable
+    from harness.labels import LABEL_NIT
+
+    kept = _reused_security_finding()
+    kept.label = LABEL_NIT              # non-holding, so the round's recheck accepts
+    assert armable.holding_findings([kept]) == []
+    llm = _CapturingLlm()
+    gh = _Gh()
+    phase = ReviewPhase(llm, gh, worktree=str(tmp_path))
+    cls = dataclasses.replace(_cls(), filtered_diff=(
+        "diff --git a/ibl5/t.php b/ibl5/t.php\n--- a/ibl5/t.php\n+++ b/ibl5/t.php\n"
+        "@@ -1 +1 @@\n+<?php echo 1;\n"))
+    findings, _g, _s, _d = runner._interdiff_review(
+        phase, {}, cls, PlanInfo(), ["ibl5/t.php"], [kept], [], lambda m: None,
+        security_model="opus")
+    assert kept in findings
+    sec = [b for t, b in gh.summaries if t == "Security audit"]
+    assert len(sec) == 1
+    assert "No security issues found." not in sec[0]
+    assert "1 finding(s) on unchanged files" in sec[0]
+    assert "`ibl5/s.php:3`" in sec[0]

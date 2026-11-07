@@ -2096,34 +2096,47 @@ done < "$MATRIX_FILE"
 # (composer -d or --working-dir, npm --prefix, bun --cwd) passes alone: that flag does
 # not move the shell, so later segments are still checked. Flags after a bare `--`
 # belong to the script. bun reads --cwd only before the script name.
-# env, time and timeout wrappers are stripped before matching. A segment that opens
-# $(cd ...) or `cd ...` without closing it stops checking too: the split cannot tell
-# where the substitution ends. Version flags need no project, and bun or composer
-# validate given an ibl5/ path find their file from the root, so those pass.
+# env, time and timeout wrappers are stripped before matching, with the value of any
+# flag that takes one. Backticks become $(...), then $( and <( split like a separator,
+# so the first command inside a substitution is checked like any other. A double-quoted
+# substitution still runs, so its text survives the quote blanking. A cd left open by
+# that split stops checking: the split cannot tell where the substitution ends. A cd
+# whose ) closes on the same segment moved nothing, so later segments are still checked.
+# Version flags need no project, and bun or composer validate given an ibl5/ path find
+# their file from the root, so those pass.
 # ---------------------------------------------------------------------------
 # php may carry flags before the path. -d, -c and -z take a separate value. -r takes
 # inline code, so a path after it is only an argument and is not what php opens.
 _cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(((-[dcz]|--define|--php-ini|--zend-extension)[[:space:]]+[^[:space:]]+|-[^r[:space:]][^[:space:]]*)[[:space:]]+)*(\./)?(vendor|scripts|tests)/'
 _cw_dir_re='^composer[[:space:]](.*[[:space:]])?(-d[^[:space:]]*|--working-dir(=[^[:space:]]*)?)([[:space:]]|$)|^npm[[:space:]](.*[[:space:]])?--prefix([=[:space:]]|$)|^bun[[:space:]]+(run[[:space:]]+)?--cwd([=[:space:]]|$)'
-_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])[[:space:])}]*$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
+_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])([[:space:])}]*|[[:space:]]*\).*)$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
 _cw_wrap_re='^(env|time)([[:space:]]+-[^[:space:]]+)*[[:space:]]+(.*)$'
 _cw_timeout_re='^g?timeout([[:space:]]+-[^[:space:]]+)*[[:space:]]+[0-9.]+[smhd]?[[:space:]]+(.*)$'
-_cw_subcd_re='(\$\(|`)[[:space:]]*(cd|pushd)([[:space:]][^)`]*)?$'
+_cw_flagval_re='^((env|time|g?timeout)([[:space:]]+-[^[:space:]]+)*)[[:space:]]+(-u|--unset|-s|--signal|-k|--kill-after|-o|--output)[[:space:]]+[^[:space:]]+[[:space:]]+(.*)$'
 while IFS=$'\t' read -r _cw_num _cw_cmd; do
     [ -n "$_cw_num" ] || continue
     # Blank quoted text, drop a trailing comment, then split at shell separators.
-    _cw_src="$(printf '%s\n' "$_cw_cmd" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g; s/[[:space:]]#.*$//")"
+    _cw_src="$(printf '%s\n' "$_cw_cmd" | sed -E "s/'[^']*'//g" | awk '{
+        out = ""; s = $0
+        while (match(s, /"[^"]*"/)) {
+            q = substr(s, RSTART + 1, RLENGTH - 2)
+            out = out substr(s, 1, RSTART - 1) (q ~ /\$\(|`/ ? q : "")
+            s = substr(s, RSTART + RLENGTH)
+        }
+        print out s
+    }' | sed -E 's/[[:space:]]#.*$//; s/`([^`]*)`/$(\1)/g')"
+    _cw_src="${_cw_src//\$\(/$'\n'}"; _cw_src="${_cw_src//<\(/$'\n'}"
     _cw_src="${_cw_src//&&/$'\n'}"; _cw_src="${_cw_src//||/$'\n'}"
     _cw_src="${_cw_src//;/$'\n'}"; _cw_src="${_cw_src//|/$'\n'}"
     while IFS= read -r _cw_seg; do
         _cw_seg="$(mtrim "$_cw_seg")"
-        # Test the raw segment: the assignment strip below would remove the `N=$(cd` opener.
-        [[ "$_cw_seg" =~ $_cw_subcd_re ]] && break
         while :; do
             if [[ "$_cw_seg" == [\(\{]* ]]; then
                 _cw_seg="${_cw_seg:1}"; _cw_seg="$(mtrim "$_cw_seg")"
             elif [[ "$_cw_seg" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; then
                 _cw_seg="${BASH_REMATCH[1]}"
+            elif [[ "$_cw_seg" =~ $_cw_flagval_re ]]; then
+                _cw_seg="${BASH_REMATCH[1]} ${BASH_REMATCH[5]}"
             elif [[ "$_cw_seg" =~ $_cw_wrap_re ]]; then
                 _cw_seg="${BASH_REMATCH[3]}"
             elif [[ "$_cw_seg" =~ $_cw_timeout_re ]]; then
@@ -2132,7 +2145,10 @@ while IFS=$'\t' read -r _cw_num _cw_cmd; do
                 break
             fi
         done
-        case "$_cw_seg" in cd|cd[[:space:]]*|pushd|pushd[[:space:]]*) break ;; esac
+        case "$_cw_seg" in
+            cd[[:space:]]*\)*|pushd[[:space:]]*\)*) continue ;;
+            cd|cd[[:space:]]*|pushd|pushd[[:space:]]*) break ;;
+        esac
         _cw_opts=" ${_cw_seg} "; _cw_opts="${_cw_opts%%[[:space:]]--[[:space:]]*}"; _cw_opts="${_cw_opts# }"
         [[ "$_cw_opts" =~ $_cw_dir_re ]] && continue
         [[ "$_cw_opts" =~ $_cw_root_ok_re ]] && continue

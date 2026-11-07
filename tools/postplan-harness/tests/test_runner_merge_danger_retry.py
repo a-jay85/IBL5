@@ -132,3 +132,74 @@ def test_phase2_capture_is_none_on_clean_tree_rerun(tmp_path):
                                          lambda *_: None, "phase2")
     assert isinstance(runner._phase2_merge_danger_of(injected), merge_danger.MergeDanger)
     assert runner._phase2_merge_danger_of("**Merge danger:** Door: sideways\n") is None
+
+
+# --- Phase 6.5 floor-aware arm state (self-governing narrowing) --------------------------------
+
+_ARM_DIFF = ("diff --git a/bin/lib/pr-armable.sh b/bin/lib/pr-armable.sh\n"
+             "--- a/bin/lib/pr-armable.sh\n+++ b/bin/lib/pr-armable.sh\n@@ -1 +1 @@\n-old\n+new\n")
+
+
+def _arm_worktree(tmp_path):
+    lib = tmp_path / "bin" / "lib"
+    lib.mkdir(parents=True)
+    (lib / "pr-armable.sh").write_text("#!/bin/bash\n")
+    return str(tmp_path)
+
+
+def test_inflight_legacy_one_way_body_keeps_one_way_and_gains_marker(tmp_path):
+    # The body an old harness wrote for an arming-path diff: Door one-way, no segment.
+    legacy = ("## Summary\nx\n\n**Merge danger:** Door: one-way · Blast radius: site-wide · Why: "
+              "mechanical: arming-path:bin/lib/pr-armable.sh")
+    assert merge_danger.classify_body(legacy) == "ONE-WAY"
+    out = runner._merge_danger_body(legacy, _arm_worktree(tmp_path), _ARM_DIFF,
+                                    lambda *_: None, "phase6")
+    [line] = [ln for ln in out.splitlines() if ln.startswith("**Merge danger:**")]
+    assert "Door: one-way" in line
+    assert " · Self-governing: yes · Why: " in line
+    assert merge_danger.classify_body(out) == "ONE-WAY"
+
+
+_TWO_WAY_ARM_BODY = ("## Summary\nx\n\n**Merge danger:** Door: two-way · Blast radius: site-wide · "
+                     "Why: a tidy refactor of the helper with no behavior change")
+
+
+def test_arm_state_derive_error_holds(tmp_path, monkeypatch):
+    def boom(*_a, **_k):
+        raise OSError("worktree vanished")
+    monkeypatch.setattr(merge_danger, "derive_from_worktree", boom)
+    logs = []
+    state = runner._arm_merge_danger_state(_TWO_WAY_ARM_BODY, str(tmp_path), _ARM_DIFF, logs.append)
+    assert state == "UNREADABLE"
+    assert any("floor unreadable" in ln for ln in logs)
+    assert any(c.number == 18 for c in evaluate(inputs(merge_danger_state=state)).holds)
+
+
+def test_arm_state_stripped_marker_and_held_states(tmp_path):
+    wt = _arm_worktree(tmp_path)
+    log = lambda *_: None
+    assert runner._arm_merge_danger_state(_TWO_WAY_ARM_BODY, wt, _ARM_DIFF, log) == "SELF-GOVERNING"
+    assert runner._arm_merge_danger_state(BODY_NO_LINE, wt, _ARM_DIFF, log) == "MISSING"
+    assert runner._arm_merge_danger_state(_TWO_WAY_ARM_BODY, wt, "", log) == "TWO-WAY"
+
+
+def test_arm_state_wired_into_condition18(monkeypatch):
+    # Evaluate the exact `merge_danger_state=` argument the Phase 6.5 ArmInputs call passes,
+    # with _arm_merge_danger_state patched to a sentinel: the arm inputs must carry its result.
+    import ast
+    src = open(runner.__file__).read()
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call) and getattr(n.func, "id", None) == "ArmInputs"
+             and any(k.arg == "merge_danger_state" for k in n.keywords)]
+    assert len(calls) == 1
+    [kw] = [k for k in calls[0].keywords if k.arg == "merge_danger_state"]
+    monkeypatch.setattr(runner, "_arm_merge_danger_state", lambda *a, **k: "SENTINEL")
+
+    class _Git:
+        def diff_vs_base(self):
+            return _ARM_DIFF
+
+    ns = dict(vars(runner), _arm_body=_TWO_WAY_ARM_BODY, worktree=".", git=_Git(), log=lambda *_: None)
+    value = eval(compile(ast.Expression(kw.value), "<arm>", "eval"), ns)
+    assert value == "SENTINEL"
+    assert inputs(merge_danger_state=value).merge_danger_state == "SENTINEL"

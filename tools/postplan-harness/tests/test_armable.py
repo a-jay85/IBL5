@@ -781,3 +781,10 @@ def test_condition3_hold_line_carries_fixer_note():
     cond3_clean = next(c for c in clean.conditions if c.number == 3)
     assert cond3_clean.blocked is False
     assert cond3_clean.reason == ""
+
+
+def test_condition18_holds_self_governing_state():
+    d = evaluate(inputs(merge_danger_state="SELF-GOVERNING"))
+    assert not d.armed
+    [c18] = [c for c in d.holds if c.number == 18]
+    assert "state=SELF-GOVERNING" in c18.reason

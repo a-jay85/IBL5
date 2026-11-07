@@ -288,3 +288,8 @@ def test_cond7_token_never_releases_other_conditions():
     d = evaluate(_qualifying(pr_title="feat: x"))
     assert not _cond7(d).blocked
     assert not d.armed
+
+
+def test_docs_refresh_holds_on_self_governing():
+    assert docs_refresh_holds(REFRESH_BRANCH, QUALIFYING_FILES, "SELF-GOVERNING", "READY") == \
+        ["docs-refresh:merge-danger:SELF-GOVERNING"]

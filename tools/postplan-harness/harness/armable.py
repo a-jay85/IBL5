@@ -209,7 +209,7 @@ class ArmInputs:
     meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
     gate_backtest_status: str = "NOT-APPLICABLE"      # gate replay verdict; "HELD"/"UNKNOWN"/other blocks
     gate_backtest_reason: str = ""                    # verdict reason, surfaced in the hold line
-    merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
+    merge_danger_state: str = "MISSING"   # runner._arm_merge_danger_state: classify_body re-checked against the diff floor; only "TWO-WAY" arms (fail-closed default)
     removed_guards_holds: Optional[list[str]] = None   # removed_guards.classify_body(body, flagged keys); None = never computed -> BLOCKS
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)

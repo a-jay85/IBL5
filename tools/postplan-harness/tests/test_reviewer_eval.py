@@ -283,8 +283,14 @@ def _real_case(cid):
 PINNED_EXPECTED = {
     "depth-chart-log-after-commit": [
         ("ibl5/classes/DepthChartSnapshot/DepthChartSnapshotService.php", 148, 154)],
+    "ibl-hist-conf-finals-ranked-below-early-rounds": [
+        ("ibl5/classes/Updater/Steps/RefreshIblHistStep.php", 132, 137)],
+    "player-articles-like-double-escaped": [
+        ("ibl5/modules/Player/articles.php", 11, 12)],
     "playoff-series-invalid-group-by": [
         ("ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", 78, 78)],
+    "ratings-diff-label-ignores-baseline-fallback": [
+        ("ibl5/classes/TrainingCampRatingsDiff/TrainingCampRatingsDiffView.php", 90, 90)],
     "saved-dc-sum-is-int": [
         ("ibl5/classes/SavedDepthChart/SavedDepthChartRepository.php", 312, 313)],
     "table-dropdown-unencoded-param": [
@@ -297,7 +303,7 @@ PINNED_EXPECTED = {
 
 def test_real_corpus_expected_ranges_pinned():
     confirmed = [c for c in _real_corpus()["cases"] if c["status"] == "confirmed"]
-    assert len(confirmed) == 6
+    assert len(confirmed) == 9
     got = {c["id"]: [(e["path"], e["start"], e["end"]) for e in c["expected"]]
            for c in confirmed}
     assert got == PINNED_EXPECTED

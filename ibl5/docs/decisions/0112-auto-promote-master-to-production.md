@@ -75,6 +75,6 @@ A `workflow_run`-triggered workflow, `.github/workflows/promote-to-production.ym
 
 **`bin/merge-master-to-prod` wording:** `## Decision` reads "retained unchanged as the manual/emergency path". PR #1967 changes the file by 22 lines — one functional line (adding `SKIP_CHECKS` per Phase 1e) plus 21 lines of header prose. The code path the sentence describes is accurate; "unchanged" overstates byte-identity.
 
-## Addendum — Trigger list size (2026-11-06)
+## Addendum: Trigger list size (2026-11-06)
 
 The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. On 2026-11-06 a `push:` grep over `.github/workflows/` finds fourteen workflows that fire on a master push. `.github/workflows/promote-to-production.yml` lists twelve under `workflow_run.workflows`. `Doc Freshness Audit` and `Mirror CI images` fire on a master push and are outside that list. Whether either one can make the promoter look too early is unverified. A follow-up decides whether they belong in the list. The breadth principle in the original bullet stands.

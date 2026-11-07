@@ -29,11 +29,11 @@ n=$(printf '%s\n' "$lines" | wc -l | tr -d ' ')
 [ "$n" = 1 ] || verdict deep MALFORMED
 
 line=$(printf '%s' "$lines" | sed -E 's/[[:space:]]+$//')
-re='^\*\*Merge danger:\*\* Door: ([a-z-]+) · Blast radius: ([a-z-]+) · Why: (.+)$'
+re='^\*\*Merge danger:\*\* Door: ([a-z-]+) · Blast radius: ([a-z-]+)( · Self-governing: [^ ]+)? · Why: (.+)$'
 [[ $line =~ $re ]] || verdict deep MALFORMED
 door=${BASH_REMATCH[1]}
 blast=${BASH_REMATCH[2]}
-why=${BASH_REMATCH[3]}
+why=${BASH_REMATCH[4]}
 case "$door" in two-way|one-way) ;; *) verdict deep MALFORMED ;; esac
 case "$blast" in localized|module|site-wide|external) ;; *) verdict deep MALFORMED ;; esac
 
@@ -42,6 +42,8 @@ why=$(printf '%s' "$why" | sed -E 's/^[[:space:]]+//')
 chars=$(printf '%s' "$why" | tr -d '\200-\277' | wc -c | tr -d ' ')
 [ "$chars" -ge 20 ] || verdict deep MALFORMED
 
+# The Self-governing marker anywhere on the line (even misplaced) reviews deep, never standard.
+case "$line" in *'Self-governing:'*) verdict deep self-governing ;; esac
 [ "$door" = two-way ] || verdict deep one-way
 case "$blast" in
     localized|module) verdict standard "two-way/$blast" ;;

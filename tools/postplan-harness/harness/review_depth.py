@@ -15,10 +15,16 @@ _STANDARD_BLAST = ("localized", "module")
 
 
 def classify_depth(body: str | None) -> tuple[str, str]:
-    """(depth, reason). reason is one of: UNREADABLE, MISSING, MALFORMED, one-way,
-    blast=<value>, two-way/<blast>."""
+    """(depth, reason). reason is one of: UNREADABLE, MISSING, MALFORMED, self-governing,
+    one-way, blast=<value>, two-way/<blast>.
+
+    A `Self-governing:` marker anywhere on the Merge danger line reviews deep, even when the
+    segment is misplaced or carries a bad value: a mangled marker over-reviews, never under."""
     if body is None:
         return DEEP, "UNREADABLE"
+    md_line_text = next((ln for ln in body.splitlines() if ln.startswith("**Merge danger:**")), "")
+    if "Self-governing:" in md_line_text:
+        return DEEP, "self-governing"
     try:
         md = parse_merge_danger(body)
     except MalformedMergeDanger:

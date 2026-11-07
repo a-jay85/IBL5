@@ -396,6 +396,17 @@ want "compressed body is elided" "$OUT" '…'
 wantnot "no danger prefix" "$OUT" 'ONE-WAY'
 eq "DM under 700 chars" "$([ "${#OUT}" -lt 700 ] && echo under || echo over)" "under"
 
+begin_case "two-way-localized-self-governing-full-body"
+printf '**Merge danger:** Door: two-way · Blast radius: localized · Self-governing: yes · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+# Same short title and URL as the compressed case: only the full body pushes past 700.
+OUT="$(bash "$DRIVER" --pr-number 2200 --title 'Fix' --url 'https://x.io/2200' \
+        --pr-body-file "$SCRATCH/body.md" < "$DIGEST_FIX")"
+RC=$?
+eq "exit 0" "$RC" "0"
+eq "first line is the sign-off banner" "$(printf '%s\n' "$OUT" | sed -n 1p)" '!! SELF-GOVERNING: owner sign-off required (blast radius: localized)'
+wantnot "no one-way banner" "$OUT" 'ONE-WAY'
+eq "full body, not the compressed one" "$([ "${#OUT}" -ge 700 ] && echo full || echo compressed)" "full"
+
 begin_case "two-way-site-wide-unchanged"
 printf '**Merge danger:** Door: two-way · Blast radius: site-wide · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
 run "$DIGEST_FIX"

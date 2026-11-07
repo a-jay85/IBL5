@@ -35,7 +35,7 @@ A `workflow_run`-triggered workflow, `.github/workflows/promote-to-production.ym
 
 - **`bin/merge-master-to-prod` is retained unchanged as the manual/emergency path**, which is what makes pausing cheap and reversible.
 
-## Addendum — Trigger list size (2026-11-06)
+## Addendum: Trigger list size (2026-11-06)
 
 The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. Today `.github/workflows/promote-to-production.yml` lists twelve names under `workflow_run.workflows`. The set of master-push workflows shrank after this ADR was written. The breadth principle stands: list every master-push workflow.
 

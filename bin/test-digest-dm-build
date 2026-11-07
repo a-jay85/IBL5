@@ -409,6 +409,26 @@ eq "full body, not the compressed one" "$([ "${#OUT}" -ge 700 ] && echo full || 
 # The compressed body caps Watch at 200 chars; the full body keeps more of the 650-char fixture.
 want "Watch keeps the full budget" "$OUT" "$(_rep t 300)"
 
+begin_case "two-way-localized-misplaced-self-governing-full-body"
+# A segment misplaced after Why fails toward caution: banner and full body, never compressed.
+printf '**Merge danger:** Door: two-way · Blast radius: localized · Why: %s · Self-governing: yes\n' "$DANGER_WHY" > "$SCRATCH/body.md"
+OUT="$(bash "$DRIVER" --pr-number 2200 --title 'Fix' --url 'https://x.io/2200' \
+        --pr-body-file "$SCRATCH/body.md" < "$DIGEST_FIX")"
+RC=$?
+eq "exit 0" "$RC" "0"
+eq "first line is the sign-off banner" "$(printf '%s\n' "$OUT" | sed -n 1p)" '!! SELF-GOVERNING: owner sign-off required (blast radius: localized)'
+eq "full body, not the compressed one" "$([ "${#OUT}" -ge 700 ] && echo full || echo compressed)" "full"
+
+begin_case "two-way-localized-why-prose-names-label-compressed"
+# Why prose naming the label without the ` · ` separator is not a segment: no banner, compressed.
+printf '**Merge danger:** Door: two-way · Blast radius: localized · Why: rename the Self-governing: label in docs only\n' > "$SCRATCH/body.md"
+OUT="$(bash "$DRIVER" --pr-number 2200 --title 'Fix' --url 'https://x.io/2200' \
+        --pr-body-file "$SCRATCH/body.md" < "$DIGEST_FIX")"
+RC=$?
+eq "exit 0" "$RC" "0"
+wantnot "no sign-off banner" "$OUT" 'SELF-GOVERNING'
+eq "DM under 700 chars" "$([ "${#OUT}" -lt 700 ] && echo under || echo over)" "under"
+
 begin_case "two-way-site-wide-unchanged"
 printf '**Merge danger:** Door: two-way · Blast radius: site-wide · Why: %s\n' "$DANGER_WHY" > "$SCRATCH/body.md"
 run "$DIGEST_FIX"

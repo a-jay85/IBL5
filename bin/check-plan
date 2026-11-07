@@ -2117,6 +2117,8 @@ while IFS=$'\t' read -r _cw_num _cw_cmd; do
     _cw_src="${_cw_src//;/$'\n'}"; _cw_src="${_cw_src//|/$'\n'}"
     while IFS= read -r _cw_seg; do
         _cw_seg="$(mtrim "$_cw_seg")"
+        # Test the raw segment: the assignment strip below would remove the `N=$(cd` opener.
+        [[ "$_cw_seg" =~ $_cw_subcd_re ]] && break
         while :; do
             if [[ "$_cw_seg" == [\(\{]* ]]; then
                 _cw_seg="${_cw_seg:1}"; _cw_seg="$(mtrim "$_cw_seg")"
@@ -2131,7 +2133,6 @@ while IFS=$'\t' read -r _cw_num _cw_cmd; do
             fi
         done
         case "$_cw_seg" in cd|cd[[:space:]]*|pushd|pushd[[:space:]]*) break ;; esac
-        [[ "$_cw_seg" =~ $_cw_subcd_re ]] && break
         _cw_opts=" ${_cw_seg} "; _cw_opts="${_cw_opts%%[[:space:]]--[[:space:]]*}"; _cw_opts="${_cw_opts# }"
         [[ "$_cw_opts" =~ $_cw_dir_re ]] && continue
         [[ "$_cw_opts" =~ $_cw_root_ok_re ]] && continue

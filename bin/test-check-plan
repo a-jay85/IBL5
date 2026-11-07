@@ -6179,6 +6179,30 @@ assert_viol "gateCW-backtick-no-cd-flags" 1 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `test `true && composer show` -gt 0` |
 '
+assert_viol "gateCW-assign-subst-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(cd ibl5 && composer show \| wc -l); test $N -gt 0` |
+'
+assert_viol "gateCW-assign-backtick-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=`cd ibl5 && composer show \| wc -l`; test $N -gt 0` |
+'
+assert_viol "gateCW-assign-subst-no-cd-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(true && composer show); test $N -gt 0` |
+'
+assert_viol "gateCW-assign-closed-subst-cd-then-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(cd ibl5); composer test` |
+'
 assert_viol "gateCW-env-wrapper-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |
@@ -6189,7 +6213,7 @@ assert_viol "gateCW-env-flag-wrapper-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | x | CLI-executable | post-impl | `env -i FOO=1 BAR=2 composer test` |
+| 1 | x | CLI-executable | post-impl | `env --ignore-environment FOO=1 BAR=2 composer test` |
 '
 assert_viol "gateCW-time-wrapper-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix

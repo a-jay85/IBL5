@@ -1238,4 +1238,119 @@ else
     expect "mutant meta-checks-adds-if wf_job_if exits 0" 0 "$?"
 fi
 
+# ---- UI-change classifier (bin/lib/ui-change-classifier.sh) ----
+UI_LIB="$REPO_ROOT/bin/lib/ui-change-classifier.sh"
+UI_TMP=$(mktemp -d)
+# ui_paths_rc <name> <expected_rc> <path>... — ui_paths_touch_ui on the paths.
+ui_paths_rc() {
+    local name="$1" want_rc="$2" rc=0
+    shift 2
+    LAST_OUT=$(printf '%s\n' "$@" | bash -c "set -euo pipefail; source '$UI_LIB'; ui_paths_touch_ui" 2>&1) || rc=$?
+    expect "$name" "$want_rc" "$rc"
+}
+# ui_decide_is <name> <expected_verdict> <renderable> <gallery_or_empty> <path>...
+ui_decide_is() {
+    local name="$1" want_v="$2" renderable="$3" gallery="$4" pf
+    shift 4
+    pf="$UI_TMP/paths-$name.txt"
+    if [ "$#" -gt 0 ]; then printf '%s\n' "$@" > "$pf"; else : > "$pf"; fi
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" "$3" "$4" || true' \
+        _ "$UI_LIB" "$pf" "$renderable" "$gallery" 2>&1)
+    if [ "$LAST_OUT" = "$want_v" ]; then h_pass "$name"; else h_fail "$name" "expected [$want_v] got [$LAST_OUT]"; fi
+}
+
+ui_paths_rc ui_paths_css_holds 0 ibl5/design/components/auth.css
+ui_paths_rc ui_paths_view_holds 0 ibl5/classes/ActivityTracker/ActivityTrackerView.php
+# The suffix clause needs its \.php$ anchor: a NavigationViewInterface.php
+# outside the UI directories is not UI. (The real one lives under
+# ibl5/classes/Navigation/, which the directory clause covers on its own.)
+# Preview.php carries a lowercase "view", which the suffix clause never matches.
+ui_paths_rc ui_paths_view_interface_near_miss 1 \
+    ibl5/classes/Foo/Contracts/NavigationViewInterface.php ibl5/classes/Foo/Preview.php
+ui_paths_rc ui_paths_md_excluded 1 ibl5/design/CSS_TABLE_MAP.md
+ui_paths_rc ui_paths_snapshots_hold 0 \
+    ibl5/tests/e2e/visual/team.spec.ts-snapshots/team-desktop-chromium-linux.png
+
+cat > "$UI_TMP/g-changed.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [{"module": "Team", "viewport": "desktop", "title": "Team"}], "newCells": [], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-new.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [], "newCells": [{"module": "Draft", "viewport": "mobile", "title": "Draft"}], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-strict-flake.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [{"module": "Team", "viewport": "desktop", "title": "Team", "strict": true}], "newCells": [], "flakeCells": [{"module": "Box", "viewport": "desktop", "title": "Box"}]}
+JSON
+cat > "$UI_TMP/g-zero.json" <<'JSON'
+{"renderedCells": 0, "changedCells": [], "newCells": [], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-clean.json" <<'JSON'
+{"renderedCells": 12, "changedCells": [], "newCells": [], "flakeCells": []}
+JSON
+
+BACKEND=ibl5/classes/Team/TeamService.php
+ui_decide_is ui_decide_tooling_only_passes not-ui 0 "" bin/some-tool .claude/rules/x.md
+ui_decide_is ui_decide_backend_changed_cell_holds ui-vr 1 "$UI_TMP/g-changed.json" "$BACKEND"
+ui_decide_is ui_decide_new_cell_holds ui-vr 1 "$UI_TMP/g-new.json" "$BACKEND"
+ui_decide_is ui_decide_strict_and_flake_pass not-ui 1 "$UI_TMP/g-strict-flake.json" "$BACKEND"
+ui_decide_is ui_decide_missing_gallery_holds vr-missing 1 "$UI_TMP/does-not-exist.json" "$BACKEND"
+ui_decide_is ui_decide_zero_rendered_holds vr-missing 1 "$UI_TMP/g-zero.json" "$BACKEND"
+ui_decide_is ui_decide_empty_paths_holds ui-unknown 0 ""
+
+printf 'docs/x.md\n' > "$UI_TMP/deny.txt"
+# shellcheck disable=SC2016  # $1/$2 expand inside the child bash
+UI_R=$(bash -c 'set -euo pipefail; source "$1"; ui_renderable "$2" "dependabot[bot]"' _ "$UI_LIB" "$UI_TMP/deny.txt" 2>&1)
+same ui_renderable_dependabot_forced "$UI_R" 1
+# shellcheck disable=SC2016  # $1/$2 expand inside the child bash
+UI_R=$(bash -c 'set -euo pipefail; source "$1"; ui_renderable "$2" "a-jay85"' _ "$UI_LIB" "$UI_TMP/deny.txt" 2>&1)
+same "ui_renderable: a human's deny-listed docs path prints 0" "$UI_R" 0
+ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean.json" \
+    ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+
+# ui_await_run <attempts> <rc...> — ui_await_gallery with sleep 0 and a stub
+# fetch that returns the next rc from the list on each call (the last rc
+# repeats). Sets UI_AWAIT_RC and UI_AWAIT_CALLS.
+cat > "$UI_TMP/stub-fetch.sh" <<'SH'
+# shellcheck shell=bash
+stub_fetch() {
+    local n i
+    echo call >> "$UI_STUB_CALLS"
+    n=$(wc -l < "$UI_STUB_CALLS")
+    read -r -a UI_STUB_SEQ_A <<< "$UI_STUB_SEQ"
+    i=$((n - 1))
+    if [ "$i" -ge "${#UI_STUB_SEQ_A[@]}" ]; then i=$((${#UI_STUB_SEQ_A[@]} - 1)); fi
+    return "${UI_STUB_SEQ_A[$i]}"
+}
+SH
+ui_await_run() {
+    local attempts="$1" rc=0
+    shift
+    : > "$UI_TMP/calls"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    UI_STUB_CALLS="$UI_TMP/calls" UI_STUB_SEQ="$*" bash -c \
+        'set -euo pipefail; source "$1"; source "$2"; ui_await_gallery "$3" 0 stub_fetch "$4"' \
+        _ "$UI_LIB" "$UI_TMP/stub-fetch.sh" "$attempts" "$UI_TMP/out.json" > /dev/null 2>&1 || rc=$?
+    UI_AWAIT_RC=$rc
+    UI_AWAIT_CALLS=$(wc -l < "$UI_TMP/calls" | tr -d ' ')
+}
+ui_await_case() { # name want_rc want_calls
+    if [ "$UI_AWAIT_RC" = "$2" ] && [ "$UI_AWAIT_CALLS" = "$3" ]; then
+        h_pass "$1"
+    else
+        h_fail "$1" "rc=$UI_AWAIT_RC calls=$UI_AWAIT_CALLS (want rc=$2 calls=$3)"
+    fi
+}
+ui_await_run 3 1;   ui_await_case ui_await_gallery_bounded 1 3
+ui_await_run 5 1 0; ui_await_case ui_await_gallery_found_late 0 2
+ui_await_run 5 3;   ui_await_case ui_await_gallery_stops_on_completed 1 1
+
+# The CLI the arming harness calls by subprocess.
+UI_CLI_RC=0
+printf 'ibl5/design/components/auth.css\n' | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
+expect "ui-change-classifier.sh --paths: a CSS path exits 0" 0 "$UI_CLI_RC"
+UI_CLI_RC=0
+printf 'bin/some-tool\n' | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
+expect "ui-change-classifier.sh --paths: a tooling path exits 1" 1 "$UI_CLI_RC"
+rm -rf "$UI_TMP"
+
 h_done

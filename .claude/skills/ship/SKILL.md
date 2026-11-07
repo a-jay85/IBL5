@@ -1,7 +1,7 @@
 ---
 name: ship
 description: "Commit, push, and open a PR via /post-plan, which decides whether auto-merge arms; /ship never arms directly."
-last_verified: 2026-10-23
+last_verified: 2026-11-07
 ---
 
 # /ship — Commit, push, PR via /post-plan
@@ -10,7 +10,7 @@ last_verified: 2026-10-23
 
 > ## Core invariant — `/ship` ONLY delegates; it NEVER arms auto-merge itself.
 >
-> Arming is owned exclusively by `/post-plan` Phase 6.5, which runs the teeth a chat-context wrapper structurally cannot supply: code-review scoring (condition (2)), Phase-5 verification (condition (4)), planned-test / planned-file completeness (condition (3)), CI-green-required, the realized-diff safety verdict (condition (9)), the `feat:` floor (condition (8)), and the independent `human-signoff` required GitHub check. A **reviewed-but-held PR** (open, a human merges it) is the **automatic** outcome whenever any Phase 6.5 condition holds — there is no token to request it. A routing bug **fails safe**: the worst case is a delayed ship, never an unreviewed merge.
+> Arming is owned exclusively by `/post-plan` Phase 6.5, which runs the teeth a chat-context wrapper structurally cannot supply: code-review scoring (condition (2)), Phase-5 verification (condition (4)), planned-test / planned-file completeness (condition (3)), CI-green-required, the realized-diff safety verdict (condition (9)), the UI floor (condition (8) `ui-review-floor`), and the independent `human-signoff` required GitHub check. A **reviewed-but-held PR** (open, a human merges it) is the **automatic** outcome whenever any Phase 6.5 condition holds — there is no token to request it. A routing bug **fails safe**: the worst case is a delayed ship, never an unreviewed merge.
 
 (`/ship` previously carried merge-intent tokens and a routing step; both were removed per ADR-0067 — the held-PR outcome already emerges automatically when work is not arming-safe, and a flag the user never reaches for is dead weight. `/ship` now has a single behavior.)
 
@@ -28,7 +28,7 @@ Evaluate all three before doing any work. On any hit, refuse with the one-line r
 
 First, a cheap **advisory prediction** — clearly label it *"advisory only; `/post-plan` Phase 6.5 makes the real call"*. Emit a warning for each that matches:
 
-- PR/commit title matches `^feat(\(|!|:)` → Phase 6.5 condition **(8)** (the `feat:` floor) will **HOLD**.
+- `git diff HEAD --name-only | bash bin/lib/ui-change-classifier.sh --paths` exits 0 → Phase 6.5 condition **(8)** (`ui-review-floor`) will **HOLD**. The PR title plays no part.
 - `git diff HEAD --name-only` includes `engine/internal/sim/testdata/golden.json` → condition **(5)** holds under headless (warns interactively).
 - A plan at `~/claude-plans/<branch-slug>.md` whose **line-1** frontmatter has `auto_merge: false` → condition **(7)** will **HOLD**.
 

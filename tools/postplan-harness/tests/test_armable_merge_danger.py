@@ -12,7 +12,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
 
+from harness.gate_backtest import _ARMING_PATHS
 from tests.test_armable import BODY_CLEARED, _CHARACTERIZATION_FIXTURES, inputs
+from tests.test_merge_danger import _derive
 
 
 def _cond(decision, number):
@@ -69,3 +71,11 @@ def test_conditions_1_to_17_unchanged_by_new_field(label, kwargs):
     # the new entry can only add a hold, never clear one
     assert {c.number for c in two.holds} <= {c.number for c in one.holds}
     assert one.armed is False
+
+
+def test_arming_paths_include_ui_classifier():
+    path = "bin/lib/ui-change-classifier.sh"
+    assert path in _ARMING_PATHS
+    d = _derive([("M", path)])
+    assert d.door == "one-way"
+    assert f"arming-path:{path}" in d.triggers

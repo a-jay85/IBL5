@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 #
 # bin/lib/human-signoff-classifier.sh — single source of truth for the
-# .github/workflows/human-signoff.yml feature-PR sign-off classifier (ADR-0062),
+# .github/workflows/human-signoff.yml UI-PR sign-off classifier (ADR-0062),
 # sourced by BOTH the workflow and the regression harness
 # bin/test-human-signoff-classifier so the logic cannot drift.
 #
@@ -11,42 +11,32 @@
 # function must be strict-mode safe.
 # The hs_*fingerprint* functions pin human-approved to the PR diff (ADR-0062 Update).
 
-# hs_is_feat_title <title> — 0 if the title is a conventional-commit feature
-# (feat:, feat(scope):, feat!:, feat(scope)!:), 1 otherwise. Mirrors the grep in
-# /post-plan Phase 6.5 condition (8) and pr-armable.sh pr_feat_hold.
-hs_is_feat_title() {
-    printf '%s' "$1" | grep -qiE '^feat(\([^)]*\))?!?:'
-}
-
-# hs_pr_cleared <title> <labels_csv> — 0 if the PR may merge (non-feat, OR feat
-# with the human-approved label), 1 if it is a feat: PR still awaiting sign-off.
+# hs_pr_cleared <ui_verdict> <labels_csv> — 0 if the PR may merge (the UI
+# verdict from bin/lib/ui-change-classifier.sh is not-ui, OR the PR carries the
+# human-approved label), 1 if it is a UI PR still awaiting sign-off. Arming
+# condition (8) and pr-armable.sh pr_ui_hold read the same classifier.
 # Comma-wrap both sides so the label match is whole-name, never a substring.
 hs_pr_cleared() {
-    local title="$1" labels="$2"
-    if ! hs_is_feat_title "$title"; then
-        return 0
-    fi
-    if printf '%s' ",$labels," | grep -q ',human-approved,'; then
-        return 0
-    fi
+    [ "$1" = not-ui ] && return 0
+    case ",$2," in *,human-approved,*) return 0 ;; esac
     return 1
 }
 
-# hs_eval_pull_request <title> <labels_csv> — the entry gate. 0 = cleared,
+# hs_eval_pull_request <ui_verdict> <labels_csv> — the entry gate. 0 = cleared,
 # 1 = needs sign-off (emits the GitHub ::error:: that reds the required check).
 hs_eval_pull_request() {
     if hs_pr_cleared "$1" "$2"; then
-        echo "Entry gate: PR cleared (title: $1)"
+        echo "Entry gate: PR cleared (UI verdict: $1)"
         return 0
     fi
-    echo "::error title=Human sign-off required::This feature PR must be manually inspected by a maintainer, who then applies the 'human-approved' label. Auto-merge cannot satisfy this gate."
+    echo "::error title=Human sign-off required::This PR changes the UI ($1) and must be manually inspected by a maintainer, who then applies the 'human-approved' label. Auto-merge cannot satisfy this gate."
     return 1
 }
 
 # ---- Diff-pinned approval (ADR-0062 Update) ----
 # The human-approved label covers one PR diff. The approving `labeled` run
 # records the diff's patch-id in a github-actions[bot] comment carrying the
-# marker below. Every later run on a feat: PR holding the label recomputes the
+# marker below. Every later run on a UI PR holding the label recomputes the
 # id and compares. A clean rebase keeps the id. A real diff change, a missing
 # record, or any read/compute error drops the approval (fail closed).
 # Marker value: 40 lowercase hex, or `revoked` (written when an approval drops).
@@ -131,26 +121,26 @@ hs_drop_comment_body() {
     printf 'Removed `human-approved` at head `%s`: %s. Review the current diff, then re-apply the label to approve it.\n' "$2" "$why"
 }
 
-# hs_eval_approval <action> <event_label> <title> <labels_csv> <current_fp> <comments_json_file>
+# hs_eval_approval <action> <event_label> <ui_verdict> <labels_csv> <current_fp> <comments_json_file>
 # The workflow's entry gate. Sets HS_VERDICT and HS_DROP_REASON (globals).
-#   pass   (rc 0) not a feat: PR; no fingerprint work
-#   hold   (rc 1) feat: PR without the label; same annotation as today
+#   pass   (rc 0) not a UI PR; no fingerprint work
+#   hold   (rc 1) UI PR without the label; same annotation as today
 #   record (rc 0) the event IS the human-approved label being applied
-#   keep   (rc 0) feat: + label, current fingerprint equals the recorded one
-#   drop   (rc 1) feat: + label, reason mismatch | missing | error
+#   keep   (rc 0) UI + label, current fingerprint equals the recorded one
+#   drop   (rc 1) UI + label, reason mismatch | missing | error
 # Tightening only: every rc-0 path first passes hs_pr_cleared.
 hs_eval_approval() {
-    local action="$1" event_label="$2" title="$3" labels="$4" current="$5" comments="$6"
+    local action="$1" event_label="$2" verdict="$3" labels="$4" current="$5" comments="$6"
     local recorded rc=0
     HS_VERDICT=""
     HS_DROP_REASON=""
-    if ! hs_pr_cleared "$title" "$labels"; then
-        hs_eval_pull_request "$title" "$labels" || true
+    if ! hs_pr_cleared "$verdict" "$labels"; then
+        hs_eval_pull_request "$verdict" "$labels" || true
         HS_VERDICT="hold"
         return 1
     fi
-    if ! hs_is_feat_title "$title"; then
-        echo "Entry gate: PR cleared (title: $title)"
+    if [ "$verdict" = not-ui ]; then
+        echo "Entry gate: PR cleared (UI verdict: not-ui)"
         HS_VERDICT="pass"
         return 0
     fi
@@ -217,7 +207,7 @@ hs_label_newer_than_marker() {
     esac
 }
 
-# hs_await_record <attempts> <sleep_s> <refetch_fn> <action> <event_label> <title> <labels_csv> <current_fp> <comments_json_file> <events_json_file>
+# hs_await_record <attempts> <sleep_s> <refetch_fn> <action> <event_label> <ui_verdict> <labels_csv> <current_fp> <comments_json_file> <events_json_file>
 # Call right after hs_eval_approval with the same arguments. Changes nothing
 # unless the verdict is `drop missing` or `drop mismatch`. When hs_label_newer_than_marker says
 # wait, it re-reads comments up to <attempts> times, <sleep_s> seconds apart,
@@ -229,7 +219,7 @@ hs_label_newer_than_marker() {
 #         missing or mismatch (the last re-read's reason) on timeout or when a newer bot marker appears
 hs_await_record() {
     local attempts="$1" sleep_s="$2" refetch="$3" action="$4" event_label="$5"
-    local title="$6" labels="$7" current="$8" comments="$9" events="${10}"
+    local verdict="$6" labels="$7" current="$8" comments="$9" events="${10}"
     local hs_await_i=0 nrc=0
     if [ "${HS_VERDICT:-}" != "drop" ] || { [ "${HS_DROP_REASON:-}" != "missing" ] && [ "${HS_DROP_REASON:-}" != "mismatch" ]; }; then
         if [ "${HS_VERDICT:-}" = "drop" ]; then return 1; fi
@@ -255,7 +245,7 @@ hs_await_record() {
             _hs_drop error
             return 1
         fi
-        if hs_eval_approval "$action" "$event_label" "$title" "$labels" "$current" "$comments"; then
+        if hs_eval_approval "$action" "$event_label" "$verdict" "$labels" "$current" "$comments"; then
             if [ "$HS_VERDICT" = "keep" ]; then return 0; fi
             _hs_drop error
             return 1

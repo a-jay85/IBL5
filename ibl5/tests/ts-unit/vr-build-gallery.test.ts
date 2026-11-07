@@ -96,7 +96,7 @@ describe('bin/vr-build-gallery', () => {
     expect(res.stderr).toContain('vr-build-gallery: 1 changed, 0 new, 0 infra/flake');
     const parsed = JSON.parse(readFileSync(json, 'utf-8'));
     expect(Object.keys(parsed).sort()).toEqual(['changedCells', 'flakeCells', 'newCells', 'renderedCells']);
-    expect(Object.keys(parsed.changedCells[0]).sort()).toEqual(['module', 'title', 'viewport']);
+    expect(Object.keys(parsed.changedCells[0]).sort()).toEqual(['module', 'strict', 'title', 'viewport']);
     expect(parsed.changedCells[0].title).toBe('standings');
     expect(parsed.changedCells[0].viewport).toBe('desktop');
     for (const suffix of ['before', 'after', 'diff']) {
@@ -116,4 +116,29 @@ describe('bin/vr-build-gallery', () => {
     const res = run();
     expect(res.stderr).toContain('vr-build-gallery: 0 changed, 0 new, 0 infra/flake');
   });
+
+  it('emits strict: true for a strict-only changed cell', () => {
+    // standings: a sub-gate recolor only the strict pass sees.
+    const strictOnly = shiftRegion(baseline);
+    writeCell('a', strictOnly);
+    writeCell('b', strictOnly);
+    // activity-tracker: a 400x400 block driven to black fails the gate itself.
+    const gateTitle = 'activity-tracker';
+    const gateBaseline = execFileSync('git', ['show', `HEAD:${dirname(baselinePath)}/${gateTitle}.png`], {
+      cwd: repoRoot,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const gateChanged = shiftRegion(gateBaseline, 255, 0, 0, 400, 400);
+    writeFileSync(join(act, `${gateTitle}.a.png`), gateChanged);
+    writeFileSync(join(act, `${gateTitle}.b.png`), gateChanged);
+    const res = run();
+    expect(res.status).toBe(0);
+    const parsed = JSON.parse(readFileSync(json, 'utf-8'));
+    const byTitle = new Map<string, Record<string, unknown>>(
+      parsed.changedCells.map((c: Record<string, unknown>) => [c.title as string, c]),
+    );
+    expect(byTitle.get('standings')?.strict).toBe(true);
+    expect(byTitle.has(gateTitle)).toBe(true);
+    expect(Object.keys(byTitle.get(gateTitle) ?? {})).not.toContain('strict');
+  }, 30_000);
 });

@@ -144,7 +144,7 @@ A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead;
 
 An ad-hoc branch with no plan file makes post-plan run **plan-blind**. That is expected,
 not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so
-auto-opening the PR never auto-merges a `feat:` / `auto_merge: false` / visual PR without
+auto-opening the PR never auto-merges a UI-touching / `auto_merge: false` / visual PR without
 human signoff.
 
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only

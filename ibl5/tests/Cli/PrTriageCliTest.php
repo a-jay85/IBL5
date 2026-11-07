@@ -106,7 +106,7 @@ final class PrTriageCliTest extends TestCase
             $this->pr(6,    'fix: dnm frontmatter', self::CLEARED . "\n\nauto_merge: false",    'CLEAN', 'shaGREEN'),
             $this->pr(7,    'fix: prose hold',     self::CLEARED . "\n\nNeeds a human reviewer first.", 'CLEAN', 'shaGREEN'),
             $this->pr(8,    'fix: has dep',        self::CLEARED . "\n\nDepends-on: #1100",     'CLEAN', 'shaGREEN'),
-            $this->pr(9,    'feat: shiny',         self::CLEARED,                              'CLEAN', 'shaGREEN'),
+            $this->pr(9,    'feat: shiny',         self::CLEARED,                              'CLEAN', 'shaGREEN', [['path' => 'ibl5/design/input.css']]),
             $this->pr(10,   'fix: handmade',       "Just a body, no manual testing heading." . "\n\n" . self::DANGER_TWO_WAY,  'CLEAN', 'shaGREEN'),
             $this->pr(11,   'fix: clean armable',  self::CLEARED,                              'CLEAN', 'shaGREEN'),
             $this->pr(12,   'feat: approved',      self::CLEARED,                              'CLEAN', 'shaGREEN', [], [['name' => 'human-approved']]),
@@ -297,7 +297,7 @@ final class PrTriageCliTest extends TestCase
             'labels' => $labels,
             'mergeStateStatus' => $mss,
             'headRefOid' => $sha,
-            'files' => $files,
+            'files' => $files === [] ? [['path' => 'ibl5/classes/Trade/TradeService.php']] : $files,
         ];
     }
 

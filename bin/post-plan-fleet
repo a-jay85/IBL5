@@ -967,8 +967,8 @@ for c in (d.get("arm") or {}).get("conditions") or []:
     name, reason = c.get("name") or "", (c.get("reason") or "")[:150]
     if name == "plan-auto-merge-hold":
         h = "plan says auto_merge: false — review and merge by hand"
-    elif name == "feat-commit-type-floor":
-        h = "feat: PR — check it, then add the `human-approved` label"
+    elif name == "ui-review-floor":
+        h = "UI-touching PR — check it, then add the `human-approved` label"
     elif name == "manual-testing-clearance":
         rows = [r.get("id", "") for r in (d.get("manual_testing") or {}).get("rows") or []
                 if str(r.get("verdict", "")).startswith("SKIP")]

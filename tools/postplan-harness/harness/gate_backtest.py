@@ -177,6 +177,9 @@ _ARMING_PATHS = (
     ".claude/agents/pr-second-reviewer.md",
     "tools/postplan-harness/harness/fidelity.py",
     "tools/postplan-harness/harness/planfile.py",
+    "bin/lib/ui-change-classifier.sh",
+    "bin/lib/human-signoff-classifier.sh",
+    ".claude/skills/post-plan/_phase-6.5-arm-auto-merge.md",
 )
 
 # runner.py builds ArmInputs and calls the seat, but most edits to it are not merge-rule

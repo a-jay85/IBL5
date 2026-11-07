@@ -18,7 +18,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-11-02
+last_verified: 2026-11-07
 ---
 
 # Visual-review PRs
@@ -122,6 +122,11 @@ commit. The label is removed once the VR step ran, before the bot pushes. A left
 VR job (ADR-0214).
 
 The label starts `update-baselines.yml`, which calls `e2e-tests.yml`. Its checks report as `Update baselines / <job>`.
+
+The gallery also feeds the human-signoff hold. Each E2E run uploads the `vr-gallery-json-<head sha>`
+artifact, and `bin/lib/ui-change-classifier.sh` holds the PR when it lists a changed or new
+gating cell. Cells marked `strict: true` and `flakeCells` never hold. `update-baselines` runs
+publish no artifact.
 
 ## When the comment is missing
 

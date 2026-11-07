@@ -18,10 +18,11 @@ merge; a false ARM ships unreviewed code).
 from __future__ import annotations
 
 import os
-
 import re
+import subprocess
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from . import labels
@@ -40,7 +41,6 @@ _DOCS_REFRESH_CLASS_README = re.compile(r"ibl5/classes/.*/README\.md")
 # literal to the --context= of .github/workflows/all-checks-settled.yml and to bin/lib/pr-armable.sh.
 AGGREGATOR_CONTEXT = "All checks settled"
 
-FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
 # Tail-clause AND gate (pr_manual_testing_clearance parity, bin/lib/pr-armable.sh).
@@ -162,10 +162,24 @@ def dep_numbers(body: str) -> list[int]:
     return nums
 
 
-def feat_hold(title: str, labels: list[str]) -> bool:
-    if FEAT_RE.match((title or "").strip()):
-        return "human-approved" not in labels
-    return False
+UI_CLASSIFIER = Path(__file__).resolve().parents[3] / "bin" / "lib" / "ui-change-classifier.sh"
+
+
+def ui_hold(files: list[str], labels: list[str]) -> str:
+    """Condition (8): a UI-touching PR holds until `human-approved`. Fail closed."""
+    if "human-approved" in labels:
+        return ""
+    try:
+        proc = subprocess.run(["bash", str(UI_CLASSIFIER), "--paths"],
+                              input="\n".join(files) + "\n", capture_output=True,
+                              text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return "ui classifier unavailable"
+    if proc.returncode == 0:
+        return "UI-touching PR awaiting human-signoff"
+    if proc.returncode == 1:
+        return ""
+    return "ui classifier error"
 
 
 # Second-review clear. A blind Opus seat may clear these holds, and only when every
@@ -529,9 +543,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                      f"{DOCS_REFRESH_TOKEN} are recognized")
     cs.append(ConditionResult(7, "plan-auto-merge-hold", c7_blocked, c7_reason))
 
-    f_hold = feat_hold(inp.pr_title, inp.pr_labels)
-    cs.append(ConditionResult(8, "feat-commit-type-floor", f_hold,
-                              "feat: PR awaiting human-signoff" if f_hold else ""))
+    u_hold = ui_hold(inp.classification.files, inp.pr_labels)
+    cs.append(ConditionResult(8, "ui-review-floor", bool(u_hold), u_hold))
 
     det_holds = deterministic_safety_holds(inp.classification, inp.pr_title)
     all_holds = det_holds + list(inp.llm_safety_holds)

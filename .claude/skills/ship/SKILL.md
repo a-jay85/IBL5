@@ -28,7 +28,7 @@ Evaluate all three before doing any work. On any hit, refuse with the one-line r
 
 First, a cheap **advisory prediction** — clearly label it *"advisory only; `/post-plan` Phase 6.5 makes the real call"*. Emit a warning for each that matches:
 
-- PR/commit title matches `^feat(\(|!|:)` → Phase 6.5 condition **(8)** (the `feat:` floor) will **HOLD**.
+- `git diff HEAD --name-only | bash bin/lib/ui-change-classifier.sh --paths` exits 0 → Phase 6.5 condition **(8)** (`ui-review-floor`) will **HOLD**. The PR title plays no part.
 - `git diff HEAD --name-only` includes `engine/internal/sim/testdata/golden.json` → condition **(5)** holds under headless (warns interactively).
 - A plan at `~/claude-plans/<branch-slug>.md` whose **line-1** frontmatter has `auto_merge: false` → condition **(7)** will **HOLD**.
 

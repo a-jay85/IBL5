@@ -5849,6 +5849,54 @@ assert_viol "gateCW-bare-php-script-flags" 1 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `php scripts/foo.php --bogus` |
 '
+assert_viol "gateCW-php-vendor-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php vendor/bin/phpunit tests/Foo` |
+'
+assert_viol "gateCW-php-define-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -d memory_limit=-1 scripts/foo.php` |
+'
+assert_viol "gateCW-php-define-attached-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -dmemory_limit=-1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-php-ini-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -c custom.ini -f scripts/foo.php` |
+'
+assert_viol "gateCW-php-ibl5-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -d memory_limit=-1 ibl5/vendor/bin/phpunit` |
+'
+assert_viol "gateCW-php-inline-code-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -r "exit(0);" scripts/foo.php` |
+'
+assert_viol "gateCW-php-version-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -v` |
+'
+assert_viol "gateCW-php-cd-first-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `cd ibl5 && php -d memory_limit=-1 vendor/bin/phpunit` |
+'
 assert_viol "gateCW-later-segment-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |

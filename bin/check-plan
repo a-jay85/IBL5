@@ -2097,7 +2097,9 @@ done < "$MATRIX_FILE"
 # not move the shell, so later segments are still checked. Flags after a bare `--`
 # belong to the script. bun reads --cwd only before the script name.
 # ---------------------------------------------------------------------------
-_cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(\./)?(scripts|tests)/'
+# php may carry flags before the path. -d, -c and -z take a separate value. -r takes
+# inline code, so a path after it is only an argument and is not what php opens.
+_cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(((-[dcz]|--define|--php-ini|--zend-extension)[[:space:]]+[^[:space:]]+|-[^r[:space:]][^[:space:]]*)[[:space:]]+)*(\./)?(vendor|scripts|tests)/'
 _cw_dir_re='^composer[[:space:]](.*[[:space:]])?(-d[^[:space:]]*|--working-dir(=[^[:space:]]*)?)([[:space:]]|$)|^npm[[:space:]](.*[[:space:]])?--prefix([=[:space:]]|$)|^bun[[:space:]]+(run[[:space:]]+)?--cwd([=[:space:]]|$)'
 while IFS=$'\t' read -r _cw_num _cw_cmd; do
     [ -n "$_cw_num" ] || continue

@@ -530,8 +530,15 @@ class ReviewPhase:
                           + (" fallback" if r.get("fallback") else ""))
 
     def run(self, meta: dict, cls: Classification, plan: PlanInfo,
-            reused: list[Finding] | None = None) -> tuple[list[Finding], dict, list[dict], list[str]]:
+            reused: list[Finding] | None = None, *,
+            security_model: str | None = None) -> tuple[list[Finding], dict, list[dict], list[str]]:
         gates = self.gates(cls)
+        # A fix-round security recheck: the seat runs on `security_model` even when the
+        # gate is off, and reused security findings are not counted as already reviewed.
+        # `gates` stays untouched, since the review cache record is built from it.
+        run_sec = bool(gates["security"]) or security_model is not None
+        if security_model is not None:
+            reused = [f for f in (reused or []) if f.source != "security-audit"]
         findings: list[Finding] = []
         degraded_agents: list[str] = []
 
@@ -551,9 +558,11 @@ class ReviewPhase:
         if gates["D"]:
             tasks.append(("D", "code-review", "review-agent-d", "sonnet",
                           agent_d_prompt(meta, cls)))
-        if gates["security"]:
+        if run_sec:
             tasks.append(("security", "security-audit", "security-audit", "sonnet" if self.depth != DEEP else "opus",
                           security_prompt(meta, cls, plan)))
+            if security_model is not None:
+                tasks[-1] = tasks[-1][:3] + (security_model,) + tasks[-1][4:]
 
         def _call_agent(task: tuple[str, str, str, str, str]):
             agent, source, purpose, model, prompt = task
@@ -624,7 +633,7 @@ class ReviewPhase:
             self.gh.post_review_summary(pr, "Code review", _reused_note(reused_code).strip())
         else:
             self.gh.post_review_summary(pr, "Code review", "No issues found.")
-        if gates["security"]:
+        if run_sec:
             if sec:
                 self.gh.post_review_findings(pr, sha, "Security audit", sec)
             elif "security-audit" in degraded_agents:

@@ -57,8 +57,12 @@ _BASES = [("armed-base", {})] + [(f[0], f[1]) for f in _CHARACTERIZATION_FIXTURE
 def test_conditions_1_to_17_unchanged_by_new_field(label, kwargs):
     two = evaluate(inputs(**kwargs, merge_danger_state="TWO-WAY"))
     one = evaluate(inputs(**kwargs, merge_danger_state="ONE-WAY"))
-    early_two = [(c.number, c.blocked, c.warning, c.reason) for c in two.conditions if c.number != 18]
-    early_one = [(c.number, c.blocked, c.warning, c.reason) for c in one.conditions if c.number != 18]
+    # The second-reviewer note differs by design: a lone (10) is a candidate, (10)+(18) is not.
+    def _early(d):
+        return [(c.number, c.blocked, c.warning, c.reason.split("; second reviewer:")[0])
+                for c in d.conditions if c.number != 18]
+    early_two = _early(two)
+    early_one = _early(one)
     assert early_two == early_one
     assert [c.number for c in two.conditions if c.number == 18] == [18]
     assert not _cond(two, 18).blocked and _cond(one, 18).blocked

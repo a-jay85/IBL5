@@ -1,6 +1,6 @@
 ---
 description: The conditional parts of plan/SKILL.md Steps 4.5 and 5 (the hold challenge, drift remediation, staleness remediation), each loaded by the /plan orchestrator one section at a time and only when its trigger fires.
-last_verified: 2026-10-26
+last_verified: 2026-11-06
 ---
 
 This file is Read-on-demand only, one section at a time. Never Read it whole. The SKILL.md Step 4.5 stub and two pointers in `_validate-and-write.md` § Step 5 each name a section and the `awk` command that loads it.
@@ -29,6 +29,8 @@ You may **not** keep the hold on that basis alone. Resolve it one of two ways �
 - an **irreversibly-destructive or design-data-blocked** change (gate 14c) — DROP / lossy backfill / in-place data mutation, a column-rename sweep, an FK-ordering migration, or a migration whose *target shape* depends on prod data unreadable from CI; <!-- slop-ok -->
 - a **self-gating / bootstrap hazard** (gate 14e), and only when the change meets one of the two Step 3 check-1 tests: it weakens an executable gate (some input the gate previously rejected now passes) or it rewrites the arming, escalation, or auto-merge rule that governs its own merge. No self-run check can be trusted for that shape, because the thing under change *is* the verifier; a human merges it under the old, known-good floor, and lever 3 cannot mechanize a check whose own validity the PR is rewriting. Making a gate stricter is not weakening. Touching a workflow, `bin/check-*`, `bin/lib/pr-*`, `tools/postplan-harness/`, or `/post-plan` prose on its own is not a trigger either; such a change takes the gate-14 no-hold default or, when its correctness is merely unverified, the reducible path above;
 - a **golden-snapshot change** or a **recorded-and-unresolved design fork** (gate 14f / 14g): the first because a regenerated baseline passes its own check by construction, the second because the run has already said it could not decide.
+
+A hold on `hold_trigger` tokens `security-surface`, `gate-weakening` or `golden-snapshot` goes to the second reviewer at arming time (ADR-0231). Every other token waits on the owner.
 
 **Record the outcome.** Every plan that *keeps* `auto_merge: false` must carry an `## Automouse Hold Justification` section (its presence is enforced by `bin/check-plan`; validity is your judgment). State in it: the hold **category** (reducible-confirmed or intrinsic) and which gate-14/15 trigger it rests on, plus one line — for a reducible-confirmed hold, *why no mechanical check is buildable*; for an intrinsic hold, *why the judgment is irreducible*. A reducible hold you **dissolved** carries no section, because the plan no longer holds. <!-- slop-ok -->
 

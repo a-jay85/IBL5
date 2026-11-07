@@ -154,7 +154,8 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
 _ARMING_PATHS = (
     "tools/postplan-harness/harness/armable.py",
     "bin/lib/pr-armable.sh",
-    ".claude/skills/post-plan/_phase-6.5-arm-auto-merge.md",
+    "tools/postplan-harness/harness/second_review.py",
+    ".claude/agents/pr-second-reviewer.md",
 )
 
 

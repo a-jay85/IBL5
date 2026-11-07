@@ -6267,4 +6267,17 @@ assert_viol "gateCW-one-time-check-not-run-ok" 0 '[CW]' "$FM"'
 | 4 | w | CLI-executable | post-impl | `bin/check-prose --since=origin/master` |
 '
 
+assert_viol "gateCW-assign-subst-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(cd ibl5 && composer show \| wc -l); test $N -gt 0` |
+'
+assert_viol "gateCW-assign-backtick-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=`cd ibl5 && composer show \| wc -l`; test $N -gt 0` |
+'
+
 h_done

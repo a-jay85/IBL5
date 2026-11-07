@@ -4,9 +4,12 @@
 write a real thread fixer would. The replayed git advances its head with every commit, so the
 runner sees a real new head after an accepted round.
 """
+import glob
 import json
 import os
+import shutil
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,9 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import adr_draft, fix_round, holdrepeat, thread_ingestion
 from harness.adapters.gitad import ReplayGit
+from harness.adapters.ghad import RecordingGh
 from harness.adapters.verify import ReplayVerify
+from harness.mutations import MutationReport
 from harness.review import VERIFIER_PURPOSES
 from harness.state import HarnessError, TerminalState, UsageLedger
+from test_mutation_repair import NEW_MATCH, OLD_MATCH, STALE_LINE, _plan_text, _row_block
 from test_runner_conformance_fix import (BASE_DIFF, CANNED, SLUG, WritingLlm, _fixture)
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
@@ -285,3 +291,299 @@ def test_fix_round_holdrepeat_skip_reaches_sticky_line(rig, monkeypatch):
     assert res.fix_round["reason"] == "holdrepeat-same-holds"
     assert (fix_round.summary_line(res.fix_round)
             == "Fix round: skipped (already tried for these holds)")
+
+
+# ---- Holds (12), (14), (19) through the runner ----
+
+CALC = "def f(total_cap, used):\n    return total_cap - used\n"
+ROW_PLAN = _plan_text(_row_block(1, check="true"), rows=(1,))
+BASELINE_LINE = "row 1 BASELINE-FAILED — true exited 1 before any mutation"
+GATE_FILE = ".claude/rules/some-gate.md"
+FID_DIGEST = "\n## DIGEST\n\n**What changed:** a synthetic replay change\n"
+
+
+def _fid_doc(word, findings=""):
+    return f"## 6d checks\n\nCheck 3: fine.\n\n{word}\n{findings}{FID_DIGEST}"
+
+
+class QuietLlm(FrLlm):
+    """Reviews find nothing, so no (2) hold brings the review fixers along."""
+
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        return WritingLlm.call(self, purpose, model, prompt, validate, max_retries, normalizer)
+
+    def round_purposes(self):
+        wanted = {"fix-round-row-repair", "fidelity-remediation", "thread-remediation", "conflict-review"}
+        return [purpose for purpose, _ in self.tooled_argvs if purpose in wanted]
+
+
+def _quiet(rig, **canned):
+    merged = dict(CANNED)
+    for p in VERIFIER_PURPOSES:
+        merged[p] = _all_real(1)
+    merged.update(canned)
+    return QuietLlm(UsageLedger(), merged, git_getter=lambda: rig.git)
+
+
+@pytest.fixture
+def row_rig(rig, monkeypatch):
+    """The rig with a real plan file, whose first arming evaluation holds on the stale row."""
+    (rig.wt / "calc.py").write_text(CALC)
+    plan_file = rig.tmp_path / "plan.md"
+    plan_file.write_bytes(ROW_PLAN.encode())
+    real_locate = runner.locate_plan
+
+    def locate(slug, **kw):
+        info = real_locate(slug, **kw)
+        info.path = str(plan_file)
+        return info
+
+    monkeypatch.setattr(runner, "locate_plan", locate)
+    monkeypatch.setattr(ReplayGit, "read_worktree_file",
+                        lambda git, path: (rig.wt / path).read_text())
+    rig.plan_file = plan_file
+    rig.seen_plans = []
+    rig.holding_after = [(STALE_LINE_1,), ()]
+
+    def step(plan, worktree, live, log, fixture=None):
+        rig.seen_plans.append(open(plan.path, "rb").read())
+        n = len(rig.seen_plans) - 1
+        holding = rig.holding_after[min(n, len(rig.holding_after) - 1)]
+        return MutationReport(ran=True, results=(), holding=tuple(holding), tree_suspect=False)
+
+    monkeypatch.setattr(runner, "_exec_mutations_step", step)
+    rig.proofs = []
+    rig.proof_kind = "TRIPPED"
+
+    def proof(path, worktree, remaining):
+        rig.proofs.append(path)
+        holding = (STALE_LINE_1,) if rig.proof_kind == "HELD" else ()
+        return MutationReport(ran=True, results=(SimpleNamespace(row="1", kind=rig.proof_kind, detail=""),),
+                              holding=holding, tree_suspect=False)
+
+    monkeypatch.setattr(runner, "_fix_round_mutation_check", proof)
+    return rig
+
+
+STALE_LINE_1 = STALE_LINE.replace("row 7", "row 1")
+ROW_REPLY = {"fix-round-row-repair": f"NEW-MATCH: {NEW_MATCH}"}
+
+
+def _row_run(rig, llm, **kw):
+    return rig.run(llm, extra={"plan_content": ROW_PLAN}, **kw)
+
+
+def test_runner_repair_swaps_plan_before_reevaluation(row_rig):
+    res = _row_run(row_rig, _quiet(row_rig, **ROW_REPLY))
+    assert res.fix_round["status"] == "no-change"
+    assert res.fix_round["repair_applied"] is True
+    assert OLD_MATCH.encode() in row_rig.seen_plans[0]
+    assert f"match: {NEW_MATCH}".encode() in row_rig.seen_plans[-1]
+    assert OLD_MATCH.encode() not in row_rig.seen_plans[-1]
+    assert f"match: {NEW_MATCH}".encode() in row_rig.plan_file.read_bytes()
+    orig = row_rig.tmp_path / "out" / fix_round.ORIGINAL_PLAN_BASENAME
+    assert orig.read_bytes() == ROW_PLAN.encode()
+    assert 19 not in _holds(res)
+
+
+def test_runner_rejected_round_keeps_plan_and_hold(row_rig):
+    row_rig.proof_kind = "HELD"
+    res = _row_run(row_rig, _quiet(row_rig, **ROW_REPLY))
+    assert (res.fix_round["status"], res.fix_round["reason"]) == ("rejected", "mutation-unproven")
+    assert res.fix_round["row_repairs"] == []
+    assert row_rig.plan_file.read_bytes() == ROW_PLAN.encode()
+    assert len(row_rig.seen_plans) == 1
+    assert 19 in _holds(res)
+
+
+def test_runner_fix_round_disabled_skips_new_holds(row_rig, monkeypatch):
+    monkeypatch.setenv(fix_round.ENV_FLAG, "0")
+    llm = _quiet(row_rig, **ROW_REPLY)
+    res = _row_run(row_rig, llm)
+    assert not res.fix_round
+    assert row_rig.proofs == []
+    assert llm.round_purposes() == []
+    assert row_rig.plan_file.read_bytes() == ROW_PLAN.encode()
+    assert 19 in _holds(res)
+
+
+def test_runner_no_hold_spends_no_tokens(row_rig, monkeypatch):
+    fetches = []
+    real_collect = fix_round.collect_items
+    monkeypatch.setattr(fix_round, "collect_items",
+                        lambda *a, **k: fetches.append(a) or real_collect(*a, **k))
+
+    row_rig.holding_after = [()]
+    llm = _quiet(row_rig, **ROW_REPLY)
+    res = _row_run(row_rig, llm)
+    assert not res.fix_round
+    assert 19 not in _holds(res)
+    assert llm.round_purposes() == []
+    assert fetches == []
+
+    row_rig.holding_after = [(BASELINE_LINE,)]
+    row_rig.seen_plans.clear()
+    llm = _quiet(row_rig, **ROW_REPLY)
+    res = _row_run(row_rig, llm, name="baseline")
+    on_disk = json.loads((row_rig.tmp_path / "baseline" / fix_round.RESULT_BASENAME).read_text())
+    assert (on_disk["status"], on_disk["reason"]) == ("skipped", "no-eligible-hold")
+    assert on_disk["head_before"] == ""
+    assert 19 in _holds(res)
+    assert llm.round_purposes() == []
+    assert row_rig.proofs == []
+    assert fetches == []
+    assert row_rig.plan_file.read_bytes() == ROW_PLAN.encode()
+
+
+def _sticky_body(rig):
+    posts = [a for a in rig.actions() if a["action"] == "pr_sticky_verdict"]
+    assert posts
+    return posts[-1]["body"]
+
+
+def test_runner_sticky_and_digest_list_row_repair(row_rig, monkeypatch, fid_pr):
+    pr = fid_pr(7303)
+    bodies = []
+    real_edit = RecordingGh.pr_edit_body
+    monkeypatch.setattr(RecordingGh, "pr_edit_body",
+                        lambda gh, n, body: bodies.append(body) or real_edit(gh, n, body))
+    # The replay's canned review leaves every digest row degraded, which skips the body write.
+    monkeypatch.setattr(runner.fidelity, "digest_rows_for_display",
+                        lambda digest, fid, kept_titles=(): ["**What changed:** a change"] * 5)
+    llm = _quiet(row_rig, **ROW_REPLY, **{"plan-fidelity-review": _fid_doc("READY")})
+    res = row_rig.run(llm, extra={"plan_content": ROW_PLAN, **_pr_extra(pr)})
+    assert res.fix_round["repair_applied"] is True
+    assert "repaired Executable Mutations row 1 match in calc.py" in _sticky_body(row_rig)
+    digest = [b for b in bodies if "Executable Mutations row 1" in b and "calc.py" in b]
+    assert digest
+    assert NEW_MATCH in digest[-1]
+
+
+def test_runner_push_failure_never_swaps_plan(row_rig, monkeypatch):
+    real_push = runner._push_with_gate_fix
+
+    def boom(git, log, phase, *a, **k):
+        if phase == "phase6.5-fix":
+            raise HarnessError("push-failed", "no")
+        return real_push(git, log, phase, *a, **k)
+
+    monkeypatch.setattr(runner, "_push_with_gate_fix", boom)
+    llm = row_rig.llm(later=[])
+    llm.canned.update(ROW_REPLY)
+    res = _row_run(row_rig, llm)
+    assert (res.fix_round["status"], res.fix_round["reason"]) == ("rejected", "push-failed")
+    assert res.fix_round["row_repairs"] == []
+    assert row_rig.proofs
+    assert row_rig.plan_file.read_bytes() == ROW_PLAN.encode()
+    assert 19 in _holds(res)
+
+
+# ---- (14): a conflict review with no verdict stays a hold ----
+
+def test_runner_absent_conflict_review_never_arms_3705(rig, monkeypatch):
+    key = f"t-{os.getpid()}-3705"
+    review_dir = f"/tmp/postplan-conflict-review-{key}"
+    os.makedirs(review_dir, exist_ok=True)
+    with open(os.path.join(review_dir, "resolved-files.txt"), "w") as fh:
+        fh.write("a.php\n")
+    with open(os.path.join(review_dir, "proof-output.txt"), "w") as fh:
+        fh.write("TREE-EQUIVALENT")
+    git_run = lambda *a, **k: "deadbeef\n"
+    got = []
+
+    def rereview(llm, git):
+        got.append(runner.conflict.rereview_absent(llm, git_run, worktree=str(rig.wt), key=key))
+        return got[-1]
+
+    monkeypatch.setattr(runner, "_fix_round_conflict_rereview", rereview)
+    llm = _quiet(rig, **{"conflict-review": "no token here"})
+    try:
+        res = rig.run(llm, extra={"conflict_resolved": True,
+                                  "conflict_verdict": runner.conflict.VERDICT_ABSENT})
+    finally:
+        runner.conflict.purge_verdict_artifacts(key)
+        shutil.rmtree(review_dir, ignore_errors=True)
+    assert got == [(runner.conflict.VERDICT_ABSENT, runner.conflict.CONFLICT_REREVIEW_ATTEMPTS, "reviewed")]
+    assert llm.round_purposes() == ["conflict-review"] * (runner.conflict.CONFLICT_REREVIEW_ATTEMPTS * 2)
+    assert res.fix_round["conflict_rereview"]["verdict"] == runner.conflict.VERDICT_ABSENT
+    assert res.fix_round["reevaluate"] is False
+    assert 14 in _holds(res)
+    assert not res.arm.armed
+
+
+# ---- (12): one remediation pass for a NOT READY blocker that names a PR file ----
+
+def _pr_extra(pr):
+    return {"pr_number": pr, "pr_meta": dict(_fixture()["pr_meta"], number=pr)}
+
+
+@pytest.fixture
+def fid_pr():
+    """Hand out a PR number of the test's own, and clear its /tmp verdict files afterward."""
+    used = []
+
+    def take(pr):
+        used.append(pr)
+        return pr
+
+    yield take
+    for pr in used:
+        for path in glob.glob(f"/tmp/post-plan-fidelity-*-{pr}*"):
+            os.unlink(path)
+
+
+def _not_ready_llm(rig, finding):
+    doc = _fid_doc("NOT READY", f"\n## FINDINGS\n\n- [BLOCKING] {finding}\n")
+    return _quiet(rig, **{"plan-fidelity-review": doc, "fidelity-remediation": "done",
+                          "plan-fidelity-re-review-2": doc, "plan-fidelity-re-review-3": doc,
+                          "plan-fidelity-re-review-4": doc})
+
+
+def test_fidelity_pass_keeps_gate_path_deny(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7301)
+    monkeypatch.setattr(
+        ReplayGit, "conformance_files",
+        lambda git, base="origin/master": [GATE_FILE] if base.endswith("^") else [PATH, GATE_FILE])
+    verdicts = []
+    real_permit = runner.fidelity_filefix.permit
+
+    def permit(hits, *a, **k):
+        verdicts.append((list(hits), real_permit(hits, *a, **k)))
+        return verdicts[-1][1]
+
+    monkeypatch.setattr(runner.fidelity_filefix, "permit", permit)
+
+    def strip(gitad, sha, hits, commit, log, out):
+        gitad.commit_messages.pop()   # the real strip leaves no commit for a gate-only edit
+        return ""
+
+    monkeypatch.setattr(runner.fidelity, "_strip_gate_paths", strip)
+    res = rig.run(_not_ready_llm(rig, f"`{PATH}` still drops the row."), extra=_pr_extra(pr))
+    assert res.fix_round["fidelity"]["ran"] is True
+    assert res.fix_round["fidelity"]["blockers"] == 1
+    assert res.fix_round["fidelity"]["outcome"] == "gate-path-edit"
+    assert verdicts[-1] == ([GATE_FILE], False)
+    assert res.fix_round["status"] == "no-change"
+    assert runner.fidelity.REMEDIATION_COMMIT_MSG not in rig.git.commit_messages
+    assert 12 in _holds(res)
+
+
+def test_fidelity_fix_skips_unplanned_scope_blockers(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7302)
+    # Keep the hold standing, so the round is the one that meets these blockers.
+    monkeypatch.setattr(runner.unplanned_scope, "downgrade_applies", lambda *a, **k: False)
+    llm = _not_ready_llm(rig, f"[unplanned-scope] `{PATH}` is outside every phase.")
+    during_round = []
+    real_round = fix_round.run_fix_round
+
+    def counted(**kw):
+        before = len(llm.round_purposes())
+        out = real_round(**kw)
+        during_round.extend(llm.round_purposes()[before:])
+        return out
+
+    monkeypatch.setattr(fix_round, "run_fix_round", counted)
+    res = rig.run(llm, extra=_pr_extra(pr))
+    assert res.fix_round["fidelity"] == {"ran": False, "reason": "no-file-blocker"}
+    assert during_round == []
+    assert 12 in _holds(res)

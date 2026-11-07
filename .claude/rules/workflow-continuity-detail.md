@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-04
+last_verified: 2026-11-07
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -8,7 +8,7 @@ paths:
 no-adr: lazy-load companion relocating existing guidance out of workflow-continuity.md behind a glob; introduces no new decision surface, mechanism, or default — exactly mirrors agent-tiering-detail.md and work-triage-detail.md
 ---
 
-# Workflow Continuity — Post-Plan Detail
+# Workflow Continuity: Post-Plan Detail
 
 Companion to `.claude/rules/workflow-continuity.md` § Post-Plan. That rule carries the
 triggers. This file carries the internals. Read it before debugging or changing a
@@ -19,9 +19,9 @@ post-plan run.
 `bin/post-plan-now --auto` spawns a detached, launchd-supervised post-plan run on the current
 branch; it survives you closing Claude Code. Engine selection:
 
-- **Compiled post-plan harness** (`tools/postplan-harness`) when present — a
+- **Compiled post-plan harness** (`tools/postplan-harness`) when present. It is a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
-  copy, never the worktree's (ADR-0092).
+  copy and ignores the worktree's (ADR-0092).
 - **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session if the harness is
   absent or exits outside 0, 3 and 7. It triages and holds the PR; it never arms.
   `POST_PLAN_SKILL=1` forces it.
@@ -120,7 +120,7 @@ run that holds on the same reason keeps it. Automouse treats exit **8** as termi
 decline in its resume path never trips the postplan env-breaker. The marker only
 suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming condition.
 
-**In-run fix round.** On a first arming hold on condition (2), (3) or (11), the harness tries one bounded fix round, then re-reviews and re-evaluates before the sticky posts. A doubtful round is discarded. `POSTPLAN_FIX_ROUND=0` disables it. Detail: `tools/postplan-harness/README.md` § One fix round before the sticky verdict.
+**In-run fix round.** On a first arming hold on condition (2), (3), (11), (12), (14) or (19), the harness tries one bounded fix round, then re-reviews and re-evaluates before the sticky posts. A doubtful round is discarded. `POSTPLAN_FIX_ROUND=0` disables it. Detail: `tools/postplan-harness/README.md` § One fix round before the sticky verdict.
 
 **PR-cycle skips.** `bin/pr-cycle` skips a PR held only on human conditions, and fires a DIRTY
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
@@ -132,7 +132,7 @@ one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged sk
 
 `--auto` adds exactly one safety gate; a bare `bin/post-plan-now` skips it, because running it by
 hand IS the decision to ship. The gate: **skip** when already inside a headless/automouse
-run — the automouse runner fires post-plan itself.
+run. The automouse runner fires post-plan itself.
 
 It does **not** hold post-plan for a "risky" plan. Post-plan **always** runs and opens
 the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5, which
@@ -169,7 +169,7 @@ beats `<slug>-2.md` beats `<slug>.md`; a non-numeric suffix like `-shared-contex
 variant), so no handoff file is needed, and the detached child reparents under launchd and clears
 its own plan-gate independently. Override the selection with `bin/post-plan-now --plan <abs-path>`.
 
-When no `<slug>.md` exists at all, resolution falls back once to a **slug-drift** match —
+When no `<slug>.md` exists at all, resolution falls back once to a **slug-drift** match:
 exactly one `<prefix>-<slug>.md` (the shape `/plan` produces when the plan filename and the
 branch name disagree). An adopted drift match HOLDS auto-merge for that run via arming
 condition (13), because adoption is a guess; two or more candidates is ambiguous and stays

@@ -437,16 +437,17 @@ PR3267_DIR="$SCRIPT_DIR/fixtures/review-shared"
 PR3267_V1="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v1.json")"
 PR3267_V2="$(jq -r '.comments[-1].body' "$PR3267_DIR/post-plan-sticky-pr3267-v2.json")"
 PR3267_WANT='(3) plan-matrix — MISSING: tests/example'
+PR3267_V2_WANT='(3) The plan asks for things this PR does not have yet: tests/example'
 OUT="$(hp_sticky_reasons "$PR3267_V1")"
 assert_status "pr3267-v1-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
 OUT="$(hp_sticky_reasons "$PR3267_V2")"
-assert_status "pr3267-v2-hold-reasons"               0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+assert_status "pr3267-v2-hold-reasons"               0 "$([ "$OUT" = "$PR3267_V2_WANT" ] && echo 0 || echo 1)"
 PR3267_OPEN=$'### Still open (non-blocking)\n'
 PR3267_OPEN_NEW="${PR3267_OPEN}- (9) fake — x"$'\n'
 PR3267_V2_OPEN="${PR3267_V2/"$PR3267_OPEN"/$PR3267_OPEN_NEW}"
 assert_status "pr3267-v2-open-item-inserted"         0 "$([ "$PR3267_V2_OPEN" != "$PR3267_V2" ] && echo 0 || echo 1)"
 OUT="$(hp_sticky_reasons "$PR3267_V2_OPEN")"
-assert_status "pr3267-v2-open-item-not-a-hold"       0 "$([ "$OUT" = "$PR3267_WANT" ] && echo 0 || echo 1)"
+assert_status "pr3267-v2-open-item-not-a-hold"       0 "$([ "$OUT" = "$PR3267_V2_WANT" ] && echo 0 || echo 1)"
 
 OUT="$(hp_sticky_reasons "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Auto-merge held:' '- no arming decision recorded')")"
 assert_status "H7 no-decision bullet -> no reason"   0 "${#OUT}"

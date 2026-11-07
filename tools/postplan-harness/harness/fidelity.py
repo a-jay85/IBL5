@@ -20,6 +20,7 @@ from .state import HarnessError
 from . import llm_calls
 from . import fidelity_filefix
 from . import schemas
+from . import hold_text
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -1436,6 +1437,9 @@ DIGEST_UNAVAILABLE = "digest script did not produce output"
 MAX_FIDELITY_ROUNDS = 3  # round 1 is the historical single remediation
 STICKY_MARKER = "<!-- pr-ready-verdict -->"
 MERGE_DIGEST_HEADING = "### Merge digest"
+# Shown under a held sticky's `Auto-merge held:` block. A held run turns off any
+# auto-merge already set on the PR.
+DISARM_LINE = "Any auto-merge already set on this PR is now turned off."
 EXCERPT_LIMIT = 30000
 
 # Sticky-comment field parsers for the Phase 5.5 carry-forward. Anchored and exact-width,
@@ -2060,14 +2064,18 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         status.append(ci_line)
     if fix_round_line:
         status.append(fix_round_line)
+    # The block's shape is read by bin/lib/held-prs.sh: the exact `Auto-merge held:` line,
+    # then contiguous `- (N) ` bullets, ended by the first line that does not start `- `.
+    # The bullet text is plain words for people; the machine reason goes to the audit trail.
+    holds = []
     if not armed:
         status.append("Auto-merge held:")
         holds = list(getattr(decision, "holds", []) or []) if decision is not None else []
         if holds:
-            status.extend(f"- ({c.number}) {c.name} — {c.reason}" for c in holds)
+            status.extend(f"- ({c.number}) {hold_text.plain_hold(c)}" for c in holds)
         else:
             status.append("- no arming decision recorded")
-        status.append("Auto-merge disarmed: a held run removes any existing arm on this PR.")
+        status.append(DISARM_LINE)
     if status:
         out.extend(status)
         out.append("")
@@ -2119,6 +2127,9 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             out.append(f"**Own change:** {own_id}")
     if plan_hash:
         out.append(f"**Plan hash:** {plan_hash}")
+    for c in holds:
+        # The raw machine reason behind each plain-words bullet above.
+        out.append(f"**Hold code:** ({c.number}) {c.name} — {c.reason}")
     by_run: dict = {}
     for arm, run_id in (reused_from or {}).items():
         by_run.setdefault(run_id, []).append(arm)

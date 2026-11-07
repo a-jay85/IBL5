@@ -23,7 +23,7 @@ from test_holdrepeat_runner import CANNED, CLEAN_PLAN, HOLD_7_PLAN, _fixture
 
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
-DISARM_LINE = "Auto-merge disarmed: a held run removes any existing arm on this PR."
+DISARM_LINE = "Any auto-merge already set on this PR is now turned off."
 
 
 @pytest.fixture(autouse=True)

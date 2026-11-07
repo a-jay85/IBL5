@@ -911,7 +911,8 @@ def test_replay_c_failing_re_review_holds_and_never_arms(tmp_path, sticky_tmp):
     assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
     body = _sticky_body(out)
     assert "NOT READY (re-review)" in body
-    assert "- (12) plan-fidelity-verdict" in body
+    assert "- (12) The check that compares the PR to its plan did not pass" in body
+    assert "**Hold code:** (12) plan-fidelity-verdict" in body
 
 
 def test_replay_d_prose_after_the_tree_falls_back_to_verdict_1(tmp_path, sticky_tmp):

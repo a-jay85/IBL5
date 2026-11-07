@@ -1,6 +1,6 @@
 ---
 description: master fast-forwards to production automatically on all-green CI, gated by the AUTO_PROMOTE_PAUSED repo variable; the push is FF-only and uses CI_PAT.
-last_verified: 2026-09-07
+last_verified: 2026-11-06
 ---
 
 # ADR-0112: Auto-promote master to production on green CI
@@ -34,6 +34,10 @@ A `workflow_run`-triggered workflow, `.github/workflows/promote-to-production.ym
 - **Notification:** Discord DM via `.github/actions/notify-discord` on promoted, on paused, and on hard failure — never on the ordinary "not green yet" no-op.
 
 - **`bin/merge-master-to-prod` is retained unchanged as the manual/emergency path**, which is what makes pausing cheap and reversible.
+
+## Addendum — Trigger list size (2026-11-06)
+
+The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. Today `.github/workflows/promote-to-production.yml` lists twelve names under `workflow_run.workflows`. The set of master-push workflows shrank after this ADR was written. The breadth principle stands: list every master-push workflow.
 
 ## Alternatives Considered
 

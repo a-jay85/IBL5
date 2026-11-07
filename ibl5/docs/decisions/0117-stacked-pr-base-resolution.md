@@ -1,6 +1,6 @@
 ---
 description: Layered base-ref resolution for the ADR gate so stacked-PR branches are not blocked by a hardcoded origin/master assumption.
-last_verified: 2026-09-07
+last_verified: 2026-11-06
 ---
 
 # ADR-0117: Stacked-PR-aware base resolution for the ADR gate

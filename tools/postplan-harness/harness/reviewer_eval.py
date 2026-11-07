@@ -666,15 +666,50 @@ def _load_cached(path: Path) -> Optional[tuple[list[Finding], list[dict], list[s
     """An entry without `scored` predates the verifier checkout and kept every finding
     unverified, so it reads as a miss."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        findings = [Finding(source=f["source"], agent=f["agent"], path=f["path"],
-                            line=int(f["line"]), body="", score=f["score"])
-                    for f in data["findings"]]
-        scored = [dict(s) for s in data["scored"]]
-        degraded = [str(d) for d in data["degraded"]]
-        return findings, scored, degraded
+        return parse_entry(json.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError, KeyError, TypeError):
         return None
+
+
+def parse_entry(data: dict) -> tuple[list[Finding], list[dict], list[str]]:
+    """One cache entry in the `_write_cache` shape. Raises on a malformed entry."""
+    findings = [Finding(source=f["source"], agent=f["agent"], path=f["path"],
+                        line=int(f["line"]), body="", score=f["score"])
+                for f in data["findings"]]
+    scored = [dict(s) for s in data["scored"]]
+    degraded = [str(d) for d in data["degraded"]]
+    return findings, scored, degraded
+
+
+def case_outcome(case: dict, kind: str, per_run: Sequence[Sequence[Finding]],
+                 degraded: Sequence[str]) -> CaseOutcome:
+    """A bug case hits only when every run hits; a clean case keeps its worst run."""
+    worst = max(per_run, key=len)
+    if kind == "bug":
+        expected = accepted_ranges(case)
+        hit = all(case_hit(f, expected) for f in per_run)
+        return CaseOutcome(case["id"], "bug", tuple(worst), tuple(degraded), hit)
+    return CaseOutcome(case["id"], "clean", tuple(worst), tuple(degraded), None)
+
+
+def score_from_entries(corpus: dict, entries: dict, *, v: str,
+                       c: Optional[str] = None) -> Score:
+    """Score the whole corpus from one run-1 cache entry per case. `entries` is
+    {"cases": {cid: entry}, "clean": {cid: entry}}. `run_eval` and the reviewer bar
+    both score through `case_outcome` and `compute_score`."""
+    bug_out: list[CaseOutcome] = []
+    clean_out: list[CaseOutcome] = []
+    for group, kind, cases, out in (
+            ("cases", "bug", [x for x in corpus["cases"] if x["status"] == "confirmed"], bug_out),
+            ("clean", "clean", list(corpus["clean"]), clean_out)):
+        table = entries.get(group) or {}
+        for case in cases:
+            if case["id"] not in table:
+                raise EvalUsageError(f"missing cache entry {case['id']}")
+            findings, _scored, degraded = parse_entry(table[case["id"]])
+            out.append(case_outcome(case, kind, [findings], degraded))
+    return compute_score(bug_out, clean_out, v=v,
+                         c=corpus_digest(corpus) if c is None else c)
 
 
 def _write_cache(path: Path, findings: Sequence[Finding], scored: Sequence[dict]) -> None:
@@ -783,7 +818,8 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
             per_run.append(findings)
             run_hits.append(case_hit(findings, expected) if kind == "bug" else bool(findings))
             degraded += [d for d in run_degraded if d not in degraded]
-        worst = max(per_run, key=len)
+        outcome = case_outcome(case, kind, per_run, degraded)
+        worst = list(outcome.findings)
         suffix = f" DEGRADED={','.join(degraded)}" if degraded else ""
         if runs > 1:
             n = sum(run_hits)
@@ -792,12 +828,11 @@ def run_eval(root: Path, corpus: dict, *, kinds: str, case_ids: Optional[set],
                 flaky += 1
                 suffix += " FLAKY"
         if kind == "bug":
-            hit = all(run_hits)
-            bug_out.append(CaseOutcome(cid, "bug", tuple(worst), tuple(degraded), hit))
-            print(f"case {cid} bug {'HIT' if hit else 'MISS'} findings={len(worst)} "
+            bug_out.append(outcome)
+            print(f"case {cid} bug {'HIT' if outcome.hit else 'MISS'} findings={len(worst)} "
                   f"file_only={file_only_count(worst, expected)}{suffix}", file=out)
         else:
-            clean_out.append(CaseOutcome(cid, "clean", tuple(worst), tuple(degraded), None))
+            clean_out.append(outcome)
             print(f"case {cid} clean flagged={len(worst)}{suffix}", file=out)
 
     score = compute_score(bug_out, clean_out, v=v, c=c_digest)
@@ -848,6 +883,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if errors:
         raise EvalUsageError("; ".join(errors))
     case_ids = {s for s in args.cases.split(",") if s} if args.cases else None
+    write_record = bool(getattr(args, "write_record", False))
+    if write_record:
+        if args.canned:
+            raise EvalUsageError("--write-record cannot record canned results")
+        if case_ids is not None or args.kinds != "all" or args.no_cache or args.dry_run:
+            raise EvalUsageError("--write-record scores the whole corpus from the cache; "
+                                 "drop --cases, --kinds, --no-cache and --dry-run")
+        from . import reviewer_bar
+        n_confirmed = reviewer_bar.confirmed_count(corpus)
+        if n_confirmed < reviewer_bar.MIN_CASES:
+            print(f"reviewer-bar: record NOT written (too-few-cases: {n_confirmed} < "
+                  f"{reviewer_bar.MIN_CASES})")
+            return 1
     ledger = UsageLedger()
     cache_dir: Optional[Path] = None
     if not args.no_cache:
@@ -868,12 +916,63 @@ def _cmd_run(args: argparse.Namespace) -> int:
     out_fh = open(args.out, "w", encoding="utf-8") if args.out else None
     try:
         out: TextIO = _Tee(sys.stdout, out_fh) if out_fh else sys.stdout  # type: ignore[assignment]
-        return run_eval(root, corpus, kinds=args.kinds, case_ids=case_ids,
-                        llm_factory=factory, cache_dir=cache_dir,
-                        dry_run=args.dry_run, out=out, runs=args.runs)
+        rc = run_eval(root, corpus, kinds=args.kinds, case_ids=case_ids,
+                      llm_factory=factory, cache_dir=cache_dir,
+                      dry_run=args.dry_run, out=out, runs=args.runs)
+        if write_record and cache_dir is not None:
+            return _write_bar_record(root, corpus, cache_dir, rc, args.record_path, out)
+        return rc
     finally:
         if out_fh:
             out_fh.close()
+
+
+def _write_bar_record(root: Path, corpus: dict, cache_dir: Path, rc: int,
+                      record_path: Optional[str], out: TextIO) -> int:
+    """Write the reviewer-bar record from each case's run-1 cache entry. A degraded run
+    writes nothing and keeps exit 3."""
+    from . import reviewer_bar
+    if rc == 3:
+        print("reviewer-bar: record NOT written (degraded)", file=out)
+        return rc
+    v = surface_hash_worktree(root)
+    entries: dict = {"cases": {}, "clean": {}}
+    groups = (("cases", "bug", [x for x in corpus["cases"] if x["status"] == "confirmed"]),
+              ("clean", "clean", list(corpus["clean"])))
+    for group, kind, cases in groups:
+        for case in cases:
+            path = cache_dir / v / f"{case['id']}-{case_digest(case, kind)}.json"
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                parse_entry(data)
+            except (OSError, ValueError, KeyError, TypeError):
+                print(f"reviewer-bar: record NOT written (missing cache entry {case['id']})",
+                      file=out)
+                return 1
+            entries[group][case["id"]] = data
+    record = {"schema": reviewer_bar.RECORD_SCHEMA, "v": v, "c": corpus_digest(corpus),
+              "line": format_score_line(score_from_entries(corpus, entries, v=v)),
+              "written_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "entries": entries}
+    dest = record_path or reviewer_bar.default_record_path()
+    os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
+    tmp = dest + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(record, fh, sort_keys=True)
+    os.replace(tmp, dest)
+    print(f"reviewer-bar: record written {dest}", file=out)
+    return rc
+
+
+def _cmd_bar(args: argparse.Namespace) -> int:
+    from . import reviewer_bar
+    path = args.record_path or reviewer_bar.default_record_path()
+    verdict = reviewer_bar.check(_repo_root(args.repo), path)
+    if verdict.passed:
+        print(f"reviewer-bar: PASS {verdict.reason}")
+        return 0
+    print(f"reviewer-bar: FAIL {verdict.reason}")
+    return 1
 
 
 # ---------------------------------------------------------------------------
@@ -1178,6 +1277,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("--out", metavar="FILE", default=None)
     r.add_argument("--runs", type=int, default=1, metavar="N",
                    help="review each case N times; a bug hits only when every run hits")
+    r.add_argument("--write-record", action="store_true",
+                   help="write the reviewer-bar record from this run's cache entries")
+    r.add_argument("--record-path", metavar="FILE", default=None)
     r.set_defaults(func=_cmd_run)
     sm = sub.add_parser("smoke", help="one live review-agent call proving the claude -p boundary")
     sm.set_defaults(func=_cmd_smoke)
@@ -1215,6 +1317,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     grp.add_argument("--body-file", metavar="PATH", default=None)
     cc.add_argument("--gh", metavar="CMD", default="gh")
     cc.set_defaults(func=_cmd_check_claim)
+    b = sub.add_parser("bar", help="pass/fail on the owner's reviewer bar for the current v and c")
+    b.add_argument("--record-path", default=None)
+    b.add_argument("--repo", metavar="DIR", default=None)
+    b.set_defaults(func=_cmd_bar)
     args = parser.parse_args(argv)
     try:
         return args.func(args)

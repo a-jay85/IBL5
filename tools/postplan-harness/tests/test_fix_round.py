@@ -576,7 +576,7 @@ def test_security_recheck_missing_seat_rejects(tmp_path):
 
 
 def test_security_recheck_degraded_rejects(tmp_path):
-    rec, res, git, calls = _run_seat(tmp_path, degraded=("security",))
+    rec, res, git, calls = _run_seat(tmp_path, degraded=("security-audit",))
     assert rec["status"] == "rejected"
     assert rec["reason"] == "security-recheck-degraded"
 

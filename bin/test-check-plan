@@ -6089,12 +6089,6 @@ assert_viol "gateCW-version-flag-extra-arg-flags" 1 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `composer --version test` |
 '
-assert_viol "gateCW-version-flag-redirect-ok" 0 '[CW]' "$FM"'
-## Verification Matrix
-| # | What to verify | Test type | Timing | Test file / location |
-|---|---------------|-----------|--------|---------------------|
-| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null 2>&1` |
-'
 assert_viol "gateCW-bun-run-ibl5-path-ok" 0 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |

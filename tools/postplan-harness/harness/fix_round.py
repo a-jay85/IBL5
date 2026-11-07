@@ -231,6 +231,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     defer: list[dict] = []
     before_holding = mutation_repair.holding_row_ids(mutation_holding)
     held_worked: list[str] = []
+    held_committed: list[str] = []
     held_changed = False
 
     def _check_deadline() -> int:
@@ -342,7 +343,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             return
         if mutation_check is None:
             raise _Reject("mutation-unproven")
-        wanted = held_worked + [r["row"] for r in record["row_repairs"]]
+        wanted = held_committed + [r["row"] for r in record["row_repairs"]]
         report = mutation_check(record.get("repaired_plan") or plan.path,
                                 max(1, int(_check_deadline())))
         if not mutation_repair.proof_ok(report, wanted, before_holding):
@@ -381,7 +382,10 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
                 head_held = git.head()
                 pre_ids = reviewcache.per_file_patch_ids(git.diff_vs_base())
                 for row_id in held_worked:
+                    head_row = git.head()
                     _dispose(_held_row_item(by_row[row_id]))
+                    if git.head() != head_row:
+                        held_committed.append(row_id)
                 touched = reviewcache.file_delta(pre_ids, reviewcache.per_file_patch_ids(git.diff_vs_base()))
                 held_changed = git.head() != head_held
                 if held_changed and not touched:

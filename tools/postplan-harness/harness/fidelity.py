@@ -181,7 +181,8 @@ LOCAL_GATE_PATH_PREFIXES = GATE_OWNING_PREFIXES + (
     ".githooks/",                        # absent today; listed defensively
     ".claude/hooks/",                    # project-scoped hooks, absent today
     ".claude/settings",                  # settings.json, settings.local.json
-    ".claude/skills/post-plan/",         # includes _phase-6.5-arm-auto-merge.md
+    ".claude/skills/post-plan/",         # post-plan skill prose
+    ".claude/agents/pr-second-reviewer.md",  # the seat; second_review.py sits under tools/postplan-harness/
     "bin/pre-commit-hook",
     "bin/pre-push-adr-hook",
     "bin/run-meta-checks-local",
@@ -355,6 +356,19 @@ def blocking_finding_texts(verdict_path: str) -> list[str]:
     `_verdict_findings` uses for the work list are too loose to widen a commit permission.
     """
     return marked_finding_texts(verdict_path, "BLOCKING")
+
+
+def gate_edit_only(verdict_path: str) -> bool:
+    """True when every blocking finding is tagged [GATE-EDIT] and none names an owner tag.
+
+    An untagged, [MERGE-RULE] or [ONE-WAY] finding stays with the owner. So does a missing
+    verdict: the list is empty, and an empty list is never gate-edit-only.
+    """
+    texts = blocking_finding_texts(verdict_path)
+    if not texts:
+        return False
+    return all("[GATE-EDIT]" in t and "[MERGE-RULE]" not in t and "[ONE-WAY]" not in t
+               for t in texts)
 
 
 def marked_finding_texts(verdict_path: str, marker_word: str) -> list[str]:

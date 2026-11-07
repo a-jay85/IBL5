@@ -248,7 +248,7 @@ def pr_body_recheck_prompt(findings: list[str], hunks: list[dict], old_body: str
 
 def safety_verdict_prompt(cls: Classification, title: str, arm_preview: ArmDecision) -> str:
     """Condition (9) bounded verdict — may only ADD holds, never release one.
-    Surface list from _phase-6.5-arm-auto-merge.md condition (9)."""
+    Surface list from the retired Phase 6.5 skill prose, condition (9)."""
     other = "\n".join(f"({c.number}) {c.name}: {'BLOCKED — ' + c.reason if c.blocked else 'pass'}"
                       for c in arm_preview.conditions if c.number != 9)
     return (

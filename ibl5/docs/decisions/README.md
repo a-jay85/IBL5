@@ -1,6 +1,7 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
 last_verified: 2026-11-07
+last_verified: 2026-11-06
 ---
 
 # IBL5 Architecture Decision Records
@@ -100,6 +101,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0228](0228-postplan-sync-rebases-onto-target.md) | Post-plan sync rebases onto the target | Accepted | The harness Phase 2 sync replays the branch's own commits with `git rebase --onto`, pushes with `--force-with-lease=refs/heads/<b>:<sha>`, and fails closed. Supersedes ADR-0064's fix advice in part. |
 | [0230](0230-postplan-conflict-report.md) | Show model-resolved conflicts in the post-plan sticky | Accepted | The sticky gains a display-only conflict section built from a record beside the condition-(14) marker; no arming condition changes. |
 | [0234](0234-merge-danger-self-governing.md) | Narrow the Merge danger one-way Door; add a Self-governing segment | Accepted | One-way means a revert cannot undo it; arming-path and gate-removed changes carry ` · Self-governing: yes`, and condition (18) holds both. |
+| [0231](0231-second-reviewer-clears-holds.md) | A second reviewer clears the non-UI owner holds | Accepted | A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them; the verdict binds to the reviewed tree. |
 
 ## When an ADR is Required
 

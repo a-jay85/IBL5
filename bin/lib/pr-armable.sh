@@ -391,16 +391,75 @@ pr_dep_holds() {
 #   ALWAYS holds for a human merge regardless of commit type.
 #   head_ref is optional — an absent/empty second arg behaves exactly as today
 #   (backward compatible; use ${2:-} to avoid an unbound-variable error).
+#
+#   Second-reviewer clear (twin of armable.second_review_candidates for condition 10):
+#   optional args 3 to 5 are verdict_file, current_tree, files_file (one changed path per
+#   line). A fired axis stays silent only when pr_second_review_clears_10 passes. Any missing
+#   arg keeps the hold, so every two-arg caller behaves as before.
 pr_pipeline_authored_hold() {
     local labels_json="$1"
     local head_ref="${2:-}"
+    local verdict_file="${3:-}"
+    local current_tree="${4:-}"
+    local files_file="${5:-}"
+    local axes=""
     if printf '%s' "$labels_json" \
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
-        echo "pipeline-authored"
+        axes="pipeline-authored"
     fi
     if [ -n "$head_ref" ] && grep -qE '^bug-[0-9]+(-|$)' <<< "$head_ref"; then
-        echo "pipeline-branch"
+        axes="${axes:+$axes
+}pipeline-branch"
     fi
+    [ -n "$axes" ] || return 0
+    if pr_second_review_clears_10 "$verdict_file" "$current_tree" "$files_file"; then
+        return 0
+    fi
+    printf '%s\n' "$axes"
+}
+
+# Copies of armable.UI_PATH_PREFIXES and armable.UI_PATH_SUFFIXES. A parity test pins them.
+PR_ARMABLE_UI_PREFIXES=(
+    "ibl5/design/"
+    "ibl5/themes/"
+    "ibl5/templates/"
+    "ibl5/jslib/"
+    "ibl5/modules/"
+    "ibl5/images/"
+)
+PR_ARMABLE_UI_SUFFIXES=(
+    ".css"
+    ".js"
+    ".html"
+    ".twig"
+    "View.php"
+)
+
+# pr_second_review_clears_10 <verdict_file> <current_tree> <files_file>
+#   Returns 0 only for a fresh CLEAN verdict that clears condition 10 on a PR with no UI
+#   file. Every other shape returns 1, including any missing arg.
+pr_second_review_clears_10() {
+    local verdict_file="${1:-}" current_tree="${2:-}" files_file="${3:-}"
+    [ -n "$verdict_file" ] && [ -n "$current_tree" ] && [ -n "$files_file" ] || return 1
+    [ -f "$verdict_file" ] && [ -f "$files_file" ] || return 1
+    local recorded last
+    # fidelity.record_reviewed_tree writes the file's last line; read_reviewed_tree parses it.
+    recorded="$(awk 'NF { line = $0 } END { print line }' "$verdict_file")"
+    [ "$recorded" = "REVIEWED_TREE=$current_tree" ] || return 1
+    grep -qE '^REVIEWED_TREE=[0-9a-f]{40}$' <<< "$recorded" || return 1
+    last="$(awk 'NF && !/^REVIEWED_TREE=/ { line = $0 } END { print line }' "$verdict_file")"
+    [ "$last" = "VERDICT: CLEAN" ] || return 1
+    grep -qE '^CLEARS 10: .{10,}$' "$verdict_file" || return 1
+    local path entry
+    while IFS= read -r path || [ -n "$path" ]; do
+        for entry in "${PR_ARMABLE_UI_PREFIXES[@]}"; do
+            case "$path" in "$entry"*) return 1 ;; esac
+        done
+        for entry in "${PR_ARMABLE_UI_SUFFIXES[@]}"; do
+            case "$path" in *"$entry") return 1 ;; esac
+        done
+    done < "$files_file"
+    return 0
 }
 
 # pr_unresolved_findings_hold <pr_number>

@@ -54,7 +54,7 @@ Arming-path and gate-removed changes carry ` · Self-governing: yes` with a two-
 condition (18) holds them as `SELF-GOVERNING`. The arm step re-checks a two-way body against the
 diff floor, so a stripped segment or a hand-lowered Door still holds.
 
-**Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps UI, one-way and merge-rule changes with the owner. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.
+**Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps one-way and merge-rule changes with the owner. The UI path floor covers condition 10 only, and the `ui` plan token covers condition 7. A UI file on a PR blocked only on condition 12 or 17 can still clear. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.
 
 ## Layout
 

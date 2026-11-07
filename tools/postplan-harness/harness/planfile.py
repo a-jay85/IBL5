@@ -72,6 +72,26 @@ def frontmatter_auto_merge_false(content: str) -> bool:
     return frontmatter_auto_merge_value(content) == "false"
 
 
+def frontmatter_hold_triggers(content: str) -> tuple[str, ...]:
+    """Tokens from the `hold_trigger:` key of the line-1 YAML frontmatter.
+
+    Line-1 frontmatter only (a body documenting the syntax can't self-select).
+    Absent key returns (). Each token is stripped and lower-cased; an unknown
+    token stays as written so arming sees it and holds.
+    """
+    lines = content.splitlines()
+    if not lines or not re.match(r"^---\s*$", lines[0]):
+        return ()
+    for line in lines[1:]:
+        if re.match(r"^---\s*$", line):
+            return ()
+        m = re.match(r"^hold_trigger:\s*(.+?)\s*$", line)
+        if m:
+            tokens = (t.strip().lower() for t in m.group(1).split(","))
+            return tuple(t for t in tokens if t)
+    return ()
+
+
 def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
     """(stop_condition, evidence_tokens, error) from line-1 YAML frontmatter only
     (a body documenting the syntax can't self-select).
@@ -1106,6 +1126,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
     info.auto_merge_value = frontmatter_auto_merge_value(content)
+    info.hold_triggers = frontmatter_hold_triggers(content)
     info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())

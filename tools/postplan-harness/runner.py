@@ -75,6 +75,7 @@ from harness.gate_backtest import upsert_gate_backtest
 from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
 from harness import removed_guards
+from harness import second_review
 from harness import unplanned_scope
 from harness.gate_backtest_replay import gate_backtest_result
 from harness.planfile import locate_plan
@@ -877,6 +878,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
                 plan_auto_merge_false=plan.auto_merge_false, headless=headless,
                 plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+                plan_hold_triggers=getattr(plan, "hold_triggers", ()),
+                fidelity_gate_edit_only=_selected_gate_edit_only(res.fidelity or {}, pr,
+                                                                 git.head_tree()),
                 branch=git.branch(),
                 dep_state_lookup=lambda n: gh.pr_state(n),
                 # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
@@ -913,6 +917,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # replay-only seam for condition (15): live mode never reads this path
                 inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
             _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log)
+            # Before the preview, so a cleared PR still reaches the add-only safety verdict.
+            inputs = _second_review_pass(inputs, pr, git.head_tree, git.diff_vs_base, plan, log,
+                                         _second_review_spawner(llm, worktree))
             preview = evaluate(inputs)
             if not preview.holds:
                 # only spend the add-only safety verdict when deterministic checks pass
@@ -1082,7 +1089,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     except Exception:
                         prior_body_ = None
                 sticky_ = fidelity.compose_sticky(
-                    rebase_line, ci_line_, fid, decision_, digest,
+                    rebase_line, ci_line_, fid, decision_,
+                    digest + second_review.digest_clear_lines(decision_),
                     fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
                     fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
                                            fid.get("remediation_sha"),
@@ -1204,7 +1212,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 git, gh, llm, log, res, state, inputs, decision, outcome,
                 worktree=worktree, pr=pr, sha=sha, live=live, fixture=fixture,
                 out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
-                flag=_mc_flag, post_sticky=_post_sticky)
+                flag=_mc_flag, post_sticky=_post_sticky, plan=plan)
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
@@ -2369,7 +2377,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
 
 def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome, *,
                         worktree, pr, sha, live, fixture, out_dir, state_dir, slug,
-                        flag, post_sticky):
+                        flag, post_sticky, plan=None):
     """Phase 7: re-run Phase 6.5's arming decision after the fix loop turned CI green.
 
     Same ArmInputs, same evaluate(). Only (15), (16), (17) and current_tree are refreshed,
@@ -2393,7 +2401,11 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
         meta_checks_status=meta_checks_clearance(flag, rc),
         failed_checks=sorted(set(outcome.failed or [])),
         gate_backtest_status=gb.status, gate_backtest_reason=gb.reason,
+        fidelity_gate_edit_only=_selected_gate_edit_only(res.fidelity or {}, pr, cur_tree),
         llm_safety_holds=[])
+    # Before the preview, so a cleared PR still reaches the add-only safety verdict.
+    new = _second_review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
+                              _second_review_spawner(llm, worktree))
     preview = evaluate(new)
     if not preview.holds:
         verdict = llm.call("safety-verdict", "haiku",
@@ -2820,6 +2832,22 @@ def _declare_kept(kept_all, ctx, gh, body, pr, log) -> None:
         log(f"phase5.5: kept-unplanned body write failed ({e.__class__.__name__}: {e})")
 
 
+def _selected_fidelity_path(source, fid, pr):
+    """The verdict file behind select_fidelity_verdict's `source` slot."""
+    if source == "verdict-2":
+        return ((fid.get("same_run_repin") or {}).get("verdict_path")
+                or fid.get("verdict_path"))
+    return fidelity.verdict_path(pr)
+
+
+def _selected_gate_edit_only(fid, pr, current_tree) -> bool:
+    """Condition (12) arm input: fidelity.gate_edit_only on the verdict condition (12) reads."""
+    _, source = select_fidelity_verdict(fid.get("verdict_1"), fid.get("verdict_2"),
+                                        fid.get("reviewed_tree_2"), current_tree)
+    path = _selected_fidelity_path(source, fid, pr)
+    return bool(path) and fidelity.gate_edit_only(path)
+
+
 def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log) -> None:
     """Condition (12) arm input: read a NOT READY whose blockers are all kept and declared
     as READY WITH NOTES. Only the selected slot of `inputs` moves. The verdict file and
@@ -2830,11 +2858,7 @@ def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log)
     if selected != "NOT READY":
         return
     fid = res.fidelity or {}
-    if source == "verdict-2":
-        path = ((fid.get("same_run_repin") or {}).get("verdict_path")
-                or fid.get("verdict_path"))
-    else:
-        path = fidelity.verdict_path(pr)
+    path = _selected_fidelity_path(source, fid, pr)
     if not path or not any(unplanned_scope.is_unplanned_scope(t)
                            for t in fidelity.blocking_finding_texts(path)):
         return
@@ -3403,6 +3427,49 @@ def _stray_master_merges(git, log) -> tuple[str, list[str]]:
         log(f"phase5.5: history-shape check skipped ({e.kind})")
         return "origin/master", []
     return base, history_shape.stray_master_merges(getattr(git, "worktree", "") or "", base)
+
+
+def _second_review_spawner(llm, worktree):
+    """A fresh read-only session for the seat: no resume, no continue, no session id."""
+    def spawn(agent, prompt):
+        return llm.call_tooled("second-review", "opus", prompt, cwd=worktree, agent=agent,
+                               allowed_tools=second_review.ALLOWED_TOOLS,
+                               denied_tools=second_review.DENIED_TOOLS, advisor=False)
+    return spawn
+
+
+def _plan_content(plan) -> str | None:
+    """The plan's text for the seat's stated reason; None when plan-blind or unreadable."""
+    if not getattr(plan, "found", False) or not getattr(plan, "path", ""):
+        return None
+    try:
+        with open(plan.path) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _second_review_pass(inp, pr, head_tree, diff, plan, log, spawn):
+    """Fill the seat's verdict into ArmInputs. Zero tokens unless every hold is clearable."""
+    cands = evaluate(inp).second_review_candidates
+    if not pr or not cands:
+        return inp
+    fresh = second_review.load_fresh(pr, inp.current_tree)
+    if fresh is None:
+        reason = second_review.reason_text(_plan_content(plan), inp.pr_title, inp.pr_body)
+        word, tree, clears = second_review.run_seat(pr, head_tree, diff, cands, reason, spawn)
+    else:
+        word, tree, clears = fresh
+    log(f"second-review: {word or 'absent'} tree={tree} clears={sorted(clears)}")
+    current_tree = inp.current_tree
+    if tree is not None and fresh is None:
+        now = head_tree()
+        if now != tree:              # the head moved during the spawn, so the verdict is stale
+            current_tree = now
+    return dataclasses.replace(
+        inp, current_tree=current_tree, second_review_verdict=word, second_review_tree=tree,
+        second_review_clears=clears,
+        second_review_reject_reason=second_review.reject_reason(second_review.verdict_path(pr)))
 
 
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,

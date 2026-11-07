@@ -51,6 +51,8 @@ not land. `result.json` carries `retries` (`{"conflict-review": 1, "merge-danger
 only when a retry ran. No per-run call cap exists to raise: the budget grows by at most one
 `conflict-review` call per run.
 
+**Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps one-way and merge-rule changes with the owner. The UI path floor covers condition 10 only, and the `ui` plan token covers condition 7. A UI file on a PR blocked only on condition 12 or 17 can still clear. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.
+
 ## Layout
 
 ```
@@ -65,6 +67,7 @@ harness/
   conformance_fix.py      Phase 5.0-pre bounded fixer for MISSING-METHOD / test-path MISSING / MISSING-FILE / UNREALISED-ASSERTION; never MISSING-PHASE; post-checks revert anything outside plan-cited paths; result.json key conformance_fix; POSTPLAN_CONFORMANCE_FIX=0 disables
   scope_conformance.py    shells out to bin/lib/plan-scope-conformance; renders advisory scope notes as a PR-body `## Unplanned changes` block and holds on none
   armable.py              eighteen arming conditions (numbered 1-18, no gap)
+  second_review.py        blind second-reviewer seat: prompt, verdict file, tree binding
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   reviewer_eval.py        reviewer eval: corpus validate, run, score line, surface hash, mine, compare, check-claim
   ciwatch.py              Phase 7 outcome interpretation

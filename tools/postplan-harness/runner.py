@@ -959,6 +959,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _fr_ctx: dict = {}
             _fr_posts = fix_round.DeferredPosts(gh)
 
+            def _reviewer_bar_verdict():
+                from harness import reviewer_bar
+                v = reviewer_bar.check(reviewer_bar.harness_root(),
+                                       reviewer_bar.default_record_path())
+                log(f"fix-round: reviewer bar {'PASS' if v.passed else 'FAIL'} ({v.reason})")
+                return v
+
             def _fr_recheck(head_before):
                 pre = {same_run_threads._key(f.path, f.body)
                        for f in _armable_mod.holding_findings(res.findings)}
@@ -1045,7 +1052,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
                 mutation_check=lambda p, rem: _fix_round_mutation_check(p, worktree, rem),
                 fidelity_fix=_fr_fidelity_fix if pr else None,
-                conflict_rereview=_fr_conflict_rereview if pr else None)
+                conflict_rereview=_fr_conflict_rereview if pr else None,
+                security_bar=_reviewer_bar_verdict)
             if (fr.get("status") != "skipped"
                     or fr.get("reason") == "holdrepeat-same-holds"):
                 # Other skips leave result.json byte-identical; the already-tried skip

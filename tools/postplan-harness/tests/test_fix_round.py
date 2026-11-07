@@ -797,3 +797,82 @@ def test_summary_and_digest_list_the_repair():
     rows = fix_round.digest_rows(rec)
     assert len(rows) == 1
     assert "row 7 (calc.py)" in rows[0] and "`old m`" in rows[0] and "`new m`" in rows[0]
+
+
+# --- security-audit items wait for the reviewer bar ------------------------------------
+
+def _sec_finding(path="ibl5/s.php"):
+    f = Finding(source="security-audit", agent="security", path=path, line=7,
+                body="Escape the name before output.", score=90)
+    f.label = LABEL_IMPORTANT
+    return f
+
+
+def _bar(passed, reason="r"):
+    from harness.reviewer_bar import Verdict
+    return lambda: Verdict(passed, reason)
+
+
+def test_collect_items_security_excluded_without_bar():
+    res = RunResult(terminal="x")
+    sec = _sec_finding()
+    res.findings = [sec, _finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record)
+    assert [i["path"] for i in items] == ["ibl5/a.php"]
+    assert record["security_excluded"] == 1
+    assert record["security_bar"].startswith("FAIL ")
+    # Condition (2) still holds on it: the finding is untouched in the holding set.
+    assert sec in holding_findings(res.findings)
+
+
+def test_collect_items_threaded_security_row_excluded_without_bar():
+    t = dict(_thread(901, login="review-agent", typ="Bot"), agent="security")
+    res = RunResult(terminal="x")
+    record = {}
+    items = fix_round.collect_items(_Gh([t]), PR, res, [], record,
+                                    security_bar=_bar(False, "missing: x"))
+    assert items == []
+    assert record["security_excluded"] == 1
+    assert record["security_bar"] == "FAIL missing: x"
+
+
+def test_collect_items_security_included_when_bar_passes():
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding(), _finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record,
+                                    security_bar=_bar(True, "pass: ok"))
+    assert sorted(i["path"] for i in items) == ["ibl5/a.php", "ibl5/s.php"]
+    assert record["security_items"] == 1
+    assert "security_excluded" not in record
+    assert record["security_bar"] == "PASS pass: ok"
+
+
+def test_collect_items_bar_raises_fails_closed():
+    def boom():
+        raise RuntimeError("bar broke")
+
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record, security_bar=boom)
+    assert items == []
+    assert record["security_bar"].startswith("FAIL error:")
+    assert record["security_excluded"] == 1
+
+
+def test_collect_items_no_security_candidate_never_calls_bar():
+    calls = []
+
+    def bar():
+        calls.append(1)
+        raise AssertionError("bar evaluated")
+
+    res = RunResult(terminal="x")
+    res.findings = [_finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh([_thread(903)]), PR, res, [], record, security_bar=bar)
+    assert len(items) == 2
+    assert calls == []
+    assert not [k for k in record if k.startswith("security_")]

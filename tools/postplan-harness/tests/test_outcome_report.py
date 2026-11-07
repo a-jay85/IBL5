@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import outcome_log as ol
+from harness.adapters.ghad import RecordingGh
 
 REPO = Path(__file__).resolve().parents[3]
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "review_outcomes_sample.jsonl"
@@ -136,6 +137,8 @@ def test_report_corpus_matches_master_baseline(extra, table, old_json, capsys):
     new = _json(capsys, *extra)
     new.pop("cycles")
     new.pop("reverts")
+    new.pop("blamed_fixes", None)
+    new.pop("blamed_fixes_root", None)
     assert json.dumps(new, sort_keys=True) == old_json
 
 
@@ -312,3 +315,130 @@ def test_read_master_subjects_parses_rows_utc(monkeypatch):
     assert _REAL_READER() == [("2026-10-01", 'Revert "x"'), ("2026-10-02", "fix: a\tb")]
     assert "--date=format-local:%Y-%m-%d" in seen["argv"]
     assert seen["kwargs"]["env"]["TZ"] == "UTC"
+
+
+# -- later fixes blamed on auto-merged PRs ---------------------------------
+
+_DAY = 86400
+_T0 = 1788220800  # 2026-09-01T00:00:00Z
+
+
+def _git_c(repo, msg, ts, files):
+    for name, text in files.items():
+        p = repo / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    env = {**os.environ, "GIT_COMMITTER_DATE": f"{ts} +0000", "GIT_AUTHOR_DATE": f"{ts} +0000"}
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, env=env)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                    "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", msg],
+                   check=True, env=env)
+    return subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _blame_repo(tmp_path, fix_subject="fix: off by one (#14)", fix_days=5):
+    """PR #12 adds a.txt, human-merged #13 adds b.txt, one commit then rewrites both."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    base = _git_c(repo, "chore: base (#1)", _T0, {"keep.txt": "k\n"})
+    pr12 = _git_c(repo, "feat: add a (#12)", _T0 + 9 * _DAY, {"a.txt": "a1\na2\na3\n"})
+    pr13 = _git_c(repo, "feat: add b (#13)", _T0 + 9 * _DAY + 3600, {"b.txt": "b1\nb2\nb3\n"})
+    fix = _git_c(repo, fix_subject, _T0 + (9 + fix_days) * _DAY,
+                 {"a.txt": "a1\nA2\na3\n", "b.txt": "b1\nB2\nb3\n"})
+    subprocess.run(["git", "-C", str(repo), "update-ref", "refs/remotes/origin/master", "HEAD"],
+                   check=True)
+    return {"root": repo, "base": base, "pr12": pr12, "pr13": pr13, "fix": fix}
+
+
+def _actions(tmp_path, *prs, executed=True):
+    out = tmp_path / "out" / "run1"
+    gh = RecordingGh(str(out))
+    for pr in prs:
+        if executed:
+            gh.record("pr_merge_auto", pr=pr, args="--squash --auto", executed=True)
+        else:
+            gh.record("pr_merge_auto", pr=pr, args="--squash --auto")
+    return tmp_path / "out"
+
+
+_RANGE = ("2026-09-01", "2026-10-31")
+
+
+def test_blamed_fixes_counts_fix_blaming_auto_merged_pr(tmp_path):
+    r = _blame_repo(tmp_path)
+    out_root = _actions(tmp_path, 12)
+    merged = ol.auto_merged_prs(out_root)
+    assert merged == {12}
+    b = ol.build_blamed_fixes(r["root"], *_RANGE, merged)
+    assert b["auto_merged"] == 1
+    assert b["fix_commits"] == 1
+    assert [x["pr"] for x in b["blamed"]] == [12]
+    assert b["blamed"][0]["fixes"][0]["sha"] == r["fix"]
+    text = "\n".join(ol._format_blamed_fixes(b))
+    assert "1 of 1" in text
+    assert "#12" in text
+    assert "#13" not in text
+    assert f"#12 {r['pr12'][:7]} <- {r['fix'][:7]} fix: off by one (#14)" in text
+
+
+def test_blamed_fixes_ignores_chore_subject(tmp_path):
+    r = _blame_repo(tmp_path, fix_subject="chore: tidy (#14)")
+    b = ol.build_blamed_fixes(r["root"], *_RANGE, {12})
+    assert b["blamed"] == []
+    assert b["fix_commits"] == 0
+
+
+def test_blamed_fixes_ignores_human_merged_pr(tmp_path):
+    r = _blame_repo(tmp_path)
+    b = ol.build_blamed_fixes(r["root"], *_RANGE, {99})
+    assert b == {"auto_merged": 0, "blamed": [], "fix_commits": 0}
+
+
+def test_blamed_fixes_ignores_unexecuted_merge_intent(tmp_path):
+    out_root = _actions(tmp_path, 12, executed=False)
+    assert ol.auto_merged_prs(out_root) == set()
+    (out_root / "run1" / "actions.jsonl").write_text(
+        '{"action": "pr_merge_auto", "pr": 12, "executed": "yes"}\nnot json\n'
+        '{"action": "pr_merge_auto", "pr": 12, "executed": false}\n'
+        '{"action": "pr_comment", "pr": 12, "executed": true}\n')
+    assert ol.auto_merged_prs(out_root) == set()
+
+
+def test_blamed_fixes_ignores_fix_outside_window(tmp_path):
+    r = _blame_repo(tmp_path, fix_days=31)
+    b = ol.build_blamed_fixes(r["root"], *_RANGE, {12})
+    assert b["auto_merged"] == 1
+    assert b["blamed"] == []
+
+
+def test_blamed_fixes_reports_missing_action_logs(tmp_path):
+    (tmp_path / "out" / "cache").mkdir(parents=True)
+    (tmp_path / "out" / "cache" / "actions.jsonl").write_text(
+        '{"action": "pr_merge_auto", "pr": 12, "executed": true}\n')
+    assert ol.auto_merged_prs(tmp_path / "out") is None
+    text = "\n".join(ol._format_blamed_fixes(None, str(tmp_path / "out")))
+    assert "no auto-merge records under" in text
+    assert str(tmp_path / "out") in text
+    assert "0 of 0" not in text
+
+
+def test_pr_suffix_regex_takes_trailing_number_only():
+    assert ol._pr_number("fix: handle (#12) in title (#13)") == 13
+    assert ol._pr_number("feat: foo #12") is None
+    assert ol._pr_number("feat: (#12) tail") is None
+    assert ol._pr_number("feat: foo (#12)  ") == 12
+    assert ol._PR_SUFFIX_RE.search("fix: handle (#12) in title (#13)").group(1) == "13"
+    assert ol._PR_SUFFIX_RE.search("feat: (#12) tail") is None
+
+
+def test_format_report_places_blamed_fixes_after_reverts():
+    report = {"agents": {}, "total": ol._agent_row({}),
+              "reverts": {"months": {}, "commits": 0, "total": 0},
+              "blamed_fixes": {"auto_merged": 2, "blamed": [], "fix_commits": 0}}
+    out = ol.format_report(report)
+    assert out.index("reverts on origin/master") < out.index(
+        "later fixes blamed on auto-merged PRs: 0 of 2")
+    err = ol.format_report({**report, "blamed_fixes": {"error": "boom"}})
+    assert "later fixes blamed on auto-merged PRs: unavailable (boom)" in err

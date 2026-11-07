@@ -443,7 +443,18 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             record["defer"] = defer
             settled = True
             return _write(out_dir, record)
-        rc = recheck(head_before) or {}
+        if record.get("security_items", 0):
+            # A blind Opus re-review of the post-fix tree; any remaining security
+            # hold rejects the round, so the original hold goes to the owner.
+            rc = recheck(head_before, security_seat="opus") or {}
+            if rc.get("security_seat") != "opus":
+                raise _Reject("security-recheck-seat")
+            if SECURITY_AGENT in (res.degraded_agents or ()):
+                raise _Reject("security-recheck-degraded")
+            if any(f.source == SECURITY_SOURCE for f in armable.holding_findings(res.findings)):
+                raise _Reject("security-recheck-not-clean")
+        else:
+            rc = recheck(head_before) or {}
         if rc.get("new_holding"):
             raise _Reject("new-finding")
         if rc.get("conformance_added"):

@@ -876,3 +876,90 @@ def test_collect_items_no_security_candidate_never_calls_bar():
     assert len(items) == 2
     assert calls == []
     assert not [k for k in record if k.startswith("security_")]
+
+
+def _run_sec(tmp_path, recheck, *, findings=None):
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = findings if findings is not None else [_sec_finding()]
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=recheck, already_tried=False,
+        clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    return rec, res, git
+
+
+def _seat_recheck(calls, res_box, *, seat="opus", degraded=(), clear=True):
+    """A recheck stub that records its call and, when `clear`, leaves no finding."""
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        res = res_box[0]
+        if clear:
+            res.findings = []
+        res.degraded_agents = list(degraded)
+        return {"new_holding": [], "conformance_added": [], "degraded": False,
+                "security_seat": seat}
+    return recheck
+
+
+def _run_seat(tmp_path, **kw):
+    calls, box = [], []
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    box.append(res)
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=_seat_recheck(calls, box, **kw),
+        already_tried=False, clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    return rec, res, git, calls
+
+
+def test_security_round_rechecks_with_opus_seat(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path)
+    assert calls == [("head0", {"security_seat": "opus"})]
+    assert rec["status"] == "accepted"
+    assert rec["security_items"] == 1
+
+
+def test_security_recheck_not_clean_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, clear=False)
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-not-clean"
+    assert git.drops == ["head0"] and git.sha == "head0"
+    assert any(f.source == "security-audit" for f in holding_findings(res.findings))
+
+
+def test_security_recheck_wrong_seat_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, seat="sonnet")
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-seat"
+    assert git.drops == ["head0"]
+
+
+def test_security_recheck_missing_seat_rejects(tmp_path):
+    # The runner reports no seat when the delta review never ran.
+    rec, res, git, calls = _run_seat(tmp_path, seat=None)
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-seat"
+
+
+def test_security_recheck_degraded_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, degraded=("security",))
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-degraded"
+
+
+def test_non_security_round_recheck_single_arg(tmp_path):
+    calls = []
+
+    def recheck(pre):                # a one-argument stub, as before this change
+        calls.append(pre)
+        return {"new_holding": [], "conformance_added": [], "degraded": False}
+
+    rec, res, git = _run_sec(tmp_path, recheck, findings=[_finding()])
+    assert calls == ["head0"]
+    assert rec["status"] == "accepted"
+    assert "security_items" not in rec

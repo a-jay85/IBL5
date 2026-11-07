@@ -963,3 +963,62 @@ def test_non_security_round_recheck_single_arg(tmp_path):
     assert calls == ["head0"]
     assert rec["status"] == "accepted"
     assert "security_items" not in rec
+
+
+def test_security_recheck_rejects_on_security_hold_in_another_file(tmp_path):
+    # The round fixed ibl5/s.php, but a security finding still holds on another file.
+    calls, box = [], []
+
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        box[0].findings = [_sec_finding("ibl5/other.php")]
+        return {"new_holding": [], "conformance_added": [], "degraded": False,
+                "security_seat": "opus"}
+
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    box.append(res)
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=recheck, already_tried=False,
+        clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-not-clean"
+    assert git.drops == ["head0"]
+
+
+def test_collect_items_security_past_cap_keeps_all_security_out():
+    res = RunResult(terminal="x")
+    code = [_finding(path=f"ibl5/c{n}.php") for n in range(fix_round.MAX_ITEMS)]
+    res.findings = code + [_sec_finding("ibl5/s1.php"), _sec_finding("ibl5/s2.php")]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record,
+                                    security_bar=_bar(True, "pass: ok"))
+    assert [i["path"] for i in items] == [f"ibl5/c{n}.php" for n in range(fix_round.MAX_ITEMS)]
+    assert record["security_overflow"] == 2
+    assert "security_items" not in record
+    assert "overflow" not in record
+
+
+def test_security_past_cap_round_uses_plain_recheck(tmp_path):
+    calls = []
+
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        return {"new_holding": [], "conformance_added": [], "degraded": False}
+
+    code = [_finding(path=f"ibl5/c{n}.php") for n in range(fix_round.MAX_ITEMS)]
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = code + [_sec_finding()]
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX] * fix_round.MAX_ITEMS),
+        git=git, worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path),
+        log=lambda m: None, commit=lambda msg: git.commit(msg), recheck=recheck,
+        already_tried=False, clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    assert calls == [("head0", {})]
+    assert rec["status"] == "accepted"
+    assert rec["security_overflow"] == 1
+    assert "security_items" not in rec

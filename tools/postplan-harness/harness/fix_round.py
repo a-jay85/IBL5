@@ -113,11 +113,18 @@ def collect_items(gh, pr, res, actions, record: dict | None = None, *,
                       "authorLogin": "review-agent", "authorType": "Bot", "outdated": False,
                       "isResolved": False, "threaded": False})
         sec_flags.append(f.source == SECURITY_SOURCE)
+    if len(items) > MAX_ITEMS and any(sec_flags[MAX_ITEMS:]):
+        # The recheck rejects on any security hold, so a security item the cap would cut
+        # dooms the round. Keep every security item out; they hold condition (2).
+        record["security_overflow"] = sum(sec_flags)
+        items = [i for i, s in zip(items, sec_flags) if not s]
+        sec_flags = [False] * len(items)
     if len(items) > MAX_ITEMS:
         record["overflow"] = len(items) - MAX_ITEMS
         items = items[:MAX_ITEMS]
-    if sum(sec_flags[:MAX_ITEMS]):
-        record["security_items"] = sum(sec_flags[:MAX_ITEMS])
+        sec_flags = sec_flags[:MAX_ITEMS]
+    if sum(sec_flags):
+        record["security_items"] = sum(sec_flags)
     if excluded:
         record["security_excluded"] = excluded
     return items
@@ -452,9 +459,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
                 raise _Reject("security-recheck-seat")
             if rc.get("degraded"):
                 raise _Reject("security-recheck-degraded")
-            sec_paths = {i["path"] for i in items if i.get("path")}
-            if any(f.source == SECURITY_SOURCE and f.path in sec_paths
-                   for f in armable.holding_findings(res.findings)):
+            if any(f.source == SECURITY_SOURCE for f in armable.holding_findings(res.findings)):
                 raise _Reject("security-recheck-not-clean")
         else:
             rc = recheck(head_before) or {}

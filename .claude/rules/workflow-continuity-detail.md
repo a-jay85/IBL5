@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-04
+last_verified: 2026-11-07
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -144,7 +144,7 @@ A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead;
 
 An ad-hoc branch with no plan file makes post-plan run **plan-blind**. That is expected,
 not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so
-auto-opening the PR never auto-merges a `feat:` / `auto_merge: false` / visual PR without
+auto-opening the PR never auto-merges a UI-touching / `auto_merge: false` / visual PR without
 human signoff.
 
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only

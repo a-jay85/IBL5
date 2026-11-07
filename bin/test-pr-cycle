@@ -541,7 +541,7 @@ grep -qF 'PRs fill the cap first, then DIRTY rescues' <<< "$OUT" \
     && fail "--help still carries the old ordered-first --max-ready wording"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
-grep -qF 'feat-commit-type-floor' <<< "$OUT" \
+grep -qF 'ui-review-floor' <<< "$OUT" \
     || fail "--help omits the widened held-unchanged condition names"
 grep -qF 'manual-testing-clearance' <<< "$OUT" \
     || fail "--help omits condition 1's name in the held-unchanged text"
@@ -2965,7 +2965,7 @@ HRHARNESS="$HRH" run --worker
 [[ "$(calls ready)" == "0" ]] || fail "human-only-skip-1-7-8: fleet ran $(calls ready) time(s), want 0"
 grep -qF 'held it for (1,7,8)' "$(rundir)/stage1-skipped.txt" \
     || fail "human-only-skip-1-7-8: skip line lacks 'held it for (1,7,8)'"
-grep -qF 'waiting on: 1 manual-testing-clearance, 7 plan-auto-merge-hold, 8 feat-commit-type-floor' \
+grep -qF 'waiting on: 1 manual-testing-clearance, 7 plan-auto-merge-hold, 8 ui-review-floor' \
     "$(rundir)/stage1-skipped.txt" \
     || fail "human-only-skip-1-7-8: skip line lacks the condition names"
 _dm="$(cat "$SCRATCH/dm.argv")"
@@ -3780,7 +3780,7 @@ end_case "case red-held-37-unchanged-still-fires"
 fi
 
 # 3: a green PR waiting on human sign-off keeps both pre-fire skips and gets no flag.
-if should_run "case feat-awaiting-signoff-no-bypass"; then
+if should_run "case ui-awaiting-signoff-no-bypass"; then
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -3788,14 +3788,14 @@ triage_report "101 FEAT-AWAITING-SIGNOFF sign-off" > "$SCRATCH/triage-out"
 install_harness_verdict 101 "$DIFF_A"
 hr_fixture 101 first-slug "3,7"
 HRHARNESS="$HRH" run --worker
-[[ $RC -eq 0 ]] || fail "feat-awaiting-signoff-no-bypass: exit $RC, want 0"
+[[ $RC -eq 0 ]] || fail "ui-awaiting-signoff-no-bypass: exit $RC, want 0"
 grep -qF 'last post-plan run held it for (3,7) and the diff is unchanged' "$(rundir)/stage1-skipped.txt" \
-    || fail "feat-awaiting-signoff-no-bypass: held-unchanged skip line missing"
-grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "feat-awaiting-signoff-no-bypass: 101 is in stage1.txt"
+    || fail "ui-awaiting-signoff-no-bypass: held-unchanged skip line missing"
+grep -qxF 101 "$(rundir)/stage1.txt" 2>/dev/null && fail "ui-awaiting-signoff-no-bypass: 101 is in stage1.txt"
 grep -qF -- '--state-changed-prs' <<< "$(cat "$SCRATCH/ready.argv")" \
-    && fail "feat-awaiting-signoff-no-bypass: --state-changed-prs passed"
+    && fail "ui-awaiting-signoff-no-bypass: --state-changed-prs passed"
 hr_cleanup
-end_case "case feat-awaiting-signoff-no-bypass"
+end_case "case ui-awaiting-signoff-no-bypass"
 fi
 
 # 4: a stacked PR is skipped on both paths, even when red and held; the flag never names it.

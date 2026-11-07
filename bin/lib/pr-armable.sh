@@ -9,7 +9,7 @@
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
-#   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
+#   (8) UI floor                   -> pr_ui_hold <files_json> <labels_json>
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
@@ -149,20 +149,26 @@ pr_golden_hold() {
     fi
 }
 
-# pr_feat_hold <title> <labels_json>
-#   Phase 6.5 condition (8), the `feat:` floor. A conventional-commit feature
-#   title holds for human sign-off UNLESS the `human-approved` label is already
-#   applied (the label, set by a maintainer, flips it). Echoes
-#   `feat-awaiting-signoff` when held, nothing otherwise.
-#   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
-pr_feat_hold() {
-    local title="$1" labels_json="$2"
-    if grep -qiE '^feat(\([^)]*\))?!?:' <<< "$title"; then
-        if printf '%s' "$labels_json" \
-            | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
-            return  # label flips it — not held
-        fi
-        echo "feat-awaiting-signoff"
+# pr_ui_hold <files_json> <labels_json>
+#   Phase 6.5 condition (8), the UI floor. A PR whose changed paths touch the UI
+#   (bin/lib/ui-change-classifier.sh --paths) holds for human sign-off UNLESS the
+#   `human-approved` label is already applied (the label flips it). Echoes
+#   `ui-awaiting-signoff` when held, nothing otherwise, and
+#   `ui-classifier-error` when the classifier cannot decide (fail closed).
+#   Pass the `.files` array (objects with `.path`) and the `.labels` array, e.g.
+#   `gh pr view N --json files --jq '.files'`.
+pr_ui_hold() {
+    local files_json="$1" labels_json="$2" rc=0
+    if printf '%s' "$labels_json" \
+        | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
+        return  # label flips it — not held
+    fi
+    jq -r '.[].path' <<< "$files_json" \
+        | bash "$(dirname "${BASH_SOURCE[0]}")/ui-change-classifier.sh" --paths >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        echo "ui-awaiting-signoff"
+    elif [ "$rc" -ne 1 ]; then
+        echo "ui-classifier-error"
     fi
 }
 
@@ -380,7 +386,7 @@ pr_dep_holds() {
 #     or bare `bug-<id>`). The digit anchor (`[0-9]+`) is load-bearing: the human
 #     branch `bug-pipeline-reproduce-gate` must NOT be caught by this predicate.
 #
-#   UNCONDITIONAL: unlike pr_feat_hold there is NO override label; a pipeline PR
+#   UNCONDITIONAL: unlike pr_ui_hold there is NO override label; a pipeline PR
 #   ALWAYS holds for a human merge regardless of commit type.
 #   head_ref is optional — an absent/empty second arg behaves exactly as today
 #   (backward compatible; use ${2:-} to avoid an unbound-variable error).

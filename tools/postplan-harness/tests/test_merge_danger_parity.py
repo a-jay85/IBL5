@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import merge_danger
 from harness.armable import evaluate
+from harness.gate_backtest import GateChange
 from test_armable import inputs
 
 REPO = Path(__file__).resolve().parents[3]
@@ -65,3 +66,41 @@ def test_legacy_held_set_parity_both_twins():
     for label, body, held_before in LEGACY_BODIES:
         assert _python_held(merge_danger.classify_body(body)) == held_before, label
         assert (_shell_token(body) != "") == held_before, label
+
+
+def _mig_diff(path, *added):
+    lines = [f"diff --git a/{path} b/{path}", "new file mode 100644", "--- /dev/null", f"+++ b/{path}",
+             "@@ -0,0 +1 @@"]
+    lines += [f"+{a}" for a in added]
+    return "\n".join(lines) + "\n"
+
+
+_MIG = "ibl5/migrations/200_drop_col.sql"
+_WF = ".github/workflows/nightly.yml"
+_DROP = _mig_diff(_MIG, "ALTER TABLE ibl_plr DROP COLUMN foo;")
+_NOTIFY_READ = (lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == _WF else None)
+
+# Same inputs as LEGACY_BODIES L1 to L7: (label, changed, diff, gates, read_candidate).
+DIFF_FIXTURES = [
+    ("L1", [("M", "ibl5/classes/Foo/Bar.php")], "", [], lambda p: None),
+    ("L2", [("M", "bin/lib/pr-armable.sh")], "", [], lambda p: None),
+    ("L3", [("D", "bin/check-foo")], "",
+     [GateChange("bin/check-foo", "check-script", "removed", None, "gate deleted")], lambda p: None),
+    ("L4", [("A", _MIG)], _DROP, [], lambda p: None),
+    ("L5", [("M", "bin/db-sync-prod")], "", [], lambda p: None),
+    ("L6", [("M", _WF)], "", [], _NOTIFY_READ),
+    ("L7", [("M", "bin/lib/pr-armable.sh"), ("A", _MIG)], _DROP, [], lambda p: None),
+]
+
+
+def _new_body(changed, diff, gates, read):
+    floor = merge_danger.derive_merge_danger(changed, diff, gates, read)
+    return "## Summary\nx\n\n" + merge_danger.render_merge_danger(floor)
+
+
+def test_new_held_set_matches_legacy_both_twins():
+    legacy = {label: held for label, _, held in LEGACY_BODIES}
+    for label, changed, diff, gates, read in DIFF_FIXTURES:
+        body = _new_body(changed, diff, gates, read)
+        assert _python_held(merge_danger.classify_body(body)) == legacy[label], label
+        assert (_shell_token(body) != "") == legacy[label], label

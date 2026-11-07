@@ -53,14 +53,16 @@ def test_inject_adds_field_when_llm_omitted_it(tmp_path):
     assert any("Door=" in ln for ln in logs)
 
 
-def test_inject_never_lowers_mechanical_one_way(tmp_path):
+def test_inject_never_drops_mechanical_self_governing(tmp_path):
     wt = _worktree(tmp_path, {"bin/lib/pr-armable.sh": "#!/bin/bash\n"})
     llm_why = "only a tidy comment in a shell helper"
     copy = {"summary_md": "## Summary\n- tidy\n\n**Merge danger:** Door: two-way · Blast radius: "
                           f"localized · Why: {llm_why}"}
     _run(copy, wt, _diff("bin/lib/pr-armable.sh"))
     [line] = _field_lines(copy["summary_md"])
-    assert "Door: one-way" in line
+    assert "Door: two-way" in line
+    assert " · Self-governing: yes · Why: " in line
+    assert merge_danger.classify_body(copy["summary_md"]) == "SELF-GOVERNING"
     assert "Blast radius: site-wide" in line
     assert "arming-path:bin/lib/pr-armable.sh" in line
     assert line.index("arming-path:") < line.index(llm_why)

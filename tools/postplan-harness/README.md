@@ -50,6 +50,9 @@ verdict, so condition (18) holds with `state=MISSING after 1 retry` only after a
 not land. `result.json` carries `retries` (`{"conflict-review": 1, "merge-danger": 1}` at most)
 only when a retry ran. No per-run call cap exists to raise: the budget grows by at most one
 `conflict-review` call per run.
+Arming-path and gate-removed changes carry ` · Self-governing: yes` with a two-way Door, and
+condition (18) holds them as `SELF-GOVERNING`. The arm step re-checks a two-way body against the
+diff floor, so a stripped segment or a hand-lowered Door still holds.
 
 ## Layout
 

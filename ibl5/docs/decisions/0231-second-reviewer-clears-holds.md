@@ -1,5 +1,5 @@
 ---
-description: ADR-0231. A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them. The verdict binds to the tree it reviewed, and UI, one-way and merge-rule changes stay with the owner.
+description: ADR-0231. A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them. The verdict binds to the tree it reviewed, and the owner keeps one-way and merge-rule changes. UI paths are guarded only on condition 10 and by the `ui` plan token.
 last_verified: 2026-11-06
 ---
 
@@ -55,6 +55,7 @@ The seat runs before the preview so that a cleared PR still reaches the add-only
 - Positive: a change to the seat itself always waits for the owner.
 - Negative: one Opus spawn per eligible tree. It runs only when every hold is clearable, and only for diffs inside the 40 KB inline budget. A larger diff holds.
 - Negative: plans written before this change carry no `hold_trigger`, so they keep waiting on the owner.
+- Negative: the UI path floor guards condition 10 only. A UI file on a PR blocked only on condition 7, 12 or 17 can still clear. Extending `touches_ui` to those conditions is an owner decision.
 - Negative: the UI path floor also holds some non-visual PHP under `ibl5/modules/` that a reviewer could have cleared.
 
 ## References

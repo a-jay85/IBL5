@@ -405,7 +405,7 @@ def _arm_inputs(unresolved_findings):
     """Minimal ArmInputs with every other condition clear, mirroring
     tests/test_armable_phase4.py::inputs so only condition (11) can hold."""
     return ArmInputs(pr_body="## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n",
-                     pr_title="chore: x", pr_labels=[], classification=Classification(),
+                     pr_title="chore: x", pr_labels=[], classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]),
                      findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False, phase5_status="pass",
                      plan_auto_merge_false=False, headless=True,
                      dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",

@@ -1,6 +1,6 @@
 ---
 description: Cross-PR auto-merge triage via a shared, fail-closed armability predicate sourced by both /post-plan Phase 6.5 and bin/pr-triage.
-last_verified: 2026-11-03
+last_verified: 2026-11-07
 ---
 
 # ADR-0069: Shared fail-closed armability predicate + cross-PR auto-arm
@@ -44,6 +44,6 @@ Three policies come with it.
 
 - **Stale verdicts.** The latest sticky wins, whatever head it reviewed. A held, NOT READY, or unreadable sticky stays a hold until a newer sticky replaces it, and only a post-plan run posts one. A READY armed sticky from an older head stays a clear, as before. The banner carries no head SHA, so a SHA-staleness gate would hold every PR. Pushes to the live head are still covered by the clearance and green-checks conditions on the ARMABLE branch.
 - **Owner approval for an `auto_merge: false` plan.** The owner arms by hand with `gh pr merge <n> --squash --auto` after the last post-plan run. No label lifts hold (7), so `bin/pr-triage` never arms a PR the verdict holds. A hand arm survives `bin/pr-triage`, which only ever arms. A `feat:` PR keeps its documented path: the `human-approved` label, then a post-plan re-run that posts an armed sticky, then triage may arm it.
-- **Disarm path.** A post-plan run that ends held calls `pr_disable_auto_merge` at the arm point, after the Phase 6.5 sticky post. The sticky says so with the line `Auto-merge disarmed: a held run removes any existing arm on this PR.` The call runs `gh pr merge <pr> --disable-auto` and swallows errors, so it does nothing on a PR that is not armed. The `auto-mergeable` label resyncs on `auto_merge_disabled`, and `bin/merge-line-select` selects only PRs with an arm set, so a disarm leaves the merge line with no extra step. A run armed at Phase 6.5 whose closer then returns a held decision is disarmed once, just before the terminal state is computed.
+- **Disarm path.** A post-plan run that ends held calls `pr_disable_auto_merge` at the arm point, after the Phase 6.5 sticky post. The sticky says so with the line `Any auto-merge already set on this PR is now turned off.` The call runs `gh pr merge <pr> --disable-auto` and swallows errors, so it does nothing on a PR that is not armed. The `auto-mergeable` label resyncs on `auto_merge_disabled`, and `bin/merge-line-select` selects only PRs with an arm set, so a disarm leaves the merge line with no extra step. A run armed at Phase 6.5 whose closer then returns a held decision is disarmed once, just before the terminal state is computed.
 
 `bin/pr-cycle` is unchanged. It keeps one unscoped `bin/pr-triage --arm` per cycle, and `--only` and `--skip` scope work order only.

@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import sticky_shapes
-from harness import fidelity
+from harness import fidelity, hold_text
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
 
@@ -252,9 +252,12 @@ def test_holds_are_listed_and_a_clean_run_says_so():
     assert held.holds
     body = _sticky(decision=held)
     assert "Auto-merge held:" in body
-    assert "- (12) plan-fidelity-verdict" in body
+    assert ("- (12) The check that compares the PR to its plan did not pass "
+            "(it said NOT READY).") in body
     for c in held.holds:
-        assert f"- ({c.number}) {c.name} — {c.reason}" in body
+        assert f"- ({c.number}) {hold_text.plain_hold(c)}" in body
+        assert f"**Hold code:** ({c.number}) {c.name} — {c.reason}" in body
+        assert f"- ({c.number}) {c.name}" not in body
     assert body.splitlines()[0].endswith("· auto-merge held")
     assert "HOLD — auto-merge not armed" not in body
     none_recorded = _sticky(decision=None)
@@ -1106,8 +1109,7 @@ def test_sticky_layout_keeps_reader_anchors(tmp_path):
     lines = body.splitlines()
     assert lines[0].startswith("**")
     last_hold = max(i for i, ln in enumerate(lines) if ln.startswith("- ("))
-    assert lines[last_hold + 1] == ("Auto-merge disarmed: a held run removes any "
-                                    "existing arm on this PR.")
+    assert lines[last_hold + 1] == fidelity.DISARM_LINE
     assert lines[last_hold + 2] == ""
     assert [i for i, ln in enumerate(lines) if re.match(r"^- \(\d", ln)] == [last_hold]
     digest = lines.index(fidelity.MERGE_DIGEST_HEADING)

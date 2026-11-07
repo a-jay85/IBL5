@@ -660,6 +660,7 @@ def verdict_ok_path(key: str, sha: str) -> str:
 # either one only repeats the failure. Everything else (tooled-cli, tooled-empty, a
 # subprocess error, a tokenless reply) gets the one re-ask.
 _NO_RETRY_KINDS = ("llm-usage-limit", "llm-auth-expired")
+CONFLICT_REREVIEW_ATTEMPTS = 2
 
 
 def review_resolution(
@@ -749,6 +750,34 @@ def review_resolution(
     sidecar_path.write_text(post_resolution_sha)
 
     return verdict_line
+
+
+def rereview_absent(llm, run, *, worktree, key, attempts=CONFLICT_REREVIEW_ATTEMPTS) -> tuple[str, int, str]:
+    """Ask again for a conflict verdict the first review never gave. Returns (verdict, calls, reason).
+
+    Reads the inputs `review_resolution` saved. A resolution with adaptations stays with
+    the first review, because this path passes no adaptations to ask about.
+    """
+    review_dir = Path(f"/tmp/postplan-conflict-review-{key}")
+    try:
+        files_text = (review_dir / "resolved-files.txt").read_text()
+        proof = (review_dir / "proof-output.txt").read_text()
+    except OSError:
+        return VERDICT_ABSENT, 0, "artifacts-missing"
+    try:
+        if (review_dir / "adaptations.txt").read_text().strip():
+            return VERDICT_ABSENT, 0, "adaptations-present"
+    except OSError:
+        pass
+    files = tuple(line for line in files_text.splitlines() if line)
+    verdict, calls = VERDICT_ABSENT, 0
+    for _ in range(attempts):   # bounded: CONFLICT_REREVIEW_ATTEMPTS calls, each with its one inner retry
+        verdict = review_resolution(llm, run, worktree=worktree, key=key,
+                                    resolved_files=files, proof_out=proof, adaptations=())
+        calls += 1
+        if verdict != VERDICT_ABSENT:
+            break
+    return verdict, calls, "reviewed"
 
 
 def purge_verdict_artifacts(key: str) -> None:

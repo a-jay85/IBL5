@@ -1,26 +1,41 @@
-"""One in-run fix round for holds on arming conditions {2, 3, 11}.
+"""One in-run fix round for holds on arming conditions {2, 3, 11, 12, 14, 19}.
 
-Owns no fixer. It sequences the two that exist, ``thread_ingestion.disposition_thread``
-(review threads and unthreaded findings) and ``conformance_fix.remediate_missing`` (MISSING
-items), and adds only the budget, the accept-or-discard decision and the deferred reply flush.
-Nothing is pushed or posted to GitHub inside the round. The runner pushes an accepted round
-and then calls ``flush``; a rejected round leaves head and ``res`` as found.
+Owns no fixer for review work. It sequences the ones that exist:
+``thread_ingestion.disposition_thread`` (review threads, unthreaded findings, and test-only
+strengthening for a HELD mutation row), ``conformance_fix.remediate_missing`` (MISSING items)
+and the runner's ``fidelity_fix`` and ``conflict_rereview`` callables. It adds the budget, the
+accept-or-discard decision, the deferred reply flush, and the one repair it makes itself: a new
+``match`` for a stale Executable Mutations row, checked by ``mutation_repair``.
+Nothing is pushed or posted to GitHub inside the round, and the plan file is never written
+inside it. The runner pushes an accepted round, calls ``flush`` and ``apply_plan_repair``; a
+rejected round leaves head and ``res`` as found.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import shutil
 import sys
+import tempfile
 import time
 from typing import Mapping
 
-from . import armable, conformance_fix, same_run_threads, thread_ingestion
+from . import armable, conformance_fix, mutation_repair, reviewcache, same_run_threads, thread_ingestion
 from .adapters import llm as llm_mod
 from .labels import render_body
 from .state import HarnessError
 
 ENV_FLAG = "POSTPLAN_FIX_ROUND"
-TARGET_CONDITIONS = frozenset({2, 3, 11})
+TARGET_CONDITIONS = frozenset({2, 3, 11, 12, 14, 19})
+REVIEW_CONDITIONS = frozenset({2, 3, 11})
+MUTATION_CONDITION = 19
+FIDELITY_CONDITION = 12
+CONFLICT_CONDITION = 14
+REPAIRED_PLAN_BASENAME = "fix-round-plan.md"
+ORIGINAL_PLAN_BASENAME = "fix-round-plan.orig.md"
+_DECIDED_VERDICTS = ("CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=FOUND-PROBLEM")
+_UNREADABLE_DELTA = "<unreadable-delta>"
 MAX_FIX_ROUNDS = 1          # asserted by test; the round has no loop
 MAX_ITEMS = 8               # threads first, then unthreaded findings
 DEADLINE_S = 1200           # wall clock for the whole round, re-check included
@@ -144,8 +159,41 @@ def _write(out_dir: str, record: dict) -> dict:
     return record
 
 
+def _held_row_item(row) -> dict:
+    """One fixer item for a HELD row, in the shape `collect_items` gives an unthreaded finding."""
+    body = (f"Executable Mutations row {row.row} HELD: with {row.match} replaced by {row.replace} "
+            f"in {row.file}, the check {row.check} still passes. Add or strengthen a test so this "
+            f"check fails under that mutation. Edit test files only. Do not edit {row.file}, the "
+            "plan, or any gate file.")
+    return {"commentId": None, "path": row.file, "line": None, "body": body,
+            "authorLogin": "exec-mutations", "authorType": "Bot", "outdated": False,
+            "isResolved": False, "threaded": False}
+
+
+def _row_repair_prompt(row) -> str:
+    return (f"Executable Mutations row {row.row} names code that no longer exists in {row.file}.\n"
+            f"Old match: {row.match}\n"
+            f"Replacement the row applies: {row.replace}\n\n"
+            f"Read {row.file} and find the current wording of the same code. Do not move the row "
+            "to different code. The replacement stays as written, so the new match must be text "
+            "it can stand in for.\n"
+            "Reply with exactly one line and nothing else:\n"
+            "NEW-MATCH: <one line of text that occurs exactly once in the file>\n")
+
+
+def _remove_quietly(path: str | None) -> None:
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, log,
-                  commit, recheck, already_tried, clock=time.monotonic, env=None) -> dict:
+                  commit, recheck, already_tried, clock=time.monotonic, env=None,
+                  inputs=None, mutation_check=None, fidelity_fix=None,
+                  conflict_rereview=None) -> dict:
     """Run at most one round. Always writes ``fix-round.json`` and returns the record.
 
     ``record["status"]`` is one of skipped, no-change, accepted, rejected, aborted.
@@ -154,7 +202,8 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         return res.fix_round
     tg = targets(decision)
     record: dict = {"status": "skipped", "reason": "", "targets": tg, "items": [],
-                    "defer": [], "sha": "", "reevaluate": False, "head_before": ""}
+                    "defer": [], "sha": "", "reevaluate": False, "head_before": "",
+                    "row_repairs": [], "mutation": {}, "fidelity": {}, "conflict_rereview": {}}
     if not enabled(env):
         record["reason"] = "disabled"
         return _write(out_dir, record)
@@ -164,6 +213,15 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     if already_tried:
         record["reason"] = "holdrepeat-same-holds"
         return _write(out_dir, record)
+    mutation_holding = getattr(inputs, "exec_mutations_holding", None) or ()
+    held, stale = (mutation_repair.eligible_rows(mutation_holding)
+                   if MUTATION_CONDITION in tg else ([], []))
+    review_tg = set(tg) & REVIEW_CONDITIONS
+    if (not review_tg and not held and not stale
+            and (FIDELITY_CONDITION not in tg or fidelity_fix is None)
+            and (CONFLICT_CONDITION not in tg or conflict_rereview is None)):
+        record["reason"] = "no-eligible-hold"
+        return _write(out_dir, record)
 
     head_before = git.head()
     record["head_before"] = head_before
@@ -171,6 +229,9 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     t0 = clock()
     deadline = t0 + DEADLINE_S
     defer: list[dict] = []
+    before_holding = mutation_repair.holding_row_ids(mutation_holding)
+    held_worked: list[str] = []
+    held_changed = False
 
     def _check_deadline() -> int:
         remaining = deadline - clock()
@@ -192,26 +253,119 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         record["items"] = [dict(r, outcome="skipped") if r.get("outcome") != "skipped" else r
                            for r in record["items"]]
         record["reevaluate"] = False
+        record["row_repairs"] = []
+        _remove_quietly(record.pop("repaired_plan", None))
+
+    def _dispose(item: dict) -> None:
+        remaining = _check_deadline()
+        info: dict = {}
+        outcome = thread_ingestion.disposition_thread(
+            item, llm, git, worktree, pr, gh, log,
+            commit=commit, push=lambda: "", defer=defer, info=info,
+            timeout=max(1, int(min(remaining, llm_mod.TOOLED_TIMEOUT))))
+        record["items"].append({
+            "commentId": item.get("commentId"), "outcome": outcome, "sha": None,
+            "path": item.get("path"), "outdated": bool(item.get("outdated")),
+            "body_head": (item.get("body") or "")[:160],
+            "threaded": bool(item.get("threaded")),
+            "author": item.get("authorLogin")})
+        _check_deadline()
+
+    def _plan_rows():
+        rows = mutation_repair.parse_rows(getattr(plan, "path", "") or "", worktree)
+        if rows is None:
+            record["mutation"]["skipped"] = "parse-failed"
+        return rows
+
+    def _repair_stale_rows() -> None:
+        """Propose a new match per stale row into a copy of the plan. `plan.path` stays as is."""
+        old_rows = _plan_rows()
+        if old_rows is None:
+            return
+        with open(plan.path, "rb") as fh:
+            raw = fh.read()
+        text = raw.decode("utf-8", "surrogateescape")
+        by_id = {r.row: r for r in old_rows}
+        proposals: dict[str, str] = {}
+        dropped: list[str] = []
+        for row_id in stale:
+            row = by_id.get(row_id)
+            if row is None:
+                dropped.append(f"row {row_id}: not-in-plan")
+                continue
+            remaining = _check_deadline()
+            reply = llm.call_tooled("fix-round-row-repair", "sonnet", _row_repair_prompt(row),
+                                    cwd=worktree, allowed_tools=("Read",),
+                                    denied_tools=("Bash", "Agent", "Write", "Edit"),
+                                    timeout=max(1, int(min(remaining, llm_mod.TOOLED_TIMEOUT))))
+            _check_deadline()
+            new_match = mutation_repair.parse_new_match(reply)
+            if new_match is None:
+                dropped.append(f"row {row_id}: no-new-match")
+                continue
+            rewritten = mutation_repair.rewrite_match(text, row_id, new_match)
+            if rewritten is None:
+                dropped.append(f"row {row_id}: rewrite-refused")
+                continue
+            text = rewritten
+            proposals[row_id] = new_match
+        if dropped:
+            record["mutation"]["dropped"] = dropped
+        if not proposals:
+            return
+        os.makedirs(out_dir, exist_ok=True)
+        copy_path = os.path.join(out_dir, REPAIRED_PLAN_BASENAME)
+        with open(copy_path, "wb") as fh:
+            fh.write(text.encode("utf-8", "surrogateescape"))
+        new_rows = mutation_repair.parse_rows(copy_path, worktree)
+        if new_rows is None:
+            reasons = ["reparse-failed"]
+        else:
+            reasons = mutation_repair.validate_repair(old_rows, new_rows, set(proposals),
+                                                      read_file=git.read_worktree_file)
+            new_by_id = {r.row: r for r in new_rows}
+            reasons += [f"proposal-mismatch row {row_id}" for row_id, match in proposals.items()
+                        if row_id not in new_by_id or new_by_id[row_id].match != match]
+        if reasons:
+            _remove_quietly(copy_path)
+            record["mutation"]["refused"] = reasons
+            return
+        record["row_repairs"] = [{"row": row_id, "file": by_id[row_id].file,
+                                  "old_match": by_id[row_id].match, "new_match": match}
+                                 for row_id, match in proposals.items()]
+        record["repaired_plan"] = copy_path
+        record["plan_sha256"] = hashlib.sha256(raw).hexdigest()
+
+    def _prove_mutations() -> None:
+        """A strengthened test or a repaired row counts only if the row now trips."""
+        if not held_changed and not record["row_repairs"]:
+            return
+        if mutation_check is None:
+            raise _Reject("mutation-unproven")
+        wanted = held_worked + [r["row"] for r in record["row_repairs"]]
+        report = mutation_check(record.get("repaired_plan") or plan.path,
+                                max(1, int(_check_deadline())))
+        if not mutation_repair.proof_ok(report, wanted, before_holding):
+            raise _Reject("mutation-unproven")
+
+    def _rereview_conflict() -> None:
+        """Last, so the verdict binds to the head the re-evaluation sees. Never rejects."""
+        if CONFLICT_CONDITION not in tg or conflict_rereview is None:
+            return
+        got = conflict_rereview()
+        if got is not None:
+            record["conflict_rereview"] = {"verdict": got[0], "calls": got[1], "reason": got[2]}
 
     # A UsagePause (BaseException) must reset the tree too. It is handled in the finally
     # below so no handler can swallow it: the pause keeps propagating after the undo.
     settled = False
     try:
-        items = collect_items(gh, pr, res, gh.actions(), record)
+        if review_tg:
+            items = collect_items(gh, pr, res, gh.actions(), record)
+        else:
+            items = []
         for item in items:
-            remaining = _check_deadline()
-            info: dict = {}
-            outcome = thread_ingestion.disposition_thread(
-                item, llm, git, worktree, pr, gh, log,
-                commit=commit, push=lambda: "", defer=defer, info=info,
-                timeout=max(1, int(min(remaining, llm_mod.TOOLED_TIMEOUT))))
-            record["items"].append({
-                "commentId": item.get("commentId"), "outcome": outcome, "sha": None,
-                "path": item.get("path"), "outdated": bool(item.get("outdated")),
-                "body_head": (item.get("body") or "")[:160],
-                "threaded": bool(item.get("threaded")),
-                "author": item.get("authorLogin")})
-            _check_deadline()
+            _dispose(item)
         mi = confix_items(res) if 3 in tg else []
         if mi:
             _check_deadline()
@@ -219,10 +373,34 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
                 llm, git, plan, worktree, out_dir, mi,
                 commit=commit, push=lambda: "", log=log)
             _check_deadline()
+        if held:
+            held_rows = _plan_rows()
+            if held_rows is not None:
+                by_row = {r.row: r for r in held_rows}
+                held_worked = [row_id for row_id in held if row_id in by_row]
+                head_held = git.head()
+                pre_ids = reviewcache.per_file_patch_ids(git.diff_vs_base())
+                for row_id in held_worked:
+                    _dispose(_held_row_item(by_row[row_id]))
+                touched = reviewcache.file_delta(pre_ids, reviewcache.per_file_patch_ids(git.diff_vs_base()))
+                held_changed = git.head() != head_held
+                if held_changed and not touched:
+                    # A patch-id failure reads as "nothing changed". A new commit says otherwise.
+                    touched = {_UNREADABLE_DELTA}
+                if not all(mutation_repair.is_test_path(p) for p in touched):
+                    raise _Reject("non-test-edit")
+        if stale:
+            _repair_stale_rows()
+        if FIDELITY_CONDITION in tg and fidelity_fix is not None:
+            record["fidelity"] = fidelity_fix(max(1, int(_check_deadline()))) or {}
+            _check_deadline()
         if git.head() == head_before:
+            _prove_mutations()
+            _rereview_conflict()
             record["status"] = "no-change"
             record["reason"] = "no-commit"
-            record["reevaluate"] = bool(defer)
+            record["reevaluate"] = (bool(defer) or bool(record["row_repairs"])
+                                    or record["conflict_rereview"].get("verdict") in _DECIDED_VERDICTS)
             record["defer"] = defer
             settled = True
             return _write(out_dir, record)
@@ -233,7 +411,9 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             raise _Reject("conformance-worse")
         if rc.get("degraded"):
             raise _Reject("recheck-degraded")
+        _prove_mutations()
         _check_deadline()
+        _rereview_conflict()
         record["status"] = "accepted"
         record["reason"] = "recheck-clean"
         record["sha"] = git.head()
@@ -285,6 +465,43 @@ def flush(gh, pr, record: dict, pushed_sha: str, log) -> int:
     return posted
 
 
+def apply_plan_repair(plan, record: dict, out_dir: str, log) -> bool:
+    """Swap the proven repaired copy onto the plan. Called only after the round's push.
+
+    Refuses when the plan changed during the round. The original stays in the run dir.
+    """
+    if not record.get("row_repairs"):
+        return False
+    tmp_path = None
+    try:
+        target = os.path.realpath(plan.path)
+        with open(target, "rb") as fh:
+            original = fh.read()
+        if hashlib.sha256(original).hexdigest() != record.get("plan_sha256"):
+            log("fix-round: plan changed during the round; row repair not applied")
+            record["repair_applied"] = False
+            _write(out_dir, record)
+            return False
+        with open(record["repaired_plan"], "rb") as fh:
+            repaired = fh.read()
+        with open(os.path.join(out_dir, ORIGINAL_PLAN_BASENAME), "wb") as fh:
+            fh.write(original)
+        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".fix-round-plan.")
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(repaired)
+        shutil.copymode(target, tmp_path)
+        os.replace(tmp_path, target)
+    except OSError as e:
+        _remove_quietly(tmp_path)
+        log(f"fix-round: row repair not applied ({e!r})")
+        record["repair_applied"] = False
+        _write(out_dir, record)
+        return False
+    record["repair_applied"] = True
+    _write(out_dir, record)
+    return True
+
+
 def prune_keys(record: dict) -> set:
     """Keys of rows whose finding the round released from conditions (2) and (11)."""
     keys = set()
@@ -296,6 +513,18 @@ def prune_keys(record: dict) -> set:
     return keys
 
 
+def _extra_clauses(record: dict) -> str:
+    """Sticky clauses for the repairs that stood and for a re-run conflict review."""
+    clauses = ""
+    if record.get("repair_applied") is not False:
+        for r in record.get("row_repairs") or ():
+            clauses += f"; repaired Executable Mutations row {r.get('row')} match in {r.get('file')}"
+    verdict = (record.get("conflict_rereview") or {}).get("verdict")
+    if verdict:
+        clauses += f"; conflict review re-run: {verdict}"
+    return clauses
+
+
 def summary_line(record: dict) -> str:
     """One sticky line per status; empty when the round did not run or was disabled."""
     status = record.get("status")
@@ -304,12 +533,21 @@ def summary_line(record: dict) -> str:
     declined = sum(1 for r in items if r.get("outcome") == "declined")
     if status == "accepted":
         return (f"Fix round: fixed {fixed} of {len(items)} items in {record.get('sha', '')[:12]}; "
-                "re-reviewed and re-evaluated on the new head")
+                "re-reviewed and re-evaluated on the new head" + _extra_clauses(record))
     if status == "no-change" and record.get("reevaluate"):
-        return f"Fix round: no code change; {declined} threads declined"
+        return f"Fix round: no code change; {declined} threads declined" + _extra_clauses(record)
     if status == "rejected":
         return (f"Fix round: discarded ({record.get('reason', '')}); "
                 "this verdict is the pre-round hold")
     if status == "skipped" and record.get("reason") == "holdrepeat-same-holds":
         return "Fix round: skipped (already tried for these holds)"
     return ""
+
+
+def digest_rows(record: dict) -> list:
+    """One merge-digest row per repair that reached the plan file."""
+    if not record.get("repair_applied"):
+        return []
+    return [f"**Fix round repaired Executable Mutations row {r.get('row')} ({r.get('file')}):** "
+            f"old match `{r.get('old_match')}`, new match `{r.get('new_match')}`"
+            for r in record.get("row_repairs") or ()]

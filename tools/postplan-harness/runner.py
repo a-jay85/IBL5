@@ -43,7 +43,7 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
                      manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
-from harness import conflict_report
+from harness import conflict, conflict_report, fidelity_filefix
 from harness import armable as _armable_mod
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
@@ -226,6 +226,19 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
 
+
+
+def _fix_round_mutation_check(path, worktree, remaining) -> MutationReport:
+    """The fix round's proof run. Module-level so tests stub the executor."""
+    return run_executable_mutations(Path(path), Path(worktree or "."), outer_timeout=remaining)
+
+
+def _fix_round_conflict_rereview(llm, git):
+    """Re-ask a conflict review that gave no verdict. None for any other stored verdict."""
+    if not isinstance(git, LiveGit) or conflict_verdict_for(git.branch()) != conflict.VERDICT_ABSENT:
+        return None
+    return conflict.rereview_absent(llm, git._run, worktree=git.worktree,
+                                    key=git.branch().translate(str.maketrans("/:", "--")))
 
 
 def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
@@ -932,7 +945,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         _arm = _evaluate_arm()
         inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
-        # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11} ----
+        # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11, 12, 14, 19} ----
         # Runs between the first arming evaluation and everything that records or posts it.
         # It edits code only; the unchanged _evaluate_arm judges the new head. A rejected
         # round resets the tree and the original decision stands.
@@ -982,13 +995,57 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         "conformance_added": sorted(set(after) - pre_conf),
                         "degraded": degraded}
 
+            def _fr_commit(msg):
+                return _commit_with_gate_fix(git, worktree, msg, log, phase="phase6.5-fix",
+                                             llm=None, res=res)
+
+            def _fr_fidelity_fix(_remaining):
+                # `remediate` takes no timeout; the round's deadline check right after this
+                # call rejects an overrun.
+                selected, source = select_fidelity_verdict(
+                    inputs.fidelity_verdict, inputs.fidelity_verdict_2,
+                    inputs.fidelity_tree_2, inputs.current_tree)
+                if selected != "NOT READY":
+                    return {"ran": False, "reason": "not-not-ready"}
+                fid = res.fidelity or {}
+                path = ((fid.get("same_run_repin") or {}).get("verdict_path") or fid.get("verdict_path")
+                        if source == "verdict-2" else fidelity.verdict_path(pr))
+                texts = fidelity.blocking_finding_texts(path)
+                pr_files = git.conformance_files()
+                kept = [t for t in texts if not unplanned_scope.is_unplanned_scope(t)
+                        and fidelity_filefix.named_paths(t, pr_files)]
+                if not kept:
+                    return {"ran": False, "reason": "no-file-blocker"}
+                try:
+                    packet = fidelity.build_packet(
+                        out_dir, master_sha, git.head_tree(), plan, git.diff_vs_base(), body, pr,
+                        phase4b_ran=getattr(res, "phase4b_code_ran", False),
+                        worktree=worktree or ".", packet_name="fidelity-packet-fix-round")
+                except HarnessError as e:
+                    log(f"phase6.5-fix: fidelity packet failed ({e.kind})")
+                    return {"ran": False, "reason": "packet-failed"}
+                outcome: dict = {}
+                # pr_number=None leaves out the `gh pr edit` note: nothing in the round
+                # reaches GitHub.
+                fidelity.remediate(llm, git, out_dir, worktree or ".", packet, path, master_sha,
+                                   log=log, commit=_fr_commit, push=lambda: "", pr_number=None,
+                                   work_list=[{"hold": "12", "text": t} for t in kept],
+                                   outcome=outcome,
+                                   withheld=tuple(t for t in texts if t not in kept))
+                return {"ran": True, "blockers": len(kept), "outcome": outcome.get("reason")}
+
+            def _fr_conflict_rereview():
+                return _fix_round_conflict_rereview(llm, git)
+
             _fr_snap = fix_round.snapshot(res)
             fr = fix_round.run_fix_round(
                 decision=decision, res=res, gh=gh, llm=llm, git=git, worktree=worktree or ".",
                 plan=plan, pr=pr, out_dir=out_dir, log=log,
-                commit=lambda msg: _commit_with_gate_fix(
-                    git, worktree, msg, log, phase="phase6.5-fix", llm=None, res=res),
-                recheck=_fr_recheck, already_tried=_fr_tried)
+                commit=_fr_commit,
+                recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
+                mutation_check=lambda p, rem: _fix_round_mutation_check(p, worktree, rem),
+                fidelity_fix=_fr_fidelity_fix if pr else None,
+                conflict_rereview=_fr_conflict_rereview if pr else None)
             if (fr.get("status") != "skipped"
                     or fr.get("reason") == "holdrepeat-same-holds"):
                 # Other skips leave result.json byte-identical; the already-tried skip
@@ -1015,6 +1072,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     fix_round.restore(res, _fr_snap)
                     fr["status"], fr["reason"], fr["reevaluate"] = "rejected", "push-failed", False
                     fr["defer"] = []
+                    fr["row_repairs"] = []
                     fix_round._write(out_dir, fr)
             if fr.get("status") == "accepted" or (fr.get("status") == "no-change"
                                                   and fr.get("reevaluate")):
@@ -1032,6 +1090,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     sha = git.head()
                     _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
                                                    master_sha, body, pr, pushed or sha, res, log)
+                fix_round.apply_plan_repair(plan, fr, out_dir, log)
                 _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
                 inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
             _fr_line = fix_round.summary_line(fr)
@@ -1116,7 +1175,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     log("phase6.5: merge digest all degraded; PR body digest left as is")
                 else:
                     cur = gh.pr_body_fresh() or ""
-                    new = upsert_merge_digest(cur, render_merge_digest(drows))
+                    new = upsert_merge_digest(cur, render_merge_digest(drows + fix_round.digest_rows(res.fix_round or {})))
                     if new != cur:
                         gh.pr_edit_body(pr, new)
                     log("phase6.5: merge digest upserted into PR body")

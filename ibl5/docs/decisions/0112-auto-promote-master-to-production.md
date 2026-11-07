@@ -35,10 +35,6 @@ A `workflow_run`-triggered workflow, `.github/workflows/promote-to-production.ym
 
 - **`bin/merge-master-to-prod` is retained unchanged as the manual/emergency path**, which is what makes pausing cheap and reversible.
 
-## Addendum: Trigger list size (2026-11-06)
-
-The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. Today `.github/workflows/promote-to-production.yml` lists twelve names under `workflow_run.workflows`. The set of master-push workflows shrank after this ADR was written. The breadth principle stands: list every master-push workflow.
-
 ## Alternatives Considered
 
 - **A scheduled `cron` promoter** (e.g. hourly, promote whatever is green). Rejected: it decouples the deploy from the merge that caused it, so a bad merge's blast radius is bounded by a clock instead of by CI, and the DM arrives with no causal commit attached. `workflow_run` promotes *because* this SHA went green.
@@ -78,3 +74,7 @@ The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflo
 **Workflow trigger list:** `## Decision` listed `Auto-Rebase PRs` as one of the thirteen master-push workflows. That workflow was retired in PR #1949 and replaced by `.github/workflows/update-behind-prs.yml` (`name: Update BEHIND PRs`). The trigger list in `.github/workflows/promote-to-production.yml` has been corrected to name `Update BEHIND PRs`; the decision's trigger count of thirteen remains accurate.
 
 **`bin/merge-master-to-prod` wording:** `## Decision` reads "retained unchanged as the manual/emergency path". PR #1967 changes the file by 22 lines — one functional line (adding `SKIP_CHECKS` per Phase 1e) plus 21 lines of header prose. The code path the sentence describes is accurate; "unchanged" overstates byte-identity.
+
+## Addendum — Trigger list size (2026-11-06)
+
+The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. On 2026-11-06 a `push:` grep over `.github/workflows/` finds fourteen workflows that fire on a master push. `.github/workflows/promote-to-production.yml` lists twelve under `workflow_run.workflows`. `Doc Freshness Audit` and `Mirror CI images` fire on a master push and are outside that list. Whether either one can make the promoter look too early is unverified. A follow-up decides whether they belong in the list. The breadth principle in the original bullet stands.

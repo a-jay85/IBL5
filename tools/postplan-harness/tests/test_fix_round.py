@@ -898,7 +898,7 @@ def _seat_recheck(calls, res_box, *, seat="opus", degraded=(), clear=True):
         if clear:
             res.findings = []
         res.degraded_agents = list(degraded)
-        return {"new_holding": [], "conformance_added": [], "degraded": False,
+        return {"new_holding": [], "conformance_added": [], "degraded": bool(degraded),
                 "security_seat": seat}
     return recheck
 

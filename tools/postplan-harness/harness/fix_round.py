@@ -450,9 +450,11 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             rc = recheck(head_before, security_seat="opus") or {}
             if rc.get("security_seat") != "opus":
                 raise _Reject("security-recheck-seat")
-            if SECURITY_PURPOSE in (res.degraded_agents or ()):
+            if rc.get("degraded"):
                 raise _Reject("security-recheck-degraded")
-            if any(f.source == SECURITY_SOURCE for f in armable.holding_findings(res.findings)):
+            sec_paths = {i["path"] for i in items if i.get("path")}
+            if any(f.source == SECURITY_SOURCE and f.path in sec_paths
+                   for f in armable.holding_findings(res.findings)):
                 raise _Reject("security-recheck-not-clean")
         else:
             rc = recheck(head_before) or {}

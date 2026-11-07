@@ -23,7 +23,8 @@ SYNTAX_TIMEOUT_S = 30
 
 ELIGIBLE_RE = re.compile(r"^row (?P<row>[0-9]+(?:-[A-Za-z0-9]+)*) (?P<kind>HELD|NOT-APPLIED) — (?P<detail>.*)$")
 NEW_MATCH_RE = re.compile(r"^NEW-MATCH: (.*)$", re.M)
-_ROW_PREFIX_RE = re.compile(r"^row ([0-9A-Za-z_-]+) ")
+_IDENT_RE = re.compile(r"[A-Za-z_]\w*")
+_ROW_PREFIX_RE =re.compile(r"^row ([0-9A-Za-z_-]+) ")
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 _ROW_LINE_RE = re.compile(r"^row:(?: (.*))?$")
 _MATCH_LINE_RE = re.compile(r"^match:( .*)?$")
@@ -191,6 +192,11 @@ def validate_repair(old_rows, new_rows, repaired, read_file: Callable[[str], Opt
             reasons.append(f"match-count row {o.row}")
         elif not syntax_ok(n.file, text.replace(n.match, n.replace, 1)):
             reasons.append(f"mutation-breaks-syntax row {o.row}")
+        elif _IDENT_RE.findall(n.replace) and (
+                (set(_IDENT_RE.findall(n.replace)) & set(_IDENT_RE.findall(o.match)))
+                - set(_IDENT_RE.findall(text))):
+            # A renamed identifier left in `replace` would trip on a NameError, not on the test.
+            reasons.append(f"replace-stale-identifier row {o.row}")
         if difflib.SequenceMatcher(None, o.match, n.match).ratio() < MATCH_SIMILARITY_MIN:
             reasons.append(f"match-dissimilar row {o.row}")
     return reasons

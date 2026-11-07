@@ -17,7 +17,8 @@ FENCE = "`" * 3
 SOURCE = "def f(total_cap, used):\n    return total_cap - used\n"
 OLD_MATCH = "return cap - used"
 NEW_MATCH = "return total_cap - used"
-REPLACE = "return cap + used"
+REPLACE = "return total_cap + used"
+STALE_REPLACE = "return cap + used"
 
 
 def _row_block(row, match=OLD_MATCH, replace=REPLACE, check="false", file="calc.py"):
@@ -116,6 +117,12 @@ def test_unreadable_file_fails_closed(tmp_path):
     old = _parsed(tmp_path, "old.md", _row_block(1))
     new = _parsed(tmp_path, "new.md", _row_block(1, match=NEW_MATCH))
     assert validate_repair(old, new, {"1"}, lambda p: None) == ["not-stale row 1", "match-count row 1"]
+
+
+def test_refuses_replace_with_renamed_away_identifier(tmp_path):
+    reasons = _repair(tmp_path, _row_block(1, match=NEW_MATCH, replace=STALE_REPLACE),
+                      old_block=_row_block(1, replace=STALE_REPLACE))
+    assert reasons == ["replace-stale-identifier row 1"]
 
 
 def test_accepts_stale_row_repair_3680(tmp_path):

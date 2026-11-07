@@ -29,7 +29,6 @@ run_predicate() {
 }
 
 BODY="$(gh pr view "$1" --json body --jq .body)"          || { echo "STOP: gh pr view body failed for PR #$1"; exit 1; }
-TITLE="$(gh pr view "$1" --json title --jq .title)"       || { echo "STOP: gh pr view title failed for PR #$1"; exit 1; }
 LABELS="$(gh pr view "$1" --json labels --jq '.labels')"  || { echo "STOP: gh pr view labels failed for PR #$1"; exit 1; }
 FILES="$(gh pr view "$1" --json files --jq '.files')"     || { echo "STOP: gh pr view files failed for PR #$1"; exit 1; }
 HEADREF="$(gh pr view "$1" --json headRefName --jq .headRefName)" || { echo "STOP: gh pr view headRefName failed for PR #$1"; exit 1; }
@@ -37,6 +36,6 @@ HEADREF="$(gh pr view "$1" --json headRefName --jq .headRefName)" || { echo "STO
 run_predicate "manual-testing-clearance" pr_manual_testing_clearance "$BODY"
 run_predicate "golden-hold"              pr_golden_hold "$FILES"
 run_predicate "dep-holds"                pr_dep_holds "$BODY"
-run_predicate "feat-hold"                pr_feat_hold "$TITLE" "$LABELS"
+run_predicate "ui-hold"                  pr_ui_hold "$FILES" "$LABELS"
 run_predicate "pipeline-authored-hold"   pr_pipeline_authored_hold "$LABELS" "$HEADREF"
 run_predicate "unresolved-findings-hold" pr_unresolved_findings_hold "$1"

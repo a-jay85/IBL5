@@ -136,7 +136,7 @@ def test_no_mutating_gh_commands_ever_executed():
 def _fixture(**over):
     fx = {
         "slug": "synthetic-degrade",
-        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "diff": "diff --git a/ibl5/classes/Trade/TradeService.php b/ibl5/classes/Trade/TradeService.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
                     "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
@@ -179,7 +179,7 @@ def test_clean_rerun_with_open_pr_skips_pr_copy():
     """No pr-copy canned: calling it would raise llm-fixture-missing and fail the run."""
     out = tempfile.mkdtemp()
     canned = {k: v for k, v in CANNED.items() if k != "pr-copy"}
-    fx = _fixture(clean_tree=True, head_subject="feat: add widget")
+    fx = _fixture(clean_tree=True, head_subject="feat: add widget", diff=_UI_DIFF)
     fx["pr_meta"] = dict(fx["pr_meta"], title="feat: synthetic")
     res = runner.run(fx, out, FixtureLlm(UsageLedger(), canned), mode="replay")
     assert res.terminal != TerminalState.FAILED, res.error
@@ -253,6 +253,7 @@ def test_new_pr_on_stacked_branch_opens_against_its_parent():
     assert _created_base(merge_target="origin/parent-branch") == "parent-branch"
 
 
+_UI_DIFF = "diff --git a/ibl5/design/input.css b/ibl5/design/input.css\n+a{}\n"
 _TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
 
 
@@ -277,7 +278,7 @@ def test_model_feat_copy_on_tooling_diff_opens_chore_pr_and_clears_condition_8()
 def test_model_feat_copy_on_runtime_diff_still_opens_feat_pr_and_holds_condition_8():
     out = tempfile.mkdtemp()
     llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
-    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_UI_DIFF), out, llm, mode="replay")
     creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert creates and creates[-1]["title"] == "feat: synthetic"
     assert 8 in {c.number for c in res.arm.holds}

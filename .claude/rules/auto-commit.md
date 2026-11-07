@@ -1,13 +1,13 @@
 ---
 description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test.
-last_verified: 2026-10-06
+last_verified: 2026-11-07
 ---
 
 # Auto-Commit
 
 Worktree work is committed by `/post-plan` (auto-fired) or `/commit-commands:commit-push-pr`.
 
-**PR/commit title type.** Decision test: *"Would a league GM notice a new ability they didn't have before?"* Yes → `feat:` (trips the human-signoff hold by design); invisible to a GM (dev tooling, refactor, doc, dep bump) → `chore:`/`fix:`/`refactor:`/`docs:`. Classify by what the diff **is**. The desired merge outcome plays no part. Full rubric: `.claude/rules/commit-conventions.md`.
+**PR/commit title type.** Decision test: *"Would a league GM notice a new ability they didn't have before?"* Yes → `feat:`; invisible to a GM (dev tooling, refactor, doc, dep bump) → `chore:`/`fix:`/`refactor:`/`docs:`. Classify by what the diff **is**. The desired merge outcome plays no part. Full rubric: `.claude/rules/commit-conventions.md`. The title type no longer affects merging. The human-signoff hold keys on the diff (`bin/lib/ui-change-classifier.sh`).
 
 When you finish a unit of work in a worktree outside the `/post-plan` auto-fire, invoke `/commit-commands:commit` (or `commit-push-pr`). Skip when mid-task or only exploring.
 

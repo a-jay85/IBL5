@@ -26,7 +26,7 @@ DECLINE_EXIT = 10
 
 # 3  unresolved-MISSING-items  (conformance of plan vs diff)
 # 7  plan-auto-merge-hold      (plan frontmatter)
-# 8  feat-commit-type-floor    (PR title)
+# 8  ui-review-floor    (PR files)
 # 13 plan-slug-drift           (plan path vs branch)
 # Excluded: 1 manual-testing state, 2/11 review state, 4 phase-5 verify,
 # 5 golden snapshot, 6 dependency merge order, 9 pr-time safety verdict
@@ -35,18 +35,18 @@ DECLINE_EXIT = 10
 # 15 red CI, 16 meta-checks. All of these can clear on a re-run.
 STRUCTURAL_CONDITIONS = frozenset({3, 7, 8, 13})
 # Conditions only a human can clear (3 = plan files missing, 7 = plan
-# auto_merge: false, 8 = feat signoff floor). A DIRTY PR whose last hold is
+# auto_merge: false, 8 = UI signoff floor). A DIRTY PR whose last hold is
 # a non-empty subset of these only needs a rebase, never a fresh review.
 REBASE_ONLY_CONDITIONS = frozenset({3, 7, 8})
 # Conditions only a human can clear, as the Stage 1 held-unchanged skip sees them
 # (1 manual-testing-clearance, 3 unresolved-MISSING-items, 7 plan-auto-merge-hold,
-# 8 feat-commit-type-floor). A re-run cannot change any of them.
+# 8 ui-review-floor). A re-run cannot change any of them.
 HUMAN_ONLY_CONDITIONS = frozenset({1, 3, 7, 8})
 CONDITION_NAMES = {
     1: "manual-testing-clearance",
     3: "unresolved-MISSING-items",
     7: "plan-auto-merge-hold",
-    8: "feat-commit-type-floor",
+    8: "ui-review-floor",
 }
 ELIGIBLE_EXIT = 10
 FIX_ELIGIBLE_EXIT = 10

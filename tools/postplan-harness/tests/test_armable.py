@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.gitad import LiveGit
-from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, feat_hold,
+from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, ui_hold,
                              manual_testing_clearance, all_rows_ticked)
 from harness.classify import _neutralize_checkboxes
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
@@ -20,7 +20,7 @@ BODY_HELD = "## Summary\nx\n\n## Manual Testing\n\n- [ ] eyeball the layout\n"
 
 def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
+                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY",
@@ -46,11 +46,11 @@ def test_each_condition_blocks():
         inputs(findings=[Finding("code-review", "A", "f.php", 1, "bug", 85)]),  # (2)
         inputs(unresolved_conformance=["MISSING: t.php"]),                  # (3)
         inputs(phase5_status="fail"),                                       # (4)
-        inputs(classification=Classification(golden_changed=True)),         # (5) headless
+        inputs(classification=Classification(golden_changed=True, files=["ibl5/classes/Trade/TradeService.php"])),         # (5) headless
         inputs(dep_state_lookup=lambda n: "OPEN",
                pr_body=BODY_CLEARED + "\nDepends-on: #1400\n"),             # (6)
         inputs(plan_auto_merge_false=True),                                 # (7)
-        inputs(pr_title="feat: shiny new GM power"),                        # (8)
+        inputs(classification=Classification(files=["ibl5/design/input.css"])),                      # (8)
         inputs(llm_safety_holds=["new UI needs visual judgment"]),          # (9)
         inputs(pr_labels=["pipeline-authored"]),                            # (10)
     ]
@@ -67,18 +67,34 @@ def test_fail_closed_on_unknown_dep():
 
 
 def test_golden_interactive_warns_not_blocks():
-    d = evaluate(inputs(classification=Classification(golden_changed=True), headless=False))
+    d = evaluate(inputs(classification=Classification(golden_changed=True, files=["ibl5/classes/Trade/TradeService.php"]), headless=False))
     assert d.armed
     c5 = next(c for c in d.conditions if c.number == 5)
     assert c5.warning and not c5.blocked
 
 
-def test_feat_hold_and_override():
-    assert feat_hold("feat(trade): new button", [])
-    assert feat_hold("FEAT!: breaking", [])
-    assert not feat_hold("feat(trade): new button", ["human-approved"])
-    assert not feat_hold("chore: feat-adjacent", [])
-    assert not feat_hold("refactor: featherweight", [])
+BACKEND_FILES = ["ibl5/classes/Trade/TradeService.php"]
+
+
+def test_ui_hold_css_change_holds():
+    assert ui_hold(["ibl5/design/input.css"], []) == "UI-touching PR awaiting human-signoff"
+    d = evaluate(inputs(classification=Classification(files=["ibl5/design/input.css"])))
+    c8 = next(c for c in d.conditions if c.number == 8)
+    assert c8.name == "ui-review-floor" and c8.blocked
+
+
+def test_ui_hold_human_approved_clears():
+    assert ui_hold(["ibl5/design/input.css"], ["human-approved"]) == ""
+
+
+def test_ui_hold_backend_only_passes():
+    assert ui_hold(BACKEND_FILES, []) == ""
+    d = evaluate(inputs(pr_title="feat: x", classification=Classification(files=BACKEND_FILES)))
+    assert not next(c for c in d.conditions if c.number == 8).blocked
+
+
+def test_ui_hold_empty_files_fails_closed():
+    assert ui_hold([], []) == "ui classifier error"
 
 
 def test_dep_numbers_anchored_only():
@@ -216,11 +232,11 @@ def test_conditions_1_to_19_unchanged_by_removed_guards():
 
 def test_fidelity_is_additive_and_releases_nothing():
     """(12) may add a hold; it may never clear one."""
-    feat = inputs(pr_title="feat: shiny new GM power")          # (8) holds
+    feat = inputs(classification=Classification(files=["ibl5/design/input.css"]))          # (8) holds
     assert {c.number for c in evaluate(feat).holds} == {8}
-    both = inputs(pr_title="feat: shiny new GM power", fidelity_verdict=None)
+    both = inputs(classification=Classification(files=["ibl5/design/input.css"]), fidelity_verdict=None)
     assert {c.number for c in evaluate(both).holds} == {8, 12}
-    cleared = inputs(pr_title="feat: shiny new GM power", fidelity_verdict="READY")
+    cleared = inputs(classification=Classification(files=["ibl5/design/input.css"]), fidelity_verdict="READY")
     assert 8 in {c.number for c in evaluate(cleared).holds}      # (12) did not release (8)
     assert not evaluate(cleared).armed
 
@@ -245,9 +261,9 @@ def test_gate_backtest_reason_surfaces():
 
 def test_gate_backtest_is_additive_and_releases_nothing():
     """(17) may add a hold; it may never clear one."""
-    feat = "feat: shiny new GM power"
-    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="CLEARED")).holds} == {8}
-    assert {c.number for c in evaluate(inputs(pr_title=feat, gate_backtest_status="HELD")).holds} == {8, 17}
+    feat = Classification(files=["ibl5/design/input.css"])
+    assert {c.number for c in evaluate(inputs(classification=feat, gate_backtest_status="CLEARED")).holds} == {8}
+    assert {c.number for c in evaluate(inputs(classification=feat, gate_backtest_status="HELD")).holds} == {8, 17}
     both = inputs(meta_checks_status="HELD", gate_backtest_status="CLEARED")
     assert {c.number for c in evaluate(both).holds} == {16}
 
@@ -260,11 +276,11 @@ _CHARACTERIZATION_FIXTURES = [
     ("finding-85", dict(findings=[Finding("code-review", "A", "f.php", 1, "bug", 85)]), False, {2}),
     ("unresolved-conformance", dict(unresolved_conformance=["MISSING: t.php"]), False, {3}),
     ("phase5-fail", dict(phase5_status="fail"), False, {4}),
-    ("golden-headless", dict(classification=Classification(golden_changed=True)), False, {5}),
+    ("golden-headless", dict(classification=Classification(golden_changed=True, files=["ibl5/classes/Trade/TradeService.php"])), False, {5}),
     ("dep-open", dict(dep_state_lookup=lambda n: "OPEN",
                       pr_body=BODY_CLEARED + "\nDepends-on: #1400\n"), False, {6}),
     ("plan-auto-merge-false", dict(plan_auto_merge_false=True), False, {7}),
-    ("feat-title", dict(pr_title="feat: shiny new GM power"), False, {8}),
+    ("ui-css-files", dict(classification=Classification(files=["ibl5/design/input.css"])), False, {8}),
     ("llm-safety", dict(llm_safety_holds=["new UI needs visual judgment"]), False, {9}),
     ("pipeline-authored", dict(pr_labels=["pipeline-authored"]), False, {10}),
     ("fidelity-none", dict(fidelity_verdict=None), False, {12}),
@@ -274,7 +290,7 @@ _CHARACTERIZATION_FIXTURES = [
     ("red-check", dict(failed_checks=["php-tests"]), False, {15}),
     ("meta-held", dict(meta_checks_status="HELD"), False, {16}),
     ("meta-unknown", dict(meta_checks_status="UNKNOWN"), False, {16}),
-    ("feat-plus-meta-held", dict(pr_title="feat: shiny new GM power",
+    ("ui-plus-meta-held", dict(classification=Classification(files=["ibl5/design/input.css"]),
                                  meta_checks_status="HELD"), False, {8, 16}),
 ]
 
@@ -553,18 +569,19 @@ def test_narrow_row_shape():
 
 
 def test_feat_pr_with_clean_remediation_loop_still_holds():
-    """A Phase 5.5 loop that cleared every machine hold never clears the feat: floor.
+    """A Phase 5.5 loop that cleared every machine hold never clears the UI floor.
 
     This plan never edits armable.py, so the only way this row fails is a later diff
-    weakening feat_hold.
+    weakening ui_hold.
     """
-    d = evaluate(inputs(pr_title="feat: add thing", fidelity_verdict="READY",
+    d = evaluate(inputs(classification=Classification(files=["ibl5/design/input.css"]),
+                        pr_title="chore: add thing", fidelity_verdict="READY",
                         unresolved_conformance=[], findings=[],
                         plan_auto_merge_false=False))
     assert d.armed is False
     c8 = next(c for c in d.holds if c.number == 8)
     assert c8.blocked is True
-    assert c8.reason == "feat: PR awaiting human-signoff"
+    assert c8.reason == "UI-touching PR awaiting human-signoff"
 
 
 def test_auto_merge_false_plan_with_clean_loop_still_holds():

@@ -38,7 +38,7 @@ def test_subset_is_eligible(tmp_path):
     d = str(tmp_path)
     _seed(d, [1, 7, 8])
     assert holdrepeat.human_only_names(d, SLUG) == (
-        "1 manual-testing-clearance, 7 plan-auto-merge-hold, 8 feat-commit-type-floor")
+        "1 manual-testing-clearance, 7 plan-auto-merge-hold, 8 ui-review-floor")
 
 
 def test_single_condition_each(tmp_path):
@@ -47,7 +47,7 @@ def test_single_condition_each(tmp_path):
         1: "1 manual-testing-clearance",
         3: "3 unresolved-MISSING-items",
         7: "7 plan-auto-merge-hold",
-        8: "8 feat-commit-type-floor",
+        8: "8 ui-review-floor",
     }
     for n, text in expected.items():
         _seed(d, [n])

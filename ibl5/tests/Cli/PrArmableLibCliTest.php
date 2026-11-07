@@ -126,35 +126,35 @@ final class PrArmableLibCliTest extends TestCase
         self::assertSame('', $this->runFn('pr_golden_hold', [$files])['output']);
     }
 
-    // --- (8) feat: floor — label-aware ---
+    // --- (8) UI floor — path-keyed, label-aware ---
 
-    public function testFeatHoldFiresOnFeatTitleWithoutLabel(): void
+    public function testUiHoldFiresOnCssChangeWithoutLabel(): void
     {
         self::assertSame(
-            'feat-awaiting-signoff',
-            $this->runFn('pr_feat_hold', ['feat: shiny new page', '[]'])['output']
+            'ui-awaiting-signoff',
+            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/design/input.css"}]', '[]'])['output']
         );
     }
 
-    public function testFeatHoldClearedByHumanApprovedLabel(): void
+    public function testUiHoldClearedByHumanApprovedLabel(): void
     {
         self::assertSame(
             '',
-            $this->runFn('pr_feat_hold', ['feat(x): y', '[{"name":"human-approved"}]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/design/input.css"}]', '[{"name":"human-approved"}]'])['output']
         );
     }
 
-    public function testFeatHoldEmptyForNonFeatTitle(): void
-    {
-        self::assertSame('', $this->runFn('pr_feat_hold', ['fix(a11y): z', '[]'])['output']);
-    }
-
-    public function testFeatHoldFiresOnBangVariant(): void
+    public function testUiHoldEmptyForBackendOnlyChange(): void
     {
         self::assertSame(
-            'feat-awaiting-signoff',
-            $this->runFn('pr_feat_hold', ['feat!: breaking', '[]'])['output']
+            '',
+            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/Trade/TradeService.php"}]', '[]'])['output']
         );
+    }
+
+    public function testUiHoldFailsClosedOnEmptyFileList(): void
+    {
+        self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', ['[]', '[]'])['output']);
     }
 
     // --- (10) pipeline-authored floor — UNCONDITIONAL (no override label) ---

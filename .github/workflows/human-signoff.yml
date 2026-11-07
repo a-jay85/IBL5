@@ -1,6 +1,6 @@
 name: Human Sign-off
 
-# Deterministic human-sign-off gate for feature PRs.
+# Deterministic human-sign-off gate for PRs that change the UI.
 #
 # Why this exists: the automouse autonomous pipeline (bin/automouse/run → /post-plan
 # Phase 6.5) arms `gh pr merge --squash --auto`, and master's branch protection
@@ -8,16 +8,26 @@ name: Human Sign-off
 # revert of #1073–#1076). A docs/frontmatter convention (#1072) could not stop
 # this: the automouse path never reads it and GitHub has nothing to block on.
 #
-# This job IS that block. Once added to master's required status checks, a
-# `feat:` PR stays un-mergeable (red required check) until a human inspects it
-# and applies the `human-approved` label. `--auto` queues but GitHub never
-# completes the merge while a required check is red. Non-feature work
-# (fix/refactor/chore/docs/ci/revert/…) passes automatically, so the automouse
-# pipeline can still auto-merge maintenance.
+# This job IS that block. Once added to master's required status checks, a PR
+# that changes the UI stays un-mergeable (red required check) until a human
+# inspects it and applies the `human-approved` label. `--auto` queues but
+# GitHub never completes the merge while a required check is red. The verdict
+# never reads the PR title. It comes from bin/lib/ui-change-classifier.sh: a PR
+# holds when a changed path is on the UI list, or when its VR gallery shows a
+# gating changed or new cell, or when the classifier cannot tell. Every other
+# PR passes, so the automouse pipeline can still auto-merge backend and tooling
+# work.
 #
-# The classifier itself lives in bin/lib/human-signoff-classifier.sh, sourced by
-# BOTH this workflow and bin/test-human-signoff-classifier so the gate's logic
-# cannot drift from its regression test.
+# The VR gallery arrives late. When no path is on the UI list and VR is
+# expected to run, this job waits in-job for the same-tree gallery artifact
+# that e2e-tests.yml uploads (`vr-gallery-json-<head tree>`), for up to
+# UI_VR_ATTEMPTS x UI_VR_SLEEP seconds. It stops early once every same-SHA
+# `E2E Tests` run finished without one. A timeout holds (`vr-missing`).
+#
+# The classifiers live in bin/lib/human-signoff-classifier.sh and
+# bin/lib/ui-change-classifier.sh, sourced by BOTH this workflow and
+# bin/test-human-signoff-classifier so the gate's logic cannot drift from its
+# regression test.
 #
 # The `needs-a-human-label` job mirrors the gate's verdict onto the PR as the
 # `needs-a-human` label: added while the gate is red, removed once it passes.
@@ -29,21 +39,16 @@ name: Human Sign-off
 # job checks out the PR head and computes the patch-id of origin/<base>...HEAD.
 # When the event is the label being applied, the gate passes and the
 # human-approved-fingerprint job records that id in a github-actions[bot]
-# comment. On every other event for a feat: PR holding the label, the gate
+# comment. On every other event for a UI PR holding the label, the gate
 # compares the current id with the newest bot record. A mismatch, a missing
 # record, or any error reds the gate in the same run (so auto-merge cannot
 # complete first), and the write job removes the label and comments why.
 #
-# Job-level skip (ADR 0210, see ibl5/docs/decisions/): the `human-signoff` job
-# skips a labeled/unlabeled event for any label except `human-approved`, and an
-# `edited` event that did not change the title, but ONLY when the title contains
-# no `feat` substring. The verdict reads only the title and that one label, and a
-# title with no `feat` can never fail, so the skipped run (which GitHub reports
-# as success) equals the verdict under either same-name check-run precedence.
-# A feat* title always runs. The skipped runs use a per-run concurrency group so
-# they never cancel a real queued run (the ADR-0145 incident). The predicate is
-# copied verbatim into the concurrency group; bin/test-human-signoff-classifier
-# asserts the two copies are identical and that a feat title never skips.
+# No job-level skip. The title-keyed skip of ADR 0210 is gone: the verdict now
+# depends on the diff and the VR gallery, which no event payload carries, so a
+# skipped run (which GitHub reports as success) could post a passing check on a
+# held PR. Each event cancels and replaces the per-PR run. The needs-a-human
+# label is written with github.token, so it starts no new run.
 #
 # Approval race (ADR-0062 Update 2026-11-02): a `labeled` event for
 # human-approved runs in its own per-run group (`-approve-<run_id>`), so a push
@@ -57,26 +62,25 @@ name: Human Sign-off
 on:
   pull_request:
     branches: [ master ]
-    # labeled/unlabeled re-run the gate so applying `human-approved` flips red→green;
-    # edited re-runs when the title (the classifier input) changes. The job-level
-    # `if:` below skips the label and edit events the verdict cannot depend on.
+    # labeled/unlabeled re-run the gate so applying `human-approved` flips red→green.
+    # Every event runs the job; none may skip.
     types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
   issues: read
   pull-requests: read
+  actions: read
 
 concurrency:
-  group: ${{ (!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) && format('human-signoff-{0}-skip-{1}', github.event.pull_request.number, github.run_id) || (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
+  group: ${{ (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
   cancel-in-progress: true
 
 jobs:
   human-signoff:
     name: human-signoff
-    if: ${{ !(!contains(github.event.pull_request.title, 'feat') && ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'human-approved' || github.event.action == 'edited' && github.event.changes.title == null)) }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 60
     outputs:
       verdict: ${{ steps.eval.outputs.verdict }}
       reason: ${{ steps.eval.outputs.reason }}
@@ -85,7 +89,7 @@ jobs:
       approved_at: ${{ steps.eval.outputs.approved_at }}
     steps:
       # Check out the PR HEAD (not the default refs/pull/N/merge), shallow. The
-      # eval step deepens history only for a feat: PR holding the label, so the
+      # eval step deepens history only for a UI PR holding the label, so the
       # fingerprint is the PR's own diff against its merge base.
       - name: Checkout the PR head (shared classifier lib)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,7 +99,7 @@ jobs:
       - name: Evaluate human sign-off and the approved-diff fingerprint
         id: eval
         env:
-          TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           ACTION: ${{ github.event.action }}
           EVENT_LABEL: ${{ github.event.label.name }}
@@ -107,19 +111,35 @@ jobs:
           # Bounded wait for an in-flight approving run's record (ADR-0062 Update 2026-11-02).
           HS_AWAIT_ATTEMPTS: '20'
           HS_AWAIT_SLEEP: '15'
+          # Bounded wait for the same-tree VR gallery artifact (e2e-tests.yml).
+          UI_VR_ATTEMPTS: '90'
+          UI_VR_SLEEP: '30'
         run: |
           set -euo pipefail
           # shellcheck source=bin/lib/human-signoff-classifier.sh
           source bin/lib/human-signoff-classifier.sh
+          # shellcheck source=bin/lib/ui-change-classifier.sh
+          source bin/lib/ui-change-classifier.sh
+          PATHS="$RUNNER_TEMP/ui-paths.txt"
+          if ! gh api --paginate "repos/$GH_REPO/pulls/$PR/files" \
+               --jq '.[] | .filename, (.previous_filename // empty)' > "$PATHS"; then
+            : > "$PATHS"   # empty list -> ui-unknown -> hold
+          fi
+          if [ "$(wc -l < "$PATHS")" -ge 3000 ]; then : > "$PATHS"; fi  # API cap: cannot tell
+          UI_TREE=$(gh api "repos/$GH_REPO/git/commits/$HEAD_SHA" --jq .tree.sha) || UI_TREE=""
+          export UI_TREE
+          UI_VERDICT=$(ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh) || true
+          UI_VERDICT="${UI_VERDICT:-ui-unknown}"
+          echo "UI verdict: $UI_VERDICT"
 
           # Every failure below leaves FP or COMMENTS empty/absent, and
-          # hs_eval_approval turns that into a red gate for a feat: PR holding
-          # the label. Non-feat PRs never read either value.
-          # Only a feat: PR holding the label reads FP or COMMENTS. Every other
+          # hs_eval_approval turns that into a red gate for a UI PR holding
+          # the label. A not-ui PR never reads either value.
+          # Only a UI PR holding the label reads FP or COMMENTS. Every other
           # PR skips the deep fetch, the diff, and the comment read.
           FP=""
           COMMENTS="$RUNNER_TEMP/hs-comments.json"
-          if hs_is_feat_title "$TITLE" && hs_pr_cleared "$TITLE" "$LABELS"; then
+          if [ "$UI_VERDICT" != not-ui ] && hs_pr_cleared "$UI_VERDICT" "$LABELS"; then
             if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
               git fetch --no-tags --quiet --unshallow origin || echo "::warning::could not deepen history"
             fi
@@ -136,11 +156,11 @@ jobs:
             if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \
                    && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$COMMENTS"; }; then
               rm -f "$COMMENTS"
-              echo "Comment read failed; a feat: PR holding the label will fail closed"
+              echo "Comment read failed; a UI PR holding the label will fail closed"
             fi
           fi
 
-          hs_eval_approval "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" || true
+          hs_eval_approval "$ACTION" "$EVENT_LABEL" "$UI_VERDICT" "$LABELS" "$FP" "$COMMENTS" || true
 
           # A push seconds after the label (an update-branch merge) can read
           # comments before the approving run posts its record. When the newest
@@ -159,7 +179,7 @@ jobs:
                 && jq 'add // []' "$RUNNER_TEMP/hs-pages.json" > "$1"
             }
             hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments \
-              "$ACTION" "$EVENT_LABEL" "$TITLE" "$LABELS" "$FP" "$COMMENTS" "$EVENTS" || true
+              "$ACTION" "$EVENT_LABEL" "$UI_VERDICT" "$LABELS" "$FP" "$COMMENTS" "$EVENTS" || true
           fi
 
           # The approving run records its own label event time, so the write
@@ -194,7 +214,7 @@ jobs:
       # A separate step maps the verdict to the check result, so the outputs
       # above are always published for the write job. An unset or unknown
       # verdict (the eval step crashed) is red.
-      - name: Require human sign-off for feature PRs
+      - name: Require human sign-off for UI PRs
         env:
           VERDICT: ${{ steps.eval.outputs.verdict }}
         run: |

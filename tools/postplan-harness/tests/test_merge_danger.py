@@ -182,17 +182,19 @@ def test_notify_action_and_mail_class_are_external():
         assert (d.door, d.blast) == ("one-way", "external"), path
 
 
-def test_arming_path_is_one_way():
+def test_arming_path_is_two_way_self_governing():
     d = _derive([("M", "bin/lib/pr-armable.sh")])
-    assert d.door == "one-way"
+    assert d.door == "two-way"
+    assert d.self_governing is True
     assert d.blast == "site-wide"
     assert "arming-path:bin/lib/pr-armable.sh" in d.triggers
 
 
-def test_gate_removed_is_one_way():
+def test_gate_removed_is_two_way_self_governing():
     gates = [GateChange("bin/check-foo", "check-script", "removed", None, "gate deleted")]
     d = _derive([("D", "bin/check-foo")], gates=gates)
-    assert d.door == "one-way"
+    assert d.door == "two-way"
+    assert d.self_governing is True
     assert "gate-removed:bin/check-foo" in d.triggers
 
 
@@ -494,3 +496,116 @@ def test_inject_replaces_in_place_and_is_idempotent():
     appended = md.inject_merge_danger("## Summary\n\nbody\n", TWO)
     assert appended.endswith("\n\n" + md.render_merge_danger(TWO))
     assert md.inject_merge_danger(appended, TWO) == appended
+
+
+# --- self-governing segment (narrowed Door) ----------------------------------------------------
+
+_ARM = [("M", "bin/lib/pr-armable.sh")]
+_GATE_RM = [GateChange("bin/check-foo", "check-script", "removed", None, "gate deleted")]
+_DROP_DIFF = _migration_diff(MIG, "ALTER TABLE ibl_plr DROP COLUMN foo;")
+_LLM_WHY = "a tidy refactor of the helper with no behavior change at all"
+
+
+def _body(line):
+    return "## Summary\nx\n\n" + line
+
+
+def test_derive_arming_path_only_two_way_self_governing():
+    d = _derive(_ARM)
+    assert d.door == "two-way"
+    assert d.self_governing is True
+    assert "arming-path:bin/lib/pr-armable.sh" in d.triggers
+
+
+def test_derive_gate_removed_only_two_way_self_governing():
+    d = _derive([("D", "bin/check-foo")], gates=_GATE_RM)
+    assert d.door == "two-way"
+    assert d.self_governing is True
+
+
+def test_derive_true_one_way_kinds_unchanged():
+    wf = ".github/workflows/nightly.yml"
+    cases = [
+        _derive([("A", MIG)], _DROP_DIFF),
+        _derive([("M", "bin/db-sync-prod")]),
+        _derive([("M", wf)], read=lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == wf else None),
+    ]
+    for d in cases:
+        assert d.door == "one-way", d
+        assert d.self_governing is False, d
+
+
+def test_derive_combined_one_way_and_self_governing():
+    d = _derive(_ARM + [("A", MIG)], _DROP_DIFF)
+    assert d.door == "one-way"
+    assert d.self_governing is True
+
+
+def test_render_parse_round_trip_self_governing():
+    d = _derive(_ARM)
+    line = md.render_merge_danger(d)
+    assert " · Blast radius: site-wide · Self-governing: yes · Why: " in line
+    parsed = md.parse_merge_danger(_body(line))
+    assert parsed.self_governing is True
+    assert parsed.door == "two-way"
+    plain = md.render_merge_danger(_derive([("M", "docs/a.md")]))
+    assert "Self-governing" not in plain
+    assert md.parse_merge_danger(_body(plain)).self_governing is False
+
+
+def test_classify_body_self_governing_state():
+    two = md.render_merge_danger(_derive(_ARM))
+    one = md.render_merge_danger(_derive(_ARM + [("A", MIG)], _DROP_DIFF))
+    assert md.classify_body(_body(two)) == "SELF-GOVERNING"
+    assert md.classify_body(_body(one)) == "ONE-WAY"
+
+
+def test_merge_verdicts_never_drops_floor_self_governing():
+    floor = _derive(_ARM)
+    for bar in (True, False):
+        out = md.merge_verdicts(floor, "two-way", "localized", _LLM_WHY, llm_raise_bar=bar)
+        assert out.self_governing is True, bar
+        assert out.door == "two-way"
+        assert "arming-path:bin/lib/pr-armable.sh" in out.why
+
+
+def test_phase2_llm_marker_dropped_at_floor():
+    floor = _derive([("M", "docs/a.md")])
+    out = md.merge_verdicts(floor, "two-way", "localized", _LLM_WHY,
+                            llm_raise_bar=True, llm_self_governing=True)
+    assert out.self_governing is False
+
+
+def test_later_phase_human_marker_kept():
+    floor = _derive([("M", "docs/a.md")])
+    out = md.merge_verdicts(floor, "two-way", "localized", _LLM_WHY,
+                            llm_raise_bar=False, llm_self_governing=True)
+    assert out.self_governing is True
+
+
+def test_merge_verdicts_never_lowers_true_one_way():
+    floor = _derive([("A", MIG)], _DROP_DIFF)
+    for bar in (True, False):
+        out = md.merge_verdicts(floor, "two-way", "localized", _LLM_WHY, llm_raise_bar=bar)
+        assert out.door == "one-way", bar
+        assert out.self_governing is False
+
+
+_TWO_WAY_BODY = _body("**Merge danger:** Door: two-way · Blast radius: site-wide · Why: "
+                      "a tidy refactor of the helper with no behavior change")
+
+
+def test_classify_with_floor_stripped_marker_holds():
+    assert md.classify_body(_TWO_WAY_BODY) == "TWO-WAY"
+    assert md.classify_with_floor(_TWO_WAY_BODY, _derive(_ARM)) == "SELF-GOVERNING"
+    assert md.classify_with_floor(_TWO_WAY_BODY, _derive([("M", "docs/a.md")])) == "TWO-WAY"
+
+
+def test_classify_with_floor_lowered_door_holds():
+    one_floor = _derive([("A", MIG)], _DROP_DIFF)
+    assert md.classify_with_floor(_TWO_WAY_BODY, one_floor) == "ONE-WAY"
+    assert md.classify_with_floor(_body("no line"), one_floor) == "MISSING"
+    two = _body(md.render_merge_danger(_derive([("M", "docs/a.md")])) + "\n" +
+                md.render_merge_danger(_derive([("M", "docs/a.md")])))
+    assert md.classify_with_floor(two, one_floor) == "MALFORMED"
+    assert md.classify_with_floor(None, one_floor) == "UNREADABLE"

@@ -5,9 +5,13 @@ Pure functions only. No subprocess, network, or git calls live here, apart from 
 the contract between `/post-plan` Phase 2 (writer), the harness body check (validator), Phase 6.5
 condition (18) (reader), and `bin/digest-dm-build` (reader). The Phase 6.5 shell twin is
 `pr_merge_danger_hold` in `bin/lib/pr-armable.sh`; keep its regex in step with `FIELD_RE`.
+The optional ` · Self-governing:` segment before Why accepts only `yes`; any other value is malformed.
 
 The door is derived from the realized diff and only ever raised: the LLM (or a human) may move
-`two-way` to `one-way` or widen the blast radius, never the reverse.
+`two-way` to `one-way` or widen the blast radius, never the reverse. `Door: one-way` means an
+effect `git revert` cannot undo (data loss, prod external state, an outbound message). A diff that
+edits the merge machinery itself (an arming path, a removed gate) sets the Self-governing segment
+instead; condition (18) holds on either signal, and nothing may drop a floor marker.
 """
 from __future__ import annotations
 
@@ -30,8 +34,9 @@ DOORS = ("two-way", "one-way")                                  # index = rank; 
 BLAST = ("localized", "module", "site-wide", "external")        # index = rank
 WHY_MIN, WHY_MAX = 20, 200
 FIELD_PREFIX = "**Merge danger:**"
+SELF_GOVERNING_KINDS = ("arming-path", "gate-removed")
 FIELD_RE = re.compile(
-    r"^\*\*Merge danger:\*\* Door: (?P<door>[a-z-]+) · Blast radius: (?P<blast>[a-z-]+) · Why: (?P<why>.+)$"
+    r"^\*\*Merge danger:\*\* Door: (?P<door>[a-z-]+) · Blast radius: (?P<blast>[a-z-]+)(?: · Self-governing: (?P<sg>[a-z-]+))? · Why: (?P<why>.+)$"
 )
 _LINE_RE = re.compile(r"^\*\*Merge danger:\*\*")
 _EXTERNAL_PATHS = ("bin/db-sync-prod", ".github/workflows/promote-to-production.yml", "bin/discord-dm")
@@ -49,6 +54,7 @@ class MergeDanger:
     blast: str
     why: str
     triggers: tuple[str, ...] = ()
+    self_governing: bool = False
 
 
 class MalformedMergeDanger(ValueError):
@@ -129,7 +135,8 @@ def derive_merge_danger(
     gate_changes: list[GateChange],
     read_candidate: Callable[[str], str | None],
 ) -> MergeDanger:
-    """The mechanical floor. Any trigger makes the door one-way.
+    """The mechanical floor. A destructive, external or notify trigger makes the door one-way;
+    an arming-path or gate-removed trigger sets self_governing and leaves the door alone.
 
     changed: (status, path) pairs, as `gate_backtest.changes_from_unified_diff` returns them.
     gate_changes: the `detect_gate_changes` result for the same diff.
@@ -175,7 +182,8 @@ def derive_merge_danger(
                     add(f"notify-workflow:{wf}")
                     external = True
 
-    # 3. Self-governing merge machinery (the bootstrap hazard).
+    # 3. Self-governing merge machinery (the bootstrap hazard). These triggers set the
+    # Self-governing segment and leave the Door alone: `git revert` undoes them.
     for p in paths:
         if p in _ARMING_PATHS:
             add(f"arming-path:{p}")
@@ -188,11 +196,14 @@ def derive_merge_danger(
         if g.state == "removed":
             add(f"gate-removed:{g.path}")
 
-    door = "one-way" if triggers else "two-way"
+    door_triggers = [t for t in triggers if t.split(":", 1)[0] not in SELF_GOVERNING_KINDS]
+    door = "one-way" if door_triggers else "two-way"
+    self_governing = len(door_triggers) < len(triggers)
     blast = _blast_radius(paths, gate_changes, external)
     why = ("mechanical: " + "; ".join(triggers)) if triggers else \
         "mechanical: no one-way trigger in the realized diff"
-    return MergeDanger(door, blast, why[:WHY_MAX].rstrip(), tuple(triggers))
+    return MergeDanger(door, blast, why[:WHY_MAX].rstrip(), tuple(triggers),
+                       self_governing=self_governing)
 
 
 def _rank(value: str | None, scale: tuple[str, ...]) -> int:
@@ -234,12 +245,17 @@ def merge_verdicts(
     llm_why: str | None,
     *,
     llm_raise_bar: bool = False,
+    llm_self_governing: bool = False,
 ) -> MergeDanger:
     """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers.
 
     llm_raise_bar: Phase 2 only. A one-way the floor did not raise is kept only when the Why
     (prefix stripped) names a concrete irreversible effect per _IRREVERSIBLE_RE; otherwise the
-    door stays at the mechanical floor. Blast radius is never subject to the bar."""
+    door stays at the mechanical floor. Blast radius is never subject to the bar.
+
+    llm_self_governing: the marker the LLM or the live body carries. The floor marker is never
+    dropped. At Phase 2 (llm_raise_bar=True) an LLM marker above the floor is ignored, mirroring
+    the door bar; later phases keep a human-added marker."""
     # Every [:WHY_MAX] cut is re-stripped: a cut landing after a space would leave a trailing
     # space that the next phase's _clean_why drops, so the line would change between phases.
     core = _llm_core(llm_why)[:WHY_MAX].rstrip()
@@ -251,7 +267,7 @@ def merge_verdicts(
     blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
     if len(core) < WHY_MIN:
         why = mechanical.why
-    elif mechanical.door == "one-way":
+    elif mechanical.door == "one-way" or mechanical.self_governing:
         # Cut first, then re-check: a long prefix can leave under WHY_MIN core chars, and a
         # later re-application would see that short core and fall back, breaking the fixed point.
         why = f"{mechanical.why}. {core}"[:WHY_MAX].rstrip()
@@ -259,12 +275,14 @@ def merge_verdicts(
             why = mechanical.why
     else:
         why = core
-    return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers)
+    return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers,
+                       self_governing=mechanical.self_governing or (llm_self_governing and not llm_raise_bar))
 
 
 def render_merge_danger(md: MergeDanger) -> str:
     why = _clean_why(md.why)[:WHY_MAX]
-    return f"{FIELD_PREFIX} Door: {md.door} · Blast radius: {md.blast} · Why: {why}"
+    seg = " · Self-governing: yes" if md.self_governing else ""
+    return f"{FIELD_PREFIX} Door: {md.door} · Blast radius: {md.blast}{seg} · Why: {why}"
 
 
 def parse_merge_danger(body: str) -> MergeDanger | None:
@@ -286,11 +304,20 @@ def parse_merge_danger(body: str) -> MergeDanger | None:
         raise MalformedMergeDanger(f"unknown Blast radius {blast!r}")
     if len(why) < WHY_MIN:
         raise MalformedMergeDanger(f"Why is shorter than {WHY_MIN} chars")
-    return MergeDanger(door, blast, why)
+    sg = m.group("sg")
+    why_text = m.group("why")
+    if sg is not None and sg != "yes":
+        raise MalformedMergeDanger(f"Self-governing must be 'yes' when present, got {sg!r}")
+    if " · Self-governing:" in why_text:
+        raise MalformedMergeDanger("Self-governing segment must sit before Why")
+    return MergeDanger(door, blast, why, self_governing=(sg == "yes"))
 
 
 def classify_body(body: str | None) -> str:
-    """"ONE-WAY" | "TWO-WAY" | "MISSING" | "MALFORMED" | "UNREADABLE"."""
+    """"ONE-WAY" | "SELF-GOVERNING" | "TWO-WAY" | "MISSING" | "MALFORMED" | "UNREADABLE".
+
+    SELF-GOVERNING is a two-way door carrying the Self-governing segment; a one-way door with
+    the segment is ONE-WAY."""
     if body is None:
         return "UNREADABLE"
     try:
@@ -299,7 +326,22 @@ def classify_body(body: str | None) -> str:
         return "MALFORMED"
     if md is None:
         return "MISSING"
+    if md.door == "two-way" and md.self_governing:
+        return "SELF-GOVERNING"
     return "ONE-WAY" if md.door == "one-way" else "TWO-WAY"
+
+
+def classify_with_floor(body: str | None, floor: MergeDanger) -> str:
+    """classify_body re-checked against this diff's mechanical floor (raise-only).
+
+    A TWO-WAY body over a one-way floor is ONE-WAY; over a self-governing floor it is
+    SELF-GOVERNING. Any other state already holds and is returned unchanged."""
+    state = classify_body(body)
+    if state != "TWO-WAY":
+        return state
+    if floor.door == "one-way":
+        return "ONE-WAY"
+    return "SELF-GOVERNING" if floor.self_governing else state
 
 
 def validate_merge_danger_field(body: str) -> list[str]:

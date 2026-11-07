@@ -53,3 +53,34 @@ def test_max_depth():
     assert max_depth("standard", "") == "deep"
     assert max_depth("standard", "Standard") == "deep"
     assert max_depth() == "deep"
+
+
+_RD_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))), "bin", "lib", "review-depth.sh")
+_SG_BODY = ("## Summary\nx\n\n**Merge danger:** Door: two-way · Blast radius: localized · "
+            "Self-governing: yes · Why: mechanical: arming-path:bin/lib/pr-armable.sh")
+_SG_AFTER_WHY_BODY = ("## Summary\nx\n\n**Merge danger:** Door: two-way · Blast radius: localized · "
+                      "Why: mechanical: arming-path:bin/lib/pr-armable.sh · Self-governing: yes")
+
+
+def _shell_depth(body):
+    import subprocess
+    out = subprocess.run(["bash", _RD_SCRIPT], input=body, capture_output=True, text=True, check=True)
+    return out.stdout.split()[0]
+
+
+def test_review_depth_self_governing_is_deep():
+    assert _shell_depth(_SG_BODY) == "deep"
+    plain = _SG_BODY.replace(" · Self-governing: yes", "")
+    assert _shell_depth(plain) == "standard"
+
+
+def test_review_depth_py_self_governing_is_deep():
+    assert classify_depth(_SG_BODY) == ("deep", "self-governing")
+    assert depth_for_body(_SG_BODY.replace(" · Self-governing: yes", "")) == "standard"
+
+
+def test_review_depth_misplaced_marker_is_deep_both_twins():
+    assert _shell_depth(_SG_AFTER_WHY_BODY) == "deep"
+    assert depth_for_body(_SG_AFTER_WHY_BODY) == "deep"
+    assert classify_depth(_SG_AFTER_WHY_BODY) == ("deep", "self-governing")

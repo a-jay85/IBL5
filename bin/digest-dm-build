@@ -8,8 +8,9 @@
 #   digest is NOT an error: it degrades the message body and still exits 0.
 #   --pr-body-file is optional; when it names a readable PR body carrying a valid
 #   `**Merge danger:**` line, a one-way door adds a loud line above the PR header (any
-#   after-merge lines print first) and a two-way localized change compresses the
-#   What/Watch budgets. An unreadable path exits 2; a missing or malformed danger
+#   after-merge lines print first), a two-way door carrying `Self-governing: yes` adds a
+#   SELF-GOVERNING sign-off line there instead, and any other two-way localized change
+#   compresses the What/Watch budgets. An unreadable path exits 2; a missing or malformed danger
 #   line leaves the output unchanged.
 #   After-merge mode: [--ping-out FILE] [--manual-count N] [--auto-ci-count N]
 #   [--auto-mac-count N] [--auto-failed-count N] [--comment-url URL] [--run-url URL]
@@ -194,10 +195,14 @@ WATCH="${WATCH//@/@$ZWSP}"
 BRANCH="${BRANCH//@/@$ZWSP}"
 # Merge danger (optional): parsed from the PR body file with the same line shape that
 # bin/lib/pr-armable.sh pr_merge_danger_hold and harness/merge_danger.py accept.
-DANGER_LINE=""; MD_DOOR=""; MD_BLAST=""
+DANGER_LINE=""; MD_DOOR=""; MD_BLAST=""; MD_SG=no
 if [ -n "$PR_BODY_FILE" ]; then
     [ -r "$PR_BODY_FILE" ] || { echo "digest-dm-build: --pr-body-file not readable: $PR_BODY_FILE" >&2; exit 2; }
-    MD_RAW="$(grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external) · Why: .{20,}$' "$PR_BODY_FILE" | head -n1 || true)"
+    MD_RAW="$(grep -E '^\*\*Merge danger:\*\* Door: (one-way|two-way) · Blast radius: (localized|module|site-wide|external)( · Self-governing: [^ ]+)? · Why: .{20,}$' "$PR_BODY_FILE" | head -n1 || true)"
+    # Match the ` · Self-governing:` segment anywhere on the line, with any value, so a
+    # mangled or misplaced segment (even one after Why) gets the banner and never compresses.
+    # Plain Why prose that names the label without the ` · ` separator does not set it.
+    case "$MD_RAW" in *' · Self-governing:'*) MD_SG=yes ;; *) MD_SG=no ;; esac
     if [ -n "$MD_RAW" ]; then
         MD_DOOR="${MD_RAW#*Door: }"; MD_DOOR="${MD_DOOR%% ·*}"
         MD_BLAST="${MD_RAW#*Blast radius: }"; MD_BLAST="${MD_BLAST%% ·*}"
@@ -206,8 +211,15 @@ fi
 if [ "$MD_DOOR" = one-way ]; then
     DANGER_LINE="!! ONE-WAY DOOR (blast radius: $MD_BLAST)"
     WHAT_MAX=$((WHAT_MAX - ${#DANGER_LINE} - 1))     # the prefix spends from WHAT's budget
-elif [ "$MD_DOOR" = two-way ] && [ "$MD_BLAST" = localized ]; then
-    WHAT_MAX=400; WATCH_MAX=200                      # quiet merge: compressed body
+elif [ "$MD_DOOR" = two-way ]; then
+    if [ "$MD_SG" = yes ]; then
+        # Self-governing: the diff edits a gate that judges its own merge, so the owner signs off.
+        DANGER_LINE="!! SELF-GOVERNING: owner sign-off required (blast radius: $MD_BLAST)"
+        WHAT_MAX=$((WHAT_MAX - ${#DANGER_LINE} - 1)) # the prefix spends from WHAT's budget
+    fi
+    if [ "$MD_BLAST" = localized ] && [ "$MD_SG" != yes ]; then
+        WHAT_MAX=400; WATCH_MAX=200                  # quiet merge: compressed body
+    fi
 fi
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 

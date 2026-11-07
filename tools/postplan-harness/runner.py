@@ -915,7 +915,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 meta_checks_status=_mc_status,
                 gate_backtest_status=_gb.status,
                 gate_backtest_reason=_gb.reason,
-                merge_danger_state=merge_danger.classify_body(_arm_body),
+                merge_danger_state=_arm_merge_danger_state(_arm_body, worktree,
+                                                           git.diff_vs_base(), log),
                 retried_stages=sorted(res.retries),
                 removed_guards_holds=_rg_holds,
             )
@@ -2803,13 +2804,31 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
                                         prior.blast if prior else None,
                                         prior.why if prior else None,
+                                        llm_self_governing=(prior.self_governing if prior else False),
                                         llm_raise_bar=(phase == "phase2"))
     if prior and prior.door == "one-way" and final.door == "two-way":
         log(f"{phase}: LLM one-way kept at the mechanical two-way floor; the Why names no "
             f"irreversible effect ({prior.why[:80]!r})")
     log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
-        f"triggers={list(final.triggers)}")
+        f"self_governing={final.self_governing} triggers={list(final.triggers)}")
     return merge_danger.inject_merge_danger(body, final)
+
+
+def _arm_merge_danger_state(body: str, worktree, diff_body: str, log) -> str:
+    """Phase 6.5: condition (18) state for the arm body, re-checked against this diff.
+
+    The body alone cannot show a stripped Self-governing segment or a Door lowered by
+    hand, so a TWO-WAY body is re-checked against the mechanical floor. A floor that
+    cannot be derived holds (fail closed)."""
+    state = merge_danger.classify_body(body)
+    if state != "TWO-WAY":
+        return state
+    try:
+        floor = merge_danger.derive_from_worktree(worktree or ".", diff_body)
+    except Exception as exc:  # fail closed: an unreadable floor holds condition (18)
+        log(f"phase6.5: merge-danger floor unreadable ({exc}); condition (18) holds")
+        return "UNREADABLE"  # derive failed: hold
+    return merge_danger.classify_with_floor(body, floor)
 
 
 def _detector_root(worktree) -> str:

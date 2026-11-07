@@ -125,6 +125,7 @@ pr_json() {
 
 DANGER_TWO_WAY='**Merge danger:** Door: two-way · Blast radius: localized · Why: fixture change, a revert restores it'
 DANGER_ONE_WAY='**Merge danger:** Door: one-way · Blast radius: site-wide · Why: fixture prunes data a revert cannot restore'
+DANGER_SELF_GOV='**Merge danger:** Door: two-way · Blast radius: localized · Self-governing: yes · Why: mechanical: arming-path:bin/lib/pr-armable.sh'
 MT_CLEAR=$'## Manual Testing\nNo manual testing needed (covered by automated tests).'
 BODY_CLEAR="$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_TWO_WAY")"
 BODY_HELD="$(printf '## Summary\nx\n\n## Manual Testing\n- [ ] click the button')"
@@ -286,6 +287,16 @@ assert_match  "C10b bucket=HELD"              "^HELD$"               "$(row_buck
 assert_match  "C10b HOLDS names one-way"      "merge-danger:ONE-WAY" "$OUT"
 assert_absent "C10b no pr merge"              "pr merge"             "$(cat "$FIX/calls.log" 2>/dev/null)"
 assert_status "C10b exit 0"                   0                      "$ST"
+
+# --- C10b2: cleared + green, two-way door with the Self-governing segment is HELD (condition 18) ---
+FIX="$(mktemp -d -p "$TMP")"
+checks_json success success success > "$FIX/checks-$(printf '%040d' 44).json"
+pr_json 44 BEHIND "$(printf '## Summary\nx\n\n%s\n\n%s' "$MT_CLEAR" "$DANGER_SELF_GOV")" | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+assert_match  "C10b2 bucket=HELD"             "^HELD$"                       "$(row_bucket "$OUT" 44)"
+assert_match  "C10b2 HOLDS names self-gov"    "merge-danger:SELF-GOVERNING"  "$OUT"
+assert_absent "C10b2 no pr merge"             "pr merge"                     "$(cat "$FIX/calls.log" 2>/dev/null)"
+assert_status "C10b2 exit 0"                  0                              "$ST"
 
 # --- C10c: cleared + green but no merge-danger line is HELD (condition 18 fails closed) ---
 FIX="$(mktemp -d -p "$TMP")"

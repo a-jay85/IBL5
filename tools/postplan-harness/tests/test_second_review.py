@@ -22,13 +22,9 @@ CLEAN_REPLY = "CLEARS 7: the diff only adds a read-only tool\nVERDICT: CLEAN\n"
 
 
 @pytest.fixture(autouse=True)
-def _clean_verdict_file():
-    path = second_review.verdict_path(PR)
-    if os.path.exists(path):
-        os.unlink(path)
-    yield
-    if os.path.exists(path):
-        os.unlink(path)
+def _private_verdict_file(tmp_path, monkeypatch):
+    """Parallel workers must not share the /tmp verdict file."""
+    monkeypatch.setattr(second_review, "verdict_path", lambda pr: str(tmp_path / f"seat-{pr}.md"))
 
 
 def _write(tmp_path, text, name="verdict.md"):

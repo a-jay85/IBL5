@@ -42,6 +42,7 @@ DEADLINE_S = 1200           # wall clock for the whole round, re-check included
 RESULT_BASENAME = "fix-round.json"
 SECURITY_SOURCE = "security-audit"
 SECURITY_AGENT = "security"
+SECURITY_PURPOSE = "security-audit"
 
 _SNAPSHOT_FIELDS = ("findings", "scored_findings", "degraded_agents",
                     "unresolved_conformance", "review_delta")
@@ -449,7 +450,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             rc = recheck(head_before, security_seat="opus") or {}
             if rc.get("security_seat") != "opus":
                 raise _Reject("security-recheck-seat")
-            if SECURITY_AGENT in (res.degraded_agents or ()):
+            if SECURITY_PURPOSE in (res.degraded_agents or ()):
                 raise _Reject("security-recheck-degraded")
             if any(f.source == SECURITY_SOURCE for f in armable.holding_findings(res.findings)):
                 raise _Reject("security-recheck-not-clean")

@@ -797,3 +797,228 @@ def test_summary_and_digest_list_the_repair():
     rows = fix_round.digest_rows(rec)
     assert len(rows) == 1
     assert "row 7 (calc.py)" in rows[0] and "`old m`" in rows[0] and "`new m`" in rows[0]
+
+
+# --- security-audit items wait for the reviewer bar ------------------------------------
+
+def _sec_finding(path="ibl5/s.php"):
+    f = Finding(source="security-audit", agent="security", path=path, line=7,
+                body="Escape the name before output.", score=90)
+    f.label = LABEL_IMPORTANT
+    return f
+
+
+def _bar(passed, reason="r"):
+    from harness.reviewer_bar import Verdict
+    return lambda: Verdict(passed, reason)
+
+
+def test_collect_items_security_excluded_without_bar():
+    res = RunResult(terminal="x")
+    sec = _sec_finding()
+    res.findings = [sec, _finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record)
+    assert [i["path"] for i in items] == ["ibl5/a.php"]
+    assert record["security_excluded"] == 1
+    assert record["security_bar"].startswith("FAIL ")
+    # Condition (2) still holds on it: the finding is untouched in the holding set.
+    assert sec in holding_findings(res.findings)
+
+
+def test_collect_items_threaded_security_row_excluded_without_bar():
+    t = dict(_thread(901, login="review-agent", typ="Bot"), agent="security")
+    res = RunResult(terminal="x")
+    record = {}
+    items = fix_round.collect_items(_Gh([t]), PR, res, [], record,
+                                    security_bar=_bar(False, "missing: x"))
+    assert items == []
+    assert record["security_excluded"] == 1
+    assert record["security_bar"] == "FAIL missing: x"
+
+
+def test_collect_items_security_included_when_bar_passes():
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding(), _finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record,
+                                    security_bar=_bar(True, "pass: ok"))
+    assert sorted(i["path"] for i in items) == ["ibl5/a.php", "ibl5/s.php"]
+    assert record["security_items"] == 1
+    assert "security_excluded" not in record
+    assert record["security_bar"] == "PASS pass: ok"
+
+
+def test_collect_items_bar_raises_fails_closed():
+    def boom():
+        raise RuntimeError("bar broke")
+
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record, security_bar=boom)
+    assert items == []
+    assert record["security_bar"].startswith("FAIL error:")
+    assert record["security_excluded"] == 1
+
+
+def test_collect_items_no_security_candidate_never_calls_bar():
+    calls = []
+
+    def bar():
+        calls.append(1)
+        raise AssertionError("bar evaluated")
+
+    res = RunResult(terminal="x")
+    res.findings = [_finding()]
+    record = {}
+    items = fix_round.collect_items(_Gh([_thread(903)]), PR, res, [], record, security_bar=bar)
+    assert len(items) == 2
+    assert calls == []
+    assert not [k for k in record if k.startswith("security_")]
+
+
+def _run_sec(tmp_path, recheck, *, findings=None):
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = findings if findings is not None else [_sec_finding()]
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=recheck, already_tried=False,
+        clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    return rec, res, git
+
+
+def _seat_recheck(calls, res_box, *, seat="opus", degraded=(), clear=True):
+    """A recheck stub that records its call and, when `clear`, leaves no finding."""
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        res = res_box[0]
+        if clear:
+            res.findings = []
+        res.degraded_agents = list(degraded)
+        return {"new_holding": [], "conformance_added": [], "degraded": bool(degraded),
+                "security_seat": seat}
+    return recheck
+
+
+def _run_seat(tmp_path, **kw):
+    calls, box = [], []
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    box.append(res)
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=_seat_recheck(calls, box, **kw),
+        already_tried=False, clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    return rec, res, git, calls
+
+
+def test_security_round_rechecks_with_opus_seat(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path)
+    assert calls == [("head0", {"security_seat": "opus"})]
+    assert rec["status"] == "accepted"
+    assert rec["security_items"] == 1
+
+
+def test_security_recheck_not_clean_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, clear=False)
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-not-clean"
+    assert git.drops == ["head0"] and git.sha == "head0"
+    assert any(f.source == "security-audit" for f in holding_findings(res.findings))
+
+
+def test_security_recheck_wrong_seat_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, seat="sonnet")
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-seat"
+    assert git.drops == ["head0"]
+
+
+def test_security_recheck_missing_seat_rejects(tmp_path):
+    # The runner reports no seat when the delta review never ran.
+    rec, res, git, calls = _run_seat(tmp_path, seat=None)
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-seat"
+
+
+def test_security_recheck_degraded_rejects(tmp_path):
+    rec, res, git, calls = _run_seat(tmp_path, degraded=("security-audit",))
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-degraded"
+
+
+def test_non_security_round_recheck_single_arg(tmp_path):
+    calls = []
+
+    def recheck(pre):                # a one-argument stub, as before this change
+        calls.append(pre)
+        return {"new_holding": [], "conformance_added": [], "degraded": False}
+
+    rec, res, git = _run_sec(tmp_path, recheck, findings=[_finding()])
+    assert calls == ["head0"]
+    assert rec["status"] == "accepted"
+    assert "security_items" not in rec
+
+
+def test_security_recheck_rejects_on_security_hold_in_another_file(tmp_path):
+    # The round fixed ibl5/s.php, but a security finding still holds on another file.
+    calls, box = [], []
+
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        box[0].findings = [_sec_finding("ibl5/other.php")]
+        return {"new_holding": [], "conformance_added": [], "degraded": False,
+                "security_seat": "opus"}
+
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = [_sec_finding()]
+    box.append(res)
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX]), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg), recheck=recheck, already_tried=False,
+        clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    assert rec["status"] == "rejected"
+    assert rec["reason"] == "security-recheck-not-clean"
+    assert git.drops == ["head0"]
+
+
+def test_collect_items_security_past_cap_keeps_all_security_out():
+    res = RunResult(terminal="x")
+    code = [_finding(path=f"ibl5/c{n}.php") for n in range(fix_round.MAX_ITEMS)]
+    res.findings = code + [_sec_finding("ibl5/s1.php"), _sec_finding("ibl5/s2.php")]
+    record = {}
+    items = fix_round.collect_items(_Gh(), PR, res, [], record,
+                                    security_bar=_bar(True, "pass: ok"))
+    assert [i["path"] for i in items] == [f"ibl5/c{n}.php" for n in range(fix_round.MAX_ITEMS)]
+    assert record["security_overflow"] == 2
+    assert "security_items" not in record
+    assert "overflow" not in record
+
+
+def test_security_past_cap_round_uses_plain_recheck(tmp_path):
+    calls = []
+
+    def recheck(pre, **kw):
+        calls.append((pre, kw))
+        return {"new_holding": [], "conformance_added": [], "degraded": False}
+
+    code = [_finding(path=f"ibl5/c{n}.php") for n in range(fix_round.MAX_ITEMS)]
+    git = _Git()
+    res = RunResult(terminal="x")
+    res.findings = code + [_sec_finding()]
+    rec = fix_round.run_fix_round(
+        decision=_decision(2), res=res, gh=_Gh(), llm=_Llm(git, [FIX] * fix_round.MAX_ITEMS),
+        git=git, worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path),
+        log=lambda m: None, commit=lambda msg: git.commit(msg), recheck=recheck,
+        already_tried=False, clock=_Clock(), env={}, security_bar=_bar(True, "pass: ok"))
+    assert calls == [("head0", {})]
+    assert rec["status"] == "accepted"
+    assert rec["security_overflow"] == 1
+    assert "security_items" not in rec

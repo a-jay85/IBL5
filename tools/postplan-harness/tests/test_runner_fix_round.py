@@ -587,3 +587,28 @@ def test_fidelity_fix_skips_unplanned_scope_blockers(rig, monkeypatch, fid_pr):
     assert res.fix_round["fidelity"] == {"ran": False, "reason": "no-file-blocker"}
     assert during_round == []
     assert 12 in _holds(res)
+
+
+def test_runner_recheck_forwards_security_seat(rig, monkeypatch):
+    from harness import review as review_mod
+    seen = []
+    real_run = review_mod.ReviewPhase.run
+
+    def spy(self, meta, cls, plan, reused=None, **kw):
+        seen.append(kw.get("security_model"))
+        return real_run(self, meta, cls, plan, reused=reused, **kw)
+
+    monkeypatch.setattr(review_mod.ReviewPhase, "run", spy)
+    got = {}
+
+    def fake_fix_round(**kw):
+        kw["commit"]("fix(review): escape the name")
+        got["rc"] = kw["recheck"]("head0", security_seat="opus")
+        got["bar"] = kw["security_bar"]
+        return {"status": "skipped", "reason": "test"}
+
+    monkeypatch.setattr(fix_round, "run_fix_round", fake_fix_round)
+    rig.run(rig.llm(later=[]))
+    assert "opus" in seen
+    assert got["rc"]["security_seat"] == "opus"
+    assert callable(got["bar"])

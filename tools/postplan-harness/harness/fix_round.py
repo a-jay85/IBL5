@@ -40,6 +40,9 @@ MAX_FIX_ROUNDS = 1          # asserted by test; the round has no loop
 MAX_ITEMS = 8               # threads first, then unthreaded findings
 DEADLINE_S = 1200           # wall clock for the whole round, re-check included
 RESULT_BASENAME = "fix-round.json"
+SECURITY_SOURCE = "security-audit"
+SECURITY_AGENT = "security"
+SECURITY_PURPOSE = "security-audit"
 
 _SNAPSHOT_FIELDS = ("findings", "scored_findings", "degraded_agents",
                     "unresolved_conformance", "review_delta")
@@ -60,10 +63,30 @@ def targets(decision) -> list[int]:
     return sorted(c.number for c in decision.holds if c.number in TARGET_CONDITIONS)
 
 
-def collect_items(gh, pr, res, actions, record: dict | None = None) -> list[dict]:
-    """Threads first (trusted authors only), then unthreaded holding findings."""
+def collect_items(gh, pr, res, actions, record: dict | None = None, *,
+                  security_bar=None) -> list[dict]:
+    """Threads first (trusted authors only), then unthreaded holding findings.
+
+    A security-audit item reaches the fixer only while `security_bar()` passes. Below
+    the bar it stays out of the round and keeps holding arming condition (2), so the
+    owner sees it. The bar is evaluated once, and only when a security item appears."""
     record = record if record is not None else {}
     items: list[dict] = []
+    sec_flags: list[bool] = []
+    excluded = 0
+    verdict: list = []
+
+    def _security_allowed() -> bool:
+        if not verdict:
+            from .reviewer_bar import Verdict
+            try:
+                v = security_bar() if security_bar is not None else Verdict(False, "no-bar")
+            except Exception as e:  # noqa: BLE001 - the bar fails closed
+                v = Verdict(False, f"error: {e!r}"[:200])
+            record["security_bar"] = ("PASS " if v.passed else "FAIL ") + v.reason
+            verdict.append(bool(v.passed))
+        return verdict[0]
+
     rows = thread_ingestion.fetch_trusted_threads(
         gh, pr, gh.pr_thread_ids(pr), include_outdated=True)
     if rows is None:
@@ -73,18 +96,37 @@ def collect_items(gh, pr, res, actions, record: dict | None = None) -> list[dict
         for t in rows:
             if thread_ingestion._is_gate_held(t):
                 continue
+            if t.get("agent") == SECURITY_AGENT and not _security_allowed():
+                excluded += 1
+                continue
             items.append(dict(t, threaded=True))
+            sec_flags.append(t.get("agent") == SECURITY_AGENT)
     posted = same_run_threads.posted_keys(actions)
     for f in armable.holding_findings(res.findings):
+        if f.source == SECURITY_SOURCE and not _security_allowed():
+            excluded += 1
+            continue
         body = render_body(f, same_run_threads.POSTED_BODY_LIMIT)
         if same_run_threads._key(f.path, body) in posted:
             continue
         items.append({"commentId": None, "path": f.path, "line": f.line, "body": body,
                       "authorLogin": "review-agent", "authorType": "Bot", "outdated": False,
                       "isResolved": False, "threaded": False})
+        sec_flags.append(f.source == SECURITY_SOURCE)
+    if len(items) > MAX_ITEMS and any(sec_flags[MAX_ITEMS:]):
+        # The recheck rejects on any security hold, so a security item the cap would cut
+        # dooms the round. Keep every security item out; they hold condition (2).
+        record["security_overflow"] = sum(sec_flags)
+        items = [i for i, s in zip(items, sec_flags) if not s]
+        sec_flags = [False] * len(items)
     if len(items) > MAX_ITEMS:
         record["overflow"] = len(items) - MAX_ITEMS
         items = items[:MAX_ITEMS]
+        sec_flags = sec_flags[:MAX_ITEMS]
+    if sum(sec_flags):
+        record["security_items"] = sum(sec_flags)
+    if excluded:
+        record["security_excluded"] = excluded
     return items
 
 
@@ -193,7 +235,7 @@ def _remove_quietly(path: str | None) -> None:
 def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, log,
                   commit, recheck, already_tried, clock=time.monotonic, env=None,
                   inputs=None, mutation_check=None, fidelity_fix=None,
-                  conflict_rereview=None) -> dict:
+                  conflict_rereview=None, security_bar=None) -> dict:
     """Run at most one round. Always writes ``fix-round.json`` and returns the record.
 
     ``record["status"]`` is one of skipped, no-change, accepted, rejected, aborted.
@@ -362,7 +404,8 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     settled = False
     try:
         if review_tg:
-            items = collect_items(gh, pr, res, gh.actions(), record)
+            items = collect_items(gh, pr, res, gh.actions(), record,
+                                  security_bar=security_bar)
         else:
             items = []
         for item in items:
@@ -408,7 +451,18 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             record["defer"] = defer
             settled = True
             return _write(out_dir, record)
-        rc = recheck(head_before) or {}
+        if record.get("security_items", 0):
+            # A blind Opus re-review of the post-fix tree; any remaining security
+            # hold rejects the round, so the original hold goes to the owner.
+            rc = recheck(head_before, security_seat="opus") or {}
+            if rc.get("security_seat") != "opus":
+                raise _Reject("security-recheck-seat")
+            if rc.get("degraded"):
+                raise _Reject("security-recheck-degraded")
+            if any(f.source == SECURITY_SOURCE for f in armable.holding_findings(res.findings)):
+                raise _Reject("security-recheck-not-clean")
+        else:
+            rc = recheck(head_before) or {}
         if rc.get("new_holding"):
             raise _Reject("new-finding")
         if rc.get("conformance_added"):

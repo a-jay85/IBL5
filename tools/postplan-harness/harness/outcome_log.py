@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import re
 import statistics
 import subprocess
 import sys
@@ -277,6 +278,8 @@ _CYCLE_GAP_SECONDS = 300
 _CYCLE_BUCKETS = ("1", "2", "3", "4+")
 _REVERT_PREFIX = 'Revert "'
 _GIT_TIMEOUT_SECONDS = 20
+BLAME_WINDOW_DAYS = 30
+_PR_SUFFIX_RE = re.compile(r"\(#(\d+)\)$")
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
 
@@ -423,6 +426,97 @@ def _format_reverts(r) -> list:
     return lines
 
 
+def auto_merged_prs(out_root):
+    """PR numbers with an executed ``pr_merge_auto`` record; ``None`` if no action log exists."""
+    found = False
+    prs = set()
+    for dirpath, dirnames, filenames in os.walk(out_root):
+        dirnames[:] = [d for d in dirnames if d != "cache"]
+        if "actions.jsonl" not in filenames:
+            continue
+        found = True
+        with open(os.path.join(dirpath, "actions.jsonl"), errors="replace") as fh:
+            for raw in fh:
+                try:
+                    rec = json.loads(raw)
+                except ValueError:
+                    continue
+                if not isinstance(rec, dict) or rec.get("action") != "pr_merge_auto":
+                    continue
+                if rec.get("executed") is not True:
+                    continue
+                pr = rec.get("pr")
+                if isinstance(pr, int) and not isinstance(pr, bool):
+                    prs.add(pr)
+    return prs if found else None
+
+
+def _pr_number(subject):
+    m = _PR_SUFFIX_RE.search(subject.rstrip())
+    return int(m.group(1)) if m else None
+
+
+def _git_lines(root, *argv):
+    try:
+        proc = subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True,
+                              errors="replace", timeout=_GIT_TIMEOUT_SECONDS,
+                              env=dict(os.environ, TZ="UTC"))
+    except subprocess.TimeoutExpired as e:
+        raise ValueError(f"git {argv[0]} timed out") from e
+    if proc.returncode != 0:
+        raise ValueError(f"git {argv[0]} exit {proc.returncode}: {proc.stderr.strip()[:200]}")
+    return proc.stdout.splitlines()
+
+
+def build_blamed_fixes(root, since, until, auto_merged) -> dict:
+    """Auto-merged PRs in [since, until] whose added lines a later ``fix:`` commit removed."""
+    from pathlib import Path
+
+    from . import reviewer_eval
+
+    argv = ["log", "origin/master", "--format=%H%x09%s"]
+    if since:
+        argv.append(f"--since={since} 00:00:00 +0000")
+    if until:
+        argv.append(f"--until={until} 23:59:59 +0000")
+    root = Path(root)
+    blamed = []
+    in_range = 0
+    fix_shas = set()
+    for line in _git_lines(root, *argv):
+        sha, _, subject = line.partition("\t")
+        pr_num = _pr_number(subject)
+        if pr_num is None:
+            continue
+        if pr_num not in auto_merged:
+            continue
+        in_range += 1
+        fixes = []
+        for fix in reviewer_eval.blamed_by_fix_within(root, sha, BLAME_WINDOW_DAYS, "origin/master"):
+            if fix == sha:
+                continue
+            subj = "\n".join(_git_lines(root, "log", "-1", "--format=%s", fix))
+            fixes.append({"sha": fix, "subject": subj})
+            fix_shas.add(fix)
+        if fixes:
+            blamed.append({"pr": pr_num, "sha": sha, "fixes": fixes})
+    return {"auto_merged": in_range, "blamed": blamed, "fix_commits": len(fix_shas)}
+
+
+def _format_blamed_fixes(b, out_root="?") -> list:
+    head = "later fixes blamed on auto-merged PRs:"
+    if b is None:
+        return [f"{head} no auto-merge records under {out_root}"]
+    if "error" in b:
+        return [f"{head} unavailable ({b['error']})"]
+    lines = [f"{head} {len(b['blamed'])} of {b['auto_merged']} auto-merged PRs "
+             f"({b['fix_commits']} fix commits, window {BLAME_WINDOW_DAYS}d, fix: subjects only)"]
+    for item in b["blamed"]:
+        for fix in item["fixes"]:
+            lines.append(f"  #{item['pr']} {item['sha'][:7]} <- {fix['sha'][:7]} {fix['subject']}")
+    return lines
+
+
 def _format_cycles(c) -> list:
     mean = "-" if c["mean"] is None else f"{c['mean']:.2f}"
     median = "-" if c["median"] is None else f"{c['median']:g}"
@@ -454,6 +548,9 @@ def format_report(report) -> str:
         lines += [""] + _format_cycles(report["cycles"])
     if "reverts" in report:
         lines += [""] + _format_reverts(report["reverts"])
+    if "blamed_fixes" in report:
+        lines += [""] + _format_blamed_fixes(report["blamed_fixes"],
+                                             report.get("blamed_fixes_root", "?"))
     return "\n".join(lines)
 
 
@@ -470,6 +567,17 @@ def _cli_report(flags) -> int:
     except RuntimeError as e:
         report["reverts"] = None
         print(f"review-outcomes: revert count unavailable ({e})", file=sys.stderr)
+    out_root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
+    try:
+        auto_merged = auto_merged_prs(out_root)
+        if auto_merged is None:
+            report["blamed_fixes"] = None
+            report["blamed_fixes_root"] = out_root
+        else:
+            report["blamed_fixes"] = build_blamed_fixes(
+                _REPO_ROOT, flags.get("since"), flags.get("until"), auto_merged)
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
+        report["blamed_fixes"] = {"error": str(e)[:200]}
     if flags["json"]:
         print(json.dumps(report, sort_keys=True))
     else:

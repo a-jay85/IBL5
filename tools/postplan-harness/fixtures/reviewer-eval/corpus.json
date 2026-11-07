@@ -25,6 +25,28 @@
       "description": "Missing guard: the audit-log call runs after commit inside the try whose catch rolls back, so a logger failure reports a committed save as failed."
     },
     {
+      "id": "ibl-hist-conf-finals-ranked-below-early-rounds",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 619,
+      "commit": "92aedc9c2cec2cdfbf123aac997756fb3ee4c1d1",
+      "fix_pr": 2817,
+      "fix_commit": "696d32bf6804b5faf185b7f0bd1348d27d53e034",
+      "expected": [{"path": "ibl5/classes/Updater/Steps/RefreshIblHistStep.php", "start": 132, "end": 137}],
+      "description": "Wrong value: the snapshot tie-break CASE ranks conference-finals phases below the first and second playoff rounds, so an earlier round wins a tie that the latest round should win."
+    },
+    {
+      "id": "player-articles-like-double-escaped",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 114,
+      "commit": "fcaf785ba0f412d080fb89e16cecec122a653f73",
+      "fix_pr": 2370,
+      "fix_commit": "e40df9b62d0bb39113712c03d376d38819f5454e",
+      "expected": [{"path": "ibl5/modules/Player/articles.php", "start": 11, "end": 12}],
+      "description": "Wrong value: the search term is escaped with real_escape_string and then bound to a prepared statement, so a name with a quote is double-escaped and never matches."
+    },
+    {
       "id": "playoff-series-invalid-group-by",
       "kind": "bug",
       "status": "confirmed",
@@ -34,6 +56,17 @@
       "fix_commit": "9328b5c5b8ac342b332e534eae61342cd0a0a207",
       "expected": [{"path": "ibl5/classes/Updater/Steps/RefreshPlayoffSeriesResultsStep.php", "start": 78, "end": 78}],
       "description": "Wrong query: the refresh CTE groups by four columns while selecting ungrouped ones, so the step errors under strict SQL group-by mode."
+    },
+    {
+      "id": "ratings-diff-label-ignores-baseline-fallback",
+      "kind": "bug",
+      "status": "confirmed",
+      "pr": 2296,
+      "commit": "9a050cce07f8d8edaa56219699d9dccb46206135",
+      "fix_pr": 2389,
+      "fix_commit": "cde33ee25fd3692edd2076704570eb858af6f931",
+      "expected": [{"path": "ibl5/classes/TrainingCampRatingsDiff/TrainingCampRatingsDiffView.php", "start": 90, "end": 90}],
+      "description": "Wrong value: the intro text always says the baseline is last playoffs ratings, while the same change makes the baseline fall back to end-of-season or mid-season snapshots."
     },
     {
       "id": "saved-dc-sum-is-int",

@@ -959,7 +959,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _fr_ctx: dict = {}
             _fr_posts = fix_round.DeferredPosts(gh)
 
-            def _fr_recheck(head_before):
+            def _reviewer_bar_verdict():
+                from harness import reviewer_bar
+                v = reviewer_bar.check(reviewer_bar.harness_root(),
+                                       reviewer_bar.default_record_path())
+                log(f"fix-round: reviewer bar {'PASS' if v.passed else 'FAIL'} ({v.reason})")
+                return v
+
+            def _fr_recheck(head_before, security_seat=None):
+                seat_out: dict = {}
                 pre = {same_run_threads._key(f.path, f.body)
                        for f in _armable_mod.holding_findings(res.findings)}
                 pre_conf = set(res.unresolved_conformance)
@@ -975,7 +983,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     try:
                         n, c_, m_, ck_, cf_ = _same_run_delta_review(
                             review_phase, meta, cls, plan, git, gh, res, delta, worktree,
-                            master_sha, log)
+                            master_sha, log, security_model=security_seat,
+                            seat_out=seat_out)
                         _fr_ctx.update(cls=c_, meta=m_, cache_key=ck_, cache_files=cf_)
                     except Exception as e:  # noqa: BLE001 - an unreviewed fix is never accepted
                         log(f"phase6.5-fix: delta re-review failed ({e.__class__.__name__})")
@@ -991,9 +1000,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                           pr_body=gh.pr_body() or body,
                                           read_file=git.read_worktree_file)
                 res.unresolved_conformance = after
-                return {"new_holding": sorted(post - pre),
-                        "conformance_added": sorted(set(after) - pre_conf),
-                        "degraded": degraded}
+                rc = {"new_holding": sorted(post - pre),
+                      "conformance_added": sorted(set(after) - pre_conf),
+                      "degraded": degraded}
+                if security_seat is not None:
+                    # Report the seat only when the delta review actually ran on it.
+                    rc["security_seat"] = seat_out.get("seat")
+                return rc
 
             def _fr_commit(msg):
                 return _commit_with_gate_fix(git, worktree, msg, log, phase="phase6.5-fix",
@@ -1045,7 +1058,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
                 mutation_check=lambda p, rem: _fix_round_mutation_check(p, worktree, rem),
                 fidelity_fix=_fr_fidelity_fix if pr else None,
-                conflict_rereview=_fr_conflict_rereview if pr else None)
+                conflict_rereview=_fr_conflict_rereview if pr else None,
+                security_bar=_reviewer_bar_verdict)
             if (fr.get("status") != "skipped"
                     or fr.get("reason") == "holdrepeat-same-holds"):
                 # Other skips leave result.json byte-identical; the already-tried skip
@@ -3324,15 +3338,20 @@ def _review_phase_for(llm, gh, copy: dict, meta: dict | None, log, worktree: str
     return ReviewPhase(llm, gh, depth=depth, log=log, worktree=worktree)
 
 
-def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log):
+def _interdiff_review(review_phase, meta, cls, plan, delta, keep_findings, keep_scored, log,
+                      security_model=None):
     sub = dataclasses.replace(cls, filtered_diff=reviewcache.subset_diff(cls.filtered_diff, delta))
-    findings, gates, scored, degraded = review_phase.run(meta, sub, plan, reused=keep_findings)
+    if security_model is None:
+        findings, gates, scored, degraded = review_phase.run(meta, sub, plan, reused=keep_findings)
+    else:
+        findings, gates, scored, degraded = review_phase.run(
+            meta, sub, plan, reused=keep_findings, security_model=security_model)
     log(f"reviewcache: interdiff reviewed {len(delta)} file(s), merged {len(keep_findings)} reused finding(s)")
     return (keep_findings + findings, gates, keep_scored + scored, degraded)
 
 
 def _same_run_delta_review(review_phase, meta, cls, plan, git, gh, res, delta, worktree,
-                           master_sha, log):
+                           master_sha, log, security_model=None, seat_out=None):
     """Phase 4.5b delta re-review: review only the files the same-run fix changed.
 
     Returns ``(new_finding_count, cls, meta, cache_key, cache_files)``, all re-derived
@@ -3348,10 +3367,13 @@ def _same_run_delta_review(review_phase, meta, cls, plan, git, gh, res, delta, w
     if not reviewcache.subset_diff(cls.filtered_diff, delta):
         log("phase4.5b: delta lives only in filtered-out files; no delta review")
         return 0, cls, meta, cache_key, cache_files
+    if seat_out is not None:
+        seat_out["seat"] = security_model   # the seat really re-reviewed the delta
     keep_f, keep_s = reviewcache.reusable_by_path(res.findings, res.scored_findings, delta,
                                                   set(cache_files))
     findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, cls, plan, delta,
-                                                           keep_f, keep_s, log)
+                                                           keep_f, keep_s, log,
+                                                           security_model=security_model)
     res.findings, res.scored_findings = findings, scored
     res.degraded_agents = list(res.degraded_agents) + list(degraded)
     res.review_delta = sorted(set(res.review_delta or ()) | set(delta))

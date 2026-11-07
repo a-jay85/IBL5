@@ -4552,14 +4552,15 @@ _corpus_guard_ok() {
     # clean run too, so a bare '^\[' match would flag passing plans.
     # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
     # the plans it flags carry genuine plan-only negated greps (true positives).
+    # Gate [CW] is the same: frozen plans shipped before prefire-verify ran their rows.
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -5819,5 +5820,590 @@ else
     h_fail "AB-deny-message" "expected exit 1 naming the durable path and the opt-out tag, got exit $got"
 fi
 GUARD="$AB_GUARD_SAVED"
+
+# ---------------------------------------------------------------------------
+# Gate [CW]: prefire-verify runs matrix rows from the repo root, so a row that starts
+# with an ibl5/-only tool can never pass. The 2026-11-06 trade-suggestions skip.
+# ---------------------------------------------------------------------------
+assert_viol "gateCW-bare-phpunit-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `vendor/bin/phpunit tests/Foo` |
+'
+assert_viol "gateCW-bare-composer-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer run analyse` |
+'
+assert_viol "gateCW-bare-bun-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run test:e2e` |
+'
+assert_viol "gateCW-bare-php-script-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php scripts/foo.php --bogus` |
+'
+assert_viol "gateCW-php-vendor-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php vendor/bin/phpunit tests/Foo` |
+'
+assert_viol "gateCW-php-define-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -d memory_limit=-1 scripts/foo.php` |
+'
+assert_viol "gateCW-php-define-attached-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -dmemory_limit=-1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-php-ini-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -c custom.ini -f scripts/foo.php` |
+'
+assert_viol "gateCW-php-ibl5-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -d memory_limit=-1 ibl5/vendor/bin/phpunit` |
+'
+assert_viol "gateCW-php-inline-code-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -r "exit(0);" scripts/foo.php` |
+'
+assert_viol "gateCW-php-version-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `php -v` |
+'
+assert_viol "gateCW-php-cd-first-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `cd ibl5 && php -d memory_limit=-1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-later-segment-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose --since=master && composer test` |
+'
+assert_viol "gateCW-env-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `FOO=1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-comment-does-not-excuse-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer run analyse # run from the worktree ibl5 dir` |
+'
+assert_viol "gateCW-cd-ibl5-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `cd ibl5 && vendor/bin/phpunit && composer run analyse` |
+'
+assert_viol "gateCW-subshell-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `(cd ibl5 && vendor/bin/phpunit)` |
+'
+assert_viol "gateCW-composer-d-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer -d ibl5 test` |
+'
+assert_viol "gateCW-composer-d-attached-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer -dibl5 test` |
+'
+assert_viol "gateCW-composer-d-after-subcommand-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer test -d ibl5` |
+'
+assert_viol "gateCW-composer-working-dir-eq-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --working-dir=ibl5 run analyse` |
+'
+assert_viol "gateCW-composer-working-dir-space-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --working-dir ibl5 run analyse` |
+'
+assert_viol "gateCW-npm-prefix-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm --prefix ibl5 test` |
+'
+assert_viol "gateCW-npm-prefix-after-subcommand-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm test --prefix ibl5` |
+'
+assert_viol "gateCW-bun-cwd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun --cwd ibl5 run test` |
+'
+assert_viol "gateCW-bun-run-cwd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run --cwd ibl5 test` |
+'
+assert_viol "gateCW-pushd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `pushd ibl5 && composer test` |
+'
+assert_viol "gateCW-brace-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `{ cd ibl5 && composer test; }` |
+'
+assert_viol "gateCW-subshell-brace-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `( { cd ibl5 && vendor/bin/phpunit; } )` |
+'
+assert_viol "gateCW-dir-flag-then-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer -d ibl5 test && composer run analyse` |
+'
+assert_viol "gateCW-flag-after-dashes-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer run analyse -- -d ibl5` |
+'
+assert_viol "gateCW-npm-flag-after-dashes-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm run test -- --prefix ibl5` |
+'
+assert_viol "gateCW-bun-flag-after-script-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run test --cwd ibl5` |
+'
+assert_viol "gateCW-other-tool-flag-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun -d ibl5 run test` |
+'
+assert_viol "gateCW-npm-d-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm -d test` |
+'
+assert_viol "gateCW-npx-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npx --prefix ibl5 playwright test` |
+'
+assert_viol "gateCW-composer-dev-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer install --dev` |
+'
+assert_viol "gateCW-working-dir-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --working-directory=ibl5 test` |
+'
+assert_viol "gateCW-brace-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `{ composer test; }` |
+'
+assert_viol "gateCW-pushd-name-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `pushdx ibl5 && composer test` |
+'
+assert_viol "gateCW-version-flag-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version` |
+'
+assert_viol "gateCW-short-version-flag-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun -v` |
+'
+assert_viol "gateCW-subshell-version-flag-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `(npm --version)` |
+'
+assert_viol "gateCW-version-flag-extra-arg-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version test` |
+'
+assert_viol "gateCW-bun-run-ibl5-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run ibl5/scripts/check.ts` |
+'
+assert_viol "gateCW-bun-ibl5-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun ./ibl5/scripts/check.ts` |
+'
+assert_viol "gateCW-composer-validate-ibl5-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer validate ibl5/composer.json` |
+'
+assert_viol "gateCW-composer-validate-no-path-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer validate` |
+'
+assert_viol "gateCW-composer-other-ibl5-path-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer test ibl5/foo` |
+'
+assert_viol "gateCW-npm-ibl5-path-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm test ibl5/foo` |
+'
+assert_viol "gateCW-ibl5-path-after-dashes-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun run test -- ibl5/foo` |
+'
+assert_viol "gateCW-subst-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(cd ibl5 && composer show) -gt 0` |
+'
+assert_viol "gateCW-subst-cd-pipe-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(cd ibl5 && composer show \| wc -l) -gt 0` |
+'
+assert_viol "gateCW-subst-spaced-pushd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $( pushd ibl5 && composer show) -gt 0` |
+'
+assert_viol "gateCW-subst-no-cd-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(true && composer show) -gt 0` |
+'
+assert_viol "gateCW-closed-subst-cd-then-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `echo $(cd ibl5) && composer test` |
+'
+assert_viol "gateCW-subst-cd-name-prefix-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(cdx ibl5 && composer show) -gt 0` |
+'
+assert_viol "gateCW-backtick-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test `cd ibl5 && composer show` -gt 0` |
+'
+assert_viol "gateCW-backtick-no-cd-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test `true && composer show` -gt 0` |
+'
+assert_viol "gateCW-assign-subst-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(cd ibl5 && composer show \| wc -l); test $N -gt 0` |
+'
+assert_viol "gateCW-assign-backtick-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=`cd ibl5 && composer show \| wc -l`; test $N -gt 0` |
+'
+assert_viol "gateCW-assign-subst-no-cd-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(true && composer show); test $N -gt 0` |
+'
+assert_viol "gateCW-assign-closed-subst-cd-then-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(cd ibl5); composer test` |
+'
+assert_viol "gateCW-env-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `env FOO=1 vendor/bin/phpunit` |
+'
+assert_viol "gateCW-env-flag-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `env --ignore-environment FOO=1 BAR=2 composer test` |
+'
+assert_viol "gateCW-time-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `time composer test` |
+'
+assert_viol "gateCW-time-flag-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `time -p composer test` |
+'
+assert_viol "gateCW-timeout-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout 60 composer test` |
+'
+assert_viol "gateCW-timeout-flag-wrapper-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout --signal=KILL 5m npm test` |
+'
+assert_viol "gateCW-assign-then-env-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `A=1 env B=2 time bun test` |
+'
+assert_viol "gateCW-time-subshell-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `time (cd ibl5 && composer test)` |
+'
+assert_viol "gateCW-timeout-root-tool-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout 60 bin/check-prose --since=master` |
+'
+assert_viol "gateCW-time-version-flag-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `time composer --version` |
+'
+assert_viol "gateCW-root-tools-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose --since=master` |
+'
+assert_viol "gateCW-quoted-text-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `command grep -c "; vendor/bin/phpunit" README.md` |
+'
+assert_viol "gateCW-tool-name-in-path-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/check-prose ibl5/vendor/bin/README.md` |
+'
+assert_viol "gateCW-one-time-check-not-run-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x (one-time-check: run once by hand) | CLI-executable | post-impl | `composer run analyse` |
+| 2 | y | CLI-executable | post-impl | `bin/check-prose --since=master` |
+| 3 | z | CLI-executable | post-impl | `bin/check-docs --since=master` |
+| 4 | w | CLI-executable | post-impl | `bin/check-prose --since=origin/master` |
+'
+
+assert_viol "gateCW-subst-first-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(composer show \| wc -l); test $N -gt 0` |
+'
+assert_viol "gateCW-closed-subst-first-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(composer show) -gt 0` |
+'
+assert_viol "gateCW-backtick-first-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test `npm ls` = x` |
+'
+assert_viol "gateCW-quoted-subst-first-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test "$(composer show)" = x` |
+'
+assert_viol "gateCW-procsub-first-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `diff <(composer show) /tmp/x` |
+'
+assert_viol "gateCW-subst-wrapped-tool-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(timeout 5 composer show)` |
+'
+assert_viol "gateCW-subst-version-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test $(composer --version) = x` |
+'
+assert_viol "gateCW-subst-dir-flag-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `N=$(composer -d ibl5 show)` |
+'
+assert_viol "gateCW-quoted-subst-cd-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `test "$(cd ibl5 && composer show)" = x` |
+'
+assert_viol "gateCW-backtick-closed-cd-then-bare-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `echo `cd ibl5` && composer test` |
+'
+assert_viol "gateCW-quoted-tool-word-after-subst-text-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `echo "$(pwd) composer"` |
+'
+assert_viol "gateCW-timeout-s-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout -s KILL 5m npm test` |
+'
+assert_viol "gateCW-timeout-k-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout -k 5 60 composer test` |
+'
+assert_viol "gateCW-timeout-long-signal-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout --signal KILL 5m npm test` |
+'
+assert_viol "gateCW-timeout-mixed-flags-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout -v -k 5 -s KILL 60 composer test` |
+'
+assert_viol "gateCW-env-u-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `env -u FOO composer test` |
+'
+assert_viol "gateCW-env-flag-then-u-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `env -v -u FOO BAR=1 composer test` |
+'
+assert_viol "gateCW-time-o-value-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `time -o /tmp/t composer test` |
+'
+assert_viol "gateCW-timeout-s-value-root-tool-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `timeout -s KILL 5m bin/check-prose --since=master` |
+'
 
 h_done

@@ -1,7 +1,9 @@
 """In-run fix round: accept-or-discard state machine over the existing fixers."""
+import hashlib
 import json
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +15,8 @@ from harness.labels import LABEL_IMPORTANT, render_body
 from harness.state import ArmDecision, ConditionResult, Finding, HarnessError, RunResult
 from harness.thread_ingestion import declined_body, fixed_body
 from harness.usage_pause import UsagePause
+from test_mutation_repair import (HELD_LINE, NEW_MATCH, OLD_MATCH, STALE_LINE, _plan_text,
+                                  _row_block)
 
 PR = 77
 FIX = '{"verdict":"FIX","reason":"Added the guard"}'
@@ -106,7 +110,8 @@ class _Clock:
 
 
 def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, recheck=None,
-         already_tried=False, commit=None, clock=None, env=None, plan=None):
+         already_tried=False, commit=None, clock=None, env=None, plan=None, inputs=None,
+         mutation_check=None, fidelity_fix=None, conflict_rereview=None):
     git = git or _Git()
     res = res if res is not None else RunResult(terminal="x")
     gh = gh or _Gh()
@@ -117,7 +122,9 @@ def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, rech
         commit=commit or (lambda msg: git.commit(msg)),
         recheck=recheck or (lambda pre: {"new_holding": [], "conformance_added": [],
                                          "degraded": False}),
-        already_tried=already_tried, clock=clock or _Clock(), env=env or {})
+        already_tried=already_tried, clock=clock or _Clock(), env=env or {}, inputs=inputs,
+        mutation_check=mutation_check, fidelity_fix=fidelity_fix,
+        conflict_rereview=conflict_rereview)
     return rec, res, gh, git, llm
 
 
@@ -231,7 +238,7 @@ def test_enabled_unset_empty_zero():
 def test_skips_when_no_target_hold(tmp_path):
     res = RunResult(terminal="x")
     res.findings = [_finding()]
-    rec, res, gh, git, llm = _run(tmp_path, res=res, decision=_decision(7, 12))
+    rec, res, gh, git, llm = _run(tmp_path, res=res, decision=_decision(7, 8))
     assert rec["status"] == "skipped" and rec["reason"] == "no-target-hold"
     assert llm.calls == 0
 
@@ -426,3 +433,367 @@ def test_flush_skips_followup_when_reply_fails():
     assert fix_round.flush(gh, PR, rec, "abc", lambda m: None) == 0
     assert gh.filed == []
     assert rec["defer"][0]["flush_failed"] is True
+
+
+def test_disabled_round_spends_no_tokens_on_new_holds(tmp_path):
+    git = _Git()
+    llm = _Llm(git, [])
+    rec, _, _, _, llm = _run(tmp_path, decision=_decision(12, 14, 19), git=git, llm=llm,
+                             env={"POSTPLAN_FIX_ROUND": "0"})
+    assert rec["status"] == "skipped"
+    assert rec["reason"] == "disabled"
+    assert llm.calls == 0
+
+
+# ---- Executable Mutations rows, condition (19) ----
+
+CALC = "def f(total_cap, used):\n    return total_cap - used\n\ndef g():\n    return 1\n"
+TEST_PATH = "tests/test_calc.py"
+HELD_BLOCK = _row_block(8, match="return 1", replace="return 2", check="true")
+STALE_BLOCK = _row_block(7, check="true")
+NEW_MATCH_REPLY = f"NEW-MATCH: {NEW_MATCH}"
+NO_RECHECK_FINDINGS = {"new_holding": [], "conformance_added": [], "degraded": False}
+
+
+def _section(path, added):
+    return (f"diff --git a/{path} b/{path}\nindex 1111111..2222222 100644\n--- a/{path}\n"
+            f"+++ b/{path}\n@@ -1 +1,2 @@\n x\n+{added}\n")
+
+
+class _MutGit(_Git):
+    """`diff_vs_base` gives real-shaped sections, so the real patch-id delta runs on them."""
+
+    def __init__(self, root, touches=(TEST_PATH,), *, diff_after=None):
+        super().__init__()
+        self.root = root
+        self.touches = touches
+        self.diff_after = diff_after
+
+    def diff_vs_base(self, base=None):
+        base_diff = _section("calc.py", "base")
+        if self.sha == "head0":
+            return base_diff
+        if self.diff_after is not None:
+            return self.diff_after
+        moved = "".join(_section(p, "fixed") for p in self.touches)
+        return moved if "calc.py" in self.touches else base_diff + moved
+
+    def read_worktree_file(self, path):
+        return (self.root / path).read_text()
+
+
+def _plan(tmp_path, *blocks):
+    (tmp_path / "calc.py").write_text(CALC)
+    plan = tmp_path / "plan.md"
+    plan.write_text(_plan_text(*blocks, rows=(7, 8)))
+    return SimpleNamespace(path=str(plan))
+
+
+def _proof(*tripped, holding=()):
+    return SimpleNamespace(results=tuple(SimpleNamespace(row=r, kind="TRIPPED") for r in tripped)
+                           + tuple(SimpleNamespace(row=h.split()[1], kind="HELD") for h in holding),
+                           holding=tuple(holding), tree_suspect=False)
+
+
+def _holding(*lines):
+    return SimpleNamespace(exec_mutations_holding=list(lines))
+
+
+def test_held_row_strengthened_test_is_accepted_3701(tmp_path):
+    plan = _plan(tmp_path, HELD_BLOCK)
+    seen = []
+
+    def check(path, remaining):
+        seen.append((path, remaining))
+        return _proof("8")
+
+    rec, _, _, git, llm = _run(tmp_path, decision=_decision(19), git=_MutGit(tmp_path), plan=plan,
+                               inputs=_holding(HELD_LINE), mutation_check=check)
+    assert rec["status"] == "accepted"
+    assert rec["reevaluate"] is True
+    assert rec["sha"] == "head1"
+    assert git.drops == []
+    assert llm.calls == 1
+    assert seen[0][0] == plan.path
+
+    other = tmp_path / "again"
+    other.mkdir()
+    plan = _plan(other, HELD_BLOCK)
+    rec, _, _, git, _ = _run(other, decision=_decision(19), git=_MutGit(other), plan=plan,
+                             inputs=_holding(HELD_LINE),
+                             mutation_check=lambda p, r: _proof(holding=[HELD_LINE]))
+    assert rec["status"] == "rejected"
+    assert rec["reevaluate"] is False
+
+
+def test_held_row_fix_touching_source_is_discarded(tmp_path):
+    plan = _plan(tmp_path, HELD_BLOCK)
+    calls = []
+    rec, _, _, git, _ = _run(tmp_path, decision=_decision(19), plan=plan,
+                             git=_MutGit(tmp_path, touches=("calc.py",)),
+                             inputs=_holding(HELD_LINE),
+                             mutation_check=lambda p, r: calls.append(p) or _proof("8"))
+    assert (rec["status"], rec["reason"]) == ("rejected", "non-test-edit")
+    assert git.drops == ["head0"]
+    assert git.head() == "head0"
+    assert calls == []
+
+
+def test_held_row_fix_with_unreadable_delta_is_discarded(tmp_path):
+    plan = _plan(tmp_path, HELD_BLOCK)
+    rec, _, _, git, _ = _run(tmp_path, decision=_decision(19), plan=plan,
+                             git=_MutGit(tmp_path, diff_after=""),
+                             inputs=_holding(HELD_LINE),
+                             mutation_check=lambda p, r: _proof("8"))
+    assert (rec["status"], rec["reason"]) == ("rejected", "non-test-edit")
+    assert git.drops == ["head0"]
+
+
+def test_held_row_declined_runs_no_proof(tmp_path):
+    plan = _plan(tmp_path, HELD_BLOCK)
+    git = _MutGit(tmp_path)
+    calls = []
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                           llm=_Llm(git, [DECLINE]), inputs=_holding(HELD_LINE),
+                           mutation_check=lambda p, r: calls.append(p))
+    assert rec["status"] == "no-change"
+    assert calls == []
+
+
+def test_unproven_mutation_round_is_discarded(tmp_path):
+    plan = _plan(tmp_path, STALE_BLOCK, HELD_BLOCK)
+    git = _MutGit(tmp_path)
+    res = RunResult(terminal="x")
+    res.findings = [_finding()]
+
+    def recheck(pre):
+        res.findings = []
+        return NO_RECHECK_FINDINGS
+
+    rec, res, _, git, _ = _run(tmp_path, decision=_decision(19), git=git, plan=plan, res=res,
+                               llm=_Llm(git, [FIX, NEW_MATCH_REPLY]), recheck=recheck,
+                               inputs=_holding(STALE_LINE, HELD_LINE),
+                               mutation_check=lambda p, r: _proof("7", holding=[HELD_LINE]))
+    assert (rec["status"], rec["reason"]) == ("rejected", "mutation-unproven")
+    assert git.head() == "head0"
+    assert git.drops == ["head0"]
+    assert [f.path for f in res.findings] == ["ibl5/a.php"]
+    assert rec["row_repairs"] == []
+    assert rec["reevaluate"] is False
+    assert not os.path.exists(os.path.join(str(tmp_path), fix_round.REPAIRED_PLAN_BASENAME))
+
+
+def test_stale_row_repair_recorded_plan_untouched_3680(tmp_path):
+    plan = _plan(tmp_path, STALE_BLOCK)
+    before = open(plan.path, "rb").read()
+    git = _MutGit(tmp_path)
+    seen = []
+    rec, _, _, _, llm = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                             llm=_Llm(git, [NEW_MATCH_REPLY]), inputs=_holding(STALE_LINE),
+                             mutation_check=lambda p, r: seen.append(p) or _proof("7"))
+    assert (rec["status"], rec["reason"]) == ("no-change", "no-commit")
+    assert rec["reevaluate"] is True
+    assert rec["row_repairs"] == [{"row": "7", "file": "calc.py", "old_match": OLD_MATCH,
+                                   "new_match": NEW_MATCH}]
+    assert open(plan.path, "rb").read() == before
+    copy = os.path.join(str(tmp_path), fix_round.REPAIRED_PLAN_BASENAME)
+    assert seen == [copy]
+    assert f"match: {NEW_MATCH}\n" in open(copy).read()
+    assert rec["plan_sha256"] == hashlib.sha256(before).hexdigest()
+    assert llm.kwargs[0]["allowed_tools"] == ("Read",)
+    assert {"Write", "Edit", "Bash", "Agent"} <= set(llm.kwargs[0]["denied_tools"])
+
+
+def test_refused_repair_records_reasons_and_skips_proof(tmp_path):
+    plan = _plan(tmp_path, STALE_BLOCK)
+    git = _MutGit(tmp_path)
+    calls = []
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                           llm=_Llm(git, ["NEW-MATCH: def g():"]), inputs=_holding(STALE_LINE),
+                           mutation_check=lambda p, r: calls.append(p))
+    assert "match-dissimilar row 7" in rec["mutation"]["refused"]
+    assert rec["row_repairs"] == []
+    assert (rec["status"], rec["reevaluate"]) == ("no-change", False)
+    assert calls == []
+    assert not os.path.exists(os.path.join(str(tmp_path), fix_round.REPAIRED_PLAN_BASENAME))
+
+
+def test_repair_reply_without_new_match_records_no_repair(tmp_path):
+    plan = _plan(tmp_path, STALE_BLOCK)
+    git = _MutGit(tmp_path)
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                           llm=_Llm(git, ['{"NEW-MATCH": "x"}']), inputs=_holding(STALE_LINE))
+    assert rec["mutation"]["dropped"] == ["row 7: no-new-match"]
+    assert rec["row_repairs"] == []
+    assert fix_round.digest_rows(rec) == []
+
+
+def test_repair_with_no_prover_is_discarded(tmp_path):
+    plan = _plan(tmp_path, STALE_BLOCK)
+    git = _MutGit(tmp_path)
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                           llm=_Llm(git, [NEW_MATCH_REPLY]), inputs=_holding(STALE_LINE))
+    assert (rec["status"], rec["reason"]) == ("rejected", "mutation-unproven")
+    assert rec["row_repairs"] == []
+
+
+def test_unparsable_plan_skips_the_rows(tmp_path):
+    git = _MutGit(tmp_path)
+    plan = SimpleNamespace(path=str(tmp_path / "missing.md"))
+    rec, _, _, _, llm = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                             llm=_Llm(git, []), inputs=_holding(STALE_LINE, HELD_LINE))
+    assert rec["mutation"]["skipped"] == "parse-failed"
+    assert (rec["status"], rec["reevaluate"]) == ("no-change", False)
+    assert llm.calls == 0
+
+
+def test_no_eligible_hold_touches_nothing(tmp_path):
+    class Untouchable(_Git):
+        def head(self):
+            raise AssertionError("no-eligible-hold returns before reading the head")
+
+    git = Untouchable()
+    gh = _Gh()
+    gh.pr_thread_ids = None
+    rec, _, _, _, llm = _run(tmp_path, decision=_decision(19, 12, 14), git=git, gh=gh,
+                             llm=_Llm(git, []),
+                             inputs=_holding("row 7 BASELINE-FAILED — check failed before mutation"))
+    assert (rec["status"], rec["reason"]) == ("skipped", "no-eligible-hold")
+    assert llm.calls == 0
+
+
+# ---- Fidelity NOT READY, condition (12) ----
+
+def test_fidelity_fix_called_once_for_not_ready(tmp_path):
+    calls = []
+    res = RunResult(terminal="x")
+    res.findings = [_finding(), _finding(path="ibl5/b.php")]
+    git = _Git()
+
+    def fidelity_fix(remaining):
+        calls.append(remaining)
+        return {"ran": True, "blockers": 1}
+
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(2, 12), res=res, git=git,
+                           llm=_Llm(git, [DECLINE, DECLINE]), fidelity_fix=fidelity_fix)
+    assert calls == [fix_round.DEADLINE_S]
+    assert rec["fidelity"] == {"ran": True, "blockers": 1}
+
+
+def test_fidelity_commit_goes_through_recheck(tmp_path):
+    git = _Git()
+    rejected, _, _, _, _ = _run(tmp_path, decision=_decision(12), git=git, llm=_Llm(git, []),
+                                fidelity_fix=lambda rem: git.commit("fix") and {"ran": True},
+                                recheck=lambda pre: dict(NO_RECHECK_FINDINGS, degraded=True))
+    assert (rejected["status"], rejected["reason"]) == ("rejected", "recheck-degraded")
+    assert git.drops == ["head0"]
+
+
+# ---- Conflict review with no verdict, condition (14) ----
+
+@pytest.mark.parametrize("got,reevaluate", [
+    (("CONFLICT-REVIEW=CLEAN", 1, "reviewed"), True),
+    (("CONFLICT-REVIEW=FOUND-PROBLEM", 1, "reviewed"), True),
+    (("CONFLICT-REVIEW=ABSENT", 2, "reviewed"), False),
+    (None, False),
+])
+def test_conflict_rereview_clean_sets_reevaluate(tmp_path, got, reevaluate):
+    git = _Git()
+    rec, _, _, _, llm = _run(tmp_path, decision=_decision(14), git=git, llm=_Llm(git, []),
+                             conflict_rereview=lambda: got)
+    assert rec["status"] == "no-change"
+    assert rec["reevaluate"] is reevaluate
+    assert llm.calls == 0
+    if got:
+        assert rec["conflict_rereview"] == {"verdict": got[0], "calls": got[1], "reason": got[2]}
+    else:
+        assert rec["conflict_rereview"] == {}
+
+
+def test_conflict_rereview_runs_after_the_recheck(tmp_path):
+    order = []
+    res = RunResult(terminal="x")
+    res.findings = [_finding()]
+
+    def recheck(pre):
+        order.append("recheck")
+        return NO_RECHECK_FINDINGS
+
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(2, 14), res=res, recheck=recheck,
+                           conflict_rereview=lambda: order.append("conflict")
+                           or ("CONFLICT-REVIEW=ABSENT", 2, "reviewed"))
+    assert rec["status"] == "accepted"
+    assert order == ["recheck", "conflict"]
+
+
+# ---- Swapping the proven repair onto the plan, after the push ----
+
+def _repaired_record(tmp_path, plan_path):
+    copy = tmp_path / fix_round.REPAIRED_PLAN_BASENAME
+    copy.write_bytes(b"repaired\n")
+    with open(plan_path, "rb") as fh:
+        sha = hashlib.sha256(fh.read()).hexdigest()
+    return {"status": "no-change", "repaired_plan": str(copy), "plan_sha256": sha,
+            "row_repairs": [{"row": "7", "file": "calc.py", "old_match": "old m",
+                             "new_match": "new m"}]}
+
+
+def test_apply_plan_repair_refuses_changed_plan(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_bytes(b"original\n")
+    rec = _repaired_record(tmp_path, plan)
+    plan.write_bytes(b"changed by someone else\n")
+    logs = []
+    assert fix_round.apply_plan_repair(SimpleNamespace(path=str(plan)), rec, str(tmp_path),
+                                       logs.append) is False
+    assert plan.read_bytes() == b"changed by someone else\n"
+    assert rec["repair_applied"] is False
+    assert logs == ["fix-round: plan changed during the round; row repair not applied"]
+    assert fix_round.digest_rows(rec) == []
+    assert "repaired" not in fix_round.summary_line(dict(rec, reevaluate=True))
+
+
+def test_apply_plan_repair_swaps_through_a_symlink_and_keeps_the_original(tmp_path):
+    real = tmp_path / "real.md"
+    real.write_bytes(b"original\n")
+    link = tmp_path / "link.md"
+    link.symlink_to(real)
+    rec = _repaired_record(tmp_path, link)
+    assert fix_round.apply_plan_repair(SimpleNamespace(path=str(link)), rec, str(tmp_path),
+                                       lambda m: None) is True
+    assert link.is_symlink()
+    assert real.read_bytes() == b"repaired\n"
+    assert (tmp_path / fix_round.ORIGINAL_PLAN_BASENAME).read_bytes() == b"original\n"
+    assert rec["repair_applied"] is True
+    on_disk = json.loads((tmp_path / fix_round.RESULT_BASENAME).read_text())
+    assert on_disk["repair_applied"] is True
+
+
+def test_apply_plan_repair_without_repairs_is_a_noop(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_bytes(b"original\n")
+    assert fix_round.apply_plan_repair(SimpleNamespace(path=str(plan)), {"row_repairs": []},
+                                       str(tmp_path), lambda m: None) is False
+    assert plan.read_bytes() == b"original\n"
+
+
+def test_apply_plan_repair_read_failure_is_not_applied(tmp_path):
+    rec = {"row_repairs": [{"row": "7"}], "plan_sha256": "x", "repaired_plan": "y"}
+    logs = []
+    assert fix_round.apply_plan_repair(SimpleNamespace(path=str(tmp_path / "gone.md")), rec,
+                                       str(tmp_path), logs.append) is False
+    assert rec["repair_applied"] is False
+    assert logs[0].startswith("fix-round: row repair not applied")
+
+
+def test_summary_and_digest_list_the_repair():
+    repair = {"row": "7", "file": "calc.py", "old_match": "old m", "new_match": "new m"}
+    rec = {"status": "no-change", "reevaluate": True, "items": [], "row_repairs": [repair],
+           "repair_applied": True, "conflict_rereview": {"verdict": "CONFLICT-REVIEW=CLEAN"}}
+    line = fix_round.summary_line(rec)
+    assert "; repaired Executable Mutations row 7 match in calc.py" in line
+    assert "; conflict review re-run: CONFLICT-REVIEW=CLEAN" in line
+    assert "row 7 match in calc.py" in fix_round.summary_line(dict(rec, status="accepted", sha="abc"))
+    rows = fix_round.digest_rows(rec)
+    assert len(rows) == 1
+    assert "row 7 (calc.py)" in rows[0] and "`old m`" in rows[0] and "`new m`" in rows[0]

@@ -1,13 +1,13 @@
-# postplan-harness — compiled `/post-plan`
+# postplan-harness: compiled `/post-plan`
 
-A specialized, deterministic harness for the IBL5 `/post-plan` ship pipeline —
+A specialized, deterministic harness for the IBL5 `/post-plan` ship pipeline,
 the most frequently repeated workflow in this machine's Claude Code history
 (323 full runs in 30 days, ~9M gross tokens and ~108 model turns per run).
 Historically, a general-purpose agent re-read the 11-phase skill and re-decided
 every mechanical step turn-by-turn. This harness **compiles** the stable
 procedure into code and keeps the LLM only where judgment is irreducible.
 
-**Status: INSTALLED (2026-07-16, explicit approval).** `./run isolated
+Status: INSTALLED (2026-07-16, explicit approval). `./run isolated
 <worktree> --live` is the live mode: it pushes to origin, executes the seven
 allowlisted `gh` mutations (each still audited to `out/actions.jsonl` with
 `executed: true`), and watches CI. `bin/post-plan-now` in IBL5 invokes it,
@@ -20,13 +20,13 @@ Without `--live`, every would-be side effect remains a typed intent record.
 |---|---|
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (sonnet). States no exact count its packet does not show; the diff is cut at `PR_COPY_DIFF_CAP` characters and the prompt says so when it is. Skipped when the PR is open and the tree is clean |
 | Phase 2 pre-push meta-check gate (rebase → gate → push) | `prose-fix`: rewrites the flagged lines when `check-prose-since` is the only failing check (sonnet, then opus; at most 2 tool-enabled calls with Read/Grep/Glob/Edit). A diff check enforces the line scope, and a re-run of the real gate decides success. Doc-staleness remediation stays mechanical |
-| Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
+| Phase 3 diff classification (all flags) | `review-agent-a/b/d`: code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` (sonnet) for security judgment |
-| Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
+| Phase 5.0 plan→test/file conformance | `score-findings`: rubric confidence scoring (haiku) |
 | All eighteen arming conditions (numbered 1-18, matching the `# condition (N)` comments in armable.py): 1 manual-testing clearance, 2 review finding >= 80, 3 unresolved MISSING items, 4 Phase 5 verify, 5 golden-snapshot headless, 6 depends-on merge order, 7 plan auto-merge hold, 8 feat commit-type floor, 9 PR-time safety verdict, 10 pipeline-authored floor, 11 unresolved review threads, 12 plan-fidelity verdict, 13 plan-slug drift, 14 conflict auto-resolved, 15 red CI check, 16 meta-checks, 17 gate backtest, 18 merge danger. The harness is the only arming authority; the skill fallback carries no arming logic. | `safety-verdict`: condition (9), **add-only** holds (haiku) |
-| CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
+| CI-watch interpretation | `manual-classify`: plan-blind manual-step triage (haiku) |
 | Phase 5.5 body-only round: eligibility (round outcome `body-only`, head tree equal to the prior review's `REVIEWED_TREE=`, plan hash unchanged, every prior finding under check 4) | `plan-fidelity-body-recheck-N`: prior body findings and numbered added body hunks vs. diff evidence (sonnet). Any decline runs the full Opus re-review |
-| Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
+| Side-effect gating + audit log | `retrospective`: save-a-lesson-or-not (haiku) |
 
 Phase 2 merges the branch's base, runs the local meta-check gate, then pushes to origin. The base is origin/master unless the branch is stacked. A stacked branch merges origin/<parent>, resolved by branch_base_merge_target in bin/lib/branch-base.sh (iblBase config, then gh baseRefName). A branch that records an iblBase no layer resolves stops with base-resolve and exit 3, and never falls back to master. When the lookup could not reach GitHub (ls-remote exit 128 or a timeout, or a gh network error), the helper returns 2 and the run stops with remote-unreachable and exit 76, which automouse treats as environmental. On a conflict against a parent, the --onto squash-trap fallback is skipped because it targets origin/master.
 
@@ -38,7 +38,7 @@ Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basen
 
 Every retained call: single turn, no tools, byte-capped input packet, JSON
 output validated by `harness/schemas.py`, one bounded retry, usage recorded.
-Invalid output is a typed failure — never silently accepted.
+Invalid output is a typed failure. The harness never accepts it silently.
 
 Two arming inputs get one stage-level retry when they miss. A real verdict is never retried. The read-only
 `conflict-review` call is asked again once when its reply carries no verdict token or the
@@ -102,7 +102,7 @@ python3 bench/benchmark.py all      # full benchmark (see report/report.html)
 `replay` is the **benchmark/development** command (point-in-time historical
 inputs). `isolated` is the closest thing to normal use: point it at a real
 worktree and it classifies, reviews, verifies, decides arming, and writes the
-intent log — without touching GitHub.
+intent log, without touching GitHub.
 
 ## Safety model
 
@@ -114,7 +114,7 @@ intent log — without touching GitHub.
   clearance section, degraded fixtures) block arming; the LLM safety verdict
   can only ADD holds, never release one.
 - **Human gates preserved.** `feat:` floor, `auto_merge: false`, golden-file
-  and manual-testing holds all land in `SHIPPED_HELD` — exactly the PRs a
+  and manual-testing holds all land in `SHIPPED_HELD`. Those are exactly the PRs a
   human had to merge before.
 - **`auto_merge: docs-only-ready`.** Seeded only by `bin/docfix-run`. Condition (7) arms it when `docs_refresh_holds` (`harness/armable.py`) returns no clause for the realized PR; the shell twin is `pr_docs_refresh_hold` in `bin/lib/pr-armable.sh`, and `tests/test_armable_docs_refresh.py` pins parity. Any other value holds as unknown.
 - **Degraded-review handling.** When a review agent's reply cannot be parsed, the harness records `degraded`, holds the PR, notes the failed agents on the PR body, and exits 0. The PR is open and held for manual merge.
@@ -124,7 +124,12 @@ intent log — without touching GitHub.
 - **The sticky quotes the newest grade.** Once a remediation round is graded, the sticky comment's findings excerpt and merge digest come from that round's verdict file, and the header names it (`Plan-fidelity verdict: <word> (re-review after remediation round N)`). A round whose reviewer wrote no verdict word is skipped, so the excerpt always quotes a document that carries one; verdict 1 stays the source until some round is graded. The `REVIEWED_TREE=<sha>` record that `record_reviewed_tree` appends below `## DIGEST` is stripped out of the five digest lines, which otherwise carry it into the merge DM.
 - **Bounded remediation loop.** Entry still keys on a `NOT READY` plan-fidelity verdict. Each round hands the fixer one work list: the union of arming holds (12) the bullets under the verdict's `## FINDINGS` heading (every pre-digest bullet when a verdict lacks that heading, and the whole body when neither yields a bullet), (3) plan-named files still missing, (16) failed meta-checks with their output, and (2) review findings scored at or above 80. Every item carries the hold it clears. Round 1 runs Sonnet 4.6 and round 2 onward run Opus 5.5, so a round that failed to clear the verdict escalates while a flaky call does not. `result.json` records `fidelity.rounds[]` with `model`, `work_list_sizes`, `retries` and `outcome` per round, plus a `models` list. A transient failure gets one retry inside the same round: no edits, `llm-invalid-output`, `llm-tooled-cli`, `llm-tooled-empty`, or a re-review that produced no verdict word. A terminal one ends the loop with the commit left local for the next run: `rebase-conflict`, `push-retry-cap`, `local-gate`, `gate-path-edit`. `push-failed` is the exception: it re-raises out of `_run_fidelity` and ends the run. `MAX_FIDELITY_ROUNDS` bounds the rounds and the fixer spawn count is at most twice that. The fixer prompt denies `.claude/rules/**`, `.github/workflows/**`, `bin/check-*` and `harness/armable.py`, and `denied_gate_edits` discards a commit that touched one before anything is pushed. One exception, the Phase 5.5 file-fix carve-out in the bullet below, lets the fixer commit a bounded edit to a rules file a blocking finding names. Arming conditions (7), (8), (13) and the `human-signoff` CI check are untouched by the loop, so a `feat:` PR with a fully cleared loop still waits for a human. The Phase 7 byte-budget carve-out in the next bullet never reaches this loop.
 - **Bounded body recheck after a body-only round.** When a remediation round edits only the PR body, the harness first asks whether the prior review's findings were all PR-body findings. `fidelity.body_recheck` reads the prior verdict file and `fidelity.body_recheck_eligibility` (through `body_only_findings_text`) returns the bullets only when the failing-check set is exactly check 4 (4a, 4b and 4c count as 4), every `## FINDINGS` bullet carries a `[BLOCKING]` or `[NOTE]` marker, no bullet cites another check, and `REVIEW-COVERAGE` is `CURRENT` or absent. An unrecognised layout returns `None`. `fidelity.body_recheck` then requires the head tree to equal that file's `REVIEWED_TREE=` line and the plan hash to be unchanged, numbers the prior findings `F1..Fn` and the added or changed body hunks `H1..Hm` (`llm_calls.body_hunks`, a line diff of the body the prior review read against the new one), and runs one single-turn Sonnet call with the diff sections the findings and hunks name as evidence. `schemas.validate_body_recheck` demands every id exactly once with a closed status enum. The round passes only when every finding is `resolved` and every hunk is `supported`; it then writes a `READY` verdict file at the re-review path with the prior digest carried forward and `REVIEWED_TREE=` recorded, so `select_fidelity_verdict` and arming condition (12) read it exactly as they read a re-review. Every other outcome (ineligible, invalid output, a `HarnessError`, an `unresolved` finding, an `unsupported` hunk) falls through to the unchanged full Opus re-review. The recheck never writes `NOT READY`. `result.json` records `rounds[].review_kind` (`body-recheck` or `full`) and `rounds[].recheck_fallback_reason`. `bench/replay_body_only_recheck.py` replays the predicate over `out/live-*` and, with `--live`, the real call.
-- **One fix round before the sticky verdict.** When the first arming evaluation holds on condition (2), (3) or (11), `harness/fix_round.py` runs one bounded round before anything is recorded or posted. It reuses `thread_ingestion.disposition_thread` for review threads and unthreaded findings, and `conformance_fix.remediate_missing` for MISSING items. Both defer: no reply and no push happen inside the round. The round gets at most 8 items and 1200 seconds. A delta review and the conformance check then judge the new head. A new holding finding, a worse conformance result, a degraded review, a timeout or an error discards the round with `git.drop_commit`, so the original hold stands. An accepted round is pushed, the deferred replies are posted, and the unchanged `_evaluate_arm` re-reads every arming input on the new head. One round per run. `holdrepeat` keeps a per-branch `fix_round` record capped at 3 attempts and skips a repeat on the same holds. `POSTPLAN_FIX_ROUND=0` turns it off; `bin/post-plan-now` passes the value through. The record is `fix-round.json` in the run dir and `result.json` `fix_round`; the sticky carries one `Fix round:` line.
+- **One fix round before the sticky verdict.** When the first arming evaluation holds on condition (2), (3), (11), (12), (14) or (19), `harness/fix_round.py` runs one bounded round before anything is recorded or posted. It reuses `thread_ingestion.disposition_thread` for review threads and unthreaded findings, and `conformance_fix.remediate_missing` for MISSING items. Both defer: no reply and no push happen inside the round. The round gets at most 8 items and 1200 seconds. A delta review and the conformance check then judge the new head. A new holding finding, a worse conformance result, a degraded review, a timeout or an error discards the round with `git.drop_commit`, so the original hold stands. An accepted round is pushed, the deferred replies are posted, and the unchanged `_evaluate_arm` re-reads every arming input on the new head. One round per run. `holdrepeat` keeps a per-branch `fix_round` record capped at 3 attempts and skips a repeat on the same holds. `POSTPLAN_FIX_ROUND=0` turns it off; `bin/post-plan-now` passes the value through. The record is `fix-round.json` in the run dir and `result.json` `fix_round`; the sticky carries one `Fix round:` line.
+  - **HELD rows, condition (19).** A row whose mutation survived its check gets one test-only strengthen pass. The fixer may edit test paths only. A second mutation run must trip the row, or the round is discarded.
+  - **NOT-APPLIED rows, condition (19).** A row whose `match` text finds zero matches gets a `match`-only repair. `harness/mutation_repair.py` checks the new text, which must match once in the same file and resemble the old text. A mutation run on a copy of the plan at `<out_dir>/fix-round-plan.md` must then trip the row. The fixer never edits the plan file. The harness swaps the copy onto the plan path after the push, or at once when the round changed no code, and saves the original as `fix-round-plan.orig.md`. A rejected round or a failed push leaves the plan as it was.
+  - **NOT READY blockers, condition (12).** A blocker naming a file in the PR gets one `fidelity.remediate` pass under the existing gate-owning path deny. Unplanned-scope blockers never reach it.
+  - **ABSENT conflict review, condition (14).** The review is re-asked up to `CONFLICT_REREVIEW_ATTEMPTS` times. A review that stays absent keeps the hold, so absence never arms.
+  - **Record.** Each applied repair appears in the sticky's `Fix round:` line and as a row in the merge digest, with its row id and file.
 - **Phase 7 byte-budget carve-out (ADR-0184).** When the triaged failing checks are exactly `Static guards` and `bin/check-rules-byte-budget` fails in the worktree before the fix, `_ci_fix_loop` tells the ci-fix fixer which `.claude/rules/*.md` files already in the PR diff it may shrink, and allows one new `*-detail.md` companion with a `paths:` list. `harness/rules_budget_carveout.py` re-checks the commit with git: each modified rules file must be smaller than before, each added one must be a companion with `paths:`, and any other gate-owning path, deletion or rename refuses the whole commit. It then reruns `bin/check-rules-byte-budget`, `bin/check-prose --since=origin/master` and `bin/check-docs --since=origin/master --no-staleness`. A refusal takes the existing `error:gate-path-edit` exit. Thread ingestion and prosefix keep the full deny; the Phase 5.5 fixer has its own, separate carve-out below.
 - **Phase 4.5 unreachable-defect filing.** A fixer that declines a thread as `not-worth-it` may add a `followup` key (title, harm, trigger) when the defect is real and its fix needs a file it may not edit. `thread_ingestion.file_declined_followup` files it as a `maintenance` backlog issue through the per-PR follow-up cap, after the thread resolves. Only the harms `crash`, `wrong-value`, `lost-data` and `security` file. A malformed key files nothing, a title already filed under `maintenance` files nothing, matched on its first 60 normalised characters, and a filing failure is a log line. In a fix round the filing waits for `fix_round.flush`, so a discarded round files nothing.
 - **Phase 5.5 note filing.** `fidelity.extract_notes` keeps `followup` notes only. A note citing only tooling paths (`bin/`, `tools/`, `.claude/`, `.github/`, `ibl5/docs/`) also needs a harm in `NOTE_HARMS`: crash, wrong value, lost data, security hole, or a gate that passes or blocks wrongly. Notes citing website paths, or no path, file without one.
@@ -161,21 +166,21 @@ A bot-resolved rebase from `postplan-fix --headless` follows the same rules as a
 ## Installation (executed 2026-07-16 with explicit approval)
 
 1. ✅ `LiveGh` (`harness/adapters/ghad.py`) executes the seven allowlisted
-   mutations behind `--live` — the allowlist is the method set; there is no
+   mutations behind `--live`. The allowlist is the method set; there is no
    generic gh escape hatch. Merge uses `--squash --auto` (no `--delete-branch`:
    benign-error in multi-worktree clones, and it permanently closes stacked
    child PRs).
 2. ✅ `LiveGit(push_remote="origin")` enabled in `--live` only.
 3. ✅ IBL5 `bin/post-plan-now` invokes `./run isolated <worktree> --live`
    under launchd, falling back to the Sonnet skill session on harness failure
-   (or when the harness is absent — other machines keep working). Escape
+   (or when the harness is absent, so other machines keep working). Escape
    hatch: `POST_PLAN_SKILL=1 bin/post-plan-now` forces the skill path.
 4. ✅ Phase 10 (preview) and Phase 9 memory WRITES stay interactive-side; the
    harness records a Phase 9 intent only.
 
 Known scope reductions vs the full skill (accepted at install): no backlog
 housekeeping (the skill's Phase 2.5 now fires on plan-blind PRs too via its
-Trigger C, so this gap widened — a harness run ships no housekeeping on ANY
+Trigger C, so this gap widened. A harness run ships no housekeeping on ANY
 PR class), no worktree teardown, no Playwright E2E spec track, no
 review Agent C (prior-PR feedback). The skill fallback retains all of them.
 

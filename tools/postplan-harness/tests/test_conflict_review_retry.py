@@ -1,7 +1,9 @@
 """review_resolution attempt counting (harness/conflict.py): real verdicts cost one call; a miss is retried once."""
 import os
+import shutil
 import sys
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -148,3 +150,53 @@ def test_pause_on_second_attempt_propagates(tmp_path, key):
     with pytest.raises(UsagePause):
         _review(llm, tmp_path, key, {})
     assert not os.path.exists(verdict_ok_path(key, "deadbeef"))
+
+
+# ---- rereview_absent: the fix round's bounded re-ask ----
+
+_NO_VERDICT = "I looked at it."
+
+
+@pytest.fixture
+def review_dir(key):
+    d = Path(f"/tmp/postplan-conflict-review-{key}")
+    d.mkdir(parents=True)
+    (d / "resolved-files.txt").write_text("a.php\nb.php\n")
+    (d / "proof-output.txt").write_text("TREE-EQUIVALENT")
+    yield d
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def _rereview(llm, tmp_path, key):
+    return conflict.rereview_absent(llm, _run, worktree=str(tmp_path), key=key)
+
+
+def test_rereview_absent_stops_on_verdict(tmp_path, key, review_dir):
+    llm = _TooledLlm([_NO_VERDICT, _NO_VERDICT, "CONFLICT-REVIEW=CLEAN\nfine", _NO_VERDICT])
+    assert _rereview(llm, tmp_path, key) == (VERDICT_CLEAN, 2, "reviewed")
+    assert len(llm.calls) == 3
+    with open(verdict_ok_path(key, "deadbeef")) as fh:
+        assert fh.readline().rstrip() == VERDICT_CLEAN
+    assert (review_dir / "resolved-files.txt").read_text() == "a.php\nb.php\n"
+
+
+def test_rereview_absent_bounded_attempts(tmp_path, key, review_dir):
+    llm = _TooledLlm([_NO_VERDICT] * 8)
+    assert _rereview(llm, tmp_path, key) == (VERDICT_ABSENT, conflict.CONFLICT_REREVIEW_ATTEMPTS,
+                                             "reviewed")
+    assert llm.calls == ["conflict-review"] * (conflict.CONFLICT_REREVIEW_ATTEMPTS * 2)
+
+
+def test_rereview_absent_skips_when_adaptations_present(tmp_path, key, review_dir):
+    (review_dir / "adaptations.txt").write_text("- a.php: +x => +y [x -> y]\n")
+    llm = _TooledLlm([])
+    assert _rereview(llm, tmp_path, key) == (VERDICT_ABSENT, 0, "adaptations-present")
+    assert llm.calls == []
+    assert (review_dir / "adaptations.txt").exists()
+
+
+def test_rereview_absent_needs_the_saved_inputs(tmp_path, key, review_dir):
+    (review_dir / "proof-output.txt").unlink()
+    llm = _TooledLlm([])
+    assert _rereview(llm, tmp_path, key) == (VERDICT_ABSENT, 0, "artifacts-missing")
+    assert llm.calls == []

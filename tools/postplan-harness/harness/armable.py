@@ -168,6 +168,72 @@ def feat_hold(title: str, labels: list[str]) -> bool:
     return False
 
 
+# Second-review clear. A blind Opus seat may clear these holds, and only when every
+# blocked condition is one of them and each passes its own check below. Anything else
+# stays with the owner. The UI floor is deliberately broad: a false positive keeps a hold.
+SECOND_REVIEW_CLEARABLE = frozenset({7, 10, 12, 17})
+CLEARABLE_PLAN_TRIGGERS = frozenset({"security-surface", "gate-weakening", "golden-snapshot"})
+UI_PATH_PREFIXES = ("ibl5/design/", "ibl5/themes/", "ibl5/templates/", "ibl5/jslib/", "ibl5/modules/", "ibl5/images/")
+UI_PATH_SUFFIXES = (".css", ".js", ".html", ".twig", "View.php")
+
+
+def touches_ui(files) -> bool:
+    return any(f.startswith(UI_PATH_PREFIXES) or f.endswith(UI_PATH_SUFFIXES) for f in files)
+
+
+def second_review_candidates(inp, cs) -> dict[int, str]:
+    """{condition number: hold reason} the seat may rule on; {} keeps every hold."""
+    blocked = {c.number: c for c in cs if c.blocked}
+    blocked_nums = set(blocked)
+    if not blocked_nums or not blocked_nums <= SECOND_REVIEW_CLEARABLE:
+        return {}
+    if 7 in blocked_nums:
+        if inp.plan_auto_merge_value != "false" and not inp.plan_auto_merge_false:
+            return {}
+        if not inp.plan_hold_triggers:
+            return {}
+        if not set(inp.plan_hold_triggers) <= CLEARABLE_PLAN_TRIGGERS:
+            return {}
+    if 10 in blocked_nums and touches_ui(inp.classification.files):
+        return {}
+    if 12 in blocked_nums:
+        selected, _ = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
+                                              inp.fidelity_tree_2, inp.current_tree)
+        # A verdict that never ran is indeterminate; only a real NOT READY with
+        # gate-edit-only findings goes to the seat.
+        if (selected or "").strip() != "NOT READY" or not inp.fidelity_gate_edit_only:
+            return {}
+    if 17 in blocked_nums and inp.gate_backtest_status != "HELD":
+        return {}
+    return {n: blocked[n].reason for n in blocked_nums}
+
+
+def _apply_second_review(inp, cs, cands) -> list[str]:
+    """Unblock each candidate a fresh CLEAN verdict names; note why on the rest."""
+    if not cands:
+        return []
+    by_number = {c.number: c for c in cs}
+    fresh = bool(inp.current_tree) and inp.second_review_tree == inp.current_tree
+    if inp.second_review_verdict is None:
+        note = "absent"
+    elif not fresh:
+        note = "stale tree"
+    elif inp.second_review_verdict == "CLEAN":
+        note = "no CLEARS line"
+    else:
+        note = f"{inp.second_review_verdict} {inp.second_review_reject_reason}".strip()
+    cleared: list[str] = []
+    for n in sorted(cands):
+        c = by_number[n]
+        if inp.second_review_verdict == "CLEAN" and fresh and n in inp.second_review_clears:
+            c.blocked = False
+            c.reason = ""
+            cleared.append(f"({n}) {c.name}: {inp.second_review_clears[n]}")
+        else:
+            c.reason = f"{c.reason}; second reviewer: {note}"
+    return cleared
+
+
 def deterministic_safety_holds(cls: Classification, title: str) -> list[str]:
     """Condition (9)'s enumerable hold-triggers. The bounded LLM verdict (when
     enabled) can only APPEND to this list."""
@@ -212,6 +278,12 @@ class ArmInputs:
     merge_danger_state: str = "MISSING"   # harness/merge_danger.classify_body(pr_body); only "TWO-WAY" arms (fail-closed default)
     removed_guards_holds: Optional[list[str]] = None   # removed_guards.classify_body(body, flagged keys); None = never computed -> BLOCKS
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
+    plan_hold_triggers: tuple = ()                # line-1 `hold_trigger:` tokens; () keeps condition (7) with the owner
+    fidelity_gate_edit_only: bool = False         # every blocking fidelity finding is [GATE-EDIT]
+    second_review_verdict: Optional[str] = None   # "CLEAN"/"REJECT"; None = the seat gave no verdict
+    second_review_tree: Optional[str] = None      # tree the seat reviewed; must equal current_tree
+    second_review_clears: dict = field(default_factory=dict)  # condition number -> reviewer reason
+    second_review_reject_reason: str = ""         # REJECT text, surfaced in the hold line
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
     conformance_fix_note: str = ""   # Phase 5.0-pre fixer summary appended to the condition-(3) hold line; "" = fixer did not run
@@ -595,4 +667,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     rg_reason = "state=UNCOMPUTED" if rg is None else "; ".join(rg)
     cs.append(ConditionResult(20, "removed-guards", rg_blocked, rg_reason if rg_blocked else ""))
 
-    return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)
+    # Post-pass: the only code here that releases a hold. Fail-closed on every path.
+    cands = second_review_candidates(inp, cs)
+    cleared = _apply_second_review(inp, cs, cands)
+    return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs,
+                       second_review_candidates=cands, second_review_cleared=cleared)

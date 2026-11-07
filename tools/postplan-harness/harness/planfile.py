@@ -1126,6 +1126,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
     info.auto_merge_value = frontmatter_auto_merge_value(content)
+    info.hold_triggers = frontmatter_hold_triggers(content)
     info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())

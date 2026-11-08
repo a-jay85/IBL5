@@ -24,6 +24,9 @@ name: Human Sign-off
 # UI_VR_ATTEMPTS x UI_VR_SLEEP seconds. Only this PR's own `E2E Tests` run on
 # the exact head SHA may supply it, checked through the run API. It stops early
 # once every such run finished without one. A timeout holds (`vr-missing`).
+# The approving `labeled human-approved` run skips this wait: the label clears
+# the hold anyway, and its fingerprint record must land before a sync run's
+# HS_AWAIT wait gives up.
 #
 # The classifiers live in bin/lib/human-signoff-classifier.sh and
 # bin/lib/ui-change-classifier.sh, sourced by BOTH this workflow and
@@ -153,7 +156,9 @@ jobs:
             : > "$PATHS"   # empty list -> ui-unknown -> hold
           fi
           if [ "$(wc -l < "$PATHS")" -ge 3000 ]; then : > "$PATHS"; fi  # API cap: cannot tell
-          UI_VERDICT=$(ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh) || true
+          # The approving label run skips the gallery wait so its record lands
+          # before a sync run's bounded HS_AWAIT wait gives up.
+          UI_VERDICT=$(ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh "$ACTION" "$EVENT_LABEL") || true
           UI_VERDICT="${UI_VERDICT:-ui-unknown}"
           echo "UI verdict: $UI_VERDICT"
 

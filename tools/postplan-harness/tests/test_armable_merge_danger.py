@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
 
+from harness import merge_danger as md
 from harness.gate_backtest import _ARMING_PATHS
 from tests.test_armable import BODY_CLEARED, _CHARACTERIZATION_FIXTURES, inputs
 from tests.test_merge_danger import _derive
@@ -77,5 +78,13 @@ def test_arming_paths_include_ui_classifier():
     path = "bin/lib/ui-change-classifier.sh"
     assert path in _ARMING_PATHS
     d = _derive([("M", path)])
-    assert d.door == "one-way"
+    assert d.door == "two-way"
+    assert d.self_governing is True
     assert f"arming-path:{path}" in d.triggers
+    two_way_body = "**Merge danger:** Door: two-way · Blast radius: module · Why: twenty chars of reason here"
+    state = md.classify_with_floor(two_way_body, d)
+    assert state == "SELF-GOVERNING"
+    decision = evaluate(inputs(merge_danger_state=state))
+    assert not decision.armed
+    assert _cond(decision, 18).blocked
+    assert _cond(decision, 18).reason == "state=SELF-GOVERNING"

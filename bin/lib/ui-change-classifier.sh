@@ -24,13 +24,24 @@ UI_PATH_RE+='|^ibl5/classes/.+(View|Renderer|Formatter)\.php$'
 UI_PATH_RE+='|^ibl5/(index|modules|block|demo-login)\.php$|^ibl5/favicon\.ico$'
 UI_PATH_RE+='|-snapshots/'
 # The gallery producers run from the PR's own code on pull_request, so a PR
-# that edits one could write a clean gallery. Those paths always hold: the
-# workflow and its local actions, the gallery builder, the VR spec, and the
-# fixtures, helpers and auth setup that run inside the VR Playwright process.
+# that edits one could write a clean gallery. Every PR-head file the VR job
+# runs before the vr-gallery-json upload always holds: the workflow and its
+# local actions, the bin/ scripts it calls, the specs the VR and manual-row
+# configs match (their testMatch is unanchored, so any directory), the
+# fixtures, helpers and auth setup inside the Playwright process, the package
+# and lock files that `bun install` and `composer install` run, and the
+# Docker files that start the containers. The app under test (PHP, SQL, CSS)
+# is what the gallery measures, so it is out of scope here.
 UI_PATH_RE+='|^\.github/workflows/e2e-tests\.yml$|^\.github/actions/|^bin/vr-build-gallery$'
+UI_PATH_RE+='|^bin/vr-review-comment$|^bin/vr-changed-coverage$|^bin/playwright-image-tag$'
+UI_PATH_RE+='|^ibl5/bin/run-migrations-ci$'
 UI_PATH_RE+='|^ibl5/tests/e2e/vr-[^/]*\.ts$|^ibl5/playwright[^/]*\.config\.ts$'
-UI_PATH_RE+='|^ibl5/tests/e2e/smoke/visual-regression\.spec\.ts$'
-UI_PATH_RE+='|^ibl5/tests/e2e/(fixtures|helpers)/|^ibl5/tests/e2e/[^/]*\.setup\.ts$'
+UI_PATH_RE+='|^ibl5/tests/e2e/visual/'
+UI_PATH_RE+='|^ibl5/tests/e2e/.*visual-regression\.spec\.ts$|^ibl5/tests/e2e/.*manual-rows\.spec\.ts$'
+UI_PATH_RE+='|^ibl5/tests/e2e/(fixtures|helpers)/|^ibl5/tests/e2e/.*\.setup\.ts$'
+UI_PATH_RE+='|^ibl5/package\.json$|^ibl5/bun\.lockb?$|^ibl5/bunfig\.toml$|^ibl5/\.npmrc$'
+UI_PATH_RE+='|^ibl5/composer\.(json|lock)$|^ibl5/tsconfig\.json$'
+UI_PATH_RE+='|^docker-compose\.ci\.yml$|^Dockerfile$|^docker/'
 UI_EXCLUDE_RE='\.md$'
 UI_GALLERY_JQ='[(.changedCells // [])[] | select(.strict != true)] + (.newCells // []) | length'
 
@@ -169,14 +180,24 @@ ui_fetch_gallery_gh() {
     return 1
 }
 
-# ui_workflow_verdict <paths_file> <pr_author> <fetch_fn> — prints the verdict.
-# Waits for the VR gallery only when no path is UI and VR is expected to run.
+# ui_approving_event <action> <event_label>: rc 0 for the `labeled human-approved` event.
+ui_approving_event() {
+    [ "${1:-}" = labeled ] && [ "${2:-}" = human-approved ]
+}
+
+# ui_workflow_verdict <paths_file> <pr_author> <fetch_fn> [action] [event_label]
+# Prints the verdict. Waits for the VR gallery only when no path is UI and VR
+# is expected to run. The approving `labeled human-approved` run never waits:
+# the label clears the hold whatever the gallery shows, and a sync run gives up
+# on the approval record after HS_AWAIT_ATTEMPTS x HS_AWAIT_SLEEP. That run
+# decides with no gallery, so it holds as vr-missing and records its
+# fingerprint at once. Every other event waits as before.
 # rc follows ui_decide (0 not-ui, 1 hold).
 ui_workflow_verdict() {
     local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp
     renderable=$(ui_renderable "$paths" "$author")
     ui_paths_touch_ui < "$paths" >/dev/null || rc=$?
-    if [ "$rc" = 1 ] && [ "$renderable" = 1 ]; then
+    if [ "$rc" = 1 ] && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
         tmp=$(mktemp) || tmp=""
         if [ -n "$tmp" ] && ui_await_gallery "${UI_VR_ATTEMPTS:-90}" "${UI_VR_SLEEP:-30}" "$fetch" "$tmp"; then
             gallery="$tmp"

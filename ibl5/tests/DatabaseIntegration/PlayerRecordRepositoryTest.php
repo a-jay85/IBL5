@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use PHPUnit\Framework\Attributes\Group;
 use RecordHolders\PlayerRecordRepository;
+use RecordHolders\RecordStatDefinitions;
 
 /**
  * Direct tests for PlayerRecordRepository against the real schema.
@@ -188,6 +190,51 @@ final class PlayerRecordRepositoryTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * Golden test: the full 9-stat output for every filter equals the old
+     * (pre-threshold) query run verbatim on the seeded DB.
+     */
+    public function testBatchMatchesReferenceForAllStatsAndFilters(): void
+    {
+        $exprs = array_column(RecordStatDefinitions::STATS, 'expression', 'recordLabel');
+
+        foreach (RecordStatDefinitions::DATE_FILTERS as $filter) {
+            self::assertSame(
+                $this->referenceBatch($exprs, $filter),
+                $this->repo->getTopPlayerSingleGameBatch($exprs, $filter),
+                $filter,
+            );
+        }
+    }
+
+    public function testBatchKeepsEarliestTiedRowsAtCandidateBoundary(): void
+    {
+        $this->seedBoundaryTies();
+
+        $exprs = ['assists' => 'bs.game_ast'];
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+        $result = $this->repo->getTopPlayerSingleGameBatch($exprs, $heat);
+
+        self::assertSame(
+            [200000104, 200000106],
+            array_column($result['assists'], 'pid'),
+        );
+        self::assertSame($this->referenceBatch($exprs, $heat), $result);
+    }
+
+    public function testBatchReturnsRowsWhenFewerThan500Candidates(): void
+    {
+        $this->seedThirtyRows();
+
+        $exprs = ['assists' => 'bs.game_ast'];
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+        $result = $this->repo->getTopPlayerSingleGameBatch($exprs, $heat);
+
+        self::assertCount(5, $result['assists']);
+        self::assertSame(6, $result['assists'][0]['value']);
+        self::assertSame($this->referenceBatch($exprs, $heat), $result);
+    }
+
     // --- getTopSeasonAverageBatch ---
 
     public function testGetTopSeasonAverageBatchRanksEachLabelAndExcludesIneligibleRows(): void
@@ -337,6 +384,216 @@ final class PlayerRecordRepositoryTest extends DatabaseTestCase
                 'pts' => $pts,
                 'ast' => $ast,
             ]);
+        }
+    }
+
+    /**
+     * 498 filler rows (no ibl_hist row, so the outer JOIN drops them) outrank
+     * 20 players tied at 10 assists. Two candidate slots remain: the earliest
+     * date wins, then the lowest bs.id.
+     */
+    private function seedBoundaryTies(): void
+    {
+        $this->clearHeatRows();
+
+        $this->insertTestPlayer(200000001, 'RhBd Filler');
+        $rows = [];
+        for ($n = 0; $n < 498; $n++) {
+            $rows[] = ['pid' => 200000001, 'date' => $this->heatDate($n), 'ast' => 12 + ($n % 8)];
+        }
+        $this->insertAssistRows($rows);
+
+        $dateIndexes = [7, 3, 3, 15, 0, 9, 1, 1, 12, 5, 18, 2, 6, 4, 11, 8, 10, 13, 14, 16];
+        $tied = [];
+        foreach ($dateIndexes as $i => $dateIndex) {
+            $pid = 200000100 + $i;
+            $this->insertTestPlayer($pid, 'RhBd Tied ' . $i);
+            $this->insertHistRow($pid, 'RhBd Tied ' . $i, 2102, ['team' => 'RhHist-' . $pid]);
+            $tied[] = ['pid' => $pid, 'date' => $this->heatDate($dateIndex), 'ast' => 10];
+        }
+        $this->insertAssistRows($tied);
+    }
+
+    /**
+     * One player with 30 HEAT rows, fewer than the 500-row candidate buffer.
+     */
+    private function seedThirtyRows(): void
+    {
+        $this->clearHeatRows();
+
+        $this->insertTestPlayer(200000201, 'RhFew Player');
+        $this->insertHistRow(200000201, 'RhFew Player', 2102, ['team' => 'RhHist-200000201']);
+        $rows = [];
+        for ($n = 0; $n < 30; $n++) {
+            $rows[] = ['pid' => 200000201, 'date' => $this->heatDate($n), 'ast' => $n % 7];
+        }
+        $this->insertAssistRows($rows);
+    }
+
+    // --- reference (pre-threshold) queries ---
+
+    private const REFERENCE_CANDIDATE_TEMPLATE = 'SELECT
+            bs.pid,
+            bs.game_date,
+            bs.visitor_teamid,
+            bs.home_teamid,
+            (bs.season_year) AS season_year,
+            {expr} AS value
+        FROM `ibl_box_scores` bs
+        WHERE {filter}
+            AND bs.visitor_teamid BETWEEN 1 AND {max}
+            AND bs.home_teamid BETWEEN 1 AND {max}
+        ORDER BY {expr} DESC, bs.game_date ASC, bs.id ASC
+        LIMIT 500';
+
+    private const REFERENCE_BRANCH_TEMPLATE = "(SELECT
+            '{label}' AS stat_type,
+            cand.pid,
+            p.name,
+            h.teamid AS teamid,
+            h.team AS team_name,
+            cand.game_date AS `date`,
+            COALESCE(sch.box_id, 0) AS box_id,
+            COALESCE(bst.game_of_that_day, 0) AS game_of_that_day,
+            CASE WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid ELSE cand.visitor_teamid END AS oppTid,
+            opp.team_name AS opp_team_name,
+            cand.value
+        FROM ({candidate}) cand
+        JOIN `ibl_plr` p ON p.pid = cand.pid
+        JOIN `ibl_hist` h ON h.pid = cand.pid AND h.year = cand.season_year
+        LEFT JOIN `ibl_schedule` sch ON sch.game_date = cand.game_date
+            AND sch.visitor_teamid = cand.visitor_teamid AND sch.home_teamid = cand.home_teamid
+        LEFT JOIN _game_of_day bst ON bst.game_date = cand.game_date
+            AND bst.visitor_teamid = cand.visitor_teamid AND bst.home_teamid = cand.home_teamid
+        LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
+            WHEN h.teamid = cand.visitor_teamid THEN cand.home_teamid
+            ELSE cand.visitor_teamid END
+        ORDER BY cand.value DESC, cand.game_date ASC, cand.pid ASC
+        LIMIT 5)";
+
+    /**
+     * The old inner query, verbatim from master.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function referenceCandidates(string $expression, string $dateFilter): array
+    {
+        return $this->fetchRows($this->referenceCandidateSql($expression, $dateFilter));
+    }
+
+    private function referenceCandidateSql(string $expression, string $dateFilter): string
+    {
+        return strtr(self::REFERENCE_CANDIDATE_TEMPLATE, [
+            '{expr}' => $expression,
+            '{filter}' => $dateFilter,
+            '{max}' => (string) League::MAX_REAL_TEAMID,
+        ]);
+    }
+
+    /**
+     * The old full batch query, verbatim from master.
+     *
+     * @param array<string, string> $statExpressions
+     * @return array<string, list<array<string, int|string>>>
+     */
+    private function referenceBatch(array $statExpressions, string $dateFilter): array
+    {
+        $cte = new \ReflectionClassConstant(PlayerRecordRepository::class, 'GAME_OF_THAT_DAY_SUBQUERY');
+        $branches = [];
+        foreach ($statExpressions as $label => $expression) {
+            $branches[] = strtr(self::REFERENCE_BRANCH_TEMPLATE, [
+                '{label}' => str_replace("'", "''", $label),
+                '{candidate}' => $this->referenceCandidateSql($expression, $dateFilter),
+            ]);
+        }
+        $sql = 'WITH _game_of_day AS ' . (string) $cte->getValue() . "\n" . implode("\nUNION ALL\n", $branches);
+
+        $results = [];
+        foreach (array_keys($statExpressions) as $label) {
+            $results[$label] = [];
+        }
+        foreach ($this->fetchRows($sql) as $row) {
+            $results[(string) $row['stat_type']][] = [
+                'pid' => (int) $row['pid'],
+                'name' => (string) $row['name'],
+                'teamid' => (int) $row['teamid'],
+                'team_name' => (string) $row['team_name'],
+                'date' => (string) $row['date'],
+                'box_id' => (int) $row['box_id'],
+                'game_of_that_day' => (int) $row['game_of_that_day'],
+                'oppTid' => (int) $row['oppTid'],
+                'opp_team_name' => (string) $row['opp_team_name'],
+                'value' => (int) $row['value'],
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param list<int> $params
+     * @return list<array<string, mixed>>
+     */
+    private function fetchRows(string $sql, array $params = []): array
+    {
+        $stmt = $this->db->prepare($sql);
+        self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
+        if ($params !== []) {
+            $stmt->bind_param(str_repeat('i', count($params)), ...$params);
+        }
+        self::assertTrue($stmt->execute(), 'execute failed: ' . $stmt->error);
+        $result = $stmt->get_result();
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        return $rows;
+    }
+
+    // --- bulk fixture helpers ---
+
+    /**
+     * Distinct HEAT (October) dates: index 0 is 2101-10-01, 31 per year.
+     * Season year is the stored generated column (year + 1 for October).
+     */
+    private function heatDate(int $n): string
+    {
+        return sprintf('%04d-10-%02d', 2101 + intdiv($n, 31), $n % 31 + 1);
+    }
+
+    /**
+     * Remove seed HEAT rows so they cannot leak into the fixtures. Rolled back with the test transaction.
+     */
+    private function clearHeatRows(): void
+    {
+        $this->db->query('DELETE FROM ibl_box_scores WHERE game_type = 3');
+    }
+
+    /**
+     * Multi-row insert of box-score lines (visitor team 1, home team 2) that
+     * vary only in pid, date and game_ast. Row order fixes the bs.id order.
+     *
+     * @param list<array{pid: int, date: string, ast: int|null}> $rows
+     */
+    private function insertAssistRows(array $rows): void
+    {
+        $tuple = "(?, 'RhBulk', 'PG', ?, 1, 2, 1, 30, 5, 10, 4, 5, 2, 6, 2, 6, ?, 2, 2, 1, 3, 1, 10000, 15000, 20, 10, 25, 5)";
+        foreach (array_chunk($rows, 100) as $chunk) {
+            $sql = 'INSERT INTO ibl_box_scores (game_date, name, pos, pid, visitor_teamid, home_teamid, teamid, game_min,'
+                . ' game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga, game_orb, game_drb, game_ast, game_stl,'
+                . ' game_tov, game_blk, game_pf, game_of_that_day, attendance, capacity, visitor_wins, visitor_losses,'
+                . ' home_wins, home_losses) VALUES '
+                . implode(', ', array_fill(0, count($chunk), $tuple));
+            $values = [];
+            foreach ($chunk as $row) {
+                array_push($values, $row['date'], $row['pid'], $row['ast']);
+            }
+            $stmt = $this->db->prepare($sql);
+            self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
+            $stmt->bind_param(str_repeat('sii', count($chunk)), ...$values);
+            self::assertTrue($stmt->execute(), 'insert failed: ' . $stmt->error);
+            $stmt->close();
         }
     }
 

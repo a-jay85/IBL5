@@ -226,6 +226,22 @@ fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
     PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; ${FETCH_PRELUDE:-}usage_fetch $1"
 }
 
+# barrier_wait <file>: bounded poll for a barrier file. It gives ordering, not timing. On timeout it
+# appends to b.timeout beside the file and returns 1, so the test fails loudly instead of hanging.
+barrier_wait() {
+    local i=0
+    while [ ! -e "$1" ]; do
+        i=$((i + 1))
+        [ "$i" -le 1000 ] || { echo "$$ $1" >> "$(dirname "$1")/b.timeout"; return 1; }
+        sleep 0.01
+    done
+}
+
+stale_fetch_lock() {  # <state_dir>: seeds fetch.lock.d with a stamp 100 s old (stale at the default 15 s)
+    mkdir -p "$1/fetch.lock.d"
+    printf '%s 99999\n' "$(( $(date +%s) - 100 ))" > "$1/fetch.lock.d/at"
+}
+
 # diag_dump <label> <file...>: after a failed concurrency assert, prints each file (or <missing>)
 # under a DIAG banner so a CI log shows which processes held which lock.
 diag_dump() {
@@ -2951,6 +2967,33 @@ test_usage_log_concurrent_writers() {
         diag_dump seeds "$T/rotate.trace"
     fi
     assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
+}
+
+# Two reclaimers judge one stale lock. R2 is held right after its stale verdict while R1 reclaims;
+# R1 is held after its mkdir, before its stamp, until R2 returns. Exactly one may hold the lock.
+test_fetch_lock_reclaim_race_one_holder() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" lib="$REPO_ROOT/bin/lib/usage-fetch.sh" p1 p2 r wins=0
+    stale_fetch_lock "$d"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = fetch-reclaim-stale ] || return 0; touch '$T/b.r2-ready'; barrier_wait '$T/b.r1-won'; }"
+    } > "$T/hook.r2"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = fetch-reclaim-won ] || return 0; touch '$T/b.r1-won'; barrier_wait '$T/b.r2-done'; }"
+    } > "$T/hook.r1"
+    bash -c ". '$lib'; . '$T/hook.r2'; _usage_fetch_lock_acquire '$d'; echo \$? > '$T/rc.r2'; echo \$\$ > '$T/pid.r2'; touch '$T/b.r2-done'" &
+    p2=$!
+    barrier_wait "$T/b.r2-ready"
+    bash -c ". '$lib'; . '$T/hook.r1'; _usage_fetch_lock_acquire '$d'; echo \$? > '$T/rc.r1'; echo \$\$ > '$T/pid.r1'" &
+    p1=$!
+    wait "$p2"; wait "$p1"
+    for r in r1 r2; do [ "$(cat "$T/rc.$r" 2>/dev/null)" = 0 ] && wins=$((wins + 1)); done
+    assert_eq reclaim_race:one-winner 1 "$wins"
+    assert_eq reclaim_race:r1-wins 0 "$(cat "$T/rc.r1" 2>/dev/null)"
+    assert_eq reclaim_race:r2-loses 1 "$(cat "$T/rc.r2" 2>/dev/null)"
+    assert_eq reclaim_race:stamp-is-r1 "$(cat "$T/pid.r1" 2>/dev/null)" "$(cut -d' ' -f2 "$d/fetch.lock.d/at" 2>/dev/null)"
+    assert_no_file reclaim_race:no-timeout "$T/b.timeout"
+    assert_no_file reclaim_race:no-mutex-left "$d/fetch-reclaim.lock.d"
 }
 
 ep() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; $*"; }

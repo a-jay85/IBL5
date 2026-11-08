@@ -13,20 +13,19 @@ final class CliFlagGuardTest extends TestCase
     {
         $this->assertSame([], CliFlagGuard::unknownFlags(['migrate', '--status'], ['--status']));
         CliFlagGuard::assertKnown(['migrate', '--status'], ['--status']);
-        $this->addToAssertionCount(1);
     }
 
     public function testNoFlagsPasses(): void
     {
+        $this->expectNotToPerformAssertions();
         CliFlagGuard::assertKnown(['migrate'], ['--status']);
-        $this->addToAssertionCount(1);
     }
 
     public function testMisspelledFlagThrowsWithUsageMessage(): void
     {
         try {
             CliFlagGuard::assertKnown(['migrate', '--statu'], ['--status']);
-            $this->fail('Expected InvalidArgumentException');
+            self::fail('Expected InvalidArgumentException');
         } catch (\InvalidArgumentException $e) {
             $this->assertSame("Unknown option(s): --statu\nAccepted options: --status", $e->getMessage());
         }
@@ -69,7 +68,7 @@ final class CliFlagGuardTest extends TestCase
     {
         try {
             CliFlagGuard::assertKnown(['x', '--a', '-b', '--status'], ['--status', '--dry-run']);
-            $this->fail('Expected InvalidArgumentException');
+            self::fail('Expected InvalidArgumentException');
         } catch (\InvalidArgumentException $e) {
             $this->assertSame(
                 "Unknown option(s): --a -b\nAccepted options: --status --dry-run",
@@ -82,7 +81,7 @@ final class CliFlagGuardTest extends TestCase
     {
         try {
             CliFlagGuard::assertKnown(['x', '--dry-run'], []);
-            $this->fail('Expected InvalidArgumentException');
+            self::fail('Expected InvalidArgumentException');
         } catch (\InvalidArgumentException $e) {
             $this->assertSame("Unknown option(s): --dry-run\nAccepted options: (none)", $e->getMessage());
         }

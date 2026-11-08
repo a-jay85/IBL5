@@ -187,7 +187,7 @@ hs_eval_approval() {
 
 # hs_label_newer_than_marker <events_json_file> <comments_json_file> — read a
 # flat array of issue events and a flat array of issue comments (GitHub REST
-# shapes) and decide whether a would-be `missing` drop should wait.
+# shapes) and decide whether a would-be `missing` or `mismatch` drop should wait.
 #   rc 0: a `labeled` event for human-approved exists, and no github-actions[bot]
 #         hs marker (record or revoked) is strictly newer than the newest one
 #   rc 1: no such labeled event, or a bot marker is strictly newer
@@ -219,19 +219,19 @@ hs_label_newer_than_marker() {
 
 # hs_await_record <attempts> <sleep_s> <refetch_fn> <action> <event_label> <title> <labels_csv> <current_fp> <comments_json_file> <events_json_file>
 # Call right after hs_eval_approval with the same arguments. Changes nothing
-# unless the verdict is `drop missing`. When hs_label_newer_than_marker says
+# unless the verdict is `drop missing` or `drop mismatch`. When hs_label_newer_than_marker says
 # wait, it re-reads comments up to <attempts> times, <sleep_s> seconds apart,
 # by calling "$refetch_fn" <comments_json_file> directly (never in a subshell),
 # and re-runs hs_eval_approval after each read.
 #   rc 0: verdict became keep (a matching bot record appeared)
 #   rc 1: any drop. mismatch if a non-matching record appeared; error on a bad
 #         argument, an events/comments read error, or a refetch failure;
-#         missing on timeout or when a newer bot marker appears
+#         missing or mismatch (the last re-read's reason) on timeout or when a newer bot marker appears
 hs_await_record() {
     local attempts="$1" sleep_s="$2" refetch="$3" action="$4" event_label="$5"
     local title="$6" labels="$7" current="$8" comments="$9" events="${10}"
     local hs_await_i=0 nrc=0
-    if [ "${HS_VERDICT:-}" != "drop" ] || [ "${HS_DROP_REASON:-}" != "missing" ]; then
+    if [ "${HS_VERDICT:-}" != "drop" ] || { [ "${HS_DROP_REASON:-}" != "missing" ] && [ "${HS_DROP_REASON:-}" != "mismatch" ]; }; then
         if [ "${HS_VERDICT:-}" = "drop" ]; then return 1; fi
         return 0
     fi
@@ -260,7 +260,7 @@ hs_await_record() {
             _hs_drop error
             return 1
         fi
-        if [ "$HS_VERDICT" != "drop" ] || [ "$HS_DROP_REASON" != "missing" ]; then return 1; fi
+        if [ "$HS_VERDICT" != "drop" ] || { [ "$HS_DROP_REASON" != "missing" ] && [ "$HS_DROP_REASON" != "mismatch" ]; }; then return 1; fi
         nrc=0
         hs_label_newer_than_marker "$events" "$comments" || nrc=$?
         case "$nrc" in
@@ -271,7 +271,7 @@ hs_await_record() {
                return 1 ;;
         esac
     done
-    echo "Entry gate: no approval record after $attempts re-reads; dropping (missing)"
+    echo "Entry gate: no matching approval record after $attempts re-reads; dropping ($HS_DROP_REASON)"
     return 1
 }
 

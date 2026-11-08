@@ -38,6 +38,26 @@ class BoxScoreUrlBuilderTest extends TestCase
         $this->assertSame('', $url);
     }
 
+    public function testBuildUrlReturnsEmptyForUnplayedPlaceholderBoxId(): void
+    {
+        $this->assertSame('', BoxScoreUrlBuilder::buildUrl('2009-01-10', 0, 100000));
+        $this->assertSame('', BoxScoreUrlBuilder::buildUrl('2009-01-10', 0, 100000, 7));
+    }
+
+    public function testBuildUrlKeepsLegacyLinkForBoxIdsNextToPlaceholder(): void
+    {
+        $this->assertSame('./ibl/IBL/box99999.htm', BoxScoreUrlBuilder::buildUrl('2009-01-10', 0, 99999));
+        $this->assertSame('./ibl/IBL/box100001.htm', BoxScoreUrlBuilder::buildUrl('2009-01-10', 0, 100001));
+    }
+
+    public function testBuildUrlPrefersInternalEvenWithPlaceholderBoxId(): void
+    {
+        $this->assertSame(
+            'modules.php?name=GameBoxscore&date=2009-01-10&game=2',
+            BoxScoreUrlBuilder::buildUrl('2009-01-10', 2, 100000)
+        );
+    }
+
     public function testBuildUrlReturnsEmptyForNegativeGameOfThatDayAndNoBoxId(): void
     {
         $url = BoxScoreUrlBuilder::buildUrl('2025-01-15', -1);

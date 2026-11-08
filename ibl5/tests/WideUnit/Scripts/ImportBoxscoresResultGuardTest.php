@@ -24,7 +24,8 @@ final class ImportBoxscoresResultGuardTest extends TestCase
         );
         self::assertStringContainsString('throw new RuntimeException', $m[1]);
         self::assertSame(0, preg_match('/\b(exit|die)\b/', $m[1]), 'guard must throw, never exit/die');
-        self::assertStringNotContainsString('catch (', $src, 'an uncaught throw keeps exit 255 only while the script has no catch');
+        self::assertSame(1, substr_count($src, 'catch ('), 'an uncaught throw keeps exit 255 only while the script catches nothing but the flag guard');
+        self::assertStringContainsString('catch (\\InvalidArgumentException $e)', $src);
         self::assertStringContainsString("global \$mysqli_db;\n/** @var \\mysqli \$mysqli_db */", $src);
     }
 }

@@ -17,9 +17,10 @@ declare(strict_types=1);
  * Usage: php claim-next.php [--owner=<lease-token>] [--resume=<id>]
  */
 
+/** @var list<string> $argv */
 require_once __DIR__ . '/../../classes/Cli/CliFlagGuard.php';
 try {
-    \Cli\CliFlagGuard::assertKnown($argv ?? [], ['--owner=', '--resume=']);
+    \Cli\CliFlagGuard::assertKnown($argv, ['--owner=', '--resume=']);
 } catch (\InvalidArgumentException $e) {
     fwrite(STDERR, $e->getMessage() . "\n");
     exit(2);
@@ -32,7 +33,6 @@ use BugPipeline\BugReportRepository;
 /** Lease TTL — how long a claim is held before reclaimStaleLease may steal it. */
 const LEASE_TTL_MINUTES = 10;
 
-/** @var list<string> $argv */
 $args = array_slice($argv, 1);
 $owner = gethostname() . ':' . getmypid();
 $resumeId = null;

@@ -46,6 +46,14 @@ final class RivalryScorerTest extends TestCase
             'playoff_games' => 20, 'close_games' => 200, 'recent_games' => 30,
         ]);
         self::assertSame(100, $this->scorer->score($max));
+        self::assertSame(
+            100,
+            RivalryScorer::WEIGHT_PLAYOFF
+            + RivalryScorer::WEIGHT_VOLUME
+            + RivalryScorer::WEIGHT_CLOSENESS
+            + RivalryScorer::WEIGHT_CLOSE_GAMES
+            + RivalryScorer::WEIGHT_RECENCY,
+        );
     }
 
     public function testNineGamesDoesNotQualifyAndTenDoes(): void

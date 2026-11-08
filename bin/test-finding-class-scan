@@ -536,7 +536,8 @@ case_counting() {
     seed_counting_fixture
     fcs
     expect_eq "row 27: six issue create calls on a real run" 6 "$(count_lines gh.calls 'issue create')"
-    expect_has "row 26: DM lists the none class" "$(cat "$STUB_DIR/dm.txt")" "no static check 1"
+    expect_has "row 26: DM counts the none class" "$(cat "$STUB_DIR/dm.txt")" "NO CHECK POSSIBLE: 1 classes, 0 grew this run"
+    expect_lacks "row 26: an old none class that did not grow is not listed" "$(cat "$STUB_DIR/dm.txt")" "Title for kind-none"
 }
 
 # ── Cases: backlog dedupe (Phase 5) ───────────────────────────────────────────
@@ -689,7 +690,10 @@ case_filing_failure_and_success() {
     fcs
     expect_eq "row 35: success exits 0" 0 "$RC"
     expect_eq "row 35: success writes the watermark" "2026-10-12T10:00:00Z" "$(cat "$STATE/watermark")"
-    expect_has "row 35: DM says filed 1" "$(cat "$STUB_DIR/dm.txt")" "filed 1"
+    expect_has "row 35: DM says Filed 1" "$(cat "$STUB_DIR/dm.txt")" "Filed 1"
+    expect_has "row 35: DM keeps a clickable link to the filed issue" "$(cat "$STUB_DIR/dm.txt")" \
+        "[#101](<https://github.com/a-jay85/IBL5-backlog/issues/101>)"
+    expect_has "row 35: DM counts the new filing in the backlog tally" "$(cat "$STUB_DIR/dm.txt")" "BACKLOG: 1 open, 0 closed"
     expect_has "success summary line" "$OUT" "summary mode=backfill dry_run=0 threads_new=5 filed=1"
     expect_eq "success appends to runs.log" 1 "$(grep -c 'summary ' "$STATE/runs.log")"
     new_fixture
@@ -700,7 +704,51 @@ case_filing_failure_and_success() {
     local size
     size="$(wc -c < "$STUB_DIR/dm.txt" | tr -d ' ')"
     if [ "$size" -le 1800 ]; then ok "row 35: DM stdin is $size bytes for 200 skipped classes"; else fail "row 35: DM stdin is $size bytes"; fi
-    expect_has "row 35: DM is marked truncated" "$(cat "$STUB_DIR/dm.txt")" "[truncated]"
+    expect_lacks "row 35: 200 old skipped classes no longer flood the DM" "$(cat "$STUB_DIR/dm.txt")" "[truncated]"
+    expect_has "row 35: the skipped total still shows" "$(cat "$STUB_DIR/dm.txt")" "NO CHECK POSSIBLE: 200 classes"
+}
+
+# The DM layout, driven through the sourced functions with hand-made $WORK files.
+case_dm_layout() {
+    new_fixture
+    local W="$FX/work" out i
+    mkdir -p "$W"
+    for i in $(seq 1 10); do
+        jq -nc --argjson n "$((200 + i))" --argjson a "$i" \
+            '{kind: "growing", number: $n, title: "Grow \($n)", added: $a, total: ($a + 5)}' >> "$W/dm-items.jsonl"
+    done
+    jq -nc '{kind: "new", number: 300, title: ("Long `x` | [y](z) <@1> https://evil.example/a " + ("w" * 80)), added: 2, total: 2}' \
+        >> "$W/dm-items.jsonl"
+    for i in 1 2 3 4 5 6 7; do
+        jq -nc --arg k "none-$i" '{key: $k, title: ("None " + $k), thread_count: 9}' >> "$W/skipped-none.jsonl"
+        jq -nc --arg k "none-$i" '{thread_id: "t", class_key: $k}' >> "$W/run-assignments.jsonl"
+    done
+    jq -nc '{key: "none-old", title: "None old", thread_count: 9}' >> "$W/skipped-none.jsonl"
+    jq -nc '{thread_id: "t2", class_key: "none-3"}' >> "$W/run-assignments.jsonl"
+    jq -nc '{thread_id: "t3", class_key: null}' >> "$W/run-assignments.jsonl"
+    printf '%s\n' '{"key":"a","number":1,"state":"open"}' '{"key":"b","number":2,"state":"closed"}' > "$W/backlog-keys.jsonl"
+    out="$(BACKLOG_SLUG=a-jay85/IBL5-backlog bash -c 'source "$1"; WORK="$2"; THREADS_NEW=42; FILED=1; COMMENTED=10
+        SKIPPED_NONE=8; FAIL_REASON="boom"; build_dm 1 | sanitize_dm' _ "$FCS" "$W")"
+    expect_has "dm: failure line comes first" "$(sed -n 1p <<< "$out")" "FAILED: boom"
+    expect_has "dm: header counts threads and actions" "$out" "42 new review threads. Filed 1, commented 10."
+    expect_eq "dm: NEW comes before GROWING" "NEW" "$(sed -n 3p <<< "$out")"
+    expect_has "dm: new issue link stays clickable" "$out" "[#300](<https://github.com/a-jay85/IBL5-backlog/issues/300>)"
+    expect_lacks "dm: model text loses backticks" "$out" '`x`'
+    expect_lacks "dm: model text loses brackets" "$out" "[y](z)"
+    expect_lacks "dm: model text cannot mention" "$out" "<@1>"
+    expect_has "dm: model text URL is broken" "$out" "https[:]//evil.example"
+    expect_has "dm: long title is cut with an ellipsis" "$out" "…: 2 threads"
+    expect_has "dm: biggest growth is listed first" "$(sed -n 6p <<< "$out")" "[#210]"
+    expect_has "dm: growing line shows gain and total" "$out" "Grow 210: +10, now 15 threads"
+    expect_lacks "dm: items past the cap are left out" "$out" "Grow 203"
+    expect_has "dm: items past the cap are counted" "$out" "+3 more in the backlog"
+    expect_has "dm: grown none count" "$out" "NO CHECK POSSIBLE: 8 classes, 7 grew this run"
+    expect_has "dm: top grown none class first" "$out" "None none-3: +2, now 9 threads"
+    expect_lacks "dm: none classes past the cap are left out" "$out" "None none-7"
+    expect_lacks "dm: a none class with no new threads is left out" "$out" "None old"
+    expect_has "dm: backlog tally adds this run's filings" "$out" "BACKLOG: 2 open, 1 closed scan issues"
+    out="$(bash -c 'source "$1"; DM_BODY_MAX=60; printf "%s\n" "line one is here" "$(printf "x%.0s" $(seq 1 80))" | sanitize_dm' _ "$FCS")"
+    expect_eq "dm: an over-long body is cut at a line and marked" "line one is here"$'\n'"[truncated]" "$out"
 }
 
 # 125 trusted threads on one PR give three classifier batches of 60.

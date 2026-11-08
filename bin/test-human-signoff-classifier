@@ -455,6 +455,24 @@ else
 fi
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: eval step calls hs_await_record" "$GATE_BLOCK" 'hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments'
+# The eval-step guard admits the bounded wait for drop missing and drop mismatch only.
+HS_GUARD=$(printf '%s\n' "$GATE_BLOCK" | command grep -E '^[[:space:]]*if .*HS_DROP_REASON' \
+    | sed -E 's/^[[:space:]]*if (.*); then$/\1/')
+if [ "$(printf '%s\n' "$HS_GUARD" | grep -c .)" = 1 ]; then
+    h_pass "guard: exactly one HS_DROP_REASON guard in the eval step"
+else
+    h_fail "guard: exactly one HS_DROP_REASON guard in the eval step" "got: $HS_GUARD"
+fi
+guard_says() {
+    [ -n "$HS_GUARD" ] || { echo EMPTY; return 0; }
+    # shellcheck disable=SC2016  # expands in the child bash
+    HS_VERDICT="$1" HS_DROP_REASON="$2" bash -c 'if eval "$1"; then echo ADMIT; else echo SKIP; fi' _ "$HS_GUARD"
+}
+want "guard: drop missing admits the wait" "$(guard_says drop missing)" "ADMIT"
+want "guard: drop mismatch admits the wait" "$(guard_says drop mismatch)" "ADMIT"
+want "guard: drop error skips the wait" "$(guard_says drop error)" "SKIP"
+want "guard: near-miss reason mismatched skips the wait" "$(guard_says drop mismatched)" "SKIP"
+want "guard: keep skips the wait" "$(guard_says keep "")" "SKIP"
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: eval step reads issue events" "$GATE_BLOCK" '"repos/$GH_REPO/issues/$PR/events"'
 # shellcheck disable=SC2016  # literal workflow text

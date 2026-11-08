@@ -100,6 +100,7 @@ lock_acquire() {
 }
 
 lock_release() {
+    rm -f "$LOCK_DIR.stamp.${LOCK_PID:-}"
     if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "${LOCK_PID:-}" ]; then
         rm -rf "$LOCK_DIR"
     fi
@@ -119,7 +120,8 @@ lock_release() {
         echo "$(date): css fresh, skip ($REPO_ROOT)" >> "$LOG"
         exit 0
     fi
-    STAMP="$LOCK_DIR/build-start"
+    # Outside the lock dir: a timed-out waiter may reap the dir under a live build.
+    STAMP="$LOCK_DIR.stamp.$LOCK_PID"
     : > "$STAMP"
     built=0
     echo "$(date): css source newer than output — rebuilding ($slug)" >> "$LOG"

@@ -160,6 +160,7 @@ jobs:
           while [ "$action" = "unknown" ] && [ "$attempt" -lt "$UNKNOWN_ATTEMPTS" ]; do
             attempt=$((attempt + 1))
             sleep 3
+            # shellcheck disable=SC2016  # GraphQL variables in the single-quoted query stay literal
             state=$(gh api graphql -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$head" -f query='
               query($owner:String!, $name:String!, $number:Int!) {
                 repository(owner:$owner, name:$name) {

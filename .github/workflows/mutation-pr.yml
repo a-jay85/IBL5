@@ -74,7 +74,19 @@ jobs:
           origin/${{ github.base_ref }}...HEAD \
           -- 'classes/**/*.php' || true)
         printf '%s\n' "$CHANGED" > /tmp/changed-classes.txt
+        # Deletion-only skip, mirroring bin/mutation-diff: when no changed
+        # class gains a line, --git-diff-lines has nothing to mutate and
+        # bin/check-infection-ran would exit 5 on a correct diff. numstat
+        # prints "-" for a binary file; count it as added so the run
+        # fails closed.
+        NUMSTAT=$(git diff --numstat --diff-filter=AM \
+          origin/${{ github.base_ref }}...HEAD \
+          -- 'classes/**/*.php')
+        ADDED=$(awk -F'\t' '$1 == "-" { n++; next } { n += $1 } END { print n + 0 }' <<<"$NUMSTAT")
         if [ -z "$CHANGED" ]; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+        elif [ "$ADDED" -eq 0 ]; then
+          echo "Diff only deletes lines from classes/**/*.php; nothing to mutate."
           echo "skip=true" >> $GITHUB_OUTPUT
         else
           echo "skip=false" >> $GITHUB_OUTPUT

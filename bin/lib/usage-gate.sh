@@ -79,6 +79,8 @@ usage_pace_reserve() {
 #   blind seven_day.utilization or seven_day.resets_at missing/unparseable, or a
 #         bad now; wait 0 (caller sleeps its own cap). Fails closed.
 # allowed = (100 - reserve) * (168 - hours_left) / 168, hours_left clamped to [0,168].
+# Under 24 hours before seven_day.resets_at the reserve is 0, so the line aims at
+# 100% and the drain and stop zones are the only brakes left on the last day.
 usage_pace_verdict() {
     local body="${1:-}" now="${2:-}" r zone pct resets out
     case "$now" in ''|*[!0-9]*) echo "blind - - 0"; return 0 ;; esac
@@ -91,6 +93,7 @@ usage_pace_verdict() {
     case "$resets" in ''|*[!0-9]*) echo "blind $pct - 0"; return 0 ;; esac
     out=$(jq -nr --argjson p "$pct" --argjson r "$r" --argjson now "$now" --argjson rs "$resets" '
         (($rs - $now) / 3600) as $hl
+        | (if $hl < 24 then 0 else $r end) as $r
         | (if $hl < 0 then 0 elif $hl > 168 then 168 else $hl end) as $h
         | ((100 - $r) * (168 - $h) / 168) as $a
         | ((($a * 10) | round) / 10) as $ar

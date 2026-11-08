@@ -2012,9 +2012,27 @@ test_pace_verdict_wait_formula() {
 test_pace_verdict_over_ceiling() {
     new_env
     local out
-    out=$(pace_at "$(pace_json 5 91 "$PACE_RS")" 10)
+    out=$(pace_at "$(pace_json 5 91 "$PACE_RS")" 36)
     assert_eq pace_ceiling:verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
-    assert_eq pace_ceiling:until-reset 36000 "$(printf '%s' "$out" | cut -d' ' -f4)"
+    assert_eq pace_ceiling:until-reset 129600 "$(printf '%s' "$out" | cut -d' ' -f4)"
+}
+
+# Under 24 hours before the reset the reserve drops to 0 and the line aims at 100%.
+test_pace_verdict_last_day_full_spend() {
+    new_env
+    local out
+    out=$(pace_at "$(pace_json 5 91 "$PACE_RS")" 10)
+    assert_eq pace_lastday:verdict go "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_lastday:allowed 94 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    out=$(gate_run "IBL5_BURNDOWN_RESERVE_PCT=30 usage_pace_verdict '$(pace_json 5 91 "$PACE_RS")' $(( PACE_RS - 10 * 3600 ))")
+    assert_eq pace_lastday:env-reserve-ignored go "$(printf '%s' "$out" | cut -d' ' -f1)"
+    out=$(pace_at "$(pace_json 5 92 "$PACE_RS")" 2)
+    assert_eq pace_lastday:late-verdict go "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_lastday:late-allowed 98.8 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    # At exactly 24 hours left the reserve still holds: allowed = 90 * 144 / 168.
+    out=$(pace_at "$(pace_json 5 80 "$PACE_RS")" 24)
+    assert_eq pace_lastday:boundary-verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
+    assert_eq pace_lastday:boundary-allowed 77.1 "$(printf '%s' "$out" | cut -d' ' -f3)"
 }
 
 test_pace_verdict_zone_weekly() {
@@ -2045,7 +2063,7 @@ test_pace_verdict_clamps() {
     local out
     out=$(gate_run "usage_pace_verdict '$(pace_json 5 50 "$PACE_RS")' $(( PACE_RS + 3600 ))")
     assert_eq pace_clamp:past-verdict go "$(printf '%s' "$out" | cut -d' ' -f1)"
-    assert_eq pace_clamp:past-allowed 90 "$(printf '%s' "$out" | cut -d' ' -f3)"
+    assert_eq pace_clamp:past-allowed 100 "$(printf '%s' "$out" | cut -d' ' -f3)"
     out=$(pace_at "$(pace_json 5 0 "$PACE_RS")" 200)
     assert_eq pace_clamp:far-verdict wait "$(printf '%s' "$out" | cut -d' ' -f1)"
     assert_eq pace_clamp:far-allowed 0 "$(printf '%s' "$out" | cut -d' ' -f3)"

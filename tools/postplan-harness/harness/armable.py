@@ -173,6 +173,14 @@ def feat_hold(title: str, labels: list[str]) -> bool:
 # stays with the owner. The UI floor is deliberately broad: a false positive keeps a hold.
 SECOND_REVIEW_CLEARABLE = frozenset({7, 10, 12, 17})
 CLEARABLE_PLAN_TRIGGERS = frozenset({"security-surface", "gate-weakening", "golden-snapshot"})
+# The owner-held tokens. Arming holds these the same way it holds an unknown token. They are
+# listed so the vocabulary is explicit and a test can pin that the two sets never overlap.
+# bootstrap-hazard, security-irreducible and golden-new are the must-ask shapes of gate 14(e),
+# 14(b) and 14(f); their dischargeable siblings keep the clearable tokens above.
+OWNER_HELD_PLAN_TRIGGERS = frozenset({
+    "ui", "truly-manual", "schema", "merge-rule", "gate-removal", "one-way", "unresolved-fork",
+    "other", "bootstrap-hazard", "security-irreducible", "golden-new",
+})
 UI_PATH_PREFIXES = ("ibl5/design/", "ibl5/themes/", "ibl5/templates/", "ibl5/jslib/", "ibl5/modules/", "ibl5/images/")
 UI_PATH_SUFFIXES = (".css", ".js", ".html", ".twig", "View.php")
 
@@ -187,6 +195,9 @@ def second_review_candidates(inp, cs) -> dict[int, str]:
     blocked_nums = set(blocked)
     if not blocked_nums or not blocked_nums <= SECOND_REVIEW_CLEARABLE:
         return {}
+    # The UI floor covers all four conditions: a UI-touching PR stays with the owner.
+    if touches_ui(inp.classification.files):
+        return {}
     if 7 in blocked_nums:
         if inp.plan_auto_merge_value != "false" and not inp.plan_auto_merge_false:
             return {}
@@ -194,8 +205,6 @@ def second_review_candidates(inp, cs) -> dict[int, str]:
             return {}
         if not set(inp.plan_hold_triggers) <= CLEARABLE_PLAN_TRIGGERS:
             return {}
-    if 10 in blocked_nums and touches_ui(inp.classification.files):
-        return {}
     if 12 in blocked_nums:
         selected, _ = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
                                               inp.fidelity_tree_2, inp.current_tree)

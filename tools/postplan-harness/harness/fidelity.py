@@ -320,13 +320,41 @@ def verdict_items(path: str) -> dict:
     with the bullet and severity marker removed. A missing or unreadable file is empty.
     """
     empty = {"verdict": None, "blocking": [], "notes": []}
-    if not path:
+    scoped = _scoped_items(path)
+    if scoped is None:
         return empty
+    verdict, items = scoped
+    blocking: list[str] = []
+    notes: list[str] = []
+    for marker, item in items:
+        title = _ITEM_LEAD_RE.sub("", item.splitlines()[0]).strip()
+        if not title:
+            continue
+        if _is_blocking(marker, verdict):
+            blocking.append(title)
+        else:
+            notes.append(title)
+    return {"verdict": verdict, "blocking": blocking, "notes": notes}
+
+
+def _is_blocking(marker, verdict) -> bool:
+    """An item blocks when marked [BLOCKING], or when unmarked under a NOT READY verdict."""
+    return marker == "BLOCKING" or (marker is None and verdict == "NOT READY")
+
+
+def _scoped_items(path: str):
+    """(verdict, [(marker, full item text), ...]) in the scope `verdict_items` reads.
+
+    The scope is the `## FINDINGS` section above the digest cut, else the whole body above
+    it. A missing path or an unreadable file is None.
+    """
+    if not path:
+        return None
     try:
         with open(path) as fh:
             text = fh.read()
     except OSError:
-        return empty
+        return None
     verdict = parse_verdict(path)
     lines = text.splitlines()
     for i, line in enumerate(lines):
@@ -336,17 +364,7 @@ def verdict_items(path: str) -> dict:
     body = [ln for ln in lines if not VERDICT_RE.match(ln)]
     section = _findings_section(body)
     scope = body if section is None else section
-    blocking: list[str] = []
-    notes: list[str] = []
-    for marker, item in _group_findings(scope):
-        title = _ITEM_LEAD_RE.sub("", item.splitlines()[0]).strip()
-        if not title:
-            continue
-        if marker == "BLOCKING" or (marker is None and verdict == "NOT READY"):
-            blocking.append(title)
-        else:
-            notes.append(title)
-    return {"verdict": verdict, "blocking": blocking, "notes": notes}
+    return verdict, _group_findings(scope)
 
 
 def blocking_finding_texts(verdict_path: str) -> list[str]:
@@ -361,10 +379,16 @@ def blocking_finding_texts(verdict_path: str) -> list[str]:
 def gate_edit_only(verdict_path: str) -> bool:
     """True when every blocking finding is tagged [GATE-EDIT] and none names an owner tag.
 
-    An untagged, [MERGE-RULE] or [ONE-WAY] finding stays with the owner. So does a missing
-    verdict: the list is empty, and an empty list is never gate-edit-only.
+    It reads the same items `verdict_items` counts as blocking, so an unmarked bullet under
+    NOT READY must carry the tag too. An untagged, [MERGE-RULE] or [ONE-WAY] finding stays
+    with the owner. So does a missing verdict: the list is empty, and an empty list is never
+    gate-edit-only.
     """
-    texts = blocking_finding_texts(verdict_path)
+    scoped = _scoped_items(verdict_path)
+    if scoped is None:
+        return False
+    verdict, items = scoped
+    texts = [item for marker, item in items if _is_blocking(marker, verdict)]
     if not texts:
         return False
     return all("[GATE-EDIT]" in t and "[MERGE-RULE]" not in t and "[ONE-WAY]" not in t

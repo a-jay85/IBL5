@@ -1,6 +1,6 @@
 ---
-description: ADR-0231. A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them. The verdict binds to the tree it reviewed, and the owner keeps one-way and merge-rule changes. UI paths are guarded only on condition 10 and by the `ui` plan token.
-last_verified: 2026-11-06
+description: ADR-0231. A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them. The verdict binds to the tree it reviewed, and the owner keeps one-way and merge-rule changes. A PR that changes a UI path gets no seat for any of the four.
+last_verified: 2026-11-08
 ---
 
 # ADR-0231: A second reviewer clears the non-UI owner holds
@@ -23,12 +23,12 @@ Add a blind second reviewer to Phase 6.5. It lives in `tools/postplan-harness/ha
 **Never-clear floor.**
 
 - Condition 7 clears only when the plan's `hold_trigger` tokens are all reviewer-clearable. A missing key holds, and so does an unknown token.
-- Condition 10 holds when a changed file matches the UI path floor, the `UI_PATH_PREFIXES` and `UI_PATH_SUFFIXES` constants in `armable.py`. They cover the design, theme, template, JS library, module and image folders, plus any `.css`, `.js`, `.html`, `.twig` or `View.php` file. The floor is broad on purpose.
-- Condition 12 clears only on a `NOT READY` verdict whose blocking findings all carry `[GATE-EDIT]`. A `[MERGE-RULE]`, `[ONE-WAY]` or untagged finding holds.
+- Every one of the four holds when a changed file matches the UI path floor, the `UI_PATH_PREFIXES` and `UI_PATH_SUFFIXES` constants in `armable.py`. They cover the design, theme, template, JS library, module and image folders, plus any `.css`, `.js`, `.html`, `.twig` or `View.php` file. The floor is broad on purpose.
+- Condition 12 clears only on a `NOT READY` verdict whose blocking findings all carry `[GATE-EDIT]`. A `[MERGE-RULE]`, `[ONE-WAY]` or untagged finding holds. That includes an unmarked bullet under `NOT READY`, which the harness counts as blocking.
 - Condition 17 clears only on status `HELD`. `UNKNOWN` means the replay failed, and it holds.
 - Conditions 15 (red CI), 9 (safety), 18 (merge rule) and 19 (planted bug) are outside the set, so their presence stops the seat outright.
 
-**The `hold_trigger` vocabulary.** A plan with `auto_merge: false` records one or more tokens in frontmatter. The owner-held tokens are `ui`, `truly-manual`, `schema`, `merge-rule`, `gate-removal`, `one-way`, `unresolved-fork` and `other`. The reviewer-clearable tokens are `security-surface`, `gate-weakening` and `golden-snapshot`. An older plan with no key stays with the owner.
+**The `hold_trigger` vocabulary.** A plan with `auto_merge: false` records one or more tokens in frontmatter. The owner-held tokens are `ui`, `truly-manual`, `schema`, `merge-rule`, `gate-removal`, `bootstrap-hazard`, `security-irreducible`, `golden-new`, `one-way`, `unresolved-fork` and `other`. The reviewer-clearable tokens are `security-surface`, `gate-weakening` and `golden-snapshot`. Each clearable token names only the dischargeable shape of its gate-14 letter. The must-ask shapes have their own owner-held tokens: a bootstrap hazard of 14(e), an irreducible security surface of 14(b), and a new golden a person must look at under 14(f). The owner picked this split on 2026-11-08. An older plan with no key stays with the owner.
 
 **Seat isolation.** Each seat is a fresh Opus session with no resume, continue or session argument. Its prompt holds the stated reason, the hold list and the diff. Lines that frame earlier review rounds are dropped from the reason and from hold text. The seat has Read, Grep and Glob only. Its own two files sit in `_ARMING_PATHS`, so a change to the seat is a one-way merge-rule change and can never pass through the seat.
 

@@ -375,3 +375,12 @@ def test_condition_names_match_the_armable_conditions():
                                fidelity_verdict="NOT READY", gate_backtest_status="HELD"))
     names = {c.number: c.name for c in decision.holds}
     assert {n: second_review.CONDITION_NAMES[n] for n in names} == names
+
+
+def test_gate_edit_only_counts_unmarked_bullet_under_not_ready(tmp_path):
+    mixed = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] [GATE-EDIT] edits a gate\n"
+                             "- Phase 3 has no diff footprint\n\nNOT READY\n", "unmarked.md")
+    assert fidelity.gate_edit_only(mixed) is False
+    tagged = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] [GATE-EDIT] edits a gate\n"
+                              "- [GATE-EDIT] edits another gate\n\nNOT READY\n", "tagged.md")
+    assert fidelity.gate_edit_only(tagged) is True

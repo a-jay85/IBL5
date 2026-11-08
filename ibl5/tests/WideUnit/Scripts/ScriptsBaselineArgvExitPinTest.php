@@ -49,7 +49,7 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
             'jsbExport' => ['jsbExport.php', [''], []],
             'reconstructPlr' => [
                 'reconstructPlr.php',
-                ['1', '2', '2', '2', '$exitCode', '2', '$ok?0:1', '2', '$result->hasErrors()?1:0'],
+                ['1', '2', '2', '2', '2', '$exitCode', '2', '$ok?0:1', '2', '$result->hasErrors()?1:0'],
                 [
                     '--all',
                     '--all requires --out-dir=PATH\n',
@@ -64,7 +64,7 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
             ],
             'bulkJsbImport' => [
                 'bulkJsbImport.php',
-                ['1', '1', '1', '1', '$summary->hasErrors()?1:0'],
+                ['1', '2', '1', '1', '1', '$summary->hasErrors()?1:0'],
                 ['--dry-run', '--file-type=', '--season=', '--verify'],
             ],
             'build-engine-bundle' => ['build-engine-bundle.php', ['1', '1', '1', '1'], []],

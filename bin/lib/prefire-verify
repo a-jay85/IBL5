@@ -261,7 +261,7 @@ stage_infection() {
     case "$rc" in
         0)
             write_record infection "$BASE_SHA"
-            say "infection passed (or skipped: no changed classes) vs $BASE_REF"
+            say "infection passed (or skipped: no changed classes, or class lines only deleted) vs $BASE_REF"
             return 0 ;;
         2) say "FAIL infection: base ref unusable" >&2; rc=3 ;;
         3) say "FAIL infection: prerequisite missing (pcov, docker, ibl5-mariadb, or db-test-up)" >&2

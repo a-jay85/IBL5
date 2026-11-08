@@ -1,6 +1,6 @@
 ---
 description: Before adding a new hook, CI gate, workflow, or bin/ script, first ask whether an existing one can be extended; quarterly cull retires dead meta-tooling.
-last_verified: 2026-09-29
+last_verified: 2026-11-08
 paths:
   - "bin/**"
   - ".github/workflows/**"
@@ -40,7 +40,13 @@ The teeth are documented hand-run greps, not a maintained script (a `bin/cull-au
 - **Unreferenced gate** — a `check-*` referenced by no `.github/workflows/*.yml`: grep the workflows dir for each `check-*` name; zero hits ⇒ candidate.
 - **Unwired `test-*`.** The target still exists, but no workflow ever runs it: `for t in bin/test-*; do n=$(basename "$t"); grep -rqF "$n" .github/workflows/ || echo "UNWIRED $n"; done`. Check each hit for an invoking wrapper (a wrapper counts as wired). Such a test passes locally forever and protects nothing, which is how `bin/test-plan-now` went unrun until 2026-07-28. Disposition: **wire it or retire it**. A test that self-skips off-platform may stay unwired only when every one of its cases needs that platform, so a Linux runner would buy nothing but a SKIP line. When some cases are portable, run those everywhere, print a loud `SKIP:` line for the rest, and wire it: `bin/test-automouse-single` runs cases 4 and 6 on Linux and skips its macOS run-loop cases. This check is the inverse of the trap below. It never mandates a new `test-*` and only asks whether an existing one runs.
 - **Buggy gate/hook** — bugs recorded in memory: still earning its keep, or has its cost outgrown its value?
-- **Dead rule / silent hook** — a rule superseded by another, or a hook that never fires: confirm against recent logs/PRs.
+- **Dead rule / silent hook.** A rule superseded by another, or a hook that never fires: confirm against recent logs/PRs. No hook logs its denies, but the session transcripts record each one as a `hook error: [$HOME/.claude/hooks/<name>.sh]` tool result. Count denies per hook over the last 60 days (slow: the transcripts run to several GB, so allow a few minutes):
+
+  ```bash
+  find ~/.claude/projects -name '*.jsonl' -mtime -60 -print0 | xargs -0 command grep -h -o -E 'tool_result","content":"[A-Za-z]+:[A-Za-z]+ hook error: \[[^]]*\]' | command grep -o -E '[A-Za-z0-9_.-]+\.sh' | sort | uniq -c | sort -rn
+  ```
+
+  Only denies whose message carries the bracketed script path are attributable, and many hooks print none (a sample showed most denies unnamed). For a hook missing from the output or near 0, also grep the transcripts for a distinctive phrase from its deny message; if that finds nothing too, it is a retirement CANDIDATE. Headless sessions are not filtered out, because no transcript field marks them reliably (`entrypoint` is `sdk-cli` for interactive and headless runs alike).
 
 Each hit is a **CANDIDATE**, judgment-gated — the cull PROPOSES retirements; a human confirms.
 

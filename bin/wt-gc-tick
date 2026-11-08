@@ -22,6 +22,9 @@
 # order, each in a subshell behind its own kill switch ("0" disables it):
 #   empty         WT_GC_REAP_EMPTY         EMPTY worktrees older than
 #                                          WT_GC_EMPTY_DAYS (7), re-verified
+#   t3            WT_GC_REAP_T3            T3 scheduled-run worktrees
+#                                          (WT_GC_T3_ROOT/t3-*) older than
+#                                          WT_GC_T3_DAYS (1), same checks
 #   dirty-merged  WT_GC_REAP_DIRTY_MERGED  merged worktrees whose dirt is
 #                                          byte-identical to origin/master
 #   refs          WT_GC_REAP_REFS          backup branches (PR merged >
@@ -86,6 +89,7 @@ WT_GC_CLEANUP="${WT_GC_CLEANUP:-$SCRIPT_DIR/cleanup}"        # test seam: argv-c
 WT_GC_WT_STATUS="${WT_GC_WT_STATUS:-$SCRIPT_DIR/wt-status}"  # test seam: fixture output
 # Per-step kill switches: "0" disables that step only; unset/empty = enabled.
 WT_GC_REAP_EMPTY="${WT_GC_REAP_EMPTY:-1}"
+WT_GC_REAP_T3="${WT_GC_REAP_T3:-1}"
 WT_GC_REAP_DIRTY_MERGED="${WT_GC_REAP_DIRTY_MERGED:-1}"
 WT_GC_REAP_DETACHED="${WT_GC_REAP_DETACHED:-1}"
 WT_GC_REAP_CLOSED="${WT_GC_REAP_CLOSED:-1}"
@@ -100,6 +104,7 @@ WT_GC_STALE_LIST="${WT_GC_STALE_LIST:-1}"
 WT_GC_ARCHIVE_PRUNE="${WT_GC_ARCHIVE_PRUNE:-1}"
 # Ages (days) / Docker until-filter. Non-numeric or empty = that step skipped, rc=1.
 WT_GC_EMPTY_DAYS="${WT_GC_EMPTY_DAYS-7}"
+WT_GC_T3_DAYS="${WT_GC_T3_DAYS-1}"
 WT_GC_DIRTY_ARCHIVE_DAYS="${WT_GC_DIRTY_ARCHIVE_DAYS-3}"
 WT_GC_DETACHED_DAYS="${WT_GC_DETACHED_DAYS-3}"
 WT_GC_CLOSED_DAYS="${WT_GC_CLOSED_DAYS-7}"
@@ -117,6 +122,7 @@ WT_GC_ARCHIVE_STAMP="${WT_GC_ARCHIVE_STAMP:-}"   # test seam: pins keep-ref name
 WT_GC_TIPS_DIR="${WT_GC_TIPS_DIR:-$WT_GC_LOCK_DIR/tips}"
 WT_GC_STALE_FILE="${WT_GC_STALE_FILE:-$WT_GC_LOCK_DIR/stale-worktrees.tsv}"
 WT_GC_WT_REMOVE="${WT_GC_WT_REMOVE:-$SCRIPT_DIR/wt-remove}"
+WT_GC_T3_ROOT="${WT_GC_T3_ROOT:-$HOME/.t3/worktrees/IBL5}"
 WT_GC_QUEUE_DIR="${WT_GC_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
 WT_GC_SESSION_REGISTRY="${WT_GC_SESSION_REGISTRY:-$HOME/.claude/session-registry/active.json}"
 WT_GC_LAUNCHCTL="${WT_GC_LAUNCHCTL:-/bin/launchctl}"
@@ -464,8 +470,10 @@ log "config WT_GC_ARCHIVE_PRUNE=$WT_GC_ARCHIVE_PRUNE WT_GC_ARCHIVE_DAYS=$WT_GC_A
     "WT_GC_DROP_STASHES=$WT_GC_DROP_STASHES WT_GC_STASH_DAYS=$WT_GC_STASH_DAYS" \
     "WT_GC_REF_FALLBACK=$WT_GC_REF_FALLBACK WT_GC_BACKUP_FALLBACK_DAYS=$WT_GC_BACKUP_FALLBACK_DAYS" \
     "WT_GC_DOCKER_CONTAINERS=$WT_GC_DOCKER_CONTAINERS WT_GC_CONTAINER_DAYS=$WT_GC_CONTAINER_DAYS" \
+    "WT_GC_REAP_T3=$WT_GC_REAP_T3 WT_GC_T3_DAYS=$WT_GC_T3_DAYS" \
     "WT_GC_ARCHIVE_STAMP=$WT_GC_ARCHIVE_STAMP"
 run_step empty        "$WT_GC_REAP_EMPTY"       WT_GC_REAP_EMPTY        reap_empty_worktrees
+run_step t3           "$WT_GC_REAP_T3"           WT_GC_REAP_T3           reap_t3_worktrees
 run_step dirty-merged "$WT_GC_REAP_DIRTY_MERGED" WT_GC_REAP_DIRTY_MERGED reap_dirty_merged_worktrees
 run_step detached     "$WT_GC_REAP_DETACHED"     WT_GC_REAP_DETACHED     reap_detached_snapshots
 run_step closed       "$WT_GC_REAP_CLOSED"       WT_GC_REAP_CLOSED       reap_closed_worktrees

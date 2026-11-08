@@ -204,28 +204,4 @@ class TeamStatsCalculator extends \Database\BaseMysqliRepository
         );
         return $result ?? ['win' => 0, 'loss' => 0];
     }
-
-    /**
-     * Calculate ranking score from win/loss points
-     */
-    public static function calculateRankingScore(int $wins, int $losses, int $winPoints, int $lossPoints): float
-    {
-        $totalWinPoints = $winPoints + $wins;
-        $totalLossPoints = $lossPoints + $losses;
-        $total = $totalWinPoints + $totalLossPoints;
-
-        if ($total === 0) {
-            return 0.0;
-        }
-
-        return round(($totalWinPoints / $total) * 100, 1);
-    }
-
-    /**
-     * Calculate games back from first place
-     */
-    public static function calculateGamesBack(int $wins, int $losses): float
-    {
-        return ($wins / 2) - ($losses / 2);
-    }
 }

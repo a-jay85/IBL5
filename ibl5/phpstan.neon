@@ -217,3 +217,7 @@ services:
         class: PHPStanRules\BanUnknownCliOptionRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanUnguardedArgvFlagRule
+        tags:
+            - phpstan.rules.rule

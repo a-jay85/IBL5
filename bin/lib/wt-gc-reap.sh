@@ -343,16 +343,23 @@ _gc_wt_guard() {
     GC_BRANCH="$branch"
 }
 
-# _gc_remove_wt_and_branch <tag> <name> <branch> <sha> — tips line, then
-# wt-remove (never --force), then a compare-and-delete of the branch.
+# _gc_remove_wt_and_branch <tag> <name> <branch> <sha> [<path>] — tips line,
+# then wt-remove (never --force), then a compare-and-delete of the branch.
+# With <path>, a worktree outside IBL5-worktrees has no Docker stack, so
+# `git worktree remove <path>` (never --force) replaces wt-remove.
 _gc_remove_wt_and_branch() {
-    local tag="$1" name="$2" branch="$3" sha="$4"
+    local tag="$1" name="$2" branch="$3" sha="$4" path="${5:-}"
     GC_REMOVED=0
     if ! _gc_tips_record "$sha" "refs/heads/$branch"; then
         log "$tag keep $name: tips write failed"
         return 1
     fi
-    if ! _gc_do "$WT_GC_WT_REMOVE" "$name" --volumes; then
+    if [ -n "$path" ]; then
+        if ! _gc_do git -C "$WT_GC_REPO_ROOT" worktree remove "$path"; then
+            log "$tag keep $name: git worktree remove refused"
+            return 0
+        fi
+    elif ! _gc_do "$WT_GC_WT_REMOVE" "$name" --volumes; then
         log "$tag keep $name: wt-remove refused"
         return 0
     fi
@@ -399,6 +406,57 @@ _gc_reap_empty_one() {
     _gc_remove_wt_and_branch empty "$name" "$branch" "$sha" || return 1
     [ "$GC_REMOVED" = 1 ] || return 0
     log "empty reaped $name branch=$branch age=${age}d"
+}
+
+# ── Step: T3 scheduled-run worktrees ──────────────────────────────────────────
+# T3 Code starts every scheduled-task run in a new worktree named t3-<hex>
+# directly under WT_GC_T3_ROOT, and nothing removes it after the run. Reap
+# the ones older than WT_GC_T3_DAYS with no own commits and a clean tree,
+# under the same guards as the EMPTY step.
+reap_t3_worktrees() {
+    _gc_valid_days WT_GC_T3_DAYS || return 1
+    log "step t3 threshold=${WT_GC_T3_DAYS}d root=$WT_GC_T3_ROOT"
+    local root listing paths wt real rc=0
+    [ -d "$WT_GC_T3_ROOT" ] || return 0
+    if ! root="$(cd "$WT_GC_T3_ROOT" && pwd -P)"; then
+        log "t3 root unresolved: $WT_GC_T3_ROOT"
+        return 1
+    fi
+    if ! listing="$(git -C "$WT_GC_REPO_ROOT" worktree list --porcelain 2>/dev/null)"; then
+        log "t3 worktree list failed"
+        return 1
+    fi
+    paths="$(sed -n 's/^worktree //p' <<< "$listing")"
+    while IFS= read -r wt <&3; do
+        [ -n "$wt" ] || continue
+        case "${wt##*/}" in t3-*) ;; *) continue ;; esac
+        [ -d "$wt" ] || continue
+        real="$(cd "$wt" && pwd -P)" || continue
+        [ "${real%/*}" = "$root" ] || continue
+        _gc_reap_t3_one "${wt##*/}" "$wt" || rc=1
+    done 3<<< "$paths"
+    return "$rc"
+}
+
+_gc_reap_t3_one() {
+    local name="$1" wt="$2" branch age ahead dirt sha
+    _gc_wt_guard t3 "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    age="$(_gc_wt_age_days "$wt" "$branch")" || age=""
+    if [ -z "$age" ]; then log "t3 keep $name: age unknown"; return 0; fi
+    if [ "$age" -lt "$WT_GC_T3_DAYS" ]; then log "t3 keep $name: age=${age}d"; return 0; fi
+    ahead="$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null)" || ahead=""
+    if [ "$ahead" != 0 ]; then log "t3 keep $name: ahead=${ahead:-?}"; return 0; fi
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
+        log "t3 keep $name: status error"; return 0
+    fi
+    if [ -n "$dirt" ]; then log "t3 keep $name: dirty"; return 0; fi
+    if ! sha="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
+        log "t3 keep $name: branch unresolved"; return 0
+    fi
+    _gc_remove_wt_and_branch t3 "$name" "$branch" "$sha" "$wt" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
+    log "t3 reaped $name branch=$branch age=${age}d"
 }
 
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────

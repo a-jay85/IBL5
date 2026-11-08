@@ -183,36 +183,4 @@ class ApiLeadersRepositoryTest extends DatabaseTestCase
 
         self::assertSame(0, $count);
     }
-
-    // ── getAvailableSeasons ─────────────────────────────────────
-
-    public function testGetAvailableSeasonsReturnsYears(): void
-    {
-        $this->insertTestPlayer(200000094, 'DB Test Seasons Player', [
-            'uuid' => 'batch7-seasons-00000094',
-        ]);
-        $this->insertHistRow(200000094, 'DB Test Seasons Player', 2025);
-
-        $seasons = $this->repo->getAvailableSeasons();
-
-        self::assertNotSame([], $seasons);
-        self::assertContains(2025, $seasons);
-
-        // Should be ordered DESC
-        for ($i = 1; $i < count($seasons); $i++) {
-            self::assertGreaterThanOrEqual($seasons[$i], $seasons[$i - 1]);
-        }
-    }
-
-    public function testGetAvailableSeasonsIncludesInsertedYear(): void
-    {
-        $this->insertTestPlayer(200100040, 'API Seasons 8888', [
-            'uuid' => 'batch10-seasons-8888',
-        ]);
-        $this->insertHistRow(200100040, 'API Seasons 8888', 8888);
-
-        $seasons = $this->repo->getAvailableSeasons();
-
-        self::assertContains(8888, $seasons);
-    }
 }

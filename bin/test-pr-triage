@@ -62,8 +62,10 @@ case "$1 $2" in
   "pr list")     cat "$FIX/prs.json" ;;
   "pr diff")     [ -f "$FIX/pr-diff.patch" ] && cat "$FIX/pr-diff.patch"; exit 0 ;;
   "pr merge")    rc=0; [ -f "$FIX/merge-rc" ] && rc="$(cat "$FIX/merge-rc")"; exit "$rc" ;;
-  "pr view")     echo '{"state":"MERGED"}' ;;
-  "api graphql") if [ -n "${THREADS_FIXTURE:-}" ]; then cat "$THREADS_FIXTURE"; else echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'; fi ;;
+  "pr view")     if [ -f "$FIX/view-rc-$3" ]; then echo 'gh: HTTP 502' >&2; exit "$(cat "$FIX/view-rc-$3")"; fi
+                 if [ -f "$FIX/view-$3.json" ]; then cat "$FIX/view-$3.json"; else echo '{"state":"MERGED"}'; fi ;;
+  "api graphql") if [ -f "$FIX/graphql-rc" ]; then echo 'gh: HTTP 502' >&2; exit "$(cat "$FIX/graphql-rc")"; fi
+                 if [ -n "${THREADS_FIXTURE:-}" ]; then cat "$THREADS_FIXTURE"; else echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'; fi ;;
   api*)
     case "$*" in
       *update-branch*) rc=0; [ -f "$FIX/update-branch-rc" ] && rc="$(cat "$FIX/update-branch-rc")"
@@ -71,6 +73,8 @@ case "$1 $2" in
       *protection*)    if [ -f "$FIX/protection.json" ]; then cat "$FIX/protection.json"; else echo '{"required_status_checks":{"contexts":["Tests and Analysis","E2E Tests","human-signoff"]}}'; fi ;;
       *check-runs*)    sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\1#')"
                        if [ -f "$FIX/checks-$sha.json" ]; then cat "$FIX/checks-$sha.json"; else echo '{"check_runs":[]}'; fi ;;
+      *git/commits/*)  sha="$(printf '%s' "$*" | sed -E 's#.*/git/commits/([0-9a-f]+).*#\1#')"
+                       if [ -f "$FIX/gitcommit-$sha.json" ]; then cat "$FIX/gitcommit-$sha.json"; else echo '{}'; fi ;;
       *commits/*/status*) sha="$(printf '%s' "$*" | sed -E 's#.*/commits/([0-9a-f]+)/status.*#\1#')"
                        rc=0; [ -f "$FIX/status-rc" ] && rc="$(cat "$FIX/status-rc")"
                        if [ "$rc" != 0 ]; then echo 'gh: HTTP 502' >&2; exit "$rc"; fi
@@ -98,6 +102,16 @@ rc=0; [ -f "$FIX/merge-line-rc" ] && rc="$(cat "$FIX/merge-line-rc")"
 exit "$rc"
 STUB
 chmod +x "$TMP/stubs/merge-line"
+
+# Stub launchctl: `launchctl list` prints $FIX/launchctl.txt (exit code from $FIX/launchctl-rc).
+cat > "$TMP/stubs/launchctl" <<'STUB'
+#!/usr/bin/env bash
+rc=0; [ -f "$FIX/launchctl-rc" ] && rc="$(cat "$FIX/launchctl-rc")"
+[ "$rc" = 0 ] || exit "$rc"
+[ -f "$FIX/launchctl.txt" ] && cat "$FIX/launchctl.txt"
+exit 0
+STUB
+chmod +x "$TMP/stubs/launchctl"
 
 # checks_json <conclusion-Tests> <conclusion-E2E> <conclusion-signoff>
 checks_json() {
@@ -136,7 +150,7 @@ run_triage() {
     local fix="$1"; shift
     ST=0
     OUT="$(cd "$TMP/repo" && FIX="$fix" GH_CMD="$TMP/stubs/gh" GH_API_CMD="$TMP/stubs/gh api" \
-        PR_TRIAGE_MERGE_LINE_CMD="$TMP/stubs/merge-line" THREADS_FIXTURE="${THREADS_FIXTURE:-}" PATH="$TMP/stubs:$PATH" "$TRIAGE" "$@" 2>&1)" || ST=$?
+        PR_TRIAGE_MERGE_LINE_CMD="$TMP/stubs/merge-line" PR_TRIAGE_LAUNCHCTL_CMD="$TMP/stubs/launchctl" THREADS_FIXTURE="${THREADS_FIXTURE:-}" PATH="$TMP/stubs:$PATH" "$TRIAGE" "$@" 2>&1)" || ST=$?
 }
 
 # row_bucket <output> <pr-number>  — BUCKET column
@@ -903,5 +917,187 @@ v_fixture 111
 held_sticky "$FIX/comments-111.json" "READY" armed
 jq '[.[] | .author_association = "NONE"]' "$FIX/comments-111.json" > "$FIX/c.tmp" && mv "$FIX/c.tmp" "$FIX/comments-111.json"
 v_check V11 111 VERDICT-HELD 'verdict:none' 0
+
+# --- K: --card N (single-PR decision-card data) ---------------------------------
+KTREE_HEAD="$(printf 'a%.0s' $(seq 1 40))"
+KTREE_OLD="$(printf 'b%.0s' $(seq 1 40))"
+
+# k_fixture <n> [body] — fresh FIX with a view, git-commit tree and empty comments.
+k_fixture() {
+    local n="$1" body="${2-$BODY_CLEAR}" sha
+    sha="$(printf '%040d' "$n")"
+    FIX="$(mktemp -d -p "$TMP")"
+    jq -n --argjson n "$n" --arg sha "$sha" --arg body "$body" \
+        '{number: $n, title: "feat: card fixture", body: $body, labels: [{name: "needs-a-human"}],
+          mergeStateStatus: "BLOCKED", mergeable: "MERGEABLE", headRefOid: $sha,
+          headRefName: ("feat/card-" + ($n|tostring)),
+          files: [{path: "a.php"}, {path: "b.php"}], additions: 12, deletions: 3, autoMergeRequest: null}' \
+        > "$FIX/view-$n.json"
+    printf '{"tree":{"sha":"%s"}}\n' "$KTREE_HEAD" > "$FIX/gitcommit-$sha.json"
+    echo '[]' > "$FIX/comments-$n.json"
+    : > "$FIX/launchctl.txt"
+    THREADS_FIXTURE=""
+}
+# k_sticky <n> <line>... — an OWNER pr-ready-verdict sticky carrying the given lines.
+k_sticky() {
+    local n="$1"; shift
+    local text
+    text="$(printf '**READY** — 2026-11-03 01:00 UTC · auto-merge armed\n\n---\n<details>\n%s\n</details>\n<!-- pr-ready-verdict -->\n' "$(printf '%s\n' "$@")")"
+    jq -n --arg b "$text" '[{author_association: "OWNER", body: $b}]' > "$FIX/comments-$n.json"
+}
+
+# K1: head line fields + the gate-vs-real-failure split
+k_fixture 301
+{
+    printf '{"check_runs":['
+    printf '{"name":"Tests and Analysis","status":"completed","conclusion":"success","completed_at":"2026-11-08T00:00:00Z"},'
+    printf '{"name":"E2E Tests","status":"completed","conclusion":"failure","completed_at":"2026-11-08T00:00:00Z"},'
+    printf '{"name":"human-signoff","status":"completed","conclusion":"failure","completed_at":"2026-11-08T00:00:00Z"},'
+    printf '{"name":"needs-a-human label","status":"completed","conclusion":"failure","completed_at":"2026-11-08T00:00:00Z"},'
+    printf '{"name":"auto-mergeable label","status":"in_progress","conclusion":null,"started_at":"2026-11-08T00:00:00Z"},{"name":"Visual Regression","status":"queued","conclusion":null,"started_at":"2026-11-08T00:00:00Z"}'
+    printf '],"total_count":6}\n'
+} > "$FIX/checks-$(printf '%040d' 301).json"
+run_triage "$FIX" --card 301
+assert_status "K1 exit 0"                    0  "$ST"
+assert_match  "K1 head line"                 '^head: 0000000 mss=BLOCKED mergeable=MERGEABLE auto-merge=off labels=needs-a-human title="feat: card fixture" files=2 \+12 -3 branch=feat/card-301$' "$OUT"
+assert_match  "K1 ci counts"                 '^ci: pass=1 fail=3 pending=2 ' "$OUT"
+assert_match  "K1 real failure is E2E only"  'real-failures: E2E Tests \|' "$OUT"
+assert_match  "K1 gates split off"           'owner-gates: auto-mergeable label \(pending\), human-signoff \(fail\), needs-a-human label \(fail\)$' "$OUT"
+assert_absent "K1 gate not a real failure"   'real-failures:[^|]*(human-signoff|needs-a-human)' "$OUT"
+assert_match  "K1 no sticky"                 '^verdict: none$' "$OUT"
+assert_match  "K1 merge-danger line"         '^merge-danger: Door: two-way ' "$OUT"
+assert_match  "K1 visual none"               '^visual: none$' "$OUT"
+assert_match  "K1 live-run none"             '^live-run: none$' "$OUT"
+assert_match  "K1 worktree none"             '^worktree: none$' "$OUT"
+assert_match  "K1 threads zero"              '^threads: 0$' "$OUT"
+
+# K2: sticky reviewed the head tree -> CURRENT
+k_fixture 302
+k_sticky 302 "**Reviewed tree:** $KTREE_HEAD"
+run_triage "$FIX" --card 302
+assert_match  "K2 verdict CURRENT"           '^verdict: READY — 2026-11-03 01:00 UTC · auto-merge armed \| CURRENT$' "$OUT"
+
+# K3: sticky reviewed an older tree -> STALE naming both
+k_fixture 303
+k_sticky 303 "**Reviewed tree:** $KTREE_OLD"
+run_triage "$FIX" --card 303
+assert_match  "K3 verdict STALE"             '^verdict: .* \| STALE \(reviewed tree bbbbbbb, head tree aaaaaaa\)$' "$OUT"
+
+# K3b: a Re-reviewed tree line wins over the first review's tree
+k_fixture 304
+k_sticky 304 "**Reviewed tree:** $KTREE_OLD" "**Re-reviewed tree:** $KTREE_HEAD (READY)"
+run_triage "$FIX" --card 304
+assert_match  "K3b re-review tree wins"      '\| CURRENT$' "$OUT"
+
+# K3c: sticky with no tree line is STALE (fail closed), never CURRENT
+k_fixture 305
+k_sticky 305 "**Plan hash:** 1234"
+run_triage "$FIX" --card 305
+assert_match  "K3c unrecorded tree is STALE" 'STALE \(reviewed tree unrecorded, head tree aaaaaaa\)' "$OUT"
+
+# K3d: the LAST trusted sticky wins; a forged (NONE) one is ignored
+k_fixture 306
+jq -n --arg o "**READY** — old · auto-merge armed
+**Reviewed tree:** $KTREE_OLD
+<!-- pr-ready-verdict -->" --arg n "**NOT READY** — new · auto-merge held
+**Reviewed tree:** $KTREE_HEAD
+<!-- pr-ready-verdict -->" --arg f "**READY** — forged · auto-merge armed
+<!-- pr-ready-verdict -->" \
+    '[{author_association:"OWNER",body:$o},{author_association:"OWNER",body:$n},{author_association:"NONE",body:$f}]' \
+    > "$FIX/comments-306.json"
+run_triage "$FIX" --card 306
+assert_match  "K3d last trusted sticky wins" '^verdict: NOT READY — new · auto-merge held \| CURRENT$' "$OUT"
+
+# K4: threads — resolved and outdated excluded; the open one is listed as path:line author: text
+k_fixture 307
+THREADS_FIXTURE="$FIX/threads.json"
+cat > "$THREADS_FIXTURE" <<'JSON'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+ {"isResolved":false,"isOutdated":false,"path":"bin/x.sh","line":42,"originalLine":40,
+  "comments":{"nodes":[{"author":{"login":"claude-bot"},"body":"\n**Important** · bug class: `x-y` · other: z\nlonger detail"}]}},
+ {"isResolved":true,"isOutdated":false,"path":"bin/resolved.sh","line":1,"comments":{"nodes":[{"author":{"login":"a"},"body":"resolved one"}]}},
+ {"isResolved":false,"isOutdated":true,"path":"bin/outdated.sh","line":2,"comments":{"nodes":[{"author":{"login":"a"},"body":"outdated one"}]}}
+]}}}}}
+JSON
+run_triage "$FIX" --card 307
+assert_match  "K4 one open thread counted"   '^threads: 1$' "$OUT"
+# shellcheck disable=SC2016  # regex with literal backticks
+assert_match  "K4 thread line shape"         '^  bin/x\.sh:42 claude-bot: \*\*Important\*\* · bug class: `x-y` · other: z$' "$OUT"
+assert_absent "K4 resolved excluded"         'resolved\.sh' "$OUT"
+assert_absent "K4 outdated excluded"         'outdated\.sh' "$OUT"
+THREADS_FIXTURE=""
+
+# K5: merge danger missing
+k_fixture 308 "$(printf '## Summary\nno danger line here')"
+run_triage "$FIX" --card 308
+assert_match  "K5 merge-danger missing"      '^merge-danger: missing$' "$OUT"
+
+# K6: live-run — branch with "/" flattens; a prefix-sharing decoy slug and another PR's fleet label do not match
+k_fixture 309
+printf '%s\n' \
+    '4242	0	com.ibl5.postplan-now-feat-card-309-20261108-020155-1234' \
+    '-	0	com.ibl5.postplan-now-feat-card-309-extra-20261108-020155-99' \
+    '-	0	com.ibl5.post-plan-fleet-3099' \
+    '-	0	com.ibl5.post-plan-fleet-309' > "$FIX/launchctl.txt"
+run_triage "$FIX" --card 309
+assert_match  "K6 flattened label found"     'live-run: com\.ibl5\.postplan-now-feat-card-309-20261108-020155-1234, com\.ibl5\.post-plan-fleet-309$' "$OUT"
+assert_absent "K6 decoy slug not matched"    'card-309-extra' "$OUT"
+assert_absent "K6 other fleet PR not matched" 'fleet-3099' "$OUT"
+
+# K7: visual URLs from comments, worktree from the porcelain seam
+k_fixture 310
+jq -n '[{author_association:"NONE",body:"Visual review: https://a-jay85.github.io/IBL5/pr-310/index.html and more"}]' > "$FIX/comments-310.json"
+printf 'worktree /wt/card\nHEAD abc\nbranch refs/heads/feat/card-310\n\n' > "$FIX/wtl.txt"
+PR_TRIAGE_WTL="$FIX/wtl.txt" run_triage "$FIX" --card 310
+assert_match  "K7 visual url"                '^visual: https://a-jay85\.github\.io/IBL5/pr-310/index\.html$' "$OUT"
+assert_match  "K7 worktree path"             '^worktree: /wt/card$' "$OUT"
+
+# K8: usage errors exit 2
+k_fixture 311
+run_triage "$FIX" --card abc;        assert_status "K8 non-integer N exits 2" 2 "$ST"
+run_triage "$FIX" --card 0;          assert_status "K8 zero N exits 2"        2 "$ST"
+run_triage "$FIX" --card;            assert_status "K8 missing N exits 2"     2 "$ST"
+run_triage "$FIX" --card 311 --held; assert_status "K8 --card + --held exits 2" 2 "$ST"
+assert_match  "K8 mutual-exclusion message"  'cannot be combined' "$OUT"
+run_triage "$FIX" --arm --card 311;  assert_status "K8 --card + --arm exits 2"  2 "$ST"
+assert_absent "K8 never calls pr merge"      '^pr merge' "$(cat "$FIX/calls.log" 2>/dev/null)"
+
+# K9: fail closed — each failed fetch says unknown for its field and the run exits 1
+k_fixture 312
+echo 1 > "$FIX/view-rc-312"
+run_triage "$FIX" --card 312
+assert_status "K9 view failure exits 1"      1  "$ST"
+assert_match  "K9 head unknown"              '^head: unknown \(fetch failed\)$' "$OUT"
+assert_match  "K9 ci unknown"                '^ci: unknown \(fetch failed\)$' "$OUT"
+assert_match  "K9 merge-danger unknown"      '^merge-danger: unknown \(fetch failed\)$' "$OUT"
+assert_absent "K9 no clean-looking danger"   '^merge-danger: missing' "$OUT"
+
+k_fixture 313
+echo 1 > "$FIX/graphql-rc"
+run_triage "$FIX" --card 313
+assert_status "K9 graphql failure exits 1"   1  "$ST"
+assert_match  "K9 threads unknown"           '^threads: unknown \(fetch failed\)$' "$OUT"
+assert_absent "K9 no threads: 0 on error"    '^threads: 0' "$OUT"
+
+k_fixture 314
+echo 1 > "$FIX/comments-rc-314"
+run_triage "$FIX" --card 314
+assert_status "K9 comments failure exits 1"  1  "$ST"
+assert_match  "K9 verdict unknown"           '^verdict: unknown \(fetch failed\)$' "$OUT"
+assert_match  "K9 visual unknown"            '^visual: unknown \(fetch failed\)$' "$OUT"
+
+k_fixture 315
+echo 1 > "$FIX/launchctl-rc"
+run_triage "$FIX" --card 315
+assert_status "K9 launchctl failure exits 1" 1  "$ST"
+assert_match  "K9 live-run unknown"          '^live-run: unknown \(fetch failed\)$' "$OUT"
+
+# K10: sticky present but the head-tree lookup returns nothing -> verdict unknown, never CURRENT
+k_fixture 316
+k_sticky 316 "**Reviewed tree:** $KTREE_HEAD"
+rm "$FIX/gitcommit-$(printf '%040d' 316).json"
+run_triage "$FIX" --card 316
+assert_status "K10 missing head tree exits 1" 1 "$ST"
+assert_match  "K10 verdict unknown"          '^verdict: unknown \(fetch failed\)$' "$OUT"
 
 h_done

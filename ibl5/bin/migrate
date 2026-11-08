@@ -13,6 +13,13 @@ set_time_limit(0);
 $docRoot = dirname(__DIR__, 2);
 $_SERVER['DOCUMENT_ROOT'] = $docRoot;
 require $docRoot . '/ibl5/vendor/autoload.php';
+require_once $docRoot . '/ibl5/classes/Cli/CliFlagGuard.php';
+try {
+    \Cli\CliFlagGuard::assertKnown($argv ?? [], ['--status']);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
 include $docRoot . '/ibl5/config.php';
 include $docRoot . '/ibl5/db/db.php';
 

@@ -157,6 +157,20 @@ final class PrArmableLibCliTest extends TestCase
         self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', ['[]', '[]'])['output']);
     }
 
+    public function testUiHoldCountsPreviousFilenameOfRename(): void
+    {
+        self::assertSame(
+            'ui-awaiting-signoff',
+            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/X.php","previous_filename":"ibl5/design/input.css"}]', '[]'])['output']
+        );
+    }
+
+    public function testUiHoldFailsClosedAtHundredFiles(): void
+    {
+        $files = json_encode(array_fill(0, 100, ['path' => 'ibl5/classes/X.php']), JSON_THROW_ON_ERROR);
+        self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+    }
+
     // --- (10) pipeline-authored floor — UNCONDITIONAL (no override label) ---
 
     public function testPipelineAuthoredHoldFiresWhenLabelPresent(): void

@@ -163,7 +163,13 @@ pr_ui_hold() {
         | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
         return  # label flips it — not held
     fi
-    jq -r '.[].path' <<< "$files_json" \
+    # `gh pr view --json files` caps at 100 entries: a full page may hide UI
+    # paths, so fail closed. Renames also count their old path when present.
+    if [ "$(jq -r 'length' <<< "$files_json" 2>/dev/null || echo 0)" -ge 100 ]; then
+        echo "ui-classifier-error"
+        return
+    fi
+    jq -r '.[] | (.path, .previous_filename // empty)' <<< "$files_json" \
         | bash "$(dirname "${BASH_SOURCE[0]}")/ui-change-classifier.sh" --paths >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
         echo "ui-awaiting-signoff"

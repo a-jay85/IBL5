@@ -160,6 +160,8 @@ run_md --help
 h_eq "help exits 0 with usage: exit" 0 "$RC"
 h_contains "help exits 0 with usage" "$OUT" "Usage: bin/mutation-diff"
 h_contains "help lists exit 5 for an empty filter" "$OUT" "5  Infection matched no source files"
+h_contains "help lists the deletion-only skip under exit 0" "$OUT" "0  passed, or skipped (no changed classes, or class lines only deleted)"
+h_contains "help explains the deletion-only skip" "$OUT" "Also skips (exit 0) when the changed class files only"
 
 # 2
 make_repo

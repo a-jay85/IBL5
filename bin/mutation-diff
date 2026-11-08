@@ -16,7 +16,7 @@ of .github/workflows/mutation-pr.yml with the same flags, against the diff
 from <base-ref> (default: origin/master) to the working tree. Unlike CI, it
 leaves diff.relative unset: with it set, Infection finds no changed file.
 
-When Infection matches no source file although the diff changes
+When Infection matches no source file although the diff adds lines to
 classes/**/*.php files, the run exits 5, so an empty run never reads as a pass.
 
 Runs on the host, from the invoking checkout's ibl5/. The host needs php with
@@ -25,18 +25,19 @@ sibling database ibl5_test on that container, reset by
 bin/db-test-up --no-run from this checkout's migrations and db-seed.sql.
 
 Skips (exit 0) when the diff has no added or modified classes/**/*.php
-files, as CI does. Untracked new classes are marked intent-to-add so
-Infection sees them.
+files, as CI does. Also skips (exit 0) when the changed class files only
+lose lines, since Infection has no added line to mutate. Untracked new
+classes are marked intent-to-add so Infection sees them.
 
 A lock at /tmp/ibl5-mutation-diff.lock keeps two runs from sharing
 ibl5_test. Override the path with MUTATION_DIFF_LOCK_DIR.
 
 Exit codes:
-  0  passed, or skipped (no changed classes)
+  0  passed, or skipped (no changed classes, or class lines only deleted)
   2  usage error, or <base-ref> does not resolve
   3  prerequisite missing: pcov, docker, ibl5-mariadb, or bin/db-test-up failed
   4  lock held by another run
-  5  Infection matched no source files although the diff changes classes/**/*.php
+  5  Infection matched no source files although the diff adds classes/**/*.php lines
   other  the phpunit or Infection exit code, passed through
 EOF
     exit 0

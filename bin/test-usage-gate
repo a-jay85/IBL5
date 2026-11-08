@@ -211,7 +211,7 @@ while [ \$# -gt 0 ]; do
     shift
 done
 echo "call \$PPID" >> "$dir/curl.calls"
-[ "$sl" -gt 0 ] && sleep "$sl"
+if [ "${STUB_GATE:-0}" = 1 ]; then i=0; while [ ! -e "$dir/release" ]; do i=\$((i + 1)); [ "\$i" -le 2000 ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
 if [ -n "\$hdr" ]; then
     printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
     [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
@@ -261,12 +261,22 @@ diag_dump() {
 fetch_parallel() {
     local i=1 pids="" pre
     rm -f "$T/lock.trace"
+    rm -f "$T"/rc.* "$T"/out.* "$STUB/release"
     pre="USAGE_FETCH_LOCK_STALE=3600; _usage_lock_hook() { printf '%s %s\\n' \"\$\$\" \"\$1\" >> '$T/lock.trace'; }; "
     while [ "$i" -le "$1" ]; do
         ( FETCH_PRELUDE="$pre"; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
         pids="$pids $!"
         i=$((i + 1))
     done
+    if [ "${STUB_GATE:-0}" = 1 ]; then
+        # Hold the curl holder until every other caller has returned, then release it.
+        local k=0
+        until [ $(( $(find "$T" -maxdepth 1 -name 'rc.*' | wc -l) + $(curl_calls "$STUB") )) -ge "$1" ]; do
+            k=$((k + 1)); [ "$k" -le 2000 ] || { echo timeout >> "$T/gate.timeout"; break; }
+            sleep 0.01
+        done
+        touch "$STUB/release"
+    fi
     for p in $pids; do wait "$p"; done
 }
 
@@ -374,12 +384,15 @@ test_fetch_429_exponential_and_expiry() {
 
 test_fetch_429_concurrent_one_call() {
     new_env
+    local STUB_GATE=1
     seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
     make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120 2
     local i round
     for round in 1 2; do
         fetch_parallel 6 45
         assert_eq "fetch_429_conc:calls$round" 1 "$(curl_calls "$STUB")"
+        assert_no_file "fetch_429_conc:no-gate-timeout$round" "$T/gate.timeout"
+        assert_no_file "fetch_429_conc:no-stub-timeout$round" "$STUB/gate.timeout"
         [ "$(curl_calls "$STUB")" = 1 ] || diag_dump "fetch_429_conc$round" "$STUB/curl.calls" "$T/lock.trace"
         for i in 1 2 3 4 5 6; do
             assert_eq "fetch_429_conc:rc$round.$i" 2 "$(cat "$T/rc.$i")"
@@ -425,11 +438,14 @@ test_fetch_429_no_cache_rc1() {
 
 test_fetch_single_flight_parallel() {
     new_env
+    local STUB_GATE=1
     seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
     make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B" "" 3
     local i rc saw77=0 n
     fetch_parallel 6 45
     assert_eq fetch_single_flight:calls 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_single_flight:no-gate-timeout "$T/gate.timeout"
+    assert_no_file fetch_single_flight:no-stub-timeout "$STUB/gate.timeout"
     [ "$(curl_calls "$STUB")" = 1 ] || diag_dump fetch_single_flight "$STUB/curl.calls" "$T/lock.trace"
     for i in 1 2 3 4 5 6; do
         rc=$(cat "$T/rc.$i")

@@ -225,6 +225,7 @@ assert_match "Q: clear message" 'no bot-committing master run open' "$OUT"
 assert_eq "Q: one runs-list call" 1 "$RUNS_CALLS"
 assert_eq "Q: one jobs-list call" 1 "$JOBS_CALLS"
 assert_match "Q: jobs query for the open run" '^api repos/o/r/actions/runs/101/jobs\?per_page=100 ' "$(cat "$BOT_LOG")"
+assert_eq "Q: exact jobs path called once" 1 "$(grep -cF 'repos/o/r/actions/runs/101/jobs?per_page=100' "$BOT_LOG")"
 
 # R: a bot job still in progress keeps the run open.
 BOT_OPEN_UNTIL=2 BOT_JOBS_JSON="$TMP/jobs-running.json" bot_wait o/r

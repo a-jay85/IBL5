@@ -1,6 +1,6 @@
 ---
 description: Narrows ADR-0001's trait rejection — a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition, and is permitted.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 ---
 
 # ADR-0119: Entity field-accessor trait splits are not trait composition

@@ -156,7 +156,7 @@ gate_candidates() {
             holds ~ /body-hold/ || holds ~ /golden-changed/ || holds ~ /unresolved-finding:/) {
             print pr, "manual test", 2
         } else if (bucket=="FEAT-AWAITING-SIGNOFF" || holds ~ /ui-awaiting-signoff/) {
-            print pr, "sign feat:", 1
+            print pr, "sign UI:", 1
         } else if (bucket=="UNCLEARED" || clearance=="UNKNOWN") {
             print pr, "manual test", 2
         } else if (bucket=="VERDICT-HELD" || holds ~ /verdict:(none|unreadable|fetch-failed)/) {
@@ -167,7 +167,7 @@ gate_candidates() {
             # BEHIND/DRAFT/UNKNOWN merge state — GitHub will not merge it as-is, so
             # it is NOT "—". Ranked last so a NOT-MERGEABLE PR that also carries a
             # hold still reports the costlier human action above; rank 1 (peer of
-            # "sign feat:") because updating the branch is one mechanical step.
+            # "sign UI:") because updating the branch is one mechanical step.
             print pr, "update branch onto master", 1
         } else {
             print pr, "—", 0

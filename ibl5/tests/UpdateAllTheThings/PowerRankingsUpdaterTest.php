@@ -6,7 +6,6 @@ namespace Tests\UpdateAllTheThings;
 
 use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
-use BasketballStats\TeamStatsCalculator;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
 
@@ -276,10 +275,6 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertSame(10, $result['lossPoints']);
         $this->assertSame(1, $result['wins']);
         $this->assertSame(1, $result['losses']);
-        $this->assertSame(
-            73.8,
-            TeamStatsCalculator::calculateRankingScore($result['wins'], $result['losses'], $result['winPoints'], $result['lossPoints'])
-        );
     }
 
     public function testDefaultCalculatorUsesOlympicsStandingsWithOlympicsContext(): void

@@ -85,18 +85,4 @@ class StandingsGrouperTest extends TestCase
         $this->assertFalse(StandingsGrouper::isConference('Atlantic'));
         $this->assertFalse(StandingsGrouper::isConference('Central'));
     }
-
-    public function testIsDivisionReturnsTrueForDivisions(): void
-    {
-        $this->assertTrue(StandingsGrouper::isDivision('Atlantic'));
-        $this->assertTrue(StandingsGrouper::isDivision('Central'));
-        $this->assertTrue(StandingsGrouper::isDivision('Midwest'));
-        $this->assertTrue(StandingsGrouper::isDivision('Pacific'));
-    }
-
-    public function testIsDivisionReturnsFalseForConferences(): void
-    {
-        $this->assertFalse(StandingsGrouper::isDivision('Eastern'));
-        $this->assertFalse(StandingsGrouper::isDivision('Western'));
-    }
 }

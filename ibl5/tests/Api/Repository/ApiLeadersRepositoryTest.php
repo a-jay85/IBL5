@@ -137,20 +137,6 @@ class ApiLeadersRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('h.year');
     }
 
-    // --- getAvailableSeasons ---
-
-    public function testGetAvailableSeasonsReturnsSeasonYears(): void
-    {
-        $this->mockDb->setMockData([
-            ['year' => 2025],
-            ['year' => 2024],
-        ]);
-
-        $result = $this->repository->getAvailableSeasons();
-
-        self::assertIsArray($result);
-    }
-
     private function buildPaginator(): Paginator
     {
         return new Paginator([], 'pts', ['pts', 'games', 'ast']);

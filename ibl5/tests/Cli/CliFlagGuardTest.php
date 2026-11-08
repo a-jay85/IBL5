@@ -59,6 +59,14 @@ final class CliFlagGuardTest extends TestCase
         $this->assertSame([], CliFlagGuard::unknownFlags(['x', '-', 'file.txt'], []));
     }
 
+    public function testFlagsAfterPositionalsStillChecked(): void
+    {
+        $this->assertSame(
+            ['--bogus', '--typo'],
+            CliFlagGuard::unknownFlags(['x', 'file.txt', '--bogus', '-', '--typo'], [])
+        );
+    }
+
     public function testScriptNameAtIndexZeroIgnored(): void
     {
         $this->assertSame([], CliFlagGuard::unknownFlags(['--weird-script-name', '--status'], ['--status']));

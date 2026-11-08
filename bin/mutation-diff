@@ -16,7 +16,7 @@ of .github/workflows/mutation-pr.yml with the same flags, against the diff
 from <base-ref> (default: origin/master) to the working tree. Unlike CI, it
 leaves diff.relative unset: with it set, Infection finds no changed file.
 
-When Infection matches no source file although the diff changes
+When Infection matches no source file although the diff adds lines to
 classes/**/*.php files, the run exits 5, so an empty run never reads as a pass.
 
 Runs on the host, from the invoking checkout's ibl5/. The host needs php with
@@ -25,18 +25,19 @@ sibling database ibl5_test on that container, reset by
 bin/db-test-up --no-run from this checkout's migrations and db-seed.sql.
 
 Skips (exit 0) when the diff has no added or modified classes/**/*.php
-files, as CI does. Untracked new classes are marked intent-to-add so
-Infection sees them.
+files, as CI does. Also skips (exit 0) when the changed class files only
+lose lines, since Infection has no added line to mutate. Untracked new
+classes are marked intent-to-add so Infection sees them.
 
 A lock at /tmp/ibl5-mutation-diff.lock keeps two runs from sharing
 ibl5_test. Override the path with MUTATION_DIFF_LOCK_DIR.
 
 Exit codes:
-  0  passed, or skipped (no changed classes)
+  0  passed, or skipped (no changed classes, or class lines only deleted)
   2  usage error, or <base-ref> does not resolve
   3  prerequisite missing: pcov, docker, ibl5-mariadb, or bin/db-test-up failed
   4  lock held by another run
-  5  Infection matched no source files although the diff changes classes/**/*.php
+  5  Infection matched no source files although the diff adds classes/**/*.php lines
   other  the phpunit or Infection exit code, passed through
 EOF
     exit 0
@@ -91,6 +92,21 @@ MB="$(git merge-base "$BASE" HEAD)"
 CHANGED="$(git diff --name-only --diff-filter=AM "$MB" -- 'classes/**/*.php')"
 if [ -z "$CHANGED" ]; then
     echo "SKIP: no added or modified classes/**/*.php files vs $BASE; CI skips the mutation job for this diff too."
+    exit 0
+fi
+
+# Deletion-only skip: when no changed class gains a line, Infection's
+# --git-diff-lines filter has nothing to mutate, and the empty-filter guard
+# below would exit 5 on a correct diff. The sum is per diff, so one class with
+# an added line keeps the run going. numstat prints "-" for a binary file;
+# count it as added so the run fails closed.
+NUMSTAT="$(git diff --numstat --diff-filter=AM "$MB" -- 'classes/**/*.php')" || {
+    echo "Error: git diff --numstat failed against the merge-base of '$BASE'." >&2
+    exit 2
+}
+ADDED="$(awk -F'\t' '$1 == "-" { n++; next } { n += $1 } END { print n + 0 }' <<<"$NUMSTAT")"
+if [ "$ADDED" -eq 0 ]; then
+    echo "SKIP: the diff vs $BASE only deletes lines from classes/**/*.php files, so nothing is mutable."
     exit 0
 fi
 
@@ -186,9 +202,10 @@ vendor/bin/infection \
 rc=${PIPESTATUS[0]}
 set -e
 
-# Infection exits 0 when its git filter matches nothing. CHANGED is non-empty
-# here (the skip above exits otherwise), so an empty filter means no class in
-# this diff was mutated. Report that as a failure, never as a pass.
+# Infection exits 0 when its git filter matches nothing. Here CHANGED is
+# non-empty and at least one changed class gains a line (both skips above exit
+# otherwise), so an empty filter means no class in this diff was mutated.
+# Report that as a failure, never as a pass.
 if [ "$rc" -eq 0 ] && grep -qE 'No source file found|Could not find any modified (files|lines)' "$INFECTION_LOG"; then
     {
         echo "Error: Infection matched no source files, but the diff changes these classes:"

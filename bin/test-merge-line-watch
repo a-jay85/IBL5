@@ -108,17 +108,67 @@ assert_absent "I: no comment posted" 'comments' "$GH"
 SEL_OUT=$'action=none\nhead=8\nskipped=' run "$WATCH" --once
 assert_absent "J: no skipped line" 'skipped:' "$OUT"
 
-# K-P: bin/lib/master-bot-wait.sh, which the watch loop calls after its settle.
-# The stub gh stands in for gh's --jq output: it prints "Tests and Analysis"
-# until call number $BOT_OPEN_UNTIL, then nothing (no open run).
+# K-V: bin/lib/master-bot-wait.sh, which the watch loop calls after its settle.
+# The stub gh runs the helper's real --jq filter over JSON fixtures. Runs-list
+# calls read $BOT_RUNS_OPEN_JSON (default runs-open.json) until runs-list call
+# number $BOT_OPEN_UNTIL, then runs-clear.json. Jobs-list calls read
+# $BOT_JOBS_JSON (default jobs-running.json). BOT_FAIL fails the runs list and
+# BOT_JOBS_FAIL the jobs list. Past 20 runs-list calls the stub fails, so a
+# mutated helper that never clears ends in a failed case instead of a hang.
+command -v jq >/dev/null 2>&1 \
+    || failcase "K-V: jq not on PATH; the bot-wait stub runs the helper's jq filters"
 BOT_LOG="$TMP/bot.log"
+cat > "$TMP/runs-open.json" <<'EOF'
+{"workflow_runs":[
+ {"id":101,"name":"Tests and Analysis","status":"in_progress"},
+ {"id":102,"name":"Tests and Analysis","status":"completed"},
+ {"id":103,"name":"Deploy","status":"queued"},
+ {"id":104,"name":"Migration Safety","status":"completed"}]}
+EOF
+cat > "$TMP/runs-clear.json" <<'EOF'
+{"workflow_runs":[
+ {"id":102,"name":"Tests and Analysis","status":"completed"},
+ {"id":104,"name":"Migration Safety","status":"completed"}]}
+EOF
+cat > "$TMP/runs-ms.json" <<'EOF'
+{"workflow_runs":[
+ {"id":105,"name":"Migration Safety","status":"queued"},
+ {"id":102,"name":"Tests and Analysis","status":"completed"}]}
+EOF
+cat > "$TMP/jobs-running.json" <<'EOF'
+{"jobs":[
+ {"name":"Update coverage & PHPStan baselines","status":"in_progress"},
+ {"name":"Regenerate codebase-map","status":"completed","conclusion":"success"},
+ {"name":"Tests and Analysis","status":"queued"}]}
+EOF
+cat > "$TMP/jobs-done.json" <<'EOF'
+{"jobs":[
+ {"name":"Update coverage & PHPStan baselines","status":"completed","conclusion":"success"},
+ {"name":"Regenerate codebase-map","status":"completed","conclusion":"skipped"},
+ {"name":"Harness tests","status":"in_progress"},
+ {"name":"Tests and Analysis","status":"queued"}]}
+EOF
+cat > "$TMP/jobs-absent.json" <<'EOF'
+{"jobs":[
+ {"name":"Regenerate codebase-map","status":"completed","conclusion":"success"},
+ {"name":"Update coverage baselines","status":"completed","conclusion":"success"},
+ {"name":"Harness tests","status":"in_progress"}]}
+EOF
 cat > "$TMP/botgh" <<EOF
 #!/bin/sh
 echo "\$1 \$2 \$3" >> "$BOT_LOG"
+case "\$2" in
+*/jobs*)
+    [ -n "\${BOT_JOBS_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }
+    exec jq -r "\$4" "\${BOT_JOBS_JSON:-$TMP/jobs-running.json}" ;;
+esac
+n=\$(grep -cF 'actions/runs?branch=' "$BOT_LOG")
+[ "\$n" -gt 20 ] && { echo "stub: runaway poll" >&2; exit 1; }
 [ -n "\${BOT_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }
-n=\$(wc -l < "$BOT_LOG")
-[ "\$n" -lt "\${BOT_OPEN_UNTIL:-1}" ] && echo "Tests and Analysis"
-exit 0
+if [ "\$n" -lt "\${BOT_OPEN_UNTIL:-1}" ]; then
+    exec jq -r "\$4" "\${BOT_RUNS_OPEN_JSON:-$TMP/runs-open.json}"
+fi
+exec jq -r "\$4" "$TMP/runs-clear.json"
 EOF
 chmod +x "$TMP/botgh"
 
@@ -131,6 +181,8 @@ bot_wait() {
     )
     RC=$?
     CALLS=$(wc -l < "$BOT_LOG" | tr -d ' ')
+    RUNS_CALLS=$(grep -cF 'actions/runs?branch=' "$BOT_LOG")
+    JOBS_CALLS=$(grep -cF '/jobs?per_page=100' "$BOT_LOG")
 }
 
 # K: nothing open returns at once, after one call on the branch-wide runs list.
@@ -144,7 +196,8 @@ assert_eq "K: exit 0" 0 "$RC"
 BOT_OPEN_UNTIL=3 bot_wait o/r
 assert_match "L: names the open run" 'waiting on Tests and Analysis' "$OUT"
 assert_match "L: then clear" 'no bot-committing master run open' "$OUT"
-assert_eq "L: three API calls" 3 "$CALLS"
+assert_eq "L: three runs-list calls" 3 "$RUNS_CALLS"
+assert_eq "L: two jobs-list calls" 2 "$JOBS_CALLS"
 
 # M: an API failure goes ahead (fail open), exit 0.
 BOT_FAIL=1 bot_wait o/r
@@ -154,7 +207,8 @@ assert_eq "M: exit 0" 0 "$RC"
 # N: the cap ends the wait even while a run is still open.
 MASTER_BOT_WAIT_CAP=0 BOT_OPEN_UNTIL=99 bot_wait o/r
 assert_match "N: cap goes ahead" 'still open after 0s \(Tests and Analysis\); going ahead' "$OUT"
-assert_eq "N: one API call" 1 "$CALLS"
+assert_eq "N: one runs-list call" 1 "$RUNS_CALLS"
+assert_eq "N: one jobs-list call" 1 "$JOBS_CALLS"
 
 # O: progress goes through the caller's say command.
 tag() { echo "TAG $*"; }
@@ -163,6 +217,84 @@ assert_match "O: custom say used" '^TAG bot-commit wait: no bot-committing' "$OU
 
 # P: the watch loop calls the wait between the settle and the pass.
 assert_match "P: loop waits before the pass" 'master_bot_wait "\$REPO" say' "$(sed -n '/sleep "\$SETTLE"/,/run_pass/p' "$WATCH")"
+
+# Q: an open run whose two bot jobs are done (one skipped) clears. Only the
+# open run's jobs list is read.
+BOT_OPEN_UNTIL=99 BOT_JOBS_JSON="$TMP/jobs-done.json" bot_wait o/r
+assert_match "Q: clear message" 'no bot-committing master run open' "$OUT"
+assert_eq "Q: one runs-list call" 1 "$RUNS_CALLS"
+assert_eq "Q: one jobs-list call" 1 "$JOBS_CALLS"
+assert_match "Q: jobs query for the open run" '^api repos/o/r/actions/runs/101/jobs\?per_page=100 ' "$(cat "$BOT_LOG")"
+assert_eq "Q: exact jobs path called once" 1 "$(grep -cF 'repos/o/r/actions/runs/101/jobs?per_page=100' "$BOT_LOG")"
+
+# R: a bot job still in progress keeps the run open.
+BOT_OPEN_UNTIL=2 BOT_JOBS_JSON="$TMP/jobs-running.json" bot_wait o/r
+assert_match "R: waits on the run" 'waiting on Tests and Analysis' "$OUT"
+assert_eq "R: two runs-list calls" 2 "$RUNS_CALLS"
+assert_eq "R: one jobs-list call" 1 "$JOBS_CALLS"
+
+# S: a bot job missing from the jobs list (needs pending, or renamed) keeps
+# the run open, even beside a completed job with a near-miss name.
+BOT_OPEN_UNTIL=2 BOT_JOBS_JSON="$TMP/jobs-absent.json" bot_wait o/r
+assert_match "S: waits on the run" 'waiting on Tests and Analysis' "$OUT"
+assert_eq "S: two runs-list calls" 2 "$RUNS_CALLS"
+
+# T: a jobs-list failure goes ahead (fail open), exit 0.
+BOT_OPEN_UNTIL=99 BOT_JOBS_FAIL=1 bot_wait o/r
+assert_match "T: failure goes ahead" 'could not list Tests and Analysis jobs; going ahead' "$OUT"
+assert_eq "T: one runs-list call" 1 "$RUNS_CALLS"
+assert_eq "T: exit 0" 0 "$RC"
+
+# U: Migration Safety stays a whole-run wait and reads no jobs list.
+BOT_OPEN_UNTIL=2 BOT_RUNS_OPEN_JSON="$TMP/runs-ms.json" bot_wait o/r
+assert_match "U: waits on Migration Safety" 'waiting on Migration Safety' "$OUT"
+assert_eq "U: two runs-list calls" 2 "$RUNS_CALLS"
+assert_eq "U: no jobs-list call" 0 "$JOBS_CALLS"
+
+# V: name-drift guard. The helper pins two tests.yml job names. Fail when a
+# pinned name is missing from tests.yml, when a pinned job no longer runs git
+# push, or when any other tests.yml job runs git push.
+# MASTER_BOT_TESTS_YML points the guard at another copy (mutation rows).
+# Unset or empty both mean the repo's own tests.yml.
+TESTS_YML="${MASTER_BOT_TESTS_YML:-$SCRIPT_DIR/../.github/workflows/tests.yml}"
+# One line per job under jobs: as "<id><TAB><name><TAB><git push count>". A
+# job block runs from its two-space "<id>:" key to the next one. The job name
+# is the four-space name: line, so step names (six spaces) never match.
+JOBS_AWK='
+/^jobs:[[:space:]]*$/ { injobs = 1; next }
+injobs && /^[^[:space:]#]/ { injobs = 0 }
+!injobs { next }
+/^  [A-Za-z0-9_-]+:[[:space:]]*$/ { id = $1; sub(/:$/, "", id); ids[id] = 1; next }
+id != "" && /^    name:/ && !(id in names) {
+    n = $0; sub(/^    name:[[:space:]]*/, "", n); sub(/[[:space:]]+$/, "", n)
+    gsub(/"/, "", n); names[id] = n
+}
+id != "" && /git push/ { push[id]++ }
+END { for (j in ids) printf "%s\t%s\t%d\n", j, names[j], push[j] + 0 }'
+if [ ! -f "$TESTS_YML" ]; then
+    failcase "V: tests.yml not found at $TESTS_YML"
+else
+    JOBS=$(awk "$JOBS_AWK" "$TESTS_YML")
+    (
+        # shellcheck source=bin/lib/master-bot-wait.sh
+        . "$SCRIPT_DIR/lib/master-bot-wait.sh"
+        printf '%s\n' "${MASTER_BOT_TA_JOBS[@]}"
+    ) > "$TMP/pinned"
+    printf '%s\n' "$JOBS" > "$TMP/jobs.tsv"
+    assert_eq "V: helper pins two bot jobs" 2 "$(grep -c . "$TMP/pinned")"
+    while IFS= read -r p; do
+        row=$(awk -F'\t' -v n="$p" '$2 == n' "$TMP/jobs.tsv")
+        if [ -n "$row" ]; then pass "V: tests.yml has a job named '$p'"
+        else failcase "V: tests.yml has no job named '$p'"; fi
+        assert_match "V: job '$p' runs git push" $'\t[1-9][0-9]*$' "$row"
+    done < "$TMP/pinned"
+    STRAY=$(awk -F'\t' 'NR == FNR { pin[$0] = 1; next } $3 > 0 && !($2 in pin) { print $1 }' \
+        "$TMP/pinned" "$TMP/jobs.tsv")
+    assert_eq "V: no other tests.yml job runs git push" "" "$STRAY"
+    assert_eq "V: every git push sits inside a job block" \
+        "$(grep -c 'git push' "$TESTS_YML")" \
+        "$(awk -F'\t' '{ s += $3 } END { print s + 0 }' "$TMP/jobs.tsv")"
+fi
 
 # H: usage errors exit 2.
 run "$WATCH" --interval abc

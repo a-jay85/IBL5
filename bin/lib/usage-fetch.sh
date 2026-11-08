@@ -352,7 +352,7 @@ _usage_fetch_log_once() {
 
 # _usage_fetch_lock_acquire <state_dir>: rc 0 when this process now owns fetch.lock.d. Never waits.
 _usage_fetch_lock_acquire() {
-    local lock="$1/fetch.lock.d" now at="" pid="" got=""
+    local lock="$1/fetch.lock.d" mutex="$1/fetch-reclaim.lock.d" now at="" pid="" rc
     now=$(date +%s)
     if mkdir "$lock" 2>/dev/null; then
         _usage_lock_hook fetch-mkdir-won
@@ -367,16 +367,36 @@ _usage_fetch_lock_acquire() {
         return 1
     fi
     _usage_lock_hook fetch-busy
-    read -r at pid < "$lock/at" 2>/dev/null
+    { read -r at pid < "$lock/at"; } 2>/dev/null
     case "$at" in ''|*[!0-9]*) at=$now ;; esac
     [ $((now - at)) -gt "$USAGE_FETCH_LOCK_STALE" ] || return 1
     _usage_lock_hook fetch-reclaim-stale
+    # One reclaimer at a time. Without this, a peer's mv can take the lock this reclaim just made.
+    if ! mkdir "$mutex" 2>/dev/null; then
+        # A reclaimer died holding the mutex: age it out the way _usage_log_rotate does.
+        [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 1
+        rmdir "$mutex" 2>/dev/null
+        mkdir "$mutex" 2>/dev/null || return 1
+    fi
+    _usage_fetch_lock_reclaim "$lock" "$now" "$at $pid"
+    rc=$?
+    rmdir "$mutex" 2>/dev/null
+    return "$rc"
+}
+
+# _usage_fetch_lock_reclaim <lock> <now> <judged "at pid">: run only under the reclaim mutex.
+# Moves the lock aside only while it still carries the stale stamp judged above, then takes it
+# fresh. rc 0 = this process holds the lock.
+_usage_fetch_lock_reclaim() {
+    local lock="$1" now="$2" judged="$3" at="" pid=""
+    { read -r at pid < "$lock/at"; } 2>/dev/null || return 1
+    [ "$at $pid" = "$judged" ] || return 1
     mv "$lock" "$lock.stale.$$" 2>/dev/null || return 1
     _usage_lock_hook fetch-reclaim-mv
-    read -r got pid < "$lock.stale.$$/at" 2>/dev/null
-    case "$got" in ''|*[!0-9]*) got=0 ;; esac
-    if [ $((now - got)) -le "$USAGE_FETCH_LOCK_STALE" ]; then
-        # A peer reclaimed first and this mv took its fresh lock: hand it back and lose.
+    at="" pid=""
+    { read -r at pid < "$lock.stale.$$/at"; } 2>/dev/null
+    if [ "$at $pid" != "$judged" ]; then
+        # The lock changed hands between the re-read and the mv: hand it back and lose.
         if [ -e "$lock" ]; then rm -rf "$lock.stale.$$"; else mv "$lock.stale.$$" "$lock" 2>/dev/null; fi
         return 1
     fi
@@ -390,7 +410,7 @@ _usage_fetch_lock_acquire() {
 # _usage_fetch_lock_release <state_dir>: removes fetch.lock.d only when this process owns it.
 _usage_fetch_lock_release() {
     local lock="$1/fetch.lock.d" at="" pid=""
-    read -r at pid < "$lock/at" 2>/dev/null
+    { read -r at pid < "$lock/at"; } 2>/dev/null
     if [ "$pid" = "$$" ]; then _usage_lock_hook fetch-release-rm; rm -rf "$lock"; else _usage_lock_hook fetch-release-skip; fi
     return 0
 }

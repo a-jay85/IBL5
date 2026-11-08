@@ -2996,6 +2996,54 @@ test_fetch_lock_reclaim_race_one_holder() {
     assert_no_file reclaim_race:no-mutex-left "$d/fetch-reclaim.lock.d"
 }
 
+test_fetch_lock_reclaim_mutex_busy_loses() {  # a live reclaimer holds the mutex: no second reclaim
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" before
+    stale_fetch_lock "$d"; mkdir "$d/fetch-reclaim.lock.d"; before=$(cat "$d/fetch.lock.d/at")
+    ep "_usage_fetch_lock_acquire '$d'"
+    assert_eq reclaim_mutex_busy:rc 1 "$?"
+    assert_eq reclaim_mutex_busy:stamp-kept "$before" "$(cat "$d/fetch.lock.d/at")"
+}
+
+test_fetch_lock_reclaim_mutex_orphan_ages_out() {  # a dead reclaimer's mutex never blocks forever
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" won
+    stale_fetch_lock "$d"; mkdir "$d/fetch-reclaim.lock.d"; touch -t 202001010000 "$d/fetch-reclaim.lock.d"
+    won=$(ep "_usage_fetch_lock_acquire '$d' && echo \$\$")
+    assert_eq reclaim_mutex_orphan:stamp-pid "${won:-none}" "$(cut -d' ' -f2 "$d/fetch.lock.d/at")"
+    assert_no_file reclaim_mutex_orphan:mutex-gone "$d/fetch-reclaim.lock.d"
+}
+
+test_fetch_lock_reclaim_stamp_changed_loses() {  # stamp re-stamped since the stale verdict: hands off
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" before
+    stale_fetch_lock "$d"; before=$(cat "$d/fetch.lock.d/at")
+    ep "_usage_fetch_lock_reclaim '$d/fetch.lock.d' \$(date +%s) '1 1'"
+    assert_eq reclaim_changed:rc 1 "$?"
+    assert_eq reclaim_changed:stamp-kept "$before" "$(cat "$d/fetch.lock.d/at")"
+}
+
+test_fetch_lock_release_quiet_when_gone() {  # release with no lock dir: rc 0, nothing on stderr
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" err rc
+    mkdir -p "$d"
+    err=$(ep "_usage_fetch_lock_release '$d'" 2>&1 >/dev/null); rc=$?
+    assert_eq release_gone:stderr "" "$err"
+    assert_eq release_gone:rc 0 "$rc"
+    mkdir -p "$d/fetch.lock.d"; printf '%s 99999\n' "$(date +%s)" > "$d/fetch.lock.d/at"
+    ep "_usage_fetch_lock_release '$d'"
+    assert_eq release_foreign:kept yes "$([ -d "$d/fetch.lock.d" ] && echo yes || echo no)"
+}
+
+test_fetch_lock_busy_read_quiet_when_gone() {  # lock vanishes between the -f test and the read
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" err rc
+    mkdir -p "$d/fetch.lock.d"; printf '%s 99999\n' "$(date +%s)" > "$d/fetch.lock.d/at"
+    err=$(ep "_usage_lock_hook() { [ \"\$1\" = fetch-busy ] && rm -rf '$d/fetch.lock.d'; return 0; }; _usage_fetch_lock_acquire '$d'" 2>&1 >/dev/null); rc=$?
+    assert_eq busy_gone:stderr "" "$err"
+    assert_eq busy_gone:rc 1 "$rc"
+}
+
 ep() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; $*"; }
 
 # hold_fetch_lock: a fresh fetch.lock.d (as test_fetch_fresh_lock_respected seeds it).

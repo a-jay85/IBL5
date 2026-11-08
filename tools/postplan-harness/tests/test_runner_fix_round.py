@@ -5,6 +5,7 @@ write a real thread fixer would. The replayed git advances its head with every c
 runner sees a real new head after an accepted round.
 """
 import glob
+import hashlib
 import json
 import os
 import shutil
@@ -208,23 +209,66 @@ def test_fix_round_user_thread_reply_recorded(rig, monkeypatch):
         {"commentId": 501, "path": PATH, "line": 2, "body": "please reconsider this",
          "authorLogin": thread_ingestion.TRUSTED_LOGIN, "authorType": "User",
          "isResolved": False, "isOutdated": False}]}
-    llm = rig.llm(thread_reply=DECLINE_REPLY, edit=False, later=[FINDING])
+    llm = rig.llm(thread_reply=FIX_REPLY, edit=True, later=[])
     res = rig.run(llm, extra=extra)
-    assert res.fix_round["status"] in ("no-change", "accepted")
+    assert res.fix_round["status"] == "accepted"
+    pushed = res.fix_round["sha"]
+    assert pushed and pushed == rig.git.head()
+    assert pushed != res.fix_round["head_before"]
     rows = [r for r in res.fix_round["items"] if r["commentId"] == 501]
-    assert rows and rows[0]["outcome"] == "declined"
-    resolved = [a for a in rig.actions() if a["action"] == "pr_resolve_thread"]
-    assert [a for a in resolved if a["comment_id"] == 501]
+    assert rows and rows[0]["outcome"] == "fixed"
+    resolved = [a for a in rig.actions() if a["action"] == "pr_resolve_thread"
+                and a["comment_id"] == 501]
+    # The recorded reply names the pushed sha and the fixer's reason, not a decline.
+    assert [a["body"] for a in resolved] == [thread_ingestion.fixed_body(pushed, "guarded the call")]
 
 
-def test_fix_round_reevaluates_every_condition(rig):
-    res = rig.run(rig.llm(later=[]))
+def test_fix_round_reevaluates_every_condition(rig, monkeypatch):
+    # Spy on every arming evaluation: what head the run stood on, and what (15) and
+    # current_tree held. A genuinely new ArmInputs per evaluation is a fresh read.
+    evals = []
+    real_evaluate = runner.evaluate
+
+    def spy(inputs):
+        if not evals or evals[-1]["inputs"] is not inputs:
+            evals.append({"inputs": inputs, "head": rig.git.head(), "pushes": rig.git.pushes,
+                          "tree_now": rig.git.head_tree(), "tree": inputs.current_tree,
+                          "failed": list(inputs.failed_checks)})
+        return real_evaluate(inputs)
+
+    monkeypatch.setattr(runner, "evaluate", spy)
+    # Replay reads (15) from this fixture key at evaluation time; the push makes it go red,
+    # so only an evaluation made after the push can see it.
+    red = []
+    real_push = ReplayGit.push
+
+    def push(git):
+        if any(m.startswith("fix(review)") for m in git.commit_messages):
+            red.append("ci-red-after-push")
+        return real_push(git)
+
+    monkeypatch.setattr(ReplayGit, "push", push)
+    res = rig.run(rig.llm(later=[]), extra={"red_ci_checks": red})
     assert res.fix_round["status"] == "accepted"
     text = (rig.tmp_path / "out" / "audit.log").read_text()
     assert text.count("phase6.5: HELD") == 2
     assert text.count("(post-fix-round)") == 1
     assert 2 not in _holds(res)
     assert 3 in _holds(res)      # the conformance hold the round could not touch still stands
+    assert len(evals) == 2
+    old, new = evals
+    # The first evaluation stood on the old head, before the round's push.
+    assert old["head"] == res.fix_round["head_before"]
+    # The second stood on the new head, after the round's push.
+    assert new["head"] == res.fix_round["sha"] != old["head"]
+    assert new["pushes"] == old["pushes"] + 1
+    # current_tree was re-read on the new head, not carried over from the old one.
+    assert old["tree"] == old["tree_now"]
+    assert new["tree"] == new["tree_now"] != old["tree"]
+    # Condition (15) input was re-read after the push: absent before, present after.
+    assert old["failed"] == []
+    assert new["failed"] == ["ci-red-after-push"]
+    assert 15 in _holds(res)
 
 
 def test_fix_round_one_round_per_run(rig):
@@ -245,15 +289,31 @@ def test_fix_round_disabled_env(rig, monkeypatch):
     assert 2 in _holds(res)
 
 
-def test_fix_round_rejected_keeps_fingerprint(rig, tmp_path):
+def test_fix_round_rejected_keeps_fingerprint(rig, tmp_path, monkeypatch):
+    # Replay has no plan file to fingerprint, so derive one from the diff the run ends on. A
+    # rejected round that leaked its commit would end on a different diff, hence a different one.
+    monkeypatch.setattr(holdrepeat, "fingerprint",
+                        lambda plan_path, worktree, *a, **k: hashlib.sha256(
+                            rig.git.diff_vs_base().encode()).hexdigest())
+    # Baseline: the same run with the round off.
+    monkeypatch.setenv(fix_round.ENV_FLAG, "0")
+    rig.run(rig.llm(), state_dir=str(tmp_path / "state-off"), name="off")
+    baseline = holdrepeat.load_record(str(tmp_path / "state-off"), SLUG)
+    assert baseline and baseline["fingerprint"]
+    assert "fix_round" not in baseline
+    monkeypatch.delenv(fix_round.ENV_FLAG)
     sd = tmp_path / "state"
     llm = rig.llm(later=[OTHER])
-    res = rig.run(llm, state_dir=str(sd))
+    res = rig.run(llm, state_dir=str(sd), name="rejected")
     assert res.fix_round["status"] == "rejected"
     rec = holdrepeat.load_record(str(sd), SLUG)
     assert rec["fix_round"]["attempts"] == 1
     assert rec["fix_round"]["targets"] == [2, 3]
     assert rec["fix_round"]["status"] == "rejected"
+    assert rec["fingerprint"] == baseline["fingerprint"]
+    volatile = ("fix_round", "updated_at")
+    assert ({k: v for k, v in rec.items() if k not in volatile}
+            == {k: v for k, v in baseline.items() if k not in volatile})
 
 
 def test_fix_round_dirty_tree_fails_closed(rig, monkeypatch):

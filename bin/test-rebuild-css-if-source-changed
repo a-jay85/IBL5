@@ -37,6 +37,8 @@ deny()  { if grep -qF -- "$3" "$2"; then fail "$1 (unexpected: $3)"; else pass "
 wantx() { if grep -qxF -- "$3" "$2"; then pass "$1"; else fail "$1 (missing line: $3)"; fi; }
 denyx() { if grep -qxF -- "$3" "$2"; then fail "$1 (unexpected line: $3)"; else pass "$1"; fi; }
 rc0()   { if [ "$RC" -eq 0 ]; then pass "$1"; else fail "$1 (rc=$RC, out: $OUT)"; fi; }
+wantn() { local n; n="$(grep -cF -- "$3" "$2" || true)"; if [ "$n" = "$4" ]; then pass "$1"; else fail "$1 (want $4 of '$3', got $n)"; fi; }
+wantnx() { local n; n="$(grep -cxF -- "$3" "$2" || true)"; if [ "$n" = "$4" ]; then pass "$1"; else fail "$1 (want $4 of line '$3', got $n)"; fi; }
 empty() { if [ -s "$2" ]; then fail "$1 (got: $(tr '\n' ';' < "$2"))"; else pass "$1"; fi; }
 
 # --- stubs: docker always present; bunx only when a case asks for it
@@ -55,6 +57,13 @@ STUB
 cat > "$STUB_BUNX/bunx" <<'STUB'
 #!/usr/bin/env bash
 printf 'bunx %s\n' "$*" >> "$STUB_LOG"
+if [ -n "${STUB_BUNX_SLEEP:-}" ]; then sleep "$STUB_BUNX_SLEEP"; fi
+if [ -n "${STUB_BUNX_TOUCH:-}" ]; then sleep 1; touch "$STUB_BUNX_TOUCH"; fi
+if [ "${STUB_BUNX_WRITE:-0}" = 1 ]; then
+    out=""; prev=""
+    for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+    [ -n "$out" ] && printf 'stub\n' > "$out"
+fi
 exit "${STUB_BUNX_RC:-0}"
 STUB
 chmod +x "$STUB_DOCKER/docker" "$STUB_BUNX/bunx"
@@ -69,15 +78,14 @@ git -C "$MAIN" add -A
 git -C "$MAIN" -c user.name=t -c user.email=t@t commit -q --no-verify -m init
 git -C "$MAIN" worktree add -q "$WT" -b feat-x
 
-# run_case <case-id> <checkout-dir> <bunx: yes|no> <stale: yes|no> <ps names...>
-# Env knobs read by the stubs: STUB_RESTART_RC, STUB_EXEC_RC, STUB_BUNX_RC.
-# Sets globals CALLS (stub call log), LOG (target's css-rebuild.log), RC, OUT.
-run_case() {
-    local id="$1" dir="$2" bunx="$3" stale="$4"; shift 4
-    local cdir="$TMP/case-$id"; mkdir -p "$cdir/cache" "$cdir/home"
-    CALLS="$cdir/calls"; : > "$CALLS"
-    LOG="$cdir/cache/ibl5-hooks/css-rebuild.log"
-    : > "$cdir/ps"; local n; for n in "$@"; do printf '%s\n' "$n" >> "$cdir/ps"; done
+# prep_case <case-id> <checkout-dir> <stale: yes|no> <ps names...>
+# Sets globals CASE_DIR, CALLS (stub call log), LOG (target's css-rebuild.log).
+prep_case() {
+    local id="$1" dir="$2" stale="$3"; shift 3
+    CASE_DIR="$TMP/case-$id"; mkdir -p "$CASE_DIR/cache" "$CASE_DIR/home"
+    CALLS="$CASE_DIR/calls"; : > "$CALLS"
+    LOG="$CASE_DIR/cache/ibl5-hooks/css-rebuild.log"
+    : > "$CASE_DIR/ps"; local n; for n in "$@"; do printf '%s\n' "$n" >> "$CASE_DIR/ps"; done
     if [ "$stale" = yes ]; then
         touch -t 202001010000 "$dir/ibl5/themes/IBL/style/style.css"
         touch -t 202101010000 "$dir/ibl5/design/input.css"
@@ -85,16 +93,54 @@ run_case() {
         touch -t 202001010000 "$dir/ibl5/design/input.css"
         touch -t 202101010000 "$dir/ibl5/themes/IBL/style/style.css"
     fi
+}
+
+# exec_case <checkout-dir> <bunx: yes|no>
+# Env knobs read by the stubs: STUB_RESTART_RC, STUB_EXEC_RC, STUB_BUNX_RC,
+# STUB_BUNX_SLEEP, STUB_BUNX_TOUCH, STUB_BUNX_WRITE. CSS_REBUILD_LOCK_WAIT_SECS
+# is forwarded only when set (empty counts as set). COPIES=<n> runs n hooks at
+# once; DETACH=1 does not capture output, so the call returns when the hook
+# process exits and not when its backgrounded subshell finishes.
+# Sets globals RC and OUT.
+exec_case() {
+    local dir="$1" bunx="$2" copies="${COPIES:-1}"
     local path="$STUB_DOCKER:/usr/bin:/bin"
     [ "$bunx" = yes ] && path="$STUB_DOCKER:$STUB_BUNX:/usr/bin:/bin"
-    OUT="$(cd "$dir" && env -i HOME="$cdir/home" XDG_CACHE_HOME="$cdir/cache" \
-        PATH="$path" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-        STUB_LOG="$CALLS" STUB_PS_FILE="$cdir/ps" \
-        STUB_RESTART_RC="${STUB_RESTART_RC:-0}" STUB_EXEC_RC="${STUB_EXEC_RC:-0}" \
-        STUB_BUNX_RC="${STUB_BUNX_RC:-0}" \
-        bash "$TARGET" 2>&1)"
-    RC=$?
+    local envv
+    envv=(env -i HOME="$CASE_DIR/home" XDG_CACHE_HOME="$CASE_DIR/cache"
+        PATH="$path" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+        STUB_LOG="$CALLS" STUB_PS_FILE="$CASE_DIR/ps"
+        STUB_RESTART_RC="${STUB_RESTART_RC:-0}" STUB_EXEC_RC="${STUB_EXEC_RC:-0}"
+        STUB_BUNX_RC="${STUB_BUNX_RC:-0}" STUB_BUNX_SLEEP="${STUB_BUNX_SLEEP:-}"
+        STUB_BUNX_TOUCH="${STUB_BUNX_TOUCH:-}" STUB_BUNX_WRITE="${STUB_BUNX_WRITE:-0}")
+    if [ -n "${CSS_REBUILD_LOCK_WAIT_SECS+x}" ]; then
+        envv+=(CSS_REBUILD_LOCK_WAIT_SECS="$CSS_REBUILD_LOCK_WAIT_SECS")
+    fi
+    if [ "${DETACH:-0}" = 1 ]; then
+        (cd "$dir" && "${envv[@]}" bash "$TARGET" >/dev/null 2>&1 </dev/null)
+        RC=$?
+        OUT=""
+    else
+        OUT="$(cd "$dir" && {
+            pids=""; i=0
+            while [ "$i" -lt "$copies" ]; do
+                "${envv[@]}" bash "$TARGET" &
+                pids="$pids $!"; i=$((i + 1))
+            done
+            rc=0
+            for p in $pids; do wait "$p" || rc=$?; done
+            exit "$rc"
+        } 2>&1)"
+        RC=$?
+    fi
     [ -f "$LOG" ] || : > "$LOG"   # absent log => every want() on it fails loudly
+}
+
+# run_case <case-id> <checkout-dir> <bunx: yes|no> <stale: yes|no> <ps names...>
+run_case() {
+    local id="$1" dir="$2" bunx="$3" stale="$4"; shift 4
+    prep_case "$id" "$dir" "$stale" "$@"
+    exec_case "$dir" "$bunx"
 }
 
 # Case 1: main checkout, both watcher names running -> restarts ONLY ibl5-tailwind
@@ -186,5 +232,145 @@ rc0   "c8 fresh: exit 0"
 want  "c8 fresh: skip logged" "$LOG" "css fresh, skip"
 empty "c8 fresh: zero docker/bunx calls" "$CALLS"
 deny  "c8 fresh: no rebuild started" "$LOG" "rebuilding"
+
+lockdir_for() { printf '%s\n' "$TMP/case-$1/cache/ibl5-hooks/css-rebuild-$(basename "$2").lock"; }
+# A live orphan: the sleeper outlives its parent shell, so `kill -0` sees it die
+# when it exits (a zombie child of this harness would still answer `kill -0`).
+spawn_holder() { sh -c "sleep $1 >/dev/null 2>&1 & echo \$!"; }
+seed_lock() { mkdir -p "$1"; printf '%s\n' "$2" > "$1/pid"; }
+
+# Case 9: a rebase fires two hooks at once -> one rebuild, one restart, one skip
+prep_case 9 "$MAIN" yes ibl5-tailwind
+COPIES=2 STUB_BUNX_SLEEP=1 STUB_BUNX_WRITE=1 exec_case "$MAIN" yes
+rc0   "c9 pair: exit 0"
+wantn "c9 pair: exactly one host rebuild" "$LOG" "css rebuilt on host" 1
+wantn "c9 pair: the waiter skips once" "$LOG" "css fresh, skip" 1
+wantn "c9 pair: exactly one run waited" "$LOG" "waiting up to" 1
+wantnx "c9 pair: exactly one watcher restart" "$CALLS" "restart ibl5-tailwind" 1
+if [ ! -d "$(lockdir_for 9 "$MAIN")" ]; then pass "c9 lock released"; else fail "c9 lock released (dir left behind)"; fi
+
+# Case 10: lock left by a dead pid -> removed at once, rebuild runs, no timeout
+sh -c 'exit 0' & dead=$!; wait "$dead"
+prep_case 10 "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-10/cache/ibl5-hooks"
+seed_lock "$(lockdir_for 10 "$MAIN")" "$dead"
+CSS_REBUILD_LOCK_WAIT_SECS=2 exec_case "$MAIN" yes
+rc0  "c10 dead holder: exit 0"
+want "c10 dead holder: stale lock removed" "$LOG" "removed stale css lock from dead pid $dead"
+want "c10 dead holder: rebuild runs" "$LOG" "css rebuilt on host"
+deny "c10 dead holder: no timeout path" "$LOG" "timed out"
+
+# Case 11: live holder outlasts the wait budget -> takeover, rebuild, restart
+prep_case 11 "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-11/cache/ibl5-hooks"
+holder="$(spawn_holder 30)"
+seed_lock "$(lockdir_for 11 "$MAIN")" "$holder"
+CSS_REBUILD_LOCK_WAIT_SECS=1 exec_case "$MAIN" yes
+kill "$holder" 2>/dev/null || true
+rc0   "c11 live holder: exit 0"
+want  "c11 live holder: budget logged" "$LOG" "waiting up to 1s"
+want  "c11 live holder: takeover logged" "$LOG" "css lock wait timed out after 1s, taking it over"
+want  "c11 live holder: rebuild runs" "$LOG" "css rebuilt on host"
+wantx "c11 live holder: restart runs" "$CALLS" "restart ibl5-tailwind"
+
+# Case 12: wait budget parsing. Each holder dies after ~1 s, so stale recovery ends the wait.
+prep_case 12a "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-12a/cache/ibl5-hooks"
+holder="$(spawn_holder 1)"
+seed_lock "$(lockdir_for 12a "$MAIN")" "$holder"
+exec_case "$MAIN" yes
+want "c12a unset: default budget is 120s" "$LOG" "waiting up to 120s"
+want "c12a unset: rebuild runs" "$LOG" "css rebuilt on host"
+
+prep_case 12b "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-12b/cache/ibl5-hooks"
+holder="$(spawn_holder 1)"
+seed_lock "$(lockdir_for 12b "$MAIN")" "$holder"
+CSS_REBUILD_LOCK_WAIT_SECS='' exec_case "$MAIN" yes
+want "c12b empty: default budget is 120s" "$LOG" "waiting up to 120s"
+want "c12b empty: rebuild runs" "$LOG" "css rebuilt on host"
+
+prep_case 12c "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-12c/cache/ibl5-hooks"
+holder="$(spawn_holder 1)"
+seed_lock "$(lockdir_for 12c "$MAIN")" "$holder"
+CSS_REBUILD_LOCK_WAIT_SECS=5s exec_case "$MAIN" yes
+want "c12c near-miss 5s: default budget is 120s" "$LOG" "waiting up to 120s"
+want "c12c near-miss 5s: rebuild runs" "$LOG" "css rebuilt on host"
+
+# Case 13: the hook returns before the lock wait ends, so a git op never blocks on it
+prep_case 13 "$MAIN" yes ibl5-tailwind
+mkdir -p "$TMP/case-13/cache/ibl5-hooks"
+holder="$(spawn_holder 30)"
+seed_lock "$(lockdir_for 13 "$MAIN")" "$holder"
+DETACH=1 CSS_REBUILD_LOCK_WAIT_SECS=1 exec_case "$MAIN" yes
+rc0  "c13 detached: exit 0"
+deny "c13 hook returned before the lock wait" "$LOG" "timed out"
+c13_wait=0
+while [ "$c13_wait" -lt 10 ] && ! grep -qF -- "css rebuilt on host" "$LOG"; do
+    sleep 1; c13_wait=$((c13_wait + 1))
+done
+kill "$holder" 2>/dev/null || true
+want "c13 detached: the background run still finished" "$LOG" "css rebuilt on host"
+
+# Case 14: a source rewritten mid-build keeps OUTPUT stale, so the next run rebuilds again
+MIDBUILD="$MAIN/ibl5/design/zz-midbuild.css"
+prep_case 14 "$MAIN" yes ibl5-tailwind
+STUB_BUNX_WRITE=1 STUB_BUNX_TOUCH="$MIDBUILD" exec_case "$MAIN" yes
+rc0 "c14 mid-build rewrite: first run exit 0"
+STUB_BUNX_WRITE=1 exec_case "$MAIN" yes
+rc0   "c14 mid-build rewrite: second run exit 0"
+wantn "c14 mid-build rewrite: rebuilt twice" "$LOG" "css rebuilt on host" 2
+wantn "c14 mid-build rewrite: second run does not skip" "$LOG" "css fresh, skip" 0
+rm -f "$MIDBUILD"
+
+# Prints each `@source not "<path>";` path in a stylesheet, one per line.
+# Commented-out lines and positive `@source` lines are skipped.
+source_not_paths() {
+    sed -n 's/^[[:space:]]*@source not "\([^"]*\)"[[:space:]]*;.*$/\1/p' "$1"
+}
+
+# Case 15: every @source not path in the real input.css matches no tracked file
+REPO_TOP="$SCRIPT_DIR/.."
+INPUT_CSS="$REPO_TOP/ibl5/design/input.css"
+c15_paths="$(source_not_paths "$INPUT_CSS")"
+if [ -z "$c15_paths" ]; then
+    fail "c15 parser found @source not lines"
+else
+    pass "c15 parser found @source not lines"
+    while IFS= read -r p; do
+        case "$p" in
+            ../*)
+                rel="ibl5/${p#../}"
+                hits="$(git -C "$REPO_TOP" ls-files -- ":(glob)$rel" ":(glob)$rel/**")"
+                if [ -z "$hits" ]; then
+                    pass "c15 $p matches no tracked file"
+                else
+                    fail "c15 $p matches tracked files: $(head -3 <<< "$hits" | tr '\n' ' ')"
+                fi
+                ;;
+            *) fail "c15 unexpected @source not path shape: $p" ;;
+        esac
+    done <<< "$c15_paths"
+fi
+
+# Case 16: the parser skips comments, positive @source, and single-quoted lines
+cat > "$TMP/near-miss.css" <<'CSS'
+@source not "../backups";
+/* @source not "../classes"; */
+@source "../modules";
+  @source not "../indented";
+@source not "../spaced" ;
+@source not '../single-quoted';
+CSS
+c16_got="$(source_not_paths "$TMP/near-miss.css")"
+c16_want='../backups
+../indented
+../spaced'
+if [ "$c16_got" = "$c16_want" ]; then
+    pass "c16 parser returns exactly the three plain @source not paths"
+else
+    fail "c16 parser output differs (got: $(tr '\n' ';' <<< "$c16_got"))"
+fi
 
 h_done

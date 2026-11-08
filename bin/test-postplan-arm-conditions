@@ -1762,14 +1762,16 @@ done
 if grep -qE 'never runs .gh pr merge.' "$_SKILL_DIR/SKILL.md"; then echo "ok: skill_states_no_arm"
 else echo "FAIL: skill_states_no_arm — SKILL.md intro lost the no-arming sentence"; FAILED=1; fi
 # Repo-wide sweep: no live reference to a retired _phase-{2,3,4,5-final,6,6.5,7} file.
-# Excluded: harness path lists and fixtures, the two sibling-owned skill files, this guard,
+# Excluded: harness path lists and fixtures, _pr-body-claims.md (its line 176 lists
+# _phase-6.5-arm-auto-merge.md on purpose, mirroring _ARMING_PATHS in
+# harness/gate_backtest.py:157, so a recreated file trips the hazard check), this guard,
 # and the registry rows that carry (example) / retired markers.
 _dangling=$(git -C "$REPO_ROOT" grep -n -e '_phase-2-conflict' -e '_phase-3-classify' \
     -e '_phase-4-review' -e '_phase-5-final' -e '_phase-6-manual' -e '_phase-6\.5-arm' -e '_phase-7-ci' -- . \
     ':!tools/postplan-harness/harness/gate_backtest.py' ':!tools/postplan-harness/harness/fidelity.py' \
     ':!tools/postplan-harness/tests/fixtures' ':!tools/postplan-harness/tests/test_gatefix.py' \
     ':!tools/postplan-harness/tests/test_resolver_self_heal.py' \
-    ':!tools/postplan-harness/harness/llm_calls.py' ':!.claude/skills/post-plan/_phase-5.5-fidelity.md' \
+    ':!tools/postplan-harness/harness/llm_calls.py' \
     ':!.claude/skills/post-plan/_pr-body-claims.md' ':!bin/test-postplan-arm-conditions' \
     ':!ibl5/docs/retrospective-class-registry.md' 2>/dev/null || true)
 if [ -z "$_dangling" ]; then echo "ok: no_dangling_retired_phase_refs"

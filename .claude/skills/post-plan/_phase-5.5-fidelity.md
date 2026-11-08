@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-11-05
+last_verified: 2026-11-07
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -29,7 +29,7 @@ echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE PLAN_SH
 
 ## Step 1b — Carry-forward gate <!-- slop-ok -->
 
-Purpose: decide whether the sticky comment already carries a terminal verdict for exactly this tree and this plan. The decision is three checks in sequence, all fail-closed: the pinned `skip-review.sh` (one sticky, well-formed `**Reviewed tree:**`, tree equals `HEAD^{tree}`, no conflicts flag, five digest labels), then the prior verdict word, then plan identity. Any `RUN-REVIEW`, a missing script, a parse doubt, or a plan mismatch means Step 2 runs exactly as before. `<MASTER_SHA>` and `<PLAN_SHA256>` are Step 1 literals. `CONFLICT_FLAG` is the empty string unless `_phase-2-conflict-resolution.md` ran this run (Phase 1 printed `REBASE=conflict`), in which case set it to the literal `conflicts-resolved`.
+Purpose: decide whether the sticky comment already carries a terminal verdict for exactly this tree and this plan. The decision is three checks in sequence, all fail-closed: the pinned `skip-review.sh` (one sticky, well-formed `**Reviewed tree:**`, tree equals `HEAD^{tree}`, no conflicts flag, five digest labels), then the prior verdict word, then plan identity. Any `RUN-REVIEW`, a missing script, a parse doubt, or a plan mismatch means Step 2 runs exactly as before. `<MASTER_SHA>` and `<PLAN_SHA256>` are Step 1 literals. `CONFLICT_FLAG` is the empty string. Phase 1's rebase fail-closes on a conflict (live procedure: `.claude/review-shared/_rebase-and-conflicts.md`), so a run that reaches this step never carries one. Set it to the literal `conflicts-resolved` only if a conflict resolution ran this run.
 
 ```bash
 # phase 5.5 carry-forward probe
@@ -158,7 +158,7 @@ The skill does not write `SHADOW_ARMING: requested` into the reviewer's context,
 
 ## Step 3 — Read the verdict word
 
-This is the **single canonical parse** — condition (12)'s block in `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` re-derives the identical expression, and `bin/test-postplan-arm-conditions`'s drift guard asserts both copies agree.
+This block produces the verdict word. `bin/test-postplan-arm-conditions`'s drift guard asserts it keeps the verdict-path stem `post-plan-fidelity-verdict-` and the three parse tokens below: the `sed` delete from `## DIGEST`, the anchored `READY WITH NOTES|NOT READY|READY` match, and `tail -1`. Condition (12) is evaluated in `tools/postplan-harness/harness/armable.py` (`select_fidelity_verdict`).
 
 Why this shape: 6e(b) requires the verdict file to *end* in the `## DIGEST` section, so the verdict word is never the last line. Deleting from `^## DIGEST` to end-of-file before matching prevents a digest body that happens to contain the word `READY` from being mistaken for the verdict. `tail -1` takes the terminal verdict word when the reviewer restated it. An unmatched or empty result yields `missing`, which condition (12) treats as indeterminate and therefore blocking.
 
@@ -414,6 +414,6 @@ The disclosure line sits directly under `**Plan hash:**`. In the skill layout th
 
 Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s and must not be renamed or reformatted. `.github/workflows/merge-digest-notify.yml` selects the **last** comment containing that HTML marker and pipes it into `bin/digest-dm-build`'s `_digest_labels`, which anchors on that exact heading. Renaming either silently degrades every DM to the fallback message while every test stays green.
 
-Post with the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh`. Grep the function name rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
+Post with the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh`. Grep the function name rather than trusting a line number. Do **not** write into the `/tmp/pr-ready-verdict-<N>.md` namespace. Step 3 of `.claude/review-shared/_phase7-verdict.md` ("Post the sticky verdict") writes there, and a post-plan write would collide with a concurrent run of that step on the same PR.
 
 After posting, when `FIDELITY=missing` or `FIDELITY=NOT READY`: STOP with instructions to remediate the reviewer's findings and re-run `/post-plan`. Never hand-edit the verdict file to clear it — an absent file is itself a blocking state for condition (12).

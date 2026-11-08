@@ -173,7 +173,7 @@ A one-way Door means an effect `git revert` cannot undo: lost data, a prod sync 
 
 Either of these triggers adds the Self-governing segment and leaves the Door alone:
 
-- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md`. This is the bootstrap hazard.
+- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md` (retired; kept so a recreated file trips the hazard check). This is the bootstrap hazard.
 - Gate removal. Any `detect_gate_changes` result whose state is `removed`: a deleted `bin/check-*`, lib gate, CI workflow, or arming path.
 
 An LLM cannot add the segment in Phase 2. A human may add it in a later phase, and nobody may remove a mechanical one.
@@ -299,7 +299,7 @@ Phase 5.5 writes this block when it keeps a change that the fidelity reviewer ta
 
 ## Plan gaps
 
-A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule in `_phase-5-final-verification.md`.
+A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule: the `MISSING-FILE:` branch in `tools/postplan-harness/harness/conformance_fix.py`. `bin/lib/plan-scope-conformance` documents the label.
 
 ```markdown
 ## Plan gaps

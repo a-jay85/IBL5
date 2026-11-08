@@ -5,11 +5,27 @@
 @import 'tailwindcss';
 
 /* The tailwind container mounts only ibl5/, so the repo-root .gitignore never reaches the
-   class scanner. Without these excludes it walks the main checkout's multi-GB backups and
-   logs and gets OOM-killed. None of these paths is tracked. */
+   class scanner, and ibl5/.gitignore may not apply without a .git in the mount. Without
+   these excludes it walks multi-GB backups and logs (once OOM-killed), plus coverage
+   reports, league data files, and test output that slowed cold watcher builds to 8-18s.
+   None of these paths is tracked; bin/test-rebuild-css-if-source-changed fails if one
+   ever matches a tracked file. */
 @source not "../backups";
 @source not "../shellScripts";
 @source not "../*.log";
+@source not "../coverage";
+@source not "../spreadsheets";
+@source not "../IBL5.car";
+@source not "../IBL5.sco";
+@source not "../IBL5.rcb";
+@source not "../IBL5.plr";
+@source not "../test-results";
+@source not "../playwright-report";
+@source not "../infection-report.html";
+@source not "../.phpunit.result.cache";
+@source not "../vendor";
+@source not "../tmp";
+@source not "../tmp-tests";
 
 /* daisyUI 5: component classes carry the d- prefix so they cannot collide with ibl-* or
    Tailwind classes. The excludes keep daisyUI from restyling :root colors, the scrollbar

@@ -16,8 +16,9 @@
 #
 # Wired (via bin/install-git-hooks) into post-checkout, post-merge, and
 # post-rewrite — the git ops that bulk-rewrite the working tree. Safe to call
-# unconditionally: it is a no-op when the compiled output is already fresh
-# (mtime-gated), and the rebuild is backgrounded so the git op returns at once.
+# unconditionally: all work, including the mtime gate, runs backgrounded under a
+# per-checkout mkdir lock, so the two hooks a rebase fires run one after the
+# other and the second no-ops when the first already rebuilt.
 
 set -euo pipefail
 
@@ -45,22 +46,89 @@ DESIGN="$IBL5/design"
 LOG_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ibl5-hooks"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/css-rebuild.log"
+slug="$(basename "$REPO_ROOT")"
 
-# Gate: rebuild only when a CSS source under design/ is newer than the compiled
-# output (git sets a rewritten file's mtime to checkout time, so an unchanged op
-# leaves every source older than OUTPUT → no-op). Missing OUTPUT → rebuild.
-if [ -f "$OUTPUT" ] && [ -z "$(find "$DESIGN" -type f -newer "$OUTPUT" -print -quit 2>/dev/null)" ]; then
-    echo "$(date): css fresh, skip ($REPO_ROOT)" >> "$LOG"
-    exit 0
-fi
+# One lock per checkout serializes the post-checkout + post-rewrite pair that a
+# rebase fires. mkdir is atomic on macOS and Linux; macOS ships no flock.
+LOCK_DIR="$LOG_DIR/css-rebuild-$slug.lock"
+LOCK_WAIT_SECS="${CSS_REBUILD_LOCK_WAIT_SECS:-120}"
+case "$LOCK_WAIT_SECS" in *[!0-9]*) LOCK_WAIT_SECS=120 ;; esac
 
-# Rebuild in the background so the git operation returns immediately.
+# Remove the lock only if its holder is still $1. A second mkdir guard lets one
+# waiter at a time re-check and delete, so a waiter that lost the race never
+# deletes a lock another waiter just took.
+reap_lock() {
+    local expected="$1"
+    mkdir "$LOCK_DIR.reap" 2>/dev/null || return 1
+    if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$expected" ]; then
+        rm -rf "$LOCK_DIR"
+    fi
+    rmdir "$LOCK_DIR.reap" 2>/dev/null || true
+}
+
+lock_acquire() {
+    local waited=0 logged=0 holder
+    while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+        holder="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
+            if reap_lock "$holder"; then
+                echo "$(date): removed stale css lock from dead pid $holder ($slug)" >> "$LOG"
+            else
+                sleep 1
+            fi
+            continue
+        fi
+        if [ "$logged" = 0 ]; then
+            echo "$(date): css lock held by pid ${holder:-unknown}, waiting up to ${LOCK_WAIT_SECS}s ($slug)" >> "$LOG"
+            logged=1
+        fi
+        if [ "$waited" -ge "$LOCK_WAIT_SECS" ]; then
+            echo "$(date): css lock wait timed out after ${LOCK_WAIT_SECS}s, taking it over ($slug)" >> "$LOG"
+            rmdir "$LOCK_DIR.reap" 2>/dev/null || true   # a reaper that died mid-reap
+            reap_lock "$holder" || true
+            waited=0
+            logged=0
+            continue
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    # $$ is the hook process, which exits at once. sh's parent is this subshell,
+    # so this records the PID that actually holds the lock (bash 3.2 has no BASHPID).
+    sh -c 'echo "$PPID"' > "$LOCK_DIR/pid"
+    LOCK_PID="$(cat "$LOCK_DIR/pid")"
+}
+
+lock_release() {
+    rm -f "$LOCK_DIR.stamp.${LOCK_PID:-}"
+    if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "${LOCK_PID:-}" ]; then
+        rm -rf "$LOCK_DIR"
+    fi
+}
+
+# Everything, including the mtime gate, runs in the background so the git
+# operation returns immediately.
 (
-    slug="$(basename "$REPO_ROOT")"
+    lock_acquire
+    trap lock_release EXIT
+    # Gate inside the lock: the second run of a rebase pair waits here, then
+    # no-ops (and skips the restart) when the first run already rebuilt.
+    # Rebuild only when a CSS source under design/ is newer than the compiled
+    # output (git sets a rewritten file's mtime to checkout time, so an unchanged
+    # op leaves every source older than OUTPUT → no-op). Missing OUTPUT → rebuild.
+    if [ -f "$OUTPUT" ] && [ -z "$(find "$DESIGN" -type f -newer "$OUTPUT" -print -quit 2>/dev/null)" ]; then
+        echo "$(date): css fresh, skip ($REPO_ROOT)" >> "$LOG"
+        exit 0
+    fi
+    # Outside the lock dir: a timed-out waiter may reap the dir under a live build.
+    STAMP="$LOCK_DIR.stamp.$LOCK_PID"
+    : > "$STAMP"
+    built=0
     echo "$(date): css source newer than output — rebuilding ($slug)" >> "$LOG"
     if command -v bunx >/dev/null 2>&1 &&
         (cd "$IBL5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css) >> "$LOG" 2>&1; then
         echo "$(date): css rebuilt on host ($slug)" >> "$LOG"
+        built=1
     else
         # Fallback: the tailwind container always has the toolchain. Worktree
         # stacks are ibl5-tailwind-<slug>; the main stack is ibl5-tailwind.
@@ -72,10 +140,15 @@ fi
         if grep -qx -- "$container" <<< "$running" &&
             docker exec "$container" bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css >> "$LOG" 2>&1; then
             echo "$(date): css rebuilt in $container" >> "$LOG"
+            built=1
         else
             echo "$(date): css rebuild FAILED — no host bunx and no usable tailwind container ($slug)" >> "$LOG"
         fi
     fi
+
+    # Backdate OUTPUT to build start. A source that git rewrites mid-build then stays
+    # newer than OUTPUT, so the next hook run rebuilds instead of skipping.
+    if [ "$built" = 1 ]; then touch -c -r "$STAMP" "$OUTPUT"; fi
 
     # Restart this checkout's watcher so it re-reads design/** from disk. It missed
     # the git op's events, so its in-memory copy of the sources is stale. Left

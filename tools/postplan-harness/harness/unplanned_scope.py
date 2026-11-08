@@ -152,14 +152,21 @@ def context_for(worktree: str, base_sha: str, plan_text: str, changed_paths: Ite
 
 
 def partition(items: Iterable[dict], ctx: Optional[dict]) -> tuple[list, list, list]:
-    """(work, kept, held). Only a tagged hold-12 item can leave `work`, and only with a ctx."""
+    """(work, kept, held). Only a hold-12 item can leave `work`.
+
+    With a ctx, `classify` picks the branch, and a `remove` verdict sends the item to the
+    fixer. With no ctx (detector failure, timeout, unreadable input), every tagged hold-12
+    item is held: the classifier could not clear it, so the fixer must not delete its code.
+    """
     work: list = []
     kept: list = []
     held: list = []
     for item in items:
         branch = None
-        if ctx is not None and item["hold"] == "12":
+        if item["hold"] == "12" and ctx is not None:
             branch = classify(item["text"], **ctx)
+        elif item["hold"] == "12" and is_unplanned_scope(item["text"]):
+            branch = "hold"   # no ctx: the classifier could not clear it
         {"keep": kept, "hold": held}.get(branch, work).append(item)
     return work, kept, held
 

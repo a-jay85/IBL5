@@ -72,8 +72,20 @@ def test_partition_hold_branch_never_reaches_fixer():
     assert (work, kept, held) == ([], [], [_item()])
 
 
-def test_partition_ctx_none_is_identity():
+def test_partition_ctx_none_holds_tagged():
+    work, kept, held = us.partition([_item()], None)
+    assert (work, kept, held) == ([], [], [_item()])
+
+
+def test_partition_ctx_none_leaves_untagged_in_work():
     items = [_item(), _item(UNTAGGED_ITEM)]
+    work, kept, held = us.partition(items, None)
+    assert (work, kept) == ([_item(UNTAGGED_ITEM)], [])
+    assert held == [_item()]
+
+
+def test_partition_ctx_none_leaves_other_holds_in_work():
+    items = [_item(hold="3"), _item(hold="16")]
     assert us.partition(items, None) == (items, [], [])
 
 
@@ -290,6 +302,18 @@ def test_unplanned_ctx_none_when_plan_unreadable(monkeypatch, tmp_path):
     assert "phase5.5: unplanned-scope context unavailable" in logs
 
 
+def test_partition_unplanned_ctx_none_keeps_tagged_off_fixer(monkeypatch):
+    monkeypatch.setattr(runner, "_unplanned_ctx", lambda *a, **k: None)
+    res = types.SimpleNamespace(fidelity={})
+    work, cut = runner._partition_unplanned(
+        [_item(), _item(UNTAGGED_ITEM)], [], ".", None, None, None, "", "", 1, res,
+        lambda msg: None)
+    assert work == [_item(UNTAGGED_ITEM)]
+    assert cut == [KEEP_ITEM]
+    assert res.fidelity["held_unplanned"] == [us.title_of(KEEP_ITEM)]
+    assert "kept_unplanned" not in res.fidelity
+
+
 # ---- The round loop, driven end to end through _run_fidelity -----------------------------
 
 class _PromptLlm(FixtureLlm):
@@ -456,7 +480,8 @@ def test_partition_survives_diff_vs_base_failure():
     res = types.SimpleNamespace(fidelity={})
     out, withheld = runner._partition_unplanned(
         work, [], ".", git, _BodyGh(""), None, "base", "", 7, res, lambda m: None)
-    assert out == work and withheld == []
+    assert out == [] and withheld == [KEEP_ITEM]
+    assert res.fidelity["held_unplanned"] == [us.title_of(KEEP_ITEM)]
 
 
 def test_cited_paths_respects_path_boundaries():

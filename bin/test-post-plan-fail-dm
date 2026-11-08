@@ -210,9 +210,16 @@ S="$(faildm_script)"
 bash "$S" >/dev/null 2>&1 &
 KJOB=$!
 for _i in $(seq 1 20); do [ -e "$S" ] || break; sleep 0.1; done
-pkill -9 -P "$KJOB" 2>/dev/null
+for _i in $(seq 1 20); do KKIDS=$(pgrep -P "$KJOB"); [ -n "$KKIDS" ] && break; sleep 0.1; done
+# Kill the script's bash BEFORE its sleep. Killing sleep first lets bash run the
+# next line (the --deferred DM) before its own SIGKILL lands. That stray DM then
+# reached DM_OUT a moment later and broke case 7 in CI.
 kill -9 "$KJOB" 2>/dev/null
 wait "$KJOB" 2>/dev/null
+# shellcheck disable=SC2086 # KKIDS is a pid list
+[ -n "$KKIDS" ] && kill -9 $KKIDS 2>/dev/null
+# Give a leaked --deferred run time to write, so a leak fails here, not in case 7.
+sleep 0.5
 [ ! -e "$S" ] && [ ! -s "$DM_OUT" ] \
     && ok "faildm_kill_leaves_no_script: SIGKILL during the hold leaves no script and no DM" \
     || fail "faildm_kill_leaves_no_script: script=$([ -e "$S" ] && echo present || echo gone) dm=$(dm_count)"

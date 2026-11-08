@@ -1380,6 +1380,10 @@ ui_paths_rc ui_paths_view_interface_near_miss 1 \
 ui_paths_rc ui_paths_md_excluded 1 ibl5/design/CSS_TABLE_MAP.md
 ui_paths_rc ui_paths_snapshots_hold 0 \
     ibl5/tests/e2e/visual/team.spec.ts-snapshots/team-desktop-chromium-linux.png
+# Snapshot folders outside visual/ (the smoke suite's) hold only through
+# the -snapshots/ clause, since the visual/ directory clause cannot reach them.
+ui_paths_rc ui_paths_smoke_snapshots_hold 0 \
+    ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/news.png
 
 cat > "$UI_TMP/g-changed.json" <<'JSON'
 {"renderedCells": 4, "changedCells": [{"module": "Team", "viewport": "desktop", "title": "Team"}], "newCells": [], "flakeCells": []}

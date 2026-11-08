@@ -353,7 +353,6 @@ COMMENTED=0
 UNCHANGED=0
 SKIPPED_NONE=0
 FAILED_N=0
-CREATED_URLS=""
 
 # ── Window and fetch ──────────────────────────────────────────────────────────
 resolve_window() {
@@ -908,6 +907,15 @@ drop_rejected_assignments() {
     mv "$WORK/run-classes.kept" "$WORK/run-classes.json"
 }
 
+# dm_item <new|growing> <issue-number> <action-json>: one DM line's data. The
+# number comes from gh, never from model text.
+dm_item() {
+    [[ "$2" =~ ^[0-9]+$ ]] || return 0
+    jq -c --arg kind "$1" --argjson n "$2" '{kind: $kind, number: $n, title,
+        added: (if $kind == "new" then .thread_count else (.new_threads | length) end),
+        total: .thread_count}' <<< "$3" >> "$WORK/dm-items.jsonl"
+}
+
 apply_actions() {
     local a action key kind label title bodyfile url num writes=0 skipped
     : > "$WORK/summary-extra.txt"
@@ -941,7 +949,7 @@ apply_actions() {
                 fi
                 writes=$((writes + 1))
                 say "filed $url"
-                CREATED_URLS="${CREATED_URLS}${url}"$'\n'
+                dm_item new "${url##*/}" "$a"
                 FILED=$((FILED + 1)) ;;
             comment)
                 num="$(jq -r .number <<< "$a")"
@@ -965,7 +973,7 @@ apply_actions() {
                 fi
                 writes=$((writes + 1))
                 say "commented on #$num"
-                CREATED_URLS="${CREATED_URLS}https://github.com/${BACKLOG_SLUG}/issues/${num}"$'\n'
+                dm_item growing "$num" "$a"
                 COMMENTED=$((COMMENTED + 1)) ;;
         esac
     done < "$WORK/actions.jsonl"
@@ -1015,14 +1023,22 @@ print_summary() {
 # ── Discord delivery ──────────────────────────────────────────────────────────
 DM_BODY_MAX=1800
 
+DM_ISSUE_CAP=8
+DM_NONE_CAP=5
+
 # stdin -> stdout. Order matters: strip control bytes first, then mentions, then
 # bare @ and URL schemes, then cap at DM_BODY_MAX bytes including the marker.
+# Backlog issue links survive: the prefix is swapped for a control byte (which
+# input can no longer hold) before the scheme is broken, then put back.
 sanitize_dm() {
-    local LC_ALL=C body marker=$'\n''[truncated]'
-    body="$(tr -d '\000-\010\013-\037\177' | sed -E \
+    local LC_ALL=C body marker=$'\n''[truncated]' keep="https://github.com/${BACKLOG_SLUG}/issues/" tok=$'\001'
+    body="$(tr -d '\000-\010\013-\037\177')"
+    body="${body//"$keep"/$tok}"
+    body="$(sed -E \
         -e 's/<[@#][!&]?[0-9]+>/[mention removed]/g' \
         -e 's/@/(at)/g' \
-        -e 's#://#[:]//#g')"
+        -e 's#://#[:]//#g' <<< "$body")"
+    body="${body//$tok/$keep}"
     if [ "${#body}" -gt "$DM_BODY_MAX" ]; then
         body="${body:0:$((DM_BODY_MAX - ${#marker}))}"
         case "$body" in
@@ -1041,17 +1057,45 @@ send_dm() { # body
     return 0
 }
 
+# build_dm: news first, so the length cap only ever cuts the tail. Issue lines
+# (new, then growing by threads added) come before the no-check classes that
+# grew this run, then the backlog tally.
 build_dm() { # exit-code
-    local rc="$1" titles=""
-    if [ -s "$WORK/skipped-none.jsonl" ]; then
-        titles="$(jq -r '.title' "$WORK/skipped-none.jsonl" | tr '\n' ';' | sed 's/;$//')"
-    fi
+    local rc="$1" f
     if [ "$rc" -ne 0 ]; then
         printf 'finding-class-scan: FAILED: %s\n' "${FAIL_REASON:-exit $rc}"
     fi
-    printf 'finding-class-scan: filed %s, commented %s, unchanged %s, no static check %s%s\n' \
-        "$FILED" "$COMMENTED" "$UNCHANGED" "$SKIPPED_NONE" "${titles:+ ($titles)}"
-    if [ -n "$CREATED_URLS" ]; then printf '%s' "$CREATED_URLS"; fi
+    printf 'finding-class-scan: %s new review threads. Filed %s, commented %s.\n' \
+        "$THREADS_NEW" "$FILED" "$COMMENTED"
+    for f in dm-items.jsonl run-assignments.jsonl skipped-none.jsonl backlog-keys.jsonl; do
+        [ -f "$WORK/$f" ] || : > "$WORK/$f"
+    done
+    jq -rn --slurpfile items "$WORK/dm-items.jsonl" \
+        --slurpfile run "$WORK/run-assignments.jsonl" \
+        --slurpfile none "$WORK/skipped-none.jsonl" \
+        --slurpfile bk "$WORK/backlog-keys.jsonl" \
+        --arg base "https://github.com/${BACKLOG_SLUG}/issues/" \
+        --argjson icap "$DM_ISSUE_CAP" --argjson ncap "$DM_NONE_CAP" \
+        --argjson filed "$FILED" --argjson total_none "$SKIPPED_NONE" '
+        def clean: tostring | gsub("[\u0000-\u001f`|\\[\\]<>]"; "")
+            | if length > 80 then .[0:79] + "…" else . end;
+        def link: "[#\(.number)](<\($base)\(.number)>)";
+        ($items | sort_by([(if .kind == "new" then 0 else 1 end), -.added, .number])) as $all
+        | ($all[0:$icap]) as $shown
+        | ($shown | map(select(.kind == "new"))) as $new
+        | ($shown | map(select(.kind == "growing"))) as $grow
+        | (if ($new | length) > 0 then "NEW", ($new[] | "\(link) \(.title | clean): \(.total) threads") else empty end),
+          (if ($grow | length) > 0 then "GROWING", ($grow[] | "\(link) \(.title | clean): +\(.added), now \(.total) threads") else empty end),
+          (if ($all | length) > $icap then "+\(($all | length) - $icap) more in the backlog" else empty end),
+          (($run | map(select(.class_key != null)) | group_by(.class_key)
+              | map({key: .[0].class_key, value: length}) | from_entries) as $added
+           | ($none | map(select($added[.key] != null) | . + {added: $added[.key]})
+              | sort_by([-.added, .key])) as $grew
+           | "NO CHECK POSSIBLE: \($total_none) classes, \($grew | length) grew this run",
+             ($grew[0:$ncap][] | "\(.title | clean): +\(.added), now \(.thread_count) threads")),
+          (if ($bk | length) > 0 or $filed > 0 then
+             "BACKLOG: \(($bk | map(select(.state == "open")) | length) + $filed) open, \($bk | map(select(.state == "closed")) | length) closed scan issues"
+           else empty end)' 2>/dev/null || true
 }
 
 on_exit() {

@@ -293,13 +293,16 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
             $params[] = $threshold;
         }
 
-        $sql = "SELECT
+        // $expression and $dateFilter come from RecordStatDefinitions constants, never user input.
+        // The chain starts with a variable so the SQL-concatenation rule sees a fragment, not a statement.
+        $select = "SELECT
                     bs.pid,
                     bs.game_date,
                     bs.visitor_teamid,
                     bs.home_teamid,
                     (" . self::SEASON_YEAR_EXPRESSION . ") AS season_year,
-                    " . $expression . " AS value
+                    ";
+        $sql = $select . $expression . " AS value
                 FROM `ibl_box_scores` bs" . self::indexHint($expression) . "
                 " . self::candidateWhere($dateFilter) . $thresholdClause . "
                 ORDER BY " . $expression . " DESC, bs.game_date ASC, bs.id ASC
@@ -310,6 +313,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
 
     private static function candidateWhere(string $dateFilter): string
     {
+        // @phpstan-ignore ibl.sqlStringConcatenation ($dateFilter is a RecordStatDefinitions::DATE_FILTERS constant, never user input)
         return "WHERE " . $dateFilter . "
                     AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
                     AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID;

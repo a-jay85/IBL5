@@ -235,6 +235,123 @@ final class PlayerRecordRepositoryTest extends DatabaseTestCase
         self::assertSame($this->referenceBatch($exprs, $heat), $result);
     }
 
+    // --- candidate query (threshold cut) ---
+
+    public function testStatIndexesMatchExpressionColumns(): void
+    {
+        $indexes = (new \ReflectionClassConstant(PlayerRecordRepository::class, 'STAT_INDEXES'))->getValue();
+        self::assertIsArray($indexes);
+        self::assertNotSame([], $indexes);
+
+        foreach ($indexes as $expression => $index) {
+            $column = substr((string) $expression, strlen('bs.'));
+            $columns = [];
+            foreach ($this->fetchRows(
+                "SELECT SEQ_IN_INDEX, COLUMN_NAME FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_box_scores' AND INDEX_NAME = '" . (string) $index . "'"
+            ) as $row) {
+                $columns[(int) $row['SEQ_IN_INDEX']] = (string) $row['COLUMN_NAME'];
+            }
+
+            self::assertSame([1 => 'game_type', 2 => $column], $columns, (string) $index);
+        }
+    }
+
+    public function testCandidatesMatchReferenceForAllStatsAndFilters(): void
+    {
+        foreach (RecordStatDefinitions::STATS as $stat) {
+            foreach (RecordStatDefinitions::DATE_FILTERS as $filter) {
+                self::assertSame(
+                    $this->referenceCandidates($stat['expression'], $filter),
+                    $this->newCandidates($stat['expression'], $filter),
+                    $stat['expression'] . ' / ' . $filter,
+                );
+            }
+        }
+    }
+
+    public function testCandidatesMatchReferenceWhenFewerThan500Rows(): void
+    {
+        $this->seedThirtyRows();
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+
+        self::assertNull($this->candidateThreshold('bs.game_ast', $heat));
+        $candidates = $this->newCandidates('bs.game_ast', $heat);
+        self::assertCount(30, $candidates);
+        self::assertSame($this->referenceCandidates('bs.game_ast', $heat), $candidates);
+    }
+
+    public function testCandidatesMatchReferenceWhenNullValuesReach500thRow(): void
+    {
+        $this->clearHeatRows();
+        $this->insertTestPlayer(200000301, 'RhNull Reach');
+        $rows = [];
+        for ($n = 0; $n < 520; $n++) {
+            $rows[] = ['pid' => 200000301, 'date' => $this->heatDate($n), 'ast' => $n < 480 ? $n % 20 : null];
+        }
+        $this->insertAssistRows($rows);
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+
+        self::assertNull($this->candidateThreshold('bs.game_ast', $heat));
+        $candidates = $this->newCandidates('bs.game_ast', $heat);
+        self::assertCount(500, $candidates);
+        self::assertNull($candidates[499]['value']);
+        self::assertSame($this->referenceCandidates('bs.game_ast', $heat), $candidates);
+    }
+
+    public function testCandidatesMatchReferenceWhenNullValuesFallBelowThreshold(): void
+    {
+        $this->clearHeatRows();
+        $this->insertTestPlayer(200000302, 'RhNull Below');
+        $rows = [];
+        for ($n = 0; $n < 550; $n++) {
+            $rows[] = ['pid' => 200000302, 'date' => $this->heatDate($n), 'ast' => $n < 510 ? $n % 25 : null];
+        }
+        $this->insertAssistRows($rows);
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+
+        $reference = $this->referenceCandidates('bs.game_ast', $heat);
+        self::assertSame($reference[499]['value'], $this->candidateThreshold('bs.game_ast', $heat));
+        self::assertNotNull($reference[499]['value']);
+        $candidates = $this->newCandidates('bs.game_ast', $heat);
+        self::assertCount(500, $candidates);
+        self::assertNotContains(null, array_column($candidates, 'value'));
+        self::assertSame($reference, $candidates);
+    }
+
+    public function testCandidatesMatchReferenceWithLargeTiedSetAtThreshold(): void
+    {
+        $this->clearHeatRows();
+        $this->insertTestPlayer(200000303, 'RhTie Large');
+        $rows = [];
+        for ($n = 0; $n < 100; $n++) {
+            $rows[] = ['pid' => 200000303, 'date' => $this->heatDate($n), 'ast' => 20 + ($n % 5)];
+        }
+        // Inserted newest date first, so bs.id order disagrees with date order.
+        for ($k = 0; $k < 1200; $k++) {
+            $rows[] = ['pid' => 200000303, 'date' => $this->heatDate(1299 - $k), 'ast' => 10];
+        }
+        $this->insertAssistRows($rows);
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+
+        self::assertSame(10, $this->candidateThreshold('bs.game_ast', $heat));
+        $candidates = $this->newCandidates('bs.game_ast', $heat);
+        self::assertCount(500, $candidates);
+        self::assertSame($this->referenceCandidates('bs.game_ast', $heat), $candidates);
+    }
+
+    public function testTiesStraddling500thRowKeepEarliestDateThenLowestId(): void
+    {
+        $this->seedBoundaryTies();
+        $heat = RecordStatDefinitions::DATE_FILTERS['heat'];
+
+        self::assertSame(10, $this->candidateThreshold('bs.game_ast', $heat));
+        $candidates = $this->newCandidates('bs.game_ast', $heat);
+        self::assertCount(500, $candidates);
+        self::assertSame([200000104, 200000106], array_slice(array_column($candidates, 'pid'), 498));
+        self::assertSame($this->referenceCandidates('bs.game_ast', $heat), $candidates);
+    }
+
     // --- getTopSeasonAverageBatch ---
 
     public function testGetTopSeasonAverageBatchRanksEachLabelAndExcludesIneligibleRows(): void
@@ -488,6 +605,32 @@ final class PlayerRecordRepositoryTest extends DatabaseTestCase
             '{filter}' => $dateFilter,
             '{max}' => (string) League::MAX_REAL_TEAMID,
         ]);
+    }
+
+    private function candidateThreshold(string $expression, string $dateFilter): ?int
+    {
+        $method = new \ReflectionMethod(PlayerRecordRepository::class, 'fetchCandidateThresholds');
+        $thresholds = $method->invoke($this->repo, [$expression => $expression], $dateFilter);
+        self::assertIsArray($thresholds);
+        self::assertArrayHasKey($expression, $thresholds);
+        $threshold = $thresholds[$expression];
+        self::assertTrue($threshold === null || is_int($threshold));
+
+        return $threshold;
+    }
+
+    /**
+     * The candidate rows the new query returns for one stat and filter.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function newCandidates(string $expression, string $dateFilter): array
+    {
+        $method = new \ReflectionMethod(PlayerRecordRepository::class, 'buildCandidateQuery');
+        /** @var array{sql: string, params: list<int>} $query */
+        $query = $method->invoke(null, $expression, $dateFilter, $this->candidateThreshold($expression, $dateFilter));
+
+        return $this->fetchRows($query['sql'], $query['params']);
     }
 
     /**

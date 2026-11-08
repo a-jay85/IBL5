@@ -125,6 +125,11 @@ modify_class() {
     printf '// changed\n' >>"$REPO/ibl5/classes/Alpha/Foo.php"
 }
 
+# Deletion-only edit: rewrites the 2-line base Foo.php to its first line.
+delete_class_line() {
+    printf '<?php\n' >"$REPO/ibl5/classes/Alpha/Foo.php"
+}
+
 # Worktree layout, as bin/wt-new builds it: a linked worktree (its .git is a
 # file) whose ibl5/vendor is a symlink to the main repo's untracked vendor.
 # Sets MAIN_REPO to the main checkout and REPO to the worktree.
@@ -384,5 +389,38 @@ modify_class
 STUB_INFECTION_RC=7 STUB_INFECTION_SAY=nosource run_md base
 h_eq "non-zero Infection exit wins over the guard" 7 "$RC"
 h_not_contains "non-zero Infection exit: no guard message" "$ERR" "Infection matched no source files"
+
+# 24 deletion-only skip: the diff only removes class lines
+make_repo
+delete_class_line
+STUB_INFECTION_SAY=nomodified run_md base
+h_eq "deletion-only diff skips: exit" 0 "$RC"
+h_contains "deletion-only diff names the skip" "$OUT" "only deletes lines from classes/**/*.php files, so nothing is mutable"
+h_not_contains "deletion-only diff is distinct from the no-changed-classes skip" "$OUT" "no added or modified classes"
+h_eq "deletion-only diff never runs phpunit" "<absent>" "$(logline "$LOG/phpunit.args")"
+h_eq "deletion-only diff never runs infection" "<absent>" "$(logline "$LOG/infection.args")"
+h_eq "deletion-only diff never resets ibl5_test" "<absent>" "$(logline "$LOG/dbtu.args")"
+
+# 25 deletion-only skip is per diff: Foo.php loses a line, untracked Bar.php adds lines
+make_repo
+delete_class_line
+printf '<?php\nclass Bar {}\n' >"$REPO/ibl5/classes/Alpha/Bar.php"
+STUB_INFECTION_SAY=nosource run_md base
+h_eq "mixed diff still reaches the empty-filter guard" 5 "$RC"
+h_not_contains "mixed diff: no deletion-only skip" "$OUT" "only deletes lines"
+h_contains "mixed diff lists the class that gained lines" "$ERR" "classes/Alpha/Bar.php"
+
+# 26 deletion-only skip: an empty untracked class adds no line
+make_repo
+: >"$REPO/ibl5/classes/Alpha/Empty.php"
+run_md base
+h_eq "empty new class skips: exit" 0 "$RC"
+h_eq "empty new class never runs infection" "<absent>" "$(logline "$LOG/infection.args")"
+
+# 27 deletion-only skip: a binary numstat row counts as added, so the run fails closed
+make_repo
+printf '<?php\n\000\n' >"$REPO/ibl5/classes/Alpha/Foo.php"
+STUB_INFECTION_SAY=nosource run_md base
+h_eq "binary class change still reaches the empty-filter guard" 5 "$RC"
 
 h_done

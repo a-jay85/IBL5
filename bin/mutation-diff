@@ -94,6 +94,21 @@ if [ -z "$CHANGED" ]; then
     exit 0
 fi
 
+# Deletion-only skip: when no changed class gains a line, Infection's
+# --git-diff-lines filter has nothing to mutate, and the empty-filter guard
+# below would exit 5 on a correct diff. The sum is per diff, so one class with
+# an added line keeps the run going. numstat prints "-" for a binary file;
+# count it as added so the run fails closed.
+NUMSTAT="$(git diff --numstat --diff-filter=AM "$MB" -- 'classes/**/*.php')" || {
+    echo "Error: git diff --numstat failed against the merge-base of '$BASE'." >&2
+    exit 2
+}
+ADDED="$(awk -F'\t' '$1 == "-" { n++; next } { n += $1 } END { print n + 0 }' <<<"$NUMSTAT")"
+if [ "$ADDED" -eq 0 ]; then
+    echo "SKIP: the diff vs $BASE only deletes lines from classes/**/*.php files, so nothing is mutable."
+    exit 0
+fi
+
 mods=""
 if command -v php >/dev/null 2>&1; then
     mods="$(php -m)"
@@ -186,9 +201,10 @@ vendor/bin/infection \
 rc=${PIPESTATUS[0]}
 set -e
 
-# Infection exits 0 when its git filter matches nothing. CHANGED is non-empty
-# here (the skip above exits otherwise), so an empty filter means no class in
-# this diff was mutated. Report that as a failure, never as a pass.
+# Infection exits 0 when its git filter matches nothing. Here CHANGED is
+# non-empty and at least one changed class gains a line (both skips above exit
+# otherwise), so an empty filter means no class in this diff was mutated.
+# Report that as a failure, never as a pass.
 if [ "$rc" -eq 0 ] && grep -qE 'No source file found|Could not find any modified (files|lines)' "$INFECTION_LOG"; then
     {
         echo "Error: Infection matched no source files, but the diff changes these classes:"

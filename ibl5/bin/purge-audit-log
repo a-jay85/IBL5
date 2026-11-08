@@ -30,7 +30,7 @@ spl_autoload_register(static function (string $class) use ($documentRoot): void 
 /** @var list<string> $argv */
 try {
     $opts = \DataRetention\RetentionCliOptionParser::parse(
-        array_values(array_slice($argv, 1)),
+        array_values(array_slice($argv, 1)), // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: RetentionCliOptionParser rejects unknown flags, exit 2)
         ['--days' => 36500, '--dry-run' => null, '--help' => null]
     );
 } catch (\InvalidArgumentException $e) {

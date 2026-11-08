@@ -24,6 +24,13 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
+require_once __DIR__ . '/../../classes/Cli/CliFlagGuard.php';
+try {
+    \Cli\CliFlagGuard::assertKnown($argv ?? [], ['--dry-run']);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
 require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;

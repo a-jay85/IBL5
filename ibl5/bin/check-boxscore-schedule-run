@@ -60,7 +60,7 @@ $rejectsMode = false;
 $rejectsCount = 20;
 
 /** @var list<string> $argv */
-$args = array_slice($argv, 1);
+$args = array_slice($argv, 1); // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: unknown flag hits the else branch, exit 2)
 foreach ($args as $arg) {
     if (str_starts_with($arg, '--season=')) {
         $val = substr($arg, strlen('--season='));

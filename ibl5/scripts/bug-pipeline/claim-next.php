@@ -17,6 +17,13 @@ declare(strict_types=1);
  * Usage: php claim-next.php [--owner=<lease-token>] [--resume=<id>]
  */
 
+require_once __DIR__ . '/../../classes/Cli/CliFlagGuard.php';
+try {
+    \Cli\CliFlagGuard::assertKnown($argv ?? [], ['--owner=', '--resume=']);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
 require __DIR__ . '/_bootstrap.php';
 /** @var \mysqli $mysqli_db */
 

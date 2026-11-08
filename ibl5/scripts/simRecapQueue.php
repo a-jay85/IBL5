@@ -178,7 +178,7 @@ $host = null;
 $cause = null;
 $resetRaw = null;
 $event = null;
-foreach (array_slice($argv ?? [], 1) as $arg) {
+foreach (array_slice($argv ?? [], 1) as $arg) { // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: fail() on unknown argument)
     if (!is_string($arg)) {
         continue;
     }

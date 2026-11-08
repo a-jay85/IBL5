@@ -39,7 +39,7 @@ function tickUsage(): string
 
 // Argument validation and --print-cron run BEFORE the DB bootstrap and env wiring,
 // so they work without any environment variables.
-global $argv;
+global $argv; // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: unknown flag prints usage, exit 2)
 /** @var list<string> $argv */
 $tickArgs = array_slice($argv, 1);
 $limit = TICK_DEFAULT_LIMIT;

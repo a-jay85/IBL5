@@ -2985,6 +2985,27 @@ test_usage_log_concurrent_writers() {
     assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
 }
 
+# A second rotator that passed its size check before the first rotation must not clobber log.1.
+test_usage_log_double_rotate_keeps_seeds() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" p1
+    mkdir -p "$d"; seed_log 4096 "$d/usage-gate.log"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = rotate-checked ] || return 0; touch '$T/b.p1-checked'; barrier_wait '$T/b.p2-done'; }"
+    } > "$T/hook.p1"
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; . '$T/hook.p1'; _usage_log_rotate_locked '$d'" &
+    p1=$!
+    barrier_wait "$T/b.p1-checked"
+    ep "_usage_log_rotate_locked '$d'"
+    printf 'late line\n' >> "$d/usage-gate.log"
+    touch "$T/b.p2-done"
+    wait "$p1"
+    assert_eq double_rotate:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq double_rotate:late-line-kept 1 "$(cat "$d/usage-gate.log" "$d/usage-gate.log.1" 2>/dev/null | grep -c '^late line$')"
+    assert_eq double_rotate:no-private-left 0 "$(find "$d" -maxdepth 1 -name '*.rot.*' | wc -l | tr -d ' ')"
+    assert_no_file double_rotate:no-timeout "$T/b.timeout"
+}
+
 # Two reclaimers judge one stale lock. R2 is held right after its stale verdict while R1 reclaims;
 # R1 is held after its mkdir, before its stamp, until R2 returns. Exactly one may hold the lock.
 test_fetch_lock_reclaim_race_one_holder() {

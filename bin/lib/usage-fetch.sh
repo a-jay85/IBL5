@@ -110,8 +110,17 @@ _usage_log_rotate_locked() {
     local log="$1/usage-gate.log"
     [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
     _usage_lock_hook rotate-checked
-    mv -f "$log" "$log.1" 2>/dev/null
-    _usage_lock_hook rotate-mv
+    # Take the log under a private name first. If another rotator already moved the full log,
+    # this mv takes only the fresh small one, and its lines go back instead of clobbering log.1.
+    mv -f "$log" "$log.rot.$$" 2>/dev/null || return 0
+    if [ "$(_usage_log_size "$log.rot.$$")" -ge "$USAGE_LOG_MAX_BYTES" ]; then
+        mv -f "$log.rot.$$" "$log.1" 2>/dev/null
+        _usage_lock_hook rotate-mv
+    else
+        cat "$log.rot.$$" >> "$log" 2>/dev/null
+        rm -f "$log.rot.$$"
+        _usage_lock_hook rotate-putback
+    fi
     return 0
 }
 

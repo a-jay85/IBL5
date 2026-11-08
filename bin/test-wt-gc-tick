@@ -348,6 +348,8 @@ run_tick() {
         WT_GC_REPO_ROOT="$STUB_REPO"
         # Reap steps: off unless a case turns them on; every binary stubbed.
         WT_GC_REAP_EMPTY=0
+        WT_GC_REAP_T3=0
+        WT_GC_T3_ROOT="$CD/t3root"
         WT_GC_REAP_DIRTY_MERGED=0
         WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_DETACHED=0
@@ -1298,6 +1300,117 @@ chk_rc E10 0
 log_has 'empty keep e-old: dirty' || note_err "untracked-only worktree not kept as dirty"
 [ -f "$(wt_dir e-old)/notes/new.md" ] || note_err "untracked file lost"
 has_branch e-old || note_err "branch deleted"
+finish_case
+fi
+
+# ── T3 scheduled-run worktree reap ────────────────────────────────────────────
+T_ON=(WT_GC_REAP_T3=1)
+# t3_dir <name> — where T3 Code puts a scheduled run's worktree.
+t3_dir() { printf '%s/t3root/%s' "$CD" "$1"; }
+# mk_t3 <name> <branch> [ahead=N] [age_days=N] — a worktree off origin/master
+# under $CD/t3root, backdated like mk_wt.
+mk_t3() {
+    local name="$1" br="$2" ahead=0 age=0 kv i=1 ep wt
+    shift 2
+    for kv in "$@"; do
+        case "$kv" in
+            ahead=*)    ahead="${kv#ahead=}" ;;
+            age_days=*) age="${kv#age_days=}" ;;
+        esac
+    done
+    wt="$(t3_dir "$name")"
+    mkdir -p "$CD/t3root"
+    git -C "$ENV_MAIN" worktree add -q -b "$br" "$wt" origin/master >/dev/null 2>&1
+    ep="$(epoch_ago "$age")"
+    while [ "$i" -le "$ahead" ]; do
+        printf '%s\n' "$i" > "$wt/own-$i.txt"
+        git -C "$wt" add "own-$i.txt"
+        bd_commit "$wt" "$ep" "own $i"
+        i=$((i + 1))
+    done
+    touch -t "$(epoch_to_touch "$ep")" "$wt"
+}
+
+# T1 — an old, clean T3 run worktree with no own commits is reaped: tips
+# line and keep-ref first, git worktree remove (wt-remove never runs), then
+# the branch is deleted.
+if should_run T1-t3-reaped; then
+fx T1-t3-reaped
+mk_t3 t3-aaaa1111 t3/weekly-digest age_days=5
+SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/t3/weekly-digest)"
+rt "${T_ON[@]}" -- --force
+chk_rc T1 0
+log_has 'step t3 threshold=1d' || note_err "no step line"
+log_has 't3 reaped t3-aaaa1111 branch=t3/weekly-digest age=5d' || note_err "no reaped line"
+[ -d "$(t3_dir t3-aaaa1111)" ] && note_err "worktree still present"
+has_branch t3/weekly-digest && note_err "branch still present"
+tips_has "$SHA refs/heads/t3/weekly-digest" || note_err "tips lacks sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/t3/weekly-digest $SHA\$" <<< "$KEEP" || note_err "no keep-ref"
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a T3 worktree"
+finish_case
+fi
+
+# T2 — the keep reasons: young, ahead, dirty (untracked), live session.
+if should_run T2-t3-kept; then
+fx T2-t3-kept
+mk_t3 t3-young001 t3/young age_days=0
+mk_t3 t3-ahead001 t3/ahead ahead=1 age_days=5
+mk_t3 t3-dirty001 t3/dirty age_days=5
+mk_t3 t3-live0001 t3/live age_days=5
+printf 'scratch\n' > "$(t3_dir t3-dirty001)/notes.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(t3_dir t3-dirty001)"
+mk_registry "$CD/registry.json" t3/live
+rt "${T_ON[@]}" -- --force
+chk_rc T2 0
+log_has 't3 keep t3-young001: age=0d' || note_err "young not kept by age"
+log_has 't3 keep t3-ahead001: ahead=1' || note_err "ahead not kept"
+log_has 't3 keep t3-dirty001: dirty' || note_err "dirty not kept"
+log_has 'live-work t3-live0001: live Claude session' || note_err "live session not seen"
+log_has 't3 keep t3-live0001: live work' || note_err "live not kept"
+for n in t3-young001 t3-ahead001 t3-dirty001 t3-live0001; do
+    [ -d "$(t3_dir "$n")" ] || note_err "$n removed"
+done
+[ -f "$(t3_dir t3-dirty001)/notes.md" ] || note_err "untracked file lost"
+for b in t3/young t3/ahead t3/dirty t3/live; do has_branch "$b" || note_err "$b deleted"; done
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# T3 — only t3-* worktrees directly under the root are candidates: a
+# non-t3 name under the root, a t3-* name in IBL5-worktrees and a t3-* name
+# one level deeper are all ignored.
+if should_run T3-t3-scope; then
+fx T3-t3-scope
+mk_t3 dependabot-x dependabot/x age_days=5
+mk_wt t3-elsewhere t3/elsewhere age_days=10
+mkdir -p "$CD/t3root/nested"
+git -C "$ENV_MAIN" worktree add -q -b t3/nested "$CD/t3root/nested/t3-deep0001" origin/master >/dev/null 2>&1
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$CD/t3root/nested/t3-deep0001"
+B_WT="$(wt_snapshot)"; B_REFS="$(refs_snapshot)"
+rt "${T_ON[@]}" -- --force
+chk_rc T3 0
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+log_has 't3 (keep|reaped) (dependabot-x|t3-elsewhere|t3-deep0001)' && note_err "out-of-scope worktree considered"
+finish_case
+fi
+
+# T4 — dry-run is inert and names the git worktree remove it would run; an
+# absent root is a no-op success.
+if should_run T4-t3-dry-run; then
+fx T4-t3-dry-run
+mk_t3 t3-bbbb2222 t3/dry age_days=5
+B_WT="$(wt_snapshot)"; B_REFS="$(refs_snapshot)"
+rt "${T_ON[@]}" -- --dry-run --force
+chk_rc "T4 dry-run" 0
+[ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
+[ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
+log_has 'DRY-RUN would: git -C .* worktree remove .*/t3root/t3-bbbb2222$' || note_err "no DRY-RUN remove line"
+rt "${T_ON[@]}" WT_GC_T3_ROOT="$CD/no-such-root" -- --force
+chk_rc "T4 absent root" 0
+log_has 'reap done steps_failed=0' || note_err "absent root failed the step"
+[ -d "$(t3_dir t3-bbbb2222)" ] || note_err "absent-root run removed a worktree"
 finish_case
 fi
 
@@ -2765,10 +2878,11 @@ fi
 # ── Env contract: switches, ages, stamp seam, help text ───────────────────────
 # A token "-VAR" in rt's env list leaves VAR truly unset (run_tick drops it).
 EC_SWITCHES=(WT_GC_ARCHIVE_PRUNE WT_GC_REAP_DIRTY_ARCHIVE WT_GC_REAP_DETACHED
-    WT_GC_REAP_CLOSED WT_GC_DROP_STASHES WT_GC_REF_FALLBACK WT_GC_DOCKER_CONTAINERS)
+    WT_GC_REAP_CLOSED WT_GC_DROP_STASHES WT_GC_REF_FALLBACK WT_GC_DOCKER_CONTAINERS
+    WT_GC_REAP_T3)
 # The switches that own a run_step, as "VAR:step".
 EC_STEPS=(WT_GC_ARCHIVE_PRUNE:archive-prune WT_GC_REAP_DETACHED:detached
-    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes)
+    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes WT_GC_REAP_T3:t3)
 
 for ec_var in "${EC_SWITCHES[@]}"; do
     if should_run "EC-switch-$ec_var"; then
@@ -2798,6 +2912,7 @@ EC_AGES=(
     'WT_GC_STASH_DAYS|7|WT_GC_DROP_STASHES=1'
     'WT_GC_BACKUP_FALLBACK_DAYS|14|WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1'
     'WT_GC_CONTAINER_DAYS|14|WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1'
+    'WT_GC_T3_DAYS|1|WT_GC_REAP_T3=1'
 )
 for ec_row in "${EC_AGES[@]}"; do
     ec_var="${ec_row%%|*}"

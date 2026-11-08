@@ -14,7 +14,23 @@ declare(strict_types=1);
  * old path in phpunit.xml or phpunit-mutation.xml. PHPUnit silently ignores a
  * missing suite directory (it just finds zero tests), so the stale ref is invisible
  * until the coverage or mutation run produces wrong numbers. This guard catches it.
+ *
+ * Parity rule: every <directory>/<file> under phpunit.xml's <testsuites> must also
+ * appear under phpunit-mutation.xml's <testsuites>, unless MUTATION_PARITY_EXEMPT
+ * lists it with a reason. A suite missing from the mutation config leaves its classes
+ * mutated with no covering tests (2026-11-06: tests/TradeSuggestions was absent and
+ * Infection reported 100% while mutating 1 of 10 classes). <source> blocks are
+ * excluded from parity: the two files differ there by design.
  */
+
+/**
+ * phpunit.xml testsuite paths deliberately absent from phpunit-mutation.xml.
+ * Key = the phpunit.xml path; value = why (>= 12 non-whitespace chars, enforced).
+ * bin/test-check-xml-class-refs fixtures mirror this list; update both together.
+ */
+const MUTATION_PARITY_EXEMPT = [
+    'tests/Support' => 'test helpers only: GoldenSnapshotTraitTest exercises Tests\Support code and nothing in classes/, and composer autoload-dev loads the helpers for every other suite',
+];
 
 $root = dirname(__DIR__);
 $xmlGlob = glob($root . '/phpunit*.xml');
@@ -24,6 +40,7 @@ if ($xmlGlob === false || $xmlGlob === []) {
 }
 
 $failures = [];
+$suitePaths = [];
 
 foreach ($xmlGlob as $xmlPath) {
     $rel = basename($xmlPath);
@@ -47,6 +64,26 @@ foreach ($xmlGlob as $xmlPath) {
     }
 
     $baseDir = dirname($xmlPath);
+
+    // Parity input: testsuite children only, normalized (trimmed, no trailing slash).
+    if ($rel === 'phpunit.xml' || $rel === 'phpunit-mutation.xml') {
+        $suitePaths[$rel] = [];
+        $xp = new \DOMXPath($doc);
+        $nodes = $xp->query('/phpunit/testsuites/testsuite/directory | /phpunit/testsuites/testsuite/file');
+        if ($nodes === false) {
+            $failures[] = "{$rel}: testsuite XPath query failed";
+        } else {
+            foreach ($nodes as $node) {
+                if (!$node instanceof \DOMElement) {
+                    continue;
+                }
+                $suitePath = rtrim(trim($node->textContent), '/');
+                if ($suitePath !== '') {
+                    $suitePaths[$rel][$suitePath] = true;
+                }
+            }
+        }
+    }
 
     // Collect all path-valued references from the XML.
     $refs = [];
@@ -81,11 +118,40 @@ foreach ($xmlGlob as $xmlPath) {
     }
 }
 
-if ($failures !== []) {
-    echo "ERROR: stale phpunit XML reference(s) found:\n" . implode("\n", array_map(fn($f) => "  - {$f}", $failures)) . "\n";
-    echo "\nFix: update or remove the stale path from the phpunit XML config.\n";
+$parityFailures = [];
+if (isset($suitePaths['phpunit.xml'])) {
+    if (!isset($suitePaths['phpunit-mutation.xml'])) {
+        $parityFailures[] = 'phpunit-mutation.xml not found next to phpunit.xml';
+    } else {
+        foreach (array_keys(array_diff_key($suitePaths['phpunit.xml'], $suitePaths['phpunit-mutation.xml'])) as $missing) {
+            if (isset(MUTATION_PARITY_EXEMPT[$missing])) {
+                continue;
+            }
+            $parityFailures[] = "phpunit-mutation.xml: missing testsuite entry '{$missing}' listed in phpunit.xml";
+        }
+        foreach (MUTATION_PARITY_EXEMPT as $exempt => $reason) {
+            if (!isset($suitePaths['phpunit.xml'][$exempt])) {
+                $parityFailures[] = "check-xml-class-refs: stale parity exemption '{$exempt}' is not a phpunit.xml testsuite entry";
+            }
+            if (strlen((string) preg_replace('/\s+/', '', $reason)) < 12) {
+                $parityFailures[] = "check-xml-class-refs: parity exemption '{$exempt}' needs a reason of at least 12 non-whitespace characters";
+            }
+        }
+    }
+}
+
+if ($failures !== [] || $parityFailures !== []) {
+    if ($failures !== []) {
+        echo "ERROR: stale phpunit XML reference(s) found:\n" . implode("\n", array_map(fn($f) => "  - {$f}", $failures)) . "\n";
+        echo "\nFix: update or remove the stale path from the phpunit XML config.\n";
+    }
+    if ($parityFailures !== []) {
+        echo "ERROR: phpunit-mutation.xml testsuite parity broken:\n" . implode("\n", array_map(fn($f) => "  - {$f}", $parityFailures)) . "\n";
+        echo "\nFix: add the missing <directory>/<file> to phpunit-mutation.xml's <testsuites>, or exempt it in MUTATION_PARITY_EXEMPT (bin/check-xml-class-refs) with a reason.\n";
+    }
     exit(1);
 }
 
 echo 'OK: all phpunit XML file/directory references resolve.' . "\n";
+echo 'OK: phpunit-mutation.xml lists every phpunit.xml testsuite entry (' . count(MUTATION_PARITY_EXEMPT) . ' exempt).' . "\n";
 exit(0);

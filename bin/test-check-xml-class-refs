@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Harness for ibl5/bin/check-xml-class-refs (phpunit.xml -> phpunit-mutation.xml
+# testsuite parity rule). Hermetic: each case copies the script into a temp dir
+# next to fixture XML files, so no DB and no real config is touched.
+# Fixtures mirror MUTATION_PARITY_EXEMPT in ibl5/bin/check-xml-class-refs; a new
+# exemption needs its path added to the base fixture (tests/Support below).
+# Prints PASS <case-id> / FAIL <case-id> per assertion; exits 1 on any FAIL.
+set -uo pipefail
+
+command -v php >/dev/null || { echo "FAIL php-available (php not on PATH)"; exit 1; }
+
+ROOT=$(git rev-parse --show-toplevel)
+SRC="$ROOT/ibl5/bin/check-xml-class-refs"
+BASE=$(mktemp -d)
+trap 'rm -rf "$BASE"' EXIT
+
+FAILS=0
+PASSES=0
+RC=0
+OUT=""
+
+pass() { echo "PASS $1"; PASSES=$((PASSES + 1)); }
+fail() { echo "FAIL $1 ($2)"; FAILS=$((FAILS + 1)); }
+
+want_rc() {
+    if [ "$RC" -eq "$2" ]; then pass "$1"; else fail "$1" "rc=$RC, wanted $2"; fi
+}
+want() {
+    if grep -qF -- "$3" <<< "$2"; then pass "$1"; else fail "$1" "missing: $3"; fi
+}
+want_not() {
+    if grep -qF -- "$3" <<< "$2"; then fail "$1" "unexpected: $3"; else pass "$1"; fi
+}
+
+# Entry sets. P = phpunit.xml suite entries; M = P minus the exempt tests/Support.
+ENT_A='<directory>tests/A</directory>'
+ENT_B='<directory>tests/B</directory>'
+ENT_S='<directory>tests/Support</directory>'
+ENT_C='<file>tests/C/OneTest.php</file>'
+
+# Fresh case dir with the script copy and the fixture tree; echoes the path.
+new_case() {
+    local d
+    d=$(mktemp -d "$BASE/case.XXXXXX")
+    mkdir -p "$d/bin" "$d/tests/A" "$d/tests/B" "$d/tests/Support" "$d/tests/C"
+    cp "$SRC" "$d/bin/check-xml-class-refs"
+    : > "$d/tests/C/OneTest.php"
+    echo "$d"
+}
+
+# write_xml <path> <entries> [extra]
+write_xml() {
+    cat > "$1" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit>
+    <testsuites>
+        <testsuite name="Fixture">
+            $2
+        </testsuite>
+    </testsuites>
+    ${3:-}
+</phpunit>
+EOF
+}
+
+# Run the script copy in case dir $1; sets RC and OUT (stdout+stderr).
+run_case() {
+    RC=0
+    OUT=$(php "$1/bin/check-xml-class-refs" 2>&1) || RC=$?
+}
+
+# parity-ok
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+run_case "$d"
+want_rc parity-ok 0
+want parity-ok "$OUT" "OK: phpunit-mutation.xml lists every phpunit.xml testsuite entry (1 exempt)."
+
+# missing-directory
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_C"
+run_case "$d"
+want_rc missing-directory 1
+want missing-directory "$OUT" "missing testsuite entry 'tests/B' listed in phpunit.xml"
+
+# missing-file
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B"
+run_case "$d"
+want_rc missing-file 1
+want missing-file "$OUT" "missing testsuite entry 'tests/C/OneTest.php'"
+
+# exempt-honored
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+run_case "$d"
+want_rc exempt-honored 0
+want_not exempt-honored "$OUT" "'tests/Support' listed in phpunit.xml"
+
+# stale-exemption
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+run_case "$d"
+want_rc stale-exemption 1
+want stale-exemption "$OUT" "stale parity exemption 'tests/Support'"
+
+# short-reason
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+sed -E "s/^(    'tests\/Support' => ).*/\1'x',/" "$SRC" > "$d/bin/check-xml-class-refs"
+if cmp -s "$SRC" "$d/bin/check-xml-class-refs"; then
+    fail short-reason "sed anchor missed"
+else
+    run_case "$d"
+    want_rc short-reason 1
+    want short-reason "$OUT" "parity exemption 'tests/Support' needs a reason"
+fi
+
+# source-exclude-ignored (near-miss): phpunit.xml <source> dirs absent from the mutation config
+d=$(new_case)
+mkdir -p "$d/src/Legacy"
+SRC_BLOCK='<source><include><directory>src</directory></include><exclude><directory>src/Legacy</directory></exclude></source>'
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C" "$SRC_BLOCK"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+run_case "$d"
+want_rc source-exclude-ignored 0
+want source-exclude-ignored "$OUT" "(1 exempt)"
+
+# trailing-slash (near-miss)
+d=$(new_case)
+write_xml "$d/phpunit.xml" "<directory>tests/A/</directory> $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+run_case "$d"
+want_rc trailing-slash 0
+want trailing-slash "$OUT" "(1 exempt)"
+
+# mutation-only-extra: one-directional rule
+d=$(new_case)
+mkdir -p "$d/tests/D"
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/D</directory>"
+run_case "$d"
+want_rc mutation-only-extra 0
+want mutation-only-extra "$OUT" "(1 exempt)"
+
+# mutation-config-absent
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+run_case "$d"
+want_rc mutation-config-absent 1
+want mutation-config-absent "$OUT" "phpunit-mutation.xml not found next to phpunit.xml"
+
+# stale-ref-preserved: the original stale-reference check still fires
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C <directory>tests/Gone</directory>"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/Gone</directory>"
+run_case "$d"
+want_rc stale-ref-preserved 1
+want stale-ref-preserved "$OUT" "stale <directory> reference"
+want stale-ref-preserved "$OUT" "'tests/Gone' does not exist"
+
+echo "$PASSES passed, $FAILS failed"
+[ "$FAILS" -eq 0 ]

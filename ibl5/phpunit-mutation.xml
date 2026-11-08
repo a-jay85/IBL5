@@ -13,6 +13,9 @@
          infection.json5). Do NOT add them to the <exclude> below to "balance" it.
        infection.json5's excludes are the authoritative mutate-scope; this file
        only controls which classes get coverage-xml generated.
+    3. Its <testsuites> list every phpunit.xml testsuite path except the
+       MUTATION_PARITY_EXEMPT entries in bin/check-xml-class-refs, which fails CI
+       when a path is missing here. <source> parity is not checked (see 2).
   Used only by the CI mutation workflow's coverage-generation step.
 -->
 <phpunit bootstrap="tests/bootstrap.php"
@@ -298,6 +301,42 @@
         </testsuite>
         <testsuite name="DataRetention Module Tests">
             <directory>tests/DataRetention</directory>
+        </testsuite>
+        <testsuite name="GoogleSheets Tests">
+            <directory>tests/GoogleSheets</directory>
+        </testsuite>
+        <testsuite name="BugPipeline Module Tests">
+            <directory>tests/BugPipeline</directory>
+        </testsuite>
+        <testsuite name="Clock Module Tests">
+            <directory>tests/Clock</directory>
+        </testsuite>
+        <testsuite name="Contracts Module Tests">
+            <directory>tests/Contracts</directory>
+        </testsuite>
+        <testsuite name="LastSimRecap Module Tests">
+            <directory>tests/LastSimRecap</directory>
+        </testsuite>
+        <testsuite name="OnThisDay Module Tests">
+            <directory>tests/OnThisDay</directory>
+        </testsuite>
+        <testsuite name="EngineBundle Module Tests">
+            <directory>tests/EngineBundle</directory>
+        </testsuite>
+        <testsuite name="EventLog Tests">
+            <directory>tests/EventLog</directory>
+        </testsuite>
+        <testsuite name="Draft Class Import Tests">
+            <directory>tests/DraftClassImport</directory>
+        </testsuite>
+        <testsuite name="GameBoxscore Module Tests">
+            <directory>tests/GameBoxscore</directory>
+        </testsuite>
+        <testsuite name="SimRecap Module Tests">
+            <directory>tests/SimRecap</directory>
+        </testsuite>
+        <testsuite name="Http Tests">
+            <directory>tests/Http</directory>
         </testsuite>
     </testsuites>
     <!-- No <groups><exclude> — DB integration tests run for repository coverage -->

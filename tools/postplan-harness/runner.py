@@ -2853,8 +2853,9 @@ def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list
 def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):
     """Classifier inputs for `unplanned_scope`, or None when any of them cannot be read.
 
-    None restores today's handling: every tagged finding reaches the fixer and no verdict
-    is downgraded. A detector failure counts, because a guard conflict could not be seen.
+    None holds every tagged hold-12 finding: `partition` keeps it off the fixer's list, no
+    kept block is declared, and no verdict is downgraded. A detector failure counts, because
+    a guard conflict could not be seen.
     """
     plan_path = plan.path if (plan and getattr(plan, "found", False)) else None
     try:

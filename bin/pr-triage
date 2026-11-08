@@ -65,8 +65,13 @@
 # state (merge conflict, red/pending checks, HOLDS tokens), de-duplicated.
 # "unknown" when nothing explains the hold. Read-only; cannot combine with --arm.
 #
-# Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed;
-#             2 = usage error or gh not authenticated.
+# --card N prints one PR's decision-card data (head, ci, open threads, sticky verdict
+# CURRENT/STALE, merge danger, visual links, live post-plan run, worktree) in compact
+# plain text, live. Read-only; cannot combine with --arm or --held (exit 2). Fails
+# closed: a failed fetch prints `<field>: unknown (fetch failed)` and exits 1.
+#
+# Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed,
+#             or a --card fetch failed; 2 = usage error or gh not authenticated.
 
 set -euo pipefail
 
@@ -75,6 +80,7 @@ GH_API_CMD="${GH_API_CMD:-gh api}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MERGE_LINE_CMD="${PR_TRIAGE_MERGE_LINE_CMD:-$SCRIPT_DIR/merge-line-watch}"
+PR_TRIAGE_LAUNCHCTL_CMD="${PR_TRIAGE_LAUNCHCTL_CMD:-launchctl}"
 # shellcheck source=bin/lib/pr-armable.sh
 source "$SCRIPT_DIR/lib/pr-armable.sh"
 # shellcheck source=bin/lib/usage-gate.sh
@@ -84,7 +90,7 @@ source "$SCRIPT_DIR/lib/held-prs.sh"
 
 usage() {
     cat <<'EOF'
-Usage: bin/pr-triage [--arm | --held] [--help|-h]
+Usage: bin/pr-triage [--arm | --held | --card N] [--help|-h]
 
 Classifies every OPEN PR into one bucket (first-match-wins) and prints a report.
 
@@ -101,6 +107,14 @@ Options:
                conflict, red/pending checks, HOLDS tokens). Prints "unknown"
                when nothing explains the hold. Read-only; cannot be combined
                with --arm (exit 2).
+  --card N     Print one PR's decision-card data in compact plain text, live from
+               GitHub: head, ci (pass/fail/pending, real failures vs owner-only
+               gates), unresolved non-outdated review threads, the last
+               pr-ready-verdict sticky (CURRENT or STALE against the head tree),
+               the Merge danger line, visual-review URLs, a live post-plan run
+               label and the worktree. N must be a positive integer. Read-only;
+               cannot be combined with --arm or --held (exit 2). A failed fetch
+               prints `<field>: unknown (fetch failed)` and exits 1.
   --help, -h   Show this message.
 
 Environment (test seams):
@@ -108,6 +122,8 @@ Environment (test seams):
   GH_API_CMD    Override the gh api command (default: "gh api").
   PR_TRIAGE_MERGE_LINE_CMD  Override the merge-line pass command
                 (default: bin/merge-line-watch).
+  PR_TRIAGE_LAUNCHCTL_CMD  Override the launchctl command for --card's live-run
+                lookup (default: "launchctl"; called as `<cmd> list`).
   PR_TRIAGE_WTL Read `git worktree list --porcelain` output from this file instead of git.
   IBL5_USAGE_GATE_STATE_DIR  Where the usage-gate pause markers live.
 
@@ -121,15 +137,36 @@ update-branch on its head re-runs checks under master's strict protection), and
 no HELD/dep/feat hold. A PR with no `## Manual Testing` section is
 UNCLEARED and routed to a human. Reads one page (200 PRs / 100 check-runs).
 
-Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed;
-            2 = usage error / gh not authenticated.
+Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed
+            (or, with --card, a fetch failed); 2 = usage error / gh not authenticated.
 EOF
 }
 
 ARM=0
 HELD=0
+CARD=0
+WANT_CARD=0
 for arg in "$@"; do
+    if [ "$WANT_CARD" = "1" ]; then
+        case "$arg" in
+            ''|*[!0-9]*|0*)
+                echo "--card needs a positive integer PR number, got: $arg" >&2
+                usage >&2
+                exit 2
+                ;;
+        esac
+        CARD="$arg"
+        WANT_CARD=2
+        continue
+    fi
     case "$arg" in
+        --card)
+            if [ "$WANT_CARD" = "2" ]; then
+                echo "--card given twice" >&2
+                exit 2
+            fi
+            WANT_CARD=1
+            ;;
         --arm)
             ARM=1
             ;;
@@ -152,6 +189,18 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+if [ "$WANT_CARD" = "1" ]; then
+    echo "--card needs a positive integer PR number" >&2
+    usage >&2
+    exit 2
+fi
+
+if [ "$CARD" != "0" ] && { [ "$ARM" = "1" ] || [ "$HELD" = "1" ]; }; then
+    echo "--card is read-only and cannot be combined with --arm or --held" >&2
+    usage >&2
+    exit 2
+fi
 
 if [ "$ARM" = "1" ] && [ "$HELD" = "1" ]; then
     echo "--held and --arm are mutually exclusive (--held is read-only)" >&2
@@ -186,6 +235,232 @@ if [ "$HELD" = "1" ]; then
     fi
 fi
 
+# BLOCKED-CHECK evaluates only the non-signoff contexts (decision 1):
+# human-signoff is the feat: floor's lever, handled by bucket FEAT, not here.
+is_blocked_check_ctx() {
+    case "$1" in
+        "human-signoff") return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# --- PAUSED support: PR head branch -> worktree path --------------------------------------
+# One `git worktree list --porcelain` read up front (or the PR_TRIAGE_WTL test seam).
+if [ -n "${PR_TRIAGE_WTL:-}" ]; then
+    WT_PORCELAIN="$(cat "$PR_TRIAGE_WTL" 2>/dev/null || true)"
+else
+    WT_PORCELAIN="$(git -C "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null || true)"
+fi
+
+# wt_for_branch <branch> -> the worktree path checked out on that branch, or nothing.
+wt_for_branch() {
+    [ -n "${1:-}" ] || return 0
+    printf '%s\n' "$WT_PORCELAIN" | awk -v b="refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $1 == "branch" && $2 == b { print path; exit }'
+}
+
+# --- --card N: one-call decision-card data for a single PR (read-only) ---------
+# Replaces the 5-8 separate fetches /pr-burndown makes before showing a card.
+# FAIL-CLOSED: a fetch that fails prints `<field>: unknown (fetch failed)` and the
+# run exits 1; no field ever shows a clean-looking value on error.
+
+# The checks that only wait on the owner, so they are not a real failure:
+# human-signoff (via is_blocked_check_ctx) plus the two label-sync jobs.
+is_owner_gate_ctx() {
+    if ! is_blocked_check_ctx "$1"; then return 0; fi
+    case "$1" in
+        "needs-a-human label"|"auto-mergeable label") return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+CARD_FAIL=0
+card_unknown() { echo "$1: unknown (fetch failed)"; CARD_FAIL=1; }
+
+card_main() {
+    local n="$1"
+    local owner="${SLUG%%/*}" repo="${SLUG##*/}"
+    local view="" sha="" branch="" body="" cr="" st="" comments="" raw="" trusted=""
+    local view_ok=1 line
+
+    view="$("$GH_CMD" pr view "$n" --json number,title,body,labels,mergeStateStatus,mergeable,headRefOid,headRefName,files,additions,deletions,autoMergeRequest 2>/dev/null)" || view_ok=0
+    if [ "$view_ok" = 1 ] && ! jq -e '.headRefOid | type == "string" and length > 0' >/dev/null 2>&1 <<< "$view"; then
+        view_ok=0
+    fi
+
+    if [ "$view_ok" = 1 ]; then
+        sha="$(jq -r '.headRefOid' <<< "$view")"
+        branch="$(jq -r '.headRefName // ""' <<< "$view")"
+        body="$(jq -r '.body // ""' <<< "$view")"
+        jq -r '"head: \(.headRefOid[0:7]) mss=\(.mergeStateStatus // "?") mergeable=\(.mergeable // "?") auto-merge=\(if .autoMergeRequest then "on" else "off" end) labels=\([.labels[]?.name] | if length == 0 then "none" else join(",") end) title=\"\(.title)\" files=\((.files // []) | length) +\(.additions // 0) -\(.deletions // 0) branch=\(.headRefName // "?")"' <<< "$view"
+    else
+        card_unknown head
+    fi
+
+    # --- ci: latest check-run per name + combined statuses, worst state wins per name ---
+    local ci_ok=1 ci=""
+    if [ "$view_ok" = 1 ]; then
+        cr="$($GH_API_CMD "repos/$SLUG/commits/$sha/check-runs?per_page=100" 2>/dev/null)" || ci_ok=0
+        st="$($GH_API_CMD "repos/$SLUG/commits/$sha/status?per_page=100" 2>/dev/null)" || ci_ok=0
+    else
+        ci_ok=0
+    fi
+    if [ "$ci_ok" = 1 ]; then
+        ci="$(jq -n -c --argjson cr "${cr:-null}" --argjson st "${st:-null}" '
+            def rank: if .st == "fail" then 3 elif .st == "cancelled" then 2
+                      elif .st == "pending" then 1 else 0 end;
+            if ($cr.check_runs | type) != "array" or ($st.statuses | type) != "array"
+               or ($cr.total_count // 0) > ($cr.check_runs | length)
+               or ($st.total_count // 0) > ($st.statuses | length)
+            then error("bad ci payload") else . end
+            | ($cr.check_runs | group_by(.name)
+               | map(sort_by(.completed_at // .started_at // "") | last
+                     | {name, st: (if .status != "completed" then "pending"
+                                   elif .conclusion == "cancelled" then "cancelled"
+                                   elif (.conclusion | IN("success","skipped","neutral")) then "pass"
+                                   else "fail" end)})) as $a
+            | ($st.statuses | map({name: .context,
+                st: (if .state == "success" then "pass" elif .state == "pending" then "pending" else "fail" end)})) as $b
+            | ($a + $b) | group_by(.name) | map(sort_by(rank) | last)' 2>/dev/null)" || ci_ok=0
+    fi
+    if [ "$ci_ok" = 1 ] && [ -n "$ci" ]; then
+        local np nf npend real="" gates="" cname cst
+        np="$(jq '[.[] | select(.st == "pass")] | length' <<< "$ci")"
+        nf="$(jq '[.[] | select(.st == "fail" or .st == "cancelled")] | length' <<< "$ci")"
+        npend="$(jq '[.[] | select(.st == "pending")] | length' <<< "$ci")"
+        while IFS=$'\t' read -r cst cname; do
+            [ -n "$cname" ] || continue
+            if is_owner_gate_ctx "$cname"; then
+                gates="${gates:+$gates, }$cname ($cst)"
+            elif [ "$cst" = "fail" ] || [ "$cst" = "cancelled" ]; then
+                real="${real:+$real, }$cname"
+                if [ "$cst" = "cancelled" ]; then real="$real (cancelled)"; fi
+            fi
+        done < <(jq -r '.[] | select(.st != "pass") | [.st, .name] | @tsv' <<< "$ci")
+        echo "ci: pass=$np fail=$nf pending=$npend real-failures: ${real:-none} | owner-gates: ${gates:-none}"
+    else
+        card_unknown ci
+    fi
+
+    # --- threads: unresolved AND not outdated ---
+    local t_ok=1
+    # shellcheck disable=SC2016  # GraphQL variables, not shell
+    raw="$("$GH_CMD" api graphql -F owner="$owner" -F repo="$repo" -F pr="$n" -f query='
+        query($owner:String!, $repo:String!, $pr:Int!) {
+          repository(owner:$owner, name:$repo) {
+            pullRequest(number:$pr) {
+              reviewThreads(first:100) {
+                nodes { isResolved isOutdated path line originalLine
+                  comments(first:1) { nodes { author { login } body } } }
+              }
+            }
+          }
+        }' 2>/dev/null)" || t_ok=0
+    if [ "$t_ok" = 1 ] && ! jq -e '(.errors | not) and (.data.repository.pullRequest.reviewThreads.nodes | type == "array")' >/dev/null 2>&1 <<< "$raw"; then
+        t_ok=0
+    fi
+    if [ "$t_ok" = 1 ]; then
+        local tlines cnt total cap=""
+        tlines="$(jq -r '.data.repository.pullRequest.reviewThreads.nodes[]
+            | select(.isResolved == false and .isOutdated == false)
+            | (.comments.nodes[0] // {}) as $c
+            | ((($c.body // "") | split("\n") | map(gsub("^\\s+|\\s+$"; ""))
+                | map(select(length > 0 and (startswith("<!--") | not))) | .[0] // "(empty)")[0:160]) as $l
+            | "  \(.path // "?"):\(.line // .originalLine // "?") \($c.author.login // "?"): \($l)"' <<< "$raw")" || t_ok=0
+        total="$(jq '.data.repository.pullRequest.reviewThreads.nodes | length' <<< "$raw")"
+        if [ "$t_ok" = 1 ]; then
+            if [ -z "$tlines" ]; then cnt=0; else cnt="$(printf '%s\n' "$tlines" | wc -l | tr -d ' ')"; fi
+            if [ "$total" -ge 100 ]; then cap=" (100-thread page cap hit; list may be incomplete)"; fi
+            echo "threads: $cnt$cap"
+            if [ -n "$tlines" ]; then printf '%s\n' "$tlines"; fi
+        fi
+    fi
+    if [ "$t_ok" != 1 ]; then card_unknown threads; fi
+
+    # --- comments: verdict sticky + visual links ---
+    local c_ok=1
+    comments="$($GH_API_CMD "repos/$SLUG/issues/$n/comments" --paginate 2>/dev/null)" || c_ok=0
+    if [ "$c_ok" = 1 ]; then
+        trusted="$(jq -c -s '[ .[][]?
+            | select(.author_association == "OWNER" or .author_association == "MEMBER"
+                     or .author_association == "COLLABORATOR") ]' <<< "$comments" 2>/dev/null)" || c_ok=0
+    fi
+    if [ "$c_ok" = 1 ]; then
+        local sticky banner reviewed rv head_tree="" tree_ok=1 vstatus urls
+        sticky="$(hp_pick_sticky <<< "$trusted" || true)"
+        if [ -z "$sticky" ]; then
+            echo "verdict: none"
+        elif [ "$view_ok" != 1 ]; then
+            card_unknown verdict
+        else
+            banner="$(hp_verdict_banner "$sticky")"
+            if [ -z "$banner" ]; then
+                banner="$(grep -m1 -E '[^[:space:]]' <<< "$sticky" || true)"
+            fi
+            banner="${banner//\*/}"
+            # The sticky records tree shas, not the head commit: the latest re-review wins.
+            reviewed="$(grep -E '^\*\*Re-reviewed tree:\*\* [0-9a-f]{40}' <<< "$sticky" | tail -1 | sed -E 's/^\*\*Re-reviewed tree:\*\* ([0-9a-f]{40}).*/\1/' || true)"
+            if [ -z "$reviewed" ]; then
+                reviewed="$(grep -E '^\*\*Reviewed tree:\*\* [0-9a-f]{40}' <<< "$sticky" | tail -1 | sed -E 's/^\*\*Reviewed tree:\*\* ([0-9a-f]{40}).*/\1/' || true)"
+            fi
+            head_tree="$($GH_API_CMD "repos/$SLUG/git/commits/$sha" 2>/dev/null | jq -r '.tree.sha // empty' 2>/dev/null)" || tree_ok=0
+            if [ "$tree_ok" != 1 ] || [ -z "$head_tree" ]; then
+                card_unknown verdict
+            else
+                if [ -n "$reviewed" ] && [ "$reviewed" = "$head_tree" ]; then
+                    vstatus="CURRENT"
+                else
+                    rv="${reviewed:0:7}"
+                    vstatus="STALE (reviewed tree ${rv:-unrecorded}, head tree ${head_tree:0:7})"
+                fi
+                echo "verdict: $banner | $vstatus"
+            fi
+        fi
+        urls="$(jq -r -s '.[][]? | .body // ""' <<< "$comments" \
+            | grep -oE 'https://a-jay85\.github\.io/IBL5/[^[:space:])>"]*' | sort -u | tr '\n' ' ' || true)"
+        urls="${urls% }"
+        echo "visual: ${urls:-none}"
+    else
+        card_unknown verdict
+        card_unknown visual
+    fi
+
+    # --- merge-danger / live-run / worktree ---
+    if [ "$view_ok" = 1 ]; then
+        line="$(grep -m1 -E '^\*\*Merge danger:\*\*' <<< "$body" || true)"
+        if [ -n "$line" ]; then echo "merge-danger: ${line#\*\*Merge danger:\*\* }"; else echo "merge-danger: missing"; fi
+
+        local flat snap lc_ok=1 found="" label _p _s
+        flat="$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-')"
+        snap="$($PR_TRIAGE_LAUNCHCTL_CMD list 2>/dev/null)" || lc_ok=0
+        if [ "$lc_ok" = 1 ]; then
+            while IFS=$'\t' read -r _p _s label; do
+                case "$label" in
+                    com.ibl5.postplan-now-"$flat"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*|com.ibl5.post-plan-fleet-"$n")
+                        found="${found:+$found, }$label" ;;
+                esac
+            done <<< "$snap"
+            echo "live-run: ${found:-none}"
+        else
+            card_unknown live-run
+        fi
+        line="$(wt_for_branch "$branch")"
+        echo "worktree: ${line:-none}"
+    else
+        card_unknown merge-danger
+        card_unknown live-run
+        card_unknown worktree
+    fi
+    return "$CARD_FAIL"
+}
+
+if [ "$CARD" != "0" ]; then
+    CARD_RC=0
+    card_main "$CARD" || CARD_RC=$?
+    exit "$CARD_RC"
+fi
+
 # --- required contexts (decision 5): protection API, else hardcoded fallback ---
 PROT="$($GH_API_CMD "repos/$SLUG/branches/master/protection" 2>/dev/null || echo '{}')"
 REQUIRED=()
@@ -196,15 +471,6 @@ if [ "${#REQUIRED[@]}" -eq 0 ]; then
     # Fallback: token lacks admin/repo scope for the protection API.
     REQUIRED=("Tests and Analysis" "E2E Tests" "human-signoff")
 fi
-
-# BLOCKED-CHECK evaluates only the non-signoff contexts (decision 1):
-# human-signoff is the feat: floor's lever, handled by bucket FEAT, not here.
-is_blocked_check_ctx() {
-    case "$1" in
-        "human-signoff") return 1 ;;
-        *) return 0 ;;
-    esac
-}
 
 # state_of <latest_json> <ctx> -> green|failing|pending|cancelled|absent
 state_of() {
@@ -327,22 +593,6 @@ mss_action() {
         UNKNOWN) echo "re-check (state unknown)" ;;
         *)       echo "re-check merge state" ;;
     esac
-}
-
-# --- PAUSED support: PR head branch -> worktree path --------------------------------------
-# One `git worktree list --porcelain` read up front (or the PR_TRIAGE_WTL test seam).
-if [ -n "${PR_TRIAGE_WTL:-}" ]; then
-    WT_PORCELAIN="$(cat "$PR_TRIAGE_WTL" 2>/dev/null || true)"
-else
-    WT_PORCELAIN="$(git -C "$SCRIPT_DIR" worktree list --porcelain 2>/dev/null || true)"
-fi
-
-# wt_for_branch <branch> -> the worktree path checked out on that branch, or nothing.
-wt_for_branch() {
-    [ -n "${1:-}" ] || return 0
-    printf '%s\n' "$WT_PORCELAIN" | awk -v b="refs/heads/$1" '
-        /^worktree / { path = substr($0, 10) }
-        $1 == "branch" && $2 == b { print path; exit }'
 }
 
 EXIT=0

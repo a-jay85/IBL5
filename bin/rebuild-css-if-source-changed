@@ -54,13 +54,28 @@ LOCK_DIR="$LOG_DIR/css-rebuild-$slug.lock"
 LOCK_WAIT_SECS="${CSS_REBUILD_LOCK_WAIT_SECS:-120}"
 case "$LOCK_WAIT_SECS" in *[!0-9]*) LOCK_WAIT_SECS=120 ;; esac
 
+# Remove the lock only if its holder is still $1. A second mkdir guard lets one
+# waiter at a time re-check and delete, so a waiter that lost the race never
+# deletes a lock another waiter just took.
+reap_lock() {
+    local expected="$1"
+    mkdir "$LOCK_DIR.reap" 2>/dev/null || return 1
+    if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$expected" ]; then
+        rm -rf "$LOCK_DIR"
+    fi
+    rmdir "$LOCK_DIR.reap" 2>/dev/null || true
+}
+
 lock_acquire() {
     local waited=0 logged=0 holder
     while ! mkdir "$LOCK_DIR" 2>/dev/null; do
         holder="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
         if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
-            echo "$(date): removed stale css lock from dead pid $holder ($slug)" >> "$LOG"
-            rm -rf "$LOCK_DIR"
+            if reap_lock "$holder"; then
+                echo "$(date): removed stale css lock from dead pid $holder ($slug)" >> "$LOG"
+            else
+                sleep 1
+            fi
             continue
         fi
         if [ "$logged" = 0 ]; then
@@ -69,7 +84,8 @@ lock_acquire() {
         fi
         if [ "$waited" -ge "$LOCK_WAIT_SECS" ]; then
             echo "$(date): css lock wait timed out after ${LOCK_WAIT_SECS}s, taking it over ($slug)" >> "$LOG"
-            rm -rf "$LOCK_DIR"
+            rmdir "$LOCK_DIR.reap" 2>/dev/null || true   # a reaper that died mid-reap
+            reap_lock "$holder" || true
             waited=0
             logged=0
             continue

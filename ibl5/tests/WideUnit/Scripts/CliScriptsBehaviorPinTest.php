@@ -21,9 +21,9 @@ final class CliScriptsBehaviorPinTest extends TestCase
     {
         return [
             'engParser' => ['engParser.php', ['outputs' => 3, 'exits' => 2, 'constOutputs' => 1, 'constSha' => '577096c5feb0', 'sqlCount' => 0, 'sqlSha' => 'da39a3ee5e6b', 'prepares' => 0]],
-            'reconstruct' => ['reconstruct_2007_asg_boxscores.php', ['outputs' => 11, 'exits' => 2, 'constOutputs' => 6, 'constSha' => 'a1f1b663f66c', 'sqlCount' => 1, 'sqlSha' => '55934a595b79', 'prepares' => 1]],
-            'patch' => ['patch_2007_asg_sco.php', ['outputs' => 26, 'exits' => 3, 'constOutputs' => 13, 'constSha' => 'b8475cfa5a34', 'sqlCount' => 1, 'sqlSha' => '55934a595b79', 'prepares' => 1]],
-            'import' => ['archive/importBoxscoresFromHtml.php', ['outputs' => 28, 'exits' => 2, 'constOutputs' => 14, 'constSha' => 'ab4ce4d34638', 'sqlCount' => 3, 'sqlSha' => 'd83ea0e8936b', 'prepares' => 3]],
+            'reconstruct' => ['reconstruct_2007_asg_boxscores.php', ['outputs' => 13, 'exits' => 3, 'constOutputs' => 7, 'constSha' => 'db2b45f169e4', 'sqlCount' => 1, 'sqlSha' => '55934a595b79', 'prepares' => 1]],
+            'patch' => ['patch_2007_asg_sco.php', ['outputs' => 28, 'exits' => 4, 'constOutputs' => 14, 'constSha' => '06172dfb0c4b', 'sqlCount' => 1, 'sqlSha' => '55934a595b79', 'prepares' => 1]],
+            'import' => ['archive/importBoxscoresFromHtml.php', ['outputs' => 30, 'exits' => 3, 'constOutputs' => 15, 'constSha' => 'c7c4fe9cfd69', 'sqlCount' => 3, 'sqlSha' => 'd83ea0e8936b', 'prepares' => 3]],
         ];
     }
 

@@ -58,6 +58,13 @@ if ($localClassesDir !== false) {
     });
 }
 
+require_once __DIR__ . '/../classes/Cli/CliFlagGuard.php';
+try {
+    \Cli\CliFlagGuard::assertKnown($argv ?? [], ['--apply']);
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(2);
+}
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 

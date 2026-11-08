@@ -30,7 +30,7 @@ $updateMode = false;
 $syncMode = false;
 $flagBase = null;
 /** @var list<string> $argv */
-$cliArgs = array_slice($argv, 1);
+$cliArgs = array_slice($argv, 1); // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: unknown flag hits the else branch, exit 2)
 foreach ($cliArgs as $arg) {
     if ($arg === '--update') {
         $updateMode = true;

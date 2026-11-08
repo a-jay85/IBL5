@@ -1,6 +1,6 @@
 ---
 description: J21 finding — 5.60 rounds the possession clock-step half-up (int() truncation is a confirmed infidelity), but the archive A/B shows the faithful round-half-up shipped ALONE fails to flip the wrong-signed Cov(lnPOSS,lnPPS) and regresses mean pace; truncation was HELD, the coupled fix shipped in J23 (#1495); J24 then ported the full per-possession step-class mix (half-court jitter + steal + DRB-push) with a NO-GO on the faithful 16.0 center — provisional re-centered 13.65→17.7, dispersion/Cov residual open.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 ---
 
 # ADR-0085: Tempo step truncation retained; faithful round-half-up + base_time re-center deferred to J22

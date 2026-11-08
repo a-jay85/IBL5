@@ -1,6 +1,6 @@
 ---
 description: Transient request-time DOM state must be undone in htmx:historyRestore and scoped to a data-* marker, because htmx snapshots the DOM between beforeRequest and the swap.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 ---
 
 # ADR-0103: Repair Transient htmx Request-Time DOM State on History Restore

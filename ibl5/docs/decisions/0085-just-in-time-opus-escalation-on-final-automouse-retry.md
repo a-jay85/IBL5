@@ -1,6 +1,6 @@
 ---
 description: Why a genuinely-failed non-Opus automouse plan escalates only its FINAL retry to Opus with the prior attempt's capped failure report, and why environmental (refunded) failures never escalate or write a report.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 owner: A-Jay
 ---
 

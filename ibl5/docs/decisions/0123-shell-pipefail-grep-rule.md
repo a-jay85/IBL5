@@ -1,6 +1,6 @@
 ---
 description: Shell scripts under set -o pipefail must use herestrings (grep -q <<< "$var") not printf-pipe-grep-q, which causes SIGPIPE false failures on Linux.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 owner: ajaynicolas
 ---
 

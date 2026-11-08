@@ -1,6 +1,6 @@
 ---
 description: J14 — the AutoResearch eval-harness is a faithfulness-CONSTRAINED search loop, not a "perturb params, keep improvements" hill-climb. It perturbs only allowlisted stand-in constants (everything not registered is frozen — safe-by-omission), scores distributional distance to the archive target bands, and emits a per-stand-in × per-term LEVERAGE report that ranks RE prioritization for humans — it never auto-commits, because a stand-in that improves corpus fit can MASK a fidelity bug (the ADR-0085 truncation-compensating-base_time precedent). Records rejection of loop L9's naive acceptance rule; harness build is the ⚙️ follow-up.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 ---
 
 # ADR-0087: AutoResearch eval-harness — a faithfulness-constrained search loop, not a corpus hill-climb

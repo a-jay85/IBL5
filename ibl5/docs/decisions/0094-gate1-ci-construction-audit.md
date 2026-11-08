@@ -1,6 +1,6 @@
 ---
 description: Adversarial statistical audit of the ~12.42 / 2-season CI floor ADR-0090 elected as the JSB cut-over bar (re-open criterion #2). Verdict A (construction DEFECT found?) = NO; Verdict B (cut-over authorized under criterion #2?) = NO. The ~12.42 bar has no recorded derivation (a PROVENANCE gap, corrected here to the actually-computed 12.374) but is recoverable as the √2-shrink of the reproduced 1-season CI and independently corroborated by a direct 2280-game bootstrap [12.418, 12.653]; every candidate defect (denominator uncertainty, reproduction-interval-as-gate, missing engine error bar, season-level clustering) is a NOT-A-DEFECT, PREFERENCE, or PROVENANCE finding that leaves master 12.37% below the bar. HOLD stands. § Addendum (2026-07-24) corrects the Phase 6 engine seed SD 0.012pp → ≈0.016pp (the 8 seed blocks overlapped): both verdicts unchanged, disposal margin narrowed.
-last_verified: 2026-09-08
+last_verified: 2026-11-07
 ---
 
 # ADR-0094: Gate-1 cut-over CI — construction audit (ADR-0090 re-open criterion #2)

@@ -165,6 +165,14 @@ final class PrArmableLibCliTest extends TestCase
         );
     }
 
+    public function testUiHoldFailsClosedOnRenameWithoutOldPath(): void
+    {
+        self::assertSame(
+            'ui-classifier-error',
+            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/X.php","changeType":"RENAMED"}]', '[]'])['output']
+        );
+    }
+
     public function testUiHoldFailsClosedAtHundredFiles(): void
     {
         $files = json_encode(array_fill(0, 100, ['path' => 'ibl5/classes/X.php']), JSON_THROW_ON_ERROR);

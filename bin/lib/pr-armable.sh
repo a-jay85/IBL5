@@ -175,6 +175,11 @@ pr_ui_hold() {
         echo "ui-awaiting-signoff"
     elif [ "$rc" -ne 1 ]; then
         echo "ui-classifier-error"
+    elif jq -e 'any(.[]?; .changeType == "RENAMED" and ((.previous_filename // "") == ""))' \
+            <<< "$files_json" >/dev/null 2>&1; then
+        # gh's `--json files` never carries the old path of a rename, so a UI
+        # file renamed to a non-UI path is invisible here. Fail closed.
+        echo "ui-classifier-error"
     fi
 }
 

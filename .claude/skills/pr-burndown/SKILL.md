@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-10-26
+last_verified: 2026-11-08
 ---
 
 # /pr-burndown
@@ -95,7 +95,7 @@ Then put each PR in one pile:
   post-plan arms it. It reaches the owner only if something blocks.
 - **Decide now.** A chore depends on an owner call: a design fork, a one-way door, a
   fix-or-close question, or a visual look before work starts. Its card goes out in the
-  first message.
+  first message. A PR that hit the round cap in Step 4 lands here too.
 
 Tell the owner the count in each pile and name the PRs in Decide now.
 
@@ -114,19 +114,30 @@ Even the shortest card carries:
 - Each risk or open question, with the evidence for it.
 - Each test, hold reason, or check by what it does or checks, in plain words.
 
-Re-fetch the PR right before you show it. Then collect:
+Re-fetch the PR right before you show it with one call:
 
-- **Head:** `gh pr view N --json headRefOid,mergeStateStatus,labels,autoMergeRequest`.
-- **CI:** `gh pr checks N`. Split real failures from gate checks that only wait on the
-  owner (`human-signoff`, `needs-a-human label`, `auto-mergeable label`).
-- **Review threads:**
-  ```bash
-  gh api graphql -f query='query{repository(owner:"a-jay85",name:"IBL5"){pullRequest(number:N){reviewThreads(first:50){nodes{isResolved isOutdated path line comments(first:3){nodes{author{login} body}}}}}}}'
-  ```
-- **post-plan verdict:** the last comment holding `<!-- pr-ready-verdict -->`. Check
-  whether it reviewed the current head. Commits after the review make it stale.
+```bash
+bin/pr-triage --card N
+```
+
+It prints the live state the card needs:
+
+- **Head:** the head SHA, merge state, labels, and auto-merge.
+- **CI:** real failures, split from the gate checks that only wait on the owner
+  (`human-signoff`, `needs-a-human label`, `auto-mergeable label`).
+- **Review threads:** the open threads that are not outdated, each with its first line.
+- **post-plan verdict:** the last `<!-- pr-ready-verdict -->` comment, marked `CURRENT`
+  or `STALE` against the head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
-- **Visual links:** the "Visual review" comment's `a-jay85.github.io/IBL5/...` URLs.
+- **Visual links:** the `a-jay85.github.io/IBL5/...` URLs from the comments.
+- **Live run and worktree:** any live post-plan label, and the PR's worktree path.
+
+A field that prints `unknown (fetch failed)` gets ⚠️ on the card. Never fill it from an
+earlier fetch. Read the thread bodies or the full verdict only when the card needs more
+than the first line.
+
+Check one more thing yourself:
+
 - **Does it do the job where it runs?** Read the diff against how the code deploys. For
   example, a Docker-only change does nothing on prod, which deploys by `git pull` onto a
   plain server. Say so on the card when the PR misses its own goal.
@@ -160,6 +171,11 @@ Write the card in this shape:
 💡 I'd go with **<n>**. <One or two lines of why.>
 ```
 
+Before you recommend an option, read the plan's Architectural trade-offs and "Must
+preserve" sections (`ls ~/claude-plans/<branch>.md`). If the plan already rejected the
+approach an option takes, say so on that option and don't recommend it. On #3760 a
+recommended `workflow_run` retrigger that the plan had rejected cost a full round.
+
 Legend for the emoji: ✅ fine, nothing to read. ⚠️ worth a look but does not block. ❌ blocks the
 merge or is a real problem. ⏳ still running or waiting. Pick the emoji from the live state
 you fetched. Do not guess. A line with no evidence gets ⚠️. Use 🚨 only for a
@@ -180,7 +196,26 @@ last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked
 
 ## Step 4: Run the prep
 
-Launch a prep job for every PR in the two prep piles. Use the Step 6 job template, with
+First pick the route for each PR. Post-plan's own fix round fixes open review threads,
+re-anchors a plan mutation row whose code moved, and strengthens the test for a row that
+did not trip. It merges master too. A prep job that fixes those chores and then
+re-fires post-plan does the same work twice.
+
+- **Re-fire post-plan only.** The chores are open review findings, a stale verdict, a
+  `BEHIND` branch, or a failed post-plan run. Run the Step 6 live-run check, then
+  `(cd <abs worktree path> && bin/post-plan-now --auto)`. Count it as a round.
+- **Prep job.** Any chore post-plan can't do: a `DIRTY` conflict, a snapshot or golden
+  fixture to regenerate, a promised test the plan names, or a finding post-plan's fix
+  round already tried and left open.
+
+Count rounds per PR in this run. A round is one prep job or one re-fire. Stop after 2
+rounds whose post-plan verdict still holds on a new finding. Don't start a third. Move the
+PR to Decide now with a card that offers: close it, redesign the approach, or ship it with
+the open findings filed to the backlog. Count rounds, not bug classes. The reviewer gives
+each new edge case its own class name, so the same weak approach never repeats a class.
+On #3714, #3715, #3742, and #3760, round 3 and later each turned up one more edge case.
+
+Launch a prep job for every PR on the prep-job route. Use the Step 6 job template, with
 step 3 listing the chores (rebase, the snapshots to regenerate, each missing test with its
 matrix row and the mutation it must catch, each review finding to fix) and step 7 set to:
 
@@ -234,7 +269,17 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    If one is listed, do not touch the worktree. Write "blocked: post-plan run live" to $D/jobs/pN.result and stop.
 2. Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
-4. Run <the tests and composer run analyse> in the worktree's Docker. Fix what broke.
+   For each review thread you fix, also fix every site its "other instances" line names.
+   Resolve a thread only after a commit changes the code it points at.
+4. Run the same checks post-plan runs before it fires, in the worktree, one call each:
+   bin/lib/prefire-verify --plan <plan path> --stage matrix, then --stage phpunit, then
+   --stage infection, then --stage exec-mutations. Drop --plan when the PR has no plan
+   (ls ~/claude-plans/<branch>.md). Exit 3 means Docker or the DB is down: run
+   bin/wt-up <slug> and retry. Also run composer run analyse in the worktree's Docker when
+   PHP changed, and <any extra tests this change needs>. Fix what broke.
+   Do not push until every stage exits 0. A pass is cached by tree hash, so the parent's
+   re-fire reuses it. If a failure is outside this PR's diff and also fails on master,
+   write that in the .result and stop.
 5. Push (force-with-lease after a rebase).
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.

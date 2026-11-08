@@ -273,30 +273,31 @@ want  "c11 live holder: takeover logged" "$LOG" "css lock wait timed out after 1
 want  "c11 live holder: rebuild runs" "$LOG" "css rebuilt on host"
 wantx "c11 live holder: restart runs" "$CALLS" "restart ibl5-tailwind"
 
-# Case 12: wait budget parsing. Each holder dies after ~1 s, so stale recovery ends the wait.
-prep_case 12a "$MAIN" yes ibl5-tailwind
-mkdir -p "$TMP/case-12a/cache/ibl5-hooks"
-holder="$(spawn_holder 1)"
-seed_lock "$(lockdir_for 12a "$MAIN")" "$holder"
-exec_case "$MAIN" yes
-want "c12a unset: default budget is 120s" "$LOG" "waiting up to 120s"
-want "c12a unset: rebuild runs" "$LOG" "css rebuilt on host"
-
-prep_case 12b "$MAIN" yes ibl5-tailwind
-mkdir -p "$TMP/case-12b/cache/ibl5-hooks"
-holder="$(spawn_holder 1)"
-seed_lock "$(lockdir_for 12b "$MAIN")" "$holder"
-CSS_REBUILD_LOCK_WAIT_SECS='' exec_case "$MAIN" yes
-want "c12b empty: default budget is 120s" "$LOG" "waiting up to 120s"
-want "c12b empty: rebuild runs" "$LOG" "css rebuilt on host"
-
-prep_case 12c "$MAIN" yes ibl5-tailwind
-mkdir -p "$TMP/case-12c/cache/ibl5-hooks"
-holder="$(spawn_holder 1)"
-seed_lock "$(lockdir_for 12c "$MAIN")" "$holder"
-CSS_REBUILD_LOCK_WAIT_SECS=5s exec_case "$MAIN" yes
-want "c12c near-miss 5s: default budget is 120s" "$LOG" "waiting up to 120s"
-want "c12c near-miss 5s: rebuild runs" "$LOG" "css rebuilt on host"
+# Case 12: wait budget parsing. The run is detached; once it logs its budget the
+# lock is removed so the waiter proceeds at once, whatever the budget was.
+wait_log() {   # <pattern> <max-seconds>
+    local i=0 max=$(($2 * 5))
+    while [ "$i" -lt "$max" ] && ! grep -qF -- "$1" "$LOG"; do sleep 0.2; i=$((i + 1)); done
+}
+run_c12() {   # <case-id> <label>
+    prep_case "$1" "$MAIN" yes ibl5-tailwind
+    mkdir -p "$TMP/case-$1/cache/ibl5-hooks"
+    holder="$(spawn_holder 30)"
+    seed_lock "$(lockdir_for "$1" "$MAIN")" "$holder"
+    # Background it: a hook that runs its wait in the foreground must not stall the harness.
+    DETACH=1 exec_case "$MAIN" yes &
+    c12_pid=$!
+    wait_log "waiting up to" 5
+    rm -rf "$(lockdir_for "$1" "$MAIN")"
+    wait_log "css rebuilt on host" 5
+    wait "$c12_pid" 2>/dev/null || true
+    kill "$holder" 2>/dev/null || true
+    want "$2: default budget is 120s" "$LOG" "waiting up to 120s"
+    want "$2: rebuild runs" "$LOG" "css rebuilt on host"
+}
+run_c12 12a "c12a unset"
+CSS_REBUILD_LOCK_WAIT_SECS='' run_c12 12b "c12b empty"
+CSS_REBUILD_LOCK_WAIT_SECS=5s run_c12 12c "c12c near-miss 5s"
 
 # Case 13: the hook returns before the lock wait ends, so a git op never blocks on it
 prep_case 13 "$MAIN" yes ibl5-tailwind

@@ -36,29 +36,4 @@ class SeasonPhaseHelperTest extends TestCase
         $result = SeasonPhaseHelper::getMonthForPhase('Free Agency');
         $this->assertSame(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result);
     }
-
-    public function testIsRegularSeasonPhaseForRegularSeason(): void
-    {
-        $this->assertTrue(SeasonPhaseHelper::isRegularSeasonPhase('Regular Season'));
-    }
-
-    public function testIsRegularSeasonPhaseForPreseason(): void
-    {
-        $this->assertTrue(SeasonPhaseHelper::isRegularSeasonPhase('Preseason'));
-    }
-
-    public function testIsRegularSeasonPhaseReturnsFalseForHEAT(): void
-    {
-        $this->assertFalse(SeasonPhaseHelper::isRegularSeasonPhase('HEAT'));
-    }
-
-    public function testIsHeatPhaseForHEAT(): void
-    {
-        $this->assertTrue(SeasonPhaseHelper::isHeatPhase('HEAT'));
-    }
-
-    public function testIsHeatPhaseReturnsFalseForRegularSeason(): void
-    {
-        $this->assertFalse(SeasonPhaseHelper::isHeatPhase('Regular Season'));
-    }
 }

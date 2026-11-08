@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\BasketballStats;
 
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\DataProvider;
 use BasketballStats\TeamStatsCalculator;
 use League\LeagueContext;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -198,159 +197,7 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(0, $result['losses']);
     }
 
-    public function testCalculateRankingScore(): void
-    {
-        $result = TeamStatsCalculator::calculateRankingScore(10, 5, 50, 25);
-        
-        // Total win points = 50 + 10 = 60
-        // Total loss points = 25 + 5 = 30
-        // Ranking = (60 / 90) * 100 = 66.7
-        $this->assertSame(66.7, $result);
-    }
-
-    public function testCalculateRankingScoreWithZeroValues(): void
-    {
-        $result = TeamStatsCalculator::calculateRankingScore(0, 0, 0, 0);
-        $this->assertSame(0.0, $result);
-    }
-
-    public function testCalculateGamesBack(): void
-    {
-        // 10 wins, 5 losses: (10/2) - (5/2) = 5 - 2.5 = 2.5
-        $result = TeamStatsCalculator::calculateGamesBack(10, 5);
-        $this->assertSame(2.5, $result);
-    }
-
-    public function testCalculateGamesBackWithEvenRecord(): void
-    {
-        $result = TeamStatsCalculator::calculateGamesBack(10, 10);
-        $this->assertSame(0.0, $result);
-    }
-
     // --- Merged from TeamStatsCalculatorEdgeCaseTest ---
-
-    // ============================================
-    // RANKING SCORE EDGE CASES
-    // ============================================
-
-    public function testRankingScoreWithAllWins(): void
-    {
-        // All wins, no losses
-        $result = TeamStatsCalculator::calculateRankingScore(82, 0, 3000, 0);
-
-        // Total win points = 3000 + 82 = 3082
-        // Total loss points = 0 + 0 = 0
-        // Ranking = (3082 / 3082) * 100 = 100.0
-        $this->assertSame(100.0, $result);
-    }
-
-    public function testRankingScoreWithAllLosses(): void
-    {
-        // All losses, no wins
-        $result = TeamStatsCalculator::calculateRankingScore(0, 82, 0, 3000);
-
-        // Total win points = 0
-        // Total loss points = 3000 + 82 = 3082
-        // Ranking = 0 / 3082 * 100 = 0.0
-        $this->assertSame(0.0, $result);
-    }
-
-    public function testRankingScoreWithVeryLargeValues(): void
-    {
-        // Very large values that might cause overflow
-        $result = TeamStatsCalculator::calculateRankingScore(1000000, 500000, 50000000, 25000000);
-
-        // Should handle large values without overflow
-        $this->assertIsFloat($result);
-        $this->assertGreaterThan(0, $result);
-        $this->assertLessThanOrEqual(100, $result);
-    }
-
-    public function testRankingScoreRounding(): void
-    {
-        // Test that rounding works correctly
-        $result = TeamStatsCalculator::calculateRankingScore(1, 2, 0, 0);
-
-        // Total win points = 0 + 1 = 1
-        // Total loss points = 0 + 2 = 2
-        // Ranking = (1 / 3) * 100 = 33.333...
-        $this->assertSame(33.3, $result);
-    }
-
-    public function testRankingScoreExact50Percent(): void
-    {
-        // Exactly 50-50
-        $result = TeamStatsCalculator::calculateRankingScore(41, 41, 1000, 1000);
-
-        // Total win = 1041, Total loss = 1041
-        // Ranking = 1041 / 2082 * 100 = 50.0
-        $this->assertSame(50.0, $result);
-    }
-
-    public function testRankingScoreNear50Percent(): void
-    {
-        // Test values that show clear difference after rounding
-        // Just above 50% - need larger difference to survive rounding
-        $result1 = TeamStatsCalculator::calculateRankingScore(50, 41, 1000, 1000);
-        // Just below 50%
-        $result2 = TeamStatsCalculator::calculateRankingScore(41, 50, 1000, 1000);
-
-        $this->assertGreaterThan(50.0, $result1);
-        $this->assertLessThan(50.0, $result2);
-    }
-
-    // ============================================
-    // GAMES BACK EDGE CASES
-    // ============================================
-
-    public function testGamesBackWithNegative(): void
-    {
-        // More losses than wins - behind first place
-        $result = TeamStatsCalculator::calculateGamesBack(5, 10);
-
-        // (5/2) - (10/2) = 2.5 - 5 = -2.5
-        $this->assertSame(-2.5, $result);
-    }
-
-    public function testGamesBackWithVeryLargeDifferential(): void
-    {
-        // Huge differential
-        $result = TeamStatsCalculator::calculateGamesBack(82, 0);
-
-        $this->assertSame(41.0, $result);
-    }
-
-    public function testGamesBackWithOddNumbers(): void
-    {
-        // Odd number of wins/losses
-        $result = TeamStatsCalculator::calculateGamesBack(7, 4);
-
-        // (7/2) - (4/2) = 3.5 - 2 = 1.5
-        $this->assertSame(1.5, $result);
-    }
-
-    public function testGamesBackWithZeroWins(): void
-    {
-        $result = TeamStatsCalculator::calculateGamesBack(0, 10);
-
-        // (0/2) - (10/2) = 0 - 5 = -5
-        $this->assertSame(-5.0, $result);
-    }
-
-    public function testGamesBackWithZeroLosses(): void
-    {
-        $result = TeamStatsCalculator::calculateGamesBack(10, 0);
-
-        // (10/2) - (0/2) = 5 - 0 = 5
-        $this->assertSame(5.0, $result);
-    }
-
-    public function testGamesBackWithBothZero(): void
-    {
-        $result = TeamStatsCalculator::calculateGamesBack(0, 0);
-
-        $this->assertSame(0.0, $result);
-    }
 
     // ============================================
     // STREAK EDGE CASES
@@ -638,7 +485,6 @@ class TeamStatsCalculatorTest extends TestCase
         $this->assertSame(1, $result['losses']);
         $this->assertSame(35, $result['winPoints']);
         $this->assertSame(20, $result['lossPoints']);
-        $this->assertSame(63.8, TeamStatsCalculator::calculateRankingScore(2, 1, 35, 20));
 
         $queries = $db->getPreparedQueries();
         $this->assertCount(1, array_filter($queries, static fn (string $q): bool => str_contains($q, 'teamid AS teamid')));
@@ -701,51 +547,6 @@ class TeamStatsCalculatorTest extends TestCase
             1,
             array_filter($db->getPreparedQueries(), static fn (string $q): bool => str_contains($q, 'teamid AS teamid'))
         );
-    }
-
-    // ============================================
-    // DATA PROVIDER TESTS
-    // ============================================
-
-    #[DataProvider('rankingScoreBoundaryProvider')]
-    public function testRankingScoreBoundaries(int $wins, int $losses, int $winPts, int $lossPts, float $expected): void
-    {
-        $result = TeamStatsCalculator::calculateRankingScore($wins, $losses, $winPts, $lossPts);
-
-        $this->assertSame($expected, $result);
-    }
-
-    public static function rankingScoreBoundaryProvider(): array
-    {
-        return [
-            'perfect record' => [82, 0, 3000, 0, 100.0],
-            'worst record' => [0, 82, 0, 3000, 0.0],
-            'even record' => [41, 41, 1000, 1000, 50.0],
-            'all zeros' => [0, 0, 0, 0, 0.0],
-            'only one win' => [1, 0, 0, 0, 100.0],
-            'only one loss' => [0, 1, 0, 0, 0.0],
-        ];
-    }
-
-    #[DataProvider('gamesBackProvider')]
-    public function testGamesBackVariousScenarios(int $wins, int $losses, float $expected): void
-    {
-        $result = TeamStatsCalculator::calculateGamesBack($wins, $losses);
-
-        $this->assertSame($expected, $result);
-    }
-
-    public static function gamesBackProvider(): array
-    {
-        return [
-            'even record' => [41, 41, 0.0],
-            '10 game lead' => [51, 31, 10.0],
-            '10 games back' => [31, 51, -10.0],
-            'half game lead' => [42, 41, 0.5],
-            'half game back' => [41, 42, -0.5],
-            'perfect season' => [82, 0, 41.0],
-            'winless season' => [0, 82, -41.0],
-        ];
     }
 
     public function testStandingsQueriesTargetIblStandingsWithoutLeagueContext(): void

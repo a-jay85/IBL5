@@ -53,12 +53,4 @@ class StandingsGrouper
     {
         return in_array($region, self::CONFERENCES, true);
     }
-
-    /**
-     * Check if a region is a division
-     */
-    public static function isDivision(string $region): bool
-    {
-        return in_array($region, self::DIVISIONS, true);
-    }
 }

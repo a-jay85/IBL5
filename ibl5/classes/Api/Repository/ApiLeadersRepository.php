@@ -82,16 +82,6 @@ class ApiLeadersRepository extends \Database\BaseMysqliRepository
     }
 
     /**
-     * Get available seasons for the leaders endpoint.
-     *
-     * @return list<int>
-     */
-    public function getAvailableSeasons(): array
-    {
-        return (new \Season\SeasonQueryRepository($this->db))->getAvailableSeasonYears();
-    }
-
-    /**
      * Resolve the category from filters, defaulting to 'ppg'.
      *
      * @param array<string, string> $filters

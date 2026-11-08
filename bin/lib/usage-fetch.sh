@@ -38,6 +38,10 @@ USAGE_AUTH_DEAD_TTL=900
 # Plain assignment like the tunables above: tests drive rotation by seeding an oversized log.
 USAGE_LOG_MAX_BYTES=262144
 
+# _usage_lock_hook <event>: a no-op seam the lock code calls at each step. bin/test-usage-gate
+# redefines it after sourcing this file, to trace lock events and to hold a process at a barrier.
+_usage_lock_hook() { :; }
+
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
 # an empty value falls back to the default.
@@ -89,9 +93,11 @@ _usage_log_rotate() {
     [ "$(_usage_log_size "$1/usage-gate.log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
     if ! mkdir "$lock" 2>/dev/null; then
         [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 0
+        _usage_lock_hook rotate-orphan-reclaim
         rmdir "$lock" 2>/dev/null
         mkdir "$lock" 2>/dev/null || return 0
     fi
+    _usage_lock_hook rotate-lock-won
     _usage_log_rotate_locked "$1"
     rmdir "$lock" 2>/dev/null
     return 0
@@ -103,7 +109,9 @@ _usage_log_rotate() {
 _usage_log_rotate_locked() {
     local log="$1/usage-gate.log"
     [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
+    _usage_lock_hook rotate-checked
     mv -f "$log" "$log.1" 2>/dev/null
+    _usage_lock_hook rotate-mv
     return 0
 }
 
@@ -347,19 +355,24 @@ _usage_fetch_lock_acquire() {
     local lock="$1/fetch.lock.d" now at="" pid="" got=""
     now=$(date +%s)
     if mkdir "$lock" 2>/dev/null; then
+        _usage_lock_hook fetch-mkdir-won
         { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
         return 0
     fi
     if [ ! -f "$lock/at" ]; then
         # Orphan from a holder that died between mkdir and its stamp: stamp it so it ages out.
         # noclobber (O_EXCL): never overwrite the real holder's stamp, or its release can't match its pid.
+        _usage_lock_hook fetch-orphan-stamp
         ( set -C; printf '%s 0\n' "$now" > "$lock/at" ) 2>/dev/null
         return 1
     fi
+    _usage_lock_hook fetch-busy
     read -r at pid < "$lock/at" 2>/dev/null
     case "$at" in ''|*[!0-9]*) at=$now ;; esac
     [ $((now - at)) -gt "$USAGE_FETCH_LOCK_STALE" ] || return 1
+    _usage_lock_hook fetch-reclaim-stale
     mv "$lock" "$lock.stale.$$" 2>/dev/null || return 1
+    _usage_lock_hook fetch-reclaim-mv
     read -r got pid < "$lock.stale.$$/at" 2>/dev/null
     case "$got" in ''|*[!0-9]*) got=0 ;; esac
     if [ $((now - got)) -le "$USAGE_FETCH_LOCK_STALE" ]; then
@@ -369,6 +382,7 @@ _usage_fetch_lock_acquire() {
     fi
     rm -rf "$lock.stale.$$"
     mkdir "$lock" 2>/dev/null || return 1
+    _usage_lock_hook fetch-reclaim-won
     { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
     return 0
 }
@@ -377,7 +391,7 @@ _usage_fetch_lock_acquire() {
 _usage_fetch_lock_release() {
     local lock="$1/fetch.lock.d" at="" pid=""
     read -r at pid < "$lock/at" 2>/dev/null
-    [ "$pid" = "$$" ] && rm -rf "$lock"
+    if [ "$pid" = "$$" ]; then _usage_lock_hook fetch-release-rm; rm -rf "$lock"; else _usage_lock_hook fetch-release-skip; fi
     return 0
 }
 
@@ -482,6 +496,7 @@ usage_fetch() {
         # rc (locked keychain, no UI access under launchd) says nothing about the login.
         if [ "$src" -eq 44 ] || [ "$src" -eq 0 ]; then dead="no-token"; fi
     else
+        _usage_lock_hook fetch-pre-curl
         rm -f "$hdr"
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
             -H "Authorization: Bearer $tok" -H "anthropic-beta: oauth-2025-04-20"); crc=$?

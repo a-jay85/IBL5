@@ -210,7 +210,7 @@ while [ \$# -gt 0 ]; do
     case "\$1" in -D) hdr="\$2"; shift ;; esac
     shift
 done
-echo call >> "$dir/curl.calls"
+echo "call \$PPID" >> "$dir/curl.calls"
 [ "$sl" -gt 0 ] && sleep "$sl"
 if [ -n "\$hdr" ]; then
     printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
@@ -226,6 +226,16 @@ fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
     PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; ${FETCH_PRELUDE:-}usage_fetch $1"
 }
 
+# diag_dump <label> <file...>: after a failed concurrency assert, prints each file (or <missing>)
+# under a DIAG banner so a CI log shows which processes held which lock.
+diag_dump() {
+    local label="$1" f; shift
+    for f in "$@"; do
+        echo "  DIAG $label $f:"
+        if [ -e "$f" ]; then tail -n 80 "$f" | sed 's/^/    | /'; else echo "    | <missing>"; fi
+    done
+}
+
 # fetch_parallel <n> <max_age>: n concurrent usage_fetch calls; results in $T/out.<i>, $T/rc.<i>.
 # Waits only on its own pids (never a bare `wait`).
 # A runner stall past the 15s stale limit lets a late peer reclaim a live lock and call
@@ -233,9 +243,11 @@ fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
 # so these runs lift the limit. The prelude is set after the lib is sourced because the
 # lib assigns the default on load.
 fetch_parallel() {
-    local i=1 pids=""
+    local i=1 pids="" pre
+    rm -f "$T/lock.trace"
+    pre="USAGE_FETCH_LOCK_STALE=3600; _usage_lock_hook() { printf '%s %s\\n' \"\$\$\" \"\$1\" >> '$T/lock.trace'; }; "
     while [ "$i" -le "$1" ]; do
-        ( FETCH_PRELUDE='USAGE_FETCH_LOCK_STALE=3600; '; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
+        ( FETCH_PRELUDE="$pre"; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
         pids="$pids $!"
         i=$((i + 1))
     done
@@ -352,6 +364,7 @@ test_fetch_429_concurrent_one_call() {
     for round in 1 2; do
         fetch_parallel 6 45
         assert_eq "fetch_429_conc:calls$round" 1 "$(curl_calls "$STUB")"
+        [ "$(curl_calls "$STUB")" = 1 ] || diag_dump "fetch_429_conc$round" "$STUB/curl.calls" "$T/lock.trace"
         for i in 1 2 3 4 5 6; do
             assert_eq "fetch_429_conc:rc$round.$i" 2 "$(cat "$T/rc.$i")"
             assert_eq "fetch_429_conc:util$round.$i" 41.0 "$(util_of "$(cat "$T/out.$i")")"
@@ -401,6 +414,7 @@ test_fetch_single_flight_parallel() {
     local i rc saw77=0 n
     fetch_parallel 6 45
     assert_eq fetch_single_flight:calls 1 "$(curl_calls "$STUB")"
+    [ "$(curl_calls "$STUB")" = 1 ] || diag_dump fetch_single_flight "$STUB/curl.calls" "$T/lock.trace"
     for i in 1 2 3 4 5 6; do
         rc=$(cat "$T/rc.$i")
         if [ "$rc" = 0 ] || [ "$rc" = 2 ]; then pass "fetch_single_flight:rc.$i"; else fail "fetch_single_flight:rc.$i" "rc=$rc"; fi
@@ -2917,10 +2931,10 @@ test_usage_log_refused_dir_silent() {
 
 test_usage_log_concurrent_writers() {
     new_env
-    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids=""
+    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids="" f
     seed_log 4096 "$d/usage-gate.log"
     for w in 1 2 3 4 5 6 7 8; do
-        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
+        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; _usage_lock_hook() { printf '%s %s\n' \"\$\$\" \"\$1\" >> '$T/rotate.trace'; }; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
         pids="$pids $!"
     done
     for p in $pids; do wait "$p"; done
@@ -2929,6 +2943,13 @@ test_usage_log_concurrent_writers() {
     assert_eq concurrent:no-malformed 0 "$(grep -cvE "(${LOG_PFX}writer-[0-9]+-[0-9]+\$)|(${SEED_RE#^})" "$T/all")"
     assert_eq concurrent:no-dupes 0 "$(sort "$T/all" | uniq -d | wc -l | tr -d ' ')"
     assert_eq concurrent:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    if [ "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1" 2>/dev/null)" != 4096 ]; then
+        ls -la "$d" | sed 's/^/  DIAG seeds ls | /'
+        for f in "$d/usage-gate.log" "$d/usage-gate.log.1"; do
+            echo "  DIAG seeds $f bytes=$(wc -c < "$f" 2>/dev/null | tr -dc 0-9) seeds=$(grep -cE "$SEED_RE" "$f" 2>/dev/null) writers=$(grep -cE "${LOG_PFX}writer-" "$f" 2>/dev/null)"
+        done
+        diag_dump seeds "$T/rotate.trace"
+    fi
     assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
 }
 

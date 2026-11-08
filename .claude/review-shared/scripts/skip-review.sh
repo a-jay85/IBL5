@@ -309,15 +309,13 @@ fi
 # Step 11: carry-forward extraction — precondition of SKIP.
 # Mirrors bin/digest-dm-build's _digest_labels: start after `### Merge digest`, stop at the
 # next heading OR at a horizontal rule (`---`, the terminator both sticky writers emit).
-# Herestring, not a printf pipe: awk exits early at the terminator, and under pipefail a
-# printf still writing a long body dies of SIGPIPE, misreporting prior-digest-unparseable.
-DIGEST_BLOCK="$(awk '
+DIGEST_BLOCK="$(printf '%s\n' "$BODY" | awk '
   { sub(/[[:space:]]*$/, "") }
   /^### Merge digest[[:space:]]*$/ { in_digest=1; next }
   in_digest && /^#+ /              { exit }
   in_digest && /^---$/             { exit }
   in_digest && $0 != ""            { print }
-' <<< "$BODY" 2>/dev/null)" || run "prior-digest-unparseable"
+' 2>/dev/null)" || run "prior-digest-unparseable"
 
 DIGEST_ARRAY=()
 n=0

@@ -5,8 +5,18 @@
 # helpers and T_FAIL counter. Each case writes a scenario script that
 # sources the lib, runs it under /bin/bash (bash 3.2 on macOS, 5.x on
 # Ubuntu), and checks stdout, stderr, and the exit code.
+#
+# Run: bin/test-harness-lib  (every case)
+#      bin/test-harness-lib shard|leg|coverage  (only that group of the
+#      shard and leg cases, so a plan mutation check runs inside its limit)
 
 set -uo pipefail
+
+THL_ONLY="${1:-}"
+case "$THL_ONLY" in
+    '' | shard | leg | coverage) ;;
+    *) echo "test-harness-lib: unknown group [$THL_ONLY]; use shard, leg, or coverage" >&2; exit 2 ;;
+esac
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="$SELF_DIR/lib/harness.sh"
@@ -687,6 +697,7 @@ case_usage_gate_isolated() {
     fi
 }
 
+if [ -z "$THL_ONLY" ]; then
 case_pass_summary
 case_fail_exits_nonzero
 case_zero_assertions
@@ -721,6 +732,199 @@ case_fail_fd_invalid
 case_skip_suffix
 case_skip_only_fails_by_default
 case_skip_ok
+fi
+
+
+# ---- shard helpers + shard-union + leg/coverage modes (ci-split-shell-harness) ----
+RUNNER="$SELF_DIR/run-shell-harnesses"
+
+# chk NAME WANT_RC PATTERN: asserts RC and (when PATTERN is non-empty) that OUT or ERR holds it.
+chk() {
+    local name="$1" want="$2" pat="$3"
+    if [ "$RC" -eq "$want" ] && { [ -z "$pat" ] || grep -qF -- "$pat" <<<"$OUT$ERR"; }; then
+        t_ok "$name"
+    else
+        t_bad "$name (rc=$RC want $want, pattern [$pat]): $OUT$ERR"
+    fi
+}
+
+case_shard_partition() {
+    local got
+    run_scenario shard_part_a 'h_shard_init 0/2; for k in 1 2 3 4 5 6; do h_shard_take && printf 1 || printf 0; done; echo'
+    got="$(cat "$WORK/shard_part_a.out")"
+    [ "$got" = 101010 ] || { t_bad "shard-partition: 0/2 gave [$got]"; return; }
+    run_scenario shard_part_b 'h_shard_init 1/2; for k in 1 2 3 4 5 6; do h_shard_take && printf 1 || printf 0; done; echo'
+    got="$(cat "$WORK/shard_part_b.out")"
+    [ "$got" = 010101 ] || { t_bad "shard-partition: 1/2 gave [$got]"; return; }
+    run_scenario shard_part_c 'h_shard_init 0/1; for k in 1 2 3 4 5 6; do h_shard_take && printf 1 || printf 0; done; echo'
+    got="$(cat "$WORK/shard_part_c.out")"
+    [ "$got" = 111111 ] || { t_bad "shard-partition: 0/1 gave [$got]"; return; }
+    run_scenario shard_part_d 'h_shard_init; for k in 1 2 3 4 5 6; do h_shard_take && printf 1 || printf 0; done; echo'
+    got="$(cat "$WORK/shard_part_d.out")"
+    [ "$got" = 111111 ] || { t_bad "shard-partition: no argument gave [$got]"; return; }
+    run_scenario shard_part_e 'h_shard_init ""; for k in 1 2 3 4 5 6; do h_shard_take && printf 1 || printf 0; done; echo'
+    got="$(cat "$WORK/shard_part_e.out")"
+    [ "$got" = 111111 ] || { t_bad "shard-partition: empty spec gave [$got]"; return; }
+    t_ok "shard-partition"
+}
+
+case_shard_spec_rejects() {
+    local spec i=0 bad=0
+    for spec in 0/02 01/2 1/1 2/2 a/2 /2 1/2/3 "1/2 " 1; do
+        i=$((i + 1))
+        run_scenario "shard_rej_$i" 'h_shard_init "$SPEC"; echo reached' "SPEC=$spec"
+        if [ "$RC" -ne 2 ] || ! grep -qF 'h_shard_init: spec must be' "$WORK/shard_rej_$i.err"; then
+            t_bad "shard-spec-rejects: [$spec] rc=$RC"; bad=1
+        fi
+    done
+    [ "$bad" -ne 0 ] || t_ok "shard-spec-rejects"
+}
+
+case_shard_primary() {
+    local a b c
+    run_scenario shard_prim_a 'h_shard_primary && echo Y || echo N'
+    a="$(cat "$WORK/shard_prim_a.out")"
+    run_scenario shard_prim_b 'h_shard_init 0/2; h_shard_primary && echo Y || echo N'
+    b="$(cat "$WORK/shard_prim_b.out")"
+    run_scenario shard_prim_c 'h_shard_init 1/2; h_shard_primary && echo Y || echo N'
+    c="$(cat "$WORK/shard_prim_c.out")"
+    if [ "$a$b$c" = YYN ]; then t_ok "shard-primary"; else t_bad "shard-primary: unsharded=$a 0/2=$b 1/2=$c"; fi
+}
+
+# mk_union_fixture NAME CALL: a harness that emits case-1..case-6 through CALL.
+mk_union_fixture() {
+    local f="$WORK/$1.sh"
+    {
+        printf '#!/usr/bin/env bash\n. %q\n' "$LIB"
+        printf 'h_shard_init "${FX_SHARD:-}"\n'
+        printf 'for c in 1 2 3 4 5 6; do %s; done\n' "$2"
+        printf 'h_done\n'
+    } >"$f"
+    chmod +x "$f"
+}
+
+run_runner() {
+    local dir="$1"
+    shift
+    RC=0
+    OUT="$(cd "$dir" && "$RUNNER" "$@" 2>"$WORK/runner.err" </dev/null)" || RC=$?
+    ERR="$(cat "$WORK/runner.err")"
+}
+
+case_shard_union() {
+    mk_union_fixture fx_good 'h_shard_take && h_pass "case-$c"'
+    mk_union_fixture fx_bad 'h_pass "case-$c"'
+    run_runner "$WORK" --shard-union FX_SHARD=3 "$WORK/fx_good.sh"
+    chk "shard-union-ok" 0 'shard-union: OK (6 cases across 3 shards)'
+    run_runner "$WORK" --shard-union FX_SHARD=3 "$WORK/fx_bad.sh"
+    chk "shard-union-catches-duplicates" 1 'shard cases differ'
+    local bad=0 spec
+    for spec in "2" "FX_SHARD=1" "fx=2"; do
+        run_runner "$WORK" --shard-union "$spec" "$WORK/fx_good.sh"
+        [ "$RC" -eq 2 ] || { t_bad "shard-union-usage: [$spec] rc=$RC"; bad=1; }
+    done
+    [ "$bad" -ne 0 ] || t_ok "shard-union-usage"
+}
+
+# mk_leg_fixture DIR: scripts, a workflow naming test-c, and a three-entry list.
+mk_leg_fixture() {
+    local d="$1"
+    mkdir -p "$d/bin" "$d/.github/workflows"
+    printf '#!/bin/sh\nexit 0\n' >"$d/bin/test-a"
+    cp "$d/bin/test-a" "$d/bin/test-b"
+    cp "$d/bin/test-a" "$d/bin/test-c"
+    cp "$d/bin/test-a" "$d/bin/test-d"
+    printf '#!/bin/sh\n[ "${FX:-}" = 1 ]\n' >"$d/bin/test-env"
+    chmod +x "$d/bin/test-a" "$d/bin/test-b" "$d/bin/test-c" "$d/bin/test-env"
+    printf 'jobs:\n  j:\n    steps:\n      - run: bin/test-c\n' >"$d/.github/workflows/w.yml"
+    printf '0 bin/test-a\n0 FX=1 bin/test-env\n1 bin/test-b\nexempt bin/test-d kept for a wrapper\n' >"$d/legs.txt"
+}
+
+case_leg_modes() {
+    local d="$WORK/legfx" bad=0
+    mk_leg_fixture "$d"
+    run_runner "$d" -j 2 --list legs.txt --leg 0
+    chk "leg-runs-only-its-entries (leg 0)" 0 'Ran 2/2 scripts'
+    run_runner "$d" -j 2 --list legs.txt --leg 1
+    chk "leg-runs-only-its-entries (leg 1)" 0 'Ran 1/1 scripts'
+    run_runner "$d" -j 2 --list legs.txt --leg 0
+    chk "leg-env-prefix (FX=1 reached bin/test-env)" 0 '0 failed'
+    run_runner "$d" -j 2 bin/test-a
+    chk "leg-env-prefix (positional script)" 0 'Ran 1/1 scripts'
+    local args
+    for args in "--leg 0" "--list legs.txt" "--list=legs.txt --leg 0" "--list legs.txt --leg 0 bin/test-a" "--list legs.txt --leg 7"; do
+        # shellcheck disable=SC2086  # intentional word splitting of the fixture argument list
+        run_runner "$d" $args
+        [ "$RC" -eq 2 ] || { t_bad "leg-usage-rejects: [$args] rc=$RC"; bad=1; }
+        # A lone --list or --leg must be refused by the pairing check itself, not by a later
+        # "no such file" or "no entries" error that also exits 2.
+        case "$args" in
+            "--leg 0" | "--list legs.txt")
+                case "$ERR" in
+                    *'--list and --leg go together'*) ;;
+                    *) t_bad "leg-usage-rejects: [$args] not refused by the pairing check: $ERR"; bad=1 ;;
+                esac ;;
+        esac
+    done
+    [ "$bad" -ne 0 ] || t_ok "leg-usage-rejects"
+}
+
+case_coverage_modes() {
+    local d="$WORK/covfx"
+    mk_leg_fixture "$d"
+    run_runner "$d" --check-coverage legs.txt --leg-count 2
+    chk "coverage-ok" 0 'coverage: OK (3 entries, 2 legs)'
+
+    grep -v '^1 bin/test-b$' "$d/legs.txt" >"$d/legs-nob.txt"
+    printf '1 FX=1 bin/test-env\n' >>"$d/legs-nob.txt"
+    run_runner "$d" --check-coverage legs-nob.txt --leg-count 2
+    chk "coverage-unlisted" 1 'unlisted harness bin/test-b'
+    printf 'run: bin/test-bb\nrun: ibl5/bin/test-b\nrun: bin/test-c\n' >"$d/.github/workflows/w.yml"
+    run_runner "$d" --check-coverage legs-nob.txt --leg-count 2
+    chk "coverage-unlisted (near-miss workflow names)" 1 'unlisted harness bin/test-b'
+    printf 'run: bin/test-c\n' >"$d/.github/workflows/w.yml"
+
+    cp "$d/legs.txt" "$d/legs-dup.txt"
+    printf '1 bin/test-a\n' >>"$d/legs-dup.txt"
+    run_runner "$d" --check-coverage legs-dup.txt --leg-count 2
+    chk "coverage-listed-twice" 1 'listed twice: bin/test-a'
+
+    cp "$d/legs.txt" "$d/legs-two.txt"
+    printf '1 FY=2 bin/test-a\n' >>"$d/legs-two.txt"
+    run_runner "$d" --check-coverage legs-two.txt --leg-count 2
+    chk "coverage-two-entries" 1 'in two entries without a shard split: bin/test-a'
+
+    printf '0 bin/test-a\n0 FX=1 bin/test-env\n0 S_SHARD=0/2 bin/test-b\nexempt bin/test-d kept for a wrapper\n' >"$d/legs-sh.txt"
+    run_runner "$d" --check-coverage legs-sh.txt --leg-count 1
+    chk "coverage-shard-set (missing partner)" 1 'shard 1/2 of bin/test-b runs 0 times'
+    printf '0 S_SHARD=1/2 bin/test-b\n' >>"$d/legs-sh.txt"
+    run_runner "$d" --check-coverage legs-sh.txt --leg-count 1
+    chk "coverage-shard-set (complete)" 0 'coverage: OK'
+
+    run_runner "$d" --check-coverage legs.txt --leg-count 3
+    chk "coverage-leg-count (too many)" 1 'leg 2 has no entries'
+    run_runner "$d" --check-coverage legs.txt --leg-count 1
+    chk "coverage-leg-count (too few)" 1 'outside the workflow matrix'
+
+    { printf '00 bin/test-a\n'; cat "$d/legs.txt"; } >"$d/legs-tok.txt"
+    run_runner "$d" --check-coverage legs-tok.txt --leg-count 2
+    chk "coverage-parse-near-miss (leg token)" 1 'bad leg token'
+    { cat "$d/legs.txt"; printf 'exempt bin/test-d\n'; } >"$d/legs-noreason.txt"
+    run_runner "$d" --check-coverage legs-noreason.txt --leg-count 2
+    chk "coverage-parse-near-miss (exempt reason)" 1 'exempt entry has no reason'
+    { cat "$d/legs.txt"; printf '# 0 bin/test-x\n'; } >"$d/legs-comment.txt"
+    run_runner "$d" --check-coverage legs-comment.txt --leg-count 2
+    chk "coverage-parse-near-miss (comment ignored)" 0 'coverage: OK (3 entries, 2 legs)'
+}
+
+if [ -z "$THL_ONLY" ] || [ "$THL_ONLY" = shard ]; then
+    case_shard_partition
+    case_shard_spec_rejects
+    case_shard_primary
+    case_shard_union
+fi
+if [ -z "$THL_ONLY" ] || [ "$THL_ONLY" = leg ]; then case_leg_modes; fi
+if [ -z "$THL_ONLY" ] || [ "$THL_ONLY" = coverage ]; then case_coverage_modes; fi
 
 if [ "$T_FAIL" -eq 0 ]; then
     echo "test-harness-lib: all cases passed"

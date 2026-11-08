@@ -162,7 +162,8 @@ ljob_lock_dir() { printf '%s\n' "${LJOB_LOCK_DIR:-$HOME/Library/Caches/com.ibl5.
 # ljob_slot_lock <label_prefix>: per-prefix mkdir lock holding the launcher's PID.
 # A lock whose holder is dead is broken, after re-reading the pid file so a lock
 # taken over in between survives. A pid file still empty after 5 tries means the
-# holder died between its mkdir and its write. LJOB_LOCK_TRIES caps the retries
+# holder died between its mkdir and its write. The pid write is exclusive, so a
+# stalled holder that wakes after that break cannot share the lock. LJOB_LOCK_TRIES caps the retries
 # (unset or empty = unbounded) and a capped run returns 1.
 ljob_slot_lock() {
     local prefix="$1" dir lock holder tries=0 empties=0
@@ -171,8 +172,13 @@ ljob_slot_lock() {
     mkdir -p "$dir" || { echo "ERROR: cannot create lock dir $dir" >&2; return 1; }
     while :; do
         if mkdir "$lock" 2>/dev/null; then
-            printf '%s\n' "$$" > "$lock/pid"
-            return 0
+            # noclobber makes the pid write exclusive. A launcher that stalls
+            # here past the empty-pid break finds the pid file already written
+            # (or the lock gone) and loses, so two launchers never both own it.
+            if (set -C; printf '%s\n' "$$" > "$lock/pid") 2>/dev/null; then
+                return 0
+            fi
+            continue
         fi
         holder="$(cat "$lock/pid" 2>/dev/null || true)"
         if [[ -z "$holder" ]]; then

@@ -1560,13 +1560,12 @@ echo "── Phase 7+8: CI-wiring assertion (Verification Matrix row 23) ──"
 # seam step breaks.
 # Source: phase 8 plan requirement, seam harness = bin/test-plan-review-seam.
 SEAM_HARNESS="$ROOT/bin/test-plan-review-seam"
-TESTS_YML="$ROOT/.github/workflows/tests.yml"
 
 # Part 1: CI workflow still wires the seam harness.
-if grep -q 'test-plan-review-seam' "$TESTS_YML" 2>/dev/null; then
-    ok "CI: tests.yml invokes bin/test-plan-review-seam"
+if grep -qE '^[0-9]+ bin/test-plan-review-seam$' "$ROOT/.github/workflows/harness-legs.txt" 2>/dev/null; then
+    ok "CI: harness-legs.txt invokes bin/test-plan-review-seam"
 else
-    fail "CI: tests.yml does NOT invoke bin/test-plan-review-seam"
+    fail "CI: harness-legs.txt does NOT invoke bin/test-plan-review-seam"
 fi
 
 # Parts 2+3: seam harness source carries the completion token and no SKIP GATE.

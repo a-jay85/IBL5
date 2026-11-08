@@ -2315,9 +2315,10 @@ if should_run "case 29 CI wiring"; then
 begin_case
 WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
 if [[ -f "$WF" ]]; then
-    # Listed once in the bin/run-shell-harnesses argument list (one script per line).
-    [[ "$(grep -cE '^[[:space:]]+bin/test-pr-cycle( \\)?$' "$WF")" == "1" ]] \
-        || fail "tests.yml does not list bin/test-pr-cycle exactly once in the harness runner"
+    # Listed once in the leg list the harness-tests matrix reads (one entry per line).
+    LEGS="$SCRIPT_DIR/../.github/workflows/harness-legs.txt"
+    [[ "$(grep -cE '^[0-9]+ bin/test-pr-cycle$' "$LEGS")" == "1" ]] \
+        || fail "harness-legs.txt does not list bin/test-pr-cycle exactly once"
 else
     fail "workflow file not found at $WF"
 fi

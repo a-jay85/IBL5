@@ -75,15 +75,17 @@ regularTest.describe('Google sign-in (regular user)', () => {
     expect(conn.status()).toBe(404);
   });
 
-  regularTest('GET op=google_start is redirected back without an alert', async ({ page }) => {
-    const response = await page.request.get(`${API_KEYS}&op=google_start`, { maxRedirects: 0 });
-    expect(response.status()).toBe(302);
-    expect(response.headers()['location']).toContain('name=ApiKeys');
-    expect(response.headers()['location']).not.toContain('google');
+  for (const op of ['google_start', 'google_refresh', 'google_disconnect']) {
+    regularTest(`GET op=${op} is redirected back without an alert`, async ({ page }) => {
+      const response = await page.request.get(`${API_KEYS}&op=${op}`, { maxRedirects: 0 });
+      expect(response.status()).toBe(302);
+      expect(response.headers()['location']).toContain('name=ApiKeys');
+      expect(response.headers()['location']).not.toContain('google');
 
-    await page.goto(API_KEYS);
-    await expect(page.locator('#apikeys-flash')).toHaveCount(0);
-  });
+      await page.goto(API_KEYS);
+      await expect(page.locator('#apikeys-flash')).toHaveCount(0);
+    });
+  }
 });
 
 publicTest.describe('Google sign-in (anonymous)', () => {

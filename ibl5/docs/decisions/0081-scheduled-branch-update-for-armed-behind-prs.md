@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once. Amended 2026-11-03: a settled verdict on the PR the line holds on dispatches one head-of-line pass.
-last_verified: 2026-11-05
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once. Amended 2026-11-03: a settled verdict on the PR the line holds on dispatches one head-of-line pass. Amended 2026-11-08: push passes no longer sleep 300 seconds before the bot-commit wait.
+last_verified: 2026-11-08
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -231,3 +231,15 @@ The pass carries one input, `settle=true`, and no PR number. It runs in its own 
 **Gate change.** `bin/check-composite-contracts` A4 used to accept only `statuses` as a write scope on `all-checks-settled.yml`. It now requires exactly `actions statuses`. The check is an exact match. `bin/test-check-composite-contracts` rejects a third write scope and a dropped `actions: write` grant.
 
 **Unchanged.** The cron line, every arming and merge gate, and the verdict `bin/check-pr-checks-green` computes. There is still no GitHub merge queue.
+
+## Addendum: coalesce sleep removed (2026-11-08)
+
+Push passes of `.github/workflows/update-behind-prs.yml` no longer run the `Coalesce a burst of master merges` step. That step slept 300 seconds before the bot-commit wait. The `PUSH_COALESCE_SECONDS` bullet in the Decision and the head-of-line addendum's coalesce wording describe the old step. Read them as history.
+
+**Why the sleep went.** The sleep was built for the burst storm, when every armed PR was updated on each merge. Since the head-of-line addendum (2026-09-29) a pass updates at most one PR. The bot-commit wait in `bin/lib/master-bot-wait.sh` already holds a push pass until master's `Tests and Analysis` and `Migration Safety` runs finish. A second master merge still cancels a running pass through `cancel-in-progress`. Measured over the week before this change: 121 push passes, each spending 5.0 minutes in the sleep and a median 2.2 minutes in the bot wait, and 12 of them updated a PR. Master is `strict: true`, so landings are serial and the sleep added five minutes to every cycle of the merge line.
+
+**The case the sleep still covered.** A merge that touches none of the paths `tests.yml` or `migration-safety.yml` trigger on starts neither bot workflow, so the bot wait returns at once. That held for 4 of the 12 most recent push SHAs that started a pass, sampled on 2026-11-08. With no sleep, such a pass updates the head right away. If a second merge lands within minutes, that head update's CI run is wasted. Under `strict: true` a second PR can land that fast only through an admin merge or the hotfix lane, so the cost is rare and bounded at one CI run.
+
+**Why the step was removed outright.** On 8 sampled SHAs the `Tests and Analysis` run had the same `created_at` second as the `Update BEHIND PRs` run, and the bot wait counts a queued run as open. A short delay that lets GitHub list the run buys nothing. A 30 to 60 second sleep was considered and dropped for that reason.
+
+**Unchanged.** `timeout-minutes: 60`, the 45-minute bot-wait cap, the 20-attempt UNKNOWN retry window, the schedule and dispatch paths, and the one-PR-per-pass rule.

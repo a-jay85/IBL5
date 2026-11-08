@@ -1,6 +1,6 @@
 ---
 description: A PR labeled hotfix sorts ahead of every other armed PR in the merge line, and a new pull_request_target workflow, hotfix-dispatch.yml, starts an update-behind-prs pass the moment an armed PR carries the label. Gates, the armed filter, and the feat floor are unchanged.
-last_verified: 2026-11-02
+last_verified: 2026-11-08
 owner: ajaynicolas
 ---
 
@@ -47,3 +47,7 @@ The label was created with `gh label create hotfix --force --color D73A4A --desc
 - `.github/workflows/update-behind-prs.yml`
 - `.github/workflows/mutation.yml`
 - ADR-0081, `ibl5/docs/decisions/0081-scheduled-branch-update-for-armed-behind-prs.md`
+
+## Addendum: coalesce sleep removed (2026-11-08)
+
+The Decision says the hotfix pass skips the 300-second coalesce sleep. That sleep no longer runs on any path. Push passes dropped it on 2026-11-08, as recorded in the ADR-0081 addendum of that date. The hotfix pass and the push pass now start the same way, at the bot-commit wait. The hotfix lane keeps its own `-hotfix` concurrency group, so a hotfix dispatch still never cancels a push pass in its bot-commit wait. Its head start over a push pass now comes from the sort order and the dispatch at label time.

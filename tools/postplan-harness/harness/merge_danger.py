@@ -46,6 +46,7 @@ _SITE_WIDE_PATHS = ("ibl5/.htaccess", "ibl5/router.php", "ibl5/composer.json")
 _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
 _WORKFLOW_GLOB = ".github/workflows/*.yml"
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
+_RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -162,9 +163,15 @@ def derive_merge_danger(
 
     # 2. Prod external state and outbound notification senders (changed lines of the workflow's own section).
     external = False
+    # changes_from_unified_diff reports a rename by its new path only; the old path comes from
+    # the diff's `rename from` lines. A rename away from an external path is still a touch of it.
+    renamed_from = {new: old for old, new in _RENAME_RE.findall(diff_text or "")}
     for status, p in pairs:
-        wf = p.split(" → ")[-1]
-        if wf in _EXTERNAL_PATHS or wf.startswith(_EXTERNAL_PREFIXES):
+        parts = p.split(" → ")
+        wf = parts[-1]
+        if status.startswith("R") and len(parts) == 1 and wf in renamed_from:
+            parts = [renamed_from[wf], wf]
+        if any(q in _EXTERNAL_PATHS or q.startswith(_EXTERNAL_PREFIXES) for q in parts):
             add(f"external-path:{p}")
             external = True
         elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):

@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import merge_danger as md
-from harness.gate_backtest import GateChange
+from harness.gate_backtest import GateChange, changes_from_unified_diff
 from harness.merge_danger import MalformedMergeDanger, MergeDanger
 
 
@@ -180,6 +180,35 @@ def test_notify_action_and_mail_class_are_external():
     for path in (".github/actions/notify-discord/action.yml", "ibl5/classes/Mail/Mailer.php", "bin/discord-dm"):
         d = _derive([("M", path)])
         assert (d.door, d.blast) == ("one-way", "external"), path
+
+
+_RENAME_AWAY = [(p, p + "-v2") for p in md._EXTERNAL_PATHS] + \
+    [(pre + "Moved.php", pre + "sub/Moved.php") for pre in md._EXTERNAL_PREFIXES] + \
+    [(pre + "Moved.php", "elsewhere/Moved.php") for pre in md._EXTERNAL_PREFIXES]
+
+
+@pytest.mark.parametrize("old,new", _RENAME_AWAY)
+def test_rename_away_from_external_path_is_one_way(old, new):
+    d = _derive([("R", f"{old} → {new}")])
+    assert d.door == "one-way"
+    assert f"external-path:{old} → {new}" in d.triggers
+
+
+@pytest.mark.parametrize("old,new", _RENAME_AWAY)
+def test_rename_away_from_external_path_in_real_diff_is_one_way(old, new):
+    # changes_from_unified_diff carries only the new path; the old one comes from `rename from`.
+    diff = (f"diff --git a/{old} b/{new}\nsimilarity index 100%\n"
+            f"rename from {old}\nrename to {new}\n")
+    changed = changes_from_unified_diff(diff)
+    assert changed == [("R", new)]
+    d = _derive(changed, diff=diff)
+    assert d.door == "one-way"
+    assert any(t.startswith("external-path:") for t in d.triggers)
+
+
+def test_rename_between_non_external_paths_is_two_way():
+    d = _derive([("R", "bin/check-a → bin/check-b")])
+    assert not any(t.startswith("external-path:") for t in d.triggers)
 
 
 def test_arming_path_is_two_way_self_governing():

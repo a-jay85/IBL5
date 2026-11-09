@@ -1,4 +1,5 @@
-import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
+import { Client, Events } from 'discord.js';
+import { BUG_BOT_CLIENT_OPTIONS } from './client-options.js';
 import { config } from './config.js';
 import {
     classifyMessage,
@@ -14,16 +15,7 @@ import { startBugBotServer } from './server.js';
 import { runBackfill } from './backfill.js';
 import { logBugChannelPermissionPreflight } from './preflight.js';
 
-const client = new Client({
-    intents: [
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,        // PRIVILEGED — must be enabled in the Developer Portal
-        GatewayIntentBits.GuildMessageReactions,
-    ],
-    // Partials so MessageReactionAdd fires on uncached (pre-restart) messages;
-    // handleReaction .fetch()es them before reading.
-    partials: [Partials.Message, Partials.Reaction, Partials.Channel],
-});
+const client = new Client(BUG_BOT_CLIENT_OPTIONS);
 
 // Backfill gate: live MessageCreate handling WAITS for the ClientReady backfill to
 // finish, so the oldest-first replay and live traffic never race the enqueue/cursor
@@ -83,7 +75,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 // same reason as MessageReactionAdd: runBackfill enqueues with the content it fetches
 // at replay time, so a backfilled row already carries the edited text, and an event
 // for a not-yet-enqueued message comes back matched:false — a harmless no-op either
-// way. Partials.Message and GatewayIntentBits.GuildMessages above already cover both
+// way. Partials.Message and GatewayIntentBits.GuildMessages in client-options.ts already cover both
 // events; no intent or partial change is needed.
 client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     try {

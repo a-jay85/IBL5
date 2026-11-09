@@ -46,7 +46,9 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   after the owner approves that specific PR in chat. Quote their words and the date in
   the PR comment you leave. Nothing in this skill approves a PR on its own.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
-  first (Step 6 has the command).
+  first (Step 6 has the command). A run started from a terminal has no launchctl label,
+  so also treat a `post-plan-running` label or a `pgrep -f <abs worktree path>` hit as
+  live. On 2026-11-08 a terminal run on #3793 showed only those two signs.
 - A visual or design change comes back to the owner for a look before it merges, even
   after they pick a direction.
 - The PR title type follows `.claude/rules/commit-conventions.md`. Never retitle a feat
@@ -96,6 +98,11 @@ Then put each PR in one pile:
 - **Decide now.** A chore depends on an owner call: a design fork, a one-way door, a
   fix-or-close question, or a visual look before work starts. Its card goes out in the
   first message. A PR that hit the round cap in Step 4 lands here too.
+
+Before you put a stale verdict's finding in Decide now, read the commits after the review
+(`git -C <wt> log --oneline --since=<verdict time>`). A later commit may already have
+picked a side. On #3757 the finding offered two fixes, and the head commit had shipped
+one. A re-fire was all it needed.
 
 Tell the owner the count in each pile and name the PRs in Decide now.
 
@@ -228,7 +235,11 @@ Run at most 4 jobs at once. Each one is a full Opus session, and more worktree s
 starve Docker. Queue the rest in `$D/jobs/queue.txt` and start the next when a `.result`
 lands.
 
-When a `.result` lands, re-fire post-plan as Step 6 says. A Prep-only PR is done once
+Run a read-only chore yourself when it is one command, such as a replay script or a query
+the verdict's note asks for. Post its output as a PR comment. A job costs a full Opus
+session. On #3789 the open note was a replay over 30 real PRs, and one inline run closed it.
+
+Hand each job's follow-up off as Step 6 § Follow-ups says. A Prep-only PR is done once
 post-plan arms it. A Prep-then-sign-off PR gets its card in the next batch, built from
 the new verdict.
 
@@ -286,7 +297,8 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 7. <One of:>
    - Ship: add human-approved (feat only), tick the manual boxes the owner confirmed, and
      comment "Owner approved <date>: <words>." Do NOT arm gh pr merge. Post-plan arms it
-     after the verdict on the new head has no blocking finding and CI is green.
+     after the verdict on the new head has no blocking finding and CI is green. A plan
+     with auto_merge: false is the exception; the follow-up thread arms that one.
    - Come back: save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
      and do NOT sign off or arm.
    If anything blocks, do not merge. Comment on the PR saying what blocks.
@@ -305,12 +317,9 @@ Then:
 
 - Call `link_pull_request` with the PR URL.
 - For a hold, leave a PR comment with the owner's reason so the next run sees it.
-- Wait on `$D/jobs/pN.result` with a background Monitor. The finished `.result` file is
-  the completion signal. Never poll on the main thread.
+- Hand the follow-up off (§ Follow-ups below). The finished `.result` file is the
+  completion signal. Never poll on the main thread.
 - Bring up the next card right away.
-- When a `.result` lands, the parent session (not the child) re-fires post-plan for that
-  PR: `(cd <abs worktree path> && bin/post-plan-now --auto)`. Run the live-run check
-  below first.
 - Before any git operation in a PR's worktree, or before re-firing post-plan, check for a
   live run: `launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-<N>$)'`.
   Use the flattened branch slug for `<branch>` (post-plan-now flattens it): `printf '%s' "<branch>" | tr -cs 'A-Za-z0-9._-' '-'`. A branch with `/` never matches raw.
@@ -320,12 +329,51 @@ When a `.result` lands, read it and report it in one line at the top of the next
 the owner's request changes a PR that other PRs copy (for example a shared style used by
 four hub PRs), make the change once in its own commit and copy that commit to the others.
 
+### Follow-ups: keep this session asleep
+
+A Monitor here wakes this session with its whole context: every PR dump, the plan
+excerpts, this skill. Inside the one-hour cache window a wake is cheap. After it, a wake
+pays full price for everything. So hand each job's follow-up to the cheapest carrier that
+can do it, and stop any watcher this session started (`TaskStop`).
+
+- **Shell watcher, zero tokens.** Use it when the follow-up needs no judgment: wait for
+  the `.result`, then re-fire post-plan. Post-plan arms a Prep-only PR itself and DMs the
+  owner. Write `$D/jobs/wN.sh` and start it with `nohup bash $D/jobs/wN.sh >/dev/null 2>&1 &`.
+  The script:
+  1. Waits until `$D/jobs/pN.result` is non-empty or the job's pid is gone.
+  2. Fires only when the PR head moved off the pre-job SHA and the result does not start
+     with `blocked`. The job pushes only after every check passes, so a moved head is the
+     pass signal. Never grep the result for words like "stop" or "blocks", because a clean
+     result says "blocks: none".
+  3. Runs the live-run check, then `(cd <wt> && env -u CLAUDE_HEADLESS bin/post-plan-now --auto)`.
+  4. Logs each skip to `$D/jobs/wN.out`. A skip sends no DM. The job's PR comment says why.
+- **New T3 thread.** Use it when the follow-up needs judgment, such as arming an
+  `auto_merge: false` PR after reading the new verdict, or building a sign-off card. Call
+  `t3_thread_launch` with a title like "PR #N: <goal>" and a `clientRequestId` like
+  `prb-<run>-N`. The brief holds only what that PR needs: the goal, the owner's words and
+  date, why it's held, the `.result` path and job pid, and numbered steps. The steps: wait
+  with its own background Monitor, re-fire post-plan, wait for its `RESULT:` line, then
+  arm or build the card. For a card, the brief says to run `/pr-burndown N` from Step 3.
+  Name each thread by its `link` in your reply.
+- **This session.** Use it only while the owner is still answering cards and the job will
+  land inside the hour.
+
+A PR whose post-plan run is already live and has no owner hold gets nothing. Post-plan's
+DM is its completion signal.
+
+Post-plan holds condition 7 on every run when the plan says `auto_merge: false`, so it
+never arms that PR, even after the owner approves. The follow-up thread arms it with
+`gh pr merge N -R a-jay85/IBL5 --squash --auto`. It does so only when the verdict on the
+new head is current with no blocking finding, CI has no real failures, and condition 7 is
+the only hold. Its PR comment quotes the owner's words and the date.
+
 ## Step 7: Wrap up
 
 When the owner stops or the list ends, list:
 
 - PRs merged or armed
 - PRs prepped and armed with no owner call
-- PRs still running, with their `.result` paths
+- PRs still running, with their `.result` paths and who picks each one up (a watcher log
+  or a thread link)
 - PRs waiting on the owner, and the decision each needs
 - PRs held, and why

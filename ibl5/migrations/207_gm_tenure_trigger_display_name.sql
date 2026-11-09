@@ -1,5 +1,7 @@
 -- Migration 207: trg_gm_tenure_track stores GM display names and follows owner_name renames (backlog#1708).
 --
+-- rollback-incompatible: the trigger now opens tenures under owner_name, so pre-migration code that sets only gm_username on a team with an owner_name reads a different tenure name
+--
 -- Before: the trigger opened a tenure under ibl_team_info.gm_username (the site username) and closed
 -- the old tenure by matching that same username. Every other ibl_gm_tenures row holds a display name,
 -- the same spelling as ibl_team_info.owner_name. So the next GM change wrote a username row, and the

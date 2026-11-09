@@ -376,6 +376,11 @@ if [ "\$1" = "api" ]; then
     *"/issues/"*"/comments"*)
       echo '[{"author_association":"OWNER","body":"<!-- pr-ready-verdict -->\\n**READY** — 2026-11-03 01:00 UTC · auto-merge armed\\n"}]'
       exit 0 ;;
+    *"/pulls/"*"/files"*)
+      # REST pulls/N/files in --paginate --slurp shape, built from the fixture's gh pr list files.
+      n=\$(echo "\$url" | sed -E 's#.*/pulls/([0-9]+)/files.*#\\1#')
+      jq -c --argjson n "\$n" '[[.[] | select(.number == \$n) | .files[] | {filename: .path, status: "modified"}]]' "\$PRS"
+      exit 0 ;;
     graphql) echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'; exit 0 ;;
   esac
   echo '{}'; exit 0

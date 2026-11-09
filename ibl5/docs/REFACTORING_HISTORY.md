@@ -803,10 +803,10 @@ All IBL5 modules (31 total) have been refactored to the interface-driven archite
 
 ### Archived Summaries
 - `../../.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md`
-- `.archive/SEASON_LEADERS_REFACTORING_SUMMARY.md`
-- `.archive/LEADERBOARDS_REFACTORING_SUMMARY.md`
-- `.archive/DRAFT_REFACTORING_SUMMARY.md`
-- `.archive/Extension_REFACTORING_SUMMARY.md`
+- `../../.archive/SEASON_LEADERS_REFACTORING_SUMMARY.md`
+- `../../.archive/LEADERBOARDS_REFACTORING_SUMMARY.md`
+- `../../.archive/DRAFT_REFACTORING_SUMMARY.md`
+- `../../.archive/Extension_REFACTORING_SUMMARY.md`
 - Plus 35+ historical documents
 
 ---

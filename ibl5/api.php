@@ -104,7 +104,8 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             return new \Api\Controller\EnqueueController(
                 new \BugPipeline\BugReportRepository($db),
                 new \Repositories\TeamIdentityRepository($db),
-                new \BugPipeline\AttachmentInputValidator()
+                new \BugPipeline\AttachmentInputValidator(),
+                new \Api\Repository\ApiKeyRepository($db)
             );
         }
 
@@ -122,13 +123,25 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             );
         }
 
+        if ($controllerClass === \Api\Controller\SourceUpdatedController::class) {
+            return new \Api\Controller\SourceUpdatedController(
+                new \BugPipeline\BugReportRepository($db),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
+        }
+
+        if ($controllerClass === \Api\Controller\SourceDeletedController::class) {
+            return new \Api\Controller\SourceDeletedController(
+                new \BugPipeline\BugReportRepository($db),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
+        }
+
         $bugPipelineControllers = [
             \Api\Controller\ThreadReplyController::class,
             \Api\Controller\LastSeenController::class,
             \Api\Controller\PipelineStateController::class,
             \Api\Controller\ThreadByPrController::class,
-            \Api\Controller\SourceUpdatedController::class,
-            \Api\Controller\SourceDeletedController::class,
         ];
         if (in_array($controllerClass, $bugPipelineControllers, true)) {
             return new $controllerClass(new \BugPipeline\BugReportRepository($db));

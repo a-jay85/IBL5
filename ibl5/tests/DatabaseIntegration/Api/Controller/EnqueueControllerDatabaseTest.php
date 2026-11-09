@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\Api\Controller;
 
 use Api\Controller\EnqueueController;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\AttachmentInputValidator;
 use BugPipeline\BugReportRepository;
@@ -26,16 +27,35 @@ class EnqueueControllerDatabaseTest extends DatabaseTestCase
     private const UNKNOWN_AUTHOR = '999999999999999999';
     private const CHANNEL        = '200000000000000002';
     private const MSG_ID         = '300000000000000003';
+    private const BOT_KEY        = 'svkguard-bot-key';
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->bugRepo  = new BugReportRepository($this->db);
+
+        $this->insertRow('ibl_api_keys', [
+            'key_hash'         => hash('sha256', self::BOT_KEY),
+            'key_prefix'       => 'svkbotky',
+            'owner_name'       => 'Service key guard bot',
+            'permission_level' => 'commissioner',
+            'rate_limit_tier'  => 'unlimited',
+            'is_active'        => 1,
+        ]);
+        $_SERVER['HTTP_X_API_KEY'] = self::BOT_KEY;
+
         $this->controller = new EnqueueController(
             $this->bugRepo,
             new TeamIdentityRepository($this->db),
-            new AttachmentInputValidator()
+            new AttachmentInputValidator(),
+            new ApiKeyRepository($this->db)
         );
+    }
+
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        parent::tearDown();
     }
 
     public function testAuthorizedAuthorInsertsRowAndReturnsReportId(): void

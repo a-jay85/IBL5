@@ -623,6 +623,19 @@ qentry() {
     printf '%s\n' "$1/(no entry for $2)"
 }
 
+# assert_queued / assert_not_queued <desc> <queue-dir> <slug>: the NNN-<slug>.md
+# entry check plus a bare <slug>.md check, so a leaked bare entry fails
+# (backlog#1576). Sidecars (.attempts, .failure, .lock, .wt-fail) keep bare
+# <slug>.md.<ext> names on purpose and are never checked here.
+assert_queued() {
+    assert_present "$1" "$(qentry "$2" "$3")"
+    assert_absent "$1 (no bare entry)" "$2/$3.md"
+}
+assert_not_queued() {
+    assert_absent "$1" "$(qentry "$2" "$3")"
+    assert_absent "$1 (no bare entry)" "$2/$3.md"
+}
+
 # V2 — unmet slug dep: hold written, attempt NOT incremented, plan stays in queue
 reset_e2
 write_e2_plan "held" "depends_on: prereq"
@@ -631,7 +644,7 @@ assert_present "V2: unmet dep → .depends-hold sidecar written" \
     "$E2_NDIR/queue/held.md.depends-hold"
 assert_absent  "V2: unmet dep → attempt counter not incremented" \
     "$E2_NDIR/queue/held.md.attempts"
-assert_present "V2: unmet dep → plan stays in queue/"  "$(qentry "$E2_NDIR/queue" held)"
+assert_queued "V2: unmet dep → plan stays in queue/" "$E2_NDIR/queue" held
 assert_absent  "V2: unmet dep → plan NOT moved to skipped/" "$E2_NDIR/skipped/held.md"
 LOGTXT_V2="$(e2_logtxt)"
 want "V2: log carries [depends-hold]"           "$LOGTXT_V2" "[depends-hold]"
@@ -664,8 +677,7 @@ write_e2_plan "closed-dep" "depends_on: prereq"
 run_e2 > /dev/null 2>&1
 assert_present "V3b: closed-unmerged dep → .depends-hold written" \
     "$E2_NDIR/queue/closed-dep.md.depends-hold"
-assert_present "V3b: closed-unmerged dep → plan stays in queue/" \
-    "$(qentry "$E2_NDIR/queue" closed-dep)"
+assert_queued "V3b: closed-unmerged dep → plan stays in queue/" "$E2_NDIR/queue" closed-dep
 LOGTXT_V3B="$(e2_logtxt)"
 want "V3b: log carries [depends-unresolvable]" "$LOGTXT_V3B" "[depends-unresolvable]"
 want "V3b: log names the closed-unmerged reason" "$LOGTXT_V3B" "closed-unmerged"
@@ -723,7 +735,7 @@ else
 fi
 assert_eq "P1: post-plan-now invoked exactly once (loop stopped, no re-claim)" \
     "$(grep -c 'ppfast.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
-assert_present "P1: fast failure → plan stays in queue/"  "$(qentry "$E2_NDIR/queue" ppfast)"
+assert_queued "P1: fast failure → plan stays in queue/" "$E2_NDIR/queue" ppfast
 assert_absent  "P1: fast failure → plan NOT moved to done/" "$E2_NDIR/done/ppfast.md"
 assert_absent  "P1: fast failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppfast.md"
 # Impl handoff seeds .attempts to 1, so this absence proves refund_attempt ran
@@ -788,7 +800,7 @@ else
 fi
 assert_eq "P2: post-plan-now invoked exactly once (single-plan mode, no retry)" \
     "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "1"
-assert_present "P2: genuine failure → plan stays in queue/ for retry"  "$(qentry "$E2_NDIR/queue" ppslow)"
+assert_queued "P2: genuine failure → plan stays in queue/ for retry" "$E2_NDIR/queue" ppslow
 assert_absent  "P2: genuine failure → plan NOT filed to done/" "$E2_NDIR/done/ppslow.md"
 assert_absent  "P2: genuine failure → plan NOT moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
 # Impl handoff seeds .attempts to 1 (the impl run's post-plan is attempt 1), so
@@ -840,10 +852,10 @@ assert_eq "P4: resume 1 → post-plan invoked 2 times in total" \
 p4_resume
 assert_eq "P4: resume 2 → .attempts reads 3" \
     "$(cat "$E2_NDIR/queue/ppslow.md.attempts" 2>/dev/null)" "3"
-assert_present "P4: resume 2 → plan still in queue/"  "$(qentry "$E2_NDIR/queue" ppslow)"
+assert_queued "P4: resume 2 → plan still in queue/" "$E2_NDIR/queue" ppslow
 p4_resume
 assert_present "P4: claim at cap → plan moved to skipped/" "$E2_NDIR/skipped/ppslow.md"
-assert_absent  "P4: claim at cap → plan gone from queue/"  "$(qentry "$E2_NDIR/queue" ppslow)"
+assert_not_queued "P4: claim at cap → plan gone from queue/" "$E2_NDIR/queue" ppslow
 assert_eq "P4: post-plan invoked exactly MAX_ATTEMPTS=3 times across all runs" \
     "$(grep -c 'ppslow.md postplan-fail' "$E2_TRACE" 2>/dev/null)" "3"
 

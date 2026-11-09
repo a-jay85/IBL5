@@ -1,6 +1,6 @@
 ---
 description: Phase 6.5 remediation procedure for the post-plan harness. Fixes every Phase 6 finding in-PR; harness commits and pushes after exit.
-last_verified: 2026-11-08
+last_verified: 2026-11-09
 ---
 
 # Phase 6.5 in-PR remediation

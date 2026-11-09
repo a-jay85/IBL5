@@ -1,6 +1,6 @@
 ---
 description: Phase 7 arm-hold evaluation, provenance line, sticky verdict comment, and hard terminator. Loaded via git show at Phase 7.
-last_verified: 2026-11-08
+last_verified: 2026-11-09
 ---
 
 # Phase 7 — holds, sticky verdict, terminator

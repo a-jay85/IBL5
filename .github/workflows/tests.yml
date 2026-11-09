@@ -184,7 +184,7 @@ jobs:
 
     - name: Check coverage threshold
       working-directory: ibl5
-      run: php bin/check-coverage coverage/clover.xml 80
+      run: php bin/check-coverage coverage/clover.xml 86
 
     - name: Check coverage regression
       working-directory: ibl5
@@ -193,7 +193,7 @@ jobs:
     - name: Check if threshold needs ratcheting
       working-directory: ibl5
       run: |
-        THRESHOLD=80
+        THRESHOLD=86
         BUFFER=5
         COVERAGE=$(php -r '
           $xml = simplexml_load_file("coverage/clover.xml");
@@ -800,6 +800,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.3'
+          cache: false
       - name: Install pinact
         if: ${{ !cancelled() }}
         run: go install github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@v3.10.1

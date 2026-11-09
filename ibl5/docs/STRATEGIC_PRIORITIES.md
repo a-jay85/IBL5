@@ -1,6 +1,6 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-09-29
+last_verified: 2026-11-09
 ---
 
 # Strategic Development Priorities for IBL5
@@ -23,7 +23,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 
 - PHPStan level `max` with `strict-rules` and `bleedingEdge` — zero errors
 - PHPUnit — full suite green, zero skips
-- Coverage threshold — 80% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 84.26%)
+- Coverage threshold: 86% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 88.22%)
 - Mutation testing — 100% MSI / 100% Covered MSI (weekly + on-demand)
 - Playwright E2E — single shard (was 4; collapsed to fit free-tier runner caps), visual regression baselines
 - Lighthouse: performance audits on each master push, plus a weekly full-site audit
@@ -55,7 +55,7 @@ HTMX is partially adopted — boosted navigation, tab switching, and form boost 
 
 ### 3. Test Coverage Expansion
 
-Coverage is at 84.26% with an 80% CI floor plus a no-regression check. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
+Coverage is at 88.22% with an 86% CI floor plus a no-regression check. The test suite is mature (PHPUnit, Playwright, mutation testing all enforced), but there are still gaps in integration test coverage for some modules.
 
 **Remaining work:**
 - Ratchet the coverage floor upward as new tests are added (the floor is manual — set in the `Check coverage threshold` step of `.github/workflows/tests.yml`)

@@ -1460,6 +1460,7 @@ REWRITE_CASES = [
     ("rw null backfill", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL;\n", True, False, []),
     ("rw near-miss or", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL OR c = 0;\n", True, False, ["rewrite-no-backup"]),
     ("rw near-miss is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NOT NULL;\n", True, False, ["rewrite-no-backup"]),
+    # A guard loop that checks cols[:1] only would wrongly pass the next case.
     ("rw near-miss second column", "x.sql", "UPDATE t SET c = 1, d = 2 WHERE c IS NULL;\n", True, False, ["rewrite-no-backup"]),
     ("rw near-miss suffix column", "x.sql", "UPDATE t SET c = 1 WHERE abc IS NULL;\n", True, False, ["rewrite-no-backup"]),
     ("rw delete where", "x.sql", "DELETE FROM t WHERE id = 1;\n", True, False, ["rewrite-no-backup"]),

@@ -53,6 +53,13 @@ Detected patterns (v2, statement-level):
   drop-index              DROP INDEX|KEY <name> (suppressed when the scanned
                           statements add an index/key with the same name)
   rename-table            RENAME TABLE, or ALTER TABLE ... RENAME [TO|AS]
+  rewrite-no-backup       UPDATE ... SET ... WHERE or DELETE ... WHERE on an added
+                          line, with no earlier INSERT INTO <name containing
+                          backup> ... SELECT ... FROM <table> in the same file, or
+                          no undo script at undo/<migration-stem>.sql beside it.
+                          A SET whose WHERE pins every assigned column IS NULL
+                          (no OR) is a backfill and passes. Diff modes only;
+                          --full-scan skips it.
   delete-no-where         DELETE ... FROM with no WHERE anywhere in the statement
   update-no-where         UPDATE ... SET with no WHERE anywhere in the statement;
                           UPDATE ... JOIN without WHERE counts, INSERT ... ON
@@ -95,7 +102,8 @@ Bypass markers name the triggers they suppress:
   A marker suppresses only the triggers it names. Known tags: drop-column,
   drop-table, truncate, rename-column, add-not-null-no-default,
   tighten-not-null, drop-index, rename-table, delete-no-where,
-  update-no-where, narrow-type, drop-recreate-existing.
+  update-no-where, narrow-type, drop-recreate-existing,
+  rewrite-no-backup.
   An untagged marker (destructive-migration: <reason>) is rejected in --staged
   and --since modes and honoured only by --full-scan. An unknown tag is an error.
 

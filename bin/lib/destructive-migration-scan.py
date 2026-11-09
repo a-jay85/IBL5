@@ -1095,8 +1095,9 @@ def _set_columns(low):
 
 # Any of these can let a row with a value through the IS NULL test: OR in
 # either spelling, XOR, a negation, a parenthesised group, or a subquery whose
-# unqualified column belongs to another table.
-NOT_A_BACKFILL_RE = re.compile(r"\bor\b|\|\||\bxor\b|\bnot\b|!|[()]|\bselect\b")
+# unqualified column belongs to another table. IS NOT only tests a value, so it
+# may appear; the pattern below still rejects `<col> IS NOT NULL`.
+NOT_A_BACKFILL_RE = re.compile(r"\bor\b|\|\||\bxor\b|(?<!\bis )\bnot\b|!|[()]|\bselect\b")
 
 
 def _null_guarded(cols, where):
@@ -1141,9 +1142,9 @@ def _update_targets(low, cols):
     if not cols:
         return order[:1]
     targets = []
-    for c in cols:
-        if "." in c:
-            q = last_part(c.rsplit(".", 1)[0])
+    for col in cols:
+        if "." in col:
+            q = last_part(col.rsplit(".", 1)[0])
             table = refs.get(q, q)
         else:
             table = order[0]
@@ -1562,6 +1563,7 @@ REWRITE_CASES = [
     ("rw near-miss is null compared", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL = 0;\n", True, False, ["rewrite-no-backup"]),
     ("rw near-miss subquery", "x.sql", "UPDATE t SET c = 1 WHERE id IN (SELECT id FROM u WHERE c IS NULL);\n", True, False, ["rewrite-no-backup"]),
     ("rw null backfill and", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d = 1 LIMIT 10;\n", True, False, []),
+    ("rw null backfill and is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d IS NOT NULL;\n", True, False, []),
     # A backup of one table does not cover a write to another table in the same statement.
     ("rw join writes second table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw join alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nUPDATE ibl_players p JOIN ibl_hist h ON p.pid = h.pid SET p.name = h.name WHERE h.k = 1;\n", True, True, []),

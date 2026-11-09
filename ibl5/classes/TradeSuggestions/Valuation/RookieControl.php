@@ -45,12 +45,13 @@ final class RookieControl
     /**
      * The `+ 1` is the option year. Round 1 at exp 3 has only the option left.
      * Round 2 at exp 3 has none, because its option year is already behind him.
-     * The `isRookieScale` check caps exp at 3, so the result is never negative.
+     * The `isRookieScale` check caps exp at 3, so `max(0, ...)` is a guard that
+     * no current input reaches. It keeps the result non-negative if the caps change.
      */
     public static function controlYearsLeft(int $draftRound, int $exp): int
     {
         return self::isRookieScale($draftRound, $exp)
-            ? self::contractYears($draftRound) + 1 - $exp
+            ? max(0, self::contractYears($draftRound) + 1 - $exp)
             : 0;
     }
 

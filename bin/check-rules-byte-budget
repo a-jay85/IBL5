@@ -97,7 +97,7 @@ ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity"
 _rule_globs() {
   local fm
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$1")"
-  printf '%s\n' "$fm" | grep -q '^paths:' || return 0
+  grep -q '^paths:' <<< "$fm" || return 0
   printf '%s\n' "$fm" | awk '
     /^paths:[[:space:]]*$/            { inlist=1; next }
     /^paths:[[:space:]]*[^[:space:]]/ { sub(/^paths:[[:space:]]*/, ""); print; next }
@@ -225,11 +225,11 @@ for f in "$RULES_DIR"/*.md; do
   # Skip files not in this changeset — a dead glob elsewhere is swept nightly
   # by --report-mode, never failed here. Empty changeset => skip everything.
   _rel=".claude/rules/$(basename "$f")"
-  if [ -z "$_CHANGED_RULES" ] || ! printf '%s\n' "$_CHANGED_RULES" | grep -qxF "$_rel"; then
+  if [ -z "$_CHANGED_RULES" ] || ! grep -qxF "$_rel" <<< "$_CHANGED_RULES"; then
     continue
   fi
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
-  printf '%s\n' "$fm" | grep -q '^paths:' || continue
+  grep -q '^paths:' <<< "$fm" || continue
   # Handles BOTH shapes: scalar (`paths: "ibl5/**"`, as browser-login.md uses) and
   # list (`paths:` + `  - "…"` lines, as commit-conventions.md uses).
   globs="$(printf '%s\n' "$fm" | awk '
@@ -270,7 +270,7 @@ while IFS='|' read -r scoped referrer; do
   [ -n "$scoped" ] || continue
   # Skip frontmatter — check only the rule body, not the description field.
   body="$(awk '/^---$/{c++; if(c>=2){found=1;next}} found{print}' "$ROOT/$referrer")"
-  if ! printf '%s\n' "$body" | grep -qF "$scoped"; then
+  if ! grep -qF "$scoped" <<< "$body"; then
     printf 'FAIL  %s is path-scoped but %s no longer names it — payload unreachable\n' \
       "$scoped" "$referrer" >&2
     stub_fail=1

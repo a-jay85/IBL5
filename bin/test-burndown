@@ -2870,7 +2870,7 @@ want "BP6: says no other batch item holds files" "$OUT" "- No other batch item h
 if grep -qF ': .' <<< "$OUT"; then fail "BP6: no empty code-span list"; else ok "BP6: no empty code-span list"; fi
 
 # BP7: liveness evidence never produces an empty heading
-bp_empty_headings "$(printf '## A\n\n## B\nx\n')" | grep -qF "EMPTY ## A" \
+grep -qF "EMPTY ## A" <<< "$(bp_empty_headings "$(printf '## A\n\n## B\nx\n')")" \
     && ok "BP7: detector flags an empty heading" || fail "BP7: detector flags an empty heading"
 : > "$T/bp-empty.txt"
 printf '  \n\n   \n' > "$T/bp-blank.txt"

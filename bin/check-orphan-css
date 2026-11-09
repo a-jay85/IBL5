@@ -291,8 +291,8 @@ PHPEOF
         echo "FAIL: parse_routes_file got $parsed_count routes (expected 2)" >&2
         pass=0
     fi
-    if printf '%s\n' "$parsed_routes" | grep -qx 'modules.php?name=A' && \
-       printf '%s\n' "$parsed_routes" | grep -qx 'modules.php?name=B'; then
+    if grep -qx 'modules.php?name=A' <<< "$parsed_routes" && \
+       grep -qx 'modules.php?name=B' <<< "$parsed_routes"; then
         echo "PASS: parse_routes_file fixture routes present"
     else
         echo "FAIL: parse_routes_file missing expected route" >&2
@@ -332,7 +332,7 @@ PHPEOF
     # Row 6: known class returns file:line matching correct line number
     local loc_known
     loc_known=$(css_definition_location "dead-loc-class" "$css_fixture_dir")
-    if echo "$loc_known" | grep -qE ':2$'; then
+    if grep -qE ':2$' <<< "$loc_known"; then
         echo "PASS: css_definition_location returns correct file:line for dead-loc-class"
     else
         echo "FAIL: css_definition_location for dead-loc-class got '$loc_known' (expected :2)" >&2
@@ -353,7 +353,7 @@ PHPEOF
     # .alert-error is on line 3; .alert is on line 4 -- must resolve to line 4
     local loc_alert
     loc_alert=$(css_definition_location "alert" "$css_fixture_dir")
-    if echo "$loc_alert" | grep -qE ':4$'; then
+    if grep -qE ':4$' <<< "$loc_alert"; then
         echo "PASS: css_definition_location alert -> line 4 (not alert-error on line 3)"
     else
         echo "FAIL: css_definition_location alert got '$loc_alert' (expected :4)" >&2

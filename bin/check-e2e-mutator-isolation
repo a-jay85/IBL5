@@ -81,7 +81,7 @@ violations=0
 while IFS= read -r f; do
   grep -Eq "$FIRE_PATTERN" "$f" || continue   # spec does not fire the updater
   base=$(basename "$f")
-  if ! printf '%s\n' "$allowlist" | grep -qxF "$base"; then
+  if ! grep -qxF "$base" <<< "$allowlist"; then
     echo "ERROR: $base fires the updater pipeline but is NOT in the mutators project." >&2
     grep -nE "$FIRE_PATTERN" "$f" | sed 's/^/    /' >&2
     violations=$((violations + 1))

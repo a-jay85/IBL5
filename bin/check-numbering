@@ -148,7 +148,7 @@ is_grandfathered() {
         migration) list="$MIGRATION_GRANDFATHER" ;;
         *)         return 1 ;;
     esac
-    printf '%s\n' "$list" | grep -qx -- "$key"
+    grep -qx -- "$key" <<< "$list"
 }
 
 kind_for() {

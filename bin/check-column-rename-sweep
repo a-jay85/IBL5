@@ -180,19 +180,19 @@ while IFS= read -r migfile; do
         new_name=""
 
         # CHANGE COLUMN [IF EXISTS] `old` `new` (backtick-quoted)
-        if printf '%s' "$line" | grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+`[^`]+`'; then
+        if grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+`[^`]+`' <<< "$line"; then
             old_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+`([^`]+)`.*/\2/I')"
             new_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+`([^`]+)`.*/\3/I')"
         # RENAME COLUMN [IF EXISTS] `old` TO `new` (backtick-quoted)
-        elif printf '%s' "$line" | grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+TO[[:space:]]+`[^`]+`'; then
+        elif grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`[^`]+`[[:space:]]+TO[[:space:]]+`[^`]+`' <<< "$line"; then
             old_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+TO[[:space:]]+`([^`]+)`.*/\2/I')"
             new_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+`([^`]+)`[[:space:]]+TO[[:space:]]+`([^`]+)`.*/\3/I')"
         # CHANGE COLUMN [IF EXISTS] old new (un-backticked — for test fixtures)
-        elif printf '%s' "$line" | grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*'; then
+        elif grep -qiE 'CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*' <<< "$line"; then
             old_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\2/I')"
             new_name="$(printf '%s' "$line" | sed -E 's/.*CHANGE[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\3/I')"
         # RENAME COLUMN [IF EXISTS] old TO new (un-backticked — for test fixtures)
-        elif printf '%s' "$line" | grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+TO[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*'; then
+        elif grep -qiE 'RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]+TO[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*' <<< "$line"; then
             old_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+TO[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\2/I')"
             new_name="$(printf '%s' "$line" | sed -E 's/.*RENAME[[:space:]]+COLUMN([[:space:]]+IF[[:space:]]+EXISTS)?[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]+TO[[:space:]]+([a-zA-Z_][a-zA-Z0-9_]*).*/\3/I')"
         fi
@@ -234,7 +234,7 @@ while IFS='	' read -r old_name mig_basename; do
         continue
     fi
     # Choose match expression: denylisted words require backtick- or quote-wrapped token.
-    if printf '%s' "$COMMON_WORD_DENYLIST" | grep -qiF " ${old_name} "; then
+    if grep -qiF " ${old_name} " <<< "$COMMON_WORD_DENYLIST"; then
         match_re="(\`${old_name}\`|['\"]${old_name}['\"])"
     else
         match_re="\b${old_name}\b"

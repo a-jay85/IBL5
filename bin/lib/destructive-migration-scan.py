@@ -1111,11 +1111,14 @@ def _null_guarded(cols, where):
     return True
 
 
-TABLE_REF_RE = re.compile(r"(?:^|,|\bjoin\b)\s*" + NAME + r"(?:\s+(?:as\s+)?([a-z0-9_$]+))?")
 NOT_AN_ALIAS = {
     "as", "cross", "force", "ignore", "inner", "join", "left", "natural", "on",
     "outer", "partition", "right", "set", "straight_join", "use", "using", "where",
 }
+TABLE_REF_RE = re.compile(
+    r"(?:^|,|\bjoin\b)\s*" + NAME
+    + r"(?:\s+(?:as\s+)?(?!(?:" + "|".join(sorted(NOT_AN_ALIAS)) + r")\b)([a-z0-9_$]+))?"
+)
 
 
 def _table_refs(region):
@@ -1140,7 +1143,8 @@ def _update_targets(low, cols):
     if not order:
         return []
     if not cols:
-        return order[:1]
+        # SET columns are unknown (a subquery in SET): check every table.
+        return order
     targets = []
     for col in cols:
         if "." in col:
@@ -1566,6 +1570,7 @@ REWRITE_CASES = [
     ("rw null backfill and is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d IS NOT NULL;\n", True, False, []),
     # A backup of one table does not cover a write to another table in the same statement.
     ("rw join writes second table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join subquery set checks every table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = (SELECT MAX(x) FROM v) WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw join alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nUPDATE ibl_players p JOIN ibl_hist h ON p.pid = h.pid SET p.name = h.name WHERE h.k = 1;\n", True, True, []),
     ("rw delete joined target", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw delete two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE t, u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),

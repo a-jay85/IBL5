@@ -98,11 +98,14 @@ def test_backtest_3733_plan_time_hold_shape():
 
 
 def test_backtest_3673_gate_backtest_shape():
-    shared = dict(merge_danger_state=_merge_danger(PR_3673), **_seat(17))
-    held = evaluate(inputs(**PR_3673, gate_backtest_status="HELD", **shared))
-    _armed_unless_merge_rule(held, PR_3673)
+    # PR 3673 edits .github/workflows/e2e-tests.yml, which the UI floor (8) holds
+    # (ADR-0233). The owner's human-approved label clears it, so 17 is the seat's to rule on.
+    shape = dict(PR_3673, pr_labels=["human-approved"])
+    shared = dict(merge_danger_state=_merge_danger(shape), **_seat(17))
+    held = evaluate(inputs(**shape, gate_backtest_status="HELD", **shared))
+    _armed_unless_merge_rule(held, shape)
 
-    unknown = evaluate(inputs(**PR_3673, gate_backtest_status="UNKNOWN", **shared))
+    unknown = evaluate(inputs(**shape, gate_backtest_status="UNKNOWN", **shared))
     assert not unknown.armed
     assert 17 in {c.number for c in unknown.holds}
 

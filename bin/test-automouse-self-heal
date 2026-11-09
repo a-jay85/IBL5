@@ -227,6 +227,30 @@ if ! echo "$out" | grep -q "reaped tombstone: plan-no-marker.md"; then
 fi
 h_pass "row9 — TOMBSTONE reaped regardless of skip reason"
 # ---------------------------------------------------------------------------
+# Guard self-test (backlog#1576) — the bare-entry half of assert_queued and the
+# NNN- half of assert_not_queued must trip on a stray entry. h_fail is stubbed
+# in a subshell, so the probe never touches the counters and the RESULT count
+# stays put; only a guard that fails to trip (or trips on the wrong label) is
+# reported.
+# ---------------------------------------------------------------------------
+tripped_labels() {  # <helper> <label> <slug>: the labels the helper failed with
+    ( h_fail() { printf '%s\n' "$1"; }; "$1" "$2" "$3" )
+}
+setup
+mkplan plan-fresh.md
+ln -s "$PDIR/plan-fresh.md" "$NDIR/queue/010-plan-fresh.md"
+h_eq "guard: assert_queued is quiet on a clean queue" "" \
+     "$(tripped_labels assert_queued "guard Q" plan-fresh)"
+ln -s /nonexistent-1576 "$NDIR/queue/plan-fresh.md"   # stray bare queue/plan-fresh.md
+h_eq "guard: stray bare queue/plan-fresh.md trips assert_queued" "guard Q (no bare entry)" \
+     "$(tripped_labels assert_queued "guard Q" plan-fresh)"
+setup
+h_eq "guard: assert_not_queued is quiet on an empty queue" "" \
+     "$(tripped_labels assert_not_queued "guard N" plan-stale)"
+ln -s /nonexistent-1576 "$NDIR/queue/010-plan-stale.md"   # stray queue/010-plan-stale.md
+h_eq "guard: stray queue/010-plan-stale.md trips assert_not_queued" "guard N" \
+     "$(tripped_labels assert_not_queued "guard N" plan-stale)"
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # Orphan-watcher sweep (sweep_orphan_watchers)

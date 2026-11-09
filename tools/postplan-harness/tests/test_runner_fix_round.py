@@ -155,13 +155,56 @@ def _holds(res):
     return {c.number for c in res.arm.holds}
 
 
-def test_fix_round_clears_finding_hold_ready(rig):
-    llm = rig.llm(later=[])
-    res = rig.run(llm)
+@pytest.fixture
+def armable_rig(rig, monkeypatch):
+    """The rig with conditions (3) and (20) neutralized, so (2) is its only possible hold.
+
+    Condition (2) and every other condition stay computed by production code; only the two
+    inputs the replay fixture cannot satisfy are blanked before `evaluate` runs.
+    """
+    monkeypatch.setattr(runner, "_removed_guards_holds",
+                        lambda worktree, diff_body, plan, arm_body: [])
+    real_evaluate = runner.evaluate
+    rig.held_sets = []
+
+    def evaluate(inputs):
+        inputs.unresolved_conformance = []
+        decision = real_evaluate(inputs)
+        rig.held_sets.append({c.number for c in decision.holds})
+        return decision
+
+    monkeypatch.setattr(runner, "evaluate", evaluate)
+    return rig
+
+
+def test_fix_round_clears_finding_hold_ready(armable_rig):
+    rig = armable_rig
+    res = rig.run(rig.llm(later=[]))
     assert res.fix_round["status"] == "accepted"
-    assert 2 not in _holds(res)
+    # Precondition: before the round, the rig held on the review finding alone.
+    assert {2} in rig.held_sets
+    # The step-9 re-evaluation ran once and produced the armed decision.
+    text = (rig.tmp_path / "out" / "audit.log").read_text()
+    assert text.count("(post-fix-round)") == 1
+    assert rig.held_sets[-1] == set()
+    assert res.arm.armed is True
+    assert _holds(res) == set()
+    # The sticky is composed with the re-evaluated (armed) decision.
+    body = _sticky_body(rig)
+    assert "auto-merge armed" in body
+    assert "Auto-merge held:" not in body
     assert rig.git.commit_messages and rig.git.commit_messages[-1].startswith("fix(review)")
     assert rig.git.pushes >= 1
+
+
+def test_fix_round_rejected_on_armable_rig_stays_held(armable_rig):
+    """The variant does not arm on its own: a rejected round leaves exactly the (2) hold."""
+    rig = armable_rig
+    res = rig.run(rig.llm(later=[OTHER]))
+    assert res.fix_round["status"] == "rejected"
+    assert res.arm.armed is False
+    assert _holds(res) == {2}
+    assert "auto-merge held" in _sticky_body(rig)
 
 
 def test_fix_round_new_finding_posts_original_hold(rig):

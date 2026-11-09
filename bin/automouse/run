@@ -3033,11 +3033,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             refund_attempt
             break
         fi
+        # Login re-probe before the judge spawn: park (attempt refunded, handoff kept, stop)
         if ! login_preflight "$NIGHTLY_DIR" "$LOG" "$SELF_DIR/../discord-dm"; then
             echo "Login expired before the judge spawn: refunding attempt, handoff kept, stopping loop." >> "$LOG"
             refund_attempt
             break
         fi
+        # End login re-probe before the judge spawn
         JUDGE_WT=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || JUDGE_WT=""
         JUDGE_OUT="$NIGHTLY_DIR/logs/$(date +%Y-%m-%d)-judge-${PLAN_NAME%.md}.jsonl"
         rm -f "$JUDGE_OUT"

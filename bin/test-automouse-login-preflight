@@ -381,10 +381,13 @@ IMPL_START_C='# Login re-probe before the impl spawn'
 IMPL_END_C='# End login re-probe before the impl spawn'
 PP_START_C='# Login re-probe before the post-plan spawn'
 PP_END_C='# End login re-probe before the post-plan spawn'
+JUDGE_START_C='# Login re-probe before the judge spawn'
+JUDGE_END_C='# End login re-probe before the judge spawn'
 RP_RAN=""
 
 for spec in "impl-reprobe|$IMPL_START_C|$IMPL_END_C|impl spawn" \
-    "postplan-reprobe|$PP_START_C|$PP_END_C|post-plan spawn"; do
+    "postplan-reprobe|$PP_START_C|$PP_END_C|post-plan spawn" \
+    "judge-reprobe|$JUDGE_START_C|$JUDGE_END_C|judge spawn"; do
     IFS='|' read -r prefix start end spawn_word <<< "$spec"
     S_COUNT=$(grep -cF -- "$start" "$RUN_SCRIPT" || true)
     E_COUNT=$(grep -cF -- "$end" "$RUN_SCRIPT" || true)
@@ -451,7 +454,9 @@ for rp_case in impl-reprobe-anchors postplan-reprobe-anchors \
     impl-reprobe-expired-refunds-and-stops postplan-reprobe-expired-refunds-and-stops \
     impl-reprobe-ok-spawns postplan-reprobe-ok-spawns \
     impl-reprobe-unknown-fails-open postplan-reprobe-unknown-fails-open \
-    impl-reprobe-mutation-caught postplan-reprobe-mutation-caught; do
+    impl-reprobe-mutation-caught postplan-reprobe-mutation-caught \
+    judge-reprobe-anchors judge-reprobe-expired-refunds-and-stops judge-reprobe-ok-spawns \
+    judge-reprobe-unknown-fails-open judge-reprobe-mutation-caught; do
     case " $RP_RAN " in
         *" $rp_case "*) pass "$rp_case ran" ;;
         *) fail "$rp_case did not run" ;;
@@ -468,6 +473,16 @@ if [ -n "$IMPL_RP_LINE" ] && [ -n "$IMPL_SPAWN_LINE" ] && [ -n "$PP_RP_LINE" ] &
     pass "reprobes-sit-before-their-spawns"
 else
     fail "reprobes-sit-before-their-spawns (attempt=$ATTEMPT_LINE impl=$IMPL_RP_LINE/$IMPL_SPAWN_LINE pp=$PP_RP_LINE/$PP_SPAWN_LINE)"
+fi
+
+JUDGE_BUDGET_LINE=$(grep -nF 'if [ "$JUDGE_REMAINING" -lt "$JUDGE_CAP_SECS" ]; then' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+JUDGE_RP_LINE=$(grep -nF -- "$JUDGE_START_C" "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+JUDGE_SPAWN_LINE=$(grep -nF 'run_manual_judge "$NEXT_PLAN" "$JUDGE_WT" "$JUDGE_OUT"' "$RUN_SCRIPT" | head -1 | cut -d: -f1)
+if [ -n "$JUDGE_BUDGET_LINE" ] && [ -n "$JUDGE_RP_LINE" ] && [ -n "$JUDGE_SPAWN_LINE" ] \
+    && [ "$JUDGE_BUDGET_LINE" -lt "$JUDGE_RP_LINE" ] && [ "$JUDGE_RP_LINE" -lt "$JUDGE_SPAWN_LINE" ]; then
+    pass "judge-reprobe-sits-between-budget-gate-and-judge-spawn"
+else
+    fail "judge-reprobe-sits-between-budget-gate-and-judge-spawn (budget=$JUDGE_BUDGET_LINE rp=$JUDGE_RP_LINE spawn=$JUDGE_SPAWN_LINE)"
 fi
 
 echo "--- plan-now caller cases ---"

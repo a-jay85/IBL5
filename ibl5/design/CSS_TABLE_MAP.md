@@ -24,7 +24,7 @@
 | `.table-scroll-wrapper` + `.table-scroll-container` | Horizontal scroll on mobile, scroll shadow | `.ibl-data-table`, `.responsive-table` |
 | `.sticky-scroll-wrapper` + `.sticky-scroll-container` | Both-axis scroll with sticky header+column | `.ibl-data-table.sticky-table` |
 | `.trading-layout` | Trade module grid layout | `.trading-roster`, `.trading-team-select`, etc. |
-| `.ibl-grid` / `.ibl-grid--2col` / `.ibl-grid--3col` | Multi-column card grids | `.stat-table` (mini tables inside) |
+| `.ibl-grid` / `.ibl-grid--3col` | Multi-column card grids | `.stat-table` (mini tables inside) |
 
 ## Impact Analysis: What Changes When You Edit a Selector
 

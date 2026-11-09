@@ -1,6 +1,6 @@
 ---
 description: Phase 7 arm-hold evaluation, provenance line, sticky verdict comment, and hard terminator. Loaded via git show at Phase 7.
-last_verified: 2026-10-22
+last_verified: 2026-11-09
 ---
 
 # Phase 7 — holds, sticky verdict, terminator
@@ -25,7 +25,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
    git rev-parse --short=12 HEAD && git rev-parse --short=12 <MASTER_SHA> && date -u "+%Y-%m-%dT%H:%MZ"
    ```
 
-   Three printed values, three uses — record each as a **literal**; like every other capture in this skill they do not survive into the next Bash call. Both SHAs come back already 12 characters, so nothing is hand-truncated: `<MASTER_SHA>` is the 40-char Phase 1.3 pin and the short form the line needs is derived here, not sliced by eye. `HEAD` is the branch head *after* any Phase 6.5 remediation push, which is exactly the commit this verdict describes. Run this at Phase 7 entry, not earlier — a SHA carried in from Phase 4.5 or Phase 5.9 predates remediation and would name a commit the verdict does not describe.
+   Three printed values, three uses. Record each as a **literal**; like every other capture in this skill they do not survive into the next Bash call. Both SHAs come back already 12 characters, so nothing is hand-truncated: `<MASTER_SHA>` is the 40-char Phase 1.3 pin, and this command derives the short form the line needs. `HEAD` is the branch head *after* any Phase 6.5 remediation push, which is the commit this verdict describes. Run this at Phase 7 entry. A SHA carried in from Phase 4.5 predates remediation and would name a commit the verdict does not describe.
 
 3. **Post the sticky verdict.** Marker, placed as the **last line of the body** so an update matches:
 
@@ -67,7 +67,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
 
    `<!-- pr-ready-verdict -->` **remains the last line of the body**, after the READY / NOT READY line. The body is now bracketed: contract line first, sticky marker last.
 
-   Comment body sections, in order: **Reviewed tree** (`**Reviewed tree:** <sha>`, as above), **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim, which is `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **merge digest** (the `### Merge digest` block, below), **code review** (one `**Code review:**` line using the same six rows as the post-plan sticky), **Fixed in this PR** (`### Fixed in this PR`; each item Phase 6.5 fixed as `- [x] <title> (fixed in <sha12>)`), **Still open** (`### Still open (non-blocking)`; each remaining item as `- [ ] <title> (<backlog link | not filed>)`, which replaces the old `not fixed` wording), **post-remediation CI result**, **hold predicates**, and one explicit **READY / NOT READY** line. That last line reflects the state *after* remediation, and it replaces the Phase 6 findings. No line other than the final READY / NOT READY line may open with a verdict word. Phase 6 narration that names a prior verdict goes inside a `<details><summary>Reviewer verdict</summary>` block. If any include was loaded by the declared fallback rather than from the pin, say so here with one `include-source:` line, so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line. The block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
+   Comment body sections, in order: **Reviewed tree** (`**Reviewed tree:** <sha>`, as above), **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **merge digest** (the `### Merge digest` block, below), **code review** (one `**Code review:**` line using the same six rows as the post-plan sticky), **Fixed in this PR** (`### Fixed in this PR`; each item Phase 6.5 fixed as `- [x] <title> (fixed in <sha12>)`), **Still open** (`### Still open (non-blocking)`; each remaining item as `- [ ] <title> (<backlog link | not filed>)`, which replaces the old `not fixed` wording), **post-remediation CI result**, **hold predicates**, and one explicit **READY / NOT READY** line. That last line reflects the state *after* remediation, and it replaces the Phase 6 findings. No line other than the final READY / NOT READY line may open with a verdict word. Phase 6 narration that names a prior verdict goes inside a `<details><summary>Reviewer verdict</summary>` block. If any include was loaded by the declared fallback rather than from the pin, say so here with one `include-source:` line, so the verdict states which revision of its own procedure it followed.
 
    **Skip-path body composition.** When `skip-review.sh` emits `SKIP-REVIEW`, the following table fixes which sections are refreshed and which are carried verbatim (no judgment left to the composing turn):
 
@@ -76,7 +76,6 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
    | `**Reviewed tree:** <sha>` | Carried forward — same SHA the predicate matched |
    | Rebase result | **Refreshed** — this run's master SHA, conflicts none |
    | CI result | **Refreshed** — this run's CI outcome |
-   | Files-changed refresh | **Refreshed** — this run's Phase 5.9 `FILES-CHANGED:` line verbatim |
    | Plan-fidelity verdict | **Carried verbatim** from `/tmp/pr-ready-prior-verdict-<N>.md`, plus the disclosure line below |
    | `### Merge digest` | **Carried verbatim** from `/tmp/pr-ready-digest-lines-<N>.txt` |
    | Remediation | **Carried verbatim** — Phase 6.5 is structurally unreachable on the skip path |

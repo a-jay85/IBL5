@@ -19,8 +19,6 @@ final class RivalriesControllerTest extends TestCase
     private ControllerFakeView $view;
     /** @var array<int, string> teamid => owner name */
     private array $owners = [];
-    /** @var array<string, string> team nickname => site username */
-    private array $usernames = [];
     /** @var array<string, string> team nickname => city; a missing nickname means no ibl_team_info row */
     private array $cities = ['Metros' => 'Metro City'];
 
@@ -51,9 +49,6 @@ final class RivalriesControllerTest extends TestCase
         );
         $teams->method('getOwnerName')->willReturnCallback(
             fn (int $id): ?string => $this->owners[$id] ?? null,
-        );
-        $teams->method('getUsernameFromTeamname')->willReturnCallback(
-            fn (string $name): ?string => $this->usernames[$name] ?? null,
         );
         $teams->method('getTeamByName')->willReturnCallback(
             fn (string $name): ?array => isset($this->cities[$name])
@@ -192,44 +187,21 @@ final class RivalriesControllerTest extends TestCase
         self::assertSame([['getTopFranchiseRivals', 3, RivalriesController::TOP_LIMIT]], $this->service->calls);
     }
 
-    public function testTeamPageFallsBackToUsernameWhenOwnerNameIsNotStored(): void
+    public function testTeamPageDoesNotFallBackToUsernameWhenOwnerHasNoTenure(): void
     {
-        $this->owners[3] = 'Mover-Gm';
-        $this->usernames['Metros'] = 'mover gm';
+        $teams = self::createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::never())->method('getUsernameFromTeamname');
+        $teams->method('getTeamnameFromTeamID')->willReturn('Metros');
+        $teams->method('getOwnerName')->willReturn('ZZ Owner Without Tenure');
+        $teams->method('getTeamByName')->willReturn(
+            ['teamid' => 3, 'team_city' => 'Metro City', 'team_name' => 'Metros'],
+        );
+        $controller = new RivalriesController($this->service, $this->view, $this->repo, $teams);
 
-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
-
-        self::assertSame('Mover Gm', $this->view->teamArgs['gmName']);
-        self::assertSame(['getTopGmRivals', 'Mover Gm', RivalriesController::TOP_LIMIT], $this->service->calls[1]);
-    }
-
-    public function testTeamPageWithoutOwnerFallsBackToUsername(): void
-    {
-        $this->usernames['Metros'] = 'Rival Gm';
-
-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
-
-        self::assertSame('Rival Gm', $this->view->teamArgs['gmName']);
-    }
-
-    public function testTeamPageWithUnknownOwnerAndUsernamePassesNullGm(): void
-    {
-        $this->owners[3] = 'Ghost Gm';
-        $this->usernames['Metros'] = 'ghostly';
-
-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
+        $controller->handle(['op' => 'team', 'team' => '3'], null, null);
 
         self::assertNull($this->view->teamArgs['gmName']);
-    }
-
-    public function testTeamPageWithEmptyUsernameSkipsTheLookup(): void
-    {
-        $this->owners[3] = 'Ghost Gm';
-        $this->usernames['Metros'] = '';
-
-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
-
-        self::assertNull($this->view->teamArgs['gmName']);
+        self::assertSame([], $this->view->teamArgs['gmRivals']);
         self::assertSame(1, $this->repo->calls['findGmName']);
     }
 

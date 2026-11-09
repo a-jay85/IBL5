@@ -23,6 +23,7 @@ final class ModuleRedirect
         'CareerLeaderboards'   => 'modules.php?name=Leaderboards&tab=career',
         'CapSpace'           => 'modules.php?name=Contracts&tab=teams',
         'ContractList'       => 'modules.php?name=Contracts&tab=players',
+        'League_Starters'      => 'modules.php?name=LeagueStarters',
     ];
 
     public static function targetFor(string $moduleName): ?string

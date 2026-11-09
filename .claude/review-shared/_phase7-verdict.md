@@ -25,7 +25,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
    git rev-parse --short=12 HEAD && git rev-parse --short=12 <MASTER_SHA> && date -u "+%Y-%m-%dT%H:%MZ"
    ```
 
-   Three printed values, three uses. Record each as a **literal**; like every other capture in this skill they do not survive into the next Bash call. Both SHAs come back already 12 characters, so nothing is hand-truncated: `<MASTER_SHA>` is the 40-char Phase 1.3 pin, and this command derives the short form the line needs. `HEAD` is the branch head *after* any Phase 6.5 remediation push, which is exactly the commit this verdict describes. Run this at Phase 7 entry. A SHA carried in from Phase 4.5 predates remediation and would name a commit the verdict does not describe.
+   Three printed values, three uses. Record each as a **literal**; like every other capture in this skill they do not survive into the next Bash call. Both SHAs come back already 12 characters, so nothing is hand-truncated: `<MASTER_SHA>` is the 40-char Phase 1.3 pin, and this command derives the short form the line needs. `HEAD` is the branch head *after* any Phase 6.5 remediation push, which is the commit this verdict describes. Run this at Phase 7 entry. A SHA carried in from Phase 4.5 predates remediation and would name a commit the verdict does not describe.
 
 3. **Post the sticky verdict.** Marker, placed as the **last line of the body** so an update matches:
 

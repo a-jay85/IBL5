@@ -139,7 +139,7 @@ def test_never_clear_planted_bug():
 
 
 def test_never_clear_ui_pipeline_pr():
-    _assert_held_with_clean([10], pr_labels=["pipeline-authored"],
+    _assert_held_with_clean([10], pr_labels=["pipeline-authored", "human-approved"],
                             classification=Classification(files=["ibl5/design/foo.css"]))
 
 
@@ -147,32 +147,34 @@ def test_never_clear_gate_backtest_unknown():
     _assert_held_with_clean([17], gate_backtest_status="UNKNOWN")
 
 
-# The UI floor covers every clearable condition, not condition 10 only.
+# The UI floor covers every clearable condition, not condition 10 only. Each case
+# carries `human-approved`, which clears condition 8, so the seat's own UI check
+# is what keeps the hold.
 _UI_FILES = (["ibl5/design/input.css"], ["ibl5/classes/Foo/FooView.php"])
 
 
 @pytest.mark.parametrize("files", _UI_FILES)
 def test_ui_floor_holds_plan_trigger_on_clean(files):
     _assert_held_with_clean([7], **_PLAN_HOLD, plan_hold_triggers=("gate-weakening",),
-                            classification=Classification(files=files))
+                            pr_labels=["human-approved"], classification=Classification(files=files))
 
 
 @pytest.mark.parametrize("files", _UI_FILES)
 def test_ui_floor_holds_pipeline_on_clean(files):
-    _assert_held_with_clean([10], pr_labels=["pipeline-authored"],
+    _assert_held_with_clean([10], pr_labels=["pipeline-authored", "human-approved"],
                             classification=Classification(files=files))
 
 
 @pytest.mark.parametrize("files", _UI_FILES)
 def test_ui_floor_holds_fidelity_on_clean(files):
     _assert_held_with_clean([12], fidelity_verdict="NOT READY", fidelity_gate_edit_only=True,
-                            classification=Classification(files=files))
+                            pr_labels=["human-approved"], classification=Classification(files=files))
 
 
 @pytest.mark.parametrize("files", _UI_FILES)
 def test_ui_floor_holds_gate_backtest_on_clean(files):
     _assert_held_with_clean([17], gate_backtest_status="HELD",
-                            classification=Classification(files=files))
+                            pr_labels=["human-approved"], classification=Classification(files=files))
 
 
 # The must-ask shapes of gate 14(b), 14(e) and 14(f) have owner-held tokens.

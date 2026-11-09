@@ -2472,3 +2472,37 @@ def test_precommit_hang_fails_run_closed_no_push_no_gatefix(tmp_path, monkeypatc
     assert "phase2: PR #" not in audit
     assert "REBASE=" not in audit
     assert "phase6.5" not in audit
+
+
+class _UiRenameGit(runner.ReplayGit):
+    """A UI file renamed to a non-UI path: changed_files lists only the new path."""
+    def changed_files(self, base="origin/master"):
+        return ["ibl5/classes/Moved.php"]
+
+    def conformance_files(self, base="origin/master"):
+        return ["ibl5/classes/Moved.php", "ibl5/design/input.css"]
+
+
+def test_arm_inputs_ui_paths_carry_rename_source(tmp_path, monkeypatch):
+    """The UI floor must see a rename's old path, so ArmInputs.ui_paths reads
+    `conformance_files`.
+
+    Mutation caught: drop `ui_paths=git.conformance_files()` from the ArmInputs
+    build and ui_paths is None, so condition (8) reads only the new path.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _UiRenameGit)
+    seen = []
+    real_evaluate = runner.evaluate
+
+    def _spy(inputs):
+        seen.append(inputs.ui_paths)
+        return real_evaluate(inputs)
+
+    monkeypatch.setattr(runner, "evaluate", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(plan_content=_PLAN_RENAME_TARGET_ONLY), out,
+                     FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert seen and "ibl5/design/input.css" in seen[0]
+    assert 8 in {c.number for c in res.arm.holds}

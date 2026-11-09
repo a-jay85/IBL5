@@ -102,7 +102,9 @@ describe('alert contrast', () => {
 });
 
 // The built stylesheet is gitignored, so it only exists after `bun run css:build`.
-// Minified output spells the new step as `--color-warning-700:#b45309`.
+// `bun run css:build` minifies it; `bin/wt-up` does not, so allow whitespace.
+// Test names here avoid the 'success alert' / 'warning alert' row filters,
+// which target the source-token tests above.
 const builtPath = `${ibl5Root}themes/IBL/style/style.css`;
 
 describe.skipIf(!existsSync(builtPath))('built stylesheet alert tokens', () => {
@@ -113,8 +115,8 @@ describe.skipIf(!existsSync(builtPath))('built stylesheet alert tokens', () => {
     expect(built).toMatch(/--warning-700:\s*var\(--color-warning-700\)/);
   });
 
-  it('points the success and warning alert text at the 700 steps', () => {
-    expect(built).toMatch(/\.ibl-alert--success\{[^}]*color:\s*var\(--success-700\)/);
-    expect(built).toMatch(/\.ibl-alert--warning\{[^}]*color:\s*var\(--warning-700\)/);
+  it('points both alert text rules at the 700 steps', () => {
+    expect(built).toMatch(/\.ibl-alert--success\s*\{[^}]*color:\s*var\(--success-700\)/);
+    expect(built).toMatch(/\.ibl-alert--warning\s*\{[^}]*color:\s*var\(--warning-700\)/);
   });
 });

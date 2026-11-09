@@ -229,9 +229,10 @@ h_pass "row9 — TOMBSTONE reaped regardless of skip reason"
 # ---------------------------------------------------------------------------
 # Guard self-test (backlog#1576) — the bare-entry half of assert_queued and the
 # NNN- half of assert_not_queued must trip on a stray entry. h_fail is stubbed
-# in a subshell, so the probe never touches the counters and the RESULT count
-# stays put; only a guard that fails to trip (or trips on the wrong label) is
-# reported.
+# in a subshell, so the helpers' own failures never reach the counters. The four
+# h_eq probes below run in the parent shell and each add a pass, so the RESULT
+# count rises by four (40 to 44); a guard that fails to trip (or trips on the
+# wrong label) fails its h_eq.
 # ---------------------------------------------------------------------------
 tripped_labels() {  # <helper> <label> <slug>: the labels the helper failed with
     ( h_fail() { printf '%s\n' "$1"; }; "$1" "$2" "$3" )

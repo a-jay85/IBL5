@@ -147,6 +147,7 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             return new $controllerClass(new \BugPipeline\BugReportRepository($db));
         }
 
+        /** @var class-string<\Api\Contracts\ControllerInterface> $controllerClass */
         return new $controllerClass($db);
     };
 });

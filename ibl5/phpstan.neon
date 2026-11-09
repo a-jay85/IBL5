@@ -6,6 +6,7 @@ parameters:
     tmpDir: tmp
     level: max
     paths:
+        - api.php
         - classes
         - themes
         - phpstan-rules

@@ -206,6 +206,28 @@ ui_workflow_verdict() {
     ui_decide "$paths" "$renderable" "$gallery"
 }
 
+# ui_fetch_pr_gh — the production fetch for ui_live_pr_state. Prints the live
+# REST pulls/N object. Env: GH_REPO, PR.
+ui_fetch_pr_gh() {
+    gh api "repos/$GH_REPO/pulls/$PR"
+}
+
+# ui_live_pr_state <expected_head_sha> <fetch_fn>
+# The gallery wait can last UI_VR_ATTEMPTS x UI_VR_SLEEP seconds, and the event
+# payload's labels and head SHA are frozen at trigger time. This re-reads the
+# PR after the wait. It prints the live labels as a comma list.
+#   rc 0 the head is still <expected_head_sha>
+#   rc 3 the head moved: the run must post no verdict for the old head
+#   rc 1 the read or parse failed, so the caller must hold
+ui_live_pr_state() {
+    local want="$1" fetch="$2" json head labels
+    json=$("$fetch") || return 1
+    head=$(jq -er '.head.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' <<< "$json" 2>/dev/null) || return 1
+    labels=$(jq -er '.labels | select(type == "array") | map(.name | strings) | join(",")' <<< "$json" 2>/dev/null) || return 1
+    [ "$head" = "$want" ] || return 3
+    printf '%s\n' "$labels"
+}
+
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     case "${1:-}" in
         --paths) ui_paths_touch_ui; exit $? ;;

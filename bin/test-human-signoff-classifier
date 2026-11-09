@@ -1671,4 +1671,92 @@ else
     h_fail "workflow_e2e_uploads_gallery_json" "e2e-tests.yml has no artifact named ${UI_PREFIX}..."
 fi
 
+# ---- live PR re-read after the gallery wait (stale-event-payload) ----
+# The sync run can wait UI_VR_ATTEMPTS x UI_VR_SLEEP seconds. Its payload
+# labels and head SHA are frozen at trigger time, so the gate re-reads both.
+LV_TMP=$(mktemp -d)
+LV_HEAD=$(printf 'a%.0s' {1..40})
+LV_NEW=$(printf 'b%.0s' {1..40})
+# live_run <stub_json|FAIL> — runs ui_live_pr_state "$LV_HEAD" under strict mode.
+live_run() {
+    printf '%s' "$1" > "$LV_TMP/pr.json"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LV_OUT=$(bash -c 'set -euo pipefail; source "$1"; stub="$3"
+        lv_fetch() { [ "$(cat "$stub")" != FAIL ] && cat "$stub"; }
+        rc=0; ui_live_pr_state "$2" lv_fetch || rc=$?; echo "RC=$rc"' \
+        _ "$UI_LIB" "$LV_HEAD" "$LV_TMP/pr.json" 2>&1)
+}
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"},\"labels\":[{\"name\":\"human-approved\"},{\"name\":\"x\"}]}"
+same "live re-read: same head prints the live labels" "$LV_OUT" "$(printf 'human-approved,x\nRC=0')"
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"},\"labels\":[]}"
+same "live re-read: a removed label reads as no labels" "$LV_OUT" "$(printf '\nRC=0')"
+live_run "{\"head\":{\"sha\":\"$LV_NEW\"},\"labels\":[{\"name\":\"human-approved\"}]}"
+same "live re-read: a moved head is rc 3 and prints no labels" "$LV_OUT" "RC=3"
+live_run FAIL
+same "live re-read: a failed fetch is rc 1" "$LV_OUT" "RC=1"
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"}}"
+same "live re-read: missing labels is rc 1" "$LV_OUT" "RC=1"
+live_run '{"head":{"sha":"short"},"labels":[]}'
+same "live re-read: a malformed head SHA is rc 1" "$LV_OUT" "RC=1"
+live_run 'not json'
+same "live re-read: unparseable JSON is rc 1" "$LV_OUT" "RC=1"
+
+# hs_live_reread_ok <workflow-file> — 0 when the eval step re-reads the live PR
+# after ui_workflow_verdict and before the first hs_pr_cleared, takes the live
+# labels, posts superseded on a moved head, and the label job skips superseded.
+hs_live_reread_ok() {
+    local v l a s c
+    v=$(command grep -n -F -m1 'UI_VERDICT=$(ui_workflow_verdict' "$1" | cut -d: -f1)
+    l=$(command grep -n -F -m1 'LIVE_LABELS=$(ui_live_pr_state "$HEAD_SHA" ui_fetch_pr_gh) || LIVE_RC=$?' "$1" | cut -d: -f1)
+    a=$(command grep -n -F -m1 '0) LABELS="$LIVE_LABELS" ;;' "$1" | cut -d: -f1)
+    s=$(command grep -n -F -m1 'echo "verdict=superseded" >> "$GITHUB_OUTPUT"' "$1" | cut -d: -f1)
+    c=$(command grep -n -F -m1 'hs_pr_cleared "$UI_VERDICT" "$LABELS"' "$1" | cut -d: -f1)
+    [ -n "$v" ] && [ -n "$l" ] && [ -n "$a" ] && [ -n "$s" ] && [ -n "$c" ] || return 1
+    [ "$v" -lt "$l" ] && [ "$l" -lt "$a" ] && [ "$a" -lt "$c" ] && [ "$s" -lt "$c" ] || return 1
+    [ "$(sed -n "$((s + 1))p" "$1" | tr -d ' ')" = "exit0;;" ] || return 1
+    wf_job_block "$1" needs-a-human-label | command grep -qF 'if [ "$VERDICT" = "superseded" ]; then' || return 1
+}
+if hs_live_reread_ok "$HS_YML"; then
+    h_pass "live re-read: human-signoff.yml re-reads the PR between the wait and the verdict"
+else
+    h_fail "live re-read: human-signoff.yml re-reads the PR between the wait and the verdict" "wiring not found or out of order"
+fi
+LV_M1="$LV_TMP/m-no-reread.yml"
+sed '/LIVE_LABELS=$(ui_live_pr_state/d' "$HS_YML" > "$LV_M1"
+if cmp -s "$HS_YML" "$LV_M1"; then
+    h_fail "mutant identical: no-reread"
+elif hs_live_reread_ok "$LV_M1"; then
+    h_fail "mutant no-reread: guard catches a deleted re-read" "guard still passed"
+else
+    h_pass "mutant no-reread: guard catches a deleted re-read"
+fi
+LV_M2="$LV_TMP/m-stale-labels.yml"
+sed 's/0) LABELS="\$LIVE_LABELS" ;;/0) : ;;/' "$HS_YML" > "$LV_M2"
+if cmp -s "$HS_YML" "$LV_M2"; then
+    h_fail "mutant identical: stale-labels"
+elif hs_live_reread_ok "$LV_M2"; then
+    h_fail "mutant stale-labels: guard catches the payload labels kept" "guard still passed"
+else
+    h_pass "mutant stale-labels: guard catches the payload labels kept"
+fi
+LV_M3="$LV_TMP/m-superseded-falls-through.yml"
+awk 'p && /exit 0 ;;/ { sub(/exit 0 ;;/, ";;") } { p = index($0, "verdict=superseded") > 0; print }' "$HS_YML" > "$LV_M3"
+if cmp -s "$HS_YML" "$LV_M3"; then
+    h_fail "mutant identical: superseded-falls-through"
+elif hs_live_reread_ok "$LV_M3"; then
+    h_fail "mutant superseded-falls-through: guard catches a moved head reaching the verdict" "guard still passed"
+else
+    h_pass "mutant superseded-falls-through: guard catches a moved head reaching the verdict"
+fi
+LV_M4="$LV_TMP/m-label-job-writes.yml"
+sed '/if \[ "\$VERDICT" = "superseded" \]; then/d' "$HS_YML" > "$LV_M4"
+if cmp -s "$HS_YML" "$LV_M4"; then
+    h_fail "mutant identical: label-job-writes"
+elif hs_live_reread_ok "$LV_M4"; then
+    h_fail "mutant label-job-writes: guard catches a label write on superseded" "guard still passed"
+else
+    h_pass "mutant label-job-writes: guard catches a label write on superseded"
+fi
+rm -rf "$LV_TMP"
+
 h_done

@@ -28,6 +28,11 @@ name: Human Sign-off
 # the hold anyway, and its fingerprint record must land before a sync run's
 # HS_AWAIT wait gives up.
 #
+# After the wait the event payload may be stale. The gate re-reads the live PR
+# (ui_live_pr_state) before it judges: it uses the live labels, and when the
+# head SHA moved it posts `superseded`, which is red and writes no label,
+# record, or drop for the old head. A failed re-read holds.
+#
 # The classifiers live in bin/lib/human-signoff-classifier.sh and
 # bin/lib/ui-change-classifier.sh, sourced by BOTH this workflow and
 # bin/test-human-signoff-classifier so the gate's logic cannot drift from its
@@ -162,6 +167,24 @@ jobs:
           UI_VERDICT="${UI_VERDICT:-ui-unknown}"
           echo "UI verdict: $UI_VERDICT"
 
+          # The gallery wait can run for many minutes, so the payload's LABELS
+          # and HEAD_SHA may be stale by now. Re-read the live PR once. A moved
+          # head posts no verdict for the old head (superseded is red and
+          # writes nothing). A failed read holds with no labels.
+          LIVE_RC=0
+          LIVE_LABELS=$(ui_live_pr_state "$HEAD_SHA" ui_fetch_pr_gh) || LIVE_RC=$?
+          case "$LIVE_RC" in
+            0) LABELS="$LIVE_LABELS" ;;
+            3)
+              echo "Head moved off $HEAD_SHA during the wait; no verdict for the old head"
+              echo "verdict=superseded" >> "$GITHUB_OUTPUT"
+              exit 0 ;;
+            *)
+              echo "::warning::could not re-read the live PR; holding with no labels"
+              UI_VERDICT=ui-unknown
+              LABELS="" ;;
+          esac
+
           # Every failure below leaves FP or COMMENTS empty/absent, and
           # hs_eval_approval turns that into a red gate for a UI PR holding
           # the label. A not-ui PR never reads either value.
@@ -275,9 +298,15 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           RESULT: ${{ needs.human-signoff.result }}
+          VERDICT: ${{ needs.human-signoff.outputs.verdict }}
           HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'needs-a-human') }}
         run: |
           set -euo pipefail
+          # The head moved during the gate's wait. The newer head's run owns the label.
+          if [ "$VERDICT" = "superseded" ]; then
+            echo "Gate superseded by a newer head; label left alone"
+            exit 0
+          fi
           if [ "$RESULT" = "failure" ]; then
             # Create the label on first use; a no-op once it exists.
             gh label create needs-a-human --color D93F0B \

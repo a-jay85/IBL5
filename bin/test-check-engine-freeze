@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Test harness for bin/check-engine-freeze (the engine/ freeze and the decompile-token gate).
+# Test harness for bin/check-engine-freeze (the decompile-token gate and its path allowlist).
 # Follows bin/test-check-docs style.
 #
 # One fixture repo lives in a mktemp dir. Each case resets it to the base commit,
@@ -79,84 +79,7 @@ expect_since() { # <label> <want_rc> <want_substring>
     expect "$1" "$2" "$3" --since="$BASE"
 }
 
-# ── Gate A: freeze ───────────────────────────────────────────────────────────
-
-reset_repo
-echo 'func Extra() {}' >>"$REPO/engine/a.go"
-commit_all
-expect_since freeze-add-line 1 'FROZEN engine/a.go'
-
-reset_repo
-printf 'package c\n' >"$REPO/engine/c.go"
-commit_all
-expect_since freeze-new-file 1 'FROZEN engine/c.go'
-
-reset_repo
-: >"$REPO/engine/e.go"
-commit_all
-expect_since freeze-new-empty 1 'FROZEN engine/e.go'
-
-reset_repo
-echo 'require example.test/dep v1.0.0' >>"$REPO/engine/go.mod"
-commit_all
-expect_since freeze-gomod 1 'FROZEN engine/go.mod'
-
-reset_repo
-echo 'example.test/dep v1.0.0/go.mod h1:def=' >>"$REPO/engine/go.sum"
-commit_all
-expect_since freeze-gosum 1 'FROZEN engine/go.sum'
-
-reset_repo
-printf '\007\010\011\012' >"$REPO/engine/blob.bin"
-commit_all
-expect_since freeze-binary 1 'FROZEN engine/blob.bin'
-
-reset_repo
-git -C "$REPO" mv engine/b.go engine/d.go
-commit_all
-expect_since freeze-rename-within 1 'FROZEN engine/d.go'
-
-reset_repo
-git -C "$REPO" mv ibl5/y.php engine/y.php
-commit_all
-expect_since freeze-rename-into 1 'FROZEN engine/y.php'
-
-reset_repo
-git -C "$REPO" mv engine/b.go ibl5/b.go
-commit_all
-expect_since freeze-rename-out 1 'moved out of engine/'
-
-reset_repo
-echo 'func Dirty() {}' >>"$REPO/engine/a.go"
-expect_since freeze-uncommitted 1 'FROZEN engine/a.go'
-
-reset_repo
-git -C "$REPO" rm -rq engine
-commit_all
-expect_since freeze-delete-tree 0 'OK'
-
-reset_repo
-git -C "$REPO" rm -q engine/blob.bin
-commit_all
-expect_since freeze-delete-binary 0 'OK'
-
-reset_repo
-sed '3d' "$REPO/engine/a.go" >"$REPO/engine/a.go.new"
-mv "$REPO/engine/a.go.new" "$REPO/engine/a.go"
-commit_all
-expect_since freeze-remove-lines 0 'OK'
-
-reset_repo
-chmod +x "$REPO/engine/a.go"
-commit_all
-expect_since freeze-mode-only 0 'OK'
-
-reset_repo
-echo '$b = 2;' >>"$REPO/ibl5/y.php"
-commit_all
-expect_since outside-only 0 'OK'
-
-# ── Gate B: decompile tokens ─────────────────────────────────────────────────
+# ── Decompile-token gate ─────────────────────────────────────────────────────
 
 reset_repo
 echo "x = $T_FUN" >>"$REPO/ibl5/y.php"
@@ -211,6 +134,108 @@ reset_repo
 commit_all
 expect_since token-boundary 0 'OK'
 
+# ── Allowlist ────────────────────────────────────────────────────────────────
+
+reset_repo
+echo '$b = 2;' >>"$REPO/ibl5/y.php"
+commit_all
+expect_since outside-only 0 'OK'
+
+reset_repo
+echo 'func Extra() {}' >>"$REPO/engine/a.go"
+commit_all
+expect_since engine-plain-line 0 'OK'
+
+reset_repo
+printf 'package a\n\nfunc New() {}\n' >"$REPO/engine/new.go"
+commit_all
+expect_since engine-new-file 0 'OK'
+
+reset_repo
+printf '\007\010\011\012' >"$REPO/engine/blob.bin"
+commit_all
+expect_since engine-binary 0 'OK'
+
+reset_repo
+git -C "$REPO" mv engine/b.go engine/d.go
+commit_all
+expect_since engine-rename-within 0 'OK'
+
+reset_repo
+echo 'require example.test/dep v1.0.0' >>"$REPO/engine/go.mod"
+commit_all
+expect_since engine-gomod 0 'OK'
+
+reset_repo
+echo "// cites $T_FUN" >>"$REPO/engine/a.go"
+commit_all
+expect_since allow-engine-token 0 'OK'
+
+reset_repo
+echo 'package a' >"$REPO/engine/${T_FUN}.go"
+commit_all
+expect_since allow-engine-filename 0 'OK'
+
+reset_repo
+mkdir -p "$REPO/jsb-native"
+echo "note cites $T_FUN" >"$REPO/jsb-native/notes.md"
+commit_all
+expect_since allow-jsb-native-token 0 'OK'
+
+reset_repo
+mkdir -p "$REPO/ibl5/classes"
+echo "// cites $T_FUN" >"$REPO/ibl5/classes/Port.php"
+commit_all
+expect_since deny-ibl5-classes 1 'DECOMPILE-TOKEN ibl5/classes/Port.php:'
+
+reset_repo
+echo "# cites $T_FUN" >"$REPO/bin/tool"
+commit_all
+expect_since deny-bin 1 'DECOMPILE-TOKEN bin/tool:'
+
+reset_repo
+mkdir -p "$REPO/.claude/rules"
+echo "cites $T_FUN" >"$REPO/.claude/rules/port.md"
+commit_all
+expect_since deny-claude 1 'DECOMPILE-TOKEN .claude/rules/port.md:'
+
+reset_repo
+echo "cites $T_FUN" >"$REPO/notes.md"
+commit_all
+expect_since deny-root 1 'DECOMPILE-TOKEN notes.md:'
+
+reset_repo
+mkdir -p "$REPO/engines"
+echo "// cites $T_FUN" >"$REPO/engines/a.go"
+commit_all
+expect_since deny-near-engines 1 'DECOMPILE-TOKEN engines/a.go:'
+
+reset_repo
+mkdir -p "$REPO/ibl5/engine"
+echo "// cites $T_FUN" >"$REPO/ibl5/engine/a.go"
+commit_all
+expect_since deny-near-nested 1 'DECOMPILE-TOKEN ibl5/engine/a.go:'
+
+reset_repo
+echo "cites $T_FUN" >"$REPO/notes.md"
+commit_all
+expect_since deny-footer 1 'may be added only under engine/ or jsb-native/'
+
+# The engine/ token comes first in the diff, so a stale allowlist flag would let
+# the ibl5/ token through.
+reset_repo
+echo "// cites $T_FUN" >>"$REPO/engine/a.go"
+mkdir -p "$REPO/ibl5/classes"
+echo "// cites $T_FUN" >"$REPO/ibl5/classes/Mixed.php"
+commit_all
+expect_since mixed-resets 1 'DECOMPILE-TOKEN ibl5/classes/Mixed.php:'
+out=$(cd "$REPO" && bin/check-engine-freeze --since="$BASE" 2>&1) || true
+if grep -qF 'DECOMPILE-TOKEN engine/' <<< "$out"; then
+    fail "mixed-resets omits the engine/ path"
+else
+    pass "mixed-resets omits the engine/ path"
+fi
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 reset_repo
@@ -219,6 +244,7 @@ expect cli-space-form 2 'use --since=<ref>' --since "$BASE"
 expect cli-no-args 2 'use --since=<ref>'
 expect cli-bad-ref 2 'cannot resolve ref' --since=nonexistent-ref
 expect cli-help 0 'usage' --help
+expect cli-help-allowlist 0 'outside engine/ or jsb-native/' --help
 expect empty-range 0 'OK' --since=HEAD
 
 echo ""

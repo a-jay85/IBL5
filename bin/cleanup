@@ -473,7 +473,7 @@ if [ "$ALL" = true ]; then
         fi
 
         # Skip branches checked out in a worktree (handled by check_worktree above)
-        if echo "$WORKTREE_BRANCHES" | grep -qx "$bare_branch"; then
+        if grep -qx "$bare_branch" <<< "$WORKTREE_BRANCHES"; then
             continue
         fi
 
@@ -512,7 +512,7 @@ if [ "$ALL" = true ]; then
 
         # Check 2: Remote tracking ref is [gone] (no PR or gh unavailable)
         if [ "$should_delete" = false ]; then
-            if echo " $GONE_BRANCHES " | grep -q " $bare_branch "; then
+            if grep -q " $bare_branch " <<< " $GONE_BRANCHES "; then
                 should_delete=true
                 delete_reason="remote branch deleted"
             fi
@@ -644,7 +644,7 @@ if [ "$ALL" = true ]; then
             if [[ "$project" == ibl5-* ]]; then
                 slug="${project#ibl5-}"
                 # Skip if slug belongs to an active worktree
-                if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+                if grep -qx "$slug" 2>/dev/null <<< "$(printf '%s\n' "$active_slugs" | tr ' ' '\n')"; then
                     continue
                 fi
             else
@@ -711,7 +711,7 @@ if [ "$ALL" = true ]; then
             slug=$(echo "$img" | sed -E 's/^ibl5-(.+)-(php|browsersync|tailwind)$/\1/')
             [ "$slug" = "$img" ] && continue
             # Skip if slug belongs to an active worktree
-            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+            if grep -qx "$slug" 2>/dev/null <<< "$(printf '%s\n' "$active_slugs" | tr ' ' '\n')"; then
                 continue
             fi
             if [ "$DRY_RUN" = true ]; then
@@ -733,7 +733,7 @@ if [ "$ALL" = true ]; then
             slug=$(echo "$vol" | sed -E 's/^ibl5-(.+)_[^_]+$/\1/')
             [ "$slug" = "$vol" ] && continue
             # Skip if slug belongs to an active worktree
-            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+            if grep -qx "$slug" 2>/dev/null <<< "$(printf '%s\n' "$active_slugs" | tr ' ' '\n')"; then
                 continue
             fi
             if [ "$DRY_RUN" = true ]; then

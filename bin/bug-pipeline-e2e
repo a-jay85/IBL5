@@ -142,10 +142,10 @@ expect 'status still pr_open after rejected form' 'pr_open' \
 
 # Step 6.6 — The row appears in the PR-open listing
 LIST_OUT=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php scripts/bug-pipeline/list-pr-open.php)
-printf '%s' "$LIST_OUT" | grep -qF "$ID" \
+grep -qF "$ID" <<< "$LIST_OUT" \
     && echo "ok: list-pr-open contains ID=$ID" \
     || { echo "FAIL: list-pr-open missing ID=$ID" >&2; RC=1; }
-printf '%s' "$LIST_OUT" | grep -qF '42' \
+grep -qF '42' <<< "$LIST_OUT" \
     && echo 'ok: list-pr-open contains pr_number=42' \
     || { echo 'FAIL: list-pr-open missing 42' >&2; RC=1; }
 

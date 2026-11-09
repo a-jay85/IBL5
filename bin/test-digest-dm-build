@@ -354,7 +354,7 @@ want "above-heading ignored" "$OUT" '(No /pr-ready digest'
 
 # The producer really does emit bare-bold, not bulleted — case 2 must stay honest.
 begin_case "14c producer emits bare bold"
-printf '%s\n' "$LINES" | grep -q '^\*\*What changed:\*\*' \
+grep -q '^\*\*What changed:\*\*' <<< "$LINES" \
     && ok || fail "digest.sh no longer emits bare-bold labels; case 2 may be vacuous"
 
 # ---------------------------------------------------------------------------

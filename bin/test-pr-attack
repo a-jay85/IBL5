@@ -80,7 +80,7 @@ cat > "$TMP/stubs/git" <<STUB
 #!/usr/bin/env bash
 # Intercept rev-parse origin/master to return the fixed fake tip SHA.
 if [ "\${1:-}" = "rev-parse" ] && [ "\${*: -1}" = "origin/master" ]; then
-    if printf '%s ' "\$@" | grep -qF ' --short '; then
+    if grep -qF ' --short ' <<< "\$* "; then
         printf '%s\n' "\${GIT_MASTER_SHA:0:7}"
     else
         printf '%s\n' "\${GIT_MASTER_SHA}"

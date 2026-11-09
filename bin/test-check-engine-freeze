@@ -67,7 +67,7 @@ expect() {
     if [ "$rc" -ne "$want" ]; then
         fail "$label: exit $rc, wanted $want"
         echo "$out" | sed 's/^/    /'
-    elif [ -n "$sub" ] && ! printf '%s\n' "$out" | grep -qF -- "$sub"; then
+    elif [ -n "$sub" ] && ! grep -qF -- "$sub" <<< "$out"; then
         fail "$label: output lacks '$sub'"
         echo "$out" | sed 's/^/    /'
     else
@@ -163,7 +163,7 @@ echo "x = $T_FUN" >>"$REPO/ibl5/y.php"
 commit_all
 expect_since token-fun 1 'ibl5/y.php:'
 out=$(cd "$REPO" && bin/check-engine-freeze --since="$BASE" 2>&1) || true
-if printf '%s\n' "$out" | grep -qF "$T_FUN"; then
+if grep -qF "$T_FUN" <<< "$out"; then
     pass "token-fun names the token"
 else
     fail "token-fun names the token"

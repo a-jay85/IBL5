@@ -746,7 +746,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         fi
     done
     expected_red=0
-    if echo "$body" | grep -qiE "$EXPECTED_RED_RE"; then
+    if grep -qiE "$EXPECTED_RED_RE" <<< "$body"; then
         expected_red=1
         blocked_check=1
     fi
@@ -766,7 +766,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     verdict_holds="$(hp_verdict_holds "$sticky" "$comments_status")"
 
     held_body=0
-    if echo "$body" | grep -qiE "$HELD_BODY_RE"; then
+    if grep -qiE "$HELD_BODY_RE" <<< "$body"; then
         held_body=1
     fi
 

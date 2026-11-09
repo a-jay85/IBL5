@@ -1582,12 +1582,12 @@ test_setup_print_no_unexpanded() {
     local out
     out="$("$SETUP" --print)
 $("$SETUP" --print-probe)"
-    if printf '%s\n' "$out" | grep -qE '\$\{|\$[A-Za-z_]'; then
+    if grep -qE '\$\{|\$[A-Za-z_]' <<< "$out"; then
         fail setup_unexpanded:dollar "found an unexpanded variable"
     else
         pass setup_unexpanded:dollar
     fi
-    if printf '%s\n' "$out" | grep -q '<string></string>'; then
+    if grep -q '<string></string>' <<< "$out"; then
         fail setup_unexpanded:empty-string "found an empty <string>"
     else
         pass setup_unexpanded:empty-string

@@ -64,6 +64,20 @@ run_rm() {
 
 ref_exists() { git -C "$MAIN" show-ref --verify --quiet "refs/heads/$1"; }
 
+echo "== case 18a: an absolute path nested below a worktree is rejected (runs first: the mutation check trips here fast)"
+mkwt nest-a nest-a
+run_rm "$WTS/nest-a/sub" --if-empty
+h_eq "case 18a: nested path rc 1" 1 "$RC"
+h_contains "case 18a: nested path message" "$OUT" "nested below"
+run_rm "$WTS/nest-a/sub/" --if-empty
+h_eq "case 18a: nested path with trailing slash rc 1" 1 "$RC"
+h_contains "case 18a: nested path with trailing slash message" "$OUT" "nested below"
+h_exists "case 18a: nested rejection left nest-a alone" "$WTS/nest-a"
+[ "$H_FAIL" -eq 0 ] || { echo "case 18a failed; stopping early"; exit 1; }
+git -C "$MAIN" worktree remove --force "$WTS/nest-a" >/dev/null 2>&1
+git -C "$MAIN" branch -D nest-a >/dev/null 2>&1
+if [ "${WT_REMOVE_TEST_ONLY:-}" = 18a ]; then echo "----"; h_done; exit $?; fi
+
 echo "== case 1: fresh worktree is removed and its unpushed branch deleted"
 mkwt empty-1 empty-1
 run_rm empty-1 --if-empty

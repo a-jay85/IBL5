@@ -246,7 +246,12 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // The WHERE'd UPDATEs trip rewrite-no-backup, but keywords inside string literals must not flag.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[rename-column]', $result['output']);
+        self::assertStringNotContainsString('[drop-index]', $result['output']);
+        self::assertStringNotContainsString('[narrow-type]', $result['output']);
     }
 
     public function testMultiLineAlterClausesAreFlagged(): void
@@ -618,7 +623,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // A WHERE clears the delete-no-where tag, but the rewrite needs a backup and undo script.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[delete-no-where]', $result['output']);
     }
 
     public function testDeleteWhereOnlyInCommentStillFlagged(): void
@@ -661,7 +669,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // A WHERE clears the update-no-where tag, but the rewrite needs a backup and undo script.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[update-no-where]', $result['output']);
     }
 
     public function testInsertOnDuplicateKeyUpdateIsClean(): void
@@ -977,7 +988,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // A WHERE clears the delete-no-where tag, but the rewrite needs a backup and undo script.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[delete-no-where]', $result['output']);
     }
 
     public function testPhpConcatenatedDeleteWithWhereIsClean(): void
@@ -990,7 +1004,10 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript();
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // A WHERE clears the delete-no-where tag, but the rewrite needs a backup and undo script.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[delete-no-where]', $result['output']);
     }
 
     public function testPhpBareActionWordsAreClean(): void
@@ -1032,7 +1049,11 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
 
         $result = $this->runScript(['--since=' . $baseSha]);
 
-        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        // A WHERE clears the delete-no-where tag, but the rewrite needs a backup and undo script.
+        // The old no-WHERE fragment is untouched, so it must stay unscanned.
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['output']);
+        self::assertStringNotContainsString('[delete-no-where]', $result['output']);
     }
 
     // ---- Phase 6: tagged bypass markers ---------------------------------

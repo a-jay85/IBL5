@@ -85,7 +85,10 @@ final class PreCommitHookDestructiveScanTest extends TestCase
 
         $result = $this->runHook();
 
-        self::assertSame(0, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        // A WHERE clears the delete-no-where tag, but the rewrite needs a backup and undo script.
+        self::assertSame(1, $result['exit'], "stdout: {$result['stdout']}\nstderr: {$result['stderr']}");
+        self::assertStringContainsString('[rewrite-no-backup]', $result['stdout']);
+        self::assertStringNotContainsString('[delete-no-where]', $result['stdout']);
     }
 
     public function testHookBlocksPhpHeredocDropColumn(): void

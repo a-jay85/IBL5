@@ -30,7 +30,7 @@
 # Run: bin/test-automouse-env-breaker  (exit 0 = all pass, 1 = a case failed)
 #      bin/test-automouse-env-breaker <judge-case>  (Section 1 plus one Opus judge
 #      case, for plan mutation checks; judge-pass also covers e2-judge-prompt)
-#      <judge-case>: judge-pass | judge-fail | judge-crash | judge-forged | no-judge
+#      <judge-case>: judge-pass | judge-fail | judge-crash | judge-forged | judge-deferred | judge-stall | judge-limit | no-judge
 
 set -u
 # shellcheck source=bin/lib/harness.sh
@@ -39,8 +39,8 @@ set -u
 # Case filter: empty runs every case; a judge case name skips the other run-loop cases.
 EB_ONLY="${1:-}"
 case "$EB_ONLY" in
-    ''|judge-pass|judge-fail|judge-crash|judge-forged|no-judge) ;;
-    *) echo "usage: bin/test-automouse-env-breaker [judge-pass|judge-fail|judge-crash|judge-forged|no-judge]" >&2; exit 2 ;;
+    ''|judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge) ;;
+    *) echo "usage: bin/test-automouse-env-breaker [judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge]" >&2; exit 2 ;;
 esac
 eb_want() { [ -z "$EB_ONLY" ] || [ "$EB_ONLY" = "$1" ]; }
 
@@ -377,6 +377,14 @@ if [ "\$kind" = judge ]; then
             printf '{"type":"system","subtype":"init"}\n'
             jq -nc --arg r \$'ROW 1: FAIL - not ok\nJUDGE_VERDICT: fail' '{type:"result",result:\$r}'
             exit 0 ;;
+        stall)
+            # Simulate the heartbeat watcher: STALL-KILL lands in the runner log after JUDGE_LOG_BEFORE.
+            for f in "$E2_NDIR/logs/"*.log; do [ -f "\$f" ] && printf 'STALL-KILL: judge stub stalled\n' >> "\$f"; done
+            exit 1 ;;
+        limit)
+            # Simulate a usage-limit kill: the impl \`limit\` stub's signature lands in the runner log.
+            for f in "$E2_NDIR/logs/"*.log; do [ -f "\$f" ] && printf "You've hit your weekly limit\n" >> "\$f"; done
+            exit 1 ;;
         *) exit 1 ;;
     esac
 fi
@@ -873,6 +881,8 @@ judge_case() {
 judge_ledger_rows() {
     cat "$E2_NDIR/logs"/*.costs.jsonl 2>/dev/null | jq -c 'select(.phase == "judge")' | grep -c . || true
 }
+# judge_env_stop_reports: count this case's judge env-stop reports (judge_case wipes reports/).
+judge_env_stop_reports() { find "$E2_NDIR/reports" -name '*-env-stop-judge-plan.md' 2>/dev/null | wc -l | tr -d ' '; }
 
 if eb_want judge-pass; then
 echo ""
@@ -921,6 +931,52 @@ J_REPORT="$(cat "$E2_NDIR"/reports/*-skipped-judge-plan.md 2>/dev/null || true)"
 assert_absent  "e2-judge-crash: post-plan not called"       "$E2_ROOT/postplan.marker"
 assert_present "e2-judge-crash: plan moved to skipped/"     "$E2_NDIR/skipped/judge-plan.md"
 want           "e2-judge-crash: report names verdict missing" "$J_REPORT" "Verdict: missing"
+assert_eq      "e2-judge-crash: no env-stop report without a stall or limit signature" "$(judge_env_stop_reports)" "0"
+fi
+
+if eb_want judge-deferred; then
+echo ""
+echo "# e2-judge-deferred: under JUDGE_CAP_SECS of budget left, the judge defers and keeps the handoff"
+# Raise the cap above MAX_ELAPSED in a runner copy so the deferral fires on the first judge pass.
+sed -e 's#^JUDGE_CAP_SECS=.*#JUDGE_CAP_SECS=99999#' "$E2_RUNNER" > "$E2_ROOT/run-jcap"
+chmod +x "$E2_ROOT/run-jcap"
+if grep -q '^JUDGE_CAP_SECS=99999$' "$E2_ROOT/run-jcap"; then ok "e2-judge-deferred: cap rewrite applied"
+else fail "e2-judge-deferred: cap rewrite did not apply"; fi
+E2_RUNNER_SAVE="$E2_RUNNER"; E2_RUNNER="$E2_ROOT/run-jcap"
+judge_case judge-plan judgeimpl pass
+E2_RUNNER="$E2_RUNNER_SAVE"
+J_LOG="$(e2_logtxt)"
+J_NJ="$(grep -c ' judge$' "$E2_ROOT/claude-calls.log" 2>/dev/null || true)"
+want           "e2-judge-deferred: log records the deferral"  "$J_LOG" "Judge deferred: "
+want           "e2-judge-deferred: log names the cap"         "$J_LOG" "below JUDGE_CAP_SECS=99999s."
+assert_eq      "e2-judge-deferred: no judge spawn"            "${J_NJ:-0}" "0"
+assert_absent  "e2-judge-deferred: post-plan not called"      "$E2_ROOT/postplan.marker"
+assert_present "e2-judge-deferred: handoff kept"              "$E2_NDIR/handoff/judge-plan.md.json"
+assert_absent  "e2-judge-deferred: plan not moved to skipped/" "$E2_NDIR/skipped/judge-plan.md"
+fi
+
+if eb_want judge-stall; then
+echo ""
+echo "# e2-judge-stall: a judge killed by a stall env-stops with the handoff kept"
+judge_case judge-plan judgeimpl stall
+J_LOG="$(e2_logtxt)"
+want           "e2-judge-stall: log records verdict missing"  "$J_LOG" "judge verdict: missing (claude-opus-5-5)"
+want           "e2-judge-stall: env-stop branch taken"        "$J_LOG" "Environmental failure during judge"
+assert_eq      "e2-judge-stall: one env-stop report"          "$(judge_env_stop_reports)" "1"
+assert_absent  "e2-judge-stall: plan not moved to skipped/"   "$E2_NDIR/skipped/judge-plan.md"
+assert_present "e2-judge-stall: handoff kept"                 "$E2_NDIR/handoff/judge-plan.md.json"
+assert_absent  "e2-judge-stall: post-plan not called"         "$E2_ROOT/postplan.marker"
+fi
+
+if eb_want judge-limit; then
+echo ""
+echo "# e2-judge-limit: a judge killed by a usage limit env-stops with the handoff kept"
+judge_case judge-plan judgeimpl limit
+J_LOG="$(e2_logtxt)"
+want           "e2-judge-limit: env-stop branch taken"        "$J_LOG" "Environmental failure during judge"
+assert_eq      "e2-judge-limit: one env-stop report"          "$(judge_env_stop_reports)" "1"
+assert_absent  "e2-judge-limit: plan not moved to skipped/"   "$E2_NDIR/skipped/judge-plan.md"
+assert_present "e2-judge-limit: handoff kept"                 "$E2_NDIR/handoff/judge-plan.md.json"
 fi
 
 if eb_want judge-forged; then

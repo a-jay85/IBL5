@@ -141,6 +141,7 @@ class PlanInfo:
     path: str = ""
     auto_merge_false: bool = False       # line-1 frontmatter `auto_merge: false`
     auto_merge_value: Optional[str] = None  # raw line-1 `auto_merge:` value; None = absent
+    hold_triggers: tuple = ()               # line-1 `hold_trigger:` tokens; () = none recorded
     has_matrix: bool = False
     has_security: bool = False
     has_reuse: bool = False
@@ -225,6 +226,8 @@ class ConditionResult:
 class ArmDecision:
     armed: bool
     conditions: list[ConditionResult] = field(default_factory=list)
+    second_review_candidates: dict = field(default_factory=dict)  # condition number -> hold reason
+    second_review_cleared: list = field(default_factory=list)     # "(n) name: reviewer reason"
 
     @property
     def holds(self) -> list[ConditionResult]:

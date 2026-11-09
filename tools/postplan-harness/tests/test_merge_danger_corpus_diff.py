@@ -48,6 +48,8 @@ def _check_sources():
 
 
 _CHECK_SOURCES = _check_sources()
+_RUNNER = "tools/postplan-harness/runner.py"
+_RUNNER_TRIGGER = "arming-path:" + _RUNNER
 
 
 def _derive(entry):
@@ -104,11 +106,24 @@ def test_path_corpus_one_way_flip_set():
     assert len(_PATHS["prs"]) == 100
     # The held set (one-way OR self-governing) is unchanged since the door was narrowed;
     # measured run: one-way {3050, 3058} (notify senders), self-governing {3114} (arming path).
-    got = {n for n, (md, _) in _DERIVED.items() if md.door == "one-way" or md.self_governing}
+    # 3043 and 3112 joined the self-governing set when fidelity.py became an arming path
+    # (ADR-0231): it decides which findings the second reviewer may clear.
+    # This corpus has paths and no diff text, so the runner.py seat-feed check cannot read a
+    # section and fails closed on every PR that touched runner.py. A live diff decides by its
+    # changed lines. Those path-only fires are counted apart below.
+    def held(md):
+        sg = [t for t in md.triggers if t.split(":", 1)[0] in merge_danger.SELF_GOVERNING_KINDS
+              and t != _RUNNER_TRIGGER]
+        return md.door == "one-way" or bool(sg)
+    got = {n for n, (md, _) in _DERIVED.items() if held(md)}
     want = set(_PATHS["expected_one_way"])
     assert got == want, f"measured held set {sorted(got)} != expected {sorted(want)}"
     assert {n for n, (md, _) in _DERIVED.items() if md.door == "one-way"} == {3050, 3058}
-    assert {n for n, (md, _) in _DERIVED.items() if md.self_governing} == {3114}
+    assert {n for n, (md, _) in _DERIVED.items() if held(md) and md.self_governing} == {
+        3043, 3112, 3114}
+    runner_prs = {e["number"] for e in _PATHS["prs"] if _RUNNER in e["files"]}
+    assert runner_prs, "corpus has no runner.py PR; the fail-closed count below proves nothing"
+    assert {n for n, (md, _) in _DERIVED.items() if _RUNNER_TRIGGER in md.triggers} == runner_prs
     for n in want:
         triggers = _DERIVED[n][0].triggers
         assert triggers, n

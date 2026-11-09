@@ -219,6 +219,39 @@ def test_arming_path_is_two_way_self_governing():
     assert "arming-path:bin/lib/pr-armable.sh" in d.triggers
 
 
+RUNNER = "tools/postplan-harness/runner.py"
+
+
+def _runner_diff(*changed):
+    lines = [f"diff --git a/{RUNNER} b/{RUNNER}", "index 1..2 100644", f"--- a/{RUNNER}",
+             f"+++ b/{RUNNER}", "@@ -1,2 +1,2 @@", " context second_review untouched"]
+    return "\n".join(lines + list(changed)) + "\n"
+
+
+@pytest.mark.parametrize("line", [
+    '+                second_review_verdict="CLEAN",',
+    '+                plan_hold_triggers=("gate-weakening",),',
+    '+                fidelity_gate_edit_only=True,',
+    '-            inputs = second_review.review_pass(inputs, pr, git.head_tree, git.diff_vs_base, plan,',
+])
+def test_runner_seat_feed_edit_is_self_governing(line):
+    d = _derive([("M", RUNNER)], diff=_runner_diff(line))
+    assert d.self_governing is True
+    assert f"arming-path:{RUNNER}" in d.triggers
+
+
+def test_runner_edit_away_from_seat_feed_is_not_self_governing():
+    d = _derive([("M", RUNNER)], diff=_runner_diff("-    log('old')", "+    log('new')"))
+    assert d.self_governing is False
+    assert f"arming-path:{RUNNER}" not in d.triggers
+
+
+def test_runner_without_diff_section_fails_closed():
+    d = _derive([("M", RUNNER)], diff="")
+    assert d.self_governing is True
+    assert f"arming-path:{RUNNER}" in d.triggers
+
+
 def test_gate_removed_is_two_way_self_governing():
     gates = [GateChange("bin/check-foo", "check-script", "removed", None, "gate deleted")]
     d = _derive([("D", "bin/check-foo")], gates=gates)

@@ -28,7 +28,7 @@ from harness.workflow_scope import workflow_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
-from harness.gate_backtest import _ARMING_PATHS
+from harness.gate_backtest import _ARMING_PATHS, _SEAT_FEED_PATH, _SEAT_FEED_RE
 
 DOORS = ("two-way", "one-way")                                  # index = rank; higher is more dangerous
 BLAST = ("localized", "module", "site-wide", "external")        # index = rank
@@ -92,6 +92,19 @@ def _section_for(diff_text: str, path: str) -> str | None:
         if section_path == path:
             return text
     return None
+
+
+def _touches_seat_feed(section: str | None) -> bool:
+    """True when a changed line of runner.py's section names the second reviewer's feed.
+    An unreadable section fires (fail closed)."""
+    if section is None:
+        return True
+    for line in section.splitlines():
+        if line.startswith(("+++", "---")) or not line.startswith(("+", "-")):
+            continue
+        if _SEAT_FEED_RE.search(line):
+            return True
+    return False
 
 
 _MOVE_SOURCE_RE = re.compile(r"^(?:rename|copy) from (.+)$", re.MULTILINE)
@@ -193,6 +206,8 @@ def derive_merge_danger(
     # Self-governing segment and leave the Door alone: `git revert` undoes them.
     for p in paths:
         if p in _ARMING_PATHS:
+            add(f"arming-path:{p}")
+        elif p == _SEAT_FEED_PATH and _touches_seat_feed(_section_for(diff_text or "", p)):
             add(f"arming-path:{p}")
     for g in gate_changes:
         if g.kind == "arming-harness":

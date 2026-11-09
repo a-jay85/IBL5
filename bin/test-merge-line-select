@@ -849,6 +849,21 @@ else
     failcase "W7-hotfix-dispatcher-defence — uses=$W7_USES permkeys=$W7_PERMKEYS perms=[$W7_PERMS] runs=$W7_RUNS runexpr=$W7_RUNEXPR cmd=$W7_CMD trigger=$W7_TRIGGER plainpr=$W7_PLAINPR label=$W7_LABEL armed=$W7_ARMED armevt=$W7_ARMEVT head=$W7_HEAD"
 fi
 
+# W7b: the run-interpolation gate's pull_request_target strict mode covers the dispatcher.
+# The real file passes; a copy whose run line interpolates the PR title (the PR #3652
+# row-29 mutation) fails. W7B_MUTLINES guards the sed anchor so a no-op copy cannot pass.
+W7B_CHECK="$SCRIPT_DIR/check-workflow-run-interpolation"
+W7B_MUT="$TMP/hotfix-dispatch-row29.yml"
+sed 's#run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true#run: echo ${{ github.event.pull_request.title }}#' "$DISPATCH_WF" > "$W7B_MUT"
+W7B_MUTLINES=$(grep -cF 'run: echo ${{ github.event.pull_request.title }}' "$W7B_MUT" || true)
+"$W7B_CHECK" "$DISPATCH_WF" >/dev/null 2>&1; W7B_REAL=$?
+"$W7B_CHECK" "$W7B_MUT" >/dev/null 2>&1; W7B_MUTRC=$?
+if [ "$W7B_MUTLINES" = 1 ] && [ "$W7B_REAL" = 0 ] && [ "$W7B_MUTRC" = 1 ]; then
+    pass "W7b-dispatcher-strict-interpolation-gate"
+else
+    failcase "W7b-dispatcher-strict-interpolation-gate — mutlines=$W7B_MUTLINES real=$W7B_REAL mut=$W7B_MUTRC"
+fi
+
 # W8: a hotfix (or any unrelated) label event never cancels an in-flight labeled run.
 MUTATION_WF="${MUTATION_WF:-$REPO_ROOT/.github/workflows/mutation.yml}"
 W8_MUT=$(count_lines "github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id)" "$MUTATION_WF")

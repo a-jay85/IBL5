@@ -1082,11 +1082,15 @@ def _set_columns(low):
     m = re.search(r"\bset\b(.*?)\bwhere\b(.*)$", low)
     if not m:
         return None, None
+    if re.search(r"\bselect\b", m.group(1)):
+        # A subquery in SET can hold its own WHERE; the split above is unreliable.
+        return None, None
     cols = []
     for part in split_depth0(m.group(1)):
-        lhs = part.split("=", 1)[0].strip().strip("`")
-        cols.append(last_part(lhs).strip("`"))
-    return cols, m.group(2)
+        # Keep the qualifier: the IS NULL must be on the same table.column.
+        lhs = part.split("=", 1)[0].strip().replace("`", "").replace(" ", "")
+        cols.append(lhs)
+    return cols, m.group(2).replace("`", "")
 
 
 def _null_guarded(cols, where):
@@ -1094,7 +1098,7 @@ def _null_guarded(cols, where):
     if re.search(r"\bor\b", where):
         return False
     for c in cols:
-        pat = r"(?<![a-z0-9_$])" + re.escape(c) + r"`? is null\b"
+        pat = r"(?<![a-z0-9_$.])" + re.escape(c) + r" is null\b"
         if not re.search(pat, where):
             return False
     return True

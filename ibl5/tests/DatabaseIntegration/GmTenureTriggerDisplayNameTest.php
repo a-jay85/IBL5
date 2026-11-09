@@ -184,7 +184,7 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
             "SELECT name FROM ibl_gm_awards WHERE award = 'ZZ Probe GM Award'"
         )->fetch_assoc();
         self::assertIsArray($row);
-        self::assertSame('ZZ Old Gm', $row['name']);
+        self::assertSame('ZZ Old Gm', $row['name'], 'ibl_gm_awards.name carries no franchise key, so a rename must not touch it');
     }
 
     public function testUnrelatedColumnUpdateLeavesTenuresUntouched(): void

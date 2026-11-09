@@ -3926,6 +3926,8 @@ if [ "$(wc -l < "$CF_PPREC" | tr -d ' ')" = 1 ]; then
     echo 'RESULT: post-plan BLOCKED: rebase-conflict: tree proof failed: LOST: f.txt: +x'
 else
     echo "$CF_PP2_RESULT"
+    # CF_PP2_RC: the re-fire's exit code; 124 stands in for a re-fire that timed out.
+    exit "${CF_PP2_RC:-0}"
 fi
 exit 0
 CFSTUB
@@ -3959,7 +3961,8 @@ _cf_setup() {  # fresh worktree + bare origin + empty attempt record; sets _CF_H
     _CF_ORIGIN_REF="$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)"
     printf '%s  %s [branch-live]\n' "$_CF_WT" "${_CF_HEAD0:0:7}" > "$_CF_WTL"
 }
-_cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT
+# CF_PP2_RESULT uses ${VAR-default}: unset gets the default, an explicit empty value reaches the stub.
+_cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PP2_RC
     POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
         POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_CF_PPSTUB" \
         POST_PLAN_FLEET_POSTPLAN_FIX="$_CF_FIXSTUB" POST_PLAN_FLEET_WTL="$_CF_WTL" \
@@ -3970,12 +3973,12 @@ _cf_run() {  # rest = extra driver args; knobs: CF_FIX_WORD CF_FIX_COMMIT CF_FIX
         sed -i.bak "s|^PCW_LIB=.*|PCW_LIB=$CF_PCW_LIB|" "$_DM_RUNNER" && rm -f "$_DM_RUNNER.bak"
     fi
     HOME="$SCRATCH" CF_PPREC="$_CF_PPREC" CF_FIXREC="$_CF_FIXREC" CF_WT="$_CF_WT" \
-        CF_PP2_RESULT="${CF_PP2_RESULT:-RESULT: terminal=shipped-held}" \
+        CF_PP2_RESULT="${CF_PP2_RESULT-RESULT: terminal=shipped-held}" CF_PP2_RC="${CF_PP2_RC:-0}" \
         CF_FIX_WORD="${CF_FIX_WORD:-}" CF_FIX_COMMIT="${CF_FIX_COMMIT:-0}" CF_FIX_RC="${CF_FIX_RC:-0}" \
         CF_PP1_BREAK="${CF_PP1_BREAK:-0}" \
         bash "$_DM_RUNNER" >/dev/null 2>&1 || true
 }
-_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PCW_LIB CF_PP1_BREAK; }
+_cf_reset_knobs() { unset CF_FIX_WORD CF_FIX_COMMIT CF_FIX_RC CF_PP2_RESULT CF_PP2_RC CF_PCW_LIB CF_PP1_BREAK; }
 
 # --- case: conflict-fix-refires ---------------------------------------------------------
 if should_run "conflict-fix-refires"; then
@@ -4088,6 +4091,83 @@ CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RESULT="$_CF_CONFLICT_LINE" _cf_run
 [[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
     || fail "conflict-fix-refire-conflict-restores: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
 end_case conflict-fix-refire-conflict-restores
+fi
+
+# --- case: conflict-fix-clean-unproven-restores -----------------------------------------
+# The fix reports a clean merge. A clean merge writes no pre-merge manifest, so the runner
+# gives up without a re-fire and puts the worktree back at the pre-fix head.
+if should_run "conflict-fix-clean-unproven-restores"; then
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=clean CF_FIX_COMMIT=1 _cf_run --conflict-fix-prs="${_DM_PR}"
+grep -qF 'post-plan-fleet: conflict-fix=gave-up-clean-unproven' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-clean-unproven-restores: log lacks conflict-fix=gave-up-clean-unproven"
+[[ "$(_outcome_of)" == conflict-fix-gave-up ]] \
+    || fail "conflict-fix-clean-unproven-restores: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == gave-up-clean-unproven ]] \
+    || fail "conflict-fix-clean-unproven-restores: reason '$(_reason_of)'"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" == "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-clean-unproven-restores: HEAD is not the pre-fix SHA"
+! git -C "$_CF_WT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 \
+    || fail "conflict-fix-clean-unproven-restores: MERGE_HEAD still present"
+[[ "$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)" == "$_CF_ORIGIN_REF" ]] \
+    || fail "conflict-fix-clean-unproven-restores: the origin ref moved"
+[[ "$(_hr_calls "$_CF_PPREC")" == 1 ]] \
+    || fail "conflict-fix-clean-unproven-restores: want one post-plan call, got $(_hr_calls "$_CF_PPREC")"
+grep -qF "post-plan-fleet: conflict-fix-restored=${_CF_HEAD0:0:7}" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-clean-unproven-restores: log lacks the conflict-fix-restored line"
+end_case conflict-fix-clean-unproven-restores
+fi
+
+# --- case: conflict-fix-refire-timeout-restores -----------------------------------------
+# The fix commits, the re-fire times out (rc 124) without a conflict RESULT: give up, restore.
+if should_run "conflict-fix-refire-timeout-restores"; then
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RC=124 CF_PP2_RESULT='RESULT: terminal=shipped-held' \
+    _cf_run --conflict-fix-prs="${_DM_PR}"
+grep -qF 'post-plan-fleet: conflict-fix=gave-up-refire-timeout' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-refire-timeout-restores: log lacks conflict-fix=gave-up-refire-timeout"
+[[ "$(_outcome_of)" == conflict-fix-gave-up ]] \
+    || fail "conflict-fix-refire-timeout-restores: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == gave-up-refire-timeout ]] \
+    || fail "conflict-fix-refire-timeout-restores: reason '$(_reason_of)'"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" == "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-refire-timeout-restores: HEAD is not the pre-fix SHA"
+! git -C "$_CF_WT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 \
+    || fail "conflict-fix-refire-timeout-restores: MERGE_HEAD still present"
+[[ "$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)" == "$_CF_ORIGIN_REF" ]] \
+    || fail "conflict-fix-refire-timeout-restores: the origin ref moved"
+[[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
+    || fail "conflict-fix-refire-timeout-restores: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
+grep -qF "post-plan-fleet: conflict-fix-restored=${_CF_HEAD0:0:7}" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-refire-timeout-restores: log lacks the conflict-fix-restored line"
+end_case conflict-fix-refire-timeout-restores
+fi
+
+# --- case: conflict-fix-refire-no-result-restores ---------------------------------------
+# The fix commits, the re-fire prints no RESULT line at all: give up, restore.
+if should_run "conflict-fix-refire-no-result-restores"; then
+begin_case
+_cf_reset_knobs; _cf_setup
+CF_FIX_WORD=committed CF_FIX_COMMIT=1 CF_PP2_RESULT='' _cf_run --conflict-fix-prs="${_DM_PR}"
+grep -qF 'post-plan-fleet: conflict-fix=gave-up-refire-no-result' "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-refire-no-result-restores: log lacks conflict-fix=gave-up-refire-no-result"
+[[ "$(_outcome_of)" == conflict-fix-gave-up ]] \
+    || fail "conflict-fix-refire-no-result-restores: outcome '$(_outcome_of)'"
+[[ "$(_reason_of)" == gave-up-refire-no-result ]] \
+    || fail "conflict-fix-refire-no-result-restores: reason '$(_reason_of)'"
+[[ "$(git -C "$_CF_WT" rev-parse HEAD)" == "$_CF_HEAD0" ]] \
+    || fail "conflict-fix-refire-no-result-restores: HEAD is not the pre-fix SHA"
+! git -C "$_CF_WT" rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 \
+    || fail "conflict-fix-refire-no-result-restores: MERGE_HEAD still present"
+[[ "$(git -C "$_CF_ORIGIN" rev-parse refs/heads/branch-live)" == "$_CF_ORIGIN_REF" ]] \
+    || fail "conflict-fix-refire-no-result-restores: the origin ref moved"
+[[ "$(_hr_calls "$_CF_PPREC")" == 2 ]] \
+    || fail "conflict-fix-refire-no-result-restores: want two post-plan calls, got $(_hr_calls "$_CF_PPREC")"
+grep -qF "post-plan-fleet: conflict-fix-restored=${_CF_HEAD0:0:7}" "$_DM_LOG" 2>/dev/null \
+    || fail "conflict-fix-refire-no-result-restores: log lacks the conflict-fix-restored line"
+end_case conflict-fix-refire-no-result-restores
 fi
 
 # --- case: conflict-fix-restore-probe-error ---------------------------------------------

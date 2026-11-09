@@ -1,6 +1,6 @@
 ---
-description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date, SSH single-line commands, heredoc JSON, isolated bash blocks in skills.
-last_verified: 2026-09-16
+description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills.
+last_verified: 2026-11-08
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
@@ -18,6 +18,23 @@ macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 | `date --date='...'` | no `--date` flag |
 
 **Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded) — it detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
+
+## BSD vs GNU `stat`: GNU form first
+
+macOS ships BSD `stat`. Linux CI ships GNU `stat`. The format flags differ:
+
+| GNU (Linux) | BSD (macOS) |
+|-------------|-------------|
+| `stat -c %Y file` (mtime epoch) | `stat -f %m file` |
+| `stat -c %s file` (size in bytes) | `stat -f %z file` |
+
+On Linux, `stat -f` selects filesystem status. It prints a block of filesystem text to stdout and then exits 1. A BSD-first fallback such as `stat -f %m f || stat -c %Y f` captures that text plus the real epoch, and the next arithmetic test fails. BSD `stat -c` prints nothing to stdout and exits 1, so the GNU-first order is safe on both:
+
+```bash
+mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+```
+
+`bin/check-shell-portability` enforces this on every shell file under `bin/`, and CI runs it on each pull request. It flags a `stat -f` call with a format operand when no `stat -c` call comes earlier in the same statement. Backslash-continued lines count as one statement. When a site is correct for another reason, such as output validated before use or a GNU branch chosen by a probe, end the line with `# portability-ok: <reason>`. The reason must be non-empty.
 
 ## SSH commands must be single-line strings
 

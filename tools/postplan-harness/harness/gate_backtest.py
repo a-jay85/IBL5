@@ -108,6 +108,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-playwright-pinning": _TREE,
     "bin/check-registry-trigger-rows": _TREE,
     "bin/check-rules-byte-budget": _TREE,
+    "bin/check-shell-portability": _TREE,
     "bin/check-skill-arguments": _TREE,
     "bin/check-workflow-checkout": _TREE,
     "bin/check-workflow-run-interpolation": _TREE,

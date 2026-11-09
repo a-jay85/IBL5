@@ -223,6 +223,17 @@ jobs:
           bin/test-check-pipefail-grep-q
           bin/check-pipefail-grep-q --since="$BASE_SHA"
 
+      # --- Shell portability guard: no bin/ shell line may call BSD-only
+      # stat -f without a GNU stat -c form earlier in the same statement
+      # (see .claude/rules/shell-portability.md). Whole-tree scan, so it
+      # needs no base sha. The harness runs first so a broken pattern fails
+      # loudly. Hard gate. ---
+      - name: Run bin/check-shell-portability (harness + whole tree)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          bin/test-check-shell-portability
+          bin/check-shell-portability
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

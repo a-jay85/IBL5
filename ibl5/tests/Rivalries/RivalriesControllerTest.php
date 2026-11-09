@@ -205,6 +205,34 @@ final class RivalriesControllerTest extends TestCase
         self::assertSame(1, $this->repo->calls['findGmName']);
     }
 
+    /**
+     * @return array<string, array{?string}>
+     */
+    public static function missingOwnerProvider(): array
+    {
+        return [
+            'null owner' => [null],
+            'empty owner' => [''],
+        ];
+    }
+
+    #[DataProvider('missingOwnerProvider')]
+    public function testTeamPageWithoutOwnerNameFallsBackToUsernameTenure(?string $owner): void
+    {
+        $teams = self::createMock(TeamIdentityRepositoryInterface::class);
+        $teams->expects(self::once())->method('getUsernameFromTeamname')->with('Metros')->willReturn('mover gm');
+        $teams->method('getTeamnameFromTeamID')->willReturn('Metros');
+        $teams->method('getOwnerName')->willReturn($owner);
+        $teams->method('getTeamByName')->willReturn(
+            ['teamid' => 3, 'team_city' => 'Metro City', 'team_name' => 'Metros'],
+        );
+        $controller = new RivalriesController($this->service, $this->view, $this->repo, $teams);
+
+        $controller->handle(['op' => 'team', 'team' => '3'], null, null);
+
+        self::assertSame('Mover Gm', $this->view->teamArgs['gmName']);
+    }
+
     public function testTeamPageColorMapsUseTeamColorAndGmColorFranchise(): void
     {
         $this->owners[3] = 'Mover Gm';

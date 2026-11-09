@@ -900,8 +900,8 @@ case_verify_schedule() {
 }
 
 case_ci_wiring() {
-    if grep -qF 'bin/test-finding-class-scan' "$REPO_ROOT/.github/workflows/tests.yml"; then ok "row 41: harness wired into tests.yml"
-    else fail "row 41: harness not wired into tests.yml"; fi
+    if grep -qF 'bin/test-finding-class-scan' "$REPO_ROOT/.github/workflows/harness-legs.txt"; then ok "row 41: harness wired into harness-legs.txt"
+    else fail "row 41: harness not wired into harness-legs.txt"; fi
 }
 
 # ── Live exercise (owner runs once before arming the schedule) ────────────────

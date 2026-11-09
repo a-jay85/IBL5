@@ -219,6 +219,34 @@ h_git_repo() {
     return 0
 }
 
+# h_shard_init <spec>: opt-in case sharding. An empty or absent spec runs every
+# case. "i/N" (0 <= i < N, no leading zeros) makes h_shard_take accept only the
+# cases whose ordinal mod N equals i.
+h_shard_init() {
+    local spec="${1:-}" i n
+    H_SHARD_SEQ=0 H_SHARD_I=0 H_SHARD_N=1
+    [ -n "$spec" ] || return 0
+    case "$spec" in
+        */*) i="${spec%%/*}"; n="${spec#*/}" ;;
+        *) _h_setup_die "h_shard_init: spec must be i/N with 0 <= i < N, got [$spec]" ;;
+    esac
+    case "$i" in '' | *[!0-9]* | 0?*) _h_setup_die "h_shard_init: spec must be i/N with 0 <= i < N, got [$spec]" ;; esac
+    case "$n" in '' | *[!0-9]* | 0*) _h_setup_die "h_shard_init: spec must be i/N with 0 <= i < N, got [$spec]" ;; esac
+    [ "$i" -lt "$n" ] || _h_setup_die "h_shard_init: spec must be i/N with 0 <= i < N, got [$spec]"
+    H_SHARD_I="$i" H_SHARD_N="$n"
+}
+
+# h_shard_take: advance the case ordinal; succeed when this shard owns the case.
+h_shard_take() {
+    local k="${H_SHARD_SEQ:-0}"
+    H_SHARD_SEQ=$((k + 1))
+    [ $((k % ${H_SHARD_N:-1})) -eq "${H_SHARD_I:-0}" ]
+}
+
+# h_shard_primary: true when unsharded or on shard 0. Inline cases that are not
+# routed through h_shard_take run only here, so each still runs exactly once.
+h_shard_primary() { [ "${H_SHARD_I:-0}" -eq 0 ]; }
+
 h_done() {
     local total=$((H_PASS + H_FAIL)) sfx=""
     if [ "$H_SKIP" -gt 0 ]; then

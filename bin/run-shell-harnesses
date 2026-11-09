@@ -2,8 +2,9 @@
 # bin/run-shell-harnesses — run shell harness scripts in parallel, fail if ANY fails.
 #
 # Used by the "Shell harness regression tests" job in .github/workflows/tests.yml,
-# which lists the harnesses explicitly so bin/check-plan gate [G] can still see
-# each one. Every harness builds its own state under mktemp, so they are safe to
+# which reads its legs from .github/workflows/harness-legs.txt, kept under
+# .github/workflows/ so bin/check-plan gate [G]'s recursive grep still sees each
+# harness name. Every harness builds its own state under mktemp, so they are safe to
 # run concurrently; a harness that is not stays in its own serial workflow step.
 #
 # Each script's output goes to its own log and is printed as one ::group:: block
@@ -11,21 +12,149 @@
 # the order given (list the slowest first for the best packing).
 #
 # Usage: bin/run-shell-harnesses [-j N] <script> [<script> ...]
+#        bin/run-shell-harnesses [-j N] --list FILE --leg N
+#        bin/run-shell-harnesses --check-coverage FILE --leg-count N
+#        bin/run-shell-harnesses --shard-union VAR=N <script> [args ...]
 #   -j N   parallel workers (default: CPU count)
+#   --list FILE --leg N   run the entries of leg N from FILE ("N [VAR=v ...] script")
+#   --check-coverage FILE --leg-count N   verify FILE against the filesystem
+#   --shard-union VAR=N   prove VAR=i/N shards of <script> cover its cases once
 set -euo pipefail
 
 usage() { sed -n '/^# Usage:/,/^set /p' "$0" | sed '$d; s/^# \{0,1\}//'; }
 
+# shard_union VAR=N <script> [args]: run <script> unsharded (VAR empty) and as
+# shards VAR=0/N .. VAR=(N-1)/N in parallel. Passes only when the shards' ok:/FAIL:
+# lines equal the unsharded run's as a multiset and the exit codes agree.
+shard_union() {
+    local spec="$1" var n dir i pids="" full_pid full_rc=0 shard_fail=0 status pid
+    shift
+    var="${spec%%=*}"; n="${spec#*=}"
+    case "$spec" in *=*) ;; *) echo "Usage: --shard-union needs VAR=N" >&2; return 2 ;; esac
+    case "$var" in '' | [0-9]* | *[!ABCDEFGHIJKLMNOPQRSTUVWXYZ0-9_]*) echo "Usage: --shard-union VAR must be upper-case, got [$var]" >&2; return 2 ;; esac
+    case "$n" in '' | *[!0-9]* | 0* | 1) echo "Usage: --shard-union N must be an integer >= 2, got [$n]" >&2; return 2 ;; esac
+    [ $# -ge 1 ] || { echo "Usage: --shard-union needs a script" >&2; return 2; }
+    dir="$(mktemp -d)"
+    env "$var=" "$@" >"$dir/full.out" 2>&1 </dev/null & full_pid=$!
+    for ((i = 0; i < n; i++)); do
+        env "$var=$i/$n" "$@" >"$dir/shard-$i.out" 2>&1 </dev/null & pids="$pids $!"
+    done
+    wait "$full_pid" || full_rc=$?
+    for pid in $pids; do wait "$pid" || shard_fail=1; done
+    norm() { grep -hE '^(ok|FAIL): ' "$@" | sed -E 's#(/private)?/(tmp|var/folders)/[^ )]*#<tmp>#g' | sort; }
+    norm "$dir/full.out" >"$dir/full.sorted" || true
+    norm "$dir"/shard-*.out >"$dir/shards.sorted" || true
+    if [ ! -s "$dir/full.sorted" ]; then
+        echo "shard-union: the unsharded run printed no ok:/FAIL: lines" >&2; status=1
+    elif ! cmp -s "$dir/full.sorted" "$dir/shards.sorted"; then
+        echo "shard-union: shard cases differ from the unsharded run (< unsharded, > shards):" >&2
+        diff "$dir/full.sorted" "$dir/shards.sorted" | head -40 >&2 || true; status=1
+    elif [ $((full_rc != 0)) -ne "$shard_fail" ]; then
+        echo "shard-union: exit codes disagree (unsharded rc=$full_rc, shard failure=$shard_fail)" >&2; status=1
+    else
+        echo "shard-union: OK ($(wc -l <"$dir/full.sorted" | tr -d ' ') cases across $n shards)"; status=0
+    fi
+    rm -rf "$dir"
+    return "$status"
+}
+
+# check_coverage <list-file> <leg-count>: legs are exactly 0..count-1, every entry
+# names an executable script, nothing runs twice, every *_SHARD=i/N split covers
+# 0..N-1 exactly once, and every bin/test-* / ibl5/bin/test-* is listed, exempt,
+# or named in a workflow .yml.
+check_coverage() {
+    local file="$1" count="$2" out bad paths exempt t p fails=0 prog
+    [ -f "$file" ] || { echo "coverage: no such list file $file" >&2; return 2; }
+    prog='
+/^[[:space:]]*(#|$)/ { next }
+$1 == "exempt" { if (NF < 3) print "BAD exempt entry has no reason: " $0; else print "EXEMPT " $2; next }
+$1 !~ /^(0|[1-9][0-9]*)$/ { print "BAD bad leg token: " $0; next }
+{
+    if ($1 + 0 >= count + 0) print "BAD leg " $1 " is outside the workflow matrix (leg-count " count ")"
+    used[$1 + 0] = 1
+    key = $0; sub(/^[^[:space:]]+[[:space:]]+/, "", key)
+    if (key in entry) print "BAD listed twice: " key
+    entry[key] = 1
+    path = ""; spec = ""
+    for (i = 2; i <= NF; i++) {
+        if ($i !~ /^[A-Za-z_][A-Za-z0-9_]*=/) { path = $i; break }
+        if ($i ~ /_SHARD=/) { spec = $i; sub(/^[^=]*=/, "", spec) }
+    }
+    if (path == "") { print "BAD entry names no script: " $0; next }
+    print "PATH " path
+    n[path]++
+    if (spec == "") plain[path] = 1; else specs[path] = specs[path] " " spec
+}
+END {
+    for (l = 0; l < count + 0; l++) if (!(l in used)) print "BAD leg " l " has no entries"
+    for (p in n) {
+        if (!(p in specs)) { if (n[p] > 1) print "BAD in two entries without a shard split: " p; continue }
+        if (p in plain) { print "BAD mixes sharded and unsharded entries: " p; continue }
+        k = split(specs[p], s, " "); N = ""; split("", got)
+        for (j = 1; j <= k; j++) {
+            if (s[j] !~ /^(0|[1-9][0-9]*)\/[1-9][0-9]*$/) { print "BAD malformed shard spec " s[j] " for " p; continue }
+            split(s[j], q, "/")
+            if (N == "") N = q[2]
+            if (q[2] != N) print "BAD mixed shard counts for " p
+            got[q[1]]++
+        }
+        for (j = 0; j < N + 0; j++) if (got[j] != 1) print "BAD shard " j "/" N " of " p " runs " (got[j] + 0) " times"
+    }
+}'
+    out="$(awk -v count="$count" "$prog" "$file")"
+    bad="$(grep '^BAD ' <<<"$out" | sed 's/^BAD /coverage: /' || true)"
+    paths="$(sed -n 's/^PATH //p' <<<"$out")"
+    exempt="$(sed -n 's/^EXEMPT //p' <<<"$out")"
+    [ -z "$bad" ] || { printf '%s\n' "$bad" >&2; fails=1; }
+    while IFS= read -r p; do
+        [ -z "$p" ] || [ -x "$p" ] || { echo "coverage: listed script missing or not executable: $p" >&2; fails=1; }
+    done <<<"$paths"
+    while IFS= read -r p; do
+        [ -z "$p" ] || [ -e "$p" ] || { echo "coverage: exempt script does not exist: $p" >&2; fails=1; }
+    done <<<"$exempt"
+    for t in bin/test-* ibl5/bin/test-*; do
+        [ -f "$t" ] || continue
+        grep -qxF "$t" <<<"$paths" && continue
+        grep -qxF "$t" <<<"$exempt" && continue
+        grep -qE "(^|[^A-Za-z0-9_./-])${t}([^A-Za-z0-9_-]|\$)" .github/workflows/*.yml 2>/dev/null && continue
+        echo "coverage: unlisted harness $t (add it to a leg in $file, or exempt it with a reason)" >&2
+        fails=1
+    done
+    [ "$fails" -ne 0 ] || echo "coverage: OK ($(grep -c . <<<"$paths") entries, $count legs)"
+    return "$fails"
+}
+
 jobs_n=""
+list_file="" leg="" cov_file="" leg_count="" union_spec=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
         -j) jobs_n="${2:?-j needs a number}"; shift 2 ;;
+        --list) list_file="${2:?--list needs a file}"; shift 2 ;;
+        --leg) leg="${2:?--leg needs a leg number}"; shift 2 ;;
+        --check-coverage) cov_file="${2:?--check-coverage needs a file}"; shift 2 ;;
+        --leg-count) leg_count="${2:?--leg-count needs a number}"; shift 2 ;;
+        --shard-union) union_spec="${2:?--shard-union needs VAR=N}"; shift 2 ;;
         --) shift; break ;;
         -*) echo "Usage: unknown flag $1" >&2; exit 2 ;;
         *) break ;;
     esac
 done
+[ -z "$union_spec" ] || { shard_union "$union_spec" "$@"; exit $?; }
+if [ -n "$cov_file" ]; then
+    { [ $# -eq 0 ] && [ -z "$list_file$leg" ]; } || { echo "Usage: --check-coverage takes no scripts, --list or --leg" >&2; exit 2; }
+    case "$leg_count" in '' | 0 | *[!0-9]*) echo "Usage: --check-coverage needs --leg-count N (N >= 1)" >&2; exit 2 ;; esac
+    check_coverage "$cov_file" "$leg_count"; exit $?
+fi
+if [ -n "$list_file" ] || [ -n "$leg" ]; then
+    [ -n "$list_file" ] && [ -n "$leg" ] || { echo "Usage: --list and --leg go together" >&2; exit 2; }
+    [ $# -eq 0 ] || { echo "Usage: --list replaces positional scripts" >&2; exit 2; }
+    [ -f "$list_file" ] || { echo "Usage: no such list file $list_file" >&2; exit 2; }
+    entries="$(awk -v leg="$leg" '$1 == leg { sub(/^[^[:space:]]+[[:space:]]+/, ""); print }' "$list_file")"
+    [ -n "$entries" ] || { echo "Usage: leg $leg has no entries in $list_file" >&2; exit 2; }
+    set --
+    while IFS= read -r e; do set -- "$@" "$e"; done <<<"$entries"
+fi
 [ $# -gt 0 ] || { usage >&2; exit 2; }
 [ -n "$jobs_n" ] || jobs_n="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 
@@ -36,11 +165,13 @@ export HARNESS_RUN_DIR
 
 run_one() {
     local script="$1" key log start rc dur
-    key="$(printf '%s' "$script" | tr '/' '_')"
+    local -a argv
+    read -r -a argv <<<"$script"
+    key="$(printf '%s' "$script" | tr '/ =' '___')"
     log="$HARNESS_RUN_DIR/$key.log"
     start=$SECONDS
     rc=0
-    "$script" >"$log" 2>&1 </dev/null || rc=$?
+    env "${argv[@]}" >"$log" 2>&1 </dev/null || rc=$?
     dur=$((SECONDS - start))
     # mkdir is an atomic lock; keeps each group block contiguous across workers.
     until mkdir "$HARNESS_RUN_DIR/lock" 2>/dev/null; do sleep 0.05; done

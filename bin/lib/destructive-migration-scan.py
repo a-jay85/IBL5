@@ -22,7 +22,9 @@ Python 3.8 syntax, stdlib only.
 import argparse
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 BYPASS_MIN_LENGTH = 20
 
@@ -39,6 +41,7 @@ KNOWN_TRIGGERS = [
     "update-no-where",
     "narrow-type",
     "drop-recreate-existing",
+    "rewrite-no-backup",
 ]
 
 NAME = r"([a-z0-9_$]+(?:\.[a-z0-9_$]+)?)"
@@ -1058,7 +1061,167 @@ STATEMENT_RULES = [
 ]
 
 
-def evaluate(statements, selected, lookups):
+UPDATE_HEAD_RE = re.compile(r"^update (?:low_priority |ignore )*`?" + NAME)
+DELETE_FROM_RE = re.compile(r"\bfrom `?" + NAME)
+BACKUP_FILL_RE = re.compile(
+    r"^insert (?:ignore )?into `?" + NAME + r"\b.*?\bselect\b.*?\bfrom `?" + NAME
+)
+
+
+def undo_script_path(path):
+    """Convention: the undo script sits in an undo subdirectory beside the migration."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    return os.path.join(os.path.dirname(path), "undo", stem + ".sql")
+
+
+def _is_undo_script(path):
+    return "undo" in os.path.normpath(path).split(os.sep)[:-1]
+
+
+def _set_columns(low):
+    m = re.search(r"\bset\b(.*?)\bwhere\b(.*)$", low)
+    if not m:
+        return None, None
+    if re.search(r"\bselect\b", m.group(1)):
+        # A subquery in SET can hold its own WHERE; the split above is unreliable.
+        return None, None
+    cols = []
+    for part in split_depth0(m.group(1)):
+        # Keep the qualifier: the IS NULL must be on the same table.column.
+        lhs = part.split("=", 1)[0].strip().replace("`", "").replace(" ", "")
+        cols.append(lhs)
+    return cols, m.group(2).replace("`", "")
+
+
+# Any of these can let a row with a value through the IS NULL test: OR in
+# either spelling, XOR, a negation, a parenthesised group, or a subquery whose
+# unqualified column belongs to another table. IS NOT only tests a value, so it
+# may appear; the pattern below still rejects `<col> IS NOT NULL`.
+NOT_A_BACKFILL_RE = re.compile(r"\bor\b|\|\||\bxor\b|(?<!\bis )\bnot\b|!|[()]|\bselect\b")
+
+
+def _null_guarded(cols, where):
+    """True when the WHERE is a plain AND chain that pins every assigned column IS NULL."""
+    if NOT_A_BACKFILL_RE.search(where):
+        return False
+    for c in cols:
+        pat = r"(?<![a-z0-9_$.])" + re.escape(c) + r" is null(?= and\b| &&|$| order by\b| limit\b)"
+        if not re.search(pat, where):
+            return False
+    return True
+
+
+NOT_AN_ALIAS = {
+    "as", "cross", "force", "ignore", "inner", "join", "left", "natural", "on",
+    "outer", "partition", "right", "set", "straight_join", "use", "using", "where",
+}
+TABLE_REF_RE = re.compile(
+    r"(?:^|,|\bjoin\b)\s*" + NAME
+    + r"(?:\s+(?:as\s+)?(?!(?:" + "|".join(sorted(NOT_AN_ALIAS)) + r")\b)([a-z0-9_$]+))?"
+)
+
+
+def _table_refs(region):
+    """Map each alias and table name in a table-reference list to its table, plus the tables in order."""
+    refs = {}
+    order = []
+    for m in TABLE_REF_RE.finditer(region.strip()):
+        table = last_part(m.group(1))
+        refs[table] = table
+        if m.group(2) and m.group(2) not in NOT_AN_ALIAS:
+            refs[m.group(2)] = table
+        order.append(table)
+    return refs, order
+
+
+def _update_targets(low, cols):
+    """The tables an UPDATE writes: each SET column's qualifier, or every table when a column is unqualified."""
+    m = re.match(r"^update (?:low_priority |ignore )*(.*?)\bset\b", low)
+    if not m:
+        return []
+    refs, order = _table_refs(m.group(1))
+    if not order:
+        return []
+    if not cols:
+        # SET columns are unknown (a subquery in SET): check every table.
+        return order
+    if len(order) > 1 and any("." not in col for col in cols):
+        # An unqualified SET column belongs to whichever joined table holds it: check every table.
+        return order
+    targets = []
+    for col in cols:
+        if "." in col:
+            q = last_part(col.rsplit(".", 1)[0])
+            table = refs.get(q, q)
+        else:
+            table = order[0]
+        if table not in targets:
+            targets.append(table)
+    return targets
+
+
+def _delete_targets(low):
+    """The tables a DELETE removes rows from: its target list when it names one, else the FROM table."""
+    m = re.match(r"^delete (?:low_priority |quick |ignore )*(.*?)\bfrom\b(.*?)(?:\bwhere\b|$)", low)
+    if not m:
+        return []
+    named, rest = m.group(1).strip(), m.group(2)
+    using = re.search(r"\busing\b", rest)
+    if not named and using:
+        named, rest = rest[: using.start()], rest[using.end():]
+    refs, order = _table_refs(rest)
+    if not named:
+        return order[:1]
+    targets = []
+    for part in named.split(","):
+        q = last_part(part.strip().replace(".*", ""))
+        if q:
+            table = refs.get(q, q)
+            if table not in targets:
+                targets.append(table)
+    return targets
+
+
+def _backup_filled_before(ctx, table):
+    for j in range(ctx.index):
+        m = BACKUP_FILL_RE.match(ctx.statements[j].lower)
+        if m and "backup" in last_part(m.group(1)) and last_part(m.group(2)) == table:
+            return True
+    return False
+
+
+def rule_rewrite_no_backup(ctx, path, undo_present):
+    if _is_undo_script(path):
+        return []
+    low = ctx.st.lower
+    if not re.search(r"\bwhere\b", low):
+        return []
+    m = UPDATE_HEAD_RE.match(low)
+    if m and re.search(r"\bset\b", low):
+        cols, where = _set_columns(low)
+        if cols and _null_guarded(cols, where):
+            return []
+        tables = _update_targets(low, cols) or [last_part(m.group(1))]
+    elif re.match(r"^delete\b", low):
+        m = DELETE_FROM_RE.search(low)
+        if not m:
+            return []
+        tables = _delete_targets(low) or [last_part(m.group(1))]
+    else:
+        return []
+    missing = []
+    for table in tables:
+        if not _backup_filled_before(ctx, table):
+            missing.append("no backup fill of %s before this statement" % table)
+    present = os.path.isfile(undo_script_path(path)) if undo_present is None else undo_present
+    if not present:
+        missing.append("no undo script at %s" % undo_script_path(path))
+    if missing:
+        return [("rewrite-no-backup", "(" + "; ".join(missing) + ")")]
+    return []
+
+
+def evaluate(statements, selected, lookups, rewrite_path=None, undo_present=None):
     """Return a list of (tag, line, extra, statement_text) hits."""
     hits = []
     seen = set()
@@ -1068,6 +1231,8 @@ def evaluate(statements, selected, lookups):
         found = []
         for rule in STATEMENT_RULES:
             found.extend(rule(ctx))
+        if rewrite_path is not None:
+            found.extend(rule_rewrite_no_backup(ctx, rewrite_path, undo_present))
         table, clauses = alter_clauses(st)
         for masked_clause, clean_clause in clauses:
             for rule in ALTER_CLAUSE_RULES:
@@ -1171,7 +1336,7 @@ def run_scan(path, text, ranges, policy, pr_body, lookups):
         return any(lo <= b and a <= hi for a, b in ranges)
 
     selected = [k for k, st in enumerate(statements) if in_ranges(st.start_line, st.end_line)]
-    hits = evaluate(statements, selected, lookups)
+    hits = evaluate(statements, selected, lookups, rewrite_path=path if ranges is not None else None)
     markers, errors = collect_markers(comments, lambda ln: in_ranges(ln, ln), pr_body, policy)
 
     out = []
@@ -1366,6 +1531,69 @@ MARKER_CASES = [
 ]
 
 
+REWRITE_BACKED_SQL = (
+    "CREATE TABLE IF NOT EXISTS t_backup LIKE t;\n"
+    "INSERT INTO t_backup SELECT * FROM t WHERE id = 1;\n"
+    "DELETE FROM t WHERE id = 1;\n"
+)
+
+REWRITE_CASES = [
+    # (name, file, sql, rewrite_on, undo_present, expected_tags)
+    ("rw update overwrite", "x.sql", "UPDATE t SET name = 'x' WHERE id = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw null backfill", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL;\n", True, False, []),
+    ("rw near-miss or", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL OR c = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NOT NULL;\n", True, False, ["rewrite-no-backup"]),
+    # A guard loop that checks cols[:1] only would wrongly pass the next case.
+    ("rw near-miss second column", "x.sql", "UPDATE t SET c = 1, d = 2 WHERE c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss suffix column", "x.sql", "UPDATE t SET c = 1 WHERE abc IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw delete where", "x.sql", "DELETE FROM t WHERE id = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw backup and undo", "x.sql", REWRITE_BACKED_SQL, True, True, []),
+    ("rw backup no undo", "x.sql", REWRITE_BACKED_SQL, True, False, ["rewrite-no-backup"]),
+    ("rw undo no backup", "x.sql", "DELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw backup after rewrite", "x.sql", "DELETE FROM t WHERE id = 1;\nINSERT INTO t_backup SELECT * FROM t;\n", True, True, ["rewrite-no-backup"]),
+    ("rw copy not named backup", "x.sql", "INSERT INTO t_copy SELECT * FROM t;\nDELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw backup of other table", "x.sql", "INSERT INTO u_backup SELECT * FROM u;\nDELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw rule off", "x.sql", "UPDATE t SET name = 'x' WHERE id = 1;\n", False, False, []),
+    ("rw undo dir exempt", "ibl5/migrations/undo/x.sql", "UPDATE t, t_backup b SET t.c = b.c WHERE t.id = b.id;\n", True, False, []),
+    ("rw no where keeps legacy tag", "x.sql", "UPDATE t SET c = 1;\n", True, False, ["update-no-where"]),
+    ("rw update join", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE u.k = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw update join null guard", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE t.c IS NULL;\n", True, False, []),
+    # The IS NULL must sit on the SET column's own table.
+    ("rw join guard on other table", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE u.c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    # Each WHERE shape below lets a row that holds a value through the IS NULL test.
+    ("rw near-miss pipe or", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL || c = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss not", "x.sql", "UPDATE t SET c = 1 WHERE d = 1 AND NOT c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss not group", "x.sql", "UPDATE t SET c = 1 WHERE NOT (c IS NULL);\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss bang", "x.sql", "UPDATE t SET c = 1 WHERE d = 1 AND ! c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss xor", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL XOR d = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss group compared", "x.sql", "UPDATE t SET c = 1 WHERE (c IS NULL AND d = 1) = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss is null compared", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss subquery", "x.sql", "UPDATE t SET c = 1 WHERE id IN (SELECT id FROM u WHERE c IS NULL);\n", True, False, ["rewrite-no-backup"]),
+    ("rw null backfill and", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d = 1 LIMIT 10;\n", True, False, []),
+    ("rw null backfill and is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d IS NOT NULL;\n", True, False, []),
+    # A backup of one table does not cover a write to another table in the same statement.
+    ("rw join writes second table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join subquery set checks every table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = (SELECT MAX(x) FROM v) WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join unqualified set checks every table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nUPDATE ibl_players p JOIN ibl_hist h ON p.pid = h.pid SET p.name = h.name WHERE h.k = 1;\n", True, True, []),
+    ("rw delete joined target", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE t, u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete using two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE FROM t, u USING t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nDELETE p FROM ibl_players p JOIN ibl_hist h ON p.pid = h.pid WHERE h.k = 1;\n", True, True, []),
+    ("rw odku is not an update", "x.sql", "INSERT INTO t (a) VALUES (1) ON DUPLICATE KEY UPDATE a = 1;\n", True, False, []),
+    ("rw php prepared delete", "x.php", "<?php\n$stmt = $db->prepare('DELETE FROM t WHERE id = ?');\n", True, False, ["rewrite-no-backup"]),
+]
+
+REWRITE_SCAN_CASES = [
+    # (name, sql, ranges, pr_body, expected_exit) through run_scan("x.sql", ...)
+    ("rw diff mode fires", "UPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 1)], None, 1),
+    ("rw all-lines silent", "UPDATE t SET name = 'x' WHERE id = 1;\n", None, None, 0),
+    ("rw marker suppresses", "-- destructive-migration[rewrite-no-backup]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 0),
+    ("rw marker other tag", "-- destructive-migration[update-no-where]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 1),
+    ("rw marker typo tag", "-- destructive-migration[rewrite-no-backups]: importer rebuilds this column on every run\nSELECT 1;\n", [(1, 2)], None, 1),
+]
+
+
 def self_test():
     cases = 0
     failures = 0
@@ -1400,6 +1628,41 @@ def self_test():
         if code != expected:
             failures += 1
             print("FAIL marker %s: expected exit %d, got %d" % (name, expected, code))
+    for name, path, sql, rewrite_on, undo_present, expected in REWRITE_CASES:
+        cases += 1
+        statements, _ = extract_sql(path, sql)
+        hits = evaluate(
+            statements,
+            list(range(len(statements))),
+            Lookups(None, None, path),
+            rewrite_path=path if rewrite_on else None,
+            undo_present=undo_present,
+        )
+        got = sorted(set(h[0] for h in hits))
+        if got != sorted(expected):
+            failures += 1
+            print("FAIL %s: expected %s, got %s" % (name, sorted(expected), got))
+    for name, sql, ranges, body, expected in REWRITE_SCAN_CASES:
+        cases += 1
+        code, _ = run_scan("x.sql", sql, ranges, "strict", body, Lookups(None, None, "x.sql"))
+        if code != expected:
+            failures += 1
+            print("FAIL rewrite-scan %s: expected exit %d, got %d" % (name, expected, code))
+    for with_undo, expected in ((True, 0), (False, 1)):
+        cases += 1
+        tmp = tempfile.mkdtemp()
+        try:
+            mig = os.path.join(tmp, "x.sql")
+            if with_undo:
+                os.mkdir(os.path.join(tmp, "undo"))
+                with open(os.path.join(tmp, "undo", "x.sql"), "w") as fh:
+                    fh.write("-- restore\n")
+            code, _ = run_scan(mig, REWRITE_BACKED_SQL, [(1, 999)], "strict", None, Lookups(None, None, mig))
+        finally:
+            shutil.rmtree(tmp)
+        if code != expected:
+            failures += 1
+            print("FAIL rewrite-disk undo=%s: expected exit %d, got %d" % (with_undo, expected, code))
     print("%d cases, %d failures" % (cases, failures))
     return 1 if failures else 0
 

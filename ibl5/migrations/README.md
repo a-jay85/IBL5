@@ -56,6 +56,7 @@ The `migration-safety.yml` workflow includes a **destructive migration scan** (`
 | `rename-table` | `RENAME TABLE ...` or `ALTER TABLE ... RENAME TO\|AS ...` |
 | `delete-no-where` | `DELETE ... FROM` with no `WHERE` anywhere in the statement |
 | `update-no-where` | `UPDATE ... SET` with no `WHERE` anywhere in the statement (`UPDATE ... JOIN` counts; `INSERT ... ON DUPLICATE KEY UPDATE` does not) |
+| `rewrite-no-backup` | `UPDATE ... SET ... WHERE` or `DELETE ... WHERE` on an added line with no earlier backup fill in the same file or no undo script (see Reversible Data-Rewrite Migrations). Diff modes only. |
 | `narrow-type` | `MODIFY` / `CHANGE` to a narrower type. The old type comes from `ibl5/docs/schema/current-schema.sql`, then a same-file definition; a column the dump does not know fires as unresolved |
 | `drop-recreate-existing` | `DROP TABLE IF EXISTS` + `CREATE TABLE` of a table that already exists in the schema dump, the baseline, or an earlier-numbered migration |
 
@@ -75,11 +76,61 @@ When a destructive operation is intentional and reviewed, add a bypass marker th
 <!-- destructive-migration[update-no-where]: <reason at least 20 characters> -->
 ```
 
-Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-null-no-default`, `tighten-not-null`, `drop-index`, `rename-table`, `delete-no-where`, `update-no-where`, `narrow-type`, `drop-recreate-existing`. An unknown tag is an error. The reason must be at least 20 characters. Short reasons are rejected.
+Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-null-no-default`, `tighten-not-null`, `drop-index`, `rename-table`, `delete-no-where`, `update-no-where`, `narrow-type`, `drop-recreate-existing`, `rewrite-no-backup`. An unknown tag is an error. The reason must be at least 20 characters. Short reasons are rejected.
 
 An untagged marker (`-- destructive-migration: <reason>`) is rejected in `--staged` and `--since` modes. `bin/check-destructive-migrations --full-scan` audits every tracked migration and still honours untagged markers, so historical files scan the same as before.
 
 DDL run through a prepared statement is scanned too. For `PREPARE n FROM @v` the scanner takes the nearest preceding `SET @v = ...`, and scans each string literal in it that starts with `ALTER`, `CREATE`, `DROP`, `RENAME`, `TRUNCATE`, `DELETE` or `UPDATE` as a statement of its own. A hit is reported at the SET's line, so put any bypass marker on an added line of the same file as usual. The `'SELECT 1'` no-op branch of the usual `IF(<guard>, '<DDL>', 'SELECT 1')` idiom is skipped. SQL assembled with `CONCAT(...)` or bound by `SELECT ... INTO @v` is not scanned.
+
+## Reversible Data-Rewrite Migrations
+
+A migration that replaces existing values or deletes rows must keep the old data and ship a way to put it back. Reverting the merge does not undo an applied `UPDATE`. Migration 205 rewrote `ibl_gm_tenures.gm_display_name` with no copy, so its old values are gone.
+
+The destructive scan enforces this with the `rewrite-no-backup` trigger. It runs on added lines (`--staged`, `--since`). `--full-scan` skips it, so applied migrations are not re-judged.
+
+### What the trigger flags
+
+- `UPDATE ... SET ... WHERE ...`, including `UPDATE ... JOIN`.
+- `DELETE ... FROM ... WHERE ...`.
+
+Statements with no `WHERE` keep their `update-no-where` and `delete-no-where` tags.
+
+A `SET` passes as a backfill when its `WHERE` is a plain `AND` chain that holds `<col> IS NULL` for every assigned column, with the same table qualifier the `SET` uses. It only fills empty cells, so nothing is lost. A `WHERE` that holds `OR`, `||`, `XOR`, `NOT`, `!`, parentheses or a subquery counts as an overwrite, and so does every other `WHERE`.
+
+### What satisfies it
+
+The rewriting file needs both of these for each table it rewrites. In a multi-table `UPDATE` that is each table a `SET` column belongs to. In a multi-table `DELETE` it is each table in the delete list.
+
+1. A backup fill earlier in the same file. This is an `INSERT INTO <name> ... SELECT ... FROM <table>` placed before the rewrite, where `<name>` contains `backup`. Create the table with `CREATE TABLE IF NOT EXISTS ... LIKE`, as migrations 167 and 183 do. The `CREATE` may live in an earlier migration. The fill must live in the rewriting file.
+2. An undo script in an `undo/` folder beside the migration, named after the migration's stem, for example `ibl5/migrations/undo/NNN_slug.sql` (example).
+
+```sql
+-- ibl5/migrations/NNN_slug.sql
+CREATE TABLE IF NOT EXISTS my_table_backup_NNN LIKE my_table;
+INSERT INTO my_table_backup_NNN
+  SELECT * FROM my_table WHERE status = 'old';
+UPDATE my_table SET status = 'new' WHERE status = 'old';
+```
+
+```sql
+-- ibl5/migrations/undo/NNN_slug.sql
+UPDATE my_table, my_table_backup_NNN b
+  SET my_table.status = b.status
+  WHERE my_table.id = b.id;
+-- for a DELETE, restore the rows instead:
+-- INSERT IGNORE INTO my_table SELECT * FROM my_table_backup_NNN;
+```
+
+### Undo script rules
+
+- `bin/db-migrate` and `ibl5/bin/run-migrations-ci` glob only top-level `*.sql`, so a file in `undo/` never runs on its own. An operator applies it by hand, the way `bin/rollback-phantom-repair` restores the phantom-repair backups.
+- Join with a `WHERE`, as above. The scan exempts `undo/` files from `rewrite-no-backup` only, so a restore with no `WHERE` still trips `update-no-where`.
+- Never `DROP`, `TRUNCATE`, or `RENAME` in an undo script. The merge-danger check reads every `.sql` under `ibl5/migrations/` recursively and treats those statements as one-way.
+- Drop the backup table in a later migration once the rewrite has held. That `DROP TABLE` trips `drop-table` and needs its own marker.
+
+### When there is nothing to keep
+
+Some rewrites lose nothing of value, such as a column an importer rebuilds on every run. Mark the statement with `-- destructive-migration[rewrite-no-backup]: <reason of at least 20 characters>` and say why the old values do not matter.
 
 ## Automated Migration Runner
 

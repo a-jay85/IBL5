@@ -1145,6 +1145,9 @@ def _update_targets(low, cols):
     if not cols:
         # SET columns are unknown (a subquery in SET): check every table.
         return order
+    if len(order) > 1 and any("." not in col for col in cols):
+        # An unqualified SET column belongs to whichever joined table holds it: check every table.
+        return order
     targets = []
     for col in cols:
         if "." in col:
@@ -1571,6 +1574,7 @@ REWRITE_CASES = [
     # A backup of one table does not cover a write to another table in the same statement.
     ("rw join writes second table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw join subquery set checks every table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = (SELECT MAX(x) FROM v) WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join unqualified set checks every table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw join alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nUPDATE ibl_players p JOIN ibl_hist h ON p.pid = h.pid SET p.name = h.name WHERE h.k = 1;\n", True, True, []),
     ("rw delete joined target", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
     ("rw delete two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE t, u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),

@@ -54,12 +54,12 @@ on:
         default: false
         type: boolean
       hotfix:
-        description: 'Hotfix pass from hotfix-dispatch.yml. Skips the coalesce sleep, keeps the bot-commit wait, runs in its own concurrency group.'
+        description: 'Hotfix pass from hotfix-dispatch.yml. Keeps the bot-commit wait and runs in its own concurrency group.'
         required: false
         default: false
         type: boolean
       settle:
-        description: 'Head-of-line pass from all-checks-settled.yml after the line head settles. Skips the coalesce sleep, keeps the bot-commit wait, runs in its own concurrency group.'
+        description: 'Head-of-line pass from all-checks-settled.yml after the line head settles. Keeps the bot-commit wait and runs in its own concurrency group.'
         required: false
         default: false
         type: boolean
@@ -73,10 +73,10 @@ concurrency:
   # A dry-run dispatch gets its own group so it never cancels a live push pass in flight.
   # A named-PR dispatch gets its own group so a manual one-PR update never cancels the
   # head-of-line pass. A hotfix dispatch (hotfix-dispatch.yml) gets its own group so it never
-  # cancels a push pass during its coalesce or bot-commit wait; a second hotfix dispatch still
+  # cancels a push pass during its bot-commit wait; a second hotfix dispatch still
   # cancels the first. A settle dispatch (all-checks-settled.yml) gets its own group for the same reason; a second settle dispatch cancels the first.
   # On push and schedule every input is null, so the group is the plain
-  # name and a second master merge still cancels the first pass during its coalesce wait.
+  # name and a second master merge still cancels the first pass during its bot-commit wait.
   group: update-behind-prs${{ inputs.dry_run == true && '-dryrun' || '' }}${{ inputs.pr && '-pr' || '' }}${{ inputs.hotfix == true && '-hotfix' || '' }}${{ inputs.settle == true && '-settle' || '' }}
   cancel-in-progress: true
 
@@ -84,19 +84,20 @@ jobs:
   update-behind:
     name: Keep the merge-line head current
     runs-on: ubuntu-26.04
-    timeout-minutes: 60   # coalesce wait + bot-commit wait (capped at 45 min) + mergeability retries
+    timeout-minutes: 60   # bot-commit wait (capped at 45 min) + mergeability retries
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # A master merge starts a run. A second merge inside the wait starts a new run, and
-      # cancel-in-progress kills this one. A burst of merges coalesces into one pass at the end.
-      - name: Coalesce a burst of master merges
-        if: github.event_name == 'push'
-        run: sleep 300
-
+      # No coalesce wait runs before this step. Each pass updates one PR, the head of the
+      # merge line, so a burst of master merges no longer means a burst of updates. The bot
+      # wait below holds a push pass until master CI finishes, and a second merge still
+      # cancels this pass through cancel-in-progress. A merge that starts no bot workflow
+      # costs at most one head update that a quick second merge makes stale (ADR-0081
+      # addendum, 2026-11-08).
+      #
       # Updating the head before master's bot commits land wastes its whole CI run: the bot
       # commit makes it BEHIND again, and the baseline push is in paths-ignore above, so no
       # pass even re-updates it. The helper's header says which workflows push them and why
@@ -159,6 +160,7 @@ jobs:
           while [ "$action" = "unknown" ] && [ "$attempt" -lt "$UNKNOWN_ATTEMPTS" ]; do
             attempt=$((attempt + 1))
             sleep 3
+            # shellcheck disable=SC2016  # GraphQL variables in the single-quoted query stay literal
             state=$(gh api graphql -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$head" -f query='
               query($owner:String!, $name:String!, $number:Int!) {
                 repository(owner:$owner, name:$name) {

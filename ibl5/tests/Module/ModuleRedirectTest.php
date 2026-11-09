@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Module;
 
 use Module\ModuleRedirect;
+use Module\ModuleRegistry;
 use PHPUnit\Framework\TestCase;
 
 class ModuleRedirectTest extends TestCase
@@ -26,6 +27,30 @@ class ModuleRedirectTest extends TestCase
         );
         $this->assertSame('modules.php?name=Contracts&tab=teams', ModuleRedirect::targetFor('CapSpace'));
         $this->assertSame('modules.php?name=Contracts&tab=players', ModuleRedirect::targetFor('ContractList'));
+        $this->assertSame('modules.php?name=LeagueStarters', ModuleRedirect::targetFor('League_Starters'));
+    }
+
+    public function testLeagueStartersLegacyTargetIsRegisteredAndNotSelfLooping(): void
+    {
+        $target = ModuleRedirect::targetFor('League_Starters');
+        $this->assertNotNull($target);
+
+        $query = parse_url($target, PHP_URL_QUERY);
+        $this->assertIsString($query);
+        parse_str($query, $params);
+
+        $dest = $params['name'] ?? null;
+        $this->assertIsString($dest);
+        $this->assertTrue(ModuleRegistry::isValid($dest));
+        $this->assertNotSame('League_Starters', $dest);
+        $this->assertArrayNotHasKey($dest, ModuleRedirect::TARGETS);
+    }
+
+    public function testTargetForRejectsLeagueStartersNearMissNames(): void
+    {
+        foreach (['League_Starter', 'league_starters', 'LEAGUE_STARTERS', 'League_Starters ', 'LeagueStarters'] as $name) {
+            $this->assertNull(ModuleRedirect::targetFor($name));
+        }
     }
 
     public function testTargetForReturnsNullForUnknownModule(): void

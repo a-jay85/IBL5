@@ -14,8 +14,10 @@
 --
 -- Write orders for the two columns (no PHP writer exists, so an admin edits them in a DB tool):
 --   1. Both columns in one UPDATE statement: exact. This is the supported procedure.
---   2. gm_username first, then owner_name: exact. The second statement takes the rename branch and
---      fixes the tenure the first statement opened under the stale name.
+--   2. gm_username first, then owner_name: exact when the outgoing tenure started in an earlier
+--      season. The second statement takes the rename branch and fixes the tenure the first statement
+--      opened under the stale name. If the outgoing tenure started this season under the same
+--      name, the first statement hits the uq_tenure key and fails, so use order 1.
 --   3. owner_name first, then gm_username: the rename branch renames the outgoing GM's open tenure
 --      to the incoming GM's name before the second statement closes it. One closed row then carries
 --      the wrong name. No single-row AFTER UPDATE trigger can tell this from a plain rename.

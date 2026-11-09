@@ -321,7 +321,7 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         $text = $this->migrationText();
         self::assertLessThan(strpos($text, $backfill), strpos($text, $backupFill), 'backup fill must run before the backfill');
 
-        $undo = file_get_contents(__DIR__ . '/../../migrations/undo/207_gm_tenure_trigger_display_name.sql');
+        $undo = file_get_contents(__DIR__ . '/../../migrations-undo/207_gm_tenure_trigger_display_name.sql');
         self::assertIsString($undo);
 
         // Team A: an open tenure still holding the username (a backfill target) and a closed one.

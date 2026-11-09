@@ -1063,6 +1063,31 @@ assert_absent "row44c run: .normalize.lock is gone" "$NDIR/queue/.normalize.lock
 h_pass "row44c — dispose_entry waits for the queue lock"
 
 # ---------------------------------------------------------------------------
+# Row 44f — a `queue remove` that lands mid-renumber waits for .normalize.lock
+# instead of resolving an entry the renumber is about to rename (backlog#1576
+# item 7). The remove branch has held the lock since #3105; this row pins it.
+# The queue is fully prefixed, so the CLI's normalize_queue takes its fast path.
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-a.md plan-b.md
+ln -s "$PDIR/plan-a.md" "$NDIR/queue/010-plan-a.md"
+ln -s "$PDIR/plan-b.md" "$NDIR/queue/020-plan-b.md"
+mkdir "$NDIR/queue/.normalize.lock"
+run_queue remove plan-a >/dev/null 2>&1 &
+pid_rm=$!
+sleep 2
+assert_present "row44f: entry stays queued while the lock is held" "$NDIR/queue/010-plan-a.md"
+rmdir "$NDIR/queue/.normalize.lock"
+rc_rm=0
+wait "$pid_rm" || rc_rm=$?
+h_eq "row44f: remove exits 0 once the lock frees" "0" "$rc_rm"
+assert_not_queued "row44f: entry left the queue" plan-a
+assert_present "row44f: the other entry is untouched" "$NDIR/queue/020-plan-b.md"
+assert_present "row44f: the original plan is untouched" "$PDIR/plan-a.md"
+assert_absent "row44f: .normalize.lock is gone" "$NDIR/queue/.normalize.lock"
+h_pass "row44f — queue remove waits for the queue lock"
+
+# ---------------------------------------------------------------------------
 # Row 44d (matrix 19) — the runner's end-of-run sweeps test queue membership by
 # slug. A queued NNN-<slug>.md entry keeps all of its slug-keyed sidecars
 # (.attempts, .failure, .cap-refunds, the claim lock, handoff/<slug>.md.json).

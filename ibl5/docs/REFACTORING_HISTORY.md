@@ -1,6 +1,6 @@
 ---
 description: Complete timeline of the 31-module interface-driven refactoring.
-last_verified: 2026-10-03
+last_verified: 2026-11-09
 ---
 
 # IBL5 Refactoring History
@@ -574,7 +574,7 @@ $stmt = $db->prepare($query);
 $stmt->bind_param('ss', $searchTerm, $searchTerm);
 ```
 
-**Reference:** See `.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md` and `TASK_COMPLETION_SUMMARY.md`
+**Reference:** See `../../.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md` and `../../.archive/TASK_COMPLETION_SUMMARY.md`
 
 ---
 
@@ -802,7 +802,7 @@ All IBL5 modules (31 total) have been refactored to the interface-driven archite
 - [Standings README](../classes/Standings/README.md) - Standings module architecture
 
 ### Archived Summaries
-- `.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md`
+- `../../.archive/PLAYER_PAGE_REFACTORING_SUMMARY.md`
 - `.archive/SEASON_LEADERS_REFACTORING_SUMMARY.md`
 - `.archive/LEADERBOARDS_REFACTORING_SUMMARY.md`
 - `.archive/DRAFT_REFACTORING_SUMMARY.md`

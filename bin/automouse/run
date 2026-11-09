@@ -982,7 +982,7 @@ acquire_cost_lock() {
         fi
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
         now=$(date +%s)
-        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        lock_epoch=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo "$now")
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
             rm -rf "$lock" 2>/dev/null || true
@@ -2324,7 +2324,7 @@ claim_next_plan() {
         # Locked — is the holder dead or the lock expired? If so, steal it.
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
         now=$(date +%s)
-        lock_epoch=$(stat -f %m "$lock" 2>/dev/null || echo "$now")
+        lock_epoch=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo "$now")
         # A lock held for a usage-gate pause is not stale, whatever its pid or age says.
         held=$(cat "$lock/paused-held" 2>/dev/null) || held=""
         if [ -n "$held" ] && usage_paused_hold_live "$held" "$LOCK_TTL_SECS"; then

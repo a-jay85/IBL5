@@ -602,7 +602,7 @@ DRAFTS_DIR="$PLANS_DIR/.drafts"
 # green on macOS and red on Linux CI; keep the numeric check.
 draft_mtime() {
     local mt
-    mt=$(stat -f %m "$1" 2>/dev/null)
+    mt=$(stat -f %m "$1" 2>/dev/null)  # portability-ok: output validated by the case on the next line
     case "$mt" in '' | *[!0-9]*) mt=$(stat -c %Y "$1" 2>/dev/null) ;; esac
     case "$mt" in '' | *[!0-9]*) return 1 ;; esac
     printf '%s\n' "$mt"

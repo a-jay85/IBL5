@@ -43,7 +43,7 @@ lstat_mtime() {
     if [ "$_LIB_STAT_FMT" = gnu ]; then
         stat -c '%Y' "$1" 2>/dev/null
     else
-        stat -f '%m' "$1" 2>/dev/null
+        stat -f '%m' "$1" 2>/dev/null  # portability-ok: GNU branch above is picked by the _LIB_STAT_FMT probe
     fi
 }
 

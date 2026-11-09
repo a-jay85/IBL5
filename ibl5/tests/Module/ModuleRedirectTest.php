@@ -32,7 +32,7 @@ class ModuleRedirectTest extends TestCase
 
     public function testLeagueStartersLegacyTargetIsRegisteredAndNotSelfLooping(): void
     {
-        $target = ModuleRedirect::targetFor('League_Starters');
+        $target = ModuleRedirect::targetFor("League_Starters");
         $this->assertNotNull($target);
 
         $query = parse_url($target, PHP_URL_QUERY);

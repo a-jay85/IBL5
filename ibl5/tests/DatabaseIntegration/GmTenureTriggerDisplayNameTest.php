@@ -12,9 +12,11 @@ use PHPUnit\Framework\Attributes\Group;
  * by franchise rather than by name, and follows owner_name renames.
  *
  * Three write orders exist for the two columns, since an admin edits them in a DB tool:
- *   1. Both columns in one UPDATE statement: exact.
- *   2. gm_username first, then owner_name: exact. The second statement takes the rename branch
- *      and fixes the open tenure the first statement opened under the stale name.
+ *   1. Both columns in one UPDATE statement: exact. This is the supported procedure.
+ *   2. gm_username first, then owner_name: exact when the outgoing tenure started in an earlier
+ *      season. The second statement takes the rename branch and fixes the open tenure the first
+ *      statement opened under the stale name. If the outgoing tenure started this season under the
+ *      same name, the first statement hits the uq_tenure key and fails, so use order 1.
  *   3. owner_name first, then gm_username: the rename branch renames the outgoing GM's open
  *      tenure to the incoming GM's name before the second statement closes it, so one closed row
  *      carries the wrong name. This is the named residual and is not tested.
@@ -297,6 +299,114 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         self::assertSame(['trg_team_identity_sync', 'trg_gm_tenure_track'], $names);
         self::assertSame([1, 2], $orders);
         self::assertStringContainsString('NEW.owner_name', $actions['trg_gm_tenure_track']);
+    }
+
+    public function testBackfillBackupHoldsChangedRowsAndUndoRestoresThem(): void
+    {
+        [$a, $b] = $this->probeTeams();
+
+        // Run only the migration's DML, inside the test transaction. Its CREATE TABLE would commit,
+        // and the test DB already holds ibl_gm_tenures_backup_207 because every migration is applied.
+        $backupFill = null;
+        $backfill = null;
+        foreach ($this->migrationStatements() as $statement) {
+            if (str_starts_with($statement, 'INSERT IGNORE INTO ibl_gm_tenures_backup_207')) {
+                $backupFill = $statement;
+            } elseif (preg_match('/^UPDATE ibl_gm_tenures t\s/m', $statement) === 1) {
+                $backfill = $statement;
+            }
+        }
+        self::assertNotNull($backupFill, 'migration has no backup fill of ibl_gm_tenures_backup_207');
+        self::assertNotNull($backfill, 'migration has no backfill UPDATE');
+        $text = $this->migrationText();
+        self::assertLessThan(strpos($text, $backfill), strpos($text, $backupFill), 'backup fill must run before the backfill');
+
+        $undo = file_get_contents(__DIR__ . '/../../migrations/undo/207_gm_tenure_trigger_display_name.sql');
+        self::assertIsString($undo);
+
+        // Team A: an open tenure still holding the username (a backfill target) and a closed one.
+        $this->setTeamGm($a, 'zzusera', 'ZZ Owner A');
+        $legacy = $this->db->prepare(
+            "UPDATE ibl_gm_tenures SET gm_display_name = 'zzusera' WHERE franchise_id = ? AND end_season_year IS NULL"
+        );
+        self::assertNotFalse($legacy);
+        $legacy->bind_param('i', $a);
+        $legacy->execute();
+        $legacy->close();
+        $closedA = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => $a,
+            'gm_display_name' => 'zzusera',
+            'start_season_year' => 2010,
+            'end_season_year' => 2015,
+        ]);
+        // Team B: an open tenure that already holds the display name.
+        $this->setTeamGm($b, 'zzuserb', 'ZZ Owner B');
+
+        // Earlier committed runs of the whole migration may have left backup rows. Rolled back in tearDown.
+        $this->db->query('DELETE FROM ibl_gm_tenures_backup_207 WHERE id > 0');
+        $before = $this->tenureNames();
+
+        $this->db->query($backupFill);
+        $this->db->query($backfill);
+
+        $after = $this->tenureNames();
+        $changed = [];
+        foreach ($before as $id => $name) {
+            if (($after[$id] ?? null) !== $name) {
+                $changed[$id] = $name;
+            }
+        }
+        $openA = array_values(array_filter(
+            $this->openTenures($a),
+            static fn (array $row): bool => $row['end_season_year'] === null
+        ));
+        self::assertCount(1, $openA);
+        self::assertSame('ZZ Owner A', $openA[0]['gm_display_name']);
+        self::assertSame('zzusera', $after[$closedA]);
+        self::assertContains('zzusera', $changed);
+        self::assertNotContains('ZZ Owner B', $changed);
+
+        $backup = [];
+        $res = $this->db->query('SELECT id, gm_display_name FROM ibl_gm_tenures_backup_207 ORDER BY id');
+        while ($row = $res->fetch_assoc()) {
+            $backup[(int) $row['id']] = (string) $row['gm_display_name'];
+        }
+        self::assertSame($changed, $backup);
+
+        self::assertTrue($this->db->multi_query($undo));
+        do {
+            $result = $this->db->store_result();
+            if ($result instanceof \mysqli_result) {
+                $result->free();
+            }
+        } while ($this->db->more_results() && $this->db->next_result());
+
+        self::assertSame($before, $this->tenureNames());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function tenureNames(): array
+    {
+        $names = [];
+        $res = $this->db->query('SELECT id, gm_display_name FROM ibl_gm_tenures ORDER BY id');
+        while ($row = $res->fetch_assoc()) {
+            $names[(int) $row['id']] = (string) $row['gm_display_name'];
+        }
+
+        return $names;
+    }
+
+    private function migrationText(): string
+    {
+        $files = glob(__DIR__ . '/../../migrations/*_gm_tenure_trigger_display_name.sql');
+        self::assertIsArray($files);
+        self::assertCount(1, $files);
+        $contents = file_get_contents($files[0]);
+        self::assertIsString($contents);
+
+        return $contents;
     }
 
     /**

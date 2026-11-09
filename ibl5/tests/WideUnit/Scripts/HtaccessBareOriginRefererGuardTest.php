@@ -116,6 +116,7 @@ final class HtaccessBareOriginRefererGuardTest extends TestCase
             'http www' => ['http://www.iblhoops.net'],
             'uppercase apex' => ['HTTPS://IBLHOOPS.NET'],
             'mixed-case www' => ['https://WWW.IblHoops.Net'],
+            'http uppercase www' => ['http://WWW.iblhoops.net'],
         ];
     }
 

@@ -160,6 +160,14 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/planfile.py",
 )
 
+# runner.py builds ArmInputs and calls the seat, but most edits to it are not merge-rule
+# changes, so the whole file is not an arming path. A changed line in it that names the
+# seat's feed is one: merge_danger marks it `arming-path:` like the files above. Fails
+# closed when the file's diff section cannot be read. A line that hides these names
+# (string-built attribute names, say) still gets past this; it is a tripwire, not a proof.
+_SEAT_FEED_PATH = "tools/postplan-harness/runner.py"
+_SEAT_FEED_RE = re.compile(r"second_review|hold_trigger|gate_edit_only")
+
 
 # --- Spec resolution -------------------------------------------------------------------------
 

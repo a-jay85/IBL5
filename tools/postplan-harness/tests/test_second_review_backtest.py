@@ -86,6 +86,16 @@ def test_backtest_3733_plan_time_hold_shape():
                                    **_seat(7)))
     _armed_unless_merge_rule(with_trigger, PR_3733)
 
+    # PR_3733 is also held by the merge-danger line (18), which the seat cannot clear, so the
+    # checks above pass even when an empty trigger list reaches the seat. Take 18 out of play:
+    # with no trigger the seat must still leave 7 held; with one it clears 7.
+    two_way = dict(hold, merge_danger_state="TWO-WAY")
+    no_trigger = evaluate(inputs(**PR_3733, **two_way, **_seat(7)))
+    assert not no_trigger.armed
+    assert 7 in {c.number for c in no_trigger.holds}
+    assert evaluate(inputs(**PR_3733, **two_way, plan_hold_triggers=("gate-weakening",),
+                           **_seat(7))).armed
+
 
 def test_backtest_3673_gate_backtest_shape():
     shared = dict(merge_danger_state=_merge_danger(PR_3673), **_seat(17))

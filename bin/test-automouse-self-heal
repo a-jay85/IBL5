@@ -40,6 +40,18 @@ qentry() {
     printf '%s\n' "$NDIR/queue/(no entry for $1)"
 }
 
+# assert_queued / assert_not_queued <label> <slug>: the NNN-<slug>.md entry
+# check plus a bare <slug>.md check, so a leaked bare entry fails (backlog#1576).
+# Both bare checks use assert_gone, which also catches a dangling symlink.
+assert_queued() {
+    assert_present "$1" "$(qentry "$2")"
+    assert_gone "$1 (no bare entry)" "$NDIR/queue/$2.md"
+}
+assert_not_queued() {
+    assert_gone "$1" "$(qentry "$2")"
+    assert_gone "$1 (no bare entry)" "$NDIR/queue/$2.md"
+}
+
 assert_absent() {
     local label=$1 path=$2
     if [ -e "$path" ]; then
@@ -94,7 +106,7 @@ ln -s "$PDIR/plan-fresh.md" "$NDIR/skipped/plan-fresh.md"
 touch "$NDIR/skipped/plan-fresh.md.staleness"
 run_heal >/dev/null 2>&1
 assert_absent  "row1 skipped symlink gone"  "$NDIR/skipped/plan-fresh.md"
-assert_present "row1 queued"                "$(qentry plan-fresh)"
+assert_queued "row1 queued" plan-fresh
 assert_absent  "row1 staleness marker gone" "$NDIR/skipped/plan-fresh.md.staleness"
 h_pass "row1 — POSITIVE healable"
 # ---------------------------------------------------------------------------
@@ -106,7 +118,7 @@ ln -s "$PDIR/plan-stale.md" "$NDIR/skipped/plan-stale.md"
 touch "$NDIR/skipped/plan-stale.md.staleness"
 run_heal >/dev/null 2>&1
 assert_present "row2 skipped stays"         "$NDIR/skipped/plan-stale.md"
-assert_absent  "row2 not queued"            "$NDIR/queue/plan-stale.md"
+assert_not_queued "row2 not queued" plan-stale
 assert_present "row2 marker retained"       "$NDIR/skipped/plan-stale.md.staleness"
 h_pass "row2 — NEGATIVE still-stale"
 # ---------------------------------------------------------------------------
@@ -118,7 +130,7 @@ ln -s "$PDIR/plan-fresh-nomarker.md" "$NDIR/skipped/plan-fresh-nomarker.md"
 # deliberately NO .staleness marker
 run_heal >/dev/null 2>&1
 assert_present "row3 skipped stays"   "$NDIR/skipped/plan-fresh-nomarker.md"
-assert_absent  "row3 not queued"      "$(qentry plan-fresh-nomarker)"
+assert_not_queued "row3 not queued" plan-fresh-nomarker
 h_pass "row3 — NEGATIVE core safety (no marker, not recovered)"
 # ---------------------------------------------------------------------------
 # Row 4 — DRY-RUN: healable plan listed but not moved, no report written
@@ -129,7 +141,7 @@ ln -s "$PDIR/plan-fresh-dry.md" "$NDIR/skipped/plan-fresh-dry.md"
 touch "$NDIR/skipped/plan-fresh-dry.md.staleness"
 out=$(run_heal --dry-run 2>&1)
 assert_present "row4 skipped still present" "$NDIR/skipped/plan-fresh-dry.md"
-assert_absent  "row4 not queued"            "$(qentry plan-fresh-dry)"
+assert_not_queued "row4 not queued" plan-fresh-dry
 assert_present "row4 marker still present"  "$NDIR/skipped/plan-fresh-dry.md.staleness"
 if ! echo "$out" | grep -q "would heal"; then
     h_fail "row4" "expected 'would heal' in dry-run output, got: $out"
@@ -160,7 +172,7 @@ run_heal >/dev/null 2>&1
 assert_absent  "row6 skipped symlink gone"  "$NDIR/skipped/plan-fresh-clean.md"
 assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.attempts"
 assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
-assert_present "row6 queued"                "$(qentry plan-fresh-clean)"
+assert_queued "row6 queued" plan-fresh-clean
 h_pass "row6 — CLEANUP sidecars evicted"
 # ---------------------------------------------------------------------------
 # Row 7 — TOMBSTONE (real): plan deleted from PLANS_DIR leaves a dangling
@@ -174,7 +186,7 @@ out=$(run_heal 2>&1)
 assert_gone "row7 dangling symlink reaped" "$NDIR/skipped/plan-deleted.md"
 assert_gone "row7 staleness reaped"        "$NDIR/skipped/plan-deleted.md.staleness"
 assert_gone "row7 attempts reaped"         "$NDIR/skipped/plan-deleted.md.attempts"
-assert_gone   "row7 not requeued"          "$NDIR/queue/plan-deleted.md"
+assert_not_queued "row7 not requeued" plan-deleted
 if ! echo "$out" | grep -q "reaped tombstone: plan-deleted.md"; then
     h_fail "row7" "expected 'reaped tombstone' in output, got: $out"
 fi
@@ -209,7 +221,7 @@ setup
 ln -s "$PDIR/plan-no-marker.md" "$NDIR/skipped/plan-no-marker.md"   # dangling, no .staleness
 out=$(run_heal 2>&1)
 assert_gone "row9 dangling symlink reaped" "$NDIR/skipped/plan-no-marker.md"
-assert_absent "row9 not requeued"          "$NDIR/queue/plan-no-marker.md"
+assert_not_queued "row9 not requeued" plan-no-marker
 if ! echo "$out" | grep -q "reaped tombstone: plan-no-marker.md"; then
     h_fail "row9" "expected 'reaped tombstone' in output, got: $out"
 fi

@@ -1047,7 +1047,9 @@ for c in (d.get("arm") or {}).get("conditions") or []:
                             [ -z "$_hr_dm_word" ] || DM_NEXT="${DM_NEXT}${DM_NEXT:+$'\n'}autofix: $_hr_dm_word" ;;
         *)
             if [ "$RC" != 0 ]; then
-                DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="$bail_lines"
+                _fail_dm=$(grep -m1 '^prefire-verify: FAIL' "$LOG" 2>/dev/null | cut -c1-200 || true)
+                DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"
+                DM_NEXT="${_fail_dm}${_fail_dm:+${bail_lines:+$'\n'}}${bail_lines}"
             else
                 DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="$bail_lines"
             fi ;;

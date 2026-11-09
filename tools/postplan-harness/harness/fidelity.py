@@ -376,6 +376,12 @@ def blocking_finding_texts(verdict_path: str) -> list[str]:
     return marked_finding_texts(verdict_path, "BLOCKING")
 
 
+# The tag sits in the lead run of bracket tags (`- [BLOCKING] [unplanned-scope] [GATE-EDIT]`),
+# never in the prose, so a finding that only mentions the tag does not count.
+_GATE_EDIT_LEAD_RE = re.compile(
+    r"^\s*(?:(?:[-*]|\d+[.)])\s+)?(?:\[(?:BLOCKING|NOTE|unplanned-scope)\]\s+)*\[GATE-EDIT\](?=\s|$)")
+
+
 def gate_edit_only(verdict_path: str) -> bool:
     """True when every blocking finding is tagged [GATE-EDIT] and none names an owner tag.
 
@@ -391,7 +397,8 @@ def gate_edit_only(verdict_path: str) -> bool:
     texts = [item for marker, item in items if _is_blocking(marker, verdict)]
     if not texts:
         return False
-    return all("[GATE-EDIT]" in t and "[MERGE-RULE]" not in t and "[ONE-WAY]" not in t
+    return all(_GATE_EDIT_LEAD_RE.match(t) is not None
+               and "[MERGE-RULE]" not in t and "[ONE-WAY]" not in t
                for t in texts)
 
 

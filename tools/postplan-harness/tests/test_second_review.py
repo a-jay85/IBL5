@@ -343,6 +343,15 @@ def test_gate_edit_only_requires_every_finding_tagged(tmp_path):
     assert fidelity.gate_edit_only(str(tmp_path / "missing.md")) is False
 
 
+def test_gate_edit_mentioned_in_prose_is_not_gate_edit(tmp_path):
+    prose = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] routes [GATE-EDIT] findings wrongly\n\n"
+                             "NOT READY\n", "prose.md")
+    assert fidelity.gate_edit_only(prose) is False
+    scoped = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] [unplanned-scope] [GATE-EDIT] edits\n\n"
+                              "NOT READY\n", "scoped.md")
+    assert fidelity.gate_edit_only(scoped) is True
+
+
 def test_merge_rule_tag_is_not_gate_edit(tmp_path):
     both = _write(tmp_path, f"{_finding('[GATE-EDIT]', '[MERGE-RULE]')}\nNOT READY\n", "both.md")
     assert fidelity.gate_edit_only(both) is False

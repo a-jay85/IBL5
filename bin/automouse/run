@@ -982,7 +982,7 @@ acquire_cost_lock() {
         fi
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
         now=$(date +%s)
-        lock_epoch=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo "$now")
+        lock_epoch=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo "$now")  # cost-lock age
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
             rm -rf "$lock" 2>/dev/null || true

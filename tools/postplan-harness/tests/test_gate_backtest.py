@@ -526,6 +526,14 @@ def test_tally_base_flag_without_lines_stays_pre_existing():
     assert tally.false_flags == []
 
 
+def test_tally_capped_line_lists_are_never_pre_existing():
+    full = tuple(f"line {i}" for i in range(500))
+    assert len(flag_lines("\n".join(f"line {i}" for i in range(900)))) == 500
+    tally = _lined_tally(full, full)
+    assert tally.pre_existing == []
+    assert tally.false_flags == [10]
+
+
 def test_tally_reworded_case_counts_as_false_flag():
     tally = _lined_tally(("Body changed",), ("body changed",))
     assert tally.false_flags == [10]

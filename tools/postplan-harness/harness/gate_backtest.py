@@ -502,6 +502,11 @@ def flag_lines(stdout: str) -> tuple[str, ...]:
 
 def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
     """Head flag lines the base gate did not also print on the same tree."""
+    if (len(r.flag_lines) >= _FLAG_LINES_CAP
+            or len(r.base_flag_lines) >= _FLAG_LINES_CAP):
+        # A capped list is a cut-off window; comparing windows is unreliable.
+        # Cannot tell, so treat every head line as new (never pre_existing).
+        return r.flag_lines
     base = set(r.base_flag_lines)
     return tuple(line for line in r.flag_lines if line not in base)
 

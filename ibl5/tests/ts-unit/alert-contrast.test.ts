@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ibl5Root = fileURLToPath(new URL('../../', import.meta.url));
@@ -98,5 +98,23 @@ describe('alert contrast', () => {
   it('warning alert text meets 4.5:1 on its background', () => {
     const { fg, bg } = alertPair('.ibl-alert--warning');
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// The built stylesheet is gitignored, so it only exists after `bun run css:build`.
+// Minified output spells the new step as `--color-warning-700:#b45309`.
+const builtPath = `${ibl5Root}themes/IBL/style/style.css`;
+
+describe.skipIf(!existsSync(builtPath))('built stylesheet alert tokens', () => {
+  const built = existsSync(builtPath) ? readFileSync(builtPath, 'utf8') : '';
+
+  it('defines the warning-700 palette step and alias', () => {
+    expect(built).toMatch(/--color-warning-700:\s*#b45309/);
+    expect(built).toMatch(/--warning-700:\s*var\(--color-warning-700\)/);
+  });
+
+  it('points the success and warning alert text at the 700 steps', () => {
+    expect(built).toMatch(/\.ibl-alert--success\{[^}]*color:\s*var\(--success-700\)/);
+    expect(built).toMatch(/\.ibl-alert--warning\{[^}]*color:\s*var\(--warning-700\)/);
   });
 });

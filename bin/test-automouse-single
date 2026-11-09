@@ -226,7 +226,7 @@ errexit_off
 out=$(PLANS_DIR="$PDIR" "$RUNNER" plan nonexistent-slug 2>&1); exit_code=$?
 errexit_restore
 [ "$exit_code" -ne 0 ] || h_fail "case4 expected non-zero exit, got 0"
-echo "$out" | grep -qi "cannot resolve\|no such plan\|nonexistent-slug" \
+grep -qi "cannot resolve\|no such plan\|nonexistent-slug" <<< "$out" \
     || h_fail "case4 expected a loud unresolved-slug message, got: $out"
 assert_absent "case4 no no-queue report" \
     "$NDIR/reports/$(date +%Y-%m-%d)-no-queue.md"

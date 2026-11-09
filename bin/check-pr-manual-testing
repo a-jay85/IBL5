@@ -128,14 +128,14 @@ content=$(printf '%s\n' "$section" | sed '1d')
 
 # Well-formed case 1: sentinel line present (case-insensitive).
 # Mirrors the grep in pr_manual_testing_clearance exactly.
-if printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+if grep -qiE '^[[:space:]]*No manual testing needed' <<< "$content"; then
     echo "check-pr-manual-testing: sentinel present — section is well-formed ($LABEL)"
     exit 0
 fi
 
 # Well-formed case 2: structured checkbox rows (real manual testing, correctly HELD).
 # These rows are already the right shape; the predicate returns HELD as intended.
-if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[[ x]\]'; then
+if grep -qE '^[[:space:]]*- \[[ x]\]' <<< "$content"; then
     echo "check-pr-manual-testing: checkbox rows present — section is well-formed ($LABEL)"
     exit 0
 fi

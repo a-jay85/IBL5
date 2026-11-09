@@ -129,7 +129,7 @@ if [[ -z "$TESTS" ]]; then
 fi
 
 # Add cross-cutting specs when any flow tests are selected
-if echo "$TESTS" | grep -q '^tests/e2e/flows/'; then
+if grep -q '^tests/e2e/flows/' <<< "$TESTS"; then
     for cc in \
         "tests/e2e/flows/cross-module-navigation.spec.ts" \
         "tests/e2e/flows/parameter-edge-cases.spec.ts"; do

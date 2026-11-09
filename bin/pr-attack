@@ -391,7 +391,7 @@ _ingest_gate_edge() {
     [ -z "$spec" ] && return 0
     case "$spec" in \#[[:space:]]*|\#) return 0 ;; esac
 
-    if ! printf '%s\n' "$spec" | grep -qE '^#[0-9]+>#[0-9]+$'; then
+    if ! grep -qE '^#[0-9]+>#[0-9]+$' <<< "$spec"; then
         echo "bin/pr-attack: invalid --gate-edge spec '$spec' (expected #A>#B)" >&2
         exit 1
     fi

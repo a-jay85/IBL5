@@ -97,13 +97,13 @@ has_inline_allow() {
   local file="$2"
   local lineno="$3"
 
-  if echo "$line" | grep -qE '// e2e-hygiene-allow: .{20,}'; then
+  if grep -qE '// e2e-hygiene-allow: .{20,}' <<< "$line"; then
     return 0
   fi
   if [ "$lineno" -gt 1 ]; then
     local prev
     prev=$(sed -n "$((lineno - 1))p" "$file")
-    if echo "$prev" | grep -qE '// e2e-hygiene-allow: .{20,}'; then
+    if grep -qE '// e2e-hygiene-allow: .{20,}' <<< "$prev"; then
       return 0
     fi
   fi
@@ -154,7 +154,7 @@ check_count_no_else() {
       [ "$end_line" -gt "$file_lines" ] && end_line=$file_lines
       local block
       block=$(sed -n "${line_num},${end_line}p" "$f")
-      if echo "$block" | grep -qE '}\s*else\s*\{'; then
+      if grep -qE '}\s*else\s*\{' <<< "$block"; then
         has_else=true
       fi
       if [ "$has_else" = false ]; then
@@ -182,7 +182,7 @@ check_visible_no_else() {
       [ "$end_line" -gt "$file_lines" ] && end_line=$file_lines
       local block
       block=$(sed -n "${line_num},${end_line}p" "$f")
-      if echo "$block" | grep -qE '}\s*else\s*\{'; then
+      if grep -qE '}\s*else\s*\{' <<< "$block"; then
         has_else=true
       fi
       if [ "$has_else" = false ]; then

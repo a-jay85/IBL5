@@ -112,7 +112,7 @@ fi
 # p2: MERGED answer — rc 0, stdout starts MERGED
 STUB_MODE=merged; export STUB_MODE
 p2_out=$(automouse_pr_state some-branch 2>/dev/null); p2_rc=$?
-if [ "$p2_rc" -eq 0 ] && printf '%s\n' "$p2_out" | grep -q '^MERGED '; then
+if [ "$p2_rc" -eq 0 ] && grep -q '^MERGED ' <<< "$p2_out"; then
     echo "ok: p2-merged-rc0"
 else
     echo "FAIL: p2-merged-rc0 — rc=$p2_rc out='$p2_out'"
@@ -155,7 +155,7 @@ p5_result=$(set -euo pipefail
     automouse_pr_state some-branch 2>/dev/null || true
     echo "survived"
 )
-if printf '%s\n' "$p5_result" | grep -q 'survived'; then
+if grep -q 'survived' <<< "$p5_result"; then
     echo "ok: p5-gh-error-subshell-survives"
 else
     echo "FAIL: p5-gh-error-subshell-survives — subshell aborted"
@@ -164,9 +164,9 @@ fi
 
 # p6: static — extracted body contains --state all AND "OPEN" AND "MERGED" in --jq
 p6_body=$(extract_fn automouse_pr_state)
-if printf '%s\n' "$p6_body" | grep -q -- '--state all' \
-   && printf '%s\n' "$p6_body" | grep -q '"OPEN"' \
-   && printf '%s\n' "$p6_body" | grep -q '"MERGED"'; then
+if grep -q -- '--state all' <<< "$p6_body" \
+   && grep -q '"OPEN"' <<< "$p6_body" \
+   && grep -q '"MERGED"' <<< "$p6_body"; then
     echo "ok: p6-static-state-all-open-merged"
 else
     echo "FAIL: p6-static-state-all-open-merged — missing --state all or OPEN/MERGED in jq"
@@ -218,7 +218,7 @@ b3_result=$(set -euo pipefail
     echo "survived"
 )
 b3_out=$(printf '%s\n' "$b3_result" | head -1)
-if [ "$b3_out" = "p-slug" ] && printf '%s\n' "$b3_result" | grep -q 'survived'; then
+if [ "$b3_out" = "p-slug" ] && grep -q 'survived' <<< "$b3_result"; then
     echo "ok: b3-malformed-json-slug-fallback-survives"
 else
     echo "FAIL: b3-malformed-json-slug-fallback-survives — out='$b3_out' result='$b3_result'"
@@ -503,7 +503,7 @@ c4_region=$(awk '
     in_region && /^    echo \$\(\( ATTEMPTS \+ 1 \)\)/ { exit }
     in_region { print }
 ' "$RUNNER")
-if printf '%s\n' "$c4_region" | grep -qw 'break'; then
+if grep -qw 'break' <<< "$c4_region"; then
     echo "FAIL: c4-no-break-in-claim-guard — found break in guard region"
     FAILED=1
 else
@@ -538,7 +538,7 @@ e2_region=$(awk '
     in_region && /^        fi$/ { exit }
     in_region { print }
 ' "$RUNNER")
-if printf '%s\n' "$e2_region" | grep -qE '^\s*(continue|break)\s*$'; then
+if grep -qE '^\s*(continue|break)\s*$' <<< "$e2_region"; then
     echo "FAIL: e2-no-continue-break-in-postpostplan — found continue or break"
     FAILED=1
 else
@@ -626,7 +626,7 @@ fi
 # e10: impl_cap_timeout does not accept 137 (the new postplan function is not a refactor of it)
 e10_137=$(grep -c '\[ "$status" -eq 137 \]' "$RUNNER" || true)
 e10_impl_body=$(extract_fn impl_cap_timeout)
-if [ "$e10_137" -eq 1 ] && ! printf '%s\n' "$e10_impl_body" | grep -q '137'; then
+if [ "$e10_137" -eq 1 ] && ! grep -q '137' <<< "$e10_impl_body"; then
     echo "ok: e10-impl-cap-timeout-no-137"
 else
     echo "FAIL: e10-impl-cap-timeout-no-137 — 137-count=$e10_137 impl-body-has-137=$(printf '%s\n' "$e10_impl_body" | grep -c '137')"
@@ -708,13 +708,13 @@ else
     echo "FAIL: e2a-anchor-region-non-empty — comment anchor not found or region empty"
     FAILED=1
 fi
-if printf '%s\n' "$e2a_region" | grep -qF 'dispose_plan_done'; then
+if grep -qF 'dispose_plan_done' <<< "$e2a_region"; then
     echo "ok: e2b-region-contains-dispose"
 else
     echo "FAIL: e2b-region-contains-dispose — dispose_plan_done not in anchor region"
     FAILED=1
 fi
-if printf '%s\n' "$e2a_region" | grep -qF 'should_hold_postplan_disposal'; then
+if grep -qF 'should_hold_postplan_disposal' <<< "$e2a_region"; then
     echo "ok: e2c-region-contains-hold-predicate"
 else
     echo "FAIL: e2c-region-contains-hold-predicate — should_hold_postplan_disposal not in anchor region"
@@ -731,9 +731,9 @@ t_lock=$(awk -F'[= ]' '/^LOCK_TTL_SECS=/{print $2; exit}' "$RUNNER")
 
 # t3: all three parsed non-empty and numeric
 if [ -n "$t_impl" ] && [ -n "$t_pp" ] && [ -n "$t_lock" ] \
-   && printf '%s\n' "$t_impl" | grep -qE '^[0-9]+$' \
-   && printf '%s\n' "$t_pp"   | grep -qE '^[0-9]+$' \
-   && printf '%s\n' "$t_lock" | grep -qE '^[0-9]+$'; then
+   && grep -qE '^[0-9]+$' <<< "$t_impl" \
+   && grep -qE '^[0-9]+$' <<< "$t_pp" \
+   && grep -qE '^[0-9]+$' <<< "$t_lock"; then
     echo "ok: t3-constants-parsed"
 else
     echo "FAIL: t3-constants-parsed — impl='$t_impl' pp='$t_pp' lock='$t_lock'"

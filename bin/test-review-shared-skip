@@ -209,7 +209,7 @@ STATUS1=$?
 FIRST1="$(printf '%s\n' "$OUT1" | head -1)"
 LAST1="$(printf '%s\n' "$OUT1" | tail -1)"
 [ "$STATUS1" -eq 0 ] || fail "case 1: exit status was $STATUS1, want 0"
-printf '%s' "$FIRST1" | grep -q '^CURRENT-TREE: ' || fail "case 1: line 1 not CURRENT-TREE:, got: $FIRST1"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST1" || fail "case 1: line 1 not CURRENT-TREE:, got: $FIRST1"
 want "no-verdict-comment verdict" "$LAST1" "no-verdict-comment"
 [ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 1: digest file not cleared by step-0"
 [ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 1: prior-verdict file not cleared by step-0"
@@ -226,7 +226,7 @@ STATUS2=$?
 FIRST2="$(printf '%s\n' "$OUT2" | head -1)"
 LAST2="$(printf '%s\n' "$OUT2" | tail -1)"
 [ "$STATUS2" -eq 0 ] || fail "case 2: exit status was $STATUS2, want 0"
-printf '%s' "$FIRST2" | grep -q '^CURRENT-TREE: ' || fail "case 2: line 1 not CURRENT-TREE:, got: $FIRST2"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST2" || fail "case 2: line 1 not CURRENT-TREE:, got: $FIRST2"
 want "no-tree-line verdict" "$LAST2" "RUN-REVIEW no-tree-line"
 end_case comment-no-tree-line
 
@@ -255,7 +255,7 @@ STATUS3=$?
 FIRST3="$(printf '%s\n' "$OUT3" | head -1)"
 LAST3="$(printf '%s\n' "$OUT3" | tail -1)"
 [ "$STATUS3" -eq 0 ] || fail "case 3: exit status was $STATUS3, want 0"
-printf '%s' "$FIRST3" | grep -q '^CURRENT-TREE: ' || fail "case 3: line 1 not CURRENT-TREE:, got: $FIRST3"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST3" || fail "case 3: line 1 not CURRENT-TREE:, got: $FIRST3"
 want "SKIP-REVIEW verdict" "$LAST3" "SKIP-REVIEW"
 want "SKIP-REVIEW contains tree sha" "$LAST3" "$TREE"
 # Carry-forward files must exist after SKIP.
@@ -288,10 +288,10 @@ STATUS4=$?
 FIRST4="$(printf '%s\n' "$OUT4" | head -1)"
 LAST4="$(printf '%s\n' "$OUT4" | tail -1)"
 [ "$STATUS4" -eq 0 ] || fail "case 4: exit status was $STATUS4, want 0"
-printf '%s' "$FIRST4" | grep -q '^CURRENT-TREE: ' || fail "case 4: line 1 not CURRENT-TREE:, got: $FIRST4"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST4" || fail "case 4: line 1 not CURRENT-TREE:, got: $FIRST4"
 want "tree-changed verdict" "$LAST4" "RUN-REVIEW tree-changed"
 # Negative pairing: must NOT be wrong-worktree (proves guard order is correct).
-printf '%s\n' "$LAST4" | grep -qF "RUN-REVIEW wrong-worktree" && fail "case 4: got wrong-worktree, expected tree-changed"
+grep -qF "RUN-REVIEW wrong-worktree" <<< "$LAST4" && fail "case 4: got wrong-worktree, expected tree-changed"
 end_case tree-differs
 
 # --- case 5: tree-equal-with-conflicts ---------------------------------------------------
@@ -304,7 +304,7 @@ STATUS5=$?
 FIRST5="$(printf '%s\n' "$OUT5" | head -1)"
 LAST5="$(printf '%s\n' "$OUT5" | tail -1)"
 [ "$STATUS5" -eq 0 ] || fail "case 5: exit status was $STATUS5, want 0"
-printf '%s' "$FIRST5" | grep -q '^CURRENT-TREE: ' || fail "case 5: line 1 not CURRENT-TREE:, got: $FIRST5"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST5" || fail "case 5: line 1 not CURRENT-TREE:, got: $FIRST5"
 want "conflicts-resolved verdict" "$LAST5" "RUN-REVIEW conflicts-resolved"
 # Step 0 clears carry-forward even on conflicts path.
 [ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 5: digest file not cleared by step-0"
@@ -356,7 +356,7 @@ STATUS6=$?
 FIRST6="$(printf '%s\n' "$OUT6" | head -1)"
 LAST6="$(printf '%s\n' "$OUT6" | tail -1)"
 [ "$STATUS6" -eq 0 ] || fail "case 6: exit status was $STATUS6, want 0"
-printf '%s' "$FIRST6" | grep -q '^CURRENT-TREE: ' || fail "case 6: line 1 not CURRENT-TREE:, got: $FIRST6"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST6" || fail "case 6: line 1 not CURRENT-TREE:, got: $FIRST6"
 want "multiple-sticky-comments verdict" "$LAST6" "RUN-REVIEW multiple-sticky-comments"
 end_case multiple-sticky-comments
 
@@ -387,7 +387,7 @@ STATUS8=$?
 FIRST8="$(printf '%s\n' "$OUT8" | head -1)"
 LAST8="$(printf '%s\n' "$OUT8" | tail -1)"
 [ "$STATUS8" -eq 0 ] || fail "case 8: exit status was $STATUS8, want 0"
-printf '%s' "$FIRST8" | grep -q '^CURRENT-TREE: ' || fail "case 8: line 1 not CURRENT-TREE:, got: $FIRST8"
+grep -q '^CURRENT-TREE: ' <<< "$FIRST8" || fail "case 8: line 1 not CURRENT-TREE:, got: $FIRST8"
 want "wrong-worktree verdict" "$LAST8" "RUN-REVIEW wrong-worktree"
 end_case wrong-worktree
 
@@ -403,7 +403,7 @@ for BAD_TREE in "abc123" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "unavailable
     printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BAD_BODY9_JSON" > "$fixture9"
     OUT9="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture9" bash "$SKIP_SCRIPT" 9999 "")"
     LAST9="$(printf '%s\n' "$OUT9" | tail -1)"
-    printf '%s\n' "$LAST9" | grep -qF "SKIP-REVIEW" \
+    grep -qF "SKIP-REVIEW" <<< "$LAST9" \
         && fail "case 9 ($BAD_TREE): malformed tree produced SKIP-REVIEW"
     want "malformed-tree no-tree-line ($BAD_TREE)" "$LAST9" "RUN-REVIEW no-tree-line"
 done
@@ -845,7 +845,7 @@ if [ "$(grep -c '' "$HR_MUTANT")" -ge "$(grep -c '' "$SKIP_SCRIPT")" ]; then
     fail "hr-stop mutation inert: hr-stop line not removed from the mutant copy"
 fi
 _run_skip "$PP_FIX" "$HR_MUTANT"
-printf '%s\n' "$RS_LAST" | grep -qF "RUN-REVIEW prior-digest-unparseable" \
+grep -qF "RUN-REVIEW prior-digest-unparseable" <<< "$RS_LAST" \
     || fail "hr-stop mutation inert: mutant without the rule stop printed '$RS_LAST'"
 rm -f "$HR_MUTANT"
 end_case hr-stop-reverted
@@ -864,7 +864,7 @@ if [[ "${1:-}" != "--skip-mutation" ]]; then
     LAST_MUT="$(printf '%s\n' "$OUT_MUT" | tail -1)"
     # Mutant with inverted comparison should pass through and produce SKIP-REVIEW for
     # a mismatched tree, proving the real guard actually catches tree changes.
-    printf '%s\n' "$LAST_MUT" | grep -qF "SKIP-REVIEW" \
+    grep -qF "SKIP-REVIEW" <<< "$LAST_MUT" \
         || fail "mutation: mutant did not produce SKIP-REVIEW for mismatched tree — mutation check is inert"
     rm -f "$MUTANT" "$MUTANT.bak"
     end_case mutation-check

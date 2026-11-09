@@ -1135,14 +1135,14 @@ else
             _ppf_reason=$(printf '%s\n' "$_ppf_result" | grep -oE 'PR #[0-9]+' | head -1 || true)
             ;;
         *)
-            if printf '%s\n' "$_ppf_result" | grep -q '^RESULT: post-plan DECLINED'; then
+            if grep -q '^RESULT: post-plan DECLINED' <<< "$_ppf_result"; then
                 _ppf_outcome="declined"
                 _ppf_reason="holdrepeat"
             elif grep -q 'postplan-rc=75' "$LOG" 2>/dev/null \
-                || printf '%s\n' "$_ppf_result" | grep -q '^RESULT: post-plan PAUSED'; then
+                || grep -q '^RESULT: post-plan PAUSED' <<< "$_ppf_result"; then
                 _ppf_outcome="paused"
                 _ppf_reason="usage-gate"
-            elif printf '%s\n' "$_ppf_result" | grep -qE 'rebase conflict|rebase-conflict:'; then
+            elif grep -qE 'rebase conflict|rebase-conflict:' <<< "$_ppf_result"; then
                 _ppf_outcome="conflict"
                 _ppf_reason=$(printf '%s\n' "$_ppf_result" | sed -n 's/.*tree proof failed://p' \
                     | grep -oE '(^|[[:space:]])[0-9]+ [0-9]+ [^[:space:]]+' \

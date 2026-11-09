@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# bin/check-shell-portability — keep BSD-first stat calls out of bin/ shell scripts.
+#
+# On Linux, stat -f is filesystem-status mode. Given a format operand it prints text to
+# stdout and then exits 1, so a BSD-first fallback such as stat -f %m F || stat -c %Y F
+# appends the real value to that text and the caller gets garbage. macOS accepts the
+# GNU form -c only on newer coreutils, so the safe order is GNU first, BSD second.
+# See .claude/rules/shell-portability.md.
+#
+# What the gate flags: a stat call with -f and a format operand (a % after the flag,
+# optionally quoted) when no stat -c call comes earlier in the same statement.
+#
+# Statements: a backslash-continued line is joined to the next one, so a GNU-first call
+# on line 1 covers a BSD call on a continuation line. A hit is reported at the first
+# physical line of its statement.
+#
+# Allow marker: end any line of the statement with a trailing comment of the form
+#   # portability-ok: <reason>
+# A marker with no reason, or without the colon, does not count. Use it when the site
+# is correct another way, such as a caller that validates the value.
+#
+# Scope: every file under bin/ whose name ends in .sh or .bash, or whose first line is
+# a shebang naming a shell. Python and other scripts are skipped. The scan is the whole
+# tree, not a diff, so the gate takes no base ref. --files exists for the harness.
+#
+# Limit: comment stripping is quote-blind. The first # at line start or after
+# whitespace starts a comment, even inside a quoted string. Comment-only lines are never
+# scanned, so this header may describe the pattern.
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage error.
+
+set -euo pipefail
+
+usage() { echo "usage: bin/check-shell-portability [--files <path>...]"; }
+die() { echo "check-shell-portability: $*" >&2; exit 2; }
+
+# An invocation: stat as its own word, optional other flags, then -f and a format
+# operand (optional space, optional quote, then %). Covers the attached -f%z form.
+BSD_RE="(^|[^[:alnum:]_.-])stat[[:space:]]+(-[[:alpha:]]+[[:space:]]+)*-f[[:space:]]*[\"']?%"
+GNU_RE="(^|[^[:alnum:]_.-])stat[[:space:]]+(-[[:alpha:]]+[[:space:]]+)*-c"
+
+FILES_MODE=0
+files=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --files)
+            FILES_MODE=1
+            shift
+            while [ $# -gt 0 ]; do files+=("$1"); shift; done
+            ;;
+        -h | --help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+
+if [ "$FILES_MODE" -eq 1 ]; then
+    [ "${#files[@]}" -gt 0 ] || die "--files needs at least one path"
+    for f in "${files[@]}"; do
+        [ -f "$f" ] || die "no such file: $f"
+    done
+else
+    cd "$(dirname "$0")/.."
+    if list=$(git ls-files -- bin 2>/dev/null) && [ -n "$list" ]; then :; else list=$(find bin -type f); fi
+    while IFS= read -r f; do
+        if [ -f "$f" ]; then files+=("$f"); fi
+    done <<< "$list"
+fi
+
+# Bash 3.2 + set -u: expanding an empty array errors, so stop before awk.
+if [ "${#files[@]}" -eq 0 ]; then echo "check-shell-portability: OK (0 files scanned)"; exit 0; fi
+
+read -r -d '' AWK_PROG <<'AWK' || true
+function report(f, n, t) { printf "%s:%d: %s\n", f, n, t; hits++ }
+function check(    b, pre) {
+    if (marked) return
+    if (!match(buf, bsd_re)) return
+    b = RSTART
+    pre = substr(buf, 1, b)
+    if (pre ~ gnu_re) return
+    report(sfile, start, text)
+}
+FNR == 1 {
+    if (cont) check()
+    cont = 0
+    skip = !(FILENAME ~ /\.(sh|bash)$/ || $0 ~ /^#!.*sh/)
+}
+skip { next }
+{
+    line = $0
+    code = line
+    cmt = ""
+    if (match(line, /(^|[[:space:]])#/)) {
+        code = substr(line, 1, RSTART - 1)
+        cmt = substr(line, RSTART)
+    }
+    if (!cont) { buf = ""; start = FNR; sfile = FILENAME; marked = 0; text = line; sub(/^[[:space:]]+/, "", text) }
+    if (cmt ~ /#[[:space:]]*portability-ok:[[:space:]]*[^[:space:]]/) marked = 1
+    if (code ~ /\\$/) { sub(/\\$/, "", code); buf = buf code " "; cont = 1; next }
+    buf = buf code
+    cont = 0
+    check()
+}
+END {
+    if (cont) check()
+    exit (hits > 0 ? 1 : 0)
+}
+AWK
+
+if out=$(awk -v bsd_re="$BSD_RE" -v gnu_re="$GNU_RE" "$AWK_PROG" "${files[@]}"); then rc=0; else rc=$?; fi
+case "$rc" in
+    0) echo "check-shell-portability: OK (${#files[@]} files scanned)"; exit 0 ;;
+    1)
+        printf '%s\n' "$out"
+        echo "fix: put the GNU form first: stat -c <fmt> FILE || stat -f <fmt> FILE"
+        echo "fix: or end the line with # portability-ok: <reason> when the site is correct another way"
+        echo "see .claude/rules/shell-portability.md"
+        exit 1
+        ;;
+    *) echo "check-shell-portability: awk failed (exit $rc)" >&2; exit 2 ;;
+esac

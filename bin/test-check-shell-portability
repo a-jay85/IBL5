@@ -1,0 +1,94 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-shell-portability (the BSD-first stat gate).
+# Follows bin/test-check-pipefail-grep-q style.
+#
+# Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
+# Fixture lines are built by concatenation (ST='st''at'), so this file holds no
+# literal BSD-first call and the gate passes on its own file.
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+DIR=$(mktemp -d)
+trap 'rm -rf "$DIR"' EXIT
+
+BIN="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$BIN/check-shell-portability"
+HARNESS="$BIN/$(basename "$0")"
+ST='st''at'
+SB='#!/bin/bash'
+FX="$DIR/fixture.sh"
+
+mk() { local out="$1"; shift; printf '%s\n' "$@" > "$out"; }
+run_gate() { set +e; OUT=$("$SCRIPT" "$@" 2>&1); RC=$?; set -e; }
+expect() { # name want_rc want_substring
+    if [ "$RC" -eq "$2" ]; then
+        case "$OUT" in *"$3"*) pass "$1"; return 0 ;; esac
+    fi
+    fail "$1 (rc=$RC, want rc=$2 and '$3'; output: $OUT)"
+}
+# case_fx name want_rc substring line...   (writes $FX as shebang + lines, scans it)
+case_fx() {
+    local name="$1" rc="$2" sub="$3"
+    shift 3
+    mk "$FX" "$SB" "$@"
+    run_gate --files "$FX"
+    expect "$name" "$rc" "$sub"
+}
+
+OKMSG="check-shell-portability: OK"
+
+case_fx bsd-spaced 1 "fixture.sh:2:" "x=\$($ST -f %m \"\$f\")"
+case_fx bsd-attached 1 "fixture.sh:2:" "x=\$($ST -f%z \"\$f\")"
+case_fx bsd-quoted 1 "fixture.sh:2:" "x=\$($ST -f '%m' \"\$f\")"
+case_fx bsd-leading-flag 1 "fixture.sh:2:" "x=\$($ST -L -f %m \"\$f\")"
+case_fx bsd-first-dual 1 "fixture.sh:2:" "x=\$($ST -f%z \"\$f\" || $ST -c%s \"\$f\" || echo 0)"
+case_fx gnu-first-dual 0 "$OKMSG" "x=\$($ST -c%s \"\$f\" || $ST -f%z \"\$f\" || echo 0)"
+case_fx continued-gnu-first 0 "$OKMSG" \
+    "x=\$($ST -c '%Y' \"\$f\" 2>/dev/null || \\" \
+    "      $ST -f '%m' \"\$f\" 2>/dev/null || echo 0)"
+case_fx continued-bsd-first 1 "fixture.sh:2:" \
+    "x=\$($ST -f '%m' \"\$f\" 2>/dev/null || \\" \
+    "      $ST -c '%Y' \"\$f\")"
+case_fx continued-start-line 1 "fixture.sh:3:" \
+    "y=1" \
+    "x=\$($ST -f '%m' \"\$f\" 2>/dev/null || \\" \
+    "      $ST -c '%Y' \"\$f\")"
+case_fx marker 0 "$OKMSG" "x=\$($ST -f %m \"\$f\")  # portability-ok: validated below"
+case_fx marker-on-last-line 0 "$OKMSG" \
+    "x=\$($ST -f '%m' \"\$f\" 2>/dev/null || \\" \
+    "      echo 0)  # portability-ok: caller validates"
+case_fx marker-empty-reason 1 "fixture.sh:2:" "x=\$($ST -f %m \"\$f\")  # portability-ok:"
+case_fx marker-no-colon 1 "fixture.sh:2:" "x=\$($ST -f %m \"\$f\")  # portability-ok validated"
+case_fx comment-only 0 "$OKMSG" "    # old form: $ST -f %m \"\$f\""
+case_fx trailing-comment 0 "$OKMSG" "x=1  # was $ST -f %m \"\$f\""
+case_fx quoted-message 0 "$OKMSG" "echo \"SKIP: needs $ST -f and BSD date\""
+case_fx lstat-near-miss 0 "$OKMSG" "x=\$(lstat -f %m \"\$f\")"
+
+mk "$DIR/tool.py" '#!/usr/bin/env python3' "os.system('$ST -f %m x')"
+run_gate --files "$DIR/tool.py"
+expect python-skipped 0 "$OKMSG"
+
+mk "$DIR/lib.sh" "x=\$($ST -f %m \"\$f\")"
+run_gate --files "$DIR/lib.sh"
+expect sh-suffix-no-shebang 1 "lib.sh:1:"
+
+run_gate --since=x
+expect unknown-flag 2 "usage:"
+
+run_gate --files
+expect files-without-paths 2 "--files needs at least one path"
+
+run_gate --files "$DIR/nope.sh"
+expect files-missing-path 2 "no such file"
+
+run_gate --files "$SCRIPT" "$HARNESS"
+expect self-scan 0 "$OKMSG"
+
+echo "test-check-shell-portability: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

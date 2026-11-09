@@ -110,10 +110,6 @@ while IFS= read -r l; do
         '+++ b/'*)
             path="${l#+++ b/}"
             if allowed_path "$path"; then ok=1; else ok=0; fi
-            if [ "$ok" -eq 0 ] && [[ $path =~ $TOKEN_RE ]]; then
-                echo "DECOMPILE-TOKEN $path: file name: ${BASH_REMATCH[0]}"
-                viol=1
-            fi
             ;;
         '@@ '*)
             if [[ $l =~ $HUNK_RE ]]; then
@@ -131,6 +127,18 @@ while IFS= read -r l; do
             ;;
     esac
 done <"$tmp/added.diff"
+
+# File names come from --name-only, which lists every non-deleted path. git prints
+# no +++ header for an empty or binary new file, so the content scan above cannot
+# see those names.
+gitdiff --name-only --no-renames --diff-filter=d -z "$mb" >"$tmp/names" \
+    || die "git diff failed: --name-only"
+while IFS= read -r -d '' path; do
+    if ! allowed_path "$path" && [[ $path =~ $TOKEN_RE ]]; then
+        echo "DECOMPILE-TOKEN $path: file name: ${BASH_REMATCH[0]}"
+        viol=1
+    fi
+done <"$tmp/names"
 
 if [ "$viol" -ne 0 ]; then
     echo "decompile tokens may be added only under engine/ or jsb-native/; see .claude/rules/engine-go.md"

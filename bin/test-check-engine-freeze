@@ -104,6 +104,23 @@ echo 'plain content' >"$REPO/ibl5/${T_J}.txt"
 commit_all
 expect_since token-filename 1 'DECOMPILE-TOKEN'
 
+# git prints no +++ header for an empty or binary new file. The name must still hit.
+reset_repo
+: >"$REPO/ibl5/${T_J}.txt"
+commit_all
+expect_since token-filename-empty 1 "DECOMPILE-TOKEN ibl5/${T_J}.txt: file name"
+
+reset_repo
+printf '\000\001\002' >"$REPO/ibl5/${F}1234ab.png"
+commit_all
+expect_since token-filename-binary 1 "DECOMPILE-TOKEN ibl5/${F}1234ab.png: file name"
+
+reset_repo
+: >"$REPO/engine/${T_J}.txt"
+printf '\000\001' >"$REPO/engine/${F}1234ab.bin"
+commit_all
+expect_since token-filename-headerless-allowed 0 'OK'
+
 reset_repo
 git -C "$REPO" mv engine/a.go ibl5/a.go
 commit_all

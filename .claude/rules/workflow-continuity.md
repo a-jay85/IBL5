@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-04
+last_verified: 2026-11-09
 ---
 
 # Workflow Continuity Rule
@@ -41,16 +41,16 @@ Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --s
 
 ## Post-Plan
 
-Never run `/post-plan` **inline**. It re-reads the full implementation context every phase, so an inline run costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
+Never run `/post-plan` **inline**. It re-reads the full context every phase, so an inline run costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
 
-**Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized.
+**Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized. A session not rooted in the worktree fires `(cd <abs wt> && bin/post-plan-now --auto)`.
 
 **Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`.
 
-- **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
+- **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR.
 - **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.
 - **Matrix check first.** With a plan, `git add -A` and run `bin/lib/plan-matrix-assertions <plan> <(git diff --cached origin/master)`. Write the test for each `UNREALISED-ASSERTION` row and rerun; if you cannot, do not fire. No plan: skip.
 - **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's post-impl CLI matrix rows, changed-file Infection at MSI 100, the plan's Executable Mutations rows) and exits 9 until all four pass on the current tree. Run it first with `--plan <plan> --stage matrix`, then `phpunit`, then `infection`, then `exec-mutations`, one foreground call each. The fire point reruns exec-mutations with larger limits. A pass is cached by tree hash. With no plan, the matrix stage skips. A human may bypass with `--skip-verify=<reason>`; it is logged and refused under `CLAUDE_HEADLESS`.
-- **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run. The finish DM tells the user how it went.
+- **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run.
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

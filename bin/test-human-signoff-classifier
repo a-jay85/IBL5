@@ -346,18 +346,65 @@ run_await "$T/aw-w10" 3 "$A" "$T/aw-w10/c.json" "$T/aw-w10/e.json"; rc=$?
 want "await: no labeled event -> drop missing" "$LAST_OUT" "REASON=missing"
 want "await: no labeled event -> drop missing (calls)" "$LAST_OUT" "CALLS=0"
 
-# W11: a mismatch verdict is left alone.
+# W11: a stale mismatch record older than the label waits the full budget.
 aw_mk w11
 comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w11/c.json"
 run_await "$T/aw-w11" 3 "$A" "$T/aw-w11/c.json" "$T/aw-w11/e.json"; rc=$?
-want "await: mismatch verdict is untouched" "$LAST_OUT" "REASON=mismatch"
-want "await: mismatch verdict is untouched (calls)" "$LAST_OUT" "CALLS=0"
+want "await: stale mismatch waits full budget -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+want "await: stale mismatch waits full budget (calls)" "$LAST_OUT" "CALLS=3"
+want "await: stale mismatch timeout names mismatch" "$LAST_OUT" "dropping (mismatch)"
 
 # W12: a bad attempts argument fails closed.
 aw_mk w12
 run_await "$T/aw-w12" x "$A" "$T/aw-w12/c.json" "$T/aw-w12/e.json"; rc=$?
 want "await: bad attempts arg -> drop error" "$LAST_OUT" "REASON=error"
 want "await: bad attempts arg -> drop error (calls)" "$LAST_OUT" "CALLS=0"
+
+# W13: stale mismatch, then the approving run's matching record lands on re-read 2 -> keep.
+aw_mk w13
+comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w13/c.json"
+{ comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")"
+  comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(record_body "$A")"; } | jq -s . > "$T/aw-w13/attempt-2.json"
+run_await "$T/aw-w13" 4 "$A" "$T/aw-w13/c.json" "$T/aw-w13/e.json"; rc=$?
+want "await: stale mismatch then matching record -> keep" "$LAST_OUT" "VERDICT=keep"
+want "await: stale mismatch then matching record -> keep (calls)" "$LAST_OUT" "CALLS=2"
+want "await: stale mismatch then matching record -> rc 0" "rc=$rc" "rc=0"
+
+# W14: stale mismatch, then a new bot record with the old fingerprint lands -> stop, mismatch.
+aw_mk w14
+comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w14/c.json"
+{ comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")"
+  comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(record_body "$B40")"; } | jq -s . > "$T/aw-w14/attempt-2.json"
+run_await "$T/aw-w14" 4 "$A" "$T/aw-w14/c.json" "$T/aw-w14/e.json"; rc=$?
+want "await: newer mismatch record mid-wait -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+want "await: newer mismatch record mid-wait -> stop (calls)" "$LAST_OUT" "CALLS=2"
+want "await: newer mismatch record mid-wait -> stop message" "$LAST_OUT" "a newer bot marker appeared; stop waiting"
+
+# W15: the mismatching record is newer than the label (a push after approval) -> no wait.
+aw_mk w15
+comment_json "$BOT" Bot "2026-11-02T22:59:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w15/c.json"
+run_await "$T/aw-w15" 3 "$A" "$T/aw-w15/c.json" "$T/aw-w15/e.json"; rc=$?
+want "await: fresh mismatch -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
+want "await: fresh mismatch -> no wait (calls)" "$LAST_OUT" "CALLS=0"
+want "await: fresh mismatch -> no-wait message" "$LAST_OUT" "newer than the approving label; no wait"
+
+# W16: a refetch failure during a stale-mismatch wait fails closed.
+aw_mk w16
+comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w16/c.json"
+touch "$T/aw-w16/fail-1"
+run_await "$T/aw-w16" 3 "$A" "$T/aw-w16/c.json" "$T/aw-w16/e.json"; rc=$?
+want "await: stale mismatch refetch failure -> drop error" "$LAST_OUT" "REASON=error"
+want "await: stale mismatch refetch failure -> drop error (calls)" "$LAST_OUT" "CALLS=1"
+
+# W17: a forged non-bot record with the current fingerprint never keeps.
+aw_mk w17
+comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w17/c.json"
+{ comment_json "$BOT" Bot "2026-11-02T22:00:00Z" "$(record_body "$B40")"
+  comment_json "$BOT" User "2026-11-02T22:59:55Z" "$(record_body "$A")"; } | jq -s . > "$T/aw-w17/attempt-1.json"
+run_await "$T/aw-w17" 3 "$A" "$T/aw-w17/c.json" "$T/aw-w17/e.json"; rc=$?
+want "await: forged record during stale mismatch -> drop" "$LAST_OUT" "VERDICT=drop"
+want "await: forged record during stale mismatch -> mismatch" "$LAST_OUT" "REASON=mismatch"
+want "await: forged record during stale mismatch (calls)" "$LAST_OUT" "CALLS=3"
 
 # N1-N5: the predicate alone.
 aw_mk n1
@@ -408,6 +455,24 @@ else
 fi
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: eval step calls hs_await_record" "$GATE_BLOCK" 'hs_await_record "$HS_AWAIT_ATTEMPTS" "$HS_AWAIT_SLEEP" hs_refetch_comments'
+# The eval-step guard admits the bounded wait for drop missing and drop mismatch only.
+HS_GUARD=$(printf '%s\n' "$GATE_BLOCK" | command grep -E '^[[:space:]]*if .*HS_DROP_REASON' \
+    | sed -E 's/^[[:space:]]*if (.*); then$/\1/')
+if [ "$(printf '%s\n' "$HS_GUARD" | grep -c .)" = 1 ]; then
+    h_pass "guard: exactly one HS_DROP_REASON guard in the eval step"
+else
+    h_fail "guard: exactly one HS_DROP_REASON guard in the eval step" "got: $HS_GUARD"
+fi
+guard_says() {
+    [ -n "$HS_GUARD" ] || { echo EMPTY; return 0; }
+    # shellcheck disable=SC2016  # expands in the child bash
+    HS_VERDICT="$1" HS_DROP_REASON="$2" bash -c 'if eval "$1"; then echo ADMIT; else echo SKIP; fi' _ "$HS_GUARD"
+}
+want "guard: drop missing admits the wait" "$(guard_says drop missing)" "ADMIT"
+want "guard: drop mismatch admits the wait" "$(guard_says drop mismatch)" "ADMIT"
+want "guard: drop error skips the wait" "$(guard_says drop error)" "SKIP"
+want "guard: near-miss reason mismatched skips the wait" "$(guard_says drop mismatched)" "SKIP"
+want "guard: keep skips the wait" "$(guard_says keep "")" "SKIP"
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: eval step reads issue events" "$GATE_BLOCK" '"repos/$GH_REPO/issues/$PR/events"'
 # shellcheck disable=SC2016  # literal workflow text

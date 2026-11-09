@@ -48,7 +48,8 @@ name: Human Sign-off
 # Approval race (ADR-0062 Update 2026-11-02): a `labeled` event for
 # human-approved runs in its own per-run group (`-approve-<run_id>`), so a push
 # seconds later (an update-branch merge) can no longer cancel it before it
-# records the fingerprint. A run that would drop `missing` while that label
+# records the fingerprint. A run that would drop `missing`, or `mismatch`
+# against a stale older record (ADR-0062 Update 2026-11-08), while that label
 # event is at or after the newest bot marker re-reads comments for up to
 # HS_AWAIT_ATTEMPTS x HS_AWAIT_SLEEP seconds, and only a matching bot record
 # keeps the label. The write job skips a record that a newer approval or a
@@ -147,12 +148,13 @@ jobs:
           # human-approved label event is at or after the newest bot marker,
           # re-read comments for a bounded time. Only a matching bot record
           # keeps the label; an events read error drops `error`.
-          if [ "$HS_VERDICT" = "drop" ] && [ "$HS_DROP_REASON" = "missing" ]; then
+          # A mismatch against a stale older record waits the same way (ADR-0062 Update 2026-11-08).
+          if [ "$HS_VERDICT" = "drop" ] && { [ "$HS_DROP_REASON" = "missing" ] || [ "$HS_DROP_REASON" = "mismatch" ]; }; then
             EVENTS="$RUNNER_TEMP/hs-events.json"
             if ! { gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/events" > "$RUNNER_TEMP/hs-event-pages.json" \
                    && jq 'add // []' "$RUNNER_TEMP/hs-event-pages.json" > "$EVENTS"; }; then
               rm -f "$EVENTS"
-              echo "Issue events read failed; the would-be missing drop becomes error"
+              echo "Issue events read failed; the would-be missing or mismatch drop becomes error"
             fi
             hs_refetch_comments() {
               gh api --paginate --slurp "repos/$GH_REPO/issues/$PR/comments" > "$RUNNER_TEMP/hs-pages.json" \

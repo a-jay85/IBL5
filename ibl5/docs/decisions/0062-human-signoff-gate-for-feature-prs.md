@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-02
+last_verified: 2026-11-08
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -59,6 +59,10 @@ On PR [#3685](https://github.com/a-jay85/IBL5/pull/3685) the label was applied a
 - **Job timeouts.** The gate job has `timeout-minutes: 20` and the write job has 5. A run that times out publishes no verdict, so it writes nothing and cannot keep the label.
 
 Keeping the label still requires the current fingerprint to equal a record written by github-actions[bot]. A recent label event never counts as approval on its own. `bin/test-human-signoff-classifier` pins each case, including the PR #3685 sequence.
+
+## Update (2026-11-08): the wait also covers a stale mismatch record
+
+A human who removes `human-approved` leaves no revoked marker, so an older bot record stays the newest marker. When the label is reapplied and a racing push cancels the approving run, the synchronize run used to drop `mismatch` against that stale record at once. The eval step now runs the same bounded wait for a `mismatch` drop whenever the approving label event is at or after the newest bot marker. Only a bot record whose fingerprint matches the current diff keeps the label. A mismatch whose record is newer than the label still drops without waiting. Tracked in a-jay85/IBL5-backlog#1781.
 
 ## Lineage
 

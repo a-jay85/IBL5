@@ -22,7 +22,9 @@ Python 3.8 syntax, stdlib only.
 import argparse
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 BYPASS_MIN_LENGTH = 20
 
@@ -1446,6 +1448,46 @@ MARKER_CASES = [
 ]
 
 
+REWRITE_BACKED_SQL = (
+    "CREATE TABLE IF NOT EXISTS t_backup LIKE t;\n"
+    "INSERT INTO t_backup SELECT * FROM t WHERE id = 1;\n"
+    "DELETE FROM t WHERE id = 1;\n"
+)
+
+REWRITE_CASES = [
+    # (name, file, sql, rewrite_on, undo_present, expected_tags)
+    ("rw update overwrite", "x.sql", "UPDATE t SET name = 'x' WHERE id = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw null backfill", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL;\n", True, False, []),
+    ("rw near-miss or", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL OR c = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss is not null", "x.sql", "UPDATE t SET c = 1 WHERE c IS NOT NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss second column", "x.sql", "UPDATE t SET c = 1, d = 2 WHERE c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss suffix column", "x.sql", "UPDATE t SET c = 1 WHERE abc IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw delete where", "x.sql", "DELETE FROM t WHERE id = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw backup and undo", "x.sql", REWRITE_BACKED_SQL, True, True, []),
+    ("rw backup no undo", "x.sql", REWRITE_BACKED_SQL, True, False, ["rewrite-no-backup"]),
+    ("rw undo no backup", "x.sql", "DELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw backup after rewrite", "x.sql", "DELETE FROM t WHERE id = 1;\nINSERT INTO t_backup SELECT * FROM t;\n", True, True, ["rewrite-no-backup"]),
+    ("rw copy not named backup", "x.sql", "INSERT INTO t_copy SELECT * FROM t;\nDELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw backup of other table", "x.sql", "INSERT INTO u_backup SELECT * FROM u;\nDELETE FROM t WHERE id = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw rule off", "x.sql", "UPDATE t SET name = 'x' WHERE id = 1;\n", False, False, []),
+    ("rw undo dir exempt", "ibl5/migrations/undo/x.sql", "UPDATE t, t_backup b SET t.c = b.c WHERE t.id = b.id;\n", True, False, []),
+    ("rw no where keeps legacy tag", "x.sql", "UPDATE t SET c = 1;\n", True, False, ["update-no-where"]),
+    ("rw update join", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE u.k = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw update join null guard", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE t.c IS NULL;\n", True, False, []),
+    ("rw odku is not an update", "x.sql", "INSERT INTO t (a) VALUES (1) ON DUPLICATE KEY UPDATE a = 1;\n", True, False, []),
+    ("rw php prepared delete", "x.php", "<?php\n$stmt = $db->prepare('DELETE FROM t WHERE id = ?');\n", True, False, ["rewrite-no-backup"]),
+]
+
+REWRITE_SCAN_CASES = [
+    # (name, sql, ranges, pr_body, expected_exit) through run_scan("x.sql", ...)
+    ("rw diff mode fires", "UPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 1)], None, 1),
+    ("rw all-lines silent", "UPDATE t SET name = 'x' WHERE id = 1;\n", None, None, 0),
+    ("rw marker suppresses", "-- destructive-migration[rewrite-no-backup]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 0),
+    ("rw marker other tag", "-- destructive-migration[update-no-where]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 1),
+    ("rw marker typo tag", "-- destructive-migration[rewrite-no-backups]: importer rebuilds this column on every run\nSELECT 1;\n", [(1, 2)], None, 1),
+]
+
+
 def self_test():
     cases = 0
     failures = 0
@@ -1480,6 +1522,41 @@ def self_test():
         if code != expected:
             failures += 1
             print("FAIL marker %s: expected exit %d, got %d" % (name, expected, code))
+    for name, path, sql, rewrite_on, undo_present, expected in REWRITE_CASES:
+        cases += 1
+        statements, _ = extract_sql(path, sql)
+        hits = evaluate(
+            statements,
+            list(range(len(statements))),
+            Lookups(None, None, path),
+            rewrite_path=path if rewrite_on else None,
+            undo_present=undo_present,
+        )
+        got = sorted(set(h[0] for h in hits))
+        if got != sorted(expected):
+            failures += 1
+            print("FAIL %s: expected %s, got %s" % (name, sorted(expected), got))
+    for name, sql, ranges, body, expected in REWRITE_SCAN_CASES:
+        cases += 1
+        code, _ = run_scan("x.sql", sql, ranges, "strict", body, Lookups(None, None, "x.sql"))
+        if code != expected:
+            failures += 1
+            print("FAIL rewrite-scan %s: expected exit %d, got %d" % (name, expected, code))
+    for with_undo, expected in ((True, 0), (False, 1)):
+        cases += 1
+        tmp = tempfile.mkdtemp()
+        try:
+            mig = os.path.join(tmp, "x.sql")
+            if with_undo:
+                os.mkdir(os.path.join(tmp, "undo"))
+                with open(os.path.join(tmp, "undo", "x.sql"), "w") as fh:
+                    fh.write("-- restore\n")
+            code, _ = run_scan(mig, REWRITE_BACKED_SQL, [(1, 999)], "strict", None, Lookups(None, None, mig))
+        finally:
+            shutil.rmtree(tmp)
+        if code != expected:
+            failures += 1
+            print("FAIL rewrite-disk undo=%s: expected exit %d, got %d" % (with_undo, expected, code))
     print("%d cases, %d failures" % (cases, failures))
     return 1 if failures else 0
 

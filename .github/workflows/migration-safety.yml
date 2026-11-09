@@ -285,6 +285,8 @@ jobs:
           else
             echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
           fi
+      - name: Destructive-migration engine self-test
+        run: bin/check-destructive-migrations --self-test
       - name: Scan for destructive patterns
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

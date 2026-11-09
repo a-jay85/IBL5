@@ -31,6 +31,8 @@
 # Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
 #
 # Exit codes: 0 = pass, 1 = violation found, 2 = usage error.
+#
+# gate-backtest-argv:
 
 set -euo pipefail
 

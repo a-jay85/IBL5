@@ -39,6 +39,7 @@ KNOWN_TRIGGERS = [
     "update-no-where",
     "narrow-type",
     "drop-recreate-existing",
+    "rewrite-no-backup",
 ]
 
 NAME = r"([a-z0-9_$]+(?:\.[a-z0-9_$]+)?)"
@@ -1058,7 +1059,84 @@ STATEMENT_RULES = [
 ]
 
 
-def evaluate(statements, selected, lookups):
+UPDATE_HEAD_RE = re.compile(r"^update (?:low_priority |ignore )*`?" + NAME)
+DELETE_FROM_RE = re.compile(r"\bfrom `?" + NAME)
+BACKUP_FILL_RE = re.compile(
+    r"^insert (?:ignore )?into `?" + NAME + r"\b.*?\bselect\b.*?\bfrom `?" + NAME
+)
+
+
+def undo_script_path(path):
+    """Convention: the undo script sits in an undo subdirectory beside the migration."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    return os.path.join(os.path.dirname(path), "undo", stem + ".sql")
+
+
+def _is_undo_script(path):
+    return "undo" in os.path.normpath(path).split(os.sep)[:-1]
+
+
+def _set_columns(low):
+    m = re.search(r"\bset\b(.*?)\bwhere\b(.*)$", low)
+    if not m:
+        return None, None
+    cols = []
+    for part in split_depth0(m.group(1)):
+        lhs = part.split("=", 1)[0].strip().strip("`")
+        cols.append(last_part(lhs).strip("`"))
+    return cols, m.group(2)
+
+
+def _null_guarded(cols, where):
+    """True when the WHERE pins every assigned column IS NULL with no OR."""
+    if re.search(r"\bor\b", where):
+        return False
+    for c in cols:
+        pat = r"(?<![a-z0-9_$])" + re.escape(c) + r"`? is null\b"
+        if not re.search(pat, where):
+            return False
+    return True
+
+
+def _backup_filled_before(ctx, table):
+    for j in range(ctx.index):
+        m = BACKUP_FILL_RE.match(ctx.statements[j].lower)
+        if m and "backup" in last_part(m.group(1)) and last_part(m.group(2)) == table:
+            return True
+    return False
+
+
+def rule_rewrite_no_backup(ctx, path, undo_present):
+    if _is_undo_script(path):
+        return []
+    low = ctx.st.lower
+    if not re.search(r"\bwhere\b", low):
+        return []
+    m = UPDATE_HEAD_RE.match(low)
+    if m and re.search(r"\bset\b", low):
+        cols, where = _set_columns(low)
+        if cols and _null_guarded(cols, where):
+            return []
+        table = last_part(m.group(1))
+    elif re.match(r"^delete\b", low):
+        m = DELETE_FROM_RE.search(low)
+        if not m:
+            return []
+        table = last_part(m.group(1))
+    else:
+        return []
+    missing = []
+    if not _backup_filled_before(ctx, table):
+        missing.append("no backup fill of %s before this statement" % table)
+    present = os.path.isfile(undo_script_path(path)) if undo_present is None else undo_present
+    if not present:
+        missing.append("no undo script at %s" % undo_script_path(path))
+    if missing:
+        return [("rewrite-no-backup", "(" + "; ".join(missing) + ")")]
+    return []
+
+
+def evaluate(statements, selected, lookups, rewrite_path=None, undo_present=None):
     """Return a list of (tag, line, extra, statement_text) hits."""
     hits = []
     seen = set()
@@ -1068,6 +1146,8 @@ def evaluate(statements, selected, lookups):
         found = []
         for rule in STATEMENT_RULES:
             found.extend(rule(ctx))
+        if rewrite_path is not None:
+            found.extend(rule_rewrite_no_backup(ctx, rewrite_path, undo_present))
         table, clauses = alter_clauses(st)
         for masked_clause, clean_clause in clauses:
             for rule in ALTER_CLAUSE_RULES:
@@ -1171,7 +1251,7 @@ def run_scan(path, text, ranges, policy, pr_body, lookups):
         return any(lo <= b and a <= hi for a, b in ranges)
 
     selected = [k for k, st in enumerate(statements) if in_ranges(st.start_line, st.end_line)]
-    hits = evaluate(statements, selected, lookups)
+    hits = evaluate(statements, selected, lookups, rewrite_path=path if ranges is not None else None)
     markers, errors = collect_markers(comments, lambda ln: in_ranges(ln, ln), pr_body, policy)
 
     out = []

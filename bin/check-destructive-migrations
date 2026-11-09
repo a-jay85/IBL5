@@ -58,8 +58,8 @@ Detected patterns (v2, statement-level):
                           backup> ... SELECT ... FROM <table> in the same file, or
                           no undo script at undo/<migration-stem>.sql beside it.
                           A SET whose WHERE pins every assigned column IS NULL
-                          (no OR) is a backfill and passes. Diff modes only;
-                          --full-scan skips it.
+                          in a plain AND chain is a backfill and passes. Diff
+                          modes only; --full-scan skips it.
   delete-no-where         DELETE ... FROM with no WHERE anywhere in the statement
   update-no-where         UPDATE ... SET with no WHERE anywhere in the statement;
                           UPDATE ... JOIN without WHERE counts, INSERT ... ON

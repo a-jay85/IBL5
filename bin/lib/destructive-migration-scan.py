@@ -1093,15 +1093,85 @@ def _set_columns(low):
     return cols, m.group(2).replace("`", "")
 
 
+# Any of these can let a row with a value through the IS NULL test: OR in
+# either spelling, XOR, a negation, a parenthesised group, or a subquery whose
+# unqualified column belongs to another table.
+NOT_A_BACKFILL_RE = re.compile(r"\bor\b|\|\||\bxor\b|\bnot\b|!|[()]|\bselect\b")
+
+
 def _null_guarded(cols, where):
-    """True when the WHERE pins every assigned column IS NULL with no OR."""
-    if re.search(r"\bor\b", where):
+    """True when the WHERE is a plain AND chain that pins every assigned column IS NULL."""
+    if NOT_A_BACKFILL_RE.search(where):
         return False
     for c in cols:
-        pat = r"(?<![a-z0-9_$.])" + re.escape(c) + r" is null\b"
+        pat = r"(?<![a-z0-9_$.])" + re.escape(c) + r" is null(?= and\b| &&|$| order by\b| limit\b)"
         if not re.search(pat, where):
             return False
     return True
+
+
+TABLE_REF_RE = re.compile(r"(?:^|,|\bjoin\b)\s*" + NAME + r"(?:\s+(?:as\s+)?([a-z0-9_$]+))?")
+NOT_AN_ALIAS = {
+    "as", "cross", "force", "ignore", "inner", "join", "left", "natural", "on",
+    "outer", "partition", "right", "set", "straight_join", "use", "using", "where",
+}
+
+
+def _table_refs(region):
+    """Map each alias and table name in a table-reference list to its table, plus the tables in order."""
+    refs = {}
+    order = []
+    for m in TABLE_REF_RE.finditer(region.strip()):
+        table = last_part(m.group(1))
+        refs[table] = table
+        if m.group(2) and m.group(2) not in NOT_AN_ALIAS:
+            refs[m.group(2)] = table
+        order.append(table)
+    return refs, order
+
+
+def _update_targets(low, cols):
+    """The tables a multi-table UPDATE writes: the qualifier of each SET column, else the first table."""
+    m = re.match(r"^update (?:low_priority |ignore )*(.*?)\bset\b", low)
+    if not m:
+        return []
+    refs, order = _table_refs(m.group(1))
+    if not order:
+        return []
+    if not cols:
+        return order[:1]
+    targets = []
+    for c in cols:
+        if "." in c:
+            q = last_part(c.rsplit(".", 1)[0])
+            table = refs.get(q, q)
+        else:
+            table = order[0]
+        if table not in targets:
+            targets.append(table)
+    return targets
+
+
+def _delete_targets(low):
+    """The tables a DELETE removes rows from: its target list when it names one, else the FROM table."""
+    m = re.match(r"^delete (?:low_priority |quick |ignore )*(.*?)\bfrom\b(.*?)(?:\bwhere\b|$)", low)
+    if not m:
+        return []
+    named, rest = m.group(1).strip(), m.group(2)
+    using = re.search(r"\busing\b", rest)
+    if not named and using:
+        named, rest = rest[: using.start()], rest[using.end():]
+    refs, order = _table_refs(rest)
+    if not named:
+        return order[:1]
+    targets = []
+    for part in named.split(","):
+        q = last_part(part.strip().replace(".*", ""))
+        if q:
+            table = refs.get(q, q)
+            if table not in targets:
+                targets.append(table)
+    return targets
 
 
 def _backup_filled_before(ctx, table):
@@ -1123,17 +1193,18 @@ def rule_rewrite_no_backup(ctx, path, undo_present):
         cols, where = _set_columns(low)
         if cols and _null_guarded(cols, where):
             return []
-        table = last_part(m.group(1))
+        tables = _update_targets(low, cols) or [last_part(m.group(1))]
     elif re.match(r"^delete\b", low):
         m = DELETE_FROM_RE.search(low)
         if not m:
             return []
-        table = last_part(m.group(1))
+        tables = _delete_targets(low) or [last_part(m.group(1))]
     else:
         return []
     missing = []
-    if not _backup_filled_before(ctx, table):
-        missing.append("no backup fill of %s before this statement" % table)
+    for table in tables:
+        if not _backup_filled_before(ctx, table):
+            missing.append("no backup fill of %s before this statement" % table)
     present = os.path.isfile(undo_script_path(path)) if undo_present is None else undo_present
     if not present:
         missing.append("no undo script at %s" % undo_script_path(path))
@@ -1479,6 +1550,25 @@ REWRITE_CASES = [
     ("rw no where keeps legacy tag", "x.sql", "UPDATE t SET c = 1;\n", True, False, ["update-no-where"]),
     ("rw update join", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE u.k = 1;\n", True, False, ["rewrite-no-backup"]),
     ("rw update join null guard", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE t.c IS NULL;\n", True, False, []),
+    # The IS NULL must sit on the SET column's own table.
+    ("rw join guard on other table", "x.sql", "UPDATE t JOIN u ON t.id = u.id SET t.c = u.c WHERE u.c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    # Each WHERE shape below lets a row that holds a value through the IS NULL test.
+    ("rw near-miss pipe or", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL || c = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss not", "x.sql", "UPDATE t SET c = 1 WHERE d = 1 AND NOT c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss not group", "x.sql", "UPDATE t SET c = 1 WHERE NOT (c IS NULL);\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss bang", "x.sql", "UPDATE t SET c = 1 WHERE d = 1 AND ! c IS NULL;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss xor", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL XOR d = 1;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss group compared", "x.sql", "UPDATE t SET c = 1 WHERE (c IS NULL AND d = 1) = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss is null compared", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL = 0;\n", True, False, ["rewrite-no-backup"]),
+    ("rw near-miss subquery", "x.sql", "UPDATE t SET c = 1 WHERE id IN (SELECT id FROM u WHERE c IS NULL);\n", True, False, ["rewrite-no-backup"]),
+    ("rw null backfill and", "x.sql", "UPDATE t SET c = 1 WHERE c IS NULL AND d = 1 LIMIT 10;\n", True, False, []),
+    # A backup of one table does not cover a write to another table in the same statement.
+    ("rw join writes second table", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "UPDATE t JOIN u ON t.i = u.i SET u.c = 1 WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw join alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nUPDATE ibl_players p JOIN ibl_hist h ON p.pid = h.pid SET p.name = h.name WHERE h.k = 1;\n", True, True, []),
+    ("rw delete joined target", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE t, u FROM t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete using two targets", "x.sql", "INSERT INTO t_backup SELECT * FROM t;\n" "DELETE FROM t, u USING t JOIN u ON t.i = u.i WHERE t.k = 1;\n", True, True, ["rewrite-no-backup"]),
+    ("rw delete alias backed", "x.sql", "INSERT INTO ibl_players_backup SELECT * FROM ibl_players;\nDELETE p FROM ibl_players p JOIN ibl_hist h ON p.pid = h.pid WHERE h.k = 1;\n", True, True, []),
     ("rw odku is not an update", "x.sql", "INSERT INTO t (a) VALUES (1) ON DUPLICATE KEY UPDATE a = 1;\n", True, False, []),
     ("rw php prepared delete", "x.php", "<?php\n$stmt = $db->prepare('DELETE FROM t WHERE id = ?');\n", True, False, ["rewrite-no-backup"]),
 ]

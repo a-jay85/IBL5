@@ -95,11 +95,11 @@ The destructive scan enforces this with the `rewrite-no-backup` trigger. It runs
 
 Statements with no `WHERE` keep their `update-no-where` and `delete-no-where` tags.
 
-A `SET` passes as a backfill when its `WHERE` holds `<col> IS NULL` for every assigned column and holds no `OR`. It only fills empty cells, so nothing is lost. Every other `WHERE` counts as an overwrite.
+A `SET` passes as a backfill when its `WHERE` is a plain `AND` chain that holds `<col> IS NULL` for every assigned column, with the same table qualifier the `SET` uses. It only fills empty cells, so nothing is lost. A `WHERE` that holds `OR`, `||`, `XOR`, `NOT`, `!`, parentheses or a subquery counts as an overwrite, and so does every other `WHERE`.
 
 ### What satisfies it
 
-The rewriting file needs both of these for the table it rewrites.
+The rewriting file needs both of these for each table it rewrites. In a multi-table `UPDATE` that is each table a `SET` column belongs to. In a multi-table `DELETE` it is each table in the delete list.
 
 1. A backup fill earlier in the same file. This is an `INSERT INTO <name> ... SELECT ... FROM <table>` placed before the rewrite, where `<name>` contains `backup`. Create the table with `CREATE TABLE IF NOT EXISTS ... LIKE`, as migrations 167 and 183 do. The `CREATE` may live in an earlier migration. The fill must live in the rewriting file.
 2. An undo script in an `undo/` folder beside the migration, named after the migration's stem, for example `ibl5/migrations/undo/NNN_slug.sql` (example).

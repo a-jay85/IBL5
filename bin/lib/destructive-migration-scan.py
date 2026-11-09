@@ -1135,7 +1135,7 @@ def _table_refs(region):
 
 
 def _update_targets(low, cols):
-    """The tables a multi-table UPDATE writes: the qualifier of each SET column, else the first table."""
+    """The tables an UPDATE writes: each SET column's qualifier, or every table when a column is unqualified."""
     m = re.match(r"^update (?:low_priority |ignore )*(.*?)\bset\b", low)
     if not m:
         return []

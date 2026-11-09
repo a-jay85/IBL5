@@ -1707,6 +1707,75 @@ grep -qF "post-plan-now: worktree 'x' needs manual resolution" "$_DM_CAPTURE" \
 end_case dm-links-pr-and-title-and-bail-fix
 fi
 
+# --- case 51c: dm-rc9-names-prefire-fail-check -------------------------------------------
+# A pre-fire refusal (rc=9): the DM leads its Fix: block with the first
+# "prefire-verify: FAIL" line (cut to 200 chars), ahead of post-plan-now's own lines.
+# The log prints the "named above" line FIRST, so the order assertion proves the move.
+if should_run "dm-rc9-names-prefire-fail-check"; then
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
+_cs51c="$SCRATCH/.local/bin/dm-cs-51c"
+cat > "$_cs51c" <<'STUB'
+#!/usr/bin/env bash
+echo "post-plan-now: pre-fire verification refused; fix the check named above and re-run."
+printf 'prefire-verify: FAIL exec-mutations: a row did not trip (exit 1); follow the NEXT-STEP line: %s\n' "$(printf 'y%.0s' $(seq 1 220))"
+echo "prefire-verify: FAIL phpunit: second-failure-marker"
+exit 9
+STUB
+chmod +x "$_cs51c"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs51c" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+_dm=$(cat "$_DM_CAPTURE" 2>/dev/null || true)
+grep -qF -- 'runner exited rc=9' <<< "$_dm" \
+    || fail "dm-rc9-names-prefire-fail-check: rc=9 verdict missing ($_dm)"
+grep -qF -- 'prefire-verify: FAIL exec-mutations: a row did not trip (exit 1)' <<< "$_dm" \
+    || fail "dm-rc9-names-prefire-fail-check: FAIL line not named in DM ($_dm)"
+_fail_ln=$(grep -m1 -nF -- 'prefire-verify: FAIL exec-mutations' <<< "$_dm" | cut -d: -f1)
+_bail_ln=$(grep -m1 -nF -- 'fix the check named above' <<< "$_dm" | cut -d: -f1)
+[ -n "$_fail_ln" ] && [ -n "$_bail_ln" ] && [ "$_fail_ln" -lt "$_bail_ln" ] \
+    || fail "dm-rc9-names-prefire-fail-check: FAIL line not ahead of bail line (fail=$_fail_ln bail=$_bail_ln)"
+grep -qF -- 'fix the check named above' <<< "$_dm" \
+    || fail "dm-rc9-names-prefire-fail-check: bail line dropped"
+! grep -qF -- 'second-failure-marker' <<< "$_dm" \
+    || fail "dm-rc9-names-prefire-fail-check: second FAIL line leaked in"
+_l=$(grep -m1 -F -- 'prefire-verify: FAIL exec-mutations' <<< "$_dm")
+_l="prefire-verify: FAIL${_l#*prefire-verify: FAIL}"
+[ "${#_l}" -eq 200 ] \
+    || fail "dm-rc9-names-prefire-fail-check: FAIL line is ${#_l} chars, want 200"
+end_case dm-rc9-names-prefire-fail-check
+fi
+
+# --- case 51d: dm-rc9-no-prefire-fail-keeps-bail-text ------------------------------------
+# rc=9 with no line-start "prefire-verify: FAIL": the DM keeps today's bail text only.
+# The two near-miss lines must not match the ^prefire-verify: FAIL anchor.
+if should_run "dm-rc9-no-prefire-fail-keeps-bail-text"; then
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_CAPTURE"
+_cs51d="$SCRATCH/.local/bin/dm-cs-51d"
+cat > "$_cs51d" <<'STUB'
+#!/usr/bin/env bash
+echo "post-plan-now: pre-fire verification refused; fix the check named above and re-run."
+echo "prefire-verify: PASS phpunit (no failures)"
+echo "note: prefire-verify: FAIL not at line start"
+exit 9
+STUB
+chmod +x "$_cs51d"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs51d" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+_dm=$(cat "$_DM_CAPTURE" 2>/dev/null || true)
+grep -qF -- 'runner exited rc=9' <<< "$_dm" \
+    || fail "dm-rc9-no-prefire-fail: rc=9 verdict missing ($_dm)"
+grep -qF -- 'fix the check named above' <<< "$_dm" \
+    || fail "dm-rc9-no-prefire-fail: old bail text lost ($_dm)"
+! grep -qF -- 'prefire-verify:' <<< "$_dm" \
+    || fail "dm-rc9-no-prefire-fail: a prefire-verify line leaked into the DM ($_dm)"
+end_case dm-rc9-no-prefire-fail-keeps-bail-text
+fi
+
 # --- case 52: dm-malformed-result-json-falls-back -----------------------------------------
 # Truncated result.json that still carries a greppable "verdict_1": "NOT READY" line.
 # JSON parsing fails -> non-fatal -> RESULT: fallback maps shipped-held to HELD. The DM

@@ -1,6 +1,6 @@
 ---
-description: ADR-0188. Ban env.* and string-typed inputs.* expressions inside workflow run bodies, enforced by bin/check-workflow-run-interpolation in Static guards.
-last_verified: 2026-10-08
+description: ADR-0188. Ban env.* and string-typed inputs.* expressions inside workflow run bodies, and every expression in a pull_request_target workflow's run bodies, enforced by bin/check-workflow-run-interpolation in Static guards.
+last_verified: 2026-11-08
 ---
 
 # ADR-0188: Ban env and string-input expressions inside workflow run: bodies
@@ -35,3 +35,13 @@ GitHub Actions expands `${{ }}` into a `run:` script's text before the shell par
 - `bin/test-check-workflow-run-interpolation`
 - `.github/workflows/vr-refresh.yml`
 - `.github/workflows/tests.yml`
+
+## Addendum: pull_request_target strict mode
+
+**Date:** 2026-11-08
+
+The Consequences above leave `github.*`, `steps.*`, `needs.*`, and `matrix.*` outside the rule. That holds for workflows that run on trusted events. A workflow triggered by `pull_request_target` runs with a write token on event data the PR author controls, such as the title, body, head ref, and labels. In such a file, `${{ github.event.pull_request.title }}` pasted into a run body is shell injection with a write token. PR #3652 planned a check for that shape against `.github/workflows/hotfix-dispatch.yml` (its matrix row 29), and the mutation passed this gate.
+
+The checker now has a strict mode. When a workflow's top-level `on:` block names `pull_request_target`, any `${{ }}` expression inside a `run:` body fails, whatever its context. The trigger is read only from the `on:` block before `jobs:`, in scalar, flow-list, and block form. Comments are stripped first, so a file that mentions `pull_request_target` only in a comment stays on the default rule. Values reach the shell through `env:` and a quoted `"$NAME"`, as before.
+
+A deny-list of untrusted event fields was considered and left for a later change. It would still pass `steps.*.outputs.*` and `needs.*.outputs.*`, which can carry attacker data forward from an earlier step. Every other workflow keeps the original env and string-input rule unchanged. `bin/test-check-workflow-run-interpolation` covers the trigger forms and the comment cases, and case W7b in `bin/test-merge-line-select` runs the checker on the real dispatcher and on a copy carrying the row-29 mutation.

@@ -9,6 +9,10 @@
 # their expansion is a fixed literal. Everything outside a `run:` body (with:, env:,
 # if:, name:, concurrency:) is out of scope, as are matrix/github/steps/needs/secrets.
 #
+# Strict mode: a workflow whose top-level on: block names pull_request_target runs
+# with a write token on PR-author-controlled event data, so there ANY ${{ }} inside
+# a run: body fails, github.*, steps.* and needs.* included (ADR-0188 addendum).
+#
 # Usage: bin/check-workflow-run-interpolation [file ...]
 #   default: .github/workflows/*.yml and .github/actions/*/action.yml
 set -eu
@@ -19,6 +23,8 @@ Usage: bin/check-workflow-run-interpolation [file ...]
 
 CI gate: no ${{ env.* }} or string-typed ${{ inputs.* }} expression inside a run: body.
 Pass the value through env: and use a quoted "$NAME" in the shell.
+Strict mode: in a workflow whose on: block names pull_request_target, any ${{ }}
+expression inside a run: body fails.
 
 Arguments:
   [file ...]   workflow or action files to check
@@ -60,6 +66,11 @@ function scan(s, lineno,    e, rest, off, abs, pc, ref, name) {
   while (match(s, /\$\{\{[^}]*\}\}/)) {
     e = substr(s, RSTART, RLENGTH)
     s = substr(s, RSTART + RLENGTH)
+    if (strict) {
+      printf "%s:%d: %s in a run: body of a pull_request_target workflow; any ${{ }} there is shell-injectable, pass it through env: and use \"$NAME\" in the shell\n", FILENAME, lineno, e
+      fail = 1
+      return  # strict: one report per line
+    }
     rest = e
     off = 0
     while (match(rest, /(env|inputs)\.[A-Za-z_][A-Za-z0-9_-]*/)) {
@@ -84,6 +95,15 @@ function scan(s, lineno,    e, rest, off, abs, pc, ref, name) {
 pass == 1 {
   if (!collecting) next
   if ($0 ~ /^jobs:/) { collecting = 0; next }
+  # Strict-mode trigger: only the top-level on: block counts; comments are stripped.
+  line = $0
+  sub(/^#.*$/, "", line)
+  sub(/[[:space:]]#.*$/, "", line)
+  if (line ~ /^[^[:space:]]/) {
+    inon = (line ~ /^["']?on["']?:/)
+    sub(/^["']?on["']?:/, "", line)
+  }
+  if (inon && (" " line " ") ~ /[^A-Za-z0-9_]pull_request_target[^A-Za-z0-9_]/) strict = 1
   if ($0 ~ /^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*$/) {
     lastkey = $0
     gsub(/[[:space:]:]/, "", lastkey)
@@ -120,6 +140,7 @@ done
 
 if [ "$rc" -ne 0 ]; then
     echo "check-workflow-run-interpolation: pass the value through env: and read it as a quoted shell variable — see 'Select PRs to refresh' in .github/workflows/vr-refresh.yml (env: INPUT_PR: \${{ inputs.pr }} then \"\$INPUT_PR\")." >&2
+    echo "check-workflow-run-interpolation: in a pull_request_target workflow every \${{ }} in a run: body fails, github.* included (ADR-0188 addendum)." >&2
     exit 1
 fi
 exit 0

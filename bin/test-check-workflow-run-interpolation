@@ -298,6 +298,133 @@ if [ "$lines" -ne 1 ]; then
   h_fail "one report per line" "expected 1 output line, got $lines"
 fi
 
+# --- strict mode: pull_request_target trigger ------------------------------------
+# Row-29 acceptance mutation (PR #3652): PR title in the dispatcher's run line.
+f="$(write_wf 'name: t
+on:
+  pull_request_target:
+    types: [labeled, auto_merge_enabled]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.pull_request.title }}')"
+run_case "strict: flags PR title in pull_request_target run (row-29)" 1 "$f"
+if ! grep -qF -- "pull_request_target workflow" <<< "$out"; then
+  h_fail "strict: report names pull_request_target" "output lacks 'pull_request_target workflow': $out"
+fi
+if ! grep -qF -- ":9:" <<< "$out"; then
+  h_fail "strict: report names line 9" "output does not name line 9: $out"
+fi
+"$CHECK" "$f" >/dev/null 2>"$TMP/strict-err"
+if grep -qF -- "in a pull_request_target workflow every" "$TMP/strict-err"; then
+  h_pass "strict: stderr hint names pull_request_target"
+else
+  h_fail "strict: stderr hint names pull_request_target" "stderr lacks the strict hint"
+fi
+
+f="$(write_wf 'name: t
+on: pull_request_target
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo ${{ steps.a.outputs.x }}')"
+run_case "strict: scalar on: flags steps output" 1 "$f"
+
+f="$(write_wf 'name: t
+on: [pull_request_target, workflow_dispatch]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: echo ${{ needs.a.outputs.x }}')"
+run_case "strict: flow on: list flags needs output" 1 "$f"
+
+f="$(write_wf 'name: t
+on:
+# trigger list
+  pull_request_target:
+    types: [labeled]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.label.name }}')"
+run_case "strict: block on: with column-0 comment still flags" 1 "$f"
+
+f="$(write_wf 'name: t
+"on":
+  pull_request_target:
+    types: [opened]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.pull_request.head.ref }}')"
+run_case "strict: quoted on: block form flags" 1 "$f"
+
+f="$(write_wf 'name: t
+on:
+  pull_request_target:
+    types: [labeled]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run x.yml --ref master')"
+run_case "strict: env: expression outside run passes" 0 "$f"
+
+f="$(write_wf 'name: t
+on: pull_request_target
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - name: A
+        run: |
+          echo ${{ github.a }} ${{ github.b }}')"
+run_case "strict: one report per line" 1 "$f"
+lines="$(printf '%s\n' "$out" | grep -c .)"
+if [ "$lines" -ne 1 ]; then
+  h_fail "strict: one report per line" "expected 1 output line, got $lines"
+fi
+
+# --- trigger parser near-misses: these files stay on the default rule ------------
+f="$(write_wf 'name: t
+on: [push]  # pull_request_target relay lives elsewhere
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.repository }}')"
+run_case "trigger: trailing comment mention passes" 0 "$f"
+
+f="$(write_wf 'name: relay for pull_request_target events
+on: [push]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.repository }}')"
+run_case "trigger: name: mention outside on: passes" 0 "$f"
+
+f="$(write_wf 'name: t
+on: [pull_request]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.pull_request.number }}')"
+run_case "trigger: on: [pull_request] keeps github.* allowed" 0 "$f"
+
 # --- usage errors ---------------------------------------------------------------
 "$CHECK" --bogus >/dev/null 2>"$TMP/err"; rc=$?
 expect "rejects unknown option" 2 "$rc"

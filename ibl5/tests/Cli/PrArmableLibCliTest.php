@@ -132,7 +132,7 @@ final class PrArmableLibCliTest extends TestCase
     {
         self::assertSame(
             'ui-awaiting-signoff',
-            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/design/input.css"}]', '[]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/design/input.css","status":"modified"}]', '[]'])['output']
         );
     }
 
@@ -140,7 +140,7 @@ final class PrArmableLibCliTest extends TestCase
     {
         self::assertSame(
             '',
-            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/design/input.css"}]', '[{"name":"human-approved"}]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/design/input.css","status":"modified"}]', '[{"name":"human-approved"}]'])['output']
         );
     }
 
@@ -148,7 +148,7 @@ final class PrArmableLibCliTest extends TestCase
     {
         self::assertSame(
             '',
-            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/Trade/TradeService.php"}]', '[]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/Trade/TradeService.php","status":"modified"}]', '[]'])['output']
         );
     }
 
@@ -161,7 +161,7 @@ final class PrArmableLibCliTest extends TestCase
     {
         self::assertSame(
             'ui-awaiting-signoff',
-            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/X.php","previous_filename":"ibl5/design/input.css"}]', '[]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/X.php","previous_filename":"ibl5/design/input.css","status":"renamed"}]', '[]'])['output']
         );
     }
 
@@ -169,14 +169,38 @@ final class PrArmableLibCliTest extends TestCase
     {
         self::assertSame(
             'ui-classifier-error',
-            $this->runFn('pr_ui_hold', ['[{"path":"ibl5/classes/X.php","changeType":"RENAMED"}]', '[]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/X.php","status":"renamed"}]', '[]'])['output']
         );
     }
 
-    public function testUiHoldFailsClosedAtHundredFiles(): void
+    public function testUiHoldPassesJustBelowFileCap(): void
     {
-        $files = json_encode(array_fill(0, 100, ['path' => 'ibl5/classes/X.php']), JSON_THROW_ON_ERROR);
+        $files = json_encode(array_fill(0, 2999, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
+        self::assertSame('', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+    }
+
+    public function testUiHoldFailsClosedAtFileCap(): void
+    {
+        $files = json_encode(array_fill(0, 3000, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
         self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+    }
+
+    public function testUiHoldFailsClosedOnGhPrViewShape(): void
+    {
+        // gh pr view returns {path, changeType} and never a rename's old path.
+        foreach ([
+            '[{"path":"ibl5/classes/X.php","changeType":"RENAMED","additions":1,"deletions":1}]',
+            '[{"path":"ibl5/classes/Trade/TradeService.php","changeType":"MODIFIED"}]',
+        ] as $files) {
+            self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        }
+    }
+
+    public function testUiHoldFailsClosedOnNonArrayFileList(): void
+    {
+        foreach (['{}', ''] as $files) {
+            self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        }
     }
 
     // --- (10) pipeline-authored floor — UNCONDITIONAL (no override label) ---

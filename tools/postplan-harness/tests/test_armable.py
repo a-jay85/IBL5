@@ -93,6 +93,18 @@ def test_ui_hold_backend_only_passes():
     assert not next(c for c in d.conditions if c.number == 8).blocked
 
 
+def test_ui_paths_rename_source_holds_condition_8():
+    cls = Classification(files=["ibl5/classes/X.php"])
+    d = evaluate(inputs(classification=cls,
+                        ui_paths=["ibl5/classes/X.php", "ibl5/design/input.css"]))
+    assert next(c for c in d.conditions if c.number == 8).blocked
+
+
+def test_ui_paths_absent_falls_back_to_classification_files():
+    d = evaluate(inputs(classification=Classification(files=["ibl5/classes/X.php"])))
+    assert not next(c for c in d.conditions if c.number == 8).blocked
+
+
 def test_ui_hold_empty_files_fails_closed():
     assert ui_hold([], []) == "ui classifier error"
 

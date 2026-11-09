@@ -186,3 +186,12 @@ def test_owner_held_and_clearable_tokens_never_overlap():
     from harness.armable import CLEARABLE_PLAN_TRIGGERS, OWNER_HELD_PLAN_TRIGGERS
     assert not CLEARABLE_PLAN_TRIGGERS & OWNER_HELD_PLAN_TRIGGERS
     assert {"bootstrap-hazard", "security-irreducible", "golden-new"} <= OWNER_HELD_PLAN_TRIGGERS
+
+
+def test_ui_floor_holds_on_rename_source_in_ui_paths():
+    """A UI file renamed to a non-UI path: classification.files lists only the new
+    path, ui_paths lists both. The owner's human-approved label clears condition 8,
+    but the seat must still not clear the pipeline hold for a UI-touching PR."""
+    _assert_held_with_clean([10], pr_labels=["pipeline-authored", "human-approved"],
+                            classification=Classification(files=["bin/check-prose"]),
+                            ui_paths=["bin/check-prose", "ibl5/design/input.css"])

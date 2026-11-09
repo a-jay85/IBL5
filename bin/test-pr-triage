@@ -79,6 +79,11 @@ case "$1 $2" in
                        rc=0; [ -f "$FIX/status-rc" ] && rc="$(cat "$FIX/status-rc")"
                        if [ "$rc" != 0 ]; then echo 'gh: HTTP 502' >&2; exit "$rc"; fi
                        if [ -f "$FIX/status-$sha.json" ]; then cat "$FIX/status-$sha.json"; else echo '{"state":"pending","statuses":[],"total_count":0}'; fi ;;
+      *pulls/*/files*) n="$(printf '%s' "$*" | sed -E 's#.*/pulls/([0-9]+)/files.*#\1#')"
+                       if [ -f "$FIX/rest-files-rc-$n" ]; then echo 'gh: HTTP 502' >&2; exit "$(cat "$FIX/rest-files-rc-$n")"; fi
+                       # --paginate --slurp shape: an array of REST pages.
+                       if [ -f "$FIX/rest-files-$n.json" ]; then cat "$FIX/rest-files-$n.json"
+                       else echo '[[{"filename":"ibl5/classes/Trade/TradeService.php","status":"modified"}]]'; fi ;;
       "api user")      if [ -f "$FIX/viewer.json" ]; then cat "$FIX/viewer.json"; else echo '{"login":"fixture-me"}'; fi ;;
       *issues/*/comments*) n="$(printf '%s' "$*" | sed -E 's#.*/issues/([0-9]+)/comments.*#\1#')"
                        if [ -f "$FIX/comments-rc-$n" ]; then echo 'gh: HTTP 502' >&2; exit "$(cat "$FIX/comments-rc-$n")"; fi
@@ -514,7 +519,7 @@ held_pr() {
 }
 
 FIX_A="$(mktemp -d -p "$TMP")"
-for n in 40 41 42 43 44 45 46 47; do
+for n in 40 41 42 43 44 45 46 47 48 49; do
     checks_json success success success > "$FIX_A/checks-$(printf '%040d' "$n").json"
 done
 checks_json failure success success > "$FIX_A/checks-$(printf '%040d' 46).json"
@@ -533,7 +538,17 @@ jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · au
     held_pr 45 CLEAN fixture-me false false "chore: fixture forty-five" ibl5/design/input.css
     held_pr 46 CLEAN fixture-me false false
     held_pr 47 CLEAN fixture-me false false
+    held_pr 48 CLEAN fixture-me false false "chore: fixture forty-eight" ibl5/classes/Moved.php
+    held_pr 49 CLEAN fixture-me false false
 } | jq -s . > "$FIX_A/prs.json"
+# The UI floor reads REST pulls/N/files (--paginate --slurp pages), not gh pr list's files.
+echo '[[{"filename":"ibl5/design/input.css","status":"modified"}]]' > "$FIX_A/rest-files-45.json"
+# H-E6: a UI file renamed to a non-UI path. gh pr list shows only the new path;
+# the REST entry (real shape, captured from PR #2514) carries the old one.
+echo '[[{"filename":"ibl5/classes/Moved.php","previous_filename":"ibl5/design/input.css","status":"renamed"}]]' \
+    > "$FIX_A/rest-files-48.json"
+# H-E7: the REST file read fails, so the UI floor fails closed.
+echo 1 > "$FIX_A/rest-files-rc-49"
 
 run_triage "$FIX_A" --held
 assert_match  "H-E1 header"                        '^PR#  URL  TITLE  REASONS$' "$OUT"
@@ -550,6 +565,9 @@ assert_match  "H-E3 unknown"                      '^#40  https://github.com/a-ja
 assert_match  "H-E4 UI awaiting sign-off"        '^#45  .*  ui-awaiting-signoff$'                      "$OUT"
 assert_match  "H-E4 red check"                     '^#46  .*  red checks: Tests and Analysis \(failure\)$' "$OUT"
 assert_match  "H-E4 pending check"                 '^#47  .*  pending checks: E2E Tests$'                  "$OUT"
+assert_match  "H-E6 rename out of a UI path holds" '^#48  .*  ui-awaiting-signoff$'                      "$OUT"
+assert_match  "H-E7 REST file read error fails closed" '^#49  .*  ui-classifier-error$'                  "$OUT"
+assert_match  "H-E6 UI floor reads REST pulls/N/files" 'api repos/a-jay85/IBL5-test/pulls/48/files'     "$(cat "$FIX_A/calls.log")"
 
 # H-E9: default mode still lists the armed PR and prints the old header.
 run_triage "$FIX_A"

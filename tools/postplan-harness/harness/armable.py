@@ -203,6 +203,11 @@ def touches_ui(files) -> bool:
     return any(f.startswith(UI_PATH_PREFIXES) or f.endswith(UI_PATH_SUFFIXES) for f in files)
 
 
+def _ui_paths(inp) -> list[str]:
+    """Paths the UI floor classifies: both sides of a rename when the caller supplies them."""
+    return inp.ui_paths if inp.ui_paths is not None else inp.classification.files
+
+
 def second_review_candidates(inp, cs) -> dict[int, str]:
     """{condition number: hold reason} the seat may rule on; {} keeps every hold."""
     blocked = {c.number: c for c in cs if c.blocked}
@@ -210,7 +215,7 @@ def second_review_candidates(inp, cs) -> dict[int, str]:
     if not blocked_nums or not blocked_nums <= SECOND_REVIEW_CLEARABLE:
         return {}
     # The UI floor covers all four conditions: a UI-touching PR stays with the owner.
-    if touches_ui(inp.classification.files):
+    if touches_ui(_ui_paths(inp)):
         return {}
     if 7 in blocked_nums:
         if inp.plan_auto_merge_value != "false" and not inp.plan_auto_merge_false:
@@ -283,6 +288,7 @@ class ArmInputs:
     # a dataclass cannot default a field ahead of the required ones above. None = the step did not run (holds).
     exec_mutations_holding: Optional[tuple[str, ...]] = None
     exec_mutations_tree_suspect: bool = True
+    ui_paths: Optional[list[str]] = None  # git.conformance_files(): lists a rename's source too; None = classification.files
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
@@ -543,7 +549,7 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                      f"{DOCS_REFRESH_TOKEN} are recognized")
     cs.append(ConditionResult(7, "plan-auto-merge-hold", c7_blocked, c7_reason))
 
-    u_hold = ui_hold(inp.classification.files, inp.pr_labels)
+    u_hold = ui_hold(_ui_paths(inp), inp.pr_labels)
     cs.append(ConditionResult(8, "ui-review-floor", bool(u_hold), u_hold))
 
     det_holds = deterministic_safety_holds(inp.classification, inp.pr_title)

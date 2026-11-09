@@ -9,7 +9,7 @@
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
-#   (8) UI floor                   -> pr_ui_hold <files_json> <labels_json>
+#   (8) UI floor                   -> pr_ui_hold <rest_files_json> <labels_json>  (REST pulls/N/files, not gh pr view)
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
@@ -155,30 +155,39 @@ pr_golden_hold() {
 #   `human-approved` label is already applied (the label flips it). Echoes
 #   `ui-awaiting-signoff` when held, nothing otherwise, and
 #   `ui-classifier-error` when the classifier cannot decide (fail closed).
-#   Pass the `.files` array (objects with `.path`) and the `.labels` array, e.g.
-#   `gh pr view N --json files --jq '.files'`.
+#   Pass the REST file list and the `.labels` array. The file list MUST come
+#   from the REST API, because only it carries a rename's old path:
+#     gh api "repos/{o}/{r}/pulls/N/files?per_page=100" --paginate --slurp | jq -c 'add // []'
+#   Each entry has `.filename`, `.status` and, for a rename, `.previous_filename`.
+#   `gh pr view N --json files` returns `.path` objects with no old path, so an
+#   entry without a string `.filename` fails closed.
 pr_ui_hold() {
-    local files_json="$1" labels_json="$2" rc=0
+    local files_json="$1" labels_json="$2" rc=0 n
     if printf '%s' "$labels_json" \
         | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
         return  # label flips it — not held
     fi
-    # `gh pr view --json files` caps at 100 entries: a full page may hide UI
-    # paths, so fail closed. Renames also count their old path when present.
-    if [ "$(jq -r 'length' <<< "$files_json" 2>/dev/null || echo 0)" -ge 100 ]; then
+    # Wrong shape (not an array, or an entry with no string .filename): fail closed.
+    if ! jq -e 'type == "array" and all(.[]; (.filename | type) == "string")' \
+            <<< "$files_json" >/dev/null 2>&1; then
         echo "ui-classifier-error"
         return
     fi
-    jq -r '.[] | (.path, .previous_filename // empty)' <<< "$files_json" \
+    # The REST list stops at 3000 files: a full list may hide UI paths.
+    n="$(jq -r 'length' <<< "$files_json")"
+    if [ "$n" -ge 3000 ]; then
+        echo "ui-classifier-error"
+        return
+    fi
+    jq -r '.[] | (.filename, .previous_filename // empty)' <<< "$files_json" \
         | bash "$(dirname "${BASH_SOURCE[0]}")/ui-change-classifier.sh" --paths >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
         echo "ui-awaiting-signoff"
     elif [ "$rc" -ne 1 ]; then
         echo "ui-classifier-error"
-    elif jq -e 'any(.[]?; .changeType == "RENAMED" and ((.previous_filename // "") == ""))' \
+    elif jq -e 'any(.[]; .status == "renamed" and ((.previous_filename // "") == ""))' \
             <<< "$files_json" >/dev/null 2>&1; then
-        # gh's `--json files` never carries the old path of a rename, so a UI
-        # file renamed to a non-UI path is invisible here. Fail closed.
+        # A rename with no old path cannot be judged: the old path may be UI.
         echo "ui-classifier-error"
     fi
 }

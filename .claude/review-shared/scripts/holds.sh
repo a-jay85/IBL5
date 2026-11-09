@@ -36,6 +36,9 @@ HEADREF="$(gh pr view "$1" --json headRefName --jq .headRefName)" || { echo "STO
 run_predicate "manual-testing-clearance" pr_manual_testing_clearance "$BODY"
 run_predicate "golden-hold"              pr_golden_hold "$FILES"
 run_predicate "dep-holds"                pr_dep_holds "$BODY"
-run_predicate "ui-hold"                  pr_ui_hold "$FILES" "$LABELS"
+# The UI floor reads the REST file list: only it carries a rename's old path.
+UI_FILES="$(gh api "repos/{owner}/{repo}/pulls/$1/files?per_page=100" --paginate --slurp | jq -c 'add // []')" \
+  || { echo "STOP: gh api pulls/$1/files failed for PR #$1"; exit 1; }
+run_predicate "ui-hold"                  pr_ui_hold "$UI_FILES" "$LABELS"
 run_predicate "pipeline-authored-hold"   pr_pipeline_authored_hold "$LABELS" "$HEADREF"
 run_predicate "unresolved-findings-hold" pr_unresolved_findings_hold "$1"

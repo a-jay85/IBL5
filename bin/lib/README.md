@@ -43,7 +43,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, invoked by `bin/check-plan` gate `[13]` and by the `bin/automouse/queue` add-time backstop |
 | `plan-resolve.sh` | Shared plan-file resolver for `/post-plan` Phase 1, condition (7), and condition (13): variant-aware and drift-aware resolution of `$PLAN_FILE` and `$PLAN_SLUG_DRIFT`; mirrors `harness/planfile.py::locate_plan/_resolve_variant/_resolve_drift`; also exports `plans_dir [SEAM_VAR ...]`, the single resolver for the plans directory (`$HOME/claude-plans`, or the first non-empty named seam variable) |
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |
-| `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
+| `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; `pr_ui_hold` takes the REST `pulls/N/files` list, which carries `previous_filename` for renames; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |
 | `tick-guards.sh` | Single-flight PID lock and fail-closed HID idle read shared by `bin/wt-gc-tick` and `bin/wt-sync-tick`; tested by `bin/test-tick-guards` |
 | `wt-compose.sh` | Worktree docker-compose helpers: slug format, compose file, `--env-file` flag, project label lookup |

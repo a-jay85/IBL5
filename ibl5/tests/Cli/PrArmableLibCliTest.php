@@ -274,6 +274,11 @@ final class PrArmableLibCliTest extends TestCase
         return trim(implode("\n", $output));
     }
 
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $env
+     * @return array{output: string, exit: int}
+     */
     private function runFn(string $fn, array $args, array $env = []): array
     {
         $envPrefix = '';

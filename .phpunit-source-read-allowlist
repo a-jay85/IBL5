@@ -32,6 +32,8 @@ ibl5/tests/WideUnit/Scripts/BugPipelineWrapperAnnotationWiringTest.php
 ibl5/tests/WideUnit/Scripts/CliScriptsBehaviorPinTest.php
 # engParser fopen() failure guard throws RuntimeException and never calls exit/die (exit 255 contract); the failure path is not inducible without a live DB, no seam
 ibl5/tests/WideUnit/Scripts/EngParserFopenGuardTest.php
+# ibl5/.htaccess bare-origin Referer deny (RewriteCond %{HTTP_REFERER} anchored to a slashless iblhoops.net origin, bound to RewriteRule ^ - [F,L]); Apache never reads it under AllowOverride None, so the file is the property
+ibl5/tests/WideUnit/Scripts/HtaccessBareOriginRefererGuardTest.php
 # ibl5/.htaccess canonical-domain RewriteCond whitelist (apex, www, localhost, main.localhost, loopback; ibl6 removed); Apache never reads it under AllowOverride None, so the file is the property
 ibl5/tests/WideUnit/Scripts/HtaccessCanonicalDomainGuardTest.php
 # importBoxscoresFromHtml get_result() failure throws uncaught (exit 255), the script has no catch and never calls exit/die; the failure path is not inducible, no seam

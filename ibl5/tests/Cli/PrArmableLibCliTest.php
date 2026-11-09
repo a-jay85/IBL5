@@ -176,13 +176,13 @@ final class PrArmableLibCliTest extends TestCase
     public function testUiHoldPassesJustBelowFileCap(): void
     {
         $files = json_encode(array_fill(0, 2999, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
-        self::assertSame('', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        self::assertSame('', $this->runUiHoldWithFileArg($files, '[]'));
     }
 
     public function testUiHoldFailsClosedAtFileCap(): void
     {
         $files = json_encode(array_fill(0, 3000, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
-        self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        self::assertSame('ui-classifier-error', $this->runUiHoldWithFileArg($files, '[]'));
     }
 
     public function testUiHoldFailsClosedOnGhPrViewShape(): void
@@ -252,6 +252,28 @@ final class PrArmableLibCliTest extends TestCase
      * @param array<string,string> $env
      * @return array{output: string, exit: int}
      */
+    /**
+     * Run pr_ui_hold with the file list read from a temp file inside bash.
+     * A 3000-entry list is ~165 KB, over Linux's 128 KB per-argument exec cap,
+     * so it cannot go on the command line. A bash function call has no such cap.
+     */
+    private function runUiHoldWithFileArg(string $filesJson, string $labelsJson): string
+    {
+        $filesPath = $this->tmpDir . '/files.json';
+        file_put_contents($filesPath, $filesJson);
+        $script = $this->tmpDir . '/ui-hold-from-file.sh';
+        file_put_contents(
+            $script,
+            "#!/bin/bash\nset -uo pipefail\nsource " . escapeshellarg($this->libPath)
+            . "\npr_ui_hold \"\$(cat \"\$1\")\" \"\$2\"\n"
+        );
+        $cmd = 'bash ' . escapeshellarg($script) . ' ' . escapeshellarg($filesPath) . ' ' . escapeshellarg($labelsJson) . ' 2>&1';
+        $output = [];
+        $exit = 0;
+        exec($cmd, $output, $exit);
+        return trim(implode("\n", $output));
+    }
+
     private function runFn(string $fn, array $args, array $env = []): array
     {
         $envPrefix = '';

@@ -61,11 +61,6 @@
     font-size: var(--text-xs);
 }
 
-.ibl-label--required::after {
-    content: ' *';
-    color: var(--error-600);
-}
-
 /* ==========================================================================
    Buttons
    ========================================================================== */
@@ -117,18 +112,6 @@
 
 .ibl-btn--secondary:hover:not(:disabled) {
     background: var(--navy-900);
-}
-
-/* Ghost button */
-.ibl-btn--ghost {
-    background: transparent;
-    color: var(--navy-800);
-    border: 1px solid var(--gray-300);
-}
-
-.ibl-btn--ghost:hover:not(:disabled) {
-    background: var(--gray-100);
-    border-color: var(--gray-400);
 }
 
 /* Neutral button (gray) */

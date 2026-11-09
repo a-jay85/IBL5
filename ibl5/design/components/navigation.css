@@ -393,12 +393,6 @@
     box-shadow: var(--shadow-sm);
 }
 
-.ibl-jump-menu__link--active {
-    background: var(--white);
-    color: var(--accent-500);
-    box-shadow: var(--shadow-sm);
-}
-
 /* ==========================================================================
    Mobile Navigation Menu
    ========================================================================== */

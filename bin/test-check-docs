@@ -345,9 +345,7 @@ fi
 # Fail fast: this section runs first so a planted bug in the edit-date ref path
 # (Executable Mutations rows 3-8) fails in seconds. Running the rest of the suite
 # would push a mutated run past the mutation runner's time limit.
-if [ "$H_FAIL" -gt 0 ]; then
-    h_done
-fi
+if [ "$H_FAIL" -gt 0 ]; then h_done; fi
 
 # ── Test 5: doc verified on the local day passes with no commit on the branch ─
 

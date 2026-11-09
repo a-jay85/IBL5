@@ -556,6 +556,185 @@ else
     echo "  output: $OUT"
 fi
 
+# ── Edit-date ref (CHECK_DOCS_EDIT_DATE_REF) ─────────────────────────────────
+#
+# A squash replay reads the merge-day squash author date, which can be later than
+# the branch edit that carried last_verified. The gate backtest sets
+# CHECK_DOCS_EDIT_DATE_REF to the PR's pre-squash head so editCommitDate() reads the
+# branch's own per-file dates. CI never sets it. Fixture shape:
+#   B : doc with last_verified 2026-10-23
+#   T : parent B, body edit only, author date 2026-10-23T12:00:00-05:00
+#   S : parent B, tree of T, author date 2026-10-24T00:35:00-05:00 (checked out)
+
+EDR_LV="2026-10-23"
+EDR_TODAY="2026-10-24"
+
+make_edit_ref_fixture() {   # make_edit_ref_fixture <repo> <squash|branch>; sets EDR_BASE EDR_TIP
+    local repo="$1" shape="$2"
+    write_doc "$repo" "$EDR_LV" "Original body."
+    commit_doc "$repo"
+    EDR_BASE=$(git -C "$repo" rev-parse HEAD)
+    write_doc "$repo" "$EDR_LV" "Branch edit, verified that day."
+    git -C "$repo" add -A
+    GIT_AUTHOR_DATE="${EDR_LV}T12:00:00-05:00" git -C "$repo" commit -qm branch-edit
+    EDR_TIP=$(git -C "$repo" rev-parse HEAD)
+    if [[ "$shape" == squash ]]; then
+        local squash
+        squash=$(GIT_AUTHOR_DATE="2026-10-24T00:35:00-05:00" git -C "$repo" commit-tree "${EDR_TIP}^{tree}" -p "$EDR_BASE" -m squash)
+        git -C "$repo" reset -q --hard "$squash"
+    fi
+}
+
+# run_edit_ref <repo> <base> <unset|set> [ref]; sets EDR_RC EDR_OUT EDR_ERR
+run_edit_ref() {
+    local repo="$1" base="$2" mode="$3" ref="${4:-}"
+    local of ef
+    of=$(mktemp)
+    ef=$(mktemp)
+    EDR_RC=0
+    if [[ "$mode" == unset ]]; then
+        (cd "$repo" && env -u CHECK_DOCS_EDIT_DATE_REF CHECK_DOCS_TODAY="$EDR_TODAY" \
+            bin/check-docs --since="$base" --no-staleness > "$of" 2> "$ef") || EDR_RC=$?
+    else
+        (cd "$repo" && CHECK_DOCS_EDIT_DATE_REF="$ref" CHECK_DOCS_TODAY="$EDR_TODAY" \
+            bin/check-docs --since="$base" --no-staleness > "$of" 2> "$ef") || EDR_RC=$?
+    fi
+    EDR_OUT=$(cat "$of")
+    EDR_ERR=$(cat "$ef")
+    rm -f "$of" "$ef"
+}
+
+# Case: the quirk. Unset ref on a squash replay reads the squash date and fails.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" unset
+rm -rf "$REPO"
+if [[ $EDR_RC -ne 0 ]]; then
+    pass "squash-dated edit fails without edit-date ref: rc nonzero"
+else
+    fail "squash-dated edit fails without edit-date ref: expected nonzero rc"
+    echo "  output: $EDR_OUT"
+fi
+if bump_present "$EDR_OUT"; then
+    pass "squash-dated edit fails without edit-date ref: stdout has the bump message"
+else
+    fail "squash-dated edit fails without edit-date ref: expected the bump message"
+    echo "  output: $EDR_OUT"
+fi
+
+# Case: ref names the branch tip, so the branch edit date wins.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" set "$EDR_TIP"
+rm -rf "$REPO"
+if [[ $EDR_RC -eq 0 ]]; then
+    pass "edit-date ref to branch tip passes squash replay: rc 0"
+else
+    fail "edit-date ref to branch tip passes squash replay: expected rc 0 (got $EDR_RC)"
+    echo "  output: $EDR_OUT"
+fi
+if bump_absent "$EDR_OUT"; then
+    pass "edit-date ref to branch tip passes squash replay: no bump message"
+else
+    fail "edit-date ref to branch tip passes squash replay: bump message present"
+    echo "  output: $EDR_OUT"
+fi
+if ! grep -qF 'CHECK_DOCS_EDIT_DATE_REF ignored' <<< "$EDR_ERR"; then
+    pass "edit-date ref to branch tip passes squash replay: no ignored warning"
+else
+    fail "edit-date ref to branch tip passes squash replay: unexpected ignored warning"
+    echo "  stderr: $EDR_ERR"
+fi
+
+# Case: set-but-empty behaves as unset and stays silent.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" set ""
+rm -rf "$REPO"
+if [[ $EDR_RC -ne 0 ]]; then
+    pass "empty edit-date ref behaves as unset: rc nonzero"
+else
+    fail "empty edit-date ref behaves as unset: expected nonzero rc"
+    echo "  output: $EDR_OUT"
+fi
+if bump_present "$EDR_OUT"; then
+    pass "empty edit-date ref behaves as unset: stdout has the bump message"
+else
+    fail "empty edit-date ref behaves as unset: expected the bump message"
+    echo "  output: $EDR_OUT"
+fi
+if ! grep -qF 'CHECK_DOCS_EDIT_DATE_REF ignored' <<< "$EDR_ERR"; then
+    pass "empty edit-date ref behaves as unset: no ignored warning"
+else
+    fail "empty edit-date ref behaves as unset: unexpected ignored warning"
+    echo "  stderr: $EDR_ERR"
+fi
+
+# Case: unset on a plain branch checkout, same-day re-edit passes (CI shape).
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" branch
+run_edit_ref "$REPO" "$EDR_BASE" unset
+rm -rf "$REPO"
+if [[ $EDR_RC -eq 0 ]]; then
+    pass "unset edit-date ref keeps same-day re-edit pass"
+else
+    fail "unset edit-date ref keeps same-day re-edit pass: expected rc 0 (got $EDR_RC)"
+    echo "  output: $EDR_OUT"
+    echo "  stderr: $EDR_ERR"
+fi
+
+# Case: HEAD~1 is a valid revision but not a sha, so it is rejected.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" set "HEAD~1"
+rm -rf "$REPO"
+if grep -qF 'CHECK_DOCS_EDIT_DATE_REF ignored (not a commit sha): HEAD~1' <<< "$EDR_ERR"; then
+    pass "non-sha edit-date ref HEAD~1 is ignored with warning: stderr"
+else
+    fail "non-sha edit-date ref HEAD~1 is ignored with warning: expected stderr line"
+    echo "  stderr: $EDR_ERR"
+fi
+if [[ $EDR_RC -ne 0 ]]; then
+    pass "non-sha edit-date ref HEAD~1 is ignored with warning: rc nonzero"
+else
+    fail "non-sha edit-date ref HEAD~1 is ignored with warning: expected nonzero rc"
+fi
+if bump_present "$EDR_OUT"; then
+    pass "non-sha edit-date ref HEAD~1 is ignored with warning: bump message"
+else
+    fail "non-sha edit-date ref HEAD~1 is ignored with warning: expected the bump message"
+    echo "  output: $EDR_OUT"
+fi
+
+# Case: six hex chars is one short of a sha.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" set "${EDR_TIP:0:6}"
+rm -rf "$REPO"
+if grep -qF '(not a commit sha)' <<< "$EDR_ERR"; then
+    pass "six-hex edit-date ref is rejected as not a sha"
+else
+    fail "six-hex edit-date ref is rejected as not a sha: expected '(not a commit sha)'"
+    echo "  stderr: $EDR_ERR"
+fi
+
+# Case: a well-formed sha naming no commit.
+REPO=$(make_repo)
+make_edit_ref_fixture "$REPO" squash
+run_edit_ref "$REPO" "$EDR_BASE" set "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+rm -rf "$REPO"
+if grep -qF '(no such commit)' <<< "$EDR_ERR"; then
+    pass "missing-commit edit-date ref is ignored with warning: stderr"
+else
+    fail "missing-commit edit-date ref is ignored with warning: expected '(no such commit)'"
+    echo "  stderr: $EDR_ERR"
+fi
+if [[ $EDR_RC -ne 0 ]]; then
+    pass "missing-commit edit-date ref is ignored with warning: rc nonzero"
+else
+    fail "missing-commit edit-date ref is ignored with warning: expected nonzero rc"
+fi
+
 # ── Results ───────────────────────────────────────────────────────────────────
 
 h_done

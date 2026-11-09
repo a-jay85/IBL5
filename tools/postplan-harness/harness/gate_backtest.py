@@ -16,7 +16,7 @@ import shlex
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-ALLOWED_PLACEHOLDERS = frozenset({"base", "head", "diff_file", "plan_file", "body_file", "tree"})
+ALLOWED_PLACEHOLDERS = frozenset({"base", "head", "diff_file", "plan_file", "body_file", "tree", "pr_head"})
 _PLACEHOLDER_RE = re.compile(r"\{([^{}]*)\}")
 HEADER_SCAN_LINES = 40
 FIX_TITLE_RE = re.compile(r"^fix(\([^)]*\))?!?:")
@@ -53,6 +53,7 @@ class HistoricalPR:
     merged_at: datetime        # tz-aware UTC
     head_ref: str
     files: tuple[str, ...]
+    head_oid: str = ""         # the PR's pre-squash head sha, "" when unknown
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,17 @@ class ReplayResult:
     fix_detail: str = ""
     fix_applied: tuple[str, ...] = ()   # paths the fix patch changed (fix rerun only)
     fix_skipped: tuple[str, ...] = ()   # paths whose chunk failed; non-empty = partial apply
+    flag_lines: tuple[str, ...] = ()       # head stdout lines when outcome == "flag"
+    base_flag_lines: tuple[str, ...] = ()  # base stdout lines when base_outcome == "flag"
+
+
+HEAD_OID_FIELD = "headRefOid"
+_SHA40 = re.compile(r"[0-9a-f]{40}")
+
+
+def parse_head_oid(value) -> str:
+    """The PR's pre-squash head sha from gh JSON, or "" when absent or malformed."""
+    return value if isinstance(value, str) and _SHA40.fullmatch(value) else ""
 
 
 # --- Replay-spec registry --------------------------------------------------------------------
@@ -91,7 +103,13 @@ _LIVE_CI = "reads live CI state through gh"
 # not-replayable, so the choice shows up in a reviewed diff.
 REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     # Range-aware: replay over the historical PR's own range.
-    "bin/check-docs": _SINCE,
+    # CHECK_DOCS_EDIT_DATE_REF points check-docs' edit-date lookup at the PR's
+    # pre-squash head, so the squash commit's merge-day author date cannot fail a
+    # doc whose branch edit carried the earlier last_verified (backlog#1686). The
+    # value is "" when the head oid is unknown; check-docs then reads base..HEAD.
+    "bin/check-docs": ReplaySpec(
+        argv=("--since={base}",), env=(("CHECK_DOCS_EDIT_DATE_REF", "{pr_head}"),),
+    ),
     "bin/check-prose": _SINCE,
     "bin/check-numbering": _SINCE,
     "bin/check-engine-freeze": _SINCE,
@@ -467,6 +485,27 @@ class Verdict:
     per_gate: dict
 
 
+_FLAG_LINES_CAP = 500
+
+
+def flag_lines(stdout: str) -> tuple[str, ...]:
+    """Distinct non-blank stdout lines of a flagging run, in order, capped."""
+    seen: dict[str, None] = {}
+    for line in stdout.splitlines():
+        text = line.strip()
+        if text:
+            seen.setdefault(text, None)
+        if len(seen) >= _FLAG_LINES_CAP:
+            break
+    return tuple(seen)
+
+
+def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
+    """Head flag lines the base gate did not also print on the same tree."""
+    base = set(r.base_flag_lines)
+    return tuple(line for line in r.flag_lines if line not in base)
+
+
 def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
     tally = GateTally()
     for r in results:
@@ -488,7 +527,7 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             if state == "repaired":
                 tally.catches.append(r.pr)
             elif state == "clean":
-                if r.base_outcome == "flag":
+                if r.base_outcome == "flag" and not new_flag_lines(r):
                     tally.pre_existing.append(r.pr)
                 elif r.fix_outcome == "pass":
                     tally.fixed_by_pr.append(r.pr)

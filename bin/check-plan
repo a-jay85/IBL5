@@ -471,7 +471,7 @@ gatev_nonrunnable() {
     # backtick survives into the command (`cmd` trailing prose → cmd` trailing
     # prose → bash exits 2 "unexpected EOF") and Phase 5.0 reports a false MISSING.
     _stripped=$(printf '%s' "$MC_LOC" | sed -E 's/^[[:space:]]*`?//; s/`?[[:space:]]*$//')
-    _bt_ct=$(printf '%s' "$_stripped" | tr -cd '`' | wc -c | tr -d ' ')
+    _bt_t=${_stripped//[!\`]/}; _bt_ct=${#_bt_t}
     if printf '%s' "$MC_LOC" | grep -qiE '^(phase|step|row)[[:space:]]+[0-9]'; then
         _bad="a phase/step pointer, not a command"
     elif printf '%s' "$_probe" | grep -q '…' || printf '%s' "$_probe" | grep -qF '...'; then
@@ -550,8 +550,8 @@ awk '
 # The isolation awk consumes the header row, but gate V needs its column count to
 # tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip
 # that sub-check". A legal trailing `| PR |` column simply raises the number.
-MHDR_PIPES=$(grep -m1 -iE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" \
-    | tr -cd '|' | wc -c | tr -d ' ')
+_mhdr_line=$(grep -m1 -iE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" || true)
+_mhdr_t="${_mhdr_line//[!|]/}"; MHDR_PIPES=${#_mhdr_t}
 [ -n "$MHDR_PIPES" ] || MHDR_PIPES=0
 _v_mainhost_esc=0; grep -qF 'documents main.localhost gate' "$PLAN_FILE" && _v_mainhost_esc=1
 
@@ -953,7 +953,7 @@ elif [ "$XM_RC" -eq 0 ]; then
                     esac
                     _xm_reason="$_xm_reason$_xm_ch"
                 done
-                _xm_reason=$(mtrim "$_xm_reason")
+                mtrim_v _xm_reason "$_xm_reason"
                 if [ "${#_xm_reason}" -lt 15 ]; then
                     viol "[XM] row ${MC_NUM}: mutation-prose reason too short (need 15 or more characters): ${row}"
                 fi
@@ -1605,7 +1605,7 @@ while IFS= read -r row; do
         continue
     fi
     _y_reason=$(sed -E 's/.*\(one-time-check: ([^()|`]*)\)$/\1/' <<< "$_y_what")
-    _y_reason=$(mtrim "$_y_reason")
+    mtrim_v _y_reason "$_y_reason"
     if [ "${#_y_reason}" -lt 15 ]; then
         viol "[Y] one-time-check reason is under 15 characters — say what was run and what it printed: ${row}"
         continue
@@ -2034,7 +2034,7 @@ while IFS= read -r line; do
         continue
     fi
     _nd_reason=$(sed -E 's/^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*//' <<< "$line")
-    _nd_reason=$(mtrim "$_nd_reason")
+    mtrim_v _nd_reason "$_nd_reason"
     # 15 mirrors NO_DIFF_MIN_REASON in tools/postplan-harness/harness/planfile.py
     if [ "${#_nd_reason}" -lt 15 ]; then
         viol "[ND] **No diff:** reason is under 15 characters — say what the phase delivers instead of a diff (issue closed, plan queued, post-merge step): ${line}"
@@ -2129,10 +2129,10 @@ while IFS=$'\t' read -r _cw_num _cw_cmd; do
     _cw_src="${_cw_src//&&/$'\n'}"; _cw_src="${_cw_src//||/$'\n'}"
     _cw_src="${_cw_src//;/$'\n'}"; _cw_src="${_cw_src//|/$'\n'}"
     while IFS= read -r _cw_seg; do
-        _cw_seg="$(mtrim "$_cw_seg")"
+        mtrim_v _cw_seg "$_cw_seg"
         while :; do
             if [[ "$_cw_seg" == [\(\{]* ]]; then
-                _cw_seg="${_cw_seg:1}"; _cw_seg="$(mtrim "$_cw_seg")"
+                _cw_seg="${_cw_seg:1}"; mtrim_v _cw_seg "$_cw_seg"
             elif [[ "$_cw_seg" =~ ^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+(.*)$ ]]; then
                 _cw_seg="${BASH_REMATCH[1]}"
             elif [[ "$_cw_seg" =~ $_cw_flagval_re ]]; then
@@ -2515,7 +2515,7 @@ while IFS= read -r row; do
     matrix_split "$row" || continue
     # Herestring, never printf|grep: .claude/rules/shell-pipefail-grep.md.
     grep -qiE '(^|[^a-z-])post-merge:' <<< "$MC_LOC" || continue
-    _pm_reason="$(mtrim "$(sed -E 's/.*[Pp][Oo][Ss][Tt]-[Mm][Ee][Rr][Gg][Ee]:[[:space:]]*//' <<< "$MC_LOC")")"
+    _pm_reason=$(sed -E 's/.*[Pp][Oo][Ss][Tt]-[Mm][Ee][Rr][Gg][Ee]:[[:space:]]*//' <<< "$MC_LOC"); mtrim_v _pm_reason "$_pm_reason"
     if ! grep -qiE 'truly[- ]manual' <<< "$MC_TYPE"; then
         viol "[PM] post-merge: marker is only valid on a Truly-manual row (a row that runs pre-merge stays a normal row): ${row}"
     fi

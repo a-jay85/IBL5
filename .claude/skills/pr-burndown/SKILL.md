@@ -347,6 +347,11 @@ can do it, and stop any watcher this session started (`TaskStop`).
      result says "blocks: none".
   3. Runs the live-run check, then `(cd <wt> && env -u CLAUDE_HEADLESS bin/post-plan-now --auto)`.
   4. Logs each skip to `$D/jobs/wN.out`. A skip sends no DM. The job's PR comment says why.
+  5. DMs the owner when `post-plan-now` exits non-zero:
+     `<wt>/bin/discord-dm "PR #N: post-plan-now exited $rc. See $D/jobs/wN.out"`.
+     Exit 9 (a pre-fire check refused) and exit 10 (the check could not run) stop before
+     post-plan starts. They print to stdout and send no DM, so without this step the
+     watcher fails silently.
 - **New T3 thread.** Use it when the follow-up needs judgment, such as arming an
   `auto_merge: false` PR after reading the new verdict, or building a sign-off card. Call
   `t3_thread_launch` with a title like "PR #N: <goal>" and a `clientRequestId` like
@@ -359,7 +364,8 @@ can do it, and stop any watcher this session started (`TaskStop`).
   land inside the hour.
 
 A PR whose post-plan run is already live and has no owner hold gets nothing. Post-plan's
-DM is its completion signal.
+DM is its completion signal. That DM exists only once post-plan starts. A refused pre-fire
+check exits before then, so whoever fires `post-plan-now` reports a non-zero exit itself.
 
 Post-plan holds condition 7 on every run when the plan says `auto_merge: false`, so it
 never arms that PR, even after the owner approves. The follow-up thread arms it with

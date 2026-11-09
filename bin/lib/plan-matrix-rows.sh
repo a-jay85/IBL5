@@ -8,6 +8,11 @@ MSEN=$'\001'
 
 mtrim() { _s="${1#"${1%%[![:space:]]*}"}"; printf '%s' "${_s%"${_s##*[![:space:]]}"}"; }
 
+# mtrim_v <var> <string> — same trim as mtrim, assigned to <var> in the
+# current shell (no subshell). <var> is always a literal name chosen by the
+# caller, never plan data. Scratch is _mtv_s so a caller's _s survives.
+mtrim_v() { _mtv_s="${2#"${2%%[![:space:]]*}"}"; printf -v "$1" '%s' "${_mtv_s%"${_mtv_s##*[![:space:]]}"}"; }
+
 # matrix_split <row> — sets MC_NUM / MC_TYPE / MC_TIME / MC_LOC (trimmed, any
 # surrounding backticks stripped, pipes restored) and MC_PIPES (count of
 # STRUCTURAL pipes, i.e. after escaped pipes are hidden). Returns 1 for a
@@ -19,12 +24,13 @@ matrix_split() {
     esac
     _r="${1//\\|/$MSEN}"
     IFS='|' read -r _lead MC_NUM MC_WHAT MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
+    _mp_t="${_r//[!|]/}"
     # shellcheck disable=SC2034  # read by bin/check-plan gates
-    MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
-    MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
-    MC_WHAT=$(mtrim "$MC_WHAT")
-    MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
-    case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
+    MC_PIPES=${#_mp_t}
+    mtrim_v MC_NUM "$MC_NUM"; mtrim_v MC_TYPE "$MC_TYPE"; mtrim_v MC_TIME "$MC_TIME"
+    mtrim_v MC_WHAT "$MC_WHAT"
+    mtrim_v MC_LOC "${MC_LOC//$MSEN/|}"
+    case "$MC_LOC" in '`'*'`') mtrim_v MC_LOC "${MC_LOC#\`}"; mtrim_v MC_LOC "${MC_LOC%\`}" ;; esac
     [ -n "$MC_LOC" ] || return 1
     return 0
 }

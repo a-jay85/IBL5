@@ -318,14 +318,28 @@ class TestRealScripts:
         c = snapshot(["Static guards"], _git_with([BIG]), self.ROOT)
         assert not c.active and c.reason == "local byte budget passes"
 
-    def test_post_checks_pass_on_clean_worktree(self):
-        # check-prose/check-docs run `origin/master...HEAD`; a shallow CI checkout can hold
-        # the origin/master ref yet lack the merge base, so probe the merge base itself.
-        probe = subprocess.run(["git", "merge-base", "origin/master", "HEAD"],
-                               cwd=self.ROOT, capture_output=True)
-        if probe.returncode != 0:
-            pytest.skip("origin/master merge base unavailable")
-        assert post_check_failures(self.ROOT) == []
+    def test_post_checks_pass_on_clean_worktree(self, tmp_path):
+        # Run the real gates in a private clone whose origin/master is pinned to HEAD, so
+        # every CI checkout (shallow PR merge or master push) sees an empty, valid diff.
+        # Stripping GITHUB_ACTIONS keeps check-rules-byte-budget from fetching the live
+        # remote master, which moved past HEAD mid-run and broke the merge base before.
+        clone = tmp_path / "clone"
+        git = ["git", "-c", "advice.detachedHead=false"]
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.ROOT,
+                              capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run([*git, "clone", "-q", "--shared", "--no-checkout", self.ROOT, str(clone)],
+                       check=True, capture_output=True)
+        subprocess.run([*git, "checkout", "-q", "--detach", head], cwd=clone,
+                       check=True, capture_output=True)
+        subprocess.run(["git", "update-ref", "refs/remotes/origin/master", head], cwd=clone,
+                       check=True, capture_output=True)
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("GITHUB_ACTIONS", "GITHUB_BASE_REF")}
+
+        def run(argv, **kw):
+            return subprocess.run(argv, env=env, **kw)
+
+        assert post_check_failures(str(clone), run=run) == []
 
 
 class TestPromptWiring:

@@ -23,7 +23,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 
 - PHPStan level `max` with `strict-rules` and `bleedingEdge` — zero errors
 - PHPUnit — full suite green, zero skips
-- Coverage threshold — 86% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 88.22%)
+- Coverage threshold: 86% floor (`ibl5/bin/check-coverage`), plus a no-regression check against `ibl5/coverage-baseline.json` (actual 88.22%)
 - Mutation testing — 100% MSI / 100% Covered MSI (weekly + on-demand)
 - Playwright E2E — single shard (was 4; collapsed to fit free-tier runner caps), visual regression baselines
 - Lighthouse: performance audits on each master push, plus a weekly full-site audit

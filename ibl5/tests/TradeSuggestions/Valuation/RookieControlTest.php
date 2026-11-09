@@ -97,4 +97,32 @@ final class RookieControlTest extends TestCase
             1e-12,
         );
     }
+
+    public function testControlYearsCountDownByExperienceAndNeverGoNegative(): void
+    {
+        self::assertSame([4, 3, 2, 1, 0, 0], self::controlYearsByExp(1));
+        self::assertSame([3, 2, 1, 0, 0, 0], self::controlYearsByExp(2));
+        foreach ([0, 3, -1] as $round) {
+            self::assertSame([0, 0, 0, 0, 0, 0], self::controlYearsByExp($round));
+        }
+        foreach ([1, 2] as $round) {
+            foreach ([4, 5, 9, 50] as $exp) {
+                self::assertFalse(RookieControl::isRookieScale($round, $exp));
+                self::assertGreaterThanOrEqual(0, RookieControl::controlYearsLeft($round, $exp));
+            }
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function controlYearsByExp(int $round): array
+    {
+        $out = [];
+        foreach ([0, 1, 2, 3, 4, 5] as $exp) {
+            $out[] = RookieControl::controlYearsLeft($round, $exp);
+        }
+
+        return $out;
+    }
 }

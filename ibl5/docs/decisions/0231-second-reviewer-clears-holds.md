@@ -55,7 +55,7 @@ The seat runs before the preview so that a cleared PR still reaches the add-only
 - Positive: a change to the seat itself always waits for the owner.
 - Negative: one Opus spawn per eligible tree. It runs only when every hold is clearable, and only for diffs inside the 40 KB inline budget. A larger diff holds.
 - Negative: plans written before this change carry no `hold_trigger`, so they keep waiting on the owner.
-- Negative: the UI path floor guards condition 10 only. A UI file on a PR blocked only on condition 7, 12 or 17 can still clear. Extending `touches_ui` to those conditions is an owner decision.
+- Negative: the UI path floor covers conditions 7, 10, 12 and 17. A PR that touches any UI path keeps all four holds with the owner.
 - Negative: the UI path floor also holds some non-visual PHP under `ibl5/modules/` that a reviewer could have cleared.
 
 ## References

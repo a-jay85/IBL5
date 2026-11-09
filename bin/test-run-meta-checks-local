@@ -122,6 +122,7 @@ make_repo() {
                  check-pr-collisions check-model-pins test-check-model-pins \
                  check-engine-freeze test-check-engine-freeze \
                  check-pipefail-grep-q test-check-pipefail-grep-q \
+                 check-shell-portability test-check-shell-portability \
                  check-reviewer-eval test-check-reviewer-eval reviewer-eval; do
         base="$(printf '%s' "$sname" | tr '-' '_')"
         # Write stub using printf to avoid heredoc nesting issues.

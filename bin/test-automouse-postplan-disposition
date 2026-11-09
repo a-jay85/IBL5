@@ -1037,8 +1037,8 @@ fi
 # ---------------------------------------------------------------------------
 # Group h — claim_next_plan lock handling (stat stubbed; real usage-gate lib)
 # ---------------------------------------------------------------------------
-# claim_next_plan reads the lock mtime with BSD `stat -f %m`, which GNU stat on
-# ubuntu-latest rejects, and the paused-held block in bin/test-automouse-concurrency
+# claim_next_plan reads the lock mtime with GNU `stat -c %Y`, falling back to BSD
+# `stat -f %m`. The stub fakes both forms so H_LOCK_AGE wins on either OS, and the paused-held block in bin/test-automouse-concurrency
 # self-skips off macOS. A `stat` shell-function stub lets the real claim_next_plan
 # run here against the real usage-gate lib. Knobs (all optional env):
 #   H_OWNER=live|dead  H_LOCK_AGE=<secs>  H_SID=<uuid>  H_MARKER=1|0
@@ -1107,7 +1107,8 @@ run_h_case() {
             queue_entries_ordered() { printf '%s\n' "$QUEUE_DIR/010-p.md"; }
         fi
         stat() {
-            if [ "${1:-}" = -f ] && [ "${2:-}" = %m ]; then
+            if { [ "${1:-}" = -c ] && [ "${2:-}" = %Y ]; } \
+               || { [ "${1:-}" = -f ] && [ "${2:-}" = %m ]; }; then
                 printf '%s\n' "$(( $(date +%s) - ${H_LOCK_AGE:-0} ))"; return 0
             fi
             command stat "$@"

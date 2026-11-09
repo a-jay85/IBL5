@@ -9,11 +9,12 @@ and the hold stands. The verdict binds to the tree captured BEFORE the spawn.
 """
 from __future__ import annotations
 
+import dataclasses
 import os
 import re
 from typing import Callable
 
-from . import fidelity, planfile
+from . import armable, fidelity, planfile
 
 AGENT = "pr-second-reviewer"
 ALLOWED_TOOLS = ("Read", "Grep", "Glob")
@@ -149,3 +150,65 @@ def load_fresh(pr, current_tree: str) -> tuple[str, str, dict[int, str]] | None:
 def digest_clear_lines(decision) -> list[str]:
     """One merge-digest line per hold the seat cleared."""
     return [f"Second reviewer cleared {entry}" for entry in decision.second_review_cleared]
+
+
+# ---- Arming glue: the runner calls these so the seat's inputs live in an arming path.
+
+
+def selected_fidelity_path(source, fid, pr):
+    """The verdict file behind select_fidelity_verdict's `source` slot."""
+    if source == "verdict-2":
+        return ((fid.get("same_run_repin") or {}).get("verdict_path")
+                or fid.get("verdict_path"))
+    return fidelity.verdict_path(pr)
+
+
+def selected_gate_edit_only(fid, pr, current_tree) -> bool:
+    """Condition (12) arm input: fidelity.gate_edit_only on the verdict condition (12) reads."""
+    _, source = armable.select_fidelity_verdict(fid.get("verdict_1"), fid.get("verdict_2"),
+                                                fid.get("reviewed_tree_2"), current_tree)
+    path = selected_fidelity_path(source, fid, pr)
+    return bool(path) and fidelity.gate_edit_only(path)
+
+
+def spawner(llm, worktree):
+    """A fresh read-only session for the seat: no resume, no continue, no session id."""
+    def spawn(agent, prompt):
+        return llm.call_tooled("second-review", "opus", prompt, cwd=worktree, agent=agent,
+                               allowed_tools=ALLOWED_TOOLS,
+                               denied_tools=DENIED_TOOLS, advisor=False)
+    return spawn
+
+
+def plan_content(plan) -> str | None:
+    """The plan's text for the seat's stated reason; None when plan-blind or unreadable."""
+    if not getattr(plan, "found", False) or not getattr(plan, "path", ""):
+        return None
+    try:
+        with open(plan.path) as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def review_pass(inp, pr, head_tree, diff, plan, log, spawn):
+    """Fill the seat's verdict into ArmInputs. Zero tokens unless every hold is clearable."""
+    cands = armable.evaluate(inp).second_review_candidates
+    if not pr or not cands:
+        return inp
+    fresh = load_fresh(pr, inp.current_tree)
+    if fresh is None:
+        reason = reason_text(plan_content(plan), inp.pr_title, inp.pr_body)
+        word, tree, clears = run_seat(pr, head_tree, diff, cands, reason, spawn)
+    else:
+        word, tree, clears = fresh
+    log(f"second-review: {word or 'absent'} tree={tree} clears={sorted(clears)}")
+    current_tree = inp.current_tree
+    if tree is not None and fresh is None:
+        now = head_tree()
+        if now != tree:              # the head moved during the spawn, so the verdict is stale
+            current_tree = now
+    return dataclasses.replace(
+        inp, current_tree=current_tree, second_review_verdict=word, second_review_tree=tree,
+        second_review_clears=clears,
+        second_review_reject_reason=reject_reason(verdict_path(pr)))

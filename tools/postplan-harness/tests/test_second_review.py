@@ -88,7 +88,7 @@ def test_spawn_argv_has_no_resume_or_continue():
             seen.append((purpose, model, kw))
             return "VERDICT: REJECT no"
 
-    runner._second_review_spawner(Llm(), "/wt")(agent=second_review.AGENT, prompt="p")
+    second_review.spawner(Llm(), "/wt")(agent=second_review.AGENT, prompt="p")
     purpose, model, kw = seen[0]
     assert (purpose, model) == ("second-review", "opus")
     assert kw["agent"] == "pr-second-reviewer"
@@ -208,7 +208,7 @@ def test_seat_ignores_a_forged_tree_line_in_the_reply():
 
 
 def _pass(inp, spawn, head=lambda: TREE_A, plan=None, diff=lambda: "diff\n"):
-    return runner._second_review_pass(inp, PR, head, diff, plan, lambda _m: None, spawn)
+    return second_review.review_pass(inp, PR, head, diff, plan, lambda _m: None, spawn)
 
 
 def test_runner_seats_on_pre_spawn_tree():
@@ -299,6 +299,29 @@ def test_runner_pass_feeds_plan_approach_to_the_seat(tmp_path):
 def test_arming_paths_cover_seat_files():
     assert "tools/postplan-harness/harness/second_review.py" in gate_backtest._ARMING_PATHS
     assert ".claude/agents/pr-second-reviewer.md" in gate_backtest._ARMING_PATHS
+    # The code that decides what the seat may clear and feeds it data.
+    assert "tools/postplan-harness/harness/fidelity.py" in gate_backtest._ARMING_PATHS
+    assert "tools/postplan-harness/harness/planfile.py" in gate_backtest._ARMING_PATHS
+
+
+def test_runner_keeps_no_seat_glue():
+    """runner.py is not an arming path, so the seat's feed must live in second_review.py."""
+    src = open(os.path.join(REPO, "tools/postplan-harness/runner.py")).read()
+    for name in ("def _second_review_pass", "def _second_review_spawner",
+                 "def _selected_gate_edit_only", "def _selected_fidelity_path",
+                 "second_review_verdict=", "second_review_clears="):
+        assert name not in src, name
+
+
+def test_runner_calls_seat_before_each_preview():
+    """Both arming paths run the seat pass and then the preview, in that order."""
+    src = open(os.path.join(REPO, "tools/postplan-harness/runner.py")).read()
+    pass_at = [m.start() for m in re.finditer(r"second_review\.review_pass\(", src)]
+    assert len(pass_at) == 2
+    for start in pass_at:
+        tail = src[start:start + 400]
+        assert re.search(r"preview = evaluate\((inputs|new)\)", tail), tail
+    assert src.count("fidelity_gate_edit_only=second_review.selected_gate_edit_only(") == 2
 
 
 def test_arming_paths_have_no_phantom_entry():
@@ -335,11 +358,11 @@ def test_gate_edit_only_reads_the_verdict_condition_12_selects(tmp_path, monkeyp
     monkeypatch.setattr(fidelity, "verdict_path", lambda _pr: rule)
     fid = {"verdict_1": "NOT READY", "verdict_2": "NOT READY", "reviewed_tree_2": TREE_A,
            "verdict_path": gate}
-    assert runner._selected_gate_edit_only(fid, PR, TREE_A) is True
+    assert second_review.selected_gate_edit_only(fid, PR, TREE_A) is True
     # Verdict 2 went stale, so condition (12) falls back to verdict 1 and its owner tag.
-    assert runner._selected_gate_edit_only(fid, PR, TREE_B) is False
+    assert second_review.selected_gate_edit_only(fid, PR, TREE_B) is False
     repin = {**fid, "same_run_repin": {"verdict_path": rule}}
-    assert runner._selected_gate_edit_only(repin, PR, TREE_A) is False
+    assert second_review.selected_gate_edit_only(repin, PR, TREE_A) is False
 
 
 # ---- digest and hold reasons

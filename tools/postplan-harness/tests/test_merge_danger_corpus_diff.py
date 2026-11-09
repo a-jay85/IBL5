@@ -104,11 +104,13 @@ def test_path_corpus_one_way_flip_set():
     assert len(_PATHS["prs"]) == 100
     # The held set (one-way OR self-governing) is unchanged since the door was narrowed;
     # measured run: one-way {3050, 3058} (notify senders), self-governing {3114} (arming path).
+    # 3043 and 3112 joined the self-governing set when fidelity.py became an arming path
+    # (ADR-0231): it decides which findings the second reviewer may clear.
     got = {n for n, (md, _) in _DERIVED.items() if md.door == "one-way" or md.self_governing}
     want = set(_PATHS["expected_one_way"])
     assert got == want, f"measured held set {sorted(got)} != expected {sorted(want)}"
     assert {n for n, (md, _) in _DERIVED.items() if md.door == "one-way"} == {3050, 3058}
-    assert {n for n, (md, _) in _DERIVED.items() if md.self_governing} == {3114}
+    assert {n for n, (md, _) in _DERIVED.items() if md.self_governing} == {3043, 3112, 3114}
     for n in want:
         triggers = _DERIVED[n][0].triggers
         assert triggers, n

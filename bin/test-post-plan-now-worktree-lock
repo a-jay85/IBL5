@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# Tests the per-worktree lock (backlog#1827): bin/lib/worktree-lock.sh, bin/post-plan-now's
+# acquire/release, and pcw_inflight's probe.
+#
+# Usage: bin/test-post-plan-now-worktree-lock [--case NAME]...
+# Exit 0 iff every selected case passes.
+set -euo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
+
+ONLY_CASES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --case)
+            [[ $# -ge 2 && -n "$2" ]] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
+            ONLY_CASES+=("$2"); shift 2 ;;
+        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+    esac
+done
+RAN_CASES=$'\n'
+should_run() {  # $1 = case name; true when no --case was given or $1 was named
+    [[ ${#ONLY_CASES[@]} -eq 0 ]] && return 0
+    local c
+    for c in "${ONLY_CASES[@]}"; do
+        if [[ "$c" == "$1" ]]; then RAN_CASES+="$1"$'\n'; return 0; fi
+    done
+    return 1
+}
+check_only_cases() {  # fail every --case name that matched no case
+    local c
+    for c in ${ONLY_CASES[@]+"${ONLY_CASES[@]}"}; do
+        [[ "$RAN_CASES" == *$'\n'"$c"$'\n'* ]] || fail "unknown --case name: $c (no case ran)"
+    done
+}
+
+h_tmp TMP
+
+sleep 300 & LIVE=$!; disown "$LIVE"
+OTHER=""
+cleanup() {
+    kill "$LIVE" 2>/dev/null || true
+    if [ -n "$OTHER" ]; then kill "$OTHER" 2>/dev/null || true; fi
+    h_cleanup
+}
+trap cleanup EXIT
+
+sleep 0 & DEAD=$!
+wait "$DEAD" || true
+
+# Scratch repo with two linked worktrees whose branch names share a prefix.
+git init -q -b master "$TMP/r" >/dev/null 2>&1
+git -C "$TMP/r" config user.email "test@example.com"
+git -C "$TMP/r" config user.name "Test"
+git -C "$TMP/r" commit -q --allow-empty -m init
+git -C "$TMP/r" worktree add -q -b feat-a "$TMP/wt-a"
+git -C "$TMP/r" worktree add -q -b feat-ab "$TMP/wt-ab"
+
+# shellcheck source=bin/lib/worktree-lock.sh
+. "$REPO/bin/lib/worktree-lock.sh"
+
+L="$(wtlock_path "$TMP/wt-a")"
+reset_lock() { chmod -R u+rwx "$L" 2>/dev/null || true; rm -rf "$L"; }
+plant() {  # $1 = pid text
+    reset_lock
+    mkdir "$L"
+    printf '%s\n' "$1" > "$L/pid"
+}
+
+if should_run lib-held; then
+    plant "$LIVE"
+    RC=0; OUT=$(wtlock_live "$L") || RC=$?
+    h_eq "lib-held: live holder reads held (rc 0)" "0" "$RC"
+    h_eq "lib-held: live prints the holder pid" "$LIVE" "$OUT"
+    RC=0; OUT=$(wtlock_acquire "$L" 99999) || RC=$?
+    h_eq "lib-held: second acquire refuses (rc 1)" "1" "$RC"
+    h_eq "lib-held: refusal prints the holder pid" "$LIVE" "$OUT"
+    h_eq "lib-held: pid file unchanged" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-stale; then
+    plant "$DEAD"
+    RC=0; wtlock_live "$L" >/dev/null || RC=$?
+    h_eq "lib-stale: dead pid reads free (rc 1)" "1" "$RC"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-stale: acquire reclaims (rc 0)" "0" "$RC"
+    h_eq "lib-stale: pid is now the new holder" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-unreadable; then
+    # shellcheck disable=SC2043
+    for sub in nopid garbage mode000; do
+        reset_lock
+        mkdir "$L"
+        case "$sub" in
+            nopid) : ;;
+            garbage) printf 'abc\n' > "$L/pid" ;;
+            mode000)
+                if [ "$(id -u)" = 0 ]; then
+                    echo "SKIP: lib-unreadable mode000 (running as root)"
+                    continue
+                fi
+                printf '%s\n' "$DEAD" > "$L/pid"; chmod 000 "$L/pid" ;;
+        esac
+        RC=0; OUT=$(wtlock_live "$L") || RC=$?
+        h_eq "lib-unreadable[$sub]: reads held (rc 0)" "0" "$RC"
+        h_eq "lib-unreadable[$sub]: prints unknown" "unknown" "$OUT"
+        RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+        h_eq "lib-unreadable[$sub]: acquire refuses (rc 1)" "1" "$RC"
+    done
+    reset_lock
+fi
+
+if should_run lib-release-owner; then
+    plant "$LIVE"
+    RC=0; wtlock_release "$L" 12345 || RC=$?
+    h_eq "lib-release-owner: non-owner release rc 0" "0" "$RC"
+    h_exists "lib-release-owner: non-owner release leaves the lock" "$L"
+    RC=0; wtlock_release "$L" "$LIVE" || RC=$?
+    h_eq "lib-release-owner: owner release rc 0" "0" "$RC"
+    h_absent "lib-release-owner: owner release removes the lock" "$L"
+    RC=0; wtlock_release "$L" "$LIVE" || RC=$?
+    h_eq "lib-release-owner: release of an absent lock rc 0" "0" "$RC"
+fi
+
+if should_run lib-adopt; then
+    plant "$DEAD"
+    RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
+    h_eq "lib-adopt: hand-off rc 0" "0" "$RC"
+    h_eq "lib-adopt: pid rewritten to the run's pid" "$LIVE" "$(cat "$L/pid")"
+    sleep 300 & OTHER=$!; disown "$OTHER"
+    printf '%s\n' "$OTHER" > "$L/pid"
+    RC=0; OUT=$(wtlock_adopt "$L" "$DEAD" "$LIVE") || RC=$?
+    h_eq "lib-adopt: another live holder refuses (rc 1)" "1" "$RC"
+    h_eq "lib-adopt: refusal prints the other holder" "$OTHER" "$OUT"
+    h_eq "lib-adopt: other holder's pid left alone" "$OTHER" "$(cat "$L/pid")"
+    reset_lock
+    RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
+    h_eq "lib-adopt: absent lock is created (rc 0)" "0" "$RC"
+    h_eq "lib-adopt: created lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-path-ignored; then
+    GD="$(git -C "$TMP/wt-a" rev-parse --absolute-git-dir)"
+    h_eq "lib-path-ignored: lock sits in the git admin dir" "$GD/post-plan-now.lock" "$L"
+    h_contains "lib-path-ignored: path is under /worktrees/wt-a/" "$L" "/worktrees/wt-a/"
+    reset_lock
+    wtlock_acquire "$L" "$LIVE" >/dev/null
+    h_eq "lib-path-ignored: git status stays empty" "" "$(git -C "$TMP/wt-a" status --porcelain)"
+    reset_lock
+fi
+
+if should_run lib-branch-nearmiss; then
+    h_eq "lib-branch-nearmiss: feat-a maps to wt-a only" \
+        "$(cd "$TMP/wt-a" && pwd -P)" "$(cd "$(wtlock_wt_for_branch feat-a "$TMP/r")" && pwd -P)"
+    RC=0; OUT=$(wtlock_wt_for_branch feat "$TMP/r") || RC=$?
+    h_eq "lib-branch-nearmiss: prefix feat returns rc 1" "1" "$RC"
+    h_eq "lib-branch-nearmiss: prefix feat prints nothing" "" "$OUT"
+    RC=0; OUT=$(wtlock_wt_for_branch 'feat-[a]' "$TMP/r") || RC=$?
+    h_eq "lib-branch-nearmiss: glob returns rc 1" "1" "$RC"
+    h_eq "lib-branch-nearmiss: glob prints nothing" "" "$OUT"
+fi
+
+# --- later phases add their cases above this line ---
+
+check_only_cases
+h_done

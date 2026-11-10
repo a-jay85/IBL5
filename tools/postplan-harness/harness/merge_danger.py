@@ -7,9 +7,12 @@ condition (18) (reader), and `bin/digest-dm-build` (reader). The Phase 6.5 shell
 `pr_merge_danger_hold` in `bin/lib/pr-armable.sh`; keep its regex in step with `FIELD_RE`.
 The optional ` · Self-governing:` segment before Why accepts only `yes`; any other value is malformed.
 
-The door is derived from the realized diff and only ever raised: the LLM (or a human) may move
-`two-way` to `one-way` or widen the blast radius, never the reverse. `Door: one-way` means an
-effect `git revert` cannot undo (data loss, prod external state, an outbound message). A diff that
+The door is derived from the realized diff, and that floor is never lowered: the LLM (or a
+human) may move `two-way` to `one-way` or widen the blast radius. An LLM one-way above the floor
+must pass the raise bar at Phase 2 and on a later phase that owns the line (its round-start line
+equals the harness's saved line, `harness/savedline.py`). Any other later phase is raise-only, so
+a human raise survives. `Door: one-way` means an effect `git revert` cannot undo (data loss,
+prod external state, a message sent to a GM). A diff that
 edits the merge machinery itself (an arming path, a removed gate) sets the Self-governing segment
 instead; condition (18) holds on either signal, and nothing may drop a floor marker.
 """
@@ -243,9 +246,10 @@ def _llm_core(text: str | None) -> str:
     return _MECH_PREFIX_RE.sub("", _clean_why(text), count=1).strip()
 
 
-# Phase 2 bar on an LLM-raised door. A one-way the floor did not raise is kept only when the
-# Why names an effect `git revert` cannot undo. Later phases pass llm_raise_bar=False: they
-# cannot tell an LLM raise from a human one, and a human raise must survive.
+# Raise bar on an LLM-raised door, run at Phase 2 and on a harness-owned re-judge. A one-way the
+# floor did not raise is kept only when the Why names an effect `git revert` cannot undo. A later
+# phase whose round-start line differs from the harness's saved line passes llm_raise_bar=False,
+# so a human raise survives.
 _IRREVERSIBLE_RE = re.compile(
     r"\b(drop(s|ped|ping)?|delet(e|es|ed|ing|ion)|truncat(e|es|ed|ing|ion)|renam(e|es|ed|ing)"
     r"|overwr(ite|ites|iting|itten|ote)|purg(e|es|ed|ing)|destroy(s|ed|ing)?|wip(e|es|ed|ing)"
@@ -294,13 +298,15 @@ def merge_verdicts(
 ) -> MergeDanger:
     """Rank max on both axes. An unknown or absent LLM value ranks 0, so it never lowers.
 
-    llm_raise_bar: Phase 2 only. A one-way the floor did not raise is kept only when the Why
-    (prefix stripped) names a concrete irreversible effect per _IRREVERSIBLE_RE; otherwise the
-    door stays at the mechanical floor. Blast radius is never subject to the bar.
+    llm_raise_bar: True at Phase 2 and on a harness-owned re-judge in a later phase. A one-way
+    the floor did not raise is kept only when the Why (prefix stripped) names a concrete
+    irreversible effect per _IRREVERSIBLE_RE and is not bar-exempt; otherwise the door stays at
+    the mechanical floor. Blast radius is never subject to the bar.
 
     llm_self_governing: the marker the LLM or the live body carries. The floor marker is never
-    dropped. At Phase 2 (llm_raise_bar=True) an LLM marker above the floor is ignored, mirroring
-    the door bar; later phases keep a human-added marker."""
+    dropped. With llm_raise_bar=True an LLM marker above the floor is ignored, mirroring the door
+    bar (the owned re-judge caller restores a marker its round-start line carried); a raise-only
+    later phase keeps a human-added marker."""
     # Every [:WHY_MAX] cut is re-stripped: a cut landing after a space would leave a trailing
     # space that the next phase's _clean_why drops, so the line would change between phases.
     core = _llm_core(llm_why)[:WHY_MAX].rstrip()

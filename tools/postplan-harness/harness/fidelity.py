@@ -21,6 +21,7 @@ from . import llm_calls
 from . import fidelity_filefix
 from . import schemas
 from . import hold_text
+from .classify import strip_runner_blocks
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -789,7 +790,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         _write("plan-index.txt", PLAN_INDEX_BLIND)
 
     _write("diff.patch", diff or "")
-    _write("pr-body.md", pr_body or "")
+    _write("pr-body.md", strip_runner_blocks(pr_body))
     findings_block = (
         f"PHASE_4B_FINDINGS:\n{review_findings}\n" if review_findings else ""
     )

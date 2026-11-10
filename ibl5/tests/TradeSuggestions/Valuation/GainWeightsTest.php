@@ -53,6 +53,14 @@ final class GainWeightsTest extends TestCase
         self::assertGreaterThan($weights['bench_weight'], $weights['starter_weight']);
     }
 
+    public function testStarterAndBenchWeightsArePinned(): void
+    {
+        $weights = GainWeights::toArray();
+
+        self::assertSame(3.0, $weights['starter_weight']);
+        self::assertSame(1.0, $weights['bench_weight']);
+    }
+
     public function testRentalScaleIsOneAtOrAboveLateSeasonShare(): void
     {
         self::assertSame(1.0, GainWeights::rentalScale(21));

@@ -47,7 +47,7 @@ from harness import conflict, conflict_report, fidelity_filefix
 from harness import armable as _armable_mod
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
-                             select_fidelity_verdict)
+                             resolve_owner_approval, select_fidelity_verdict)
 
 # Directory of the pre-push meta-checks flag. Module-level so tests monkeypatch it
 # (`monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))`) and never
@@ -879,6 +879,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # Condition (20): rerun the detector on the realized diff so a body without the
             # Removed guards block (or a hand-edited one) cannot release the hold.
             _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
+            _owner_approval = resolve_owner_approval(
+                gh, git, pr, gh.pr_labels(), worktree,
+                bool(plan.auto_merge_false
+                     or getattr(plan, "auto_merge_value", None) == "false"))
             inputs = ArmInputs(
                 pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
                 pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -891,6 +895,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
                 plan_auto_merge_false=plan.auto_merge_false, headless=headless,
                 plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
+                owner_approval=_owner_approval,
                 plan_hold_triggers=getattr(plan, "hold_triggers", ()),
                 fidelity_gate_edit_only=second_review.selected_gate_edit_only(
                     res.fidelity or {}, pr, git.head_tree()),

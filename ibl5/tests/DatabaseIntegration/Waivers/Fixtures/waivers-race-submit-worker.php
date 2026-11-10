@@ -6,7 +6,8 @@ declare(strict_types=1);
 define('PHPUNIT_RUNNING', true);
 require dirname(__DIR__, 3) . '/bootstrap.php';
 
-if ($argc !== 3 || !is_numeric($argv[2])) {
+$argv = $_SERVER['argv'] ?? [];
+if (count($argv) !== 3 || !is_numeric($argv[2])) {
     fwrite(STDERR, "usage: waivers-race-submit-worker.php <team name> <player id>\n");
     exit(2);
 }

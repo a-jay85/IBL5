@@ -68,6 +68,8 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
     /** @var list<\mysqli> */
     private array $connections = [];
 
+    private bool $lockWaitObserved = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -77,6 +79,22 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
     }
 
     protected function tearDown(): void
+    {
+        $failure = null;
+        try {
+            $this->releaseFixturesAndConnections();
+        } catch (\Throwable $e) {
+            $failure = $e;
+        }
+
+        parent::tearDown();
+
+        if ($failure !== null) {
+            throw $failure;
+        }
+    }
+
+    private function releaseFixturesAndConnections(): void
     {
         try {
             // Release this test's own uncommitted rows first, or the cleanup below waits on them.
@@ -100,8 +118,6 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
                 $conn->close();
             }
             $this->connections = [];
-
-            parent::tearDown();
         }
     }
 
@@ -175,9 +191,9 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
         $proc = null;
         /** @var array<int, resource> $pipes */
         $pipes = [];
-        $waited = false;
+        $this->lockWaitObserved = false;
 
-        $whileHoldingLock = function () use (&$proc, &$pipes, &$waited, $seed, $obs): void {
+        $whileHoldingLock = function () use (&$proc, &$pipes, $seed, $obs): void {
             [$proc, $pipes] = $this->startWorker($seed['teamName'], $seed['pidB']);
             $line = fgets($pipes[1]);
             if ($line === false) {
@@ -202,7 +218,7 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
                     && str_contains($row['info'], 'ibl_team_info');
                 $consecutive = $blocked ? $consecutive + 1 : 0;
                 if ($consecutive >= 2) {
-                    $waited = true;
+                    $this->lockWaitObserved = true;
                     break;
                 }
                 if (proc_get_status($proc)['running'] === false) {
@@ -252,7 +268,7 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
             $this->assertSame(0, $this->playerTeamId($check, $seed['pidB']));
             $this->assertSame(0, $this->openSlots($check));
 
-            $this->assertTrue($waited, 'B never entered a lock wait on the ibl_team_info row');
+            $this->assertTrue($this->lockWaitObserved, 'B never entered a lock wait on the ibl_team_info row');
         } finally {
             if (is_resource($proc)) {
                 $status = proc_get_status($proc);

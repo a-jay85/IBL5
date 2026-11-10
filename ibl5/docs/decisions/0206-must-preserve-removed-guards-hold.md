@@ -1,6 +1,6 @@
 ---
 description: New plans list the guards a change must keep, a stdlib detector flags removed guards in a diff, automouse impl self-reviews before handoff, and arming condition (20) holds a PR whose removed guards lack a reason.
-last_verified: 2026-10-21
+last_verified: 2026-11-10
 ---
 
 # ADR-0206: Must preserve plans and the removed-guards arming hold
@@ -37,3 +37,7 @@ Move these findings earlier, in four layers that feed each other.
 - A date or plan-version cutoff for the new section: a date breaks plans queued across the boundary, and a version key adds a field the orchestrator must remember. The authoring-path flag keeps the queue and drain paths byte-identical.
 - AST parsers for PHP, shell and Python: a diff gives fragments, not parseable files, and three parsers add dependencies to a stdlib-only tool.
 - A second `## Must preserve` parser inside `bin/check-plan`: it would drift from the detector's parser, so a plan that lints clean could suppress nothing, or the reverse.
+
+## Addendum 2026-11-10: or-true case-arm unwrap
+
+`bin/lib/deleted-guards` also cancels a removed `or-true` guard against an added one-line shell case arm in the same file. The arm prefix `<pattern>)` and a trailing `;;` are stripped, and the rest must equal the removed line exactly. Each added line cancels one removal. PR [#3821](https://github.com/a-jay85/IBL5/pull/3821) moved a `dm_ping ... || true` line into a `case` arm, and the detector flagged it as a removed guard. Other guard kinds and cross-file moves keep the exact-match rule.

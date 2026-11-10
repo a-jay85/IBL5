@@ -2,13 +2,14 @@
 merge-danger validator) and the `pr_copy_prompt` request."""
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import merge_danger
+from harness import merge_danger, savedline
 from harness.llm_calls import pr_copy_prompt
 from harness.state import Classification, PlanInfo
 
@@ -21,7 +22,7 @@ def _diff(path, status="M"):
 
 
 def _worktree(tmp_path, files):
-    (tmp_path / "bin").mkdir(exist_ok=True)
+    (tmp_path / "bin").mkdir(parents=True, exist_ok=True)
     (tmp_path / "bin" / "check-x").write_text("#!/bin/sh\nexit 0\n")
     for rel, text in files.items():
         p = tmp_path / rel
@@ -197,3 +198,149 @@ def test_pr_copy_prompt_states_the_revert_bar():
     prompt = pr_copy_prompt("some-slug", Classification(), PlanInfo(), "")
     assert "git revert <merge-sha>" in prompt
     assert "Add-only migrations" in prompt
+
+
+# Per-round re-judge: the harness-owned line and the sticky human tombstone.
+
+_FIXROUND = (Path(__file__).parent / "fixtures" / "merge_danger" / "pr3840_fixround_line.txt").read_text().strip()
+_DOC = "ibl5/docs/x.md"
+_NO_EFFECT_ONE_WAY = "the change widens an ENUM and adds a helper table"
+_EFFECT_ONE_WAY = "drops the trade_mode column data for every team"
+_FIXER_TWO_WAY = "a read-path swap with no data change at all"
+
+
+def _swap_line(body, line):
+    return "\n".join(line if ln.startswith("**Merge danger:**") else ln for ln in body.splitlines())
+
+
+def _door(body):
+    return merge_danger.parse_merge_danger(body).door
+
+
+def _phase2(tmp_path, wt, diff, door, why):
+    return runner._merge_danger_body(_docs_body(door, why), wt, diff, lambda *_: None, "phase2",
+                                     state_dir=str(tmp_path / "state"), slug="t")
+
+
+def _later(tmp_path, wt, diff, body, start, phase="phase5.5 round 1", log=None):
+    return runner._merge_danger_body(body, wt, diff, log or (lambda *_: None), phase,
+                                     state_dir=str(tmp_path / "state"), slug="t",
+                                     round_start_body=start)
+
+
+def _fixer(start, door, why):
+    return _swap_line(start, f"**Merge danger:** Door: {door} · Blast radius: localized · Why: {why}")
+
+
+def _docs_wt(tmp_path):
+    return _worktree(tmp_path / "wt", {_DOC: "x\n"}), _diff(_DOC)
+
+
+def test_owned_line_lowered_when_fresh_verdict_two_way(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    start = _phase2(tmp_path, wt, diff, "one-way", _EFFECT_ONE_WAY)
+    assert _door(start) == "one-way"
+    assert savedline.load_line(str(tmp_path / "state"), "t") == _field_lines(start)[0]
+    # The fresh LLM line names no irreversible effect, so the Phase 2 bar judges it two-way.
+    out = _later(tmp_path, wt, diff, _fixer(start, "one-way", _NO_EFFECT_ONE_WAY), start)
+    assert _door(out) == "two-way"
+    assert savedline.load_line(str(tmp_path / "state"), "t") == _field_lines(out)[0]
+
+
+def test_phase55_fixer_rebuildable_raise_refused(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    start = _phase2(tmp_path, wt, diff, "two-way", _FIXER_TWO_WAY)
+    assert savedline.load_line(str(tmp_path / "state"), "t") == _field_lines(start)[0]
+    out = _later(tmp_path, wt, diff, _swap_line(start, _FIXROUND), start)
+    assert _door(out) == "two-way"
+    assert not savedline.is_human_owned(str(tmp_path / "state"), "t")
+
+
+def _human_round(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    harness_start = _phase2(tmp_path, wt, diff, "two-way", _FIXER_TWO_WAY)
+    human = _swap_line(harness_start, "**Merge danger:** Door: one-way · Blast radius: localized · "
+                                      f"Why: {_EFFECT_ONE_WAY}")
+    logs = []
+    out = _later(tmp_path, wt, diff, _fixer(human, "two-way", _FIXER_TWO_WAY), human, log=logs.append)
+    return wt, diff, out, logs
+
+
+def test_human_edited_line_stays_raise_only(tmp_path):
+    _, _, out, logs = _human_round(tmp_path)
+    assert _door(out) == "one-way"
+    assert savedline.is_human_owned(str(tmp_path / "state"), "t")
+    assert any("edited outside the harness" in ln for ln in logs)
+
+
+def test_human_raise_survives_next_round(tmp_path):
+    wt, diff, _, _ = _human_round(tmp_path)
+    # A later post-plan run's Phase 2 rewrites the line; the tombstone refuses its save.
+    rerun = _phase2(tmp_path, wt, diff, "one-way", _EFFECT_ONE_WAY)
+    out = _later(tmp_path, wt, diff, _fixer(rerun, "two-way", _FIXER_TWO_WAY), rerun)
+    assert _door(out) == "one-way"
+    state = Path(savedline.path_for(str(tmp_path / "state"), "t"))
+    assert state.read_text() == '{"owner": "human"}'
+
+
+def test_missing_saved_state_stays_raise_only(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    body = _swap_line(_docs_body("two-way", _FIXER_TWO_WAY), _FIXROUND)
+    out = runner._merge_danger_body(body, wt, diff, lambda *_: None, "phase6",
+                                    state_dir=str(tmp_path / "state"), slug="t")
+    assert _door(out) == "one-way"
+    assert not (tmp_path / "state").exists()
+
+
+def test_unreadable_saved_state_stays_raise_only(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    (tmp_path / "state").mkdir()
+    state = Path(savedline.path_for(str(tmp_path / "state"), "t"))
+    state.write_text("{not json")
+    body = _swap_line(_docs_body("two-way", _FIXER_TWO_WAY), _FIXROUND)
+    out = runner._merge_danger_body(body, wt, diff, lambda *_: None, "phase6",
+                                    state_dir=str(tmp_path / "state"), slug="t")
+    assert _door(out) == "one-way"
+    assert state.read_text() == "{not json"
+
+
+def test_floor_one_way_never_lowered(tmp_path):
+    mig = "ibl5/migrations/200_drop_col.sql"
+    wt = _worktree(tmp_path / "wt", {mig: "ALTER TABLE ibl_plr DROP COLUMN foo;\n"})
+    diff = (f"diff --git a/{mig} b/{mig}\nnew file mode 100644\n--- /dev/null\n+++ b/{mig}\n"
+            "@@ -0,0 +1 @@\n+ALTER TABLE ibl_plr DROP COLUMN foo;\n")
+    assert merge_danger.derive_from_worktree(wt, diff).door == "one-way"
+    start = _phase2(tmp_path, wt, diff, "two-way", _FIXER_TWO_WAY)
+    assert _door(start) == "one-way"
+    out = _later(tmp_path, wt, diff, _fixer(start, "two-way", _FIXER_TWO_WAY), start)
+    assert _door(out) == "one-way"
+    assert not savedline.is_human_owned(str(tmp_path / "state"), "t")
+
+
+def test_self_governing_never_dropped_on_owned_rejudge(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    saved = ("**Merge danger:** Door: two-way · Blast radius: localized · Self-governing: yes · "
+             f"Why: {_FIXER_TWO_WAY}")
+    assert savedline.save_line(str(tmp_path / "state"), "t", saved)
+    start = _swap_line(_docs_body("two-way", _FIXER_TWO_WAY), saved)
+    out = _later(tmp_path, wt, diff, _fixer(start, "two-way", "the fixer rewrote this Why text"), start)
+    assert merge_danger.parse_merge_danger(out).self_governing is True
+    assert merge_danger.classify_body(out) == "SELF-GOVERNING"
+
+
+def test_owned_no_fresh_verdict_keeps_saved_door(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    saved = f"**Merge danger:** Door: one-way · Blast radius: localized · Why: {_NO_EFFECT_ONE_WAY}"
+    assert savedline.save_line(str(tmp_path / "state"), "t", saved)
+    start = _swap_line(_docs_body("two-way", _FIXER_TWO_WAY), saved)
+    out = _later(tmp_path, wt, diff, start, start, phase="phase6")
+    assert _door(out) == "one-way"
+
+
+def test_default_kwargs_match_todays_raise_only(tmp_path):
+    wt, diff = _docs_wt(tmp_path)
+    body = _docs_body("one-way", _NO_EFFECT_ONE_WAY)
+    for phase in ("phase6", "phase5.5 round 1", "phase7"):
+        out = runner._merge_danger_body(body, wt, diff, lambda *_: None, phase)
+        assert _door(out) == "one-way", phase
+    assert list(tmp_path.glob("**/*" + savedline.SUFFIX)) == []

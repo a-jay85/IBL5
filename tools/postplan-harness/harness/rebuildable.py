@@ -33,9 +33,7 @@ def _step_files(repo_root: str | Path) -> list[Path]:
     root = Path(repo_root)
     steps_glob = STEPS_GLOB
     steps_dir = root / Path(steps_glob).parent
-    if not steps_dir.is_dir():
-        raise FileNotFoundError(steps_glob)
-    files = sorted(root.glob(steps_glob))
+    files = sorted(root.glob(steps_glob)) if steps_dir.is_dir() else []
     if not files:
         raise FileNotFoundError(steps_glob)
     return files

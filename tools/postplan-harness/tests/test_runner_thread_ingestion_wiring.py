@@ -17,8 +17,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner  # noqa: E402
 from harness.adapters.ghad import RecordingGh
+from harness.adapters.llm import FixtureLlm
 from harness.adapters.gitad import ReplayGit
 from harness.state import HarnessError, RunResult, TerminalState, UsageLedger
+from test_fidelity_loop import (  # noqa: E402,F401  (git_shim is a fixture)
+    TREE_1, _Res as _FidelityRes, _cleanup as _fidelity_cleanup, _git as _fidelity_git,
+    _plan as _fidelity_plan, git_shim,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +513,24 @@ def test_thread_ingestion_remote_unreachable_propagates(tmp_path, monkeypatch):
     assert ei.value.kind == "remote-unreachable"
 
 
-def test_fidelity_remediation_catch_propagates_remote_unreachable():
-    """The Phase 5.5 remediation catch re-raises remote-unreachable like push-failed."""
-    src = inspect.getsource(runner)
-    assert 'if e.kind in ("push-failed", "remote-unreachable"):' in src
+def test_fidelity_remediation_catch_propagates_remote_unreachable(tmp_path, git_shim,
+                                                                  monkeypatch):
+    """The Phase 5.5 remediation catch re-raises remote-unreachable like push-failed.
+
+    Mutation caught: dropping remote-unreachable from the catch's propagating kinds.
+    """
+    def _raising_remediate(*a, **kw):
+        raise HarnessError("remote-unreachable", "git push: Permission denied (publickey)")
+
+    monkeypatch.setattr(runner.fidelity, "remediate", _raising_remediate)
+    try:
+        with pytest.raises(HarnessError) as exc_info:
+            runner._run_fidelity(
+                FixtureLlm(UsageLedger(), {"plan-fidelity-review": "6d checks\n\nNOT READY\n"}),
+                str(tmp_path), str(tmp_path), _fidelity_git(), RecordingGh(str(tmp_path)),
+                _fidelity_plan(), "diff", "body", 99, "dead" * 10, TREE_1, False,
+                lambda m: None, _FidelityRes(),
+            )
+        assert exc_info.value.kind == "remote-unreachable"
+    finally:
+        _fidelity_cleanup(99)

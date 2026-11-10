@@ -604,4 +604,215 @@ compare_golden "contract: one hard failure lines match golden" \
 fi
 
 
+# ─── Cache group ─────────────────────────────────────────────────────────────
+CACHED_STEPS="test-check-model-pins test-check-engine-freeze test-check-pipefail-grep-q test-check-reviewer-eval reviewer-eval-validate"
+# Oracle lists typed here, never derived from the runner: every input a bust
+# must reach. The runner itself joins every set (row 14 covers that).
+ORACLE_REVIEWER_EVAL_VALIDATE="bin/reviewer-eval tools/postplan-harness/harness/reviewer_eval.py tools/postplan-harness/harness/state.py tools/postplan-harness/fixtures/reviewer-eval/corpus.json bin/run-meta-checks-local"
+ORACLE_MODEL_PINS="bin/test-check-model-pins bin/check-model-pins bin/lib/current-models bin/lib/harness.sh bin/lib/usage-test-isolation.sh bin/run-meta-checks-local"
+
+# make_cache_repo: a git fixture holding the stub bin/, the real runner and
+# bin/ci-memo, and a small text file at every path a step declares.
+make_cache_repo() {
+    local repo decl p d
+    repo=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+    cp "$SCRIPT_DIR/ci-memo" "$repo/bin/ci-memo"
+    decl=$(command grep -E '^META_INPUTS_[a-z_]+=' "$RUNNER" | sed -E 's/^[A-Za-z_]+="//; s/"$//' | tr ' ' '\n' | sort -u)
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        [ -e "$repo/$p" ] && continue
+        case "$p" in
+            bin/*) mkdir -p "$(dirname "$repo/$p")"; printf 'fixture\n' > "$repo/$p" ;;
+            *) mkdir -p "$repo/$p"; printf 'fixture\n' > "$repo/$p/placeholder.txt" ;;
+        esac
+    done <<< "$decl"
+    d="$repo/tools/postplan-harness/harness"
+    mkdir -p "$d" "$repo/tools/postplan-harness/fixtures/reviewer-eval"
+    printf 'state\n' > "$d/state.py"
+    printf 'reviewer_eval\n' > "$d/reviewer_eval.py"
+    printf '{}\n' > "$repo/tools/postplan-harness/fixtures/reviewer-eval/corpus.json"
+    git -C "$repo" add -A
+    git -C "$repo" commit -q -m "cache fixture"
+    printf '%s' "$repo"
+}
+
+# cache_run <repo> <cache-dir> [ENV=val...] [-- runner args...]: runs the
+# fixture's runner with the bypass variable unset; sets _LAST_OUT and _LAST_RC.
+cache_run() {
+    local repo="$1" cdir="$2" envs=(); shift 2
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
+    [ $# -gt 0 ] && shift
+    run_check_both env -u META_CHECKS_NO_CACHE META_CHECKS_CACHE_DIR="$cdir" \
+        ${envs[@]+"${envs[@]}"} "$repo/bin/run-meta-checks-local" \
+        --self-test-hook "$repo" --base HEAD "$@"
+}
+
+# count_pass <dir>: number of cached-pass sentinels under <dir> (0 when absent).
+count_pass() {
+    if [ -d "$1" ]; then find "$1" -name '*.pass' | wc -l | tr -d ' '; else printf '0'; fi
+}
+
+# expect_cached <label> <step>: _LAST_OUT carries a cached PASS for <step>.
+expect_cached() { want "$1" "$_LAST_OUT" "PASS  $2 (cached)"; }
+# expect_ran <label> <step>: _LAST_OUT carries an uncached PASS for <step>.
+expect_ran() {
+    want "$1 (ran)" "$_LAST_OUT" "PASS  $2"
+    absent "$1 (not cached)" "$_LAST_OUT" "PASS  $2 (cached)"
+}
+
+if want_group cache; then
+    h_tmp CT
+    CF=$(make_cache_repo)
+
+    # Rows 11 and 17: warm a cache, then hit on all five steps. An empty bypass
+    # variable keeps the cache on.
+    cache_run "$CF" "$CT/c11"
+    expect_ran "cache-11 cold run" test-check-model-pins
+    want "cache-11 cold run counts misses" "$_LAST_OUT" "CACHE hits=0 misses=5"
+    cache_run "$CF" "$CT/c11"
+    for st in $CACHED_STEPS; do expect_cached "cache-11 warm $st" "$st"; done
+    want "cache-11 warm run counts hits" "$_LAST_OUT" "CACHE hits=5 misses=0"
+    [ "$_LAST_RC" -eq 0 ] && pass "cache-11 warm exits 0" || fail "cache-11 warm exits 0 (got $_LAST_RC)"
+    cache_run "$CF" "$CT/c11" META_CHECKS_NO_CACHE=
+    for st in $CACHED_STEPS; do expect_cached "cache-17 empty bypass keeps cache on $st" "$st"; done
+
+    # Rows 12 and 13: each declared input busts the key when edited
+    # uncommitted, and restoring it hits again.
+    cache_bust_loop() {
+        local label="$1" step="$2" paths="$3" p
+        cache_run "$CF" "$CT/$label"
+        for p in $paths; do
+            printf '# bust\n' >> "$CF/$p"
+            cache_run "$CF" "$CT/$label"
+            expect_ran "$label edit of $p" "$step"
+            git -C "$CF" checkout -q -- "$p"
+            cache_run "$CF" "$CT/$label"
+            expect_cached "$label restore of $p" "$step"
+        done
+    }
+    cache_bust_loop cache-12 reviewer-eval-validate "$ORACLE_REVIEWER_EVAL_VALIDATE"
+    cache_bust_loop cache-13 test-check-model-pins "$ORACLE_MODEL_PINS"
+
+    # Row 14: editing the runner busts all five keys.
+    cache_run "$CF" "$CT/c14"
+    printf '# bust\n' >> "$CF/bin/run-meta-checks-local"
+    cache_run "$CF" "$CT/c14"
+    for st in $CACHED_STEPS; do expect_ran "cache-14 runner edit $st" "$st"; done
+    git -C "$CF" checkout -q -- bin/run-meta-checks-local
+
+    # Row 15: a failing cached step is never recorded, so it fails again.
+    cache_run "$CF" "$CT/c15" STUB_RC_reviewer_eval=1
+    want "cache-15 first failure" "$_LAST_OUT" "FAIL  reviewer-eval-validate"
+    want "cache-15 first failure line" "$_LAST_OUT" "META-CHECK-FAILED: reviewer-eval-validate"
+    [ "$_LAST_RC" -eq 1 ] && pass "cache-15 first run exits 1" || fail "cache-15 first run exits 1 (got $_LAST_RC)"
+    cache_run "$CF" "$CT/c15" STUB_RC_reviewer_eval=1
+    want "cache-15 second failure" "$_LAST_OUT" "FAIL  reviewer-eval-validate"
+    want "cache-15 second failure line" "$_LAST_OUT" "META-CHECK-FAILED: reviewer-eval-validate"
+    [ "$_LAST_RC" -eq 1 ] && pass "cache-15 second run exits 1" || fail "cache-15 second run exits 1 (got $_LAST_RC)"
+    N15=$(find "$CT/c15" -name 'ci-memo-meta-reviewer-eval-validate-*.pass' | wc -l | tr -d ' ')
+    [ "$N15" -eq 0 ] && pass "cache-15 no sentinel for the failing step" \
+                      || fail "cache-15 no sentinel for the failing step (found $N15)"
+
+    # Row 16: a step that edits its own input mid-run records no pass.
+    CORPUS_F="tools/postplan-harness/fixtures/reviewer-eval/corpus.json"
+    printf '#!/bin/sh\nprintf x >> "$(dirname "$0")/../%s"\nexit 0\n' "$CORPUS_F" > "$CF/bin/reviewer-eval"
+    git -C "$CF" commit -q -am "self-editing stub"
+    cache_run "$CF" "$CT/c16"
+    expect_ran "cache-16 self-editing run" reviewer-eval-validate
+    git -C "$CF" checkout -q -- "$CORPUS_F"
+    cache_run "$CF" "$CT/c16"
+    expect_ran "cache-16 no pass was recorded" reviewer-eval-validate
+    git -C "$CF" checkout -q -- "$CORPUS_F"
+    git -C "$CF" checkout -q HEAD~1 -- bin/reviewer-eval
+    git -C "$CF" commit -q -am "restore stub"
+
+    # Rows 18 and 19: both bypass forms run every step and write no sentinel.
+    cache_run "$CF" "$CT/c18" META_CHECKS_NO_CACHE=1
+    cache_run "$CF" "$CT/c18" META_CHECKS_NO_CACHE=1
+    absent "cache-18 env bypass never reports a hit" "$_LAST_OUT" "(cached)"
+    N18=$(count_pass "$CT/c18")
+    [ "$N18" -eq 0 ] && pass "cache-18 env bypass writes no sentinel" \
+                      || fail "cache-18 env bypass writes no sentinel (found $N18)"
+    cache_run "$CF" "$CT/c19" -- --no-cache
+    cache_run "$CF" "$CT/c19" -- --no-cache
+    absent "cache-19 flag bypass never reports a hit" "$_LAST_OUT" "(cached)"
+    for st in $CACHED_STEPS; do expect_ran "cache-19 flag bypass $st" "$st"; done
+    N19=$(count_pass "$CT/c19")
+    [ "$N19" -eq 0 ] && pass "cache-19 flag bypass writes no sentinel" \
+                      || fail "cache-19 flag bypass writes no sentinel (found $N19)"
+
+    # Row 20: the flag takes no value, so --no-cache=yes is an unknown option.
+    cache_run "$CF" "$CT/c20" -- --no-cache=yes
+    [ "$_LAST_RC" -eq 2 ] && pass "cache-20 --no-cache=yes exits 2" \
+                           || fail "cache-20 --no-cache=yes exits 2 (got $_LAST_RC)"
+    want "cache-20 names the unknown option" "$_LAST_OUT" "unknown option: --no-cache=yes"
+
+    # Row 21: an empty or unset cache dir falls back to $HOME/.cache.
+    mkdir -p "$CT/home21" "$CT/home21b"
+    run_check_both env -u META_CHECKS_NO_CACHE META_CHECKS_CACHE_DIR= XDG_CACHE_HOME= \
+        HOME="$CT/home21" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
+    N21=$(count_pass "$CT/home21/.cache/ibl5-meta-checks")
+    [ "$N21" -eq 5 ] && pass "cache-21 empty dir falls back to HOME/.cache" \
+                      || fail "cache-21 empty dir falls back to HOME/.cache (found $N21)"
+    run_check_both env -u META_CHECKS_NO_CACHE -u META_CHECKS_CACHE_DIR -u XDG_CACHE_HOME \
+        HOME="$CT/home21b" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
+    N21B=$(count_pass "$CT/home21b/.cache/ibl5-meta-checks")
+    [ "$N21B" -eq 5 ] && pass "cache-21 unset dir falls back to HOME/.cache" \
+                       || fail "cache-21 unset dir falls back to HOME/.cache (found $N21B)"
+
+    # Row 22: a cache dir that cannot be created disables the cache, not the run.
+    cache_run "$CF" /dev/null/x
+    want "cache-22 reports the disabled cache" "$_LAST_OUT" "CACHE disabled"
+    for st in $CACHED_STEPS; do expect_ran "cache-22 disabled cache $st" "$st"; done
+    [ "$_LAST_RC" -eq 0 ] && pass "cache-22 disabled cache exits 0" || fail "cache-22 disabled cache exits 0 (got $_LAST_RC)"
+
+    # Row 23: a copy at another absolute path hits the shared cache.
+    cache_run "$CF" "$CT/c23"
+    CF2="$CT/copy-of-fixture"
+    cp -R "$CF" "$CF2"
+    cache_run "$CF2" "$CT/c23"
+    for st in $CACHED_STEPS; do expect_cached "cache-23 sibling path $st" "$st"; done
+
+    # Row 24: a cached run writes nothing in the repo tree.
+    CF3=$(make_cache_repo)
+    STATUS_BEFORE=$(git -C "$CF3" status --porcelain)
+    cache_run "$CF3" "$CT/c24"
+    cache_run "$CF3" "$CT/c24"
+    STATUS_AFTER=$(git -C "$CF3" status --porcelain)
+    [ "$STATUS_BEFORE" = "$STATUS_AFTER" ] && pass "cache-24 fixture status unchanged" \
+        || fail "cache-24 fixture status unchanged (before='$STATUS_BEFORE' after='$STATUS_AFTER')"
+    N24=$(count_pass "$CT/c24")
+    [ "$N24" -eq 5 ] && pass "cache-24 five sentinels under the cache dir" \
+                      || fail "cache-24 five sentinels under the cache dir (found $N24)"
+    N24R=$(find "$CF3" -path "$CF3/.git" -prune -o -name '*.pass' -print | wc -l | tr -d ' ')
+    [ "$N24R" -eq 0 ] && pass "cache-24 no sentinel inside the repo" \
+                       || fail "cache-24 no sentinel inside the repo (found $N24R)"
+
+    # Row 25: every bin/ file a cached step's script names is declared, and
+    # each declaration is assigned once.
+    for st in $CACHED_STEPS; do
+        var="META_INPUTS_$(printf '%s' "$st" | tr '-' '_')"
+        declared=$(command grep -E "^${var}=" "$RUNNER" | sed -E 's/^[A-Za-z_]+="//; s/"$//')
+        n_assign=$(command grep -c "^${var}=" "$RUNNER" || true)
+        [ "$n_assign" -eq 1 ] && pass "cache-25 $st declared once" \
+                               || fail "cache-25 $st declared once (found $n_assign)"
+        script="$SCRIPT_DIR/$st"
+        case "$st" in reviewer-eval-validate) script="$SCRIPT_DIR/reviewer-eval" ;; esac
+        body=$(command grep -vE '^[[:space:]]*#' "$script" || true)
+        tokens=$({ command grep -oE 'lib/[A-Za-z0-9_.-]+' <<< "$body" || true
+                   command grep -oE 'check-[a-z-]+' <<< "$body" || true
+                   command grep -oE 'reviewer-eval' <<< "$body" || true; } | sort -u)
+        while IFS= read -r tok; do
+            [ -n "$tok" ] || continue
+            [ -f "$SCRIPT_DIR/$tok" ] || continue
+            [ "$tok" = "$(basename "$script")" ] && continue
+            if grep -qF -- "bin/$tok" <<< "$declared"; then
+                pass "cache-25 $st declares bin/$tok"
+            else
+                fail "cache-25 $st names bin/$tok but does not declare it"
+            fi
+        done <<< "$tokens"
+    done
+fi
+
 h_done

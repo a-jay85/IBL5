@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 usage() {
     cat <<'EOF'
 Usage: bin/run-meta-checks-local [--base <sha>] [--pr <n>] [--body-file <path>]
-                                 [--stage pre-push|post-pr] [--print-filters]
+                                 [--stage pre-push|post-pr] [--print-filters] [--no-cache]
                                  [--self-test-hook <dir>] [--help|-h]
 
   --base <sha>            Base commit to diff against. Default: merge-base with origin/master.
@@ -27,6 +27,7 @@ Usage: bin/run-meta-checks-local [--base <sha>] [--pr <n>] [--body-file <path>]
   --body-file <p>         Planned PR body for check-pr-manual-testing and check-post-merge-recipe before a PR exists.
   --stage <s>             pre-push (default) or post-pr. Selects which step subset runs.
   --print-filters         Print <filter>=true|false per filter and changed-path count, then exit 0.
+  --no-cache              Skip the pass cache: run every step, record nothing.
   --self-test-hook <dir>  Override repo root for workflow YAML and bin/ scripts (test seam).
   --help, -h              Show this message.
 
@@ -34,6 +35,9 @@ Environment:
   META_CHECKS_ADVISORY_TIMEOUT  Seconds before an advisory step is abandoned
                                (default 120). Hard gates are never timed out.
                                Ignored when neither gtimeout nor timeout exists.
+  META_CHECKS_NO_CACHE         Anything except empty or 0 acts like --no-cache.
+  META_CHECKS_CACHE_DIR        Pass-cache directory (default:
+                               ${XDG_CACHE_HOME:-$HOME/.cache}/ibl5-meta-checks).
 
 Exit: 0 all hard gates passed  1 one or more hard gates failed
       2 usage error  3 could not parse workflow filters (fail-closed)
@@ -46,6 +50,8 @@ BODY_FILE=""
 STAGE="pre-push"
 PRINT_FILTERS=0
 HOOK_ROOT=""
+CACHE_ON=1
+case "${META_CHECKS_NO_CACHE:-}" in ''|0) ;; *) CACHE_ON=0 ;; esac
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -66,6 +72,8 @@ while [ $# -gt 0 ]; do
             fi ;;
         --print-filters)
             PRINT_FILTERS=1; shift ;;
+        --no-cache)
+            CACHE_ON=0; shift ;;
         --self-test-hook)
             if [ $# -lt 2 ]; then echo "Error: --self-test-hook requires a directory" >&2; usage >&2; exit 2; fi
             HOOK_ROOT="$2"; shift 2 ;;
@@ -272,6 +280,23 @@ fi
 TIMEOUT_BIN="${META_CHECKS_TIMEOUT_BIN-$(command -v gtimeout || command -v timeout || true)}"
 ADVISORY_TIMEOUT="${META_CHECKS_ADVISORY_TIMEOUT:-120}"
 
+# ─── Pass cache ───────────────────────────────────────────────────────────────
+# A cached step replays PASS for byte-identical inputs. One dir is shared by
+# every worktree on purpose: keys are content hashes, so equal content gives an
+# equal verdict. It sits outside every git tree, so a run never dirties one.
+CACHE_DIR="${META_CHECKS_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}/ibl5-meta-checks}"
+CACHE_HITS=0
+CACHE_MISSES=0
+META_PY_VER=""
+if [ "$CACHE_ON" = 1 ] && ! mkdir -p "$CACHE_DIR" 2>/dev/null; then
+    CACHE_ON=0
+    printf 'CACHE disabled (cannot create %s)\n' "$CACHE_DIR"
+fi
+if [ "$CACHE_ON" = 1 ]; then
+    META_PY_VER="$(python3 -c 'import sys; print(sys.version.split()[0])' 2>/dev/null || echo none)"
+    find "$CACHE_DIR" -type f -name '*.pass' -mtime +30 -exec rm -f {} + 2>/dev/null || true
+fi
+
 # ─── Step execution ───────────────────────────────────────────────────────────
 FAILED=""
 WARNED=""
@@ -279,22 +304,71 @@ DEFERRED=""
 SKIP_COUNT=0
 HARD_RUN=0
 
-# run_step: always returns 0; accumulates FAILED or WARNED. Never set -e here.
-run_step() {
-    local name="$1" gate="$2"; shift 2
-    local out rc
-    if [ "$gate" = "advisory" ] && [ -n "$TIMEOUT_BIN" ]; then
-        # -k: SIGKILL 10s after the SIGTERM, so a check that traps or ignores
-        # TERM still cannot hold the run.
-        # A child the check backgrounded may outlive the signal; measured, the
-        # command substitution still returns at the deadline rather than
-        # blocking on the pipe that child inherited, so the run proceeds.
-        out=$("$TIMEOUT_BIN" -k 10 "$ADVISORY_TIMEOUT" "$@" 2>&1); rc=$?
-    else
-        out=$("$@" 2>&1); rc=$?
+# cache_key <name> <cmd...>: prints ci-memo's hash=/key= lines for a cached
+# step, or nothing for an uncached one (no META_INPUTS_<name> declaration) or
+# when ci-memo degrades. argv0 shrinks to its basename so absolute worktree
+# paths stay out of the key and sibling worktrees share hits.
+cache_key() {
+    local name="$1" var paths p
+    shift
+    var="META_INPUTS_$(printf '%s' "$name" | tr '-' '_')"
+    paths="${!var:-}"
+    [ -n "$paths" ] || return 0
+    paths="$paths bin/run-meta-checks-local"
+    set -- "$(basename "$1")" "${@:2}"
+    local args=()
+    for p in $paths; do args+=(--path "$p"); done
+    GITHUB_OUTPUT='' CI_MEMO_REPO="$ROOT" "$ROOT/bin/ci-memo" key "meta-$name" --worktree "${args[@]}" \
+        --extra "cmd=$*" --extra "py=$META_PY_VER" --fail-open 2>/dev/null
+}
+
+# exec_step <outfile> <name> <cmd...>: runs one step, output to <outfile>.
+# Returns the step's exit code. Writes <outfile>.cacheable for a cacheable step
+# and <outfile>.cached when the pass came from the cache. Touches no counters.
+exec_step() {
+    local outf="$1" name="$2" memo h1 k1 k2 rc
+    shift 2
+    k1=""
+    if [ "$CACHE_ON" = 1 ]; then
+        memo="$(cache_key "$name" "$@")"
+        h1="$(printf '%s\n' "$memo" | sed -n 's/^hash=//p')"
+        k1="$(printf '%s\n' "$memo" | sed -n 's/^key=//p' | tr -c 'A-Za-z0-9._\n-' '_')"
+        [ -n "$k1" ] && : > "$outf.cacheable"
+        if [ -n "$k1" ] && [ -f "$CACHE_DIR/$k1.pass" ]; then
+            printf 'cached pass, key %s\n' "$k1" > "$outf"
+            : > "$outf.cached"
+            return 0
+        fi
+    fi
+    "$@" > "$outf" 2>&1 && rc=0 || rc=$?
+    if [ "$rc" -eq 0 ] && [ -n "$k1" ]; then
+        # Record only when the inputs are unchanged since before the run, so a
+        # step that edited its own input never stores a pass for content it
+        # never saw. A failed record is non-fatal: the step result stands.
+        k2="$(cache_key "$name" "$@" | sed -n 's/^key=//p' | tr -c 'A-Za-z0-9._\n-' '_')"
+        if [ "$k1" = "$k2" ]; then
+            "$ROOT/bin/ci-memo" record "meta-$name" "$h1" "$CACHE_DIR/$k1.pass" >/dev/null 2>&1 || true
+        fi
+    fi
+    return "$rc"
+}
+
+# report_step <name> <gate> <rc> <outfile>: prints the step line and accumulates
+# FAILED, WARNED, HARD_RUN and the cache counters. Always returns 0. Never set -e here.
+report_step() {
+    local name="$1" gate="$2" rc="$3" outf="$4" out
+    out="$(cat "$outf")"
+    if [ -e "$outf.cached" ]; then
+        CACHE_HITS=$((CACHE_HITS + 1))
+    elif [ -e "$outf.cacheable" ]; then
+        CACHE_MISSES=$((CACHE_MISSES + 1))
     fi
     if [ "$rc" -eq 0 ]; then
-        printf 'PASS  %s\n' "$name"
+        if [ -e "$outf.cached" ]; then
+            printf 'PASS  %s (cached)\n' "$name"
+        else
+            printf 'PASS  %s\n' "$name"
+        fi
         [ "$gate" = "hard" ] && HARD_RUN=$((HARD_RUN + 1))
         return 0
     fi
@@ -317,6 +391,24 @@ run_step() {
     printf '%s\n' "$out" | tail -60
     FAILED="$FAILED $name"
     HARD_RUN=$((HARD_RUN + 1))
+    return 0
+}
+
+# run_step: always returns 0; runs exec_step then report_step. Never set -e here.
+run_step() {
+    local name="$1" gate="$2" outf rc
+    shift 2
+    outf="$(mktemp "${TMPDIR:-/tmp}/meta-step.XXXXXX")"
+    if [ "$gate" = "advisory" ] && [ -n "$TIMEOUT_BIN" ]; then
+        # -k: SIGKILL 10s after the SIGTERM, so a check that traps or ignores
+        # TERM still cannot hold the run.
+        exec_step "$outf" "$name" "$TIMEOUT_BIN" -k 10 "$ADVISORY_TIMEOUT" "$@"
+    else
+        exec_step "$outf" "$name" "$@"
+    fi
+    rc=$?
+    report_step "$name" "$gate" "$rc" "$outf"
+    rm -f "$outf" "$outf.cacheable" "$outf.cached"
     return 0
 }
 
@@ -350,6 +442,16 @@ run_pr_bypass_gate() {
     fi
     run_step "$name" "$severity" "$@"
 }
+
+# ─── Cached-step inputs (one line per cached step) ───────────────────────────
+# Repo-relative pathspecs hashed by `bin/ci-memo key --worktree`. cache_key()
+# appends bin/run-meta-checks-local to every set. Over-including is safe (it
+# only lowers the hit rate); a missing input can replay a stale pass.
+META_INPUTS_test_check_model_pins="bin/test-check-model-pins bin/check-model-pins bin/lib/current-models bin/lib/model-pins-allowlist bin/lib/harness.sh bin/lib/usage-test-isolation.sh"
+META_INPUTS_test_check_engine_freeze="bin/test-check-engine-freeze bin/check-engine-freeze"
+META_INPUTS_test_check_pipefail_grep_q="bin/test-check-pipefail-grep-q bin/check-pipefail-grep-q"
+META_INPUTS_test_check_reviewer_eval="bin/test-check-reviewer-eval bin/check-reviewer-eval bin/reviewer-eval bin/lib/harness.sh bin/lib/usage-test-isolation.sh bin/lib/branch-base.sh tools/postplan-harness/harness tools/postplan-harness/fixtures/reviewer-eval .claude/review-shared"
+META_INPUTS_reviewer_eval_validate="bin/reviewer-eval bin/lib/branch-base.sh tools/postplan-harness/harness tools/postplan-harness/fixtures/reviewer-eval .claude/review-shared"
 
 # ─── Pre-push step table ──────────────────────────────────────────────────────
 if [ "$STAGE" = "pre-push" ]; then
@@ -448,6 +550,8 @@ STATUS="OK"
 RC=0
 if [ -n "$FAILED" ]; then STATUS="FAILED"; RC=1; fi
 
+printf 'CACHE hits=%s misses=%s on=%s dir=%s\n' \
+    "$CACHE_HITS" "$CACHE_MISSES" "$CACHE_ON" "$CACHE_DIR"
 printf 'META-CHECKS: %s stage=%s hard=%s failed=%s warn=%s skip=%s defer=%s\n' \
     "$STATUS" "$STAGE" "$HARD_RUN" "$FAILED_COUNT" "$WARNED_COUNT" "$SKIP_COUNT" "$DEFER_COUNT"
 

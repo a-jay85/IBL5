@@ -4,6 +4,8 @@ Non-human (prev week): crawler 900 (850), spam 12 (30), smoke-test 4 (4), unclas
 Human traffic (events, vs prior week):
   authenticated: 480 (prev 400, +20%)
   anonymous-human: 60 (prev 55, +9%)
+Likely bot, set aside from anonymous-human (prev week): 140 (120)
+Sheets import, set aside from anonymous-human (prev week): 12 (9)
 active GMs: 12
   GMs by event count: 1-5: 2, 6-20: 4, 21-50: 5, 51+: 1
 Sessions: authenticated 31, anonymous-human 22
@@ -33,7 +35,8 @@ Top 4xx routes (authenticated, 2 distinct names):
 Top 4xx routes (anonymous-human, 3 distinct names):
   2  player
   6  other
-Referer mix (anonymous-human): none 30, internal 10, search 15, external 5
+Referer mix (anonymous-human): none 30, bare-origin 2, internal 10, search 15, external 5
+Referer mix (likely bot): none 70, bare-origin 60, internal 4, external 6
 Daily events (authenticated, last 7 days with data):
   2026-09-21  60
   2026-09-22  72
@@ -50,7 +53,7 @@ Daily events (anonymous-human, last 7 days with data):
   2026-09-25  9
   2026-09-26  8
   2026-09-27  9
-dropped malformed rows: 4
+dropped malformed rows: 6
 --- end digest ---
 --- prompt ---
 You review one week of aggregate product analytics for a 17-GM basketball league site. A human reads your output; nothing you write is applied automatically.
@@ -67,6 +70,8 @@ Non-human (prev week): crawler 900 (850), spam 12 (30), smoke-test 4 (4), unclas
 Human traffic (events, vs prior week):
   authenticated: 480 (prev 400, +20%)
   anonymous-human: 60 (prev 55, +9%)
+Likely bot, set aside from anonymous-human (prev week): 140 (120)
+Sheets import, set aside from anonymous-human (prev week): 12 (9)
 active GMs: 12
   GMs by event count: 1-5: 2, 6-20: 4, 21-50: 5, 51+: 1
 Sessions: authenticated 31, anonymous-human 22
@@ -96,7 +101,8 @@ Top 4xx routes (authenticated, 2 distinct names):
 Top 4xx routes (anonymous-human, 3 distinct names):
   2  player
   6  other
-Referer mix (anonymous-human): none 30, internal 10, search 15, external 5
+Referer mix (anonymous-human): none 30, bare-origin 2, internal 10, search 15, external 5
+Referer mix (likely bot): none 70, bare-origin 60, internal 4, external 6
 Daily events (authenticated, last 7 days with data):
   2026-09-21  60
   2026-09-22  72
@@ -113,6 +119,6 @@ Daily events (anonymous-human, last 7 days with data):
   2026-09-25  9
   2026-09-26  8
   2026-09-27  9
-dropped malformed rows: 4
+dropped malformed rows: 6
 </digest>
 --- end prompt ---

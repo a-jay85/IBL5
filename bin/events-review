@@ -520,10 +520,10 @@ function ok_action(a) { return (length(a) <= 48 && a ~ /^[a-z][a-z0-9_]*$/) }
 function ok_date(d) { return (d ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) }
 function ok_human(c) { return (c == "authenticated" || c == "anonymous-human") }
 function ok_class(c) {
-    return (ok_human(c) || c == "crawler" || c == "spam" || c == "smoke-test" || c == "unclassified")
+    return (ok_human(c) || c == "likely-bot" || c == "sheets-import" || c == "crawler" || c == "spam" || c == "smoke-test" || c == "unclassified")
 }
 function ok_bucket(b) { return (b == "1-5" || b == "6-20" || b == "21-50" || b == "51+") }
-function ok_referer(r) { return (r == "none" || r == "internal" || r == "search" || r == "external") }
+function ok_referer(r) { return (r == "none" || r == "bare-origin" || r == "internal" || r == "search" || r == "external") }
 # Selection of the top "limit" entries by count desc, name asc. Fills on/oc.
 function top_n(n, names, counts, limit, on, oc,    p, i, bi, used, m) {
     split("", used)
@@ -588,7 +588,7 @@ function gm_suffix(c, r) {
         if (ok_human(k) && sk ~ /^[1-5]xx$/) st[k, sk] += v
         else dropped++
     } else if (s == "referer") {
-        if (k == "anonymous-human" && ok_referer(sk)) ref[sk] += v
+        if ((k == "anonymous-human" || k == "likely-bot") && ok_referer(sk)) ref[k, sk] += v
         else dropped++
     } else if (s == "day") {
         if (ok_human(k) && ok_date(sk)) {
@@ -630,6 +630,8 @@ END {
         c = hc[h]
         printf "  %s: %d (prev %d, %s)\n", c, cls[c, "cur"], cls[c, "prev"], delta(cls[c, "cur"], cls[c, "prev"])
     }
+    printf "Likely bot, set aside from anonymous-human (prev week): %d (%d)\n", cls["likely-bot", "cur"], cls["likely-bot", "prev"]
+    printf "Sheets import, set aside from anonymous-human (prev week): %d (%d)\n", cls["sheets-import", "cur"], cls["sheets-import", "prev"]
     printf "active GMs: %d\n", gms_active
     printf "  GMs by event count: 1-5: %d, 6-20: %d, 21-50: %d, 51+: %d\n", \
         bucket["1-5"], bucket["6-20"], bucket["21-50"], bucket["51+"]
@@ -692,12 +694,16 @@ END {
         for (i = 1; i <= pn; i++) { printf "  %d  %s\n", oc[i], on[i]; printed += oc[i] }
         if (r4total[c] - printed > 0) printf "  %d  other\n", r4total[c] - printed
     }
-    line = ""
-    split("none internal search external", rl, " ")
-    for (q = 1; q <= 4; q++) {
-        if (rl[q] in ref) line = line ((line == "") ? "" : ", ") sprintf("%s %d", rl[q], ref[rl[q]])
+    split("none bare-origin internal search external", rl, " ")
+    split("anonymous-human likely-bot", rk, " ")
+    split("anonymous-human|likely bot", rlab, "|")
+    for (h = 1; h <= 2; h++) {
+        line = ""
+        for (q = 1; q <= 5; q++) {
+            if ((rk[h], rl[q]) in ref) line = line ((line == "") ? "" : ", ") sprintf("%s %d", rl[q], ref[rk[h], rl[q]])
+        }
+        if (line != "") printf "Referer mix (%s): %s\n", rlab[h], line
     }
-    if (line != "") printf "Referer mix (anonymous-human): %s\n", line
     for (h = 1; h <= 2; h++) {
         c = hc[h]
         if (dn[c] == 0) continue

@@ -398,8 +398,16 @@ group_digest() {
     expect_has_exact "row9: 4xx header carries distinct-name count" "$digest" "Top 4xx routes (anonymous-human, 3 distinct names):"
     expect_has_exact "row9: GM route drawing 4xx renders" "$digest" "  2  player"
     expect_has_exact "row9: folded anonymous 4xx lands in other" "$digest" "  6  other"
+    expect_has_exact "row9: likely bot set-aside line" "$digest" "Likely bot, set aside from anonymous-human (prev week): 140 (120)"
+    expect_has_exact "row9: Sheets import set-aside line" "$digest" "Sheets import, set aside from anonymous-human (prev week): 12 (9)"
+    expect_has_exact "row9: bare-origin sits ahead of internal" "$digest" "Referer mix (anonymous-human): none 30, bare-origin 2, internal 10, search 15, external 5"
+    expect_has_exact "row9: likely-bot Referer mix" "$digest" "Referer mix (likely bot): none 70, bare-origin 60, internal 4, external 6"
+    expect_has_exact "row9: unknown referer keys are dropped" "$digest" "dropped malformed rows: 6"
+    expect_lacks "row8: digest lacks raw sheets-import key" "$digest" "sheets-import"
+    expect_lacks "row8: digest lacks unknown bucket" "$digest" "zzbogus"
+    expect_lacks "row8: digest is under the size cap" "$digest" "[digest truncated]"
 
-    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 4"
+    expect_has_exact "row10: malformed rows are counted" "$digest" "dropped malformed rows: 6"
     expect_eq "row10: dry-run over malformed rows exits 0" 0 "$ER_RC"
 
     # Row 11: 2000 routes and 400 actions force the byte cap.
@@ -904,9 +912,10 @@ SH
     chmod +x "$wrapper"
 
     # shellcheck disable=SC2064
-    trap "rm -rf '$T'; '$wrapper' '$dbname' <<< \"DELETE FROM ibl_events WHERE user_agent = 'events-review-fixture';\" >/dev/null 2>&1" EXIT
+    trap "rm -rf '$T'; '$wrapper' '$dbname' <<< \"DELETE FROM ibl_events WHERE user_agent LIKE '%events-review-fixture%';\" >/dev/null 2>&1" EXIT
 
     local seed_rc=0
+    "$wrapper" "$dbname" < "$SEED_SQL" >/dev/null 2>&1 || seed_rc=$?
     "$wrapper" "$dbname" < "$SEED_SQL" >/dev/null 2>&1 || seed_rc=$?
     if [ "$seed_rc" -ne 0 ]; then
         fail "e2e: seed load failed ($SEED_SQL into $container; rc=$seed_rc)"
@@ -941,8 +950,14 @@ SH
     expect_has_exact "row31: seeded 4xx status split" "$digest" "4xx by status (anonymous-human): 404 4"
     expect_has_exact "row31: seeded 4xx GM route renders" "$digest" "Top 4xx routes (anonymous-human, 2 distinct names):"
     expect_has_exact "row31: seeded probe 4xx folds to other" "$digest" "  3  other"
+    expect_has_exact "row31: cleaned anonymous-human vs cleaned prev" "$digest" "  anonymous-human: 33 (prev 2, +1550%)"
+    expect_has_exact "row31: likely bot set aside" "$digest" "Likely bot, set aside from anonymous-human (prev week): 18 (1)"
+    expect_has_exact "row31: Sheets import set aside" "$digest" "Sheets import, set aside from anonymous-human (prev week): 2 (1)"
+    expect_has_exact "row31: cleaned sessions" "$digest" "Sessions: authenticated 3, anonymous-human 18"
+    expect_has_exact "row31: cleaned Referer mix" "$digest" "Referer mix (anonymous-human): none 4, internal 5, external 24"
+    expect_has_exact "row31: likely-bot Referer mix" "$digest" "Referer mix (likely bot): none 6, bare-origin 4, internal 6, external 2"
     local tok
-    for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous' 'wp_login'; do
+    for tok in 'fixture_gm_' 'deadbeef' 'events-review-fixture' 'secret=leak123' 'evil-referer.example' 'ignore_previous' 'wp_login' 'zeidconsulting' 'nomorevibe' 'GoogleDocs' 'MSIE' 'Trident' 'iblhoops.net.example' 'IBLHOOPS' 'erfx-'; do
         expect_lacks "row32: output lacks '$tok'" "$ER_OUT" "$tok"
     done
 

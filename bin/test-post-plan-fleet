@@ -4299,7 +4299,10 @@ grep -qF 'DRY(invocation) PR #3101:' <<< "$out" \
 grep -qF 'DRY(invocation) PR #3102:' <<< "$out" \
     || fail "usage-gate-paused: the free PR 3102 did not fire"
 [[ "$(grep -c 'DRY(invocation)' <<< "$out")" -eq 2 ]] || fail "usage-gate-paused: want 2 fires (3102, 3103) (out: $out)"
-rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
+# The driver dates its report when it writes it. A run that crosses midnight writes under the
+# new date, while an earlier case's report still sits under the old one, so prefer the new date.
+rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-$(date +%F).md"
+[[ -f "$rp" ]] || rp="$SCRATCH/claude-plans/_reports/ibl5/firstpass/pr-firstpass-${_rdate}.md"
 [[ -f "$rp" ]] || fail "usage-gate-paused: report not found at $rp"
 grep '3101' "$rp" | grep -qF 'SKIPPED (post-plan paused by usage gate' \
     || fail "usage-gate-paused: report lacks the SKIPPED row for 3101"

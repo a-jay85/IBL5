@@ -172,16 +172,16 @@ SQL;
     public const string REGULAR_SEASON_DRIFT_SQL = <<<'SQL'
         SELECT COUNT(*) AS drift FROM (
             (SELECT currentname, year, CAST(wins AS UNSIGNED) AS wins, CAST(losses AS UNSIGNED) AS losses
-             FROM ibl_team_season_records WHERE game_type = 1
+             FROM `ibl_team_season_records` WHERE game_type = 1
              EXCEPT
              SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
-             FROM ibl_team_win_loss)
+             FROM `ibl_team_win_loss`)
             UNION ALL
             (SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
-             FROM ibl_team_win_loss
+             FROM `ibl_team_win_loss`
              EXCEPT
              SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
-             FROM ibl_team_season_records WHERE game_type = 1)
+             FROM `ibl_team_season_records` WHERE game_type = 1)
         ) d
         SQL;
 

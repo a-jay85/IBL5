@@ -1,0 +1,1 @@
+**Merge danger:** Door: one-way · Blast radius: site-wide · Why: Migration 209 deletes and re-inserts every `ibl_team_season_records` row on deploy, and it exits 1 on drift, so the deploy can stop. Reverting the merge does not restore the prior rows. Window W-L can lag until the next sim refresh.

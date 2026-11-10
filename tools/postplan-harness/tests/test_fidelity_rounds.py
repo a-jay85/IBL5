@@ -381,8 +381,11 @@ def test_adr_local_gate_denial_does_not_retry(tmp_path, git_shim):
             "detail": "pre-commit-adr-gate: new bin/ script needs an ADR"}}],
     })
     try:
-        res = _drive(tmp_path, llm, _counting_git(), 9315)
+        # Same steady body gh as the retrying 3605 test: the retry reset succeeds, so
+        # only the ADR no-retry class keeps this to one fixer call.
+        res = _drive(tmp_path, llm, _counting_git(), 9315, gh=_steady_body_gh(tmp_path))
         assert len(_fixer_calls(llm)) == 1
+        assert res.fidelity["rounds"][0]["retries"] == 0
         assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
     finally:
         _cleanup(9315, "9315-2")

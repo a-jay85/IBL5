@@ -1,6 +1,6 @@
 ---
 description: The written-voice contract for machine-authored merge-digest lines and PR-body prose — five rules, the sentence-tokenizing definition bin/check-digest-prose implements, and two annotated failure samples.
-last_verified: 2026-10-07
+last_verified: 2026-11-10
 ---
 
 # Prose Voice Contract
@@ -33,6 +33,8 @@ Rule 1 is the primary constraint. Rules 2–5 are the most reliable ways to sati
 **Name the component.** Use codebase names (`Phase 6.5`, `bin/digest-dm-build`) over relative clauses describing the thing. <!-- slop-ok -->
 
 A relative clause ("the follow-up session that decides whether a PR can merge unattended") costs ~9 words and is ambiguous; the codebase name (`Phase 6.5`) costs 2 and is greppable. Rule 2 is therefore the cheapest way to satisfy rule 1. <!-- slop-ok -->
+
+Never coin a label of your own, such as `the warm-regime gap` or `the X tactic`. A reader who has not seen the label has to guess what it names. When no codebase name exists, describe the thing in plain words.
 
 Rule 2 is author-side guidance. No regex can decide whether a noun phrase has a codebase name. <!-- slop-ok -->
 

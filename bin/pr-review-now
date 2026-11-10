@@ -245,7 +245,7 @@ cd "$ROOT" || exit 1
 # Snapshotted BEFORE claude runs. When it matches, the session would only find the review
 # and quit, so the runner exits 0 here without starting claude and sends no DM. The
 # post-plan harness posts that heading in Phase 4 and then fires this script, so most
-# fires end here (2026-11-10 measurement: ~248 empty sessions in 14 days, ~$0.28 each).
+# fires end here (unverified 2026-11-10 estimate: ~248 empty sessions in 14 days, ~$0.28 each).
 # Any gh failure leaves PRIOR_REVIEW=0 and the session runs as usual.
 PRIOR_REVIEW=0
 _me="$("$GH_BIN" api user --jq .login 2>/dev/null || true)"

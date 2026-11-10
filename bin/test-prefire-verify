@@ -265,6 +265,8 @@ test_checks_mutating_tree_refuse() {
 }
 
 test_adhoc_no_plan_runs_phpunit_only() {
+    # A stray `${PREFIRE_MUTATION_CMD:-true}` call would run the exported env stub
+    # and bump the mutation counter, so want_cnt mutation 0 catches it.
     new_case
     run_gate
     want_rc 0

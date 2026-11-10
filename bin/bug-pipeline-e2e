@@ -293,15 +293,19 @@ else
 
         # 8.5 — real boundary: one real tick classifies the woken row through the stubbed
         # `claude`. The stub logs "claude <args>" and the prompt is an argv entry, so the
-        # operator's text must appear in $CLAUDE_LOG. The tick does not log its bot calls
-        # (bot_get_thread_messages is silent), so the live-transcript fetch has no log token to
-        # assert; the same endpoint is called directly with the tick's own request shape.
-        (source /tmp/bug-pipeline-test-env.sh && BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick") >/dev/null
+        # operator's text must appear in $CLAUDE_LOG. The tick writes a
+        # `transcript: fetched thread=<id> messages=<n>` marker to stderr when it fetches the
+        # thread (thread id and count only), so 8.5 captures stderr and asserts that marker.
+        TICK85_ERR="$(mktemp "${TMPDIR:-/tmp}/bpe-tick85.XXXXXX")"
+        (source /tmp/bug-pipeline-test-env.sh && BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick") >/dev/null 2>"$TICK85_ERR"
         expect 'operator context reached the prompt' 1 \
             "$(grep -cF 'operator says: check the cap calc' "$CLAUDE_LOG" | awk '{print ($1 > 0) ? 1 : 0}')"
         expect 'woken row classified by the tick' 'bug' \
             "$(q "SELECT class FROM ibl_bug_reports WHERE id='$ID3'")"
-        # Live boundary: the real test bot serves the thread the tick fetched from.
+        expect 'tick fetched the woken thread transcript' 1 \
+            "$(grep -cE "transcript: fetched thread=${THREAD3} messages=[1-9][0-9]*$" "$TICK85_ERR" | awk '{print ($1 > 0) ? 1 : 0}')"
+        rm -f "$TICK85_ERR"
+        # Live boundary: the test bot's own /get-thread-messages endpoint serves the thread.
         expect 'test bot /get-thread-messages returns messages' 1 \
             "$(curl -s -X POST -H 'Content-Type: application/json' \
                 -d "$(jq -nc --arg t "$THREAD3" '{thread_id:$t}')" \

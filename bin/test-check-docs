@@ -594,23 +594,23 @@ fi
 
 # ── Results ───────────────────────────────────────────────────────────────────
 
-# ── Test 9b: frozen engine/ docs are dropped from the staleness report ───────
+# ── Test 9b: engine/ docs are listed in the staleness report ───
 #
-# bin/check-engine-freeze rejects any edit under engine/, so a stale engine doc
-# can never be fixed. The report omits it; other stale docs stay listed.
+# engine/ is open for edits again (ADR-0236), so a stale engine doc is fixable
+# and the report lists it next to every other stale doc.
 
 REPO=$(make_repo)
 write_doc "$REPO" "$STALE_DATE" "Body."
 mkdir -p "$REPO/engine/.claude/rules"
 printf -- '---\ndescription: Test fixture\nlast_verified: %s\n---\n# Doc\n\nBody.\n' \
-    "$STALE_DATE" > "$REPO/engine/.claude/rules/frozen.md"
+    "$STALE_DATE" > "$REPO/engine/.claude/rules/port.md"
 REPORT=$(cd "$REPO" && bin/check-docs --staleness-report 2>&1) || true
 rm -rf "$REPO"
 if grep -qF '"path": ".claude/rules/fixture.md"' <<< "$REPORT" \
-    && ! grep -qF 'engine/.claude/rules/frozen.md' <<< "$REPORT"; then
-    pass "frozen engine/ docs are omitted from the staleness report"
+    && grep -qF '"path": "engine/.claude/rules/port.md"' <<< "$REPORT"; then
+    pass "engine/ docs are listed in the staleness report"
 else
-    fail "frozen engine/ docs are omitted from the staleness report"
+    fail "engine/ docs are listed in the staleness report"
     echo "  report: $REPORT"
 fi
 

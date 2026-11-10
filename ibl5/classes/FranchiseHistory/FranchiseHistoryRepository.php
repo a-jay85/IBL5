@@ -25,61 +25,17 @@ use League\League;
 class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implements FranchiseHistoryRepositoryInterface
 {
     /**
-     * Rolling five-season window. Inlines the CTE chain of the team win/loss view
-     * with a sargable game_date range (see getFiveSeasonWindowRows docblock for the
-     * equivalence argument). Public so the DB-integration perf report can EXPLAIN it.
+     * Rolling five-season window over the regular-season rows of
+     * ibl_team_season_records. Public so the DB-integration perf report can EXPLAIN it.
      */
     public const FIVE_SEASON_WINDOW_SQL = <<<'SQL'
-        WITH canonical_games AS (
-            SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
-            FROM `ibl_box_scores_teams`
-            WHERE game_type = 1 AND game_date >= ? AND game_date < ?
-            GROUP BY game_date, visitor_teamid, home_teamid
-        ), unique_games AS (
-            SELECT b.game_date, b.visitor_teamid, b.home_teamid,
-                   MIN(b.id) AS visitor_row_id, MAX(b.id) AS home_row_id
-            FROM `ibl_box_scores_teams` b
-            JOIN canonical_games c
-              ON c.game_date = b.game_date AND c.visitor_teamid = b.visitor_teamid
-             AND c.home_teamid = b.home_teamid AND c.game_of_that_day <=> b.game_of_that_day
-            WHERE b.game_type = 1 AND b.game_date >= ? AND b.game_date < ?
-            GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
-        ), scored_games AS (
-            SELECT u.game_date, u.visitor_teamid, u.home_teamid,
-                   COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS visitor_total,
-                   COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points + COALESCE(v.home_ot_points, 0), h.calc_points) AS home_total
-            FROM unique_games u
-            JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
-            JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
-        ), team_games AS (
-            SELECT visitor_teamid AS teamid, game_date,
-                   IF(visitor_total > home_total, 1, 0) AS win, IF(visitor_total < home_total, 1, 0) AS loss
-            FROM scored_games
-            UNION ALL
-            SELECT home_teamid AS teamid, game_date,
-                   IF(home_total > visitor_total, 1, 0) AS win, IF(home_total < visitor_total, 1, 0) AS loss
-            FROM scored_games
-        ), season_rows AS (
-            SELECT CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END AS year,
-                   ti.team_name AS currentname,
-                   COALESCE(fs.team_name, ti.team_name) AS namethatyear,
-                   CAST(SUM(tg.win) AS UNSIGNED) AS wins,
-                   CAST(SUM(tg.loss) AS UNSIGNED) AS losses
-            FROM team_games tg
-            JOIN `ibl_team_info` ti ON ti.teamid = tg.teamid
-            LEFT JOIN `ibl_franchise_seasons` fs
-              ON fs.franchise_id = tg.teamid
-             AND fs.season_ending_year = CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END
-            GROUP BY tg.teamid,
-                     CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END,
-                     ti.team_name, COALESCE(fs.team_name, ti.team_name)
-        )
-        SELECT currentname,
-               CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
-               CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
-        FROM season_rows
-        WHERE year BETWEEN ? AND ?
-        GROUP BY currentname
+        SELECT ti.team_name AS currentname,
+               CAST(SUM(r.wins) AS UNSIGNED) AS five_season_wins,
+               CAST(SUM(r.losses) AS UNSIGNED) AS five_season_losses
+        FROM `ibl_team_season_records` r
+        JOIN `ibl_team_info` ti ON ti.teamid = r.team_id
+        WHERE r.game_type = 1 AND r.year BETWEEN ? AND ?
+        GROUP BY ti.team_name
         SQL;
 
     /**
@@ -107,14 +63,10 @@ class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implemen
     }
 
     /**
-     * The team win/loss view derives a season-ending `year` of
-     * MONTH(game_date) >= 10 ? YEAR + 1 : YEAR, and game_type = 1 already excludes
-     * months 6, 9 and 10. So for ending years A..B, a game_type = 1 row has `year`
-     * in [A, B] exactly when game_date >= '(A-1)-10-01' AND game_date < 'B-10-01'.
-     * game_date is a GROUP BY key in both canonical_games and unique_games, so the
-     * range keeps or drops whole groups and MIN(game_of_that_day) is unchanged. The
-     * outer `year BETWEEN` filter stays, so the range only removes rows it would
-     * also remove, while letting the box-score scans use a game_date range.
+     * Sums the per-season rows RefreshTeamSeasonRecordsStep rebuilds each sim, so
+     * W-L counts lag a box-score edit until the next refresh. The team name joins live
+     * from ibl_team_info, which keeps these rows keyed like getFranchiseSummaryRows()
+     * after a rename.
      *
      * @see FranchiseHistoryRepositoryInterface::getFiveSeasonWindowRows()
      *
@@ -124,20 +76,10 @@ class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implemen
     {
         $fiveSeasonsAgoEndingYear = $currentEndingYear - 4;
 
-        // Sargable window: game_type = 1 rows whose season-ending year is in
-        // [$fiveSeasonsAgoEndingYear, $currentEndingYear] are exactly the rows with
-        // game_date in [(start - 1)-10-01, end-10-01).
-        $rangeStart = sprintf('%04d-10-01', $fiveSeasonsAgoEndingYear - 1);
-        $rangeEnd = sprintf('%04d-10-01', $currentEndingYear);
-
         /** @var list<WindowRow> $windowRows */
         $windowRows = $this->fetchAll(
             self::FIVE_SEASON_WINDOW_SQL,
-            "ssssii",
-            $rangeStart,
-            $rangeEnd,
-            $rangeStart,
-            $rangeEnd,
+            "ii",
             $fiveSeasonsAgoEndingYear,
             $currentEndingYear
         );

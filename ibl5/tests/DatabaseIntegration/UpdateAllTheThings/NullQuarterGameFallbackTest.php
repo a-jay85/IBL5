@@ -108,8 +108,10 @@ final class NullQuarterGameFallbackTest extends DatabaseTestCase
         $names = [$v => $this->teamName($v), $h => $this->teamName($h)];
         $repo = new FranchiseHistoryRepository($this->db);
 
+        $this->rebuild();
         $before = $this->windowFor($repo, $names);
         $this->seedNullQuarterGame(self::REGULAR_DATE, 6, $v, $h, 45, 55);
+        $this->rebuild();
         $after = $this->windowFor($repo, $names);
 
         self::assertSame(1, $after[$h]['wins'] - $before[$h]['wins'], 'home five-season wins delta');

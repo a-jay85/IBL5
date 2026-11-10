@@ -25,27 +25,29 @@ expect() { # name expected_rc actual_rc
         h_fail "$1" "expected rc=$2 got rc=$3; output: $LAST_OUT"
     fi
 }
+# want <name> <haystack> <needle> — substring assertion.
+want() { if [[ "$2" == *"$3"* ]]; then h_pass "$1"; else h_fail "$1" "missing [$3] in: $2"; fi; }
 
-# run_pr <title> <labels> — eval the entry gate under production strict mode.
+# run_pr <ui_verdict> <labels> — eval the entry gate under production strict mode.
 # Args are passed positionally into bash -c (no interpolation into the script
-# body) so titles cannot inject shell.
+# body) so verdicts cannot inject shell.
 run_pr() {
     LAST_OUT=$(bash -c "set -euo pipefail; source '$LIB'; hs_eval_pull_request \"\$1\" \"\$2\"" _ "$1" "$2" 2>&1)
     return $?
 }
 
-# ---- pull_request entry gate ----
-run_pr "feat: shiny new page" "";               expect "feat: no label -> FAIL" 1 "$?"
-run_pr "feat: shiny new page" "human-approved";  expect "feat: + human-approved -> PASS" 0 "$?"
-run_pr "feat(ui): scoped" "";                    expect "feat(scope): no label -> FAIL" 1 "$?"
-run_pr "feat!: breaking" "";                     expect "feat!: no label -> FAIL" 1 "$?"
-run_pr "fix: a bug" "";                          expect "fix: -> PASS" 0 "$?"
-run_pr "ci: plumb merge queue" "";               expect "ci: -> PASS" 0 "$?"
-run_pr "feat: x" "not-human-approved-yet";       expect "feat: + lookalike label -> FAIL" 1 "$?"
+# ---- pull_request entry gate (UI verdict from bin/lib/ui-change-classifier.sh) ----
+run_pr ui-paths "";                       expect "ui-paths: no label -> FAIL" 1 "$?"
+run_pr ui-paths "human-approved";         expect "ui-paths: + human-approved -> PASS" 0 "$?"
+run_pr ui-vr "";                          expect "ui-vr: no label -> FAIL" 1 "$?"
+run_pr vr-missing "";                     expect "vr-missing: no label -> FAIL" 1 "$?"
+run_pr ui-unknown "";                     expect "ui-unknown: no label -> FAIL" 1 "$?"
+run_pr "" "";                             expect "empty verdict: no label -> FAIL" 1 "$?"
+run_pr not-ui "";                         expect "not-ui -> PASS" 0 "$?"
+run_pr ui-paths "not-human-approved-yet"; expect "ui-paths: + lookalike label -> FAIL" 1 "$?"
+run_pr ui-paths "";                       want "hold annotation names the verdict" "$LAST_OUT" "This PR changes the UI (ui-paths)"
 
 # ---- diff-pinned approval (ADR-0062 Update) ----
-# want <name> <haystack> <needle> — substring assertion.
-want() { if [[ "$2" == *"$3"* ]]; then h_pass "$1"; else h_fail "$1" "missing [$3] in: $2"; fi; }
 # same / differ <name> <a> <b>
 same()   { if [ -n "$2" ] && [ "$2" = "$3" ]; then h_pass "$1"; else h_fail "$1" "[$2] != [$3]"; fi; }
 differ() { if [ -n "$2" ] && [ -n "$3" ] && [ "$2" != "$3" ]; then h_pass "$1"; else h_fail "$1" "[$2] vs [$3]"; fi; }
@@ -116,7 +118,7 @@ same "fp: clean rebase keeps the fingerprint" "$A" "$FP_RB"
 # G3: the recorded approval survives the clean rebase (real record_body round-trip)
 REC="$T/rec.json"
 comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")" | jq -s . > "$REC"
-run_approval synchronize "" "feat: x" human-approved "$FP_RB" "$REC"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$FP_RB" "$REC"; rc=$?
 expect "approval: clean rebase -> rc 0" 0 "$rc"
 want "approval: clean rebase -> keep" "$LAST_OUT" "VERDICT=keep"
 
@@ -129,7 +131,7 @@ B="$LAST_OUT"
 differ "fp: real diff change alters the fingerprint" "$A" "$B"
 
 # G5: the changed diff drops the approval
-run_approval synchronize "" "feat: x" human-approved "$B" "$REC"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$B" "$REC"; rc=$?
 expect "approval: changed diff -> rc 1" 1 "$rc"
 want "approval: changed diff -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
 
@@ -175,29 +177,29 @@ EMPTY="$T/empty.json"
 printf '[]\n' > "$EMPTY"
 
 # E1, E2: the approving labeled event
-run_approval labeled human-approved "feat: x" human-approved "$A" /nonexistent; rc=$?
+run_approval labeled human-approved ui-paths human-approved "$A" /nonexistent; rc=$?
 expect "approval: label applied -> rc 0" 0 "$rc"
 want "approval: label applied -> record" "$LAST_OUT" "VERDICT=record"
-run_approval labeled human-approved "feat: x" human-approved "" /nonexistent; rc=$?
+run_approval labeled human-approved ui-paths human-approved "" /nonexistent; rc=$?
 expect "approval: label applied, no fingerprint -> rc 1" 1 "$rc"
 want "approval: label applied, no fingerprint -> drop error" "$LAST_OUT" "REASON=error"
 
 # E3: no record
-run_approval synchronize "" "feat: x" human-approved "$A" "$EMPTY"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$EMPTY"; rc=$?
 expect "approval: no record -> rc 1" 1 "$rc"
 want "approval: no record -> drop missing" "$LAST_OUT" "REASON=missing"
 
 # E4: a marker forged by a non-bot user
 FORGED="$T/forged.json"
 comment_json mallory User "2026-10-18T00:00:01Z" "$(record_body "$A")" | jq -s . > "$FORGED"
-run_approval synchronize "" "feat: x" human-approved "$A" "$FORGED"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$FORGED"; rc=$?
 expect "approval: forged non-bot marker -> rc 1" 1 "$rc"
 want "approval: forged non-bot marker -> drop missing" "$LAST_OUT" "REASON=missing"
 
 # E15: a bot comment that carries the marker below line 1 is ignored
 ECHOED="$T/echoed.json"
 comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(printf 'Test report\n%s' "$(record_body "$A")")" | jq -s . > "$ECHOED"
-run_approval synchronize "" "feat: x" human-approved "$A" "$ECHOED"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$ECHOED"; rc=$?
 expect "approval: bot marker on line 2 -> rc 1" 1 "$rc"
 want "approval: bot marker on line 2 -> drop missing" "$LAST_OUT" "REASON=missing"
 
@@ -207,7 +209,7 @@ REVOKED="$T/revoked.json"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(drop_body mismatch)"
 } | jq -s . > "$REVOKED"
-run_approval synchronize "" "feat: x" human-approved "$A" "$REVOKED"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$REVOKED"; rc=$?
 expect "approval: revoked is newest -> rc 1" 1 "$rc"
 want "approval: revoked is newest -> drop missing" "$LAST_OUT" "REASON=missing"
 
@@ -217,7 +219,7 @@ REREC="$T/rerec.json"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(drop_body mismatch)"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(record_body "$A")"
 } | jq -s . > "$REREC"
-run_approval synchronize "" "feat: x" human-approved "$A" "$REREC"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$REREC"; rc=$?
 expect "approval: re-recorded after revoke -> rc 0" 0 "$rc"
 want "approval: re-recorded after revoke -> keep" "$LAST_OUT" "VERDICT=keep"
 
@@ -227,22 +229,22 @@ ORDER="$T/order.json"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(record_body "$B")"
     comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")"
 } | jq -s . > "$ORDER"
-run_approval synchronize "" "feat: x" human-approved "$A" "$ORDER"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$ORDER"; rc=$?
 expect "approval: newest by created_at wins over array order -> rc 1" 1 "$rc"
 want "approval: newest by created_at wins over array order -> drop mismatch" "$LAST_OUT" "REASON=mismatch"
 
 # E8, E9: malformed and unreadable comments fail closed
 BAD="$T/bad.json"
 printf 'not json\n' > "$BAD"
-run_approval synchronize "" "feat: x" human-approved "$A" "$BAD"; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" "$BAD"; rc=$?
 expect "approval: malformed comments -> rc 1" 1 "$rc"
 want "approval: malformed comments -> drop error" "$LAST_OUT" "REASON=error"
-run_approval synchronize "" "feat: x" human-approved "$A" /nonexistent/c.json; rc=$?
+run_approval synchronize "" ui-paths human-approved "$A" /nonexistent/c.json; rc=$?
 expect "approval: unreadable comments -> rc 1" 1 "$rc"
 want "approval: unreadable comments -> drop error" "$LAST_OUT" "REASON=error"
 
 # E10: any other label event compares instead of recording
-run_approval labeled needs-a-human "feat: x" human-approved "$A" "$EMPTY"; rc=$?
+run_approval labeled needs-a-human ui-paths human-approved "$A" "$EMPTY"; rc=$?
 expect "approval: other label event compares -> rc 1" 1 "$rc"
 want "approval: other label event compares -> drop missing" "$LAST_OUT" "REASON=missing"
 
@@ -265,8 +267,8 @@ run_await() {
         stub_refetch() { calls=$((calls + 1)); [ ! -e "$fix/fail-$calls" ] || return 1
             if [ -e "$fix/attempt-$calls.json" ]; then cp "$fix/attempt-$calls.json" "$1"; fi; }
         rc=0
-        hs_eval_approval synchronize "" "feat: x" human-approved "$3" "$4" || true
-        hs_await_record "$2" 0 stub_refetch synchronize "" "feat: x" human-approved "$3" "$4" "$5" || rc=$?
+        hs_eval_approval synchronize "" ui-paths human-approved "$3" "$4" || true
+        hs_await_record "$2" 0 stub_refetch synchronize "" ui-paths human-approved "$3" "$4" "$5" || rc=$?
         echo "VERDICT=$HS_VERDICT REASON=$HS_DROP_REASON CALLS=$calls"; exit "$rc"' "$LIB" "$@" 2>&1)
 }
 
@@ -488,6 +490,56 @@ else
     h_fail "wf: drop path never sources the lib" "source line [$src_ln] record-if line [$rec_ln]"
 fi
 
+# ---- trusted lib: both jobs load the classifier from the BASE ref ----
+# trusted_lib_ok <workflow-file> — rc 0 when the gate sources both libs from
+# the .hs-base checkout of base.sha, runs no head-relative bin/ script, and the
+# write job checks out base.sha (never head.sha).
+trusted_lib_ok() {
+    local wf="$1" gate write
+    gate=$(awk -v j="  human-signoff:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$wf")
+    write=$(awk -v j="  human-approved-fingerprint:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$wf")
+    # shellcheck disable=SC2016  # literal workflow text
+    command grep -qF 'HS_LIB="$GITHUB_WORKSPACE/.hs-base/bin/lib"' <<< "$gate" || return 1
+    # shellcheck disable=SC2016  # literal workflow text
+    command grep -qF 'source "$HS_LIB/ui-change-classifier.sh"' <<< "$gate" || return 1
+    # shellcheck disable=SC2016  # literal workflow text
+    command grep -qF 'source "$HS_LIB/human-signoff-classifier.sh"' <<< "$gate" || return 1
+    command grep -qE '(source|\.) +"?(\./)?bin/' <<< "$gate" && return 1
+    command grep -qE '^[[:space:]]*"?(\./)?bin/' <<< "$gate" && return 1
+    command grep -qF 'path: .hs-base' <<< "$gate" || return 1
+    # shellcheck disable=SC2016  # literal workflow text
+    [ "$(command grep -cF 'ref: ${{ github.event.pull_request.base.sha }}' <<< "$gate")" = 1 ] || return 1
+    # shellcheck disable=SC2016  # literal workflow text
+    command grep -qF 'ref: ${{ github.event.pull_request.head.sha }}' <<< "$write" && return 1
+    # shellcheck disable=SC2016  # literal workflow text
+    command grep -qF 'ref: ${{ github.event.pull_request.base.sha }}' <<< "$write" || return 1
+    return 0
+}
+if trusted_lib_ok "$HS_WF"; then
+    h_pass "wf: gate and write job load the classifier from base"
+else
+    h_fail "wf: gate and write job load the classifier from base" "head-sourced lib or no base checkout"
+fi
+# Negative paths: each scratch copy reintroduces one head-sourced load.
+TL_DIR=$(mktemp -d)
+# shellcheck disable=SC2016  # literal workflow text
+sed 's|source "$HS_LIB/ui-change-classifier.sh"|source bin/lib/ui-change-classifier.sh|' "$HS_WF" > "$TL_DIR/head-ui.yml"
+# shellcheck disable=SC2016  # literal workflow text
+sed 's|source "$HS_LIB/human-signoff-classifier.sh"|source "$HS_LIB/human-signoff-classifier.sh"; source bin/lib/human-signoff-classifier.sh|' "$HS_WF" > "$TL_DIR/head-hs.yml"
+# shellcheck disable=SC2016  # literal workflow text
+sed 's|ref: ${{ github.event.pull_request.base.sha }}|ref: ${{ github.event.pull_request.head.sha }}|' "$HS_WF" > "$TL_DIR/head-ref.yml"
+for neg in head-ui head-hs head-ref; do
+    if trusted_lib_ok "$TL_DIR/$neg.yml"; then
+        h_fail "wf: trusted-lib guard rejects $neg" "accepted"
+    else
+        h_pass "wf: trusted-lib guard rejects $neg"
+    fi
+done
+rm -rf "$TL_DIR"
+# A base without the new classifier holds instead of crashing under set -e.
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: a base without the classifier holds" "$GATE_BLOCK" 'echo "verdict=hold" >> "$GITHUB_OUTPUT"'
+
 # run_write <approved_at> <labels> <events_file> <comments_file> — prints WRITE_RC=<rc>.
 run_write() {
     # shellcheck disable=SC2016  # expands in the child bash
@@ -556,13 +608,30 @@ printf 'not json' > "$T/wr-l3/e.json"
 run_label_at "$T/wr-l3/e.json"
 want "label-at: invalid json -> rc 2" "$LAST_OUT" "LABEL_RC=2"
 
-# E11: a non-feat PR skips the fingerprint entirely
-run_approval synchronize "" "fix: y" human-approved "" /nonexistent; rc=$?
-expect "approval: non-feat skips fingerprint -> rc 0" 0 "$rc"
-want "approval: non-feat skips fingerprint -> pass" "$LAST_OUT" "VERDICT=pass"
+# E11: a not-ui PR skips the fingerprint entirely
+run_approval synchronize "" not-ui human-approved "" /nonexistent; rc=$?
+expect "approval: not-ui skips fingerprint -> rc 0" 0 "$rc"
+want "approval: not-ui skips fingerprint -> pass" "$LAST_OUT" "VERDICT=pass"
+
+# hs_not_ui_passes: a backend-only PR titled "feat: add stat endpoint" now gets
+# the not-ui verdict, so it passes with no label. The title plays no part.
+run_approval synchronize "" not-ui "" "$A" "$REC"; rc=$?
+expect "hs_not_ui_passes -> rc 0" 0 "$rc"
+want hs_not_ui_passes "$LAST_OUT" "VERDICT=pass"
+
+# hs_ui_without_label_holds: CSS paths flow through ui_decide, then the verdict
+# goes to hs_eval_approval with no label.
+HS_UI_PATHS="$T/hs-ui-paths.txt"
+printf 'ibl5/design/components/auth.css\n' > "$HS_UI_PATHS"
+# shellcheck disable=SC2016  # $1/$2 expand inside the child bash
+HS_UI_V=$(bash -c 'source "$1"; ui_decide "$2" 1 "" || true' _ "$REPO_ROOT/bin/lib/ui-change-classifier.sh" "$HS_UI_PATHS")
+same "hs_ui_without_label_holds: ui_decide -> ui-paths" "$HS_UI_V" ui-paths
+run_approval synchronize "" "$HS_UI_V" "" "$A" "$REC"; rc=$?
+expect "hs_ui_without_label_holds -> rc 1" 1 "$rc"
+want hs_ui_without_label_holds "$LAST_OUT" "VERDICT=hold"
 
 # E12: the event names the label but the csv lacks it
-run_approval labeled human-approved "feat: x" "" "$A" "$REC"; rc=$?
+run_approval labeled human-approved ui-paths "" "$A" "$REC"; rc=$?
 expect "approval: no label in csv never passes -> rc 1" 1 "$rc"
 want "approval: no label in csv never passes -> hold" "$LAST_OUT" "VERDICT=hold"
 
@@ -571,15 +640,13 @@ UPPER="ABCDEF0123456789ABCDEF0123456789ABCDEF01"
 bash -c "set -euo pipefail; source '$LIB'; hs_fingerprint_matches \"\$1\" \"\$1\"" _ "$UPPER"; rc=$?
 expect "match: uppercase hex never matches -> rc 1" 1 "$rc"
 
-# E14: tightening only — every Phase 1 FAIL input still fails with a matching record
-run_approval synchronize "" "feat: shiny new page" "" "$A" "$REC"; rc=$?
-expect "tightening: feat: shiny new page -> still rc 1" 1 "$rc"
-run_approval synchronize "" "feat(ui): scoped" "" "$A" "$REC"; rc=$?
-expect "tightening: feat(ui): scoped -> still rc 1" 1 "$rc"
-run_approval synchronize "" "feat!: breaking" "" "$A" "$REC"; rc=$?
-expect "tightening: feat!: breaking -> still rc 1" 1 "$rc"
-run_approval synchronize "" "feat: x" "not-human-approved-yet" "$A" "$REC"; rc=$?
-expect "tightening: feat: x -> still rc 1" 1 "$rc"
+# E14: tightening only — every hold verdict still fails with a matching record
+for hs_v in ui-paths ui-vr vr-missing ui-unknown ""; do
+    run_approval synchronize "" "$hs_v" "" "$A" "$REC"; rc=$?
+    expect "tightening: verdict [$hs_v] -> still rc 1" 1 "$rc"
+done
+run_approval synchronize "" ui-paths "not-human-approved-yet" "$A" "$REC"; rc=$?
+expect "tightening: ui-paths + lookalike label -> still rc 1" 1 "$rc"
 
 # B1-B3: comment-body builders
 bash -c "set -euo pipefail; source '$LIB'; hs_record_comment_body not-a-fingerprint x" >/dev/null 2>&1; rc=$?
@@ -774,28 +841,27 @@ HS_VARIANT_TITLES="feat(ui): x|FEAT: x|feat!: x"
 
 # check_fixture <action> <title> <label> <changes-title> <pr-labels>
 check_fixture() {
-    local action=$1 title=$2 label=$3 ch=$4 prl=$5 ev tag cls_labels nonfilt hs_rc
+    local action=$1 title=$2 label=$3 ch=$4 prl=$5 ev tag nonfilt
     ev=$(mk_event "$action" "$title" "$label" "$ch" "$prl") || {
         h_fail "mk_event $action $title $label"
         return 0
     }
     tag="$action $title $label"
-    cls_labels=$prl
-    [ "$cls_labels" = "-" ] && cls_labels=""
 
-    # Run invariant: wherever the classifier FAILS, the human-signoff job runs.
-    run_pr "$title" "$cls_labels"
-    hs_rc=$?
-    if [ "$hs_rc" -eq 1 ]; then
-        job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
-        if [ "$JOB_RESULT" = "run" ]; then
-            h_pass "hs run-invariant $tag"
-        else
-            h_fail "hs run-invariant $tag" "classifier FAILS but job result is $JOB_RESULT"
-        fi
-    else
-        h_pass "hs run-invariant $tag (classifier passes; no constraint)"
-    fi
+    # Run invariant: the UI verdict depends on the diff and the VR gallery,
+    # which no event payload carries, so the human-signoff job runs on every
+    # event. The title plays no part.
+    case "$action" in
+        auto_merge_*) ;; # human-signoff.yml lists no auto_merge_* types
+        *)
+            job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+            if [ "$JOB_RESULT" = "run" ]; then
+                h_pass "hs always runs $tag"
+            else
+                h_fail "hs always runs $tag" "result $JOB_RESULT"
+            fi
+            ;;
+    esac
 
     # Non-filterable events: payload cannot prove irrelevance.
     nonfilt=0
@@ -804,19 +870,6 @@ check_fixture() {
     esac
     [ "$label" = "human-approved" ] && nonfilt=1
     { [ "$action" = "edited" ] && [ "$ch" = "y" ]; } && nonfilt=1
-    if [ "$nonfilt" -eq 1 ]; then
-        case "$action" in
-            auto_merge_*) ;; # human-signoff.yml lists no auto_merge_* types
-            *)
-                job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
-                if [ "$JOB_RESULT" = "run" ]; then
-                    h_pass "nonfilterable human-signoff.yml human-signoff $tag"
-                else
-                    h_fail "nonfilterable human-signoff.yml human-signoff $tag" "result $JOB_RESULT"
-                fi
-                ;;
-        esac
-    fi
     if [ "$nonfilt" -eq 1 ] || [ "$label" = "auto-mergeable" ]; then
         job_would_run "$WF_DIR/auto-mergeable-label.yml" sync-label "$ev"
         if [ "$JOB_RESULT" = "run" ]; then
@@ -876,7 +929,7 @@ ev_expr "$EV_OPENED" "github.event.pull_request.title =="
 expect "dangling expression exits 2" 2 "$EV_RC"
 
 # ---- awk helper smoke: negative, positive, not-found, multi-line ----
-HS_JOB_IF_RC_EXPECTED=0 # human-signoff carries the payload-provable skip (ADR-0210)
+HS_JOB_IF_RC_EXPECTED=1 # human-signoff has no job-level if: (the UI verdict needs every event)
 out=$(wf_job_if "$WF_DIR/human-signoff.yml" needs-a-human-label)
 rc=$?
 if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
@@ -884,14 +937,8 @@ if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
 else
     h_fail "wf_job_if needs-a-human-label prints always()..." "rc=$rc out=[$out]"
 fi
-out=$(wf_job_if "$WF_DIR/human-signoff.yml" human-signoff 2>&1)
-rc=$?
-expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$rc"
-if [ "${out#'!('}" != "$out" ]; then
-    h_pass "wf_job_if human-signoff prints !(..."
-else
-    h_fail "wf_job_if human-signoff prints !(..." "out=[$out]"
-fi
+wf_job_if "$WF_DIR/human-signoff.yml" human-signoff > /dev/null 2>&1
+expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$?"
 # Negative path: a scratch copy of auto-mergeable-label.yml with the job `if:` deleted.
 sed '/^    if: /d' "$WF_DIR/auto-mergeable-label.yml" > "$EV_DIR/am-noif.yml"
 wf_job_if "$EV_DIR/am-noif.yml" sync-label > /dev/null 2>&1
@@ -939,30 +986,25 @@ group_pred() {
     return 1
 }
 
-# hs_group_pred <workflow-file> — human-signoff's three-arm group:
-# `(P) && format('human-signoff-{0}-skip-{1}', ...) || (approving label) &&
-# format('human-signoff-{0}-approve-{1}', ...) || format('human-signoff-{0}', ...)`.
-# The approving-label arm is pinned literally. Sets GP to P; rc 1 (GP empty)
-# on any other shape. Silent.
-hs_group_pred() {
+# hs_group_ok <workflow-file> — 0 when human-signoff's group is exactly the
+# two-arm shape `(approving label) && format('human-signoff-{0}-approve-{1}', ...)
+# || format('human-signoff-{0}', ...)`. No skip arm. Silent.
+hs_group_ok() {
     local grp re
-    GP=""
     grp=$(wf_concurrency_group "$1") || return 1
-    re="^\\((.*)\\) && format\\('human-signoff-\\{0\\}-skip-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| \\(github\\.event\\.action == 'labeled' && github\\.event\\.label\\.name == 'human-approved'\\) && format\\('human-signoff-\\{0\\}-approve-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| format\\('human-signoff-\\{0\\}', github\\.event\\.pull_request\\.number\\)\$"
-    if [[ "$grp" =~ $re ]]; then
-        GP="${BASH_REMATCH[1]}"
-        return 0
-    fi
-    return 1
+    re="^\\(github\\.event\\.action == 'labeled' && github\\.event\\.label\\.name == 'human-approved'\\) && format\\('human-signoff-\\{0\\}-approve-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| format\\('human-signoff-\\{0\\}', github\\.event\\.pull_request\\.number\\)\$"
+    [[ "$grp" =~ $re ]]
 }
 
-# hs_ident_ok / am_ident_ok <workflow-file> — 0 when the job `if:` equals the
-# negated group predicate (4a). Silent, so mutants can reuse them.
-hs_ident_ok() {
-    local ifx
-    hs_group_pred "$1" || return 1
-    ifx=$(wf_job_if "$1" human-signoff) || return 1
-    [ "$ifx" = "!($GP)" ]
+# hs_no_skip_ok <workflow-file> — 0 when the human-signoff job has no `if:` and
+# the group has no skip arm (4a). am_ident_ok <workflow-file> — 0 when the
+# sync-label `if:` equals the merged guard plus the negated group predicate.
+# Silent, so mutants can reuse them.
+hs_no_skip_ok() {
+    local rc=0
+    hs_group_ok "$1" || return 1
+    wf_job_if "$1" human-signoff > /dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 1 ]
 }
 am_ident_ok() {
     local ifx
@@ -972,16 +1014,16 @@ am_ident_ok() {
 }
 
 # ---- 4a. predicate identity ----
-if ! hs_group_pred "$WF_DIR/human-signoff.yml"; then
-    h_fail "group shape human-signoff.yml"
-fi
-if hs_ident_ok "$WF_DIR/human-signoff.yml"; then
-    h_pass "hs if == !(group predicate)"
+if hs_group_ok "$WF_DIR/human-signoff.yml"; then
+    h_pass "group shape human-signoff.yml (approve + shared arms, no skip arm)"
 else
-    h_fail "hs if == !(group predicate)" "job if and negated group predicate differ"
+    h_fail "group shape human-signoff.yml (approve + shared arms, no skip arm)"
 fi
-HS_P=""
-hs_group_pred "$WF_DIR/human-signoff.yml" && HS_P=$GP
+if hs_no_skip_ok "$WF_DIR/human-signoff.yml"; then
+    h_pass "hs job never skips"
+else
+    h_fail "hs job never skips" "job has an if: or the group has a skip arm"
+fi
 if ! group_pred "$WF_DIR/auto-mergeable-label.yml" auto-mergeable-label; then
     h_fail "group shape auto-mergeable-label.yml"
 fi
@@ -994,19 +1036,11 @@ AM_P=""
 group_pred "$WF_DIR/auto-mergeable-label.yml" auto-mergeable-label && AM_P=$GP
 
 # ---- 4b. guard contents ----
-FEAT_LIT="!contains(github.event.pull_request.title, 'feat') && "
-case "$HS_P" in
-    "$FEAT_LIT"*) h_pass "hs predicate carries feat guard" ;;
-    *) h_fail "hs predicate carries feat guard" "predicate must start with the feat guard so it binds over both arms: [$HS_P]" ;;
+HS_GROUP_TEXT=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
+case "$HS_GROUP_TEXT" in
+    *"pull_request.title"* | *"-skip-"*) h_fail "hs group names no title and no skip arm" "[$HS_GROUP_TEXT]" ;;
+    *) h_pass "hs group names no title and no skip arm" ;;
 esac
-HS_IF=$(wf_job_if "$WF_DIR/human-signoff.yml" human-signoff 2>/dev/null)
-case "$HS_IF" in
-    "!($FEAT_LIT"*) h_pass "hs job if carries feat guard" ;;
-    *) h_fail "hs job if carries feat guard" "job if must start with !( plus the feat guard: [$HS_IF]" ;;
-esac
-h_contains "hs predicate names human-approved" "$HS_P" "github.event.label.name != 'human-approved'"
-HS_ACTIONS=$(grep -o "github\\.event\\.action == '[a-z_]*'" <<< "$HS_P" | sed "s/.*== '//; s/'\$//" | sort -u | tr '\n' ' ')
-h_eq "hs predicate skips only labeled/unlabeled/edited" "edited labeled unlabeled " "$HS_ACTIONS"
 am_bad=""
 case "$AM_P" in *"!= 'human-approved'"*) ;; *) am_bad="$am_bad missing human-approved;" ;; esac
 case "$AM_P" in *"!= 'auto-mergeable'"*) ;; *) am_bad="$am_bad missing auto-mergeable;" ;; esac
@@ -1051,9 +1085,11 @@ hs_job_ok() {
             return 1
         fi
     done
-    hs_group_pred "$1" || return 1
-    ifx=$(wf_job_if "$1" "$id") || return 1
-    [ "$ifx" = "!($GP)" ]
+    # Every other job carries no `if:` at all, so it runs on every event.
+    local rc=0
+    hs_group_ok "$1" || return 1
+    wf_job_if "$1" "$id" > /dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 1 ]
 }
 # am_job_ok <workflow-file> <job-id> — EXEMPT_AM is empty: every job must equal the 4a string.
 am_job_ok() {
@@ -1071,7 +1107,7 @@ while IFS= read -r job_id; do
     if hs_job_ok "$WF_DIR/human-signoff.yml" "$job_id"; then
         h_pass "hs job $job_id guarded-or-exempt"
     else
-        h_fail "hs job $job_id guarded-or-exempt" "neither equals !(group predicate) nor a needs: human-signoff dependent excluding skipped"
+        h_fail "hs job $job_id guarded-or-exempt" "neither unguarded (no if:) nor a needs: human-signoff dependent excluding skipped"
     fi
 done <<< "$HS_IDS"
 AM_IDS=$(wf_job_ids "$WF_DIR/auto-mergeable-label.yml")
@@ -1109,21 +1145,19 @@ for t_title in "feat: x" "fix: x"; do
     tbl "$HS_WF" labeled "$t_title" human-approved n human-approved run
     tbl "$HS_WF" unlabeled "$t_title" human-approved n - run
 done
+# The old ADR-0210 skip rows (a non-feat title with an unrelated label or a
+# non-title edit) now run: the verdict reads the diff, not the payload.
 for t_lbl in needs-a-human auto-mergeable mutation-test; do
-    tbl "$HS_WF" labeled "fix: x" "$t_lbl" n "$t_lbl" skip
-    tbl "$HS_WF" unlabeled "fix: x" "$t_lbl" n - skip
-    for t_title in "feat: x" "FEAT: x" "feat(ui): x" "feat!: x" "chore: refactor feature flags"; do
+    for t_title in "fix: x" "feat: x" "FEAT: x" "feat(ui): x" "feat!: x" "chore: refactor feature flags"; do
         tbl "$HS_WF" labeled "$t_title" "$t_lbl" n "$t_lbl" run
         tbl "$HS_WF" unlabeled "$t_title" "$t_lbl" n - run
     done
 done
 for t_title in "feat: x" "fix: x"; do
     tbl "$HS_WF" edited "$t_title" - y - run
+    tbl "$HS_WF" edited "$t_title" - b - run
+    tbl "$HS_WF" edited "$t_title" - r - run
 done
-tbl "$HS_WF" edited "fix: x" - b - skip
-tbl "$HS_WF" edited "feat: x" - b - run
-tbl "$HS_WF" edited "fix: x" - r - skip
-tbl "$HS_WF" edited "feat: x" - r - run
 
 for t_act in opened reopened synchronize ready_for_review auto_merge_enabled auto_merge_disabled; do
     for t_title in "feat: x" "fix: x"; do
@@ -1145,27 +1179,40 @@ for t_title in "feat: x" "fix: x"; do
 done
 tbl "$AM_WF" opened "fix: x" - m - skip
 
-# Vacuity guard: enough rows, and every job has at least one run and one skip row.
+# Vacuity guard: enough rows; human-signoff has run rows and no skip row;
+# sync-label has at least one run and one skip row.
 if [ "${#EXPECT[@]}" -ge 60 ]; then
     h_pass "table vacuity guard: at least 60 rows"
 else
     h_fail "table vacuity guard: at least 60 rows" "only ${#EXPECT[@]} rows"
 fi
-for t_key in "human-signoff.yml|human-signoff" "auto-mergeable-label.yml|sync-label"; do
-    t_run=0
-    t_skip=0
-    for t_row in "${EXPECT[@]}"; do
-        case "$t_row" in
-            "$t_key|"*"|run") t_run=$((t_run + 1)) ;;
-            "$t_key|"*"|skip") t_skip=$((t_skip + 1)) ;;
-        esac
-    done
-    if [ "$t_run" -ge 1 ] && [ "$t_skip" -ge 1 ]; then
-        h_pass "table vacuity guard: $t_key has run and skip rows"
-    else
-        h_fail "table vacuity guard: $t_key has run and skip rows" "run=$t_run skip=$t_skip"
-    fi
+t_run=0
+t_skip=0
+for t_row in "${EXPECT[@]}"; do
+    case "$t_row" in
+        "human-signoff.yml|human-signoff|"*"|run") t_run=$((t_run + 1)) ;;
+        "human-signoff.yml|human-signoff|"*"|skip") t_skip=$((t_skip + 1)) ;;
+    esac
 done
+if [ "$t_run" -ge 30 ] && [ "$t_skip" -eq 0 ]; then
+    h_pass "table vacuity guard: human-signoff has only run rows"
+else
+    h_fail "table vacuity guard: human-signoff has only run rows" "run=$t_run skip=$t_skip"
+fi
+t_key="auto-mergeable-label.yml|sync-label"
+t_run=0
+t_skip=0
+for t_row in "${EXPECT[@]}"; do
+    case "$t_row" in
+        "$t_key|"*"|run") t_run=$((t_run + 1)) ;;
+        "$t_key|"*"|skip") t_skip=$((t_skip + 1)) ;;
+    esac
+done
+if [ "$t_run" -ge 1 ] && [ "$t_skip" -ge 1 ]; then
+    h_pass "table vacuity guard: $t_key has run and skip rows"
+else
+    h_fail "table vacuity guard: $t_key has run and skip rows" "run=$t_run skip=$t_skip"
+fi
 
 for t_row in "${EXPECT[@]}"; do
     IFS='|' read -r t_wf t_job t_action t_title t_label t_ch t_prl t_want <<< "$t_row"
@@ -1206,7 +1253,8 @@ grp_check "group: synchronize fix -> shared" synchronize "fix: x" - n - "human-s
 grp_check "group: unlabeled human-approved feat -> shared" unlabeled "feat: x" human-approved n - "human-signoff-1"
 grp_check "group: labeled lookalike human-approved-x feat -> shared" labeled "feat: x" human-approved-x n human-approved-x "human-signoff-1"
 grp_check "group: labeled needs-a-human feat -> shared" labeled "feat: x" needs-a-human n needs-a-human "human-signoff-1"
-grp_check "group: labeled needs-a-human fix -> per-run skip" labeled "fix: x" needs-a-human n needs-a-human "human-signoff-1-skip-1"
+grp_check "group: labeled needs-a-human fix -> shared (no skip group)" labeled "fix: x" needs-a-human n needs-a-human "human-signoff-1"
+grp_check "group: edited body fix -> shared (no skip group)" edited "fix: x" - b - "human-signoff-1"
 grp_check "group: edited title feat -> shared" edited "feat: x" - y - "human-signoff-1"
 
 # ---- 4e. permanent mutation checks (forced-trigger rows) ----
@@ -1222,37 +1270,46 @@ mutate() {
     return 0
 }
 
-# 1. hs-if-drops-feat: feat clause removed from the job `if:` only.
-M1="$EV_DIR/m-hs-if-drops-feat.yml"
-if mutate hs-if-drops-feat "$WF_DIR/human-signoff.yml" "$M1" -e "/^    if: /s/!contains(github.event.pull_request.title, 'feat') && //"; then
-    EV_M1=$(mk_event labeled "feat: x" mutation-test n mutation-test)
+# 1. hs-if-added: a title-keyed job `if:` re-added under `name: human-signoff`.
+M1="$EV_DIR/m-hs-if-added.yml"
+awk '{ print } $0 == "    name: human-signoff" { print "    if: ${{ !contains(github.event.pull_request.title, '"'"'feat'"'"') }}" }' \
+    "$WF_DIR/human-signoff.yml" > "$M1"
+if cmp -s "$WF_DIR/human-signoff.yml" "$M1"; then
+    h_fail "mutant identical: hs-if-added"
+else
+    EV_M1=$(mk_event synchronize "feat: x" - n -)
     job_would_run "$M1" human-signoff "$EV_M1"
     if [ "$JOB_RESULT" = "skip" ]; then
-        h_pass "mutant hs-if-drops-feat evaluator exposes the hole"
+        h_pass "mutant hs-if-added evaluator exposes the skip"
     else
-        h_fail "mutant hs-if-drops-feat evaluator exposes the hole" "result $JOB_RESULT"
+        h_fail "mutant hs-if-added evaluator exposes the skip" "result $JOB_RESULT"
     fi
-    if hs_ident_ok "$M1"; then
-        h_fail "mutant hs-if-drops-feat identity guard catches it" "identity still equal"
+    if hs_no_skip_ok "$M1"; then
+        h_fail "mutant hs-if-added no-skip guard catches it" "guard still passed"
     else
-        h_pass "mutant hs-if-drops-feat identity guard catches it"
+        h_pass "mutant hs-if-added no-skip guard catches it"
+    fi
+    if hs_job_ok "$M1" human-signoff; then
+        h_fail "mutant hs-if-added per-job guard catches it" "hs_job_ok accepted a job with an if:"
+    else
+        h_pass "mutant hs-if-added per-job guard catches it"
     fi
 fi
 
-# 2. hs-group-drops-feat: same deletion on the `  group:` line only.
-M2="$EV_DIR/m-hs-group-drops-feat.yml"
-if mutate hs-group-drops-feat "$WF_DIR/human-signoff.yml" "$M2" -e "/^  group: /s/!contains(github.event.pull_request.title, 'feat') && //"; then
-    if hs_ident_ok "$M2"; then
-        h_fail "mutant hs-group-drops-feat identity guard catches it" "identity still equal"
+# 2. hs-group-adds-skip-arm: a per-run skip arm prepended to the group.
+M2="$EV_DIR/m-hs-group-adds-skip-arm.yml"
+if mutate hs-group-adds-skip-arm "$WF_DIR/human-signoff.yml" "$M2" -e "/^  group: /s/^  group: [\$]{{ /&(github.event.action == 'edited') \&\& format('human-signoff-{0}-skip-{1}', github.event.pull_request.number, github.run_id) || /"; then
+    if hs_group_ok "$M2"; then
+        h_fail "mutant hs-group-adds-skip-arm shape guard catches it" "shape still matched"
     else
-        h_pass "mutant hs-group-drops-feat identity guard catches it"
+        h_pass "mutant hs-group-adds-skip-arm shape guard catches it"
     fi
 fi
 
 # 2b. hs-group-drops-approve-arm: the approving-label arm removed from the group.
 M2B="$EV_DIR/m-hs-group-drops-approve-arm.yml"
-if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  group: /s/ || (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id)//"; then
-    if hs_group_pred "$M2B"; then
+if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  group: /s/(github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || //"; then
+    if hs_group_ok "$M2B"; then
         h_fail "mutant hs-group-drops-approve-arm shape guard catches it" "shape still matched"
     else
         h_pass "mutant hs-group-drops-approve-arm shape guard catches it"
@@ -1260,19 +1317,6 @@ if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  
     ev_check "mutant hs-group-drops-approve-arm evaluator exposes the shared group" \
         "$(mk_event labeled 'feat: x' human-approved n human-approved)" \
         "($(wf_concurrency_group "$M2B")) == 'human-signoff-1'" true
-fi
-
-# 3. hs-if-removed: the human-signoff job `if:` line deleted.
-M3="$EV_DIR/m-hs-if-removed.yml"
-# shellcheck disable=SC2016 # literal sed pattern, not shell expansion
-if mutate hs-if-removed "$WF_DIR/human-signoff.yml" "$M3" -e '/^    if: [$]{{ !(/d'; then
-    wf_job_if "$M3" human-signoff > /dev/null 2>&1
-    expect "mutant hs-if-removed wf_job_if exits 1" 1 "$?"
-    if hs_job_ok "$M3" human-signoff; then
-        h_fail "mutant hs-if-removed per-job guard catches it" "hs_job_ok accepted a job with no if:"
-    else
-        h_pass "mutant hs-if-removed per-job guard catches it"
-    fi
 fi
 
 # 4. am-if-drops-auto-mergeable: label clause removed from the sync-label `if:` only.
@@ -1302,5 +1346,417 @@ else
     wf_job_if "$M5" meta-checks > /dev/null 2>&1
     expect "mutant meta-checks-adds-if wf_job_if exits 0" 0 "$?"
 fi
+
+# ---- UI-change classifier (bin/lib/ui-change-classifier.sh) ----
+UI_LIB="$REPO_ROOT/bin/lib/ui-change-classifier.sh"
+UI_TMP=$(mktemp -d)
+# ui_paths_rc <name> <expected_rc> <path>... — ui_paths_touch_ui on the paths.
+ui_paths_rc() {
+    local name="$1" want_rc="$2" rc=0
+    shift 2
+    LAST_OUT=$(printf '%s\n' "$@" | bash -c "set -euo pipefail; source '$UI_LIB'; ui_paths_touch_ui" 2>&1) || rc=$?
+    expect "$name" "$want_rc" "$rc"
+}
+# ui_decide_is <name> <expected_verdict> <renderable> <gallery_or_empty> <path>...
+ui_decide_is() {
+    local name="$1" want_v="$2" renderable="$3" gallery="$4" pf
+    shift 4
+    pf="$UI_TMP/paths-$name.txt"
+    if [ "$#" -gt 0 ]; then printf '%s\n' "$@" > "$pf"; else : > "$pf"; fi
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" "$3" "$4" || true' \
+        _ "$UI_LIB" "$pf" "$renderable" "$gallery" 2>&1)
+    if [ "$LAST_OUT" = "$want_v" ]; then h_pass "$name"; else h_fail "$name" "expected [$want_v] got [$LAST_OUT]"; fi
+}
+
+ui_paths_rc ui_paths_css_holds 0 ibl5/design/components/auth.css
+ui_paths_rc ui_paths_view_holds 0 ibl5/classes/ActivityTracker/ActivityTrackerView.php
+# The suffix clause needs its \.php$ anchor: a NavigationViewInterface.php
+# outside the UI directories is not UI. (The real one lives under
+# ibl5/classes/Navigation/, which the directory clause covers on its own.)
+# Preview.php carries a lowercase "view", which the suffix clause never matches.
+ui_paths_rc ui_paths_view_interface_near_miss 1 \
+    ibl5/classes/Foo/Contracts/NavigationViewInterface.php ibl5/classes/Foo/Preview.php
+ui_paths_rc ui_paths_md_excluded 1 ibl5/design/CSS_TABLE_MAP.md
+ui_paths_rc ui_paths_snapshots_hold 0 \
+    ibl5/tests/e2e/visual/team.spec.ts-snapshots/team-desktop-chromium-linux.png
+# Snapshot folders outside visual/ (the smoke suite's) hold only through
+# the -snapshots/ clause, since the visual/ directory clause cannot reach them.
+ui_paths_rc ui_paths_smoke_snapshots_hold 0 \
+    ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/news.png
+
+cat > "$UI_TMP/g-changed.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [{"module": "Team", "viewport": "desktop", "title": "Team"}], "newCells": [], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-new.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [], "newCells": [{"module": "Draft", "viewport": "mobile", "title": "Draft"}], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-strict-flake.json" <<'JSON'
+{"renderedCells": 4, "changedCells": [{"module": "Team", "viewport": "desktop", "title": "Team", "strict": true}], "newCells": [], "flakeCells": [{"module": "Box", "viewport": "desktop", "title": "Box"}]}
+JSON
+cat > "$UI_TMP/g-zero.json" <<'JSON'
+{"renderedCells": 0, "changedCells": [], "newCells": [], "flakeCells": []}
+JSON
+cat > "$UI_TMP/g-clean.json" <<'JSON'
+{"renderedCells": 12, "changedCells": [], "newCells": [], "flakeCells": []}
+JSON
+
+BACKEND=ibl5/classes/Team/TeamService.php
+ui_decide_is ui_decide_tooling_only_passes not-ui 0 "" bin/some-tool .claude/rules/x.md
+ui_decide_is ui_decide_backend_changed_cell_holds ui-vr 1 "$UI_TMP/g-changed.json" "$BACKEND"
+ui_decide_is ui_decide_new_cell_holds ui-vr 1 "$UI_TMP/g-new.json" "$BACKEND"
+ui_decide_is ui_decide_strict_and_flake_pass not-ui 1 "$UI_TMP/g-strict-flake.json" "$BACKEND"
+ui_decide_is ui_decide_missing_gallery_holds vr-missing 1 "$UI_TMP/does-not-exist.json" "$BACKEND"
+ui_decide_is ui_decide_zero_rendered_holds vr-missing 1 "$UI_TMP/g-zero.json" "$BACKEND"
+ui_decide_is ui_decide_empty_paths_holds ui-unknown 0 ""
+
+printf 'docs/x.md\n' > "$UI_TMP/deny.txt"
+# shellcheck disable=SC2016  # $1/$2 expand inside the child bash
+UI_R=$(bash -c 'set -euo pipefail; source "$1"; ui_renderable "$2" "dependabot[bot]"' _ "$UI_LIB" "$UI_TMP/deny.txt" 2>&1)
+same ui_renderable_dependabot_forced "$UI_R" 1
+# shellcheck disable=SC2016  # $1/$2 expand inside the child bash
+UI_R=$(bash -c 'set -euo pipefail; source "$1"; ui_renderable "$2" "a-jay85"' _ "$UI_LIB" "$UI_TMP/deny.txt" 2>&1)
+same "ui_renderable: a human's deny-listed docs path prints 0" "$UI_R" 0
+ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean.json" \
+    ibl5/IBLbot/package.json ibl5/IBLbot/package-lock.json
+# The VR job runs `bun install` and `composer install` from the PR head, so a
+# bump of the app's own package or lock file holds on its path, gallery or not.
+ui_decide_is ui_decide_dependabot_app_lockfile_holds ui-paths 1 "$UI_TMP/g-clean.json" \
+    ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+
+# ui_await_run <attempts> <rc...> — ui_await_gallery with sleep 0 and a stub
+# fetch that returns the next rc from the list on each call (the last rc
+# repeats). Sets UI_AWAIT_RC and UI_AWAIT_CALLS.
+cat > "$UI_TMP/stub-fetch.sh" <<'SH'
+# shellcheck shell=bash
+stub_fetch() {
+    local n i
+    echo call >> "$UI_STUB_CALLS"
+    n=$(wc -l < "$UI_STUB_CALLS")
+    read -r -a UI_STUB_SEQ_A <<< "$UI_STUB_SEQ"
+    i=$((n - 1))
+    if [ "$i" -ge "${#UI_STUB_SEQ_A[@]}" ]; then i=$((${#UI_STUB_SEQ_A[@]} - 1)); fi
+    return "${UI_STUB_SEQ_A[$i]}"
+}
+SH
+ui_await_run() {
+    local attempts="$1" rc=0
+    shift
+    : > "$UI_TMP/calls"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    UI_STUB_CALLS="$UI_TMP/calls" UI_STUB_SEQ="$*" bash -c \
+        'set -euo pipefail; source "$1"; source "$2"; ui_await_gallery "$3" 0 stub_fetch "$4"' \
+        _ "$UI_LIB" "$UI_TMP/stub-fetch.sh" "$attempts" "$UI_TMP/out.json" > /dev/null 2>&1 || rc=$?
+    UI_AWAIT_RC=$rc
+    UI_AWAIT_CALLS=$(wc -l < "$UI_TMP/calls" | tr -d ' ')
+}
+ui_await_case() { # name want_rc want_calls
+    if [ "$UI_AWAIT_RC" = "$2" ] && [ "$UI_AWAIT_CALLS" = "$3" ]; then
+        h_pass "$1"
+    else
+        h_fail "$1" "rc=$UI_AWAIT_RC calls=$UI_AWAIT_CALLS (want rc=$2 calls=$3)"
+    fi
+}
+ui_await_run 3 1;   ui_await_case ui_await_gallery_bounded 1 3
+ui_await_run 5 1 0; ui_await_case ui_await_gallery_found_late 0 2
+ui_await_run 5 3;   ui_await_case ui_await_gallery_stops_on_completed 1 1
+
+# Approval race: the `labeled human-approved` run must not wait on the gallery.
+# A sync run gives up on the record after HS_AWAIT_ATTEMPTS x HS_AWAIT_SLEEP
+# (about 5 min); the gallery wait runs up to UI_VR_ATTEMPTS x UI_VR_SLEEP
+# (about 45 min). The stub fetch stays pending, so any wait shows as calls.
+# ui_verdict_run <action> <event_label>: sets UI_WV (verdict) and UI_WV_CALLS.
+ui_verdict_run() {
+    : > "$UI_TMP/calls"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    UI_WV=$(UI_STUB_CALLS="$UI_TMP/calls" UI_STUB_SEQ=1 UI_VR_ATTEMPTS=3 UI_VR_SLEEP=0 bash -c \
+        'set -euo pipefail; source "$1"; source "$2"; ui_workflow_verdict "$3" someone stub_fetch "$4" "$5" || true' \
+        _ "$UI_LIB" "$UI_TMP/stub-fetch.sh" "$UI_TMP/backend-paths-race.txt" "$1" "$2" 2>/dev/null)
+    UI_WV_CALLS=$(wc -l < "$UI_TMP/calls" | tr -d ' ')
+}
+printf '%s\n' ibl5/classes/Team/TeamService.php > "$UI_TMP/backend-paths-race.txt"
+ui_verdict_run labeled human-approved
+same "approval race: labeled human-approved never waits on the gallery" "$UI_WV_CALLS" 0
+same "approval race: labeled human-approved with no gallery holds as vr-missing" "$UI_WV" vr-missing
+run_approval labeled human-approved "$UI_WV" human-approved "$(printf 'a%.0s' {1..40})" /dev/null
+expect "approval race: the approving run clears the check" 0 "$?"
+want "approval race: the approving run records its fingerprint" "$LAST_OUT" "VERDICT=record"
+ui_verdict_run synchronize ""
+same "approval race: a synchronize run still waits the full gallery bound" "$UI_WV_CALLS" 3
+same "approval race: a synchronize run with no gallery holds" "$UI_WV" vr-missing
+ui_verdict_run labeled needs-a-human
+same "approval race: another label event still waits on the gallery" "$UI_WV_CALLS" 3
+ui_verdict_run unlabeled human-approved
+same "approval race: removing human-approved still waits on the gallery" "$UI_WV_CALLS" 3
+# The workflow must hand the event to the verdict, or the skip never fires.
+if command grep -qF 'ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh "$ACTION" "$EVENT_LABEL"' \
+    "$REPO_ROOT/.github/workflows/human-signoff.yml"; then
+    h_pass "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict"
+else
+    h_fail "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict" "call not found"
+fi
+
+# The CLI the arming harness calls by subprocess.
+UI_CLI_RC=0
+printf 'ibl5/design/components/auth.css\n' | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
+expect "ui-change-classifier.sh --paths: a CSS path exits 0" 0 "$UI_CLI_RC"
+UI_CLI_RC=0
+printf 'bin/some-tool\n' | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
+expect "ui-change-classifier.sh --paths: a tooling path exits 1" 1 "$UI_CLI_RC"
+# The gallery producers run from PR code, so editing one always holds.
+for p in .github/workflows/e2e-tests.yml bin/vr-build-gallery ibl5/tests/e2e/vr-gallery.ts \
+    ibl5/playwright.visual.config.ts ibl5/tests/e2e/smoke/visual-regression.spec.ts \
+    ibl5/tests/e2e/fixtures/base.ts ibl5/tests/e2e/helpers/navigation.ts \
+    ibl5/tests/e2e/auth.setup.ts .github/actions/setup-docker-e2e/action.yml \
+    ibl5/tests/e2e/visual/foo.spec.ts ibl5/tests/e2e/flows/extra-visual-regression.spec.ts \
+    ibl5/tests/e2e/manual-rows.spec.ts ibl5/tests/e2e/flows/x-manual-rows.spec.ts \
+    ibl5/tests/e2e/flows/auth-regular.setup.ts \
+    ibl5/package.json ibl5/bun.lock ibl5/bun.lockb ibl5/bunfig.toml ibl5/.npmrc \
+    ibl5/composer.json ibl5/composer.lock ibl5/tsconfig.json \
+    bin/vr-review-comment bin/vr-changed-coverage bin/playwright-image-tag \
+    ibl5/bin/run-migrations-ci docker-compose.ci.yml Dockerfile docker/entrypoint.sh; do
+    UI_CLI_RC=0
+    printf '%s\n' "$p" | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
+    expect "ui-change-classifier.sh --paths: gallery producer $p exits 0" 0 "$UI_CLI_RC"
+done
+
+# Near misses: files the VR job never runs stay off the producer list.
+ui_paths_rc ui_paths_producer_near_misses 1 ibl5/tests/e2e/flows/trade.spec.ts \
+    ibl5/IBLbot/package.json bin/vr-refresh-targets docker-compose.yml ibl5/package-lock.json
+
+# ---- gallery trust: ui_fetch_gallery_gh against a fake gh ----
+# The gallery counts only when the run API shows this PR's own E2E Tests run
+# on the exact head SHA. The fake gh serves the run list, the run's artifacts
+# and the artifact zip from MOCK_* values. Each case drives the full
+# ui_workflow_verdict path with a non-UI renderable change, so a rejected
+# gallery shows as vr-missing (hold) and an accepted clean one as not-ui.
+UI_HEAD=2222222222222222222222222222222222222222
+UI_OTHER=3333333333333333333333333333333333333333
+mkdir -p "$UI_TMP/fakebin" "$UI_TMP/zip-clean" "$UI_TMP/zip-dirty"
+printf '%s\n' '{"renderedCells":4,"changedCells":[],"newCells":[]}' > "$UI_TMP/zip-clean/vr-gallery.json"
+printf '%s\n' '{"renderedCells":4,"changedCells":[{"title":"x"}],"newCells":[]}' > "$UI_TMP/zip-dirty/vr-gallery.json"
+(cd "$UI_TMP/zip-clean" && zip -q ../clean.zip vr-gallery.json)
+(cd "$UI_TMP/zip-dirty" && zip -q ../dirty.zip vr-gallery.json)
+cat > "$UI_TMP/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+url="" filter="."
+while [ $# -gt 0 ]; do
+    case "$1" in
+        api) ;;
+        --jq) filter="$2"; shift ;;
+        *) url="$1" ;;
+    esac
+    shift
+done
+case "$url" in
+    */actions/workflows/e2e-tests.yml/runs\?*) json="$MOCK_RUNS" ;;
+    */actions/runs/*/artifacts*) json="$MOCK_ARTS" ;;
+    */actions/artifacts/*/zip) cat "$MOCK_ZIP"; exit 0 ;;
+    *) exit 1 ;;
+esac
+jq -r "$filter" <<< "$json"
+SH
+chmod +x "$UI_TMP/fakebin/gh"
+printf '%s\n' ibl5/classes/Team/TeamService.php > "$UI_TMP/backend-paths.txt"
+
+# ui_run <id> <head_sha> <path> <event> <pr_numbers_json> <head_branch> <head_repo> <status>
+ui_run() {
+    printf '{"id":%s,"head_sha":"%s","path":"%s","event":"%s","pull_requests":%s,"head_branch":"%s","head_repository":{"full_name":"%s"},"status":"%s","created_at":"2026-11-01T00:00:00Z"}' \
+        "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+}
+# ui_art <id> <run_id> <run_head_sha>
+ui_art() {
+    printf '{"artifacts":[{"id":%s,"name":"vr-gallery-json-%s","expired":false,"created_at":"2026-11-01T00:00:00Z","workflow_run":{"id":%s,"head_sha":"%s"}}]}' \
+        "$1" "$3" "$2" "$3"
+}
+UI_E2E=.github/workflows/e2e-tests.yml
+UI_RUN_OK=$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed)
+UI_ART_OK=$(ui_art 77 5 "$UI_HEAD")
+
+# ui_trust_case <name> <want_verdict> <runs_json> <arts_json> [zip] [env...]
+ui_trust_case() {
+    local name="$1" want="$2" runs="$3" arts="$4" zipf="${5:-$UI_TMP/clean.zip}" got
+    shift 5 2>/dev/null || shift $#
+    # shellcheck disable=SC2016  # $1 and $2 expand inside the child bash
+    got=$(env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 \
+        HEAD_REF=feat HEAD_REPO=o/r UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 \
+        MOCK_RUNS="$runs" MOCK_ARTS="$arts" MOCK_ZIP="$zipf" "$@" \
+        bash -c 'set -euo pipefail; source "$1"; ui_workflow_verdict "$2" someone ui_fetch_gallery_gh || true' \
+        _ "$UI_LIB" "$UI_TMP/backend-paths.txt" 2>&1)
+    same "$name" "$got" "$want"
+}
+ui_trust_case "gallery trust: this PR's own E2E run on the head SHA is accepted" not-ui \
+    "{\"workflow_runs\":[$UI_RUN_OK]}" "$UI_ART_OK"
+ui_trust_case "gallery trust: an accepted gallery with a changed cell holds" ui-vr \
+    "{\"workflow_runs\":[$UI_RUN_OK]}" "$UI_ART_OK" "$UI_TMP/dirty.zip"
+ui_trust_case "gallery trust: a run of another workflow is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" .github/workflows/other.yml pull_request '[{"number":42}]' feat o/r completed)]}" "$UI_ART_OK"
+ui_trust_case "gallery trust: a run on another SHA is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_OTHER" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed)]}" "$(ui_art 77 5 "$UI_OTHER")"
+ui_trust_case "gallery trust: a run for another PR is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":99}]' other o/r completed)]}" "$UI_ART_OK"
+ui_trust_case "gallery trust: a non-pull_request run is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" workflow_dispatch '[{"number":42}]' feat o/r completed)]}" "$UI_ART_OK"
+ui_trust_case "gallery trust: an artifact stamped with another SHA is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$UI_RUN_OK]}" "$(ui_art 77 5 "$UI_OTHER")"
+ui_trust_case "gallery trust: an artifact from another run is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$UI_RUN_OK]}" "$(ui_art 77 6 "$UI_HEAD")"
+ui_trust_case "gallery trust: a fork PR matches on head branch and repo" not-ui \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[]' feat fork/r completed)]}" "$UI_ART_OK" \
+    "$UI_TMP/clean.zip" HEAD_REPO=fork/r
+ui_trust_case "gallery trust: a same-branch run from another repo is rejected (holds)" vr-missing \
+    "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[]' feat evil/r completed)]}" "$UI_ART_OK" \
+    "$UI_TMP/clean.zip" HEAD_REPO=fork/r
+ui_trust_case "gallery trust: a missing PR number holds" vr-missing \
+    "{\"workflow_runs\":[$UI_RUN_OK]}" "$UI_ART_OK" "$UI_TMP/clean.zip" PR=
+ui_trust_case "gallery trust: no E2E run holds" vr-missing '{"workflow_runs":[]}' "$UI_ART_OK"
+
+# ui_fetch_rc <runs_json> <arts_json>: prints the fetch rc (3 = finished, no artifact).
+ui_fetch_rc() {
+    local rc=0
+    # shellcheck disable=SC2016  # $1 expands inside the child bash
+    env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 HEAD_REF=feat HEAD_REPO=o/r \
+        MOCK_RUNS="$1" MOCK_ARTS="$2" MOCK_ZIP="$UI_TMP/clean.zip" \
+        bash -c 'set -euo pipefail; source "$1"; ui_fetch_gallery_gh "$2"' _ "$UI_LIB" "$UI_TMP/out.json" \
+        > /dev/null 2>&1 || rc=$?
+    printf '%s' "$rc"
+}
+expect "ui_fetch_gallery_gh: a completed trusted run with no artifact stops the wait" 3 \
+    "$(ui_fetch_rc "{\"workflow_runs\":[$UI_RUN_OK]}" '{"artifacts":[]}')"
+expect "ui_fetch_gallery_gh: an in-progress trusted run with no artifact keeps waiting" 1 \
+    "$(ui_fetch_rc "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":42}]' feat o/r in_progress)]}" '{"artifacts":[]}')"
+expect "ui_fetch_gallery_gh: an untrusted completed run never stops the wait" 1 \
+    "$(ui_fetch_rc "{\"workflow_runs\":[$(ui_run 5 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":99}]' other o/r completed)]}" '{"artifacts":[]}')"
+
+rm -rf "$UI_TMP"
+
+# ---- human-signoff.yml wiring for the UI hold (static) ----
+HS_YML="$REPO_ROOT/.github/workflows/human-signoff.yml"
+E2E_YML="$REPO_ROOT/.github/workflows/e2e-tests.yml"
+
+# workflow_title_free: no title expression, and the gallery wait can read artifacts.
+if grep -F 'pull_request.title' "$HS_YML" > /dev/null; then
+    h_fail "workflow_title_free: human-signoff.yml holds no pull_request.title token"
+else
+    h_pass "workflow_title_free: human-signoff.yml holds no pull_request.title token"
+fi
+if grep -qE '^  actions: read' "$HS_YML"; then
+    h_pass "workflow_title_free: human-signoff.yml grants actions: read"
+else
+    h_fail "workflow_title_free: human-signoff.yml grants actions: read"
+fi
+
+# workflow_label_sync_uses_github_token: a label written with github.token
+# starts no workflow run, so the label the job adds cannot retrigger the gate.
+LABEL_JOB=$(wf_job_block "$HS_YML" needs-a-human-label)
+# shellcheck disable=SC2016 # literal workflow expression text, not shell expansion
+if grep -qxF '          GH_TOKEN: ${{ github.token }}' <<< "$LABEL_JOB"; then
+    h_pass "workflow_label_sync_uses_github_token"
+else
+    h_fail "workflow_label_sync_uses_github_token" "needs-a-human-label GH_TOKEN is not github.token"
+fi
+if grep -q 'secrets\.' <<< "$LABEL_JOB"; then
+    h_fail "workflow_label_sync_uses_github_token: label job reads no secret"
+else
+    h_pass "workflow_label_sync_uses_github_token: label job reads no secret"
+fi
+
+# workflow_e2e_uploads_gallery_json: the upload name starts with the prefix the
+# classifier looks up.
+UI_PREFIX=$(bash -c 'source "$1"; printf %s "$UI_GALLERY_ARTIFACT_PREFIX"' _ "$UI_LIB")
+if [ -n "$UI_PREFIX" ] && grep -qF "name: ${UI_PREFIX}" "$E2E_YML"; then
+    h_pass "workflow_e2e_uploads_gallery_json"
+else
+    h_fail "workflow_e2e_uploads_gallery_json" "e2e-tests.yml has no artifact named ${UI_PREFIX}..."
+fi
+
+# ---- live PR re-read after the gallery wait (stale-event-payload) ----
+# The sync run can wait UI_VR_ATTEMPTS x UI_VR_SLEEP seconds. Its payload
+# labels and head SHA are frozen at trigger time, so the gate re-reads both.
+LV_TMP=$(mktemp -d)
+LV_HEAD=$(printf 'a%.0s' {1..40})
+LV_NEW=$(printf 'b%.0s' {1..40})
+# live_run <stub_json|FAIL> — runs ui_live_pr_state "$LV_HEAD" under strict mode.
+live_run() {
+    printf '%s' "$1" > "$LV_TMP/pr.json"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LV_OUT=$(bash -c 'set -euo pipefail; source "$1"; stub="$3"
+        lv_fetch() { [ "$(cat "$stub")" != FAIL ] && cat "$stub"; }
+        rc=0; ui_live_pr_state "$2" lv_fetch || rc=$?; echo "RC=$rc"' \
+        _ "$UI_LIB" "$LV_HEAD" "$LV_TMP/pr.json" 2>&1)
+}
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"},\"labels\":[{\"name\":\"human-approved\"},{\"name\":\"x\"}]}"
+same "live re-read: same head prints the live labels" "$LV_OUT" "$(printf 'human-approved,x\nRC=0')"
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"},\"labels\":[]}"
+same "live re-read: a removed label reads as no labels" "$LV_OUT" "$(printf '\nRC=0')"
+live_run "{\"head\":{\"sha\":\"$LV_NEW\"},\"labels\":[{\"name\":\"human-approved\"}]}"
+same "live re-read: a moved head is rc 3 and prints no labels" "$LV_OUT" "RC=3"
+live_run FAIL
+same "live re-read: a failed fetch is rc 1" "$LV_OUT" "RC=1"
+live_run "{\"head\":{\"sha\":\"$LV_HEAD\"}}"
+same "live re-read: missing labels is rc 1" "$LV_OUT" "RC=1"
+live_run '{"head":{"sha":"short"},"labels":[]}'
+same "live re-read: a malformed head SHA is rc 1" "$LV_OUT" "RC=1"
+live_run 'not json'
+same "live re-read: unparseable JSON is rc 1" "$LV_OUT" "RC=1"
+
+# hs_live_reread_ok <workflow-file> — 0 when the eval step re-reads the live PR
+# after ui_workflow_verdict and before the first hs_pr_cleared, takes the live
+# labels, posts superseded on a moved head, and the label job skips superseded.
+hs_live_reread_ok() {
+    local v l a s c
+    v=$(command grep -n -F -m1 'UI_VERDICT=$(ui_workflow_verdict' "$1" | cut -d: -f1)
+    l=$(command grep -n -F -m1 'LIVE_LABELS=$(ui_live_pr_state "$HEAD_SHA" ui_fetch_pr_gh) || LIVE_RC=$?' "$1" | cut -d: -f1)
+    a=$(command grep -n -F -m1 '0) LABELS="$LIVE_LABELS" ;;' "$1" | cut -d: -f1)
+    s=$(command grep -n -F -m1 'echo "verdict=superseded" >> "$GITHUB_OUTPUT"' "$1" | cut -d: -f1)
+    c=$(command grep -n -F -m1 'hs_pr_cleared "$UI_VERDICT" "$LABELS"' "$1" | cut -d: -f1)
+    [ -n "$v" ] && [ -n "$l" ] && [ -n "$a" ] && [ -n "$s" ] && [ -n "$c" ] || return 1
+    [ "$v" -lt "$l" ] && [ "$l" -lt "$a" ] && [ "$a" -lt "$c" ] && [ "$s" -lt "$c" ] || return 1
+    [ "$(sed -n "$((s + 1))p" "$1" | tr -d ' ')" = "exit0;;" ] || return 1
+    wf_job_block "$1" needs-a-human-label | command grep -qF 'if [ "$VERDICT" = "superseded" ]; then' || return 1
+}
+if hs_live_reread_ok "$HS_YML"; then
+    h_pass "live re-read: human-signoff.yml re-reads the PR between the wait and the verdict"
+else
+    h_fail "live re-read: human-signoff.yml re-reads the PR between the wait and the verdict" "wiring not found or out of order"
+fi
+LV_M1="$LV_TMP/m-no-reread.yml"
+sed '/LIVE_LABELS=$(ui_live_pr_state/d' "$HS_YML" > "$LV_M1"
+if cmp -s "$HS_YML" "$LV_M1"; then
+    h_fail "mutant identical: no-reread"
+elif hs_live_reread_ok "$LV_M1"; then
+    h_fail "mutant no-reread: guard catches a deleted re-read" "guard still passed"
+else
+    h_pass "mutant no-reread: guard catches a deleted re-read"
+fi
+LV_M2="$LV_TMP/m-stale-labels.yml"
+sed 's/0) LABELS="\$LIVE_LABELS" ;;/0) : ;;/' "$HS_YML" > "$LV_M2"
+if cmp -s "$HS_YML" "$LV_M2"; then
+    h_fail "mutant identical: stale-labels"
+elif hs_live_reread_ok "$LV_M2"; then
+    h_fail "mutant stale-labels: guard catches the payload labels kept" "guard still passed"
+else
+    h_pass "mutant stale-labels: guard catches the payload labels kept"
+fi
+LV_M3="$LV_TMP/m-superseded-falls-through.yml"
+awk 'p && /exit 0 ;;/ { sub(/exit 0 ;;/, ";;") } { p = index($0, "verdict=superseded") > 0; print }' "$HS_YML" > "$LV_M3"
+if cmp -s "$HS_YML" "$LV_M3"; then
+    h_fail "mutant identical: superseded-falls-through"
+elif hs_live_reread_ok "$LV_M3"; then
+    h_fail "mutant superseded-falls-through: guard catches a moved head reaching the verdict" "guard still passed"
+else
+    h_pass "mutant superseded-falls-through: guard catches a moved head reaching the verdict"
+fi
+LV_M4="$LV_TMP/m-label-job-writes.yml"
+sed '/if \[ "\$VERDICT" = "superseded" \]; then/d' "$HS_YML" > "$LV_M4"
+if cmp -s "$HS_YML" "$LV_M4"; then
+    h_fail "mutant identical: label-job-writes"
+elif hs_live_reread_ok "$LV_M4"; then
+    h_fail "mutant label-job-writes: guard catches a label write on superseded" "guard still passed"
+else
+    h_pass "mutant label-job-writes: guard catches a label write on superseded"
+fi
+rm -rf "$LV_TMP"
 
 h_done

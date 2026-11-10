@@ -46,7 +46,7 @@ const { titleToModule } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-com
 const { triageCell, buildGalleryHtml } = await import(resolve(ibl5Dir, 'tests/e2e/vr-gallery.ts'));
 
 type Viewport = 'desktop' | 'mobile';
-type GalleryCell = { module: string; viewport: Viewport; title: string; verdict: string; isNew?: boolean };
+type GalleryCell = { module: string; viewport: Viewport; title: string; verdict: string; isNew?: boolean; strict?: true };
 
 const USAGE =
   'Usage: bin/vr-build-gallery --base-sha=SHA [--actuals=PATH] [--out-dir=PATH] [--gallery-json=PATH]';
@@ -176,6 +176,7 @@ type Triaged = {
   module: string;
   viewport: Viewport;
   verdict: string;
+  strict?: true;
   before: Buffer | null;
   afterA: Buffer;
   diff?: Buffer;
@@ -212,6 +213,7 @@ for (const title of titles.sort()) {
     module,
     viewport,
     verdict: res.verdict,
+    ...(res.strict ? { strict: true as const } : {}),
     before,
     afterA: afterA as Buffer,
     diff: res.diff,
@@ -226,6 +228,7 @@ for (const t of triaged) {
     viewport: t.viewport,
     title: t.title,
     verdict: t.verdict,
+    ...(t.strict ? { strict: true as const } : {}),
   };
 
   switch (t.verdict) {
@@ -266,7 +269,7 @@ if (existsSync(reportSrc)) {
 }
 
 // ── Machine-readable manifest for bin/vr-review-comment ──────────────────────
-const lean = (c: GalleryCell) => ({ module: c.module, viewport: c.viewport, title: c.title });
+const lean = (c: GalleryCell) => ({ module: c.module, viewport: c.viewport, title: c.title, ...(c.strict ? { strict: true } : {}) });
 writeFileSync(
   resolve(repoRoot, galleryJsonPath),
   JSON.stringify(

@@ -931,8 +931,35 @@ else
 fi
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
-expect_rc0 "rc0: pr_feat_hold, non-feat title" \
-    "pr_feat_hold 'fix: a bug' '[]'"
+expect_rc0 "rc0: pr_ui_hold, backend-only files" \
+    "pr_ui_hold '[{\"filename\":\"ibl5/classes/Trade/TradeService.php\",\"status\":\"modified\"}]' '[]'"
+# pr_ui_hold_css_holds: a CSS path holds with `ui-awaiting-signoff`; the
+# human-approved label clears it; an empty file list fails closed.
+ui_hold_check() { # name  files_json  labels_json  expected
+    local script="$BASE_TMP/ui-hold.sh" out
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        echo "pr_ui_hold '$2' '$3'"
+    } > "$script"
+    out="$(bash "$script" 2>&1)" || true
+    if [ "$out" = "$4" ]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — want '$4', got '$out'"
+        FAILED=1
+    fi
+}
+ui_hold_check "pr_ui_hold_css_holds" \
+    '[{"filename":"ibl5/design/input.css","status":"modified"}]' '[]' "ui-awaiting-signoff"
+ui_hold_check "pr_ui_hold_human_approved_clears" \
+    '[{"filename":"ibl5/design/input.css","status":"modified"}]' '[{"name":"human-approved"}]' ""
+ui_hold_check "pr_ui_hold_empty_files_fails_closed" \
+    '[]' '[]' "ui-classifier-error"
+ui_hold_check "pr_ui_hold_rename_from_ui_path_holds" \
+    '[{"filename":"ibl5/classes/X.php","previous_filename":"ibl5/design/input.css","status":"renamed"}]' '[]' "ui-awaiting-signoff"
+ui_hold_check "pr_ui_hold_gh_pr_view_shape_fails_closed" \
+    '[{"path":"ibl5/classes/X.php","changeType":"MODIFIED"}]' '[]' "ui-classifier-error"
 expect_rc0 "rc0: pr_pipeline_authored_hold, neither axis fires" \
     "pr_pipeline_authored_hold '[]' 'feature-x'"
 expect_rc0 "rc0: pr_unresolved_findings_hold, gh api unavailable (fail-closed path)" \

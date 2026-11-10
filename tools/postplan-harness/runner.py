@@ -883,6 +883,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             inputs = ArmInputs(
                 pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
                 pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
+                ui_paths=git.conformance_files(),
                 unresolved_conformance=unresolved, phase5_status=phase5,
                 exec_mutations_holding=(mutation_report.holding
                                         if mutation_report is not None else None),

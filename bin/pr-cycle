@@ -62,7 +62,7 @@
 #                            0 disables the held-unchanged skip. When 1, a PR whose last
 #                            post-plan run held only for conditions a human clears (1
 #                            manual-testing-clearance, 3 unresolved-MISSING-items, 7
-#                            plan-auto-merge-hold, 8 feat-commit-type-floor), whose hold
+#                            plan-auto-merge-hold, 8 ui-review-floor), whose hold
 #                            record is readable and current, and whose diff matches the
 #                            sticky **Reviewed diff:** is skipped until the head or the
 #                            plan changes. Skipped PRs are listed in the your-turn DM

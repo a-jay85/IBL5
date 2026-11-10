@@ -136,7 +136,7 @@ def test_no_mutating_gh_commands_ever_executed():
 def _fixture(**over):
     fx = {
         "slug": "synthetic-degrade",
-        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "diff": "diff --git a/ibl5/classes/Trade/TradeService.php b/ibl5/classes/Trade/TradeService.php\n+<?php echo 1;\n",
         "pr_number": 9999,
         "pr_meta": {"number": 9999, "title": "fix: synthetic",
                     "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
@@ -179,7 +179,7 @@ def test_clean_rerun_with_open_pr_skips_pr_copy():
     """No pr-copy canned: calling it would raise llm-fixture-missing and fail the run."""
     out = tempfile.mkdtemp()
     canned = {k: v for k, v in CANNED.items() if k != "pr-copy"}
-    fx = _fixture(clean_tree=True, head_subject="feat: add widget")
+    fx = _fixture(clean_tree=True, head_subject="feat: add widget", diff=_UI_DIFF)
     fx["pr_meta"] = dict(fx["pr_meta"], title="feat: synthetic")
     res = runner.run(fx, out, FixtureLlm(UsageLedger(), canned), mode="replay")
     assert res.terminal != TerminalState.FAILED, res.error
@@ -253,6 +253,7 @@ def test_new_pr_on_stacked_branch_opens_against_its_parent():
     assert _created_base(merge_target="origin/parent-branch") == "parent-branch"
 
 
+_UI_DIFF = "diff --git a/ibl5/design/input.css b/ibl5/design/input.css\n+a{}\n"
 _TOOLING_DIFF = "diff --git a/bin/fleet-status b/bin/fleet-status\n+echo 1\n"
 
 
@@ -277,7 +278,7 @@ def test_model_feat_copy_on_tooling_diff_opens_chore_pr_and_clears_condition_8()
 def test_model_feat_copy_on_runtime_diff_still_opens_feat_pr_and_holds_condition_8():
     out = tempfile.mkdtemp()
     llm = FixtureLlm(UsageLedger(), _feat_pr_copy_canned())
-    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    res = runner.run(_fixture(pr_number=None, pr_meta=None, diff=_UI_DIFF), out, llm, mode="replay")
     creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
     assert creates and creates[-1]["title"] == "feat: synthetic"
     assert 8 in {c.number for c in res.arm.holds}
@@ -2471,3 +2472,37 @@ def test_precommit_hang_fails_run_closed_no_push_no_gatefix(tmp_path, monkeypatc
     assert "phase2: PR #" not in audit
     assert "REBASE=" not in audit
     assert "phase6.5" not in audit
+
+
+class _UiRenameGit(runner.ReplayGit):
+    """A UI file renamed to a non-UI path: changed_files lists only the new path."""
+    def changed_files(self, base="origin/master"):
+        return ["ibl5/classes/Moved.php"]
+
+    def conformance_files(self, base="origin/master"):
+        return ["ibl5/classes/Moved.php", "ibl5/design/input.css"]
+
+
+def test_arm_inputs_ui_paths_carry_rename_source(tmp_path, monkeypatch):
+    """The UI floor must see a rename's old path, so ArmInputs.ui_paths reads
+    `conformance_files`.
+
+    Mutation caught: drop `ui_paths=git.conformance_files()` from the ArmInputs
+    build and ui_paths is None, so condition (8) reads only the new path.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    monkeypatch.setattr(runner, "ReplayGit", _UiRenameGit)
+    seen = []
+    real_evaluate = runner.evaluate
+
+    def _spy(inputs):
+        seen.append(inputs.ui_paths)
+        return real_evaluate(inputs)
+
+    monkeypatch.setattr(runner, "evaluate", _spy)
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    res = runner.run(_fixture(plan_content=_PLAN_RENAME_TARGET_ONLY), out,
+                     FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert seen and "ibl5/design/input.css" in seen[0]
+    assert 8 in {c.number for c in res.arm.holds}

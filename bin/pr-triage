@@ -706,7 +706,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
     clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"
     golden="$(pr_golden_hold "$files")"
-    feat="$(pr_feat_hold "$title" "$labels")"
+    # The UI floor needs the REST file list: only it carries a rename's old
+    # path (`gh pr list --json files` drops it). A failed read passes "" and
+    # pr_ui_hold fails closed.
+    ui_files="$($GH_API_CMD "repos/$SLUG/pulls/$num/files?per_page=100" --paginate --slurp 2>/dev/null \
+        | jq -c 'add // []' 2>/dev/null)" || ui_files=""
+    feat="$(pr_ui_hold "$ui_files" "$labels")"
     # `| tr` like deps/unresolved below: both axes can fire, and the predicate
     # emits one reason per LINE — an untranslated newline splits the report row.
     pipeline="$(pr_pipeline_authored_hold "$labels" "$head_ref" | tr '\n' ' ')"

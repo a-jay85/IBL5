@@ -1,6 +1,6 @@
 ---
-description: Conventional-commit type rubric for PR titles — when a change is feat: (and trips the human-signoff hold) vs. fix/refactor/chore/docs/etc. Single source of truth for /post-plan Phase 2 titling. Read-on-demand at title time (the one-line decision test is mirrored in auto-commit.md); auto-loads only when editing the gate definitions.
-last_verified: 2026-10-27
+description: Conventional-commit type rubric for PR titles — when a change is feat: vs. fix/refactor/chore/docs/etc. The type does not decide the human-signoff hold. Single source of truth for /post-plan Phase 2 titling. Read-on-demand at title time (the one-line decision test is mirrored in auto-commit.md); auto-loads only when editing the gate definitions.
+last_verified: 2026-11-07
 paths:
   - ".github/workflows/human-signoff.yml"
   - ".claude/skills/post-plan/SKILL.md"
@@ -9,9 +9,11 @@ paths:
 # Commit-Type Rubric (PR titles)
 
 This file is the **single source of truth** for choosing a conventional-commit
-type when titling a PR or commit. `/post-plan` Phase 2 points here. Get the type
-right because the title-only required GitHub check (`.github/workflows/human-signoff.yml`)
-grades the PR **title** alone — it never reads the diff.
+type when titling a PR or commit. `/post-plan` Phase 2 points here. The type
+describes the change. The required `human-signoff` check
+(`.github/workflows/human-signoff.yml`) ignores the title. A PR holds for a human
+when its diff touches a UI path or its VR gallery has a changed or new gating cell,
+as decided by `bin/lib/ui-change-classifier.sh` (ADR-0233).
 
 ## The decision test
 
@@ -50,15 +52,11 @@ standing convention closes, **not** a model `feat:` example.
 
 ## Anti-gaming clause
 
-Classify by what the diff **IS**, never by the desired merge outcome. `feat:`
-tripping a human-merge hold is the gate **working**, not a cost to route around.
-Under-titling a feature as `chore:` / `refactor:` to dodge the hold defeats the
-only gate (`human-signoff`) that is blind to diff content.
+Classify by what the diff **IS**. Pick the type the change earns. The hold reads
+the diff, so retitling a PR cannot move it in or out of the hold.
 
-## Intent-alignment with the consumer regex
+## Where the hold lives
 
-The human-signoff hold trips on all four conventional-commit feature forms —
-`feat:`, `feat(scope):`, `feat!:`, and `feat(scope)!:` — matching the
-case-insensitive regex `^feat(\([^)]*\))?!?:` used by
-`.github/workflows/human-signoff.yml` and `/post-plan` Phase 6.5. Keep titles
-consistent with that regex so the gate reads the type accurately.
+`bin/lib/ui-change-classifier.sh` decides the hold from the changed paths and the
+VR gallery JSON. `.github/workflows/human-signoff.yml` and `/post-plan` Phase 6.5
+condition (8) `ui-review-floor` both call it. The `human-approved` label clears it.

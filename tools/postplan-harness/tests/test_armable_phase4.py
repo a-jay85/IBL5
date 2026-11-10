@@ -26,7 +26,7 @@ STALE = "b" * 40
 
 def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
+                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, current_tree=TREE,
@@ -133,21 +133,21 @@ def test_condition_11_name_reflects_the_widened_rule():
 
 
 def test_condition_11_unscored_hold_is_additive_with_8():
-    both = inputs(pr_title="feat: shiny new GM power",
+    both = inputs(pr_title="feat: shiny new GM power", classification=Classification(files=["ibl5/design/input.css"]), 
                   unresolved_findings=["unresolved-finding:-"])
     assert _held(evaluate(both)) >= {8, 11}
     # clearing the thread list cannot release (8)
-    assert not evaluate(inputs(pr_title="feat: x", unresolved_findings=[])).armed
+    assert not evaluate(inputs(pr_title="feat: x", classification=Classification(files=["ibl5/design/input.css"]), unresolved_findings=[])).armed
 
 
 def test_conditions_11_and_12_are_additive():
-    feat = inputs(pr_title="feat: shiny new GM power")
+    feat = inputs(pr_title="feat: shiny new GM power", classification=Classification(files=["ibl5/design/input.css"]))
     assert _held(evaluate(feat)) == {8}
-    both = inputs(pr_title="feat: shiny new GM power", unresolved_findings=None,
+    both = inputs(pr_title="feat: shiny new GM power", classification=Classification(files=["ibl5/design/input.css"]), unresolved_findings=None,
                   fidelity_verdict=None)
     assert _held(evaluate(both)) == {8, 11, 12}
     # a clear (11) cannot release the hold (8) raised
-    assert not evaluate(inputs(pr_title="feat: x", unresolved_findings=[])).armed
+    assert not evaluate(inputs(pr_title="feat: x", classification=Classification(files=["ibl5/design/input.css"]), unresolved_findings=[])).armed
 
 
 # --- condition (11) shell-out fail-closed ------------------------------------

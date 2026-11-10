@@ -463,6 +463,19 @@ jobs:
             --gallery-json=ibl5/vr-gallery.json
           cat ibl5/vr-gallery.json
 
+      # The human-signoff required check reads this gallery to decide whether a
+      # PR changes the UI (bin/lib/ui-change-classifier.sh). The classifier
+      # trusts this artifact only through the run API: this workflow, a
+      # pull_request run for that PR, on its exact head SHA. The name alone
+      # proves nothing. An E2E memo hit uploads none, so that PR holds.
+      - name: Upload VR gallery JSON for the UI-review hold
+        if: always() && steps.vr-gallery.outcome == 'success' && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vr-gallery-json-${{ github.event.pull_request.head.sha }}
+          path: ibl5/vr-gallery.json
+          retention-days: 30
+
       - name: Copy new-screen renders into gallery deploy tree
         if: always() && env.VRCTX_PUBLISH == 'true'
         continue-on-error: true

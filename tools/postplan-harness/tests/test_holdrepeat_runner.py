@@ -40,7 +40,7 @@ CLEAN_PLAN = "# Synthetic plan\n\nBody with no matrix and no frontmatter.\n"
 def _fixture(plan=HOLD_7_PLAN, **over):
     fx = {
         "slug": SLUG,
-        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "diff": "diff --git a/ibl5/classes/Trade/TradeService.php b/ibl5/classes/Trade/TradeService.php\n+<?php echo 1;\n",
         "pr_number": 4242,
         "pr_meta": {"number": 4242, "title": "fix: synthetic",
                     "body": "## Manual Testing\n\nNo manual testing needed\n\n**Merge danger:** Door: two-way · Blast radius: localized · Why: mechanical: no one-way trigger in the realized diff\n",
@@ -120,8 +120,8 @@ def test_third_identical_hold_sends_no_second_dm(tmp_path, dm):
 
 def test_changed_hold_set_sends_no_dm(tmp_path, dm):
     _run(tmp_path, 1)
-    # Second run holds on a different structural condition: 7 clears, 8 (feat title floor) holds.
-    fx2 = _fixture(CLEAN_PLAN, pr_meta={"number": 4242, "title": "feat: synthetic ability",
+    # Second run holds on a different structural condition: 7 clears, 8 (UI review floor) holds.
+    fx2 = _fixture(CLEAN_PLAN, diff="diff --git a/ibl5/design/input.css b/ibl5/design/input.css\n+a{}\n", pr_meta={"number": 4242, "title": "feat: synthetic ability",
                                         "body": "## Manual Testing\n\nNo manual testing needed\n",
                                         "headRefOid": "deadbeef"})
     res2, _, line2, _ = _run(tmp_path, 2, fixture=fx2)

@@ -126,35 +126,81 @@ final class PrArmableLibCliTest extends TestCase
         self::assertSame('', $this->runFn('pr_golden_hold', [$files])['output']);
     }
 
-    // --- (8) feat: floor — label-aware ---
+    // --- (8) UI floor — path-keyed, label-aware ---
 
-    public function testFeatHoldFiresOnFeatTitleWithoutLabel(): void
+    public function testUiHoldFiresOnCssChangeWithoutLabel(): void
     {
         self::assertSame(
-            'feat-awaiting-signoff',
-            $this->runFn('pr_feat_hold', ['feat: shiny new page', '[]'])['output']
+            'ui-awaiting-signoff',
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/design/input.css","status":"modified"}]', '[]'])['output']
         );
     }
 
-    public function testFeatHoldClearedByHumanApprovedLabel(): void
+    public function testUiHoldClearedByHumanApprovedLabel(): void
     {
         self::assertSame(
             '',
-            $this->runFn('pr_feat_hold', ['feat(x): y', '[{"name":"human-approved"}]'])['output']
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/design/input.css","status":"modified"}]', '[{"name":"human-approved"}]'])['output']
         );
     }
 
-    public function testFeatHoldEmptyForNonFeatTitle(): void
-    {
-        self::assertSame('', $this->runFn('pr_feat_hold', ['fix(a11y): z', '[]'])['output']);
-    }
-
-    public function testFeatHoldFiresOnBangVariant(): void
+    public function testUiHoldEmptyForBackendOnlyChange(): void
     {
         self::assertSame(
-            'feat-awaiting-signoff',
-            $this->runFn('pr_feat_hold', ['feat!: breaking', '[]'])['output']
+            '',
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/Trade/TradeService.php","status":"modified"}]', '[]'])['output']
         );
+    }
+
+    public function testUiHoldFailsClosedOnEmptyFileList(): void
+    {
+        self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', ['[]', '[]'])['output']);
+    }
+
+    public function testUiHoldCountsPreviousFilenameOfRename(): void
+    {
+        self::assertSame(
+            'ui-awaiting-signoff',
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/X.php","previous_filename":"ibl5/design/input.css","status":"renamed"}]', '[]'])['output']
+        );
+    }
+
+    public function testUiHoldFailsClosedOnRenameWithoutOldPath(): void
+    {
+        self::assertSame(
+            'ui-classifier-error',
+            $this->runFn('pr_ui_hold', ['[{"filename":"ibl5/classes/X.php","status":"renamed"}]', '[]'])['output']
+        );
+    }
+
+    public function testUiHoldPassesJustBelowFileCap(): void
+    {
+        $files = json_encode(array_fill(0, 2999, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
+        self::assertSame('', $this->runUiHoldWithFileArg($files, '[]'));
+    }
+
+    public function testUiHoldFailsClosedAtFileCap(): void
+    {
+        $files = json_encode(array_fill(0, 3000, ['filename' => 'ibl5/classes/X.php', 'status' => 'modified']), JSON_THROW_ON_ERROR);
+        self::assertSame('ui-classifier-error', $this->runUiHoldWithFileArg($files, '[]'));
+    }
+
+    public function testUiHoldFailsClosedOnGhPrViewShape(): void
+    {
+        // gh pr view returns {path, changeType} and never a rename's old path.
+        foreach ([
+            '[{"path":"ibl5/classes/X.php","changeType":"RENAMED","additions":1,"deletions":1}]',
+            '[{"path":"ibl5/classes/Trade/TradeService.php","changeType":"MODIFIED"}]',
+        ] as $files) {
+            self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        }
+    }
+
+    public function testUiHoldFailsClosedOnNonArrayFileList(): void
+    {
+        foreach (['{}', ''] as $files) {
+            self::assertSame('ui-classifier-error', $this->runFn('pr_ui_hold', [$files, '[]'])['output']);
+        }
     }
 
     // --- (10) pipeline-authored floor — UNCONDITIONAL (no override label) ---
@@ -204,6 +250,33 @@ final class PrArmableLibCliTest extends TestCase
     /**
      * @param list<string> $args
      * @param array<string,string> $env
+     * @return array{output: string, exit: int}
+     */
+    /**
+     * Run pr_ui_hold with the file list read from a temp file inside bash.
+     * A 3000-entry list is ~165 KB, over Linux's 128 KB per-argument exec cap,
+     * so it cannot go on the command line. A bash function call has no such cap.
+     */
+    private function runUiHoldWithFileArg(string $filesJson, string $labelsJson): string
+    {
+        $filesPath = $this->tmpDir . '/files.json';
+        file_put_contents($filesPath, $filesJson);
+        $script = $this->tmpDir . '/ui-hold-from-file.sh';
+        file_put_contents(
+            $script,
+            "#!/bin/bash\nset -uo pipefail\nsource " . escapeshellarg($this->libPath)
+            . "\npr_ui_hold \"\$(cat \"\$1\")\" \"\$2\"\n"
+        );
+        $cmd = 'bash ' . escapeshellarg($script) . ' ' . escapeshellarg($filesPath) . ' ' . escapeshellarg($labelsJson) . ' 2>&1';
+        $output = [];
+        $exit = 0;
+        exec($cmd, $output, $exit);
+        return trim(implode("\n", $output));
+    }
+
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $env
      * @return array{output: string, exit: int}
      */
     private function runFn(string $fn, array $args, array $env = []): array

@@ -18,10 +18,11 @@ merge; a false ARM ships unreviewed code).
 from __future__ import annotations
 
 import os
-
 import re
+import subprocess
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from . import labels
@@ -40,7 +41,6 @@ _DOCS_REFRESH_CLASS_README = re.compile(r"ibl5/classes/.*/README\.md")
 # literal to the --context= of .github/workflows/all-checks-settled.yml and to bin/lib/pr-armable.sh.
 AGGREGATOR_CONTEXT = "All checks settled"
 
-FEAT_RE = re.compile(r"^feat(\([^)]*\))?!?:", re.IGNORECASE)
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
 # Tail-clause AND gate (pr_manual_testing_clearance parity, bin/lib/pr-armable.sh).
@@ -162,10 +162,24 @@ def dep_numbers(body: str) -> list[int]:
     return nums
 
 
-def feat_hold(title: str, labels: list[str]) -> bool:
-    if FEAT_RE.match((title or "").strip()):
-        return "human-approved" not in labels
-    return False
+UI_CLASSIFIER = Path(__file__).resolve().parents[3] / "bin" / "lib" / "ui-change-classifier.sh"
+
+
+def ui_hold(files: list[str], labels: list[str]) -> str:
+    """Condition (8): a UI-touching PR holds until `human-approved`. Fail closed."""
+    if "human-approved" in labels:
+        return ""
+    try:
+        proc = subprocess.run(["bash", str(UI_CLASSIFIER), "--paths"],
+                              input="\n".join(files) + "\n", capture_output=True,
+                              text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return "ui classifier unavailable"
+    if proc.returncode == 0:
+        return "UI-touching PR awaiting human-signoff"
+    if proc.returncode == 1:
+        return ""
+    return "ui classifier error"
 
 
 # Second-review clear. A blind Opus seat may clear these holds, and only when every
@@ -189,6 +203,11 @@ def touches_ui(files) -> bool:
     return any(f.startswith(UI_PATH_PREFIXES) or f.endswith(UI_PATH_SUFFIXES) for f in files)
 
 
+def _ui_paths(inp) -> list[str]:
+    """Paths the UI floor classifies: both sides of a rename when the caller supplies them."""
+    return inp.ui_paths if inp.ui_paths is not None else inp.classification.files
+
+
 def second_review_candidates(inp, cs) -> dict[int, str]:
     """{condition number: hold reason} the seat may rule on; {} keeps every hold."""
     blocked = {c.number: c for c in cs if c.blocked}
@@ -196,7 +215,7 @@ def second_review_candidates(inp, cs) -> dict[int, str]:
     if not blocked_nums or not blocked_nums <= SECOND_REVIEW_CLEARABLE:
         return {}
     # The UI floor covers all four conditions: a UI-touching PR stays with the owner.
-    if touches_ui(inp.classification.files):
+    if touches_ui(_ui_paths(inp)):
         return {}
     if 7 in blocked_nums:
         if inp.plan_auto_merge_value != "false" and not inp.plan_auto_merge_false:
@@ -269,6 +288,7 @@ class ArmInputs:
     # a dataclass cannot default a field ahead of the required ones above. None = the step did not run (holds).
     exec_mutations_holding: Optional[tuple[str, ...]] = None
     exec_mutations_tree_suspect: bool = True
+    ui_paths: Optional[list[str]] = None  # git.conformance_files(): lists a rename's source too; None = classification.files
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
@@ -529,9 +549,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                      f"{DOCS_REFRESH_TOKEN} are recognized")
     cs.append(ConditionResult(7, "plan-auto-merge-hold", c7_blocked, c7_reason))
 
-    f_hold = feat_hold(inp.pr_title, inp.pr_labels)
-    cs.append(ConditionResult(8, "feat-commit-type-floor", f_hold,
-                              "feat: PR awaiting human-signoff" if f_hold else ""))
+    u_hold = ui_hold(_ui_paths(inp), inp.pr_labels)
+    cs.append(ConditionResult(8, "ui-review-floor", bool(u_hold), u_hold))
 
     det_holds = deterministic_safety_holds(inp.classification, inp.pr_title)
     all_holds = det_holds + list(inp.llm_safety_holds)

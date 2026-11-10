@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-09
+last_verified: 2026-11-10
 ---
 
 # Workflow Continuity Rule
@@ -15,7 +15,7 @@ Exempt — files that physically live **outside** the repo tree: Claude hooks (`
 
 Use `/plan <task description>` for implementation planning.
 
-**Plans live OUTSIDE the repo at `~/claude-plans/<branch-slug>.md`.** There is no `plans/` directory in the repo, so a repo-relative search finds nothing. The path is deterministic from the branch name — resolve it, don't search:
+**Plans live OUTSIDE the repo at `~/claude-plans/<branch-slug>.md`.** The branch name gives the path. Resolve it with:
 
 ```bash
 ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
@@ -33,7 +33,7 @@ Before touching any repo file, be in a worktree. Create one unless it already ex
 bin/wt-new <slug>   # slug = kebab-case branch name derived from the plan
 ```
 
-When a task builds on an open, unmerged PR, stack on it (`--base <that-branch>`) and start now. Don't wait for it to land on master. Work in `IBL5-worktrees/<slug>/ibl5/` (worktrees live outside the repo, per ADR-0046). Skip creation only when this task's worktree already exists (or the plan names one). "This edit is small enough for master" is never a reason to skip.
+When a task builds on an open, unmerged PR, stack on it (`--base <that-branch>`) and start now. Don't wait for it to land on master. Work in `IBL5-worktrees/<slug>/ibl5/` (ADR-0046). Skip creation only when this task's worktree already exists (or the plan names one). "This edit is small enough for master" is never a reason to skip.
 
 Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --show-toplevel)"`), never `main.localhost`; navigate `/ibl5/` paths only. Detail: `.claude/rules/worktree-hostname.md`.
 
@@ -41,16 +41,16 @@ Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --s
 
 ## Post-Plan
 
-Never run `/post-plan` **inline**. It re-reads the full context every phase, so an inline run costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
+Never run `/post-plan` **inline**. That costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
 
-**Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized. A session not rooted in the worktree fires `(cd <abs wt> && bin/post-plan-now --auto)`.
+**Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. Shipping is durably pre-authorized. A session not rooted in the worktree fires `(cd <abs wt> && bin/post-plan-now --auto)`.
 
 **Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`.
 
 - **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR.
 - **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.
 - **Matrix check first.** With a plan, `git add -A` and run `bin/lib/plan-matrix-assertions <plan> <(git diff --cached origin/master)`. Write the test for each `UNREALISED-ASSERTION` row and rerun; if you cannot, do not fire. No plan: skip.
-- **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's post-impl CLI matrix rows, the plan's Executable Mutations rows) and exits 9 until all three pass on the current tree. CI's required check `Infection PHP (per-PR diff)` gates mutation score. Run it first with `--plan <plan> --stage matrix`, then `phpunit`, then `exec-mutations`, one foreground call each. The fire point reruns exec-mutations with larger limits. A pass is cached by tree hash. With no plan, the matrix stage skips. A human may bypass with `--skip-verify=<reason>`; it is logged and refused under `CLAUDE_HEADLESS`.
+- **Only fire when verification passed.** On failing tests, an unresolved blocker, or a question for the user, do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's post-impl CLI matrix rows, the plan's Executable Mutations rows) and exits 9 until all three pass on the current tree. Exit 9 means the gate refused the tree: fix the check it names. Exit 10 means the gate could not run (Docker or the DB is down, or a prerequisite is missing): fix the environment and rerun, and do not hunt for a failing check. CI's required check `Infection PHP (per-PR diff)` gates mutation score. Run it first with `--plan <plan> --stage matrix`, then `phpunit`, then `exec-mutations`, one foreground call each. The fire point reruns exec-mutations with larger limits. A pass is cached by tree hash. With no plan, the matrix stage skips. A human may bypass with `--skip-verify=<reason>`; it is logged and refused under `CLAUDE_HEADLESS`.
 - **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run.
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

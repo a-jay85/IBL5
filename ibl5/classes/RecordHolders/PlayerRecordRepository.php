@@ -21,6 +21,26 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
 {
     private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
 
+    /**
+     * (game_type, stat) index per stat expression, used as a FORCE INDEX hint.
+     * The optimizer otherwise picks idx_gt_rebounds for calc_points. Keys
+     * mirror RecordStatDefinitions::STATS expressions.
+     */
+    private const STAT_INDEXES = [
+        'bs.calc_points' => 'idx_gt_points',
+        'bs.calc_rebounds' => 'idx_gt_rebounds',
+        'bs.game_ast' => 'idx_gt_ast',
+        'bs.game_stl' => 'idx_gt_stl',
+        'bs.game_blk' => 'idx_gt_blk',
+        'bs.game_tov' => 'idx_gt_tov',
+        'bs.calc_fg_made' => 'idx_gt_fg_made',
+        'bs.game_ftm' => 'idx_gt_ftm',
+        'bs.game_3gm' => 'idx_gt_3gm',
+    ];
+
+    /** Candidate rows per stat. The outer JOIN to ibl_hist can drop rows, so never shrink it. */
+    private const CANDIDATE_LIMIT = 500;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -154,8 +174,12 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
             return [];
         }
 
+        $thresholds = $this->fetchCandidateThresholds($statExpressions, $dateFilter);
         $unions = [];
+        $params = [];
         foreach ($statExpressions as $label => $expression) {
+            $candidate = self::buildCandidateQuery($expression, $dateFilter, $thresholds[$label] ?? null);
+            array_push($params, ...$candidate['params']);
             $safeLabel = str_replace("'", "''", $label);
             $unions[] = "(SELECT
                     '" . $safeLabel . "' AS stat_type,
@@ -170,19 +194,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
                     opp.team_name AS opp_team_name,
                     cand.value
                 FROM (
-                    SELECT
-                        bs.pid,
-                        bs.game_date,
-                        bs.visitor_teamid,
-                        bs.home_teamid,
-                        (" . self::SEASON_YEAR_EXPRESSION . ") AS season_year,
-                        " . $expression . " AS value
-                    FROM `ibl_box_scores` bs
-                    WHERE " . $dateFilter . "
-                        AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                        AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    ORDER BY " . $expression . " DESC, bs.game_date ASC, bs.id ASC
-                    LIMIT 500
+                    " . $candidate['sql'] . "
                 ) cand
                 JOIN `ibl_plr` p ON p.pid = cand.pid
                 JOIN `ibl_hist` h ON h.pid = cand.pid AND h.year = cand.season_year
@@ -200,7 +212,7 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
         // CTE materializes game_of_that_day lookup once instead of per UNION ALL branch
         $cte = "WITH _game_of_day AS " . self::GAME_OF_THAT_DAY_SUBQUERY . "\n";
         $query = $cte . implode("\nUNION ALL\n", $unions);
-        $rows = $this->fetchAll($query);
+        $rows = $this->fetchAll($query, str_repeat('i', count($params)), ...$params);
 
         /** @var array<string, list<PlayerSingleGameRecord>> $results */
         $results = [];
@@ -230,6 +242,88 @@ final class PlayerRecordRepository extends \Database\BaseMysqliRepository
         }
 
         return $results;
+    }
+
+    /**
+     * Value at row CANDIDATE_LIMIT of each stat's DESC order, one round trip.
+     * Null when fewer rows match or that row's value is NULL; the caller then
+     * skips the cut, which keeps the old full-scan result.
+     *
+     * @param array<string, string> $statExpressions
+     * @return array<string, int|null>
+     */
+    private function fetchCandidateThresholds(array $statExpressions, string $dateFilter): array
+    {
+        $branches = [];
+        foreach ($statExpressions as $label => $expression) {
+            $safeLabel = str_replace("'", "''", $label);
+            $branches[] = "(SELECT '" . $safeLabel . "' AS stat_type, (
+                    SELECT " . $expression . "
+                    FROM `ibl_box_scores` bs" . self::indexHint($expression) . "
+                    " . self::candidateWhere($dateFilter) . "
+                    ORDER BY " . $expression . " DESC
+                    LIMIT 1 OFFSET " . (self::CANDIDATE_LIMIT - 1) . "
+                ) AS threshold)";
+        }
+
+        $thresholds = [];
+        foreach ($this->fetchAll(implode("\nUNION ALL\n", $branches)) as $row) {
+            /** @var array{stat_type: string, threshold?: int|string|null} $row */
+            $value = $row['threshold'] ?? null;
+            $thresholds[$row['stat_type']] = $value === null ? null : (int) $value;
+        }
+
+        return $thresholds;
+    }
+
+    /**
+     * Inner candidate query for one stat: top CANDIDATE_LIMIT rows by value
+     * DESC, game_date ASC, id ASC. A non-null threshold adds `<expr> >= ?`.
+     * The `>=` keeps every row tied at the cut, so the LIMIT tiebreak sees the
+     * same leading rows as the unfiltered query.
+     *
+     * @return array{sql: string, params: list<int>}
+     */
+    private static function buildCandidateQuery(string $expression, string $dateFilter, ?int $threshold): array
+    {
+        $thresholdClause = '';
+        $params = [];
+        if ($threshold !== null) {
+            $thresholdClause = "\n                    AND " . $expression . ' >= ?';
+            $params[] = $threshold;
+        }
+
+        // $expression and $dateFilter come from RecordStatDefinitions constants, never user input.
+        // The chain starts with a variable so the SQL-concatenation rule sees a fragment, not a statement.
+        $select = "SELECT
+                    bs.pid,
+                    bs.game_date,
+                    bs.visitor_teamid,
+                    bs.home_teamid,
+                    (" . self::SEASON_YEAR_EXPRESSION . ") AS season_year,
+                    ";
+        $sql = $select . $expression . " AS value
+                FROM `ibl_box_scores` bs" . self::indexHint($expression) . "
+                " . self::candidateWhere($dateFilter) . $thresholdClause . "
+                ORDER BY " . $expression . " DESC, bs.game_date ASC, bs.id ASC
+                LIMIT " . self::CANDIDATE_LIMIT;
+
+        return ['sql' => $sql, 'params' => $params];
+    }
+
+    private static function candidateWhere(string $dateFilter): string
+    {
+        // @phpstan-ignore ibl.sqlStringConcatenation ($dateFilter is a RecordStatDefinitions::DATE_FILTERS constant, never user input)
+        return "WHERE " . $dateFilter . "
+                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID;
+    }
+
+    private static function indexHint(string $expression): string
+    {
+        $index = self::STAT_INDEXES[$expression] ?? null;
+
+        return $index === null ? '' : ' FORCE INDEX (`' . $index . '`)';
     }
 
     /**

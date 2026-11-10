@@ -1,6 +1,6 @@
 ---
 description: Changed ship-pipeline gates are replayed against recent merged PRs, and Phase 6.5 condition (17) holds auto-merge when the replay flags clean PRs.
-last_verified: 2026-11-02
+last_verified: 2026-11-08
 ---
 
 # ADR-0161: Backtest changed gates before they merge
@@ -63,3 +63,11 @@ Fail-safe rules:
 - A forced `--gate=<path>@<rev>` replay gets no overlay.
 
 The rendered block gains one list line for these PRs. The table columns and the `gate-backtest-state` line are unchanged, so `bin/lib/pr-armable.sh` reads the block as before.
+
+## Addendum: per-flag base matching and replay edit dates (backlog#1686)
+
+A clean-PR flag counts as pre-existing only when every flagged stdout line of the head gate also appears in the base gate's output on the same tree. A new line on a base-flagged PR counts as a false flag, which closes the hole where a changed gate added a diagnostic that the base gate's own flag hid. The comparison covers the first 500 distinct non-blank lines on each side, When either side reaches 500 distinct lines, every head line counts as new and the PR counts as a false flag. It is an exact line match, so a reworded message counts as new. A result that captured no lines on either side keeps the earlier pre-existing verdict.
+
+Replays of `bin/check-docs` pass the merged PR's pre-squash head as `CHECK_DOCS_EDIT_DATE_REF`, so the edit-date check reads the branch commit dates that CI saw. The squash commit carries the merge-day author date, which used to fail a doc whose branch edit had the earlier `last_verified`. CI never sets the variable. An unknown or absent head falls back to `base..HEAD`. The harness makes one best-effort, time-bounded fetch of pull heads missing from the local object store, and a failed fetch leaves the earlier behavior.
+
+The fix rerun still runs only when the base gate passes. A PR with new lines against a flagging base lands in the false-flag list and never in the fixed-by-candidate list.

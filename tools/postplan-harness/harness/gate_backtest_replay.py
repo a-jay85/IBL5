@@ -21,10 +21,10 @@ from collections import namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
-                                   HistoricalPR, ReplayResult, Verdict, classify_exit,
+from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, HEAD_OID_FIELD,
+                                   GateChange, HistoricalPR, ReplayResult, Verdict, classify_exit,
                                    changes_from_unified_diff, classify_truth, compute_verdict,
-                                   detect_gate_changes,
+                                   detect_gate_changes, flag_lines, parse_head_oid,
                                    expand_argv, expand_env, expand_stdin, is_check_script,
                                    render_gate_backtest, resolve_spec)
 
@@ -69,7 +69,7 @@ def fetch_history(gh_json, git, limit: int = HISTORY_LIMIT, exclude: int | None 
     """
     raw = gh_json(["pr", "list", "--repo", REPO_SLUG, "--state", "merged", "--base", "master",
                    "--limit", str(limit), "--json",
-                   "number,title,mergeCommit,mergedAt,headRefName,body"])
+                   f"number,title,mergeCommit,mergedAt,headRefName,body,{HEAD_OID_FIELD}"])
     out: list[HistoricalPR] = []
     for item in raw[:limit]:
         number = int(item["number"])
@@ -92,7 +92,8 @@ def fetch_history(gh_json, git, limit: int = HISTORY_LIMIT, exclude: int | None 
             bodies_out[number] = item.get("body") or ""
         out.append(HistoricalPR(number, item.get("title") or "", oid, parent_count,
                                 _parse_merged_at(item["mergedAt"]),
-                                item.get("headRefName") or "", files))
+                                item.get("headRefName") or "", files,
+                                head_oid=parse_head_oid(item.get(HEAD_OID_FIELD))))
     out.sort(key=lambda p: p.merged_at, reverse=True)
     return out
 
@@ -177,6 +178,32 @@ def partial_fix_allowed(reads: tuple[str, ...], skipped: list[str]) -> bool:
         return False
     return not any(p == _UNKNOWN_PATH or any(fnmatch.fnmatchcase(p, g) for g in reads)
                    for p in skipped)
+
+
+def ensure_pr_heads(repo: str, prs, timeout: float = 60.0) -> int:
+    """Best-effort fetch of pre-squash PR heads missing from the local object store.
+
+    One batched `git fetch` of refs/pull/<N>/head for every PR whose head_oid is
+    unknown locally. Any failure or timeout is swallowed: a missing head leaves
+    CHECK_DOCS_EDIT_DATE_REF pointing at an absent commit, which check-docs
+    ignores, keeping today's strict base..HEAD read. Returns refspecs requested.
+    """
+    missing = []
+    for pr in prs:
+        if not pr.head_oid:
+            continue
+        probe = subprocess.run(["git", "-C", repo, "cat-file", "-e", f"{pr.head_oid}^{{commit}}"],
+                               capture_output=True)
+        if probe.returncode != 0:
+            missing.append(f"refs/pull/{pr.number}/head")
+    if not missing:
+        return 0
+    try:
+        subprocess.run(["git", *_GIT_QUIET, "-C", repo, "fetch", "--no-tags", "--quiet", "origin",
+                        *missing], capture_output=True, timeout=timeout, check=False)
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return len(missing)
 
 
 class ScratchTree:
@@ -366,9 +393,10 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
         return results
 
     git = make_git(repo)
+    ensure_pr_heads(repo, [pr for pr, _ in schedule if pr.parent_count == 1])
 
-    def execute(spec, ctx: dict, gate_path: str) -> tuple[str, str]:
-        """Run one gate replay in ctx["tree"] and return (outcome, detail)."""
+    def execute(spec, ctx: dict, gate_path: str) -> tuple[str, str, tuple[str, ...]]:
+        """Run one gate replay in ctx["tree"] and return (outcome, detail, flag_lines)."""
         env = dict(os.environ)
         env.update(expand_env(spec, ctx))
         stdin_path = expand_stdin(spec, ctx)
@@ -377,7 +405,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
             try:
                 stdin_fh = open(stdin_path, "rb")
             except OSError as exc:
-                return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160]
+                return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160], ()
         try:
             proc = subprocess.run(
                 [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)],
@@ -385,13 +413,14 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                 stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=per_replay_timeout)
         except subprocess.TimeoutExpired:
-            return "timeout", f"{per_replay_timeout}s"
+            return "timeout", f"{per_replay_timeout}s", ()
         except OSError as exc:
-            return "error", re.sub(r"\s+", " ", str(exc))[:160]
+            return "error", re.sub(r"\s+", " ", str(exc))[:160], ()
         finally:
             if stdin_fh is not None:
                 stdin_fh.close()
-        return classify_exit(spec, proc.returncode, proc.stdout)
+        outcome, detail = classify_exit(spec, proc.returncode, proc.stdout)
+        return outcome, detail, (flag_lines(proc.stdout) if outcome == "flag" else ())
 
     work = tempfile.mkdtemp(prefix="gate-backtest-files-")
     capped = False
@@ -430,9 +459,11 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                     with open(body_file, "w", encoding="utf-8") as fh:
                         fh.write(bodies.get(pr.number, ""))
                     ctx = {"base": base, "head": pr.merge_sha, "tree": scratch.dir,
-                           "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file}
-                    outcome, detail = execute(spec, ctx, gate.path)
+                           "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file,
+                           "pr_head": pr.head_oid}
+                    outcome, detail, head_lines = execute(spec, ctx, gate.path)
                     base_outcome = base_detail = ""
+                    base_lines: tuple[str, ...] = ()
                     if outcome == "flag" and base_overlay is not None:
                         kind, base_spec = base_plan[gate.path]
                         if kind == "absent":
@@ -446,7 +477,8 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 scratch.overlay({k: v for k, v in base_overlay.items()
                                                  if v is not None})
                                 scratch.remove([k for k, v in base_overlay.items() if v is None])
-                                base_outcome, base_detail = execute(base_spec, ctx, gate.path)
+                                base_outcome, base_detail, base_lines = execute(
+                                    base_spec, ctx, gate.path)
                             except OSError as exc:
                                 base_outcome = "error"
                                 base_detail = re.sub(r"\s+", " ", f"base-overlay: {exc}")[:160]
@@ -467,7 +499,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                     fix_outcome = "partial-no-reads" if not spec.reads else "partial-gate-read"
                                 else:
                                     scratch.overlay(overlay_files)
-                                    fix_outcome, fix_detail = execute(spec, ctx, gate.path)
+                                    fix_outcome, fix_detail, _ = execute(spec, ctx, gate.path)
                             except OSError as exc:
                                 fix_outcome = "error"
                                 fix_detail = re.sub(r"\s+", " ", f"fix-overlay: {exc}")[:160]
@@ -478,7 +510,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                                 base_outcome, base_detail,
                                                 fix_outcome, fix_detail,
                                                 fix_applied=tuple(fix_applied),
-                                                fix_skipped=tuple(fix_skipped)))
+                                                fix_skipped=tuple(fix_skipped),
+                                                flag_lines=head_lines,
+                                                base_flag_lines=base_lines))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

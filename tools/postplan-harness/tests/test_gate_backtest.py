@@ -7,7 +7,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, REPLAY_SPECS, HistoricalPR, ReplaySpec,
                                    _PLACEHOLDER_RE, detect_gate_changes, expand_argv, expand_env,
-                                   expand_stdin, placeholder_names, resolve_spec)
+                                   expand_stdin, flag_lines, parse_head_oid, placeholder_names,
+                                   resolve_spec)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
@@ -489,6 +490,71 @@ def test_tally_base_flag_on_repaired_pr_stays_catch():
     tally = v.per_gate["bin/check-foo"]
     assert tally.catches == [10]
     assert tally.pre_existing == []
+
+
+def _lined(rows):
+    """rows: list of (pr, head_lines, base_lines); both sides flag on a clean PR."""
+    return [ReplayResult(pr, "bin/check-foo", "flag", "", base_outcome="flag",
+                         flag_lines=head, base_flag_lines=base) for pr, head, base in rows]
+
+
+def _lined_tally(head, base):
+    res = _results("bin/check-foo", _passes(1, 6)) + _lined([(10, head, base)])
+    t = _truth(clean=range(1, 12))
+    return compute_verdict([_g()], res, t).per_gate["bin/check-foo"]
+
+
+def test_flag_lines_drops_blank_lines():
+    assert flag_lines("a\n\n  \nb\n") == ("a", "b")
+
+
+def test_tally_base_flag_same_lines_is_pre_existing():
+    tally = _lined_tally(("x: bad",), ("x: bad",))
+    assert tally.pre_existing == [10]
+    assert tally.false_flags == []
+
+
+def test_tally_base_flag_new_line_is_false_flag():
+    tally = _lined_tally(("x: bad", "y: new"), ("x: bad",))
+    assert tally.false_flags == [10]
+    assert tally.pre_existing == []
+
+
+def test_tally_base_flag_without_lines_stays_pre_existing():
+    tally = _lined_tally((), ())
+    assert tally.pre_existing == [10]
+    assert tally.false_flags == []
+
+
+def test_tally_capped_line_lists_are_never_pre_existing():
+    full = tuple(f"line {i}" for i in range(500))
+    assert len(flag_lines("\n".join(f"line {i}" for i in range(900)))) == 500
+    tally = _lined_tally(full, full)
+    assert tally.pre_existing == []
+    assert tally.false_flags == [10]
+
+
+def test_tally_reworded_case_counts_as_false_flag():
+    tally = _lined_tally(("Body changed",), ("body changed",))
+    assert tally.false_flags == [10]
+    assert tally.pre_existing == []
+
+
+def test_parse_head_oid_rejects_malformed():
+    sha = "0123456789abcdef" * 2 + "01234567"
+    assert len(sha) == 40
+    assert parse_head_oid(sha) == sha
+    for bad in (None, "", sha[:39], sha.upper(), "HEAD", 12345):
+        assert parse_head_oid(bad) == "", bad
+
+
+def test_check_docs_spec_passes_pr_head_env():
+    spec = REPLAY_SPECS["bin/check-docs"]
+    sha = "ab" * 20
+    base_ctx = {"base": "b" * 40}
+    assert expand_env(spec, {**base_ctx, "pr_head": sha}) == {"CHECK_DOCS_EDIT_DATE_REF": sha}
+    assert expand_env(spec, {**base_ctx, "pr_head": ""}) == {"CHECK_DOCS_EDIT_DATE_REF": ""}
+    assert expand_argv(spec, base_ctx) == ["--since=" + "b" * 40]
 
 
 def test_verdict_two_pre_existing_zero_new_is_cleared():

@@ -788,6 +788,31 @@ test_xm_killed_lib_recovers_and_reports() {
     [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
 }
 
+test_xm_locked_stage() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) echo "EXEC-LOCKED - stub"; exit 4 ;;\n    pending) exit 1 ;;\n    recover) touch "%s/recovered"; exit 0 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$D" "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    want_rc 3
+    want_out "another plan-exec-mutations run holds this worktree's exec lock"
+    [ ! -e "$D/recovered" ] || note "recover ran although another run holds the lock"
+    grep -qF -- "stopped unexpectedly" <<< "$OUT" && note "output blames the stub as an unexpected stop"
+    [ -z "$(xm_passes)" ] || note "an exec-mutations pass record exists"
+}
+
+test_xm_locked_recover() {
+    new_case
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    pending) exit 0 ;;\n    recover) exit 4 ;;\n    *) exec "%s/bin/lib/plan-exec-mutations" "$@" ;;\nesac\n' "$REPO" > "$D/stubs/xmlib"
+    chmod +x "$D/stubs/xmlib"
+    xm_plan 'true'
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib" "$GATE" --base master --plan "$PLAN" --stage phpunit 2>&1); RC=$?
+    want_rc 3
+    want_out "another plan-exec-mutations run holds this worktree's exec lock"
+    grep -qF -- "could not restore" <<< "$OUT" && note "output claims recover could not restore"
+    [ -z "$(pass_files '\.phpunit\.pass$')" ] || note "a phpunit pass record exists"
+}
+
 # xm_argv_stub: stub lib whose `run` records its argv to $D/xm-argv and prints <verdict> row 1;
 # parse and recover go to the real lib, so the plan's record is a real one.
 xm_argv_stub() { # <verdict> <exit>
@@ -923,6 +948,8 @@ test_xm_term_mid_row_restores_tree
 test_xm_sigkill_leftover_repaired_before_tree_hash
 test_xm_revert_failed_maps_to_fail
 test_xm_killed_lib_recovers_and_reports
+test_xm_locked_stage
+test_xm_locked_recover
 test_xm_bad_stage_rejected
 test_xm_default_uses_short_limits
 test_xm_fire_point_uses_larger_limits

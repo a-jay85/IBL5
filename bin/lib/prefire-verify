@@ -97,7 +97,9 @@ XM_LIB="${PREFIRE_EXEC_MUTATIONS_LIB:-$SELF_DIR/plan-exec-mutations}"
 "$XM_LIB" pending --root "$ROOT" >/dev/null 2>&1
 case $? in
     0)
-        "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1 \
+        _xr=0; "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1 || _xr=$?
+        [ "$_xr" -ne 4 ] || die 3 "another plan-exec-mutations run holds this worktree's exec lock; wait for it to finish, then re-run"
+        [ "$_xr" -eq 0 ] \
             || die 1 "an interrupted exec-mutations run left a mutation that recover could not restore; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run"
         say "restored a mutation left by an interrupted exec-mutations run" ;;
     1) : ;;
@@ -297,6 +299,10 @@ stage_exec_mutations() {
 
     if grep -q '^NO-TIMEOUT' "$log"; then
         say "FAIL exec-mutations prerequisite missing: gtimeout or timeout" >&2
+        return 3
+    fi
+    if [ "$rc" -eq 4 ]; then  # EXEC-LOCKED
+        say "FAIL exec-mutations: another plan-exec-mutations run holds this worktree's exec lock; wait for it to finish, then re-run" >&2
         return 3
     fi
     if [ "$rc" -eq 3 ]; then

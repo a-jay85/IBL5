@@ -360,7 +360,7 @@ check_status_enum() {
     fi
     missing="$(printf '%s\n' "$want" | grep -vxF -f <(printf '%s\n' "$live"))"
     if [ -n "$missing" ]; then
-        emit DEGRADED statusenum:missing "live ibl_bug_reports.status lacks $(printf '%s' "$missing" | join_csv); a migration on a preserved table never ran locally; run bin/db-migrate"
+        emit DEGRADED statusenum:missing "live ibl_bug_reports.status lacks $(printf '%s' "$missing" | join_csv); a migration on a preserved table never ran locally. bin/db-migrate skips it when an earlier bin/db-sync-prod backfill already recorded it in schema_migrations, so apply that migration's SQL by hand against the local DB (ALTER the enum), then rerun this check"
     else
         emit OK statusenum:current "$(printf '%s\n' "$want" | wc -l | tr -d ' ') values"
     fi

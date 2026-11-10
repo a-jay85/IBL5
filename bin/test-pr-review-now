@@ -374,7 +374,9 @@ end_case pr-review-now-runner-dm-content
 
 # --- case 11: pr-review-now-prior-review-no-dm -------------------------------------------
 # Executes the generated runner end to end. A PR that already carries our own
-# `## Code review` finishes rc=0 with NO DM; a PR without one still gets the ✅ DM.
+# `## Code review` finishes rc=0 with NO DM and never starts claude. A PR without one
+# still starts claude and gets the ✅ DM. Only a heading on the body's first non-blank
+# line counts, so a comment that mentions the heading further down still gets reviewed.
 # caffeinate is shimmed to drop its `-s timeout 3600` prefix, so this runs on Linux too.
 begin_case
 printf '#!/usr/bin/env bash\nshift 3\nexec "$@"\n' > "$SCRATCH/.local/bin/caffeinate"
@@ -387,9 +389,15 @@ GHR_EOF
 chmod +x "$SCRATCH/gh-review"
 printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$SCRATCH/dm-sent.txt" > "$SCRATCH/dm-stub"
 chmod +x "$SCRATCH/dm-stub"
+_SAVED_CLAUDE_STUB="$CLAUDE_STUB"
+printf '#!/usr/bin/env bash\necho called >> "%s"\nexit 0\n' "$SCRATCH/claude-calls.txt" \
+    > "$SCRATCH/.local/bin/claude-recorder"
+chmod +x "$SCRATCH/.local/bin/claude-recorder"
+CLAUDE_STUB="$SCRATCH/.local/bin/claude-recorder"
 _run_runner() {  # $1 = gh pr view JSON fixture
     printf '%s' "$1" > "$SCRATCH/gh-view.json"
     : > "$SCRATCH/dm-sent.txt"
+    : > "$SCRATCH/claude-calls.txt"
     PR_REVIEW_NOW_DRY_RUN=1 PR_REVIEW_NOW_GH="$SCRATCH/gh-review" \
         PR_REVIEW_NOW_DISCORD_DM="$SCRATCH/dm-stub" run_driver 1903 >/dev/null 2>&1
     env HOME="$SCRATCH" PATH="$SCRATCH/.local/bin:$PATH" \
@@ -399,9 +407,22 @@ _run_runner() {  # $1 = gh pr view JSON fixture
 _run_runner '{"comments":[{"author":{"login":"me"},"body":"## Code review\nNo issues found."}],"reviews":[]}'
 [[ -s "$SCRATCH/dm-sent.txt" ]] \
     && fail "prior-review-no-dm: DM sent for an already-reviewed PR: $(cat "$SCRATCH/dm-sent.txt")"
+[[ -s "$SCRATCH/claude-calls.txt" ]] \
+    && fail "prior-review-no-dm: claude started for an already-reviewed PR"
+grep -qF 'skipped without starting claude' /tmp/pr-review-now-1903.log \
+    || fail "prior-review-no-dm: skip not recorded in the log (got: $(cat /tmp/pr-review-now-1903.log 2>/dev/null))"
+_run_runner '{"comments":[],"reviews":[{"author":{"login":"me"},"body":"\n\n### Code review\nfindings"}]}'
+[[ -s "$SCRATCH/claude-calls.txt" ]] \
+    && fail "prior-review-no-dm: review-body heading after blank lines not counted"
 _run_runner '{"comments":[{"author":{"login":"me"},"body":"verdict quoting > ## Code review"},{"author":{"login":"other"},"body":"## Code review"}],"reviews":[]}'
 grep -qF '✅ pr-review-now: PR #1903' "$SCRATCH/dm-sent.txt" \
     || fail "prior-review-no-dm: fresh PR got no ✅ DM (got: $(cat "$SCRATCH/dm-sent.txt"))"
+[[ -s "$SCRATCH/claude-calls.txt" ]] \
+    || fail "prior-review-no-dm: claude not started for a PR with no own review"
+_run_runner '{"comments":[{"author":{"login":"me"},"body":"**READY** verdict\n\n## Code review\nquoted"}],"reviews":[]}'
+[[ -s "$SCRATCH/claude-calls.txt" ]] \
+    || fail "prior-review-no-dm: heading below the first line counted as a prior review"
+CLAUDE_STUB="$_SAVED_CLAUDE_STUB"
 rm -f /tmp/pr-review-now-runner-1903.sh /tmp/pr-review-now-prompt-1903.md /tmp/pr-review-now-1903.log
 end_case pr-review-now-prior-review-no-dm
 

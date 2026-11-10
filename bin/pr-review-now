@@ -239,18 +239,26 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 cd "$ROOT" || exit 1
 
 # /pr-review skips a PR that already carries its own `Code review` heading (SKILL.md
-# Step 1 (d)). That skip exits 0 and tells the human nothing new, so the finish DM is
-# suppressed for it. Same test as the skill: a comment or review body whose own heading
-# matches ^#{1,6} +Code review, authored by the gh identity. Snapshotted BEFORE claude
-# runs, so the review this run posts never counts as a prior one. Any gh failure
-# leaves PRIOR_REVIEW=0 and the DM goes out as usual.
+# Step 1 (d)). Same test as the skill: a comment or review body by the gh identity whose
+# first non-blank line is a `#{1,6} Code review` heading. A heading further down the body
+# does not count, so a comment that quotes one never suppresses a review.
+# Snapshotted BEFORE claude runs. When it matches, the session would only find the review
+# and quit, so the runner exits 0 here without starting claude and sends no DM. The
+# post-plan harness posts that heading in Phase 4 and then fires this script, so most
+# fires end here (2026-11-10 measurement: ~248 empty sessions in 14 days, ~$0.28 each).
+# Any gh failure leaves PRIOR_REVIEW=0 and the session runs as usual.
 PRIOR_REVIEW=0
 _me="$("$GH_BIN" api user --jq .login 2>/dev/null || true)"
 if [ -n "$_me" ] && "$GH_BIN" pr view "$PR" --json comments,reviews \
         --jq "[(.comments[]?, .reviews[]?) | select(.author.login == \"$_me\") | .body // \"\"
-               | select(test(\"(^|\\n)#{1,6} +Code review\"))] | length" 2>/dev/null \
+               | select(test(\"\\\\A\\\\s*#{1,6} +Code review\"))] | length" 2>/dev/null \
         | grep -qv '^0$'; then
     PRIOR_REVIEW=1
+fi
+
+if [ "$PRIOR_REVIEW" = 1 ]; then
+    printf '%s\n' "pr-review-now: PR #${PR} already had a code review — skipped without starting claude." > "$LOG"
+    exit 0
 fi
 
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \

@@ -189,17 +189,18 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
         $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
 
         $query = "SELECT
-                twl.currentname AS team_name,
-                twl.year,
-                twl.wins,
-                twl.losses
-            FROM `ibl_team_win_loss` twl
-            JOIN `ibl_team_info` ti ON ti.team_name = twl.currentname
-            WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND (twl.wins + twl.losses) > 0"
-            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with (year, teamid), unique per ibl_team_win_loss row)
-            . " ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
-                twl.wins " . $safeOrder . ", twl.year ASC, ti.teamid ASC
+                r.currentname AS team_name,
+                r.year,
+                r.wins,
+                r.losses
+            FROM `ibl_team_season_records` r
+            JOIN `ibl_team_info` ti ON ti.teamid = r.team_id
+            WHERE r.game_type = 1
+                AND ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND (r.wins + r.losses) > 0"
+            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with (year, teamid), unique per ibl_team_season_records row at game_type = 1 because the PK is (team_id, year, game_type))
+            . " ORDER BY (r.wins / (r.wins + r.losses)) " . $safeOrder . ",
+                r.wins " . $safeOrder . ", r.year ASC, ti.teamid ASC
             LIMIT 5";
 
         $rows = $this->fetchAll($query);

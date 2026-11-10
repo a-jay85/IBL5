@@ -75,6 +75,32 @@ final class BestWorstSeasonRecordEquivalenceTest extends DatabaseTestCase
         self::assertSame($frozen, $this->normalize($repository->getBestWorstSeasonRecord('ASC')));
     }
 
+    public function testHeatSeasonRowExcludedFromBest(): void
+    {
+        $names = $this->seedTieSeasons();
+        $this->insertTeamSeasonRecordRow(1, 2012, 3, $names[1], $names[1], 5, 0);
+
+        $repository = new RecordHoldersRepository($this->db);
+
+        self::assertSame(
+            $this->expectedBest($names),
+            $this->normalize($repository->getBestWorstSeasonRecord('DESC'))
+        );
+    }
+
+    public function testZeroGameSeasonRowExcludedFromWorst(): void
+    {
+        $names = $this->seedTieSeasons();
+        $this->insertTeamSeasonRecordRow(7, 2012, 1, $names[7], $names[7], 0, 0);
+
+        $repository = new RecordHoldersRepository($this->db);
+
+        self::assertSame(
+            $this->expectedWorst($names),
+            $this->normalize($repository->getBestWorstSeasonRecord('ASC'))
+        );
+    }
+
     /**
      * Clears box scores, seeds the tie games, and rebuilds ibl_team_season_records.
      *

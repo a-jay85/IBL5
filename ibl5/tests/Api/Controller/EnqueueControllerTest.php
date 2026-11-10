@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\EnqueueController;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\AttachmentInputValidator;
 use BugPipeline\BugReportRepository;
@@ -14,11 +15,109 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 class EnqueueControllerTest extends TestCase
 {
-    private function makeController(BugReportRepository $bugRepo, TeamIdentityRepositoryInterface $teamRepo): EnqueueController
+    protected function setUp(): void
     {
+        $_SERVER['HTTP_X_API_KEY'] = 'test-bot-key';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY'], $_GET['key']);
+    }
+
+    private function makeController(
+        BugReportRepository $bugRepo,
+        TeamIdentityRepositoryInterface $teamRepo,
+        string $tier = 'unlimited'
+    ): EnqueueController {
+        $keys = self::createStub(ApiKeyRepository::class);
+        $keys->method('findByHash')->willReturn([
+            'key_hash'         => hash('sha256', 'test-bot-key'),
+            'key_prefix'       => 'test-bot',
+            'owner_name'       => 'x',
+            'permission_level' => 'public',
+            'rate_limit_tier'  => $tier,
+        ]);
         // Real validator: it is a pure, dependency-free value object — mocking it would only
         // restate its rules. Attachment-branch tests below drive it with real payloads.
-        return new EnqueueController($bugRepo, $teamRepo, new AttachmentInputValidator());
+        return new EnqueueController($bugRepo, $teamRepo, new AttachmentInputValidator(), $keys);
+    }
+
+    /** @return array<string, string> */
+    private static function validBody(): array
+    {
+        return [
+            'author_id'  => '100000000000000001',
+            'channel_id' => '200000000000000002',
+            'message_id' => '300000000000000003',
+            'text'       => 'app crashes on save',
+        ];
+    }
+
+    public function testStandardTierKeyRejected403AndNoRepositoryCall(): void
+    {
+        $bugRepo  = $this->createMock(BugReportRepository::class);
+        $teamRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teamRepo->expects($this->never())->method('isKnownDiscordID');
+        $bugRepo->expects($this->never())->method('enqueueAuthorizedAndAdvance');
+        $bugRepo->expects($this->never())->method('upsertPipelineState');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can enqueue a report.');
+        $responder->expects($this->never())->method('success');
+
+        $this->makeController($bugRepo, $teamRepo, 'standard')->handle([], [], $responder, self::validBody());
+    }
+
+    public function testMissingKeyRejected403AndNoRepositoryCall(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+
+        $bugRepo  = $this->createMock(BugReportRepository::class);
+        $teamRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
+        $teamRepo->expects($this->never())->method('isKnownDiscordID');
+        $bugRepo->expects($this->never())->method('enqueueAuthorizedAndAdvance');
+        $bugRepo->expects($this->never())->method('upsertPipelineState');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can enqueue a report.');
+        $responder->expects($this->never())->method('success');
+
+        $this->makeController($bugRepo, $teamRepo)->handle([], [], $responder, self::validBody());
+    }
+
+    public function testStandardTierKeyWithMissingBodyRejected403Not400(): void
+    {
+        $bugRepo  = self::createStub(BugReportRepository::class);
+        $teamRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can enqueue a report.');
+
+        $this->makeController($bugRepo, $teamRepo, 'standard')->handle([], [], $responder, null);
+    }
+
+    public function testElevatedTierKeyUnknownAuthorStillRejectedByAuthorCheck(): void
+    {
+        $bugRepo  = $this->createMock(BugReportRepository::class);
+        $teamRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamRepo->method('isKnownDiscordID')->willReturn(false);
+
+        $bugRepo->expects($this->once())->method('upsertPipelineState');
+        $bugRepo->expects($this->never())->method('enqueueAuthorizedAndAdvance');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('success')
+            ->with(self::callback(static fn (array $payload): bool => $payload['authorized'] === false));
+
+        $this->makeController($bugRepo, $teamRepo, 'elevated')->handle([], [], $responder, self::validBody());
     }
 
     public function testAuthorizedBranchCallsEnqueueAndReturnsReportId(): void

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
+use Api\Middleware\ServiceKeyGuard;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\AttachmentInputValidator;
 use BugPipeline\BugReportRepository;
@@ -15,15 +17,18 @@ class EnqueueController implements ControllerInterface
     private BugReportRepository $bugRepo;
     private TeamIdentityRepositoryInterface $teamRepo;
     private AttachmentInputValidator $attachmentValidator;
+    private ServiceKeyGuard $serviceKeys;
 
     public function __construct(
         BugReportRepository $bugRepo,
         TeamIdentityRepositoryInterface $teamRepo,
-        AttachmentInputValidator $attachmentValidator
+        AttachmentInputValidator $attachmentValidator,
+        ApiKeyRepository $apiKeys
     ) {
         $this->bugRepo = $bugRepo;
         $this->teamRepo = $teamRepo;
         $this->attachmentValidator = $attachmentValidator;
+        $this->serviceKeys = new ServiceKeyGuard($apiKeys);
     }
 
     /**
@@ -31,6 +36,14 @@ class EnqueueController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
+        // Runs before any body field is read, so a rejected request reads and writes nothing,
+        // including the channel watermark. author_id is body data, so the caller must also be
+        // the bot's key. The isKnownDiscordID author check below stays as the second layer.
+        if (!$this->serviceKeys->callerIsServiceKey()) {
+            $responder->error(403, 'forbidden', 'Only the pipeline bot can enqueue a report.');
+            return;
+        }
+
         if ($body === null) {
             $responder->error(400, 'bad_request', 'Missing request body.');
             return;

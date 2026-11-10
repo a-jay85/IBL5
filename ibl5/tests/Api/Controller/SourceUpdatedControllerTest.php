@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\SourceUpdatedController;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\BugReportRepository;
 use PHPUnit\Framework\TestCase;
@@ -14,9 +15,79 @@ use PHPUnit\Framework\TestCase;
  */
 class SourceUpdatedControllerTest extends TestCase
 {
-    private function makeController(BugReportRepository $bugRepo): SourceUpdatedController
+    protected function setUp(): void
     {
-        return new SourceUpdatedController($bugRepo);
+        $_SERVER['HTTP_X_API_KEY'] = 'test-bot-key';
+    }
+
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY'], $_GET['key']);
+    }
+
+    private function makeController(BugReportRepository $bugRepo, string $tier = 'unlimited'): SourceUpdatedController
+    {
+        $keys = self::createStub(ApiKeyRepository::class);
+        $keys->method('findByHash')->willReturn([
+            'key_hash'         => hash('sha256', 'test-bot-key'),
+            'key_prefix'       => 'test-bot',
+            'owner_name'       => 'x',
+            'permission_level' => 'public',
+            'rate_limit_tier'  => $tier,
+        ]);
+        return new SourceUpdatedController($bugRepo, $keys);
+    }
+
+    public function testStandardTierKeyRejected403AndNoRepositoryCall(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->never())->method('findByOriginalMessageId');
+        $bugRepo->expects($this->never())->method('updateSourceText');
+        $bugRepo->expects($this->never())->method('reviveForReclassify');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can report a source edit.');
+        $responder->expects($this->never())->method('success');
+
+        $this->makeController($bugRepo, 'standard')->handle([], [], $responder, [
+            'message_id' => '300000000000000003',
+            'text'       => 'edited text',
+        ]);
+    }
+
+    public function testMissingKeyRejected403AndNoRepositoryCall(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->never())->method('findByOriginalMessageId');
+        $bugRepo->expects($this->never())->method('updateSourceText');
+        $bugRepo->expects($this->never())->method('reviveForReclassify');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can report a source edit.');
+        $responder->expects($this->never())->method('success');
+
+        $this->makeController($bugRepo)->handle([], [], $responder, [
+            'message_id' => '300000000000000003',
+            'text'       => 'edited text',
+        ]);
+    }
+
+    public function testStandardTierKeyWithMalformedBodyRejected403Not400(): void
+    {
+        $bugRepo = self::createStub(BugReportRepository::class);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can report a source edit.');
+
+        $this->makeController($bugRepo, 'standard')->handle([], [], $responder, []);
     }
 
     /** @phpstan-return BugReportRow */

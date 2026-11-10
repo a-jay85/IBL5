@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\Api\Controller;
 
 use Api\Controller\EnqueueController;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\AttachmentInputValidator;
 use BugPipeline\BugReportRepository;
@@ -26,16 +27,44 @@ class EnqueueControllerDatabaseTest extends DatabaseTestCase
     private const UNKNOWN_AUTHOR = '999999999999999999';
     private const CHANNEL        = '200000000000000002';
     private const MSG_ID         = '300000000000000003';
+    private const BOT_KEY        = 'svkguard-bot-key';
+    private const GM_KEY         = 'svkguard-gm-key';
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->bugRepo  = new BugReportRepository($this->db);
+
+        $this->insertRow('ibl_api_keys', [
+            'key_hash'         => hash('sha256', self::BOT_KEY),
+            'key_prefix'       => 'svkbotky',
+            'owner_name'       => 'Service key guard bot',
+            'permission_level' => 'commissioner',
+            'rate_limit_tier'  => 'unlimited',
+            'is_active'        => 1,
+        ]);
+        $this->insertRow('ibl_api_keys', [
+            'key_hash'         => hash('sha256', self::GM_KEY),
+            'key_prefix'       => 'svkgmkey',
+            'owner_name'       => 'Service key guard GM',
+            'permission_level' => 'team_owner',
+            'rate_limit_tier'  => 'standard',
+            'is_active'        => 1,
+        ]);
+        $_SERVER['HTTP_X_API_KEY'] = self::BOT_KEY;
+
         $this->controller = new EnqueueController(
             $this->bugRepo,
             new TeamIdentityRepository($this->db),
-            new AttachmentInputValidator()
+            new AttachmentInputValidator(),
+            new ApiKeyRepository($this->db)
         );
+    }
+
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_X_API_KEY']);
+        parent::tearDown();
     }
 
     public function testAuthorizedAuthorInsertsRowAndReturnsReportId(): void
@@ -158,5 +187,44 @@ class EnqueueControllerDatabaseTest extends DatabaseTestCase
         self::assertCount(1, $rows);
         self::assertSame('700000000000000001', $rows[0]['attachment_id']);
         self::assertNull($rows[0]['local_path']);
+    }
+
+    public function testStandardTierKeyWritesNoReportAndNoWatermark(): void
+    {
+        $_SERVER['HTTP_X_API_KEY'] = self::GM_KEY;
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can enqueue a report.');
+        $responder->expects($this->never())->method('success');
+
+        $this->controller->handle([], [], $responder, [
+            'author_id'  => self::KNOWN_AUTHOR,
+            'channel_id' => self::CHANNEL,
+            'message_id' => self::MSG_ID,
+            'text'       => 'app crashes on save',
+        ]);
+
+        self::assertSame(
+            0,
+            $this->countRows('SELECT COUNT(*) AS cnt FROM ibl_bug_reports WHERE original_message_id = ?', self::MSG_ID)
+        );
+        self::assertSame(
+            0,
+            $this->countRows('SELECT COUNT(*) AS cnt FROM ibl_bug_pipeline_state WHERE channel_id = ?', self::CHANNEL)
+        );
+    }
+
+    private function countRows(string $sql, string $param): int
+    {
+        $stmt = $this->db->prepare($sql);
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('s', $param);
+        $stmt->execute();
+        /** @var array{cnt: int|string}|null $row */
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return (int) ($row['cnt'] ?? 0);
     }
 }

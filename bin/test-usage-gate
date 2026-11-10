@@ -214,7 +214,7 @@ while [ \$# -gt 0 ]; do
     shift
 done
 echo "call \$PPID" >> "$dir/curl.calls"
-if [ "${STUB_GATE:-0}" = 1 ]; then i=0; while [ ! -e "$dir/release" ]; do i=\$((i + 1)); [ "\$i" -le 600 ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
+if [ "${STUB_GATE:-0}" = 1 ]; then end=\$((\$(date +%s) + 30)); grace=""; while [ ! -e "$dir/release" ]; do now=\$(date +%s); if [ -e "$dir/gate.done" ]; then [ -n "\$grace" ] || grace=\$((now + 5)); [ "\$now" -lt "\$grace" ] || { echo timeout >> "$dir/gate.timeout"; break; }; fi; [ "\$now" -lt "\$end" ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
 if [ -n "\$hdr" ]; then
     printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
     [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
@@ -264,7 +264,7 @@ diag_dump() {
 fetch_parallel() {
     local i=1 pids="" pre
     rm -f "$T/lock.trace"
-    rm -f "$T"/rc.* "$T"/out.* "$STUB/release"
+    rm -f "$T"/rc.* "$T"/out.* "$STUB/release" "$STUB/gate.done"
     pre="USAGE_FETCH_LOCK_STALE=3600; _usage_lock_hook() { printf '%s %s\\n' \"\$\$\" \"\$1\" >> '$T/lock.trace'; }; "
     while [ "$i" -le "$1" ]; do
         ( FETCH_PRELUDE="$pre"; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
@@ -273,11 +273,15 @@ fetch_parallel() {
     done
     if [ "${STUB_GATE:-0}" = 1 ]; then
         # Hold the curl holder until every other caller has returned, then release it.
-        local k=0
+        # Both waits use wall-clock deadlines, so load cannot stretch them. gate.done tells
+        # the stub the release is due now: with no release 5 s later it fails fast with a
+        # stub timeout. The stub's 30 s cap stays above this loop's 20 s.
+        local end=$(( $(date +%s) + 20 ))
         until [ $(( $(find "$T" -maxdepth 1 -name 'rc.*' | wc -l) + $(curl_calls "$STUB") )) -ge "$1" ]; do
-            k=$((k + 1)); [ "$k" -le 2000 ] || { echo timeout >> "$T/gate.timeout"; break; }
+            [ "$(date +%s)" -lt "$end" ] || { echo timeout >> "$T/gate.timeout"; break; }
             sleep 0.01
         done
+        touch "$STUB/gate.done"
         touch "$STUB/release"
     fi
     for p in $pids; do wait "$p"; done

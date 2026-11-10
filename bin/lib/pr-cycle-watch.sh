@@ -11,6 +11,8 @@ _PCW_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_PCW_LIB/launchd-job.sh"
 # shellcheck source=bin/lib/ci-checks-green.sh
 source "$_PCW_LIB/ci-checks-green.sh"
+# shellcheck source=bin/lib/worktree-lock.sh
+declare -F wtlock_live >/dev/null || . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/worktree-lock.sh"
 
 PCW_GRACE_MIN=30       # skip a PR whose last post-plan run finished this recently
 # shellcheck disable=SC2034  # read by bin/pr-cycle-tick
@@ -117,15 +119,19 @@ pcw_anchors_green() {
         >/dev/null 2>&1 <<< "$json"
 }
 
-# pcw_inflight <pr> <branch> <launchctl-snapshot>: 0 when a fleet rescue for the PR
-# (com.ibl5.post-plan-fleet-<pr>, exact) or a worktree-fired post-plan-now for the
-# branch (com.ibl5.postplan-now-<safe-slug>-<ts>-<pid>) is loaded.
+# pcw_inflight <pr> <branch> <launchctl-snapshot> [repo-dir]: 0 when a fleet rescue for the
+# PR (com.ibl5.post-plan-fleet-<pr>, exact) or a worktree-fired post-plan-now for the
+# branch (com.ibl5.postplan-now-<safe-slug>-<ts>-<pid>) is loaded, or when the branch's
+# worktree holds a live <git-dir>/post-plan-now.lock (bin/lib/worktree-lock.sh).
 pcw_inflight() {
-    local pr="$1" branch="$2" snap="${3-}" _pid _status label
+    local pr="$1" branch="$2" snap="${3-}" repo="${4-}" _pid _status label _wt _lk
     while IFS=$'\t' read -r _pid _status label; do
         [[ "$label" == "com.ibl5.post-plan-fleet-$pr" ]] && return 0
     done <<< "$snap"
-    ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$snap" >/dev/null
+    ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$snap" >/dev/null && return 0
+    _wt=$(wtlock_wt_for_branch "$branch" ${repo:+"$repo"}) || return 1
+    _lk=$(wtlock_path "$_wt") || return 0
+    wtlock_live "$_lk" >/dev/null
 }
 
 # pcw_recent_finish <branch> <out-dir>...: 0 when a harness run for this branch wrote

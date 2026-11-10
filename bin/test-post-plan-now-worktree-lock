@@ -299,6 +299,30 @@ if should_run submit-fail-release; then
     h_absent "submit-fail-release: lock released" "$PL"
 fi
 
+if should_run pcw-inflight; then
+    # pcw_inflight (bin/lib/pr-cycle-watch.sh) probes the branch's worktree lock.
+    pcw_probe() {  # $1 = branch; prints the pcw_inflight return code
+        (
+            # shellcheck source=bin/lib/launchd-job.sh
+            . "$REPO/bin/lib/launchd-job.sh"
+            # shellcheck source=bin/lib/pr-cycle-watch.sh
+            . "$REPO/bin/lib/pr-cycle-watch.sh"
+            RC=0; pcw_inflight 7 "$1" "" "$TMP/r" || RC=$?
+            printf '%s' "$RC"
+        )
+    }
+    plant "$LIVE"
+    h_eq "pcw-inflight: live lock reads as in flight" "0" "$(pcw_probe feat-a)"
+    plant "$DEAD"
+    h_eq "pcw-inflight: dead lock reads as not in flight" "1" "$(pcw_probe feat-a)"
+    reset_lock
+    h_eq "pcw-inflight: no lock reads as not in flight" "1" "$(pcw_probe feat-a)"
+    plant "$LIVE"
+    h_eq "pcw-inflight: a lock on feat-a does not hold feat-ab" "1" "$(pcw_probe feat-ab)"
+    h_eq "pcw-inflight: a branch with no worktree is not in flight" "1" "$(pcw_probe no-such-branch)"
+    reset_lock
+fi
+
 # --- later phases add their cases above this line ---
 
 check_only_cases

@@ -1494,6 +1494,7 @@ _bucket_emoji() {
         NOT-MERGEABLE)          printf '🚫' ;;
         BLOCKED-CHECK)          printf '❌' ;;
         HELD)                   printf '⏸' ;;
+        VERDICT-HELD)           printf '⚖️' ;;
         OPEN-THREAD)            printf '💬' ;;
         BLOCKED-DEP)            printf '🔗' ;;
         PIPELINE-HELD)          printf '🤖' ;;

@@ -1,3 +1,8 @@
+---
+description: Shared remediation procedure for /fix-and-prevent and the /post-plan Phase 5.5 in-PR fix path: declared mode, fix, class-wide prevention, and ship hand-off.
+last_verified: 2026-11-10
+---
+
 # /fix-and-prevent remediation procedure
 
 Shared include. Two callers:

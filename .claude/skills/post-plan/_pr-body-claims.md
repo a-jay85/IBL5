@@ -1,6 +1,6 @@
 ---
 description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and only ever raised, with a Self-governing segment for arming-path and gate-removed changes; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show; a body names edited items and never tallies them by hand."
-last_verified: 2026-11-07
+last_verified: 2026-11-10
 ---
 
 # PR Body Claims
@@ -178,7 +178,7 @@ Either of these triggers adds the Self-governing segment and leaves the Door alo
 
 An LLM cannot add the segment in Phase 2. A human may add it in a later phase, and nobody may remove a mechanical one.
 
-An edited `bin/check-*`, `bin/lib/*`, or `.github/workflows/*.yml` stays two-way with `Blast radius: site-wide`. Condition (17) gate-backtest already holds the edits that flip past verdicts. On the 100 newest merged PRs (2026-10-11), these triggers hold 3 of 100 from paths alone: #3058 and #3050 one-way for notify workflows, and #3114 Self-governing for an arming path. Treating every gate edit as one-way would have marked 38 of 100. That count takes any PR touching `.github/workflows/`, `bin/check-*`, `bin/lib/`, `.claude/hooks/`, or `tools/postplan-harness/harness/`.
+An edited `bin/check-*`, `bin/lib/*`, or `.github/workflows/*.yml` stays two-way with `Blast radius: site-wide`. Condition (17) gate-backtest already holds the edits that flip past verdicts. On the 100 newest merged PRs (2026-10-11), these triggers hold 3 of 100 from paths alone: #3058 and #3050 one-way for notify workflows, and #3114 Self-governing for an arming path. Treating every gate edit as one-way would have marked 38 of 100. That count takes any PR touching `.github/workflows/`, `bin/check-*`, `bin/lib/`, `.claude/hooks/` (example), or `tools/postplan-harness/harness/`.
 
 Blast radius is a mechanical floor too. The LLM or a human may widen it and never narrow it. It is `external` when a prod-external or notification trigger hit. It is `site-wide` when any gate, migration, workflow, arming path, `ibl5/.htaccess`, `ibl5/router.php`, or `ibl5/composer.json` changed. It is `localized` when at most 3 files changed and all share one parent directory. It is `module` when every path shares one module root: `ibl5/classes/<X>`, `ibl5/modules/<X>`, `tools/<X>`, or else the first path component. Anything else is `site-wide`.
 
@@ -304,5 +304,5 @@ A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff do
 ```markdown
 ## Plan gaps
 
-- `ibl5/docs/decisions/0074-example.md` (already refreshed by #2036 before this branch was cut)
+- `ibl5/docs/decisions/0074-example.md` (example) (already refreshed by #2036 before this branch was cut)
 ```

@@ -1,3 +1,8 @@
+---
+description: /post-plan Phase 10 preview environment reference: the Path A main-stack rebuild after merge and the Path B worktree preview procedure.
+last_verified: 2026-11-10
+---
+
 # Phase 10 — Preview Environment (post-plan reference)
 
 Purpose: the full Path A / Path B procedures for Phase 10 preview.

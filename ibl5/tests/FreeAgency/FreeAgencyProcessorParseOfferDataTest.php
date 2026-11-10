@@ -262,6 +262,19 @@ final class FreeAgencyProcessorParseOfferDataTest extends TestCase
         $this->assertNull($repo->lastSavedOffer);
     }
 
+    public function testMissingOfferTypeFallsBackToCustomOffer(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData(['has_mle' => 1])]);
+        $repo = new CapturingRepository();
+        $processor = $this->buildProcessor($repo);
+
+        $post = $this->basePost(['offeryear2' => 550]);
+        unset($post['offerType']);
+        $processor->processOfferSubmission($post, 'Test Team');
+
+        $this->assertSavedOffer($repo, [500, 550, 0, 0, 0, 0], 0, 0, 0);
+    }
+
     public function testCustomOfferTypeZeroIsSoftCapChecked(): void
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
@@ -390,6 +403,22 @@ final class FreeAgencyProcessorParseOfferDataTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('validation_error', $result['type']);
         $this->assertStringContainsString('Year ' . $year . ' of this offer is not a number', $result['message']);
+        $this->assertNull($repo->lastSavedOffer);
+    }
+
+    public function testFirstNonNumericYearIsTheOneReported(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+        $repo = new CapturingRepository();
+        $processor = $this->buildProcessor($repo);
+
+        $result = $processor->processOfferSubmission(
+            $this->basePost(['offeryear2' => 'abc', 'offeryear4' => 'xyz']),
+            'Test Team',
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Year 2 of this offer is not a number', $result['message']);
         $this->assertNull($repo->lastSavedOffer);
     }
 

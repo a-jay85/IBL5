@@ -167,20 +167,20 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             // Key 0 is always present from the ladder, so the pad starts at key 1 on purpose.
             $offers = \League\ContractRules::getMLEOffers($offerType) + [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
         } else {
-            $amounts = [
-                self::toOfferAmount($postData['offeryear1'] ?? 0),
-                self::toOfferAmount($postData['offeryear2'] ?? 0),
-                self::toOfferAmount($postData['offeryear3'] ?? 0),
-                self::toOfferAmount($postData['offeryear4'] ?? 0),
-                self::toOfferAmount($postData['offeryear5'] ?? 0),
-                self::toOfferAmount($postData['offeryear6'] ?? 0),
+            $rawAmounts = [
+                $postData['offeryear1'] ?? 0,
+                $postData['offeryear2'] ?? 0,
+                $postData['offeryear3'] ?? 0,
+                $postData['offeryear4'] ?? 0,
+                $postData['offeryear5'] ?? 0,
+                $postData['offeryear6'] ?? 0,
             ];
-            foreach ($amounts as $index => $amount) {
-                if ($amount === null && $nonNumericYear === 0) {
+            foreach ($rawAmounts as $index => $raw) {
+                if (self::isNonNumericAmount($raw) && $nonNumericYear === 0) {
                     $nonNumericYear = $index + 1;
                 }
             }
-            $offers = array_map(static fn (?int $amount): int => $amount ?? 0, $amounts);
+            $offers = array_map(self::toOfferAmount(...), $rawAmounts);
         }
         [$offer1, $offer2, $offer3, $offer4, $offer5, $offer6] = $offers;
 
@@ -201,29 +201,36 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     }
 
     /**
-     * Coerce one raw POST offer amount. Blank input (missing, null, '' or whitespace-only) is 0.
-     * Numeric strings, floats and ints cast to int as before. Anything else (letters, arrays)
-     * returns null so parseOfferData() can flag the year for rejection.
+     * Coerce one raw POST offer amount the way the custom branch always has:
+     * numeric strings, floats and ints cast to int; anything else becomes 0.
+     * Non-blank, non-numeric input is flagged separately by isNonNumericAmount().
      */
-    private static function toOfferAmount(mixed $raw): ?int
+    private static function toOfferAmount(mixed $raw): int
     {
-        if ($raw === null || (is_string($raw) && trim($raw) === '')) {
-            return 0;
-        }
-        return is_numeric($raw) ? (int) $raw : null;
+        return is_numeric($raw) ? (int) $raw : 0;
     }
 
     /**
-     * Parse the posted offer type. Ints pass through. Integer-shaped numeric strings
+     * True when a raw POST offer amount held letters or an array (crafted POST).
+     * Blank input ('' or whitespace-only) counts as 0 and is not flagged. A missing or null
+     * year never gets here, because parseOfferData() turns it into 0 first.
+     */
+    private static function isNonNumericAmount(mixed $raw): bool
+    {
+        if (is_string($raw) && trim($raw) === '') {
+            return false;
+        }
+        return !is_numeric($raw);
+    }
+
+    /**
+     * Parse the posted offer type. Ints and integer-shaped numeric strings
      * ('0'..'8' from the form, also ' 7', '+7', '07') cast to int exactly as before.
      * Other numeric input ('7.5', '7.0', '7e0') would truncate into an exception type,
      * so it maps to UNRECOGNIZED_OFFER_TYPE. Non-numeric input keeps the custom fallback.
      */
     private static function toOfferType(mixed $raw): int
     {
-        if (is_int($raw)) {
-            return $raw;
-        }
         if (!is_numeric($raw)) {
             return OfferType::CUSTOM;
         }

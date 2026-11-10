@@ -30,7 +30,7 @@ const IN_SCOPE_GLOBS = [
     'CLAUDE.md',
     'README.md',
     '.claude/rules/*.md',
-    '.claude/skills/*/SKILL.md',
+    '.claude/skills/*/*.md',
     'ibl5/docs/*.md',
     'ibl5/docs/decisions/*.md',
     'ibl5/classes/*/README.md',

@@ -5,7 +5,8 @@
 #
 # Pins the guard taxonomy (one removal per kind per language), the paired-exit
 # rule, the same-file moved-guard rule, intended-removal suppression, the skip
-# list, usage errors, and two real PR replays (#3370, #3371) whose trimmed
+# list, usage errors, the or-true case-arm unwrap rule, and three real PR
+# replays (#3370, #3371, #3821) whose trimmed
 # diffs are committed under bin/fixtures/deleted-guards/.
 #
 # Run: bin/test-deleted-guards  (exit 0 = all pass, 1 = a case failed)
@@ -244,6 +245,122 @@ run_dg --diff "$T/moved-cross.diff"
 h_eq "moved-cross-file-flagged: exit 1" 1 "$RC"
 h_contains "moved-cross-file-flagged: key" "$OUT" "try@ibl5/classes/a.php#"
 
+# --- or-true case-arm unwrap ------------------------------------------------
+# A removed `cmd || true` cancels against an added one-line case arm whose
+# body equals it exactly once `<pattern>)` and a trailing `;;` are stripped.
+
+cat > "$T/arm-unwrap.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,5 @@
+-    rm -f "$x" || true
++    case "$y" in
++        *) rm -f "$x" || true ;;
++    esac
+ done
+EOF
+run_dg --diff "$T/arm-unwrap.diff"
+h_eq "arm-unwrap-not-flagged" 0 "$RC"
+
+cat > "$T/arm-shapes.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,4 +10,4 @@
+-    rm -f "$x" || true
+-    rm -f "$z" || true
++        "done"|"stopped by "*) rm -f "$x" || true ;;
++        (a|b) rm -f "$z" || true
+ done
+EOF
+run_dg --diff "$T/arm-shapes.diff"
+h_eq "arm-unwrap-pattern-shapes-not-flagged" 0 "$RC"
+
+cat > "$T/arm-count.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,4 +10,3 @@
+-    rm -f "$x" || true
+-    rm -f "$x" || true
++        *) rm -f "$x" || true ;;
+ done
+EOF
+run_dg --diff "$T/arm-count.diff"
+h_eq "arm-unwrap-count-decrement-flags-second: exit 1" 1 "$RC"
+h_eq "arm-unwrap-count-decrement-flags-second: one line" 1 "$(count_removed "$OUT")"
+
+cat > "$T/arm-other-body.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,3 @@
+-    rm -f "$x" || true
++        *) rm -f "$y" || true ;;
+ done
+EOF
+run_dg --diff "$T/arm-other-body.diff"
+h_eq "arm-different-body-flags: exit 1" 1 "$RC"
+h_contains "arm-different-body-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
+
+cat > "$T/arm-longer.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,3 @@
+-    rm -f "$x" || true
++        *) echo a; rm -f "$x" || true ;;
+ done
+EOF
+run_dg --diff "$T/arm-longer.diff"
+h_eq "arm-longer-line-flags: exit 1" 1 "$RC"
+h_contains "arm-longer-line-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
+
+cat > "$T/arm-parens.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,3 @@
+-    rm -f "$x" || true
++    x=$(pwd) rm -f "$x" || true
+ done
+EOF
+run_dg --diff "$T/arm-parens.diff"
+h_eq "arm-regex-refuses-parens-flags: exit 1" 1 "$RC"
+h_contains "arm-regex-refuses-parens-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
+
+cat > "$T/arm-cross.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,2 +10,1 @@
+-    rm -f "$x" || true
+ done
+diff --git a/bin/lib/arm-other.sh b/bin/lib/arm-other.sh
+--- a/bin/lib/arm-other.sh
++++ b/bin/lib/arm-other.sh
+@@ -10,1 +10,2 @@
++        *) rm -f "$x" || true ;;
+ done
+EOF
+run_dg --diff "$T/arm-cross.diff"
+h_eq "arm-cross-file-flags: exit 1" 1 "$RC"
+h_contains "arm-cross-file-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
+
+cat > "$T/arm-other-kind.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,3 @@
+-    command -v jq >/dev/null || exit 1
++        *) command -v jq >/dev/null || exit 1 ;;
+ done
+EOF
+run_dg --diff "$T/arm-other-kind.diff"
+h_eq "non-or-true-kind-arm-flags: exit 1" 1 "$RC"
+h_contains "non-or-true-kind-arm-flags: key" "$OUT" "command-guard@bin/lib/arm-demo.sh#"
+
 # bare-guard-cancels-only-in-hunk: a `try {` removed in one hunk must not
 # cancel against an unrelated `try {` added in another hunk of the same file.
 cat > "$T/bare-other-hunk.diff" <<'EOF'
@@ -362,6 +479,10 @@ h_eq "replay-pr3371-flags: exit 1" 1 "$RC"
 h_eq "replay-pr3371-flags: pinned line count" 2 "$(count_removed "$OUT")"
 h_contains "replay-pr3371-flags: try" "$OUT" "try@ibl5/classes/Season/Season.php#"
 h_contains "replay-pr3371-flags: catch" "$OUT" "catch@ibl5/classes/Season/Season.php#"
+
+run_dg --diff "$FIX/pr3821-trimmed.diff"
+h_eq "replay-pr3821-not-flagged: exit 0" 0 "$RC"
+h_not_contains "replay-pr3821-not-flagged: dm_ping arm cancels" "$OUT" "or-true@bin/pr-cycle#ac73c51d"
 
 # --- launchd-like empty environment -----------------------------------------
 

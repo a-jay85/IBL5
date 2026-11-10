@@ -22,7 +22,11 @@
 # A guard key is <kind>@<path>#<first 8 hex of sha1(normalized line)>, so it
 # survives rebases. A removed guard cancels against an identical (normalized)
 # added line in the SAME file only: a re-indent is not flagged, a cross-file
-# move is. Test, fixture and doc paths are skipped. A plan's
+# move is. One or-true exception: a removed `cmd || true` also cancels against
+# an added one-line case arm `<pattern>) cmd || true ;;` in the same file when
+# the body equals it exactly after the arm prefix and trailing `;;` are
+# stripped. Each added line cancels at most one removal. Test, fixture and doc
+# paths are skipped. A plan's
 # `### Intended removals` bullets suppress matching removals (printed as
 # INTENDED). Stdlib only, so it runs under a launchd-like empty environment.
 
@@ -97,6 +101,31 @@ class UsageError(Exception):
 
 def normalize(line):
     return re.sub(r"\s+", " ", line).strip()
+
+
+# A one-line shell case arm: `<pattern>) body` with an optional leading `(`.
+# The pattern may hold no parentheses, so `x=$(pwd) cmd || true` is never
+# read as an arm.
+CASE_ARM = re.compile(r"^\(?[^()]*\)\s+")
+ARM_TAIL = re.compile(r"\s*;;$")
+
+
+def unwrap_case_arm(norm):
+    """Body of a one-line case arm with any trailing `;;` removed, else None."""
+    m = CASE_ARM.match(norm)
+    if not m:
+        return None
+    body = ARM_TAIL.sub("", norm[m.end():])
+    return body or None
+
+
+def cancel_unwrapped(added, norm):
+    """Spend one added case-arm line whose unwrapped body equals norm."""
+    for cand, n in added.items():
+        if n > 0 and unwrap_case_arm(cand) == norm:
+            added[cand] -= 1
+            return True
+    return False
 
 
 _REPO_ROOT = []
@@ -298,6 +327,8 @@ def find_removed_guards(files):
                     pool[norm] -= 1
                     if pool is local_added:
                         added[norm] = max(0, added.get(norm, 0) - 1)
+                    continue
+                if kind == "or-true" and cancel_unwrapped(added, norm):
                     continue
                 key = guard_key(kind, path, norm)
                 if key in seen:

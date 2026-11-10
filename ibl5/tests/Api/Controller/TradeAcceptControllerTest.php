@@ -176,6 +176,7 @@ class TradeAcceptControllerTest extends WideUnitTestCase
 
     public function testElevatedTierKeyLocalhostTradeStillAccepts(): void
     {
+        // An elevated key on a localhost 'test' trade must reach processTrade(7) exactly once.
         $commonStub = self::createStub(TeamIdentityRepositoryInterface::class);
         $offerRepo = self::createStub(\Trading\Contracts\TradeOfferRepositoryInterface::class);
         $processor = $this->createMock(\Trading\Contracts\TradeProcessorInterface::class);

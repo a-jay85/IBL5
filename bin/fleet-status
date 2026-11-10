@@ -530,6 +530,7 @@ pid_is_accounted_for() {
 render_launchd() {
     local count=0 line label pid status suffix producer log outdir progress
     local ident ident_note slug audit progress_tool tf ph tl tool_name tool_tgt
+    local pr_key pr_mode
 
     section "LAUNCHD JOBS  (com.ibl5.*)"
 
@@ -546,13 +547,16 @@ render_launchd() {
 
         suffix="${label#com.ibl5.}"
         producer="$suffix"; log=''; outdir=''; progress=''; audit=''; progress_tool=''
-        ident="$suffix"; ident_note=''
+        ident="$suffix"; ident_note=''; pr_key=''; pr_mode=''
 
         case "$suffix" in
             postplan-now-*)
                 producer="post-plan"
                 log="$LOG_DIR/post-plan-now-${suffix#postplan-now-}.log"
                 outdir="$HARNESS_OUT/live-${suffix#postplan-now-}"
+                # The label is postplan-now-<safe-branch>-<date>-<time>-<pid>.
+                pr_key="$(sed -E 's/-[0-9]{8}-[0-9]{6}-[0-9]+$//' <<< "${suffix#postplan-now-}")"
+                pr_mode=safe
                 ;;
             plan-now-*)
                 producer="plan"
@@ -570,6 +574,7 @@ render_launchd() {
                     slug="$(transcript_plan_slug "$log")" || slug=''
                     [ -n "$slug" ] && ident_note="  ${B}${slug}${R}"
                 fi
+                pr_key="$slug"
                 ;;
             post-plan-fleet-*) producer="fleet"; log="$LOG_DIR/${suffix}.log" ;;
             docfix-*)       producer="docfix";   log="$LOG_DIR/${suffix}.log" ;;
@@ -620,8 +625,9 @@ render_launchd() {
 
         count=$(( count + 1 ))
         track_pid "$pid"
-        printf '  %s●%s %-10s %s%s%s%s\n' \
-            "$GRN" "$R" "$producer" "$B" "$ident" "$R" "$ident_note"
+        printf '  %s●%s %-10s %s %s%s%s%s\n' \
+            "$GRN" "$R" "$producer" "$(pr_slot "$pr_key" "$pr_mode")" \
+            "$B" "$ident" "$R" "$ident_note"
         printf '      pid %-7s up %-8s last-exit-col %s%s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status" \
             "$(log_word "$audit" "$log")"
@@ -747,6 +753,58 @@ pr_merged_for() {
     hit="$(GH_PROMPT_DISABLED=1 "$GH_BIN" pr list --head "$1" --state merged \
         --limit 1 --json number --jq 'length' 2>/dev/null)" || return 1
     [ "$hit" = 1 ]
+}
+
+# ── open PRs ───────────────────────────────────────────────────────────────────
+#
+# A row tied to a branch with an open PR carries that PR's number in a fixed
+# 6-wide slot, so the slugs after it stay in one column. One `gh pr list --state
+# open` per page draw feeds every slot; --watch reuses it for PR_CACHE_SECS.
+# Each OPEN_PRS line: head, head with post-plan-now's label sanitizing applied,
+# number, state (draft|auto|open), url — tab-separated. Any gh failure leaves it
+# empty, which blanks every slot and touches nothing else on the page.
+OPEN_PRS=''
+OPEN_PRS_AT=0
+PR_CACHE_SECS=60
+load_open_prs() {
+    local raw
+    # shellcheck disable=SC2016  # the $ in --jq is jq syntax, not a shell expansion
+    raw="$(cd "$MAIN_CHECKOUT" 2>/dev/null && GH_PROMPT_DISABLED=1 "$GH_BIN" pr list \
+        --state open --limit 200 --json number,headRefName,isDraft,autoMergeRequest,url \
+        --jq '.[] | [.headRefName, (.number|tostring), (if .isDraft then "draft" elif .autoMergeRequest then "auto" else "open" end), .url] | @tsv' \
+        2>/dev/null)" || raw=''
+    OPEN_PRS="$(awk -F'\t' 'NF >= 4 && $2 ~ /^[0-9]+$/ {
+        s = $1; gsub(/[^A-Za-z0-9._-]+/, "-", s)
+        print $1 "\t" s "\t" $2 "\t" $3 "\t" $4 }' <<< "$raw")"
+    OPEN_PRS_AT="$(date +%s)"
+}
+
+# pr_slot <branch> [safe] — the PR column for <branch>: `#NNNN` padded to 6, or
+# 6 blanks. `safe` matches against the sanitized head, for a post-plan-now
+# label, whose branch part has already been through tr -cs 'A-Za-z0-9._-' '-'.
+# Yellow = draft, green = auto-merge armed. The number links to the PR page.
+# Colour, link and padding sit outside each other, so the width stays 6.
+pr_slot() {
+    # Builtins only: this runs once per row, and a fork per field cost a full
+    # second on a long queue.
+    local key="${1:-}" mode="${2:-}" head safe num='' state url n s u text color='' pad
+    if [ -n "$key" ] && [ -n "$OPEN_PRS" ]; then
+        while IFS=$'\t' read -r head safe n s u; do
+            [ "$mode" = safe ] && head="$safe"
+            if [ "$head" = "$key" ]; then num="$n"; state="$s"; url="$u"; break; fi
+        done <<< "$OPEN_PRS"
+    fi
+    if [ -z "$num" ]; then printf '%6s' ''; return; fi
+    text="#$num"
+    case "$state" in draft) color="$YEL" ;; auto) color="$GRN" ;; esac
+    pad=''
+    [ "${#text}" -lt 6 ] && pad="$(printf '%*s' $(( 6 - ${#text} )) '')"
+    if [ "$LINKS" -ne 0 ] && case "$url" in https://*) true ;; *) false ;; esac; then
+        # shellcheck disable=SC1003  # '\033\\' is ESC + a literal backslash (ST)
+        text="$(printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$url" "$text")"
+    fi
+    if [ -n "$color" ]; then printf '%s%s%s%s' "$color" "$text" "$R" "$pad"
+    else printf '%s%s' "$text" "$pad"; fi
 }
 
 # impl_model, auto_merge and title of a queued plan, tab-separated. The awk is
@@ -1181,8 +1239,8 @@ render_queue() {
 $queue_list
 EOF_Q
 
-    printf '  %s%3s %-44s %-17s %-6s %s%s\n' \
-        "$DIM" '#' 'PLAN' 'MODEL' 'MERGE' 'STATUS' "$R"
+    printf '  %s%3s %-6s %-44s %-17s %-6s %s%s\n' \
+        "$DIM" '#' 'PR' 'PLAN' 'MODEL' 'MERGE' 'STATUS' "$R"
 
     # Pass 2: every heartbeat NOT claimed above. A dead or reused PID is residue
     # and only counted. A live one is a runner on a plan that is not in queue/
@@ -1223,8 +1281,9 @@ EOF_Q
         fi
         [ -z "$slug" ] && slug='(unknown plan)'
         shown=$(( shown + 1 ))
-        printf '  %s  ▶%s %-44s %-17s %-6s %s%s%s  %s(not in queue)%s\n' \
-            "$YEL" "$R" "$slug" '-' '-' "$YEL" 'running' "$R" "$DIM" "$R"
+        printf '  %s  ▶%s %s %-44s %-17s %-6s %s%s%s  %s(not in queue)%s\n' \
+            "$YEL" "$R" "$(pr_slot "$(plan_branch "$slug.md")")" "$slug" '-' '-' \
+            "$YEL" 'running' "$R" "$DIM" "$R"
         render_runner_detail "$pid" "$slug" "$hb"
     done
 
@@ -1277,14 +1336,16 @@ EOF_Q
                     mark="$DIM  ×$R"; state="$DIM"'stale lock (runner gone)'"$R"
                 fi
             fi
-            printf '  %s %s%s %-17s %-6s %s\n' \
-                "$mark" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" "$state"
+            printf '  %s %s %s%s %-17s %-6s %s\n' \
+                "$mark" "$(pr_slot "$(plan_branch "$base")")" \
+                "$(link_file "$f" "$base")" "$pad" "$model" "$merge" "$state"
             [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
             [ -n "$pid" ] && hb="$(runner_phase_file "$pid")" && \
                 render_runner_detail "$pid" "${base%.md}" "$hb"
         else
-            printf '  %s%2d.%s %s%s %-17s %-6s %s%s%s\n' \
-                "$DIM" "$count" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
+            printf '  %s%2d.%s %s %s%s %-17s %-6s %s%s%s\n' \
+                "$DIM" "$count" "$R" "$(pr_slot "$(plan_branch "$base")")" \
+                "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
                 "$DIM" 'queued' "$R"
             [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
         fi
@@ -1357,10 +1418,10 @@ pid_cwd() {
     printf '%s' "$d"
 }
 
-# "<where> · <what>" for a loose session. <args> is its `ps` command line.
+# "<where> · <what>" for a loose session. <args> is its `ps` command line,
+# <cwd> its working directory (pid_cwd).
 loose_summary() {
-    local pid="$1" args="$2" cwd where rest what='' agent cols
-    cwd="$(pid_cwd "$pid")"
+    local pid="$1" args="$2" cwd="${3:-}" where rest what='' agent cols
     case "$cwd" in
         */IBL5-worktrees/*) where="${cwd#*/IBL5-worktrees/}"; where="${where%%/*}" ;;
         '')                 where='?' ;;
@@ -1392,7 +1453,7 @@ loose_summary() {
 }
 
 render_loose() {
-    local count=0 pid args name
+    local count=0 pid args name cwd branch
 
     section "UNACCOUNTED HEADLESS SESSIONS  (claude -p with no job above them)"
 
@@ -1407,9 +1468,14 @@ render_loose() {
         name="$(printf '%s' "$args" | sed -n 's/.*--name \([^ ]*\).*/\1/p' | head -n 1)"
         [ -z "$name" ] && name='(unnamed)'
         count=$(( count + 1 ))
-        printf '  %s●%s pid %-7s up %-8s %s\n' \
-            "$YEL" "$R" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$name"
-        printf '      %s%s%s\n' "$DIM" "$(loose_summary "$pid" "$args")" "$R"
+        # symbolic-ref, not rev-parse: it names an unborn branch too, and a
+        # detached HEAD gets no branch (so no PR) instead of the word HEAD.
+        cwd="$(pid_cwd "$pid")"; branch=''
+        [ -n "$cwd" ] && branch="$(git -C "$cwd" symbolic-ref --short -q HEAD 2>/dev/null)"
+        printf '  %s●%s %s pid %-7s up %-8s %s\n' \
+            "$YEL" "$R" "$(pr_slot "$branch")" "$pid" \
+            "$(human_age "$(pid_elapsed_secs "$pid")")" "$name"
+        printf '      %s%s%s\n' "$DIM" "$(loose_summary "$pid" "$args" "$cwd")" "$R"
     done <<EOF
 $(pgrep -f 'claude -p' 2>/dev/null)
 EOF
@@ -1678,6 +1744,7 @@ if [ "$WATCH" -eq 1 ]; then
         trap 'exit 130' INT TERM
     fi
     while :; do
+        [ $(( $(date +%s) - OPEN_PRS_AT )) -ge "$PR_CACHE_SECS" ] && load_open_prs
         frame=$(render_all)
         if [ "$alt" -eq 1 ]; then
             rows="$(stty size </dev/tty 2>/dev/null)"; rows="${rows%% *}"
@@ -1696,6 +1763,7 @@ ${DIM}… $(( total - max + 1 )) more lines (make the pane taller, or run withou
         sleep "$WATCH_SECS"
     done
 else
+    load_open_prs
     render_all
 fi
 

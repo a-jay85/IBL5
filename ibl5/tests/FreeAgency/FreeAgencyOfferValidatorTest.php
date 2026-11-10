@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyOfferValidator;
 use FreeAgency\OfferType;
@@ -47,6 +48,103 @@ class FreeAgencyOfferValidatorTest extends TestCase
         ]));
 
         $this->assertTrue($result['valid']);
+    }
+
+    // ================================================================
+    // RULE 0: Offer type must be 0..8, years must be numbers
+    // ================================================================
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function outOfRangeOfferTypeProvider(): array
+    {
+        return [
+            'nine' => [9],
+            'minus one' => [-1],
+            'hundred' => [100],
+            'int max' => [PHP_INT_MAX],
+        ];
+    }
+
+    #[DataProvider('outOfRangeOfferTypeProvider')]
+    public function testRejectsOfferTypeOutsideKnownRange(int $offerType): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer(['offerType' => $offerType]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('offer type is not recognized', $result['error']);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function boundaryOfferTypeProvider(): array
+    {
+        return [
+            'custom' => [OfferType::CUSTOM],
+            'veteran minimum' => [OfferType::VETERAN_MINIMUM],
+        ];
+    }
+
+    #[DataProvider('boundaryOfferTypeProvider')]
+    public function testAcceptsBoundaryOfferTypes(int $offerType): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 500,
+            'offerType' => $offerType,
+            'birdYears' => 3,
+        ]));
+
+        $this->assertTrue($result['valid']);
+    }
+
+    public function testUnknownOfferTypeIsRejectedEvenWithBirdRights(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer([
+            'offer1' => 600,
+            'amendedCapSpaceYear1' => 500,
+            'birdYears' => 3,
+            'offerType' => 9,
+            'year1Max' => 5000,
+        ]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('offer type is not recognized', $result['error']);
+    }
+
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function nonNumericYearProvider(): array
+    {
+        return [
+            'year 1' => [1],
+            'year 2' => [2],
+            'year 6' => [6],
+        ];
+    }
+
+    #[DataProvider('nonNumericYearProvider')]
+    public function testRejectsNonNumericOfferYear(int $year): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer(['nonNumericYear' => $year]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Year ' . $year . ' of this offer is not a number', $result['error']);
+    }
+
+    public function testZeroNonNumericYearKeepsExistingValidation(): void
+    {
+        $validator = new FreeAgencyOfferValidator();
+        $result = $validator->validateOffer($this->buildOffer(['offer1' => 0, 'nonNumericYear' => 0]));
+
+        $this->assertFalse($result['valid']);
+        $this->assertStringContainsString('Your offer in Year 1 was zero', $result['error']);
     }
 
     // ================================================================

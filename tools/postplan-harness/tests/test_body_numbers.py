@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.body_numbers import BodyNumberFacts, body_number_facts, correct_body_numbers
@@ -115,3 +117,58 @@ def test_adr_in_files_changed_block_does_not_suppress_prose_correction():
     result = correct_body_numbers(body, _NAME_STATUS, _NUMSTAT)
     assert "See ADR-0131 for details" in result
     assert "ADR-0042-other.md" in result
+
+
+@pytest.mark.parametrize("body", [
+    "The 20 files add valuation math, its tests and a codebase-map entry",
+    "20 new files",
+    "the 3 test files",
+    "Phase 2 touches 4 files.",
+])
+def test_subset_file_phrasings_are_never_rewritten(body):
+    assert correct_body_numbers(body, _NAME_STATUS, _NUMSTAT) == body
+
+
+@pytest.mark.parametrize("body, expected", [
+    ("2 files in this PR.", "3 files in this PR."),
+    ("- 2 files in this PR", "- 3 files in this PR"),
+    ("Scope (2 files in this PR)", "Scope (3 files in this PR)"),
+    ("2 FILES IN THIS PR.", "3 FILES IN THIS PR."),
+])
+def test_file_total_opening_a_line_is_corrected(body, expected):
+    assert correct_body_numbers(body, _NAME_STATUS, _NUMSTAT) == expected
+
+
+def test_file_total_in_the_diff_is_corrected():
+    assert correct_body_numbers("2 files in the diff", _NAME_STATUS, _NUMSTAT) == "3 files in the diff"
+
+
+def test_this_pr_touches_total_is_corrected():
+    result = correct_body_numbers("This PR touches 2 files.", _NAME_STATUS, _NUMSTAT)
+    assert result == "This PR touches 3 files."
+
+
+def test_file_total_with_several_numbers_rewrites_only_the_total():
+    result = correct_body_numbers("2 files in this PR, 1 in tests.", _NAME_STATUS, _NUMSTAT)
+    assert result == "3 files in this PR, 1 in tests."
+
+
+@pytest.mark.parametrize("body", [
+    "5 files in this PR are tests",
+    "2 files in the diff are migrations",
+])
+def test_file_count_followed_by_more_clause_is_not_rewritten(body):
+    assert correct_body_numbers(body, _NAME_STATUS, _NUMSTAT) == body
+
+
+@pytest.mark.parametrize("body", [
+    "The tests cover 2 files in this PR.",
+    "Phase 2 edits 5 files in the diff.",
+])
+def test_file_count_mid_sentence_is_not_rewritten(body):
+    assert correct_body_numbers(body, _NAME_STATUS, _NUMSTAT) == body
+
+
+def test_this_pr_subject_with_more_clause_is_not_rewritten():
+    body = "This PR touches 2 files under classes/."
+    assert correct_body_numbers(body, _NAME_STATUS, _NUMSTAT) == body

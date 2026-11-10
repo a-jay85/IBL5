@@ -1,11 +1,12 @@
 ---
 description: ADR-0194, engine/ is frozen and bin/check-engine-freeze gates new decompile tokens on every PR.
-last_verified: 2026-10-11
+last_verified: 2026-11-09
 ---
 
 # ADR-0194: Freeze engine/ and gate new decompile tokens
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0236
+**Superseded by:** [ADR-0236](0236-two-engine-model-jsb-port.md)
 **Date:** 2026-10-10
 
 ## Context

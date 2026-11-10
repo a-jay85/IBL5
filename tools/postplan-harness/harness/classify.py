@@ -28,6 +28,29 @@ GATE_FIX_END = "<!-- gate-fix:end -->"
 EXEC_MUTATIONS_BEGIN = "<!-- exec-mutations:begin -->"
 EXEC_MUTATIONS_END = "<!-- exec-mutations:end -->"
 
+_RUNNER_BLOCKS = (
+    (FILES_CHANGED_BEGIN, FILES_CHANGED_END),  # runner-owned
+    (MERGE_DIGEST_BEGIN, MERGE_DIGEST_END),  # runner-owned
+)
+
+
+def strip_runner_blocks(text: str | None) -> str:
+    """Remove the runner-owned files-changed and merge-digest blocks from a PR body.
+
+    The runner writes both blocks itself, so neither holds a hand-written claim a
+    reviewer should judge. A pair is cut only when both markers are present and the
+    end marker follows the begin marker; an unbalanced pair is left intact. Every
+    other block, the kept-unplanned block included, is returned unchanged.
+    Outer whitespace is kept; callers that compare bodies strip it themselves.
+    """
+    remaining = text or ""
+    for begin_marker, end_marker in _RUNNER_BLOCKS:
+        start = remaining.find(begin_marker)
+        stop = remaining.find(end_marker)
+        if start != -1 and stop != -1 and stop > start:
+            remaining = remaining[:start] + remaining[stop + len(end_marker):]
+    return remaining
+
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
 _CSS = re.compile(r"\.css$|^ibl5/design/")

@@ -205,6 +205,30 @@ class SourceUpdatedControllerTest extends TestCase
         ]);
     }
 
+    public function testElevatedTierKeyPassesGuard(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->once())
+            ->method('findByOriginalMessageId')
+            ->willReturn(self::makeRow('app crashes', 'hunting', '500000000000000005'));
+        $bugRepo->expects($this->once())
+            ->method('updateSourceText')
+            ->with('300000000000000003', 'app crashes — more detail');
+        $bugRepo->expects($this->never())->method('reviveForReclassify');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->never())->method('error');
+        $responder->expects($this->once())
+            ->method('success')
+            ->with(['matched' => true, 'changed' => true, 'revived' => false,
+                    'status' => 'hunting', 'thread_id' => '500000000000000005']);
+
+        $this->makeController($bugRepo, 'elevated')->handle([], [], $responder, [
+            'message_id' => '300000000000000003',
+            'text'       => 'app crashes — more detail',
+        ]);
+    }
+
     public function testReclassifiableRowGetsRevived(): void
     {
         $bugRepo = $this->createMock(BugReportRepository::class);

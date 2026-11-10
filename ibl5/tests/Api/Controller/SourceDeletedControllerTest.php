@@ -143,6 +143,28 @@ class SourceDeletedControllerTest extends TestCase
         ]);
     }
 
+    public function testElevatedTierKeyPassesGuard(): void
+    {
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->once())
+            ->method('findByOriginalMessageId')
+            ->willReturn(self::makeRow('queued', null));
+        $bugRepo->expects($this->once())
+            ->method('markSourceDeleted')
+            ->with('300000000000000003')
+            ->willReturn(true);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->never())->method('error');
+        $responder->expects($this->once())
+            ->method('success')
+            ->with(['matched' => true, 'dropped' => true, 'status' => 'queued', 'thread_id' => null]);
+
+        $this->makeController($bugRepo, 'elevated')->handle([], [], $responder, [
+            'message_id' => '300000000000000003',
+        ]);
+    }
+
     public function testMarksSourceDeletedAndReturnsDroppedTrue(): void
     {
         $bugRepo = $this->createMock(BugReportRepository::class);

@@ -146,7 +146,10 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             \Api\Controller\ThreadByPrController::class,
         ];
         if (in_array($controllerClass, $bugPipelineControllers, true)) {
-            return new $controllerClass(new \BugPipeline\BugReportRepository($db));
+            return new $controllerClass(
+                new \BugPipeline\BugReportRepository($db),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
         }
 
         /** @var class-string<\Api\Contracts\ControllerInterface> $controllerClass */

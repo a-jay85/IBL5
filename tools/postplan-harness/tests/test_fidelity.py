@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness import fidelity
+from harness import fidelity, llm_calls
 from harness.adapters.llm import FixtureLlm
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.ghad import RecordingGh
@@ -465,3 +465,57 @@ def test_file_note_issues_records_filed_duplicate_and_failed():
         {"title": "Already tracked note", "issue": None, "state": "already tracked"},
         {"title": "Doomed note", "issue": None, "state": "not filed"},
     ]
+
+
+_PR3748_BODY = (
+    "<!-- merge-digest:begin -->\n"
+    "## Merge digest\n"
+    "**Watch:** The 20 files add valuation math, its tests and a codebase-map entry.\n"
+    "<!-- merge-digest:end -->\n\n"
+    "## Summary\n"
+    "Adds trade valuation classes.\n\n"
+    "**Merge danger:** Door: two-way · Blast radius: site-wide · Why: The 20 new files "
+    "add valuation math and its tests, and an edit to `.claude/rules/codebase-map.md` "
+    "adds its row. Nothing calls the new classes yet.\n"
+)
+
+_PR3748_WITH_KEPT = (
+    _PR3748_BODY
+    + "\n<!-- kept-unplanned:begin -->\n"
+    "KEPT-UNPLANNED-SENTINEL\n"
+    "<!-- kept-unplanned:end -->\n"
+)
+
+
+def _packet_pr_body(tmp_path, git_shim, body):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),
+                                   "d", body, 42, False, worktree=str(tmp_path))
+    with open(os.path.join(packet, "pr-body.md")) as fh:
+        return fh.read()
+
+
+def test_packet_pr_body_drops_merge_digest_block(tmp_path, git_shim):
+    written = _packet_pr_body(tmp_path, git_shim, _PR3748_BODY)
+    assert "merge-digest" not in written
+    assert "The 20 files add valuation math" not in written
+
+
+def test_packet_pr_body_keeps_merge_danger_line(tmp_path, git_shim):
+    written = _packet_pr_body(tmp_path, git_shim, _PR3748_BODY)
+    assert "**Merge danger:** Door: two-way" in written
+    assert "The 20 new files add valuation math" in written
+
+
+def test_packet_pr_body_keeps_kept_unplanned_block(tmp_path, git_shim):
+    written = _packet_pr_body(tmp_path, git_shim, _PR3748_WITH_KEPT)
+    assert "KEPT-UNPLANNED-SENTINEL" in written
+    # The machine-block stripper drops this block, so build_packet must not use it.
+    assert "KEPT-UNPLANNED-SENTINEL" not in llm_calls.strip_machine_blocks(_PR3748_WITH_KEPT)
+
+
+def test_packet_pr_body_without_markers_is_unchanged(tmp_path, git_shim):
+    body = "\n\n## Summary\nhand-written only\n\n"
+    assert _packet_pr_body(tmp_path, git_shim, body) == body

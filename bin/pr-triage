@@ -492,10 +492,11 @@ rerun_id() {
 }
 
 EXPECTED_RED_RE='expected[ -]?red|will be RED|Expected CI check.*RED'
-HELD_BODY_RE='auto_merge:[[:space:]]*false|auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
+HELD_AM_FALSE_RE='auto_merge:[[:space:]]*false'
+HELD_BODY_RE='auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
 
 PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
-    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files,author,isDraft,autoMergeRequest,url 2>/dev/null || echo '[]')"
+    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,baseRefName,files,author,isDraft,autoMergeRequest,url 2>/dev/null || echo '[]')"
 
 PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 
@@ -633,6 +634,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     labels="$(echo "$PR" | jq -c '.labels // []')"
     files="$(echo "$PR" | jq -c '.files // []')"
     head_ref="$(echo "$PR" | jq -r '.headRefName // ""')"
+    base_name="$(echo "$PR" | jq -r '.baseRefName // ""')"
     am_armed="$(echo "$PR" | jq -r 'if .autoMergeRequest then "1" else "" end')"
     if [ "$HELD" = "1" ] && ! hp_is_held "$PR" "$ME"; then
         # Counted as reported: the post-loop guard compares ROWS to PR_COUNT.
@@ -773,6 +775,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     held_body=0
     if grep -qiE "$HELD_BODY_RE" <<< "$body"; then
         held_body=1
+    elif grep -qiE "$HELD_AM_FALSE_RE" <<< "$body"; then
+        # Condition (7): human-approved clears auto_merge: false only while the
+        # recorded fingerprint matches the current diff (pr_owner_approval_live_hold).
+        if [ -n "$(pr_owner_approval_live_hold "$num" "$sha" "$base_name" "$labels" || true)" ]; then
+            held_body=1
+        fi
     fi
 
     # --- bucket (first match wins) ---

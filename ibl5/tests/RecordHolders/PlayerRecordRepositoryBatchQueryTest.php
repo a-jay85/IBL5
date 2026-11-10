@@ -104,8 +104,7 @@ final class PlayerRecordRepositoryBatchQueryTest extends WideUnitTestCase
             $this->row('Fouls', 100),
         ]);
 
-        /** @var array<string, list<array<string, mixed>>> $result */
-        $result = $this->repository->getTopPlayerSingleGameBatch(
+        return $this->repository->getTopPlayerSingleGameBatch(
             [
                 "Player's Assists" => 'bs.game_ast',
                 'Fouls' => 'bs.game_pf',
@@ -113,8 +112,6 @@ final class PlayerRecordRepositoryBatchQueryTest extends WideUnitTestCase
             ],
             self::DATE_FILTER,
         );
-
-        return $result;
     }
 
     /**

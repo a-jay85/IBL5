@@ -1,6 +1,6 @@
 ---
-description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
-last_verified: 2026-10-05
+description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies, plus the three clarity faults no regex can catch. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
+last_verified: 2026-11-10
 paths: "**/*.md"
 ---
 
@@ -33,7 +33,7 @@ Each row is one regex in the script. The fix column is what the deny message pri
 | x-isnt-the-issue | `X isn't the problem`, `X isn't the point`. | Name the real issue directly. |
 | not-because-but-because | `not because X but because Y`. | Give the real reason only. |
 | not-x-not-y-just-z | A run of `Not X. Not Y. Just Z.` | Say the one thing it is. |
-| label-colon-opener | A line that opens with `The problem:`, `Why this matters:`, `Bottom line:`, `TL;DR:`. | Delete the label. Say the thing. |
+| label-colon-opener | A line that opens with `The problem:`, `Why this matters:`, `Bottom line:`, `TL;DR:`, `Done:`. | Delete the label. Say the thing. |
 | heres-the | `here's the thing`, `here's the catch`, `here's the verdict`. | Cut it. Start with the sentence that follows. |
 | filler | `it's worth noting`, `in other words`, `at its core`, `that said`, `which is exactly why`. | Cut the phrase. The sentence stands without it. |
 | buzzword | `crucial`, `seamless`, `leveraging`, `streamline`, `pivotal`, `nuanced`, `delve`, `utilize`. | Use the plain word. |
@@ -48,6 +48,24 @@ Each row is one regex in the script. The fix column is what the deny message pri
 | bare-hash-ref | A bare `#N` PR or issue reference not written as a markdown link. Chat only. A one- or two-digit `#N` followed by a ranking word (`seed`, `pick`, `overall`, `ranked`, `in the West`) is league prose and passes. | Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`. |
 
 Two shapes from the same family stay judgment-only because a regex cannot separate them from normal usage: `rather than` and generic three-item lists. Cut them when you see them while editing. Metaphor restatement and narrating your steps are also judgment-only.
+
+## The three clarity faults
+
+The tells mark text as machine-written. They are a small part of why it is hard to read. A study of Claude Code replies (Zonder Labs, 2026-11) found 78% of them unclear, against 11% of Stack Overflow answers. Three faults caused it. The study found them by applying the principles in Williams, *Style: The Basics of Clarity and Grace*. No regex can catch them, so check every reply and doc against them by hand.
+
+**Hidden actor and action.** Each sentence tells a small story. Make the one who acts the subject, and make what they do the verb. Passive voice and action nouns hide both. `the Triton code is read` should be `I read the Triton code`. `each change to it can be attributed` should say who measures what. Watch for `request`, `arrival`, `completion`, and other nouns that hold the real verb.
+
+**Vague wording.** This was the most common fault in Claude Code replies. Three shapes cause most of it:
+
+- A coined label the reader has never seen, such as `warm-regime gap`, `the Triton tactic`, `lab-check`, `a controlled vehicle`. Use the codebase name, or describe the thing in plain words the first time.
+- A stack of nouns, such as `user-session entry boundary` or `grape availability request`. Unpack it into a phrase with a verb.
+- An object that acts like a person, such as `8 stages will close it` or `the knobs buy 3%`. Name who did the work and what number changed.
+
+Name the quantity. `same numbers within 2%` leaves the reader to guess whether it means outputs or runtimes.
+
+**Empty statement and buried point.** Put the main claim first in the sentence. Do not delay it behind examples, and do not tack it on as a tail like `so it is out`. Test each sentence: can a tired reader find the point in one skim? `Nothing else depends on anything but the result, so I'll report as soon as the poll returns` fails. `I'll report the result when the poll finishes` passes.
+
+These three faults sit beside the other judgment-only shapes above. The rules in `.claude/review-shared/_prose-voice-contract.md` (active voice with a concrete actor, name the component) apply the first two faults to machine-written PR prose.
 
 ## What the scanner skips
 

@@ -15,16 +15,15 @@ instead; condition (18) holds on either signal, and nothing may drop a floor mar
 """
 from __future__ import annotations
 
-import fnmatch
 import posixpath
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness import rebuildable
 from harness.armable import DESTRUCTIVE_SQL
 from harness.sql_comments import strip_added_sql_comments
-from harness.workflow_scope import workflow_send_change
 from harness.external_scope import external_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
@@ -45,10 +44,10 @@ _EXTERNAL_PREFIXES = (".github/actions/notify-discord/", "ibl5/classes/Mail/")
 # Narrowed external paths: their own changed hunks decide (harness/external_scope.py). Every other
 # _EXTERNAL_PATHS member, today .github/workflows/promote-to-production.yml, fires on any touch.
 _NARROWED_EXTERNAL_PATHS = ("bin/db-sync-prod", "bin/discord-dm")
+# Notify text a workflow carries. No floor trigger reads it now; test_workflow_scope does.
 _NOTIFY_TEXT_RE = re.compile(r"notify-discord|DISCORD_")
 _SITE_WIDE_PATHS = ("ibl5/.htaccess", "ibl5/router.php", "ibl5/composer.json")
 _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
-_WORKFLOW_GLOB = ".github/workflows/*.yml"
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
 _RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
 
@@ -109,16 +108,6 @@ def _touches_seat_feed(section: str | None) -> bool:
         if _SEAT_FEED_RE.search(line):
             return True
     return False
-
-
-_MOVE_SOURCE_RE = re.compile(r"^(?:rename|copy) from (.+)$", re.MULTILINE)
-
-
-def _moved_in_from_outside(section: str | None) -> bool:
-    """True when the section is a rename or copy whose source is outside the workflow glob.
-    Such a move activates a new sender even when git shows no changed notify line."""
-    m = _MOVE_SOURCE_RE.search(section or "")
-    return bool(m) and not fnmatch.fnmatchcase(m.group(1).strip(), _WORKFLOW_GLOB)
 
 
 def _external_path_fires(status: str, parts: list[str], diff_text: str) -> bool:
@@ -190,7 +179,7 @@ def derive_merge_danger(
         for p in migrations:
             add(f"destructive-migration:{p}")
 
-    # 2. Prod external state and outbound notification senders (changed lines of the workflow's own section).
+    # 2. Prod external state and outbound senders that can reach a GM.
     external = False
     # changes_from_unified_diff reports a rename by its new path only; the old path comes from
     # the diff's `rename from` lines. A rename away from an external path is still a touch of it.
@@ -205,20 +194,9 @@ def derive_merge_danger(
             if _external_path_fires(status, parts, diff_text or ""):
                 add(f"external-path:{p}")
                 external = True
-        elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):
-            text = read_candidate(wf)
-            # Notify text in the file is only the precondition; the workflow's own changed
-            # lines decide. An unreadable section or candidate fires (fail closed).
-            if text is None:
-                add(f"notify-workflow:{wf}")
-                external = True
-            elif _NOTIFY_TEXT_RE.search(text):
-                section = _section_for(diff_text or "", wf)
-                hit = _moved_in_from_outside(section) or \
-                    workflow_send_change(text, section, _NOTIFY_TEXT_RE)
-                if hit:
-                    add(f"notify-workflow:{wf}")
-                    external = True
+        # A workflow that calls notify-discord posts only to the owner's #dev, #merged and
+        # #reviews channels, so editing its send lines is two-way. The action itself stays an
+        # external path above: one edit there could add a GM-reaching webhook.
 
     # 3. Self-governing merge machinery (the bootstrap hazard). These triggers set the
     # Self-governing segment and leave the Door alone: `git revert` undoes them.
@@ -278,6 +256,33 @@ _IRREVERSIBLE_RE = re.compile(
 )
 
 
+# Exemptions from the bar. A one-way Why whose only cited loss is rows of a registered
+# rebuildable table, or an alert to an owner-only channel, is refused: a refresh step rebuilds
+# the rows, and only the owner reads #dev, #merged and #reviews. Any schema verb, GM-reaching
+# sender, prod token or unregistered table keeps the raise.
+_OWNER_CHANNEL_RE = re.compile(
+    r"DISCORD_(DEV|MERGED|REVIEWS)_WEBHOOK_URL|notify-discord|(?<![\w#])#(dev|merged|reviews)\b"
+    r"|\.github/workflows/|\b(alert|notification)s?\s+(job|step|message)s?\b", re.IGNORECASE)
+_KEEP_ONE_WAY_RE = re.compile(
+    r"\bdrop(s|ped|ping)?\s+(table|column|index)\b|\balter(s|ed|ing)?\b|\brenam\w*|\bschema\b"
+    r"|\bcolumns?\b|discord-dm|\bDMs?\b|direct message|\bGMs?\b|e-?mail|classes/Mail"
+    r"|db-sync-prod|promote-to-production|\bprod(uction)?[- ]?(sync|data|db|database)\b",
+    re.IGNORECASE)
+_TABLE_TOKEN_RE = re.compile(r"\bibl_\w+\b")
+
+
+def _bar_exempt(core: str) -> bool:
+    """True when the Why's only cited loss is rebuildable-table rows or an owner-only alert."""
+    names_registered = any(t in rebuildable.REBUILDABLE_TABLES for t in _TABLE_TOKEN_RE.findall(core))
+    if not (names_registered or _OWNER_CHANNEL_RE.search(core)):
+        return False
+    if _KEEP_ONE_WAY_RE.search(core):
+        return False
+    if any(t not in rebuildable.REBUILDABLE_TABLES for t in _TABLE_TOKEN_RE.findall(core)):
+        return False
+    return True
+
+
 def merge_verdicts(
     mechanical: MergeDanger,
     llm_door: str | None,
@@ -301,7 +306,7 @@ def merge_verdicts(
     core = _llm_core(llm_why)[:WHY_MAX].rstrip()
     llm_rank = _rank(llm_door, DOORS)
     if (llm_raise_bar and mechanical.door == "two-way" and llm_door == "one-way"
-            and not _IRREVERSIBLE_RE.search(core)):
+            and (not _IRREVERSIBLE_RE.search(core) or _bar_exempt(core))):
         llm_rank = 0
     door = DOORS[max(_rank(mechanical.door, DOORS), llm_rank)]
     blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]

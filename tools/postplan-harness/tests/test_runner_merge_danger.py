@@ -95,7 +95,8 @@ def test_pr_copy_prompt_requests_merge_danger_line():
     assert "exactly these four keys" in prompt
 
 
-def test_derive_from_worktree_reads_candidate_text(tmp_path):
+def test_derive_from_worktree_workflow_send_edit_is_two_way(tmp_path):
+    # Workflow alerts reach only the owner's channels, so a send-line edit is two-way.
     wf = ".github/workflows/x.yml"
     text = ("env:\n  DISCORD_WEBHOOK: ${{ secrets.X }}\njobs:\n  a:\n"
             "    runs-on: ubuntu-26.04\n    steps:\n      - run: echo hi\n")
@@ -103,8 +104,8 @@ def test_derive_from_worktree_reads_candidate_text(tmp_path):
     diff = (f"diff --git a/{wf} b/{wf}\n--- a/{wf}\n+++ b/{wf}\n@@ -1,2 +1,2 @@\n env:\n"
             "-  DISCORD_WEBHOOK: ${{ secrets.OLD }}\n+  DISCORD_WEBHOOK: ${{ secrets.X }}\n")
     d = merge_danger.derive_from_worktree(wt, diff)
-    assert (d.door, d.blast) == ("one-way", "external")
-    assert f"notify-workflow:{wf}" in d.triggers
+    assert (d.door, d.blast) == ("two-way", "site-wide")
+    assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
 def test_validator_returns_no_findings_after_injection(tmp_path):

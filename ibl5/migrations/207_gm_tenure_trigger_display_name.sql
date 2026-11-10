@@ -33,7 +33,7 @@
 -- using the backfill's own WHERE. Drop that table in a later migration once the backfill has held.
 --
 -- Rollback: re-run the trigger block of migration 192 (trg_gm_tenure_track), then apply
--- ibl5/migrations/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
+-- ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
 -- by id from ibl_gm_tenures_backup_207.
 -- Idempotent: DROP TRIGGER IF EXISTS, CREATE TABLE IF NOT EXISTS, and a backup fill and backfill whose
 -- WHERE matches nothing on a second run. INSERT IGNORE keeps the first run's old values.

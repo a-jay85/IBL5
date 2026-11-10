@@ -1,4 +1,4 @@
--- Undo for migration 207's backfill. Apply by hand. bin/db-migrate never runs files in migrations/undo/.
+-- Undo for migration 207's backfill. Apply by hand. It lives outside ibl5/migrations/, so bin/db-migrate never runs it.
 --
 -- Restores ibl_gm_tenures.gm_display_name to the value it held before the backfill, by id, from the
 -- full-row copies migration 207 wrote to ibl_gm_tenures_backup_207. Rows the backfill did not touch

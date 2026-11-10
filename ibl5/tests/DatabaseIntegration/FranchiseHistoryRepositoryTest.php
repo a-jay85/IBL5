@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Group;
 use FranchiseHistory\FranchiseHistoryRepository;
 use FranchiseHistory\FranchiseHistoryService;
 use League\League;
+use Updater\Steps\RefreshTeamSeasonRecordsStep;
 
 /**
  * Database integration tests for franchise history assembly over the real DB.
@@ -94,6 +95,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
             $this->insertTeamBoxscoreRow($s['date'], 'Sharks', 1, 2, 1);
         }
 
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
         $result = $this->repo->getAllFranchiseHistory(2098);
 
         $metros = null;
@@ -118,6 +120,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2092-01-15', 'Metros', 1, 2, 1);
         $this->insertTeamBoxscoreRow('2092-01-15', 'Sharks', 1, 2, 1);
 
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
         $result = $this->repo->getAllFranchiseHistory(2098);
         $metros = null;
         foreach ($result as $row) {

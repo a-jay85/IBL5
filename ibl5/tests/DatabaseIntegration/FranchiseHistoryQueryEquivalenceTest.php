@@ -179,6 +179,7 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
             ]);
         }
 
+        $this->refreshRegularSeasonRecordsInTransaction();
         $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
 
         self::assertArrayHasKey($name1, $window);
@@ -208,6 +209,7 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
             $this->insertTeamBoxscoreRow($date, 'Home', 1, $t1, $t2);
         }
 
+        $this->refreshRegularSeasonRecordsInTransaction();
         $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
 
         self::assertArrayHasKey($name1, $window);
@@ -222,9 +224,35 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         self::assertSame([], $this->runFrozen(self::FROZEN_WINDOW_SQL, 'ii', 1896, 1900));
     }
 
+    public function testWindowKeepsLiveTeamNameAfterRenameWithoutRefresh(): void
+    {
+        [$t1, $t2, $name1] = $this->firstTwoTeams();
+
+        $this->insertTeamBoxscoreRow('2013-11-05', 'Visitor', 1, $t1, $t2);
+        $this->insertTeamBoxscoreRow('2013-11-05', 'Home', 1, $t1, $t2);
+        $this->refreshRegularSeasonRecordsInTransaction();
+
+        $before = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+        self::assertArrayHasKey($name1, $before);
+
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET team_name = 'Renamed FC' WHERE teamid = ?");
+        self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
+        $stmt->bind_param('i', $t1);
+        $stmt->execute();
+        $stmt->close();
+
+        $after = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+
+        self::assertArrayNotHasKey($name1, $after);
+        self::assertArrayHasKey('Renamed FC', $after);
+        self::assertSame($before[$name1]['five_season_wins'], $after['Renamed FC']['five_season_wins']);
+        self::assertSame($before[$name1]['five_season_losses'], $after['Renamed FC']['five_season_losses']);
+    }
+
     public function testWritesExplainAndTimingReport(): void
     {
         $stats = $this->seedProdScaleVolume();
+        $this->refreshRegularSeasonRecordsInTransaction();
         $year = self::SEED_CURRENT_ENDING_YEAR;
 
         $versionResult = $this->db->query('SELECT VERSION()');
@@ -364,6 +392,8 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
 
     private function assertAllFourMatchFrozen(int $currentEndingYear): void
     {
+        $this->refreshRegularSeasonRecordsInTransaction();
+
         self::assertSame(
             $this->runFrozen(self::FROZEN_SUMMARY_SQL, 'i', League::FREE_AGENTS_TEAMID),
             $this->repository->getFranchiseSummaryRows($currentEndingYear),

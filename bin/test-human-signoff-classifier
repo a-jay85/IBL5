@@ -289,6 +289,58 @@ run_approval labeled needs-a-human ui-paths human-approved "$A" "$EMPTY"; rc=$?
 expect "approval: other label event compares -> rc 1" 1 "$rc"
 want "approval: other label event compares -> drop missing" "$LAST_OUT" "REASON=missing"
 
+# ---- labeled non-UI PRs (owner approval clears post-plan condition 7) ----
+# run_approval_red: run_approval plus the HS_GATE_RED global.
+run_approval_red() {
+    # shellcheck disable=SC2016  # $0/$@ expand inside the child bash, not here
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; rc=0; hs_eval_approval "$@" || rc=$?; echo "VERDICT=$HS_VERDICT REASON=$HS_DROP_REASON GATE_RED=$HS_GATE_RED"; exit "$rc"' "$LIB" "$@" 2>&1)
+}
+NREC="$T/nrec.json"
+printf '[%s]\n' "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")")" > "$NREC"
+NREV="$T/nrev.json"
+printf '[%s,%s]\n' "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$A")")" \
+    "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(drop_body mismatch)")" > "$NREV"
+
+run_approval_red synchronize "" not-ui "" "" /nonexistent; rc=$?
+expect "eval: unlabeled not-ui -> pass with no fingerprint (rc)" 0 "$rc"
+want "eval: unlabeled not-ui -> pass with no fingerprint" "$LAST_OUT" "VERDICT=pass REASON= GATE_RED="
+
+run_approval_red labeled human-approved not-ui human-approved "$A" /nonexistent; rc=$?
+expect "eval: not-ui labeled event -> record (rc)" 0 "$rc"
+want "eval: not-ui labeled event -> record" "$LAST_OUT" "VERDICT=record"
+
+run_approval_red synchronize "" not-ui human-approved "$A" "$NREC"; rc=$?
+expect "eval: not-ui label + match -> keep (rc)" 0 "$rc"
+want "eval: not-ui label + match -> keep" "$LAST_OUT" "VERDICT=keep"
+
+run_approval_red synchronize "" not-ui human-approved "$B" "$NREC"; rc=$?
+expect "eval: not-ui label + mismatch -> drop, gate green (rc)" 0 "$rc"
+want "eval: not-ui label + mismatch -> drop" "$LAST_OUT" "VERDICT=drop REASON=mismatch"
+want "eval: not-ui label + mismatch -> drop, gate green" "$LAST_OUT" "GATE_RED=0"
+
+run_approval_red synchronize "" not-ui human-approved "$A" "$NREV"; rc=$?
+expect "eval: not-ui label + revoked -> drop missing, gate green (rc)" 0 "$rc"
+want "eval: not-ui label + revoked -> drop missing, gate green" "$LAST_OUT" "VERDICT=drop REASON=missing GATE_RED=0"
+
+run_approval_red synchronize "" not-ui human-approved "" "$NREC"; rc=$?
+expect "eval: not-ui label + no fingerprint -> drop error, gate green (rc)" 0 "$rc"
+want "eval: not-ui label + no fingerprint -> drop error, gate green" "$LAST_OUT" "VERDICT=drop REASON=error GATE_RED=0"
+
+run_approval_red synchronize "" ui-paths human-approved "$B" "$NREC"; rc=$?
+expect "eval: ui label + mismatch -> drop, gate red (rc)" 1 "$rc"
+want "eval: ui label + mismatch -> drop, gate red" "$LAST_OUT" "VERDICT=drop REASON=mismatch GATE_RED=1"
+
+run_approval_red synchronize "" not-ui human-approved-old "" /nonexistent; rc=$?
+expect "eval: not-ui near-miss label -> pass (rc)" 0 "$rc"
+want "eval: not-ui near-miss label -> pass" "$LAST_OUT" "VERDICT=pass"
+
+WF_TEXT=$(cat "$REPO_ROOT/.github/workflows/human-signoff.yml")
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: labeled non-UI PR computes fingerprint" "$WF_TEXT" 'if hs_pr_cleared "$UI_VERDICT" "$LABELS" && { [ "$UI_VERDICT" != not-ui ] || hs_has_approval_label "$LABELS"; }; then'
+want "wf: non-UI drop exits green" "$WF_TEXT" 'echo "Human sign-off gate: drop on a non-UI PR (green; approval removed)"'
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: gate_red reaches the gate step" "$WF_TEXT" 'GATE_RED: ${{ steps.eval.outputs.gate_red }}'
+
 # ---- approval-record wait (race fix, ADR-0062 Update 2026-11-02) ----
 # event_json <event> <label> <created_at> — one REST-shaped issue event.
 event_json() { jq -n --arg e "$1" --arg l "$2" --arg c "$3" '{event:$e,label:{name:$l},created_at:$c}'; }
@@ -327,6 +379,20 @@ run_await "$T/aw-w1" 5 "$A" "$T/aw-w1/c.json" "$T/aw-w1/e.json"; rc=$?
 expect "await: PR 3685 sequence -> keep (rc)" 0 "$rc"
 want "await: PR 3685 sequence -> keep" "$LAST_OUT" "VERDICT=keep"
 want "await: PR 3685 sequence -> keep (calls)" "$LAST_OUT" "CALLS=2"
+
+# W1b: a non-UI PR whose re-read finds a non-matching record keeps the
+# mismatch reason (its eval returns rc 0 for a green drop).
+aw_mk w1b
+comment_json "$BOT" Bot "2026-11-02T22:59:55Z" "$(record_body "$B40")" | jq -s . > "$T/aw-w1b/attempt-1.json"
+# shellcheck disable=SC2016  # expands in the child bash
+LAST_OUT=$(bash -c 'set -euo pipefail; source "$0"; fix="$1"; calls=0
+    stub_refetch() { calls=$((calls + 1)); if [ -e "$fix/attempt-$calls.json" ]; then cp "$fix/attempt-$calls.json" "$1"; fi; }
+    rc=0
+    hs_eval_approval synchronize "" not-ui human-approved "$2" "$3" || true
+    hs_await_record 3 0 stub_refetch synchronize "" not-ui human-approved "$2" "$3" "$4" || rc=$?
+    echo "VERDICT=$HS_VERDICT REASON=$HS_DROP_REASON GATE_RED=$HS_GATE_RED CALLS=$calls"; exit "$rc"' \
+    "$LIB" "$T/aw-w1b" "$A" "$T/aw-w1b/c.json" "$T/aw-w1b/e.json" 2>&1)
+want "await: not-ui re-read mismatch -> drop mismatch, gate green" "$LAST_OUT" "VERDICT=drop REASON=mismatch GATE_RED=0"
 
 # W2: a marker newer than the label means no wait at all.
 aw_mk w2
@@ -649,8 +715,8 @@ printf 'not json' > "$T/wr-l3/e.json"
 run_label_at "$T/wr-l3/e.json"
 want "label-at: invalid json -> rc 2" "$LAST_OUT" "LABEL_RC=2"
 
-# E11: a not-ui PR skips the fingerprint entirely
-run_approval synchronize "" not-ui human-approved "" /nonexistent; rc=$?
+# E11: an unlabeled not-ui PR skips the fingerprint entirely
+run_approval synchronize "" not-ui "" "" /nonexistent; rc=$?
 expect "approval: not-ui skips fingerprint -> rc 0" 0 "$rc"
 want "approval: not-ui skips fingerprint -> pass" "$LAST_OUT" "VERDICT=pass"
 

@@ -126,32 +126,53 @@ hs_drop_comment_body() {
     printf 'Removed `human-approved` at head `%s`: %s. Review the current diff, then re-apply the label to approve it.\n' "$2" "$why"
 }
 
+# hs_has_approval_label <labels_csv> — 0 iff the comma list holds the exact
+# label human-approved. A near-miss such as human-approved-old never counts.
+hs_has_approval_label() {
+    [[ ",${1:-}," == *",human-approved,"* ]]
+}
+
+# _hs_drop_rc <ui_verdict> — the gate colour of a drop. A UI PR stays red
+# (rc 1). A non-UI PR stays green (rc 0): the label and record are gone, so
+# post-plan condition (7) holds again, and the diff never needed sign-off.
+_hs_drop_rc() {
+    if [ "${1:-}" = not-ui ]; then  # non-UI drop: gate stays green
+        HS_GATE_RED=0
+        return 0
+    fi
+    HS_GATE_RED=1
+    return 1
+}
+
 # hs_eval_approval <action> <event_label> <ui_verdict> <labels_csv> <current_fp> <comments_json_file>
-# The workflow's entry gate. Sets HS_VERDICT and HS_DROP_REASON (globals).
-#   pass   (rc 0) not a UI PR; no fingerprint work
+# The workflow's entry gate. Sets HS_VERDICT, HS_DROP_REASON and HS_GATE_RED (globals).
+#   pass   (rc 0) non-UI PR without the label; no fingerprint work
 #   hold   (rc 1) UI PR without the label; same annotation as today
-#   record (rc 0) the event IS the human-approved label being applied
-#   keep   (rc 0) UI + label, current fingerprint equals the recorded one
-#   drop   (rc 1) UI + label, reason mismatch | missing | error
+#   record (rc 0) the event IS the human-approved label being applied (any PR)
+#   keep   (rc 0) label held, current fingerprint equals the recorded one (any PR)
+#   drop   label held, reason mismatch | missing | error (any PR). A UI drop
+#          is rc 1 with HS_GATE_RED=1; a non-UI drop is rc 0 with HS_GATE_RED=0
 # Tightening only: every rc-0 path first passes hs_pr_cleared.
 hs_eval_approval() {
     local action="$1" event_label="$2" verdict="$3" labels="$4" current="$5" comments="$6"
     local recorded rc=0
     HS_VERDICT=""
     HS_DROP_REASON=""
+    HS_GATE_RED=""
     if ! hs_pr_cleared "$verdict" "$labels"; then
         hs_eval_pull_request "$verdict" "$labels" || true
         HS_VERDICT="hold"
         return 1
     fi
-    if [ "$verdict" = not-ui ]; then
+    if [ "$verdict" = not-ui ] && ! hs_has_approval_label "$labels"; then
         echo "Entry gate: PR cleared (UI verdict: not-ui)"
         HS_VERDICT="pass"
         return 0
     fi
     if ! hs_is_fingerprint "$current"; then
         _hs_drop error
-        return 1
+        _hs_drop_rc "$verdict"
+        return
     fi
     if [ "$action" = "labeled" ] && [ "$event_label" = "human-approved" ]; then
         echo "Entry gate: human-approved applied; recording diff fingerprint $current"
@@ -170,7 +191,7 @@ hs_eval_approval() {
         1) _hs_drop missing ;;
         *) _hs_drop error ;;
     esac
-    return 1
+    _hs_drop_rc "$verdict"
 }
 
 # ---- Approval-record wait (ADR-0062 Update 2026-11-02) ----
@@ -252,8 +273,11 @@ hs_await_record() {
         fi
         if hs_eval_approval "$action" "$event_label" "$verdict" "$labels" "$current" "$comments"; then
             if [ "$HS_VERDICT" = "keep" ]; then return 0; fi
-            _hs_drop error
-            return 1
+            # A non-UI drop is rc 0 (green gate); it falls through as a drop.
+            if [ "$HS_VERDICT" != "drop" ]; then
+                _hs_drop error
+                return 1
+            fi
         fi
         if [ "$HS_VERDICT" != "drop" ] || { [ "$HS_DROP_REASON" != "missing" ] && [ "$HS_DROP_REASON" != "mismatch" ]; }; then return 1; fi
         nrc=0

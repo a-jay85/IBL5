@@ -339,6 +339,33 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
             'start_season_year' => 2010,
             'end_season_year' => 2015,
         ]);
+        // Same GM, a closed tenure at another franchise, still under the username (migration 192 wrote it).
+        $closedAatB = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => $b,
+            'gm_display_name' => 'zzusera',
+            'start_season_year' => 2004,
+            'end_season_year' => 2009,
+        ]);
+        // A closed username row whose rename would collide with an existing display-name row on uq_tenure.
+        $collides = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => $a,
+            'gm_display_name' => 'zzusera',
+            'start_season_year' => 2001,
+            'end_season_year' => 2002,
+        ]);
+        $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => $a,
+            'gm_display_name' => 'ZZ Owner A',
+            'start_season_year' => 2001,
+            'end_season_year' => 2001,
+        ]);
+        // A closed row under a username no team holds: no mapping, left alone.
+        $orphan = $this->insertRow('ibl_gm_tenures', [
+            'franchise_id' => $a,
+            'gm_display_name' => 'zzgoneuser',
+            'start_season_year' => 1998,
+            'end_season_year' => 1999,
+        ]);
         // Team B: an open tenure that already holds the display name.
         $this->setTeamGm($b, 'zzuserb', 'ZZ Owner B');
 
@@ -362,7 +389,13 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         ));
         self::assertCount(1, $openA);
         self::assertSame('ZZ Owner A', $openA[0]['gm_display_name']);
-        self::assertSame('zzusera', $after[$closedA]);
+        // Closed tenures under the same username join the GM's display name, at any franchise.
+        self::assertSame('ZZ Owner A', $after[$closedA]);
+        self::assertSame('ZZ Owner A', $after[$closedAatB]);
+        self::assertArrayHasKey($closedA, $changed);
+        self::assertArrayHasKey($closedAatB, $changed);
+        self::assertSame('zzusera', $after[$collides]);
+        self::assertSame('zzgoneuser', $after[$orphan]);
         self::assertContains('zzusera', $changed);
         self::assertNotContains('ZZ Owner B', $changed);
 

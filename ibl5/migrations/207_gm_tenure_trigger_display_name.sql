@@ -29,11 +29,11 @@
 -- open row per franchise must hold when it takes over. The guard runs before any DROP, so an abort
 -- leaves both triggers in place.
 --
--- Backup: before the backfill, every row it will rewrite is copied whole into ibl_gm_tenures_backup_207,
--- using the backfill's own WHERE. Drop that table in a later migration once the backfill has held.
+-- Backup: before the backfill, every row it will rewrite (open and closed tenures stored under a username)
+-- is copied whole into ibl_gm_tenures_backup_207, using the backfill's own WHERE. Drop that table in a later migration once the backfill has held.
 --
 -- Rollback: re-run the trigger block of migration 192 (trg_gm_tenure_track), then apply
--- ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
+-- ibl5/migrations/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
 -- by id from ibl_gm_tenures_backup_207.
 -- Idempotent: DROP TRIGGER IF EXISTS, CREATE TABLE IF NOT EXISTS, and a backup fill and backfill whose
 -- WHERE matches nothing on a second run. INSERT IGNORE keeps the first run's old values.
@@ -155,25 +155,42 @@ END$$
 
 DELIMITER ;
 
--- Backup: copy every row the backfill below will rewrite. The WHERE matches the backfill's exactly.
+-- Backup: copy every row the backfill below will rewrite. The FROM, JOINs and WHERE match the backfill's exactly.
+--
+-- Scope: every tenure, open or closed, whose gm_display_name is a site username that maps to exactly one
+-- non-empty owner_name in ibl_team_info. Migration 192's trigger wrote such rows under the username. A closed
+-- row left under the username would split one GM across two names, and RivalriesController keys GM rivalry
+-- totals on gm_display_name, so it would drop that GM's earlier games. A username shared by teams with
+-- different owner_names maps to no one and is left alone. A row is also left alone when its franchise already
+-- has a row under the owner_name with the same start_season_year, because renaming it would break uq_tenure.
 CREATE TABLE IF NOT EXISTS ibl_gm_tenures_backup_207 LIKE ibl_gm_tenures;
 
 INSERT IGNORE INTO ibl_gm_tenures_backup_207
 SELECT t.*
   FROM ibl_gm_tenures t
-  JOIN ibl_team_info ti ON ti.teamid = t.franchise_id
- WHERE t.end_season_year IS NULL
-   AND ti.owner_name <> ''
-   AND ti.gm_username IS NOT NULL
-   AND t.gm_display_name = ti.gm_username
-   AND t.gm_display_name <> ti.owner_name;
+  JOIN (SELECT gm_username, MIN(owner_name) AS owner_name
+          FROM ibl_team_info
+         WHERE gm_username IS NOT NULL AND gm_username <> '' AND owner_name <> ''
+         GROUP BY gm_username
+        HAVING COUNT(DISTINCT owner_name) = 1) m ON m.gm_username = t.gm_display_name
+  LEFT JOIN ibl_gm_tenures dup
+         ON dup.franchise_id      = t.franchise_id
+        AND dup.start_season_year = t.start_season_year
+        AND dup.gm_display_name   = m.owner_name
+ WHERE t.gm_display_name <> m.owner_name
+   AND dup.id IS NULL;
 
--- Backfill: open rows that hold exactly the username get the display name.
+-- Backfill: open and closed rows that hold exactly a mapped username get that GM's display name.
 UPDATE ibl_gm_tenures t
-  JOIN ibl_team_info ti ON ti.teamid = t.franchise_id
-   SET t.gm_display_name = ti.owner_name
- WHERE t.end_season_year IS NULL
-   AND ti.owner_name <> ''
-   AND ti.gm_username IS NOT NULL
-   AND t.gm_display_name = ti.gm_username
-   AND t.gm_display_name <> ti.owner_name;
+  JOIN (SELECT gm_username, MIN(owner_name) AS owner_name
+          FROM ibl_team_info
+         WHERE gm_username IS NOT NULL AND gm_username <> '' AND owner_name <> ''
+         GROUP BY gm_username
+        HAVING COUNT(DISTINCT owner_name) = 1) m ON m.gm_username = t.gm_display_name
+  LEFT JOIN ibl_gm_tenures dup
+         ON dup.franchise_id      = t.franchise_id
+        AND dup.start_season_year = t.start_season_year
+        AND dup.gm_display_name   = m.owner_name
+   SET t.gm_display_name = m.owner_name
+ WHERE t.gm_display_name <> m.owner_name
+   AND dup.id IS NULL;

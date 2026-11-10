@@ -23,6 +23,12 @@ CURL_BIN="${BUG_PIPELINE_CHECK_CURL_BIN:-curl}"
 BOT_LAUNCHD_LABEL="${BUG_BOT_LAUNCHD_LABEL:-com.ibl5.bug-bot}"
 BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
 BOT_PROBE_TIMEOUT=5   # seconds; this runs from a 180s cron, so the probe must be bounded
+# ${VAR:-default}: an empty value behaves as unset, so a blank override falls back.
+BOT_REPO_ROOT="${BUG_PIPELINE_CHECK_BOT_REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+GIT_BIN="${BUG_PIPELINE_CHECK_GIT_BIN:-git}"
+PS_BIN="${BUG_PIPELINE_CHECK_PS_BIN:-ps}"
+UNAME_BIN="${BUG_PIPELINE_CHECK_UNAME_BIN:-uname}"
+SCHEMA_DUMP="${BUG_PIPELINE_CHECK_SCHEMA_DUMP:-$BOT_REPO_ROOT/ibl5/docs/schema/current-schema.sql}"
 
 DEGRADED_SIGNALS=""
 UNKNOWN_SIGNALS=""
@@ -32,7 +38,10 @@ usage() {
     printf '\n'
     printf 'Read-only liveness + staleness diagnostic for the %s LaunchAgent,\n' "$LAUNCHD_LABEL"
     printf 'plus an HTTP reachability probe of the bug-bot at %s.\n' "$BOT_BASE_URL"
-    printf 'Also reports degraded when no active bug-bot row exists in ibl_api_keys.\n'
+    printf 'Also reports degraded when no active bug-bot row exists in ibl_api_keys,\n'
+    printf 'when every such key is tier standard, when the bot dist is older than its\n'
+    printf 'source or the bot process predates the dist, and when the live\n'
+    printf 'ibl_bug_reports.status enum lacks a value the schema dump lists.\n'
     printf '\n'
     printf 'Options:\n'
     printf '  --help, -h    Show this help and exit\n'
@@ -201,8 +210,25 @@ check_bot_key() {
     fi
     if [ "$n" -eq 0 ]; then
         emit DEGRADED botkey:missing "no active ibl_api_keys row with owner_name LIKE 'bug-bot%' — the bug-bot cannot write reports; re-mint its key"
+        return 0
+    fi
+    # The wake route answers 403 unless the key's tier is above standard
+    # (ServiceKeyGuard::callerIsServiceKey). Same rows, one more predicate.
+    local tout trc tn
+    tout="$("$DB_QUERY_BIN" "$sql AND rate_limit_tier <> 'standard'" 2>&1)"; trc=$?
+    if [ "$trc" -ne 0 ]; then
+        emit UNKNOWN botkey:tier-db-unavailable "db-query exited $trc — bug-bot key tier unprobeable (${tout%%$'\n'*})"
+        return 0
+    fi
+    tn="$(printf '%s\n' "$tout" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+    if [ -z "$tn" ]; then
+        emit UNKNOWN botkey:tier-parse-failed "could not parse a tier count from db-query output"
+        return 0
+    fi
+    if [ "$tn" -eq 0 ]; then
+        emit DEGRADED botkey:standard-tier "all $n active bug-bot key(s) are tier standard; the wake route answers 403 (ServiceKeyGuard::callerIsServiceKey needs a tier other than standard); re-mint the key at elevated or unlimited"
     else
-        emit OK botkey:present "$n active bug-bot API key row(s)"
+        emit OK botkey:present "$n active bug-bot API key row(s), $tn service-tier"
     fi
 }
 
@@ -221,6 +247,122 @@ check_bot_loaded() {
         emit DEGRADED bot:unloaded "LaunchAgent $BOT_LAUNCHD_LABEL is not loaded — re-bootstrap it with bin/bug-pipeline-cron-setup --install-bot"
     else
         emit OK bot:loaded "LaunchAgent $BOT_LAUNCHD_LABEL is loaded"
+    fi
+}
+
+# _mtime <file> — file mtime as epoch seconds. GNU stat first: on GNU, `stat -f`
+# is the filesystem flag and would print noise to stdout.
+_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+# _etime_secs <ps-etime> — turn ps's [[dd-]hh:]mm:ss into seconds. Exit 1 for
+# anything else. bash 3.2 safe (one awk program, no arrays).
+_etime_secs() {
+    awk -v t="$1" 'BEGIN {
+        d = 0; rest = t
+        if (rest ~ /^[0-9]+-/) { split(rest, a, "-"); d = a[1]; rest = a[2] }
+        n = split(rest, p, ":")
+        if (n < 2 || n > 3) exit 1
+        for (i = 1; i <= n; i++) if (p[i] !~ /^[0-9]+$/) exit 1
+        if (n == 2) s = p[1] * 60 + p[2]
+        else s = p[1] * 3600 + p[2] * 60 + p[3]
+        print d * 86400 + s
+    }'
+}
+
+# check_bot_build — the bot runs from its dist/bug-bot build folder under the
+# IBLbot package, which is gitignored and built by hand. A merged src change does nothing until someone
+# rebuilds the dist AND restarts the process. Two signals, one per step.
+check_bot_build() {
+    local src_ct dist newest m f pid secs start os pout
+    src_ct="$("$GIT_BIN" -C "$BOT_REPO_ROOT" log -1 --format=%ct -- ibl5/IBLbot/src/bug-bot 2>/dev/null)"
+    case "$src_ct" in
+        ''|*[!0-9]*)
+            emit UNKNOWN botdist:unprobeable "no git history for ibl5/IBLbot/src/bug-bot"
+            return 0
+            ;;
+    esac
+
+    dist="$BOT_REPO_ROOT/ibl5/IBLbot/dist/bug-bot"
+    newest=""
+    if [ -d "$dist" ]; then
+        while IFS= read -r f; do
+            m="$(_mtime "$f")"
+            case "$m" in ''|*[!0-9]*) continue ;; esac
+            if [ -z "$newest" ] || [ "$m" -gt "$newest" ]; then newest="$m"; fi
+        done < <(find "$dist" -type f 2>/dev/null)
+    fi
+    if [ -z "$newest" ]; then
+        emit UNKNOWN botdist:unprobeable "$dist absent; the bug-bot is not built on this host"
+        return 0
+    fi
+
+    if [ "$newest" -lt "$src_ct" ]; then
+        emit DEGRADED botdist:stale "dist/bug-bot built before the newest src/bug-bot commit; rebuild the bug-bot dist, then restart the bot"
+    else
+        emit OK botdist:fresh "dist/bug-bot is newer than the newest src/bug-bot commit"
+    fi
+
+    os="$("$UNAME_BIN" -s 2>/dev/null)"
+    if [ "$os" != "Darwin" ]; then
+        emit UNKNOWN botproc:unprobeable "bot start time needs launchctl (macOS); host is ${os:-unknown}"
+        return 0
+    fi
+    pout="$("$LAUNCHCTL_BIN" list "$BOT_LAUNCHD_LABEL" 2>/dev/null)"
+    pid="$(printf '%s\n' "$pout" | sed -n 's/^[[:space:]]*"PID" = \([0-9][0-9]*\);.*/\1/p' | head -n 1)"
+    if [ -z "$pid" ]; then
+        emit UNKNOWN botproc:no-pid "bug-bot has no PID; see botload"
+        return 0
+    fi
+    if ! secs="$(_etime_secs "$("$PS_BIN" -o etime= -p "$pid" 2>/dev/null | tr -d '[:space:]')")"; then
+        emit UNKNOWN botproc:unprobeable "could not read the bot's elapsed time"
+        return 0
+    fi
+    start=$(( $(date '+%s') - secs ))
+    if [ "$start" -lt "$newest" ]; then
+        emit DEGRADED botproc:predates-dist "bug-bot started before dist/bug-bot was built; restart the $BOT_LAUNCHD_LABEL LaunchAgent so it loads the new build"
+    else
+        emit OK botproc:current "bug-bot started after dist/bug-bot was built"
+    fi
+}
+
+# _bug_status_enum — read a schema dump on stdin, print the ibl_bug_reports
+# status enum values one per line. The awk isolates that table's block first, so
+# the class enum, defaults, and other tables' status columns stay out.
+_bug_status_enum() {
+    awk '
+        /CREATE TABLE `ibl_bug_reports`/ { on = 1; print; next }
+        on && /CREATE TABLE `/ { exit }
+        on { print }
+    ' | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z_]+'" | tr -d "'"
+}
+
+# check_status_enum — a migration on a table db-sync preserves can sit unapplied
+# on a restored local DB; the PHP writers then fail on a status the live enum
+# lacks. Reads the schema dump and SHOW CREATE TABLE only: no report rows.
+check_status_enum() {
+    local want live out rc missing
+    want="$(_bug_status_enum < "$SCHEMA_DUMP" 2>/dev/null)"
+    if [ -z "$want" ]; then
+        emit UNKNOWN statusenum:no-reference "$SCHEMA_DUMP unreadable or has no ibl_bug_reports.status enum"
+        return 0
+    fi
+    out="$("$DB_QUERY_BIN" "SHOW CREATE TABLE ibl_bug_reports" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        emit UNKNOWN statusenum:db-unavailable "db-query exited $rc (${out%%$'\n'*})"
+        return 0
+    fi
+    live="$(printf '%s\n' "$out" | _bug_status_enum)"
+    if [ -z "$live" ]; then
+        emit UNKNOWN statusenum:db-parse-failed "could not parse the status enum from SHOW CREATE TABLE output"
+        return 0
+    fi
+    missing="$(printf '%s\n' "$want" | grep -vxF -f <(printf '%s\n' "$live"))"
+    if [ -n "$missing" ]; then
+        emit DEGRADED statusenum:missing "live ibl_bug_reports.status lacks $(printf '%s' "$missing" | join_csv); a migration on a preserved table never ran locally; run bin/db-migrate"
+    else
+        emit OK statusenum:current "$(printf '%s\n' "$want" | wc -l | tr -d ' ') values"
     fi
 }
 
@@ -254,7 +396,9 @@ main() {
     check_process_liveness
     check_bot_loaded
     check_bot_reachability
+    check_bot_build
     check_staleness
+    check_status_enum
     check_bot_key
 
     if [ -n "$DEGRADED_SIGNALS" ]; then

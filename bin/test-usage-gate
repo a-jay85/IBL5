@@ -67,6 +67,9 @@ new_env() {
     ORIG_HOME="${ORIG_HOME:-$HOME}"
     export HOME="$ORIG_HOME"
     unset IBL5_USAGE_GATE_TEST_MODE
+    # A runner (automouse, post-plan-now, plan-now) exports these to its child.
+    # Clear them so a test only sees the values it sets itself.
+    unset IBL5_USAGE_GATE IBL5_USAGE_GATE_RUNNER IBL5_USAGE_GATE_MODEL IBL5_USAGE_GATE_RESUME_BIN IBL5_USAGE_GATE_SESSION_ID
 }
 
 # seed_home <account_uuid|"">: isolate HOME; seed ~/.claude.json with the account id.
@@ -211,7 +214,7 @@ while [ \$# -gt 0 ]; do
     shift
 done
 echo "call \$PPID" >> "$dir/curl.calls"
-if [ "${STUB_GATE:-0}" = 1 ]; then i=0; while [ ! -e "$dir/release" ]; do i=\$((i + 1)); [ "\$i" -le 2000 ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
+if [ "${STUB_GATE:-0}" = 1 ]; then i=0; while [ ! -e "$dir/release" ]; do i=\$((i + 1)); [ "\$i" -le 600 ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
 if [ -n "\$hdr" ]; then
     printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
     [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
@@ -2545,6 +2548,7 @@ test_coord_switch_respects_runaway_and_hold() {
     patch_marker "$SID_B" ".resets_at = $(( $(date +%s) + 3600 )) | .acct_fp = \"$(acct_hash uuid-A)\""
     sw_signal 30 - 1 account
     run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
     sleep 1
     # A known account switch clears the old account's pause count, so A resumes.
     assert_eq switch_runaway:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
@@ -3055,9 +3059,12 @@ test_fetch_lock_reclaim_stamp_changed_loses() {  # stamp re-stamped since the st
     new_env
     local d="$IBL5_USAGE_GATE_STATE_DIR" before
     stale_fetch_lock "$d"; before=$(cat "$d/fetch.lock.d/at")
-    ep "_usage_fetch_lock_reclaim '$d/fetch.lock.d' \$(date +%s) '1 1'"
+    : > "$T/hook.log"
+    ep "_usage_lock_hook() { printf '%s\n' \"\$1\" >> '$T/hook.log'; }; _usage_fetch_lock_reclaim '$d/fetch.lock.d' \$(date +%s) '1 1'"
     assert_eq reclaim_changed:rc 1 "$?"
     assert_eq reclaim_changed:stamp-kept "$before" "$(cat "$d/fetch.lock.d/at")"
+    # The pre-mv re-read refuses it, so the live lock is never moved aside, even briefly.
+    assert_eq reclaim_changed:no-mv 0 "$(grep -c fetch-reclaim-mv "$T/hook.log")"
 }
 
 test_fetch_lock_release_quiet_when_gone() {  # release with no lock dir: rc 0, nothing on stderr
@@ -3203,7 +3210,7 @@ test_stale_episode_closes_on_recent_stale_cache() {
     seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99)"
     dec >/dev/null
     assert_eq stale_recent:open 1 "$(log_re_count "$DEC_OPEN_RE")"
-    seed_cache "$(( $(date +%s) - 298 ))" "$(usage_json 10)"
+    seed_cache "$(( $(date +%s) - 240 ))" "$(usage_json 10)"
     dec >/dev/null
     assert_eq stale_recent:close 1 "$(log_re_count "$STALE_END_RE")"
 }

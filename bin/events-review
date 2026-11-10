@@ -365,7 +365,8 @@ preflight_select() {
 # Stage A: one aggregate, four TSV columns: section, key, subkey, value.
 # Raw request and agent strings are never selected; identities leave the DB only
 # as COUNT(DISTINCT ...) or inside the bucket derived table; the raw referer is
-# reduced to one of four literals.
+# reduced to one of five literals. The raw agent string only feeds CASE tests
+# that yield a fixed class label.
 fetch_tsv() {
     {
         printf 'SET @d := %s;\n' "$DAYS"
@@ -379,9 +380,11 @@ SELECT 'meta', 'window_end', DATE_FORMAT(@end, '%Y-%m-%d'), 0;
 SELECT 'meta', 'days', 'days', @d;
 SELECT 'class', COALESCE(traffic_class, 'unclassified'), 'cur', COUNT(*)
 FROM ibl_events WHERE created_at >= @start AND created_at < @end
+  AND COALESCE(traffic_class, 'unclassified') <> 'anonymous-human'
 GROUP BY 2;
 SELECT 'class', COALESCE(traffic_class, 'unclassified'), 'prev', COUNT(*)
 FROM ibl_events WHERE created_at >= @pstart AND created_at < @start
+  AND COALESCE(traffic_class, 'unclassified') <> 'anonymous-human'
 GROUP BY 2;
 SELECT 'gms', 'active', 'all', COUNT(DISTINCT username)
 FROM ibl_events
@@ -397,16 +400,11 @@ SELECT 'gms', 'bucket', b, COUNT(*) FROM (
 ) k GROUP BY b;
 SELECT 'sessions', traffic_class, 'all', COUNT(DISTINCT session_id)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND created_at >= @start AND created_at < @end
 GROUP BY 2;
 (SELECT 'route', 'authenticated', route_name, COUNT(*) FROM ibl_events
  WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
-   AND created_at >= @start AND created_at < @end
- GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
-UNION ALL
-(SELECT 'route', 'anonymous-human', route_name, COUNT(*) FROM ibl_events
- WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
    AND created_at >= @start AND created_at < @end
  GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
 SELECT 'routegms', 'authenticated', route_name, COUNT(DISTINCT username)
@@ -418,24 +416,18 @@ SELECT 'status4xx', traffic_class,
   CASE WHEN http_status = 404 THEN '404' WHEN http_status = 403 THEN '403' ELSE 'other4xx' END,
   COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND http_status BETWEEN 400 AND 499
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
 SELECT 'route4xxn', traffic_class, 'all', COUNT(DISTINCT route_name)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND http_status BETWEEN 400 AND 499 AND route_name IS NOT NULL
   AND created_at >= @start AND created_at < @end
 GROUP BY 2;
 (SELECT 'route4xx', 'authenticated', route_name, COUNT(*) FROM ibl_events
  WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
-   AND http_status BETWEEN 400 AND 499
-   AND created_at >= @start AND created_at < @end
- GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
-UNION ALL
-(SELECT 'route4xx', 'anonymous-human', route_name, COUNT(*) FROM ibl_events
- WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
    AND http_status BETWEEN 400 AND 499
    AND created_at >= @start AND created_at < @end
  GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
@@ -445,23 +437,68 @@ WHERE action IS NOT NULL AND created_at >= @start AND created_at < @end
 GROUP BY 3;
 SELECT 'status', traffic_class, CONCAT(FLOOR(http_status / 100), 'xx'), COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human') AND http_status IS NOT NULL
+WHERE traffic_class = 'authenticated' AND http_status IS NOT NULL
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
-SELECT 'referer', 'anonymous-human', r, COUNT(*) FROM (
-  SELECT
-    CASE WHEN referer IS NULL OR referer = '' THEN 'none'
-    WHEN referer LIKE '%iblhoops.net%' THEN 'internal'
-    WHEN referer REGEXP 'google\\.|bing\\.|duckduckgo\\.' THEN 'search'
-    ELSE 'external' END AS r
-  FROM ibl_events
-  WHERE traffic_class = 'anonymous-human' AND created_at >= @start AND created_at < @end
-) x GROUP BY r;
 SELECT 'day', traffic_class, DATE_FORMAT(created_at, '%Y-%m-%d'), COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
+WITH s AS (
+  SELECT session_id, IF(created_at >= @start, 'cur', 'prev') AS w, COUNT(*) AS hits
+  FROM ibl_events
+  WHERE traffic_class = 'anonymous-human' AND session_id IS NOT NULL AND session_id <> ''
+    AND created_at >= @pstart AND created_at < @end
+  GROUP BY session_id, w
+), a AS (
+  SELECT e.session_id, e.route_name, e.http_status, e.created_at,
+    IF(e.created_at >= @start, 'cur', 'prev') AS w,
+    CASE WHEN e.user_agent LIKE '%GoogleDocs; apps-spreadsheets%' THEN 'sheets-import'
+    WHEN e.user_agent LIKE '%MSIE%' OR e.user_agent LIKE '%Trident%' THEN 'likely-bot'
+    WHEN e.user_agent LIKE '%+http%' THEN 'likely-bot'
+    WHEN COALESCE(e.referer, '') REGEXP '(?i)^https?://(www[.])?iblhoops[.]net$' THEN 'likely-bot'
+    WHEN COALESCE(s.hits, 1) = 1 AND NOT (COALESCE(e.referer, '') REGEXP '(?i)^https?://(www[.])?iblhoops[.]net/') THEN 'likely-bot'
+    ELSE 'anonymous-human' END AS k,
+    CASE WHEN e.referer IS NULL OR e.referer = '' THEN 'none'
+    WHEN e.referer REGEXP '(?i)^https?://(www[.])?iblhoops[.]net$' THEN 'bare-origin'
+    WHEN e.referer REGEXP '(?i)^https?://(www[.])?iblhoops[.]net/' THEN 'internal'
+    WHEN e.referer REGEXP 'google\\.|bing\\.|duckduckgo\\.' THEN 'search'
+    ELSE 'external' END AS rb
+  FROM ibl_events e
+  LEFT JOIN s ON s.session_id = e.session_id AND s.w = IF(e.created_at >= @start, 'cur', 'prev')
+  WHERE e.traffic_class = 'anonymous-human' AND e.created_at >= @pstart AND e.created_at < @end
+)
+SELECT * FROM (
+  (SELECT 'class' AS c1, k AS c2, w AS c3, COUNT(*) AS c4 FROM a GROUP BY k, w)
+  UNION ALL
+  (SELECT 'sessions', 'anonymous-human', 'all', COUNT(DISTINCT session_id)
+   FROM a WHERE w = 'cur' AND k = 'anonymous-human')
+  UNION ALL
+  (SELECT 'route', 'anonymous-human', route_name, COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND route_name IS NOT NULL
+   GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
+  UNION ALL
+  (SELECT 'status4xx', 'anonymous-human',
+   CASE WHEN http_status = 404 THEN '404' WHEN http_status = 403 THEN '403' ELSE 'other4xx' END, COUNT(*) FROM a WHERE w = 'cur'
+   AND k = 'anonymous-human' AND http_status BETWEEN 400 AND 499 GROUP BY 3)
+  UNION ALL
+  (SELECT 'route4xxn', 'anonymous-human', 'all', COUNT(DISTINCT route_name) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND http_status BETWEEN 400 AND 499 AND route_name IS NOT NULL)
+  UNION ALL
+  (SELECT 'route4xx', 'anonymous-human', route_name, COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND route_name IS NOT NULL AND http_status BETWEEN 400 AND 499
+   GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
+  UNION ALL
+  (SELECT 'status', 'anonymous-human', CONCAT(FLOOR(http_status / 100), 'xx'), COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND http_status IS NOT NULL GROUP BY 3)
+  UNION ALL
+  (SELECT 'referer', k, rb, COUNT(*) FROM a
+   WHERE w = 'cur' AND k IN ('anonymous-human', 'likely-bot') GROUP BY k, rb)
+  UNION ALL
+  (SELECT 'day', 'anonymous-human', DATE_FORMAT(created_at, '%Y-%m-%d'), COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' GROUP BY 3)
+) u;
 SQL
         # END EVENTS SQL
     } | run_mysql

@@ -342,10 +342,13 @@ sql_region_ok() {
     local region
     region="$(awk '/# BEGIN EVENTS SQL/{f=1} f; /# END EVENTS SQL/{f=0}' "$1")"
     [ -n "$region" ] || return 1
-    if grep -qE 'request_uri|user_agent' <<< "$region"; then return 1; fi
-    local bad
-    # A quoted 'referer' is a section label; any other mention must sit in a CASE/WHEN test.
-    bad="$(grep -E 'referer' <<< "${region//\'referer\'/}" | grep -vE '^[[:space:]]*(CASE[[:space:]]+)?WHEN[[:space:]]' || true)"
+    if grep -qE 'request_uri' <<< "$region"; then return 1; fi
+    local bad stripped
+    stripped="${region//\'referer\'/}"
+    # A quoted 'referer' is a section label. Any other referer or user_agent mention
+    # must sit in a CASE/WHEN test and never in the THEN/ELSE value it yields.
+    if grep -qE '(THEN|ELSE).*(referer|user_agent)' <<< "$stripped"; then return 1; fi
+    bad="$(grep -E 'referer|user_agent' <<< "$stripped" | grep -vE '^[[:space:]]*(CASE[[:space:]]+)?WHEN[[:space:]]' || true)"
     [ -z "$bad" ]
 }
 
@@ -418,13 +421,19 @@ group_digest() {
     if [ "$routes" -le 16 ]; then ok "row11: route lines per class stay capped ($routes incl. other)"; else fail "row11: $routes route lines"; fi
 
     # Row 12: the SQL block, and the mutation that must fail the check.
-    if sql_region_ok "$ER"; then ok "row12: SQL region never names request_uri or user_agent"
-    else fail "row12: SQL region check failed on the real script"; fi
+    if sql_region_ok "$ER"; then ok "row12: real SQL region passes"
+    else fail "row12: real SQL region fails the narrowed guard"; fi
     local mutant="$T/events-review.mutant"
     awk '{ print } /# BEGIN EVENTS SQL/ { print "        printf \"SELECT request_uri FROM ibl_events;\\n\"" }' "$ER" > "$mutant"
     if sql_region_ok "$mutant"; then fail "row12: injected request_uri was not detected"; else ok "row12: injected request_uri is detected"; fi
     awk '{ print } /# BEGIN EVENTS SQL/ { print "        printf \"SELECT referer FROM ibl_events;\\n\"" }' "$ER" > "$mutant"
     if sql_region_ok "$mutant"; then fail "row12: injected bare referer was not detected"; else ok "row12: injected bare referer is detected"; fi
+    awk '{ print } /# BEGIN EVENTS SQL/ { print "        printf \"SELECT user_agent FROM ibl_events;\\n\"" }' "$ER" > "$mutant"
+    if sql_region_ok "$mutant"; then fail "row12b: injected bare user_agent was not detected"; else ok "row12b: injected bare user_agent is detected"; fi
+    awk '{ print } /^SET @end := CURDATE\(\);$/ { print "    WHEN 1 THEN user_agent" }' "$ER" > "$mutant"
+    if sql_region_ok "$mutant"; then fail "row12c: WHEN line yielding user_agent was not detected"; else ok "row12c: WHEN line yielding user_agent is detected"; fi
+    awk '{ print } /^SET @end := CURDATE\(\);$/ { print "    WHEN request_uri IS NULL THEN 1" }' "$ER" > "$mutant"
+    if sql_region_ok "$mutant"; then fail "row12d: request_uri inside a WHEN line was not detected"; else ok "row12d: request_uri inside a WHEN line is detected"; fi
 }
 
 # ── Group: claude (rows 13-18) ────────────────────────────────────────────────

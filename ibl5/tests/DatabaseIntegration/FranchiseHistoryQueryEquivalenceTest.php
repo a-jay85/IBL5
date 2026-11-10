@@ -303,38 +303,72 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
         self::assertNotFalse(file_put_contents('/tmp/franchise-history-perf-report.txt', $text));
     }
 
-    public function testChosenFixAppearsInQueryPlan(): void
+    public function testWindowQueryPlanReadsSeasonRecords(): void
     {
         $this->seedProdScaleVolume();
+        $this->refreshRegularSeasonRecordsInTransaction();
 
-        self::assertStringContainsString(
-            'game_date >= ? AND game_date < ?',
-            FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL
-        );
+        self::assertStringNotContainsString('ibl_box_scores_teams', FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL);
 
         $window = $this->currentSqlMap(self::SEED_CURRENT_ENDING_YEAR)['getFiveSeasonWindowRows'];
         $explainRows = $this->runFrozen('EXPLAIN ' . $window['sql'], $window['types'], ...$window['params']);
-        self::assertNotSame([], self::dateFilteredBoxScoreRows($explainRows), 'window EXPLAIN never pushes the game_date range into idx_gt_date_teams');
-
-        $year = self::SEED_CURRENT_ENDING_YEAR;
-        $frozenExplain = $this->runFrozen('EXPLAIN ' . self::FROZEN_WINDOW_SQL, 'ii', $year - 4, $year);
-        self::assertSame([], self::dateFilteredBoxScoreRows($frozenExplain), 'the pre-fix window plan already pushes a game_date range, so this check proves nothing');
+        $tables = array_map(static fn (array $row): string => is_string($row['table']) ? $row['table'] : '', $explainRows);
+        sort($tables);
+        self::assertSame(['r', 'ti'], $tables, 'window plan must read only ibl_team_season_records and ibl_team_info');
     }
 
-    /**
-     * EXPLAIN rows where MariaDB applies the game_date range through idx_gt_date_teams
-     * (index condition pushdown). MariaDB 10.11 plans these as `ref` on game_type, not `range`.
-     *
-     * @param list<array<string, mixed>> $explainRows
-     * @return list<array<string, mixed>>
-     */
-    private static function dateFilteredBoxScoreRows(array $explainRows): array
+    public function testWindowSumsOnlyRegularSeasonRowsInsideYearRange(): void
     {
-        return array_values(array_filter(
-            $explainRows,
-            static fn (array $row): bool => ($row['key'] ?? null) === 'idx_gt_date_teams'
-                && str_contains((string) ($row['Extra'] ?? ''), 'Using index condition')
-        ));
+        [$t1, , $name1] = $this->firstTwoTeams();
+
+        $deleted = $this->db->query('DELETE FROM ibl_team_season_records WHERE team_id = ' . $t1);
+        self::assertTrue($deleted);
+
+        $rows = [
+            [2009, 1, 7, 0], // below range
+            [2010, 1, 2, 1], // inside
+            [2014, 1, 3, 2], // inside
+            [2015, 1, 11, 0], // above range
+            [2012, 3, 5, 5], // HEAT, excluded
+        ];
+        foreach ($rows as [$year, $gameType, $wins, $losses]) {
+            $this->insertRow('ibl_team_season_records', [
+                'team_id' => $t1,
+                'currentname' => $name1,
+                'namethatyear' => $name1,
+                'year' => $year,
+                'game_type' => $gameType,
+                'wins' => $wins,
+                'losses' => $losses,
+            ]);
+        }
+
+        $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+
+        self::assertArrayHasKey($name1, $window);
+        self::assertSame(5, (int) $window[$name1]['five_season_wins']);
+        self::assertSame(3, (int) $window[$name1]['five_season_losses']);
+    }
+
+    public function testWindowLagsBoxScoreInsertUntilRefresh(): void
+    {
+        [$t1, $t2, $name1] = $this->firstTwoTeams();
+        $this->refreshRegularSeasonRecordsInTransaction();
+
+        $before = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
+        self::assertArrayNotHasKey($name1, $before);
+
+        $this->insertTeamBoxscoreRow('2098-11-05', 'Visitor', 1, $t1, $t2);
+        $this->insertTeamBoxscoreRow('2098-11-05', 'Home', 1, $t1, $t2);
+
+        $lagged = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
+        self::assertArrayNotHasKey($name1, $lagged, 'the window must lag a box-score insert until the next refresh');
+
+        $this->refreshRegularSeasonRecordsInTransaction();
+
+        $after = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
+        self::assertArrayHasKey($name1, $after);
+        self::assertSame(1, (int) $after[$name1]['five_season_wins'] + (int) $after[$name1]['five_season_losses']);
     }
 
     /**
@@ -348,15 +382,8 @@ class FranchiseHistoryQueryEquivalenceTest extends DatabaseTestCase
             'getFranchiseSummaryRows' => ['sql' => self::FROZEN_SUMMARY_SQL, 'types' => 'i', 'params' => [League::FREE_AGENTS_TEAMID]],
             'getFiveSeasonWindowRows' => [
                 'sql' => FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL,
-                'types' => 'ssssii',
-                'params' => [
-                    sprintf('%04d-10-01', $currentEndingYear - 5),
-                    sprintf('%04d-10-01', $currentEndingYear),
-                    sprintf('%04d-10-01', $currentEndingYear - 5),
-                    sprintf('%04d-10-01', $currentEndingYear),
-                    $currentEndingYear - 4,
-                    $currentEndingYear,
-                ],
+                'types' => 'ii',
+                'params' => [$currentEndingYear - 4, $currentEndingYear],
             ],
             'getRawPlayoffTotals' => ['sql' => self::FROZEN_PLAYOFF_TOTALS_SQL, 'types' => '', 'params' => []],
             'getRawHeatTotals' => ['sql' => self::FROZEN_HEAT_TOTALS_SQL, 'types' => '', 'params' => []],

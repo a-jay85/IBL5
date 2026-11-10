@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
-use FranchiseHistory\FranchiseHistoryRepository;
 use League\League;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
@@ -199,17 +198,16 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         $this->assertTripleEmpty(self::REGULAR_DATE, $t1, $t2);
 
         $names = [$t1 => $this->teamName($t1), $t2 => $this->teamName($t2)];
-        $repo = new FranchiseHistoryRepository($this->db);
 
         $this->rebuild();
         $tableBefore = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
-        $windowBefore = $this->windowFor($repo, $names);
+        $windowBefore = $this->windowFor($names);
 
         $this->seedRealGame(self::REGULAR_DATE, 3, $t1, $t2);
         $this->seedPhantom(self::REGULAR_DATE, 7, $t1, $t2);
         $this->rebuild();
         $tableAfter = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
-        $windowAfter = $this->windowFor($repo, $names);
+        $windowAfter = $this->windowFor($names);
 
         foreach ([$t1, $t2] as $tid) {
             $this->assertSame(
@@ -344,11 +342,22 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
      * @param array<int, string> $names team id => team_name
      * @return array<int, array{wins: int, losses: int}>
      */
-    private function windowFor(FranchiseHistoryRepository $repo, array $names): array
+    private function windowFor(array $names): array
     {
+        // Reads the live view, not the table, so this stays an oracle independent of the refresh step.
+        $result = $this->db->query(
+            'SELECT currentname,
+                    CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
+                    CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
+             FROM ibl_team_win_loss
+             WHERE year BETWEEN 2095 AND 2099
+             GROUP BY currentname'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+
         $byName = [];
-        foreach ($repo->getFiveSeasonWindowRows(2099) as $row) {
-            $byName[$row['currentname']] = [
+        foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+            $byName[(string) $row['currentname']] = [
                 'wins' => (int) $row['five_season_wins'],
                 'losses' => (int) $row['five_season_losses'],
             ];

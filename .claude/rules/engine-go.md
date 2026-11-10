@@ -1,7 +1,7 @@
 ---
-description: Go engine workflow. Run the CI-pinned golangci-lint locally before pushing (a red Engine check holds auto-merge through All checks settled, and master pushes are ungated), the two lint rules it enforces, and the real measured runtime of an archive A/B walk. Also the engine/ freeze plus decompile-token gates.
+description: Go engine workflow. Run the CI-pinned golangci-lint locally before pushing (a red Engine check holds auto-merge through All checks settled, and master pushes are ungated), the two lint rules it enforces, and the real measured runtime of an archive A/B walk. Also the two-engine model and the decompile-token allowlist gate.
 paths: "engine/**"
-last_verified: 2026-10-22
+last_verified: 2026-11-09
 ---
 
 # Engine (Go) Workflow
@@ -10,14 +10,17 @@ Build targets, the `go.mod` toolchain pin, and module layout live in
 `engine/.claude/rules/engine-context.md` (nested, attaches on the same tree). This file
 carries only what that one does not.
 
-## Frozen pending the clean-room rebuild
+## Two engines and the decompile-token gate
 
-`engine/` is frozen until the clean-room rebuild replaces it. `bin/check-engine-freeze` runs two gates on every PR, from `.github/workflows/pr-meta-checks.yml`:
+`engine/` is the faithful Go port of JSB. It resumed on 2026-11-08 under [ADR-0236](../../ibl5/docs/decisions/0236-two-engine-model-jsb-port.md), which supersedes ADR-0194. The port aims to drop the dependency on the Windows JSB binary, document the engine the league runs on, and drive further website automation. A separate clean-room engine lives in the private `a-jay85/ibl-engine` repo. The two coexist, and `engine/` has no deletion date.
 
-- **Freeze gate.** Fails a PR that adds a file under `engine/`, adds a line to one (`engine/go.mod` and `engine/go.sum` included), changes a binary file there, or moves a file out. A PR that only deletes files or lines under `engine/` passes.
-- **Decompile-token gate.** Fails any line a PR adds, in any path, that carries a decompiler-output token: generated function, data, and label names, struct-offset forms, and the decompile-artifact file names. Lines already in the repo are never flagged. The pattern table lives in the script.
+`bin/check-engine-freeze` runs one gate on every PR, from `.github/workflows/pr-meta-checks.yml`:
 
-`bin/test-check-engine-freeze` is the harness. The cutover PR that deletes `engine/` retires both gates, the `FROZEN_DOC_PREFIXES` filter in `bin/check-docs`, and the lint-action ignore in `.github/dependabot.yml`.
+- **Decompile-token gate.** Fails any line a PR adds, and any added file name, that carries a decompiler-output token (generated function, data, and label names, struct-offset forms, and the decompile-artifact file names), unless its path sits under `engine/` or `jsb-native/`. Website code under `ibl5/` and every other path stay banned. Lines already in the repo are never flagged. The pattern table and the allowlist live in the script.
+
+`bin/test-check-engine-freeze` is the harness. The script keeps its historical name because ADR-0194 and the decision index cite it.
+
+Decompile material and port work stay in this repo. Never copy a decompile token or port code into `a-jay85/ibl-engine`.
 
 ## Lint locally before pushing
 

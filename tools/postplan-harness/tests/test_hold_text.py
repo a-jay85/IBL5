@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 
 import pytest
@@ -147,6 +148,29 @@ def test_raw_reasons_move_to_the_audit_trail():
 ])
 def test_variant_reasons(cond, want):
     assert hold_text.plain_hold(cond) == want
+
+
+def test_self_governing_merge_danger_has_its_own_words():
+    c = ConditionResult(18, "merge-danger", True, "state=SELF-GOVERNING")
+    assert hold_text.plain_hold(c) == (
+        "This PR changes the auto-merge machinery itself, so a person should merge it.")
+
+
+def test_every_held_merge_danger_state_has_distinct_words():
+    """Each held state classify_body can return gets its own line. A new state with no
+    words falls through to the MALFORMED line, and this test goes red."""
+    import inspect
+    from harness import merge_danger
+    doc = inspect.getdoc(merge_danger.classify_body) or ""
+    states = re.findall(r'"([A-Z-]+)"', doc.split("\n", 1)[0])
+    held = [s for s in states if s != "TWO-WAY"]
+    assert {"ONE-WAY", "SELF-GOVERNING", "MISSING", "MALFORMED", "UNREADABLE"} <= set(held)
+    words = {s: hold_text.plain_hold(ConditionResult(18, "merge-danger", True, f"state={s}"))
+             for s in held}
+    fallback = words["MALFORMED"]
+    for s in held:
+        if s not in ("MALFORMED", "UNREADABLE"):
+            assert words[s] != fallback, f"{s} has no plain words of its own"
 
 
 def test_unknown_condition_falls_back_to_name_and_reason():

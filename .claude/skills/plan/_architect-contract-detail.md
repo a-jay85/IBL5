@@ -107,7 +107,7 @@ A path the plan cites only to state it is **absent** — "`x/y.md` does not exis
 
 Read the seam's address from the **serving code**, never from the shared-context artifact. The URL prefix, file path, or CLI flag your acceptance test targets MUST be confirmed at implementation time against the code that serves it — `ibl5/.htaccess` plus `ibl5/router.php` for an HTTP route, the plist template for a launchd job, the script's own argument parsing for a CLI flag. A canonical-looking table in a shared-context doc is prose, and prose drifts.
 
-Observed incident (`ibl5/IBLbot/src/bug-bot/php-client.test.ts:37`): a shared context described the endpoints as `/api/bug-pipeline/` while the served prefix was `ibl5/api/v1/bug-pipeline/` (example). A unit test with a mocked `baseUrl` asserted the wrong prefix green — passing test, wrong seam. An acceptance test built from the doc faithfully reproduced the doc's bug.
+Observed incident (`ibl5/IBLbot/src/bug-bot/php-client.test.ts:37`): a shared context described the endpoints as `/api/bug-pipeline/` while the served prefix was `ibl5/api/v1/bug-pipeline/` (example). A unit test with a mocked `baseUrl` asserted the wrong prefix green. The test passed against the wrong seam. An acceptance test built from the doc faithfully reproduced the doc's bug.
 
 ### Why bin/check-plan is off-limits to the architect
 

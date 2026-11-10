@@ -967,6 +967,72 @@ expect_rc0 "rc0: pr_unresolved_findings_hold, gh api unavailable (fail-closed pa
 expect_rc0 "rc0: pr_red_check_hold, gh checks unavailable (fail-open path)" \
     "pr_red_check_hold 1234"
 
+# --- condition (7) owner approval: pr_owner_approval_hold / _live_hold ---
+# A scratch origin with master and a PR head pushed to refs/pull/7/head. The
+# gh stand-in (GH_CMD) logs each call and prints $OA_PAGES, or fails when
+# $OA_GH_FAIL is set.
+OA="$BASE_TMP/owner-approval"
+mkdir -p "$OA"
+git init -q --bare "$OA/origin.git"
+git init -q "$OA/work"
+git -C "$OA/work" checkout -q -b master
+printf 'a\nb\nc\n' > "$OA/work/f.txt"
+git -C "$OA/work" add -A
+git -C "$OA/work" -c user.name=t -c user.email=t@t commit -q -m base
+git -C "$OA/work" remote add origin "$OA/origin.git"
+git -C "$OA/work" push -q origin master
+git -C "$OA/work" checkout -q -b pr
+printf 'a\nB\nc\n' > "$OA/work/f.txt"
+git -C "$OA/work" -c user.name=t -c user.email=t@t commit -q -am "pr change"
+git -C "$OA/work" push -q origin HEAD:refs/pull/7/head
+OA_OID=$(git -C "$OA/work" rev-parse HEAD)
+OA_FP=$(cd "$OA/work" && bash -c "source '$REPO_ROOT/bin/lib/human-signoff-classifier.sh'; hs_diff_fingerprint master pr")
+OA_OTHER=$(printf '%040d' 0 | tr 0 c)
+oa_comments() { # <file> <fp> — one github-actions[bot] record for <fp>
+    jq -n --arg b "<!-- hs-approved-diff: $2 -->" \
+        '[{user:{login:"github-actions[bot]",type:"Bot"},created_at:"2026-11-01T00:00:00Z",body:$b}]' > "$1"
+}
+oa_comments "$OA/match.json" "$OA_FP"
+oa_comments "$OA/other.json" "$OA_OTHER"
+printf '[]\n' > "$OA/none.json"
+jq -s . "$OA/match.json" > "$OA/pages-match.json"
+cat > "$OA/gh" <<'OASHIM'
+#!/usr/bin/env bash
+echo "$*" >> "$OA_LOG"
+[ -z "${OA_GH_FAIL:-}" ] || exit 1
+cat "$OA_PAGES"
+OASHIM
+chmod +x "$OA/gh"
+OA_LABELED='[{"name":"human-approved"}]'
+owner_hold_check() { # name  expected  args...  (runs pr_owner_approval_hold in $OA/work)
+    local name="$1" want_out="$2" out
+    shift 2
+    out=$(cd "$OA/work" && bash -c 'set -euo pipefail; source "$0"; pr_owner_approval_hold "$@"' \
+        "$REPO_ROOT/bin/lib/pr-armable.sh" "$@" 2>&1) || true
+    if [ "$out" = "$want_out" ]; then echo "ok: $name"; else echo "FAIL: $name — want '$want_out', got '$out'"; FAILED=1; fi
+}
+owner_hold_check "owner_approval_hold: match echoes nothing" "" master pr "$OA/match.json" "$OA_LABELED"
+owner_hold_check "owner_approval_hold: mismatch -> approval-mismatch" "approval-mismatch" master pr "$OA/other.json" "$OA_LABELED"
+owner_hold_check "owner_approval_hold: no record -> approval-no-record" "approval-no-record" master pr "$OA/none.json" "$OA_LABELED"
+owner_hold_check "owner_approval_hold: no label -> approval-no-label" "approval-no-label" master pr "$OA/match.json" '[{"name":"human-approved-old"}]'
+owner_hold_check "owner_approval_hold: unreadable comments -> approval-error" "approval-error" master pr "$OA/nope.json" "$OA_LABELED"
+owner_hold_check "owner_approval_hold: bad head ref -> approval-error" "approval-error" master no-such-ref "$OA/match.json" "$OA_LABELED"
+owner_live_check() { # name  expected  want_calls  oid  labels_json  [fail]
+    local out calls
+    : > "$OA/gh.log"
+    out=$(cd "$OA/work" && OA_LOG="$OA/gh.log" OA_PAGES="$OA/pages-match.json" OA_GH_FAIL="${6:-}" \
+        GH_CMD="$OA/gh" REPO_SLUG=o/r bash -c 'set -euo pipefail; source "$0"; pr_owner_approval_live_hold "$@"' \
+        "$REPO_ROOT/bin/lib/pr-armable.sh" 7 "$4" master "$5" 2>&1) || true
+    calls=$(wc -l < "$OA/gh.log" | tr -d ' ')
+    if [ "$out" = "$2" ]; then echo "ok: $1"; else echo "FAIL: $1 — want '$2', got '$out'"; FAILED=1; fi
+    if [ "$3" = any ] || [ "$calls" = "$3" ]; then echo "ok: $1 (gh calls)"; else echo "FAIL: $1 (gh calls) — want $3, got $calls"; FAILED=1; fi
+}
+owner_live_check "live: unlabeled -> approval-no-label with zero gh calls" "approval-no-label" 0 "$OA_OID" '[]'
+owner_live_check "live: gh api failure -> approval-error" "approval-error" 1 "$OA_OID" "$OA_LABELED" 1
+owner_live_check "live: head oid differs from FETCH_HEAD -> approval-error" "approval-error" 0 "$OA_OTHER" "$OA_LABELED"
+owner_live_check "live: matching record -> empty" "" 1 "$OA_OID" "$OA_LABELED"
+# --- end condition (7) owner approval ---
+
 # --- bin/pr-triage merge-state allowlist ------------------------------------
 # BEHIND is the case that shipped wrong: master's protection is strict (branches
 # must be up to date), so a BEHIND PR's green checks ran on a SHA GitHub will not

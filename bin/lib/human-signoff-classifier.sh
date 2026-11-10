@@ -194,6 +194,30 @@ hs_eval_approval() {
     _hs_drop_rc "$verdict"
 }
 
+# hs_approval_state <base_ref> <head_ref> <comments_json_file> <labels_csv>
+# The post-plan view of an owner approval, for arming condition (7). Prints
+# one token and returns 0 only for `match`:
+#   match      label present, newest bot record equals the current fingerprint
+#   no-label   human-approved is not applied
+#   no-record  no bot record, or the newest one is `revoked`
+#   mismatch   the record is for a different diff
+#   error      the fingerprint or the comments could not be read
+# Every token except match keeps (7) held (fail closed).
+hs_approval_state() {
+    local current recorded rc=0
+    if ! hs_has_approval_label "${4:-}"; then echo no-label; return 1; fi
+    if ! current=$(hs_diff_fingerprint "$1" "$2"); then echo error; return 1; fi
+    recorded=$(hs_recorded_fingerprint "$3") || rc=$?
+    case "$rc" in
+        0) ;;
+        1) echo no-record; return 1 ;;
+        *) echo error; return 1 ;;
+    esac
+    if hs_fingerprint_matches "$current" "$recorded"; then echo match; return 0; fi
+    echo mismatch
+    return 1
+}
+
 # ---- Approval-record wait (ADR-0062 Update 2026-11-02) ----
 # A push that lands seconds after the label (an update-branch merge) starts a
 # run that can read comments before the approving `labeled` run posts its

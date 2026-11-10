@@ -213,6 +213,45 @@ fp30 pr pr; rc=$?
 expect "fp: empty diff returns rc 1" 1 "$rc"
 if [ -z "$LAST_OUT" ]; then h_pass "fp: empty diff returns rc 1 and prints nothing"; else h_fail "fp: empty diff returns rc 1 and prints nothing" "got [$LAST_OUT]"; fi
 
+# ---- hs_approval_state (post-plan condition 7 owner approval) ----
+# run_state <base> <head> <comments_file> <labels_csv> — prints STATE=<token> STATE_RC=<rc>.
+run_state() {
+    # shellcheck disable=SC2016  # expands in the child bash
+    LAST_OUT=$(cd "$R30" && bash -c 'set -euo pipefail; source "$0"; rc=0; tok=$(hs_approval_state "$@") || rc=$?; echo "STATE=$tok STATE_RC=$rc"' "$LIB" "$@" 2>/dev/null)
+}
+ST_REC="$T/st-rec.json"
+printf '[%s]\n' "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$FP30_PRE")")" > "$ST_REC"
+ST_REV="$T/st-rev.json"
+printf '[%s,%s]\n' "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "$(record_body "$FP30_PRE")")" \
+    "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:02Z" "$(drop_body mismatch)")" > "$ST_REV"
+ST_HUMAN="$T/st-human.json"
+printf '[%s]\n' "$(comment_json "someone" User "2026-10-18T00:00:01Z" "$(record_body "$FP30_PRE")")" > "$ST_HUMAN"
+ST_39="$T/st-39.json"
+printf '[%s]\n' "$(comment_json "github-actions[bot]" Bot "2026-10-18T00:00:01Z" "<!-- hs-approved-diff: ${FP30_PRE:0:39} -->")" > "$ST_39"
+
+run_state master pr "$ST_REC" human-approved
+want "state: match" "$LAST_OUT" "STATE=match STATE_RC="
+want "state: match -> rc 0" "$LAST_OUT" "STATE_RC=0"
+run_state master pr "$ST_REV" human-approved
+want "state: revoked marker -> no-record" "$LAST_OUT" "STATE=no-record STATE_RC="
+run_state master pr "$ST_HUMAN" human-approved
+want "state: marker from a non-bot author -> no-record" "$LAST_OUT" "STATE=no-record STATE_RC="
+run_state master pr "$ST_39" human-approved
+want "state: 39-hex marker -> no-record" "$LAST_OUT" "STATE=no-record STATE_RC="
+run_state master prws "$ST_REC" human-approved
+want "state: record for older diff -> mismatch" "$LAST_OUT" "STATE=mismatch STATE_RC="
+want "state: record for older diff -> rc 1" "$LAST_OUT" "STATE_RC=1"
+run_state master pr /nonexistent/c.json human-approved
+want "state: unreadable comments file -> error" "$LAST_OUT" "STATE=error STATE_RC="
+run_state master no-such-ref "$ST_REC" human-approved
+want "state: bad head ref -> error" "$LAST_OUT" "STATE=error STATE_RC="
+run_state master pr "$ST_REC" human-approved-old
+want "label: near-miss human-approved-old -> no-label" "$LAST_OUT" "STATE=no-label STATE_RC="
+run_state master pr "$ST_REC" not-human-approved
+want "label: near-miss not-human-approved -> no-label" "$LAST_OUT" "STATE=no-label STATE_RC="
+run_state master pr "$ST_REC" "x,human-approved,y"
+want "label: exact name inside a list -> match" "$LAST_OUT" "STATE=match STATE_RC="
+
 # invocation-2-only: hand-built comment state
 EMPTY="$T/empty.json"
 printf '[]\n' > "$EMPTY"

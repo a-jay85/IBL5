@@ -33,7 +33,7 @@
 -- is copied whole into ibl_gm_tenures_backup_207, using the backfill's own WHERE. Drop that table in a later migration once the backfill has held.
 --
 -- Rollback: re-run the trigger block of migration 192 (trg_gm_tenure_track), then apply
--- ibl5/migrations/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
+-- ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
 -- by id from ibl_gm_tenures_backup_207.
 -- Idempotent: DROP TRIGGER IF EXISTS, CREATE TABLE IF NOT EXISTS, and a backup fill and backfill whose
 -- WHERE matches nothing on a second run. INSERT IGNORE keeps the first run's old values.
@@ -42,7 +42,7 @@
 -- (action_order 1). trg_gm_tenure_track is recreated FOLLOWS it (action_order 2), which avoids the
 -- PRECEDES/FOLLOWS circular dependency.
 --
--- destructive-migration[rewrite-no-backup]: the flagged UPDATEs of ibl_league_config and ibl_gm_tenures sit inside the CREATE TRIGGER bodies of trg_team_identity_sync and trg_gm_tenure_track, so they run per row at trigger time, not at migration time. The one migration-time backfill below has its own backup fill and undo script.
+-- destructive-migration[rewrite-no-backup]: the flagged UPDATEs of ibl_league_config and ibl_gm_tenures sit inside the CREATE TRIGGER bodies of trg_team_identity_sync and trg_gm_tenure_track, so they run per row at trigger time, not at migration time. The one migration-time backfill below has its own backup fill and an undo script at ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql, kept outside ibl5/migrations/ so the migration runner never applies it.
 
 DELIMITER $$
 

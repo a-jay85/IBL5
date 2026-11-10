@@ -1723,7 +1723,12 @@ $(_your_turn_lines)"
         _msg="pr-cycle finished — $_FIRED_SUMMARY, armed $ARMED, your turn $LEFT — $_reason
 log: ${PR_CYCLE_LOG:-<foreground>}
 $_yt_block"
-        DM_CMD="$PR_CYCLE_DM_CMD" dm_ping "$_msg" || true
+        # A finished run posts without the @mention; the owner reads the channel when they
+        # choose. A halted run (auth failure, crash) still pings: nothing else reports it.
+        case "$_reason" in
+            "done"|"stopped by "*) "$PR_CYCLE_DM_CMD" "$_msg" || true ;;
+            *) DM_CMD="$PR_CYCLE_DM_CMD" dm_ping "$_msg" || true ;;
+        esac
     fi
 
     case "$_reason" in

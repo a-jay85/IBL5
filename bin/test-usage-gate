@@ -67,6 +67,9 @@ new_env() {
     ORIG_HOME="${ORIG_HOME:-$HOME}"
     export HOME="$ORIG_HOME"
     unset IBL5_USAGE_GATE_TEST_MODE
+    # A runner (automouse, post-plan-now, plan-now) exports these to its child.
+    # Clear them so a test only sees the values it sets itself.
+    unset IBL5_USAGE_GATE IBL5_USAGE_GATE_RUNNER IBL5_USAGE_GATE_MODEL IBL5_USAGE_GATE_RESUME_BIN IBL5_USAGE_GATE_SESSION_ID
 }
 
 # seed_home <account_uuid|"">: isolate HOME; seed ~/.claude.json with the account id.
@@ -210,8 +213,8 @@ while [ \$# -gt 0 ]; do
     case "\$1" in -D) hdr="\$2"; shift ;; esac
     shift
 done
-echo call >> "$dir/curl.calls"
-[ "$sl" -gt 0 ] && sleep "$sl"
+echo "call \$PPID" >> "$dir/curl.calls"
+if [ "${STUB_GATE:-0}" = 1 ]; then end=\$((\$(date +%s) + 30)); grace=""; while [ ! -e "$dir/release" ]; do now=\$(date +%s); if [ -e "$dir/gate.done" ]; then [ -n "\$grace" ] || grace=\$((now + 5)); [ "\$now" -lt "\$grace" ] || { echo timeout >> "$dir/gate.timeout"; break; }; fi; [ "\$now" -lt "\$end" ] || { echo timeout >> "$dir/gate.timeout"; break; }; sleep 0.01; done; elif [ "$sl" -gt 0 ]; then sleep "$sl"; fi
 if [ -n "\$hdr" ]; then
     printf 'HTTP/2 %s\r\n' "$st" > "\$hdr"
     [ -n "$ra" ] && printf 'retry-after: %s\r\n' "$ra" >> "\$hdr"
@@ -226,6 +229,32 @@ fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
     PATH="$STUB:$ORIG_PATH" bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; ${FETCH_PRELUDE:-}usage_fetch $1"
 }
 
+# barrier_wait <file>: bounded poll for a barrier file. It gives ordering, not timing. On timeout it
+# appends to b.timeout beside the file and returns 1, so the test fails loudly instead of hanging.
+barrier_wait() {
+    local i=0
+    while [ ! -e "$1" ]; do
+        i=$((i + 1))
+        [ "$i" -le 1000 ] || { echo "$$ $1" >> "$(dirname "$1")/b.timeout"; return 1; }
+        sleep 0.01
+    done
+}
+
+stale_fetch_lock() {  # <state_dir>: seeds fetch.lock.d with a stamp 100 s old (stale at the default 15 s)
+    mkdir -p "$1/fetch.lock.d"
+    printf '%s 99999\n' "$(( $(date +%s) - 100 ))" > "$1/fetch.lock.d/at"
+}
+
+# diag_dump <label> <file...>: after a failed concurrency assert, prints each file (or <missing>)
+# under a DIAG banner so a CI log shows which processes held which lock.
+diag_dump() {
+    local label="$1" f; shift
+    for f in "$@"; do
+        echo "  DIAG $label $f:"
+        if [ -e "$f" ]; then tail -n 80 "$f" | sed 's/^/    | /'; else echo "    | <missing>"; fi
+    done
+}
+
 # fetch_parallel <n> <max_age>: n concurrent usage_fetch calls; results in $T/out.<i>, $T/rc.<i>.
 # Waits only on its own pids (never a bare `wait`).
 # A runner stall past the 15s stale limit lets a late peer reclaim a live lock and call
@@ -233,12 +262,28 @@ fetch_once() {  # <max_age>: one usage_fetch; stdout = body; rc = usage_fetch rc
 # so these runs lift the limit. The prelude is set after the lib is sourced because the
 # lib assigns the default on load.
 fetch_parallel() {
-    local i=1 pids=""
+    local i=1 pids="" pre
+    rm -f "$T/lock.trace"
+    rm -f "$T"/rc.* "$T"/out.* "$STUB/release" "$STUB/gate.done"
+    pre="USAGE_FETCH_LOCK_STALE=3600; _usage_lock_hook() { printf '%s %s\\n' \"\$\$\" \"\$1\" >> '$T/lock.trace'; }; "
     while [ "$i" -le "$1" ]; do
-        ( FETCH_PRELUDE='USAGE_FETCH_LOCK_STALE=3600; '; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
+        ( FETCH_PRELUDE="$pre"; fetch_once "$2" > "$T/out.$i"; echo $? > "$T/rc.$i" ) &
         pids="$pids $!"
         i=$((i + 1))
     done
+    if [ "${STUB_GATE:-0}" = 1 ]; then
+        # Hold the curl holder until every other caller has returned, then release it.
+        # Both waits use wall-clock deadlines, so load cannot stretch them. gate.done tells
+        # the stub the release is due now: with no release 5 s later it fails fast with a
+        # stub timeout. The stub's 30 s cap stays above this loop's 20 s.
+        local end=$(( $(date +%s) + 20 ))
+        until [ $(( $(find "$T" -maxdepth 1 -name 'rc.*' | wc -l) + $(curl_calls "$STUB") )) -ge "$1" ]; do
+            [ "$(date +%s)" -lt "$end" ] || { echo timeout >> "$T/gate.timeout"; break; }
+            sleep 0.01
+        done
+        touch "$STUB/gate.done"
+        touch "$STUB/release"
+    fi
     for p in $pids; do wait "$p"; done
 }
 
@@ -346,12 +391,16 @@ test_fetch_429_exponential_and_expiry() {
 
 test_fetch_429_concurrent_one_call() {
     new_env
+    local STUB_GATE=1
     seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
     make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY" 120 2
     local i round
     for round in 1 2; do
         fetch_parallel 6 45
         assert_eq "fetch_429_conc:calls$round" 1 "$(curl_calls "$STUB")"
+        assert_no_file "fetch_429_conc:no-gate-timeout$round" "$T/gate.timeout"
+        assert_no_file "fetch_429_conc:no-stub-timeout$round" "$STUB/gate.timeout"
+        [ "$(curl_calls "$STUB")" = 1 ] || diag_dump "fetch_429_conc$round" "$STUB/curl.calls" "$T/lock.trace"
         for i in 1 2 3 4 5 6; do
             assert_eq "fetch_429_conc:rc$round.$i" 2 "$(cat "$T/rc.$i")"
             assert_eq "fetch_429_conc:util$round.$i" 41.0 "$(util_of "$(cat "$T/out.$i")")"
@@ -396,11 +445,15 @@ test_fetch_429_no_cache_rc1() {
 
 test_fetch_single_flight_parallel() {
     new_env
+    local STUB_GATE=1
     seed_cache "$(( $(date +%s) - 100 ))" "$BODY_A"
     make_stub_http "$STUB" "$SECRET_TOK" 200 "$BODY_B" "" 3
     local i rc saw77=0 n
     fetch_parallel 6 45
     assert_eq fetch_single_flight:calls 1 "$(curl_calls "$STUB")"
+    assert_no_file fetch_single_flight:no-gate-timeout "$T/gate.timeout"
+    assert_no_file fetch_single_flight:no-stub-timeout "$STUB/gate.timeout"
+    [ "$(curl_calls "$STUB")" = 1 ] || diag_dump fetch_single_flight "$STUB/curl.calls" "$T/lock.trace"
     for i in 1 2 3 4 5 6; do
         rc=$(cat "$T/rc.$i")
         if [ "$rc" = 0 ] || [ "$rc" = 2 ]; then pass "fetch_single_flight:rc.$i"; else fail "fetch_single_flight:rc.$i" "rc=$rc"; fi
@@ -2499,6 +2552,7 @@ test_coord_switch_respects_runaway_and_hold() {
     patch_marker "$SID_B" ".resets_at = $(( $(date +%s) + 3600 )) | .acct_fp = \"$(acct_hash uuid-A)\""
     sw_signal 30 - 1 account
     run_coord --once >/dev/null 2>&1
+    wait_file "$T/launched.$SID_A"
     sleep 1
     # A known account switch clears the old account's pause count, so A resumes.
     assert_eq switch_runaway:unstuck false "$(jq -r '.stuck // false' "$IBL5_USAGE_GATE_STATE_DIR/markers/$SID_A.json")"
@@ -2917,10 +2971,10 @@ test_usage_log_refused_dir_silent() {
 
 test_usage_log_concurrent_writers() {
     new_env
-    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids=""
+    local d="$IBL5_USAGE_GATE_STATE_DIR" w pids="" f
     seed_log 4096 "$d/usage-gate.log"
     for w in 1 2 3 4 5 6 7 8; do
-        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
+        bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; _usage_lock_hook() { printf '%s %s\n' \"\$\$\" \"\$1\" >> '$T/rotate.trace'; }; for i in \$(seq 1 100); do usage_log writer-$w-\$i; done" &
         pids="$pids $!"
     done
     for p in $pids; do wait "$p"; done
@@ -2929,7 +2983,113 @@ test_usage_log_concurrent_writers() {
     assert_eq concurrent:no-malformed 0 "$(grep -cvE "(${LOG_PFX}writer-[0-9]+-[0-9]+\$)|(${SEED_RE#^})" "$T/all")"
     assert_eq concurrent:no-dupes 0 "$(sort "$T/all" | uniq -d | wc -l | tr -d ' ')"
     assert_eq concurrent:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    if [ "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1" 2>/dev/null)" != 4096 ]; then
+        ls -la "$d" | sed 's/^/  DIAG seeds ls | /'
+        for f in "$d/usage-gate.log" "$d/usage-gate.log.1"; do
+            echo "  DIAG seeds $f bytes=$(wc -c < "$f" 2>/dev/null | tr -dc 0-9) seeds=$(grep -cE "$SEED_RE" "$f" 2>/dev/null) writers=$(grep -cE "${LOG_PFX}writer-" "$f" 2>/dev/null)"
+        done
+        diag_dump seeds "$T/rotate.trace"
+    fi
     assert_eq concurrent:no-seeds-in-new 0 "$(grep -cE "$SEED_RE" "$d/usage-gate.log")"
+}
+
+# A second rotator that passed its size check before the first rotation must not clobber log.1.
+test_usage_log_double_rotate_keeps_seeds() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" p1
+    mkdir -p "$d"; seed_log 4096 "$d/usage-gate.log"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = rotate-checked ] || return 0; touch '$T/b.p1-checked'; barrier_wait '$T/b.p2-done'; }"
+    } > "$T/hook.p1"
+    bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; . '$T/hook.p1'; _usage_log_rotate_locked '$d'" &
+    p1=$!
+    barrier_wait "$T/b.p1-checked"
+    ep "_usage_log_rotate_locked '$d'"
+    printf 'late line\n' >> "$d/usage-gate.log"
+    touch "$T/b.p2-done"
+    wait "$p1"
+    assert_eq double_rotate:seeds-in-old 4096 "$(grep -cE "$SEED_RE" "$d/usage-gate.log.1")"
+    assert_eq double_rotate:late-line-kept 1 "$(cat "$d/usage-gate.log" "$d/usage-gate.log.1" 2>/dev/null | grep -c '^late line$')"
+    assert_eq double_rotate:no-private-left 0 "$(find "$d" -maxdepth 1 -name '*.rot.*' | wc -l | tr -d ' ')"
+    assert_no_file double_rotate:no-timeout "$T/b.timeout"
+}
+
+# Two reclaimers judge one stale lock. R2 is held right after its stale verdict while R1 reclaims;
+# R1 is held after its mkdir, before its stamp, until R2 returns. Exactly one may hold the lock.
+test_fetch_lock_reclaim_race_one_holder() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" lib="$REPO_ROOT/bin/lib/usage-fetch.sh" p1 p2 r wins=0
+    stale_fetch_lock "$d"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = fetch-reclaim-stale ] || return 0; touch '$T/b.r2-ready'; barrier_wait '$T/b.r1-won'; }"
+    } > "$T/hook.r2"
+    { declare -f barrier_wait
+      echo "_usage_lock_hook() { [ \"\$1\" = fetch-reclaim-won ] || return 0; touch '$T/b.r1-won'; barrier_wait '$T/b.r2-done'; }"
+    } > "$T/hook.r1"
+    bash -c ". '$lib'; . '$T/hook.r2'; _usage_fetch_lock_acquire '$d'; echo \$? > '$T/rc.r2'; echo \$\$ > '$T/pid.r2'; touch '$T/b.r2-done'" &
+    p2=$!
+    barrier_wait "$T/b.r2-ready"
+    bash -c ". '$lib'; . '$T/hook.r1'; _usage_fetch_lock_acquire '$d'; echo \$? > '$T/rc.r1'; echo \$\$ > '$T/pid.r1'" &
+    p1=$!
+    wait "$p2"; wait "$p1"
+    for r in r1 r2; do [ "$(cat "$T/rc.$r" 2>/dev/null)" = 0 ] && wins=$((wins + 1)); done
+    assert_eq reclaim_race:one-winner 1 "$wins"
+    assert_eq reclaim_race:r1-wins 0 "$(cat "$T/rc.r1" 2>/dev/null)"
+    assert_eq reclaim_race:r2-loses 1 "$(cat "$T/rc.r2" 2>/dev/null)"
+    assert_eq reclaim_race:stamp-is-r1 "$(cat "$T/pid.r1" 2>/dev/null)" "$(cut -d' ' -f2 "$d/fetch.lock.d/at" 2>/dev/null)"
+    assert_no_file reclaim_race:no-timeout "$T/b.timeout"
+    assert_no_file reclaim_race:no-mutex-left "$d/fetch-reclaim.lock.d"
+}
+
+test_fetch_lock_reclaim_mutex_busy_loses() {  # a live reclaimer holds the mutex: no second reclaim
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" before
+    stale_fetch_lock "$d"; mkdir "$d/fetch-reclaim.lock.d"; before=$(cat "$d/fetch.lock.d/at")
+    ep "_usage_fetch_lock_acquire '$d'"
+    assert_eq reclaim_mutex_busy:rc 1 "$?"
+    assert_eq reclaim_mutex_busy:stamp-kept "$before" "$(cat "$d/fetch.lock.d/at")"
+}
+
+test_fetch_lock_reclaim_mutex_orphan_ages_out() {  # a dead reclaimer's mutex never blocks forever
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" won
+    stale_fetch_lock "$d"; mkdir "$d/fetch-reclaim.lock.d"; touch -t 202001010000 "$d/fetch-reclaim.lock.d"
+    won=$(ep "_usage_fetch_lock_acquire '$d' && echo \$\$")
+    assert_eq reclaim_mutex_orphan:stamp-pid "${won:-none}" "$(cut -d' ' -f2 "$d/fetch.lock.d/at")"
+    assert_no_file reclaim_mutex_orphan:mutex-gone "$d/fetch-reclaim.lock.d"
+}
+
+test_fetch_lock_reclaim_stamp_changed_loses() {  # stamp re-stamped since the stale verdict: hands off
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" before
+    stale_fetch_lock "$d"; before=$(cat "$d/fetch.lock.d/at")
+    : > "$T/hook.log"
+    ep "_usage_lock_hook() { printf '%s\n' \"\$1\" >> '$T/hook.log'; }; _usage_fetch_lock_reclaim '$d/fetch.lock.d' \$(date +%s) '1 1'"
+    assert_eq reclaim_changed:rc 1 "$?"
+    assert_eq reclaim_changed:stamp-kept "$before" "$(cat "$d/fetch.lock.d/at")"
+    # The pre-mv re-read refuses it, so the live lock is never moved aside, even briefly.
+    assert_eq reclaim_changed:no-mv 0 "$(grep -c fetch-reclaim-mv "$T/hook.log")"
+}
+
+test_fetch_lock_release_quiet_when_gone() {  # release with no lock dir: rc 0, nothing on stderr
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" err rc
+    mkdir -p "$d"
+    err=$(ep "_usage_fetch_lock_release '$d'" 2>&1 >/dev/null); rc=$?
+    assert_eq release_gone:stderr "" "$err"
+    assert_eq release_gone:rc 0 "$rc"
+    mkdir -p "$d/fetch.lock.d"; printf '%s 99999\n' "$(date +%s)" > "$d/fetch.lock.d/at"
+    ep "_usage_fetch_lock_release '$d'"
+    assert_eq release_foreign:kept yes "$([ -d "$d/fetch.lock.d" ] && echo yes || echo no)"
+}
+
+test_fetch_lock_busy_read_quiet_when_gone() {  # lock vanishes between the -f test and the read
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" err rc
+    mkdir -p "$d/fetch.lock.d"; printf '%s 99999\n' "$(date +%s)" > "$d/fetch.lock.d/at"
+    err=$(ep "_usage_lock_hook() { [ \"\$1\" = fetch-busy ] && rm -rf '$d/fetch.lock.d'; return 0; }; _usage_fetch_lock_acquire '$d'" 2>&1 >/dev/null); rc=$?
+    assert_eq busy_gone:stderr "" "$err"
+    assert_eq busy_gone:rc 1 "$rc"
 }
 
 ep() { bash -c ". '$REPO_ROOT/bin/lib/usage-fetch.sh'; $*"; }
@@ -3054,7 +3214,7 @@ test_stale_episode_closes_on_recent_stale_cache() {
     seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99)"
     dec >/dev/null
     assert_eq stale_recent:open 1 "$(log_re_count "$DEC_OPEN_RE")"
-    seed_cache "$(( $(date +%s) - 298 ))" "$(usage_json 10)"
+    seed_cache "$(( $(date +%s) - 240 ))" "$(usage_json 10)"
     dec >/dev/null
     assert_eq stale_recent:close 1 "$(log_re_count "$STALE_END_RE")"
 }

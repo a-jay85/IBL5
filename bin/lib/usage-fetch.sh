@@ -38,6 +38,10 @@ USAGE_AUTH_DEAD_TTL=900
 # Plain assignment like the tunables above: tests drive rotation by seeding an oversized log.
 USAGE_LOG_MAX_BYTES=262144
 
+# _usage_lock_hook <event>: a no-op seam the lock code calls at each step. bin/test-usage-gate
+# redefines it after sourcing this file, to trace lock events and to hold a process at a barrier.
+_usage_lock_hook() { :; }
+
 # usage_state_dir
 # Echoes the state dir (creating it and markers/). Honors IBL5_USAGE_GATE_STATE_DIR;
 # an empty value falls back to the default.
@@ -89,9 +93,11 @@ _usage_log_rotate() {
     [ "$(_usage_log_size "$1/usage-gate.log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
     if ! mkdir "$lock" 2>/dev/null; then
         [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 0
+        _usage_lock_hook rotate-orphan-reclaim
         rmdir "$lock" 2>/dev/null
         mkdir "$lock" 2>/dev/null || return 0
     fi
+    _usage_lock_hook rotate-lock-won
     _usage_log_rotate_locked "$1"
     rmdir "$lock" 2>/dev/null
     return 0
@@ -103,7 +109,18 @@ _usage_log_rotate() {
 _usage_log_rotate_locked() {
     local log="$1/usage-gate.log"
     [ "$(_usage_log_size "$log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
-    mv -f "$log" "$log.1" 2>/dev/null
+    _usage_lock_hook rotate-checked
+    # Take the log under a private name first. If another rotator already moved the full log,
+    # this mv takes only the fresh small one, and its lines go back instead of clobbering log.1.
+    mv -f "$log" "$log.rot.$$" 2>/dev/null || return 0
+    if [ "$(_usage_log_size "$log.rot.$$")" -ge "$USAGE_LOG_MAX_BYTES" ]; then
+        mv -f "$log.rot.$$" "$log.1" 2>/dev/null
+        _usage_lock_hook rotate-mv
+    else
+        cat "$log.rot.$$" >> "$log" 2>/dev/null
+        rm -f "$log.rot.$$"
+        _usage_lock_hook rotate-putback
+    fi
     return 0
 }
 
@@ -344,31 +361,57 @@ _usage_fetch_log_once() {
 
 # _usage_fetch_lock_acquire <state_dir>: rc 0 when this process now owns fetch.lock.d. Never waits.
 _usage_fetch_lock_acquire() {
-    local lock="$1/fetch.lock.d" now at="" pid="" got=""
+    local lock="$1/fetch.lock.d" mutex="$1/fetch-reclaim.lock.d" now at="" pid="" rc
     now=$(date +%s)
     if mkdir "$lock" 2>/dev/null; then
+        _usage_lock_hook fetch-mkdir-won
         { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
         return 0
     fi
     if [ ! -f "$lock/at" ]; then
         # Orphan from a holder that died between mkdir and its stamp: stamp it so it ages out.
         # noclobber (O_EXCL): never overwrite the real holder's stamp, or its release can't match its pid.
+        _usage_lock_hook fetch-orphan-stamp
         ( set -C; printf '%s 0\n' "$now" > "$lock/at" ) 2>/dev/null
         return 1
     fi
-    read -r at pid < "$lock/at" 2>/dev/null
+    _usage_lock_hook fetch-busy
+    { read -r at pid < "$lock/at"; } 2>/dev/null
     case "$at" in ''|*[!0-9]*) at=$now ;; esac
     [ $((now - at)) -gt "$USAGE_FETCH_LOCK_STALE" ] || return 1
+    _usage_lock_hook fetch-reclaim-stale
+    # One reclaimer at a time. Without this, a peer's mv can take the lock this reclaim just made.
+    if ! mkdir "$mutex" 2>/dev/null; then
+        # A reclaimer died holding the mutex: age it out the way _usage_log_rotate does.
+        [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 1
+        rmdir "$mutex" 2>/dev/null
+        mkdir "$mutex" 2>/dev/null || return 1
+    fi
+    _usage_fetch_lock_reclaim "$lock" "$now" "$at $pid"
+    rc=$?
+    rmdir "$mutex" 2>/dev/null
+    return "$rc"
+}
+
+# _usage_fetch_lock_reclaim <lock> <now> <judged "at pid">: run only under the reclaim mutex.
+# Moves the lock aside only while it still carries the stale stamp judged above, then takes it
+# fresh. rc 0 = this process holds the lock.
+_usage_fetch_lock_reclaim() {
+    local lock="$1" now="$2" judged="$3" at="" pid=""
+    { read -r at pid < "$lock/at"; } 2>/dev/null || return 1
+    [ "$at $pid" = "$judged" ] || return 1
     mv "$lock" "$lock.stale.$$" 2>/dev/null || return 1
-    read -r got pid < "$lock.stale.$$/at" 2>/dev/null
-    case "$got" in ''|*[!0-9]*) got=0 ;; esac
-    if [ $((now - got)) -le "$USAGE_FETCH_LOCK_STALE" ]; then
-        # A peer reclaimed first and this mv took its fresh lock: hand it back and lose.
+    _usage_lock_hook fetch-reclaim-mv
+    at="" pid=""
+    { read -r at pid < "$lock.stale.$$/at"; } 2>/dev/null
+    if [ "$at $pid" != "$judged" ]; then
+        # The lock changed hands between the re-read and the mv: hand it back and lose.
         if [ -e "$lock" ]; then rm -rf "$lock.stale.$$"; else mv "$lock.stale.$$" "$lock" 2>/dev/null; fi
         return 1
     fi
     rm -rf "$lock.stale.$$"
     mkdir "$lock" 2>/dev/null || return 1
+    _usage_lock_hook fetch-reclaim-won
     { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
     return 0
 }
@@ -376,8 +419,8 @@ _usage_fetch_lock_acquire() {
 # _usage_fetch_lock_release <state_dir>: removes fetch.lock.d only when this process owns it.
 _usage_fetch_lock_release() {
     local lock="$1/fetch.lock.d" at="" pid=""
-    read -r at pid < "$lock/at" 2>/dev/null
-    [ "$pid" = "$$" ] && rm -rf "$lock"
+    { read -r at pid < "$lock/at"; } 2>/dev/null
+    if [ "$pid" = "$$" ]; then _usage_lock_hook fetch-release-rm; rm -rf "$lock"; else _usage_lock_hook fetch-release-skip; fi
     return 0
 }
 
@@ -482,6 +525,7 @@ usage_fetch() {
         # rc (locked keychain, no UI access under launchd) says nothing about the login.
         if [ "$src" -eq 44 ] || [ "$src" -eq 0 ]; then dead="no-token"; fi
     else
+        _usage_lock_hook fetch-pre-curl
         rm -f "$hdr"
         body=$(curl -s -m 4 -D "$hdr" https://api.anthropic.com/api/oauth/usage \
             -H "Authorization: Bearer $tok" -H "anthropic-beta: oauth-2025-04-20"); crc=$?

@@ -335,7 +335,7 @@ _bug_status_enum() {
         /CREATE TABLE `ibl_bug_reports`/ { on = 1; print; next }
         on && /CREATE TABLE `/ { exit }
         on { print }
-    ' | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z_]+'" | tr -d "'"
+    ' | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z0-9_]+'" | tr -d "'"
 }
 
 # check_status_enum — a migration on a table db-sync preserves can sit unapplied

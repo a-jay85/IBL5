@@ -3,7 +3,7 @@
 # bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check
 # (16 stub cases + R1-R13 real-DB cases + B1-B4 bot-reachability cases
 #  + L1-L3 bot-launchd-load cases + K1-K5 bot-key cases + K6-K9 key-tier cases
-#  + D1-D8 bot-build cases + E1-E5 status-enum cases)
+#  + D1-D8 bot-build cases + E1-E6 status-enum cases)
 #
 # No set -e (constraint a). Verdict assertions use tail -n 1 (constraint b).
 # BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 pinned per case (constraint c).
@@ -909,7 +909,7 @@ bpt_expect_eq "E3: verdict" "VERDICT: unknown [statusenum:db-unavailable]" "$(ta
 # (every file there only touches ibl_bug_reports / ibl_bug_pipeline_state; the
 # pipeline-state table has no status column).
 _dump_enum="$(awk '/CREATE TABLE `ibl_bug_reports`/ {on=1; print; next} on && /CREATE TABLE `/ {exit} on {print}' "$REAL_DUMP" \
-    | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z_]+'" | tr -d "'")"
+    | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z0-9_]+'" | tr -d "'")"
 _php_lits="$(command grep -hoE "status[[:space:]]*(=|IN|NOT IN)[[:space:]]*\(?'[a-z_]+'([[:space:]]*,[[:space:]]*'[a-z_]+')*" \
     "$REPO_ROOT"/ibl5/classes/BugPipeline/*.php | command grep -oE "'[a-z_]+'" | tr -d "'" | sort -u)"
 _php_n="$(printf '%s\n' "$_php_lits" | grep -c .)"
@@ -935,6 +935,21 @@ if grep -q 'ok: statusenum:current — 14 values' "$STUB/out.txt"; then
     bpt_ok "E5: a trailing table's status enum is not parsed (still 14 values)"
 else
     bpt_fail "E5: expected 14 values from ibl_bug_reports only — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case E6: an enum value with digits is parsed (counterfactual shape) ───────
+# The first real-stack counterfactual (zz_probe1680) was silently dropped by a
+# [a-z_]+ value pattern, so the checker said "current" for a value the live
+# column lacks.
+reset_case
+sed "s/,'dormant'/,'dormant','zz_probe1680'/" "$STUB/create-default" > "$STUB/e6-dump.sql"
+CASE_SCHEMA_DUMP="$STUB/e6-dump.sql"
+run_check
+bpt_expect_eq "E6: verdict" "VERDICT: degraded [statusenum:missing]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'SIGNAL: statusenum:missing.*zz_probe1680' "$STUB/out.txt"; then
+    bpt_ok "E6: detail names zz_probe1680"
+else
+    bpt_fail "E6: detail should name zz_probe1680 — got $(cat "$STUB/out.txt")"
 fi
 
 # ── Real-DB gate ──────────────────────────────────────────────────────────────

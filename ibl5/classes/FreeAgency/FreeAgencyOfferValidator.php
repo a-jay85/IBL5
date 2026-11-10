@@ -13,7 +13,7 @@ use Team\Team;
 /**
  * @see FreeAgencyOfferValidatorInterface
  *
- * @phpstan-type OfferValidationData array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int}
+ * @phpstan-type OfferValidationData array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int, nonNumericYear?: int}
  */
 class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 {
@@ -49,6 +49,25 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         /** @var OfferValidationData $typedData */
         $typedData = $offerData;
         $this->offerData = $typedData;
+
+        // Reject any offer type the form cannot produce (0..8). An unknown type would
+        // otherwise skip the soft-cap check below, which keys on offerType === 0.
+        $offerType = $this->offerData['offerType'];
+        if ($offerType < OfferType::CUSTOM || $offerType > OfferType::VETERAN_MINIMUM) {
+            return [
+                'valid' => false,
+                'error' => 'Sorry, that offer type is not recognized. Please make your offer again from the free agency offer form.'
+            ];
+        }
+
+        // A year that held letters or an array (crafted POST) is reported by number.
+        $nonNumericYear = $this->offerData['nonNumericYear'] ?? 0;
+        if ($nonNumericYear !== 0) {
+            return [
+                'valid' => false,
+                'error' => 'Sorry, the amount you entered for Year ' . $nonNumericYear . ' of this offer is not a number. Please enter a whole number.'
+            ];
+        }
 
         // Check for zero first year
         if ($this->offerData['offer1'] === 0) {

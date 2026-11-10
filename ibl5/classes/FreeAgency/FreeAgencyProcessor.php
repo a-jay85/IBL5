@@ -19,6 +19,9 @@ use Discord\Discord;
  */
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
+    /** Out of range on purpose so FreeAgencyOfferValidator rejects it. Never saved. */
+    private const UNRECOGNIZED_OFFER_TYPE = -1;
+
     private FreeAgencyEntityLoaderInterface $entityLoader;
     private FreeAgencyCapCalculatorFactoryInterface $capCalculatorFactory;
     private FreeAgencyMarketDemandCalculatorInterface $calculator;
@@ -133,7 +136,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      * @param \Player\Player $player Player object
      * @param array<string, mixed> $postData POST data from offer form
      * @param Team $team Team object (provides team name and cap data)
-     * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} Parsed offer data
+     * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int, nonNumericYear: int} Parsed offer data
      */
     private function parseOfferData(\Player\Player $player, array $postData, Team $team): array
     {
@@ -151,8 +154,8 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0];
 
-        $rawOfferType = $postData['offerType'] ?? 0;
-        $offerType = is_numeric($rawOfferType) ? (int) $rawOfferType : 0;
+        $offerType = self::toOfferType($postData['offerType'] ?? 0);
+        $nonNumericYear = 0;
 
         // Each branch builds the six-year ladder as a list; one destructure feeds the return shape.
         if (OfferType::isVeteranMinimum($offerType)) {
@@ -164,14 +167,20 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             // Key 0 is always present from the ladder, so the pad starts at key 1 on purpose.
             $offers = \League\ContractRules::getMLEOffers($offerType) + [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
         } else {
-            $offers = [
-                self::toOfferAmount($postData['offeryear1'] ?? 0),
-                self::toOfferAmount($postData['offeryear2'] ?? 0),
-                self::toOfferAmount($postData['offeryear3'] ?? 0),
-                self::toOfferAmount($postData['offeryear4'] ?? 0),
-                self::toOfferAmount($postData['offeryear5'] ?? 0),
-                self::toOfferAmount($postData['offeryear6'] ?? 0),
+            $rawAmounts = [
+                $postData['offeryear1'] ?? 0,
+                $postData['offeryear2'] ?? 0,
+                $postData['offeryear3'] ?? 0,
+                $postData['offeryear4'] ?? 0,
+                $postData['offeryear5'] ?? 0,
+                $postData['offeryear6'] ?? 0,
             ];
+            foreach ($rawAmounts as $index => $raw) {
+                if (self::isNonNumericAmount($raw) && $nonNumericYear === 0) {
+                    $nonNumericYear = $index + 1;
+                }
+            }
+            $offers = array_map(self::toOfferAmount(...), $rawAmounts);
         }
         [$offer1, $offer2, $offer3, $offer4, $offer5, $offer6] = $offers;
 
@@ -187,12 +196,14 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             'vetmin' => $veteranMinimum,
             'year1Max' => $maxContractYear1,
             'amendedCapSpaceYear1' => $amendedCapSpaceYear1,
+            'nonNumericYear' => $nonNumericYear,
         ];
     }
 
     /**
      * Coerce one raw POST offer amount the way the custom branch always has:
-     * numeric strings, floats and ints cast to int; anything else (array, null, '', 'abc') becomes 0.
+     * numeric strings, floats and ints cast to int; anything else becomes 0.
+     * Non-blank, non-numeric input is flagged separately by isNonNumericAmount().
      */
     private static function toOfferAmount(mixed $raw): int
     {
@@ -200,11 +211,38 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     }
 
     /**
+     * True when a raw POST offer amount held letters or an array (crafted POST).
+     * Blank input ('' or whitespace-only) counts as 0 and is not flagged. A missing or null
+     * year never gets here, because parseOfferData() turns it into 0 first.
+     */
+    private static function isNonNumericAmount(mixed $raw): bool
+    {
+        if (is_string($raw) && trim($raw) === '') {
+            return false;
+        }
+        return !is_numeric($raw);
+    }
+
+    /**
+     * Parse the posted offer type. Ints and integer-shaped numeric strings
+     * ('0'..'8' from the form, also ' 7', '+7', '07') cast to int exactly as before.
+     * Other numeric input ('7.5', '7.0', '7e0') would truncate into an exception type,
+     * so it maps to UNRECOGNIZED_OFFER_TYPE. Non-numeric input keeps the custom fallback.
+     */
+    private static function toOfferType(mixed $raw): int
+    {
+        if (!is_numeric($raw)) {
+            return OfferType::CUSTOM;
+        }
+        return preg_match('/^\s*[+-]?[0-9]+\s*$/', (string) $raw) === 1 ? (int) $raw : self::UNRECOGNIZED_OFFER_TYPE;
+    }
+
+    /**
      * Save a validated offer to the database
      *
      * @param Team $team Offering team
      * @param \Player\Player $player Player object
-     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer details
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int, nonNumericYear?: int} $offerData Offer details
      * @return bool True if saved successfully
      */
     private function saveOffer(Team $team, \Player\Player $player, array $offerData): bool
@@ -273,7 +311,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * Calculate average salary per year
      *
-     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer data
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int, nonNumericYear?: int} $offerData Offer data
      * @param int $yearsInOffer Years in offer
      * @return int Average salary
      */

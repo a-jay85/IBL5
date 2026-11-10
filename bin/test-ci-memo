@@ -886,6 +886,135 @@ if should_run fail-open-degraded; then
 fi
 
 # =========================================================================
+# Working-tree mode (--worktree) and inline --path sets
+# =========================================================================
+wt_hash() {
+    # wt_hash <repo> <args...>: prints the hash; sets _WT_RC.
+    local repo="$1"; shift
+    _WT_RC=0
+    CI_MEMO_REPO="$repo" "$MEMO" hash wt "$@" 2>/dev/null || _WT_RC=$?
+}
+
+if should_run worktree-mode; then
+    WT="$TMP/wt-repo"
+    h_git_repo "$WT" --no-commit
+    mkdir -p "$WT/src"
+    printf 'one\n' > "$WT/src/a.txt"
+    printf 'ignored.txt\n' > "$WT/.gitignore"
+    git -C "$WT" add . >/dev/null
+    git -C "$WT" commit -q -m base
+
+    base_wt="$(wt_hash "$WT" --worktree --path src)"
+    base_head="$(wt_hash "$WT" --path src)"
+
+    # Row 4: an uncommitted edit to a hashed file moves the working-tree hash.
+    printf 'two\n' > "$WT/src/a.txt"
+    after_edit="$(wt_hash "$WT" --worktree --path src)"
+    if [[ -n "$base_wt" && "$after_edit" != "$base_wt" ]]; then
+        pass "worktree-edit-changes-hash"
+    else
+        fail "worktree-edit-changes-hash: base=$base_wt after=$after_edit"
+    fi
+
+    # Row 7: without --worktree the same edit leaves the HEAD-mode hash alone.
+    after_edit_head="$(wt_hash "$WT" --path src)"
+    if [[ -n "$base_head" && "$after_edit_head" == "$base_head" ]]; then
+        pass "head-mode-ignores-uncommitted-edit"
+    else
+        fail "head-mode-ignores-uncommitted-edit: base=$base_head after=$after_edit_head"
+    fi
+    printf 'one\n' > "$WT/src/a.txt"
+
+    # The restored file hashes back to the starting value.
+    restored="$(wt_hash "$WT" --worktree --path src)"
+    if [[ "$restored" == "$base_wt" ]]; then
+        pass "worktree-restore-returns-hash"
+    else
+        fail "worktree-restore-returns-hash: base=$base_wt restored=$restored"
+    fi
+
+    # Row 5: an untracked, non-ignored file under the path moves the hash.
+    printf 'new\n' > "$WT/src/new.txt"
+    after_untracked="$(wt_hash "$WT" --worktree --path src)"
+    if [[ "$after_untracked" != "$base_wt" ]]; then
+        pass "worktree-untracked-file-changes-hash"
+    else
+        fail "worktree-untracked-file-changes-hash: hash did not move"
+    fi
+    rm -f "$WT/src/new.txt"
+
+    # Row 6: a gitignored file under the path leaves the hash alone.
+    printf 'junk\n' > "$WT/src/ignored.txt"
+    after_ignored="$(wt_hash "$WT" --worktree --path src)"
+    rm -f "$WT/src/ignored.txt"
+    if [[ -n "$after_ignored" && "$after_ignored" == "$base_wt" ]]; then
+        pass "worktree-ignored-file-keeps-hash"
+    else
+        fail "worktree-ignored-file-keeps-hash: base=$base_wt with-ignored=$after_ignored"
+    fi
+
+    # A deleted tracked file moves the hash.
+    rm -f "$WT/src/a.txt"
+    after_delete="$(wt_hash "$WT" --worktree --path src)"
+    if [[ -n "$after_delete" && "$after_delete" != "$base_wt" ]]; then
+        pass "worktree-deletion-changes-hash"
+    else
+        fail "worktree-deletion-changes-hash: hash=$after_delete"
+    fi
+    git -C "$WT" checkout -q -- src/a.txt
+
+    # A HEAD key and a working-tree key never collide on identical content.
+    if [[ "$base_wt" != "$base_head" ]]; then
+        pass "worktree-and-head-keys-differ"
+    else
+        fail "worktree-and-head-keys-differ: both $base_wt"
+    fi
+
+    # Row 8: a --path that matches nothing exits 3 in both modes.
+    wt_hash "$WT" --worktree --path no-such-dir >/dev/null
+    rc_wt=$_WT_RC
+    wt_hash "$WT" --path no-such-dir >/dev/null
+    rc_head=$_WT_RC
+    if [[ "$rc_wt" -eq 3 && "$rc_head" -eq 3 ]]; then
+        pass "worktree-unmatched-path-exits-3"
+    else
+        fail "worktree-unmatched-path-exits-3: worktree=$rc_wt head=$rc_head"
+    fi
+
+    # Row 9: --path with no value is a usage error.
+    wt_hash "$WT" --worktree --path >/dev/null
+    if [[ "$_WT_RC" -eq 2 ]]; then
+        pass "path-without-value-exits-2"
+    else
+        fail "path-without-value-exits-2: got $_WT_RC"
+    fi
+fi
+
+# Row 10: concurrent records leave one complete sentinel and no temp files.
+if should_run record-atomic; then
+    REC_DIR="$TMP/rec-dir"
+    mkdir -p "$REC_DIR"
+    REC_HASH="0123456789abcdef0123456789abcdef01234567"
+    for _ in $(seq 1 20); do
+        "$MEMO" record wt "$REC_HASH" "$REC_DIR/sentinel" >/dev/null 2>&1 &
+    done
+    wait
+    if [[ -f "$REC_DIR/sentinel" ]] \
+        && grep -qxF "hash=$REC_HASH" "$REC_DIR/sentinel" \
+        && grep -qE '^recorded_at=' "$REC_DIR/sentinel"; then
+        pass "record-concurrent-sentinel-complete"
+    else
+        fail "record-concurrent-sentinel-complete: sentinel missing or partial"
+    fi
+    leftover="$(find "$REC_DIR" -name '.ci-memo-rec.*')"
+    if [[ -z "$leftover" ]]; then
+        pass "record-concurrent-no-temp-files"
+    else
+        fail "record-concurrent-no-temp-files: $leftover"
+    fi
+fi
+
+# =========================================================================
 # Summary
 # =========================================================================
 echo ""

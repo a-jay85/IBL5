@@ -1,6 +1,6 @@
 ---
 description: Classify each failing visual-review cell as NEW (no committed baseline) vs CHANGED (a real pixel regression) using git ls-files on the tracked index, and render NEW views in a distinct section of the sticky PR comment.
-last_verified: 2026-10-23
+last_verified: 2026-11-10
 ---
 
 # ADR-0069: NEW vs CHANGED classification in the visual-review PR comment
@@ -119,8 +119,8 @@ today's output.
 
 ## References
 
-- `bin/vr-review-comment` — CLI wrapper; contains the `git ls-files` call and Set
-  construction.
+- `bin/vr-build-gallery`: contains the `git ls-files` call and Set construction (moved
+  here from `bin/vr-review-comment`; see the 2026-11-10 addendum).
 - `ibl5/tests/e2e/vr-review-comment.ts` — pure builder; `classifyCells`, `buildComment`,
   `DiffCell.isNew`.
 - `ibl5/tests/ts-unit/vr-review-comment.test.ts` — unit tests for the classifier and
@@ -131,3 +131,12 @@ today's output.
   (`snapshotPathTemplate: '{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}{ext}'`).
 - `ibl5/docs/decisions/0068-visual-review-pr-publishing.md` — the publishing pipeline
   this classification layer extends.
+
+## Addendum: git ls-files call moved (2026-11-10)
+
+The Decision text above says the `git ls-files` call lives entirely in
+`bin/vr-review-comment`. That held when this ADR was written. Per ADR-0074
+(`ibl5/docs/decisions/0074-vr-change-driven-review.md`), the call and the Set
+construction now live in `bin/vr-build-gallery`, which batches one `git ls-files` call
+against the PR branch index. `bin/vr-review-comment` no longer runs `git ls-files`. The
+References entry now points at `bin/vr-build-gallery`.

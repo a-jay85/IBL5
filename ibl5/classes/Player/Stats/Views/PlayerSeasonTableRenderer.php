@@ -18,11 +18,12 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         return match ($config->mode) {
             PlayerSeasonTableMode::AVERAGES => $this->renderAveragesTable($config, $seasonRows, $careerAverages),
             PlayerSeasonTableMode::TOTALS => $this->renderTotalsTable($config, $seasonRows),
+            PlayerSeasonTableMode::DETAILED_AVERAGES => $this->renderDetailedAveragesTable($config, $seasonRows, $careerAverages),
         };
     }
 
     /**
-     * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> $seasonRows
+     * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int}> $seasonRows
      * @param array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>}|null $careerAverages
      */
     private function renderAveragesTable(PlayerSeasonTableConfig $config, array $seasonRows, ?array $careerAverages): string
@@ -55,7 +56,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 <tbody>
         <?php
         foreach ($seasonRows as $row) {
-            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int} $row */
             $gm = $row['games'];
             ?>
     <tr>
@@ -112,7 +113,115 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
     }
 
     /**
-     * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> $seasonRows
+     * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int}> $seasonRows
+     * @param array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>}|null $careerAverages
+     */
+    private function renderDetailedAveragesTable(PlayerSeasonTableConfig $config, array $seasonRows, ?array $careerAverages): string
+    {
+        ob_start();
+        ?>
+<table class="sortable ibl-data-table player-view-table">
+<thead>
+    <tr>
+        <td colspan=<?= $config->getColspan() ?> class="player-view-table__title"><?= HtmlSanitizer::e($config->title) ?></td>
+    </tr>
+    <tr>
+        <th>year</th>
+        <th>team</th>
+        <th>g</th>
+        <th>min</th>
+        <th>fgm</th>
+        <th>fga</th>
+        <th>fgp</th>
+        <th>ftm</th>
+        <th>fta</th>
+        <th>ftp</th>
+        <th>3gm</th>
+        <th>3ga</th>
+        <th>3gp</th>
+        <th>orb</th>
+        <th>reb</th>
+        <th>ast</th>
+        <th>stl</th>
+        <th>to</th>
+        <th>blk</th>
+        <th>pf</th>
+        <th>pts</th>
+    </tr>
+</thead>
+<tbody>
+        <?php
+        foreach ($seasonRows as $row) {
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int} $row */
+            $gm = $row['games'];
+            ?>
+    <tr>
+        <td><?= (int)$row['year'] ?></td>
+        <td><?php if ($config->linkTeamToSeason): ?><a href="modules.php?name=Team&op=team&teamid=<?= (int)($row['teamid'] ?? 0) ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a><?php else: ?><?= HtmlSanitizer::e($row['team']) ?><?php endif; ?></td>
+        <td><?= (int)$gm ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['fgm'], $row['fga']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['ftm'], $row['fta']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['tgm'], $row['tga']) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm) : '0.0' ?></td>
+        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm) : '0.0' ?></td>
+    </tr>
+            <?php
+        }
+        ?>
+</tbody>
+        <?php
+
+        // Career averages row
+        if ($careerAverages !== null) {
+            /** @var array{pid: int, name: string, games: int, minutes: float, fgm: float, fga: float, fgpct: float, ftm: float, fta: float, ftpct: float, tgm: float, tga: float, tpct: float, orb: float, reb: float, ast: float, stl: float, tvr: float, blk: float, pf: float, pts: float, retired: int, ...<string, mixed>} $careerAverages */
+            ?>
+<tfoot>
+    <tr class="career-row">
+        <td colspan=2><?= HtmlSanitizer::e($config->careerLabel) ?></td>
+        <td><?= (int)$careerAverages['games'] ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fgm'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fga'], 1) ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['fgm'], (float)$careerAverages['fga']) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ftm'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fta'], 1) ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['ftm'], (float)$careerAverages['fta']) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tgm'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tga'], 1) ?></td>
+        <td><?= StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['tgm'], (float)$careerAverages['tga']) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['orb'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['reb'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['ast'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['stl'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['tvr'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['blk'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pf'], 1) ?></td>
+        <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['pts'], 1) ?></td>
+    </tr>
+</tfoot>
+            <?php
+        }
+        ?>
+</table>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int}> $seasonRows
      */
     private function renderTotalsTable(PlayerSeasonTableConfig $config, array $seasonRows): string
     {
@@ -151,7 +260,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 <tbody>
         <?php
         foreach ($seasonRows as $row) {
-            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int, teamid?: int} $row */
             $gm = $row['games'];
             $min = $row['minutes'];
             $fgm = $row['fgm'];
@@ -189,7 +298,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
             ?>
     <tr>
         <td><?= (int)$row['year'] ?></td>
-        <td><?= HtmlSanitizer::e($row['team']) ?></td>
+        <td><?php if ($config->linkTeamToSeason): ?><a href="modules.php?name=Team&op=team&teamid=<?= (int)($row['teamid'] ?? 0) ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a><?php else: ?><?= HtmlSanitizer::e($row['team']) ?><?php endif; ?></td>
         <td><?= (int)$gm ?></td>
         <td><?= (int)$min ?></td>
         <td sorttable_customkey="<?= (int)$fgm ?>"><?= (int)$fgm ?>-<?= (int)$fga ?></td>
@@ -205,6 +314,10 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <td><?= (int)$pts ?></td>
     </tr>
             <?php
+        }
+
+        if ($config->careerPointsFromMadeShots) {
+            $carTotals['pts'] = (2 * $carTotals['fgm']) + $carTotals['ftm'] + $carTotals['tgm'];
         }
         ?>
 </tbody>

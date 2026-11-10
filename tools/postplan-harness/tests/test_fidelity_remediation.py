@@ -318,6 +318,7 @@ def test_extract_notes_drops_followups_that_say_already_done(tmp_path):
     """A followup whose own text says the PR already did the work never files."""
     notes_fixture = [
         {"title": "Add fable-5-1 key assertions (fixed in PR #2381)", "kind": "followup",
+         "harm": "wrong-value",
          "detail": "bin/test-automouse-cost-rows lacks the key."},
         {"title": "Assert sorted id-lists in backup tests", "kind": "followup",
          "detail": "Row counts only. Fixed in 6.5 remediation, file as pattern."},

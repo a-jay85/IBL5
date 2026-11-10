@@ -88,7 +88,6 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
           ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid";
 
     // LAG orders by game_date inside (pid, season_year), unique in the guarded table; the final ORDER BY is the ranked partition key, unique at headline_rank = 1.
-    // @phpstan-ignore ibl.orderByMissingTiebreaker
     private const TRADES_SQL = "WITH games AS (
                     SELECT g.pid, g.season_year, g.game_date, g.teamid, g.pts,
                       LAG(g.teamid) OVER (PARTITION BY g.pid, g.season_year ORDER BY g.game_date) AS prev_teamid

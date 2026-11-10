@@ -175,9 +175,9 @@ final class OnThisDayGuardedGamesCharacterizationTest extends DatabaseTestCase
     {
         $keys = $this->keys(MomentKind::FiftyPointGame);
 
-        $this->assertSame(
+        $this->assertCount(
             1,
-            count(array_filter($keys, static fn (string $key): bool => $key === MomentKind::FiftyPointGame->value . ':2029-01-10:' . self::PID_PHANTOM)),
+            array_filter($keys, static fn (string $key): bool => $key === MomentKind::FiftyPointGame->value . ':2029-01-10:' . self::PID_PHANTOM),
         );
     }
 
@@ -205,6 +205,51 @@ final class OnThisDayGuardedGamesCharacterizationTest extends DatabaseTestCase
 
         $this->assertContains(MomentKind::Trade->value . ':2029-01-08:3-5', $keys);
         $this->assertNotContains(MomentKind::Trade->value . ':2029-01-17:13-15', $keys);
+    }
+
+    public function testCollectDropsGuardedTablesAfterRun(): void
+    {
+        (new OnThisDayMomentBuilder($this->db))->collect();
+
+        $this->assertSame(1146, $this->tableErrno('tmp_otd_guarded_games'));
+        $this->assertSame(1146, $this->tableErrno('tmp_otd_trade_old_games'));
+    }
+
+    public function testCollectDropsGuardedTablesWhenACollectorThrows(): void
+    {
+        $builder = new OnThisDayMomentBuilder(new RecordingMysqli($this->db, 1146, 'ibl_playoff_series_results'));
+
+        $this->expectException(\mysqli_sql_exception::class);
+        try {
+            $builder->collect();
+        } finally {
+            $this->assertSame(1146, $this->tableErrno('tmp_otd_guarded_games'));
+            $this->assertSame(1146, $this->tableErrno('tmp_otd_trade_old_games'));
+        }
+    }
+
+    public function testCollectRunsTwiceOnOneSession(): void
+    {
+        $builder = new OnThisDayMomentBuilder($this->db);
+        $first = array_map(static fn ($moment): string => $moment->key, $builder->collect());
+        $second = array_map(static fn ($moment): string => $moment->key, $builder->collect());
+
+        $this->assertNotSame([], $first);
+        $this->assertSame($first, $second);
+    }
+
+    /**
+     * Errno from reading a session temp table: 0 when it exists, 1146 when it is gone.
+     */
+    private function tableErrno(string $table): int
+    {
+        try {
+            $this->db->query('SELECT 1 FROM `' . $table . '` LIMIT 1');
+        } catch (\mysqli_sql_exception $e) {
+            return (int) $e->getCode();
+        }
+
+        return 0;
     }
 
     /**

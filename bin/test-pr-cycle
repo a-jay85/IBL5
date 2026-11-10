@@ -771,11 +771,11 @@ grep -qF '#102' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #102"
 grep -qF '#103' "$SCRATCH/dm.argv" \
     && fail "case 11: DM should not mention absent #103"
-# Mutation check: dropping --ping from the send at bin/pr-cycle:1087 fails this line.
-grep -qF -- '--ping' <<< "$(cat "$SCRATCH/dm.argv")" \
-    || fail "case 11: end-of-run DM lacks --ping"
-grep -q '^--ping pr-cycle finished' "$SCRATCH/dm.argv" \
-    || fail "case 11: end-of-run DM argv is not '--ping <msg>'"
+# A finished run posts without the @mention. Restoring --ping on that send fails these lines.
+grep -qF -- '--ping' "$SCRATCH/dm.argv" \
+    && fail "case 11: finished-run DM carries --ping"
+grep -q '^pr-cycle finished' "$SCRATCH/dm.argv" \
+    || fail "case 11: finished-run DM argv is not '<msg>'"
 end_case "case 11 non-armable and absent"
 fi
 
@@ -2772,6 +2772,9 @@ AUTHPROBE=false run --worker
 [[ $RC -ne 0 ]] || fail "fix2 probe false: want nonzero exit, got 0"
 [[ "$(calls ready)" == "0" ]] || fail "fix2 probe false: fleet ran $(calls ready) time(s), want 0"
 grep -qi 'auth' <<< "$OUT" || fail "fix2 probe false: no auth message in output (got: $OUT)"
+# A halted run still @mentions the owner. Dropping --ping from the halt send fails this line.
+grep -q '^--ping pr-cycle finished' "$SCRATCH/dm.argv" \
+    || fail "fix2 probe false: halted-run DM argv is not '--ping <msg>'"
 end_case "case fix2 auth probe false halts before fleet"
 fi
 

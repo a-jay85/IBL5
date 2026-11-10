@@ -34,7 +34,7 @@ class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
         'teamid' => 1,
         'ordinal' => 500,
         'retired' => 0,
-        'injured' => 0,
+        'injured' => 1,
         'cy' => 1,
         'cyt' => 1,
         'salary_yr1' => 0,

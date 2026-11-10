@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
 from harness.adapters.ghad import RecordingGh
-from harness.adapters.gitad import ReplayGit
+from harness.adapters.gitad import ReplayGit, classify_local_gate_denial
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
 
@@ -105,9 +105,11 @@ class _ScriptedLlm(FixtureLlm):
         super().__init__(ledger, {k: v[0] for k, v in scripts.items()})
         self.scripts = {k: list(v) for k, v in scripts.items()}
         self.calls: list[tuple[str, str]] = []
+        self.prompt_log: list[tuple[str, str]] = []
 
     def call_tooled(self, purpose, model, prompt, **kw):
         self.calls.append((purpose, model))
+        self.prompt_log.append((purpose, prompt))
         queue = self.scripts.get(purpose)
         if queue is None:
             raise HarnessError("llm-fixture-missing", purpose)
@@ -121,6 +123,10 @@ def _fixer_calls(llm):
     return [c for c in llm.calls if c[0] == "fidelity-remediation"]
 
 
+def _fixer_prompts(llm):
+    return [p for purpose, p in llm.prompt_log if purpose == "fidelity-remediation"]
+
+
 def _drive(tmp_path, llm, git, pr, log=None, **kw):
     res = _Res()
     runner._run_fidelity(
@@ -131,6 +137,13 @@ def _drive(tmp_path, llm, git, pr, log=None, **kw):
 
 
 NOT_READY = "6d checks\n\n- finding one\n\nNOT READY\n"
+
+# PR #3605's pre-commit denial, built from bin/check-rules-byte-budget's own format.
+DENIAL_3605 = (
+    "418 docs verified.\n"
+    "FAIL  .claude/rules/workflow-continuity-detail.md  16444 bytes  "
+    "lazy (path-scoped) tier  cap 16000  over by 444  "
+    "-- compress this companion; do not raise the cap\n")
 
 # PR #3715's real verdict (run live-pr-burndown-body-only-fix-20261104-182249-71860):
 # one [BLOCKING] body-claim bullet beside code findings, so the round is mixed. Long
@@ -265,8 +278,7 @@ def test_divergent_live_body_alone_is_not_a_body_only_round(tmp_path, git_shim):
 
 # --- terminal kinds break after one call --------------------------------------
 
-@pytest.mark.parametrize("kind", ["rebase-conflict", "push-retry-cap", "local-gate",
-                                  "gate-path-edit"])
+@pytest.mark.parametrize("kind", ["rebase-conflict", "push-retry-cap", "gate-path-edit"])
 def test_each_terminal_kind_breaks(tmp_path, git_shim, kind):
     llm = _ScriptedLlm(UsageLedger(), {
         "plan-fidelity-review": [NOT_READY],
@@ -316,6 +328,58 @@ def test_blocking_bullet_under_ready_with_notes_enters_round(tmp_path, git_shim)
         assert res.fidelity["rounds"][0]["outcome"] == "rebase-conflict"
     finally:
         _cleanup(9312, "9312-2")
+
+
+def test_3605_local_gate_denial_retries_once_with_gate_output(tmp_path, git_shim):
+    """PR #3605: a refused round commit gets one retry whose prompt carries the hook output."""
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [
+            {"raise": {"kind": "local-gate", "detail": DENIAL_3605}},
+            {"raise": {"kind": "rebase-conflict", "detail": "no"}},
+        ],
+    })
+    try:
+        assert classify_local_gate_denial(DENIAL_3605) == "unknown"
+        res = _drive(tmp_path, llm, _counting_git(), 9313)
+        assert len(_fixer_calls(llm)) == 2
+        first, second = _fixer_prompts(llm)
+        assert "over by 444" not in first
+        assert "over by 444" in second
+        assert res.fidelity["rounds"][0]["retries"] == 1
+        assert res.fidelity["rounds"][0]["outcome"] == "rebase-conflict"
+    finally:
+        _cleanup(9313, "9313-2")
+
+
+def test_second_local_gate_denial_is_terminal(tmp_path, git_shim):
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [{"raise": {"kind": "local-gate", "detail": DENIAL_3605}}],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9314)
+        assert len(_fixer_calls(llm)) == 2
+        assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
+        assert res.fidelity["rounds_completed"] == 0
+        assert res.fidelity["remediation_sha"] is None
+    finally:
+        _cleanup(9314, "9314-2")
+
+
+def test_adr_local_gate_denial_does_not_retry(tmp_path, git_shim):
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [{"raise": {
+            "kind": "local-gate",
+            "detail": "pre-commit-adr-gate: new bin/ script needs an ADR"}}],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9315)
+        assert len(_fixer_calls(llm)) == 1
+        assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
+    finally:
+        _cleanup(9315, "9315-2")
 
 
 def test_push_failed_still_propagates(tmp_path, git_shim):

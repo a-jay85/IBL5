@@ -920,7 +920,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
               commit=None, push=None, pr_number: int | str | None = None,
               model: str = "sonnet", work_list: list[dict] | None = None,
-              outcome: dict | None = None, withheld=()) -> str | None:
+              outcome: dict | None = None, withheld=(), prior_denial: str = "") -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
@@ -942,6 +942,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     out-dict the runner reads for the round record -- the return stays `str | None` so
     no existing call site changes. `withheld` holds finding texts the runner decided itself
     (`unplanned_scope.partition`). They are cut from the verdict this fixer reads.
+    `prior_denial` is the tail of a local-gate denial that refused this round's previous attempt; the runner reset the tree and the body before this call.
     """
     log = log or _noop_log
     commit = commit or gitad.commit_all
@@ -1032,6 +1033,13 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         f"  - {verdict_ref}\n"
         f"  - {os.path.join(packet_dir, 'diff.patch')}\n"
     )
+    if prior_denial:
+        prompt += (
+            "\n\nA local commit gate refused the previous attempt at these fixes. "
+            "The harness reset the worktree and the PR body, so start again from "
+            "the current files. Make the same fixes so this gate passes. Never "
+            "raise a cap, disable a check, or edit a gate script. Gate output "
+            "(tail):\n\n" + prior_denial)
     llm.call_tooled(
         "fidelity-remediation", model, prompt, cwd=worktree,
         allowed_tools=REMEDIATION_ALLOWED_TOOLS, denied_tools=REMEDIATION_DENIED_TOOLS,

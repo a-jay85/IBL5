@@ -543,6 +543,28 @@ def verdict_path(pr_number: int | str) -> str:
     return f"/tmp/post-plan-fidelity-verdict-{pr_number}.md"
 
 
+def _effective_verdict_word(pre: str) -> str | None:
+    """Last bare verdict word in `pre` (text above the digest cut), or None.
+
+    A READY or READY WITH NOTES word over a `## FINDINGS` section holding a
+    top-level `[BLOCKING]` bullet reads as NOT READY. Reviewer contract item 2a
+    says the marker and the word must agree; when they disagree the harness takes
+    the stricter reading, so a blocker the reviewer named is always remediated.
+    Only an explicit marker upgrades: an unmarked bullet keeps the word.
+    """
+    words = VERDICT_RE.findall(pre)
+    if not words:
+        return None
+    word = words[-1].rstrip()
+    if word == "NOT READY":
+        return word
+    lines = [ln for ln in pre.splitlines() if not VERDICT_RE.match(ln)]
+    items = _group_findings(_findings_section(lines) or [])
+    if any(m == "BLOCKING" for m, _ in items):
+        return "NOT READY"  # explicit [BLOCKING] bullet outranks the word
+    return word
+
+
 def parse_verdict(path: str) -> str | None:
     """Last verdict word ABOVE the digest cut, or None when indeterminate."""
     try:
@@ -557,10 +579,7 @@ def parse_verdict(path: str) -> str | None:
         if line.strip() == DIGEST_CUT:
             lines = lines[:i]
             break
-    matches = VERDICT_RE.findall("\n".join(lines))
-    if not matches:
-        return None
-    return matches[-1].rstrip()
+    return _effective_verdict_word("\n".join(lines))
 
 
 def record_reviewed_tree(path: str, tree: str) -> None:
@@ -699,10 +718,9 @@ def body_only_findings_text(text: str) -> list[str] | None:
     is a PR-body (check 4) finding, else None. None is the fail-closed answer:
     any layout the parser does not recognise is None, never []."""
     pre = text.split(DIGEST_CUT, 1)[0]
-    words = VERDICT_RE.findall(pre)
-    if not words or words[-1] != "NOT READY":
+    if _effective_verdict_word(pre) != "NOT READY":
         return None
-    cov = _COVERAGE_RE.search(pre)
+    cov =_COVERAGE_RE.search(pre)
     if cov and cov.group(1).strip("*").upper() != "CURRENT":
         return None
     lines = pre.splitlines()
@@ -1129,8 +1147,7 @@ def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
                              current_tree: str, plan_hash_at_review: str | None,
                              plan_hash_now: str) -> tuple[list[str] | None, str | None]:
     """Pure. (findings, None) when eligible; (None, reason) otherwise."""
-    words = VERDICT_RE.findall((prior_verdict_text or "").split(DIGEST_CUT, 1)[0])
-    if not words or words[-1] != "NOT READY":
+    if _effective_verdict_word((prior_verdict_text or "").split(DIGEST_CUT, 1)[0]) != "NOT READY":
         return None, "prior-verdict-unparsed"
     if prior_tree is None:
         return None, "prior-tree-unrecorded"

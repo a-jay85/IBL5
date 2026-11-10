@@ -310,6 +310,29 @@ def test_predicate_ready_verdict_returns_none():
     assert fidelity.body_only_findings_text(text) is None
 
 
+def _swapped_word_verdict():
+    """The pure-body verdict with its closing word swapped to READY WITH NOTES."""
+    swapped = VERDICT1_PURE_BODY.replace("\n\nNOT READY", "\n\nREADY WITH NOTES", 1)
+    assert swapped != VERDICT1_PURE_BODY
+    return swapped
+
+
+def test_predicate_reads_blocking_bullet_under_ready_with_notes_as_not_ready():
+    swapped = _swapped_word_verdict()
+    got = fidelity.body_only_findings_text(swapped)
+    assert got
+    assert got == fidelity.body_only_findings_text(VERDICT1_PURE_BODY)
+
+
+def test_eligibility_does_not_decline_blocking_bullet_under_ready_with_notes():
+    swapped = _swapped_word_verdict()
+    got = fidelity.body_recheck_eligibility(swapped, TREE_1, TREE_1, "hash", "hash")
+    want = fidelity.body_recheck_eligibility(VERDICT1_PURE_BODY, TREE_1, TREE_1,
+                                             "hash", "hash")
+    assert got == want
+    assert got[1] != "prior-verdict-unparsed"
+
+
 def test_predicate_real_shape_fixtures(tmp_path):
     pure = fidelity.body_only_findings(os.path.join(FIXTURES, "verdict-pure-body-live.md"))
     assert pure and pure[0].startswith("- [BLOCKING] Check 4")

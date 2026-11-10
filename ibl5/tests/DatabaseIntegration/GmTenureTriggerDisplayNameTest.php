@@ -563,4 +563,32 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
 
         return $statements;
     }
+
+    public function testUndoScriptPutsBackfilledNameBack(): void
+    {
+        [$a] = $this->probeTeams();
+        $this->setTeamGm($a, 'zzundouser', 'ZZ Undo Owner');
+
+        $undo = file_get_contents(__DIR__ . '/../../scripts/undo/207_gm_tenure_trigger_display_name.sql');
+        self::assertIsString($undo);
+
+        $this->db->query('DELETE FROM ibl_gm_tenures_backup_207 WHERE id > 0');
+        $this->db->query(
+            "INSERT INTO ibl_gm_tenures_backup_207 SELECT * FROM ibl_gm_tenures WHERE franchise_id = $a AND end_season_year IS NULL"
+        );
+        $this->db->query(
+            "UPDATE ibl_gm_tenures SET gm_display_name = 'ZZ Backfilled' WHERE franchise_id = $a AND end_season_year IS NULL"
+        );
+        self::assertSame('ZZ Backfilled', $this->openTenures($a)[0]['gm_display_name']);
+
+        self::assertTrue($this->db->multi_query($undo));
+        do {
+            $result = $this->db->store_result();
+            if ($result instanceof \mysqli_result) {
+                $result->free();
+            }
+        } while ($this->db->more_results() && $this->db->next_result());
+
+        self::assertSame('ZZ Undo Owner', $this->openTenures($a)[0]['gm_display_name']);
+    }
 }

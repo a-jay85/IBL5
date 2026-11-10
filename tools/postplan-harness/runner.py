@@ -3184,14 +3184,15 @@ def _reset_for_gate_retry(git, gh, pr, raw_before_round, head_before, log,
             return False
     except Exception:  # noqa: BLE001 - any doubt keeps the fail-closed path
         return False
-    if raw_before_round:
-        live = gh.pr_body_fresh()
-        if not live:  # unreadable body: keep the fail-closed path
-            return False
-        if live != raw_before_round:
-            gh.pr_edit_body(pr, raw_before_round)
-            log(f"phase5.5 round {round_num}: restored the pre-round PR body "
-                "for the local-gate retry")
+    if not raw_before_round:  # no pre-round snapshot: the body cannot be proven restored
+        return False
+    live = gh.pr_body_fresh()
+    if not live:  # unreadable body: keep the fail-closed path
+        return False
+    if live != raw_before_round:
+        gh.pr_edit_body(pr, raw_before_round)
+        log(f"phase5.5 round {round_num}: restored the pre-round PR body "
+            "for the local-gate retry")
     return True
 
 

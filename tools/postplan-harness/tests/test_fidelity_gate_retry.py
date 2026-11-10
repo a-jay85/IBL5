@@ -84,3 +84,12 @@ def test_reset_refuses_when_body_unreadable():
     log: list[str] = []
     ok = runner._reset_for_gate_retry(git, gh, 9400, "pre-round body", "aaa", log.append, 1)
     assert ok is False
+
+
+def test_reset_refuses_when_snapshot_empty():
+    git = _FakeGit(dirty=[DIRTY_PATH])
+    gh = _FakeGh(live="fixed body")
+    log: list[str] = []
+    ok = runner._reset_for_gate_retry(git, gh, 9400, "", "aaa", log.append, 1)
+    assert ok is False
+    assert gh.edits == []

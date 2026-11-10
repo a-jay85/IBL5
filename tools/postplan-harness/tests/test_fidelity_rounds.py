@@ -127,13 +127,19 @@ def _fixer_prompts(llm):
     return [p for purpose, p in llm.prompt_log if purpose == "fidelity-remediation"]
 
 
-def _drive(tmp_path, llm, git, pr, log=None, **kw):
+def _drive(tmp_path, llm, git, pr, log=None, gh=None, **kw):
     res = _Res()
     runner._run_fidelity(
-        llm, str(tmp_path), str(tmp_path), git, RecordingGh(str(tmp_path)), _plan(),
+        llm, str(tmp_path), str(tmp_path), git, gh or RecordingGh(str(tmp_path)), _plan(),
         "diff", "body", pr, "dead" * 10, TREE_1, False,
         log if log is not None else (lambda _m: None), res, **kw)
     return res
+
+
+def _steady_body_gh(tmp_path):
+    """A gh whose live body reads as one non-empty copy, so the gate-retry reset can prove it."""
+    from test_fidelity_body_only_round import _BodySeqGh
+    return _BodySeqGh(str(tmp_path), ["body"])
 
 
 NOT_READY = "6d checks\n\n- finding one\n\nNOT READY\n"
@@ -341,7 +347,7 @@ def test_3605_local_gate_denial_retries_once_with_gate_output(tmp_path, git_shim
     })
     try:
         assert classify_local_gate_denial(DENIAL_3605) == "unknown"
-        res = _drive(tmp_path, llm, _counting_git(), 9313)
+        res = _drive(tmp_path, llm, _counting_git(), 9313, gh=_steady_body_gh(tmp_path))
         assert len(_fixer_calls(llm)) == 2
         first, second = _fixer_prompts(llm)
         assert "over by 444" not in first
@@ -358,7 +364,7 @@ def test_second_local_gate_denial_is_terminal(tmp_path, git_shim):
         "fidelity-remediation": [{"raise": {"kind": "local-gate", "detail": DENIAL_3605}}],
     })
     try:
-        res = _drive(tmp_path, llm, _counting_git(), 9314)
+        res = _drive(tmp_path, llm, _counting_git(), 9314, gh=_steady_body_gh(tmp_path))
         assert len(_fixer_calls(llm)) == 2
         assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
         assert res.fidelity["rounds_completed"] == 0

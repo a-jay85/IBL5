@@ -139,10 +139,13 @@ jobs:
     # A job that hits timeout-minutes ends 'cancelled', not 'failure'. The scheduled run
     # alerts on cancelled too, so a timeout can't go silent (it did on 2026-11-02 and
     # 2026-11-09). Label and dispatch runs stay failure-only: a newer run cancels those.
+    # If mirror-ready times out it ends 'cancelled' and mutation ends 'skipped', so the
+    # scheduled run checks mirror-ready's cancel too.
     if: >-
       ${{ always() && (needs.mutation.result == 'failure'
           || needs.mirror-ready.result == 'failure'
-          || (github.event_name == 'schedule' && needs.mutation.result == 'cancelled')) }}
+          || (github.event_name == 'schedule' && (needs.mutation.result == 'cancelled'
+              || needs.mirror-ready.result == 'cancelled'))) }}
     timeout-minutes: 5
 
     steps:
@@ -150,10 +153,15 @@ jobs:
 
       - name: Build Discord message
         env:
+          MIRROR_RESULT: ${{ needs.mirror-ready.result }}
           MUTATION_RESULT: ${{ needs.mutation.result }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ "$MUTATION_RESULT" = "cancelled" ]; then
+          if [ "$MIRROR_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) was CANCELLED, most likely by its timeout-minutes cap, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$MIRROR_RESULT" = "failure" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) FAILED, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$MUTATION_RESULT" = "cancelled" ]; then
             MSG=$(printf 'Weekly mutation testing was CANCELLED (%s trigger).\n\nIt most likely hit the job timeout-minutes cap before Infection finished. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           else
             MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nMSI dropped below 100%% — an escaped mutant or coverage regression. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")

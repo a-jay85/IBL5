@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-08
+last_verified: 2026-11-09
 ---
 
 # IBL5 Architecture Decision Records
@@ -96,11 +96,12 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
 | [0225](0225-update-baselines-caller-workflow.md) | Update-baselines regen runs from a caller workflow | Accepted | `.github/workflows/update-baselines.yml` calls `e2e-tests.yml`, which no longer triggers on `labeled`, so a label event cannot re-post the required `E2E Tests` check; `bin/check-composite-contracts` L1 and L2 pin it. |
 | [0226](0226-plan-tier-hint-open-judgment.md) | Open Opus judgment for the /plan architect tier | Accepted | `bin/plan-tier-hint` asks one open Opus 5.5 question with no trigger list, prints `default` on any failure, and logs every verdict; it supersedes ADR-0222. |
-| [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
+| [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted; Infection stage superseded by ADR-0237 | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
 | [0228](0228-postplan-sync-rebases-onto-target.md) | Post-plan sync rebases onto the target | Accepted | The harness Phase 2 sync replays the branch's own commits with `git rebase --onto`, pushes with `--force-with-lease=refs/heads/<b>:<sha>`, and fails closed. Supersedes ADR-0064's fix advice in part. |
 | [0230](0230-postplan-conflict-report.md) | Show model-resolved conflicts in the post-plan sticky | Accepted | The sticky gains a display-only conflict section built from a record beside the condition-(14) marker; no arming condition changes. |
 | [0231](0231-second-reviewer-clears-holds.md) | A second reviewer clears the non-UI owner holds | Accepted | A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them; the verdict binds to the reviewed tree. |
 | [0234](0234-merge-danger-self-governing.md) | Narrow the Merge danger one-way Door; add a Self-governing segment | Accepted | One-way means a revert cannot undo it; arming-path and gate-removed changes carry ` · Self-governing: yes`, and condition (18) holds both. |
+| [0237](0237-prefire-drop-local-infection.md) | Drop the local Infection stage from prefire-verify | Accepted | `bin/lib/prefire-verify` runs matrix, phpunit and exec-mutations; `--stage infection` exits 2 and names CI's required check `Infection PHP (per-PR diff)`, which is the mutation gate. Partially supersedes ADR-0227. |
 
 ## When an ADR is Required
 

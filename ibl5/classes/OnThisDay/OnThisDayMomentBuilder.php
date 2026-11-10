@@ -67,8 +67,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
     private const DROP_OLD_GAMES_SQL = 'DROP TEMPORARY TABLE IF EXISTS `tmp_otd_trade_old_games`';
 
     /** Every game type; collectors keep filtering game_type after the aggregate, as before. */
-    private const CREATE_GUARDED_SQL = "CREATE TEMPORARY TABLE `tmp_otd_guarded_games`
-            (KEY `idx_otd_game` (game_date, visitor_teamid, home_teamid, pid)) ENGINE=InnoDB AS "
+    private const CREATE_GUARDED_SQL = "CREATE TEMPORARY TABLE `tmp_otd_guarded_games` ENGINE=InnoDB AS "
         . self::GUARDED_PLAYER_GAMES;
 
     /** Regular-season copy for the trades `old` join, indexed for its lookup. */

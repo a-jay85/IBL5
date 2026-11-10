@@ -627,7 +627,8 @@ if [ -n "$RESUME_SID" ]; then
 fi
 
 # Pre-fire verification gate: full PHPUnit, the plan's post-impl CLI-executable
-# matrix rows, changed-file Infection at CI's thresholds, and the plan's mutation rows. Fail closed: no
+# matrix rows, and the plan's mutation rows. CI's required Infection check gates
+# mutation score (ADR-0237). Fail closed: no
 # pass for this exact tree means no fire. A --rebase-only run pushes no new
 # content, so it is exempt.
 if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
@@ -642,8 +643,8 @@ if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
     PREFIRE_RC=0
     "$PREFIRE" ${PREFIRE_ARGS[@]+"${PREFIRE_ARGS[@]}"} || PREFIRE_RC=$?
     if [ "$PREFIRE_RC" -ne 0 ]; then
-        # prefire-verify exit 3 = environment (missing prerequisite, Docker/DB down, lock
-        # held). Exit 10 tells automouse it is not a verdict on the plan. Other failures
+        # prefire-verify exit 3 = environment (missing prerequisite or Docker/DB down).
+        # Exit 10 tells automouse it is not a verdict on the plan. Other failures
         # are refusals (exit 9).
         if [ "$PREFIRE_RC" -eq 3 ]; then
             echo "post-plan-now: pre-fire verification could not run (environment); fix it and re-run." >&2

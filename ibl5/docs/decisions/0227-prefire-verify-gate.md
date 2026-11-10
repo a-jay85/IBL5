@@ -1,11 +1,11 @@
 ---
-description: bin/post-plan-now runs bin/lib/prefire-verify (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all three pass on the current tree; the automouse impl prompt runs it stage by stage first.
-last_verified: 2026-11-04
+description: bin/post-plan-now runs bin/lib/prefire-verify (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all three pass on the current tree; the automouse impl prompt runs it stage by stage first. The Infection stage was removed by ADR-0237.
+last_verified: 2026-11-09
 ---
 
 # ADR-0227: Pre-fire verification gate in post-plan-now
 
-**Status:** Accepted
+**Status:** Accepted; the Infection stage is superseded by ADR-0237
 **Date:** 2026-11-03
 **Deciders:** ajaynicolas
 
@@ -58,3 +58,7 @@ The gate gained a fourth stage, `exec-mutations`. It runs the plan's Executable 
 The plan chose one fixed budget at both call sites so they would agree. PR review found that leaves any plan with slow checks permanently unshippable: the stage stays UNDECIDED, and automated runs refuse the human bypass. The owner approved the reversal in a [PR comment](https://github.com/a-jay85/IBL5/pull/3712#issuecomment-6640681504). Implementation keeps the short limits (120 s per check run, 300 s total), which fit one 600 s foreground call. `bin/post-plan-now` passes `--fire-point`, which uses 300 s and 1800 s, matching the post-plan gate in `tools/postplan-harness/harness/mutations.py`. A pass recorded under the short limits stays valid at the fire point, because the record is keyed on the tree and plan hashes alone. A timeout is still never a pass at either limit.
 
 A clean-code run that times out (exit 124) now reports UNDECIDED instead of the BASELINE-FAILED that ADR-0199 describes. The same owner comment approves this change. Otherwise a check slower than the implementer limit could never be handed to the fire point. Both verdicts still hold at the post-plan gate, because `tools/postplan-harness/harness/mutations.py` accepts only TRIPPED. Any other non-zero clean-code exit stays BASELINE-FAILED, including a check that cannot start (exit 125 to 127), because more time cannot fix it.
+
+## Addendum — Infection stage removed (2026-11-09) <!-- slop-ok -->
+
+The gate ran four stages, including changed-file Infection through `bin/mutation-diff`. Since ADR-0237 it runs three: matrix, phpunit and exec-mutations. CI's required check `Infection PHP (per-PR diff)` is the mutation gate. The Context, Decision and Alternatives above are unchanged and record what was decided on 2026-11-03.

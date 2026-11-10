@@ -1,32 +1,31 @@
 #!/usr/bin/env bash
 # bin/lib/prefire-verify — pre-fire verification gate.
 #
-# Re-runs four checks on the current working tree before /post-plan fires:
+# Re-runs three checks on the current working tree before /post-plan fires:
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
 #   2. the full default PHPUnit suite
-#   3. Infection on the changed classes at CI's thresholds (bin/mutation-diff)
-#   4. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
+#   3. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
+# Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
 # It trusts no implementer-written ledger. Only this script writes pass records,
 # keyed by tree hash, in the per-worktree git dir. It fails closed.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|infection|exec-mutations|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
+#   --base        accepted for existing callers; no stage reads it since ADR-0237.
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
 #      (an exec-mutations row that did not trip, or a mutation revert that failed)
 #   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
-#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, pcov, gtimeout/timeout
+#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, gtimeout/timeout
 #   4  the checks changed the working tree, so no pass record was written
 #
 # Test seams (used only by bin/test-prefire-verify):
 #   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/
-#   PREFIRE_MUTATION_CMD   default bin/mutation-diff, run from the repo root
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
-#   PREFIRE_EXCLUDES_CMD   default bin/check-infection-excludes, run from ibl5/
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
 
 set -uo pipefail
@@ -34,8 +33,6 @@ set -uo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/lib/plan-matrix-rows.sh
 source "$SELF_DIR/plan-matrix-rows.sh"
-# shellcheck source=bin/lib/branch-base.sh
-source "$SELF_DIR/branch-base.sh"
 
 say() { printf 'prefire-verify: %s\n' "$*"; }
 die() { local rc="$1"; shift; printf 'prefire-verify: %s\n' "$*" >&2; exit "$rc"; }
@@ -60,10 +57,12 @@ while [ $# -gt 0 ]; do
         *) die 2 "unknown argument '$1'" ;;
     esac
 done
+: "$BASE_OPT"   # --base is still parsed for existing callers; no stage reads it
 
 case "$STAGE" in
-    matrix|phpunit|infection|exec-mutations|all) : ;;
-    *) die 2 "--stage must be matrix, phpunit, infection, exec-mutations, or all (got '$STAGE')" ;;
+    matrix|phpunit|exec-mutations|all) : ;;
+    infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
+    *) die 2 "--stage must be matrix, phpunit, exec-mutations, or all (got '$STAGE')" ;;
 esac
 if [ "$BYPASS_SET" -eq 1 ] && [ -z "$BYPASS_REASON" ]; then
     die 2 "--bypass needs a non-empty reason"
@@ -159,7 +158,7 @@ write_record() { # <stage> <key>
 stage_matrix() {
     local plan_sha rows rc num cmd log rows_rc
     if [ -z "$PLAN" ]; then
-        say "SKIP matrix: no plan (ad-hoc path); PHPUnit and Infection still run"
+        say "SKIP matrix: no plan (ad-hoc path); PHPUnit still runs"
         return 0
     fi
     plan_sha=$(git hash-object "$PLAN")
@@ -226,52 +225,6 @@ stage_phpunit() {
     write_record phpunit ""
     say "phpunit passed"
     return 0
-}
-
-# --- infection stage --------------------------------------------------------
-resolve_base() {
-    if [ -n "$BASE_OPT" ]; then
-        BASE_REF="$BASE_OPT"
-    elif _b=$(branch_base_resolve "$ROOT" "$(git rev-parse --abbrev-ref HEAD)") && [ -n "$_b" ]; then
-        BASE_REF="$_b"   # branch_base_resolve already prints "origin/<name>"
-    else
-        BASE_REF="origin/master"
-    fi
-    BASE_SHA=$(git rev-parse --verify --quiet "$BASE_REF^{commit}") || {
-        say "FAIL base ref $BASE_REF does not resolve; run git fetch origin" >&2
-        return 3
-    }
-    return 0
-}
-
-stage_infection() {
-    local log rc cmd="${PREFIRE_MUTATION_CMD:-bin/mutation-diff}"
-    resolve_base || return 3
-    cache_hit infection "$BASE_SHA" && return 0
-    log="$STATE_DIR/$TREE.infection.log"
-
-    (cd ibl5 && bash -c "${PREFIRE_EXCLUDES_CMD:-bin/check-infection-excludes}") > "$log" 2>&1; rc=$?
-    if [ "$rc" -ne 0 ]; then
-        say "FAIL infection: check-infection-excludes red (exit $rc)" >&2
-        tail -n 20 "$log" >&2
-        return 1
-    fi
-
-    bash -c "$cmd \"\$1\"" _ "$BASE_REF" > "$log" 2>&1; rc=$?
-    case "$rc" in
-        0)
-            write_record infection "$BASE_SHA"
-            say "infection passed (or skipped: no changed classes, or class lines only deleted) vs $BASE_REF"
-            return 0 ;;
-        2) say "FAIL infection: base ref unusable" >&2; rc=3 ;;
-        3) say "FAIL infection: prerequisite missing (pcov, docker, ibl5-mariadb, or db-test-up)" >&2
-           grep -E 'Error:' "$log" | tail -n 2 >&2; rc=3 ;;
-        4) say "FAIL infection: another bin/mutation-diff run holds /tmp/ibl5-mutation-diff.lock; re-run after it finishes" >&2; rc=3 ;;
-        5) say "FAIL infection: Infection matched no source files although classes changed" >&2; rc=1 ;;
-        *) say "FAIL infection: below CI threshold (min-msi=100) or coverage run red (exit $rc)" >&2; rc=1 ;;
-    esac
-    grep -E 'mutations were generated|escaped|Mutation Score Indicator|minimum required MSI' "$log" | tail -n 6 >&2
-    return "$rc"
 }
 
 # --- exec-mutations stage ---------------------------------------------------
@@ -369,7 +322,7 @@ stage_exec_mutations() {
 
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="matrix phpunit infection exec-mutations" ;;
+    all) STAGES="matrix phpunit exec-mutations" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

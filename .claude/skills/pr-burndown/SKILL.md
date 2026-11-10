@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-08
+last_verified: 2026-11-09
 ---
 
 # /pr-burndown
@@ -284,7 +284,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    Resolve a thread only after a commit changes the code it points at.
 4. Run the same checks post-plan runs before it fires, in the worktree, one call each:
    bin/lib/prefire-verify --plan <plan path> --stage matrix, then --stage phpunit, then
-   --stage infection, then --stage exec-mutations. Drop --plan when the PR has no plan
+   --stage exec-mutations. Drop --plan when the PR has no plan
    (ls ~/claude-plans/<branch>.md). Exit 3 means Docker or the DB is down: run
    bin/wt-up <slug> and retry. Also run composer run analyse in the worktree's Docker when
    PHP changed, and <any extra tests this change needs>. Fix what broke.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests bin/lib/prefire-verify (the pre-fire verification gate) and its wiring
-# into bin/post-plan-now, with stubbed PHPUnit / Infection / DB probe.
+# into bin/post-plan-now, with stubbed PHPUnit / DB probe.
 #
 # Usage: bin/test-prefire-verify [case_name ...]
 # With no arguments every case runs; with arguments only the named cases run.
@@ -59,19 +59,7 @@ new_case() {
 echo run >> "$CNT/phpunit"
 exit "${STUB_PHPUNIT_RC:-0}"
 EOF
-    cat > "$D/stubs/mutation" <<'EOF'
-#!/usr/bin/env bash
-echo run >> "$CNT/mutation"
-case "${STUB_MUT_MODE:-ok}" in
-    3672)
-        echo "2295 mutations were generated"
-        echo "491 mutants were escaped"
-        echo "[ERROR] The minimum required MSI percentage should be 100%, but actual is 78.6%"
-        exit 1 ;;
-    prereq) echo "Error: pcov is not loaded"; exit 3 ;;
-    *) echo "Mutation Score Indicator (MSI): 100%"; exit 0 ;;
-esac
-EOF
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/mutation"\nexit 0\n' > "$D/stubs/mutation"
     printf '#!/usr/bin/env bash\necho run >> "$CNT/probe"\nexit "${STUB_PROBE_RC:-0}"\n' > "$D/stubs/probe"
     printf '#!/usr/bin/env bash\necho run >> "$CNT/excludes"\nexit 0\n' > "$D/stubs/excludes"
     chmod +x "$R/ibl5/vendor/bin/phpunit" "$D/stubs/mutation" "$D/stubs/probe" "$D/stubs/excludes"
@@ -85,8 +73,9 @@ EOF
         git commit -q -m init
     ) || { echo "HARNESS-SETUP: fixture repo failed" >&2; exit 2; }
     export PREFIRE_PHPUNIT_CMD="vendor/bin/phpunit"
-    export PREFIRE_MUTATION_CMD="$D/stubs/mutation"
     export PREFIRE_DB_PROBE_CMD="$D/stubs/probe"
+    # Removed seams. Kept exported so a stray read shows up in $CNT.
+    export PREFIRE_MUTATION_CMD="$D/stubs/mutation"
     export PREFIRE_EXCLUDES_CMD="$D/stubs/excludes"
 }
 
@@ -239,7 +228,7 @@ test_all_green_passes_and_records() {
     want_rc 0
     local n
     n=$(pass_files '\.pass$' | wc -l | tr -d ' ')
-    [ "$n" -eq 3 ] || note "expected 3 .pass files, got $n"
+    [ "$n" -eq 2 ] || note "expected 2 .pass files, got $n"
     want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
 }
 
@@ -249,7 +238,7 @@ test_cache_hit_skips_rerun() {
     run_gate --plan "$PLAN"; want_rc 0
     run_gate --plan "$PLAN"; want_rc 0
     want_cnt phpunit 1
-    want_cnt mutation 1
+    want_cnt mutation 0
     want_cnt row1 1
     want_out "pass cached for tree"
 }
@@ -275,14 +264,17 @@ test_checks_mutating_tree_refuse() {
     [ -z "$(pass_files '\.phpunit\.pass$')" ] || note "a phpunit pass record exists"
 }
 
-test_adhoc_no_plan_runs_phpunit_and_infection() {
+test_adhoc_no_plan_runs_phpunit_only() {
+    # A stray `${PREFIRE_MUTATION_CMD:-true}` call would run the exported env stub
+    # and bump the mutation counter, so want_cnt mutation 0 catches it.
     new_case
     run_gate
     want_rc 0
     want_out "SKIP matrix: no plan"
     want_out "SKIP exec-mutations: no plan"
     want_cnt phpunit 1
-    want_cnt mutation 1
+    want_cnt mutation 0
+    want_cnt excludes 0
 }
 
 test_empty_plan_value_refuses() {
@@ -296,33 +288,32 @@ test_empty_plan_value_refuses() {
     want_cnt mutation 0
 }
 
-test_infection_below_threshold_refuses_3672() {
+test_stage_infection_removed_exits_2() {
     new_case
     green_plan
-    export STUB_MUT_MODE=3672
-    run_gate --plan "$PLAN"
-    want_rc 1
-    want_out "FAIL infection: below CI threshold"
-    want_out "491 mutants were escaped"
-    [ -z "$(pass_files '\.infection\..*\.pass$')" ] || note "an infection pass record exists"
+    run_gate --plan "$PLAN" --stage infection
+    want_rc 2
+    want_out "--stage infection was removed"
+    want_out "Infection PHP (per-PR diff)"
+    want_cnt phpunit 0
+    want_cnt mutation 0
+    want_cnt excludes 0
 }
 
-test_infection_at_threshold_passes() {
+test_all_never_invokes_infection() {
     new_case
     green_plan
+    mkdir -p "$R/bin" "$R/ibl5/bin"
+    printf '#!/usr/bin/env bash\ntouch "%s/mutation-diff-called"\nexit 99\n' "$D" > "$R/bin/mutation-diff"
+    printf '#!/usr/bin/env bash\ntouch "%s/excludes-called"\nexit 99\n' "$D" > "$R/ibl5/bin/check-infection-excludes"
+    chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    [ -n "$(pass_files '\.infection\..*\.pass$')" ] || note "no infection pass record"
-}
-
-test_infection_prereq_missing_fails_closed() {
-    new_case
-    green_plan
-    export STUB_MUT_MODE=prereq
-    run_gate --plan "$PLAN"
-    want_rc 3
-    want_out "prerequisite missing"
-    [ -z "$(pass_files '\.infection\..*\.pass$')" ] || note "an infection pass record exists"
+    want_out "all requested stages passed (matrix phpunit exec-mutations)"
+    want_cnt mutation 0
+    want_cnt excludes 0
+    [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
+    [ ! -e "$D/excludes-called" ] || note "check-infection-excludes ran under --stage all"
 }
 
 test_mutation_diff_flags_match_ci() {
@@ -489,9 +480,10 @@ assert_step_6_9() { # <prompt-impl path>
     if [ -n "$l7" ] && [ "$l69" -lt "$l7" ]; then
         body=$(sed -n "${l69},$((l7 - 1))p" "$f")
         local s
-        for s in "--stage matrix" "--stage phpunit" "--stage infection"; do
+        for s in "--stage matrix" "--stage phpunit" "--stage exec-mutations"; do
             grep -qF -- "$s" <<< "$body" || note "Step 6.9 does not name '$s'"
         done
+        grep -qF -- "--stage infection" <<< "$body" && note "Step 6.9 still names '--stage infection'"
     fi
 }
 
@@ -532,7 +524,7 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         b { print > out }
     ' "$f"
     i=0
-    for stage in matrix phpunit infection exec-mutations; do
+    for stage in matrix phpunit exec-mutations; do
         i=$((i + 1))
         if [ ! -f "$D/blocks/$i.sh" ]; then
             note "Step 6.9 has no bash block for $stage"
@@ -547,6 +539,7 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         [ "$got" = "--plan $want --stage $stage" ] \
             || note "$stage block called the gate with '$got'"
     done
+    [ ! -f "$D/blocks/4.sh" ] || note "Step 6.9 has a fourth bash block"
 }
 
 test_prompt_impl_step_6_9_blocks_set_plan_path() {
@@ -595,7 +588,7 @@ test_db_probe_does_not_read_callers_stdin() {
 }
 
 # ---------------------------------------------------------------------------
-# exec-mutations stage (fourth stage)
+# exec-mutations stage (third stage)
 # ---------------------------------------------------------------------------
 # xm_plan <check> [match] [replace]: plan with matrix row 1 = <check> plus one mutation block
 # on ibl5/tracked.txt (fixture content "a"). The check counts its own runs in $CNT/xm.
@@ -859,7 +852,7 @@ test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
     want_rc 2
-    want_out "--stage must be matrix, phpunit, infection, exec-mutations, or all"
+    want_out "--stage must be matrix, phpunit, exec-mutations, or all"
 }
 
 test_help_lists_exec_mutations() {
@@ -868,15 +861,17 @@ test_help_lists_exec_mutations() {
     want_rc 0
     want_out "exec-mutations"
     want_out "PREFIRE_EXEC_MUTATIONS_LIB"
+    refute_out "PREFIRE_MUTATION_CMD"
+    refute_out "PREFIRE_EXCLUDES_CMD"
 }
 
-test_prompt_impl_runs_four_stages() {
+test_prompt_impl_runs_three_stages() {
     OUT=$(cat "$REPO/bin/automouse/prompt-impl")
     want_out '--stage exec-mutations'
-    want_out 'When all four return 0, proceed to Step 7.'
+    want_out 'When all three return 0, proceed to Step 7.'
     want_out "Never edit a"
     want_out 'never delete a mutation block'
-    refute_out 'When all three return 0'
+    refute_out 'When all four return 0'
     want_out '"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]'
 }
 
@@ -895,11 +890,10 @@ test_all_green_passes_and_records
 test_cache_hit_skips_rerun
 test_tree_change_invalidates_cache
 test_checks_mutating_tree_refuse
-test_adhoc_no_plan_runs_phpunit_and_infection
+test_adhoc_no_plan_runs_phpunit_only
 test_empty_plan_value_refuses
-test_infection_below_threshold_refuses_3672
-test_infection_at_threshold_passes
-test_infection_prereq_missing_fails_closed
+test_stage_infection_removed_exits_2
+test_all_never_invokes_infection
 test_mutation_diff_flags_match_ci
 test_post_plan_now_refuses_exit_9_on_gate_failure
 test_post_plan_now_fires_when_gate_green
@@ -936,7 +930,7 @@ test_xm_fire_point_limits_match_harness
 test_xm_fire_point_undecided_still_fails
 test_post_plan_now_passes_fire_point
 test_help_lists_exec_mutations
-test_prompt_impl_runs_four_stages
+test_prompt_impl_runs_three_stages
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

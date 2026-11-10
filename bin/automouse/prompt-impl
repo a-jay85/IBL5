@@ -497,28 +497,15 @@ if [ -z "${PLAN_PATH:-}" ]; then
 fi
 PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
 GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
-"$GATE" --plan "$PLAN_PATH" --stage infection
-```
-```bash
-# Bash calls do not share variables, so rebuild the plan path from the queue entry
-NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
-PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
-# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
-if [ -z "${PLAN_PATH:-}" ]; then
-    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
-    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
-fi
-PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
-GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
 "$GATE" --plan "$PLAN_PATH" --stage exec-mutations
 ```
 
 Act on each exit code:
 
-- `0`: next stage. When all four return 0, proceed to Step 7.
+- `0`: next stage. When all three return 0, proceed to Step 7.
 - `1`: a check failed. The output names the matrix row or stage. Fix the production
   code or the test the plan asked for. Never edit the plan's Verification Matrix, and
-  never weaken an assertion. Commit a checkpoint and rerun all four stages, because
+  never weaken an assertion. Commit a checkpoint and rerun all three stages, because
   the fix changed the tree. A stage still at `1` never proceeds to Step 7. At the
   budget wall, take the Step 6.7 no-handoff STOP path.
 - `1` from `exec-mutations`: each failing row prints a `NEXT-STEP row <id>` line. Follow it.
@@ -533,7 +520,7 @@ Act on each exit code:
   check timed out or could not start; rerun the stage once, and if a row is still UNDECIDED,
   go to Step 7 and add `"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]`.
   The fire point reruns the stage with larger limits (300 s per check run, 1800 s total).
-- `3`: a prerequisite is missing (docker, the DB container, pcov, vendor). Apply the
+- `3`: a prerequisite is missing (docker, the DB container, vendor). Apply the
   fix the message names once and rerun that stage. If it is still `3`, go to Step 7 and
   add `"prefire_deferred": ["<stage>: <message>"]` to the handoff. The fire point
   reruns the stage and refuses to ship while it still fails.
@@ -545,7 +532,7 @@ Act on each exit code:
 - `2`: usage error. Use the Error Handling path in Step 8.
 
 Never pass `--bypass`; the gate refuses it under `CLAUDE_HEADLESS`. If there is no
-plan file, drop `--plan "$PLAN_PATH"`. The matrix and exec-mutations stages then skip and the other two still run.
+plan file, drop `--plan "$PLAN_PATH"`. The matrix and exec-mutations stages then skip and the phpunit stage still runs.
 
 ## Step 7: Write Handoff File
 

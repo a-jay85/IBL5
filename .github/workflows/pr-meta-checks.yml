@@ -197,11 +197,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/test-check-model-pins
 
-      # --- engine freeze + decompile-token gate: UNCONDITIONAL on every PR, no
-      # path filter. The token half scans added lines in every path, and the
-      # freeze half must see a rename out of engine/. The harness runs first so
-      # a broken pattern fails loudly. The engine cutover PR deletes this step
-      # together with engine/ (.claude/rules/engine-go.md). Hard gate. ---
+      # --- decompile-token gate: UNCONDITIONAL on every PR, no path filter. It
+      # scans added lines in every path and lets tokens through only under the
+      # fixed allowlist in the script (engine/, jsb-native/; ADR-0236). The
+      # harness runs first so a broken pattern fails loudly. Hard gate. ---
       - name: Run bin/check-engine-freeze (harness + PR diff)
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:

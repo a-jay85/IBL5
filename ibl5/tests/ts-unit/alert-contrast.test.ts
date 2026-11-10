@@ -111,7 +111,7 @@ describe.skipIf(!existsSync(builtPath))('built stylesheet alert tokens', () => {
   const built = existsSync(builtPath) ? readFileSync(builtPath, 'utf8') : '';
 
   it('defines the warning-700 palette step and alias', () => {
-    expect(built).toMatch(/--color-warning-700:\s*#b45309/);
+    expect(built.replace(/\s+/g, '')).toContain('--color-warning-700:#b45309');
     expect(built).toMatch(/--warning-700:\s*var\(--color-warning-700\)/);
   });
 

@@ -604,6 +604,42 @@ compare_golden "contract: one hard failure lines match golden" \
 fi
 
 
+# ─── Parallel group (rows 26-28) ─────────────────────────────────────────────
+if want_group parallel; then
+# Row 26: a failing grouped step still fails the run and is named.
+contract_run STUB_RC_test_check_engine_freeze=1
+P_OUT="$_LAST_OUT"; P_RC="$_LAST_RC"
+[ "$P_RC" -eq 1 ] && pass "parallel-26: grouped failure exits 1" \
+                  || fail "parallel-26: grouped failure exits 1 (got $P_RC)"
+want "parallel-26: failure line names the step" "$P_OUT" "META-CHECK-FAILED: test-check-engine-freeze"
+
+# Row 27: slowest-first stub, step lines still match the golden table order.
+contract_run STUB_SLEEP_check_docs=2
+P_OUT="$_LAST_OUT"; P_RC="$_LAST_RC"
+compare_golden "parallel-27: slow first step keeps table order" \
+    "$CONTRACT_PASS_GOLDEN" "$(step_lines "$P_OUT")"
+[ "$P_RC" -eq 0 ] && pass "parallel-27: slow first step exits 0" \
+                  || fail "parallel-27: slow first step exits 0 (got $P_RC)"
+
+# Row 28: three grouped steps overlap. A wall-clock bound flakes under machine
+# load (the runner alone took 1 s to 10 s here), so the three stubs rendezvous
+# instead: each registers, then waits up to 10 s for all three. Run one after
+# another, the first stub never sees the others and exits 1.
+P_REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL"); P_BASE=$(get_base "$P_REPO")
+printf 'x\n' > "$P_REPO/changed.txt"; git -C "$P_REPO" add .; git -C "$P_REPO" commit -q -m x
+P_RDV="$P_REPO/.rendezvous"
+for P_STUB in test-check-model-pins test-check-engine-freeze test-check-pipefail-grep-q; do
+    printf '#!/bin/sh\necho x >> "%s"\ni=0\nwhile [ "$(wc -l < "%s")" -lt 3 ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done\n[ "$(wc -l < "%s")" -ge 3 ] || { echo "no overlap" >&2; exit 1; }\n' \
+        "$P_RDV" "$P_RDV" "$P_RDV" > "$P_REPO/bin/$P_STUB"
+    chmod +x "$P_REPO/bin/$P_STUB"
+done
+run_check_both env "$P_REPO/bin/run-meta-checks-local" --self-test-hook "$P_REPO" --base "$P_BASE"
+rm -rf "$P_REPO"
+[ "$_LAST_RC" -eq 0 ] && pass "parallel-28: three grouped steps overlap" \
+                      || fail "parallel-28: grouped steps ran one at a time (rc $_LAST_RC)"
+absent "parallel-28: no rendezvous timeout" "$_LAST_OUT" "no overlap"
+fi
+
 # ─── Cache group ─────────────────────────────────────────────────────────────
 CACHED_STEPS="test-check-model-pins test-check-engine-freeze test-check-pipefail-grep-q test-check-reviewer-eval reviewer-eval-validate"
 # Oracle lists typed here, never derived from the runner: every input a bust

@@ -19,8 +19,9 @@ use Updater\Steps\RefreshTeamSeasonRecordsStep;
  * behavior is byte-identical after the Repository→Service extraction.
  *
  * Tests the VIEW chain: vw_franchise_summary (W/L from ibl_team_season_records, refreshed by
- * RefreshTeamSeasonRecordsStep), the five-season window over ibl_team_win_loss → ibl_box_scores_teams,
- * plus vw_playoff_series_results and ibl_heat_win_loss.
+ * RefreshTeamSeasonRecordsStep), plus vw_playoff_series_results and ibl_heat_win_loss.
+ * The five-season window reads ibl_team_season_records too, so window tests rebuild it
+ * after seeding box scores.
  */
 #[Group('database')]
 class FranchiseHistoryRepositoryTest extends DatabaseTestCase

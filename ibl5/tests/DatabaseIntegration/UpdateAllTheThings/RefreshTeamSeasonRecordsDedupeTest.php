@@ -57,6 +57,27 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         $this->assertSame(0, $after2['losses'] - $before2['losses']);
     }
 
+    public function testDriftFromLiveViewIsZeroAfterRebuild(): void
+    {
+        $this->rebuild();
+
+        self::assertSame(0, $this->driftCount());
+    }
+
+    public function testDriftFromLiveViewCountsBoxScoreAddedAfterRebuild(): void
+    {
+        $this->rebuild();
+
+        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Visitor', 1, 1, 2);
+        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Home', 1, 1, 2);
+
+        self::assertGreaterThan(0, $this->driftCount());
+
+        $this->rebuild();
+
+        self::assertSame(0, $this->driftCount());
+    }
+
     public function testHeatPhantomWithHigherOrdinalCountedOnce(): void
     {
         [$t1, $t2] = $this->realTeams(2);
@@ -271,6 +292,17 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         self::assertIsString($name);
 
         return $name;
+    }
+
+    private function driftCount(): int
+    {
+        $result = $this->db->query(RefreshTeamSeasonRecordsStep::REGULAR_SEASON_DRIFT_SQL);
+        self::assertInstanceOf(\mysqli_result::class, $result, 'Drift query failed: ' . $this->db->error);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsNumeric($row['drift']);
+
+        return (int) $row['drift'];
     }
 
     private function assertTripleEmpty(string $date, int $visitor, int $home): void

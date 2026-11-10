@@ -15,7 +15,15 @@ use Updater\StepResult;
  * A (game_date, visitor_teamid, home_teamid) triple is one game: the league
  * has no doubleheaders. A repeat of the triple with a different
  * game_of_that_day is a phantom, and only the lowest-ordinal copy counts.
- * Same dedupe as FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL.
+ * FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL and vw_franchise_summary read
+ * these rows, so this dedupe is the franchise page's dedupe.
+ *
+ * Both readers lag ibl_box_scores_teams until this step reruns. Inside the sim,
+ * updateAllTheThings runs CleanupPreseasonDataStep and ProcessBoxscoresStep (which
+ * reach BoxscoreRepository deletes and inserts) before this step, so a sim never
+ * leaves the table stale. Outside the sim, a migration that deletes or restores
+ * box-score rows must rerun this step afterwards, as migration 184 does.
+ * Name-only box-score updates (AllStarTeamRepository) do not change W-L.
  *
  * Runs DELETE + two INSERTs inside a transaction so the table is never
  * empty on error. Uses DELETE (not TRUNCATE) because TRUNCATE is DDL and
@@ -155,6 +163,27 @@ GROUP BY
     ti.team_name,
     COALESCE(fs.team_name, ti.team_name)
 SQL;
+
+    /**
+     * Counts regular-season rows where this table and the live ibl_team_win_loss view
+     * disagree, in either direction. Zero right after a rebuild means the materialized
+     * window matches the box-score CTE. Read by the deploy-time rebuild migration.
+     */
+    public const string REGULAR_SEASON_DRIFT_SQL = <<<'SQL'
+        SELECT COUNT(*) AS drift FROM (
+            (SELECT currentname, year, CAST(wins AS UNSIGNED) AS wins, CAST(losses AS UNSIGNED) AS losses
+             FROM ibl_team_season_records WHERE game_type = 1
+             EXCEPT
+             SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
+             FROM ibl_team_win_loss)
+            UNION ALL
+            (SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
+             FROM ibl_team_win_loss
+             EXCEPT
+             SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
+             FROM ibl_team_season_records WHERE game_type = 1)
+        ) d
+        SQL;
 
     /**
      * HEAT records (game_type=3). Year is YEAR(game_date), franchise lookup

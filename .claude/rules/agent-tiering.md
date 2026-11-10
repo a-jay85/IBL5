@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 5.5 def-pins and the effort setting per surface.
-last_verified: 2026-11-02
+last_verified: 2026-11-10
 ---
 
 # Agent Tiering
@@ -15,7 +15,7 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | **Sonnet** | `subagent_type: "sonnet-5-5"`, omit `model` (the def pins 5.5 and has no `Agent` tool, so it cannot spawn). | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, manual-test classification. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (Phase 6.5 bounded checklist: `agent-tiering-bounded-checklist.md`). Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only. `/plan` Step 3 picks between the three architect defs (`.claude/skills/plan/SKILL.md`). Do **not** pass inline `model`. |
-| **Fable** | `model: "fable"` | Rung above Opus (2.5× Opus 5.5 per token). Default to Opus; raise Opus effort before moving up. When Fable is justified over Opus (Opus likely wrong **and** a wrong answer is expensive), use it without asking; state the reason in one line. Asm-level static RE defaults to Fable. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes. Full test: `agent-tiering-fable.md`. |
+| **Fable** | `model: "fable"` | Rung above Opus (Fable 5.2 is 2× Opus 5.5 per token). Default to Opus; raise Opus effort to `high` before moving up. Past `high`, try Fable at `high` before Opus at `xhigh` or `max`. When Fable is justified over Opus (Opus likely wrong **and** a wrong answer is expensive), use it without asking; state the reason in one line. Asm-level static RE defaults to Fable. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes. Full test: `agent-tiering-fable.md`. |
 | **Effort** | `--effort` flag or `effort:` frontmatter | `high` on every surface that takes the flag. Per-surface detail and measurements: `agent-tiering-fable.md` § Effort. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.

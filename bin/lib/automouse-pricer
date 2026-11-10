@@ -34,6 +34,7 @@ PRICE = {
     "haiku-5":  (0.10,  0.50, 0.01,  0.125, 0.20),  # Haiku 5.5, <=100K prompts; 1h write = 2x input
     "fable":   (10.00, 50.00, 1.00, 12.50, 20.00),
     "fable-5-1": (10.00, 50.00, 0.25, 12.50, 20.00),  # cache read 0.025x base, verified 2026-09-23
+    "fable-5-2": (8.00, 40.00, 0.20, 10.00, 16.00),  # in/out/read verified 2026-11-10 (claude-api skill); writes derived (1.25x, 2x)
 }
 PRICE_ASOF = "2026-09-23"
 PRICE_EXPIRY = "2026-12-31"

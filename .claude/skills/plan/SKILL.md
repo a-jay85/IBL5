@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-11-06
+last_verified: 2026-11-10
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -245,7 +245,7 @@ The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, cor
 
 Launch a **single Plan agent** with a prompt containing ALL of the items listed below (1 to 5). **Choose the architect tier.** The tier is an Opus judgment. `bin/plan-tier-hint` makes it, and you own the final call. Default to `plan-architect` whenever you are unsure.
 
-1. **`plan-architect-xhigh` (`model: fable`, `effort: high`).** Pick it when you judge that Opus is likely to get this plan wrong **and** a wrong plan would be expensive: hard to notice before merge, hard to undo after, or harmful to league data, credentials, or access control. That is the Fable test in `.claude/rules/agent-tiering-fable.md`. Fable costs about 2.5 times Opus 5.5 per token, so both halves must hold. Things worth weighing, none of which decides the tier by itself: a security surface or trust boundary, a destructive migration, a change to what a gate rejects, and the mitigations the task already carries (`auto_merge: false`, a fail-closed hard constraint, characterization tests that pin today's output).
+1. **`plan-architect-xhigh` (`model: fable`, `effort: high`).** Pick it when you judge that Opus is likely to get this plan wrong **and** a wrong plan would be expensive: hard to notice before merge, hard to undo after, or harmful to league data, credentials, or access control. That is the Fable test in `.claude/rules/agent-tiering-fable.md`. Fable 5.2 costs 2 times Opus 5.5 per token, so both halves must hold. Things worth weighing, none of which decides the tier by itself: a security surface or trust boundary, a destructive migration, a change to what a gate rejects, and the mitigations the task already carries (`auto_merge: false`, a fail-closed hard constraint, characterization tests that pin today's output).
 
    **Hold-rule definitions.** Step 4 gate 14(e) and `_hold-and-remediation.md` apply these two definitions to the `auto_merge` hold. They set no tier.
 

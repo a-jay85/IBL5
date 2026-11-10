@@ -1,6 +1,6 @@
 ---
 description: How bin/plan-eval replays past /plan prompts in truncated clones and scores the plans, how to run it, what it costs, and how it stays isolated.
-last_verified: 2026-10-26
+last_verified: 2026-11-10
 ---
 
 # Plan eval
@@ -78,7 +78,7 @@ The selection rule picks 5 default, 2 Sonnet and 3 xhigh cases with 2 to 12 expe
 
 - The corpus is small and runs are noisy. Use `--runs 2` before trusting a one-point move.
 - The clone carries base-day repo content beside today's skill, so a rule the skill cites may describe code that did not exist yet.
-- The orchestrator model is fixed at Sonnet 5.5, the `bin/plan-now` default.
+- The orchestrator model defaults to Sonnet 5.5, the `bin/plan-now` default. `--model` overrides it.
 - The plans-dir override relies on the model following the coda. The sweep catches a miss.
 
 ## Baseline

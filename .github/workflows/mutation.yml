@@ -41,7 +41,9 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.label.name == 'mutation-test')
-    timeout-minutes: 60
+    # The full suite took 40-56 min through 2026-10-26, then hit a 60-min cap on
+    # 2026-11-02 and 2026-11-09. 120 leaves room while sharding is tracked in backlog.
+    timeout-minutes: 120
 
     services:
       mariadb:
@@ -134,16 +136,36 @@ jobs:
     name: Notify Mutation Failure
     runs-on: ubuntu-26.04
     needs: [mirror-ready, mutation]
-    if: ${{ always() && (needs.mutation.result == 'failure' || needs.mirror-ready.result == 'failure') }}
+    # A job that hits timeout-minutes ends 'cancelled', not 'failure'. The scheduled run
+    # alerts on cancelled too, so a timeout can't go silent (it did on 2026-11-02 and
+    # 2026-11-09). Label and dispatch runs stay failure-only: a newer run cancels those.
+    # If mirror-ready times out it ends 'cancelled' and mutation ends 'skipped', so the
+    # scheduled run checks mirror-ready's cancel too.
+    if: >-
+      ${{ always() && (needs.mutation.result == 'failure'
+          || needs.mirror-ready.result == 'failure'
+          || (github.event_name == 'schedule' && (needs.mutation.result == 'cancelled'
+              || needs.mirror-ready.result == 'cancelled'))) }}
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build Discord message
+        env:
+          MIRROR_RESULT: ${{ needs.mirror-ready.result }}
+          MUTATION_RESULT: ${{ needs.mutation.result }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nMSI dropped below 100%% — an escaped mutant or coverage regression. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          if [ "$MIRROR_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) was CANCELLED, most likely by its timeout-minutes cap, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$MIRROR_RESULT" = "failure" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) FAILED, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$MUTATION_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Weekly mutation testing was CANCELLED (%s trigger).\n\nIt most likely hit the job timeout-minutes cap before Infection finished. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          else
+            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nMSI dropped below 100%% — an escaped mutant or coverage regression. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          fi
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM

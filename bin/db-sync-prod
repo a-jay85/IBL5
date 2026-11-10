@@ -326,6 +326,10 @@ fi
 # table they create is missing.
 PRESERVE_EXISTING=""
 IGNORE_ARGS=""
+# Capture the local migration history before the sync replaces anything. The replay after
+# the backfill below needs it to tell "never applied here" from "applied here".
+PRE_SYNC_VERSIONS="$(db_cmd "$DB_CONTAINER" mariadb "$DB_DEFAULT_NAME" -N -B \
+    -e "SELECT version FROM schema_migrations /* pre-sync */" 2>/dev/null || true)"
 for t in $PRESERVE_TABLES; do
     # No pipe into grep: under `set -o pipefail` an early grep exit SIGPIPEs the
     # docker call (141) and the `if` then reads "table absent" — which would drop
@@ -522,6 +526,22 @@ db_cmd "$DB_CONTAINER" mariadb "$DB_DEFAULT_NAME" -e "
     INSERT IGNORE INTO schema_migrations (version)
         SELECT migration FROM migrations WHERE migration LIKE '%.sql';
 " 2> >(db_strip_warnings >&2) || true
+
+# The backfill marks every prod-applied migration done, so a migration that changes a
+# preserved table (whose local copy the prod dump did not touch) would never reach it.
+# Re-apply exactly those, through bin/db-migrate. Local-only: db_cmd on $DB_CONTAINER.
+MIG_DIR="$REPO_ROOT/ibl5/migrations"
+if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then
+    MIG_DIR="$WORKTREE_PATH/ibl5/migrations"
+fi
+echo ""
+echo "Replaying migrations that touch preserved tables..."
+# shellcheck disable=SC2086  # PRESERVE_TABLES is a validated space-separated list
+if ! replay_preserved_migrations "$DB_CONTAINER" "$DB_DEFAULT_NAME" "$MIG_DIR" \
+        "$PRE_SYNC_VERSIONS" $PRESERVE_TABLES; then
+    echo "ERROR: preserved-table migration replay failed; the local bug tables may be behind prod's schema." >&2
+    exit 1
+fi
 
 if [ -n "$WORKTREE_PATH" ] && [ -d "$WORKTREE_PATH/ibl5/migrations" ]; then
     echo ""

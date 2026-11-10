@@ -305,6 +305,27 @@ bpt_set_transcript '{"messages":[{"author_id":"111","content":"","attachments":[
 _tr="$(_drv row_transcript 880000000000000001)"
 bpt_log_has_str "r40: image-only message renders [attachments:" "$_tr" "[attachments: only-image.png]"
 
+# ── T-FETCH — row_transcript logs a fetch marker to stderr (thread id + count only) ──
+# _drv discards stderr, so drive the shim directly and capture the two streams apart.
+bpt_log_lacks_str() { case "$2" in *"$3"*) bpt_fail "$1 — '$3' present";; *) bpt_ok "$1";; esac; }
+_tf_err="$STUB/tfetch.err"
+bpt_reset
+bpt_set_transcript '{"messages":[{"id":"1","author_id":"111","content":"SECRET-BODY-1680","attachments":[{"name":"secret-att-1680.png","content_type":"image/png"}]},{"id":"2","author_id":"222","content":"SECRET-BODY-1680","attachments":[]}]}'
+_tf_out="$(bash -c 'source "$1"; shift; "$@"' bpt-unit-shim "$BPT_DRIVER" row_transcript 111222333444555666 2>"$_tf_err")"
+_tf_rc=$?
+_tf_errtxt="$(cat "$_tf_err")"
+bpt_log_has_str "T-FETCH: stderr holds the fetch marker with the message count" "$_tf_errtxt" "transcript: fetched thread=111222333444555666 messages=2"
+bpt_log_lacks_str "T-FETCH: stderr carries no message body" "$_tf_errtxt" "SECRET-BODY-1680"
+bpt_log_lacks_str "T-FETCH: stderr carries no attachment name" "$_tf_errtxt" "secret-att-1680.png"
+bpt_log_lacks_str "T-FETCH: stdout transcript stays free of the marker" "$_tf_out" "transcript: fetched"
+bpt_log_has_str "T-FETCH: stdout transcript still renders the body" "$_tf_out" "SECRET-BODY-1680"
+[ "$_tf_rc" = 0 ] && bpt_ok "T-FETCH: call returns 0" || bpt_fail "T-FETCH: call returned $_tf_rc"
+: > "$STUB/transcript.json"
+_tf_out="$(bash -c 'source "$1"; shift; "$@"' bpt-unit-shim "$BPT_DRIVER" row_transcript 111222333444555666 2>"$_tf_err")"
+_tf_rc=$?
+bpt_log_has_str "T-FETCH: zero-byte bot reply logs messages=unparsed" "$(cat "$_tf_err")" "messages=unparsed"
+[ "$_tf_rc" = 0 ] && bpt_ok "T-FETCH: zero-byte reply still returns 0" || bpt_fail "T-FETCH: zero-byte reply returned $_tf_rc"
+
 # ── Row 41 — NEG sanitation on the UNVALIDATED transcript path (only sanitizer there):
 # a newline in the name renders on one line; a 500-char name truncates to 120. ────
 _long="$(printf 'a%.0s' {1..500})"

@@ -1909,10 +1909,10 @@ bucket_emoji_src() {
 # PAUSED is a real pr-triage bucket with no arm today, so it pins to the fallback.
 BUCKET_EMOJI_TABLE=(
     'DIRTY|🔀' 'NOT-MERGEABLE|🚫' 'BLOCKED-CHECK|❌' 'HELD|⏸' 'OPEN-THREAD|💬' 'BLOCKED-DEP|🔗'
-    'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️'
+    'PIPELINE-HELD|🤖' 'FEAT-AWAITING-SIGNOFF|✍️' 'UNCLEARED|⚠️' 'VERDICT-HELD|⚖️'
     'PAUSED|❓' 'NO-SUCH-BUCKET|❓' '|❓'
 )
-BUCKET_EMOJI_ARMS=9  # named (non-*) arms the table above covers
+BUCKET_EMOJI_ARMS=10 # named (non-*) arms the table above covers
 # $1 = driver file. Prints one line per mismatch; returns 1 on any mismatch or a missing function.
 bucket_emoji_check() {
     local src arms

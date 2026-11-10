@@ -40,8 +40,11 @@ Avoid these shapes in all prose you write:
 - **No punchy closing fragments.** Cut `Done.`, `Full stop.`, `Every time.`
 - **Say it once.** Do not restate the same finding as a metaphor.
 - **Cut filler.** Delete `it's worth noting`, `in other words`, `at its core`, `that said`.
+- **Name the actor.** Make the one who acts the subject and the action the verb. Write `the gate denies the edit`. Avoid `the edit is denied`.
+- **Use the codebase name.** Never coin a label the reader has not seen. Explain a term the first time it appears.
+- **Lead with the claim.** Put the main point first in the sentence. Do not bury it behind examples or a trailing clause.
 
-These shapes are enumerated in `.claude/rules/prose-style.md`.
+These shapes and the three clarity faults are listed in `.claude/rules/prose-style.md`.
 
 **6d. The fidelity checks.** Each check ends in a finding or a pass. Passing checks share one summary line, in the shape `.claude/agents/pr-ready-phase6.md` item 2 sets. Each check names what makes its finding **blocking** (`NOT READY`) rather than a note (`READY WITH NOTES`); when a finding is blocking, say which clause below made it so:
 

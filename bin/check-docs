@@ -835,6 +835,47 @@ function localToday(): string
 }
 
 /**
+ * Tip of the range editCommitDate() reads. Defaults to HEAD.
+ *
+ * CHECK_DOCS_EDIT_DATE_REF is a replay-only input. The gate backtest harness sets
+ * it to a merged PR's pre-squash head sha, so a squash-commit replay reads the
+ * branch's own per-file edit dates instead of the merge-day squash date. CI never
+ * sets it. Unset or empty means HEAD. A value that is not a 7-40 char lowercase
+ * hex sha, or that names no commit object, is ignored with a stderr warning and
+ * HEAD is used, so a bad value can only keep the strict behaviour.
+ */
+function editDateTip(string $repoRoot): string
+{
+    static $cache = [];
+    if (isset($cache[$repoRoot])) {
+        return $cache[$repoRoot];
+    }
+    $cache[$repoRoot] = 'HEAD';
+    $raw = getenv('CHECK_DOCS_EDIT_DATE_REF');
+    $ref = is_string($raw) ? trim($raw) : '';
+    if ($ref === '') {
+        return $cache[$repoRoot];
+    }
+    if (preg_match('/^[0-9a-f]{7,40}$/', $ref) !== 1) {
+        fwrite(STDERR, "check-docs: CHECK_DOCS_EDIT_DATE_REF ignored (not a commit sha): {$ref}\n");
+        return $cache[$repoRoot];
+    }
+    $catOut = [];
+    $catCode = 0;
+    exec(sprintf(
+        'git -C %s cat-file -e %s 2>/dev/null',
+        escapeshellarg($repoRoot),
+        escapeshellarg($ref . '^{commit}')
+    ), $catOut, $catCode);
+    if ($catCode !== 0) {
+        fwrite(STDERR, "check-docs: CHECK_DOCS_EDIT_DATE_REF ignored (no such commit): {$ref}\n");
+        return $cache[$repoRoot];
+    }
+    $cache[$repoRoot] = $ref;
+    return $cache[$repoRoot];
+}
+
+/**
  * Calendar date (Y-m-d) of the most recent commit in $base..HEAD that touched
  * $rel, in the **author's own timezone**. Read from the author timestamp (%aI,
  * ISO 8601 with embedded tz offset) so the date reflects the author's calendar
@@ -849,13 +890,15 @@ function localToday(): string
  * `===` (which would false-fail a rebased doc whose author date predates a base
  * that already carries today's date). Returns null when the date can't be read, so
  * the caller falls back to the strict value comparison (fail-closed).
+ * The range tip comes from editDateTip(): HEAD unless the replay-only CHECK_DOCS_EDIT_DATE_REF names a commit.
  */
 function editCommitDate(string $repoRoot, string $base, string $rel): ?string
 {
     $cmd = sprintf(
-        'git -C %s log -1 --format=%%aI %s..HEAD -- %s 2>/dev/null',
+        'git -C %s log -1 --format=%%aI %s..%s -- %s 2>/dev/null',
         escapeshellarg($repoRoot),
         escapeshellarg($base),
+        escapeshellarg(editDateTip($repoRoot)),
         escapeshellarg($rel)
     );
     $out = [];

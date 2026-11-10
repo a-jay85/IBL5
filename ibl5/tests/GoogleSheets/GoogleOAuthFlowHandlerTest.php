@@ -29,7 +29,11 @@ class GoogleOAuthFlowHandlerTest extends TestCase
         GoogleOAuthState::setTestClock(null);
         $this->http = new FakeGoogleHttpClient();
         $this->repo = new InMemoryConnectionRepository();
+        $this->handler = $this->buildHandler($this->repo);
+    }
 
+    private function buildHandler(InMemoryConnectionRepository $repo): GoogleOAuthFlowHandler
+    {
         $players = self::createStub(ApiPlayerRepository::class);
         $players->method('getAllPlayersForExport')->willReturn([]);
         $transformer = self::createStub(PlayerExportTransformer::class);
@@ -37,14 +41,14 @@ class GoogleOAuthFlowHandlerTest extends TestCase
 
         $oauth = new GoogleOAuthClient(new GoogleOAuthConfig('cid', 'secret', 'http://x.localhost/cb'), $this->http);
         $export = new GoogleSheetExportService(
-            $this->repo,
+            $repo,
             $oauth,
             new GoogleSheetsClient($this->http),
             new SecretBox(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)),
             $players,
             $transformer,
         );
-        $this->handler = new GoogleOAuthFlowHandler($oauth, $export);
+        return new GoogleOAuthFlowHandler($oauth, $export);
     }
 
     protected function tearDown(): void
@@ -120,6 +124,62 @@ class GoogleOAuthFlowHandlerTest extends TestCase
         $row = $this->repo->findByUserId(5);
         self::assertNotNull($row);
         self::assertSame('sid', $row['spreadsheet_id']);
+    }
+
+    private function queueExchangeAndCreate(): void
+    {
+        $this->http->queue(200, ['access_token' => 'ya29.a', 'refresh_token' => '1//r']);
+        $this->http->queue(200, ['spreadsheetId' => 'sid', 'spreadsheetUrl' => 'https://docs.google.com/spreadsheets/d/sid/edit']);
+    }
+
+    public function testCallbackConnectionNotStoredReturnsErrorFlash(): void
+    {
+        $repo = new class extends InMemoryConnectionRepository {
+            public function upsert(int $userId, string $refreshTokenEnc, string $spreadsheetId, string $spreadsheetUrl): void
+            {
+            }
+        };
+        $handler = $this->buildHandler($repo);
+        $handler->start(5);
+        $this->queueExchangeAndCreate();
+
+        $result = $handler->callback(5, $this->storedState(), 'code-1', null);
+
+        self::assertSame(['type' => 'error', 'text' => 'Could not connect Google Sheets (server error).'], $result);
+    }
+
+    public function testCallbackFirstWriteRejectedReturnsBrokenFlashAndKeepsRow(): void
+    {
+        $this->handler->start(5);
+        $this->queueExchangeAndCreate();
+        $this->http->queue(400, ['error' => 'invalid_grant']);
+
+        $result = $this->handler->callback(5, $this->storedState(), 'code-1', null);
+
+        self::assertSame(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_FIRST_WRITE_BROKEN], $result);
+        self::assertSame('broken', $this->repo->rows[5]['status']);
+    }
+
+    public function testCallbackFirstWriteFailureReturnsRetryFlashAndKeepsRow(): void
+    {
+        $this->handler->start(5);
+        $this->queueExchangeAndCreate();
+        $this->http->queue(200, ['access_token' => 'ya29.b']);
+        $this->http->queue(500, ['error' => ['message' => 'boom']]);
+
+        $result = $this->handler->callback(5, $this->storedState(), 'code-1', null);
+
+        self::assertSame(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_FIRST_WRITE_FAILED], $result);
+        self::assertSame('active', $this->repo->rows[5]['status']);
+    }
+
+    public function testEventActionDistinguishesFirstWriteFailureFromConnectFailure(): void
+    {
+        self::assertSame('google_sheet_connected', GoogleOAuthFlowHandler::eventAction(['type' => 'success', 'text' => GoogleOAuthFlowHandler::TEXT_SUCCESS]));
+        self::assertSame('google_sheet_write_failed', GoogleOAuthFlowHandler::eventAction(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_FIRST_WRITE_BROKEN]));
+        self::assertSame('google_sheet_write_failed', GoogleOAuthFlowHandler::eventAction(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_FIRST_WRITE_FAILED]));
+        self::assertSame('google_sheet_connect_failed', GoogleOAuthFlowHandler::eventAction(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_BAD_STATE]));
+        self::assertSame('google_sheet_connect_failed', GoogleOAuthFlowHandler::eventAction(['type' => 'error', 'text' => 'Google Sheets sync is not configured on this server.']));
     }
 
     public function testCallbackExchangeFailureReturnsSanitizedErrorWithoutBody(): void

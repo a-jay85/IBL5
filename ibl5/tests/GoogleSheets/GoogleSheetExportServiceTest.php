@@ -156,6 +156,26 @@ class GoogleSheetExportServiceTest extends TestCase
         self::assertSame([['PID', 'Name'], ['1', 'Player 1'], ['2', 'Player 2']], $write['data'][0]['values']);
     }
 
+    public function testRefreshClearBoundsFollowTabRealGrid(): void
+    {
+        $this->seedConnection();
+        $this->queueAccessToken();
+        $this->http->queue(200, ['sheets' => [['properties' => ['sheetId' => 0, 'title' => 'Players', 'gridProperties' => ['rowCount' => 5000, 'columnCount' => 80]]]]]);
+        $this->http->queue(200, []);
+        $this->http->queue(200, []);
+
+        $result = $this->service->refreshConnection($this->row());
+
+        self::assertSame(GoogleSheetExportService::RESULT_OK, $result);
+        $clear = json_decode((string) $this->http->requests[3]['body'], true);
+        self::assertIsArray($clear);
+        self::assertStringEndsWith('/values:batchClear', $this->http->requests[3]['url']);
+        $ranges = $clear['ranges'];
+        self::assertIsArray($ranges);
+        self::assertStringEndsWith('5000', (string) $ranges[0]);
+        self::assertStringContainsString(':CB', (string) $ranges[1]);
+    }
+
     public function testRefreshConnectionInvalidGrantMarksBrokenAndDoesNotThrow(): void
     {
         $this->seedConnection();

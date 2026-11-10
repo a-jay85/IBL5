@@ -56,9 +56,9 @@ class GoogleSheetsClientTest extends TestCase
         $this->http->queue(200, ['sheets' => [['properties' => ['sheetId' => 0, 'title' => 'Sheet1', 'gridProperties' => ['rowCount' => 1000, 'columnCount' => 26]]]]]);
         $this->http->queue(200, ['replies' => [['addSheet' => ['properties' => ['sheetId' => 77, 'title' => 'Players']]]]]);
 
-        $sheetId = $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
+        $tab = $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
 
-        self::assertSame(77, $sheetId);
+        self::assertSame(['sheetId' => 77, 'rowCount' => 2000, 'columnCount' => 64], $tab);
         self::assertCount(2, $this->http->requests);
         self::assertSame('GET', $this->http->requests[0]['method']);
         self::assertStringEndsWith(':batchUpdate', $this->http->requests[1]['url']);
@@ -75,9 +75,9 @@ class GoogleSheetsClientTest extends TestCase
         ]]);
         $this->http->queue(200, ['replies' => [[]]]);
 
-        $sheetId = $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
+        $tab = $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
 
-        self::assertSame(9, $sheetId);
+        self::assertSame(['sheetId' => 9, 'rowCount' => 2000, 'columnCount' => 64], $tab);
         self::assertCount(2, $this->http->requests);
         $update = $this->body(1)['requests'][0]['updateSheetProperties'];
         self::assertSame(9, $update['properties']['sheetId']);
@@ -86,6 +86,18 @@ class GoogleSheetsClientTest extends TestCase
             self::assertStringNotContainsString('My Notes', (string) $request['body']);
             self::assertStringNotContainsString('"sheetId":5', (string) $request['body']);
         }
+    }
+
+    public function testEnsureTabReportsExistingLargerGridWithoutResizing(): void
+    {
+        $this->http->queue(200, ['sheets' => [
+            ['properties' => ['sheetId' => 1, 'title' => 'Players', 'gridProperties' => ['rowCount' => 5000, 'columnCount' => 80]]],
+        ]]);
+
+        $tab = $this->client->ensureTab(self::TOKEN, self::SHEET_ID, 'Players', 2000, 64);
+
+        self::assertSame(['sheetId' => 1, 'rowCount' => 5000, 'columnCount' => 80], $tab);
+        self::assertCount(1, $this->http->requests);
     }
 
     public function testOverwriteTabBatchWritesHeaderAndRowsRawThenClearsTail(): void
@@ -261,7 +273,7 @@ class GoogleSheetsClientTest extends TestCase
         }
     }
 
-    public function testOverwriteTabClearsThenBatchWritesHeaderAndRowsRaw(): void
+    public function testOverwriteTabKeepsFormulaTextRawThenClearsTail(): void
     {
         $this->http->queue(200, []);
         $this->http->queue(200, []);

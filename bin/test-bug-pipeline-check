@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 # bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check
 # (16 stub cases + R1-R13 real-DB cases + B1-B4 bot-reachability cases
-#  + L1-L3 bot-launchd-load cases + K1-K5 bot-key cases)
+#  + L1-L3 bot-launchd-load cases + K1-K5 bot-key cases + K6-K9 key-tier cases
+#  + D1-D8 bot-build cases + E1-E6 status-enum cases)
 #
 # No set -e (constraint a). Verdict assertions use tail -n 1 (constraint b).
 # BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 pinned per case (constraint c).
@@ -61,7 +62,12 @@ cat > "$STUB/bin/launchctl" <<'SH'
 case "$1" in
     list)
         case "${2:-}" in
-            *bug-bot) exit "$(cat "$STUB/launchctl-bot-list-rc" 2>/dev/null || echo 0)" ;;
+            *bug-bot)
+                _rc="$(cat "$STUB/launchctl-bot-list-rc" 2>/dev/null || echo 0)"
+                if [ "$_rc" = "0" ] && [ ! -f "$STUB/launchctl-bot-nopid" ]; then
+                    printf '{\n\t"PID" = 4242;\n\t"Label" = "com.ibl5.bug-bot";\n};\n'
+                fi
+                exit "$_rc" ;;
             *)        exit "$(cat "$STUB/launchctl-list-rc" 2>/dev/null || echo 0)" ;;
         esac
         ;;
@@ -76,6 +82,30 @@ cat > "$STUB/bin/db-query" <<'SH'
 #!/usr/bin/env bash
 sql="$*"
 printf '%s\n' "$sql" >> "$STUB/sql.log"
+# SHOW CREATE TABLE (status-enum probe) and the key-tier query answer from their
+# own files, ahead of the blanket db-unavailable switch, so the older cases keep
+# their exact UNKNOWN lines.
+case "$sql" in
+    *"SHOW CREATE TABLE"*)
+        if [ -f "$STUB/db-create-unavailable" ]; then
+            echo "DB connection error" >&2
+            exit 1
+        fi
+        cat "$STUB/create-out"
+        exit 0
+        ;;
+    *rate_limit_tier*)
+        if [ -f "$STUB/db-tier-unavailable" ]; then
+            echo "DB connection error" >&2
+            exit 1
+        fi
+        if [ -f "$STUB/db-tier-unparseable" ]; then
+            exit 0
+        fi
+        printf '| n |\n|---|\n| %s |\n' "$(cat "$STUB/db-tier-count" 2>/dev/null || echo 1)"
+        exit 0
+        ;;
+esac
 if [ -f "$STUB/db-unavailable" ]; then
     echo "DB connection error" >&2
     exit 1
@@ -119,7 +149,34 @@ printf '%s' "$(cat "$STUB/curl-code" 2>/dev/null || echo 200)"
 exit 0
 SH
 
-chmod +x "$STUB/bin/launchctl" "$STUB/bin/db-query" "$STUB/bin/curl"
+# git / ps / uname stubs for the bot-build probe. Per-case files drive them.
+cat > "$STUB/bin/git" <<'SH'
+#!/usr/bin/env bash
+if [ -f "$STUB/git-fail" ]; then
+    exit 128
+fi
+printf '%s\n' "$(cat "$STUB/src-ct" 2>/dev/null || echo 1500000000)"
+SH
+cat > "$STUB/bin/ps" <<'SH'
+#!/usr/bin/env bash
+printf '  %s\n' "$(cat "$STUB/etime" 2>/dev/null || echo 00:05)"
+SH
+cat > "$STUB/bin/uname" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$(cat "$STUB/uname" 2>/dev/null || echo Darwin)"
+SH
+
+chmod +x "$STUB/bin/launchctl" "$STUB/bin/db-query" "$STUB/bin/curl" \
+         "$STUB/bin/git" "$STUB/bin/ps" "$STUB/bin/uname"
+
+# The ibl_bug_reports block of the real schema dump: the status-enum stub's
+# default answer, so the harness tracks the dump instead of a copy of it.
+REAL_DUMP="$REPO_ROOT/ibl5/docs/schema/current-schema.sql"
+awk '
+    /CREATE TABLE `ibl_bug_reports`/ { on = 1; print; next }
+    on && /CREATE TABLE `/ { exit }
+    on { print }
+' "$REAL_DUMP" > "$STUB/create-default"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -130,6 +187,9 @@ reset_case() {
           "$STUB/db-count-blocked" "$STUB/db-count-hunting" "$STUB/db-count-other" \
           "$STUB/db-count-botkey" "$STUB/db-botkey-unavailable" "$STUB/db-botkey-unparseable" \
           "$STUB/curl-exit" "$STUB/curl-code" \
+          "$STUB/launchctl-bot-nopid" "$STUB/git-fail" "$STUB/src-ct" "$STUB/etime" \
+          "$STUB/uname" "$STUB/db-create-unavailable" "$STUB/db-tier-unavailable" \
+          "$STUB/db-tier-unparseable" "$STUB/db-tier-count" \
           "$STUB/sql.log" "$STUB/out.txt" "$STUB/err.txt" "$STUB/rc"
     # healthy launchctl
     printf '0\n' > "$STUB/launchctl-list-rc"
@@ -147,10 +207,24 @@ reset_case() {
     # bot reachable, HTTP 200
     printf '0\n'   > "$STUB/curl-exit"
     printf '200\n' > "$STUB/curl-code"
+    # bot-build probe: newest src commit in 2017, dist file in 2020, bot up 5s
+    printf '1500000000\n' > "$STUB/src-ct"
+    printf '00:05\n'      > "$STUB/etime"
+    printf 'Darwin\n'     > "$STUB/uname"
+    mkdir -p "$STUB/repo/ibl5/IBLbot/dist/bug-bot"
+    touch -t 202001010000 "$STUB/repo/ibl5/IBLbot/dist/bug-bot/index.js"
+    # status enum: live table matches the real dump; one service-tier key
+    cp "$STUB/create-default" "$STUB/create-out"
+    printf '1\n' > "$STUB/db-tier-count"
     # stub pointers
     LAUNCHCTL_STUB="$STUB/bin/launchctl"
     DB_STUB="$STUB/bin/db-query"
     CURL_STUB="$STUB/bin/curl"
+    CASE_REPO_ROOT="$STUB/repo"
+    CASE_GIT="$STUB/bin/git"
+    CASE_PS="$STUB/bin/ps"
+    CASE_UNAME="$STUB/bin/uname"
+    CASE_SCHEMA_DUMP="$REAL_DUMP"
     CHECK_RC=0
 }
 
@@ -161,6 +235,11 @@ run_check() {
     BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$LAUNCHCTL_STUB" \
     BUG_PIPELINE_CHECK_DB_QUERY_BIN="$DB_STUB" \
     BUG_PIPELINE_CHECK_CURL_BIN="$CURL_STUB" \
+    BUG_PIPELINE_CHECK_BOT_REPO_ROOT="$CASE_REPO_ROOT" \
+    BUG_PIPELINE_CHECK_GIT_BIN="$CASE_GIT" \
+    BUG_PIPELINE_CHECK_PS_BIN="$CASE_PS" \
+    BUG_PIPELINE_CHECK_UNAME_BIN="$CASE_UNAME" \
+    BUG_PIPELINE_CHECK_SCHEMA_DUMP="$CASE_SCHEMA_DUMP" \
     BUG_PIPELINE_TICK_HEARTBEAT="$HEARTBEAT_FILE" \
     BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
     "$CHECK_BIN" "$@" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?
@@ -394,7 +473,8 @@ if [ -f "$STUB/sql.log" ]; then
         bpt_ok "14: sql.log contains only SELECT statements"
     fi
     _sql_count="$(grep -c 'SELECT' "$STUB/sql.log" 2>/dev/null || echo 0)"
-    bpt_expect_eq "14: sql.log has 4 SELECT calls" "4" "$_sql_count"
+    # 3 staleness counts + key count + key-tier count. SHOW CREATE TABLE is no SELECT.
+    bpt_expect_eq "14: sql.log has 5 SELECT calls" "5" "$_sql_count"
 else
     bpt_fail "14: sql.log not found (db stub was not called)"
 fi
@@ -568,7 +648,7 @@ else
     bpt_ok "K1: no botkey SIGNAL with an active bug-bot key"
 fi
 _k1_calls="$(grep -c 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null)"
-bpt_expect_eq "K1: ibl_api_keys probe ran exactly once" "1" "${_k1_calls:-0}"
+bpt_expect_eq "K1: ibl_api_keys probe ran twice (count + tier)" "2" "${_k1_calls:-0}"
 if grep 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null | grep -qE 'key_hash|key_prefix'; then
     bpt_fail "K1: key SQL must not name key_hash or key_prefix"
 else
@@ -629,7 +709,248 @@ else
     bpt_ok "K5: no botkey SIGNAL for two active keys"
 fi
 _k5_calls="$(grep -c 'ibl_api_keys' "$STUB/sql.log" 2>/dev/null)"
-bpt_expect_eq "K5: ibl_api_keys probe ran exactly once" "1" "${_k5_calls:-0}"
+bpt_expect_eq "K5: ibl_api_keys probe ran twice (count + tier)" "2" "${_k5_calls:-0}"
+
+# ── Case K6: every active key is tier standard → botkey:standard-tier ─────────
+reset_case
+printf '0\n' > "$STUB/db-tier-count"
+run_check
+if grep -q 'SIGNAL: botkey:standard-tier' "$STUB/out.txt"; then
+    bpt_ok "K6: SIGNAL botkey:standard-tier present"
+else
+    bpt_fail "K6: SIGNAL botkey:standard-tier absent — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "K6: verdict" "VERDICT: degraded [botkey:standard-tier]" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "K6: rc=1" "1" "$CHECK_RC"
+if grep -q "rate_limit_tier <> 'standard'" "$STUB/sql.log"; then
+    bpt_ok "K6: tier SQL excludes the standard tier"
+else
+    bpt_fail "K6: tier SQL should hold rate_limit_tier <> 'standard' — got $(cat "$STUB/sql.log")"
+fi
+
+# ── Case K7: two service-tier keys → botkey:present naming the count ──────────
+reset_case
+printf '2\n' > "$STUB/db-tier-count"
+run_check
+bpt_expect_eq "K7: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'ok: botkey:present.*2 service-tier' "$STUB/out.txt"; then
+    bpt_ok "K7: botkey:present names 2 service-tier"
+else
+    bpt_fail "K7: expected 'botkey:present ... 2 service-tier' — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case K8: tier query alone fails → botkey:tier-db-unavailable (UNKNOWN) ────
+reset_case
+: > "$STUB/db-tier-unavailable"
+run_check
+if grep -q 'SIGNAL: botkey:tier-db-unavailable' "$STUB/out.txt"; then
+    bpt_ok "K8: SIGNAL botkey:tier-db-unavailable present"
+else
+    bpt_fail "K8: SIGNAL botkey:tier-db-unavailable absent — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "K8: verdict" "VERDICT: unknown [botkey:tier-db-unavailable]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'botkey:standard-tier' "$STUB/out.txt"; then
+    bpt_fail "K8: no DEGRADED standard-tier when the tier query failed"
+else
+    bpt_ok "K8: no DEGRADED standard-tier when the tier query failed"
+fi
+
+# ── Case K8b: tier output unparseable → botkey:tier-parse-failed (UNKNOWN) ────
+reset_case
+: > "$STUB/db-tier-unparseable"
+run_check
+bpt_expect_eq "K8b: verdict" "VERDICT: unknown [botkey:tier-parse-failed]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case K9: zero active keys → botkey:missing only, tier query never sent ────
+reset_case
+printf '0\n' > "$STUB/db-count-botkey"
+run_check
+bpt_expect_eq "K9: verdict" "VERDICT: degraded [botkey:missing]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'rate_limit_tier' "$STUB/sql.log"; then
+    bpt_fail "K9: tier query must not run when no active key exists"
+else
+    bpt_ok "K9: no rate_limit_tier query when the key count is 0"
+fi
+
+# ── Case D1: healthy defaults → botdist:fresh + botproc:current ───────────────
+reset_case
+run_check
+bpt_expect_eq "D1: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'ok: botdist:fresh' "$STUB/out.txt" && grep -q 'ok: botproc:current' "$STUB/out.txt"; then
+    bpt_ok "D1: botdist:fresh and botproc:current emitted"
+else
+    bpt_fail "D1: expected ok botdist:fresh + botproc:current — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case D2: newest src commit is newer than the dist → botdist:stale ─────────
+reset_case
+date '+%s' > "$STUB/src-ct"
+run_check
+bpt_expect_eq "D2: verdict" "VERDICT: degraded [botdist:stale]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case D3: bot started before the dist was built → botproc:predates-dist ────
+reset_case
+printf '9999-00:00:00\n' > "$STUB/etime"
+run_check
+bpt_expect_eq "D3: verdict" "VERDICT: degraded [botproc:predates-dist]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case D4: non-Darwin host → botproc:unprobeable, no predates-dist ──────────
+reset_case
+printf '9999-00:00:00\n' > "$STUB/etime"
+printf 'Linux\n' > "$STUB/uname"
+run_check
+if grep -q 'SIGNAL: botproc:unprobeable' "$STUB/out.txt"; then
+    bpt_ok "D4: SIGNAL botproc:unprobeable present on Linux"
+else
+    bpt_fail "D4: SIGNAL botproc:unprobeable absent — got $(cat "$STUB/out.txt")"
+fi
+if grep -q 'botproc:predates-dist' "$STUB/out.txt"; then
+    bpt_fail "D4: botproc:predates-dist must be absent off macOS"
+else
+    bpt_ok "D4: botproc:predates-dist absent off macOS"
+fi
+bpt_expect_eq "D4: verdict" "VERDICT: unknown [botproc:unprobeable]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case D5: dist dir missing → botdist:unprobeable, no DEGRADED ──────────────
+reset_case
+rm -rf "$STUB/repo/ibl5/IBLbot/dist"
+run_check
+bpt_expect_eq "D5: verdict" "VERDICT: unknown [botdist:unprobeable]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case D6: git fails → botdist:unprobeable. D6b: no PID → botproc:no-pid ────
+reset_case
+: > "$STUB/git-fail"
+run_check
+bpt_expect_eq "D6: verdict" "VERDICT: unknown [botdist:unprobeable]" "$(tail -n 1 "$STUB/out.txt")"
+reset_case
+: > "$STUB/launchctl-bot-nopid"
+printf '9999-00:00:00\n' > "$STUB/etime"
+run_check
+bpt_expect_eq "D6b: verdict" "VERDICT: unknown [botproc:no-pid]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'botproc:predates-dist' "$STUB/out.txt"; then
+    bpt_fail "D6b: botproc:predates-dist must be absent without a PID"
+else
+    bpt_ok "D6b: botproc:predates-dist absent without a PID"
+fi
+
+# ── Case D7: _etime_secs edge table ───────────────────────────────────────────
+# Pull the function out of the checker (the script runs main on source).
+eval "$(sed -n '/^_etime_secs() {/,/^}/p' "$CHECK_BIN")"
+for _row in '05:07=307' '02:03:04=7384' '1-02:03:04=93784'; do
+    _in="${_row%%=*}"; _want="${_row##*=}"
+    bpt_expect_eq "D7: _etime_secs $_in" "$_want" "$(_etime_secs "$_in")"
+done
+for _bad in 'abc' '' '1:2:3:4' '5'; do
+    if _etime_secs "$_bad" >/dev/null 2>&1; then
+        bpt_fail "D7: _etime_secs [$_bad] should exit 1"
+    else
+        bpt_ok "D7: _etime_secs [$_bad] exits non-zero"
+    fi
+done
+
+# ── Case D8: an empty env seam behaves as unset ───────────────────────────────
+for _seam in CASE_REPO_ROOT CASE_GIT CASE_PS CASE_UNAME CASE_SCHEMA_DUMP; do
+    reset_case
+    printf -v "$_seam" '%s' ''
+    run_check
+    _v="$(tail -n 1 "$STUB/out.txt")"
+    case "$_v" in
+        VERDICT:*) bpt_ok "D8: $_seam empty still prints a VERDICT line" ;;
+        *) bpt_fail "D8: $_seam empty printed no VERDICT line — got [$_v]" ;;
+    esac
+    case "$CHECK_RC" in
+        0|1|2) bpt_ok "D8: $_seam empty exits $CHECK_RC" ;;
+        *) bpt_fail "D8: $_seam empty exit code $CHECK_RC" ;;
+    esac
+    if grep -q 'command not found' "$STUB/err.txt"; then
+        bpt_fail "D8: $_seam empty left 'command not found' in stderr"
+    else
+        bpt_ok "D8: $_seam empty leaves no 'command not found'"
+    fi
+    if [ "$_seam" = "CASE_SCHEMA_DUMP" ]; then
+        if grep -qF "$STUB/repo/ibl5/docs/schema/current-schema.sql" "$STUB/out.txt"; then
+            bpt_ok "D8: empty schema-dump seam fell back to the BOT_REPO_ROOT default"
+        else
+            bpt_fail "D8: statusenum:no-reference should name the BOT_REPO_ROOT default — got $(cat "$STUB/out.txt")"
+        fi
+    fi
+done
+
+# ── Case E1: live enum matches the dump → statusenum:current ─────────────────
+reset_case
+run_check
+bpt_expect_eq "E1: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'ok: statusenum:current — 14 values' "$STUB/out.txt"; then
+    bpt_ok "E1: statusenum:current names 14 values"
+else
+    bpt_fail "E1: expected 'statusenum:current — 14 values' — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case E2: live enum lacks 'dormant' → statusenum:missing names it ──────────
+reset_case
+sed "s/,'dormant'//" "$STUB/create-default" > "$STUB/create-out"
+run_check
+bpt_expect_eq "E2: verdict" "VERDICT: degraded [statusenum:missing]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'SIGNAL: statusenum:missing.*dormant' "$STUB/out.txt"; then
+    bpt_ok "E2: detail names dormant"
+else
+    bpt_fail "E2: detail should name dormant — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case E3: SHOW CREATE TABLE fails → statusenum:db-unavailable (UNKNOWN) ────
+reset_case
+: > "$STUB/db-create-unavailable"
+run_check
+bpt_expect_eq "E3: verdict" "VERDICT: unknown [statusenum:db-unavailable]" "$(tail -n 1 "$STUB/out.txt")"
+
+# ── Case E4: every status literal the PHP writers use is in the dump enum ─────
+# Static, no stub. The dump is the reference the probe compares against, so this
+# is the link from the PHP code to the dump. Files: ibl5/classes/BugPipeline/*.php
+# (every file there only touches ibl_bug_reports / ibl_bug_pipeline_state; the
+# pipeline-state table has no status column).
+_dump_enum="$(awk '/CREATE TABLE `ibl_bug_reports`/ {on=1; print; next} on && /CREATE TABLE `/ {exit} on {print}' "$REAL_DUMP" \
+    | grep -oE '`status` enum\([^)]*\)' | head -n 1 | grep -oE "'[a-z0-9_]+'" | tr -d "'")"
+_php_lits="$(command grep -hoE "status[[:space:]]*(=|IN|NOT IN)[[:space:]]*\(?'[a-z_]+'([[:space:]]*,[[:space:]]*'[a-z_]+')*" \
+    "$REPO_ROOT"/ibl5/classes/BugPipeline/*.php | command grep -oE "'[a-z_]+'" | tr -d "'" | sort -u)"
+_php_n="$(printf '%s\n' "$_php_lits" | grep -c .)"
+_e4_bad=""
+for _lit in $_php_lits; do
+    if ! grep -qxF "$_lit" <<< "$_dump_enum"; then _e4_bad="$_e4_bad $_lit"; fi
+done
+if [ -z "$_e4_bad" ]; then
+    bpt_ok "E4: every PHP status literal is in the dump enum"
+else
+    bpt_fail "E4: PHP status literals missing from the dump enum:$_e4_bad"
+fi
+bpt_expect_eq "E4: distinct PHP status literals found" "13" "$_php_n"
+
+# ── Case E5: a later table's status enum does not leak into the parse ─────────
+reset_case
+{ cat "$STUB/create-default"
+  printf 'CREATE TABLE `ibl_bug_pipeline_state` (\n  `status` enum('"'"'x'"'"') NOT NULL\n);\n'
+} > "$STUB/e5-dump.sql"
+CASE_SCHEMA_DUMP="$STUB/e5-dump.sql"
+run_check
+if grep -q 'ok: statusenum:current — 14 values' "$STUB/out.txt"; then
+    bpt_ok "E5: a trailing table's status enum is not parsed (still 14 values)"
+else
+    bpt_fail "E5: expected 14 values from ibl_bug_reports only — got $(cat "$STUB/out.txt")"
+fi
+
+# ── Case E6: an enum value with digits is parsed (counterfactual shape) ───────
+# The first real-stack counterfactual (zz_probe1680) was silently dropped by a
+# [a-z_]+ value pattern, so the checker said "current" for a value the live
+# column lacks.
+reset_case
+sed "s/,'dormant'/,'dormant','zz_probe1680'/" "$STUB/create-default" > "$STUB/e6-dump.sql"
+CASE_SCHEMA_DUMP="$STUB/e6-dump.sql"
+run_check
+bpt_expect_eq "E6: verdict" "VERDICT: degraded [statusenum:missing]" "$(tail -n 1 "$STUB/out.txt")"
+if grep -q 'SIGNAL: statusenum:missing.*zz_probe1680' "$STUB/out.txt"; then
+    bpt_ok "E6: detail names zz_probe1680"
+else
+    bpt_fail "E6: detail should name zz_probe1680 — got $(cat "$STUB/out.txt")"
+fi
 
 # ── Real-DB gate ──────────────────────────────────────────────────────────────
 REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
@@ -666,7 +987,7 @@ if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
     bpt_finish
 fi
 if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
-        "INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, is_active) VALUES (REPEAT('0', 64), 'testtest', 'bug-bot (Buggsy)', 1)" >/dev/null 2>&1; then
+        "INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, rate_limit_tier, is_active) VALUES (REPEAT('0', 64), 'testtest', 'bug-bot (Buggsy)', 'elevated', 1)" >/dev/null 2>&1; then
     bpt_fail "real-DB seed: bug-bot api key row failed"
     bpt_finish
 fi
@@ -683,7 +1004,7 @@ chmod +x "$STUB/bin/db-query-wrap"
 cat > "$STUB/bin/launchctl-healthy" << 'LC_EOF'
 #!/bin/sh
 case "$1" in
-    list)  exit 0 ;;
+    list)  printf '{\n\t"PID" = 4242;\n};\n'; exit 0 ;;
     print) printf 'last exit code = 0\nruns = 1\n' ;;
     *)     exit 0 ;;
 esac
@@ -693,6 +1014,14 @@ chmod +x "$STUB/bin/launchctl-healthy"
 # fresh heartbeat for all real-DB cases
 REAL_DB_HB="$STUB/hb-realdb"
 date '+%s' > "$REAL_DB_HB"
+
+# The scratch DB holds migrations 153 and 158 only, so its status enum is older
+# than the shipped dump. Give the real-DB cases a reference built from the scratch
+# table itself; the live-vs-dump comparison runs against the real stack (Phase 9).
+DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" "SHOW CREATE TABLE ibl_bug_reports" \
+    > "$STUB/scratch-schema.sql" 2>/dev/null
+# Bot-build fixtures for the real-DB cases: healthy defaults from the last reset_case.
+reset_case
 
 # ── Real-DB helpers ────────────────────────────────────────────────────────────
 _SEED_CTR=0
@@ -720,6 +1049,11 @@ run_real_check() {
     BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$STUB/bin/launchctl-healthy" \
     BUG_PIPELINE_CHECK_DB_QUERY_BIN="$STUB/bin/db-query-wrap" \
     BUG_PIPELINE_CHECK_CURL_BIN="$STUB/bin/curl" \
+    BUG_PIPELINE_CHECK_BOT_REPO_ROOT="$STUB/repo" \
+    BUG_PIPELINE_CHECK_GIT_BIN="$STUB/bin/git" \
+    BUG_PIPELINE_CHECK_PS_BIN="$STUB/bin/ps" \
+    BUG_PIPELINE_CHECK_UNAME_BIN="$STUB/bin/uname" \
+    BUG_PIPELINE_CHECK_SCHEMA_DUMP="$STUB/scratch-schema.sql" \
     BUG_PIPELINE_TICK_HEARTBEAT="$REAL_DB_HB" \
     BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
     "$CHECK_BIN" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?

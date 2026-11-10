@@ -428,6 +428,11 @@ render_prompt() { # template original_text transcript attachments_text operator_
 row_transcript() { # thread_id [omit_ids_json]
     if [ -n "$1" ] && [ "$1" != "null" ]; then
         local msgs; msgs="$(bot_get_thread_messages "$1")"
+        # Fetch marker for bin/bug-pipeline-e2e case 8.5. Thread id and count only:
+        # message bodies, authors and attachment names never reach the log.
+        local _nmsgs; _nmsgs="$(printf '%s' "$msgs" | jq -r '(.messages // []) | length' 2>/dev/null)"
+        case "$_nmsgs" in ''|*[!0-9]*) _nmsgs=unparsed ;; esac
+        log "transcript: fetched thread=$1 messages=$_nmsgs" >&2
         # Transcript attachment names come straight from /get-thread-messages and have NEVER
         # passed AttachmentInputValidator — this jq is the only sanitizer on that path. Strip
         # control chars + cap 120 so an image-only message renders a non-empty, single-line tail.

@@ -55,17 +55,17 @@ class FranchiseHistoryRepositoryTest extends TestCase
         }
     }
 
-    public function testFiveSeasonWindowFetchUsesSargableDateRange(): void
+    public function testFiveSeasonWindowFetchReadsRegularSeasonRecordsByYearRange(): void
     {
         $this->assertStringContainsString(
-            'game_date >= ? AND game_date < ?',
+            '`ibl_team_season_records`',
             $this->repositorySource(),
-            'Rolling 5-season window query must filter box scores by a sargable game_date range'
+            'Rolling 5-season window query must read the materialized ibl_team_season_records table'
         );
         $this->assertStringContainsString(
-            'WHERE year BETWEEN ? AND ?',
+            'r.game_type = 1 AND r.year BETWEEN ? AND ?',
             $this->repositorySource(),
-            'Rolling 5-season window query must keep the outer season-ending year filter'
+            'Rolling 5-season window query must filter regular-season rows by a season-ending year range'
         );
     }
 

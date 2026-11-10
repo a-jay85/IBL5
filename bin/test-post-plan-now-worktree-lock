@@ -169,6 +169,136 @@ if should_run lib-branch-nearmiss; then
     h_eq "lib-branch-nearmiss: glob prints nothing" "" "$OUT"
 fi
 
+# ---------------------------------------------------------------------------
+# bin/post-plan-now integration cases (rows 11-18). Scaffold copied from
+# bin/test-post-plan-now-untracked-only, built once and only when a case needs it.
+# ---------------------------------------------------------------------------
+PPN_READY=0
+setup_ppn() {
+    [ "$PPN_READY" -eq 0 ] || return 0
+    PPN_READY=1
+    PPN="$TMP/ppn"; mkdir -p "$PPN/runlog" "$PPN/shims" "$PPN/Library/LaunchAgents" "$PPN/gate" "$PPN/.local/bin"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$PPN/prefire-pass"; chmod +x "$PPN/prefire-pass"
+    export PREFIRE_VERIFY_SCRIPT="$PPN/prefire-pass"
+    export POSTPLAN_LOG_DIR="$PPN/runlog" PLAN_NOW_LOG_DIR="$PPN/runlog"
+    export PATH="$PPN/shims:$PATH"
+    export IBL5_USAGE_GATE_STATE_DIR="$PPN/gate"
+    printf '#!/bin/sh\nexit 1\n' > "$PPN/shims/security"
+    printf '#!/bin/sh\nexit 0\n' > "$PPN/shims/launchctl"
+    # claude shim sits in $HOME/.local/bin, which $CMD's own PATH export keeps.
+    printf '#!/bin/sh\nsleep "${FAKE_CLAUDE_SLEEP:-0}"\nexit 0\n' > "$PPN/.local/bin/claude"
+    chmod +x "$PPN/shims/security" "$PPN/shims/launchctl" "$PPN/.local/bin/claude"
+    unset CLAUDE_HEADLESS
+    export POST_PLAN_SKILL=1  # skill engine: the fake claude shim runs, never the real harness
+    PORIGIN="$PPN/origin.git"; PMAIN="$PPN/IBL5"; PWT="$PPN/IBL5-worktrees/feat-lock"
+    git init -q --bare -b master "$PORIGIN" >/dev/null 2>&1
+    mkdir -p "$PMAIN/bin/lib"
+    git -C "$PMAIN" init -q -b master >/dev/null 2>&1
+    git -C "$PMAIN" config user.email "test@example.com"
+    git -C "$PMAIN" config user.name "Test"
+    git -C "$PMAIN" remote add origin "file://$PORIGIN"
+    cp "$REPO/bin/lib/git-helpers.sh" "$PMAIN/bin/lib/git-helpers.sh"
+    printf 'ignored.log\n' > "$PMAIN/.gitignore"
+    git -C "$PMAIN" add .
+    git -C "$PMAIN" commit -q -m init
+    git -C "$PMAIN" push -q origin master
+    git -C "$PMAIN" fetch -q origin
+    git -C "$PMAIN" worktree add -q -b feat-lock "$PWT" master
+    PL="$(wtlock_path "$PWT")"
+    PRC=0; POUT=""; PERR=""
+}
+dirty_wt() { printf 'change\n' > "$PWT/NewFile.txt"; }
+run_ppn() {  # args: post-plan-now flags. Sets PRC, POUT, PERR.
+    PRC=0
+    set +e
+    POUT="$(cd "$PWT" && POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+            "$REPO/bin/post-plan-now" "$@" 2>"$PPN/err")"
+    PRC=$?
+    set -e
+    PERR="$(cat "$PPN/err")"; [ -z "${PPN_DEBUG:-}" ] || { echo "--- rc=$PRC"; echo "$POUT"; echo "$PERR"; }
+}
+plant_ppn() { reset_ppn; mkdir "$PL"; printf '%s\n' "$1" > "$PL/pid"; }
+reset_ppn() { rm -rf "$PL"; }
+
+if should_run held-live; then
+    setup_ppn; dirty_wt; plant_ppn "$LIVE"
+    run_ppn --foreground
+    h_eq "held-live: exit 6" "6" "$PRC"
+    h_contains "held-live: stdout names the lock" "$POUT" "holds the worktree lock"
+    h_eq "held-live: holder pid untouched" "$LIVE" "$(cat "$PL/pid")"
+    reset_ppn
+fi
+
+if should_run dead-reclaim; then
+    setup_ppn; dirty_wt; plant_ppn "$DEAD"
+    run_ppn --foreground
+    h_eq "dead-reclaim: exit 0" "0" "$PRC"
+    h_absent "dead-reclaim: no lock left behind" "$PL"
+fi
+
+if should_run force-steal; then
+    setup_ppn; dirty_wt; plant_ppn "$LIVE"
+    run_ppn --foreground --force
+    if [ "$PRC" = 6 ]; then fail "force-steal: --force still refused (exit 6)"; else pass "force-steal: exit is not 6 (got $PRC)"; fi
+    h_not_contains "force-steal: no lock refusal text" "$POUT" "holds the worktree lock"
+    reset_ppn
+fi
+
+if should_run release-exit; then
+    setup_ppn; dirty_wt; reset_ppn
+    run_ppn --foreground
+    h_eq "release-exit: exit 0" "0" "$PRC"
+    h_absent "release-exit: lock released on exit" "$PL"
+fi
+
+if should_run release-term; then
+    setup_ppn; dirty_wt; reset_ppn
+    (cd "$PWT" && FAKE_CLAUDE_SLEEP=3 POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+        exec "$REPO/bin/post-plan-now" --foreground >/dev/null 2>&1) &
+    pp=$!
+    for _ in $(seq 1 25); do
+        if [ -r "$PL/pid" ] && [ "$(cat "$PL/pid" 2>/dev/null)" = "$pp" ]; then break; fi
+        sleep 0.2
+    done
+    h_eq "release-term: lock holds the run's pid" "$pp" "$(cat "$PL/pid" 2>/dev/null || true)"
+    kill -TERM "$pp" 2>/dev/null || true
+    wait "$pp" 2>/dev/null || true
+    h_absent "release-term: lock released after TERM" "$PL"
+fi
+
+if should_run early-exit-release; then
+    setup_ppn; reset_ppn
+    rm -f "$PWT/NewFile.txt"
+    run_ppn --foreground
+    if [ "$PRC" != 0 ]; then pass "early-exit-release: refused with nonzero exit ($PRC)"; else fail "early-exit-release: expected a nonzero exit"; fi
+    h_absent "early-exit-release: lock released on the early exit" "$PL"
+fi
+
+if should_run detached-handoff; then
+    setup_ppn; dirty_wt; reset_ppn
+    printf '#!/bin/sh\necho "$*" >> "%s/lc.log"\nexit 0\n' "$PPN" > "$PPN/shims/launchctl"
+    chmod +x "$PPN/shims/launchctl"
+    PRC=0
+    (cd "$PWT" && POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+        exec "$REPO/bin/post-plan-now" >/dev/null 2>&1) &
+    pp=$!
+    wait "$pp" || PRC=$?
+    h_eq "detached-handoff: exit 0" "0" "$PRC"
+    h_exists "detached-handoff: lock still held for the far side" "$PL"
+    h_eq "detached-handoff: pid is the submitter's" "$pp" "$(cat "$PL/pid" 2>/dev/null || true)"
+    reset_ppn
+fi
+
+if should_run submit-fail-release; then
+    setup_ppn; dirty_wt; reset_ppn
+    printf '#!/bin/sh\n[ "$1" = list ] && exit 0\nexit 1\n' > "$PPN/shims/launchctl"
+    chmod +x "$PPN/shims/launchctl"
+    run_ppn
+    h_eq "submit-fail-release: exit 1" "1" "$PRC"
+    h_contains "submit-fail-release: stderr names the failure" "$PERR" "launchctl submit failed"
+    h_absent "submit-fail-release: lock released" "$PL"
+fi
+
 # --- later phases add their cases above this line ---
 
 check_only_cases

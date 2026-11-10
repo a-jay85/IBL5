@@ -417,4 +417,21 @@ class GoogleSheetExportServiceTest extends TestCase
         self::assertSame(GoogleSheetExportService::RESULT_BROKEN, $this->service->refreshForUser(self::USER_ID));
         self::assertSame([], $this->http->requests);
     }
+
+    public function testRefreshConnectionNonGoogleFailureReturnsErrorAndRecordsReason(): void
+    {
+        $this->seedConnection();
+        $row = $this->row();
+        $repo = self::createMock(GoogleSheetConnectionRepositoryInterface::class);
+        $repo->method('clearPending')->willThrowException(new \RuntimeException('db gone'));
+        $repo->expects(self::once())->method('markRefreshed')
+            ->with(self::USER_ID, GoogleSheetExportService::RESULT_ERROR, 'internal:RuntimeException');
+        $service = $this->buildService($this->box, $repo);
+
+        $result = $service->refreshConnection($row);
+
+        self::assertSame(GoogleSheetExportService::RESULT_ERROR, $result);
+        self::assertSame([], $this->http->requests);
+        self::assertStringContainsString('google sheet refresh failed', $this->allLogText());
+    }
 }

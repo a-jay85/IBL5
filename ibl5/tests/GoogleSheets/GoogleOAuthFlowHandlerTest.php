@@ -14,6 +14,7 @@ use GoogleSheets\GoogleSheetExportService;
 use GoogleSheets\GoogleSheetsClient;
 use PHPUnit\Framework\TestCase;
 use Security\SecretBox;
+use Security\SecretBoxKeyUnavailableException;
 use Tests\GoogleSheets\Fakes\FakeGoogleHttpClient;
 use Tests\GoogleSheets\Fakes\InMemoryConnectionRepository;
 
@@ -220,5 +221,22 @@ class GoogleOAuthFlowHandlerTest extends TestCase
         self::assertSame(['type' => 'error', 'text' => GoogleOAuthFlowHandler::TEXT_BAD_STATE], $result);
         self::assertSame([], $this->http->requests);
         self::assertSame([], $this->repo->rows);
+    }
+
+    public function testCallbackKeyUnavailableNamesServerKey(): void
+    {
+        $repo = new class extends InMemoryConnectionRepository {
+            public function upsert(int $userId, string $refreshTokenEnc, string $spreadsheetId, string $spreadsheetUrl): void
+            {
+                throw new SecretBoxKeyUnavailableException('key gone');
+            }
+        };
+        $handler = $this->buildHandler($repo);
+        $handler->start(5);
+        $this->queueExchangeAndCreate();
+
+        $result = $handler->callback(5, $this->storedState(), 'code-1', null);
+
+        self::assertSame(['type' => 'error', 'text' => 'Could not connect Google Sheets (server key unavailable).'], $result);
     }
 }

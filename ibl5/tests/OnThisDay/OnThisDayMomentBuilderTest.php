@@ -219,6 +219,33 @@ final class OnThisDayMomentBuilderTest extends TestCase
         $this->assertGreaterThan($trades, $lastDrop);
     }
 
+    public function testCollectDropsGuardedTablesWhenACollectorThrows(): void
+    {
+        $failing = new class extends MockDatabase {
+            public function sql_query(string $query): bool|object
+            {
+                if (str_contains($query, 'ibl_playoff_series_results')) {
+                    throw new \RuntimeException('clincher query failed');
+                }
+
+                return parent::sql_query($query);
+            }
+        };
+        $failing->onQuery('first_season', []);
+        $failing->onQuery('g\.pts >= 50', []);
+        $failing->onQuery('g\.ast >= 10', []);
+
+        $this->expectException(\RuntimeException::class);
+        try {
+            (new OnThisDayMomentBuilder($failing))->collect();
+        } finally {
+            $log = $failing->getOperationLog();
+            $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS tmp_otd_guarded_games'));
+            $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS tmp_otd_trade_old_games'));
+            $this->assertNull($this->firstIndexContaining($log, 'WITH games AS'));
+        }
+    }
+
     public function testTradeQueryReadsGuardedTempTables(): void
     {
         $this->collect();
@@ -235,6 +262,8 @@ final class OnThisDayMomentBuilderTest extends TestCase
         foreach (['g.pts >= 50', 'g.ast >= 10'] as $marker) {
             $player = array_values(array_filter($queries, static fn (string $q): bool => str_contains($q, $marker)));
             $this->assertCount(1, $player);
+            $this->assertStringStartsWith('SELECT g.*, p.name AS player_name', $player[0]);
+            $this->assertMatchesRegularExpression('/WHERE g\\.\\w+ /', $player[0]);
             $this->assertStringContainsString('FROM tmp_otd_guarded_games g', $player[0]);
             $this->assertStringNotContainsString('GROUP BY b.game_date', $player[0]);
             $this->assertStringEndsWith('ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid', $player[0]);

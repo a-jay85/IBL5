@@ -7,9 +7,10 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.gate_backtest import GateChange, ReplaySpec, classify_exit
-from harness.gate_backtest_replay import (ScratchTree, _fix_patch, fetch_history, make_git,
-                                          resolve_plan, run_backtest)
+from harness import gate_backtest_replay as gbr
+from harness.gate_backtest import GateChange, HistoricalPR, ReplaySpec, classify_exit
+from harness.gate_backtest_replay import (ScratchTree, _fix_patch, ensure_pr_heads, fetch_history,
+                                          make_git, resolve_plan, run_backtest)
 
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
 ENV = dict(os.environ, GIT_AUTHOR_NAME="T", GIT_AUTHOR_EMAIL="t@t.com",
@@ -796,3 +797,86 @@ def test_plan_gate_records_no_no_plan_skips_outside_sample(tmp_path):
     plan_rows = [r for r in results if r.gate == "bin/check-fakeplan"]
     assert not [r for r in plan_rows if r.detail == "no-plan"]
     assert [r.pr for r in plan_rows] == [5, 4, 2]
+
+
+def test_fetch_history_reads_head_oid(tmp_path):
+    """`fetch_history` copies `headRefOid` into `HistoricalPR.head_oid` and requests the field."""
+    repo, shas = build_repo(tmp_path)
+    oid = "ab" * 20
+    requested = []
+
+    def gh_json(argv):
+        requested.append(argv)
+        items = fake_gh(shas)(argv)
+        items[0]["headRefOid"] = oid
+        items[1]["headRefOid"] = "not-a-sha"
+        return items
+
+    history = fetch_history(gh_json, make_git(str(repo)))
+    by_number = {p.number: p for p in history}
+    assert by_number[1].head_oid == oid
+    assert by_number[2].head_oid == ""
+    assert by_number[3].head_oid == ""
+    fields = requested[0][requested[0].index("--json") + 1].split(",")
+    assert "headRefOid" in fields
+
+
+def _head_pr(number, head_oid):
+    return HistoricalPR(number, "t", "f" * 40, 1, T0, f"b{number}", (), head_oid=head_oid)
+
+
+def _record_fetches(monkeypatch, raises=None):
+    real_run = subprocess.run
+    fetches = []
+
+    def wrapped(argv, *args, **kwargs):
+        if "fetch" in argv:
+            fetches.append(list(argv))
+            if raises is not None:
+                raise raises
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return real_run(argv, *args, **kwargs)
+
+    monkeypatch.setattr(gbr.subprocess, "run", wrapped)
+    return fetches
+
+
+def test_ensure_pr_heads_fetches_only_missing(monkeypatch, tmp_path):
+    repo, shas = build_repo(tmp_path)
+    fetches = _record_fetches(monkeypatch)
+    present = _head_pr(1, shas[0])
+    absent = _head_pr(2, "c" * 40)
+    unknown = _head_pr(3, "")
+    assert ensure_pr_heads(str(repo), [present, absent, unknown]) == 1
+    assert len(fetches) == 1
+    assert fetches[0][-1] == "refs/pull/2/head"
+    assert "refs/pull/1/head" not in fetches[0] and "refs/pull/3/head" not in fetches[0]
+    fetches.clear()
+    assert ensure_pr_heads(str(repo), [present, unknown]) == 0
+    assert fetches == []
+
+
+def test_ensure_pr_heads_tolerates_fetch_timeout(monkeypatch, tmp_path):
+    repo, shas = build_repo(tmp_path)
+    fetches = _record_fetches(monkeypatch, raises=subprocess.TimeoutExpired("git", 60))
+    prs = [_head_pr(1, "d" * 40), _head_pr(2, "e" * 40)]
+    assert ensure_pr_heads(str(repo), prs) == 2
+    assert len(fetches) == 1
+
+
+TWO_LINE_HEAD_GATE = ("#!/bin/sh\n"
+                      "if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "
+                      "'^src/noisy.txt$'; then echo flagged; echo extra; exit 1; fi\nexit 0\n")
+
+
+def test_run_backtest_records_base_and_head_flag_lines(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas, tmp_path, script=TWO_LINE_HEAD_GATE,
+                  base_overlay=base(BASE_FLAG_GATE))
+    flagged = [r for r in results if r.outcome == "flag"]
+    assert {r.pr for r in flagged} == {3, 5}
+    for r in flagged:
+        assert r.flag_lines == ("flagged", "extra")
+        assert r.base_flag_lines == ("flagged",)
+    for r in (r for r in results if r.outcome == "pass"):
+        assert r.flag_lines == () and r.base_flag_lines == ()

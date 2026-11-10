@@ -117,6 +117,10 @@ class TradeDeclineControllerTest extends WideUnitTestCase
         );
     }
 
+    /**
+     * @param array<string, string> $params
+     * @param array<string, mixed>|null $body
+     */
     private function rejectedDeclineHandle(string $tier, bool $withKey, array $params, ?array $body): void
     {
         if (!$withKey) {

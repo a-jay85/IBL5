@@ -139,6 +139,10 @@ class TradeAcceptControllerTest extends WideUnitTestCase
         );
     }
 
+    /**
+     * @param array<string, string> $params
+     * @param array<string, mixed>|null $body
+     */
     private function rejectedAcceptHandle(string $tier, bool $withKey, array $params, ?array $body): void
     {
         if (!$withKey) {

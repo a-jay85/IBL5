@@ -686,6 +686,60 @@ clear_live_labels
 end_case postplan-now-inflight-skip
 fi
 
+# --- cases 10c/10d: per-worktree lock probe (backlog#1827) --------------------------------
+# A --foreground post-plan-now loads no launchd label; its lock under the worktree's git
+# admin dir is the only footprint. The fleet probes it and never acquires it.
+WLK_REPO="$SCRATCH/wlk-repo"; WLK_WT="$SCRATCH/wlk-wt-one"
+wlk_setup() {
+    [[ -d "$WLK_WT" ]] && return 0
+    git init -q -b master "$WLK_REPO" >/dev/null 2>&1
+    git -C "$WLK_REPO" config user.email "test@example.com"
+    git -C "$WLK_REPO" config user.name "Test"
+    git -C "$WLK_REPO" commit -q --allow-empty -m init
+    git -C "$WLK_REPO" worktree add -q -b branch-one "$WLK_WT"
+    WLK_LOCK="$(git -C "$WLK_WT" rev-parse --absolute-git-dir)/post-plan-now.lock"
+    WLK_WTL="$SCRATCH/wlk-wtl.txt"
+    cat > "$WLK_WTL" <<WTL_EOF
+$WLK_REPO  1111111 [master]
+$WLK_WT  2222222 [branch-one]
+/Users/x/GitHub/IBL5-worktrees/second-slug/ibl5  3333333 [branch-two]
+WTL_EOF
+}
+if should_run "worktree-lock-skip"; then
+begin_case
+clean_slots; wlk_setup
+sleep 300 & wlk_live=$!; disown "$wlk_live"
+rm -rf "$WLK_LOCK"; mkdir "$WLK_LOCK"; printf '%s\n' "$wlk_live" > "$WLK_LOCK/pid"
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+kill "$wlk_live" 2>/dev/null || true
+[[ $rc -eq 0 ]] || fail "worktree-lock-skip run exited $rc, want 0 (out: $out)"
+grep -qF "post-plan-now holds the worktree lock (pid $wlk_live); skipped" <<< "$out" \
+    || fail "PR 1901 was not skipped for the live worktree lock (out: $out)"
+grep -qE '1901 +branch-one +WT.*WOULD FIRE' <<< "$out" \
+    && fail "PR 1901 would fire despite a live worktree lock (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "a runner was spawned for the locked PR"
+rm -rf "$WLK_LOCK"
+end_case worktree-lock-skip
+fi
+
+if should_run "worktree-lock-free"; then
+begin_case
+clean_slots; wlk_setup
+sleep 0 & wlk_dead=$!; wait "$wlk_dead" 2>/dev/null
+rm -rf "$WLK_LOCK"; mkdir "$WLK_LOCK"; printf '%s\n' "$wlk_dead" > "$WLK_LOCK/pid"
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "worktree-lock-free run exited $rc, want 0 (out: $out)"
+grep -qF "holds the worktree lock" <<< "$out" \
+    && fail "a dead-pid lock wrongly skipped the PR (out: $out)"
+[[ "$(cat "$WLK_LOCK/pid" 2>/dev/null)" == "$wlk_dead" ]] \
+    || fail "the fleet rewrote the planted lock pid (it must only probe)"
+rm -rf "$WLK_LOCK"
+clean_slots
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"
+[[ ! -e "$WLK_LOCK" ]] || fail "the fleet left a post-plan-now.lock behind (it must never acquire)"
+end_case worktree-lock-free
+fi
+
 # --- Phase 8 fixture setup ---------------------------------------------------------------
 # Shared fixtures for preflight/report cases.
 

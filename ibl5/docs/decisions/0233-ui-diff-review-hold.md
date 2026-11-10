@@ -1,6 +1,6 @@
 ---
 description: The human-signoff hold keys on the diff and the VR gallery instead of the PR title. Amends ADR-0062.
-last_verified: 2026-11-07
+last_verified: 2026-11-09
 ---
 
 # ADR-0233: Diff-based UI review hold
@@ -27,7 +27,7 @@ Five open questions were resolved this way:
 - **Unrenderable diffs.** The classifier reruns `bin/website-affecting`. When the diff is not renderable, the path signal alone decides.
 - **Flake vs strict pass.** Strict-only cells sit below VR's own tolerance (ADR-0180), so they stay review-only.
 - **`update-baselines` runs.** They publish no artifact. Their new baselines land in `-snapshots/`, so the path signal holds the PR.
-- **Trusted gate logic.** Both jobs load the classifier libs and `bin/website-affecting` from a checkout of the base SHA. A PR that edits the classifier cannot change its own verdict, and its change applies only after merge.
+- **Trusted gate logic.** Both jobs load the classifier libs and `bin/website-affecting` from a checkout of the base SHA. That stops a PR from changing the classifier libs, and such a change applies only after merge. A PR that edits `.github/workflows/human-signoff.yml` itself can still skip the hold, because GitHub runs the PR's copy of that file on `pull_request`. Moving the check to a trusted trigger is tracked on the backlog.
 
 Arming condition (8) is now `ui-review-floor`. `tools/postplan-harness/harness/armable.py` `ui_hold` and `bin/lib/pr-armable.sh` `pr_ui_hold` call the classifier's `--paths` mode, and a classifier failure holds. The `feat:` floor is gone.
 

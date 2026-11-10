@@ -36,8 +36,11 @@ name: Human Sign-off
 # The classifiers live in bin/lib/human-signoff-classifier.sh and
 # bin/lib/ui-change-classifier.sh, sourced by BOTH this workflow and
 # bin/test-human-signoff-classifier so the gate's logic cannot drift from its
-# regression test. Both jobs load them from the BASE ref, never the PR head,
-# so a PR cannot rewrite its own verdict. A classifier change applies after merge.
+# regression test. Both jobs load them from the BASE ref, never the PR head.
+# That stops a PR from changing the classifier libs; such a change applies
+# after merge. It does NOT stop a PR that edits this workflow file itself.
+# GitHub runs the PR's own copy of this file on pull_request, so that PR can
+# skip the hold. Moving the check to a trusted trigger is on the backlog.
 #
 # Nothing re-runs this check when the wait times out and the gallery lands
 # later. A human re-runs the failed human-signoff job by hand; an automatic
@@ -111,9 +114,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-      # The gate logic comes from the BASE ref, never the PR head. A PR that
-      # edits the classifier, bin/website-affecting, or a helper they call
-      # cannot change its own verdict. Its edit takes effect after merge.
+      # The gate logic comes from the BASE ref, never the PR head. That stops
+      # a PR from changing the classifier, bin/website-affecting, or a helper
+      # they call; such an edit takes effect after merge. A PR that edits this
+      # workflow file itself can still skip the hold, because GitHub runs the
+      # PR's copy of this file on pull_request.
       # This checkout runs second because a root checkout cleans the workspace.
       - name: Checkout the base ref (trusted classifier lib)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

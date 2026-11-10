@@ -62,6 +62,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         self::assertSame(1, $this->repo->rows[8]['refresh_pending']);
     }
 
+    public function testRunBuildsExportRowsOncePerPendingGm(): void
+    {
+        $this->connect(1);
+        $this->connect(2);
+        $this->repo->markAllActivePending();
+        $this->queueOkRefresh();
+        $this->queueOkRefresh();
+        $players = self::createMock(ApiPlayerRepository::class);
+        $players->expects(self::exactly(2))->method('getAllPlayersForExport')->willReturn([]);
+
+        $exit = $this->worker(new FixedClock(1000), null, false, false, $players)->run(100, 240, false, false, $this->collect());
+
+        self::assertSame(0, $exit);
+    }
+
     public function testDryRunWithAllDoesNotMarkRowsPending(): void
     {
         $this->connect(7);
@@ -290,18 +305,19 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         ClockInterface $clock,
         ?Logger $logger = null,
         bool $buildFails = false,
-        bool $simLandsDuringBuild = false
+        bool $simLandsDuringBuild = false,
+        ?ApiPlayerRepository $playersOverride = null
     ): GoogleSheetRefreshWorker {
-        $players = self::createStub(ApiPlayerRepository::class);
-        if ($buildFails) {
+        $players = $playersOverride ?? self::createStub(ApiPlayerRepository::class);
+        if ($playersOverride === null && $buildFails) {
             $players->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
-        } elseif ($simLandsDuringBuild) {
+        } elseif ($playersOverride === null && $simLandsDuringBuild) {
             $players->method('getAllPlayersForExport')->willReturnCallback(function (): array {
                 $this->repo->markAllActivePending();
 
                 return [];
             });
-        } else {
+        } elseif ($playersOverride === null) {
             $players->method('getAllPlayersForExport')->willReturn([]);
         }
         $transformer = self::createStub(PlayerExportTransformer::class);

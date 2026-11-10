@@ -125,6 +125,20 @@ def _replace_in_match(m: re.Match, group_index: int, new_value: str) -> str:
     return full[:s] + new_value + full[e:]
 
 
+# Whole-PR file totals. Each shape must end its clause after the count phrase, so a
+# subset such as "5 files in this PR are tests" is left alone. The first shape must
+# also open a line, a bullet or a parenthesis, so "The tests cover 2 files in this PR."
+# is left alone too.
+_FILE_TOTAL_END = r"(?=\s*(?:[.,;:)]|$))"
+_LINE_OPEN = r"(?:^|\()[ \t]*(?:[-*][ \t]+)?"
+_FILE_TOTAL_LEAD = _LINE_OPEN + r"(\d+)\s+files?\s+in\s+(?:this\s+PR|the\s+diff)"
+_FILE_TOTAL_SUBJECT = r"\bthis\s+PR\s+(?:changes|touches|modifies|edits)\s+(\d+)\s+files?"
+_FILE_TOTAL_RES = (
+    re.compile(_FILE_TOTAL_LEAD + _FILE_TOTAL_END, re.IGNORECASE | re.MULTILINE),
+    re.compile(_FILE_TOTAL_SUBJECT + _FILE_TOTAL_END, re.IGNORECASE | re.MULTILINE),
+)
+
+
 def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -> str:
     """Apply all correction rules to a single unprotected text slice."""
 
@@ -140,6 +154,8 @@ def _apply_corrections(text: str, facts: BodyNumberFacts, body_adr_count: int) -
         text,
         flags=re.IGNORECASE,
     )
+    for total_re in _FILE_TOTAL_RES:  # whole-PR file totals
+        text = total_re.sub(fix_file_count, text)
 
     # Insertions — only when lines_added > 0
     if facts.lines_added > 0:

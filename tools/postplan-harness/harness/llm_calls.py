@@ -9,7 +9,7 @@ import difflib
 import re
 
 from .classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END, MERGE_DIGEST_BEGIN,
-                       MERGE_DIGEST_END)
+                       MERGE_DIGEST_END, strip_runner_blocks)
 from . import unplanned_scope
 from .state import ArmDecision, Classification, PlanInfo
 
@@ -231,8 +231,8 @@ def pr_body_recheck_prompt(findings: list[str], hunks: list[dict], old_body: str
         "a fuller review.\n\n"
         "## PRIOR FINDINGS\n" + _cap(f_block, _RECHECK_CAPS["findings"])
         + "\n\n## ADDED OR CHANGED BODY HUNKS\n" + _cap(h_block, _RECHECK_CAPS["hunks"])
-        + "\n\n## OLD BODY\n" + _cap(old_body or "", _RECHECK_CAPS["old_body"])
-        + "\n\n## NEW BODY\n" + _cap(new_body or "", _RECHECK_CAPS["new_body"])
+        + "\n\n## OLD BODY\n" + _cap(strip_runner_blocks(old_body), _RECHECK_CAPS["old_body"])
+        + "\n\n## NEW BODY\n" + _cap(strip_runner_blocks(new_body), _RECHECK_CAPS["new_body"])
         + "\n\n## CHANGED FILES (git diff --name-status)\n"
         + _cap(name_status or "", _RECHECK_CAPS["name_status"])
         + "\n\n## DIFF EVIDENCE\n" + _cap(evidence or "", _RECHECK_CAPS["evidence"])

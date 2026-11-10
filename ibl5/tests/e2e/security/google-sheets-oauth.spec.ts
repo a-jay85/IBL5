@@ -103,6 +103,16 @@ publicTest.describe('Google sign-in (anonymous)', () => {
     await expect(page.locator('#google-sheet-card')).toHaveCount(0);
   });
 
+  publicTest('anonymous main page renders the login box and no Google card', async ({ page }) => {
+    await page.goto(API_KEYS);
+
+    // handle() gates on isUser() before any op dispatch, so the bare main page
+    // takes the same loginBox() path as the google_callback URL.
+    await expect(page.locator('#login-username')).toBeVisible();
+    await expect(page.locator('#apikeys-flash')).toHaveCount(0);
+    await expect(page.locator('#google-sheet-card')).toHaveCount(0);
+  });
+
   publicTest('anonymous ApiKeys page renders no Google card', async ({ page }) => {
     const googleRequests = countGoogleRequests(page);
     const response = await page.goto(API_KEYS);

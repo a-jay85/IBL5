@@ -95,7 +95,7 @@ TELLS: list[Tell] = [
     ),
     _t(
         "label-colon-opener",
-        r"^\s*(?:[-*+]\s+|\d+\.\s+)?(?:\*\*|__)?(?:The (?:problem|issue|fix|real fix|real (?:issue|problem|cost|question|win)|catch|kicker|upshot|takeaway|result|important part|key|short version|bottom line|good news|bad news|difference|answer|point|trick|gotcha)|Why (?:it|this|that) (?:happened|happens|matters|works|failed|broke|fired)|What (?:this|it|that|happened) (?:means|changed)|Bottom line|Here'?s (?:the|what|why|how|where)\b[^:\n]{0,40}|TL;?DR|In short|Long story short|Translation|Verdict|The (?:takeaway|lesson)|Net effect|Key (?:insight|point|takeaway))(?:\*\*|__)?\s*:",
+        r"^\s*(?:[-*+]\s+|\d+\.\s+)?(?:\*\*|__)?(?:The (?:problem|issue|fix|real fix|real (?:issue|problem|cost|question|win)|catch|kicker|upshot|takeaway|result|important part|key|short version|bottom line|good news|bad news|difference|answer|point|trick|gotcha)|Why (?:it|this|that) (?:happened|happens|matters|works|failed|broke|fired)|What (?:this|it|that|happened) (?:means|changed)|What (?:this|it|that) settles|Done|Bottom line|Here'?s (?:the|what|why|how|where)\b[^:\n]{0,40}|TL;?DR|In short|Long story short|Translation|Verdict|The (?:takeaway|lesson)|Net effect|Key (?:insight|point|takeaway))(?:\*\*|__)?\s*:",
         "Delete the label. Say the thing.",
     ),
     _t(
@@ -403,6 +403,8 @@ def mode_self_test() -> int:
         ("- **The real fix:** delete the flag.", {"label-colon-opener"}),
         ("Why it matters: the cache binds first.", {"label-colon-opener"}),
         ("TL;DR: ship it.", {"label-colon-opener"}),
+        ("Done: the Triton code is read.", {"label-colon-opener"}),
+        ("What this settles: the design was wrong.", {"label-colon-opener"}),
         ("Here's the thing about hooks.", {"heres-the"}),
         ("It's worth noting that the cap is 16000.", {"filler"}),
         ("Think of it as a tripwire.", {"filler"}),
@@ -442,6 +444,9 @@ def mode_self_test() -> int:
         "Tell — one. <!-- slop-ok --> Tell — two. <!-- slop-ok -->",
         "Use --since rather than --files for PRs.",
         "Result: 3 files changed.",
+        "Done when the poll returns.",
+        "**Done.** The poll returned.",
+        "Mark the row Done: yes.",
         "See https://example.com/a—b for details.",
         "Do not commit. Leave the tree dirty.",
         "It is not a git repository.",

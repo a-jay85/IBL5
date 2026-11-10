@@ -143,7 +143,8 @@ def _strip_gate_paths(gitad, sha: str, hits, commit, log, out) -> str:
             raise HarnessError("gate-path-edit", f"{joined}: strip failed: {strip_err[:300]}")
         state = "edits staged, no commit made"   # HEAD is back at the pre-round commit
         new_sha = commit(REMEDIATION_COMMIT_MSG) or ""
-        state = "recommit made locally, not pushed"
+        state = ("recommit made locally, not pushed" if new_sha
+                 else "edits stripped, nothing to commit")
         leftover = denied_gate_edits(gitad.conformance_files(f"{sha}^"))
         dirty = gitad.is_dirty()
         if leftover or dirty:

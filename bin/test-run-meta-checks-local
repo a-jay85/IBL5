@@ -783,13 +783,15 @@ if want_group cache; then
                            || fail "cache-20 --no-cache=yes exits 2 (got $_LAST_RC)"
     want "cache-20 names the unknown option" "$_LAST_OUT" "unknown option: --no-cache=yes"
 
-    # Row 21: an empty or unset cache dir falls back to $HOME/.cache.
+    # Row 21: an empty or unset cache dir falls back to $HOME/.cache/ibl5-meta-checks.
     mkdir -p "$CT/home21" "$CT/home21b"
     run_check_both env -u META_CHECKS_NO_CACHE META_CHECKS_CACHE_DIR= XDG_CACHE_HOME= \
         HOME="$CT/home21" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
     N21=$(count_pass "$CT/home21/.cache/ibl5-meta-checks")
     [ "$N21" -eq 5 ] && pass "cache-21 empty dir falls back to HOME/.cache" \
                       || fail "cache-21 empty dir falls back to HOME/.cache (found $N21)"
+    want "cache-21 CACHE line names the \$HOME/.cache/ibl5-meta-checks fallback" "$_LAST_OUT" \
+        "dir=$CT/home21/.cache/ibl5-meta-checks"
     run_check_both env -u META_CHECKS_NO_CACHE -u META_CHECKS_CACHE_DIR -u XDG_CACHE_HOME \
         HOME="$CT/home21b" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
     N21B=$(count_pass "$CT/home21b/.cache/ibl5-meta-checks")

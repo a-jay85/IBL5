@@ -35,6 +35,13 @@
 #     IBL5_USAGE_GATE_STATE_DIR after sourcing; the later export wins.
 #   - Sourcing installs the h_tmp EXIT trap when none is set. A consumer that
 #     replaces the trap without calling h_cleanup leaves that one dir behind.
+#   - Sourcing unsets GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR
+#     and GIT_OBJECT_DIRECTORY. Git exports GIT_DIR to every hook run in a
+#     worktree. With it set, `git -C <tmp> init` re-inits the caller's repo
+#     and writes core.bare = true into the shared .git/config, which breaks
+#     the main checkout. A consumer may set its own value after sourcing.
+
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 
 [ -n "${_H_LOADED:-}" ] && return 0
 _H_LOADED=1

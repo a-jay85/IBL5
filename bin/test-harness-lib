@@ -247,6 +247,31 @@ h_done'
     fi
 }
 
+# Git exports GIT_DIR to hooks run in a worktree. With it inherited,
+# `git -C <tmp> init` re-inits the worktree's repo instead and sets
+# core.bare = true in the shared config (it broke the main checkout on
+# 2026-11-10). Sourcing the lib must drop it.
+case_git_repo_ignores_inherited_git_dir() {
+    local outer="$WORK/gd-outer" wtgd
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git init -q "$outer"
+    env -u GIT_DIR git -C "$outer" -c user.name=t -c user.email=t@t \
+        -c commit.gpgsign=false commit -q --allow-empty -m init
+    env -u GIT_DIR git -C "$outer" worktree add -q "$WORK/gd-wt" -b gd 2>/dev/null
+    wtgd=$(env -u GIT_DIR git -C "$WORK/gd-wt" rev-parse --absolute-git-dir)
+    run_scenario git_inherited_dir 'h_tmp T
+h_git_repo "$T/r"
+echo "inner=$(git -C "$T/r" rev-parse --is-inside-work-tree)"
+h_pass a
+h_done' "GIT_DIR=$wtgd" "GIT_INDEX_FILE=$wtgd/index"
+    local bare
+    bare=$(env -u GIT_DIR git --git-dir="$outer/.git" config core.bare)
+    if [ "$RC" -eq 0 ] && [ "$bare" = false ] && has "$OUT" "inner=true"; then
+        t_ok "case_git_repo_ignores_inherited_git_dir"
+    else
+        t_bad "case_git_repo_ignores_inherited_git_dir (rc=$RC bare=$bare out=[$OUT] err=[$ERR])"
+    fi
+}
+
 case_git_repo_unknown_flag() {
     run_scenario git_bogus 'h_tmp T
 h_git_repo "$T/r" --bogus
@@ -712,6 +737,7 @@ case_tmp_respects_existing_trap
 case_git_repo_default
 case_git_repo_no_commit
 case_git_repo_bare_origin
+case_git_repo_ignores_inherited_git_dir
 case_git_repo_unknown_flag
 case_env_i
 case_double_source

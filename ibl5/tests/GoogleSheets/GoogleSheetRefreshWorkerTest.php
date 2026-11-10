@@ -62,6 +62,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         self::assertSame(1, $this->repo->rows[8]['refresh_pending']);
     }
 
+    public function testRunBuildsExportRowsOncePerPendingGm(): void
+    {
+        $this->connect(1);
+        $this->connect(2);
+        $this->repo->markAllActivePending();
+        $this->queueOkRefresh();
+        $this->queueOkRefresh();
+        $players = self::createMock(ApiPlayerRepository::class);
+        $players->expects(self::exactly(2))->method('getAllPlayersForExport')->willReturn([]);
+
+        $exit = $this->worker(new FixedClock(1000), null, false, false, $players)->run(100, 240, false, false, $this->collect());
+
+        self::assertSame(0, $exit);
+    }
+
     public function testDryRunWithAllDoesNotMarkRowsPending(): void
     {
         $this->connect(7);
@@ -290,19 +305,24 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         ClockInterface $clock,
         ?Logger $logger = null,
         bool $buildFails = false,
-        bool $simLandsDuringBuild = false
+        bool $simLandsDuringBuild = false,
+        ?ApiPlayerRepository $playersOverride = null
     ): GoogleSheetRefreshWorker {
-        $players = self::createStub(ApiPlayerRepository::class);
-        if ($buildFails) {
-            $players->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
-        } elseif ($simLandsDuringBuild) {
-            $players->method('getAllPlayersForExport')->willReturnCallback(function (): array {
-                $this->repo->markAllActivePending();
+        $players = $playersOverride;
+        if ($players === null) {
+            $stub = self::createStub(ApiPlayerRepository::class);
+            if ($buildFails) {
+                $stub->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
+            } elseif ($simLandsDuringBuild) {
+                $stub->method('getAllPlayersForExport')->willReturnCallback(function (): array {
+                    $this->repo->markAllActivePending();
 
-                return [];
-            });
-        } else {
-            $players->method('getAllPlayersForExport')->willReturn([]);
+                    return [];
+                });
+            } else {
+                $stub->method('getAllPlayersForExport')->willReturn([]);
+            }
+            $players = $stub;
         }
         $transformer = self::createStub(PlayerExportTransformer::class);
         $transformer->method('getHeaders')->willReturn(['Name', 'Team']);

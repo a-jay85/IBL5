@@ -1,6 +1,6 @@
 ---
 description: One-time Google Cloud, environment, key-rotation, and prod-cron setup for the Google Sheets player export, plus what each broken state means.
-last_verified: 2026-10-28
+last_verified: 2026-11-10
 ---
 
 # Google Sheets Export Setup
@@ -38,13 +38,13 @@ Where to set them:
 
 - **Prod.** In the same place the `MAIL_*` variables live.
 - **Local worktrees.** In `ibl5/.env.test`, beside `DEV_AUTO_LOGIN`.
-- **CI E2E.** The placeholder values on the `php` service in `docker-compose.ci.yml`. The same values in `.github/workflows/e2e-tests.yml` go to the Playwright container, which PHP does not read.
+- **CI E2E.** CI sets placeholder values for all three variables on the php service in `docker-compose.ci.yml`. The E2E workflow passes none of them to the Playwright container.
 
 ## 4. Key rotation
 
 1. Set `GOOGLE_TOKEN_KEY_PREVIOUS` to the old key.
 2. Set `GOOGLE_TOKEN_KEY` to the new key.
-3. Run `php scripts/googleSheetRefreshTick.php --all` from `ibl5/`. Each row decrypts under the old key and is re-encrypted under the new one.
+3. Run `php scripts/googleSheetRefreshTick.php --all` from `ibl5/`. `--all` marks every active connection pending. The next tick re-encrypts each active row under the new key before it makes any Google call. A broken row keeps its old ciphertext until the GM presses Reconnect Google, which stores a fresh token under the current key.
 4. Unset `GOOGLE_TOKEN_KEY_PREVIOUS`.
 
 A lost key cannot be recovered. Every connection is then marked `broken` with reason `key_unavailable`, and each GM presses Reconnect.

@@ -57,6 +57,10 @@ class GoogleOAuthFlowHandler
             return ['type' => 'error', 'text' => self::connectError('network')];
         } catch (SecretBoxKeyUnavailableException) {
             return ['type' => 'error', 'text' => self::connectError('server key unavailable')];
+        } catch (\RuntimeException) {
+            // connect() throws this when the stored row cannot be read back. It also
+            // catches a DB failure during the first fill, which would otherwise render a raw error page.
+            return ['type' => 'error', 'text' => self::connectError('server error')];
         }
 
         if ($connection['status'] === 'broken') {
@@ -67,6 +71,24 @@ class GoogleOAuthFlowHandler
         }
 
         return ['type' => 'success', 'text' => self::TEXT_SUCCESS];
+    }
+
+    /**
+     * Event-log action for a callback result. A first-write failure is logged apart
+     * from a connect failure, because the connection row is stored in that case.
+     *
+     * @param array{type: 'success'|'error', text: string} $result
+     */
+    public static function eventAction(array $result): string
+    {
+        if ($result['type'] === 'success') {
+            return 'google_sheet_connected';
+        }
+        if ($result['text'] === self::TEXT_FIRST_WRITE_BROKEN || $result['text'] === self::TEXT_FIRST_WRITE_FAILED) {
+            return 'google_sheet_write_failed';
+        }
+
+        return 'google_sheet_connect_failed';
     }
 
     private static function connectError(string $reason): string

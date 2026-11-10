@@ -11,7 +11,7 @@ use GoogleSheets\Contracts\GoogleSheetConnectionRepositoryInterface;
  *
  * @phpstan-import-type ConnectionRow from GoogleSheetConnectionRepositoryInterface
  */
-final class InMemoryConnectionRepository implements GoogleSheetConnectionRepositoryInterface
+class InMemoryConnectionRepository implements GoogleSheetConnectionRepositoryInterface
 {
     /** @var array<int, ConnectionRow> */
     public array $rows = [];

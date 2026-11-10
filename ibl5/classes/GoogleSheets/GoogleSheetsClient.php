@@ -54,11 +54,12 @@ class GoogleSheetsClient
     }
 
     /**
-     * Make sure $tab exists and is at least $rowCount x $columnCount. Returns its sheetId.
+     * Make sure $tab exists and is at least $rowCount x $columnCount. Returns its sheetId and the grid it now has.
      *
+     * @return array{sheetId: int, rowCount: int, columnCount: int}
      * @throws GoogleSheetMissingException When the spreadsheet is gone
      */
-    public function ensureTab(#[\SensitiveParameter] string $accessToken, string $spreadsheetId, string $tab, int $rowCount, int $columnCount): int
+    public function ensureTab(#[\SensitiveParameter] string $accessToken, string $spreadsheetId, string $tab, int $rowCount, int $columnCount): array
     {
         $base = self::BASE_URL . '/' . rawurlencode($spreadsheetId);
         $response = $this->send(
@@ -101,7 +102,7 @@ class GoogleSheetsClient
                     ]]], true);
                 }
 
-                return $sheetId;
+                return ['sheetId' => $sheetId, 'rowCount' => max($rowCount, $currentRows), 'columnCount' => max($columnCount, $currentColumns)];
             }
         }
 
@@ -124,14 +125,14 @@ class GoogleSheetsClient
             throw new GoogleApiException('Google API error (addSheet returned no sheet id)', 200, 'no_sheet_id');
         }
 
-        return $newId;
+        return ['sheetId' => $newId, 'rowCount' => $rowCount, 'columnCount' => $columnCount];
     }
 
     /**
      * Write $rows starting at A1 as RAW values, in chunks, then clear the rows below them and the columns right of them.
      *
      * @param list<list<mixed>> $rows Header row first
-     * @param int $gridRows Row count the tab is known to have (at least what ensureTab was asked for)
+     * @param int $gridRows Row count the tab has, as reported by ensureTab()
      * @param int $gridColumns Column count the tab is known to have
      * @throws GoogleSheetMissingException When the spreadsheet is gone
      */

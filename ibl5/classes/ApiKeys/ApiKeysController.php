@@ -57,7 +57,7 @@ class ApiKeysController implements ApiKeysControllerInterface
                 ? ['type' => 'error', 'text' => 'Google Sheets sync is not configured on this server.']
                 : $this->googleFlow->callback($userId, $q->get('state'), $q->get('code'), $q->get('error'));
             $this->flash($result['type'], $result['text']);
-            \EventLog\EventLogger::setAction($result['type'] === 'success' ? 'google_sheet_connected' : 'google_sheet_connect_failed');
+            \EventLog\EventLogger::setAction(\GoogleSheets\GoogleOAuthFlowHandler::eventAction($result));
             (new \Api\Response\RedirectResponder())->redirect('modules.php?name=ApiKeys');
             return;
         }

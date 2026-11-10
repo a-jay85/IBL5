@@ -54,9 +54,8 @@ from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, 
 # read or delete the real /tmp flag. Not an env var on purpose: nothing outside the
 # test suite should be able to redirect where condition (16) looks.
 META_CHECKS_TMP_DIR = "/tmp"
-from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END, render_merge_digest,
-                              upsert_merge_digest,
+from harness.classify import (BACKLOG_REPO, render_merge_digest,
+                              strip_runner_blocks, upsert_merge_digest,
                               MANUAL_TESTING_SENTINEL, MANUAL_TESTING_SENTINEL_STATIC,
                               render_after_merge_block, upsert_after_merge,
                               backlog_closes_mismatch, classify, files_from_diff,
@@ -1436,16 +1435,7 @@ def _body_signature(body: str | None) -> str:
     left is the prose a human or an agent wrote. An unbalanced marker pair is left
     intact rather than guessed at -- the same bounds check strip_change_blocks uses.
     """
-    text = body or ""
-    begin = text.find(FILES_CHANGED_BEGIN)
-    end = text.find(FILES_CHANGED_END)
-    if begin != -1 and end != -1 and end > begin:
-        text = text[:begin] + text[end + len(FILES_CHANGED_END):]
-    begin = text.find(MERGE_DIGEST_BEGIN)
-    end = text.find(MERGE_DIGEST_END)
-    if begin != -1 and end != -1 and end > begin:
-        text = text[:begin] + text[end + len(MERGE_DIGEST_END):]
-    return text.strip()
+    return strip_runner_blocks(body).strip()
 
 
 def _round_model(round_num: int) -> str:

@@ -26,7 +26,7 @@ Two I/O directions:
      (NOT a worktree slug, torn down on merge; NOT prod)
    - `API_KEY`: a valid `ibl_api_keys` key; **must be an `elevated` or `unlimited` rate-limit
      tier** so startup backfill isn't 429-throttled into silently dropping reports
-     The wake route also rejects a `standard`-tier key with a 403, so a standard key breaks every operator wake.
+     The wake, reaction, thread-reply, last-seen, pipeline-state, thread-by-pr, source-updated, and source-deleted routes reject a `standard`-tier key with a 403, so a standard key stops the whole pipeline.
      `bin/bug-pipeline-check` reports a standard-only bug-bot key as `botkey:standard-tier`.
    - `BUG_OPERATOR_DISCORD_ID`: the league operator's Discord user snowflake. Unset and
      empty both abort startup. The test bot's `.env.bugbot.test` needs it too.

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
+use Api\Middleware\ServiceKeyGuard;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use BugPipeline\BugReportRepository;
 
@@ -12,9 +14,12 @@ class LastSeenController implements ControllerInterface
 {
     private BugReportRepository $bugRepo;
 
-    public function __construct(BugReportRepository $bugRepo)
+    private ServiceKeyGuard $serviceKeys;
+
+    public function __construct(BugReportRepository $bugRepo, ApiKeyRepository $apiKeys)
     {
         $this->bugRepo = $bugRepo;
+        $this->serviceKeys = new ServiceKeyGuard($apiKeys);
     }
 
     /**
@@ -22,6 +27,12 @@ class LastSeenController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
+        // Runs before any body field is read, so a rejected request reads and writes nothing.
+        if (!$this->serviceKeys->callerIsServiceKey()) {
+            $responder->error(403, 'forbidden', 'Only the pipeline bot can record the last-seen message.');
+            return;
+        }
+
         $channelId = $body['channel_id'] ?? null;
         $messageId = $body['message_id'] ?? null;
         if (!is_string($channelId) || $channelId === '' || !is_string($messageId) || $messageId === '') {

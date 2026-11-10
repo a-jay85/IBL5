@@ -94,6 +94,28 @@ class PlayerRegularSeasonAveragesViewTest extends TestCase
         $this->assertStringContainsString('>Career<', $html);
     }
 
+    public function testZeroStoredPointsSeasonAverageFallsBackToMadeShotFormula(): void
+    {
+        $history = [
+            [
+                'year' => 2034, 'team' => 'MIA', 'teamid' => 15,
+                'pid' => 42, 'name' => 'Test Player',
+                'games' => 10, 'minutes' => 300,
+                'fgm' => 50, 'fga' => 100, 'ftm' => 20, 'fta' => 30,
+                'tgm' => 10, 'tga' => 20,
+                'orb' => 0, 'reb' => 0, 'ast' => 0, 'stl' => 0,
+                'tvr' => 0, 'blk' => 0, 'pf' => 0, 'pts' => 0,
+            ],
+        ];
+        $view = $this->makeView($history, TournamentViewFixtures::careerAveragesRow());
+
+        $html = $view->renderAverages(42);
+
+        // (2 * 50 + 20 + 10) / 10 games = 13.0 per game from the made-shot formula.
+        $this->assertStringContainsString('<td>13.0</td>', $html);
+        $this->assertSame(1, substr_count($html, '<td>13.0</td>'));
+    }
+
     public function testRenderReturnsEmptyStringBecauseItNeedsContext(): void
     {
         $view = $this->makeView([], null);

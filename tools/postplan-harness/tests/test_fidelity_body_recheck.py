@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
 from harness import armable, fidelity
+from harness.classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              MERGE_DIGEST_BEGIN, MERGE_DIGEST_END)
 from harness.state import PlanInfo, UsageLedger
 
 from test_fidelity_body_only_round import _BodySeqGh
@@ -830,3 +832,14 @@ def test_round_two_body_only_uses_round_one_re_review_as_prior(tmp_path, git_shi
         assert rounds[1]["verdict_path"].endswith("-3.md")
     finally:
         _cleanup(9968, "9968-2", "9968-3")
+
+
+def test_body_signature_strips_runner_blocks_and_whitespace():
+    body = (f"\n\n{MERGE_DIGEST_BEGIN}\n## Merge digest\nquote\n{MERGE_DIGEST_END}\n"
+            f"## Summary\nhand-written\n{FILES_CHANGED_BEGIN}\n- a.py\n{FILES_CHANGED_END}\n\n")
+    assert runner._body_signature(body) == "## Summary\nhand-written"
+
+
+def test_body_signature_leaves_unbalanced_pair_intact():
+    body = f"intro\n{MERGE_DIGEST_END}\nmid\n{MERGE_DIGEST_BEGIN}\ntail\n"
+    assert runner._body_signature(body) == body.strip()

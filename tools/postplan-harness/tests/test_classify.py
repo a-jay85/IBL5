@@ -23,7 +23,9 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                slice_agent_e_diff,
                                restore_manual_testing_section, strip_change_blocks, strip_manual_testing_section,
                                TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
-                               upsert_reviewer_verification)
+                               upsert_reviewer_verification,
+                               MERGE_DIGEST_BEGIN, MERGE_DIGEST_END,
+                               SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, strip_runner_blocks)
 from harness.planfile import parse_hold_justification, split_hold_justification
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -1246,3 +1248,30 @@ def test_exec_mutations_neutralizes_headings():
         holding=("row 2 HELD — ## Manual Testing",)))
     assert "> ## Manual Testing" in out
     assert not any(l.startswith("## ") for l in out.splitlines())
+
+
+def test_strip_runner_blocks_removes_merge_digest():
+    body = f"A\n{MERGE_DIGEST_BEGIN}\nstale quote\n{MERGE_DIGEST_END}\nB\n"
+    assert strip_runner_blocks(body) == "A\n\nB\n"
+
+
+def test_strip_runner_blocks_removes_files_changed():
+    body = f"A\n{FILES_CHANGED_BEGIN}\n- x.py\n{FILES_CHANGED_END}\nB\n"
+    assert strip_runner_blocks(body) == "A\n\nB\n"
+
+
+def test_strip_runner_blocks_keeps_other_marker_blocks():
+    body = f"A\n{SCOPE_NOTES_BEGIN}\nnote\n{SCOPE_NOTES_END}\nB\n"
+    assert strip_runner_blocks(body) == body
+
+
+@pytest.mark.parametrize("body", [
+    f"x {MERGE_DIGEST_BEGIN} y",
+    f"x {MERGE_DIGEST_END} y {MERGE_DIGEST_BEGIN} z",
+])
+def test_strip_runner_blocks_leaves_unbalanced_pair_intact(body):
+    assert strip_runner_blocks(body) == body
+
+
+def test_strip_runner_blocks_treats_none_as_empty():
+    assert strip_runner_blocks(None) == ""

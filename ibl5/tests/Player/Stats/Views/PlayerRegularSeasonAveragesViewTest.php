@@ -7,6 +7,7 @@ namespace Tests\Player\Stats\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerRegularSeasonAveragesView;
+use Player\Stats\Views\PlayerSeasonTableRenderer;
 use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Stats\Views\PlayerRegularSeasonAveragesView */
@@ -24,7 +25,7 @@ class PlayerRegularSeasonAveragesViewTest extends TestCase
         $repository->method('getHistoricalStats')->willReturn($history);
         $repository->method('getSeasonCareerAveragesById')->willReturn($career);
 
-        return new PlayerRegularSeasonAveragesView($repository);
+        return new PlayerRegularSeasonAveragesView($repository, new PlayerSeasonTableRenderer());
     }
 
     public function testCareerRowFromRepositoryTakesPrecedence(): void

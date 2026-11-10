@@ -40,4 +40,4 @@ Move these findings earlier, in four layers that feed each other.
 
 ## Addendum 2026-11-10: or-true case-arm unwrap
 
-`bin/lib/deleted-guards` also cancels a removed `or-true` guard against an added one-line shell case arm in the same file. The arm prefix `<pattern>)` and a trailing `;;` are stripped, and the rest must equal the removed line exactly. Each added line cancels one removal. PR [#3821](https://github.com/a-jay85/IBL5/pull/3821) moved a `dm_ping ... || true` line into a `case` arm, and condition (20) held it for that alone. Other guard kinds and cross-file moves keep the exact-match rule.
+`bin/lib/deleted-guards` also cancels a removed `or-true` guard against an added one-line shell case arm in the same file. The arm prefix `<pattern>)` and a trailing `;;` are stripped, and the rest must equal the removed line exactly. Each added line cancels one removal. PR [#3821](https://github.com/a-jay85/IBL5/pull/3821) moved a `dm_ping ... || true` line into a `case` arm, and the detector flagged it as a removed guard. Other guard kinds and cross-file moves keep the exact-match rule.

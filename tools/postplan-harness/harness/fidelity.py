@@ -136,11 +136,15 @@ def _strip_gate_paths(gitad, sha: str, hits, commit, log, out) -> str:
     joined = ", ".join(hits)
     log(f"phase5.5: remediation touched gate-owning paths ({joined}) - reverting them "
         f"to {str(sha)[:12]}^ and keeping the other edits")
+    state = "tree state unknown"   # what the log may claim; narrowed as each step succeeds
     try:
         strip_err = gitad.strip_head_paths(sha, hits)
         if strip_err:
             raise HarnessError("gate-path-edit", f"{joined}: strip failed: {strip_err[:300]}")
+        state = "edits staged, no commit made"   # HEAD is back at the pre-round commit
         new_sha = commit(REMEDIATION_COMMIT_MSG) or ""
+        state = ("recommit made locally, not pushed" if new_sha
+                 else "edits stripped, nothing to commit")
         leftover = denied_gate_edits(gitad.conformance_files(f"{sha}^"))
         dirty = gitad.is_dirty()
         if leftover or dirty:
@@ -150,7 +154,7 @@ def _strip_gate_paths(gitad, sha: str, hits, commit, log, out) -> str:
     except Exception as exc:  # noqa: BLE001 - fail closed on any strip or recommit error
         kind = getattr(exc, "kind", exc.__class__.__name__)
         log(f"phase5.5: remediation gate-path revert failed or tree unclear "
-            f"({kind}: {getattr(exc, 'detail', exc)}) - commit left local, remediation ends")
+            f"({kind}: {getattr(exc, 'detail', exc)}) - {state}, remediation ends")
         out("gate-path-edit")
         if kind == "gate-path-edit":
             raise

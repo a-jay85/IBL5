@@ -1303,7 +1303,7 @@ b14_run() {
     cat > "$R/launchctl" <<'STUB'
 #!/bin/sh
 case "$1" in
-    list)  exit 0 ;;
+    list)  printf '{\n\t"PID" = 4242;\n};\n'; exit 0 ;;
     print) printf 'last exit code = 0\nruns = 1\n'; exit 0 ;;
     *)     exit 1 ;;
 esac
@@ -1313,6 +1313,7 @@ STUB
 D="$(dirname "$0")"
 printf '%s\n' "${DB_QUERY_TARGET:-}" >> "$D/db-target"
 case "$*" in
+    *"SHOW CREATE TABLE"*) cat "$D/schema.sql" ;;
     *ibl_api_keys*) printf '| n |\n|---|\n| %s |\n' "$(cat "$D/botkey-count")" ;;
     *)              printf '| n |\n|---|\n| 0 |\n' ;;
 esac
@@ -1323,7 +1324,18 @@ STUB
 printf '200'
 exit 0
 STUB
-    chmod +x "$R/launchctl" "$R/db-query" "$R/curl"
+    # Seams for the bot-build and status-enum probes, all answering healthy:
+    # dist newer than the newest src commit, bot started after the dist build,
+    # and a live status enum that matches the schema dump.
+    printf '#!/bin/sh\nprintf "1\\n"\n' > "$R/git"
+    printf '#!/bin/sh\nprintf "00:05\\n"\n' > "$R/ps"
+    printf '#!/bin/sh\nprintf "Darwin\\n"\n' > "$R/uname"
+    mkdir -p "$R/repo/ibl5/IBLbot/dist/bug-bot"
+    : > "$R/repo/ibl5/IBLbot/dist/bug-bot/index.js"
+    touch -t 200001010000 "$R/repo/ibl5/IBLbot/dist/bug-bot/index.js"
+    printf 'CREATE TABLE `ibl_bug_reports` (\n  `status` enum('"'"'queued'"'"','"'"'closed'"'"') NOT NULL\n);\n' \
+        > "$R/schema.sql"
+    chmod +x "$R/launchctl" "$R/db-query" "$R/curl" "$R/git" "$R/ps" "$R/uname"
     printf '%s\n' "$(date +%s)" > "$R/heartbeat"
     printf '%s\n' "$2" > "$R/botkey-count"
     export BUG_PIPELINE_CHECK_BIN="$SCRIPT_DIR/bug-pipeline-check"
@@ -1331,9 +1343,17 @@ STUB
     export BUG_PIPELINE_CHECK_DB_QUERY_BIN="$R/db-query"
     export BUG_PIPELINE_CHECK_CURL_BIN="$R/curl"
     export BUG_PIPELINE_TICK_HEARTBEAT="$R/heartbeat"
+    export BUG_PIPELINE_CHECK_GIT_BIN="$R/git"
+    export BUG_PIPELINE_CHECK_PS_BIN="$R/ps"
+    export BUG_PIPELINE_CHECK_UNAME_BIN="$R/uname"
+    export BUG_PIPELINE_CHECK_BOT_REPO_ROOT="$R/repo"
+    export BUG_PIPELINE_CHECK_SCHEMA_DUMP="$R/schema.sql"
     run_checker
     unset BUG_PIPELINE_CHECK_LAUNCHCTL_BIN BUG_PIPELINE_CHECK_DB_QUERY_BIN \
-          BUG_PIPELINE_CHECK_CURL_BIN BUG_PIPELINE_TICK_HEARTBEAT
+          BUG_PIPELINE_CHECK_CURL_BIN BUG_PIPELINE_TICK_HEARTBEAT \
+          BUG_PIPELINE_CHECK_GIT_BIN BUG_PIPELINE_CHECK_PS_BIN \
+          BUG_PIPELINE_CHECK_UNAME_BIN BUG_PIPELINE_CHECK_BOT_REPO_ROOT \
+          BUG_PIPELINE_CHECK_SCHEMA_DUMP
 }
 
 b14_run B14 0

@@ -3,7 +3,7 @@
 # bin/test-bug-pipeline-e2e — regression harness for the guards in
 # bin/bug-pipeline-e2e (opt-in gate, argv, production-contact guard, stub wiring)
 # and the lsof port guard in bin/bug-pipeline-test-env. L0-L7, E0-E6, G1-G21,
-# S-cases, C1-C3, W0-W4 (wake case 8.2 region).
+# S-cases, C1-C3, W0-W4 (wake case 8.2 region), W5 (case 8.5 fetch marker).
 #
 # Usage: bin/test-bug-pipeline-e2e [--mutation-check]
 #   (no arg)          run every case
@@ -153,6 +153,8 @@ if [ "$MODE" = mutation ]; then
     # W: wake case 8.2 region
     mut m-w82-read   e2e "\"\$(jq -r '.error.message' \"\$WAKE_OUT\" 2>/dev/null || true)\"" "'Only the pipeline operator can wake a report.'"
     mut m-w82-anchor e2e '# BPE-W82-END' '# BPE-W82-GONE'
+    # W5: case 8.5 asserts the tick's transcript-fetch marker
+    mut w5-needle    e2e 'transcript: fetched thread=${THREAD3}' 'transcript: fetchd thread=${THREAD3}'
 
     echo "passed=$H_PASS failed=$H_FAIL"
     [ "$H_FAIL" -eq 0 ] || exit 1
@@ -454,5 +456,23 @@ grep -v '# BPE-W82-END' "$E2E_BIN" > "$T/w82.noend"
 w82_extract "$T/w82.noend" "$T/w82.noend.sh" 2>"$T/w82.noend.err"; RC=$?
 bpt_expect_eq "W4: deleted END anchor rc" "1" "$RC"
 bpt_expect_contains "W4: deleted END anchor message" "W82 anchor BPE-W82-END count 0" "$(cat "$T/w82.noend.err")"
+
+# W5: case 8.5 pins the tick's fetch marker. Static cross-file pin: the 8.5 region of the
+# e2e script captures the tick's stderr and greps the marker; the tick logs the same needle.
+# The region is cut at two unique comment anchors, never at fi/done.
+W5_NEEDLE='transcript: fetched thread='
+w5_region() {   # <source>; prints the 8.5 region, returns 1 when an anchor is not unique
+    local src="$1" n
+    n=$(grep -cF -- '# 8.5 — real boundary' "$src"); [ "$n" -eq 1 ] || { echo "W5 anchor 8.5 count $n (want 1)" >&2; return 1; }
+    n=$(grep -cF -- '# 8.6 — a stopped row restarts' "$src"); [ "$n" -eq 1 ] || { echo "W5 anchor 8.6 count $n (want 1)" >&2; return 1; }
+    awk '/# 8\.5 — real boundary/{f=1} /# 8\.6 — a stopped row restarts/{f=0} f{print}' "$src"
+}
+if W5_REGION="$(w5_region "$E2E_BIN" 2>"$T/w5.err")"; then
+    bpt_expect_contains "W5: 8.5 region captures the tick stderr" '2>"$TICK85_ERR"' "$W5_REGION"
+    bpt_expect_contains "W5: 8.5 region greps the fetch marker needle" "grep -cE \"$W5_NEEDLE" "$W5_REGION"
+else
+    bpt_fail "W5: 8.5 region extracted ($(cat "$T/w5.err"))"
+fi
+bpt_expect_contains "W5: bin/bug-pipeline-tick logs the same needle" "log \"$W5_NEEDLE" "$(cat "$SCRIPT_DIR/bug-pipeline-tick")"
 
 h_done

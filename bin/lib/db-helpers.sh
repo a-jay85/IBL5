@@ -53,6 +53,116 @@ db_cmd() {
     docker exec "$container" "$client" -u"$DB_ROOT_USER" -p"$DB_ROOT_PASS" "$@"
 }
 
+# Print, one per line and sorted, the basename of every NNN_*.sql in <dir> that holds a
+# line-start statement targeting one of the given tables. A table named only in a `--`
+# comment does not match, and the trailing class keeps `ibl_bug_reports` from matching a
+# longer name such as `ibl_bug_reports_archive`. Table names come from the validated
+# keep-list (bin/db-sync-preserve-tables.txt), so they are safe inside the pattern.
+#
+# Usage: preserved_table_migrations <migrations-dir> <table>...
+preserved_table_migrations() {
+    local dir="$1" alt="" t f
+    shift
+    for t in "$@"; do alt="${alt:+$alt|}$t"; done
+    [ -n "$alt" ] || return 0
+    for f in "$dir"/[0-9][0-9][0-9]_*.sql; do
+        [ -f "$f" ] || continue
+        if grep -qiE "^[[:space:]]*(ALTER[[:space:]]+TABLE|UPDATE|INSERT([[:space:]]+IGNORE)?[[:space:]]+INTO|CREATE[[:space:]]+TABLE([[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS)?|DELETE[[:space:]]+FROM|DROP[[:space:]]+TABLE([[:space:]]+IF[[:space:]]+EXISTS)?|RENAME[[:space:]]+TABLE)[[:space:]]+\`?($alt)\`?([[:space:](;]|\$)" "$f"; then
+            basename "$f"
+        fi
+    done | sort
+}
+
+# Return 0 when a migration can safely run a second time:
+#  (a) a `--` comment says re-runnable / idempotent, with no negation in a `--` comment; or
+#  (b) it has no line-start ALTER/UPDATE/INSERT/DELETE/DROP/RENAME and every CREATE TABLE
+#      carries IF NOT EXISTS.
+# Anything else returns 1.
+#
+# Usage: migration_is_rerunnable <file>
+migration_is_rerunnable() {
+    local f="$1" comments
+    comments="$(grep -E '^[[:space:]]*--' "$f" || true)"
+    if grep -qiE 're-?runnable|idempotent' <<<"$comments" \
+        && ! grep -qiE 'not[[:space:]]+re-?runnable|non-?idempotent|not[[:space:]]+idempotent' <<<"$comments"; then
+        return 0
+    fi
+    if grep -qiE '^[[:space:]]*(ALTER|UPDATE|INSERT|DELETE|DROP|RENAME)([[:space:]]|$)' "$f"; then
+        return 1
+    fi
+    if grep -iE '^[[:space:]]*CREATE[[:space:]]+TABLE' "$f" \
+        | grep -qviE 'IF[[:space:]]+NOT[[:space:]]+EXISTS'; then
+        return 1
+    fi
+    return 0
+}
+
+# Re-apply the migrations that change a preserved table, prod has applied, and the local DB
+# had not recorded before the sync. bin/db-sync-prod backfills schema_migrations from prod,
+# so bin/db-migrate would otherwise skip them and the preserved local copy never gets them.
+# Refuses (return 1, ERROR on stderr, nothing deleted) when a candidate is not provably
+# re-runnable. Local-only: every call goes through db_cmd on <container>.
+#
+# Usage: replay_preserved_migrations <container> <db-name> <migrations-dir> \
+#            <pre-sync-versions> <table>...
+replay_preserved_migrations() {
+    local container="$1" db="$2" dir="$3" pre="$4" v
+    shift 4
+    if [ -z "$pre" ]; then
+        echo "WARNING: no local schema_migrations before the sync; preserved-table migration replay skipped" >&2
+        return 0
+    fi
+    local post
+    if ! post="$(db_cmd "$container" mariadb "$db" -N -B \
+            -e "SELECT version FROM schema_migrations /* post-backfill */" 2> >(db_strip_warnings >&2))"; then
+        echo "ERROR: could not read schema_migrations after the backfill; refusing to replay." >&2
+        return 1
+    fi
+    local candidates="" bad=0 all
+    all="$(preserved_table_migrations "$dir" "$@")"
+    while IFS= read -r v; do
+        [ -n "$v" ] || continue
+        case "$v" in 000_*) continue ;; esac
+        if grep -qxF -- "$v" <<<"$pre"; then continue; fi
+        if ! grep -qxF -- "$v" <<<"$post"; then continue; fi
+        if ! grep -qE '^[0-9]{3}_[a-z0-9_]+\.sql$' <<<"$v"; then
+            echo "ERROR: unexpected migration name $v; refusing to build SQL from it" >&2
+            bad=1
+            continue
+        fi
+        if ! migration_is_rerunnable "$dir/$v"; then
+            echo "ERROR: $v changes a preserved table and prod has applied it, but it is not marked re-runnable. The local preserved copy never received it. Apply it by hand against the local DB, then rerun the sync." >&2
+            bad=1
+            continue
+        fi
+        candidates="${candidates:+$candidates
+}$v"
+    done <<<"$all"
+    [ "$bad" -eq 0 ] || return 1
+    if [ -z "$candidates" ]; then
+        echo "No preserved-table migrations to replay."
+        return 0
+    fi
+    local in_list="" n=0
+    while IFS= read -r v; do
+        in_list="${in_list:+$in_list,}'$v'"
+        n=$((n + 1))
+    done <<<"$candidates"
+    if ! db_cmd "$container" mariadb "$db" \
+            -e "DELETE FROM schema_migrations WHERE version IN ($in_list)" 2> >(db_strip_warnings >&2); then
+        echo "ERROR: could not un-mark the preserved-table migrations." >&2
+        return 1
+    fi
+    local tmpdir _bin_dir rc=0
+    _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    tmpdir="$(mktemp -d)"
+    while IFS= read -r v; do cp "$dir/$v" "$tmpdir/$v"; done <<<"$candidates"
+    "$_bin_dir/db-migrate" "$container" "$tmpdir" "$db" || rc=$?
+    rm -rf "$tmpdir"
+    echo "Replayed $n preserved-table migration(s): $(printf '%s' "$candidates" | tr '\n' ' ')"
+    return $rc
+}
+
 # Resolve which database a checkout should talk to, from the checkout root alone.
 # Prints `main` for the main checkout (or anything not recognisably a linked
 # worktree), or the per-worktree container name `ibl5-db-<slug>`. Always exits 0:

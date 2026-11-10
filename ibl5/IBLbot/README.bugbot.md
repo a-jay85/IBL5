@@ -24,9 +24,10 @@ Two I/O directions:
    - `BUG_BOT_DISCORD_TOKEN` — the new app's token
    - `BUG_PIPELINE_API_BASE_URL` — the always-up main stack `http://main.localhost/ibl5`
      (NOT a worktree slug, torn down on merge; NOT prod)
-   - `API_KEY` — a valid `ibl_api_keys` key; **must be a high/unlimited rate-limit
+   - `API_KEY`: a valid `ibl_api_keys` key; **must be an `elevated` or `unlimited` rate-limit
      tier** so startup backfill isn't 429-throttled into silently dropping reports
      The wake route also rejects a `standard`-tier key with a 403, so a standard key breaks every operator wake.
+     `bin/bug-pipeline-check` reports a standard-only bug-bot key as `botkey:standard-tier`.
    - `BUG_OPERATOR_DISCORD_ID`: the league operator's Discord user snowflake. Unset and
      empty both abort startup. The test bot's `.env.bugbot.test` needs it too.
    - `BUG_CHANNEL_ID` — the dedicated bug-report channel snowflake

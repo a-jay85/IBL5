@@ -73,7 +73,7 @@ The REST API has 24 controllers covering players (list/detail/stats/history/expo
 
 ### 5. JSB Native Sim Engine (Go)
 
-A native Go re-implementation of the jumpshot 5.60 sim engine lives under `engine/`, scaffolded May 2026. The goal is cut-over fidelity with the legacy Windows binary so simulation stops depending on it.
+A faithful Go port of the jumpshot 5.60 sim engine lives under `engine/`, scaffolded May 2026 and resumed on 2026-11-08 ([ADR-0236](decisions/0236-two-engine-model-jsb-port.md)). The goal is cut-over fidelity with the legacy Windows binary so simulation stops depending on it. A separate clean-room engine is developed in the private `a-jay85/ibl-engine` repo. It replaces the port only once it plays better than JSB, and the two coexist until then.
 
 **Remaining work:** tracked item-by-item in [a-jay85/IBL5-backlog](https://github.com/a-jay85/IBL5-backlog) (label: jsb-native) — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates. That backlog is the single source of truth for engine status; do not duplicate item state here.
 

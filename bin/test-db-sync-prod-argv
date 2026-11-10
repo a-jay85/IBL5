@@ -11,7 +11,7 @@
 # fail-closed probe, S1 dump stdout/stderr separation, L1-L4 db_cmd unit cases,
 # M1-M3 DB_CMD composition in db-migrate/db-test-up/wt-up, E1 e2e-wt pin, P1 keep-list
 # covers every ibl_bug_* table the migrations create, P2 keep-list order, P3-P4 no inline
-# list or source, K1-K12 fail-closed keep-list.
+# list or source, K1-K12 fail-closed keep-list, R1-R9 preserved-table replay.
 set -euo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -43,6 +43,8 @@ case "$1" in
     ps)   printf 'ibl5-mariadb\n'; exit 0 ;;
     exec)
         case "$*" in
+            *'/* pre-sync */'*)      printf '%s' "${STUB_PRE_VERSIONS:-}" ;;
+            *'/* post-backfill */'*) printf '%s' "${STUB_POST_VERSIONS:-}" ;;
             *information_schema.tables*)
                 if [ "${STUB_PROBE_RC:-0}" -ne 0 ]; then
                     echo "ERROR 2002 (HY000): stub probe failure" >&2
@@ -105,9 +107,12 @@ assert_default_argv() {  # <label>
         "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
     assert_eq "$l backfill argv" "1" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -e ' "$LOG")"
-    assert_eq "$l rowcount argv" "1" \
+    assert_eq "$l pre-sync argv" "1" \
+        "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e SELECT version FROM schema_migrations /* pre-sync */' "$LOG")"
+    # The pre-sync read shares the `-N -B -e` form with the row-count call, so the count is 2.
+    assert_eq "$l rowcount argv" "2" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
-    assert_eq "$l exec total" "11" "$(grep -c '^exec ' <<<"$LOG" || true)"
+    assert_eq "$l exec total" "12" "$(grep -c '^exec ' <<<"$LOG" || true)"
     assert_eq "$l two-token form absent" "0" "$(count_in '-u root' "$LOG")"
     assert_eq "$l password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
     assert_match "$l snapshot banner" "Source: snapshot file" "$OUT"
@@ -129,7 +134,7 @@ assert_eq "O1 import argv x2" "2" \
     "$(count_in 'exec -i ibl5-mariadb mariadb --force -uu1 -psekret99 altdb' "$LOG")"
 assert_eq "O1 backfill argv" "1" \
     "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 altdb -e ' "$LOG")"
-assert_eq "O1 rowcount argv" "1" \
+assert_eq "O1 rowcount argv (pre-sync read shares the form)" "2" \
     "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 altdb -N -B -e ' "$LOG")"
 assert_eq "O1 no -uroot left" "0" "$(count_in '-uroot' "$LOG")"
 assert_eq "O1 no iblhoops_ibl5 left" "0" "$(count_in 'iblhoops_ibl5' "$LOG")"
@@ -146,7 +151,7 @@ assert_eq "F1 exit 1" "1" "$RC"
 assert_match "F1 abort message" "ERROR: preserve-tables probe failed for table ibl_api_keys" "$ERR"
 assert_match "F1 cause on stderr" "ERROR 2002" "$ERR"
 assert_eq "F1 cause not on stdout" "0" "$(grep -c 'ERROR 2002' <<<"$OUT" || true)"
-assert_eq "F1 stopped at first probe" "1" "$(grep -c '^exec ' <<<"$LOG" || true)"
+assert_eq "F1 stopped at first probe (after the pre-sync read)" "2" "$(grep -c '^exec ' <<<"$LOG" || true)"
 assert_eq "F1 nothing dumped" "0" "$(count_in 'mariadb-dump' "$LOG")"
 
 # S1: the dump file gets stdout only; a failed load keeps the backup.
@@ -288,5 +293,109 @@ run_sync
 cp "$KEEP_SRC" "$KEEP_DST"
 assert_eq "K10 no-trailing-newline list runs" "0" "$RC"
 assert_match "K10 last name still probed" "ibl_bug_report_operator_context" "$LOG"
+
+# R1-R9: preserved-table migration replay (Phase 4 helpers in bin/lib/db-helpers.sh).
+# shellcheck source=/dev/null
+. "$REPO_ROOT/bin/lib/db-helpers.sh"
+R_TABLES=(ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context)
+
+# R1: on the real migrations dir the list holds 177, 178, 198 and lacks 201 (its only
+# mention of ibl_api_keys is a `--` comment).
+R1_LIST="$(preserved_table_migrations "$REPO_ROOT/ibl5/migrations" "${R_TABLES[@]}")"
+assert_match "R1 holds 177" "177_add_filed_status_to_bug_reports.sql" "$R1_LIST"
+assert_match "R1 holds 178" "178_add_roster_error_class_to_bug_reports.sql" "$R1_LIST"
+assert_match "R1 holds 198" "198_bug_pipeline_dormant_and_operator_context.sql" "$R1_LIST"
+assert_eq "R1 lacks 201 (comment-only mention)" "0" "$(count_in '201_google_sheet_connections.sql' "$R1_LIST")"
+
+# R2 near-miss: a longer table name and a comment-only file are excluded; an indented,
+# lowercase, backticked UPDATE is included.
+R_FIX="$TMP/rfix"; mkdir -p "$R_FIX"
+printf 'ALTER TABLE ibl_bug_reports_archive ADD COLUMN y INT;\n' > "$R_FIX/900_x.sql"
+printf -- '-- touches ibl_bug_reports later\n' > "$R_FIX/901_x.sql"
+printf '  update `ibl_bug_reports` set x=1;\n' > "$R_FIX/902_x.sql"
+R2_LIST="$(preserved_table_migrations "$R_FIX" "${R_TABLES[@]}")"
+assert_eq "R2 longer table name excluded" "0" "$(count_in '900_x.sql' "$R2_LIST")"
+assert_eq "R2 comment-only file excluded" "0" "$(count_in '901_x.sql' "$R2_LIST")"
+assert_eq "R2 indented lowercase backticked update included" "1" "$(count_in '902_x.sql' "$R2_LIST")"
+
+# R3: the real 153, 177 and 198 are re-runnable; the real 075 is not.
+for n in 153 177 198; do
+    if migration_is_rerunnable "$(ls "$REPO_ROOT"/ibl5/migrations/${n}_*.sql)"; then pass "R3 $n re-runnable"; else failcase "R3 $n re-runnable" "rejected"; fi
+done
+if migration_is_rerunnable "$REPO_ROOT/ibl5/migrations/075_api_keys_user_link.sql"; then
+    failcase "R3 075 rejected" "accepted"; else pass "R3 075 rejected"; fi
+
+# R4 near-miss: a negated header is not a marker.
+printf -- '-- NOT re-runnable: adds a column\nALTER TABLE t ADD COLUMN c INT;\n' > "$R_FIX/910_neg.sql"
+printf -- '-- non-idempotent backfill\nALTER TABLE t ADD COLUMN c INT;\n' > "$R_FIX/911_neg.sql"
+for f in 910_neg 911_neg; do
+    if migration_is_rerunnable "$R_FIX/$f.sql"; then failcase "R4 $f rejected" "accepted"; else pass "R4 $f rejected"; fi
+done
+
+# R5-R9: integration through run_sync. The sandbox gets an ibl5/migrations fixture tree and a
+# db-migrate stub that logs its container, db and the files in the dir it was handed. Both
+# are removed after each case so the D1/K cases above never see them.
+cat > "$TMP/db-migrate.stub" <<'STUB'
+#!/bin/bash
+{ printf 'CALL %s %s\n' "$1" "${3:-}"; printf 'FILES %s\n' "$(ls "$2" | tr '\n' ' ')"; } >> "$STUB_ARGV_LOG.migrate"
+exit 0
+STUB
+R_198="198_bug_pipeline_dormant_and_operator_context.sql"
+R_PRE=$'153_create_bug_pipeline_tables.sql\n178_add_roster_error_class_to_bug_reports.sql'
+R_POST="$R_PRE"$'\n'"$R_198"
+r_fixture() {  # <198-body> [extra-file-name extra-file-body]
+    rm -rf "$MAIN/ibl5"; mkdir -p "$MAIN/ibl5/migrations"
+    printf -- '-- Re-runnable\nCREATE TABLE IF NOT EXISTS ibl_bug_reports (id INT);\n' \
+        > "$MAIN/ibl5/migrations/153_create_bug_pipeline_tables.sql"
+    printf -- '-- Re-runnable\nALTER TABLE ibl_bug_reports ADD COLUMN IF NOT EXISTS e INT;\n' \
+        > "$MAIN/ibl5/migrations/178_add_roster_error_class_to_bug_reports.sql"
+    printf '%s' "$1" > "$MAIN/ibl5/migrations/$R_198"
+    if [ -n "${2:-}" ]; then printf '%s' "$3" > "$MAIN/ibl5/migrations/$2"; fi
+    cp "$TMP/db-migrate.stub" "$MAIN/bin/db-migrate"; chmod +x "$MAIN/bin/db-migrate"
+    : > "$STUB_ARGV_LOG.migrate"
+}
+r_teardown() { rm -rf "$MAIN/ibl5" "$MAIN/bin/db-migrate"; }
+R_OK_BODY=$'-- Re-runnable\nALTER TABLE ibl_bug_reports MODIFY status VARCHAR(20);\n'
+R_DEL="DELETE FROM schema_migrations WHERE version IN ('$R_198')"
+
+r_fixture "$R_OK_BODY"
+run_sync STUB_PRE_VERSIONS="$R_PRE" STUB_POST_VERSIONS="$R_POST"
+MLOG="$(cat "$STUB_ARGV_LOG.migrate")"
+assert_eq "R5 exit 0" "0" "$RC"
+assert_eq "R5 un-marks only 198" "1" "$(count_in "$R_DEL" "$LOG")"
+assert_eq "R5 db-migrate handed a dir holding only 198" "1" "$(count_in "FILES $R_198 " "$MLOG")"
+assert_match "R5 summary line" "Replayed 1 preserved-table migration(s): $R_198" "$OUT"
+
+# R6 fail-loud: a prod-applied candidate with an ALTER and no marker aborts before any delete.
+r_fixture $'ALTER TABLE ibl_bug_reports ADD COLUMN z INT;\n'
+run_sync STUB_PRE_VERSIONS="$R_PRE" STUB_POST_VERSIONS="$R_POST"
+MLOG="$(cat "$STUB_ARGV_LOG.migrate")"
+if [ "$RC" -ne 0 ]; then pass "R6 exits non-zero"; else failcase "R6 exits non-zero" "rc=$RC"; fi
+assert_match "R6 names the refusal" "is not marked re-runnable" "$ERR"
+assert_eq "R6 no DELETE" "0" "$(count_in 'DELETE FROM schema_migrations' "$LOG")"
+assert_eq "R6 no db-migrate call" "0" "$(count_in 'CALL' "$MLOG")"
+
+# R7 boundary: an empty pre-sync history skips the replay.
+r_fixture "$R_OK_BODY"
+run_sync STUB_POST_VERSIONS="$R_POST"
+assert_eq "R7 exit 0" "0" "$RC"
+assert_match "R7 skip warning" "preserved-table migration replay skipped" "$ERR"
+assert_eq "R7 no DELETE" "0" "$(count_in 'DELETE FROM schema_migrations' "$LOG")"
+
+# R8: a candidate prod never applied is left to the normal db-migrate path.
+r_fixture "$R_OK_BODY"
+run_sync STUB_PRE_VERSIONS="$R_PRE" STUB_POST_VERSIONS="$R_PRE"
+MLOG="$(cat "$STUB_ARGV_LOG.migrate")"
+assert_eq "R8 exit 0" "0" "$RC"
+assert_eq "R8 no DELETE" "0" "$(count_in 'DELETE FROM schema_migrations' "$LOG")"
+assert_eq "R8 198 not handed to a replay dir" "0" "$(count_in "FILES $R_198 " "$MLOG")"
+
+# R9 boundary: a name outside ^[0-9]{3}_[a-z0-9_]+\.sql$ never reaches SQL.
+r_fixture "$R_OK_BODY" "199_Bad Name.sql" $'ALTER TABLE ibl_bug_reports ADD COLUMN q INT;\n'
+run_sync STUB_PRE_VERSIONS="$R_PRE" STUB_POST_VERSIONS="$R_POST"$'\n199_Bad Name.sql'
+if [ "$RC" -ne 0 ]; then pass "R9 exits non-zero"; else failcase "R9 exits non-zero" "rc=$RC"; fi
+assert_match "R9 names the bad name" "unexpected migration name 199_Bad Name.sql" "$ERR"
+assert_eq "R9 no DELETE" "0" "$(count_in 'DELETE FROM schema_migrations' "$LOG")"
+r_teardown
 
 h_done

@@ -8,6 +8,16 @@
 # (case l) runs against the real workflow and runner on disk.
 
 set -euo pipefail
+# Group selector: all (default), base, contract, cache or parallel.
+GROUP="${1:-all}"
+case "$GROUP" in
+    all|base|contract|cache|parallel) ;;
+    *) printf 'unknown group: %s\n' "$GROUP" >&2; exit 2 ;;
+esac
+want_group() { [ "$GROUP" = all ] || [ "$GROUP" = "$1" ]; }
+# Stubs change outcome through STUB_RC_* env, which no cache key covers, so
+# every case runs cache-free unless the cache group unsets this per call.
+export META_CHECKS_NO_CACHE=1
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
@@ -147,6 +157,7 @@ make_repo() {
 
 get_base() { git -C "$1" rev-parse HEAD; }
 
+if want_group base; then
 # ─── Case a: ibl5/classes/ change → refactor=true, adr=false ─────────────────
 REPO=$(make_repo "$FIXTURE_WORKFLOW")
 BASE=$(get_base "$REPO")
@@ -502,5 +513,95 @@ rm -rf "$REPO"
                  || fail "case n: exit 0 with no timeout binary resolved (got $RC)"
 want "case n: advisory step still ran unguarded" "$OUT" "WARN  check-hot-files"
 absent "case n: no timeout wording when unguarded" "$OUT" "timed out after"
+
+fi
+
+# ─── Shared fixture helpers for the contract, cache and parallel groups ─────
+# Cache dir lives under the harness temp root so no case touches the real
+# ~/.cache. The cache group overrides it per call.
+h_tmp H_CACHE_ROOT
+export META_CHECKS_CACHE_DIR="$H_CACHE_ROOT/default-cache"
+
+# step_lines <text>: the step and META lines, with any cached suffix stripped.
+step_lines() {
+    command grep -E '^(PASS|FAIL|SKIP|DEFER|WARN) |^META-CHECK' <<< "$1" | sed 's/ (cached)$//'
+}
+
+# Goldens pasted from one run of the pre-change runner (all stubs at rc 0).
+# The parallel group reuses both.
+CONTRACT_PASS_GOLDEN='PASS  check-docs-self-test
+PASS  check-docs-no-staleness
+PASS  check-docs-since
+PASS  check-prose-self-test
+PASS  check-prose-since
+PASS  check-registry-trigger-rows
+PASS  check-model-pins
+PASS  test-check-model-pins
+PASS  test-check-engine-freeze
+PASS  check-engine-freeze
+PASS  test-check-pipefail-grep-q
+PASS  check-pipefail-grep-q
+PASS  test-check-shell-portability
+PASS  check-shell-portability
+PASS  test-check-reviewer-eval
+PASS  reviewer-eval-validate
+SKIP  check-pr-manual-testing (no --body-file)
+SKIP  check-post-merge-recipe (no --body-file)
+SKIP  check-reviewer-eval (no --body-file)
+PASS  check-numbering
+PASS  check-e2e-hygiene
+PASS  check-e2e-fa-offers-owner
+PASS  check-e2e-mutator-isolation
+PASS  check-hot-files
+PASS  check-orphan-css
+DEFER adr-check (deferred to post-pr for PR bypass check)
+DEFER refactor-flag (deferred to post-pr for PR bypass check)
+META-CHECK-DEFERRED: adr-check
+META-CHECK-DEFERRED: refactor-flag
+META-CHECKS: OK stage=pre-push hard=20 failed=0 warn=0 skip=3 defer=2'
+CONTRACT_FAIL_GOLDEN='FAIL  test-check-engine-freeze
+META-CHECK-FAILED: test-check-engine-freeze
+META-CHECK-DEFERRED: adr-check
+META-CHECK-DEFERRED: refactor-flag
+META-CHECKS: FAILED stage=pre-push hard=20 failed=1 warn=0 skip=3 defer=2'
+
+# contract_run <env-assignments...>: all-rc-0 stubs unless overridden; sets
+# _LAST_OUT and _LAST_RC from the pre-push stage on a throwaway fixture.
+contract_run() {
+    local repo base
+    repo=$(make_repo "$FIXTURE_WORKFLOW_ALL"); base=$(get_base "$repo")
+    printf 'x\n' > "$repo/changed.txt"; git -C "$repo" add .; git -C "$repo" commit -q -m x
+    run_check_both env "$@" "$repo/bin/run-meta-checks-local" \
+        --self-test-hook "$repo" --base "$base"
+    rm -rf "$repo"
+}
+
+# compare_golden <label> <golden> <actual>: print both texts on a mismatch.
+compare_golden() {
+    if [ "$2" = "$3" ]; then
+        pass "$1"
+    else
+        fail "$1"
+        printf '  --- expected ---\n%s\n  --- actual ---\n%s\n' "$2" "$3"
+    fi
+}
+
+if want_group contract; then
+# ─── Contract: the runner's step lines, failure line and summary line ───────
+contract_run META_CHECKS_CONTRACT=1
+C_OUT="$_LAST_OUT"; C_RC="$_LAST_RC"
+compare_golden "contract: all-pass step lines match golden" \
+    "$CONTRACT_PASS_GOLDEN" "$(step_lines "$C_OUT")"
+[ "$C_RC" -eq 0 ] && pass "contract: all-pass exits 0" \
+                  || fail "contract: all-pass exits 0 (got $C_RC)"
+
+contract_run STUB_RC_test_check_engine_freeze=1
+C_OUT="$_LAST_OUT"; C_RC="$_LAST_RC"
+compare_golden "contract: one hard failure lines match golden" \
+    "$CONTRACT_FAIL_GOLDEN" "$(step_lines "$C_OUT" | command grep -E '^(FAIL|META-CHECK)')"
+[ "$C_RC" -eq 1 ] && pass "contract: one hard failure exits 1" \
+                  || fail "contract: one hard failure exits 1 (got $C_RC)"
+fi
+
 
 h_done

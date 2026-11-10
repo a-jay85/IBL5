@@ -125,7 +125,7 @@ const RETIRED_FIGURES = [
         'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
     ],
     [
-        'pattern' => '~git branch(?: (?:-f+|--(?:force)?))* [^\s-]\S*-(?:backup|local)-[0-9]{8}\b|git branch(?: (?:-f+|--force))* (?:-f*[cCmM][fcCmM]*|--(?:copy|move))(?: (?:-[fcCmM]+|--(?:force|copy|move)?))*(?: [^\s-]\S*)? \S*-(?:backup|local)-[0-9]{8}\b(?! +[\w./])|(?:git (?:checkout(?: -\S+)*? -f?[bB](?: -\S+)*|switch(?: -\S+)*? (?:-[cC]|--(?:force-)?create)(?: -\S+)*) |git (?:push|fetch)(?: -\S+)* [^\s:-]\S* (?:\S+ )*?\+?[^\s:]+:(?![/\~])|refs/heads/)\S*-(?:backup|local)-[0-9]{8}\b~',
+        'pattern' => '~git branch(?: (?:-f+|--(?:force)?))* [^\s-]\S*-(?:backup|local)-[0-9]{8}\b|git branch(?: (?:-f+|--force))* (?:-f*[cCmM][fcCmM]*|--(?:copy|move))(?: (?:-[fcCmM]+|--(?:force|copy|move)?))*(?: [^\s-]\S*)? \S*-(?:backup|local)-[0-9]{8}\b(?! +[\w./])|(?:git (?:checkout(?: -\S+)*? -f?[bB](?: -\S+)*|switch(?: -\S+)*? (?:-[cC]|--(?:force-)?create)(?: -\S+)*) |git (?:push|fetch)(?: -\S+)* [^\s:-]\S* (?:\S+ )*?\+?(?:[^\s:@]|@(?=\{))+:(?![/\~])|refs/heads/)\S*-(?:backup|local)-[0-9]{8}\b~',
         'label'   => 'undated-namespace backup branch <slug>-backup-<YYYYMMDD>',
         'why'     => 'backup branches moved to backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>; a <slug>-backup-<date> or <slug>-local-<date> branch is invisible to a backup/* sweep',
         'use'     => 'mint the name with wt_backup_branch_name (bin/lib/git-helpers.sh): backup/<slug>/<YYYYMMDD-HHMMSS>-<reason>',
@@ -1538,7 +1538,7 @@ function selfTestRetiredFigures(): int
         ['push remote-delete refspec does not flag', "# Doc\n\ngit push origin :xm-backup-20261022\n", 0],
         ['fetch from scp remote does not flag', "# Doc\n\ngit fetch git@github.com:org/x-backup-20261022.git main\n", 0],
         ['push to scp remote does not flag', "# Doc\n\ngit push git@github.com:org/repo-backup-20260101.git main\n", 0],
-        ['push scp remote with refspec does not flag', "# Doc\n\ngit push git@github.com:org/repo.git HEAD:main\n", 0],
+        ['fetch origin then scp remote does not flag', "# Doc\n\ngit fetch origin git@github.com:org/x-backup-20261022.git main\n", 0],
         ['push with flag and refspec flags', "# Doc\n\ngit push -u origin HEAD:xm-backup-20261022\n", 1],
         ['fetch from URL remote does not flag', "# Doc\n\ngit fetch https://example.com/x-backup-20261022 main\n", 0],
         ['fetch from origin then URL token does not flag', "# Doc\n\ngit fetch origin https://example.com/x-backup-20261022 main\n", 0],

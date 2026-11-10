@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness import fidelity
+from harness import fidelity, llm_calls
 from harness.adapters.llm import FixtureLlm
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.ghad import RecordingGh
@@ -512,6 +512,8 @@ def test_packet_pr_body_keeps_merge_danger_line(tmp_path, git_shim):
 def test_packet_pr_body_keeps_kept_unplanned_block(tmp_path, git_shim):
     written = _packet_pr_body(tmp_path, git_shim, _PR3748_WITH_KEPT)
     assert "KEPT-UNPLANNED-SENTINEL" in written
+    # The machine-block stripper drops this block, so build_packet must not use it.
+    assert "KEPT-UNPLANNED-SENTINEL" not in llm_calls.strip_machine_blocks(_PR3748_WITH_KEPT)
 
 
 def test_packet_pr_body_without_markers_is_unchanged(tmp_path, git_shim):

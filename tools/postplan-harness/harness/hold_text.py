@@ -180,6 +180,8 @@ def _merge_danger(reason: str) -> str:
     s = _state(reason)
     if s == "ONE-WAY":
         return "This change is hard to undo, so a person should merge it."
+    if s == "SELF-GOVERNING":
+        return "This PR changes the auto-merge machinery itself, so a person should merge it."
     if s == "MISSING":
         return "The PR body has no Merge danger line saying whether this is easy to undo."
     return "The PR body's Merge danger line could not be read."

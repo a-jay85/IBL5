@@ -11,7 +11,9 @@ import { countGoogleRequests, isGoogleHost } from '../fixtures/google-request-co
  * alert, and the absence of a stored connection row.
  *
  * CI passes placeholder GOOGLE_OAUTH_* / GOOGLE_TOKEN_KEY values so the feature
- * renders as configured. Local runs need the same three variables.
+ * renders as configured. They come from the php service in the repo-root
+ * docker-compose.ci.yml (there is no ibl5/docker-compose.ci.yml), so the E2E
+ * workflow env needs none of them. Local runs need the same three variables.
  */
 
 const API_KEYS = 'modules.php?name=ApiKeys';

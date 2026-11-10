@@ -11,6 +11,8 @@ const FONTS_HOST = 'fonts.googleapis.com';
 /**
  * Counts requests the BROWSER sends to Google, apart from the theme's web-font CSS.
  * PHP's server-side Google calls are invisible here; PHPUnit pins those.
+ * The listener reads the request URL only. It never asks request.frame(), so a
+ * request from any frame of the page counts.
  * Attach before the first navigation.
  */
 export function countGoogleRequests(page: Page): () => number {

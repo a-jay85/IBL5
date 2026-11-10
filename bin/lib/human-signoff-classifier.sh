@@ -37,8 +37,10 @@ hs_eval_pull_request() {
 # The human-approved label covers one PR diff. The approving `labeled` run
 # records the diff's patch-id in a github-actions[bot] comment carrying the
 # marker below. Every later run on a UI PR holding the label recomputes the
-# id and compares. A clean rebase keeps the id. A real diff change, a missing
-# record, or any read/compute error drops the approval (fail closed).
+# id and compares. The id covers changed lines only (no context lines), so a
+# clean rebase keeps the id, even when master edits lines next to a hunk. A
+# real diff change, a missing record, or any read/compute error drops the
+# approval (fail closed).
 # Marker value: 40 lowercase hex, or `revoked` (written when an approval drops).
 HS_FP_MARKER_RE='\A<!-- hs-approved-diff: (?<v>[0-9a-f]{40}|revoked) -->'
 
@@ -48,12 +50,15 @@ hs_is_fingerprint() {
 }
 
 # hs_diff_fingerprint <base_ref> <head_ref> — print the patch-id of the
-# three-dot (merge-base) diff base...head. rc 1 on a git error, an EMPTY diff
+# three-dot (merge-base) diff base...head, taken with -U0 so the id covers
+# changed lines only. Master edits next to a hunk leave it unchanged, and
+# patch-id ignores hunk line numbers, so a shifted hunk keeps its id too.
+# --verbatim keeps whitespace in the id. rc 1 on a git error, an EMPTY diff
 # (git patch-id prints nothing and exits 0 on empty input), or a malformed id.
 hs_diff_fingerprint() {
     local diff id
     if ! diff=$(git diff --no-color --no-ext-diff --no-textconv --binary \
-            --no-renames --diff-algorithm=myers -U3 "$1...$2" --); then
+            --no-renames --diff-algorithm=myers -U0 "$1...$2" --); then
         return 1
     fi
     [ -n "$diff" ] || return 1

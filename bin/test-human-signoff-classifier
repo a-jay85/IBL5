@@ -154,14 +154,14 @@ gcommit "bin2"
 fp_of master bin2
 differ "fp: same-path binary content change alters the fingerprint" "$FP_BIN" "$LAST_OUT"
 
-# G8: an upstream edit inside the hunk's context (l5 sits in the 3 lines after l2)
+# G8: an upstream edit inside what -U3 would count as context (l5 sits 3 lines after l2)
 git -C "$R" checkout -q master
 write_a l2 "l5 upstream" l8
 gcommit "upstream l5"
 git -C "$R" checkout -q ctx
 git -C "$R" rebase -q master
 fp_of master ctx
-differ "fp: upstream edit inside hunk context alters the fingerprint (conservative drop)" "$A" "$LAST_OUT"
+same "fp: upstream edit inside hunk context keeps the fingerprint (-U0)" "$A" "$LAST_OUT"
 
 # G9: empty diff fails closed
 fp_of master master; rc=$?
@@ -171,6 +171,47 @@ if [ -z "$LAST_OUT" ]; then h_pass "fp: empty diff prints nothing"; else h_fail 
 # G10: unknown ref fails closed
 fp_of master no-such-ref; rc=$?
 expect "fp: unknown ref -> rc 1" 1 "$rc"
+
+# G11-G13: 30-line rebase fixture. pr changes line 20; master then changes
+# line 22 (inside -U3 context) and line 1.
+R30="$T/r30"
+h_git_repo "$R30"
+write30() { # write30 <l1> <l20> <l22>
+    local i
+    for i in $(seq 1 30); do
+        case "$i" in
+            1) printf '%s\n' "$1" ;;
+            20) printf '%s\n' "$2" ;;
+            22) printf '%s\n' "$3" ;;
+            *) printf 'line%s\n' "$i" ;;
+        esac
+    done > "$R30/f.txt"
+}
+g30() { git -C "$R30" add -A && git -C "$R30" -c user.name=t -c user.email=t@t commit -q -m "$1"; }
+fp30() { LAST_OUT=$(cd "$R30" && bash -c "set -euo pipefail; source '$LIB'; hs_diff_fingerprint \"\$1\" \"\$2\"" _ "$1" "$2" 2>&1); }
+write30 line1 line20 line22
+g30 base30
+git -C "$R30" checkout -q -b pr
+write30 line1 "line20 pr" line22
+g30 "pr line 20"
+fp30 master pr
+FP30_PRE="$LAST_OUT"
+git -C "$R30" branch prws pr
+git -C "$R30" checkout -q master
+write30 "line1 master" line20 "line22 master"
+g30 "master lines 1 and 22"
+git -C "$R30" checkout -q pr
+git -C "$R30" -c user.name=t -c user.email=t@t rebase -q master
+fp30 master pr
+same "fp: clean rebase with master edit inside 3-line context keeps fingerprint" "$FP30_PRE" "$LAST_OUT"
+git -C "$R30" checkout -q prws
+write30 line1 "line20 pr " line22
+git -C "$R30" add -A && git -C "$R30" -c user.name=t -c user.email=t@t commit -q --amend -m "pr line 20 ws"
+fp30 master prws
+differ "fp: whitespace-only edit to a changed line changes fingerprint" "$FP30_PRE" "$LAST_OUT"
+fp30 pr pr; rc=$?
+expect "fp: empty diff returns rc 1" 1 "$rc"
+if [ -z "$LAST_OUT" ]; then h_pass "fp: empty diff returns rc 1 and prints nothing"; else h_fail "fp: empty diff returns rc 1 and prints nothing" "got [$LAST_OUT]"; fi
 
 # invocation-2-only: hand-built comment state
 EMPTY="$T/empty.json"

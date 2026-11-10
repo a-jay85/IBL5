@@ -212,6 +212,9 @@ SPAWNED_PIDS="$SPAWNED_PIDS $ORPHAN_PID"
 # summary line has a slug and task text to show. The newline in the prompt
 # checks that only the first line prints.
 mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
+# A real (unborn) branch, so the row's PR slot can match it by branch name.
+git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
+git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
 (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
     && exec "$STUBBIN/claude" -p "Fix the fixture widget
 SECOND PROMPT LINE") >/dev/null 2>&1 &
@@ -348,8 +351,21 @@ printf '{"branch":"merged-branch"}\n' > "$AM/handoff/merged-plan.md.json"
 cat > "$STUBBIN/gh" <<'GH'
 #!/bin/bash
 # `gh pr list --head <branch> ...`: one merged PR for merged-branch only.
+# `gh pr list --state open ...`: the open-PR table, already in the TSV shape
+# fleet-status's --jq asks for (head, number, state, url). STUB_GH_OPEN_FAIL
+# makes that call fail, the way a logged-out or offline gh does.
 while [ $# -gt 0 ]; do
     [ "$1" = --head ] && { [ "$2" = merged-branch ] && echo 1 || echo 0; exit 0; }
+    if [ "$1" = --state ] && [ "$2" = open ]; then
+        [ -n "${STUB_GH_OPEN_FAIL:-}" ] && exit 1
+        printf 'demo-slug\t3001\tauto\thttps://github.com/o/r/pull/3001\n'
+        printf 'stop-waiting-on-doomed-ci\t3002\tdraft\thttps://github.com/o/r/pull/3002\n'
+        printf 'idle-plan\t3003\topen\thttps://github.com/o/r/pull/3003\n'
+        printf 'live-plan\t3004\topen\thttps://github.com/o/r/pull/3004\n'
+        printf 'fixture-wt-branch\t3005\topen\thttps://github.com/o/r/pull/3005\n'
+        printf 'resumed-branch\t3006\topen\thttps://github.com/o/r/pull/3006\n'
+        exit 0
+    fi
     shift
 done
 exit 1
@@ -719,12 +735,12 @@ assert_lacks "launchd: exited job (PID '-') hidden"  "$OUTPUT" 'exited-slug'
 assert_lacks "launchd: killed job (status -9) hidden" "$OUTPUT" 'killed-slug'
 
 # 3 — the one genuinely running job is reported, with its producer name.
-assert_has "launchd: live job shown"          "$OUTPUT" 'post-plan +postplan-now-demo-slug'
+assert_has "launchd: live job shown"          "$OUTPUT" 'post-plan +(#[0-9]+ +)?postplan-now-demo-slug'
 assert_has "launchd: live job shows its pid"  "$OUTPUT" 'pid 4242'
 
 # 11 — a plan-now row leads with the slug it is planning for, and keeps the
 # timestamp as a tail so two concurrent runs on one slug stay distinguishable.
-assert_has "plan-now: slug shown"            "$OUTPUT" 'plan +stop-waiting-on-doomed-ci'
+assert_has "plan-now: slug shown"            "$OUTPUT" 'plan +(#[0-9]+ +)?stop-waiting-on-doomed-ci'
 assert_has "plan-now: timestamp kept"        "$OUTPUT" '20260910-171016-38521'
 
 # 12 — the prose fixture must NOT render a slug. This is the whole reason the
@@ -951,22 +967,22 @@ assert_has "queue: unlocked plan reads queued" \
     "$OUTPUT" 'idle-plan\.md +[^ ]+ +[^ ]+ +queued'
 # A lock with no live runner is not work in progress.
 assert_has "queue: usage-gate hold with its marker reads paused" \
-    "$OUTPUT" '‖ paused-plan\.md +[^ ]+ +[^ ]+ +paused \(usage limit\)$'
+    "$OUTPUT" '‖ +paused-plan\.md +[^ ]+ +[^ ]+ +paused \(usage limit\)$'
 assert_has "queue: usage-gate hold without its marker reads resumed" \
-    "$OUTPUT" '▶ resumed-plan\.md +[^ ]+ +[^ ]+ +resumed \(post-plan\)$'
+    "$OUTPUT" '▶ #3006  resumed-plan\.md +[^ ]+ +[^ ]+ +resumed \(post-plan\)$'
 assert_has "queue: resumed hold with no live post-plan reads stale" \
-    "$OUTPUT" '× resumed-gone-plan\.md +[^ ]+ +[^ ]+ +stale lock \(post-plan gone\)$'
+    "$OUTPUT" '× +resumed-gone-plan\.md +[^ ]+ +[^ ]+ +stale lock \(post-plan gone\)$'
 assert_has "queue: lock with a dead runner and no hold reads stale" \
-    "$OUTPUT" '× stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
+    "$OUTPUT" '× +stale-lock-plan\.md +[^ ]+ +[^ ]+ +stale lock \(runner gone\)$'
 assert_has "queue: dead lock on a merged PR says the runner clears it" \
-    "$OUTPUT" '× merged-plan\.md +[^ ]+ +[^ ]+ +PR merged \(runner clears it\)$'
+    "$OUTPUT" '× +merged-plan\.md +[^ ]+ +[^ ]+ +PR merged \(runner clears it\)$'
 assert_lacks "queue: no dead-runner lock reads in progress" \
     "$OUTPUT" '(paused|resumed|resumed-gone|stale-lock|merged)-plan\.md .*in progress'
 
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.
 assert_has "queue: header row names every column" \
-    "$OUTPUT" '# PLAN +MODEL +MERGE +STATUS$'
+    "$OUTPUT" '# PR +PLAN +MODEL +MERGE +STATUS$'
 assert_has "queue: bare plan shows the default model and merge" \
     "$OUTPUT" 'live-plan\.md +opus +true +in progress'
 assert_has "queue: frontmatter model and merge are read" \
@@ -1014,9 +1030,9 @@ assert_has "queue: rows follow queue order, not the alphabet" \
 # renumbering around it: live-plan holds position 1 behind the arrow, so the
 # queued row below it must read 2, not 1.
 assert_has "queue: queued row is numbered by queue position" \
-    "$OUTPUT" '^ +2\. +idle-plan\.md'
+    "$OUTPUT" '^ +2\. +(#[0-9]+ +)?idle-plan\.md'
 assert_lacks "queue: in-flight plan does not give its number away" \
-    "$OUTPUT" '^ +1\. +idle-plan\.md'
+    "$OUTPUT" '^ +1\. +(#[0-9]+ +)?idle-plan\.md'
 assert_lacks "queue: bullets are gone" \
     "$OUTPUT" '^ +· +(live|idle)-plan'
 
@@ -1205,7 +1221,7 @@ assert_has "links: a non-tty capture still prints the fallback log path" \
 # queue/*.md file, so linking it would open an error dialog. Nothing else on the
 # page can emit that URI, which makes this a clean negative.
 assert_has   "links: slug with no queue file is still shown" \
-    "$OUTPUT_LINKS" '▶ nodotmd-plan +-'
+    "$OUTPUT_LINKS" '▶ +nodotmd-plan +-'
 assert_lacks "links: slug with no queue file is NOT linked" \
     "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/nodotmd-plan\.md'
 
@@ -1630,6 +1646,44 @@ elif [ "$PTY_OK" -eq 1 ]; then
 else
     printf '  skip  %s\n' "watch tty: alt-screen/clip/restore (no python3 or no pty available)"
 fi
+
+# ── PR slot ────────────────────────────────────────────────────────────────────
+# A row whose branch has an open PR shows `#NNNN` in a 6-wide slot; any other
+# row keeps 6 blanks there, so the next column never moves. The stub gh lists
+# the open PRs.
+assert_has "pr slot: post-plan row matches its label's branch part" \
+    "$OUTPUT" '● post-plan  #3001  postplan-now-demo-slug-'
+assert_has "pr slot: plan-now row matches its prompt slug" \
+    "$OUTPUT" '● plan       #3002  stop-waiting-on-doomed-ci'
+assert_has "pr slot: a row with no PR keeps the slot blank" \
+    "$OUTPUT" '● plan              plan-now-20260910-090000-77000'
+assert_has "pr slot: a post-plan row with no PR keeps the slot blank" \
+    "$OUTPUT" '● post-plan         postplan-now-noaudit-slug-'
+assert_has "pr slot: queue header names the column" \
+    "$OUTPUT" '  # PR     PLAN '
+assert_has "pr slot: queued row shows its PR" \
+    "$OUTPUT" '^ +2\. #3003  idle-plan\.md'
+assert_has "pr slot: queued row with no PR stays aligned" \
+    "$OUTPUT" '^ +3\.        fm-title-plan\.md'
+assert_has "pr slot: in-progress row shows its PR" \
+    "$OUTPUT" '▶ #3004  live-plan\.md'
+assert_has "pr slot: orphan session matches its worktree branch" \
+    "$LOOSE_PLAIN" "● #3005  pid $PROMPT_ORPHAN_PID "
+assert_has "pr slot: orphan with no branch keeps the slot blank" \
+    "$LOOSE_PLAIN" "●        pid $ORPHAN_PID "
+assert_has "pr slot: the number links to the PR page" \
+    "$OUTPUT_LINKS" '8;;https://github\.com/o/r/pull/3001.\\#3001'
+assert_has "pr slot: the link leaves the padding plain" \
+    "$OUTPUT_STRIPPED" '● post-plan  #3001  postplan-now-demo-slug-'
+assert_lacks "pr slot: no PR link in a non-tty capture" \
+    "$OUTPUT" 'https://github\.com'
+OUT_GH_FAIL="$(run_fleet STUB_GH_OPEN_FAIL=1)"; RC_GH_FAIL=$?
+if [ "$RC_GH_FAIL" -eq 0 ]; then pass "pr slot: a gh failure still exits 0"; else
+    fail "pr slot: a gh failure still exits 0 (got $RC_GH_FAIL)"; fi
+assert_lacks "pr slot: a gh failure blanks every slot" \
+    "$OUT_GH_FAIL" '#300[0-9]'
+assert_has "pr slot: a gh failure keeps the row aligned" \
+    "$OUT_GH_FAIL" '● post-plan         postplan-now-demo-slug-'
 
 # ── paused jobs section ────────────────────────────────────────────────────────
 PAUSED_BLOCK="$(sed -n '/PAUSED JOBS/,$p' <<< "$OUTPUT")"

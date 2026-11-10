@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Group;
 use FranchiseHistory\FranchiseHistoryRepository;
 use FranchiseHistory\FranchiseHistoryService;
 use League\League;
+use Updater\Steps\RefreshTeamSeasonRecordsStep;
 
 /**
  * Database integration tests for franchise history assembly over the real DB.
@@ -18,8 +19,9 @@ use League\League;
  * behavior is byte-identical after the Repository→Service extraction.
  *
  * Tests the VIEW chain: vw_franchise_summary (W/L from ibl_team_season_records, refreshed by
- * RefreshTeamSeasonRecordsStep), the five-season window over ibl_team_win_loss → ibl_box_scores_teams,
- * plus vw_playoff_series_results and ibl_heat_win_loss.
+ * RefreshTeamSeasonRecordsStep), plus vw_playoff_series_results and ibl_heat_win_loss.
+ * The five-season window reads ibl_team_season_records too, so window tests rebuild it
+ * after seeding box scores.
  */
 #[Group('database')]
 class FranchiseHistoryRepositoryTest extends DatabaseTestCase
@@ -94,6 +96,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
             $this->insertTeamBoxscoreRow($s['date'], 'Sharks', 1, 2, 1);
         }
 
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
         $result = $this->repo->getAllFranchiseHistory(2098);
 
         $metros = null;
@@ -118,6 +121,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2092-01-15', 'Metros', 1, 2, 1);
         $this->insertTeamBoxscoreRow('2092-01-15', 'Sharks', 1, 2, 1);
 
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
         $result = $this->repo->getAllFranchiseHistory(2098);
         $metros = null;
         foreach ($result as $row) {

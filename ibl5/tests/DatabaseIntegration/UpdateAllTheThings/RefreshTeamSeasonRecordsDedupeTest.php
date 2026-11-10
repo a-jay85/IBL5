@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
-use FranchiseHistory\FranchiseHistoryRepository;
 use League\League;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
@@ -56,6 +55,27 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         $this->assertSame(1, $after1['losses'] - $before1['losses']);
         $this->assertSame(1, $after2['wins'] - $before2['wins']);
         $this->assertSame(0, $after2['losses'] - $before2['losses']);
+    }
+
+    public function testDriftFromLiveViewIsZeroAfterRebuild(): void
+    {
+        $this->rebuild();
+
+        self::assertSame(0, $this->driftCount());
+    }
+
+    public function testDriftFromLiveViewCountsBoxScoreAddedAfterRebuild(): void
+    {
+        $this->rebuild();
+
+        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Visitor', 1, 1, 2);
+        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Home', 1, 1, 2);
+
+        self::assertGreaterThan(0, $this->driftCount());
+
+        $this->rebuild();
+
+        self::assertSame(0, $this->driftCount());
     }
 
     public function testHeatPhantomWithHigherOrdinalCountedOnce(): void
@@ -199,17 +219,16 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         $this->assertTripleEmpty(self::REGULAR_DATE, $t1, $t2);
 
         $names = [$t1 => $this->teamName($t1), $t2 => $this->teamName($t2)];
-        $repo = new FranchiseHistoryRepository($this->db);
 
         $this->rebuild();
         $tableBefore = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
-        $windowBefore = $this->windowFor($repo, $names);
+        $windowBefore = $this->windowFor($names);
 
         $this->seedRealGame(self::REGULAR_DATE, 3, $t1, $t2);
         $this->seedPhantom(self::REGULAR_DATE, 7, $t1, $t2);
         $this->rebuild();
         $tableAfter = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
-        $windowAfter = $this->windowFor($repo, $names);
+        $windowAfter = $this->windowFor($names);
 
         foreach ([$t1, $t2] as $tid) {
             $this->assertSame(
@@ -273,6 +292,17 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
         self::assertIsString($name);
 
         return $name;
+    }
+
+    private function driftCount(): int
+    {
+        $result = $this->db->query(RefreshTeamSeasonRecordsStep::REGULAR_SEASON_DRIFT_SQL);
+        self::assertInstanceOf(\mysqli_result::class, $result, 'Drift query failed: ' . $this->db->error);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertIsNumeric($row['drift']);
+
+        return (int) $row['drift'];
     }
 
     private function assertTripleEmpty(string $date, int $visitor, int $home): void
@@ -344,11 +374,22 @@ final class RefreshTeamSeasonRecordsDedupeTest extends DatabaseTestCase
      * @param array<int, string> $names team id => team_name
      * @return array<int, array{wins: int, losses: int}>
      */
-    private function windowFor(FranchiseHistoryRepository $repo, array $names): array
+    private function windowFor(array $names): array
     {
+        // Reads the live view, not the table, so this stays an oracle independent of the refresh step.
+        $result = $this->db->query(
+            'SELECT currentname,
+                    CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
+                    CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
+             FROM ibl_team_win_loss
+             WHERE year BETWEEN 2095 AND 2099
+             GROUP BY currentname'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+
         $byName = [];
-        foreach ($repo->getFiveSeasonWindowRows(2099) as $row) {
-            $byName[$row['currentname']] = [
+        foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
+            $byName[(string) $row['currentname']] = [
                 'wins' => (int) $row['five_season_wins'],
                 'losses' => (int) $row['five_season_losses'],
             ];

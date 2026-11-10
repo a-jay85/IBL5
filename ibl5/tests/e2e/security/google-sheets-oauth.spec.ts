@@ -1,6 +1,7 @@
 import { test as regularTest, expect } from '../fixtures/auth-regular';
 import { test as publicTest } from '../fixtures/public';
 import type { APIRequestContext } from '@playwright/test';
+import { countGoogleRequests, isGoogleHost } from '../fixtures/google-request-counter';
 
 /**
  * Google sign-in hardening for the ApiKeys page: CSRF on `op=google_start`, the
@@ -67,12 +68,14 @@ regularTest.describe('Google sign-in (regular user)', () => {
   });
 
   regularTest('google_callback with a bogus state is rejected before any token exchange', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
     await page.goto(`${API_KEYS}&op=google_callback&state=bogus&code=x`);
 
     await expect(page).toHaveURL(/modules\.php\?name=ApiKeys$/);
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('expired or invalid');
     const conn = await page.request.get(`test-state.php?action=get-google-sheet-connection&${USER}`);
     expect(conn.status()).toBe(404);
+    expect(googleRequests()).toBe(0);
   });
 
   for (const op of ['google_start', 'google_refresh', 'google_disconnect']) {
@@ -96,5 +99,34 @@ publicTest.describe('Google sign-in (anonymous)', () => {
     await expect(page.locator('#login-username')).toBeVisible();
     await expect(page.locator('#apikeys-flash')).toHaveCount(0);
     await expect(page.locator('#google-sheet-card')).toHaveCount(0);
+  });
+
+  publicTest('anonymous ApiKeys page renders no Google card', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
+    const response = await page.goto(API_KEYS);
+
+    expect(response?.status()).toBeLessThan(400);
+    await expect(page.locator('#google-sheet-card')).toHaveCount(0);
+    await expect(page.locator('#google-sheet-connect')).toHaveCount(0);
+    expect(googleRequests()).toBe(0);
+  });
+
+  publicTest('isGoogleHost matches Google hosts only', () => {
+    for (const host of ['accounts.google.com', 'google.com', 'sheets.googleapis.com']) {
+      expect(isGoogleHost(host), host).toBe(true);
+    }
+    for (const host of ['notgoogle.com', 'google.com.example.net', 'googleapis.com.evil.io', 'localhost']) {
+      expect(isGoogleHost(host), host).toBe(false);
+    }
+  });
+
+  publicTest('countGoogleRequests counts a browser request to Google', async ({ page }) => {
+    await page.route('https://accounts.google.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/plain', body: 'stub' }),
+    );
+    const googleRequests = countGoogleRequests(page);
+    await page.goto('https://accounts.google.com/o/oauth2/v2/auth');
+
+    expect(googleRequests()).toBe(1);
   });
 });

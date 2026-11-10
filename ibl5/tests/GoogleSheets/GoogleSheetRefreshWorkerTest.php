@@ -308,17 +308,21 @@ class GoogleSheetRefreshWorkerTest extends TestCase
         bool $simLandsDuringBuild = false,
         ?ApiPlayerRepository $playersOverride = null
     ): GoogleSheetRefreshWorker {
-        $players = $playersOverride ?? self::createStub(ApiPlayerRepository::class);
-        if ($playersOverride === null && $buildFails) {
-            $players->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
-        } elseif ($playersOverride === null && $simLandsDuringBuild) {
-            $players->method('getAllPlayersForExport')->willReturnCallback(function (): array {
-                $this->repo->markAllActivePending();
+        $players = $playersOverride;
+        if ($players === null) {
+            $stub = self::createStub(ApiPlayerRepository::class);
+            if ($buildFails) {
+                $stub->method('getAllPlayersForExport')->willThrowException(new \RuntimeException('db glitch'));
+            } elseif ($simLandsDuringBuild) {
+                $stub->method('getAllPlayersForExport')->willReturnCallback(function (): array {
+                    $this->repo->markAllActivePending();
 
-                return [];
-            });
-        } elseif ($playersOverride === null) {
-            $players->method('getAllPlayersForExport')->willReturn([]);
+                    return [];
+                });
+            } else {
+                $stub->method('getAllPlayersForExport')->willReturn([]);
+            }
+            $players = $stub;
         }
         $transformer = self::createStub(PlayerExportTransformer::class);
         $transformer->method('getHeaders')->willReturn(['Name', 'Team']);

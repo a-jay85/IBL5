@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth-regular';
 import type { APIRequestContext } from '@playwright/test';
 import { expectButtonRowCentered } from '../helpers/centered-row';
+import { countGoogleRequests } from '../fixtures/google-request-counter';
 
 /**
  * Google Sheets card on the ApiKeys page, driven by seeded connection rows for
@@ -131,6 +132,7 @@ test.describe('Google Sheets card', () => {
   }
 
   test('refresh without a token is rejected and leaves the row active', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
     await seed(page.request, 'active');
 
     await post(page.request, 'google_refresh', false);
@@ -138,9 +140,11 @@ test.describe('Google Sheets card', () => {
 
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Invalid or expired form submission');
     expect((await connection(page.request)).body.status).toBe('active');
+    expect(googleRequests()).toBe(0);
   });
 
   test('refresh on a broken row asks to reconnect without calling Google', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
     // The broken card has no refresh form, so take the token while the row is
     // active, then break it.
     await seed(page.request, 'active');
@@ -155,9 +159,11 @@ test.describe('Google Sheets card', () => {
     await page.goto(API_KEYS);
 
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Reconnect Google');
+    expect(googleRequests()).toBe(0);
   });
 
   test('disconnect on a broken row deletes it without calling Google', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
     await seed(page.request, 'broken', 'invalid_grant');
 
     await post(page.request, 'google_disconnect', true);
@@ -166,9 +172,11 @@ test.describe('Google Sheets card', () => {
     await expect(page.locator('#apikeys-flash.ibl-alert--success')).toContainText('stays in your Drive');
     expect((await connection(page.request)).status).toBe(404);
     await expect(page.locator('#google-sheet-connect')).toBeVisible();
+    expect(googleRequests()).toBe(0);
   });
 
   test('disconnect without a token is rejected and keeps the row', async ({ page }) => {
+    const googleRequests = countGoogleRequests(page);
     await seed(page.request, 'active');
 
     await post(page.request, 'google_disconnect', false);
@@ -176,5 +184,6 @@ test.describe('Google Sheets card', () => {
 
     await expect(page.locator('#apikeys-flash.ibl-alert--error')).toContainText('Invalid or expired form submission');
     expect((await connection(page.request)).status).toBe(200);
+    expect(googleRequests()).toBe(0);
   });
 });

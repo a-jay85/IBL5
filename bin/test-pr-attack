@@ -291,6 +291,40 @@ assert_match "needsyou #50 BEHIND+hold keeps manual test" \
 assert_match "needsyou #10 clean still —" $'^#10\t—\t0$' "$NY_NM"
 
 # ============================================================
+# needsyou classification: VERDICT-HELD / verdict:none is not "—"
+# ============================================================
+TRIAGE_FIXTURE_VH="$TMP/triage-verdictheld.txt"
+cat > "$TRIAGE_FIXTURE_VH" <<'EOF'
+#10  CLEAN          Fix something              https://github.com/x/y/pull/10  CLEARED  —
+#60  VERDICT-HELD   re-run post-plan            https://github.com/x/y/pull/60  CLEARED  verdict:none
+#70  ARMABLE        arm auto-merge             https://github.com/x/y/pull/70  CLEARED  verdict:fetch-failed
+EOF
+
+PRS_JSON_VH="$TMP/prs-verdictheld.json"
+cat > "$PRS_JSON_VH" <<'EOF'
+[
+  {"number":10,"title":"Fix something","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"fix-something","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}]},
+  {"number":60,"title":"Verdict held PR","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"verdict-held","url":"https://github.com/x/y/pull/60","files":[{"path":"app/bar.php"}]},
+  {"number":70,"title":"Verdict token only","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"verdict-token","url":"https://github.com/x/y/pull/70","files":[{"path":"app/baz.php"}]}
+]
+EOF
+
+TRIAGE_FIXTURE="$TRIAGE_FIXTURE_VH" \
+GH_PR_LIST_FIXTURE="$PRS_JSON_VH" \
+OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "needsyou VERDICT-HELD run exits 0" 0 "$ST"
+
+W_VH="$(printf '%s\n' "$OUT" | sed -n 's/^WORK=//p' | head -1)"
+NY_VH="$(cat "$W_VH/needsyou.tsv" 2>/dev/null || true)"
+
+assert_match "needsyou #60 VERDICT-HELD needs a human" \
+    $'^#60\tarm by hand \\(verdict held\\)\t2$' "$NY_VH"
+assert_match "needsyou #70 verdict:fetch-failed hold token needs a human" \
+    $'^#70\tarm by hand \\(verdict held\\)\t2$' "$NY_VH"
+assert_match "needsyou #10 control still —" $'^#10\t—\t0$' "$NY_VH"
+
+# ============================================================
 # Now build $WORK dirs for invocation-2 tests
 # ============================================================
 

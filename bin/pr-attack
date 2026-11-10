@@ -159,6 +159,10 @@ gate_candidates() {
             print pr, "sign feat:", 1
         } else if (bucket=="UNCLEARED" || clearance=="UNKNOWN") {
             print pr, "manual test", 2
+        } else if (bucket=="VERDICT-HELD" || holds ~ /verdict:(none|unreadable|fetch-failed)/) {
+            # pr-triage never arms a PR whose pr-ready-verdict sticky holds, is absent
+            # (verdict:none), or could not be read; the owner must arm it by hand.
+            print pr, "arm by hand (verdict held)", 2
         } else if (bucket=="NOT-MERGEABLE") {
             # BEHIND/DRAFT/UNKNOWN merge state — GitHub will not merge it as-is, so
             # it is NOT "—". Ranked last so a NOT-MERGEABLE PR that also carries a

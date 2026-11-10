@@ -129,4 +129,14 @@ publicTest.describe('Google sign-in (anonymous)', () => {
 
     expect(googleRequests()).toBe(1);
   });
+
+  publicTest('countGoogleRequests ignores the theme web-font request', async ({ page }) => {
+    await page.route('https://fonts.googleapis.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/css', body: '' }),
+    );
+    const googleRequests = countGoogleRequests(page);
+    await page.goto('https://fonts.googleapis.com/css2?family=Barlow');
+
+    expect(googleRequests()).toBe(0);
+  });
 });

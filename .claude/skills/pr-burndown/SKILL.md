@@ -281,7 +281,8 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 2. Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
    For each review thread you fix, also fix every site its "other instances" line names.
-   Resolve a thread only after a commit changes the code it points at.
+   Resolve a thread only after a commit changes the code it points at, or after the owner
+   defers it: then reply "Deferred to a-jay85/IBL5-backlog#M" and resolve it.
 4. Run the same checks post-plan runs before it fires, in the worktree, one call each:
    bin/lib/prefire-verify --plan <plan path> --stage matrix, then --stage phpunit, then
    --stage exec-mutations. Drop --plan when the PR has no plan
@@ -301,6 +302,11 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
      green. The label also clears post-plan condition (7) for a PR whose plan says
      auto_merge: false, while the recorded fingerprint matches the diff. After labeling,
      re-fire post-plan for that PR so it arms.
+     Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
+     resolution). Before you report the PR as shipping, list its open threads. File each
+     finding the owner deferred to the backlog, reply "Deferred to
+     a-jay85/IBL5-backlog#M", and resolve the thread. Name any thread still open in the
+     .result.
    - Come back: save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
      and do NOT sign off or arm.
    If anything blocks, do not merge. Comment on the PR saying what blocks.
@@ -378,7 +384,8 @@ lines drops the label, and the hold comes back.
 
 When the owner stops or the list ends, list:
 
-- PRs merged or armed
+- PRs merged or armed. An armed PR with an open review thread stays blocked, so list it
+  with its open threads.
 - PRs prepped and armed with no owner call
 - PRs still running, with their `.result` paths and who picks each one up (a watcher log
   or a thread link)

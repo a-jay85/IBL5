@@ -218,13 +218,19 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 	}
 
 	bh := selectBallHandler(offense, gs.rng)
+	// retainedFoul marks a trip re-entered after a below-bonus non-shooting foul
+	// (J27): the offense inbounds into a fresh set, so the attempt takes the
+	// trip-0 origin even when the foul came on a putback trip.
+	openOrigin := result.OriginInitial
+	retainedFoul := false
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
-		// trip 0 is the initial attempt; trip > 0 is reached only via a `continue`
+		// trip 0 is the initial attempt; trip > 0 is reached via a `continue`
 		// after an offensive rebound, so the attempt is a putback continuation.
-		origin := result.OriginInitial
-		if trip > 0 {
+		origin := openOrigin
+		if trip > 0 && !retainedFoul {
 			origin = result.OriginOffReb
 		}
+		retainedFoul = false
 		// Dominant, steal-driven turnover (ADR-0045): a successful steal IS the
 		// turnover and ends the trip, crediting the stealing defender and arming the
 		// defense's fast break. Rolled before the shot path; the negligible
@@ -332,10 +338,14 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			return possNormal // made shot
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, origin, periodIdx)
-			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
+			gs.resolveFoul(offense, defense, bh, def, 1, true, fm, periodIdx) // and-one always clears the guard
 			return possNormal
 		case outcomeFoulOnly:
-			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
+			if !gs.resolveFoul(offense, defense, bh, def, 2, false, fm, periodIdx) {
+				retainedFoul = true
+				trip--   // a retained foul does not spend the offensive-rebound budget
+				continue // below the bonus: offense keeps the ball (half-court)
+			}
 			return possNormal
 		case outcomeTurnover:
 			// The negligible independent [2,5] check (energyCeiling): an UNFORCED
@@ -405,16 +415,22 @@ func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st
 	})
 }
 
-// freeThrows charges the foul to the contesting defender and resolves n
-// free-throw attempts for the shooter, scoring each make. It emits the foul and
-// free-throw events (the latter carrying FTAttempts/FTMade so aggregateBoxes can
-// reconstruct GamePF/GameFTA/GameFTM); only the live score is mutated here.
-func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender onCourt, n, periodIdx int) {
+// chargeFoul charges a personal foul to defender (feeding foul-out and
+// foul-trouble substitution) and emits the EventFoul that box PF is built from.
+func (gs *gameState) chargeFoul(defense *teamState, defender onCourt) {
 	defense.fouls[defender.PID]++ // live PF tally for foul-out/trouble subs (box PF is event-derived)
 	gs.emit(result.Event{
 		Kind: result.EventFoul, Period: gs.period, Clock: gs.clock,
 		TeamID: defense.teamID, PlayerID: defender.PID,
 	})
+}
+
+// freeThrows charges the foul to the contesting defender and resolves n
+// free-throw attempts for the shooter, scoring each make. It emits the foul and
+// free-throw events (the latter carrying FTAttempts/FTMade so aggregateBoxes can
+// reconstruct GamePF/GameFTA/GameFTM); only the live score is mutated here.
+func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender onCourt, n, periodIdx int) {
+	gs.chargeFoul(defense, defender)
 	made := shootFreeThrows(shooter, n, gs.rng)
 	offense.addPeriodPoints(periodIdx, made)
 	gs.emit(result.Event{

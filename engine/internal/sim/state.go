@@ -74,6 +74,9 @@ type teamState struct {
 	fouledOut map[int]bool
 	injured   map[int]bool
 	fouls     map[int]int
+	// teamFouls is the JSB 5.60 per-period team-foul count of fouls this team
+	// committed (J27). Zero at game start; playPeriod resets it every period.
+	teamFouls int
 
 	score    int
 	quarters []int // points per period in order; index 0 = Q1

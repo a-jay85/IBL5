@@ -44,6 +44,8 @@ set -u
 export LC_ALL=C
 
 SELF="${BASH_SOURCE[0]}"
+# Resolved before any cd: a relative $0 breaks once --root changes the cwd.
+SELF_LIBDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 usage() {
     echo "Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>" >&2
@@ -299,7 +301,7 @@ cd "$ROOT" || usage
 GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null) || usage
 JDIR="$GITDIR/exec-mutations"
 XLOCK="$JDIR/run.lock"
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/worktree-lock.sh"
+. "$SELF_LIBDIR/worktree-lock.sh"
 # take_exec_lock <mode>: one plant/revert owner per worktree (backlog#1827). A live
 # holder owns the journal, so neither run nor recover may touch it. Exit 4 = EXEC-LOCKED.
 take_exec_lock() {

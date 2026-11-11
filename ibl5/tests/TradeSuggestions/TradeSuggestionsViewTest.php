@@ -130,6 +130,26 @@ class TradeSuggestionsViewTest extends TestCase
         self::assertStringContainsString('name="trade_mode" data-testid="trade-mode-select"', $rebuild);
     }
 
+    /**
+     * A Middle mode renders its label, but the picker still offers exactly Auto,
+     * Win now and Rebuild: Middle becomes GM-selectable only in unit 4.
+     */
+    public function testMiddleModeRendersMiddleLabel(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData(
+            new ResolvedTeamMode(TeamMode::Middle, TeamMode::Middle, false),
+            [],
+        ));
+
+        self::assertStringContainsString('Mode: Middle', $html);
+        self::assertStringContainsString('(our guess)', $html);
+        self::assertSame(3, substr_count($html, '<option value='));
+        self::assertStringContainsString('<option value="auto" selected>', $html);
+        self::assertStringContainsString('<option value="win_now">', $html);
+        self::assertStringContainsString('<option value="rebuild">', $html);
+        self::assertStringNotContainsString('value="middle"', $html);
+    }
+
     public function testRendersFixedModeErrorNotice(): void
     {
         $data = new TradeSuggestionsPanelData($this->autoMode(), []);

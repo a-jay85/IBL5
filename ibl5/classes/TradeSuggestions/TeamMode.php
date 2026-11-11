@@ -11,4 +11,5 @@ enum TeamMode
 {
     case WinNow;
     case Rebuild;
+    case Middle;
 }

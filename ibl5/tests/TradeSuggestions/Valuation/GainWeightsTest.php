@@ -46,6 +46,12 @@ final class GainWeightsTest extends TestCase
         self::assertCount(Horizon::SEASONS, GainWeights::SEASON_WEIGHTS['middle']);
     }
 
+    public function testMiddleModeKeyIsMiddleRow(): void
+    {
+        self::assertSame('middle', GainWeights::modeKey(TeamMode::Middle));
+        self::assertSame([0.30, 0.30, 0.22, 0.18], GainWeights::seasonWeights(TeamMode::Middle));
+    }
+
     public function testStarterOutweighsBench(): void
     {
         $weights = GainWeights::toArray();

@@ -158,6 +158,34 @@ class TeamModeGuesserTest extends TestCase
         self::assertSame(0.0, $inputs->lockedShare);
     }
 
+    public function testMiddleBandOnlyWhenAllowed(): void
+    {
+        $inputs = self::inputs(wins: 41, losses: 41, priorWins: 41, priorLosses: 41);
+
+        self::assertSame(TeamMode::WinNow, $this->guesser->guess($inputs)->mode);
+        self::assertSame(TeamMode::WinNow, $this->guesser->guess($inputs, false)->mode);
+        self::assertSame(TeamMode::Middle, $this->guesser->guess($inputs, true)->mode);
+    }
+
+    /**
+     * The band is strict: a score of exactly +MIDDLE_BAND is Win now and exactly
+     * -MIDDLE_BAND is Rebuild. A .500 record with a 30-year-old (or 23-year-old)
+     * rotation puts the whole age term, 0.15, into the score.
+     */
+    public function testMiddleBandBoundaries(): void
+    {
+        $atPlus = $this->guesser->guess(self::inputs(wins: 41, losses: 41, priorWins: 41, priorLosses: 41, age: 30.0), true);
+        $atMinus = $this->guesser->guess(self::inputs(wins: 41, losses: 41, priorWins: 41, priorLosses: 41, age: 23.0), true);
+        $inside = $this->guesser->guess(self::inputs(wins: 41, losses: 41, priorWins: 41, priorLosses: 41, locked: 0.5 + 0.149 / 0.3), true);
+
+        self::assertSame(TeamModeGuesser::MIDDLE_BAND, $atPlus->score);
+        self::assertSame(TeamMode::WinNow, $atPlus->mode);
+        self::assertSame(-TeamModeGuesser::MIDDLE_BAND, $atMinus->score);
+        self::assertSame(TeamMode::Rebuild, $atMinus->mode);
+        self::assertEqualsWithDelta(0.149, $inside->score, 1e-9);
+        self::assertSame(TeamMode::Middle, $inside->mode);
+    }
+
     private static function inputs(int $wins, int $losses, int $priorWins, int $priorLosses, float $age = 26.5, float $locked = 0.5): ModeInputs
     {
         return new ModeInputs($wins, $losses, $priorWins, $priorLosses, $age, $locked);

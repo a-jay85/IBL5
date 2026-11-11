@@ -1,6 +1,8 @@
 -- Part 1: ibl_jsb_allstar_* season 2009 is a byte copy of 2007 written by a stale
 -- IBL5.asw import (a-jay85/ibl5-bugs#29). Back up, then delete. The 2009 weekend
 -- has not been played.
+-- destructive-migration[rewrite-no-backup]: both DELETEs below first copy their rows into a _backup_210 table in this file, and the undo script lives at ibl5/scripts/undo/210_asw_stale_rows_allstar_awards_backfill.sql, kept outside ibl5/migrations/ so the migration runner never applies it.
+-- rollback-incompatible: only production's SchemaInvariantTest FK-gap inventory breaks, since it pins the exact list of pid columns without an FK and the two FK-free _backup_210 tables add two; production PHP never reads the backup tables
 -- literal-check: 2009 -> ibl_jsb_allstar_rosters.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
 -- literal-check: 2009 -> ibl_jsb_allstar_scores.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
 CREATE TABLE IF NOT EXISTS ibl_jsb_allstar_rosters_backup_210 LIKE ibl_jsb_allstar_rosters;

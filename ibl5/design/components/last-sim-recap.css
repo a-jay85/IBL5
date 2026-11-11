@@ -55,7 +55,7 @@
     text-transform: uppercase;
     letter-spacing: .1em;
 }
-.last-sim-recap__meta-value { color: var(--white); font-weight: var(--font-weight-bold) }
+.last-sim-recap__meta-value { color: var(--white); font-weight: var(--font-weight-bold); justify-self: start; text-align: left }
 /* One gap token so the colon-to-value space matches on every label */
 .last-sim-recap__meta-net {
     display: flex;

@@ -56,16 +56,18 @@
     letter-spacing: .1em;
 }
 .last-sim-recap__meta-value { color: var(--white); font-weight: var(--font-weight-bold) }
-.last-sim-recap__meta-bw {
+/* One gap token so the colon-to-value space matches on every label */
+.last-sim-recap__meta-net {
     display: flex;
-    flex-direction: column;
-    gap: .1rem;
+    gap: var(--last-sim-recap-meta-gap, .35em);
 }
-.last-sim-recap__meta-bw-row { display: flex; gap: .35em }
-.last-sim-recap__meta-bw-label {
-    text-align: right;
-    width: 5.5ch;
+.last-sim-recap__meta-bw {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: var(--last-sim-recap-meta-gap, .35em);
+    row-gap: .1rem;
 }
+.last-sim-recap__meta-bw-label { justify-self: end }
 
 /* Tabs (one per game, max 7) */
 .last-sim-recap__tabs {

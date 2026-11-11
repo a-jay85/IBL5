@@ -27,11 +27,12 @@ final class DealScorer
 
     /**
      * @param array<string, string> $shapeIdByKey candidate key => shape id
+     * @param PairRecordMemo|null $memo shared pair memo; the timing command passes one to read its size
      * @return list<ScoredDeal>
      */
-    public static function scoreAll(LeagueSnapshot $s, GenerationResult $g, array $shapeIdByKey): array
+    public static function scoreAll(LeagueSnapshot $s, GenerationResult $g, array $shapeIdByKey, ?PairRecordMemo $memo = null): array
     {
-        $memo = new PairRecordMemo();
+        $memo ??= new PairRecordMemo();
         $out = [];
         foreach ($g->candidates as $c) {
             $key = CandidateKey::of($c);

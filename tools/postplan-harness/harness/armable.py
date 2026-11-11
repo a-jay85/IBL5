@@ -363,6 +363,7 @@ class ArmInputs:
     second_review_tree: Optional[str] = None      # tree the seat reviewed; must equal current_tree
     second_review_clears: dict = field(default_factory=dict)  # condition number -> reviewer reason
     second_review_reject_reason: str = ""         # REJECT text, surfaced in the hold line
+    fidelity_blocking_findings: tuple = ()        # hold (12) BLOCKING finding texts for the seat
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
     conformance_fix_note: str = ""   # Phase 5.0-pre fixer summary appended to the condition-(3) hold line; "" = fixer did not run

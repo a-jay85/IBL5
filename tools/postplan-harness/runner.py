@@ -904,6 +904,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 plan_hold_triggers=getattr(plan, "hold_triggers", ()),
                 fidelity_gate_edit_only=second_review.selected_gate_edit_only(
                     res.fidelity or {}, pr, git.head_tree()),
+                fidelity_blocking_findings=second_review.selected_blocking_findings(
+                    res.fidelity or {}, pr, git.head_tree()),
                 branch=git.branch(),
                 dep_state_lookup=lambda n: gh.pr_state(n),
                 # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
@@ -2483,6 +2485,8 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
         gate_backtest_status=gb.status, gate_backtest_reason=gb.reason,
         fidelity_gate_edit_only=second_review.selected_gate_edit_only(res.fidelity or {}, pr,
                                                                       cur_tree),
+        fidelity_blocking_findings=second_review.selected_blocking_findings(
+            res.fidelity or {}, pr, cur_tree),
         llm_safety_holds=[])
     # Before the preview, so a cleared PR still reaches the add-only safety verdict.
     new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,

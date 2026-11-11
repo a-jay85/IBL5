@@ -1,8 +1,9 @@
 """The blind second reviewer: a fresh Opus seat that may clear a clearable arming hold.
 
 armable.second_review_candidates decides whether a PR is eligible. This module runs the
-seat and reads its verdict. The seat sees the diff, the stated reason and the hold list.
-It never sees the run's review history, so its judgment stays independent of it.
+seat and reads its verdict. The seat sees the diff, the stated reason (with the owner's
+captured request on a plan-blind run), the hold list, and the BLOCKING finding text for
+hold (12). It never sees the run's review history, so its judgment stays independent of it.
 
 Fail-closed: a spawn error, an oversized diff, or a malformed reply yields no verdict,
 and the hold stands. The verdict binds to the tree captured BEFORE the spawn.
@@ -14,7 +15,7 @@ import os
 import re
 from typing import Callable
 
-from . import armable, fidelity, planfile
+from . import armable, fidelity, owner_intent, planfile
 
 AGENT = "pr-second-reviewer"
 ALLOWED_TOOLS = ("Read", "Grep", "Glob")
@@ -23,6 +24,10 @@ DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent", "Skill")
 # A line matching this is dropped from anything the seat reads outside the diff.
 FIXER_FRAMING_RE = re.compile(
     r"addressed|fix(er| round)|remediat|previous(ly)? review|finding|resolved in", re.I)
+# Verdict finding text is filtered with this narrower pattern: a line that says "finding"
+# stays, and fixer-history narration still drops.
+_HISTORY_RE = re.compile(r"addressed|fix(er| round)|remediat|previous(ly)? review|resolved in", re.I)
+FINDINGS_CAP = 6_000
 
 CONDITION_NAMES = {
     7: "plan-auto-merge-hold",
@@ -42,17 +47,50 @@ def _without_framing(text: str) -> str:
     return "\n".join(ln for ln in text.splitlines() if not FIXER_FRAMING_RE.search(ln))
 
 
-def reason_text(plan_content: str | None, pr_title: str, pr_body: str | None) -> str:
-    """The PR title plus the plan's Approach, or the PR body's Summary when plan-blind."""
+def reason_text(plan_content: str | None, pr_title: str, pr_body: str | None,
+                owner_request: str = "") -> str:
+    """The PR title plus the plan's Approach, or the PR body's Summary when plan-blind.
+
+    On a plan-blind run a non-empty `owner_request` block follows. It skips the framing
+    filter on purpose: it is the owner's verbatim request, and the owner may write "fix".
+    """
     if plan_content:
         detail = planfile._section(plan_content, r"Approach")
     else:
         detail = planfile._section(pr_body or "", r"Summary")
-    return _without_framing(f"{pr_title}\n\n{detail}".strip())
+    reason = _without_framing(f"{pr_title}\n\n{detail}".strip())
+    if plan_content or not owner_request:
+        return reason
+    return f"{reason}\n\n{owner_request}"
 
 
-def build_prompt(diff: str, reason: str, holds: dict[int, str]) -> str | None:
-    """Reason, hold list, fenced diff. None when the diff is over the inline budget."""
+def _findings_block(holds: dict[int, str], findings: dict[int, tuple[str, ...]] | None) -> str:
+    """`## Blocking findings` for each hold with finding text; "" when none qualifies."""
+    parts = []
+    for number in sorted(holds):
+        items = (findings or {}).get(number) or ()
+        kept = []
+        for item in items:
+            lines = [ln for ln in str(item).splitlines() if not _HISTORY_RE.search(ln)]
+            joined = "\n".join(lines).strip()
+            if joined:
+                kept.append(joined)
+        text = "\n\n".join(kept)
+        if not text:
+            continue
+        if len(text.encode()) > FINDINGS_CAP:
+            continue
+        fence = owner_intent.fence_for(text)
+        name = CONDITION_NAMES.get(number, "hold")
+        parts.append(f"### ({number}) {name}\n\n{fence}text\n{text}\n{fence}")
+    if not parts:
+        return ""
+    return "## Blocking findings\n\n" + "\n\n".join(parts) + "\n\n"
+
+
+def build_prompt(diff: str, reason: str, holds: dict[int, str],
+                 findings: dict[int, tuple[str, ...]] | None = None) -> str | None:
+    """Reason, hold list, blocking findings, fenced diff. None when the diff is over budget."""
     if len(diff.encode()) > fidelity.REMEDIATION_DIFF_INLINE_CAP:
         return None
     hold_lines = []
@@ -63,8 +101,9 @@ def build_prompt(diff: str, reason: str, holds: dict[int, str]) -> str | None:
                           else f"- ({number}) {name}: {detail}")
     runs = re.findall(r"`+", diff)
     fence = "`" * max(3, max((len(r) for r in runs), default=0) + 1)
+    findings_block = _findings_block(holds, findings)
     return (f"## Reason\n\n{reason}\n\n"
-            "## Holds\n\n" + "\n".join(hold_lines) + "\n\n"
+            "## Holds\n\n" + "\n".join(hold_lines) + "\n\n" + findings_block +
             f"## Diff\n\n{fence}diff\n{diff}\n{fence}\n")
 
 
@@ -109,7 +148,8 @@ def reject_reason(path: str) -> str:
 
 
 def run_seat(pr, head_tree: Callable[[], str], diff: Callable[[], str], holds: dict[int, str],
-             reason: str, spawn: Callable[..., str]) -> tuple[str | None, str | None, dict[int, str]]:
+             reason: str, spawn: Callable[..., str],
+             findings=None) -> tuple[str | None, str | None, dict[int, str]]:
     """Spawn one fresh seat. Returns (word, tree, clears); (None, None, {}) on any failure."""
     path = verdict_path(pr)
     try:
@@ -119,7 +159,7 @@ def run_seat(pr, head_tree: Callable[[], str], diff: Callable[[], str], holds: d
     try:
         tree = head_tree()   # before the spawn: the verdict binds to the tree it reviewed
         diff_text = diff()
-        prompt = build_prompt(diff_text, reason, holds) if diff_text and tree else None
+        prompt = build_prompt(diff_text, reason, holds, findings) if diff_text and tree else None
         if prompt is None:
             return None, None, {}
         reply = spawn(agent=AGENT, prompt=prompt)
@@ -171,6 +211,17 @@ def selected_gate_edit_only(fid, pr, current_tree) -> bool:
     return bool(path) and fidelity.gate_edit_only(path)
 
 
+def selected_blocking_findings(fid, pr, current_tree) -> tuple[str, ...]:
+    """Condition (12) seat input: the BLOCKING findings of the verdict condition (12) reads."""
+    try:
+        _, source = armable.select_fidelity_verdict(fid.get("verdict_1"), fid.get("verdict_2"),
+                                                    fid.get("reviewed_tree_2"), current_tree)
+        path = selected_fidelity_path(source, fid, pr)
+    except Exception:  # noqa: BLE001 - no findings means today's name-only hold line
+        return ()
+    return tuple(fidelity._verdict_findings(path)) if path else ()
+
+
 def spawner(llm, worktree):
     """A fresh read-only session for the seat: no resume, no continue, no session id."""
     def spawn(agent, prompt):
@@ -198,8 +249,11 @@ def review_pass(inp, pr, head_tree, diff, plan, log, spawn):
         return inp
     fresh = load_fresh(pr, inp.current_tree)
     if fresh is None:
-        reason = reason_text(plan_content(plan), inp.pr_title, inp.pr_body)
-        word, tree, clears = run_seat(pr, head_tree, diff, cands, reason, spawn)
+        reason = reason_text(plan_content(plan), inp.pr_title, inp.pr_body,
+                             owner_intent.seat_section(getattr(inp, "branch", "") or ""))
+        findings = ({12: inp.fidelity_blocking_findings}
+                    if 12 in cands and inp.fidelity_blocking_findings else {})
+        word, tree, clears = run_seat(pr, head_tree, diff, cands, reason, spawn, findings)
     else:
         word, tree, clears = fresh
     log(f"second-review: {word or 'absent'} tree={tree} clears={sorted(clears)}")

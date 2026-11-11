@@ -158,6 +158,45 @@ if should_run lib-path-ignored; then
     reset_lock
 fi
 
+# Thread orphaned-pidless-lock: a failed pid write must not leave a pid-less lock dir, and
+# a pid-less dir older than the grace is reclaimable.
+if should_run lib-pidless; then
+    reset_lock
+    RC=0; OUT=$( wtlock_write_pid() { return 1; }; wtlock_acquire "$L" "$LIVE" ) || RC=$?
+    h_eq "lib-pidless: failed pid write refuses (rc 1)" "1" "$RC"
+    h_absent "lib-pidless: failed pid write leaves no lock dir" "$L"
+    reset_lock
+    mkdir "$L"; touch -t 200001010000 "$L"
+    RC=0; wtlock_live "$L" >/dev/null || RC=$?
+    h_eq "lib-pidless: old pid-less dir reads free (rc 1)" "1" "$RC"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-pidless: old pid-less dir is reclaimed (rc 0)" "0" "$RC"
+    h_eq "lib-pidless: reclaimed lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+    mkdir "$L"
+    RC=0; OUT=$(wtlock_acquire "$L" "$LIVE") || RC=$?
+    h_eq "lib-pidless: young pid-less dir still refuses (rc 1)" "1" "$RC"
+    h_absent "lib-pidless: young pid-less dir gets no pid" "$L/pid"
+    reset_lock
+fi
+
+# Thread lock-reclaim-race: two runs reclaiming one dead lock. A run that finds another's
+# reclaim in progress refuses and leaves the lock alone; a reclaim mutex left by a killed
+# run is cleared once it is older than the grace.
+if should_run lib-reclaim-race; then
+    plant "$DEAD"
+    rm -rf "$L.reclaim"; mkdir "$L.reclaim"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-reclaim-race: reclaim in progress refuses (rc 1)" "1" "$RC"
+    h_eq "lib-reclaim-race: the other run's lock is left alone" "$DEAD" "$(cat "$L/pid")"
+    touch -t 200001010000 "$L.reclaim"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-reclaim-race: old mutex is cleared and the lock reclaimed (rc 0)" "0" "$RC"
+    h_eq "lib-reclaim-race: reclaimed lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    h_absent "lib-reclaim-race: mutex released after reclaim" "$L.reclaim"
+    reset_lock
+fi
+
 if should_run lib-branch-nearmiss; then
     h_eq "lib-branch-nearmiss: feat-a maps to wt-a only" \
         "$(cd "$TMP/wt-a" && pwd -P)" "$(cd "$(wtlock_wt_for_branch feat-a "$TMP/r")" && pwd -P)"

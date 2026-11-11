@@ -301,7 +301,7 @@ fi
 [ "$TCP_ONLY" != gateSD ] || h_done
 
 # Gate [Q] seed state (backlog#1818). A url= module the CI seed keeps closed
-# (bin/lib/vr-closed-modules.tsv) cannot render; setup= or a seed flip clears it.
+# (bin/lib/vr-closed-modules.tsv) cannot render; only a seed flip clears it.
 # Placed ahead of the gate13 guard so `bin/test-check-plan gateQ` runs these alone.
 if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateQ ]; then
 _q_row_waivers='| 1 | does the waiver success alert look right | Truly-manual | post-impl | `vr: label=waiver-alert; role=admin; url=modules.php?name=Waivers&action=add; anchor=.ibl-alert--success` |'
@@ -312,8 +312,8 @@ assert_viol "q_seed_closed_module_fails" 1 "[Q]" "$FM_OPUS"'
 |---|---------------|-----------|--------|---------------------|
 '"$_q_row_waivers"
 
-# (h) Same cell with a setup= clause -> clean (the author owns the state).
-assert_viol "q_seed_closed_module_with_setup_passes" 0 "[Q]" "$FM_OPUS"'
+# (h) Same cell with a setup= clause -> [Q] still fires: no setup= can open an ibl_settings row.
+assert_viol "q_seed_closed_module_with_setup_fails" 1 "[Q]" "$FM_OPUS"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | does the waiver success alert look right | Truly-manual | post-impl | `vr: label=waiver-alert; role=admin; url=modules.php?name=Waivers&action=add; anchor=.ibl-alert--success; setup=DELETE test-state.php?action=clear-throttle` |

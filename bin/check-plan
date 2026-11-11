@@ -639,8 +639,9 @@ while IFS= read -r row; do
                     fi
                     [ -z "$_vrbad" ] || viol "[Q] malformed vr: cell — ${_vrbad}: ${row}"
                     # Seed-state check (backlog#1818): no setup= clause can set an
-                    # ibl_settings row today, so a closed module never renders.
-                    if [ -z "$_vrbad" ] && ! grep -qE '(^|;)[[:space:]]*setup=' <<< "$_vr"; then
+                    # ibl_settings row today, so a closed module never renders,
+                    # with or without setup=. Check every well-formed cell.
+                    if [ -z "$_vrbad" ]; then
                         if [ -n "${CHECK_PLAN_VR_SEED:-}" ] && [ ! -r "$CHECK_PLAN_VR_SEED" ]; then
                             viol "[Q] CHECK_PLAN_VR_SEED names an unreadable file: ${CHECK_PLAN_VR_SEED}"
                         fi

@@ -191,9 +191,9 @@ clauses drive `ibl5/test-state.php` into the state the shot needs. An unknown `a
 **400**, so a typo shows as a failed row. Clauses are `;`-separated because `|` would break the matrix table. A row that
 cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
 
-Pick a `url=` a passing E2E spec already visits. Gate `[Q]` rejects a `vr:` cell with no
-`setup=` whose module `bin/lib/vr-closed-modules.tsv` lists as closed in
-`ibl5/tests/e2e/fixtures/ci-seed.sql` (today Waivers); use `no-vr:`. A `no-vr:` row naming
+Pick a `url=` a passing E2E spec already visits. Gate `[Q]` rejects a `vr:` cell whose module
+`bin/lib/vr-closed-modules.tsv` lists as closed in
+`ibl5/tests/e2e/fixtures/ci-seed.sql` (Waivers), even with `setup=`. Use `no-vr:`. A `no-vr:` row naming
 an `.ibl-*` class a spec asserts `toBeVisible` gets an advisory warning.
 
 The pipeline is a **review aid**. Every step below is `continue-on-error: true` and

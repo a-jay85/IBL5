@@ -162,6 +162,42 @@ final class TeamSingleGameBatchCharacterizationTest extends DatabaseTestCase
         self::assertCount(5, $result["O'Neal"]);
     }
 
+    public function testStatIndexesMatchTeamTableIndexColumns(): void
+    {
+        $indexes = (new \ReflectionClassConstant(TeamRecordRepository::class, 'STAT_INDEXES'))->getValue();
+        self::assertIsArray($indexes);
+        self::assertNotSame([], $indexes);
+
+        foreach ($indexes as $expression => $index) {
+            $column = substr((string) $expression, strlen('bs.'));
+            $columns = [];
+            $result = $this->db->query(
+                "SELECT SEQ_IN_INDEX, COLUMN_NAME FROM information_schema.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_box_scores_teams' AND INDEX_NAME = '" . (string) $index . "'"
+            );
+            self::assertInstanceOf(\mysqli_result::class, $result);
+            while ($row = $result->fetch_assoc()) {
+                $columns[(int) $row['SEQ_IN_INDEX']] = (string) $row['COLUMN_NAME'];
+            }
+
+            self::assertSame([1 => 'game_type', 2 => $column], $columns, (string) $index);
+        }
+    }
+
+    public function testThresholdsMatchFifthRankedValue(): void
+    {
+        $this->seedAssistRows([50, 40, 30, 20, 10, 5, 1]);
+
+        $method = new \ReflectionMethod(TeamRecordRepository::class, 'fetchSingleGameThresholds');
+        $thresholds = $method->invoke($this->repo, [
+            'desc' => ['expression' => 'bs.game_ast', 'order' => 'DESC'],
+            'asc' => ['expression' => 'bs.game_ast', 'order' => 'ASC'],
+            'sparse' => ['expression' => 'CASE WHEN bs.game_ast >= 30 THEN bs.game_ast END', 'order' => 'DESC'],
+        ], self::MARCH_FILTER);
+
+        self::assertSame(['desc' => 10, 'asc' => 30, 'sparse' => null], $thresholds);
+    }
+
     private function day(int $n): string
     {
         return '2098-03-' . sprintf('%02d', $n + 1);

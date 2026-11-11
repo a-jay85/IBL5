@@ -109,7 +109,7 @@
     /* ========================================================================
        Typography
        ======================================================================== */
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --font-numeric: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
     /* Font weights (values equal Tailwind 4 defaults; see trade-offs) */
     --font-weight-normal: 400;

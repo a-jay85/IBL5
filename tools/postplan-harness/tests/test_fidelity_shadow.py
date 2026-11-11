@@ -493,9 +493,14 @@ class TestArmingUnchanged:
         assert bad.fidelity["shadow"]["status"] == "invalid:bad-json"
         assert _arm_snapshot(plain) == _arm_snapshot(bad)
 
-    def test_arm_inputs_has_no_shadow_field(self):
-        assert not [f.name for f in dataclasses.fields(armable.ArmInputs) if "shadow" in f.name]
+    def test_arm_inputs_shadow_enters_only_as_add_only_holds(self):
+        names = [f.name for f in dataclasses.fields(armable.ArmInputs)
+                 if "shadow" in f.name or "reviewer" in f.name]
+        assert names == ["reviewer_arming_holds"]
         assert "shadow" not in inspect.getsource(armable)
+        assert "reviewer_arming_holds" not in inspect.getsource(armable.second_review_candidates)
+        assert "reviewer_arming_holds" not in inspect.getsource(armable._apply_second_review)
+        assert 21 not in armable.SECOND_REVIEW_CLEARABLE
 
 
 # ---- Phase 6: seeded false-arm cases ----------------------------------------------------

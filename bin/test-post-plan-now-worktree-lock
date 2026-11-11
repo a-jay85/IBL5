@@ -187,7 +187,9 @@ setup_ppn() {
     printf '#!/bin/sh\nexit 0\n' > "$PPN/shims/launchctl"
     # claude shim sits in $HOME/.local/bin, which $CMD's own PATH export keeps.
     printf '#!/bin/sh\n[ -z "${FAKE_CLAUDE_MARK:-}" ] || : > "$FAKE_CLAUDE_MARK"\nsleep "${FAKE_CLAUDE_SLEEP:-0}"\nexit 0\n' > "$PPN/.local/bin/claude"
-    chmod +x "$PPN/shims/security" "$PPN/shims/launchctl" "$PPN/.local/bin/claude"
+    # caffeinate is macOS-only; Linux CI has none (exit 127). Drop its flags, run the rest.
+    printf '#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done\nexec "$@"\n' > "$PPN/.local/bin/caffeinate"
+    chmod +x "$PPN/shims/security" "$PPN/shims/launchctl" "$PPN/.local/bin/claude" "$PPN/.local/bin/caffeinate"
     unset CLAUDE_HEADLESS
     export POST_PLAN_SKILL=1  # skill engine: the fake claude shim runs, never the real harness
     PORIGIN="$PPN/origin.git"; PMAIN="$PPN/IBL5"; PWT="$PPN/IBL5-worktrees/feat-lock"

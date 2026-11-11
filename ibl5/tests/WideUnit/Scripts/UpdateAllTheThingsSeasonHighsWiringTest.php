@@ -32,6 +32,16 @@ final class UpdateAllTheThingsSeasonHighsWiringTest extends TestCase
         self::assertGreaterThan($boxscores, $call);
     }
 
+    public function testSeasonHighsStepRegisteredAfterAllStarImport(): void
+    {
+        $call = strpos($this->src, self::STEP_CALL);
+        $allStar = strpos($this->src, 'ProcessAllStarGamesStep');
+
+        self::assertNotFalse($call);
+        self::assertNotFalse($allStar);
+        self::assertGreaterThan($allStar, $call);
+    }
+
     public function testSeasonHighsStepRegisteredInsideIblOnlyBlock(): void
     {
         $call = strpos($this->src, self::STEP_CALL);

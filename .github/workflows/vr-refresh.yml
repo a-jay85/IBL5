@@ -214,7 +214,7 @@ jobs:
     secrets: inherit
 
   # Removes stale screenshots: cleans stacked PRs and banners galleries shot against an
-  # older master. Master-ref only; the select job keeps pull-requests: read.
+  # older master. Master-ref only; the select job keeps its read-only token.
   tidy:
     name: VR stale-screenshot tidy
     needs: [select, refresh]

@@ -23,7 +23,10 @@
 // Fail closed: any gh/git error, JSON parse failure, or a PR list that may be
 // truncated at --limit 500 exits 1 with EMPTY stdout. Stdout is buffered and
 // written only after every call succeeded, so a consumer that checks the exit
-// code never sees a partial keep-list.
+// code never sees a partial keep-list. The empty-stdout guarantee covers select
+// and keep modes. Tidy mode exits 1 after writing its per-PR lines when one PR's
+// edit fails (the other PRs' lines still print). Exit 3 in select mode writes
+// the selection JSON, including "error".
 //
 // Run it after oven-sh/setup-bun. Under an empty PATH, `#!/usr/bin/env bun`
 // cannot resolve bun and the shell reports exit 127.

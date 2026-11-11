@@ -18,7 +18,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # Visual-review PRs
@@ -82,7 +82,7 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 `.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls the `Visual Regression` job of `e2e-tests.yml` through its `workflow_call` inputs.
 
 - **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
-- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. If that PR is skipped for a reason other than fresh, the select job exits 3 and the run goes red with the reason. A green run never skips the named PR. A blank `pr` sweeps every open visual PR, with the same cap. `-f dry_run=true` lists what would refresh, what the tidy would edit, and what cleanup would keep.
+- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. If that PR is skipped for a reason other than fresh, the select job exits 3 and the run goes red with the reason. A stacked PR that the tidy job cleans is the one other exception and ends green. A blank `pr` sweeps every open visual PR, with the same cap. `-f dry_run=true` lists what would refresh, what the tidy would edit, and what cleanup would keep.
 - **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment is never refreshed.
 - **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
 - **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), and PRs behind `master`. The refresh skips a PR whose base is not `master`, and the tidy job removes that PR's stale screenshots (see Stale banner). A master-based PR that still shows the stacked note (the parent merged and GitHub retargeted it) is refreshed. A push republishes a behind PR anyway (ADR-0182).

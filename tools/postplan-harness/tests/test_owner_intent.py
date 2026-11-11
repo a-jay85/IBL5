@@ -158,3 +158,27 @@ def test_keeps_model_section_without_file(home):
     body = BODY.replace("## Declared scope", "## Owner request\n\nThe owner asked for X.\n\n"
                         "## Declared scope", 1)
     assert owner_intent.upsert_owner_request(body, owner_intent.pr_section(BRANCH)) == body
+
+
+RUNNER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runner.py")
+
+
+def _line_index(lines, needle):
+    hits = [i for i, ln in enumerate(lines) if needle in ln]
+    assert len(hits) == 1, (needle, hits)
+    return hits[0]
+
+
+def test_runner_wires_owner_section():
+    lines = open(RUNNER).read().splitlines()
+    create = _line_index(lines, 'pr = gh.pr_create(copy["title"], create_body, pr_base)')
+    phase6 = _line_index(lines, 'body = _merge_danger_body(body, worktree, diff, log, "phase6")')
+    upsert_create = _line_index(
+        lines, "create_body = owner_intent.upsert_owner_request(create_body, _owner)")
+    upsert_phase6 = _line_index(lines, "body = owner_intent.upsert_owner_request(body, _owner)")
+    assert upsert_create < create and create - upsert_create < 10
+    assert upsert_phase6 < phase6 and phase6 - upsert_phase6 < 5
+    gates = [i for i, ln in enumerate(lines)
+             if '_owner = "" if plan.found else owner_intent.pr_section(res.slug)' in ln]
+    assert len(gates) == 2
+    assert gates[0] == upsert_create - 1 and gates[1] == upsert_phase6 - 1

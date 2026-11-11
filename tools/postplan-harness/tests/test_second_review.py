@@ -416,3 +416,28 @@ def test_gate_edit_only_counts_unmarked_bullet_under_not_ready(tmp_path):
     tagged = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] [GATE-EDIT] edits a gate\n"
                               "- [GATE-EDIT] edits another gate\n\nNOT READY\n", "tagged.md")
     assert fidelity.gate_edit_only(tagged) is True
+
+
+# ---- golden prompt bytes (captured before the owner-request and findings blocks existed)
+
+GOLDEN = os.path.join(os.path.dirname(__file__), "fixtures", "second_review_prompt_golden.txt")
+GOLDEN_TITLE = "chore: tighten the seat"
+GOLDEN_BODY = ("## Summary\n\nAdds a read-only tool to the seat.\n"
+               "Addressed in fix round 2.\n\n## Test plan\n\n- [x] ran it\n")
+GOLDEN_DIFF = ("diff --git a/x.py b/x.py\n--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n"
+               "-old = 1\n+new = '``'\n")
+GOLDEN_HOLDS = {7: "plan auto_merge false", 12: "plan-fidelity finding NOT READY"}
+
+
+def _golden_prompt():
+    return second_review.build_prompt(
+        GOLDEN_DIFF, second_review.reason_text(None, GOLDEN_TITLE, GOLDEN_BODY), GOLDEN_HOLDS)
+
+
+def _golden():
+    with open(GOLDEN, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def test_prompt_matches_pre_change_golden():
+    assert _golden_prompt() == _golden()

@@ -1,0 +1,22 @@
+## Reason
+
+chore: tighten the seat
+
+Adds a read-only tool to the seat.
+
+## Holds
+
+- (7) plan-auto-merge-hold: plan auto_merge false
+- (12) plan-fidelity-verdict
+
+## Diff
+
+```diff
+diff --git a/x.py b/x.py
+--- a/x.py
++++ b/x.py
+@@ -1 +1 @@
+-old = 1
++new = '``'
+
+```

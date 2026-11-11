@@ -74,6 +74,7 @@ from harness.gate_backtest import upsert_gate_backtest
 from harness.mutations import MutationReport, run_executable_mutations
 from harness import merge_danger
 from harness import removed_guards
+from harness import owner_intent
 from harness import second_review
 from harness import unplanned_scope
 from harness.gate_backtest_replay import gate_backtest_result
@@ -473,6 +474,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             create_body = copy["summary_md"] or ""
             create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
+            _owner = "" if plan.found else owner_intent.pr_section(res.slug)
+            create_body = owner_intent.upsert_owner_request(create_body, _owner)
             create_body = upsert_gate_fix(create_body, render_gate_fix(res.gate_fix))
             # A stacked branch opens against its declared parent, so its diff stays its own.
             pr_base = _merge_target(git).removeprefix("origin/")
@@ -714,6 +717,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gate_fix_block = render_gate_fix(res.gate_fix)
         if _gate_fix_block:   # never strips a block an earlier run published
             body = upsert_gate_fix(body, _gate_fix_block)
+        _owner = "" if plan.found else owner_intent.pr_section(res.slug)
+        body = owner_intent.upsert_owner_request(body, _owner)
         body = _merge_danger_body(body, worktree, diff, log, "phase6")
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)

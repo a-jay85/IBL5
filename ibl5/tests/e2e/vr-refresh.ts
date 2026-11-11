@@ -164,7 +164,9 @@ export function linkedGalleryDir(pr: OpenPr): string | null {
 }
 
 // A master-based PR still showing the stacked note (its parent merged and GitHub
-// retargeted it) is refreshed like a gallery of unknown age.
+// retargeted it) is refreshed like a gallery of unknown age. Such a PR is usually
+// behind master after the squash-merge, so selection skips it as `behind-master`
+// until a push brings it level; the refresh does not happen on its own.
 export function refreshGalleryDir(pr: OpenPr): string | null {
   const linked = linkedGalleryDir(pr);
   if (linked !== null) return linked;

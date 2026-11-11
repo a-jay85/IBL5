@@ -16,9 +16,9 @@ final class CountingSeasonHighsInner implements SeasonHighsRepositoryInterface
     public int $calls = 0;
 
     /**
-     * @param array<string, list<SeasonHighEntry>> $result
+     * @param array<string, list<SeasonHighEntry>>|null $result Null returns an empty list per requested stat
      */
-    public function __construct(public array $result)
+    public function __construct(public ?array $result = null)
     {
     }
 
@@ -38,7 +38,7 @@ final class CountingSeasonHighsInner implements SeasonHighsRepositoryInterface
     ): array {
         $this->calls++;
 
-        return $this->result;
+        return $this->result ?? array_fill_keys(array_keys($stats), []);
     }
 
     /**

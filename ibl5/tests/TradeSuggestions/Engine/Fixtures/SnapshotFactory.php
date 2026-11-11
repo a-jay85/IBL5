@@ -72,7 +72,7 @@ final class SnapshotFactory
                 $years = mt_rand(1, 4);
                 $salary = [];
                 for ($y = 1; $y <= 6; $y++) {
-                    $salary[$y] = $y <= $years ? mt_rand(100, 2500) : 0;
+                    $salary[$y] = $y <= $years ? mt_rand(50, 650) : 0;
                 }
                 $roster[] = ProjectionFactory::player(
                     pid: $pid,

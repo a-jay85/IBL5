@@ -65,6 +65,48 @@ final class SlotRankStateTest extends TestCase
         }
     }
 
+    public function testWithLineupsMatchesFullRebuildAfterSwap(): void
+    {
+        $s = self::league();
+        $moves = [[101, 1, 2], [204, 2, 1], [305, 3, 1], [102, 1, 3], [103, 1, 3]];
+        foreach ($s->slotRanks as $offset => $state) {
+            $rosters = [1 => [], 2 => [], 3 => []];
+            foreach ([1, 2, 3] as $tid) {
+                foreach (array_keys($s->lineups[$offset][$tid]->players) as $pid) {
+                    $rosters[$tid][$pid] = $tid;
+                }
+            }
+            foreach ($moves as [$pid, $from, $to]) {
+                if (isset($rosters[$from][$pid])) {
+                    unset($rosters[$from][$pid]);
+                    $rosters[$to][$pid] = $to;
+                }
+            }
+            $changed = [];
+            foreach ($rosters as $tid => $pids) {
+                $projected = [];
+                foreach (array_keys($pids) as $pid) {
+                    $projected[$pid] = ['player' => $s->players[$pid], 'season' => $s->projections[$pid][$offset]];
+                }
+                $changed[$tid] = \TradeSuggestions\Profile\SeasonLineup::build($tid, $offset, $projected);
+            }
+            $ratings = SnapshotCodec::ratingsAt($s->projections, $offset);
+            $after = $state->withLineups($changed, $ratings, new PairRecordMemo());
+            $lineups = array_replace($s->lineups[$offset], $changed);
+            $table = SlotRankTable::build($lineups, $ratings);
+            foreach (SlotMapper::SLOTS as $slot) {
+                foreach (array_keys($s->players) as $pid) {
+                    self::assertSame($table->poolRank($slot, $pid), $after->poolRank($slot, $pid), "pool {$offset} {$slot} {$pid}");
+                }
+                foreach ($s->teamIds as $tid) {
+                    self::assertSame($table->starterRank($slot, $tid), $after->starterRank($slot, $tid), "starter {$offset} {$slot} {$tid}");
+                    self::assertSame($table->bestBenchRank($slot, $tid), $after->bestBenchRank($slot, $tid), "bench {$offset} {$slot} {$tid}");
+                }
+                self::assertSame($table->worstStarterPoolRank($slot), $after->worstStarterPoolRank($slot));
+            }
+        }
+    }
+
     public function testPairRecordMemoIsAntisymmetricAndCached(): void
     {
         $memo = new PairRecordMemo();

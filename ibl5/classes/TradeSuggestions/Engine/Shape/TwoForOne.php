@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TradeSuggestions\Engine\Shape;
+
+use TradeSuggestions\Engine\AssetPool;
+use TradeSuggestions\Engine\CandidateBudget;
+use TradeSuggestions\Engine\LeagueSnapshot;
+use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
+use TradeSuggestions\TradeCandidate;
+
+/**
+ * Fires when the receiving side has a weak slot (`SlotStrength::isWeak`) and
+ * the giving side has a buried player at that slot (`buriedPids`) or two
+ * surplus slots (Phase 4 docblock). Yields user pairs (6 choose 2 = 15) for
+ * one of the partner's first 2 pool players (30 max). `OneForTwo` is the
+ * mirror.
+ */
+final class TwoForOne implements DealShapeInterface
+{
+    private const int PARTNER_SINGLES = 2;
+
+    public function id(): string
+    {
+        return 'TWO_FOR_ONE';
+    }
+
+    public function generate(LeagueSnapshot $s, int $userTid, int $partnerTid, AssetPool $pool): iterable
+    {
+        $userPids = array_values(array_slice($pool->userPids, 0, CandidateBudget::PLAYERS_PER_PARTNER));
+        $count = count($userPids);
+        for ($i = 0; $i < $count; $i++) {
+            for ($j = $i + 1; $j < $count; $j++) {
+                $pair = [$userPids[$i], $userPids[$j]];
+                sort($pair);
+                foreach (array_slice($pool->partnerPids, 0, self::PARTNER_SINGLES) as $partnerPid) {
+                    yield new TradeCandidate($userTid, $partnerTid, $pair, [], [$partnerPid], []);
+                }
+            }
+        }
+    }
+}

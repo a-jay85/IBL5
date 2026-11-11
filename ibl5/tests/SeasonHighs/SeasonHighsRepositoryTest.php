@@ -58,6 +58,24 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         $this->assertSame('Later', $result['POINTS'][1]['name']);
     }
 
+    public function testGetSeasonHighsBatchTeamBranchBuildsOrderedJoinWithInlineStatAndLimit(): void
+    {
+        $this->mockDb->onQuery('ibl_box_scores_teams', []);
+
+        $this->repo()->getSeasonHighsBatch(['ASSISTS' => '`game_ast`'], '_teams', '2025-01-01', '2025-01-31', 5);
+
+        // The database tests cannot kill concatenation mutants (Infection
+        // excludes the database group), so pin the three interpolation sites:
+        // the stat expression, the box-score-first join order, and the inline LIMIT.
+        // MockDatabase records the SQL with backticks stripped.
+        $queries = $this->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertMatchesRegularExpression(
+            '/\(game_ast\) AS stat_value\s+FROM ibl_box_scores_teams bs\s+STRAIGHT_JOIN ibl_team_info t ON bs\.name = t\.team_name\b.*\bLIMIT 5\)$/s',
+            $queries[0],
+        );
+    }
+
     public function testGetSeasonHighsBatchEmptyStatsShortCircuits(): void
     {
         $result = $this->repo()->getSeasonHighsBatch([], '', '2025-01-01', '2025-01-31');

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-09
+last_verified: 2026-11-10
 ---
 
 # IBL5 Architecture Decision Records
@@ -103,6 +103,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0234](0234-merge-danger-self-governing.md) | Narrow the Merge danger one-way Door; add a Self-governing segment | Accepted | One-way means a revert cannot undo it; arming-path and gate-removed changes carry ` · Self-governing: yes`, and condition (18) holds both. |
 | [0237](0237-prefire-drop-local-infection.md) | Drop the local Infection stage from prefire-verify | Accepted | `bin/lib/prefire-verify` runs matrix, phpunit and exec-mutations; `--stage infection` exits 2 and names CI's required check `Infection PHP (per-PR diff)`, which is the mutation gate. Partially supersedes ADR-0227. |
 | [0236](0236-two-engine-model-jsb-port.md) | Two engines: resume the faithful JSB port in engine/ | Accepted | Gate A is gone; bin/check-engine-freeze allows decompile tokens only under engine/ and jsb-native/. |
+| [0239](0239-reviewer-arming-holds-add-only.md) | Reviewer shadow verdicts add holds and never clear | Accepted | Arming condition 21 holds on a reviewer `hold: true` for planned files or merge danger; `conformance.py` and `merge_danger.py` stay the only clearers of conditions 3 and 18; a bad block is neutral. |
 
 ## When an ADR is Required
 

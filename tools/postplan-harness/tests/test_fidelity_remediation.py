@@ -305,6 +305,8 @@ def test_extract_notes_keeps_only_followup_kind(tmp_path):
          "detail": "Placement differs from the plan by a better route."},
         {"title": "Change the PR title from feat to chore", "kind": "pr-copy",
          "detail": "The diff is dev tooling, invisible to a GM."},
+        {"title": "Remove the stale Residual Phases block from PR body", "kind": "pr-copy",
+         "detail": "The body still lists Residual Phases 3 and 4, which this PR finished."},
         {"title": "Queue the Phase 4B review", "kind": "process",
          "detail": "Check 4b was worked explicitly and does not fire."},
         {"title": "Untyped note from an older verdict", "detail": "No kind field at all."},

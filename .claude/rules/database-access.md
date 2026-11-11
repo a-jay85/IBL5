@@ -47,8 +47,6 @@ require_once __DIR__ . '/../db/db.php';
 mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 ```
 
-**Multi-instance protection:** other Claude sessions may share this checkout and database. Stage only files you personally modified, by explicit path, never `git add .`, `-A`, or `--all`, and read `git status` before assuming a dirty file is yours.
-
 ## Claude Code Database Queries (Auto-Approved)
 
 Moved to `.claude/rules/database-access-detail.md` § Claude Code Database Queries (Auto-Approved). Use `./bin/db-query "<SQL>"` for local database queries; it auto-approves, and routes to the database next to the script's own location.

@@ -128,3 +128,56 @@ def test_inline_list_names_from_m2_are_checked_individually():
     got = _method_items(items)
     assert len(got) == 1
     assert got[0].startswith("MISSING-METHOD: testB (")
+
+
+# Labelled lists beyond `Word:` (trade-suggestions-needs-engine read as zero methods, #3495).
+
+def test_row_label_with_class_qualified_items():
+    got = _methods("- Row 9: `ProductionLineTest::testA`, `::testB`, `::testC()`")
+    assert got == ["testA", "testB", "testC"]
+
+
+def test_row_label_list_followed_by_sentence():
+    got = _methods("- Row 39: `InvariantTest::testLeagueSweepReport`. On the CI seed it runs as a smoke check.")
+    assert got == ["testLeagueSweepReport"]
+
+
+def test_path_label_colon_list():
+    got = _methods("- `tools/postplan-harness/tests/test_x.py`: `test_a`, `test_b`")
+    assert got == ["test_a", "test_b"]
+
+
+def test_path_label_list_followed_by_paren_note():
+    got = _methods("- `ibl5/tests/FooTest.php`: `testOne` (Phase 1, new class)")
+    assert got == ["testOne"]
+
+
+def test_bold_label_line_without_bullet():
+    got = _methods("**`test_owner_approvals.py` (Phase 1):** `test_owner_record_parsed`, `test_bot_ignored`")
+    assert got == ["test_owner_record_parsed", "test_bot_ignored"]
+
+
+def test_path_label_without_colon():
+    got = _methods("- `tools/postplan-harness/tests/test_premerge.py` `test_premerged_replay` (new, Phase 1)")
+    assert got == ["test_premerged_replay"]
+
+
+def test_prose_after_list_is_not_a_list():
+    # A bare word after the first name means prose, so nothing from the list is taken.
+    assert _methods("- `bin/test-gate-backtest`: extended `case_quiet_gate_clears`") == []
+    assert _methods("- Row 4: `FooTest::testA` is reused unchanged") == []
+
+
+def test_class_qualified_items_flag_missing_method_in_conformance():
+    plan = PlanInfo(found=True, has_matrix=True,
+                    required_test_methods=_methods("- Row 35: `ServiceTest::testWritten`, `::testNeverWritten`"))
+    items = check(plan, [], diff_body="+    public function testWritten(): void {}\n")
+    assert [i for i in items if i.startswith("MISSING-METHOD:")] == [
+        "MISSING-METHOD: testNeverWritten (plan required a test method the diff never wrote)"]
+
+
+def test_item_marked_removed_is_skipped_and_later_items_kept():
+    # leaderboards-hub plan: the Phase 1 pin is deleted by Phase 4, so the final diff never holds it.
+    got = _methods("- `ibl5/tests/FooEntryPointTest.php`: `testPinned` (Phase 1, removed in Phase 4 after porting), "
+                   "`testStubEmitsNoBody` (Phase 4)")
+    assert got == ["testStubEmitsNoBody"]

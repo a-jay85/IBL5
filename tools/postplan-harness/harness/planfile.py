@@ -855,11 +855,57 @@ def parse_deferred_phase_numbers(content: str) -> list[int]:
 
 
 _HYPHEN_LABEL_RE = re.compile(r"^[*\-]\s+`([A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+)+)`")
-_INLINE_ITEM_RE = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`")
-_INLINE_LIST_RE = re.compile(
-    r"^[*\-]\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*"
-    r"(`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`(?:\s*,\s*`[A-Za-z_][A-Za-z0-9_]*(?:\(\))?`)*)"
-    r"\s*[.;]?\s*$")
+_LIST_ITEM = r"`(?:(?:[A-Za-z_][A-Za-z0-9_]*)?::)?([A-Za-z_][A-Za-z0-9_]*)(?:\(\))?`"
+_ITEM_NOTE = r"(?:\s*\(([^()]*)\))?"
+_LABELLED_LIST_RE = re.compile(
+    rf"^({_LIST_ITEM}{_ITEM_NOTE}(?:\s*,\s*{_LIST_ITEM}{_ITEM_NOTE})*)"
+    r"(?:\s*[.;]?\s*$|[.;]\s+\S.*$)")
+_ITEM_WITH_NOTE_RE = re.compile(_LIST_ITEM + _ITEM_NOTE)
+_REMOVED_NOTE_RE = re.compile(r"\b(?:removed|deleted|dropped)\b", re.I)
+_PATH_LABEL_RE = re.compile(r"^`[^`]*/[^`]*`\s+(`.*)$")
+_BULLET_RE = re.compile(r"^[*\-]\s+")
+
+
+def _labelled_list_methods(stripped: str) -> list[str] | None:
+    """Method names from a labelled list line, or None when the line is not one.
+
+    Shapes (the label is dropped; the backticked names are the methods):
+      - '- New: `testA`, `testB`'
+      - '- Row 9: `FooTest::testA`, `::testB`'  (class-qualified; '::m' reuses the class)
+      - '- `tests/test_x.py`: `test_a`, `test_b`'  (path label)
+      - '**`test_x.py` (Phase 1):** `test_a`, `test_b`'  (bold label, no bullet)
+      - '- `tests/test_x.py` `test_a` (new, Phase 1)'  (path label, no colon)
+    Each item may carry a ' (...)' note. An item whose note says removed, deleted or
+    dropped is skipped, since the plan says the final diff will not hold it ('`testA`
+    (Phase 1, removed in Phase 4)'). The list may end the line, or be followed by '.'
+    or ';' plus prose. A bare word after the list ('- x: `a` is checked')
+    rejects the line, so prose that only mentions a name never becomes a method. The
+    first colon outside backticks ends the label, so '::' inside a name never splits it.
+    """
+    if _BULLET_RE.match(stripped):
+        s = _BULLET_RE.sub("", stripped, count=1)
+    elif stripped.startswith("**"):
+        s = stripped
+    else:
+        return None
+    rest = None
+    in_tick = False
+    for i, ch in enumerate(s):
+        if ch == "`":
+            in_tick = not in_tick
+        elif ch == ":" and not in_tick:
+            rest = s[i + 1:].lstrip(" *")
+            break
+    if rest is None or not rest.startswith("`"):
+        pm = _PATH_LABEL_RE.match(s)
+        rest = pm.group(1) if pm else None
+    if rest is None:
+        return None
+    lm = _LABELLED_LIST_RE.match(rest)
+    if not lm:
+        return None
+    return [m.group(1) for m in _ITEM_WITH_NOTE_RE.finditer(lm.group(1))
+            if not (m.group(2) and _REMOVED_NOTE_RE.search(m.group(2)))]
 
 
 def parse_required_test_methods(content: str) -> list[str]:
@@ -902,6 +948,8 @@ def parse_required_test_methods(content: str) -> list[str]:
         (optional trailing '()' per item, optional trailing '.' or ';'), the items are
         the methods and the label is dropped. Any prose after the colon keeps the
         label (today's behaviour), so '- testFoo: covers `bar`' still yields 'testFoo'.
+        The label may also be 'Row N', a backticked path or a bold line, and items may be
+        class-qualified ('Class::m', '::m'). See _labelled_list_methods.
     """
     section = _section("\n".join(_strip_fenced(content)), "Required Test Methods")
     methods = []
@@ -936,9 +984,9 @@ def parse_required_test_methods(content: str) -> list[str]:
             # M2: `Label: `a`, `b`` — the backticked names ARE the required methods.
             # Only a pure comma-separated list of backticked identifiers qualifies;
             # `testFoo: covers `bar`` falls through to Pass 2 unchanged.
-            _lst = _INLINE_LIST_RE.match(stripped)
-            if _lst:
-                methods.extend(_INLINE_ITEM_RE.findall(_lst.group(1)))
+            _listed = _labelled_list_methods(stripped)
+            if _listed is not None:
+                methods.extend(_listed)
                 continue
             # Pass 2: bare identifier (no opening backtick).  Accept if followed
             # by optional '()' then end-of-line, ':', or a dash separator

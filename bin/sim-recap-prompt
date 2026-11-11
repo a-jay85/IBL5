@@ -187,7 +187,7 @@ jq -r '
       | "\(.key) \(.game_date) \(fn(.visitor_city; tn($nm; .visitor_teamid; .visitor_name))) \(.visitor_score) @ \(fn(.home_city; tn($nm; .home_teamid; .home_name))) \(.home_score)",
         (.visitor_top[] | pl("V")),
         (.home_top[] | pl("H")),
-        (.injuries[] | "  INJ \(.name): \(.injuryDescription) (\(.injuryGamesMissed) games)")),
+        (.injuries[] | "  INJ \(.name): \(.injuryDescription) (out \(.injuryGamesMissed) days, returns \(.returnDate))")),
     "",
     "STANDINGS (team W-L conference/division confGB streak last10)",
     (.standings[] | "\(fn(.city; .name)) \(.wins)-\(.losses) \(.conference // "-")/\(.division // "-") \(.conf_gb // "-") \(if .streak == "" then "-" else .streak end) \(if .last10 == "" then "-" else .last10 end)"),
@@ -357,6 +357,10 @@ of this sim. Use it to attribute players correctly in your recap:
 
 - roster: played, injured, or traded players by current team (current_teamid is authoritative;
   never use ibl_jsb_transactions.from_teamid — it is a frozen historical marker)
+- injury length: every injury count (the INJ lines above, and injuryGamesMissed
+  and daysRemaining below) is calendar days, never games. Do not write "N games
+  out". Say "out N days" or "back around <returnDate>". A player can miss fewer
+  games than days, because teams don't play every day.
 - active_injuries: players currently on the injury list as of the sim window end.
   Each row carries current_teamid (from ibl_plr.teamid) — attribute an injured
   player to THAT team, never to ibl_jsb_transactions.from_teamid, which records

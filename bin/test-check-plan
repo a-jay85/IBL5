@@ -12,6 +12,7 @@
 #      bin/test-check-plan gate13  (only the gate 13 block, for plan mutation checks)
 #      bin/test-check-plan matrix-split  (only the gate XM block, whose verdicts need matrix_split)
 #      bin/test-check-plan gateSD  (only the gate [SD] block, for plan mutation checks)
+#      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # shellcheck disable=SC2034  # FAILED is read by h_done in bin/lib/harness.sh
@@ -28,7 +29,7 @@ TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 # Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
 # `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
-# [SD] cases and exits.
+# [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits.
 TCP_ONLY="${1:-}"
 h_shard_init "${CHECK_PLAN_SHARD:-}"
 
@@ -298,6 +299,103 @@ Today any valid API key can approve as the operator; this PR adds the tier check
 '
 fi
 [ "$TCP_ONLY" != gateSD ] || h_done
+
+# Gate [Q] seed state (backlog#1818). A url= module the CI seed keeps closed
+# (bin/lib/vr-closed-modules.tsv) cannot render; setup= or a seed flip clears it.
+# Placed ahead of the gate13 guard so `bin/test-check-plan gateQ` runs these alone.
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateQ ]; then
+_q_row_waivers='| 1 | does the waiver success alert look right | Truly-manual | post-impl | `vr: label=waiver-alert; role=admin; url=modules.php?name=Waivers&action=add; anchor=.ibl-alert--success` |'
+
+# (g) Closed module, no setup= -> [Q] fires.
+assert_viol "q_seed_closed_module_fails" 1 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_row_waivers"
+
+# (h) Same cell with a setup= clause -> clean (the author owns the state).
+assert_viol "q_seed_closed_module_with_setup_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the waiver success alert look right | Truly-manual | post-impl | `vr: label=waiver-alert; role=admin; url=modules.php?name=Waivers&action=add; anchor=.ibl-alert--success; setup=DELETE test-state.php?action=clear-throttle` |
+'
+
+# (i) Near-miss module name: a prefix of a closed module is not that module.
+assert_viol "q_seed_near_miss_module_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the waiver archive layout look right | Truly-manual | post-impl | `vr: label=waiver-archive; role=admin; url=modules.php?name=WaiversArchive; anchor=.ibl-data-table` |
+'
+
+# (j) Open module proven by free-agency.spec.ts:117-130 -> clean.
+assert_viol "q_seed_open_module_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the already-signed alert look right | Truly-manual | post-impl | `vr: label=fa-already-signed; role=regular; url=modules.php?name=FreeAgency&result=already_signed; anchor=.ibl-alert--info` |
+'
+
+# (k) Seed flip: the seed opens waivers -> clean with no gate edit.
+printf "  ('Allow Waiver Moves',          'Yes',          'ibl'),\n" > "$TMP/seed-open.sql"
+export CHECK_PLAN_VR_SEED="$TMP/seed-open.sql"
+assert_viol "q_seed_flipped_seed_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_row_waivers"
+unset CHECK_PLAN_VR_SEED
+
+# (l) Empty CHECK_PLAN_VR_SEED means unset: the repo seed applies, [Q] fires.
+export CHECK_PLAN_VR_SEED=""
+assert_viol "q_seed_empty_env_uses_repo_seed" 1 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_row_waivers"
+unset CHECK_PLAN_VR_SEED
+
+# (m) A set-but-unreadable CHECK_PLAN_VR_SEED fails loudly.
+export CHECK_PLAN_VR_SEED="$TMP/no-such-seed.sql"
+assert_msg "q_seed_env_unreadable_fails" 1 "CHECK_PLAN_VR_SEED names an unreadable file" "" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_row_waivers"
+unset CHECK_PLAN_VR_SEED
+
+# (n) Every map row's SettingKey exists in the seed, so a key typo cannot
+# silently disable the check.
+if h_shard_take; then
+    _q_map="$(dirname "$GUARD")/lib/vr-closed-modules.tsv"
+    _q_seed="$(dirname "$GUARD")/../ibl5/tests/e2e/fixtures/ci-seed.sql"
+    _q_missing=""
+    while IFS=$'\t' read -r _qm _qk _qc; do
+        case "$_qm" in ''|'#'*) continue ;; esac
+        grep -qF "('$_qk'," "$_q_seed" || _q_missing="$_q_missing [$_qk]"
+    done < "$_q_map"
+    if [ -n "$_q_missing" ]; then h_fail "q_seed_map_keys_in_seed" "keys absent from seed:$_q_missing"
+    else h_pass "q_seed_map_keys_in_seed"; fi
+fi
+
+# no-vr advisory. .ibl-alert--success is asserted toBeVisible at
+# ibl5/tests/e2e/flows/free-agency.spec.ts:119.
+_q_novr_hit='| 1 | does the .ibl-alert--success banner look right | Truly-manual | post-impl | `no-vr: the alert only shows after a live signing` |'
+
+# (o) Advisory prints its tag.
+assert_msg "q_novr_class_asserted_warns" 0 "[Q-advisory]" "" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_novr_hit"
+
+# (p) Advisory never turns into a [Q] violation.
+assert_viol "q_novr_class_asserted_exit_zero" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+'"$_q_novr_hit"
+
+# (q) A class no spec asserts -> no advisory.
+assert_msg "q_novr_class_unasserted_quiet" 0 "" "[Q-advisory]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the .ibl-zz-not-a-class banner look right | Truly-manual | post-impl | `no-vr: the banner only shows after a live signing` |
+'
+fi
+[ "$TCP_ONLY" != gateQ ] || h_done
 
 if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ]; then

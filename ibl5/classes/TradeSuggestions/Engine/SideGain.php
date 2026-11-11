@@ -58,6 +58,19 @@ final readonly class SideGain
         return $this->components;
     }
 
+    /**
+     * @return list<float>
+     */
+    public function seasonWeights(): array
+    {
+        return $this->seasonWeights;
+    }
+
+    public function rentalScale(): float
+    {
+        return $this->rentalScale;
+    }
+
     public function seasonTotal(int $offset): float
     {
         $sum = array_sum($this->components[$offset] ?? []);

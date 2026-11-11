@@ -22,6 +22,18 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     private const CACHE_KEY_PREFIX = 'season_highs:v1:';
     private const TTL_SECONDS = 900; // 15 minutes; tighter than PageCache's 3600s anonymous TTL
 
+    /** 30 days. Applies only to keys written by warmKeys(); RefreshSeasonHighsCacheStep deletes them after every IBL sim. */
+    public const WARM_TTL_SECONDS = 2592000;
+
+    private const MODE_READ = 'read';
+    private const MODE_PLAN = 'plan';
+    private const MODE_WARM = 'warm';
+
+    private string $mode = self::MODE_READ;
+
+    /** @var list<string> */
+    private array $recordedKeys = [];
+
     public function __construct(
         private SeasonHighsRepositoryInterface $inner,
         private DatabaseCacheInterface $cache,
@@ -45,6 +57,27 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     ): array {
         $key = $this->buildCacheKey($stats, $tableSuffix, $startDate, $endDate, $limit, $locationFilter);
 
+        if ($this->mode === self::MODE_PLAN) {
+            $this->recordKey($key);
+
+            return array_fill_keys(array_keys($stats), []);
+        }
+
+        if ($this->mode === self::MODE_WARM) {
+            $warmed = $this->inner->getSeasonHighsBatch(
+                $stats,
+                $tableSuffix,
+                $startDate,
+                $endDate,
+                $limit,
+                $locationFilter
+            );
+            $this->cache->set($key, $warmed, self::WARM_TTL_SECONDS);
+            $this->recordKey($key);
+
+            return $warmed;
+        }
+
         /** @var array<string, list<SeasonHighEntry>>|null $cached */
         $cached = $this->cache->get($key);
 
@@ -67,6 +100,40 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     }
 
     /**
+     * Runs $calls with cache reads and the inner repository bypassed; returns every key the calls would request.
+     *
+     * @param callable(): void $calls
+     * @return list<string>
+     */
+    public function planKeys(callable $calls): array
+    {
+        return $this->runInMode(self::MODE_PLAN, $calls);
+    }
+
+    /**
+     * Runs $calls computing every result from the inner repository and overwriting its key with WARM_TTL_SECONDS.
+     *
+     * @param callable(): void $calls
+     * @return list<string>
+     */
+    public function warmKeys(callable $calls): array
+    {
+        return $this->runInMode(self::MODE_WARM, $calls);
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    public function deleteKeys(array $keys): int
+    {
+        foreach ($keys as $key) {
+            $this->cache->delete($key);
+        }
+
+        return count($keys);
+    }
+
+    /**
      * @see SeasonHighsRepositoryInterface::getRcbSeasonHighs()
      *
      * @return list<array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}>
@@ -74,6 +141,31 @@ class CachedSeasonHighsRepository implements SeasonHighsRepositoryInterface
     public function getRcbSeasonHighs(int $seasonYear, string $context): array
     {
         return $this->inner->getRcbSeasonHighs($seasonYear, $context);
+    }
+
+    /**
+     * @param callable(): void $calls
+     * @return list<string>
+     */
+    private function runInMode(string $mode, callable $calls): array
+    {
+        $this->mode = $mode;
+        $this->recordedKeys = [];
+        try {
+            $calls();
+
+            return $this->recordedKeys;
+        } finally {
+            $this->mode = self::MODE_READ;
+            $this->recordedKeys = [];
+        }
+    }
+
+    private function recordKey(string $key): void
+    {
+        if (!in_array($key, $this->recordedKeys, true)) {
+            $this->recordedKeys[] = $key;
+        }
     }
 
     /**

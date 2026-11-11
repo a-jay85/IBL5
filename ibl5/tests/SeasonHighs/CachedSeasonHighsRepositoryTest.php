@@ -211,6 +211,99 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
         $this->assertSame(2, $inner->calls);
     }
 
+    public function testPlanKeysRecordsKeysWithoutTouchingInnerOrCache(): void
+    {
+        $inner = new CountingSeasonHighsInner($this->createFixture());
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $keys = $repository->planKeys(function () use ($repository): void {
+            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+            $repository->getSeasonHighsBatch(self::STATS, '_teams', '2026-01-01', '2026-06-30');
+        });
+
+        $this->assertCount(2, $keys);
+        $this->assertNotSame($keys[0], $keys[1]);
+        $this->assertSame(0, $inner->calls);
+        $this->assertSame([], $this->cache->log);
+    }
+
+    public function testWarmKeysOverwritesExistingEntry(): void
+    {
+        $valueA = $this->createFixture(50);
+        $valueB = $this->createFixture(60);
+        $inner = new CountingSeasonHighsInner($valueA);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $call = static function () use ($repository): void {
+            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        };
+
+        $call();
+        $key = $this->cache->keysOf('set')[0];
+        $inner->result = $valueB;
+
+        $warmed = $repository->warmKeys($call);
+
+        $this->assertSame([$key], $warmed);
+        $this->assertSame($valueB, $this->cache->get($key));
+        $this->assertSame(CachedSeasonHighsRepository::WARM_TTL_SECONDS, $this->cache->ttlOf($key));
+    }
+
+    public function testWarmedValueIsServedWithoutCallingInner(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $repository->warmKeys(static function () use ($repository): void {
+            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        });
+        $this->assertSame(1, $inner->calls);
+
+        $served = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+
+        $this->assertSame($fixture, $served);
+        $this->assertSame(1, $inner->calls);
+    }
+
+    public function testModeResetsToReadAfterCallableThrows(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $this->assertSame(1, $inner->calls);
+
+        try {
+            $repository->warmKeys(static function (): void {
+                throw new \RuntimeException('boom');
+            });
+            $this->fail('warmKeys should propagate the callable exception');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $this->assertSame(1, $inner->calls);
+    }
+
+    public function testDeleteKeysDeletesEachKeyAndReturnsCount(): void
+    {
+        $inner = new CountingSeasonHighsInner($this->createFixture());
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $repository->getSeasonHighsBatch(self::STATS, '_teams', '2026-01-01', '2026-06-30');
+        $keys = $this->cache->keysOf('set');
+        $this->cache->clearLog();
+
+        $deleted = $repository->deleteKeys($keys);
+
+        $this->assertSame(2, $deleted);
+        $this->assertSame($keys, $this->cache->keysOf('delete'));
+        $this->assertCount(2, $this->cache->log);
+        $this->assertNull($this->cache->get($keys[0]));
+        $this->assertNull($this->cache->get($keys[1]));
+    }
+
     /**
      * @return array<string, list<SeasonHighEntry>>
      */

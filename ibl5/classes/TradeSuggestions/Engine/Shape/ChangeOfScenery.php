@@ -13,7 +13,7 @@ use TradeSuggestions\TradeCandidate;
 
 /**
  * Fires on a buried player on one side and a weak slot on the other at the
- * same slot (Phase 4 docblock). Yields a user buried player
+ * same slot (Phase 4 docblock); the partner's slot must be `isWeak`. Yields a user buried player
  * (`SlotStrength::$buriedPids`, offset 0) for a partner buried player at a
  * different slot, or for the partner's weakest-slot bench player.
  */
@@ -26,12 +26,17 @@ final class ChangeOfScenery implements DealShapeInterface
 
     public function generate(LeagueSnapshot $s, int $userTid, int $partnerTid, AssetPool $pool): iterable
     {
-        $userBuried = self::buriedInPool($s->positionStrength[0][$userTid] ?? [], $pool->userPids);
+        $partnerStrength = $s->positionStrength[0][$partnerTid] ?? [];
+        $userBuried = [];
+        foreach (self::buriedInPool($s->positionStrength[0][$userTid] ?? [], $pool->userPids) as $pid => $slot) {
+            if (isset($partnerStrength[$slot]) && $partnerStrength[$slot]->isWeak()) {
+                $userBuried[$pid] = $slot;
+            }
+        }
         if ($userBuried === []) {
             return;
         }
 
-        $partnerStrength = $s->positionStrength[0][$partnerTid] ?? [];
         $partnerBuried = self::buriedInPool($partnerStrength, $pool->partnerPids);
 
         $weakestBench = null;

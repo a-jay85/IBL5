@@ -41,7 +41,12 @@ final class SnapshotKeyRepository extends \Database\BaseMysqliRepository impleme
             ''
         );
         $marker = $row['m'] ?? null;
+        $picks = $this->fetchOne(
+            "SELECT SHA1(GROUP_CONCAT(CONCAT_WS(':', pickid, owner_teamid) ORDER BY pickid)) AS p FROM `ibl_draft_picks` WHERE round <= 2",
+            ''
+        );
+        $picksDigest = $picks['p'] ?? null;
 
-        return is_string($marker) ? $marker : '';
+        return (is_string($marker) ? $marker : '') . '|' . (is_string($picksDigest) ? $picksDigest : '');
     }
 }

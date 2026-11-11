@@ -16,7 +16,9 @@ interface SnapshotKeyRepositoryInterface
     public function rosterDigest(): string;
 
     /**
-     * Latest `ibl_trade_info.updated_at`, or `''` when there are no rows.
+     * Latest `ibl_trade_info.updated_at` joined to a SHA1 of round 1-2 draft
+     * pick ownership (`<updated_at>|<digest>`), so a picks-only trade changes
+     * the key. Either part is `''` when its table has no rows.
      */
     public function tradeMarker(): string;
 }

@@ -22,14 +22,15 @@ final class SnapshotKeyRepositoryTest extends TestCase
         self::assertSame('empty', (new SnapshotKeyRepository($mockDb))->rosterDigest());
     }
 
-    public function testTradeMarkerIsStringFromMaxUpdatedAt(): void
+    public function testTradeMarkerJoinsMaxUpdatedAtAndPickOwnershipDigest(): void
     {
         $mockDb = new MockDatabase();
         $mockDb->onQuery('ibl_trade_info', [['m' => '2026-11-01 10:00:00']]);
+        $mockDb->onQuery('ibl_draft_picks', [['p' => 'pickdigest']]);
         $mockDb->onQuery('ibl_plr', [['d' => str_repeat('a', 40)]]);
         $keys = new SnapshotKeyRepository($mockDb);
 
-        self::assertSame('2026-11-01 10:00:00', $keys->tradeMarker());
+        self::assertSame('2026-11-01 10:00:00|pickdigest', $keys->tradeMarker());
         self::assertSame(str_repeat('a', 40), $keys->rosterDigest());
     }
 }

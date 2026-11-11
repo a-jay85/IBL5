@@ -10,9 +10,9 @@ use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
 use TradeSuggestions\TradeCandidate;
 
 /**
- * Fires on any pair where both sides have a surplus matching the other's
- * deficit at the same offset (Phase 4 docblock). Yields every (userPid,
- * partnerPid) from the pool's first 4 per side (16 max).
+ * Fires when both sides have a surplus matching the other's deficit at the
+ * same offset (`NeedPairGate::mutual`); yields nothing otherwise. Yields every
+ * (userPid, partnerPid) from the pool's first 4 per side (16 max).
  */
 final class OneForOne implements DealShapeInterface
 {
@@ -25,6 +25,9 @@ final class OneForOne implements DealShapeInterface
 
     public function generate(LeagueSnapshot $s, int $userTid, int $partnerTid, AssetPool $pool): iterable
     {
+        if (!NeedPairGate::mutual($pool, $userTid, $partnerTid)) {
+            return;
+        }
         foreach (array_slice($pool->userPids, 0, self::PER_SIDE) as $userPid) {
             foreach (array_slice($pool->partnerPids, 0, self::PER_SIDE) as $partnerPid) {
                 yield new TradeCandidate($userTid, $partnerTid, [$userPid], [], [$partnerPid], []);

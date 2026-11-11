@@ -11,6 +11,7 @@ use Tests\TradeSuggestions\Fixtures\ProjectionFactory;
 use TradeSuggestions\Engine\AssetPool;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\LeagueSnapshotBuilder;
+use TradeSuggestions\Engine\NeedPair;
 use TradeSuggestions\Engine\PickAsset;
 use TradeSuggestions\Engine\Shape\ChangeOfScenery;
 use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
@@ -132,6 +133,42 @@ final class DealShapesTest extends TestCase
         [$s] = self::rich();
 
         self::assertSame([], self::collect($shape, $s, new AssetPool()));
+    }
+
+    /**
+     * @return iterable<string, array{DealShapeInterface, list<NeedPair>}>
+     */
+    public static function missingPatternProvider(): iterable
+    {
+        $userGives = new NeedPair(0, NeedPair::KIND_SLOT, 'PG', self::USER, self::PARTNER, 3, 20, 1.0);
+        $partnerGives = new NeedPair(0, NeedPair::KIND_SLOT, 'SF', self::PARTNER, self::USER, 3, 20, 1.0);
+        $otherOffset = new NeedPair(1, NeedPair::KIND_SLOT, 'SF', self::PARTNER, self::USER, 3, 20, 1.0);
+        yield 'one for one, one-sided need' => [new OneForOne(), [$userGives]];
+        yield 'one for one, offsets differ' => [new OneForOne(), [$userGives, $otherOffset]];
+        yield 'two for one, partner gives only' => [new TwoForOne(), [$partnerGives]];
+        yield 'one for two, user gives only' => [new OneForTwo(), [$userGives]];
+    }
+
+    /**
+     * @param list<NeedPair> $pairs
+     */
+    #[DataProvider('missingPatternProvider')]
+    public function testNeedPairShapeYieldsNothingWhenItsPatternIsMissing(DealShapeInterface $shape, array $pairs): void
+    {
+        [$s, $pool] = self::rich();
+        $thin = new AssetPool($pool->userPids, $pool->partnerPids, $pool->userPicks, $pool->partnerPicks, $pairs);
+
+        self::assertSame([], self::collect($shape, $s, $thin));
+    }
+
+    public function testChangeOfSceneryYieldsNothingWhenPartnerSlotIsNotWeak(): void
+    {
+        [$s, $pool] = self::rich();
+        $positionStrength = $s->positionStrength;
+        $positionStrength[0][self::PARTNER]['SG'] = new SlotStrength('SG', 1, null, 3, false, []);
+        $s = self::with($s, ['positionStrength' => $positionStrength]);
+
+        self::assertSame([], self::collect(new ChangeOfScenery(), $s, $pool));
     }
 
     public function testOneForOneYieldsSixteenFromFourByFour(): void
@@ -325,6 +362,7 @@ final class DealShapesTest extends TestCase
         $positionStrength[0][self::USER]['PG'] = $strong;
         $positionStrength[0][self::PARTNER]['PG'] = $strong;
         $positionStrength[0][self::USER]['SG'] = new SlotStrength('SG', 12, null, 3, false, [self::USER_BURIED]);
+        $positionStrength[0][self::PARTNER]['SG'] = new SlotStrength('SG', 25, null, 3, false, []);
         $positionStrength[0][self::PARTNER]['SF'] = new SlotStrength('SF', 25, null, 3, false, [self::PARTNER_BURIED]);
 
         $s = self::with($s, [
@@ -341,7 +379,10 @@ final class DealShapesTest extends TestCase
             array_slice(array_values(array_unique([$partnerStarter, 106, 105, 103, 102, 104, 107])), 0, 6),
             [new PickAsset(31, self::USER, self::USER, 2026, 1, 0), new PickAsset(32, self::USER, self::USER, 2027, 2, 1)],
             [new PickAsset(11, self::PARTNER, self::PARTNER, 2027, 1, 1), new PickAsset(12, self::PARTNER, self::PARTNER, 2027, 2, 1)],
-            [],
+            [
+                new NeedPair(0, NeedPair::KIND_SLOT, 'PG', self::USER, self::PARTNER, 3, 20, 1.0),
+                new NeedPair(0, NeedPair::KIND_SLOT, 'SF', self::PARTNER, self::USER, 3, 20, 1.0),
+            ],
         );
 
         return [$s, $pool];

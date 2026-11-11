@@ -40,7 +40,7 @@ final class CachedLeagueSnapshotProvider implements LeagueSnapshotProviderInterf
         if ($cached !== null) {
             try {
                 return SnapshotCodec::decode($cached);
-            } catch (\UnexpectedValueException) {
+            } catch (\UnexpectedValueException | \TypeError) {
                 // A malformed payload is a miss; the rebuild below overwrites it.
             }
         }

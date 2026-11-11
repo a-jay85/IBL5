@@ -324,3 +324,62 @@ describe('regen caller (backlog#1707)', () => {
     expect(regenProblems(CALLER_REAL, mutant)).toEqual(['e2e: workflow_call has a required input']);
   });
 });
+
+describe('vr-refresh.yml write guard', () => {
+  const REFRESH = readFileSync(resolve(__dirname, '../../../.github/workflows/vr-refresh.yml'), 'utf-8');
+
+  function jobBlock(text: string, job: string): string {
+    const start = text.search(new RegExp(`^  ${job}:$`, 'm'));
+    if (start === -1) {
+      throw new Error(`job ${job} not found`);
+    }
+    const afterKey = text.indexOf('\n', start) + 1;
+    const next = text.slice(afterKey).search(/^ {2}[a-z-]+:$/m);
+    return next === -1 ? text.slice(start) : text.slice(start, afterKey + next);
+  }
+
+  function runBlocks(text: string): string[] {
+    const lines = text.split('\n');
+    const blocks: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = /^(\s*)(?:- )?run: \|\s*$/.exec(lines[i]);
+      if (!m) {
+        continue;
+      }
+      const indent = m[1].length;
+      const body: string[] = [];
+      for (let j = i + 1; j < lines.length; j++) {
+        const lead = lines[j].length - lines[j].trimStart().length;
+        if (lines[j].trim() !== '' && lead <= indent) {
+          break;
+        }
+        body.push(lines[j]);
+      }
+      blocks.push(body.join('\n'));
+    }
+    return blocks;
+  }
+
+  it('vr-refresh tidy job is master-ref only', () => {
+    const tidy = jobBlock(REFRESH, 'tidy');
+    const cond = tidy.split('\n').find((l) => /^\s*if:/.test(l)) ?? '';
+    expect(cond).toContain("github.ref == 'refs/heads/master'");
+    expect(cond).toContain("github.event_name != 'pull_request'");
+    expect(cond).toContain('!inputs.dry_run');
+  });
+
+  it('vr-refresh select job keeps pull-requests read', () => {
+    const select = jobBlock(REFRESH, 'select');
+    expect(select).toContain('pull-requests: read');
+    expect(select).not.toContain('pull-requests: write');
+  });
+
+  it('vr-refresh run blocks never interpolate inputs', () => {
+    const blocks = runBlocks(REFRESH);
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const body of blocks) {
+      expect(body).not.toContain('${{ inputs.');
+      expect(body).not.toContain('${{ github.event.');
+    }
+  });
+});

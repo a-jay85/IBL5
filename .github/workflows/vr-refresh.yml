@@ -50,6 +50,7 @@ jobs:
     outputs:
       count: ${{ steps.select.outputs.count }}
       matrix: ${{ steps.select.outputs.matrix }}
+      tidy_count: ${{ steps.select.outputs.tidy_count }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -80,13 +81,42 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); else args+=(--all); fi
           fi
-          if ! bin/vr-refresh-targets "${args[@]}" > "$RUNNER_TEMP/sel.json" 2> "$RUNNER_TEMP/sel.md"; then
+          set +e
+          bin/vr-refresh-targets "${args[@]}" > "$RUNNER_TEMP/sel.json" 2> "$RUNNER_TEMP/sel.md"
+          rc=$?
+          set -e
+          if [ "$rc" -eq 3 ]; then
+            # A single dispatch skipped the named PR: fail red with the reason, never green.
+            { echo "### VR refresh selection (${EVENT_NAME})"; cat "$RUNNER_TEMP/sel.md"; } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$(jq -r .error "$RUNNER_TEMP/sel.json")"
+            exit 1
+          elif [ "$rc" -ne 0 ]; then
             cat "$RUNNER_TEMP/sel.md" >&2
             exit 1
           fi
           { echo "### VR refresh selection (${EVENT_NAME})"; cat "$RUNNER_TEMP/sel.md"; } >> "$GITHUB_STEP_SUMMARY"
-          echo "count=$(jq -r .count "$RUNNER_TEMP/sel.json")" >> "$GITHUB_OUTPUT"
-          echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/sel.json")" >> "$GITHUB_OUTPUT"
+          {
+            echo "count=$(jq -r .count "$RUNNER_TEMP/sel.json")"
+            echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/sel.json")"
+            echo "tidy_count=$(jq -r '.tidy | length' "$RUNNER_TEMP/sel.json")"
+          } >> "$GITHUB_OUTPUT"
+
+      # Read-only preview of the stale-screenshot tidy: lists the edits, writes nothing.
+      - name: Dry-run stale-screenshot tidy
+        if: github.event_name == 'pull_request' || inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_PR: ${{ inputs.pr }}
+        run: |
+          args=(--mode=tidy --dry-run)
+          if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); fi
+          {
+            echo "### Stale-screenshot tidy dry-run"
+            echo '```'
+            bin/vr-refresh-targets "${args[@]}"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Lists which per-SHA dirs vr-pages-cleanup would keep or prune right now, with the
       # same flags that job passes. Read-only: --dry-run never runs git rm, nothing is pushed.
@@ -181,6 +211,33 @@ jobs:
       refresh_head_sha: ${{ matrix.target.head_sha }}
       refresh_base_sha: ${{ github.sha }}
     secrets: inherit
+
+  # Removes stale screenshots: cleans stacked PRs and banners galleries shot against an
+  # older master. Master-ref only; the select job keeps pull-requests: read.
+  tidy:
+    name: VR stale-screenshot tidy
+    needs: [select, refresh]
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && !inputs.dry_run && needs.select.result == 'success' && fromJSON(needs.select.outputs.tidy_count || '0') > 0
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Tidy stale screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_PR: ${{ inputs.pr }}
+        run: |
+          args=(--mode=tidy)
+          if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); fi
+          bin/vr-refresh-targets "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"
 
   pages-deploy:
     name: VR refresh Pages dispatch

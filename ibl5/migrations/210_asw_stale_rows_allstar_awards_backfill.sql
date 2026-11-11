@@ -14,6 +14,9 @@ INSERT INTO ibl_jsb_allstar_scores_backup_210
 DELETE FROM ibl_jsb_allstar_scores WHERE season_year = 2009;
 
 -- Part 2: 2008 All-Star Weekend participants. Idempotent; never relabels.
+-- Runs only where the 2008 weekend rosters exist, so a DB without league history
+-- (the CI seed) gets no rows.
+-- literal-check: 2008 -> ibl_jsb_allstar_rosters.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
 -- literal-check: 2008 -> ibl_awards.year int(11) (per ibl5/docs/schema/current-schema.sql)
 -- literal-check: 'Rookie-Sophomore Challenge - MVP' (32 chars, longest award) -> ibl_awards.award varchar(128) (per ibl5/docs/schema/current-schema.sql)
 -- literal-check: player names (19 chars max) -> ibl_awards.name varchar(32) (per ibl5/docs/schema/current-schema.sql)
@@ -89,4 +92,5 @@ WHERE NOT EXISTS (
        OR (v.award = 'Rookie-Sophomore Challenge' AND a.award = 'Rookie-Sophomore Challenge - MVP')
        OR (v.award = 'Three-Point Contest' AND a.award = 'Three-Point Contest - Winner')
        OR (v.award = 'Slam Dunk Competition' AND a.award = 'Slam Dunk Competition - Winner'))
-);
+)
+AND EXISTS (SELECT 1 FROM ibl_jsb_allstar_rosters r WHERE r.season_year = 2008);

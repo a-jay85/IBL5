@@ -76,6 +76,16 @@ final class AswStaleRosterMigrationTest extends DatabaseTestCase
         self::assertSame(['Western Conference All-Star'], $awards);
     }
 
+    public function testMigrationSkipsBackfillWhen2008RostersAreMissing(): void
+    {
+        $this->db->query('DELETE FROM ibl_jsb_allstar_rosters WHERE season_year = 2008');
+        $before = $this->countRows('ibl_awards', 'year = 2008');
+
+        $this->runMigration();
+
+        self::assertSame($before, $this->countRows('ibl_awards', 'year = 2008'));
+    }
+
     public function testMigrationSecondRunInsertsNothing(): void
     {
         $this->runMigration();

@@ -352,6 +352,51 @@ final class AswImporterTest extends TestCase
         $this->assertStringContainsString('ASW awards: 6 roster slots skipped (unknown player name)', implode("\n", $result->messages));
     }
 
+    public function testUnnamedSlotDoesNotStopLaterSlotsInSameEvent(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnMap([[101, null], [102, 'P102']]);
+        $repo->method('findAllStarConference')->willReturn('Eastern');
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
+            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
+            ->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('ASW awards: 1 roster slots skipped (unknown player name)', implode("\n", $result->messages));
+    }
+
+    public function testMissingConferenceDoesNotStopLaterSlotsInSameEvent(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
+        $repo->method('findAllStarConference')->willReturnMap([[101, 2009, null], [102, 2009, 'Eastern']]);
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
+            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
+            ->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('no conference for P101 (pid 101) in 2009', implode("\n", $result->messages));
+    }
+
+    public function testAllNamedSlotsReportNoSkippedSlots(): void
+    {
+        $repo = $this->strictRepositoryWithWrites();
+        $repo->expects(self::exactly(6))->method('insertAwardUnlessFamilyExists')->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringNotContainsString('roster slots skipped', implode("\n", $result->messages));
+    }
+
     public function testImportFileReportsMissingFile(): void
     {
         $result = (new AswImporter(self::createStub(JsbImportRepositoryInterface::class)))->importFile('/nonexistent/x.asw', 2024);

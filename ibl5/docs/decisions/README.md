@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # IBL5 Architecture Decision Records
@@ -104,6 +104,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0237](0237-prefire-drop-local-infection.md) | Drop the local Infection stage from prefire-verify | Accepted | `bin/lib/prefire-verify` runs matrix, phpunit and exec-mutations; `--stage infection` exits 2 and names CI's required check `Infection PHP (per-PR diff)`, which is the mutation gate. Partially supersedes ADR-0227. |
 | [0236](0236-two-engine-model-jsb-port.md) | Two engines: resume the faithful JSB port in engine/ | Accepted | Gate A is gone; bin/check-engine-freeze allows decompile tokens only under engine/ and jsb-native/. |
 | [0239](0239-reviewer-arming-holds-add-only.md) | Reviewer shadow verdicts add holds and never clear | Accepted | Arming condition 21 holds on a reviewer `hold: true` for planned files or merge danger; `conformance.py` and `merge_danger.py` stay the only clearers of conditions 3 and 18; a bad block is neutral. |
+| [0240](0240-owner-request-capture-for-second-reviewer.md) | Capture the owner's request for the second reviewer | Accepted | `bin/capture-intent` copies owner turns into a hash-sealed file; post-plan quotes it in the PR body and the second-reviewer seat reads it as evidence of scope; a missing or altered file leaves the old prompt. |
 
 ## When an ADR is Required
 

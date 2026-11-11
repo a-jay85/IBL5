@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""bin/capture-intent — copy chosen owner turns from this session into an intent file.
+
+The second-reviewer seat and the plan-blind PR body quote the owner's request from
+the file this script writes. The file sits outside the repo at
+~/claude-plans/_intent/<branch>.md and is never committed.
+
+Usage:
+    bin/capture-intent [--session ID] [--branch NAME] --list
+    bin/capture-intent [--session ID] [--branch NAME] I [I ...]
+
+--list prints one line per real user turn: <index>\t<timestamp>\t<first 100 chars>.
+Indices are 1-based over real user turns in file order.
+
+Exit codes: 0 ok; 2 usage or bad input; 3 transcript missing, ambiguous or unreadable;
+4 selection empty after stripping, or over the byte cap. Every non-zero exit prints one
+`capture-intent: <reason>` line to stderr and writes no file.
+"""
+import argparse
+import glob
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+SESSION_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+WRAPPER_RE = re.compile(r"<(system-reminder|t3_context)\b[^>]*>.*?</\1>\n?", re.S)
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})")
+BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+CAP = 4000
+
+
+class Fail(Exception):
+    def __init__(self, code, reason):
+        super().__init__(reason)
+        self.code = code
+        self.reason = reason
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise Fail(2, message)
+
+
+def _parse(argv):
+    p = _Parser(prog="capture-intent", add_help=True)
+    p.add_argument("--session")
+    p.add_argument("--branch")
+    p.add_argument("--list", action="store_true")
+    p.add_argument("indices", nargs="*", type=int)
+    args = p.parse_args(argv)
+    if not args.list and not args.indices:
+        raise Fail(2, "give --list or one or more turn indices")
+    return args
+
+
+def _session_id(args):
+    sid = args.session or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    if not sid:
+        raise Fail(2, "no session id (pass --session or set CLAUDE_CODE_SESSION_ID)")
+    if not SESSION_RE.match(sid):
+        raise Fail(2, f"session id is not a lowercase UUID: {sid!r}")
+    return sid
+
+
+def _transcript(sid):
+    home = os.environ.get("HOME")
+    if not home:
+        raise Fail(2, "HOME is not set")
+    projects = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+    matches = sorted(glob.glob(os.path.join(projects, "*", sid + ".jsonl")))
+    if len(matches) != 1:
+        what = "missing" if not matches else f"ambiguous ({len(matches)} matches)"
+        raise Fail(3, f"transcript for session {sid} is {what}")
+    return matches[0]
+
+
+def _is_real_turn(row):
+    if row.get("type") != "user":
+        return False
+    content = (row.get("message") or {}).get("content")
+    return isinstance(content, str) and not row.get("isMeta") and not row.get("isSidechain")
+
+
+def _clean(raw):
+    """Strip complete wrapper blocks, then redact. Returns (text, stripped, redactions)."""
+    stripped = []
+    for m in WRAPPER_RE.finditer(raw):
+        if m.group(1) not in stripped:
+            stripped.append(m.group(1))
+    text = WRAPPER_RE.sub("", raw)
+    if stripped:
+        text = text.rstrip()
+    text, n_email = EMAIL_RE.subn("[REDACTED]", text)
+    text, n_token = TOKEN_RE.subn("[REDACTED]", text)
+    return text, stripped, n_email + n_token
+
+
+def _turns(path, sid):
+    turns = []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                if row.get("sessionId") not in (None, sid):
+                    continue
+                if not _is_real_turn(row):
+                    continue
+                turns.append(row)
+    except (OSError, UnicodeDecodeError) as exc:
+        raise Fail(3, f"cannot read transcript: {exc}")
+    return turns
+
+
+def _branch(args):
+    branch = args.branch
+    if not branch:
+        try:
+            branch = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            raise Fail(2, "cannot read the current branch (pass --branch)")
+    if not BRANCH_RE.match(branch) or ".." in branch or branch in ("HEAD", "master", "main"):
+        raise Fail(2, f"bad branch name: {branch!r}")
+    return branch
+
+
+def _write_atomic(out, text):
+    os.makedirs(os.path.dirname(out), mode=0o700, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(out), prefix=".capture-intent-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, out)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def run(argv):
+    args = _parse(argv)
+    sid = _session_id(args)
+    path = _transcript(sid)
+    turns = _turns(path, sid)
+
+    if args.list:
+        for i, row in enumerate(turns, 1):
+            preview = row["message"]["content"].replace("\r", " ").replace("\n", " ")[:100]
+            print(f"{i}\t{row.get('timestamp', '')}\t{preview}")
+        return 0
+
+    branch = _branch(args)
+    picks = args.indices
+    if not all(1 <= i <= len(turns) for i in picks):
+        raise Fail(2, f"turn index out of range 1..{len(turns)}: {picks}")
+
+    chosen = []
+    total = 0
+    for i in picks:
+        row = turns[i - 1]
+        text, stripped, redactions = _clean(row["message"]["content"])
+        if not text.strip():
+            raise Fail(4, f"turn {i} is empty after stripping")
+        total += len(text.encode())
+        chosen.append({
+            "index": i,
+            "timestamp": str(row.get("timestamp", "")),
+            "text": text,
+            "redactions": redactions,
+            "stripped": stripped,
+        })
+    if total > CAP:
+        raise Fail(4, f"selection is {total} bytes, over the {CAP}-byte cap")
+
+    data = {"version": 1, "session": sid, "branch": branch, "turns": chosen}
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    header = f"<!-- capture-intent v1 sha256={hashlib.sha256(payload.encode()).hexdigest()} -->"
+    out = os.path.join(os.path.expanduser("~"), "claude-plans", "_intent", branch + ".md")
+    try:
+        _write_atomic(out, header + "\n" + payload + "\n")
+    except OSError as exc:
+        raise Fail(3, f"cannot write {out}: {exc}")
+    print(out)
+    return 0
+
+
+def main(argv=None):
+    try:
+        return run(sys.argv[1:] if argv is None else argv)
+    except Fail as exc:
+        print(f"capture-intent: {exc.reason}", file=sys.stderr)
+        return exc.code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

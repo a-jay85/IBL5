@@ -1,7 +1,15 @@
 ---
 description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies, plus the three clarity faults no regex can catch. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
-last_verified: 2026-11-10
-paths: "**/*.md"
+last_verified: 2026-11-11
+paths:
+  - "**/README.md"
+  - ".claude/rules/*.md"
+  - ".claude/skills/**/*.md"
+  - ".claude/agents/*.md"
+  - ".claude/review-shared/*.md"
+  - ".github/*.md"
+  - "ibl5/docs/**/*.md"
+  - "engine/**/*.md"
 ---
 
 # Prose Style

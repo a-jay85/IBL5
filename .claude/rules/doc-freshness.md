@@ -1,7 +1,15 @@
 ---
 description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, the engine lint-pin rule, and required-status claims enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-10-22
-paths: "**/*.md"
+last_verified: 2026-11-11
+paths:
+  - "**/README.md"
+  - ".claude/rules/*.md"
+  - ".claude/skills/**/*.md"
+  - ".claude/agents/*.md"
+  - ".claude/review-shared/*.md"
+  - ".github/*.md"
+  - "ibl5/docs/**/*.md"
+  - "engine/**/*.md"
 ---
 
 # Doc Freshness Rule
@@ -26,7 +34,7 @@ paths: "glob-or-list"  # only meaningful for .claude/rules/*
 `paths:` is the residency selector. **No `paths:` ⇒ always-loaded** into every system prompt; **with `paths:` ⇒ lazy**, attaching only when a matching file is touched. Two constraints:
 
 - **Repo-relative only.** A `~/`- or `/`-prefixed entry does not match, so it is not a trigger at all.
-- **Never glob an always-loaded rule's own path.** Point the glob at the **source surface** the doc explains instead. A deliberately broad glob aimed at a real surface (this doc's `**/*.md`) is fine.
+- **Never glob an always-loaded rule's own path.** Point the glob at the **source surface** the doc explains instead. A deliberately broad glob aimed at a real surface (this doc's list of doc directories) is fine.
 
 A companion with no live trigger is **Read-on-demand only**. That is legitimate when the always-loaded parent cites it by name at each decision point. Say so in its `description`. Rationale and evidence: `doc-freshness-detail.md` § `paths:` residency rationale.
 

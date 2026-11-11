@@ -403,8 +403,8 @@ ORDER BY t.start_season_year ASC, t.id ASC',
             $branches[] = 'WHEN %1$s = ? AND %2$s BETWEEN ? AND ? THEN ?';
             array_push($caseParams, $franchise, $from, $to, $name);
             if (self::int($row['is_pair'] ?? null) === 1) {
-                $names[$name] = true;
-                $franchises[$franchise] = true;
+                $names[$name] = $name;
+                $franchises[$franchise] = $franchise;
                 $spans[] = '(%1$s = ? AND %2$s BETWEEN ? AND ?)';
                 array_push($spanParams, $franchise, $from, $to);
             }
@@ -436,7 +436,7 @@ ORDER BY t.start_season_year ASC, t.id ASC',
                 . "\n      AND " . sprintf($any, 'b.home_teamid', 'b.season_year'),
             'vCase' => sprintf($case, 'g.visitor_teamid', 'g.season_year'),
             'hCase' => sprintf($case, 'g.home_teamid', 'g.season_year'),
-            'types' => str_repeat('ii', count($tuples)) . str_repeat('iii', 2 * count($spans)) . str_repeat('iiis', 2 * count($branches)),
+            'types' => str_repeat('i', 2 * count($tuples) + 6 * count($spans)) . str_repeat('iiis', 2 * count($branches)),
             'params' => [...$tupleParams, ...$spanParams, ...$spanParams, ...$caseParams, ...$caseParams],
         ];
     }
